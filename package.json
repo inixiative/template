@@ -51,14 +51,18 @@
     "generate:routes": "bun --cwd apps/web generate:routes && bun --cwd apps/admin generate:routes && bun --cwd apps/superadmin generate:routes",
     "generate:sdk": "bun run with local api bash ./scripts/generate-sdk.sh",
     "deploy": "./scripts/deployment/deploy.sh",
-    "check": "bun run lint && bun run typecheck && bun run test && bun run test:fe && bash scripts/ci/run-ci-rules.sh",
+    "check": "bun run lint && bun run check:cicd && bun run typecheck && bun run test && bun run test:fe && bash scripts/ci/run-ci-rules.sh",
     "lint": "biome check . && bun run lint:postBiome",
     "lint:postBiome": "./scripts/lint/run-post-biome-checks.sh",
     "lint:imports": "./scripts/lint/check-import-aliases.sh",
     "lint:generated": "./scripts/lint/check-generated-files.sh",
     "lint:fix": "biome check --write . && bun run lint:postBiome",
     "format": "biome format --write .",
-    "docs:toc": "bun run scripts/docs/regenToc.ts"
+    "docs:toc": "bun run scripts/docs/regenToc.ts",
+    "cicd": "bun scripts/cicd/cli.ts",
+    "test:cicd": "__TEST_REDIRECT__=1 bun test scripts/cicd/",
+    "typecheck:cicd": "tsc --noEmit -p scripts/cicd/tsconfig.json",
+    "check:cicd": "bun run cicd validate && bun run typecheck:cicd && bun run test:cicd"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.0",
@@ -102,6 +106,7 @@
     "ink-text-input": "^6.0.0",
     "lodash-es": "^4.18.1",
     "react": "^19.2.4",
-    "react-dom": "^19.2.4"
+    "react-dom": "^19.2.4",
+    "zod": "4.4.3"
   }
 }

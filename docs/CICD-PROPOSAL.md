@@ -1,6 +1,6 @@
 # CI/CD and infrastructure policy for Template
 
-Status: proposal for review. Only the Vercel branch allowlist correction is implemented in this PR. The configuration and commands below describe the proposed interface; they do not exist yet.
+Status: implementation in progress in a draft PR. The committed policy, init editor, pure delivery/approval planners, policy CI checks, shared staging configuration and safer database release are implemented. Privileged deployment workflows, remote merge enforcement, cloud reconciliation, preview provisioning/teardown and the DevOps dashboard remain planned. A policy decision is not evidence that a deployment or GitHub setting was applied.
 
 ## Purpose
 
@@ -10,18 +10,18 @@ Every Template copy should have a repeatable way to configure infrastructure, va
 
 | Concern | Policy |
 | --- | --- |
-| Production on main | Automatic after passing CI, or manual deploy |
+| Production on main | Automatic after passing CI when changes reach main |
 | PR preview deployment | `auto` or `manual` |
 | Draft PR deployment | Independent `auto` or `manual`; overrides ordinary PR behavior while draft |
 | Staging | On or off, with an explicit branch when enabled |
-| Human PR approval | On or off |
+| Merge approvals | Configurable nonnegative count, with bot approvals allowed or excluded |
 | Preview cleanup | Automatic when a PR merges or closes; manual teardown also available |
 | Validation | Pre-deployment checks and post-deployment checks |
 | Configuration | Committed `cicd.config.ts`, separate from init progress and resource IDs |
 
 Manual means an operator explicitly deploys a selected revision. Later pushes do not refresh a manual preview automatically. Marking a draft ready switches to the ordinary PR policy. Auto mode reacts to eligible PR updates; it must not deploy every unrelated branch push.
 
-The human approval control is proposed as a merge requirement, separate from preview deployment. This allows a reviewer to use a preview before approving the PR. Confirm this interpretation during review. If approval is instead intended to gate previews, represent that as a distinct control rather than silently giving one flag both meanings. With merge approval enabled, dismiss stale approvals on new changes and do not count bot reviews. Provider/GitHub plan support must be checked and reported accurately.
+Approval governs merging; previews can deploy before review. requiredApprovals accepts 0, 1, 2, 3 or another nonnegative integer. allowBotApprovals decides whether eligible bot reviews count toward the same total. Count distinct authorized reviewers, exclude self-review and stale approvals, and respect dismissals and outstanding change requests. The evaluator is implemented; enforcement still requires a trusted GitHub integration. Provider limits must never silently truncate the configured count: use a required check where native rules cannot express the policy, and verify that check is required.
 
 Forks do not receive privileged deployment credentials. Auto/manual deployment never bypasses required checks, caller authorization, or trusted-revision policy. PR-owned executable configuration must not control privileged workflow execution; deployment policy is loaded from the trusted default branch.
 
@@ -29,6 +29,7 @@ Forks do not receive privileged deployment credentials. Auto/manual deployment n
 
 ```ts
 export const cicdConfig = {
+  version: 1,
   production: {
     branch: 'main',
     deploy: 'auto',
@@ -40,28 +41,39 @@ export const cicdConfig = {
   pullRequests: {
     deploy: 'manual',
     drafts: { deploy: 'manual' },
-    requireHumanApproval: true,
+    requiredApprovals: 1,
+    allowBotApprovals: false,
     cleanupOnClose: true,
     maxActive: 2,
   },
   checks: {
-    pre: ['lint', 'typecheck', 'test', 'test:fe', 'ci-rules', 'build', 'schema'],
-    post: ['api-readiness', 'worker-readiness', 'web-smoke', 'auth-smoke'],
+    pre: true,
+    post: true,
   },
   database: {
     strategy: 'schema-push',
   },
-  dashboard: {
-    enabled: false,
-  },
 };
 ```
 
-These values are proposed defaults, not yet accepted choices. The schema should use discriminated unions where appropriate: disabled staging does not require a branch. Check names resolve through a maintained command registry. CI must enforce the repository's canonical checks; config cannot silently turn a required failure into success. Synthetic data and disabled external side effects are the preview defaults.
+These defaults are committed in cicd.config.ts. Staging retains its branch while disabled. Pre/post checks and close-event cleanup cannot be disabled. The planner chooses an action but does not assert CI, authorization, resource limits or provider availability have been satisfied. Synthetic data and disabled external side effects remain the planned preview defaults.
 
-Init edits this file through its Delivery section. Resource IDs remain in the existing project configuration initially; secrets never enter either file. Generated workflow/provider settings must be deterministic and checked for drift. There must be exactly one owner of deployment triggers for each target.
+Init edits this file through its Delivery section. Both init and shell environment selection read staging from this file, falling back to the legacy field only when no delivery file exists. Resource IDs remain in the existing project configuration initially; secrets never enter either file. Generated workflow/provider settings must be deterministic and checked for drift. There must be exactly one owner of deployment triggers for each target.
 
-## Commands and shared execution
+## Available in this increment
+
+```sh
+bun run init:agent -- --section=cicd --pr=auto --drafts=manual --staging=off --approvals=2 --bot-approvals=off
+bun run cicd validate
+bun run cicd plan /path/to/event.json
+bun run check:cicd
+```
+
+Example event file: `{"kind":"pull-request","number":123,"draft":false,"sameRepository":true,"closed":false}`. Plans explicitly report `execution: "plan-only"` and `authorization: "not-evaluated"`. They make no provider calls. The init editor saves local policy; it does not alter GitHub branch protection or cloud deployment triggers. Main-only Vercel autodeploy remains the current provider behavior until the coordinated workflows are installed.
+
+The database release entrypoint remains `scripts/db/release.sh`. It now reads the explicit strategy, refuses missing/conflicting migration history, omits `--accept-data-loss` and stops on schema or seed failure. No database was migrated or baselined by this PR.
+
+## Planned commands and shared execution
 
 Proposed commands:
 
@@ -122,7 +134,7 @@ The first page should show environments, deployed revisions, checks, drift, acti
 ## Implementation sequence and acceptance
 
 1. Fix current Vercel branch matching in all three apps. Explicitly deny all branches and allow main until managed workflow triggers replace native autodeployment.
-2. Add the typed policy, init controls and read-only plan/status. Test every PR/draft auto/manual combination and human-approval/staging toggles; report unsupported provider capabilities.
+2. Add the typed policy, init controls and read-only plan/status. Test every PR/draft auto/manual combination and approval-count/bot/staging settings; report unsupported provider capabilities.
 3. Implement canonical CI, database-mode checks and manual production/staging deployment. Prove a failed precheck cannot deploy, exact revision provenance is retained, and concurrent production releases cannot overlap migrations.
 4. Implement PR deployment and teardown with isolation, partial-failure recovery and close-event reconciliation. Prove repeated cleanup is safe and late deployments cannot resurrect closed previews.
 5. Add automatic triggers using the same release path, then the optional DevOps page. Exercise failed postchecks, stale configuration, provider outages and rollback/recovery in disposable environments.
