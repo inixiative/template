@@ -28,6 +28,7 @@
 - [Inquiry System](#inquiry-system)
 - [Contact System](#contact-system)
 - [Customer Management](#customer-management)
+- [Segments](#segments)
 - [Frontend Apps](#frontend-apps)
 - [Frontend Architecture](#frontend-architecture)
 - [UI Components](#ui-components)
@@ -56,7 +57,7 @@
 
 Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and modern TypeScript stack.
 
-**Last Updated:** 2026-06-09
+**Last Updated:** 2026-09-21 (Segments, email lenses, app events, WebSockets and job infrastructure reviewed)
 
 ## How to Read This
 
@@ -285,21 +286,23 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **makeJob()** - Basic job constructor providing type-safe handler wrapper. Use for standard async operations (send email, process upload, generate report). Jobs run independently, multiple instances can execute concurrently
 
-- ✅ **makeSingletonJob()** - Ensures only one instance runs at a time across all workers using Redis locks with heartbeat. Prevents duplicate execution of sensitive operations (database migrations, billing runs, encryption key rotation). Lock expires after 5 minutes with 2-minute heartbeat refresh
+- ✅ **makeSingletonJob()** - Ensures only one instance runs at a time across all workers using Redis locks with heartbeat. Prevents duplicate execution of sensitive operations (database migrations, billing runs, encryption key rotation). Lock TTL is 5 minutes with a 1-minute heartbeat; refresh/release are token-fenced and lock loss is reported without cancelling the running handler
 
 - ✅ **makeSupersedingJob()** - Allows newer jobs to cancel/supersede older jobs with same dedupeKey. Long-running jobs poll Redis every 500ms for supersession signal and abort gracefully. Perfect for search indexing, cache warming, or report generation where only latest matters
 
-- ✅ **BullMQ Integration** - Redis-backed persistent queue with automatic retries (3 attempts, exponential backoff 5s base). Jobs survive server restarts. Separate queues for default, email, and webhook processing with independent concurrency limits
+- ✅ **BullMQ Integration** - Redis-backed persistent queue with automatic retries (3 attempts, exponential backoff 5s base). Jobs survive server restarts. One `jobs` queue serves registered handlers; `REDIS_BULLMQ_URL` can isolate it from cache Redis (fallback: `REDIS_URL`)
 
 - ✅ **Cron Jobs** - Scheduled recurring tasks registered at startup. CronJob model persists schedule, last run, next run. Admin endpoints for manual triggering, enabling/disabling schedules
 
-- ✅ **Job Handlers** - Type-safe handlers with full context (db, queue, logger). Current handlers: sendWebhook, cleanStaleWebhooks, rotateEncryptionKeys. Add new handlers by creating file in `handlers/` directory and exporting from index
+- ✅ **Job Handlers** - Type-safe handlers with full context (db, queue, logger). Registered handlers include email planning/delivery, webhooks, stale-data cleanup, key rotation and segment reconciliation/sweep. Add new handlers by creating file in `handlers/` directory and exporting from index
 
 - ✅ **BullBoard Dashboard** - Visual job monitoring at `/admin/queues`. View job status (active/waiting/delayed/failed), retry failed jobs, inspect payloads, see execution times. Filterable by queue and status
 
 - ✅ **Graceful Shutdown** - Worker process closes BullMQ connection cleanly on SIGTERM/SIGINT. In-progress jobs finish before shutdown (with timeout). Prevents job corruption
 
 - ✅ **Admin Routes** - Manual job enqueueing, cron trigger override, job status inspection, queue stats
+
+- ✅ **Overflow Buffer** — `JobOutbox` stores overflowed ad-hoc job intent; batched flushes and a serialized, lock-protected drain meter it back to BullMQ. Fast/slow lane admission and a global worker-presence cap remain planned in INFRA-031.
 
 ---
 
@@ -313,7 +316,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **RSA Signature Verification** - Each webhook includes `x-webhook-signature` header with an RSA-SHA256 signature (base64). Signed with a server-held private key; receivers verify with the public key exposed at `/webhookSubscription/info`. Asymmetric — no shared secret to leak. Signed body includes a unix `timestamp` so receivers can reject replays. Prevents webhook spoofing and tampering
 
-- ✅ **Async Delivery via Jobs** - Webhooks enqueued as BullMQ jobs (separate webhook queue). Never blocks request processing. Failed deliveries retry automatically (3 attempts, exponential backoff). Webhook jobs run outside transaction to avoid timeouts
+- ✅ **Async Delivery via Jobs** - Webhooks enqueued as BullMQ jobs on the shared `jobs` queue. Never blocks request processing. Failed deliveries retry automatically (3 attempts, exponential backoff). Webhook jobs run outside transaction to avoid timeouts
 
 - ✅ **Delivery Tracking** - WebhookEvent model records every delivery attempt with status (pending, sent, failed), response code, response body, error message. Superadmins can inspect delivery history and debug integration issues
 
@@ -325,53 +328,26 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 ## Real-Time Communication
 
-**Production-Ready WebSocket Infrastructure** - Full bidirectional real-time communication with Redis pub/sub for multi-server support. Clients can subscribe to channels, receive instant updates, and maintain persistent connections with automatic reconnection and keepalive.
+- ✅ **Authenticated WebSockets** — Bun transport with message-based authentication through the HTTP `/me` route; spoof authority follows the same middleware. Credentials are not sent as a token query parameter.
+- ✅ **Authorized Query Channels** — `WS_CHANNELS` declares channel families and supplies `LIVE_QUERIES`. Subscribe probes the corresponding HTTP route; unauthorized, unknown or malformed channels are rejected. Effective identity changes drop previous subscriptions.
+- ✅ **Refetch and Recovery** — Mounted live queries subscribe automatically. After reconnect, identity and subscriptions are replayed before recovery invalidation. Hints are not persisted or replayed; delivery is not guaranteed while disconnected.
+- ✅ **Redis Pub/Sub** — Channel and user-targeted messages reach connected clients across API instances, with local-only fallback on Redis failure.
+- ✅ **App Events** — `emitAppEvent` captures actor context and defers through `onCommit` inside a transaction. `makeAppEvent` uses `db.parallel(..., { resolution: 'allSettled' })` to isolate observation, email/WebSocket handoffs and callbacks. Observation directly upserts `AppEvent`; email delivery runs through jobs.
+- 🟣 **Feature Flags** — Not implemented. The existing transport can support flag-query invalidation after evaluation and authority are designed; see FEAT-003.
 
-- ✅ **WebSocket Server** - Native Bun WebSocket support with connection lifecycle management (open, message, close, drain). Integrates with Hono server - same HTTP port handles both REST and WebSocket upgrades. Token-based authentication via query param (`?token=`) since WebSocket handshake can't set custom headers from browser
-
-- ✅ **Connection Management** - Track connections by ID, user, and channel subscriptions. Multiple connections per user supported (tabs, devices). Automatic cleanup of stale connections (5min without ping). `getConnectionStats()` provides visibility into active connections, unique users, and channel subscribers
-
-- ✅ **Channel Subscriptions** - Clients subscribe to arbitrary channels (`org:abc123`, `space:xyz`, `user:123`). Server maintains subscription registry and routes messages only to subscribed connections. Subscribe/unsubscribe via client messages. Channels enable granular broadcasting without sending to all users
-
-- ✅ **Redis Pub/Sub for Multi-Server** - Horizontal scaling support via Redis publish/subscribe. `sendToUser()`, `sendToChannel()`, `broadcast()` functions publish to Redis, which fans out to all server instances. Each server subscribes to Redis and forwards messages to its local WebSocket connections. Enables load-balanced WebSocket servers
-
-- ✅ **Graceful Shutdown** - `drainConnections()` sends reconnect message to all clients before server shutdown. Clients can implement automatic reconnection logic. Ensures zero message loss during deployments
-
-- ✅ **Keepalive & Heartbeat** - Client sends ping messages, server responds with pong and updates last ping timestamp. Connections without ping for 5+ minutes automatically closed and cleaned up. Prevents resource leaks from abandoned connections
-
-- ✅ **Event Broadcasting Pattern** - App events broadcast over WebSocket via the `websocket` bridge in `makeAppEvent` — a handler's `websocket(data)` selector returns refresh triggers (`{category:'query', action:'refetch', key}`) that publish to channels via `sendToChannel`. Live (e.g. `inquiryResolved`) and consumed by the frontend's `addLiveQuery` → TanStack Query invalidation. (Channel subscription is not yet permission-gated — see INFRA-004 security gap)
-
-- ✅ **App Events System** - `emitAppEvent('event.name', data)` for business events; actor context auto-enriches from `auditActorContext` (AsyncLocalStorage). Handlers defined via `makeAppEvent` fan out across bridges in parallel (`Promise.allSettled`): **observe** (BullMQ job → AppEvent audit table), **email** (typed handoffs → sendEmail jobs with declarative targeting), **websocket** (Redis pub/sub channel broadcasts), and **direct callbacks**. Centralized handler map at `apps/api/src/appEvents/handlers/index.ts` mirrors the BullMQ job-handler pattern. Events inside `db.txn()` defer to `onCommit`; events outside fire immediately
-
-- 🟣 **Feature Flags** - Runtime feature toggles not implemented. Would enable gradual rollouts, A/B testing, and emergency kill switches. Could integrate with external services (LaunchDarkly, Unleash) or build internal Redis-backed solution
-
-[Learn more: APP_EVENTS.md](docs/claude/APP_EVENTS.md)
+[APP_EVENTS.md](docs/claude/APP_EVENTS.md) · [WEBSOCKETS.md](docs/claude/WEBSOCKETS.md)
 
 ---
 
 ## Email System
 
-**Database-Driven Email Templates with Multi-Tenancy** - MJML-based email system with reusable components, variable substitution, and polymorphic ownership. Organizations can customize templates with their branding. Send pipeline is operational end to end (Resend adapter + BullMQ job); remaining work is standard-template authoring, delivery tracking, preferences, and an admin authoring UI (see ticket COMM-001).
-
-- ✅ **EmailTemplate Schema** - Database model for email templates using MJML (responsive email markup). Templates have slug (otp, welcome), locale (en, es), subject with variables (`{{code}}`), and full MJML body with `{{component:slug}}` references and `{{variable.*}}` placeholders. Category (system/promotional) controls unsubscribe requirements
-
-- ✅ **EmailComponent Schema** - Reusable MJML components (headers, footers, buttons) referenced by templates via `{{component:default-header}}`. Components can nest other components. Pre-computed `componentRefs` array tracks dependencies for resolution
-
-- ✅ **Polymorphic Ownership** - False polymorphism pattern enables templates at four levels: **default** (platform-wide, all tenants), **admin** (platform internal only), **Organization** (tenant-branded), **Space** (space-specific overrides). Orgs can customize templates while inheriting platform defaults. `inheritToSpaces` flag controls whether org templates cascade to spaces
-
-- ✅ **Locale Support** - Multi-language templates via locale field. Unique constraint on (slug, locale, owner) allows same template in multiple languages. Template lookup resolves to user's locale or falls back to `en`
-
-- ✅ **Communication Categories** - System emails (OTP, password reset, security) cannot be unsubscribed. Promotional emails (newsletters, marketing) include unsubscribe link. Category enforced at send time
-
-- ✅ **Email Clients** - Resend client (production) and Console client (dev/test) implemented in `packages/email`. Clients provide unified interface for sending with from/to/subject/html. No Postmark or SendGrid clients
-
-- ✅ **Template Rendering Pipeline** - Complete MJML rendering system in `packages/email/src/render/`: `compose()` fetches templates and recursively expands `{{component:slug}}` refs, `interpolate()` substitutes `{{variable.*}}` placeholders, `expand()` handles nested components, `lookupCascade()` resolves templates with owner fallbacks (Space → Org → default). MJML validation included. Actively used by the `sendEmail` job (compose → interpolate → mjml2html → send); the remaining gap is an admin authoring endpoint/UI, not the render path
-
-- 🟡 **Common Flow Templates** - No templates created yet for standard flows (welcome email, password reset, email verification, invitation). Each needs MJML authoring and variable schema definition
-
-- ✅ **Job Queue Integration** - Email sending enqueues as BullMQ background jobs via the app-event email bridge → `sendEmail` handler (`apps/api/src/jobs/handlers/sendEmail.ts`). Non-blocking, retried; nothing synchronous hits the provider in the request path
-
-- 🟣 **Email System Completion** (ticket COMM-001, depends on INFRA-002) - Wire up template rendering, configure providers, author standard templates, integrate with job queue, add admin UI for template management
+- ✅ **Templates and Components** — Stored MJML, subjects, locales, reusable nested components, audit-backed versions and owner-tier cascade. Ownership supports default/admin, User, Organization, Space, OrganizationUser and SpaceUser tiers.
+- ✅ **Planner and Delivery** — App-event handoffs select a registry template plus bindings. `sendEmail` resolves sender and recipients, records per-recipient `CommunicationLog` intent and enqueues `deliverEmail`; delivery settles, renders, sends and records the outcome.
+- ✅ **Preferences and Verification** — Communication kind, contact acceptance and cached address deliverability participate in delivery. System messages bypass preference opt-out; other kinds must be accepted by the contact.
+- ✅ **Owner-Scoped Email Lenses** — Separate sender, recipient, data and system lenses govern tokens, rules, loops, picker options and runtime projection. Recipient data can include scoped tags and segment memberships; foreign data is filtered before interpolation.
+- ✅ **Rule References and Degradation** — Save paths maintain `RuleReference` edges; stale or transitively degraded segment references affect rule health. Preflight and render use the same lens vocabulary and reference admission.
+- ✅ **Authoring API** — Template/component save, rule-surface and preflight endpoints exist. The complete visual authoring experience remains work in progress.
+- 🟣 **Variants and Liveness** — `variant`/`live`, tombstone revival and flag-selected template variants are specified in COMM-014 but are not in the current implementation.
 
 [Learn more: COMMUNICATIONS.md](docs/claude/COMMUNICATIONS.md)
 
@@ -462,8 +438,22 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 ## Customer Management
 
-- 🟡 Customer model schema exists, not integrated into API/UI
-- 🟡 Customer reference support (polymorphic false polymorphism pattern)
+- ✅ `CustomerRef` models a customer/provider pair, with User, Organization and Space branches on both axes. Segments operate on these references.
+- ✅ Provider list (`/me/providers`) and Space customer list (`/space/:id/customers`) routes exist.
+- 🟡 Provider-side User/Organization customer lists and broader relationship-management UI remain work in progress.
+
+---
+
+## Segments
+
+- ✅ **Provider-Owned Audiences** — Named sets of `CustomerRef` rows owned by a User, Organization or Space. Every segment has a lens-validated rule; hand-picked audiences are static ID rules.
+- ✅ **Static and Dynamic Membership** — Set-based segment reconciliation plus customer-side dynamic evaluation, driven by business events and backed by a nightly sweep. Segment-of-segment rules run in dependency order.
+- ✅ **Reference Health** — RuleReference edges, cycle/ownership checks and transitive degradation. Owner reads include `ruleIssues`; membership reads hide the rule. Degraded segments retain their existing members and are skipped by continuous reconciliation.
+- ✅ **API and Reach Preview** — Owner-scoped create/list and reach estimation, segment read/update/delete and member lists, plus customer-facing membership lists.
+- ✅ **Nested Navigation** — Segments → Owned and Memberships in user, organization and space contexts. Each page enables only its own query; `/segments` defaults to Owned.
+- 🟡 **Remaining Work** — Segment rule editor, production emitters for five registered reconciliation events, and narrower change-driven evaluation. Feature flags remain unimplemented.
+
+[Learn more: SEGMENTS.md](docs/claude/SEGMENTS.md)
 
 ---
 
@@ -713,9 +703,9 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 - 🟣 Notifications (ticket FEAT-012, app-events completion + delivery stack)
 - 🟣 Fiat Payments (ticket FIN-001, provider decision, subscriptions, invoicing, tax)
 - 🟣 Web3 Payments + Wallets (ticket FIN-002, wallet connect, on-chain payments, token-gating)
-- 🟣 Rules builder foundation (ticket INFRA-002, dependency for FEAT-008 and COMM-001)
+- 🟡 Rules builder: `@inixiative/rules-builder` 0.28.0 is installed; application-specific editors and remaining INFRA-002 work are separate
 - 🟣 CI/CD baseline hardening (ticket INFRA-003, after platform decisions stabilize)
-- 🟣 App events infrastructure (ticket INFRA-004, foundation for FEAT-012)
+- ✅ App-event transport and WebSocket subscription authorization (INFRA-004); persisted notifications remain FEAT-012 work
 - 🟣 Platform baseline finalization (ticket INFRA-005, hosting/observability framework)
 - 🟣 Tenant isolation validation matrix (ticket INFRA-006)
 - 🟣 Data lifecycle operations (ticket INFRA-007, retention/export/delete)

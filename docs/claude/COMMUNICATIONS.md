@@ -12,12 +12,13 @@
   - [Database Models](#database-models)
     - [EmailTemplate](#emailtemplate)
     - [EmailComponent](#emailcomponent)
+    - [CommunicationLog](#communicationlog)
     - [Enums](#enums)
   - [Component System](#component-system)
     - [Syntax](#syntax)
     - [Extraction (mapRefs)](#extraction-maprefs)
   - [Variable Interpolation](#variable-interpolation)
-  - [Authoring & Data Surface (planned)](#authoring--data-surface-planned)
+  - [The email lens](#the-email-lens)
   - [Cascade Resolution](#cascade-resolution)
   - [Render Pipeline](#render-pipeline)
     - [Compose](#compose)
@@ -25,8 +26,13 @@
   - [Save Pipeline](#save-pipeline)
   - [MJML Validation](#mjml-validation)
   - [Send Pipeline](#send-pipeline)
-    - [Render-error policy](#render-error-policy)
+    - [Registry (`apps/api/src/lib/email/registry.ts`)](#registry-appsapisrclibemailregistryts)
+    - [Sender (`apps/api/src/lib/email/sender.ts`)](#sender-appsapisrclibemailsenderts)
+    - [Planner (`sendEmail`)](#planner-sendemail)
+    - [Deliver (`deliverEmail`) — per recipient](#deliver-deliveremail--per-recipient)
+    - [Render issues — behaviour lives in the registry entry](#render-issues--behaviour-lives-in-the-registry-entry)
   - [Template Versioning & Recompose](#template-versioning--recompose)
+  - [Rule References (the rows a rule names)](#rule-references-the-rows-a-rule-names)
 - [Messaging (non-email channels)](#messaging-non-email-channels)
   - [Provider Registry](#provider-registry)
   - [Jobs](#jobs)
@@ -35,6 +41,7 @@
 - [SMS](#sms)
 - [Webhooks](#webhooks)
 - [Communication Preferences](#communication-preferences)
+  - [Tickets](#tickets)
 
 <!-- toc:end -->
 
@@ -188,9 +195,10 @@ model EmailComponent {
 #### CommunicationLog
 
 Per-recipient delivery ledger — one row per recipient per send (grouped by `sendKey`) — and the
-at-most-once dedup fence (`idempotencyKey @unique`). **Metadata only**, never the rendered body
-(re-render from `emailTemplateId` + data). Sender is false-polymorphic; `kind`/`emailTemplateId` are
-filled when deliver resolves the template.
+deduplicated send intent (`idempotencyKey @unique`). It stores the settled MJML, render variables
+(including the hydrated recipient projection), render issues, and template/component audit references.
+It does not store the final provider HTML. Sender is false-polymorphic; `kind`/`emailTemplateId`
+are filled when delivery resolves the template.
 
 ```prisma
 model CommunicationLog {
@@ -333,9 +341,27 @@ is decided per site: save takes it from the input, the rule surface and prefligh
 (default: platform), and settle from `composeTemplate`'s `owner` — the row that won the cascade,
 so an Organization row rendered for a Space sender sees the organization's tags. No inheritance up
 the tree for now. The picker gets real options for Tag and Segment (`emailSourceValues`, the lens's
-`sourceQueries` run through Prisma); Organization and Space sources stay unscoped and unlisted.
+`sourceQueries` run through Prisma). Organization and Space are scoped on both the model and
+its ID source: an Organization owner sees itself and its spaces; a Space owner sees itself
+and its organization; a User owner sees neither; platform rows leave these two models unrestricted.
+The picker uses those same source queries.
+
+**Rendering enforces the projection too.** `interpolate` calls `narrowVariables` before any
+token or rule reads a slot. `prune` applies both picks and each visit's `where`: hidden list
+elements are dropped, hidden to-one relations become null, and a hidden root becomes null.
+An unfiltered loop cannot expose a foreign tag through a token while the corresponding rule
+would refuse it. Token/path traversal delegates to json-rules' `resolveLensPath`.
+
+A route's `filterLens` is a different role: it controls accepted filters and sorting, while
+`responseSchema` controls the response. Do not use this projection step to reshape an already
+paginated response; its `where` clauses can remove rows from the page.
 
 **Deferred (documented, not built):**
+
+- **Template variants and liveness** — `variant`, `live`, tombstone revival and flag-selected
+  variants remain the proposal in [COMM-014](../../tickets/COMM-014-template-variants-and-untombstone.md).
+  The current schema has neither column and `saveScopedRow` only finds live rows before
+  update-or-create; it does not revive a deleted natural key.
 
 - **Subtenancy brand lock** — an `Organization`-level `spaceEmailPolicy:
   free | locked` (+ locked/required component slugs). On `locked`, the cascade
@@ -515,7 +541,7 @@ type EmailEntry = {
   recipients: RecipientTarget;   // { where } — the target only; the shape is the template's recipient lens
   cc?:  RecipientTarget;         // addresses only
   bcc?: RecipientTarget;
-  data?: string[];               // declared data fields the event must supply
+  data: RuleLens;                // declared model/field lens for the data slot
   render?: RenderSpec;
 };
 ```
@@ -561,8 +587,10 @@ chain (user or org) down to the `default` floor, carrying the user id for interp
    then `sent` (+ `providerMessageId`) / `failed`. **Every terminal write is CAS-guarded** so a sibling
    can't clobber a `sent` row.
 
-`CommunicationLog` is metadata-only (never the rendered body). Re-render the current version from
-`emailTemplateId` + data, or recompose the *exact version sent* from `emailTemplateAuditLogId` (see
+`CommunicationLog` persists `settledMjml`, `variables` and `renderIssues` alongside delivery metadata
+and audit references. Variables currently include the hydrated recipient, not just its delivery fields.
+The retention/projection boundary for that snapshot remains a design question in FEAT-021.
+Recompose the recorded template/component versions through their audit references (see
 [Template Versioning & Recompose](#template-versioning--recompose)).
 Idempotency keys are event-anchored, hash-last: planner `{event}:{template}:{hash(data)}`; deliver adds
 `{hash(sender)}:{email}:{hash(contents)}`. Intentional resends are distinct events, never key mutation.

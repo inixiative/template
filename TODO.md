@@ -4,6 +4,7 @@
 
 ## Contents
 
+- [Security](#security)
 - [In Progress](#in-progress)
 - [Type Errors](#type-errors)
 - [Missing Deps (install when needed)](#missing-deps-install-when-needed)
@@ -24,11 +25,10 @@
 
 ## Security
 
-- [ ] **WS channel subscription requires permission** (INFRA-004 §Security Gap) — `subscribe`
-  currently accepts any channel from any (even anonymous) connection with no authz. Payloads are
-  refresh triggers only, so it's a side-channel (change-activity/existence oracle by guessable
-  channel key), not a data leak — but subscribe must run the underlying route's read permission
-  check, require identity, and re-authorize on identity change. Tests must cover rejection.
+- [x] **WS subscription authorization** — `canSubscribe` checks a registered operation through
+  its real HTTP route using the connection's credentials. Unknown/malformed channels and
+  unauthorized reads are rejected; effective identity changes drop existing subscriptions.
+  Covered by `apps/api/src/ws/probe.test.ts`. See [WEBSOCKETS.md](docs/claude/WEBSOCKETS.md).
 
 ## In Progress
 
@@ -95,7 +95,7 @@
   - [ ] Superadmin UI: Platform-wide feature flags + analytics
   - [ ] Integration with conditional component props
   - [ ] Flag change webhooks/events (external systems)
-- [x] Wire up WebSocket event handlers — app-event `websocket` bridge live (`makeAppEvent` → `sendToChannel`); refetch triggers consumed by FE `addLiveQuery`. (Remaining: permission-gate subscribe — see Security section)
+- [x] Wire up WebSocket event handlers — app-event `websocket` bridge live (`makeAppEvent` → `sendToChannel`); refetch triggers consumed by FE `addLiveQuery`. (Subscribe authorization also shipped; see Security section)
 - [ ] Optional modules system (opt-in features)
 - [ ] I18n package
 - [ ] Mermaid diagram support in markdown

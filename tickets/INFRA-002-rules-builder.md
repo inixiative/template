@@ -1,14 +1,22 @@
 # INFRA-002: Rules Builder (Separate Repo)
 
-**Status**: 🚧 In Progress (pivoted to pure-headless descriptor tree in 0.2.0; shadcn drop-in renderer + one-call `resolve` in 0.3.0; Ladle + check()-preview panel + standalone FieldSelector still open. Built locally, NOT published)
+**Status**: 🚧 In Progress — the builder package is installed; remaining application integration and authoring UX are separate work
 **Assignee**: Aron
 **Priority**: High
 **Created**: 2026-02-06
-**Updated**: 2026-06-27
+**Updated**: 2026-09-21
 
 ---
 
 _Updated 2026-06-27: rules-builder built **0.2.0 + 0.3.0** (local working tree, **not published**). **0.2.0 — pure-headless pivot:** `useRuleBuilder` now returns a **descriptor tree** (`GroupNode`/`LeafNode` = which controls exist + bound actions), and the entire slot system this ticket described — `ComponentSlots`/`RuleBuilder`/`RuleGroup`/`RuleRow`/`builder/slots.ts`/`context.ts`/`GroupHeader`/`GroupFooter` — was **deleted** (so the "recursive components / slot contracts" `[x]` tasks below are now superseded by the descriptor model, not regressed). Added `lensValuePicker`/`useLensValuePicker` (pick any value/path in a lens — the shared field+path atom, i.e. the FieldSelector substrate) and a plain reference renderer. **0.3.0:** `composeSurface` → one-call `resolve(source, { sourceValues })`; `decorateSources` deleted (folded into the projection); a real **shadcn-style drop-in renderer + Tailwind** added in the example app. **Still open:** Ladle stories, the check()-on-sample **preview panel**, and extracting a standalone `FieldSelector` (the descriptor + `lensValuePicker` cover the substrate, but the packaged component isn't cut). The shadcn slot item below is now satisfied by the 0.3.0 renderer._
+
+## Current baseline (2026-09-21)
+
+The UI package declares and installs `@inixiative/rules-builder` **0.28.0**. The June notes
+below describe an earlier local build, not the current dependency's availability. Reuse the
+installed package's API when designing a new editor. Feature-flag evaluation does not depend
+on finishing every optional builder widget; its authoring UI can consume the builder once
+its rule lens and evaluation contract are defined.
 
 ## Overview
 
@@ -17,9 +25,7 @@ Visual rule builder for `@inixiative/json-rules`, in the **`rules-builder`** rep
 Lets users compose a json-rules `Condition` without writing JSON. Used by feature
 flags, email rules, notification rules, and permission rules.
 
-The existing `rules-builder` contents are a stale type-only skeleton from the
-old PLAN.md (predates Lens v2.2) and may be deleted wholesale — it hand-rolls a
-`FieldType`/operator registry that json-rules now ships natively and better.
+The old PLAN.md type-only skeleton has been replaced. The installed package and its exported types are the implementation reference; do not delete them based on the earlier rebuild plan.
 
 ## Architecture (revised 2026-06-13)
 

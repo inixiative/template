@@ -100,6 +100,7 @@ bun run local
 - [API Patterns](docs/claude/API_ROUTES.md) - Routes, controllers, schemas
 - [Auth](docs/claude/AUTH.md) - Authentication
 - [Permissions](docs/claude/PERMISSIONS.md) - ReBAC authorization
+- [Segments](docs/claude/SEGMENTS.md) - Provider audiences, reconciliation and Owned/Memberships navigation
 - [Testing](docs/claude/TESTING.md) - Test setup
 - [Deployment](docs/claude/CICD.md) - CI/CD
 
