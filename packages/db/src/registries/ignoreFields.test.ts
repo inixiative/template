@@ -12,6 +12,14 @@ describe('NOOP_FIELDS', () => {
     expect(NOOP_FIELDS.Contact).toContain('position');
   });
 
+  it('keeps a FeatureFlagVariant position change meaningful: it moves what subjects are served', () => {
+    expect(NOOP_FIELDS.FeatureFlagVariant ?? []).not.toContain('position');
+    const before = { id: 'v1', position: 0, updatedAt: new Date(0) };
+    const after = { id: 'v1', position: 1, updatedAt: new Date(1) };
+    expect(isNoOpUpdate('FeatureFlagVariant', after, before, NOOP_FIELDS)).toBe(false);
+    expect(isNoOpUpdate('Contact', { id: 'c1', position: 1 }, { id: 'c1', position: 0 }, NOOP_FIELDS)).toBe(true);
+  });
+
   it('does NOT include encrypted columns — those belong to REDACT_FIELDS', () => {
     expect(NOOP_FIELDS.AuthProvider ?? []).not.toContain('encryptedSecrets');
   });

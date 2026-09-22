@@ -194,6 +194,9 @@ Finding that shapes this stage: `polymorphicIs` (`packages/db/src/registries/pol
 
 ## Ratification notes for the PR description
 
+- `valueNumber` is `Float`, not the ticket's `Decimal(38,10)`: Decimal breaks the db-wide `HydratedRecord` type the permissions walk reads, serialises as a string, and the repo has no Decimal column anywhere; the FEAT-020 reason for Decimal (exact ordered comparisons over enrichment data) does not apply to a flag's configuration value.
+- Two row-shaped cache keys instead of the ticket's one: `<owner>:featureFlags` (flag rows) and `featureFlag:<id>:variants`. `cacheReference` is synchronous over the written row, and a variant row carries only `featureFlagId`, so it cannot name the owner key.
+- Flag and variant uniques are partial on `deletedAt IS NULL` so a deleted slug or label can be reused; `Segment.name` uniques are not, and this is a deliberate departure.
 - `slug` and `subjectModel` immutability on `FeatureFlag` (this plan's addition).
 - Platform owner id is the literal string `'platform'` wherever an owner id is needed (`segmentOwnerId`, `polymorphicBindings`) — one convention across A3/E1.
 - `customerRef.created` gains its first production emitter (B1).

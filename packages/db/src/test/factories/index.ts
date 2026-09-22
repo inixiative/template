@@ -6,6 +6,8 @@ export * from './cronJobFactory';
 export * from './customerRefFactory';
 export * from './emailComponentFactory';
 export * from './emailTemplateFactory';
+export * from './featureFlagFactory';
+export * from './featureFlagVariantFactory';
 export * from './inquiryFactory';
 export * from './integrationFactory';
 export * from './jobOutboxFactory';

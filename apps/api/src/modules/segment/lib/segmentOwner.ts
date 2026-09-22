@@ -4,7 +4,7 @@
  * @partOf feature:segment
  * @uses infrastructure:prisma
  */
-import { polymorphicKeyColumn, polymorphicTarget, type Prisma } from '@template/db';
+import { type Prisma, polymorphicKeyColumn, polymorphicTarget } from '@template/db';
 import type { CustomerRef } from '@template/db/generated/client/client';
 import type { CustomerModel, ProviderModel } from '@template/db/generated/client/enums';
 

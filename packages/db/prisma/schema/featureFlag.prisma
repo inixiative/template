@@ -1,0 +1,72 @@
+model FeatureFlag {
+  id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  ownerModel     ProviderModel
+  userId         String?       @db.VarChar(36)
+  organizationId String?       @db.VarChar(36)
+  spaceId        String?       @db.VarChar(36)
+
+  user         User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  space        Space?        @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+
+  slug        String
+  name        String
+  description String?
+  enabled     Boolean @default(false)
+
+  subjectModel CustomerModel
+  valueType    FeatureFlagValueType
+
+  segmentId String?  @db.VarChar(36)
+  segment   Segment? @relation("FeatureFlagGate", fields: [segmentId], references: [id], onDelete: SetNull)
+
+  variants  FeatureFlagVariant[]
+  auditLogs AuditLog[]
+
+  @@unique([userId, slug], where: { userId: { not: null }, deletedAt: null })
+  @@unique([organizationId, slug], where: { organizationId: { not: null }, deletedAt: null })
+  @@unique([spaceId, slug], where: { spaceId: { not: null }, deletedAt: null })
+  @@unique([slug], where: raw("\"ownerModel\" = 'platform' AND \"deletedAt\" IS NULL"))
+  @@index([ownerModel])
+  @@index([segmentId])
+}
+
+model FeatureFlagVariant {
+  id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  featureFlagId String      @db.VarChar(36)
+  featureFlag   FeatureFlag @relation(fields: [featureFlagId], references: [id], onDelete: Cascade)
+
+  label     String
+  position  Int
+  isDefault Boolean @default(false)
+
+  segmentId String?  @db.VarChar(36)
+  segment   Segment? @relation("FeatureFlagVariantAudience", fields: [segmentId], references: [id], onDelete: SetNull)
+
+  valueBoolean Boolean?
+  valueText    String?
+  valueNumber  Float?
+  valueJson    Json?
+
+  inlineSegment Segment?   @relation("SegmentInlineForVariant")
+  auditLogs     AuditLog[]
+
+  @@unique([featureFlagId, label], where: { deletedAt: null })
+  @@unique([featureFlagId], where: { isDefault: true, deletedAt: null })
+  @@index([segmentId])
+}
+
+enum FeatureFlagValueType {
+  boolean
+  string
+  number
+  json
+}

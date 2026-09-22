@@ -299,12 +299,28 @@ export const PolymorphismRegistry: Partial<Record<ModelName, PolymorphicConfig>>
           CustomerRef: ['subjectCustomerRefId'],
           Integration: ['subjectIntegrationId'],
           Segment: ['subjectSegmentId'],
+          FeatureFlag: ['subjectFeatureFlagId'],
+          FeatureFlagVariant: ['subjectFeatureFlagVariantId'],
         },
       },
     ],
   },
 
   Segment: {
+    axes: [
+      {
+        field: 'ownerModel',
+        fkMap: {
+          platform: [],
+          User: ['userId'],
+          Organization: ['organizationId'],
+          Space: ['spaceId'],
+        },
+      },
+    ],
+  },
+
+  FeatureFlag: {
     axes: [
       {
         field: 'ownerModel',

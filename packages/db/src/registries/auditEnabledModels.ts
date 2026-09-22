@@ -19,6 +19,8 @@ export const AUDIT_ENABLED_MODELS: AuditSubjectModel[] = [
   AuditSubjectModel.EmailComponent,
   AuditSubjectModel.Integration,
   AuditSubjectModel.Segment,
+  AuditSubjectModel.FeatureFlag,
+  AuditSubjectModel.FeatureFlagVariant,
   // Token, Account, Session excluded — ephemeral auth state, hard-deleted on redact.
 ];
 

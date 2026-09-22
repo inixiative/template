@@ -17,6 +17,7 @@ type ImmutableFieldsOverride = {
 export const ImmutableFieldsOverrides: Partial<Record<ModelName, ImmutableFieldsOverride>> = {
   ...polymorphismImmutableFields,
   Space: { exclude: ['organizationId'] },
+  FeatureFlag: { include: ['slug', 'subjectModel', 'valueType'] },
 };
 
 const inferForeignKeyFields = (modelName: ModelName): string[] => {

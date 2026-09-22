@@ -2,10 +2,15 @@
  * @atlas
  * @kind constant
  * @partOf primitive:caching
- * @uses infrastructure:prisma
+ * @uses infrastructure:prisma, feature:featureFlag
  */
 import type { ModelTypeMap, Prisma } from '@template/db';
 import { cacheKey } from '@template/db';
+import {
+  customerRefSegmentMembersKey,
+  featureFlagOwnerKeyOf,
+  featureFlagVariantsKey,
+} from '#/modules/featureFlag/lib/featureFlagCacheKeys';
 
 type CacheReference = { [M in Prisma.ModelName]?: (r: ModelTypeMap[M]) => string[] };
 
@@ -47,6 +52,12 @@ export const cacheReference: CacheReference = {
     if (r.providerSpaceId) keys.push(cacheKey('space', r.providerSpaceId, ['providerRefs']));
     return keys;
   },
+
+  SegmentMember: (r) => [customerRefSegmentMembersKey(r.customerRefId)],
+
+  FeatureFlag: (r) => [featureFlagOwnerKeyOf(r), featureFlagVariantsKey(r.id)],
+
+  FeatureFlagVariant: (r) => [featureFlagVariantsKey(r.featureFlagId)],
 
   WebhookSubscription: (r) => {
     const ownerId = (() => {

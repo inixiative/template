@@ -43,10 +43,15 @@ model Segment {
   conditions       Json
   conditionsPrompt String?
 
+  featureFlagVariantId String?             @unique @db.VarChar(36)
+  inlineForVariant     FeatureFlagVariant? @relation("SegmentInlineForVariant", fields: [featureFlagVariantId], references: [id], onDelete: Cascade)
+
   members           SegmentMember[]
   auditLogs         AuditLog[]
   ruleReferences    RuleReference[] @relation("RuleReferenceOwnerSegment")
   referencedByRules RuleReference[] @relation("RuleReferenceReferencedSegment")
+  featureFlagGates    FeatureFlag[]        @relation("FeatureFlagGate")
+  featureFlagVariants FeatureFlagVariant[] @relation("FeatureFlagVariantAudience")
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
