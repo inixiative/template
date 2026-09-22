@@ -13,6 +13,7 @@ import { assertSegmentUsableBy } from '#/modules/featureFlag/validations/assertS
 export type FeatureFlagRow = Partial<FeatureFlag>;
 
 export const validateFeatureFlagRow = async (row: FeatureFlagRow, previous?: FeatureFlag): Promise<void> => {
+  if (previous && Object.keys(row).every((column) => column === 'deletedAt')) return;
   const merged = { ...previous, ...row } as FeatureFlag;
   if (row.slug !== undefined || !previous) {
     if (typeof merged.slug !== 'string' || !isFeatureFlagSlug(merged.slug)) {

@@ -86,8 +86,11 @@ the rule, re-point, detach (tombstone) and delete, and refuses more than one aud
 `cacheReference` busts `<owner>:featureFlags`, `featureFlag:<id>:variants`, `segment:<id>` and
 `customerRef:<id>:segmentMembers` on the corresponding row writes; `FeatureFlagVariant.position` is
 exempt from `NOOP_FIELDS` so a reorder busts and emits. Any flag or variant write emits
-`featureFlag.changed`, broadcast as a `meReadManyFeatureFlagValues` refetch; membership events send
-the same refetch to the affected user.
+`featureFlag.changed`, broadcast as a `meReadManyFeatureFlagValues` refetch on one shared channel (the
+values route carries no owner, so the channel cannot either); membership events send the same refetch
+to the affected user. Deleting a variant tombstones its inline segment through the soft-delete cascade
+and publishes `segment.deleted` for its members; re-pointing a variant's audience tombstones the old
+inline segment and releases it.
 
 ## API
 

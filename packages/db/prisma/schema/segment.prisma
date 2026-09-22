@@ -59,10 +59,10 @@ model Segment {
 
   // Per-owner uniqueness on name — partial uniques (see Contact for rationale).
   // Each partial doubles as that owner's lookup index.
-  @@unique([userId, name], where: { userId: { not: null } })
-  @@unique([organizationId, name], where: { organizationId: { not: null } })
-  @@unique([spaceId, name], where: { spaceId: { not: null } })
-  @@unique([name], where: raw("\"ownerModel\" = 'platform'"))
+  @@unique([userId, name], where: { userId: { not: null }, deletedAt: null })
+  @@unique([organizationId, name], where: { organizationId: { not: null }, deletedAt: null })
+  @@unique([spaceId, name], where: { spaceId: { not: null }, deletedAt: null })
+  @@unique([name], where: raw("\"ownerModel\" = 'platform' AND \"deletedAt\" IS NULL"))
   @@index([ownerModel])
   @@index([type])
 }

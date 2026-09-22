@@ -40,7 +40,8 @@ const enrolledIds = (segment: Segment | null): string[] => {
     : [];
 };
 
-const inlineName = (flag: FeatureFlag, variant: FeatureFlagVariant): string => `${flag.slug}/${variant.label}`;
+const inlineName = (flag: FeatureFlag, variant: Pick<FeatureFlagVariant, 'id' | 'label'>): string =>
+  `${flag.slug}/${variant.label} ${variant.id}`;
 
 const writeInline = async (
   flag: FeatureFlag,
@@ -78,19 +79,31 @@ const audienceFor = async (
   if (audience.inlineSegment) return (await writeInline(flag, variant, current, audience.inlineSegment)).id;
   if (audience.sample) {
     if (audience.sample.from) await assertSegmentUsableBy(audience.sample.from, ownerOf(flag));
-    const ids = await sampleCustomerRefIds(ownerOf(flag), flag.subjectModel, audience.sample, enrolledIds(current));
+    const own = current?.featureFlagVariantId === variant.id ? current : null;
+    const ids = await sampleCustomerRefIds(ownerOf(flag), flag.subjectModel, audience.sample, enrolledIds(own));
     return (await writeInline(flag, variant, current, { type: SegmentType.static, conditions: idsRule(ids) })).id;
   }
   return audience.segmentId;
 };
 
+const ownInline = async (variant: FeatureFlagVariant): Promise<Segment | null> =>
+  variant.segmentId
+    ? db.segment.findFirst({ where: { id: variant.segmentId, featureFlagVariantId: variant.id } })
+    : null;
+
+const memberIdsOf = async (segment: Segment): Promise<string[]> =>
+  (await db.segmentMember.findMany({ where: { segmentId: segment.id } })).map((member) => member.customerRefId);
+
 const detachInline = async (variant: FeatureFlagVariant, nextSegmentId: string | null | undefined): Promise<void> => {
   if (!variant.segmentId || nextSegmentId === undefined || nextSegmentId === variant.segmentId) return;
-  const current = await db.segment.findUnique({ where: { id: variant.segmentId } });
-  if (current?.featureFlagVariantId !== variant.id) return;
-  const members = await db.segmentMember.findMany({ where: { segmentId: current.id } });
-  const deleted = await db.segment.update({ where: { id: current.id }, data: { deletedAt: new Date() } });
-  await emitAppEvent('segment.deleted', { segment: deleted, customerRefIds: members.map((m) => m.customerRefId) });
+  const current = await ownInline(variant);
+  if (!current) return;
+  const customerRefIds = await memberIdsOf(current);
+  const deleted = await db.segment.update({
+    where: { id: current.id },
+    data: { deletedAt: new Date(), featureFlagVariantId: null },
+  });
+  await emitAppEvent('segment.deleted', { segment: deleted, customerRefIds });
 };
 
 const assertOneAudience = (audience: VariantAudience): void => {
@@ -115,12 +128,13 @@ export const createVariant = async (flag: FeatureFlag, write: VariantWrite): Pro
   if (!columns.isDefault && !segmentId && !inline) {
     throw makeError({ status: 422, message: 'a rule variant names the segment it serves' });
   }
+  const id = Bun.randomUUIDv7();
   return db.txn(async () => {
     const segment = inline
       ? await db.segment.create({
           data: {
             ...ownerColumns(flag),
-            name: `${flag.slug}/${columns.label}`,
+            name: inlineName(flag, { id, label: columns.label ?? '' }),
             type: inline.type,
             conditions: inline.conditions as Prisma.InputJsonValue,
           },
@@ -129,6 +143,7 @@ export const createVariant = async (flag: FeatureFlag, write: VariantWrite): Pro
     const variant = await db.featureFlagVariant.create({
       data: {
         ...columns,
+        id,
         featureFlagId: flag.id,
         segmentId: segment?.id ?? segmentId ?? null,
       } as Prisma.FeatureFlagVariantUncheckedCreateInput,
@@ -161,9 +176,11 @@ export const updateVariant = async (
   });
 };
 
+/** The variant's tombstone cascades to its inline segment; only the membership event needs publishing. */
 export const deleteVariant = async (variant: FeatureFlagVariant): Promise<void> => {
-  await db.txn(async () => {
-    await db.featureFlagVariant.update({ where: { id: variant.id }, data: { deletedAt: new Date() } });
-    await detachInline(variant, null);
-  });
+  const inline = await ownInline(variant);
+  const customerRefIds = inline ? await memberIdsOf(inline) : [];
+  const deletedAt = new Date();
+  await db.featureFlagVariant.update({ where: { id: variant.id }, data: { deletedAt } });
+  if (inline) await emitAppEvent('segment.deleted', { segment: { ...inline, deletedAt }, customerRefIds });
 };

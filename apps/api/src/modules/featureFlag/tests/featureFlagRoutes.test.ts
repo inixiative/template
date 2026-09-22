@@ -6,6 +6,7 @@ import { PlatformRole } from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
   createCustomerRef,
+  createOrganization,
   createOrganizationUser,
   createSegment,
   createUser,
@@ -222,17 +223,116 @@ describe('feature flag routes', () => {
     expect(values.find((each) => each.slug === 'custom:dark-mode')?.value).toBe(false);
   });
 
+  it('a variant moves inline -> shared -> inline; the old inline is tombstoned and released', async () => {
+    const created = await ownerFetch(
+      post(`/api/v1/organization/${org.id}/featureFlags`, {
+        slug: 'custom:moving',
+        name: 'Moving',
+        subjectModel: 'User',
+        valueType: 'string',
+        enabled: true,
+      }),
+    );
+    const moving = (await json<Flag>(created)).data;
+    const first = (
+      await json<Variant>(
+        await ownerFetch(
+          post(`/api/v1/featureFlag/${moving.id}/featureFlagVariants`, {
+            label: 'a',
+            inlineSegment: { type: 'dynamic', conditions: { all: [] } },
+            valueText: 'one',
+          }),
+        ),
+      )
+    ).data;
+    const firstInline = first.segmentId!;
+
+    const toShared = await ownerFetch(patch(`/api/v1/featureFlagVariant/${first.id}`, { segmentId: audience.id }));
+    expect(toShared.status).toBe(200);
+    expect((await json<Variant>(toShared)).data.segmentId).toBe(audience.id);
+    const released = await db.segment.findFirst({ where: { id: firstInline, deletedAt: { not: null } } });
+    expect(released?.featureFlagVariantId).toBeNull();
+
+    const backInline = await ownerFetch(
+      patch(`/api/v1/featureFlagVariant/${first.id}`, {
+        inlineSegment: { type: 'dynamic', conditions: { all: [] } },
+      }),
+    );
+    expect(backInline.status).toBe(200);
+    const again = (await json<Variant>(backInline)).data;
+    expect(again.segment?.featureFlagVariantId).toBe(first.id);
+    expect(again.segmentId).not.toBe(firstInline);
+  });
+
+  it('a deleted label and a deleted slug can be reused', async () => {
+    const recreated = await ownerFetch(
+      post(`/api/v1/featureFlag/${flag.id}/featureFlagVariants`, {
+        label: 'on',
+        inlineSegment: { type: 'dynamic', conditions: { all: [] } },
+        valueBoolean: true,
+      }),
+    );
+    expect(recreated.status).toBe(201);
+
+    const removed = await ownerFetch(del(`/api/v1/featureFlag/${flag.id}`));
+    expect(removed.status).toBe(204);
+    const variants = await db.featureFlagVariant.findMany({
+      where: { featureFlagId: flag.id, deletedAt: { not: null } },
+    });
+    expect(variants.length).toBeGreaterThan(0);
+    const inlines = await db.segment.findMany({
+      where: { featureFlagVariantId: { in: variants.map((each) => each.id) }, deletedAt: { not: null } },
+    });
+    expect(inlines.length).toBe(variants.filter((each) => each.segmentId).length);
+
+    const again = await ownerFetch(
+      post(`/api/v1/organization/${org.id}/featureFlags`, {
+        slug: 'custom:dark-mode',
+        name: 'Dark mode',
+        subjectModel: 'User',
+        valueType: 'boolean',
+      }),
+    );
+    expect(again.status).toBe(201);
+    flag = (await json<Flag>(again)).data;
+  });
+
+  it('tombstoning the owner tombstones its flags, variants and inline segments', async () => {
+    const { entity: doomed } = await createOrganization();
+    const created = await superadminFetch(
+      post(`/api/v1/organization/${doomed.id}/featureFlags`, {
+        slug: 'custom:doomed',
+        name: 'Doomed',
+        subjectModel: 'User',
+        valueType: 'boolean',
+      }),
+    );
+    expect(created.status).toBe(201);
+    const doomedFlag = (await json<Flag>(created)).data;
+
+    await db.organization.update({ where: { id: doomed.id }, data: { deletedAt: new Date() } });
+    expect(await db.featureFlag.findFirst({ where: { id: doomedFlag.id, deletedAt: { not: null } } })).not.toBeNull();
+    expect(
+      await db.featureFlagVariant.findFirst({ where: { id: doomedFlag.variants[0]!.id, deletedAt: { not: null } } }),
+    ).not.toBeNull();
+    expect(
+      await db.segment.findFirst({ where: { id: doomedFlag.variants[0]!.segmentId!, deletedAt: { not: null } } }),
+    ).not.toBeNull();
+  });
+
   it('the superadmin creates a bare platform flag and lists every owner’s flags', async () => {
     const created = await superadminFetch(
       post('/api/admin/featureFlag', { slug: 'new-nav', name: 'New nav', subjectModel: 'User', valueType: 'boolean' }),
     );
     expect(created.status).toBe(201);
-    expect((await json<Flag>(created)).data.ownerModel).toBe('platform');
+    const platformFlag = (await json<Flag>(created)).data;
+    expect(platformFlag.ownerModel).toBe('platform');
 
     const all = await superadminFetch(get('/api/admin/featureFlag'));
     const slugs = (await json<Flag[]>(all)).data.map((each) => each.slug);
     expect(slugs).toContain('new-nav');
     expect(slugs).toContain('custom:dark-mode');
     expect((await ownerFetch(get('/api/admin/featureFlag'))).status).toBe(403);
+    expect((await ownerFetch(get(`/api/v1/featureFlag/${platformFlag.id}`))).status).toBe(403);
   });
 });

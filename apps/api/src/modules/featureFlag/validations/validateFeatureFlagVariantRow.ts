@@ -28,6 +28,7 @@ export const validateFeatureFlagVariantRow = async (
   previous?: FeatureFlagVariant,
   flag?: FeatureFlag,
 ): Promise<void> => {
+  if (previous && Object.keys(row).every((column) => column === 'deletedAt')) return;
   const merged = { ...previous, ...row } as FeatureFlagVariant;
   const parent = flag ?? (await db.featureFlag.findFirst({ where: { id: merged.featureFlagId, deletedAt: null } }));
   if (!parent) throw makeError({ status: 422, message: `FeatureFlag ${merged.featureFlagId} not found` });

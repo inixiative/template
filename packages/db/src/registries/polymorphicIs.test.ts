@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { check, requiredBindings, resolveBindings } from '@inixiative/json-rules';
+import { check, requiredBindings, resolveBindings, toPrisma } from '@inixiative/json-rules';
 import { polymorphicBindings, polymorphicIs } from '@template/db/registries/polymorphicIs';
 
 describe('polymorphicIs', () => {
@@ -56,6 +56,20 @@ describe('polymorphicIs', () => {
       const asOrg = resolveBindings(polymorphicIs(model, axis), polymorphicBindings('Organization', 'org-1'));
       expect(check(asOrg, { [axis]: 'platform' })).not.toBe(true);
     }
+  });
+
+  it('the discriminator arm compiles on the Prisma rail: bound admits platform rows, unbound matches nothing', () => {
+    const compile = (bindings: Record<string, unknown>) =>
+      JSON.stringify(
+        toPrisma(resolveBindings(polymorphicIs('Tag', 'ownerModel'), bindings as never), {
+          map: { models: {} },
+          mapName: 'probe',
+          model: 'Tag',
+          now: new Date(),
+        } as never),
+      );
+    expect(compile(polymorphicBindings('platform', 'platform'))).toContain('"ownerModel":{"in":["platform"]}');
+    expect(compile(polymorphicBindings('Organization', 'org-1'))).toContain('"ownerModel":{"in":[]}');
   });
 
   it('refuses an axis the registry does not declare, and a kind no single key binds', () => {
