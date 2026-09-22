@@ -41,9 +41,7 @@ describe('polymorphicIs', () => {
 
   it('a value with keys keeps its FK arm and gains no discriminator arm', () => {
     const rule = polymorphicIs('Tag', 'ownerModel') as { any: unknown[] };
-    const discriminatorArms = rule.any.filter((arm) =>
-      JSON.stringify(arm).includes('"bind":"platform"'),
-    );
+    const discriminatorArms = rule.any.filter((arm) => JSON.stringify(arm).includes('"bind":"platform"'));
     expect(discriminatorArms).toHaveLength(1);
     expect(JSON.stringify(rule)).not.toContain('"bind":"Organization"');
   });
