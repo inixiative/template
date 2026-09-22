@@ -198,5 +198,8 @@ Finding that shapes this stage: `polymorphicIs` (`packages/db/src/registries/pol
 - Two row-shaped cache keys instead of the ticket's one: `<owner>:featureFlags` (flag rows) and `featureFlag:<id>:variants`. `cacheReference` is synchronous over the written row, and a variant row carries only `featureFlagId`, so it cannot name the owner key.
 - Flag and variant uniques are partial on `deletedAt IS NULL` so a deleted slug or label can be reused; `Segment.name` uniques are not, and this is a deliberate departure.
 - `slug` and `subjectModel` immutability on `FeatureFlag` (this plan's addition).
+- `hydrate()` (permissions hydration) gained a cycle guard: variant → inline segment → variant is the schema's first FK cycle and the old walker recursed forever, hanging every `validatePermission` on a variant.
+- One-audience-per-write is enforced in `writeVariant.ts` (422), not as a zod refine, because a refine on a create body breaks the route template's body schema shape.
+- Frontend (Stage H) is not in this PR.
 - Platform owner id is the literal string `'platform'` wherever an owner id is needed (`segmentOwnerId`, `polymorphicBindings`) — one convention across A3/E1.
 - `customerRef.created` gains its first production emitter (B1).

@@ -33,6 +33,10 @@ rules may read, including contacts, tags, received communications and other segm
 memberships. `resolvedCustomerRefLens(ownerModel, ownerId)` binds the provider scope.
 Shared lens conditions also restrict related tags and communications to the permitted owner.
 
+A segment carrying `featureFlagVariantId` is a feature flag variant's inline audience: created and
+edited only through that variant, deleted with it, and excluded from lists, pickers and the lens
+`Segment.id` source. See [FEATURE_FLAGS.md](FEATURE_FLAGS.md).
+
 ## Static and dynamic membership
 
 Every segment has `conditions`. A static segment is computed after creation or a rule
@@ -111,7 +115,7 @@ can inspect. See [COMMUNICATIONS.md](COMMUNICATIONS.md#the-email-lens).
 - The rule editor, provider-side customer lists for User/Organization, and `CustomerRef.lastActiveAt`
   remain separate work.
 - Whether `customerRefLens` should become a general customer lens is an unresolved design question.
-- Feature flags and flag-selected email variants are not implemented.
+- Flag-selected email variants are not implemented; feature flags are, see [FEATURE_FLAGS.md](FEATURE_FLAGS.md).
 
 ## Source map
 
