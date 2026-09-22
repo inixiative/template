@@ -9,8 +9,8 @@ import { db } from '@template/db';
 import type { Segment } from '@template/db/generated/client/client';
 import type { ProviderModel } from '@template/db/generated/client/enums';
 import { withRule } from '@template/shared/rules';
-import { ownedSegments, resolvedCustomerRefLens } from '#/modules/customerRef/lib/customerRefLens';
-import { providerOf } from '#/modules/segment/lib/segmentOwner';
+import { resolvedCustomerRefLens } from '#/modules/customerRef/lib/customerRefLens';
+import { providerOf, segmentsOf } from '#/modules/segment/lib/segmentOwner';
 import { applyMembershipDiff, type MembershipDiff } from '#/modules/segment/services/applyMembershipDiff';
 import { type HydratedCustomerRef, hydrateCustomerRefs } from '#/modules/segment/services/hydrateCustomerRefs';
 import { isContinuous } from '#/modules/segment/services/reconcileSegment';
@@ -20,7 +20,7 @@ import { segmentRuleStates } from '#/modules/segment/services/segmentRuleHealth'
 export type CustomerRefReconciliation = { segmentId: string; diff: MembershipDiff }[];
 
 export const dynamicSegmentsOf = (ownerModel: ProviderModel, ownerId: string): Promise<Segment[]> =>
-  ownedSegments(ownerModel, ownerId, { type: 'dynamic' });
+  segmentsOf(ownerModel, ownerId, { type: 'dynamic' });
 
 const recordDecision = (row: HydratedCustomerRef, segment: Segment, matches: boolean): void => {
   const index = row.segmentMembers.findIndex((member) => member.segment?.id === segment.id);

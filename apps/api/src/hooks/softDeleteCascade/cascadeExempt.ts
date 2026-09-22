@@ -10,5 +10,7 @@
 // counterparty or an author — those rows outlive the referenced parent.
 export const CASCADE_EXEMPT: Record<string, readonly string[]> = {
   CustomerRef: ['customerOrganization', 'customerSpace', 'customerUser'],
+  FeatureFlag: ['segment'],
+  FeatureFlagVariant: ['segment'],
   Inquiry: ['sourceOrganization', 'sourceSpace', 'sourceUser'],
 };

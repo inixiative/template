@@ -10,10 +10,12 @@ import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
 import { segmentUpdateRoute } from '#/modules/segment/routes/segmentUpdate';
 import { withSegmentRuleIssues } from '#/modules/segment/services/withSegmentRuleIssues';
+import { assertNotInlineSegment } from '#/modules/segment/validations/assertNotInlineSegment';
 
 export const segmentUpdateController = makeController(segmentUpdateRoute, async (c, respond) => {
   const db = c.get('db');
   const segment = getResource<'segment'>(c);
+  assertNotInlineSegment(segment);
   const body = c.req.valid('json');
 
   const updated = await db.segment.update({

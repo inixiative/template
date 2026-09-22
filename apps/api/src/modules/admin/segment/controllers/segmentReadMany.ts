@@ -13,7 +13,10 @@ import { withSegmentsRuleIssues } from '#/modules/segment/services/withSegmentRu
 export const segmentReadManyController = makeController(segmentReadManyRoute, async (c, respond) => {
   const db = c.get('db');
 
-  const { data, pagination } = await paginate(c, db.segment, { include: includeSegmentRuleReferences });
+  const { data, pagination } = await paginate(c, db.segment, {
+    where: { featureFlagVariantId: null },
+    include: includeSegmentRuleReferences,
+  });
 
   return respond.ok(await withSegmentsRuleIssues(data), { pagination });
 });

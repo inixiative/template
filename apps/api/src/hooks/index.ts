@@ -4,6 +4,8 @@ import { registerClearCacheHook } from '#/hooks/cache/hook';
 import { registerContactRulesHook } from '#/hooks/contactRules/hook';
 import { registerCronJobSyncHook } from '#/hooks/cronJobSync/hook';
 import { registerEmailVersioningHook } from '#/hooks/emailVersioning/hook';
+import { registerFeatureFlagHook } from '#/hooks/featureFlag/hook';
+import { registerFeatureFlagVariantHook } from '#/hooks/featureFlagVariant/hook';
 import { registerImmutableFieldsHook } from '#/hooks/immutableFields/hook';
 import { registerLastLoginAtHook } from '#/hooks/lastLoginAt/hook';
 import { registerOrderedListHook } from '#/hooks/orderedList/hook';
@@ -27,6 +29,8 @@ export const registerHooks = () => {
   registerRulesHook();
   registerAuditLogHook();
   registerEmailVersioningHook();
+  registerFeatureFlagHook();
+  registerFeatureFlagVariantHook();
   registerClearCacheHook();
   registerContactRulesHook();
   registerCronJobSyncHook();

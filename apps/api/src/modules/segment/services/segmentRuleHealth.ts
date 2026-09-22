@@ -10,7 +10,7 @@ import type { Segment } from '@template/db/generated/client/client';
 import { type RuleHealth, type RuleIssue, referenceKey, ruleIssues } from '@template/shared/rules';
 import { groupBy, keyBy, uniqBy } from 'lodash-es';
 import { customerRefLens, ownedSegments } from '#/modules/customerRef/lib/customerRefLens';
-import { segmentOwnerId } from '#/modules/segment/lib/segmentOwner';
+import { segmentOwnerId, segmentsOf } from '#/modules/segment/lib/segmentOwner';
 
 export type SegmentRuleState = { segment: Segment; health: RuleHealth; issues: RuleIssue[] };
 
@@ -25,7 +25,7 @@ const degradedReferenceDetail = (issue: RuleIssue, degraded: ReadonlySet<string>
     ? { ...issue, detail: `rule names a ${issue.reference.model} whose own rule is degraded: ${issue.reference.id}` }
     : issue;
 
-const ownerSegments = (sample: Segment): Promise<Segment[]> => ownedSegments(sample.ownerModel, segmentOwnerId(sample));
+const ownerSegments = (sample: Segment): Promise<Segment[]> => segmentsOf(sample.ownerModel, segmentOwnerId(sample));
 
 const edgesFor = async (segmentIds: string[]): Promise<Record<string, RuleReferenceRow[]>> =>
   groupBy(

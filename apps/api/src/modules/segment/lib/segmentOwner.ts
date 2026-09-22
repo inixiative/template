@@ -4,8 +4,8 @@
  * @partOf feature:segment
  * @uses infrastructure:prisma
  */
-import { type Prisma, polymorphicKeyColumn, polymorphicTarget } from '@template/db';
-import type { CustomerRef } from '@template/db/generated/client/client';
+import { db, type Prisma, polymorphicKeyColumn, polymorphicTarget } from '@template/db';
+import type { CustomerRef, Segment } from '@template/db/generated/client/client';
 import type { CustomerModel, ProviderModel } from '@template/db/generated/client/enums';
 
 type OwnerColumns = { ownerModel: ProviderModel } & Record<string, unknown>;
@@ -25,6 +25,19 @@ export const providerWhere = (ownerModel: ProviderModel, ownerId: string): Prism
   const fk = customerRefProviderFk(ownerModel);
   return fk ? { providerModel: ownerModel, [fk]: ownerId } : { providerModel: ownerModel };
 };
+
+export const segmentOwnerWhere = (ownerModel: ProviderModel, ownerId: string): Prisma.SegmentWhereInput => {
+  const fk = polymorphicKeyColumn('Segment', 'ownerModel', ownerModel);
+  return fk ? { ownerModel, [fk]: ownerId } : { ownerModel };
+};
+
+/** Every live segment the owner holds, inline ones included — the reconcile view, not the nameable one. */
+export const segmentsOf = (
+  ownerModel: ProviderModel,
+  ownerId: string,
+  where: Prisma.SegmentWhereInput = {},
+): Promise<Segment[]> =>
+  db.segment.findMany({ where: { AND: [segmentOwnerWhere(ownerModel, ownerId), { deletedAt: null }, where] } });
 
 export const providerOf = (customerRef: CustomerRef): Provider => {
   const target = polymorphicTarget(customerRef, 'CustomerRef', 'providerModel');

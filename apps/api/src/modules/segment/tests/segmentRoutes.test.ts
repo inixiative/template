@@ -13,6 +13,8 @@ import type {
 import {
   cleanupTouchedTables,
   createCustomerRef,
+  createFeatureFlag,
+  createFeatureFlagVariant,
   createOrganizationUser,
   createSegment,
   createSpace,
@@ -28,7 +30,7 @@ import { segmentRouter } from '#/modules/segment';
 import { spaceRouter } from '#/modules/space';
 import { userRouter } from '#/modules/user';
 import { createTestApp, type MountFn } from '#tests/createTestApp';
-import { del, get, json, post } from '#tests/utils/request';
+import { del, get, json, patch, post } from '#tests/utils/request';
 
 const acmeRule = { field: 'customerUser.email', operator: Operator.endsWith, value: '@acme.test' };
 
@@ -127,6 +129,21 @@ describe('segment routes', () => {
     const { data } = await json<(SegmentMember & { customerRef: CustomerRef })[]>(members);
     expect(data.map((member) => member.customerRefId)).toEqual([customerRef.id]);
     expect(data[0]!.customerRef.customerUser).toBeTruthy();
+  });
+
+  it('an inline segment stays out of the owner’s list and is edited only through its variant', async () => {
+    const { entity: flag } = await createFeatureFlag({ slug: 'custom:x', ownerModel: 'Space', space });
+    const { entity: variant } = await createFeatureFlagVariant({ segment }, { featureFlag: flag });
+    const { entity: inline } = await createSegment(
+      { conditions: acmeRule, featureFlagVariantId: variant.id },
+      { space },
+    );
+
+    const listed = await ownerFetch(get(`/api/v1/space/${space.id}/segments`));
+    expect((await json<Segment[]>(listed)).data.map((each) => each.id)).not.toContain(inline.id);
+
+    expect((await ownerFetch(patch(`/api/v1/segment/${inline.id}`, { name: 'renamed' }))).status).toBe(422);
+    expect((await ownerFetch(del(`/api/v1/segment/${inline.id}`))).status).toBe(422);
   });
 
   it('the space lists the segments it owns', async () => {

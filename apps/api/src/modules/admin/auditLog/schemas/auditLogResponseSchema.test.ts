@@ -37,6 +37,8 @@ const baseAuditLog = {
   subjectCustomerRefId: null,
   subjectIntegrationId: null,
   subjectSegmentId: null,
+  subjectFeatureFlagId: null,
+  subjectFeatureFlagVariantId: null,
   actorUser: null,
   actorSpoofUser: null,
   actorToken: null,
