@@ -15,6 +15,7 @@
     "lint:fix": "biome check --write src",
     "typecheck": "tsc --noEmit",
     "db:seed": "bun run scripts/seed.ts",
+    "db:backfill:platformCustomerRefs": "bun run scripts/backfillPlatformCustomerRefs.ts",
     "generate:openapi": "OPENAPI_OUTPUT_PATH=./openapi.local.gen.json bun run ./scripts/generateOpenapiSpec.ts && cp ./openapi.local.gen.json ../../packages/sdk/openapi.gen.json"
   },
   "dependencies": {

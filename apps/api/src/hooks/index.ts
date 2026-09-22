@@ -7,6 +7,7 @@ import { registerEmailVersioningHook } from '#/hooks/emailVersioning/hook';
 import { registerImmutableFieldsHook } from '#/hooks/immutableFields/hook';
 import { registerLastLoginAtHook } from '#/hooks/lastLoginAt/hook';
 import { registerOrderedListHook } from '#/hooks/orderedList/hook';
+import { registerPlatformCustomerRefHook } from '#/hooks/platformCustomerRef/hook';
 import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
 import { registerRuleReferenceReferencedHook } from '#/hooks/ruleReference/referencedHook';
 import { registerRulesHook } from '#/hooks/rules/hook';
@@ -32,6 +33,7 @@ export const registerHooks = () => {
   registerImmutableFieldsHook();
   registerLastLoginAtHook();
   registerOrderedListHook();
+  registerPlatformCustomerRefHook();
   registerPreventHardDeleteHook();
   registerRuleReferenceReferencedHook();
   registerSegmentConditionsHook();
