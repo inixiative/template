@@ -26,6 +26,28 @@ describe('polymorphicIs', () => {
     expect(check(bound, { senderType: 'User', senderUserId: 'u-9', senderOrganizationId: null })).not.toBe(true);
   });
 
+  it('a no-FK owner is bound by its discriminator: platform rows match only when platform is the bound owner', () => {
+    const rule = polymorphicIs('Tag', 'ownerModel');
+    expect(requiredBindings(rule).size).toBe(0);
+    expect(polymorphicBindings('platform', 'platform')).toEqual({ platform: 'platform' });
+
+    const asPlatform = resolveBindings(rule, polymorphicBindings('platform', 'platform'));
+    expect(check(asPlatform, { ownerModel: 'platform', userId: null, organizationId: null, spaceId: null })).toBe(true);
+    expect(check(asPlatform, { ownerModel: 'Organization', organizationId: 'org-1' })).not.toBe(true);
+
+    const asOrg = resolveBindings(rule, polymorphicBindings('Organization', 'org-1'));
+    expect(check(asOrg, { ownerModel: 'platform', userId: null, organizationId: null, spaceId: null })).not.toBe(true);
+  });
+
+  it('a value with keys keeps its FK arm and gains no discriminator arm', () => {
+    const rule = polymorphicIs('Tag', 'ownerModel') as { any: unknown[] };
+    const discriminatorArms = rule.any.filter((arm) =>
+      JSON.stringify(arm).includes('"bind":"platform"'),
+    );
+    expect(discriminatorArms).toHaveLength(1);
+    expect(JSON.stringify(rule)).not.toContain('"bind":"Organization"');
+  });
+
   it('refuses an axis the registry does not declare, and a kind no single key binds', () => {
     expect(() => polymorphicIs('Tag', 'nope')).toThrow('no false-polymorphic axis');
     expect(() => polymorphicIs('EmailTemplate', 'ownerModel')).toThrow('no single kind binds');

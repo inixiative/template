@@ -15,7 +15,7 @@ import type { ModelName } from '@template/db/utils/modelNames';
 // - Immutable fields (type fields are immutable)
 
 // Special non-model values for ownership
-type SpecialOwner = 'default' | 'admin' | 'platform';
+export type SpecialOwner = 'default' | 'admin' | 'platform';
 
 // Valid type values in polymorphic fields (strongly typed)
 export type PolymorphicValue = ModelName | SpecialOwner;
