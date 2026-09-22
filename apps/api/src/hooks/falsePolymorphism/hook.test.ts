@@ -169,4 +169,33 @@ describe('falsePolymorphism hook', () => {
       expect(updated.ownerModel).toBe('User');
     });
   });
+
+  it('pass: platform provider on a CustomerRef carries no provider key', async () => {
+    const { entity: user } = await createUser();
+
+    const ref = await db.customerRef.create({
+      data: { customerModel: 'User', customerUserId: user.id, providerModel: 'platform' },
+    });
+
+    expect(ref.providerModel).toBe('platform');
+    expect(ref.providerUserId).toBeNull();
+    expect(ref.providerOrganizationId).toBeNull();
+    expect(ref.providerSpaceId).toBeNull();
+  });
+
+  it('fail: platform provider on a CustomerRef with a provider key', async () => {
+    const { entity: user } = await createUser();
+    const { entity: org } = await createOrganization();
+
+    await expect(
+      db.customerRef.create({
+        data: {
+          customerModel: 'User',
+          customerUserId: user.id,
+          providerModel: 'platform',
+          providerOrganizationId: org.id,
+        },
+      }),
+    ).rejects.toThrow('Invalid providerModel value on CustomerRef');
+  });
 });

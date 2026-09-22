@@ -57,6 +57,7 @@ model Segment {
   @@unique([userId, name], where: { userId: { not: null } })
   @@unique([organizationId, name], where: { organizationId: { not: null } })
   @@unique([spaceId, name], where: { spaceId: { not: null } })
+  @@unique([name], where: raw("\"ownerModel\" = 'platform'"))
   @@index([ownerModel])
   @@index([type])
 }

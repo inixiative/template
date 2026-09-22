@@ -59,6 +59,9 @@ model CustomerRef {
   @@unique([customerSpaceId, providerUserId], where: { customerSpaceId: { not: null }, providerUserId: { not: null } })
   @@unique([customerSpaceId, providerOrganizationId], where: { customerSpaceId: { not: null }, providerOrganizationId: { not: null } })
   @@unique([customerSpaceId, providerSpaceId], where: { customerSpaceId: { not: null }, providerSpaceId: { not: null } })
+  @@unique([customerUserId], where: raw("\"providerModel\" = 'platform'"))
+  @@unique([customerOrganizationId], where: raw("\"providerModel\" = 'platform'"))
+  @@unique([customerSpaceId], where: raw("\"providerModel\" = 'platform'"))
   @@index([customerModel])
   @@index([providerModel])
   @@index([providerUserId])
@@ -73,6 +76,7 @@ enum CustomerModel {
 }
 
 enum ProviderModel {
+  platform
   User
   Organization
   Space

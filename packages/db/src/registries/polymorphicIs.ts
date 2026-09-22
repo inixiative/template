@@ -36,16 +36,16 @@ export const polymorphicTarget = (
 
 const isFkKind = (value: string): value is PolymorphicFkKind => value in POLYMORPHIC_BINDS;
 
-export const polymorphicBindings = (ownerModel: PolymorphicKind, ownerId: string): Record<string, string> =>
-  isFkKind(ownerModel) ? { [POLYMORPHIC_BINDS[ownerModel]]: ownerId } : { [ownerModel]: ownerModel };
+export const polymorphicBindings = (ownerModel: PolymorphicKind, ownerId: string): Record<string, string | string[]> =>
+  isFkKind(ownerModel) ? { [POLYMORPHIC_BINDS[ownerModel]]: ownerId } : { [ownerModel]: [ownerModel] };
 
 /**
  * "This row's false-polymorphic axis points at the bound row": one arm per key column, each pairing
  * the discriminator with an optional bind named for the kind. The axis may be an owner, a provider,
  * a resource, a sender — the shape is the same. An unbound kind compiles to `key equals null`, which
  * no row of that kind has (the polymorphism rule makes the key required), so the arm matches nothing.
- * A value with no key (platform, admin, default) gets one arm keyed on the discriminator itself, bound
- * under the value's own name; unbound it compiles to `axis equals null` and matches nothing likewise.
+ * A value with no key (platform, admin, default) gets one arm keyed on the discriminator itself, `in`
+ * a list bound under the value's own name; unbound it compiles to `axis in []` and matches nothing likewise.
  */
 export const polymorphicIs = (model: ModelName, axisField: string): Condition => {
   const axis = getPolymorphismConfig(model)?.axes.find((candidate) => candidate.field === axisField);
@@ -79,7 +79,7 @@ export const polymorphicIs = (model: ModelName, axisField: string): Condition =>
     .map(([value]) => ({
       all: [
         { field: axisField, operator: Operator.equals, value },
-        { field: axisField, operator: Operator.equals, bind: value, bindOptional: true },
+        { field: axisField, operator: Operator.in, bind: value, bindOptional: true },
       ],
     }));
   return { any: [...fkArms, ...discriminatorArms] };

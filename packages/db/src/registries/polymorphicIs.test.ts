@@ -29,7 +29,7 @@ describe('polymorphicIs', () => {
   it('a no-FK owner is bound by its discriminator: platform rows match only when platform is the bound owner', () => {
     const rule = polymorphicIs('Tag', 'ownerModel');
     expect(requiredBindings(rule).size).toBe(0);
-    expect(polymorphicBindings('platform', 'platform')).toEqual({ platform: 'platform' });
+    expect(polymorphicBindings('platform', 'platform')).toEqual({ platform: ['platform'] });
 
     const asPlatform = resolveBindings(rule, polymorphicBindings('platform', 'platform'));
     expect(check(asPlatform, { ownerModel: 'platform', userId: null, organizationId: null, spaceId: null })).toBe(true);
@@ -46,6 +46,18 @@ describe('polymorphicIs', () => {
     );
     expect(discriminatorArms).toHaveLength(1);
     expect(JSON.stringify(rule)).not.toContain('"bind":"Organization"');
+  });
+
+  it('the provider axes carry the platform arm', () => {
+    for (const [model, axis] of [
+      ['Segment', 'ownerModel'],
+      ['CustomerRef', 'providerModel'],
+    ] as const) {
+      const asPlatform = resolveBindings(polymorphicIs(model, axis), polymorphicBindings('platform', 'platform'));
+      expect(check(asPlatform, { [axis]: 'platform' })).toBe(true);
+      const asOrg = resolveBindings(polymorphicIs(model, axis), polymorphicBindings('Organization', 'org-1'));
+      expect(check(asOrg, { [axis]: 'platform' })).not.toBe(true);
+    }
   });
 
   it('refuses an axis the registry does not declare, and a kind no single key binds', () => {
