@@ -22,6 +22,7 @@ kanban
     DEV-004-prisma-map-doc-comment-tags
     FEAT-002-notes-system
     FEAT-003-feature-flags
+    FEAT-022-feature-flag-inheritance
     FEAT-020-custom-fields-eav
     FEAT-004-ai-providers
     FEAT-009-file-management
@@ -73,7 +74,8 @@ kanban
 
 **Features:**
 - [FEAT-002: Notes System](./FEAT-002-notes-system.md) - Polymorphic notes (from Carde)
-- [FEAT-003: Feature Flags](./FEAT-003-feature-flags.md) ⭐ - DB + Redis + WS + Admin UI
+- [FEAT-003: Feature Flags](./FEAT-003-feature-flags.md) ⭐ - Typed values, ordered variant rules over segments, platform + `custom:` owners; rides FEAT-021
+- [FEAT-022: Feature Flag Inheritance](./FEAT-022-feature-flag-inheritance.md) - The provider-chain semantics FEAT-003 leaves undefined
 - [FEAT-004: AI Providers](./FEAT-004-ai-providers.md) - OpenAI, Anthropic, Gemini (from Zealot)
 - [FEAT-009: File Management](./FEAT-009-file-management.md) - S3 uploads, CDN, virus scanning
 - [FEAT-011: Dates & Timezones](./FEAT-011-dates-timezones.md) - Timezone handling, recurring events
@@ -128,8 +130,9 @@ INFRA-001 (Init Script)
 └─> INFRA-011 (Railway Buckets — Phase 2 provisioning)
     └─> FEAT-009 (File Management)
 
-INFRA-004 (WebSockets)
-└─> FEAT-003 (Feature Flags - real-time updates)
+FEAT-021 (Segments, PR #105)
+└─> FEAT-003 (Feature Flags)
+    └─> FEAT-022 (Feature Flag Inheritance)
 ```
 
 ---
