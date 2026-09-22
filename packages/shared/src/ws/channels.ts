@@ -17,9 +17,9 @@ export const WS_CHANNELS = {
     type: 'query',
     name: (id: string) => channelKey({ _id: 'segmentReadManySegmentMembers', path: { id } }),
   },
-  meReadManyFeatureFlags: {
+  meReadManyFeatureFlagValues: {
     type: 'query',
-    name: () => channelKey({ _id: 'meReadManyFeatureFlags' }),
+    name: () => channelKey({ _id: 'meReadManyFeatureFlagValues' }),
   },
 } as const;
 

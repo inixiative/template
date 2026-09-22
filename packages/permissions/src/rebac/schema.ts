@@ -80,6 +80,15 @@ export const rebacSchema: RebacSchema = {
       },
     },
     'db:integration': { actions: ownerActions() },
+    'db:featureFlag': { actions: ownerActions() },
+    'db:featureFlagVariant': {
+      actions: {
+        own: { rel: 'featureFlag', action: 'own' },
+        manage: { rel: 'featureFlag', action: 'manage' },
+        operate: { rel: 'featureFlag', action: 'operate' },
+        read: { rel: 'featureFlag', action: 'read' },
+      },
+    },
 
     'db:organizationUser': {
       actions: {

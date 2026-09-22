@@ -14,8 +14,8 @@ export type FeatureFlagChangedPayload = { ownerModel: ProviderModel; ownerId: st
 export const featureFlagChanged = makeAppEvent<FeatureFlagChangedPayload>({
   websocket: () => [
     {
-      target: { channels: [WS_CHANNELS.meReadManyFeatureFlags.name()] },
-      message: { data: refetch({ _id: 'meReadManyFeatureFlags' }) },
+      target: { channels: [WS_CHANNELS.meReadManyFeatureFlagValues.name()] },
+      message: { data: refetch({ _id: 'meReadManyFeatureFlagValues' }) },
     },
   ],
 });

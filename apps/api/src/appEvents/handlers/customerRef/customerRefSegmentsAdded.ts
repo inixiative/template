@@ -25,7 +25,7 @@ export const customerRefSegmentsAdded = makeAppEvent<CustomerRefSegmentsAddedPay
           },
           {
             target: { userIds: [data.customerId] },
-            message: { data: refetch({ _id: 'meReadManyFeatureFlags' }) },
+            message: { data: refetch({ _id: 'meReadManyFeatureFlagValues' }) },
           },
         ]
       : null,

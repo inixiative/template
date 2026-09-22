@@ -5,7 +5,10 @@ import { fetchOne } from '@template/db/hydrate/fetchOne';
 import { hydrate } from '@template/db/hydrate/hydrate';
 import {
   cleanupTouchedTables,
+  createFeatureFlag,
+  createFeatureFlagVariant,
   createOrganizationUser,
+  createSegment,
   createSession,
   createToken,
   createUser,
@@ -80,6 +83,26 @@ describe('hydrate', () => {
     // Cache key format: cache:organization:id:<value>
     const orgKeys = [...pending.keys()].filter((k) => k.includes(':organization:'));
     expect(orgKeys.length).toBe(1);
+  });
+
+  it('stops at a relation cycle: a variant whose inline segment points back at it', async () => {
+    const { entity: flag } = await createFeatureFlag({});
+    const { entity: audience } = await createSegment({ ownerModel: 'platform' });
+    const { entity: variant } = await createFeatureFlagVariant({ segmentId: audience.id }, { featureFlag: flag });
+    const { entity: inline } = await createSegment({ ownerModel: 'platform', featureFlagVariantId: variant.id });
+    await db.featureFlagVariant.update({ where: { id: variant.id }, data: { segmentId: inline.id } });
+
+    const result = await hydrate(db, 'featureFlagVariant', {
+      id: variant.id,
+      featureFlagId: flag.id,
+      segmentId: inline.id,
+    });
+
+    const segment = result.segment as { id: string; inlineForVariant: { id: string; segment?: unknown } };
+    expect(segment.id).toBe(inline.id);
+    expect(segment.inlineForVariant.id).toBe(variant.id);
+    expect(segment.inlineForVariant.segment).toBeUndefined();
+    expect((result.featureFlag as { id: string }).id).toBe(flag.id);
   });
 
   it('handles null FK gracefully', async () => {

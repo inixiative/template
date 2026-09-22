@@ -25,7 +25,7 @@ export const customerRefSegmentsRemoved = makeAppEvent<CustomerRefSegmentsRemove
           },
           {
             target: { userIds: [data.customerId] },
-            message: { data: refetch({ _id: 'meReadManyFeatureFlags' }) },
+            message: { data: refetch({ _id: 'meReadManyFeatureFlagValues' }) },
           },
         ]
       : null,
