@@ -77,7 +77,7 @@ const liveSegmentIds = async (segmentIds: string[]): Promise<Set<string>> => {
   return new Set(rows.filter((row): row is Segment => !!row && !row.deletedAt).map((row) => row.id));
 };
 
-const valueOf = (flag: FeatureFlag, variant: FeatureFlagVariant): FlagValue =>
+const variantValue = (flag: FeatureFlag, variant: FeatureFlagVariant): FlagValue =>
   variant[VALUE_COLUMNS[flag.valueType]] as FlagValue;
 
 export const foldFlag = (
@@ -90,13 +90,13 @@ export const foldFlag = (
   const defaultVariant = variants.find((variant) => variant.isDefault) ?? null;
   const fallback = (): ResolvedFlag =>
     defaultVariant
-      ? { flag, value: valueOf(flag, defaultVariant), step: 'default', variant: defaultVariant }
+      ? { flag, value: variantValue(flag, defaultVariant), step: 'default', variant: defaultVariant }
       : { flag, value: zeroFor(flag.valueType), step: 'zero', variant: null };
 
   if (!flag.enabled) return { flag, value: zeroFor(flag.valueType), step: 'disabled', variant: null };
   if (flag.segmentId && !matches(flag.segmentId)) return { ...fallback(), step: 'gate' };
   const rule = variants.find((variant) => !variant.isDefault && matches(variant.segmentId));
-  if (rule) return { flag, value: valueOf(flag, rule), step: 'rule', variant: rule };
+  if (rule) return { flag, value: variantValue(flag, rule), step: 'rule', variant: rule };
   return fallback();
 };
 

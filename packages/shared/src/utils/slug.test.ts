@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'bun:test';
-import { featureFlagSlugSchema, isCustomFlagSlug, keepSlugCharacters, slugSchema, toSlug } from './slug';
+import {
+  featureFlagSlugSchema,
+  isCustomFlagSlug,
+  keepSlugCharacters,
+  slugSchema,
+  toSlug,
+} from '@template/shared/utils/slug';
 
 describe('slug', () => {
   it('accepts lowercase words joined by single hyphens and nothing else', () => {

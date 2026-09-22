@@ -9,7 +9,7 @@ import { db, type RuleReferenceRow, ruleHealthFromEdges } from '@template/db';
 import type { Segment } from '@template/db/generated/client/client';
 import { type RuleHealth, type RuleIssue, referenceKey, ruleIssues } from '@template/shared/rules';
 import { groupBy, keyBy, uniqBy } from 'lodash-es';
-import { customerRefLens, ownedSegments } from '#/modules/customerRef/lib/customerRefLens';
+import { customerRefLens } from '#/modules/customerRef/lib/customerRefLens';
 import { segmentOwnerId, segmentsOf } from '#/modules/segment/lib/segmentOwner';
 
 export type SegmentRuleState = { segment: Segment; health: RuleHealth; issues: RuleIssue[] };
