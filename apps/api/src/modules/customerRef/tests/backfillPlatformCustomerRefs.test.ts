@@ -1,6 +1,12 @@
 import { afterAll, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
-import { cleanupTouchedTables, createOrganization, createSpace, createUser } from '@template/db/test';
+import {
+  cleanupTouchedTables,
+  createCustomerRef,
+  createOrganization,
+  createSpace,
+  createUser,
+} from '@template/db/test';
 import { backfillPlatformCustomerRefs } from '#/modules/customerRef/services/backfillPlatformCustomerRefs';
 
 describe('backfillPlatformCustomerRefs', () => {
@@ -13,8 +19,11 @@ describe('backfillPlatformCustomerRefs', () => {
     const { entity: organization } = await createOrganization();
     const { entity: space } = await createSpace({}, { organization });
     const { entity: tombstoned } = await createUser();
-    await db.customerRef.create({
-      data: { customerModel: 'User', customerUserId: tombstoned.id, providerModel: 'platform', deletedAt: new Date() },
+    await createCustomerRef({
+      customerModel: 'User',
+      providerModel: 'platform',
+      customerUser: tombstoned,
+      deletedAt: new Date(),
     });
 
     const first = await backfillPlatformCustomerRefs();

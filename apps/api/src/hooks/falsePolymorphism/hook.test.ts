@@ -2,8 +2,10 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import {
   cleanupTouchedTables,
+  createCustomerRef,
   createOrganization,
   createOrganizationUser,
+  createToken,
   createUser,
   getNextSeq,
 } from '@template/db/test';
@@ -19,11 +21,8 @@ afterAll(async () => {
 describe('falsePolymorphism hook', () => {
   it('pass: User owner with userId', async () => {
     const { entity: user } = await createUser();
-    const seq = getNextSeq();
 
-    const token = await db.token.create({
-      data: { name: 'test', keyHash: `h${seq}`, keyPrefix: `p${seq}`, ownerModel: 'User', userId: user.id },
-    });
+    const { entity: token } = await createToken({ ownerModel: 'User', userId: user.id });
 
     expect(token.userId).toBe(user.id);
     expect(token.organizationId).toBeNull();
@@ -31,17 +30,8 @@ describe('falsePolymorphism hook', () => {
 
   it('pass: Organization owner with organizationId', async () => {
     const { entity: org } = await createOrganization();
-    const seq = getNextSeq();
 
-    const token = await db.token.create({
-      data: {
-        name: 'test',
-        keyHash: `h${seq}`,
-        keyPrefix: `p${seq}`,
-        ownerModel: 'Organization',
-        organizationId: org.id,
-      },
-    });
+    const { entity: token } = await createToken({ ownerModel: 'Organization', organizationId: org.id });
 
     expect(token.organizationId).toBe(org.id);
     expect(token.userId).toBeNull();
@@ -49,17 +39,11 @@ describe('falsePolymorphism hook', () => {
 
   it('pass: OrganizationUser owner with both FKs', async () => {
     const { entity: orgUser } = await createOrganizationUser();
-    const seq = getNextSeq();
 
-    const token = await db.token.create({
-      data: {
-        name: 'test',
-        keyHash: `h${seq}`,
-        keyPrefix: `p${seq}`,
-        ownerModel: 'OrganizationUser',
-        userId: orgUser.userId,
-        organizationId: orgUser.organizationId,
-      },
+    const { entity: token } = await createToken({
+      ownerModel: 'OrganizationUser',
+      userId: orgUser.userId,
+      organizationId: orgUser.organizationId,
     });
 
     expect(token.userId).toBe(orgUser.userId);
@@ -69,21 +53,10 @@ describe('falsePolymorphism hook', () => {
   it('fail: User owner with extra organizationId', async () => {
     const { entity: user } = await createUser();
     const { entity: org } = await createOrganization();
-    const seq = getNextSeq();
 
-    const promise = async () =>
-      db.token.create({
-        data: {
-          name: 'test',
-          keyHash: `h${seq}`,
-          keyPrefix: `p${seq}`,
-          ownerModel: 'User',
-          userId: user.id,
-          organizationId: org.id,
-        },
-      });
-
-    await expect(promise).toThrow('Invalid ownerModel value on Token');
+    await expect(createToken({ ownerModel: 'User', userId: user.id, organizationId: org.id })).rejects.toThrow(
+      'Invalid ownerModel value on Token',
+    );
   });
 
   it('fail: createManyAndReturn with invalid item', async () => {
@@ -154,11 +127,8 @@ describe('falsePolymorphism hook', () => {
 
     it('pass: regular update without nested creates', async () => {
       const { entity: user } = await createUser();
-      const seq = getNextSeq();
 
-      const token = await db.token.create({
-        data: { name: 'original', keyHash: `h${seq}`, keyPrefix: `p${seq}`, ownerModel: 'User', userId: user.id },
-      });
+      const { entity: token } = await createToken({ name: 'original', ownerModel: 'User', userId: user.id });
 
       const updated = await db.token.update({
         where: { id: token.id },
@@ -173,8 +143,10 @@ describe('falsePolymorphism hook', () => {
   it('pass: platform provider on a CustomerRef carries no provider key', async () => {
     const { entity: user } = await createUser();
 
-    const ref = await db.customerRef.create({
-      data: { customerModel: 'User', customerUserId: user.id, providerModel: 'platform' },
+    const { entity: ref } = await createCustomerRef({
+      customerModel: 'User',
+      providerModel: 'platform',
+      customerUser: user,
     });
 
     expect(ref.providerModel).toBe('platform');
@@ -188,13 +160,11 @@ describe('falsePolymorphism hook', () => {
     const { entity: org } = await createOrganization();
 
     await expect(
-      db.customerRef.create({
-        data: {
-          customerModel: 'User',
-          customerUserId: user.id,
-          providerModel: 'platform',
-          providerOrganizationId: org.id,
-        },
+      createCustomerRef({
+        customerModel: 'User',
+        providerModel: 'platform',
+        customerUser: user,
+        providerOrganizationId: org.id,
       }),
     ).rejects.toThrow('Invalid providerModel value on CustomerRef');
   });
