@@ -43,6 +43,22 @@ describe('segmentConditions hook', () => {
     ).rejects.toThrow('Invalid segment conditions');
   });
 
+  it('a platform segment may name only platform segments', async () => {
+    const { entity: theirs } = await createSegment({ conditions: acmeRule }, { space });
+    const naming = (id: string) => ({
+      field: 'segmentMembers',
+      arrayOperator: 'any',
+      condition: { field: 'segment.id', operator: Operator.equals, value: id },
+    });
+    await expect(
+      createSegment({ ownerModel: ProviderModel.platform, conditions: naming(theirs.id) }, {}),
+    ).rejects.toThrow('this platform does not own');
+
+    const { entity: ours } = await createSegment({ ownerModel: ProviderModel.platform, conditions: acmeRule }, {});
+    const { entity } = await createSegment({ ownerModel: ProviderModel.platform, conditions: naming(ours.id) }, {});
+    expect(entity.ownerModel).toBe('platform');
+  });
+
   it('accepts a valid rule and writes the normalized tree back', async () => {
     const { entity } = await createSegment(
       { conditions: { all: [acmeRule, { field: 'customerUser.contacts', arrayOperator: 'any' }] } },
