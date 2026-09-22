@@ -53,6 +53,8 @@ export const cacheReference: CacheReference = {
     return keys;
   },
 
+  Segment: (r) => [cacheKey('segment', r.id)],
+
   SegmentMember: (r) => [customerRefSegmentMembersKey(r.customerRefId)],
 
   FeatureFlag: (r) => [featureFlagOwnerKeyOf(r), featureFlagVariantsKey(r.id)],

@@ -46,6 +46,7 @@ export const prepareRequest = async (c: Context<AppEnv>, next: Next) => {
       'spaces',
       'token',
       'spoofedBy',
+      'featureFlags',
     ] as const;
     for (const key of keysToClone) {
       const value = batchContext.baseContext.get(key);
@@ -71,6 +72,7 @@ export const prepareRequest = async (c: Context<AppEnv>, next: Next) => {
     c.set('spaces', null);
     c.set('token', null);
     c.set('spoofedBy', null);
+    c.set('featureFlags', null);
   }
 
   c.set('resource', null);
