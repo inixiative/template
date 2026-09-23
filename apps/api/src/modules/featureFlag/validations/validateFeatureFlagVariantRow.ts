@@ -57,7 +57,7 @@ export const validateFeatureFlagVariantRow = async (
     await assertSegmentUsableBy(merged.segmentId, {
       ownerModel: parent.ownerModel,
       ownerId: featureFlagOwnerIdOf(parent),
-      internalTo: previous?.id,
+      audienceOf: previous?.id ?? null,
     });
   }
 };

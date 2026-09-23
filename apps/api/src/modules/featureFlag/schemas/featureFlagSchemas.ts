@@ -29,8 +29,11 @@ export const featureFlagUpdateBodySchema = featureFlagCreateBodySchema
   .omit({ slug: true, subjectModel: true, valueType: true })
   .partial();
 
-export const variantSegmentSchema = SegmentScalarSchema.pick({ ...selectSegmentForCustomer, deletedAt: true }).extend({
-  featureFlagVariantId: z.string().nullable(),
+export const variantSegmentSchema = SegmentScalarSchema.pick({
+  ...selectSegmentForCustomer,
+  featureFlagInternal: true,
+  deletedAt: true,
+}).extend({
   members: z.number().int().nonnegative(),
 });
 
@@ -47,15 +50,9 @@ export const internalSegmentSchema = z.object({
   conditions: z.unknown(),
 });
 
-export const sampleSchema = z.object({
-  percent: z.number().min(0).max(100),
-  from: z.string().optional(),
-});
-
 const audienceFields = {
   segmentId: z.string().nullable().optional(),
   internalSegment: internalSegmentSchema.optional(),
-  sample: sampleSchema.optional(),
 };
 
 export const featureFlagVariantCreateBodySchema = FeatureFlagVariantScalarInputSchema.omit({

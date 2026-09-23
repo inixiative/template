@@ -34,7 +34,7 @@ type Variant = {
   label: string;
   position: number;
   segmentId: string | null;
-  segment: { id: string; members: number; featureFlagVariantId: string | null; deletedAt: string | null } | null;
+  segment: { id: string; members: number; featureFlagInternal: boolean; deletedAt: string | null } | null;
 };
 type Flag = { id: string; slug: string; ownerModel: string; enabled: boolean; variants: Variant[] };
 type Value = {
@@ -139,7 +139,7 @@ describe('feature flag routes', () => {
     expect(flag.ownerModel).toBe('Organization');
     expect(flag.variants).toHaveLength(1);
     expect(flag.variants[0]!.label).toBe('on');
-    expect(flag.variants[0]!.segment?.featureFlagVariantId).toBe(flag.variants[0]!.id);
+    expect(flag.variants[0]!.segment?.featureFlagInternal).toBe(true);
   });
 
   it('the internal segment is hidden from the owner’s segment list and the member sees the value', async () => {
@@ -157,7 +157,7 @@ describe('feature flag routes', () => {
     expect(segmentIds).not.toContain(flag.variants[0]!.segmentId);
   });
 
-  it('a string flag takes ordered variants over shared and sampled audiences; a position update reorders', async () => {
+  it('a string flag takes ordered variants over shared and internal audiences; a position update reorders', async () => {
     const created = await ownerFetch(
       post(`/api/v1/organization/${org.id}/featureFlags`, {
         slug: 'custom:theme',
@@ -181,22 +181,25 @@ describe('feature flag routes', () => {
     const beta = (await json<Variant>(shared)).data;
     expect(beta.segment?.id).toBe(audience.id);
 
-    const sampled = await ownerFetch(
+    const internal = await ownerFetch(
       post(`/api/v1/featureFlag/${theme.id}/featureFlagVariants`, {
         label: 'rollout',
-        sample: { percent: 100, from: audience.id },
+        internalSegment: {
+          type: 'dynamic',
+          conditions: { field: 'customerUser.email', operator: Operator.endsWith, value: domain },
+        },
         valueText: 'classic',
       }),
     );
-    expect(sampled.status).toBe(201);
-    const rollout = (await json<Variant>(sampled)).data;
-    expect(rollout.segment?.featureFlagVariantId).toBe(rollout.id);
+    expect(internal.status).toBe(201);
+    const rollout = (await json<Variant>(internal)).data;
+    expect(rollout.segment?.featureFlagInternal).toBe(true);
 
     const both = await ownerFetch(
       post(`/api/v1/featureFlag/${theme.id}/featureFlagVariants`, {
         label: 'wrong',
         segmentId: audience.id,
-        sample: { percent: 10 },
+        internalSegment: { type: 'dynamic', conditions: { all: [] } },
         valueText: 'x',
       }),
     );
@@ -217,7 +220,36 @@ describe('feature flag routes', () => {
     const relabeled = await ownerFetch(patch(`/api/v1/featureFlagVariant/${rollout.id}`, { label: 'staged' }));
     expect(relabeled.status).toBe(200);
     const renamed = await db.segment.findUnique({ where: { id: rollout.segmentId! } });
-    expect(renamed?.name).toBe(`custom:theme/staged ${rollout.id}`);
+    expect(renamed?.name).toBe('custom:theme/staged');
+  });
+
+  it('internal names never collide: a second flag reuses a label and the owner names a shared segment the same', async () => {
+    const created = await ownerFetch(
+      post(`/api/v1/organization/${org.id}/featureFlags`, {
+        slug: 'custom:theme-next',
+        name: 'Theme next',
+        subjectModel: 'User',
+        valueType: 'string',
+      }),
+    );
+    const next = (await json<Flag>(created)).data;
+    const staged = await ownerFetch(
+      post(`/api/v1/featureFlag/${next.id}/featureFlagVariants`, {
+        label: 'staged',
+        internalSegment: { type: 'dynamic', conditions: { all: [] } },
+        valueText: 'x',
+      }),
+    );
+    expect(staged.status).toBe(201);
+
+    const shared = await ownerFetch(
+      post(`/api/v1/organization/${org.id}/segments`, {
+        name: 'custom:theme-next/staged',
+        type: 'static',
+        conditions: { field: 'id', operator: Operator.in, value: [] },
+      }),
+    );
+    expect(shared.status).toBe(201);
   });
 
   it('a tombstoned shared audience shows as deleted on the owner’s read', async () => {
@@ -293,8 +325,8 @@ describe('feature flag routes', () => {
     const toShared = await ownerFetch(patch(`/api/v1/featureFlagVariant/${first.id}`, { segmentId: audience.id }));
     expect(toShared.status).toBe(200);
     expect((await json<Variant>(toShared)).data.segmentId).toBe(audience.id);
-    const released = await db.segment.findFirst({ where: { id: firstInternal, deletedAt: { not: null } } });
-    expect(released?.featureFlagVariantId).toBeNull();
+    const released = await db.segment.findUnique({ where: { id: firstInternal } });
+    expect(released?.deletedAt).not.toBeNull();
 
     const backInternal = await ownerFetch(
       patch(`/api/v1/featureFlagVariant/${first.id}`, {
@@ -303,7 +335,7 @@ describe('feature flag routes', () => {
     );
     expect(backInternal.status).toBe(200);
     const again = (await json<Variant>(backInternal)).data;
-    expect(again.segment?.featureFlagVariantId).toBe(first.id);
+    expect(again.segment?.featureFlagInternal).toBe(true);
     expect(again.segmentId).not.toBe(firstInternal);
   });
 
@@ -324,9 +356,13 @@ describe('feature flag routes', () => {
     });
     expect(variants.length).toBeGreaterThan(0);
     const internals = await db.segment.findMany({
-      where: { featureFlagVariantId: { in: variants.map((each) => each.id) }, deletedAt: { not: null } },
+      where: {
+        id: { in: variants.map((each) => each.segmentId!) },
+        featureFlagInternal: true,
+        deletedAt: { not: null },
+      },
     });
-    expect(internals.length).toBe(variants.filter((each) => each.segmentId).length);
+    expect(internals.length).toBe(variants.length);
 
     const again = await ownerFetch(
       post(`/api/v1/organization/${org.id}/featureFlags`, {

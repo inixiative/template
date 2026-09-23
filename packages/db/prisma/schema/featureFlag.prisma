@@ -58,8 +58,7 @@ model FeatureFlagVariant {
   valueNumber  Float?
   valueJson    Json?
 
-  internalSegment Segment?   @relation("FeatureFlagVariantInternalSegment")
-  auditLogs     AuditLog[]
+  auditLogs AuditLog[]
 
   @@unique([featureFlagId, label], where: { deletedAt: null })
   @@unique([featureFlagId], where: { isDefault: true, deletedAt: null })

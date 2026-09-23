@@ -67,9 +67,9 @@ describe('getModelRelations', () => {
   });
 
   it('carries `/// @tagClass(key: value)` annotations and names the permission edges', () => {
-    const internal = getModelRelations('Segment').find((r) => r.relationName === 'internalToVariant');
-    expect(internal?.annotations).toEqual({ permissions: { hydrate: false } });
-    expect(shouldHydrate(internal!)).toBe(false);
+    const audience = getModelRelations('FeatureFlagVariant').find((r) => r.relationName === 'segment');
+    expect(audience?.annotations).toEqual({ permissions: { hydrate: false } });
+    expect(shouldHydrate(audience!)).toBe(false);
 
     const segment = getModelRelations('SegmentMember').find((r) => r.relationName === 'segment');
     expect(segment?.annotations).toBeUndefined();

@@ -24,7 +24,7 @@ const tagOwned = platformOrBound('Tag', 'ownerModel');
 const segmentOwned = boundAndLive('Segment', 'ownerModel');
 
 const segmentNameable: Condition = {
-  all: [segmentOwned, { field: 'featureFlagVariantId', operator: Operator.notExists }],
+  all: [segmentOwned, { field: 'featureFlagInternal', operator: Operator.equals, value: false }],
 };
 
 const contacts: ModelNarrowing = {

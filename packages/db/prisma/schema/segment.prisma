@@ -43,9 +43,7 @@ model Segment {
   conditions       Json
   conditionsPrompt String?
 
-  featureFlagVariantId String?             @unique @db.VarChar(36)
-  /// @permissions(hydrate: false)
-  internalToVariant     FeatureFlagVariant? @relation("FeatureFlagVariantInternalSegment", fields: [featureFlagVariantId], references: [id], onDelete: Cascade)
+  featureFlagInternal Boolean @default(false)
 
   members           SegmentMember[]
   auditLogs         AuditLog[]
@@ -60,10 +58,10 @@ model Segment {
 
   // Per-owner uniqueness on name — partial uniques (see Contact for rationale).
   // Each partial doubles as that owner's lookup index.
-  @@unique([userId, name], where: { userId: { not: null }, deletedAt: null })
-  @@unique([organizationId, name], where: { organizationId: { not: null }, deletedAt: null })
-  @@unique([spaceId, name], where: { spaceId: { not: null }, deletedAt: null })
-  @@unique([name], where: raw("\"ownerModel\" = 'platform' AND \"deletedAt\" IS NULL"))
+  @@unique([userId, name], where: { userId: { not: null }, deletedAt: null, featureFlagInternal: false })
+  @@unique([organizationId, name], where: { organizationId: { not: null }, deletedAt: null, featureFlagInternal: false })
+  @@unique([spaceId, name], where: { spaceId: { not: null }, deletedAt: null, featureFlagInternal: false })
+  @@unique([name], where: raw("\"ownerModel\" = 'platform' AND \"deletedAt\" IS NULL AND \"featureFlagInternal\" = false"))
   @@index([ownerModel])
   @@index([type])
 }

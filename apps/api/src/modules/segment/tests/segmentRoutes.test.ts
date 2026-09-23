@@ -133,11 +133,8 @@ describe('segment routes', () => {
 
   it('an internal segment stays out of the owner’s list and is edited only through its variant', async () => {
     const { entity: flag } = await createFeatureFlag({ slug: 'custom:x', ownerModel: 'Space', space });
-    const { entity: variant } = await createFeatureFlagVariant({ segment }, { featureFlag: flag });
-    const { entity: internal } = await createSegment(
-      { conditions: acmeRule, featureFlagVariantId: variant.id },
-      { space },
-    );
+    const { entity: internal } = await createSegment({ conditions: acmeRule, featureFlagInternal: true }, { space });
+    await createFeatureFlagVariant({ segment: internal }, { featureFlag: flag });
 
     const listed = await ownerFetch(get(`/api/v1/space/${space.id}/segments`));
     expect((await json<Segment[]>(listed)).data.map((each) => each.id)).not.toContain(internal.id);

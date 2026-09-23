@@ -14,7 +14,7 @@ export const segmentReadManyController = makeController(segmentReadManyRoute, as
   const db = c.get('db');
 
   const { data, pagination } = await paginate(c, db.segment, {
-    where: { featureFlagVariantId: null },
+    where: { featureFlagInternal: false },
     include: includeSegmentRuleReferences,
   });
 

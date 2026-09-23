@@ -68,12 +68,8 @@ describe('segmentConditions hook', () => {
 
   it('a rule may not name an internal segment, even the owner’s own', async () => {
     const { entity: flag } = await createFeatureFlag({ slug: 'custom:x', ownerModel: ProviderModel.Space, space });
-    const { entity: audience } = await createSegment({ conditions: acmeRule }, { space });
-    const { entity: variant } = await createFeatureFlagVariant({ segment: audience }, { featureFlag: flag });
-    const { entity: internal } = await createSegment(
-      { conditions: acmeRule, featureFlagVariantId: variant.id },
-      { space },
-    );
+    const { entity: internal } = await createSegment({ conditions: acmeRule, featureFlagInternal: true }, { space });
+    await createFeatureFlagVariant({ segment: internal }, { featureFlag: flag });
     const naming = {
       field: 'segmentMembers',
       arrayOperator: 'any',

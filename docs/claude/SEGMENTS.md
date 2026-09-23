@@ -33,9 +33,10 @@ rules may read, including contacts, tags, received communications and other segm
 memberships. `resolvedCustomerRefLens(ownerModel, ownerId)` binds the provider scope.
 Shared lens conditions also restrict related tags and communications to the permitted owner.
 
-A segment carrying `featureFlagVariantId` is a feature flag variant's internal audience: created and
-edited only through that variant, deleted with it, and excluded from lists, pickers and the lens
-`Segment.id` source. See [FEATURE_FLAGS.md](FEATURE_FLAGS.md).
+A segment carrying `featureFlagInternal` is a feature flag variant's internal audience, reached only
+through the variant's `segmentId`: created and edited only through that variant, tombstoned with it,
+excluded from the `Segment.name` uniques, and hidden from lists, pickers, the lens `Segment.id` source
+and the membership routes. See [FEATURE_FLAGS.md](FEATURE_FLAGS.md).
 
 ## Static and dynamic membership
 

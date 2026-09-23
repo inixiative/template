@@ -8,11 +8,42 @@ import {
   type SingleAction,
 } from '@template/db';
 import type { FeatureFlagVariant } from '@template/db/generated/client/client';
-import { castArray } from 'lodash-es';
+import { castArray, keyBy } from 'lodash-es';
 import {
   type FeatureFlagVariantRow,
   validateFeatureFlagVariantRow,
 } from '#/modules/featureFlag/validations/validateFeatureFlagVariantRow';
+
+type Row = Record<string, unknown>;
+
+const internalSegmentWhere = (segmentId: string, deletedAt: Date | null) => ({
+  id: segmentId,
+  featureFlagInternal: true,
+  deletedAt,
+});
+
+const cascadeInternalSegment = async ({ action, args, result, previous }: HookOptions) => {
+  const data = (action === DbAction.upsert ? (args as { update?: Row }).update : (args as { data?: Row }).data) as
+    | Row
+    | undefined;
+  if (!data || !('deletedAt' in data)) return;
+  const previousById = keyBy(castArray((previous ?? []) as FeatureFlagVariant[]), 'id');
+  for (const variant of castArray(result) as FeatureFlagVariant[]) {
+    const prior = previousById[variant.id];
+    if (!variant.segmentId) continue;
+    if (variant.deletedAt === null && prior?.deletedAt) {
+      await db.segment.updateManyAndReturn({
+        where: internalSegmentWhere(variant.segmentId, prior.deletedAt),
+        data: { deletedAt: null },
+      });
+    } else if (variant.deletedAt && !prior?.deletedAt) {
+      await db.segment.updateManyAndReturn({
+        where: internalSegmentWhere(variant.segmentId, null),
+        data: { deletedAt: variant.deletedAt },
+      });
+    }
+  }
+};
 
 export const registerFeatureFlagVariantHook = () => {
   registerDbHook(
@@ -65,5 +96,13 @@ export const registerFeatureFlagVariantHook = () => {
         if (before) await validateFeatureFlagVariantRow(a.update, before);
       }
     },
+  );
+
+  registerDbHook(
+    'featureFlagVariant:internalSegment',
+    'FeatureFlagVariant',
+    HookTiming.after,
+    [DbAction.update, DbAction.updateManyAndReturn, DbAction.upsert],
+    cascadeInternalSegment,
   );
 };

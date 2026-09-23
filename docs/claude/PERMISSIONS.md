@@ -790,8 +790,8 @@ How it works:
 1. Gets the loaded `resource` and `resourceType` from context
 2. Hydrates the resource with relations for ReBAC traversal (org -> space, etc.). A relation tagged
    `/// @permissions(hydrate: false)` in the Prisma schema is not part of the permissions tree and is
-   never walked (a flag's gate, a variant's audience, a segment's internal owner, a member's customer
-   reference); prisma-map surfaces the tag as `annotations.permissions.hydrate`. A relation cycle
+   never walked (a flag's gate, a variant's audience, a member's customer reference); prisma-map
+   surfaces the tag as `annotations.permissions.hydrate`. A relation cycle
    throws rather than recursing — tag one edge to break it.
 3. Checks permission via `check(permix, rebacSchema, resourceType, hydrated, action)`
 4. Throws 403 if check fails

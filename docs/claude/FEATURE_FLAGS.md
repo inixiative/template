@@ -39,11 +39,13 @@ Every user, organization and space is provisioned a platform `CustomerRef` on cr
 (`hooks/platformCustomerRef`), with `db:backfill:platformCustomerRefs` for existing rows.
 
 A variant's audience is a `Segment` of the same owner: a shared one the owner named, or an internal
-one carrying `Segment.featureFlagVariantId`. An internal segment is created and edited only through
-its variant, deleted with it, excluded from segment lists, pickers and the lens `Segment.id` source,
-and refused as a gate or audience by any other flag or variant. A percentage rollout is an internal
-static segment whose rule is `id in [...]`, sampled from the owner's customers of the subject kind
-or from a named segment (`sample: { percent, from? }`). A boolean flag is created with an `on`
+one carrying `Segment.featureFlagInternal`. The variant's `segmentId` is the only edge between the two;
+the internal segment is named `${flag.slug}/${variant.label}` and excluded from the `Segment.name`
+uniques. It is created and edited only through its variant, tombstoned with it, excluded from segment
+lists, pickers, the lens `Segment.id` source and every subject-facing route, and refused as a gate or
+as the audience of any variant but the one already serving it. A hand-picked rollout is an internal
+static segment whose rule is `id in [...]`; percentage sampling is not part of the variant API yet. A
+boolean flag is created with an `on`
 variant over an internal open dynamic segment, so create → toggle `enabled` is the whole kill switch.
 
 ## Resolution
@@ -81,9 +83,9 @@ row segment-less, rule row with a segment, exactly one value column. Label uniqu
 default are partial unique indexes. `writeVariant.ts` owns the internal-segment lifecycle: create with
 the rule, re-point, detach (tombstone) and delete, and refuses more than one audience per write.
 
-Permissions on a variant flow through its flag, never its audience; a flag's gate and a segment's
-internal owner are likewise outside the permissions tree. Those relations carry
-`/// @permissions(hydrate: false)` in the schema so `hydrate` skips them (see PERMISSIONS.md).
+Permissions on a variant flow through its flag, never its audience; a flag's gate is likewise outside
+the permissions tree. Those relations carry `/// @permissions(hydrate: false)` in the schema so
+`hydrate` skips them (see PERMISSIONS.md).
 
 ## Invalidation and live updates
 
@@ -92,9 +94,11 @@ internal owner are likewise outside the permissions tree. Those relations carry
 exempt from `NOOP_FIELDS` so a reorder busts and emits. Any flag or variant write emits
 `featureFlag.changed`, broadcast as a `meReadManyFeatureFlagValues` refetch on one shared channel (the
 values route carries no owner, so the channel cannot either); membership events send the same refetch
-to the affected user. Deleting a variant tombstones its internal segment through the soft-delete cascade
-and publishes `segment.deleted` for its members; re-pointing a variant's audience tombstones the old
-internal segment and releases it.
+to the affected user. A variant's tombstone reaches its internal segment through the `featureFlagVariant`
+hook with the same timestamp (the soft-delete cascade walks parent→child FKs and the segment is not the
+variant's child), so a flag or owner tombstone reaches it too and reviving the variant revives it;
+`deleteVariant` publishes `segment.deleted` for the members. Re-pointing a variant's audience tombstones
+the old internal segment.
 
 ## API
 
@@ -104,16 +108,16 @@ Paths relative to `/api/v1` unless noted:
 | --- | --- |
 | Create, list an owner's flags | `/me/featureFlags`, `/organization/:id/featureFlags`, `/space/:id/featureFlags`; platform: `/admin/featureFlag` |
 | Read, update, delete a flag | `/featureFlag/:id` |
-| Add a variant | `POST /featureFlag/:id/featureFlagVariants` with `segmentId` \| `internalSegment` \| `sample` |
+| Add a variant | `POST /featureFlag/:id/featureFlagVariants` with `segmentId` \| `internalSegment` |
 | Edit, reorder, delete a variant | `PATCH` / `DELETE /featureFlagVariant/:id` (`position` reorders) |
 | Values for the caller | `GET /me/featureFlagValues` |
 | Every owner's flags (superadmin) | `GET /admin/featureFlag`, filter `searchFields[ownerModel]=platform` |
 
 ## Source map
 
-- `packages/db/prisma/schema/featureFlag.prisma`, `segment.prisma` (`featureFlagVariantId`).
+- `packages/db/prisma/schema/featureFlag.prisma`, `segment.prisma` (`featureFlagInternal`).
 - `apps/api/src/modules/featureFlag/`: schemas, services (`resolveFlags`, `checkFlag`,
-  `requestFeatureFlags`, `writeVariant`, `sampleCustomerRefIds`, `createFeatureFlag`), routes, tests.
+  `requestFeatureFlags`, `writeVariant`, `createFeatureFlag`), routes, tests.
 - `apps/api/src/hooks/featureFlag`, `featureFlagVariant`, `featureFlagChanged`, `platformCustomerRef`.
 - `packages/shared/src/utils/slug.ts`: slug and `custom:` schema shared by API and UI.
 

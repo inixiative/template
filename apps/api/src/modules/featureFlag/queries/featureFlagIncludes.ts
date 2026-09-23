@@ -11,7 +11,7 @@ export const includeVariantSegment = {
   segment: {
     select: {
       ...selectSegmentForCustomer,
-      featureFlagVariantId: true,
+      featureFlagInternal: true,
       deletedAt: true,
       _count: { select: { members: true } },
     },

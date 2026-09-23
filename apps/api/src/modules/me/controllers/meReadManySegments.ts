@@ -15,7 +15,7 @@ export const meReadManySegmentsController = makeController(meReadManySegmentsRou
   const user = c.get('user')!;
 
   const { data, pagination } = await paginate(c, db.segment, {
-    where: { ownerModel: 'User', userId: user.id, featureFlagVariantId: null },
+    where: { ownerModel: 'User', userId: user.id, featureFlagInternal: false },
     include: includeSegmentRuleReferences,
   });
 

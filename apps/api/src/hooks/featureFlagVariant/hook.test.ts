@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db } from '@template/db';
+import { clearHookRegistry, db, revive } from '@template/db';
 import type { FeatureFlag, Organization, Segment } from '@template/db/generated/client/client';
 import { FeatureFlagValueType, ProviderModel } from '@template/db/generated/client/enums';
 import {
@@ -10,6 +10,7 @@ import {
   createSegment,
 } from '@template/db/test';
 import { registerFeatureFlagVariantHook } from '#/hooks/featureFlagVariant/hook';
+import { registerSoftDeleteCascadeHook } from '#/hooks/softDeleteCascade/hook';
 
 describe('featureFlagVariant hook', () => {
   let organization: Organization;
@@ -18,6 +19,7 @@ describe('featureFlagVariant hook', () => {
 
   beforeAll(async () => {
     registerFeatureFlagVariantHook();
+    registerSoftDeleteCascadeHook();
     organization = (await createOrganization()).entity;
     audience = (await createSegment({ ownerModel: ProviderModel.Organization, organization })).entity;
     flag = (await createFeatureFlag({ slug: 'custom:theme', ownerModel: ProviderModel.Organization, organization }))
@@ -74,17 +76,59 @@ describe('featureFlagVariant hook', () => {
       'not a live segment of this Organization',
     );
 
-    const { entity: first } = await createFeatureFlagVariant({ segment: audience }, { featureFlag: flag });
     const { entity: internal } = await createSegment({
       ownerModel: ProviderModel.Organization,
       organization,
-      featureFlagVariantId: first.id,
+      featureFlagInternal: true,
     });
-    const own = await db.featureFlagVariant.update({ where: { id: first.id }, data: { segmentId: internal.id } });
+    const { entity: own } = await createFeatureFlagVariant({ segment: internal }, { featureFlag: flag });
     expect(own.segmentId).toBe(internal.id);
+    const kept = await db.featureFlagVariant.update({ where: { id: own.id }, data: { segmentId: internal.id } });
+    expect(kept.segmentId).toBe(internal.id);
 
     await expect(createFeatureFlagVariant({ segment: internal }, { featureFlag: flag })).rejects.toThrow(
       "another variant's internal audience",
     );
+  });
+
+  it('a variant’s tombstone reaches its internal segment, revive brings it back, and a shared audience is untouched', async () => {
+    const { entity: internal } = await createSegment({
+      ownerModel: ProviderModel.Organization,
+      organization,
+      featureFlagInternal: true,
+    });
+    const { entity: variant } = await createFeatureFlagVariant({ segment: internal }, { featureFlag: flag });
+    const { entity: shared } = await createFeatureFlagVariant({ segment: audience }, { featureFlag: flag });
+
+    const deleted = await db.featureFlagVariant.update({ where: { id: variant.id }, data: { deletedAt: new Date() } });
+    expect((await db.segment.findUnique({ where: { id: internal.id } }))?.deletedAt).toEqual(deleted.deletedAt);
+
+    await db.featureFlagVariant.update({ where: { id: shared.id }, data: { deletedAt: new Date() } });
+    expect((await db.segment.findUnique({ where: { id: audience.id } }))?.deletedAt).toBeNull();
+
+    await revive(db.featureFlagVariant, { id: variant.id });
+    expect((await db.segment.findUnique({ where: { id: internal.id } }))?.deletedAt).toBeNull();
+  });
+
+  it('a flag’s tombstone cascades through its variants to their internal segments with one timestamp', async () => {
+    const { entity: doomed } = await createFeatureFlag({
+      slug: 'custom:doomed',
+      ownerModel: ProviderModel.Organization,
+      organization,
+    });
+    const { entity: internal } = await createSegment({
+      ownerModel: ProviderModel.Organization,
+      organization,
+      featureFlagInternal: true,
+    });
+    const { entity: variant } = await createFeatureFlagVariant({ segment: internal }, { featureFlag: doomed });
+
+    const dead = await db.featureFlag.update({ where: { id: doomed.id }, data: { deletedAt: new Date() } });
+    expect((await db.featureFlagVariant.findUnique({ where: { id: variant.id } }))?.deletedAt).toEqual(dead.deletedAt);
+    expect((await db.segment.findUnique({ where: { id: internal.id } }))?.deletedAt).toEqual(dead.deletedAt);
+
+    await revive(db.featureFlag, { id: doomed.id });
+    expect((await db.featureFlagVariant.findUnique({ where: { id: variant.id } }))?.deletedAt).toBeNull();
+    expect((await db.segment.findUnique({ where: { id: internal.id } }))?.deletedAt).toBeNull();
   });
 });

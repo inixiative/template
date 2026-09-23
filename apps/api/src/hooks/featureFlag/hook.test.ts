@@ -67,12 +67,12 @@ describe('featureFlag hook', () => {
     });
     expect(gated.segmentId).toBe(ours.id);
 
-    const { entity: variant } = await createFeatureFlagVariant({ segment: ours }, { featureFlag: gated });
     const { entity: internal } = await createSegment({
       ownerModel: ProviderModel.Organization,
       organization,
-      featureFlagVariantId: variant.id,
+      featureFlagInternal: true,
     });
+    await createFeatureFlagVariant({ segment: internal }, { featureFlag: gated });
     await expect(
       createFeatureFlag({
         slug: 'custom:other',
@@ -80,6 +80,6 @@ describe('featureFlag hook', () => {
         organization,
         segment: internal,
       }),
-    ).rejects.toThrow("another variant's internal audience");
+    ).rejects.toThrow("a feature flag variant's internal audience");
   });
 });
