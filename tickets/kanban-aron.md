@@ -70,7 +70,7 @@ kanban
 - [INFRA-019: json-rules target sharp edges](./INFRA-019-json-rules-target-sharp-edges.md) - Backlog of check-only operators / target asymmetry
 
 **Developer Tooling:**
-- [DEV-004: prisma-map doc-comment tags](./DEV-004-prisma-map-doc-comment-tags.md) - `///` tag for self-relation parent direction → factory traversal + hydration tree auto-fill (feature lives in `@inixiative/prisma-map`)
+- [DEV-004: prisma-map doc-comment tags](./DEV-004-prisma-map-doc-comment-tags.md) - `///` annotation DSL; `@permissions(hydrate: false)` shipped with FEAT-003; `@permissions(side: …)` (provider/customer chains on CustomerRef) and `@tree.parent` pending
 
 **Features:**
 - [FEAT-002: Notes System](./FEAT-002-notes-system.md) - Polymorphic notes (from Carde)

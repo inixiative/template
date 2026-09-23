@@ -922,6 +922,13 @@ Additionally, org/space admins can delete tokens within their scope via delegati
 
 ## Future Work
 
+### Relation sides
+
+A model between two parties (CustomerRef: provider and customer) has two ancestry chains, and each
+action belongs to one. Planned: `/// @permissions(side: provider|customer)` on the edges, hydration
+and the action's fan-out driven by the side being acted on. Design and open questions in
+`tickets/DEV-004-prisma-map-doc-comment-tags.md`.
+
 ### Groups
 
 Permission groups for bulk assignment:

@@ -1,10 +1,10 @@
 # DEV-004: prisma-map — parse `///` doc-comment tags (self-relation parent direction)
 
-**Status**: 🚧 In Progress (`@tagClass` DSL shipped in `@inixiative/prisma-map`; template consumption + vocab pending)
+**Status**: 🚧 In Progress (`@tagClass` DSL shipped in `@inixiative/prisma-map` 0.2.0; template consumes it as of FEAT-003 PR #115 — first vocab `@permissions(hydrate: false)`; `@tree.parent` and `@permissions(side: …)` pending)
 **Assignee**: TBD
 **Priority**: Medium
 **Created**: 2026-06-12
-**Updated**: 2026-06-12
+**Updated**: 2026-09-22
 **Repo**: `@inixiative/prisma-map` (the feature lives in the lib; tracked here because template/Zealot/Tribe all consume it)
 
 ---
@@ -32,13 +32,49 @@ model Category {
 }
 ```
 
-## Key implementation note
+## How it landed (prisma-map 0.2.0)
 
-- The **runtime** DMMF (`Prisma.dmmf`) strips `documentation` for bundle size — so the tag MUST be
-  read at **build time**, in prisma-map's generator step, via `@prisma/internals` `getDMMF()`
-  (which keeps `documentation`). Template's `packages/db/scripts/generatePrismaMap.ts` is the seam.
-- Emit a `parentSide` / `treeParent` flag on the self-relation entry in the map (alongside the
-  existing FK-direction metadata — same mandate).
+- Prisma v7 preserves `///` comments in the generated client's `inlineSchema`; prisma-map's v7
+  builder parses `@<tagClass>(<key>: <value>, …)` out of them and records the bag under
+  `annotations` on the model, field, or index it sits above. Multiple tag classes per line, multiple
+  keys per class. Template's `generatePrismaMap.ts` needed no change.
+- The map records; the consumer decides what a tag means. Template surfaces `annotations` on
+  `RelationInfo` (`packages/db/src/utils/prismaMapRelations.ts`).
+
+## Vocabulary in use
+
+### `@permissions(hydrate: false)` — shipped (FEAT-003)
+
+"This relation is not part of the permissions tree." `isPermissionEdge` filters it out of
+`hydrate()` and `relationTargetsGen`. Tagged: `FeatureFlag.segment`, `FeatureFlagVariant.segment`,
+`Segment.inlineForVariant`, `SegmentMember.customerRef`. It replaced a runtime cycle guard: the
+variant ↔ inline-segment pair is the schema's first mutual-FK cycle, and `hydrate()` now throws on
+a cycle instead of walking it — the fix is to tag an edge, not to truncate at runtime.
+
+### `@permissions(side: …)` — decided in principle, not built
+
+A model that sits between two parties has two chains of ancestry, and an action belongs to one of
+them. CustomerRef is the case that surfaced it: the **provider** (`providerOrganization` /
+`providerSpace` / `providerUser`, or platform) grants and manages the relationship; the **customer**
+(`customerUser` / `customerOrganization` / `customerSpace`) owns their own communication settings
+on the same row. Both parties edit the model; their permissions must traverse separate sides of the
+tree and never meet.
+
+- Declare the side on the edge: `/// @permissions(side: provider)` on the three provider relations,
+  `side: customer` on the three customer relations. Composes with `hydrate: false` in one tag class.
+- The side is an input to hydration and to the check: "which side am I acting on" → hydrate that
+  side only, and the action's `rel:` fan-out (today's `ownerActions()` shape) is derived from the
+  edges carrying that side rather than hand-listed. Rebac then asks the row exactly one question per
+  action: are you the parent, or are you the child?
+- Platform as provider has no FK; that side resolves to superadmin.
+- **Open:** where the side → action mapping lives (the rebac schema entry, or the tag itself).
+  CustomerRef has no rebac entry and no routes yet, so nothing forces the call.
+
+### `@tree.parent` — original motivation, not built
+
+Self-relation parent direction for factory traversal and tree auto-fill (below). `Inquiry.parent`
+is the current self-relation; today `hydrate()` walks it upward because only the parent side carries
+the FK.
 
 ## Powers
 
@@ -46,12 +82,10 @@ model Category {
   auto-building related records.
 - **Hydration tree auto-fill** — expand the child side to materialize the tree.
 
-## Open questions (brainstorm tag vocabulary before building)
+## Open questions
 
-- Just `@tree.parent` on the parent-pointing field? Or also `@tree.root` / ordering hints
-  (`@tree.order`) for sortable trees?
-- One tag namespace (`@tree.*`) vs. a flatter convention.
-- Does prisma-map already expose a doc-comment passthrough we extend, or is this net-new parsing?
+- `@tree.parent` alone, or also `@tree.root` / ordering hints (`@tree.order`) for sortable trees?
+- Where `@permissions(side: …)` is consumed (see above).
 
 ## Related Tickets
 
@@ -60,4 +94,4 @@ model Category {
 
 ---
 
-_Stub ticket — captures the design from the 2026-06-12 product/architecture session. Expand and finalize tag vocabulary when prioritized._
+_Captures the 2026-06-12 design session and the 2026-09-22 FEAT-003 ruling (annotation over runtime guard; sides). Expand the vocabulary when prioritized._
