@@ -4,20 +4,17 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/lib.sh"
 ROOT_DIR="$(main_checkout_root "$SCRIPT_DIR")"
+MAIN_REAL="$(real_dir "$ROOT_DIR")"
 
 printf "\n%-6s %-35s %-40s %s\n" "Slot" "Name" "Branch" "Ports (web/admin/super/api)"
 printf "%-6s %-35s %-40s %s\n" "----" "----" "------" "----------------------------"
 
-while IFS= read -r line; do
-  wt_path="$(echo "$line" | awk '{print $1}')"
-  branch="$(echo "$line" | sed -n 's/.*\[\(.*\)\].*/\1/p')"
-  [ -z "$branch" ] && branch="(detached)"
-
+print_row() {
+  local wt_path="$1" branch="$2" name slot ports
   name="$(basename "$wt_path")"
   slot="$(env_value "$wt_path/.env.local" WORKTREE_SLOT)"
-
   if [ -z "$slot" ]; then
-    if [ "$wt_path" = "$ROOT_DIR" ]; then
+    if [ "$(real_dir "$wt_path")" = "$MAIN_REAL" ]; then
       name="(main)"
       slot="0"
       ports="$(slot_ports 0)"
@@ -28,8 +25,23 @@ while IFS= read -r line; do
   else
     ports="$(slot_ports "$slot")"
   fi
-
   printf "%-6s %-35s %-40s %s\n" "$slot" "$name" "$branch" "$ports"
-done < <(git -C "$ROOT_DIR" worktree list)
+}
+
+wt_path=""
+branch=""
+while IFS= read -r line; do
+  case "$line" in
+    "worktree "*) wt_path="${line#worktree }"; branch="" ;;
+    "branch "*) branch="${line#branch refs/heads/}" ;;
+    detached) branch="(detached)" ;;
+    "") [ -n "$wt_path" ] && print_row "$wt_path" "${branch:-(detached)}"; wt_path="" ;;
+  esac
+done < <(git -C "$ROOT_DIR" worktree list --porcelain; echo)
+
+while IFS= read -r dup; do
+  [ -n "$dup" ] || continue
+  warn "Slot registry conflict: ${dup%%:*} is registered under slots${dup#*:} — fix .worktrees/.slots/ so each worktree owns one slot."
+done < <(registry_duplicates)
 
 echo

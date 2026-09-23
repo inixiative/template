@@ -6,7 +6,6 @@ source "$SCRIPT_DIR/lib.sh"
 ROOT_DIR="$(main_checkout_root "$SCRIPT_DIR")"
 PROJECT_NAME="$(project_name "$ROOT_DIR")"
 PG_CONTAINER="${PROJECT_NAME}_postgres"
-MINIO_CONTAINER="${PROJECT_NAME}_minio"
 
 NAME=""
 FORCE=0
@@ -27,7 +26,7 @@ if [ -z "$NAME" ]; then
   exit 1
 fi
 
-if echo "$NAME" | grep -qE '(^\.|\.\.|/)'; then
+if [[ "$NAME" =~ (^\.|\.\.|/) ]]; then
   die "Error: Name cannot start with '.' or contain '..' or path separators"
 fi
 
@@ -44,6 +43,9 @@ elif [ -f "$WORKTREE_DIR/.git" ]; then
 else
   die "Error: $WORKTREE_DIR is not a git worktree (no .git file, not registered). Refusing to delete it."
 fi
+
+worktree_shares_main_git "$WORKTREE_DIR" \
+  || die "Error: $WORKTREE_DIR does not belong to this repository (its git common dir is not $ROOT_DIR/.git). Refusing to delete an independent repository."
 
 if [ "$REGISTERED" -eq 1 ]; then
   info "$(branch_merge_status "$WORKTREE_DIR")"
@@ -103,18 +105,15 @@ else
       warn "Warning: $PG_CONTAINER not running — databases NOT dropped. worktree:create drops them when it reclaims slot $SLOT."
     fi
 
-    if [ "$(container_state "$MINIO_CONTAINER")" = "true" ]; then
-      info "Removing MinIO buckets for slot ${SLOT}..."
-      for BUCKET in "$STORAGE_BUCKET_SYSTEM" "$STORAGE_BUCKET_USER" \
-                    "$STORAGE_BUCKET_SYSTEM_TEST" "$STORAGE_BUCKET_USER_TEST"; do
-        "$DOCKER" run --rm --network "${PROJECT_NAME}_default" \
-          -e MC_HOST_local="http://minioadmin:minioadmin@minio:9000" \
-          minio/mc:latest rb --force "local/${BUCKET}" >/dev/null 2>&1 || true
-      done
-      ok "MinIO buckets removed"
-    else
-      warn "Warning: $MINIO_CONTAINER not running — buckets NOT removed."
-    fi
+    info "Removing MinIO buckets for slot ${SLOT}..."
+    MINIO_REMOVE="$SCRIPT_DIR/../db/minio-remove.sh"
+    STORAGE_ENDPOINT="$(env_value "$ROOT_DIR/.env.local" STORAGE_ENDPOINT)" \
+    STORAGE_ACCESS_KEY_ID="$(env_value "$ROOT_DIR/.env.local" STORAGE_ACCESS_KEY_ID)" \
+    STORAGE_SECRET_ACCESS_KEY="$(env_value "$ROOT_DIR/.env.local" STORAGE_SECRET_ACCESS_KEY)" \
+    PATH="$(dirname "$DOCKER"):$PATH" bash "$MINIO_REMOVE" \
+      "$STORAGE_BUCKET_SYSTEM" "$STORAGE_BUCKET_USER" \
+      "$STORAGE_BUCKET_SYSTEM_TEST" "$STORAGE_BUCKET_USER_TEST" \
+      || warn "Warning: bucket removal did not complete."
 
     REDIS_CONTAINER="$(container_on_port 6379)"
     if [ -z "$REDIS_CONTAINER" ]; then

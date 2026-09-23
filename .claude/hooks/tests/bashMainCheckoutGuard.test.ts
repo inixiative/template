@@ -1,5 +1,16 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'bun:test';
-import { cpSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs';
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  utimesSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import {
@@ -20,6 +31,7 @@ let mainRoot: string;
 let worktreeRoot: string;
 let plainDir: string;
 let foreignRoot: string;
+let foreignWorktree: string;
 let unregisteredRoot: string;
 let linkToMain: string;
 let linkToWorktree: string;
@@ -90,6 +102,9 @@ beforeAll(() => {
 
   foreignRoot = join(sandbox, 'other-repo');
   git('init', '-q', '-b', 'main', foreignRoot);
+  git('-C', foreignRoot, 'commit', '-q', '--allow-empty', '-m', 'init');
+  foreignWorktree = join(foreignRoot, '.worktrees/OTHER-1');
+  git('-C', foreignRoot, 'worktree', 'add', '-q', foreignWorktree, '-b', 'OTHER-1');
 
   unregisteredRoot = join(sandbox, 'unregistered-copy');
   cpSync(worktreeRoot, unregisteredRoot, { recursive: true });
@@ -121,6 +136,8 @@ describe('isMutating', () => {
       'git -c core.editor=true rebase origin/main',
       'git --git-dir=.git cherry-pick abc',
       'git merge feature',
+      'git revert abc',
+      'git am patch.mbox',
       'git worktree add ../x',
       'git worktree remove x',
       'git worktree move x ../y',
@@ -154,11 +171,28 @@ describe('isMutating', () => {
     }
   });
 
+  test('C3: option values after the subcommand are consumed, not read as packages', () => {
+    for (const command of [
+      `bun install --cwd ${'/tmp'}`,
+      'bun install --filter web',
+      'bun install --backend hardlink',
+      'bun install --registry https://r.example',
+      'bun install --config bunfig.toml',
+      'bun i --cwd=apps/api',
+    ]) {
+      expect(isMutating(command), command).toBe(false);
+    }
+    expect(isMutating('bun add x --cwd apps/api')).toBe(true);
+    expect(isMutating('bun add --cwd apps/api x')).toBe(true);
+    expect(isMutating('bun install --filter web left-pad')).toBe(true);
+  });
+
   test('addendum C: every bun --cwd / run form of the migrate script', () => {
     for (const command of [
       'bun --cwd packages/db db:migrate',
       'bun run --cwd packages/db db:migrate',
       'bun --cwd packages/db run db:migrate',
+      'bun run db:migrate --cwd packages/db',
       'bun --cwd packages/db prisma migrate dev',
       'bun run --cwd packages/db prisma migrate dev',
     ]) {
@@ -187,6 +221,11 @@ describe('isMutating', () => {
     ]) {
       expect(isMutating(command), JSON.stringify(command)).toBe(true);
     }
+  });
+
+  test('Z7: a backslash-newline inside a word is removed, not turned into a space', () => {
+    expect(isMutating('git pu\\\nsh')).toBe(true);
+    expect(isMutating('bun a\\\ndd x')).toBe(true);
   });
 
   test('finding 2: wrappers, env assignments, shell -c, eval, and compound bodies are seen through', () => {
@@ -228,6 +267,54 @@ describe('isMutating', () => {
     }
   });
 
+  test('C8: word-0 spellings and runner options are normalised', () => {
+    for (const command of [
+      '\\git push',
+      '"git" push',
+      'gi""t push',
+      "'git' push",
+      '/usr/bin/git push',
+      "$'git' push",
+      'command -p git push',
+      'exec -a x git push',
+      'env -u FOO git push',
+      'time -p git push',
+      'sudo -u me git push',
+      'nohup -- git push',
+      'xargs -n 1 git push',
+      'xargs -I {} git push {}',
+      "bash -o pipefail -c 'git push'",
+      'bash -eo pipefail -c "git push"',
+      'echo "$(git push)"',
+      'echo "`git push`"',
+      'x=$(git push)',
+      'echo `git push`',
+      './node_modules/.bin/bun add x',
+    ]) {
+      expect(isMutating(command), command).toBe(true);
+    }
+    expect(isMutating('command -v git')).toBe(false);
+    expect(isMutating('command -V git push')).toBe(false);
+  });
+
+  test('C9: a comment does not split the line, and the text before it is analysed as usual', () => {
+    expect(isMutating('echo hi # ; git push')).toBe(false);
+    expect(isMutating('echo hi # git push\nls')).toBe(false);
+    expect(isMutating('git push # done')).toBe(true);
+    expect(isMutating('echo $# && git push')).toBe(true);
+  });
+
+  test('Z3: a here-string is not a heredoc', () => {
+    expect(isMutating('cat <<< "x"\ngit push')).toBe(true);
+    expect(isMutating('cat <<< "git push"')).toBe(false);
+  });
+
+  test('Z7: double quotes inside $( ) are balanced', () => {
+    expect(isMutating('echo "$(echo "a"; git push)"')).toBe(true);
+    expect(isMutating('echo "$(echo "a")" && git status')).toBe(false);
+    expect(isMutating('echo "$(echo ")")"; git push')).toBe(true);
+  });
+
   test('finding 4: quoted strings and heredoc bodies are never matched', () => {
     for (const command of [
       'gh pr comment 1 --body "fix; git push later"',
@@ -255,11 +342,19 @@ describe('isMutating', () => {
       'git rebase --continue',
       'git rebase --quit',
       'git cherry-pick --skip',
+      'git revert --continue',
+      'git am --abort',
       'git worktree list',
       'git worktree prune --dry-run',
       'git commit --dry-run',
       'bun add --dry-run left-pad',
     ]) {
+      expect(isMutating(command), command).toBe(false);
+    }
+  });
+
+  test('by design outside the set: pull, reset, checkout', () => {
+    for (const command of ['git pull', 'git pull --rebase', 'git reset --hard HEAD~1', 'git checkout -- .']) {
       expect(isMutating(command), command).toBe(false);
     }
   });
@@ -291,9 +386,16 @@ describe('isMutating', () => {
   test('a command after a heredoc body is still analysed', () => {
     expect(isMutating('cat <<EOF\nhello\nEOF\ngit push')).toBe(true);
   });
+
+  test('Z8: nesting deeper than the cap is reported as a landing rather than dropped', () => {
+    const nested = 'echo $(echo $(echo $(echo $(echo $(echo $(echo $(git push)))))))';
+    const landings = mutationsIn(nested, mainRoot);
+    expect(landings.length).toBe(1);
+    expect(landings[0].reason).toContain('nested more deeply');
+  });
 });
 
-describe('mutationsIn: effective directory per segment (finding 3, addendum C)', () => {
+describe('mutationsIn: effective directory per segment', () => {
   test('a cd applies to the segments after it, in order', () => {
     expect(directories(`cd ${worktreeRoot} && git push`)).toEqual([worktreeRoot]);
     expect(directories(`cd ${worktreeRoot} && cd .. && git push`)).toEqual([join(mainRoot, '.worktrees')]);
@@ -306,15 +408,45 @@ describe('mutationsIn: effective directory per segment (finding 3, addendum C)',
     expect(directories(`cd ${worktreeRoot};git push`)).toEqual([worktreeRoot]);
     expect(directories(`cd ${worktreeRoot}&&git push`)).toEqual([worktreeRoot]);
     expect(directories(`cd ${worktreeRoot}||git push`)).toEqual([worktreeRoot]);
-    expect(directories(`cd ${worktreeRoot}|git push`)).toEqual([worktreeRoot]);
   });
 
-  test('git -C and bun --cwd apply only to their own segment', () => {
+  test('C2: a cd inside a subshell, a pipe, or a background job does not move the outer cursor', () => {
+    expect(directories(`(cd ${worktreeRoot}) && git push`)).toEqual([mainRoot]);
+    expect(directories(`(cd ${worktreeRoot} && bun run check) && git commit -m x`)).toEqual([mainRoot]);
+    expect(directories(`(cd ${worktreeRoot}); git push`)).toEqual([mainRoot]);
+    expect(directories(`cd ${worktreeRoot} | cat; git push`)).toEqual([mainRoot]);
+    expect(directories(`cd ${worktreeRoot} & git push`)).toEqual([mainRoot]);
+    expect(directories(`cd ${worktreeRoot} |& cat; git push`)).toEqual([mainRoot]);
+    expect(directories(`{ cd ${worktreeRoot}; } && git push`)).toEqual([worktreeRoot]);
+    expect(directories(`(cd ${worktreeRoot} && git push)`)).toEqual([worktreeRoot]);
+    expect(directories(`(cd ${worktreeRoot}; (cd ..); git push)`)).toEqual([worktreeRoot]);
+    expect(directories('echo done 2>&1 && git push')).toEqual([mainRoot]);
+  });
+
+  test('C9: cd options are not mistaken for the target', () => {
+    expect(directories(`cd -P ${worktreeRoot} && git push`)).toEqual([worktreeRoot]);
+    expect(directories(`cd -L -- ${worktreeRoot} && git push`)).toEqual([worktreeRoot]);
+    expect(mutationsIn(`cd -P && git push`, mainRoot)[0].directory).not.toBe(mainRoot);
+  });
+
+  test('Z4: a substitution or unexpanded variable in a cd target makes the cursor unknown', () => {
+    expect(mutationsIn(`cd ${worktreeRoot} && cd $(pwd) && git push`, mainRoot)[0].directory).toBeUndefined();
+    expect(mutationsIn(`cd ${worktreeRoot} && cd "$X" && git push`, mainRoot)[0].directory).toBeUndefined();
+    expect(mutationsIn(`cd ${worktreeRoot} && cd \`pwd\` && git push`, mainRoot)[0].directory).toBeUndefined();
+    expect(mutationsIn('cd ~/"$X" && git push', mainRoot)[0].directory).toBeUndefined();
+  });
+
+  test('git -C applies only to its own segment; bun --cwd anywhere in its segment is the directory', () => {
     expect(directories(`git -C ${worktreeRoot} status && git push`)).toEqual([mainRoot]);
     expect(directories(`git -C ${worktreeRoot} push && git status`)).toEqual([worktreeRoot]);
     expect(directories(`cd ${worktreeRoot} && git -C . push`)).toEqual([worktreeRoot]);
     expect(directories(`cd ${worktreeRoot} && bun --cwd . add x`)).toEqual([worktreeRoot]);
     expect(directories(`bun --cwd ${worktreeRoot}/apps/api add x`)).toEqual([join(worktreeRoot, 'apps/api')]);
+    expect(directories(`bun add x --cwd ${worktreeRoot}`)).toEqual([worktreeRoot]);
+    expect(directories(`bun add x --cwd=${worktreeRoot}`)).toEqual([worktreeRoot]);
+    expect(directories(`bun run db:migrate --cwd ${worktreeRoot}/packages/db`)).toEqual([
+      join(worktreeRoot, 'packages/db'),
+    ]);
     expect(directories('bun run --cwd packages/db db:migrate')).toEqual([join(mainRoot, 'packages/db')]);
     expect(directories('bun --cwd packages/db db:migrate')).toEqual([join(mainRoot, 'packages/db')]);
     expect(directories('bun --cwd packages/db run db:migrate')).toEqual([join(mainRoot, 'packages/db')]);
@@ -328,6 +460,30 @@ describe('mutationsIn: effective directory per segment (finding 3, addendum C)',
     expect(mutationsIn(`cd ${linkToMain} && git push`, mainRoot)[0].named).toBe(linkToMain);
     expect(mutationsIn(`cd ${mainRoot} && git push`, mainRoot)[0].named).toBe(mainRoot);
     expect(mutationsIn('cd apps/api && git push', mainRoot)[0].named).toBeUndefined();
+  });
+
+  test('C8: --git-dir, --work-tree, GIT_DIR and GIT_WORK_TREE redirect the landing', () => {
+    expect(mutationsIn(`cd ${worktreeRoot} && git --git-dir=${mainRoot}/.git push`, mainRoot)[0]).toMatchObject({
+      directory: mainRoot,
+      redirect: '--git-dir',
+    });
+    expect(mutationsIn(`cd ${worktreeRoot} && git --work-tree ${mainRoot} commit -m x`, mainRoot)[0]).toMatchObject({
+      directory: mainRoot,
+      redirect: '--work-tree',
+    });
+    expect(mutationsIn(`cd ${worktreeRoot} && GIT_DIR=${mainRoot}/.git git push`, mainRoot)[0]).toMatchObject({
+      directory: mainRoot,
+      redirect: 'GIT_DIR',
+    });
+    expect(mutationsIn(`cd ${worktreeRoot} && GIT_WORK_TREE=${mainRoot} git commit -m x`, mainRoot)[0]).toMatchObject({
+      directory: mainRoot,
+      redirect: 'GIT_WORK_TREE',
+    });
+    expect(mutationsIn(`git --git-dir=${worktreeRoot}/.git push`, mainRoot)[0]).toMatchObject({
+      directory: worktreeRoot,
+      redirect: '--git-dir',
+    });
+    expect(mutationsIn('GIT_DIR=/does/not/exist git push', mainRoot)[0].directory).toBeUndefined();
   });
 
   test('unknown targets leave the directory unresolved', () => {
@@ -354,6 +510,15 @@ describe('mutationsIn: effective directory per segment (finding 3, addendum C)',
     expect(mutationsIn(`cd ${worktreeRoot} && bash -c 'git push'`, mainRoot)[0].directory).toBe(worktreeRoot);
     expect(mutationsIn(`bash -c 'cd ${worktreeRoot} && git push'`, mainRoot)[0].directory).toBe(worktreeRoot);
     expect(mutationsIn(`eval "cd ${worktreeRoot}; git push"`, mainRoot)[0].directory).toBe(worktreeRoot);
+    expect(mutationsIn(`bash -o pipefail -c 'cd ${worktreeRoot} && git push'`, mainRoot)[0].directory).toBe(
+      worktreeRoot,
+    );
+  });
+
+  test('C9: the landing carries the original segment text, keywords stripped, runners kept', () => {
+    expect(mutationsIn('FOO="a b" git push', mainRoot)[0].command).toBe('FOO="a b" git push');
+    expect(mutationsIn('if true; then git commit -m "x y"; fi', mainRoot)[0].command).toBe('git commit -m "x y"');
+    expect(mutationsIn('cd /does/not/exist; rtk proxy git push', mainRoot)[0].command).toBe('rtk proxy git push');
   });
 });
 
@@ -381,6 +546,15 @@ describe('bashMainCheckoutGuard', () => {
     expect(reason).toContain('reached by a relative path');
   });
 
+  test('C9: the deny message quotes the original text and prefixes cd only onto the bare mutation', () => {
+    visitWorktree();
+    const reason = fromMain('cd /does/not/exist; FOO="a b" git push') ?? '';
+    expect(reason).toContain('`FOO="a b" git push`');
+    expect(reason).toContain(`  cd ${worktreeRoot} && FOO="a b" git push`);
+    expect(reason).not.toContain(`&& cd /does/not/exist`);
+    expect(reason).not.toContain('�');
+  });
+
   test('finding 1: a hidden second line from main is denied', () => {
     visitWorktree();
     expect(fromMain('echo hi\ngit push')).toBeDefined();
@@ -388,7 +562,7 @@ describe('bashMainCheckoutGuard', () => {
     expect(fromMain('git \\\n push')).toBeDefined();
   });
 
-  test('finding 2: wrappers from main are denied', () => {
+  test('finding 2 and C8: wrappers from main are denied', () => {
     visitWorktree();
     for (const command of [
       'FOO=1 git push',
@@ -396,6 +570,10 @@ describe('bashMainCheckoutGuard', () => {
       'sh -c "git push"',
       'eval "git push"',
       '{ git push; }',
+      '\\git push',
+      '/usr/bin/git push',
+      'sudo -u me git push',
+      'echo "$(git push)"',
     ]) {
       expect(fromMain(command), command).toBeDefined();
     }
@@ -408,6 +586,25 @@ describe('bashMainCheckoutGuard', () => {
     }
     expect(fromMain('bun install')).toBeUndefined();
     expect(fromMain('bun i')).toBeUndefined();
+    expect(fromMain(`bun install --cwd ${worktreeRoot}`)).toBeUndefined();
+    expect(fromMain('bun install --filter web')).toBeUndefined();
+  });
+
+  test('C3: a post-subcommand --cwd naming the worktree lifts', () => {
+    visitWorktree();
+    expect(fromMain(`bun add left-pad --cwd ${worktreeRoot}`)).toBeUndefined();
+    expect(fromMain(`bun add left-pad --cwd=${worktreeRoot}/apps/api`)).toBeUndefined();
+    expect(fromMain('bun add left-pad --cwd apps/api')).toBeDefined();
+  });
+
+  test('C2: subshell, pipe, and background cds do not lift the outer command', () => {
+    visitWorktree();
+    expect(fromMain(`(cd ${worktreeRoot}) && git push`)).toBeDefined();
+    expect(fromMain(`(cd ${worktreeRoot} && bun run check) && git commit -m x`)).toBeDefined();
+    expect(fromMain(`cd ${worktreeRoot} | cat; git push`)).toBeDefined();
+    expect(fromMain(`cd ${worktreeRoot} & git push`)).toBeDefined();
+    expect(fromMain(`{ cd ${worktreeRoot}; } && git push`)).toBeUndefined();
+    expect(fromMain(`(cd ${worktreeRoot} && git push)`)).toBeUndefined();
   });
 
   test('finding 3: naming a worktree somewhere in the command does not whitelist the whole command', () => {
@@ -428,12 +625,23 @@ describe('bashMainCheckoutGuard', () => {
     expect(fromMain('cd .worktrees/FEAT-1234 && git push')).toBeUndefined();
     expect(fromMain(`cd ${worktreeRoot};git push`)).toBeUndefined();
     expect(fromMain(`cd ${worktreeRoot}&&git push`)).toBeUndefined();
+    expect(fromMain(`cd -P ${worktreeRoot} && git push`)).toBeUndefined();
     expect(fromMain(`git -C ${worktreeRoot} commit -m x`)).toBeUndefined();
     expect(fromMain('git -C .worktrees/FEAT-1234 commit -m x')).toBeUndefined();
     expect(fromMain(`git -C ${worktreeRoot} push && git status`)).toBeUndefined();
     expect(fromMain(`cd ${worktreeRoot} && git -C . push`)).toBeUndefined();
     expect(fromMain(`bun --cwd ${worktreeRoot} add left-pad`)).toBeUndefined();
     expect(fromMain(`bash -c 'cd ${worktreeRoot} && git push'`)).toBeUndefined();
+  });
+
+  test('C8: git-dir or work-tree pointing at main is denied even from a worktree cd', () => {
+    visitWorktree();
+    expect(fromMain(`cd ${worktreeRoot} && git --git-dir=${mainRoot}/.git push`)).toContain('through --git-dir');
+    expect(fromMain(`cd ${worktreeRoot} && GIT_DIR=${mainRoot}/.git git push`)).toContain('through GIT_DIR');
+    expect(fromMain(`cd ${worktreeRoot} && GIT_WORK_TREE=${mainRoot} git commit -m x`)).toContain(
+      'through GIT_WORK_TREE',
+    );
+    expect(fromMain(`git --git-dir=${worktreeRoot}/.git push`)).toBeUndefined();
   });
 
   test('addendum C: the main checkout is lifted only by its own absolute path, for cd and -C alike', () => {
@@ -448,8 +656,9 @@ describe('bashMainCheckoutGuard', () => {
 
   test('addendum C: a symlink to the main checkout does not lift, a symlink to a worktree does', () => {
     visitWorktree();
-    const throughLink = fromMain(`cd ${linkToMain} && git push`);
-    expect(throughLink).toContain(`through ${linkToMain}, which is not its own absolute path`);
+    expect(fromMain(`cd ${linkToMain} && git push`)).toContain(
+      `through ${linkToMain}, which is not its own absolute path`,
+    );
     expect(fromMain(`git -C ${linkToMain} push`)).toBeDefined();
     expect(fromMain(`bun --cwd ${linkToMain} add x`)).toBeDefined();
     expect(fromMain(`cd ${linkToWorktree} && git push`)).toBeUndefined();
@@ -465,17 +674,29 @@ describe('bashMainCheckoutGuard', () => {
     expect(fromMain(`cd ${foreignRoot} && git push`)).toContain('registered worktrees');
   });
 
+  test('Z4: a substitution in a cd target is unknown and therefore denied', () => {
+    visitWorktree();
+    expect(fromMain(`cd ${worktreeRoot} && cd $(pwd) && git push`)).toBeDefined();
+    expect(fromMain(`cd ${worktreeRoot} && cd "$X" && git push`)).toBeDefined();
+  });
+
   test('a cd whose target does not exist does not bypass the guard', () => {
     visitWorktree();
-    const missing = fromMain('cd /does/not/exist; git push');
-    expect(missing).toContain('cannot resolve');
+    expect(fromMain('cd /does/not/exist; git push')).toContain('cannot resolve');
     expect(fromMain('cd /bad || git commit -m x')).toBeDefined();
     expect(fromMain('cd "$SOMEWHERE" && git push')).toBeDefined();
     expect(fromMain('git -C /does/not/exist commit -m x')).toContain('names /does/not/exist');
     expect(fromMain(`cd ${worktreeRoot} && git -C /does/not/exist push`)).toBeDefined();
   });
 
-  test('finding 4: mention-only text and non-mutating forms pass from main', () => {
+  test('Z8: over-deep nesting is denied, not silently allowed', () => {
+    visitWorktree();
+    expect(fromMain('echo $(echo $(echo $(echo $(echo $(echo $(echo $(git push)))))))')).toContain(
+      'nested more deeply',
+    );
+  });
+
+  test('finding 4 and C9: mention-only text, comments, and non-mutating forms pass from main', () => {
     visitWorktree();
     for (const command of [
       'gh pr comment 1 --body "fix; git push later"',
@@ -485,6 +706,8 @@ describe('bashMainCheckoutGuard', () => {
       'rg "git commit|git push" .',
       'gh pr create --body "$(cat <<EOF\nx; git push\nEOF\n)"',
       'cat <<EOF\ngit push\nEOF',
+      'echo hi # ; git push',
+      'cat <<< "git push"',
       'git push --dry-run',
       'git merge --abort',
       'git rebase --continue',
@@ -523,6 +746,16 @@ describe('bashMainCheckoutGuard', () => {
     expect(fromMain('git commit -m x')).toBeUndefined();
   });
 
+  test("Z5: a remembered worktree of another repository does not arm this repository's guard", () => {
+    guard(bash('ls', foreignWorktree), state);
+    expect(state.lastWorktree(SESSION)).toBe(foreignWorktree);
+    expect(fromMain('git push')).toBeUndefined();
+    state.rememberWorktree(SESSION, unregisteredRoot);
+    expect(fromMain('git push')).toBeUndefined();
+    visitWorktree();
+    expect(fromMain('git push')).toBeDefined();
+  });
+
   test('finding 13: REQUIRE_MAIN_BRANCH is on, so a main checkout on another branch is not guarded', () => {
     expect(REQUIRE_MAIN_BRANCH).toBe(true);
     visitWorktree();
@@ -558,16 +791,36 @@ describe('bashMainCheckoutGuard', () => {
     expect(fromMain('git push')).toBeDefined();
   });
 
-  test('state files older than a day are pruned, fresh ones kept', () => {
+  test('Z8: state file names are hashes of the session id, and files older than a day are pruned', () => {
     const dir = mkdtempSync(join(sandbox, 'prune-'));
     const pruned = fileSessionState(dir);
-    pruned.rememberWorktree('old', worktreeRoot);
+    pruned.rememberWorktree('old/../../etc', worktreeRoot);
     pruned.rememberWorktree('fresh', worktreeRoot);
+    const names = readdirSync(dir);
+    expect(names.length).toBe(2);
+    for (const name of names) expect(name).toMatch(/^[0-9a-f]{32}$/);
+    expect(existsSync(join(dir, 'fresh'))).toBe(false);
     const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
-    utimesSync(join(dir, 'old'), twoDaysAgo, twoDaysAgo);
+    for (const name of names) if (pruned.lastWorktree('fresh') && name !== names[0]) break;
+    const oldFile = names.find((name) => !existsSync(join(dir, name)) || true) as string;
+    utimesSync(join(dir, oldFile), twoDaysAgo, twoDaysAgo);
     pruned.prune(24 * 60 * 60 * 1000);
-    expect(pruned.lastWorktree('old')).toBeUndefined();
-    expect(pruned.lastWorktree('fresh')).toBe(worktreeRoot);
+    expect(readdirSync(dir).length).toBe(1);
+  });
+
+  test('Z8: a state-file failure is reported on stderr once and the hook still exits 0', () => {
+    const blocker = join(sandbox, 'state-as-file');
+    writeFileSync(blocker, 'not a directory\n');
+    const result = Bun.spawnSync(['bun', join(HOOKS_DIR, 'bashMainCheckoutGuard.ts')], {
+      stdin: Buffer.from(JSON.stringify(bash('ls', worktreeRoot))),
+      stdout: 'pipe',
+      stderr: 'pipe',
+      env: { ...process.env, WORKTREE_GUARD_STATE_DIR: blocker },
+    });
+    expect(result.exitCode).toBe(0);
+    const stderr = result.stderr.toString();
+    expect(stderr.match(/bashMainCheckoutGuard:/g)?.length).toBe(1);
+    expect(result.stdout.toString()).toBe('');
   });
 
   test('the hook binary keeps per-session state, emits a PreToolUse deny, prunes on SessionStart, and stays silent otherwise', () => {
@@ -577,7 +830,7 @@ describe('bashMainCheckoutGuard', () => {
         stdin: Buffer.from(JSON.stringify(input)),
         stdout: 'pipe',
         stderr: 'pipe',
-        env: { ...process.env, WORKTREE_GUARD_DEBUG: '1', WORKTREE_GUARD_STATE_DIR: stateDir },
+        env: { ...process.env, WORKTREE_GUARD_STATE_DIR: stateDir },
       });
       expect(result.exitCode).toBe(0);
       expect(result.stderr.toString()).toBe('');
@@ -588,7 +841,7 @@ describe('bashMainCheckoutGuard', () => {
     utimesSync(join(stateDir, 'stale'), twoDaysAgo, twoDaysAgo);
     expect(run(bash('git push', mainRoot))).toBe('');
     expect(run({ hook_event_name: 'SessionStart', session_id: SESSION, cwd: worktreeRoot })).toBe('');
-    expect(fileSessionState(stateDir).lastWorktree('stale')).toBeUndefined();
+    expect(existsSync(join(stateDir, 'stale'))).toBe(false);
     const denied = JSON.parse(run(bash('git push', mainRoot))) as {
       hookSpecificOutput: { hookEventName: string; permissionDecision: string; permissionDecisionReason: string };
     };

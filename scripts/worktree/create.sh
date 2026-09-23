@@ -121,6 +121,16 @@ USED_SLOTS=" "
 MERGED_WARNINGS=""
 MERGED_COUNT=0
 
+while IFS= read -r entry; do
+  [ -n "$entry" ] || continue
+  USED_SLOTS="${USED_SLOTS}${entry%% *} "
+done < <(registry_entries)
+
+while IFS= read -r dup; do
+  [ -n "$dup" ] || continue
+  warn "Slot registry conflict: ${dup%%:*} is registered under slots${dup#*:} — reserving all of them. Fix .worktrees/.slots/ so it owns one."
+done < <(registry_duplicates)
+
 while IFS= read -r wt_path; do
   [ -n "$wt_path" ] && [ -d "$wt_path" ] || continue
   wt_branch="$(git -C "$wt_path" branch --show-current 2>/dev/null || true)"
@@ -130,7 +140,7 @@ while IFS= read -r wt_path; do
   fi
   for i in $wt_slots; do
     USED_SLOTS="${USED_SLOTS}${i} "
-    if [ -n "$wt_branch" ] && echo "$MERGED_BRANCHES" | grep -qx "$wt_branch"; then
+    if [ -n "$wt_branch" ] && grep -qxF -- "$wt_branch" <<< "$MERGED_BRANCHES"; then
       MERGED_WARNINGS="${MERGED_WARNINGS}  Slot ${i}: $(basename "$wt_path") (${wt_branch}) — bun run worktree:destroy $(basename "$wt_path")\n"
       MERGED_COUNT=$((MERGED_COUNT + 1))
     fi
@@ -144,10 +154,26 @@ fi
 
 SLOT=""
 SLOT_LOCK=""
-trap release_slot_lock EXIT
+SLOT_REGISTERED=0
+CREATED=0
+FINISHED=0
+
+on_exit() {
+  local rc=$?
+  release_slot_lock
+  if [ "$rc" -ne 0 ] && [ "$FINISHED" -eq 0 ]; then
+    if [ "$CREATED" -eq 1 ]; then
+      warn "The worktree '$WT_NAME' was created before this failure. Remove it and free slot $SLOT with:"
+      warn "  bun run worktree:destroy $WT_NAME --force"
+    elif [ "$SLOT_REGISTERED" -eq 1 ]; then
+      unregister_slot "$SLOT" "$WORKTREE_DIR"
+    fi
+  fi
+}
+trap on_exit EXIT
 
 for i in $(seq 1 9); do
-  echo "$USED_SLOTS" | grep -q " ${i} " && continue
+  [[ "$USED_SLOTS" == *" ${i} "* ]] && continue
   if claim_slot_lock "$i"; then
     SLOT="$i"
     break
@@ -162,6 +188,8 @@ fi
 
 ok "Claimed slot $SLOT"
 slot_resources "$SLOT"
+register_slot "$SLOT" "$WORKTREE_DIR"
+SLOT_REGISTERED=1
 
 if [ "$ATTACH_ONLY" -eq 1 ]; then
   info "Attaching existing branch '$NEW_BRANCH' to a new worktree..."
@@ -176,7 +204,7 @@ elif [ "$ATTACH_ONLY" -eq 1 ]; then
 else
   git -C "$ROOT_DIR" worktree add -b "$NEW_BRANCH" "$WORKTREE_DIR" "$BASE_BRANCH"
 fi
-register_slot "$SLOT" "$WORKTREE_DIR"
+CREATED=1
 
 info "Generating env files (root values, the branch's keys, slot $SLOT ports/DBs/buckets)..."
 
@@ -209,7 +237,7 @@ ensure_env_var "$WT_ENV" SUPERADMIN_URL "http://localhost:${SUPERADMIN_PORT}"
 replace_env_var_if_present "$WT_ENV" BETTER_AUTH_BASE_URL "http://localhost:${API_PORT}"
 ensure_env_var "$WT_ENV" STORAGE_BUCKET_SYSTEM "$STORAGE_BUCKET_SYSTEM"
 ensure_env_var "$WT_ENV" STORAGE_BUCKET_USER "$STORAGE_BUCKET_USER"
-rewrite_database_url "$WT_ENV" "$DB_LOCAL" || die "Error: DATABASE_URL in $WT_ENV could not be pointed at $DB_LOCAL."
+rewrite_database_url "$WT_ENV" "$DB_LOCAL"
 rewrite_redis_db "$WT_ENV" "$REDIS_DB"
 
 if [ -f "$WT_TEST_ENV" ]; then
@@ -219,7 +247,7 @@ if [ -f "$WT_TEST_ENV" ]; then
   replace_env_var_if_present "$WT_TEST_ENV" WEB_URL "http://localhost:${WEB_PORT}"
   replace_env_var_if_present "$WT_TEST_ENV" ADMIN_URL "http://localhost:${ADMIN_PORT}"
   replace_env_var_if_present "$WT_TEST_ENV" SUPERADMIN_URL "http://localhost:${SUPERADMIN_PORT}"
-  rewrite_database_url "$WT_TEST_ENV" "$DB_TEST" || die "Error: DATABASE_URL in $WT_TEST_ENV could not be pointed at $DB_TEST."
+  rewrite_database_url "$WT_TEST_ENV" "$DB_TEST"
   rewrite_redis_db "$WT_TEST_ENV" "$REDIS_DB"
 else
   warn "Warning: neither root .env.test nor a .env.test.example on this branch — .env.test not generated."
@@ -232,13 +260,13 @@ for f in "$WORKTREE_DIR"/apps/*/.env.local; do
   replace_env_var_if_present "$f" WEB_URL "http://localhost:${WEB_PORT}"
   replace_env_var_if_present "$f" ADMIN_URL "http://localhost:${ADMIN_PORT}"
   replace_env_var_if_present "$f" SUPERADMIN_URL "http://localhost:${SUPERADMIN_PORT}"
-  rewrite_database_url "$f" "$DB_LOCAL" || die "Error: DATABASE_URL in $f could not be pointed at $DB_LOCAL."
+  rewrite_database_url "$f" "$DB_LOCAL"
   rewrite_redis_db "$f" "$REDIS_DB"
 done
 for f in "$WORKTREE_DIR"/apps/*/.env.test; do
   [ -f "$f" ] || continue
   replace_env_var_if_present "$f" API_URL "http://localhost:${API_PORT}"
-  rewrite_database_url "$f" "$DB_TEST" || die "Error: DATABASE_URL in $f could not be pointed at $DB_TEST."
+  rewrite_database_url "$f" "$DB_TEST"
   rewrite_redis_db "$f" "$REDIS_DB"
 done
 
@@ -313,6 +341,7 @@ if [ "$DB_AVAILABLE" -eq 1 ]; then
   fi
 fi
 
+FINISHED=1
 echo
 if [ -z "$GAPS" ]; then
   ok "======================================"
