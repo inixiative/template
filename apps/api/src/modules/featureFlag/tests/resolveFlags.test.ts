@@ -16,6 +16,7 @@ import {
 import { registerClearCacheHook } from '#/hooks/cache/hook';
 import { checkFlag } from '#/modules/featureFlag/services/checkFlag';
 import { resolveFlags } from '#/modules/featureFlag/services/resolveFlags';
+import { bucketOf } from '#/modules/segment/lib/sample';
 
 const slug = (base: string) => `${base}-${getNextSeq()}`;
 
@@ -147,5 +148,20 @@ describe('resolveFlags', () => {
       { featureFlag: flag },
     );
     expect(await check(flag, 'json')).toEqual({ columns: 3 });
+  });
+
+  it("a sampled variant serves only the subjects whose id bucket sits in its range, at the flag's offset", async () => {
+    const { entity: flag } = await createFeatureFlag({ slug: slug('sampled'), valueType: FeatureFlagValueType.string });
+    const bucket = bucketOf(ref.id, flag.sampleOffset);
+    const excluding = bucket < 50 ? { from: 50, to: 100 } : { from: 0, to: 50 };
+    const including = bucket < 50 ? { from: 0, to: 50 } : { from: 50, to: 100 };
+    const { entity: arm } = await createFeatureFlagVariant(
+      { label: 'arm', position: 1, segment: everyone, valueBoolean: null, valueText: 'sampled', sample: excluding },
+      { featureFlag: flag },
+    );
+    expect(await check(flag, FeatureFlagValueType.string)).toBe('');
+
+    await db.featureFlagVariant.update({ where: { id: arm.id }, data: { sample: including } });
+    expect(await check(flag, FeatureFlagValueType.string)).toBe('sampled');
   });
 });

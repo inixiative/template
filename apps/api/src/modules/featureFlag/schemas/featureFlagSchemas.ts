@@ -43,19 +43,19 @@ export const featureFlagVariantReadResponseSchema = FeatureFlagVariantScalarSche
   segment: variantSegmentSchema.nullable(),
 });
 
-export const featureFlagReadResponseSchema = FeatureFlagScalarSchema.extend({
+export const featureFlagReadResponseSchema = FeatureFlagScalarSchema.omit({ sampleOffset: true }).extend({
   variants: z.array(featureFlagVariantReadResponseSchema),
 });
 
 export const internalSegmentSchema = z.object({
   type: z.enum(SegmentType),
   conditions: z.unknown(),
-  sample: sampleRangeSchema.nullable().optional(),
 });
 
 const audienceFields = {
   segmentId: z.string().nullable().optional(),
   internalSegment: internalSegmentSchema.optional(),
+  sample: sampleRangeSchema.nullable().optional(),
 };
 
 export const featureFlagVariantCreateBodySchema = FeatureFlagVariantScalarInputSchema.omit({

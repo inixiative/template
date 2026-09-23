@@ -36,7 +36,11 @@ export const presentVariant = ({ segment, ...variant }: VariantRow) => ({
   segment: segment ? presentSegment(segment) : null,
 });
 
-export const presentFeatureFlag = <T extends { variants: VariantRow[] }>({ variants, ...flag }: T) => ({
+export const presentFeatureFlag = <T extends { variants: VariantRow[]; sampleOffset: number }>({
+  variants,
+  sampleOffset: _offset,
+  ...flag
+}: T) => ({
   ...flag,
   variants: variants.map(presentVariant),
 });

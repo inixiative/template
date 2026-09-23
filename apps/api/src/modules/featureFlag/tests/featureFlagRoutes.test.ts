@@ -6,6 +6,7 @@ import { PlatformRole } from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
   createCustomerRef,
+  createFeatureFlag,
   createOrganization,
   createOrganizationUser,
   createSegment,
@@ -21,6 +22,7 @@ import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
 import { registerSegmentMemberOwnerHook } from '#/hooks/segmentMemberOwner/hook';
 import { registerSoftDeleteCascadeHook } from '#/hooks/softDeleteCascade/hook';
 import { featureFlagRouter } from '#/modules/featureFlag';
+import { createVariant } from '#/modules/featureFlag/services/writeVariant';
 import { featureFlagVariantRouter } from '#/modules/featureFlagVariant';
 import { meRouter } from '#/modules/me';
 import { organizationRouter } from '#/modules/organization';
@@ -34,16 +36,10 @@ type Variant = {
   label: string;
   position: number;
   segmentId: string | null;
+  sample: { from: number; to: number } | null;
   segment: { id: string; members: number; featureFlagInternal: boolean; deletedAt: string | null } | null;
 };
-type Flag = {
-  id: string;
-  slug: string;
-  ownerModel: string;
-  enabled: boolean;
-  sampleOffset: number;
-  variants: Variant[];
-};
+type Flag = { id: string; slug: string; ownerModel: string; enabled: boolean; variants: Variant[] };
 type Value = {
   ownerModel: string;
   ownerId: string;
@@ -205,24 +201,26 @@ describe('feature flag routes', () => {
     const sampled = await ownerFetch(
       post(`/api/v1/featureFlag/${theme.id}/featureFlagVariants`, {
         label: 'half',
-        internalSegment: { type: 'dynamic', conditions: { all: [] }, sample: { from: 0, to: 50 } },
+        segmentId: audience.id,
+        sample: { from: 0, to: 50 },
         valueText: 'half',
       }),
     );
     expect(sampled.status).toBe(201);
     const half = (await json<Variant>(sampled)).data;
-    const halfSegment = await db.segment.findUnique({ where: { id: half.segmentId! } });
-    expect(halfSegment?.sample).toEqual({ from: 0, to: 50, offset: theme.sampleOffset });
+    expect(half.sample).toEqual({ from: 0, to: 50 });
     expect((await ownerFetch(del(`/api/v1/featureFlagVariant/${half.id}`))).status).toBe(204);
 
     const inverted = await ownerFetch(
       post(`/api/v1/featureFlag/${theme.id}/featureFlagVariants`, {
         label: 'inverted',
-        internalSegment: { type: 'dynamic', conditions: { all: [] }, sample: { from: 60, to: 40 } },
+        segmentId: audience.id,
+        sample: { from: 60, to: 40 },
         valueText: 'x',
       }),
     );
     expect(inverted.status).toBe(400);
+    expect(theme).not.toHaveProperty('sampleOffset');
 
     const both = await ownerFetch(
       post(`/api/v1/featureFlag/${theme.id}/featureFlagVariants`, {
@@ -426,6 +424,42 @@ describe('feature flag routes', () => {
     expect(
       await db.segment.findFirst({ where: { id: doomedFlag.variants[0]!.segmentId!, deletedAt: { not: null } } }),
     ).not.toBeNull();
+  });
+
+  it('featureFlagInternal is not writable through the segment API', async () => {
+    const created = await ownerFetch(
+      post(`/api/v1/organization/${org.id}/segments`, {
+        name: `sneaky-${getNextSeq()}`,
+        type: 'static',
+        conditions: { all: [] },
+        featureFlagInternal: true,
+      }),
+    );
+    expect(created.status).toBe(400);
+    const flipped = await ownerFetch(patch(`/api/v1/segment/${audience.id}`, { featureFlagInternal: true }));
+    expect(flipped.status).toBe(400);
+    expect((await db.segment.findUnique({ where: { id: audience.id } }))?.featureFlagInternal).toBe(false);
+  });
+
+  it('two variants racing for one orphaned internal segment: exactly one wins', async () => {
+    const { entity: raceFlag } = await createFeatureFlag({
+      slug: `custom:race-${getNextSeq()}`,
+      ownerModel: 'Organization',
+      organization: org,
+      valueType: 'boolean',
+    });
+    const { entity: orphan } = await createSegment({
+      ownerModel: 'Organization',
+      organization: org,
+      featureFlagInternal: true,
+    });
+    const outcomes = await Promise.allSettled([
+      createVariant(raceFlag, { label: 'a', segmentId: orphan.id, valueBoolean: true }),
+      createVariant(raceFlag, { label: 'b', segmentId: orphan.id, valueBoolean: false }),
+    ]);
+    expect(outcomes.filter((each) => each.status === 'fulfilled')).toHaveLength(1);
+    const referrers = await db.featureFlagVariant.findMany({ where: { segmentId: orphan.id, deletedAt: null } });
+    expect(referrers).toHaveLength(1);
   });
 
   it('the superadmin creates a bare platform flag and lists every owner’s flags', async () => {

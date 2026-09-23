@@ -16,6 +16,7 @@ import {
 import { featureFlagOwnerIdOf } from '#/modules/featureFlag/lib/featureFlagOwner';
 import { type FlagValue, zeroFor } from '#/modules/featureFlag/lib/zeroFor';
 import { VALUE_COLUMNS } from '#/modules/featureFlag/validations/validateFeatureFlagVariantRow';
+import { inSample } from '#/modules/segment/lib/sample';
 import { type Provider, providerOf } from '#/modules/segment/lib/segmentOwner';
 
 const FLAG_TTL = 60 * 10;
@@ -83,10 +84,15 @@ const variantValue = (flag: FeatureFlag, variant: FeatureFlagVariant): FlagValue
 export const foldFlag = (
   flag: FeatureFlag,
   variants: FeatureFlagVariant[],
+  customerRefId: string,
   memberOf: Set<string>,
   live: Set<string>,
 ): ResolvedFlag => {
   const matches = (segmentId: string | null): boolean => !!segmentId && live.has(segmentId) && memberOf.has(segmentId);
+  const serves = (variant: FeatureFlagVariant): boolean =>
+    !variant.isDefault &&
+    matches(variant.segmentId) &&
+    (variant.sample === null || inSample(customerRefId, variant.sample, flag.sampleOffset));
   const defaultVariant = variants.find((variant) => variant.isDefault) ?? null;
   const fallback = (): ResolvedFlag =>
     defaultVariant
@@ -95,7 +101,7 @@ export const foldFlag = (
 
   if (!flag.enabled) return { flag, value: zeroFor(flag.valueType), step: 'disabled', variant: null };
   if (flag.segmentId && !matches(flag.segmentId)) return { ...fallback(), step: 'gate' };
-  const rule = variants.find((variant) => !variant.isDefault && matches(variant.segmentId));
+  const rule = variants.find(serves);
   if (rule) return { flag, value: variantValue(flag, rule), step: 'rule', variant: rule };
   return fallback();
 };
@@ -118,7 +124,7 @@ export const resolveFlags = async (refs: CustomerRef[]): Promise<ResolvedFlags> 
       const addressed = flags.filter((flag) => flag.subjectModel === customerRef.customerModel);
       const entries = addressed.map((flag) => [
         flag.slug,
-        foldFlag(flag, variantsByFlag.get(flag.id)!, memberOf, live),
+        foldFlag(flag, variantsByFlag.get(flag.id)!, customerRef.id, memberOf, live),
       ]);
       resolved.push({ customerRef, provider, flags: Object.fromEntries(entries) });
     }

@@ -43,18 +43,20 @@ one carrying `Segment.featureFlagInternal`. The variant's `segmentId` is the onl
 the internal segment is named `${flag.slug}/${variant.label}` and excluded from the `Segment.name`
 uniques. It is created and edited only through its variant, tombstoned with it, excluded from segment
 lists, pickers, the lens `Segment.id` source and every subject-facing route, and refused as a gate or
-as the audience of any variant but the one already serving it. A boolean flag is created with an `on`
+as the audience of any variant but the one already serving it (checked under a row lock inside the
+write's transaction, so two variants cannot both claim an orphaned internal segment). A boolean flag is created with an `on`
 variant over an internal open dynamic segment, so create → toggle `enabled` is the whole kill switch.
 
-A percentage rollout is `internalSegment.sample: { from, to }`, a slice of the 0–100 line. Nothing is
-stored or hashed: a `CustomerRef` id is a uuidv7 whose last 15 hex digits are random, three of them read
-as a number are the customer's bucket, and the segment keeps the customers whose bucket sits in
-`[from, to)`. The result is deterministic, recalculates with the rule, admits new customers as they
-arrive, and widening a range keeps everyone already in it. `offset`, the digit position from the tail where the read starts (0–12), is never in the API: a flag
-draws `FeatureFlag.sampleOffset` at random on insert (a column default) and every internal segment of its variants copies
-it, so one flag's arms read the same digits and never overlap while different flags read different
-digits; a shared segment draws its own when its sample is first set and keeps it across edits. `Segment.sample` is applied after rule evaluation on both rails (`evaluateSegment`,
-`reconcileCustomerRef`), so the rules engine and the builder never see it. Reach counts ignore it.
+A percentage rollout is `sample: { from, to }` on a variant, a slice of the 0–100 line, over whatever
+audience the variant already has. Nothing is stored or hashed: a `CustomerRef` id is a uuidv7 whose last
+15 hex digits are random, three of them read as a number are the subject's bucket, and the fold serves
+the variant when the subject is a member of its segment and the bucket sits in `[from, to)`. So it is
+deterministic, needs no reconcile, admits new customers as they arrive, and widening a range keeps
+everyone already in. `FeatureFlag.sampleOffset`, the digit position from the tail where the read starts
+(0–12), is a random column default and never in the API; every variant of a flag reads the same digits,
+so its arms never overlap, and different flags read different digits. Segments know nothing about
+sampling; a sampled arm has no member rows of its own (reach is the audience's members times the range
+width). `apps/api/src/modules/segment/lib/sample.ts` holds the read.
 
 ## Resolution
 

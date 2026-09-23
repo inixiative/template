@@ -20,7 +20,6 @@ export const segmentNeedsReconcile = (segment: Segment, previous?: Segment): boo
   if (!previous) return true;
   return (
     !isEqual(previous.conditions, segment.conditions) ||
-    !isEqual(previous.sample, segment.sample) ||
     (segment.type === SegmentType.dynamic && previous.type !== segment.type)
   );
 };

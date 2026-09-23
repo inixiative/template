@@ -16,6 +16,7 @@ const assertInternalAudienceOf = async (segment: Segment, holder: Holder): Promi
   if (holder.audienceOf === undefined) {
     throw makeError({ status: 422, message: `Segment ${segment.id} is a feature flag variant's internal audience` });
   }
+  await db.findForUpdate('Segment', { id: segment.id });
   const referrers = await db.featureFlagVariant.findMany({ where: { segmentId: segment.id, deletedAt: null } });
   if (referrers.some((variant) => variant.id !== holder.audienceOf)) {
     throw makeError({ status: 422, message: `Segment ${segment.id} is another variant's internal audience` });

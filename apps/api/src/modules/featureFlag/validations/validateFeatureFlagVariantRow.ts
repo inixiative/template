@@ -11,6 +11,7 @@ import { isSlug } from '@template/shared/utils';
 import { makeError } from '#/lib/errors';
 import { featureFlagOwnerIdOf } from '#/modules/featureFlag/lib/featureFlagOwner';
 import { assertSegmentUsableBy } from '#/modules/featureFlag/validations/assertSegmentUsableBy';
+import { sampleRangeSchema } from '#/modules/segment/lib/sample';
 
 export type FeatureFlagVariantRow = Partial<FeatureFlagVariant>;
 
@@ -42,6 +43,12 @@ export const validateFeatureFlagVariantRow = async (
   }
   if (!merged.isDefault && !merged.segmentId) {
     throw makeError({ status: 422, message: 'a rule variant names the segment it serves' });
+  }
+  if (isSet(merged.sample) && !sampleRangeSchema.safeParse(merged.sample).success) {
+    throw makeError({ status: 422, message: 'a sample is { from, to } on 0–100 with from below to' });
+  }
+  if (merged.isDefault && isSet(merged.sample)) {
+    throw makeError({ status: 422, message: 'the default variant is not sampled; it serves whoever no rule matched' });
   }
 
   const expected = VALUE_COLUMNS[parent.valueType];

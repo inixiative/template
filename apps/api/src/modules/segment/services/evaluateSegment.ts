@@ -11,7 +11,6 @@ import type { ProviderModel } from '@template/db/generated/client/enums';
 import { rootLens } from '@template/db/lens';
 import { RuleDegradedError, RuleEvaluationError, withRule } from '@template/shared/rules';
 import { resolvedCustomerRefLens } from '#/modules/customerRef/lib/customerRefLens';
-import { inSample } from '#/modules/segment/lib/sample';
 import { providerWhere, segmentOwnerId } from '#/modules/segment/lib/segmentOwner';
 import { segmentRuleState } from '#/modules/segment/services/segmentRuleHealth';
 
@@ -47,7 +46,7 @@ export const evaluateSegment = async (segment: Segment): Promise<string[]> => {
   try {
     const where = await segmentWhere(segment);
     const rows = await db.customerRef.findMany({ where, select: { id: true } });
-    return rows.map((row) => row.id).filter((id) => inSample(id, segment.sample));
+    return rows.map((row) => row.id);
   } catch (error) {
     if (error instanceof RuleDegradedError || isInfrastructureFault(error)) throw error;
     throw new RuleEvaluationError(error);

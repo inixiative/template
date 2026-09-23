@@ -54,6 +54,8 @@ model FeatureFlagVariant {
   /// @permissions(hydrate: false)
   segment   Segment? @relation("FeatureFlagVariantAudience", fields: [segmentId], references: [id], onDelete: SetNull)
 
+  sample Json?
+
   valueBoolean Boolean?
   valueText    String?
   valueNumber  Float?
