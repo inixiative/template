@@ -53,5 +53,6 @@ export const makeSupersedingJob = <TPayload = void>(
     }
   };
   h.dedupeKeyFn = dedupeKeyFn;
+  h.lane = handler.lane;
   return h;
 };

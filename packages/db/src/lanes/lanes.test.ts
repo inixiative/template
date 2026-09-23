@@ -1,5 +1,13 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { claimLane, getJobSupersededBy, laneKey, reclaimLane, releaseLane, watchLane } from '@template/db/lanes/lanes';
+import {
+  claimLane,
+  getJobSupersededBy,
+  laneKey,
+  reclaimLane,
+  releaseLane,
+  transferLane,
+  watchLane,
+} from '@template/db/lanes/lanes';
 import { getRedisClient } from '@template/db/redis/client';
 
 // The supersede lane "baton": one Redis key per lane = its current holder (a jobId). Latest claim wins
@@ -134,5 +142,35 @@ describe('supersede lane baton', () => {
     await sleep(1200); // > two polls (500ms) — a poll while we hold refreshes the TTL back up
     stop();
     expect(await redis.pttl(lane)).toBeGreaterThan(5000); // refreshed well past the original 2s
+  });
+
+  test('transferLane hands the baton to a replacement while the old id still holds it', async () => {
+    const lane = laneKey('h', 'transfer');
+    await claimLane(lane, 'job-a');
+
+    expect(await transferLane(lane, 'job-a', 'job-a2')).toBe(true);
+
+    expect(await redis.get(lane)).toBe('job-a2');
+    expect(await getJobSupersededBy('job-a')).toBe('job-a2');
+  });
+
+  test('transferLane claims a vacant lane for the replacement', async () => {
+    const lane = laneKey('h', 'transfer-vacant');
+    expect(await transferLane(lane, 'job-a', 'job-a2')).toBe(true);
+    expect(await redis.get(lane)).toBe('job-a2');
+  });
+
+  test('transferLane refuses when a newer job holds the lane or already superseded the old id', async () => {
+    const lane = laneKey('h', 'transfer-stale');
+    await claimLane(lane, 'job-a');
+    await claimLane(lane, 'job-c');
+
+    expect(await transferLane(lane, 'job-a', 'job-a2')).toBe(false);
+    expect(await redis.get(lane)).toBe('job-c');
+    expect(await getJobSupersededBy('job-c')).toBeNull();
+
+    await redis.del(lane);
+    expect(await transferLane(lane, 'job-a', 'job-a2')).toBe(false);
+    expect(await redis.get(lane)).toBeNull();
   });
 });

@@ -1,5 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
 import { clearHookRegistry, db } from '@template/db';
+import { CommunicationReasonCode } from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
   createCommunicationLog,
@@ -21,17 +22,18 @@ const documentMjml = (content: string) =>
 
 describe('deliverEmail — send-time component version closure', () => {
   const sent: SendEmailOptions[] = [];
-  let rejectNextSend = false;
+  const attempts: SendEmailOptions[] = [];
+  const outcomes: Array<Error | { id: string; success: false }> = [];
 
   beforeAll(() => {
     registerAuditLogHook();
     registerEmailVersioningHook();
     const recorder: EmailClient = {
       send: async (options) => {
-        if (rejectNextSend) {
-          rejectNextSend = false;
-          return { id: 'rejected', success: false };
-        }
+        attempts.push(options);
+        const outcome = outcomes.shift();
+        if (outcome instanceof Error) throw outcome;
+        if (outcome) return outcome;
         sent.push(options);
         return { id: `rec-${sent.length}`, success: true };
       },
@@ -48,6 +50,8 @@ describe('deliverEmail — send-time component version closure', () => {
 
   afterEach(async () => {
     sent.length = 0;
+    attempts.length = 0;
+    outcomes.length = 0;
     await db.communicationComponentVersion.deleteMany({});
     await db.communicationLog.deleteMany({});
     await db.auditLog.deleteMany({});
@@ -135,7 +139,7 @@ describe('deliverEmail — send-time component version closure', () => {
     expect(byId.get('closure-hero')).toBe(hero.id);
   });
 
-  it('a re-claimed retry rewrites the closure instead of duplicating rows', async () => {
+  it('a rejected send closes the row; a retry of the same job does not resend', async () => {
     await createEmailComponent({ slug: 'closure-footer', mjml: '<mj-text>Footer</mj-text>' });
     await saveEmailTemplate({
       slug: 'closure-template',
@@ -148,15 +152,17 @@ describe('deliverEmail — send-time component version closure', () => {
     const log = await createLog({});
     const payload = payloadFor(log.id, { type: 'platform' });
 
-    rejectNextSend = true;
-    await expect(deliverEmail(ctx(), payload)).rejects.toThrow('rejected send');
+    outcomes.push({ id: 'rejected', success: false });
+    await deliverEmail(ctx(), payload);
     await deliverEmail(ctx(), payload);
 
+    expect(attempts).toHaveLength(1);
+    expect(sent).toHaveLength(0);
+    const refreshed = await db.communicationLog.findUnique({ where: { id: log.id } });
+    expect(refreshed?.status).toBe('failed');
+    expect(refreshed?.reasonCode).toBe(CommunicationReasonCode.send_error);
     const rows = await db.communicationComponentVersion.findMany({ where: { communicationLogId: log.id } });
     expect(rows).toHaveLength(1);
-    expect(rows[0]?.slug).toBe('closure-footer');
-    const refreshed = await db.communicationLog.findUnique({ where: { id: log.id } });
-    expect(refreshed?.status).toBe('sent');
   });
 
   it('writes no closure rows for a template with no component references', async () => {

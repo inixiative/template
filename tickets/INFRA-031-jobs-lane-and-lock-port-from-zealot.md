@@ -1,10 +1,10 @@
 # INFRA-031: Jobs — port the Gate 5 lane, the lock hardening, and the claim policy from Zealot
 
-**Status**: 🔄 In Progress — §1 (`createLock` hardening) ported 2026-09-13, in review; §2 / §3 wait for Steven's rework of Zealot #2248 (Aron's 2026-09-12 review) to land
+**Status**: 👀 Review — §1 landed in template #104 (2026-09-13); §2 and §3 ported from merged Zealot #2248 on 2026-09-23 (branch `INFRA-031-slow-lane`)
 **Assignee**: Aron
 **Priority**: Medium (template's `createLock` carries the same refresh race Zealot fixes in #2271)
 **Created**: 2026-09-12
-**Updated**: 2026-09-21
+**Updated**: 2026-09-23
 
 The jobs rail converged with Zealot in June (INFRA-021 / INFRA-022: outbox, drain, `createLock`, `heartbeat`, lanes). Zealot has moved again. Bring each item below over once it lands there, in the shape Aron settled — not the shape of Zealot's first pass.
 
@@ -27,7 +27,17 @@ The pre-port `tick()` used `GET` then `PEXPIRE`, allowing a refresh to extend a 
 - `LockOptions` takes an injected connection and a key override (`{ service, identifier } | { key }`). Relevant here because the singleton lock should run on the queue's connection, not the eviction-prone cache store — the same split Zealot made in ZLT-4235 (`REDIS_BULLMQ_URL` vs the cache URL); template now prefers `REDIS_BULLMQ_URL`, with a warned fallback to `REDIS_URL` (`apps/api/src/jobs/bullmqRedisUrl.ts`).
 - A singleton run that loses its lock is **not cancelled** (no cooperative cancellation on the worker context; racing the handler would leave a third run in the background). It finishes and reports `lockLost` → `completedAfterLockLoss` / `failedAfterLockLoss`.
 
-### 2. Fast / slow lane — Zealot #2248 (ZLT-4633), the reworked shape
+### 2. Fast / slow lane — Zealot #2248 (ZLT-4633), the reworked shape — PORTED
+
+Landed on `INFRA-031-slow-lane`. Template-side decisions, in order of consequence:
+- **Slow jobs enter BullMQ only holding a slot, and feed themselves.** Zealot adds every slow job to BullMQ and spills refusals; its drain is the only admitter, on a 2s tick. Here `admitEnvelope` reserves a slot at enqueue (no slot → outbox), and a finishing slow job admits the next buffered slow row (`feedSlowLane`) — so a per-recipient fan-out neither floods the wait list ahead of fast work nor idles freed slots until the next tick. Worker refusal-spill remains the fallback for an expired reservation or a delayed/bypassed job. The drain stays at 15s as backstop.
+- **Admission is one row per transaction under `FOR UPDATE SKIP LOCKED`**, shared by the drain and the self-feed (`admitNextSlowOutboxRow`), via a `db.findForUpdate` extension (`orderBy`, `take`, `skipLocked`, `lt`).
+- **Outbox lane is a column** (`JobOutbox.lane`, enum `JobLane`, index `(lane, attempts, id)`), mirroring `data.lane`; Zealot filters by JSON path.
+- **No chunking.** Zealot sends 25 recipients per job; the template keeps its per-recipient `deliverEmail` (row-backed, per-recipient idempotency) and puts fan-outs wider than `EMAIL_SLOW_LANE_MIN_RECIPIENTS` on the slow lane, enqueued concurrently so outbox spills batch. Send-time suppression is already per-recipient (`canDeliver` reads the contact at delivery), so Zealot's snapshot refresh has no counterpart.
+- Redis script in `apps/api/src/jobs/queries/evaluateBulkCapacity.ts`. The `lanes` and `createLock` scripts already live in `@template/db`'s `queries/`; not touched.
+- Env knobs in the Zod schema; test overrides for them are parsed through the same fields (`wrapEnvWithOverrides` parser hook). Modules that read a knob import `#/config/env` so a script entrypoint cannot see raw strings.
+- `apps/api/scripts/slowLaneCheck.ts` is the Gate 5 harness equivalent (real Redis, real BullMQ, Postgres).
+- Not ported: Zealot's `JobsWorker:*` blocking-connection rule — template connections set no command timeout (see §1's open question).
 
 - `lane` is a **tag on the job data envelope** next to `type`, resolved once as `request ?? enqueue option ?? handler default`; no default = fast. No wrapper constructor. The superadmin manual-enqueue and cron-trigger requests expose the override; every `queue.add` site stamps it (cron register/trigger bypass `enqueueJob`).
 - **No second parking mechanism.** Slow-lane jobs buffer in the outbox (new `lane` column); the drain admits fast rows first, then slow rows while the slot set has room, bounded per pass. No `moveToDelayed` / `DelayedError` / processor token.
@@ -37,7 +47,9 @@ The pre-port `tick()` used `GET` then `PEXPIRE`, allowing a refresh to extend a 
 - `validateJobId` is its own file (BullMQ rejects custom ids containing `:` unless exactly three segments; `0` / `0:` prefixes are also invalid). Called from enqueue and the drain.
 - Every worker knob (`JOBS_WORKER_CONCURRENCY`, slot fraction, lease TTL, …) is in the env schema with defaults in the example env files; no side parser.
 
-### 3. Delivery claim policy — Aron's ruling on #2248, 2026-09-12
+### 3. Delivery claim policy — Aron's ruling on #2248, 2026-09-12 — PORTED
+
+`deliverEmail` (body in `lib/email/deliverEmailMessage.ts`) now claims only `queued` rows — it previously claimed `queued | failed`, so a BullMQ retry after a recorded failure resent. Post-claim failures are recorded with a `reasonCode` (new `CommunicationLog.reasonCode`, enum `CommunicationReasonCode`) and not thrown. Retryable provider failures (Resend rate limit / 5xx, classified by `EmailProviderError`) retry inside the claim (5 retries, 2→32s); 408, network failure (`ambiguous_timeout`) and quota walls close on the first attempt. Pre-claim: content errors close as `render_failed`; infrastructure errors (database, verifier) throw with the row still `queued`, since nothing was sent. Sends carry `Idempotency-Key: communicationLogId`. The admin view + explicit resend with a staleness bound (Zealot ZLT-4716) is not built here.
 
 The claim reads **row state only**; which job wrote the row never decides anything. No row → open; SENT, any failure, or a SENDING row → closed. A concurrent attempt that meets a SENDING row skips it. An unfinished SENDING row (worker died mid-call) is a normal outcome and stays as written; an ambiguous provider timeout is closed as `ambiguous_timeout`. Neither is ever reclaimed or resent by the claim. Retryable provider failures (429 / 5xx) retry inside the claim, then record a `reasonCode` and stop. What replaces a sweeper is an **admin view** of orphaned / unsure rows with resend as an explicit action, plus a staleness bound on the resend path.
 
@@ -50,5 +62,8 @@ Check `deliverEmail` against this: confirm its `sending` claim is row-state only
 - The delivery queue and virtual-time priority work from Zealot #2222 / #2226 (closed without merge).
 
 ## Exit criteria
+
+Met on `INFRA-031-slow-lane`, pending review.
+
 
 `createLock` refresh is one eval with the tri-state release and tests mirroring Zealot's; the lane tag + outbox lane + presence set exist with the drain ordering test; `deliverEmail` claim audited against §3; Redis scripts under `jobs/queries/`.

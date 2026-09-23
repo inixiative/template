@@ -302,7 +302,9 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **Admin Routes** - Manual job enqueueing, cron trigger override, job status inspection, queue stats
 
-- ✅ **Overflow Buffer** — `JobOutbox` stores overflowed ad-hoc job intent; batched flushes and a serialized, lock-protected drain meter it back to BullMQ. Fast/slow lane admission and a global worker-presence cap remain planned in INFRA-031.
+- ✅ **Overflow Buffer** — `JobOutbox` stores overflowed ad-hoc job intent; batched flushes and a serialized, lock-protected drain meter it back to BullMQ.
+
+- ✅ **Fast/Slow Lanes** — A lane label on every job envelope; slow work (e.g. a large email fan-out) holds at most a configured share of the fleet's worker slots, sized from live-worker presence, so it never queues ahead of everything else. Slow jobs enter BullMQ only once they hold a slot, wait in the outbox otherwise, and a finishing slow job admits the next one itself (`FOR UPDATE SKIP LOCKED`). Rollback is an env knob.
 
 ---
 

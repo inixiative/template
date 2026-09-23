@@ -3,8 +3,8 @@
 // (outbox/drain) meters them back in. See tickets/INFRA-021. Concerns split across this folder; this
 // barrel is the public surface.
 
-export { flushOutbox, spillToOutbox } from '#/jobs/outbox/accumulator';
-export { lowWater, maxQueueDepth } from '#/jobs/outbox/config';
+export { flushOutbox, hasPendingFastSpills, hasPendingSpills, spillToOutbox } from '#/jobs/outbox/accumulator';
+export { lowWater, MAX_DRAIN_ATTEMPTS, maxQueueDepth, maxSlowAdmissions } from '#/jobs/outbox/config';
 export {
   clearOverflow,
   isOverflowing,
@@ -15,4 +15,4 @@ export {
 } from '#/jobs/outbox/flag';
 export { runOnOutboxQueue } from '#/jobs/outbox/mutex';
 export { queueDepth } from '#/jobs/outbox/queueDepth';
-export { type OutboxRow, shouldSpill } from '#/jobs/outbox/types';
+export { type OutboxRow, outboxLaneOf, type SpillOptions, shouldSpill } from '#/jobs/outbox/types';

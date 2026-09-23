@@ -6,7 +6,14 @@
  */
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { PrismaPg } from '@prisma/adapter-pg';
-import type { AfterCommitFn, Db, OpenTransaction, Scope, ScopeContext } from '@template/db/clientTypes';
+import type {
+  AfterCommitFn,
+  Db,
+  FindForUpdateOptions,
+  OpenTransaction,
+  Scope,
+  ScopeContext,
+} from '@template/db/clientTypes';
 import { assertNoNestedWrites } from '@template/db/extensions/assertNoNestedWrites';
 import { captureBridgedContext, hasHooksFor, runInBridgedContext } from '@template/db/extensions/hookRegistry';
 import { mutationLifeCycleExtension } from '@template/db/extensions/mutationLifeCycle';
@@ -192,7 +199,11 @@ const dbMethods = {
   isInTxn: (): boolean => !!store.getStore()?.openTransaction,
 
   // Raw SELECT * FOR UPDATE — scalar columns only, no relations/includes; load related data separately.
-  findForUpdate: <T = unknown>(model: ModelName, where: Record<string, unknown>): Promise<T[]> => {
+  findForUpdate: <T = unknown>(
+    model: ModelName,
+    where: Record<string, unknown>,
+    { orderBy, take, skipLocked = false }: FindForUpdateOptions = {},
+  ): Promise<T[]> => {
     if (!dbMethods.isInTxn()) throw new Error('db.findForUpdate() requires db.txn()');
     const keys = Object.keys(where);
     if (!keys.length) throw new Error('db.findForUpdate() requires at least one predicate');
@@ -217,10 +228,26 @@ const dbMethods = {
         if (!list.length) return Prisma.sql`1 = 0`;
         return Prisma.sql`${column} IN (${Prisma.join(list)})`;
       }
+      if (value !== null && typeof value === 'object' && 'lt' in (value as Record<string, unknown>)) {
+        return Prisma.sql`${column} < ${(value as { lt: unknown }).lt}`;
+      }
       return Prisma.sql`${column} = ${value}`;
     });
+    const orderEntries = Object.entries(orderBy ?? {});
+    const orderSql = orderEntries.length
+      ? Prisma.sql` ORDER BY ${Prisma.join(
+          orderEntries.map(([key, direction]) =>
+            Prisma.raw(`"${columnFor(key)}" ${direction === 'desc' ? 'DESC' : 'ASC'}`),
+          ),
+        )}`
+      : Prisma.empty;
+    if (take !== undefined && (!Number.isInteger(take) || take < 1)) {
+      throw new Error(`db.findForUpdate(): take must be a positive integer, got ${take}`);
+    }
+    const limitSql = take === undefined ? Prisma.empty : Prisma.sql` LIMIT ${take}`;
+    const lockSql = skipLocked ? Prisma.raw(' FOR UPDATE SKIP LOCKED') : Prisma.raw(' FOR UPDATE');
     return db.$queryRaw<T[]>(
-      Prisma.sql`SELECT * FROM ${Prisma.raw(`"${table}"`)} WHERE ${Prisma.join(conds, ' AND ')} FOR UPDATE`,
+      Prisma.sql`SELECT * FROM ${Prisma.raw(`"${table}"`)} WHERE ${Prisma.join(conds, ' AND ')}${orderSql}${limitSql}${lockSql}`,
     );
   },
 };

@@ -221,6 +221,7 @@ model CommunicationLog {
   idempotencyKey       String                // @unique — the fence
   providerMessageId    String?
   error                String?
+  reasonCode           CommunicationReasonCode?  // why a failed row failed — see Deliver
   sentAt               DateTime?
 }
 ```
@@ -567,25 +568,43 @@ chain (user or org) down to the `default` floor, carrying the user id for interp
    (settings + deliverability live there).
 3. **Find-or-create** a `queued` `CommunicationLog` row keyed on the per-recipient `idempotencyKey`
    — the at-most-once fence, durable beyond BullMQ's retention window (P2002 race → re-read).
-4. Enqueue `deliverEmail` with the log id.
+4. Enqueue `deliverEmail` with the log id. A fan-out wider than `EMAIL_SLOW_LANE_MIN_RECIPIENTS` runs on
+   the **slow lane** (enqueued concurrently, sharing the fleet's capped slow-lane slots); smaller sends
+   stay fast. See [JOBS.md § Fast and Slow Lanes](./JOBS.md#fast-and-slow-lanes).
 
 #### Deliver (`deliverEmail`) — per recipient
 
-1. Load the log; **skip if already `sent`**.
+The body lives in `lib/email/deliverEmailMessage.ts`; `deliverEmail` is its job wrapper. **The claim reads
+the row and nothing else: only a `queued` row is open.** `sending`, `sent`, `failed`, `suppressed` and
+`undeliverable` are all closed — a retry, a duplicate job, or a re-dispatch never resends. A crash between
+claim and settle leaves `sending` for a person to resolve (an explicit resend with a staleness bound), never
+for the claim to reopen.
+
+1. Load the log; **skip unless `queued`**.
 2. **Resolve** the template via the cascade (`settleTemplate`) → subject/mjml + `kind` + `emailTemplateId`.
    Rules evaluate through the lens of the row that won the cascade (`composed.owner`); a referenced
    segment whose own rule is degraded leaves the live set first (`withoutDegradedSegments`).
-   A render error → mark `failed` → rethrow → retries → DLQ.
+   A content error (`isEmailContentError`: render, parse, MJML, token, condition) → `failed` with
+   `reasonCode: render_failed`, no retry. Any other error before the claim (database, verifier) throws with
+   the row still `queued`, so the job retry picks it up — nothing has been sent.
 3. **Gate ① scope** — `inScope` rebac read-check. STUB pass-through today (see COMM-005).
 4. **Gate ② settings** — `canDeliver(kind, contact)`: honor `acceptedKinds` opt-outs; `system` always
    delivers; a non-`system` send with no `Contact` → `suppressed`.
 5. **Deliverability** — bouncer pre-flight, cached on `Contact.deliverability` (TTL 30d); `undeliverable`
    → mark `undeliverable`, no send.
-6. **Claim** the send — atomic compare-and-set `queued|failed → sending`; a racing/retried sibling that
-   loses the claim bails (no double-send).
-7. Render `mjml2html`, add `List-Unsubscribe` + `List-Unsubscribe-Post` headers (non-`system`), send,
-   then `sent` (+ `providerMessageId`) / `failed`. **Every terminal write is CAS-guarded** so a sibling
-   can't clobber a `sent` row.
+6. Render `mjml2html` (content error → `render_failed`) and add `List-Unsubscribe` +
+   `List-Unsubscribe-Post` headers (non-`system`).
+7. **Claim** the send — atomic compare-and-set `queued → sending`; a racing/retried sibling that loses the
+   claim bails (no double-send).
+8. Send with `Idempotency-Key: <communicationLogId>`. Failures the provider definitely did not accept — a
+   rate limit or a 5xx — retry inside the claim, up to five retries backing off 2→32s. Everything else
+   closes on the first attempt: a 408 or network failure (`ambiguous_timeout` — the provider may have
+   accepted it), a quota wall (`quota_exceeded`), auth, validation, not found. Once worker shutdown
+   begins, the backoff wakes early and the next failure is recorded instead of retried, so a deploy never
+   force-exits mid-backoff and strands the row in `sending`. Then `sent`
+   (+ `providerMessageId`) or `failed` with a `reasonCode`; the failure is recorded, not thrown. **Every
+   terminal write is CAS-guarded** so a sibling can't clobber a `sent` row; if recording the outcome itself
+   fails, the job retries and meets the `sending` row.
 
 `CommunicationLog` persists `settledMjml`, `variables` and `renderIssues` alongside delivery metadata
 and audit references. Variables currently include the hydrated recipient, not just its delivery fields.
