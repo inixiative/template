@@ -38,7 +38,6 @@ export {
   reclaimLane,
   releaseLane,
   supersededKey,
-  transferLane,
   watchLane,
 } from './lanes';
 // Distributed lock

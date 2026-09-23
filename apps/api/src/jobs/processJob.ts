@@ -8,22 +8,16 @@ import { db } from '@template/db';
 import { auditActorContext, nullAuditActor } from '@template/db/lib/auditActorContext';
 import { addLogBroadcast, LogScope, log, logScope } from '@template/shared/logger';
 import type { Job } from 'bullmq';
-import { isSlowJobData } from '#/jobs/buildJobData';
 import { isValidHandlerName, type JobHandlers, jobHandlers } from '#/jobs/handlers';
 import { queue } from '#/jobs/queue';
-import { runSlowLaneJob, type SlowLaneSeams } from '#/jobs/slowLane/runSlowLaneJob';
 import { traceJob } from '#/jobs/traceJob';
 import type { WorkerContext } from '#/jobs/types';
 
 type ProcessJobSeams = {
   handlers?: Partial<JobHandlers>;
-  slowLane?: SlowLaneSeams;
 };
 
-export const processJob = async (
-  job: Job,
-  { handlers = jobHandlers, slowLane }: ProcessJobSeams = {},
-): Promise<void> => {
+export const processJob = async (job: Job, { handlers = jobHandlers }: ProcessJobSeams = {}): Promise<void> => {
   const handler = isValidHandlerName(job.name) ? handlers[job.name] : undefined;
   if (!handler) {
     log.error(`Unknown job handler: ${job.name}`, LogScope.worker);
@@ -44,20 +38,14 @@ export const processJob = async (
             log.info(`Processing job ${job.name} (${job.id})`);
 
             const payload = (job.data as { payload?: unknown }).payload;
-            const runHandler = (): Promise<void> =>
-              auditActorContext.scope({ ...nullAuditActor, actorJobName: job.name }, async () => {
-                if (payload === undefined) {
-                  await (handler as (handlerCtx: WorkerContext) => Promise<void>)(ctx);
-                } else {
-                  await (handler as (handlerCtx: WorkerContext, handlerPayload: unknown) => Promise<void>)(
-                    ctx,
-                    payload,
-                  );
-                }
-              });
+            await auditActorContext.scope({ ...nullAuditActor, actorJobName: job.name }, async () => {
+              if (payload === undefined) {
+                await (handler as (handlerCtx: WorkerContext) => Promise<void>)(ctx);
+              } else {
+                await (handler as (handlerCtx: WorkerContext, handlerPayload: unknown) => Promise<void>)(ctx, payload);
+              }
+            });
 
-            if (isSlowJobData(job.data)) await runSlowLaneJob(ctx, runHandler, slowLane);
-            else await runHandler();
             log.info(`Completed job ${job.name} (${job.id})`);
           },
           'worker',

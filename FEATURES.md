@@ -304,7 +304,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **Overflow Buffer** — `JobOutbox` stores overflowed ad-hoc job intent; batched flushes and a serialized, lock-protected drain meter it back to BullMQ.
 
-- ✅ **Fast/Slow Lanes** — A lane label on every job envelope; slow work (e.g. a large email fan-out) holds at most a configured share of the fleet's worker slots, sized from live-worker presence, so it never queues ahead of everything else. Slow jobs enter BullMQ only once they hold a slot, wait in the outbox otherwise, and a finishing slow job admits the next one itself (`FOR UPDATE SKIP LOCKED`). Rollback is an env knob.
+- ✅ **Fast/Slow Lanes** — A lane label on every job envelope. Slow work (e.g. a large email fan-out) waits in the same BullMQ queue at the lowest priority, so fast work is always picked first while idle slots still run slow work, and it may fill only its share of the queue's depth budget before spilling to the outbox. Tunable by env knob.
 
 ---
 

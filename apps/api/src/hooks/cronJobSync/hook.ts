@@ -9,6 +9,7 @@ import { DbAction, db, HookTiming, registerDbHook } from '@template/db';
 import type { CronJob } from '@template/db/generated/client/client';
 import { ConcurrencyType } from '@template/shared/utils';
 import { buildJobData } from '#/jobs/buildJobData';
+import { withLanePriority } from '#/jobs/lanePriority';
 import { queue } from '#/jobs/queue';
 import { JobType } from '#/jobs/types';
 
@@ -22,12 +23,17 @@ const syncToBullMQ = (prev: CronJob | null, curr: CronJob | null) => async () =>
     // Lazy: the handler registry imports handlers that emit through hooks — a static import cycles.
     const { isValidHandlerName, jobHandlers } = await import('#/jobs/handlers');
     const handler = isValidHandlerName(curr.handler) ? jobHandlers[curr.handler] : {};
-    await queue.add(curr.handler, buildJobData(handler, { id: curr.id, type: JobType.cron, payload: curr.payload }), {
-      jobId: curr.jobId,
-      repeat: { pattern: curr.pattern },
-      attempts: curr.maxAttempts,
-      backoff: { type: 'exponential', delay: curr.backoffMs },
-    });
+    const data = buildJobData(handler, { id: curr.id, type: JobType.cron, payload: curr.payload });
+    await queue.add(
+      curr.handler,
+      data,
+      withLanePriority(data, {
+        jobId: curr.jobId,
+        repeat: { pattern: curr.pattern },
+        attempts: curr.maxAttempts,
+        backoff: { type: 'exponential', delay: curr.backoffMs },
+      }),
+    );
   }
 };
 

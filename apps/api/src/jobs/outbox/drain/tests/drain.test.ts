@@ -1,10 +1,12 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, spyOn } from 'bun:test';
-import { claimLane, getJobSupersededBy, laneKey, redisNamespace, watchLane } from '@template/db';
+import { claimLane, getJobSupersededBy, laneKey, watchLane } from '@template/db';
 import { cleanupTouchedTables, createJobOutbox } from '@template/db/test';
 import { setEnvOverride } from '@template/shared/utils';
+import { SLOW_LANE_PRIORITY } from '#/jobs/lanePriority';
 import {
   flushOutbox,
   hasPendingFastSpills,
+  hasPendingSlowSpills,
   hasPendingSpills,
   isOverflowing,
   type OutboxRow,
@@ -13,14 +15,15 @@ import {
   spillToOutbox,
   tripIfFull,
 } from '#/jobs/outbox';
+import { flagKey } from '#/jobs/outbox/config';
 import { runDrainOutboxPass } from '#/jobs/outbox/drain';
 import { flushQueue } from '#/jobs/outbox/mutex';
 import { queue } from '#/jobs/queue';
-import { claimBulkSlot } from '#/jobs/slowLane/capacity';
 import { JobLane, JobType, type WorkerContext } from '#/jobs/types';
 import { createTestWorker } from '#tests/createTestWorker';
 
-const FLAG_KEY = `${redisNamespace.job}:overflow`;
+const FLAG_KEY = flagKey(JobLane.fast);
+const SLOW_FLAG_KEY = flagKey(JobLane.slow);
 
 const fanRow = (jobId: string): OutboxRow => ({
   handlerName: 'sendWebhook',
@@ -52,7 +55,7 @@ describe('jobs overflow buffer (spill + drain)', () => {
 
   // ioredis-mock can't run BullMQ's Lua scripts, so spy the queue boundary and drive the real
   // outbox logic against an in-memory job map. The overflow flag still uses the (mock) Redis.
-  const queued = new Map<string, { id: string; name: string; data: unknown }>();
+  const queued = new Map<string, { id: string; name: string; data: unknown; priority?: number }>();
   const poison = new Set<string>(); // handlerNames whose queue.add throws — drives the quarantine path
   let restoreQueueSpies = (): void => {};
 
@@ -62,17 +65,17 @@ describe('jobs overflow buffer (spill + drain)', () => {
     const add = spyOn(queue, 'add').mockImplementation((async (
       name: string,
       data: unknown,
-      opts?: { jobId?: string },
+      opts?: { jobId?: string; priority?: number },
     ) => {
       if (poison.has(name)) throw new Error(`poison handler: ${name}`);
       const id = opts?.jobId ?? `${name}-${queued.size}`;
-      if (!queued.has(id)) queued.set(id, { id, name, data });
+      if (!queued.has(id)) queued.set(id, { id, name, data, priority: opts?.priority });
       return { id };
     }) as never);
-    const counts = spyOn(queue, 'getJobCounts').mockImplementation((async () => ({
-      waiting: queued.size,
-      active: 0,
-    })) as never);
+    const counts = spyOn(queue, 'getJobCounts').mockImplementation((async () => {
+      const prioritized = [...queued.values()].filter((job) => job.priority).length;
+      return { waiting: queued.size - prioritized, prioritized, active: 0 };
+    }) as never);
     const getJob = spyOn(queue, 'getJob').mockImplementation((async (id: string) => queued.get(id)) as never);
     const getJobs = spyOn(queue, 'getJobs').mockImplementation((async () => [...queued.values()]) as never);
     restoreQueueSpies = () => {
@@ -353,44 +356,58 @@ describe('jobs overflow buffer (spill + drain)', () => {
       ]);
     });
 
-    it('admits fast rows before older slow rows', async () => {
+    it('re-admits fast rows first and slow rows at the slow priority', async () => {
       await spillToOutbox(slowRow('old-slow'));
       await spillToOutbox(fanRow('new-fast'));
 
       await runDrainOutboxPass();
 
-      expect([...queued.keys()]).toEqual(['new-fast', 'old-slow']);
+      expect([...queued.values()].map((job) => [job.id, job.priority])).toEqual([
+        ['new-fast', undefined],
+        ['old-slow', SLOW_LANE_PRIORITY],
+      ]);
     });
 
-    it('bounds slow admissions by the per-pass cap and the free fleet slots', async () => {
-      setEnvOverride('BULK_SLOTS', '10');
-      setEnvOverride('JOBS_OUTBOX_MAX_SLOW_ADMISSIONS', '2');
-      for (const id of ['s1', 's2', 's3']) await spillToOutbox(slowRow(id));
+    it('fills the slow lane only up to its share of the depth budget', async () => {
+      setEnvOverride('JOBS_MAX_QUEUE_DEPTH', '10');
+      setEnvOverride('JOBS_SLOW_QUEUE_DEPTH_FRACTION', '0.3');
+      for (const id of ['s1', 's2', 's3', 's4', 's5']) await spillToOutbox(slowRow(id));
 
       await runDrainOutboxPass();
-      expect([...queued.keys()]).toEqual(['s1', 's2']);
 
-      setEnvOverride('JOBS_OUTBOX_MAX_SLOW_ADMISSIONS', '100');
-      setEnvOverride('BULK_SLOTS', '2');
-      await runDrainOutboxPass();
-      expect(await ctx.db.jobOutbox.count()).toBe(1);
+      expect([...queued.keys()]).toEqual(['s1', 's2', 's3']);
+      expect(await ctx.db.jobOutbox.count()).toBe(2);
     });
 
-    it('clears the overflow flag while slow rows still wait for a slot', async () => {
-      setEnvOverride('BULK_SLOTS', '1');
-      await claimBulkSlot(ctx.queue.redis, 'busy');
+    it('gives slow rows only the budget left after fast rows', async () => {
+      setEnvOverride('JOBS_MAX_QUEUE_DEPTH', '4');
+      setEnvOverride('JOBS_SLOW_QUEUE_DEPTH_FRACTION', '1');
+      for (const id of ['f1', 'f2', 'f3']) await spillToOutbox(fanRow(id));
+      for (const id of ['s1', 's2']) await spillToOutbox(slowRow(id));
+
+      await runDrainOutboxPass();
+
+      expect([...queued.keys()]).toEqual(['f1', 'f2', 'f3', 's1']);
+    });
+
+    it('clears each lane flag independently once that lane is drained below its low-water', async () => {
+      setEnvOverride('JOBS_MAX_QUEUE_DEPTH', '10');
+      setEnvOverride('JOBS_SLOW_QUEUE_DEPTH_FRACTION', '0.5');
       await ctx.queue.redis.set(FLAG_KEY, String(Date.now()));
-      await spillToOutbox(slowRow('waiting-for-slot'));
+      await ctx.queue.redis.set(SLOW_FLAG_KEY, String(Date.now()));
+      for (const id of ['s1', 's2', 's3', 's4', 's5', 's6']) await spillToOutbox(slowRow(id));
 
       await runDrainOutboxPass();
 
+      expect(await isOverflowing(JobLane.fast)).toBe(false);
+      expect(await isOverflowing(JobLane.slow)).toBe(true);
       expect(await ctx.db.jobOutbox.count()).toBe(1);
-      expect(await isOverflowing()).toBe(false);
     });
 
     it('resets quarantined rows only once no slow row is admittable either', async () => {
-      setEnvOverride('BULK_SLOTS', '1');
-      await claimBulkSlot(ctx.queue.redis, 'busy');
+      setEnvOverride('JOBS_MAX_QUEUE_DEPTH', '10');
+      setEnvOverride('JOBS_SLOW_QUEUE_DEPTH_FRACTION', '0.1');
+      await ctx.queue.add('sendWebhook', {}, { jobId: 'slow-in-queue', priority: SLOW_LANE_PRIORITY });
       await createJobOutbox({
         jobId: 'q',
         lane: JobLane.fast,
@@ -407,11 +424,11 @@ describe('jobs overflow buffer (spill + drain)', () => {
       expect((await ctx.db.jobOutbox.findFirst({ where: { jobId: 'q' } }))?.attempts).toBe(0);
     });
 
-    it('counts only fast spills as pending for the overflow flag', async () => {
+    it('tracks pending spills per lane', async () => {
       setEnvOverride('JOBS_OUTBOX_FLUSH_MAX_ROWS', '100');
       setEnvOverride('JOBS_OUTBOX_FLUSH_LINGER_MS', '60000');
       const slow = spillToOutbox(slowRow('pending-slow'));
-      expect(hasPendingSpills()).toBe(true);
+      expect(hasPendingSlowSpills()).toBe(true);
       expect(hasPendingFastSpills()).toBe(false);
 
       const fast = spillToOutbox(fanRow('pending-fast'));
@@ -420,7 +437,6 @@ describe('jobs overflow buffer (spill + drain)', () => {
       await flushOutbox();
       await Promise.all([slow, fast]);
       expect(hasPendingSpills()).toBe(false);
-      expect(hasPendingFastSpills()).toBe(false);
     });
 
     it('re-adds a stored invalid job id under a fresh one instead of quarantining it', async () => {

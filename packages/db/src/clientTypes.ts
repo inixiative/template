@@ -29,17 +29,7 @@ export type DbMethods = {
   getScopeId: () => string | null;
   getScope: () => ScopeContext | null;
   isInTxn: () => boolean;
-  findForUpdate: <T = unknown>(
-    model: ModelName,
-    where: Record<string, unknown>,
-    options?: FindForUpdateOptions,
-  ) => Promise<T[]>;
-};
-
-export type FindForUpdateOptions = {
-  orderBy?: Record<string, 'asc' | 'desc'>;
-  take?: number;
-  skipLocked?: boolean;
+  findForUpdate: <T = unknown>(model: ModelName, where: Record<string, unknown>) => Promise<T[]>;
 };
 
 export type Db = PrismaClient & DbMethods;
