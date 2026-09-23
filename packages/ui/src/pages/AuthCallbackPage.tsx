@@ -6,25 +6,29 @@
  */
 import { useNavigate } from '@tanstack/react-router';
 import { fetchAndHydrateMe } from '@template/ui/lib/auth/fetchAndHydrateMe';
-import { setToken } from '@template/ui/lib/auth/token';
+import { completeOAuthSignIn } from '@template/ui/lib/auth/signin';
 import { log } from '@template/ui/lib/logger';
 import { useAppStore } from '@template/ui/store';
-import { useEffect } from 'react';
-
-const TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+import { useEffect, useRef } from 'react';
 
 export const AuthCallbackPage = () => {
   const navigate = useNavigate();
+  const hasExchangedToken = useRef(false);
 
   useEffect(() => {
+    if (hasExchangedToken.current) return;
+    hasExchangedToken.current = true;
+
     const completeOAuth = async () => {
       try {
         const url = new URL(window.location.href);
-        const token = url.searchParams.get('token') || url.hash.match(/token=([^&]+)/)?.[1];
+        const oneTimeToken = new URLSearchParams(url.hash.slice(1)).get('ott');
+        url.hash = '';
+        window.history.replaceState({}, '', url.toString());
 
-        if (!token) throw new Error('No authentication token received');
+        if (!oneTimeToken) throw new Error('No authentication token received');
 
-        setToken(token, new Date(Date.now() + TOKEN_TTL_MS));
+        await completeOAuthSignIn(oneTimeToken);
 
         await fetchAndHydrateMe(useAppStore.setState, useAppStore.getState);
 

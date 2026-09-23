@@ -9,6 +9,7 @@ import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { bearer } from 'better-auth/plugins';
 import { emitAppEvent } from '#/appEvents/emit';
+import { oauthHandoffPlugins } from '#/lib/auth/oauthHandoffPlugins';
 import { getAllowedOrigins } from '#/middleware/corsMiddleware';
 
 export const auth = betterAuth({
@@ -67,7 +68,7 @@ export const auth = betterAuth({
     },
   },
 
-  plugins: [bearer()],
+  plugins: [bearer(), ...oauthHandoffPlugins()],
 
   trustedOrigins: getAllowedOrigins(),
 
@@ -81,6 +82,10 @@ export const auth = betterAuth({
     },
     delete: async (key) => {
       await getRedisClient().del(`${redisNamespace.session}:${key}`);
+    },
+    getAndDelete: async (key) => {
+      const value = await getRedisClient().getdel(`${redisNamespace.session}:${key}`);
+      return value ? JSON.parse(value) : null;
     },
   },
 });
