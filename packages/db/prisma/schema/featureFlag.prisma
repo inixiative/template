@@ -22,6 +22,7 @@ model FeatureFlag {
   valueType    FeatureFlagValueType
 
   segmentId String?  @db.VarChar(36)
+  /// @permissions(hydrate: false)
   segment   Segment? @relation("FeatureFlagGate", fields: [segmentId], references: [id], onDelete: SetNull)
 
   variants  FeatureFlagVariant[]
@@ -49,6 +50,7 @@ model FeatureFlagVariant {
   isDefault Boolean @default(false)
 
   segmentId String?  @db.VarChar(36)
+  /// @permissions(hydrate: false)
   segment   Segment? @relation("FeatureFlagVariantAudience", fields: [segmentId], references: [id], onDelete: SetNull)
 
   valueBoolean Boolean?

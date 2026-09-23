@@ -81,6 +81,10 @@ row segment-less, rule row with a segment, exactly one value column. Label uniqu
 default are partial unique indexes. `writeVariant.ts` owns the inline-segment lifecycle: create with
 the rule, re-point, detach (tombstone) and delete, and refuses more than one audience per write.
 
+Permissions on a variant flow through its flag, never its audience; a flag's gate and a segment's
+inline owner are likewise outside the permissions tree. Those relations carry
+`/// @permissions(hydrate: false)` in the schema so `hydrate` skips them (see PERMISSIONS.md).
+
 ## Invalidation and live updates
 
 `cacheReference` busts `<owner>:featureFlags`, `featureFlag:<id>:variants`, `segment:<id>` and

@@ -98,7 +98,6 @@ export const relationTargets: Partial<Record<AccessorName, Partial<Record<string
   featureFlag: {
     auditLogs: 'auditLog',
     organization: 'organization',
-    segment: 'segment',
     space: 'space',
     user: 'user',
     variants: 'featureFlagVariant',
@@ -107,7 +106,6 @@ export const relationTargets: Partial<Record<AccessorName, Partial<Record<string
     auditLogs: 'auditLog',
     featureFlag: 'featureFlag',
     inlineSegment: 'segment',
-    segment: 'segment',
   },
   inquiry: {
     auditLogsAsSource: 'auditLog',
@@ -174,7 +172,6 @@ export const relationTargets: Partial<Record<AccessorName, Partial<Record<string
     auditLogs: 'auditLog',
     featureFlagGates: 'featureFlag',
     featureFlagVariants: 'featureFlagVariant',
-    inlineForVariant: 'featureFlagVariant',
     members: 'segmentMember',
     organization: 'organization',
     referencedByRules: 'ruleReference',
@@ -183,7 +180,6 @@ export const relationTargets: Partial<Record<AccessorName, Partial<Record<string
     user: 'user',
   },
   segmentMember: {
-    customerRef: 'customerRef',
     segment: 'segment',
   },
   session: {

@@ -200,7 +200,7 @@ Finding that shapes this stage: `polymorphicIs` (`packages/db/src/registries/pol
 - `featureFlag.changed` refetches `meReadManyFeatureFlagValues` on one global channel, not an owner channel: websocket channels are authorized by probing the route they name, and the values route carries no owner parameter. The payload is a refetch hint, so this is fan-out, not a leak; a per-owner channel needs a route shape that carries the owner.
 - Lowering a `sample.percent` keeps the already-enrolled ids (the ticket specifies raising only); shrinking a rollout is a ruling to take.
 - `slug` and `subjectModel` immutability on `FeatureFlag` (this plan's addition).
-- `hydrate()` (permissions hydration) gained a cycle guard: variant → inline segment → variant is the schema's first FK cycle and the old walker recursed forever, hanging every `validatePermission` on a variant.
+- Variant → inline segment → variant is the schema's first mutual-FK pair and `hydrate()` recursed forever on it, hanging every `validatePermission` on a variant. Resolved with prisma-map's annotation DSL: `/// @permissions(hydrate: false)` on `FeatureFlag.segment`, `FeatureFlagVariant.segment`, `Segment.inlineForVariant` and `SegmentMember.customerRef` keeps those edges out of the permissions tree (`isPermissionEdge`, honored by `hydrate` and `relationTargetsGen`); a cycle now throws instead of walking.
 - One-audience-per-write is enforced in `writeVariant.ts` (422), not as a zod refine, because a refine on a create body breaks the route template's body schema shape.
 - Frontend (Stage H) is not in this PR.
 - Platform owner id is the literal string `'platform'` wherever an owner id is needed (`segmentOwnerId`, `polymorphicBindings`) — one convention across A3/E1.

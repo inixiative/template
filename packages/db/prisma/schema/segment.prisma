@@ -44,6 +44,7 @@ model Segment {
   conditionsPrompt String?
 
   featureFlagVariantId String?             @unique @db.VarChar(36)
+  /// @permissions(hydrate: false)
   inlineForVariant     FeatureFlagVariant? @relation("SegmentInlineForVariant", fields: [featureFlagVariantId], references: [id], onDelete: Cascade)
 
   members           SegmentMember[]
