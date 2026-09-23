@@ -78,7 +78,7 @@ experiment arms to hold still makes the segments disjoint.
 
 On a request, `requestFeatureFlags(c)` resolves once for the caller's refs (their own, plus the
 platform refs of the organizations and spaces they act in) and memoizes on `c.var.featureFlags`,
-cloned into batch sub-requests. `checkFlag(resolved, owner, slug, type, subject?)` returns the value
+cloned into batch sub-requests. `checkFlag(owner, slug, type, resolved, subject?)` returns the value
 typed as `type`; a missing flag or a mismatched type is `null`, logged once per slug. Off-request
 callers (jobs, event handlers, email render) call `resolveFlags` directly.
 

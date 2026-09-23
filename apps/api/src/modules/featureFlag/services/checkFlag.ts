@@ -27,9 +27,9 @@ const ownerOf = (owner: FlagOwner) =>
   owner === 'platform' ? { ownerModel: 'platform' as const, ownerId: 'platform' } : owner;
 
 export const findResolvedFlag = (
-  resolved: ResolvedFlags,
   owner: FlagOwner,
   slug: string,
+  resolved: ResolvedFlags,
   subject?: FlagSubject,
 ): ResolvedFlag | null => {
   const hop = hopKey(ownerOf(owner));
@@ -45,13 +45,13 @@ export const findResolvedFlag = (
 };
 
 export const checkFlag = <T extends FeatureFlagValueType>(
-  resolved: ResolvedFlags,
   owner: FlagOwner,
   slug: string,
   type: T,
+  resolved: ResolvedFlags,
   subject?: FlagSubject,
 ): TypedValue[T] | null => {
-  const found = findResolvedFlag(resolved, owner, slug, subject);
+  const found = findResolvedFlag(owner, slug, resolved, subject);
   if (!found) return null;
   if (found.flag.valueType !== type) {
     reportOnce(

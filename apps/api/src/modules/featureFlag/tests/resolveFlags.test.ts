@@ -29,7 +29,7 @@ describe('resolveFlags', () => {
   const platformSegment = async () => (await createSegment({ ownerModel: ProviderModel.platform })).entity;
   const flagFor = (ref: CustomerRef) => resolveFlags([ref]);
   const check = async <T extends FeatureFlagValueType>(flag: FeatureFlag, type: T, subject = ref) =>
-    checkFlag(await flagFor(subject), 'platform', flag.slug, type);
+    checkFlag('platform', flag.slug, type, await flagFor(subject));
 
   beforeAll(async () => {
     registerClearCacheHook();
@@ -114,9 +114,9 @@ describe('resolveFlags', () => {
     await createFeatureFlagVariant({ label: 'on', segment: everyone }, { featureFlag: flag });
 
     expect(await check(flag, 'boolean')).toBeNull();
-    expect(checkFlag(await flagFor(orgRef), 'platform', flag.slug, 'boolean')).toBe(true);
+    expect(checkFlag('platform', flag.slug, 'boolean', await flagFor(orgRef))).toBe(true);
     expect(
-      checkFlag(await resolveFlags([ref, orgRef]), 'platform', flag.slug, 'boolean', {
+      checkFlag('platform', flag.slug, 'boolean', await resolveFlags([ref, orgRef]), {
         customerModel: 'Organization',
         customerId: organization.id,
       }),
@@ -138,7 +138,7 @@ describe('resolveFlags', () => {
     const { entity: flag } = await createFeatureFlag({ slug: slug('typed') });
     await createFeatureFlagVariant({ label: 'on', segment: everyone }, { featureFlag: flag });
     expect(await check(flag, 'string')).toBeNull();
-    expect(checkFlag(await flagFor(ref), 'platform', 'never-defined', 'boolean')).toBeNull();
+    expect(checkFlag('platform', 'never-defined', 'boolean', await flagFor(ref))).toBeNull();
   });
 
   it('json values come back as stored', async () => {
