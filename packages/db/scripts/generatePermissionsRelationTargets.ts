@@ -7,7 +7,7 @@ import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { prismaMap } from '@template/db/generated/prismaMap';
 import { type AccessorName, isModelName, toAccessor } from '../src/utils/modelNames';
-import { getModelRelations, isPermissionEdge } from '../src/utils/prismaMapRelations';
+import { getModelRelations, shouldHydrate } from '../src/utils/prismaMapRelations';
 
 const outFile = join(import.meta.dir, '../../permissions/src/rebac/relationTargetsGen.ts');
 
@@ -19,7 +19,7 @@ for (const modelName of Object.keys(prismaMap.models)) {
   const sourceAccessor = toAccessor(modelName);
   const targets: Partial<Record<string, AccessorName>> = {};
 
-  for (const rel of getModelRelations(modelName).filter(isPermissionEdge)) {
+  for (const rel of getModelRelations(modelName).filter(shouldHydrate)) {
     targets[rel.relationName] = rel.targetAccessor;
   }
 

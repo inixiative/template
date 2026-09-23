@@ -35,5 +35,4 @@ export const getAccessorRelations = (accessor: AccessorName): RelationInfo[] => 
 };
 
 /** `/// @permissions(hydrate: false)` on a relation keeps it out of the permissions tree. */
-export const isPermissionEdge = (relation: RelationInfo): boolean =>
-  relation.annotations?.permissions?.hydrate !== false;
+export const shouldHydrate = (relation: RelationInfo): boolean => relation.annotations?.permissions?.hydrate !== false;

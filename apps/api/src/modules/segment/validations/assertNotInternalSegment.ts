@@ -7,8 +7,8 @@
 import type { Segment } from '@template/db/generated/client/client';
 import { makeError } from '#/lib/errors';
 
-export const assertNotInlineSegment = (segment: Pick<Segment, 'featureFlagVariantId'>): void => {
+export const assertNotInternalSegment = (segment: Pick<Segment, 'featureFlagVariantId'>): void => {
   if (segment.featureFlagVariantId) {
-    throw makeError({ status: 422, message: 'an inline segment is edited through its feature flag variant' });
+    throw makeError({ status: 422, message: 'an internal segment is edited through its feature flag variant' });
   }
 };

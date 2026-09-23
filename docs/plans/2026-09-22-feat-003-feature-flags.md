@@ -4,7 +4,7 @@
 
 **Goal:** Ship `tickets/FEAT-003-feature-flags.md` v1: platform and `custom:` flags whose typed value is chosen by ordered variant rows, each row's audience a FEAT-021 segment, resolved as a per-request fold.
 
-**Architecture:** Three prerequisites first (the platform as a `ProviderModel`, provisioned platform `CustomerRef`s, variant-owned inline segments), then the two models, then hooks, resolver, routes. Nothing new is materialized; `SegmentMember` is the only stored audience. Every rule in this plan comes from the ticket; where the plan adds a mechanism it says so.
+**Architecture:** Three prerequisites first (the platform as a `ProviderModel`, provisioned platform `CustomerRef`s, variant-owned internal segments), then the two models, then hooks, resolver, routes. Nothing new is materialized; `SegmentMember` is the only stored audience. Every rule in this plan comes from the ticket; where the plan adds a mechanism it says so.
 
 **Tech Stack:** Hono + zod-openapi route templates, Prisma (Postgres, partial uniques via `where:` / `raw()`), `@template/db` registries and `registerDbHook`, `@inixiative/json-rules` lens + `polymorphicIs`, app events → websocket refetch, bun test with `@template/db/test` factories.
 
@@ -106,8 +106,8 @@ Finding that shapes this stage: `polymorphicIs` (`packages/db/src/registries/pol
 ### Task C1: Prisma models
 
 **Files:**
-- Create: `packages/db/prisma/schema/featureFlag.prisma` (the `FeatureFlag` and `FeatureFlagVariant` models + `FeatureFlagValueType` enum exactly as in the ticket's Model section, plus owner relations `user/organization/space`, `segment Segment? @relation("FeatureFlagGate")`, `auditLogs AuditLog[]`; the variant's `segment Segment? @relation("FeatureFlagVariantAudience")` and `inlineSegment Segment? @relation("SegmentInlineForVariant")`).
-- Modify: `packages/db/prisma/schema/segment.prisma` — `featureFlagVariantId String? @unique @db.VarChar(36)`, `inlineForVariant FeatureFlagVariant? @relation("SegmentInlineForVariant", fields: [featureFlagVariantId], references: [id], onDelete: Cascade)`, back-relations `featureFlagGates FeatureFlag[] @relation("FeatureFlagGate")`, `featureFlagVariants FeatureFlagVariant[] @relation("FeatureFlagVariantAudience")`.
+- Create: `packages/db/prisma/schema/featureFlag.prisma` (the `FeatureFlag` and `FeatureFlagVariant` models + `FeatureFlagValueType` enum exactly as in the ticket's Model section, plus owner relations `user/organization/space`, `segment Segment? @relation("FeatureFlagGate")`, `auditLogs AuditLog[]`; the variant's `segment Segment? @relation("FeatureFlagVariantAudience")` and `internalSegment Segment? @relation("FeatureFlagVariantInternalSegment")`).
+- Modify: `packages/db/prisma/schema/segment.prisma` — `featureFlagVariantId String? @unique @db.VarChar(36)`, `internalToVariant FeatureFlagVariant? @relation("FeatureFlagVariantInternalSegment", fields: [featureFlagVariantId], references: [id], onDelete: Cascade)`, back-relations `featureFlagGates FeatureFlag[] @relation("FeatureFlagGate")`, `featureFlagVariants FeatureFlagVariant[] @relation("FeatureFlagVariantAudience")`.
 - Modify: `user.prisma`, `organization.prisma`, `space.prisma` (`featureFlags FeatureFlag[]`), `auditLog.prisma` (`subjectFeatureFlagId`, `subjectFeatureFlagVariantId` following the existing subject columns).
 - Flag uniqueness: `@@unique([userId, slug], where: { userId: { not: null } })` ×3 + `@@unique([slug], where: raw("\"ownerModel\" = 'platform'"))`. Variant: `@@unique([featureFlagId, label])`, `@@unique([featureFlagId], where: { isDefault: true })`.
 - Migration `feature_flags`.
@@ -126,19 +126,19 @@ Finding that shapes this stage: `polymorphicIs` (`packages/db/src/registries/pol
 ### Task D1: `featureFlag` hook (row-local invariants)
 
 **Files:**
-- Create: `apps/api/src/hooks/featureFlag/hook.ts`: before create/update/upsert on `FeatureFlag` — slug shape via the shared schema (Task G1; until then the regex from `CreateOrganizationModal`), bare slug ⇒ `ownerModel === 'platform'`, `custom:` ⇒ any owner; gate `segmentId` must be a live segment of the same owner and must not be inline for a variant (`featureFlagVariantId` null).
-- Create: `apps/api/src/hooks/featureFlagVariant/hook.ts`: rule row ⇒ `segmentId` required, default row ⇒ `segmentId` null; exactly the value column for the flag's `valueType`; `segmentId` owner = flag owner; `segmentId` not inline for a *different* variant.
+- Create: `apps/api/src/hooks/featureFlag/hook.ts`: before create/update/upsert on `FeatureFlag` — slug shape via the shared schema (Task G1; until then the regex from `CreateOrganizationModal`), bare slug ⇒ `ownerModel === 'platform'`, `custom:` ⇒ any owner; gate `segmentId` must be a live segment of the same owner and must not be internal for a variant (`featureFlagVariantId` null).
+- Create: `apps/api/src/hooks/featureFlagVariant/hook.ts`: rule row ⇒ `segmentId` required, default row ⇒ `segmentId` null; exactly the value column for the flag's `valueType`; `segmentId` owner = flag owner; `segmentId` not internal for a *different* variant.
 - Tests: `apps/api/src/hooks/featureFlag/hook.test.ts`, `apps/api/src/hooks/featureFlagVariant/hook.test.ts` — one case per refusal, one happy path each, through factories.
 
 ### Task D2: save-gate refusals on the segment side
 
 **Files:**
-- Modify: `apps/api/src/modules/segment/validations/validateSegmentReferences.ts` (or `assertSegmentReferencesOwned.ts`) — a referenced segment with `featureFlagVariantId` set is refused with 422 "inline segment".
-- Modify: `apps/api/src/modules/segment/controllers/segmentUpdate.ts`, `segmentDelete.ts` — refuse inline rows (edit through the variant).
+- Modify: `apps/api/src/modules/segment/validations/validateSegmentReferences.ts` (or `assertSegmentReferencesOwned.ts`) — a referenced segment with `featureFlagVariantId` set is refused with 422 "internal segment".
+- Modify: `apps/api/src/modules/segment/controllers/segmentUpdate.ts`, `segmentDelete.ts` — refuse internal rows (edit through the variant).
 - Modify: `modules/{me,organization,space}/controllers/*ReadManySegments.ts` and `customerRefLens.ts` `ownedSegments` (the picker/source) — `featureFlagVariantId: null`.
 - Tests in `segmentConditionsHook.test.ts`, `segmentRoutes.test.ts`.
 
-**Commit:** `inline segments: owned by the variant, refused elsewhere`.
+**Commit:** `internal segments: owned by the variant, refused elsewhere`.
 
 ## Stage E — resolution
 
@@ -165,11 +165,11 @@ Finding that shapes this stage: `polymorphicIs` (`packages/db/src/registries/pol
 ### Task F1: flag routes
 
 **Files:** `apps/api/src/modules/featureFlag/{routes,controllers,schemas,queries}` following `modules/segment` file-for-file: `featureFlagRead/Update/Delete`, `featureFlagReadManyVariants`, `featureFlagCreateVariant`; `modules/featureFlagVariant/{routes,controllers}`: `Update/Delete`; owner create + read-many on `me`, `organization`, `space`, `admin`; `meReadManyFeatureFlags` (subject-facing: `{ owner, slug, value }` only, from `c.var.featureFlags`). Register in `modules/modules.ts`, `tags.ts`, the router index.
-- Variant create/update body: `segmentId` **xor** `inlineSegment: { type, conditions }` **xor** `sample: { percent, from?: segmentId }`; the service `apps/api/src/modules/featureFlag/services/writeVariant.ts` runs the row-local checks (nested creates bypass hooks — HOOKS.md) and writes the inline segment with `featureFlagVariantId`.
-- `sample`: population = `providerWhere(owner)` refs of the flag's `subjectModel`, intersected with `from`'s members when given; sample `percent` of ids not already in the list (raising re-samples from the remainder into the same list); write/update the inline static segment with `{ field: 'id', operator: 'in', value: ids }`.
-- Boolean flag create: the service also writes the `on` variant (`valueBoolean: true`) pointing at an inline dynamic open segment (`conditions: {}` — confirm the save gate accepts `{}` as the open rule; `feedback-default-open-not-a-bug`).
+- Variant create/update body: `segmentId` **xor** `internalSegment: { type, conditions }` **xor** `sample: { percent, from?: segmentId }`; the service `apps/api/src/modules/featureFlag/services/writeVariant.ts` runs the row-local checks (nested creates bypass hooks — HOOKS.md) and writes the internal segment with `featureFlagVariantId`.
+- `sample`: population = `providerWhere(owner)` refs of the flag's `subjectModel`, intersected with `from`'s members when given; sample `percent` of ids not already in the list (raising re-samples from the remainder into the same list); write/update the internal static segment with `{ field: 'id', operator: 'in', value: ids }`.
+- Boolean flag create: the service also writes the `on` variant (`valueBoolean: true`) pointing at an internal dynamic open segment (`conditions: {}` — confirm the save gate accepts `{}` as the open rule; `feedback-default-open-not-a-bug`).
 - `estimateSegmentReach` route: `GET /segment/:id/reach` (the ticket puts reach on the variant row).
-- Tests: `apps/api/src/modules/featureFlag/tests/featureFlagRoutes.test.ts` — create per owner, bare slug refused for org, `custom:` accepted, variant with `segmentId` / `inlineSegment` / `sample`, position update reorders, delete cascades the inline segment, subject-facing read has no labels, superadmin read-many over all flags.
+- Tests: `apps/api/src/modules/featureFlag/tests/featureFlagRoutes.test.ts` — create per owner, bare slug refused for org, `custom:` accepted, variant with `segmentId` / `internalSegment` / `sample`, position update reorders, delete cascades the internal segment, subject-facing read has no labels, superadmin read-many over all flags.
 
 ### Task F2: superadmin read-many
 
@@ -190,17 +190,17 @@ Finding that shapes this stage: `polymorphicIs` (`packages/db/src/registries/pol
 
 - `useFeatureFlag(owner, slug, type)` over `meReadManyFeatureFlags` in `packages/ui`; ws handler names the query key.
 - Superadmin: `apps/superadmin/app/routes/_authenticated/featureFlags.tsx` with two tabs on `/admin/featureFlags`.
-- Owner pages (me / org / space): flags list, variants with reach, segment picker (excludes inline), `sample` form, JSON conditions textarea until the segment builder exists.
+- Owner pages (me / org / space): flags list, variants with reach, segment picker (excludes internal), `sample` form, JSON conditions textarea until the segment builder exists.
 
 ## Ratification notes for the PR description
 
 - `valueNumber` is `Float`, not the ticket's `Decimal(38,10)`: Decimal breaks the db-wide `HydratedRecord` type the permissions walk reads, serialises as a string, and the repo has no Decimal column anywhere; the FEAT-020 reason for Decimal (exact ordered comparisons over enrichment data) does not apply to a flag's configuration value.
 - Two row-shaped cache keys instead of the ticket's one: `<owner>:featureFlags` (flag rows) and `featureFlag:<id>:variants`. `cacheReference` is synchronous over the written row, and a variant row carries only `featureFlagId`, so it cannot name the owner key.
-- Flag, variant and `Segment.name` uniques are partial on `deletedAt IS NULL` so a deleted slug, label or segment name can be reused. The segment change is a FEAT-021 model change made here because an inline segment is recreated under its variant's name whenever the audience is re-pointed.
+- Flag, variant and `Segment.name` uniques are partial on `deletedAt IS NULL` so a deleted slug, label or segment name can be reused. The segment change is a FEAT-021 model change made here because an internal segment is recreated under its variant's name whenever the audience is re-pointed.
 - `featureFlag.changed` refetches `meReadManyFeatureFlagValues` on one global channel, not an owner channel: websocket channels are authorized by probing the route they name, and the values route carries no owner parameter. The payload is a refetch hint, so this is fan-out, not a leak; a per-owner channel needs a route shape that carries the owner.
 - Lowering a `sample.percent` keeps the already-enrolled ids (the ticket specifies raising only); shrinking a rollout is a ruling to take.
 - `slug` and `subjectModel` immutability on `FeatureFlag` (this plan's addition).
-- Variant → inline segment → variant is the schema's first mutual-FK pair and `hydrate()` recursed forever on it, hanging every `validatePermission` on a variant. Resolved with prisma-map's annotation DSL: `/// @permissions(hydrate: false)` on `FeatureFlag.segment`, `FeatureFlagVariant.segment`, `Segment.inlineForVariant` and `SegmentMember.customerRef` keeps those edges out of the permissions tree (`isPermissionEdge`, honored by `hydrate` and `relationTargetsGen`); a cycle now throws instead of walking.
+- Variant → internal segment → variant is the schema's first mutual-FK pair and `hydrate()` recursed forever on it, hanging every `validatePermission` on a variant. Resolved with prisma-map's annotation DSL: `/// @permissions(hydrate: false)` on `FeatureFlag.segment`, `FeatureFlagVariant.segment`, `Segment.internalToVariant` and `SegmentMember.customerRef` keeps those edges out of the permissions tree (`shouldHydrate`, honored by `hydrate` and `relationTargetsGen`); a cycle now throws instead of walking.
 - One-audience-per-write is enforced in `writeVariant.ts` (422), not as a zod refine, because a refine on a create body breaks the route template's body schema shape.
 - Frontend (Stage H) is not in this PR.
 - Platform owner id is the literal string `'platform'` wherever an owner id is needed (`segmentOwnerId`, `polymorphicBindings`) — one convention across A3/E1.

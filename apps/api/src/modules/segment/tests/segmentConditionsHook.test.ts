@@ -66,18 +66,18 @@ describe('segmentConditions hook', () => {
     expect(entity.ownerModel).toBe('platform');
   });
 
-  it('a rule may not name an inline segment, even the owner’s own', async () => {
+  it('a rule may not name an internal segment, even the owner’s own', async () => {
     const { entity: flag } = await createFeatureFlag({ slug: 'custom:x', ownerModel: ProviderModel.Space, space });
     const { entity: audience } = await createSegment({ conditions: acmeRule }, { space });
     const { entity: variant } = await createFeatureFlagVariant({ segment: audience }, { featureFlag: flag });
-    const { entity: inline } = await createSegment(
+    const { entity: internal } = await createSegment(
       { conditions: acmeRule, featureFlagVariantId: variant.id },
       { space },
     );
     const naming = {
       field: 'segmentMembers',
       arrayOperator: 'any',
-      condition: { field: 'segment.id', operator: Operator.equals, value: inline.id },
+      condition: { field: 'segment.id', operator: Operator.equals, value: internal.id },
     };
     await expect(createSegment({ conditions: naming }, { space })).rejects.toThrow('does not own');
   });

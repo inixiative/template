@@ -105,7 +105,7 @@ export const relationTargets: Partial<Record<AccessorName, Partial<Record<string
   featureFlagVariant: {
     auditLogs: 'auditLog',
     featureFlag: 'featureFlag',
-    inlineSegment: 'segment',
+    internalSegment: 'segment',
   },
   inquiry: {
     auditLogsAsSource: 'auditLog',

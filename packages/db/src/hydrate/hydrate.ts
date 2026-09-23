@@ -9,7 +9,7 @@ import { fetchOne } from '@template/db/hydrate/fetchOne';
 import type { HydratedRecord } from '@template/db/hydrate/types';
 import { cacheKey } from '@template/db/redis';
 import type { AccessorName } from '@template/db/utils/modelNames';
-import { getAccessorRelations, type Identifier, isPermissionEdge } from '@template/db/utils/prismaMapRelations';
+import { getAccessorRelations, type Identifier, shouldHydrate } from '@template/db/utils/prismaMapRelations';
 
 type PendingMap = Map<string, Promise<HydratedRecord | null>>;
 
@@ -39,7 +39,7 @@ export const hydrate = async <T extends HydratedRecord>(
   pending: PendingMap = new Map(),
   hydrating: Set<string> = new Set(),
 ): Promise<T & HydratedRecord> => {
-  const relations = getAccessorRelations(accessor).filter(isPermissionEdge);
+  const relations = getAccessorRelations(accessor).filter(shouldHydrate);
   const result: HydratedRecord = { ...record };
   const path = new Set([...hydrating, recordKey(accessor, record)]);
 

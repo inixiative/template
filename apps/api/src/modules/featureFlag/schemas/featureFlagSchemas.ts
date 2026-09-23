@@ -42,7 +42,7 @@ export const featureFlagReadResponseSchema = FeatureFlagScalarSchema.extend({
   variants: z.array(featureFlagVariantReadResponseSchema),
 });
 
-export const inlineSegmentSchema = z.object({
+export const internalSegmentSchema = z.object({
   type: z.enum(SegmentType),
   conditions: z.unknown(),
 });
@@ -54,7 +54,7 @@ export const sampleSchema = z.object({
 
 const audienceFields = {
   segmentId: z.string().nullable().optional(),
-  inlineSegment: inlineSegmentSchema.optional(),
+  internalSegment: internalSegmentSchema.optional(),
   sample: sampleSchema.optional(),
 };
 

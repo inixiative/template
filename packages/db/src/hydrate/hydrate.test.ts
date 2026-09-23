@@ -92,19 +92,19 @@ describe('hydrate', () => {
     const { entity: flag } = await createFeatureFlag({});
     const { entity: audience } = await createSegment({ ownerModel: 'platform' });
     const { entity: variant } = await createFeatureFlagVariant({ segmentId: audience.id }, { featureFlag: flag });
-    const { entity: inline } = await createSegment({ ownerModel: 'platform', featureFlagVariantId: variant.id });
-    await db.featureFlagVariant.update({ where: { id: variant.id }, data: { segmentId: inline.id } });
+    const { entity: internal } = await createSegment({ ownerModel: 'platform', featureFlagVariantId: variant.id });
+    await db.featureFlagVariant.update({ where: { id: variant.id }, data: { segmentId: internal.id } });
 
     const hydratedVariant = await hydrate(db, 'featureFlagVariant', {
       id: variant.id,
       featureFlagId: flag.id,
-      segmentId: inline.id,
+      segmentId: internal.id,
     });
     expect((hydratedVariant.featureFlag as { id: string }).id).toBe(flag.id);
     expect(hydratedVariant.segment).toBeUndefined();
 
-    const hydratedSegment = await hydrate(db, 'segment', { id: inline.id, featureFlagVariantId: variant.id });
-    expect(hydratedSegment.inlineForVariant).toBeUndefined();
+    const hydratedSegment = await hydrate(db, 'segment', { id: internal.id, featureFlagVariantId: variant.id });
+    expect(hydratedSegment.internalToVariant).toBeUndefined();
   });
 
   it('a segment member reaches its segment and owner, never the customer reference', async () => {

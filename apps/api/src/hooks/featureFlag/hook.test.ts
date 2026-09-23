@@ -47,7 +47,7 @@ describe('featureFlag hook', () => {
     }
   });
 
-  it('the gate segment must be a live segment of the same owner and nobody’s inline audience', async () => {
+  it('the gate segment must be a live segment of the same owner and nobody’s internal audience', async () => {
     const { entity: theirs } = await createSegment({ ownerModel: ProviderModel.Space, space });
     await expect(
       createFeatureFlag({
@@ -68,7 +68,7 @@ describe('featureFlag hook', () => {
     expect(gated.segmentId).toBe(ours.id);
 
     const { entity: variant } = await createFeatureFlagVariant({ segment: ours }, { featureFlag: gated });
-    const { entity: inline } = await createSegment({
+    const { entity: internal } = await createSegment({
       ownerModel: ProviderModel.Organization,
       organization,
       featureFlagVariantId: variant.id,
@@ -78,8 +78,8 @@ describe('featureFlag hook', () => {
         slug: 'custom:other',
         ownerModel: ProviderModel.Organization,
         organization,
-        segment: inline,
+        segment: internal,
       }),
-    ).rejects.toThrow("another variant's inline audience");
+    ).rejects.toThrow("another variant's internal audience");
   });
 });

@@ -131,19 +131,19 @@ describe('segment routes', () => {
     expect(data[0]!.customerRef.customerUser).toBeTruthy();
   });
 
-  it('an inline segment stays out of the owner’s list and is edited only through its variant', async () => {
+  it('an internal segment stays out of the owner’s list and is edited only through its variant', async () => {
     const { entity: flag } = await createFeatureFlag({ slug: 'custom:x', ownerModel: 'Space', space });
     const { entity: variant } = await createFeatureFlagVariant({ segment }, { featureFlag: flag });
-    const { entity: inline } = await createSegment(
+    const { entity: internal } = await createSegment(
       { conditions: acmeRule, featureFlagVariantId: variant.id },
       { space },
     );
 
     const listed = await ownerFetch(get(`/api/v1/space/${space.id}/segments`));
-    expect((await json<Segment[]>(listed)).data.map((each) => each.id)).not.toContain(inline.id);
+    expect((await json<Segment[]>(listed)).data.map((each) => each.id)).not.toContain(internal.id);
 
-    expect((await ownerFetch(patch(`/api/v1/segment/${inline.id}`, { name: 'renamed' }))).status).toBe(422);
-    expect((await ownerFetch(del(`/api/v1/segment/${inline.id}`))).status).toBe(422);
+    expect((await ownerFetch(patch(`/api/v1/segment/${internal.id}`, { name: 'renamed' }))).status).toBe(422);
+    expect((await ownerFetch(del(`/api/v1/segment/${internal.id}`))).status).toBe(422);
   });
 
   it('the space lists the segments it owns', async () => {

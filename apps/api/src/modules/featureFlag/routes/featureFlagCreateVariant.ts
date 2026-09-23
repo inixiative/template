@@ -20,6 +20,6 @@ export const featureFlagCreateVariantRoute = createRoute({
   bodySchema: featureFlagVariantCreateBodySchema,
   responseSchema: featureFlagVariantReadResponseSchema,
   description:
-    'Adds a rule (or the default) to a flag. A rule takes one audience: a shared segmentId, an inlineSegment { type, conditions }, or a sample { percent, from? } drawn into an inline static segment.',
+    'Adds a rule (or the default) to a flag. A rule takes one audience: a shared segmentId, an internalSegment { type, conditions }, or a sample { percent, from? } drawn into an internal static segment.',
   tags: [Tags.featureFlag, Tags.featureFlagVariant],
 });

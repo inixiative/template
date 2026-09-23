@@ -15,10 +15,10 @@ import { sampleCustomerRefIds } from '#/modules/featureFlag/services/sampleCusto
 import { assertSegmentUsableBy } from '#/modules/featureFlag/validations/assertSegmentUsableBy';
 import type { Provider } from '#/modules/segment/lib/segmentOwner';
 
-type InlineSegment = { type: SegmentType; conditions: unknown };
+type InternalSegment = { type: SegmentType; conditions: unknown };
 type Sample = { percent: number; from?: string };
 
-export type VariantAudience = { segmentId?: string | null; inlineSegment?: InlineSegment; sample?: Sample };
+export type VariantAudience = { segmentId?: string | null; internalSegment?: InternalSegment; sample?: Sample };
 
 export type VariantWrite = VariantAudience & Partial<Omit<FeatureFlagVariant, 'segmentId'>>;
 
@@ -40,10 +40,10 @@ const enrolledIds = (segment: Segment | null): string[] => {
     : [];
 };
 
-const inlineName = (flag: FeatureFlag, variant: Pick<FeatureFlagVariant, 'id' | 'label'>): string =>
+const internalName = (flag: FeatureFlag, variant: Pick<FeatureFlagVariant, 'id' | 'label'>): string =>
   `${flag.slug}/${variant.label} ${variant.id}`;
 
-const writeInline = async (
+const writeInternal = async (
   flag: FeatureFlag,
   variant: FeatureFlagVariant,
   current: Segment | null,
@@ -52,7 +52,11 @@ const writeInline = async (
   if (current?.featureFlagVariantId === variant.id) {
     const updated = await db.segment.update({
       where: { id: current.id },
-      data: { type: data.type, conditions: data.conditions as Prisma.InputJsonValue, name: inlineName(flag, variant) },
+      data: {
+        type: data.type,
+        conditions: data.conditions as Prisma.InputJsonValue,
+        name: internalName(flag, variant),
+      },
     });
     await emitAppEvent('segment.updated', { segment: updated, previous: current });
     return updated;
@@ -60,7 +64,7 @@ const writeInline = async (
   const created = await db.segment.create({
     data: {
       ...ownerColumns(flag),
-      name: inlineName(flag, variant),
+      name: internalName(flag, variant),
       type: data.type,
       conditions: data.conditions as Prisma.InputJsonValue,
       featureFlagVariantId: variant.id,
@@ -76,17 +80,17 @@ const audienceFor = async (
   audience: VariantAudience,
 ): Promise<string | null | undefined> => {
   const current = variant.segmentId ? await db.segment.findUnique({ where: { id: variant.segmentId } }) : null;
-  if (audience.inlineSegment) return (await writeInline(flag, variant, current, audience.inlineSegment)).id;
+  if (audience.internalSegment) return (await writeInternal(flag, variant, current, audience.internalSegment)).id;
   if (audience.sample) {
     if (audience.sample.from) await assertSegmentUsableBy(audience.sample.from, ownerOf(flag));
     const own = current?.featureFlagVariantId === variant.id ? current : null;
     const ids = await sampleCustomerRefIds(ownerOf(flag), flag.subjectModel, audience.sample, enrolledIds(own));
-    return (await writeInline(flag, variant, current, { type: SegmentType.static, conditions: idsRule(ids) })).id;
+    return (await writeInternal(flag, variant, current, { type: SegmentType.static, conditions: idsRule(ids) })).id;
   }
   return audience.segmentId;
 };
 
-const ownInline = async (variant: FeatureFlagVariant): Promise<Segment | null> =>
+const ownInternal = async (variant: FeatureFlagVariant): Promise<Segment | null> =>
   variant.segmentId
     ? db.segment.findFirst({ where: { id: variant.segmentId, featureFlagVariantId: variant.id } })
     : null;
@@ -94,9 +98,9 @@ const ownInline = async (variant: FeatureFlagVariant): Promise<Segment | null> =
 const memberIdsOf = async (segment: Segment): Promise<string[]> =>
   (await db.segmentMember.findMany({ where: { segmentId: segment.id } })).map((member) => member.customerRefId);
 
-const detachInline = async (variant: FeatureFlagVariant, nextSegmentId: string | null | undefined): Promise<void> => {
+const detachInternal = async (variant: FeatureFlagVariant, nextSegmentId: string | null | undefined): Promise<void> => {
   if (!variant.segmentId || nextSegmentId === undefined || nextSegmentId === variant.segmentId) return;
-  const current = await ownInline(variant);
+  const current = await ownInternal(variant);
   if (!current) return;
   const customerRefIds = await memberIdsOf(current);
   const deleted = await db.segment.update({
@@ -107,14 +111,14 @@ const detachInline = async (variant: FeatureFlagVariant, nextSegmentId: string |
 };
 
 const assertOneAudience = (audience: VariantAudience): void => {
-  const given = [audience.segmentId, audience.inlineSegment, audience.sample].filter((each) => each != null);
+  const given = [audience.segmentId, audience.internalSegment, audience.sample].filter((each) => each != null);
   if (given.length > 1) {
-    throw makeError({ status: 422, message: 'a variant takes one audience: segmentId, inlineSegment or sample' });
+    throw makeError({ status: 422, message: 'a variant takes one audience: segmentId, internalSegment or sample' });
   }
 };
 
-const resolveInline = async (flag: FeatureFlag, audience: VariantAudience): Promise<InlineSegment | null> => {
-  if (audience.inlineSegment) return audience.inlineSegment;
+const resolveInternal = async (flag: FeatureFlag, audience: VariantAudience): Promise<InternalSegment | null> => {
+  if (audience.internalSegment) return audience.internalSegment;
   if (!audience.sample) return null;
   if (audience.sample.from) await assertSegmentUsableBy(audience.sample.from, ownerOf(flag));
   const ids = await sampleCustomerRefIds(ownerOf(flag), flag.subjectModel, audience.sample, []);
@@ -122,21 +126,21 @@ const resolveInline = async (flag: FeatureFlag, audience: VariantAudience): Prom
 };
 
 export const createVariant = async (flag: FeatureFlag, write: VariantWrite): Promise<FeatureFlagVariant> => {
-  const { segmentId, inlineSegment, sample, ...columns } = write;
-  assertOneAudience({ segmentId, inlineSegment, sample });
-  const inline = await resolveInline(flag, { inlineSegment, sample });
-  if (!columns.isDefault && !segmentId && !inline) {
+  const { segmentId, internalSegment, sample, ...columns } = write;
+  assertOneAudience({ segmentId, internalSegment, sample });
+  const internal = await resolveInternal(flag, { internalSegment, sample });
+  if (!columns.isDefault && !segmentId && !internal) {
     throw makeError({ status: 422, message: 'a rule variant names the segment it serves' });
   }
   const id = Bun.randomUUIDv7();
   return db.txn(async () => {
-    const segment = inline
+    const segment = internal
       ? await db.segment.create({
           data: {
             ...ownerColumns(flag),
-            name: inlineName(flag, { id, label: columns.label ?? '' }),
-            type: inline.type,
-            conditions: inline.conditions as Prisma.InputJsonValue,
+            name: internalName(flag, { id, label: columns.label ?? '' }),
+            type: internal.type,
+            conditions: internal.conditions as Prisma.InputJsonValue,
           },
         })
       : null;
@@ -161,11 +165,11 @@ export const updateVariant = async (
   variant: FeatureFlagVariant,
   write: VariantWrite,
 ): Promise<FeatureFlagVariant> => {
-  const { segmentId, inlineSegment, sample, ...columns } = write;
-  assertOneAudience({ segmentId, inlineSegment, sample });
+  const { segmentId, internalSegment, sample, ...columns } = write;
+  assertOneAudience({ segmentId, internalSegment, sample });
   return db.txn(async () => {
-    const nextSegmentId = await audienceFor(flag, variant, { segmentId, inlineSegment, sample });
-    await detachInline(variant, nextSegmentId);
+    const nextSegmentId = await audienceFor(flag, variant, { segmentId, internalSegment, sample });
+    await detachInternal(variant, nextSegmentId);
     return db.featureFlagVariant.update({
       where: { id: variant.id },
       data: {
@@ -176,11 +180,11 @@ export const updateVariant = async (
   });
 };
 
-/** The variant's tombstone cascades to its inline segment; only the membership event needs publishing. */
+/** The variant's tombstone cascades to its internal segment; only the membership event needs publishing. */
 export const deleteVariant = async (variant: FeatureFlagVariant): Promise<void> => {
-  const inline = await ownInline(variant);
-  const customerRefIds = inline ? await memberIdsOf(inline) : [];
+  const internal = await ownInternal(variant);
+  const customerRefIds = internal ? await memberIdsOf(internal) : [];
   const deletedAt = new Date();
   await db.featureFlagVariant.update({ where: { id: variant.id }, data: { deletedAt } });
-  if (inline) await emitAppEvent('segment.deleted', { segment: { ...inline, deletedAt }, customerRefIds });
+  if (internal) await emitAppEvent('segment.deleted', { segment: { ...internal, deletedAt }, customerRefIds });
 };

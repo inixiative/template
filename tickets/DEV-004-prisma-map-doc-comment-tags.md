@@ -45,10 +45,10 @@ model Category {
 
 ### `@permissions(hydrate: false)` — shipped (FEAT-003)
 
-"This relation is not part of the permissions tree." `isPermissionEdge` filters it out of
+"This relation is not part of the permissions tree." `shouldHydrate` filters it out of
 `hydrate()` and `relationTargetsGen`. Tagged: `FeatureFlag.segment`, `FeatureFlagVariant.segment`,
-`Segment.inlineForVariant`, `SegmentMember.customerRef`. It replaced a runtime cycle guard: the
-variant ↔ inline-segment pair is the schema's first mutual-FK cycle, and `hydrate()` now throws on
+`Segment.internalToVariant`, `SegmentMember.customerRef`. It replaced a runtime cycle guard: the
+variant ↔ internal-segment pair is the schema's first mutual-FK cycle, and `hydrate()` now throws on
 a cycle instead of walking it — the fix is to tag an edge, not to truncate at runtime.
 
 ### `@permissions(side: …)` — decided in principle, not built

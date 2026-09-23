@@ -114,7 +114,7 @@ describe('feature flag routes', () => {
 
   let flag: Flag;
 
-  it('an organization admin creates a custom: boolean flag and gets its on variant over an inline open segment', async () => {
+  it('an organization admin creates a custom: boolean flag and gets its on variant over an internal open segment', async () => {
     const refused = await ownerFetch(
       post(`/api/v1/organization/${org.id}/featureFlags`, {
         slug: 'dark-mode',
@@ -142,7 +142,7 @@ describe('feature flag routes', () => {
     expect(flag.variants[0]!.segment?.featureFlagVariantId).toBe(flag.variants[0]!.id);
   });
 
-  it('the inline segment is hidden from the owner’s segment list and the member sees the value', async () => {
+  it('the internal segment is hidden from the owner’s segment list and the member sees the value', async () => {
     const listed = await ownerFetch(get(`/api/v1/organization/${org.id}/segments`));
     expect((await json<Segment[]>(listed)).data.map((each) => each.id)).not.toContain(flag.variants[0]!.segmentId);
 
@@ -210,20 +210,20 @@ describe('feature flag routes', () => {
     expect(read.variants[0]!.segment?.members).toBe(1);
   });
 
-  it('deleting a variant tombstones its inline segment; a member cannot manage the flag', async () => {
+  it('deleting a variant tombstones its internal segment; a member cannot manage the flag', async () => {
     const onVariant = flag.variants[0]!;
     expect((await memberFetch(patch(`/api/v1/featureFlag/${flag.id}`, { enabled: false }))).status).toBe(403);
 
     const deleted = await ownerFetch(del(`/api/v1/featureFlagVariant/${onVariant.id}`));
     expect(deleted.status).toBe(204);
-    const inline = await db.segment.findUnique({ where: { id: onVariant.segmentId! } });
-    expect(inline?.deletedAt).not.toBeNull();
+    const internal = await db.segment.findUnique({ where: { id: onVariant.segmentId! } });
+    expect(internal?.deletedAt).not.toBeNull();
 
     const values = (await json<Value[]>(await memberFetch(get('/api/v1/me/featureFlagValues')))).data;
     expect(values.find((each) => each.slug === 'custom:dark-mode')?.value).toBe(false);
   });
 
-  it('a variant moves inline -> shared -> inline; the old inline is tombstoned and released', async () => {
+  it('a variant moves internal -> shared -> internal; the old internal is tombstoned and released', async () => {
     const created = await ownerFetch(
       post(`/api/v1/organization/${org.id}/featureFlags`, {
         slug: 'custom:moving',
@@ -239,36 +239,36 @@ describe('feature flag routes', () => {
         await ownerFetch(
           post(`/api/v1/featureFlag/${moving.id}/featureFlagVariants`, {
             label: 'a',
-            inlineSegment: { type: 'dynamic', conditions: { all: [] } },
+            internalSegment: { type: 'dynamic', conditions: { all: [] } },
             valueText: 'one',
           }),
         ),
       )
     ).data;
-    const firstInline = first.segmentId!;
+    const firstInternal = first.segmentId!;
 
     const toShared = await ownerFetch(patch(`/api/v1/featureFlagVariant/${first.id}`, { segmentId: audience.id }));
     expect(toShared.status).toBe(200);
     expect((await json<Variant>(toShared)).data.segmentId).toBe(audience.id);
-    const released = await db.segment.findFirst({ where: { id: firstInline, deletedAt: { not: null } } });
+    const released = await db.segment.findFirst({ where: { id: firstInternal, deletedAt: { not: null } } });
     expect(released?.featureFlagVariantId).toBeNull();
 
-    const backInline = await ownerFetch(
+    const backInternal = await ownerFetch(
       patch(`/api/v1/featureFlagVariant/${first.id}`, {
-        inlineSegment: { type: 'dynamic', conditions: { all: [] } },
+        internalSegment: { type: 'dynamic', conditions: { all: [] } },
       }),
     );
-    expect(backInline.status).toBe(200);
-    const again = (await json<Variant>(backInline)).data;
+    expect(backInternal.status).toBe(200);
+    const again = (await json<Variant>(backInternal)).data;
     expect(again.segment?.featureFlagVariantId).toBe(first.id);
-    expect(again.segmentId).not.toBe(firstInline);
+    expect(again.segmentId).not.toBe(firstInternal);
   });
 
   it('a deleted label and a deleted slug can be reused', async () => {
     const recreated = await ownerFetch(
       post(`/api/v1/featureFlag/${flag.id}/featureFlagVariants`, {
         label: 'on',
-        inlineSegment: { type: 'dynamic', conditions: { all: [] } },
+        internalSegment: { type: 'dynamic', conditions: { all: [] } },
         valueBoolean: true,
       }),
     );
@@ -280,10 +280,10 @@ describe('feature flag routes', () => {
       where: { featureFlagId: flag.id, deletedAt: { not: null } },
     });
     expect(variants.length).toBeGreaterThan(0);
-    const inlines = await db.segment.findMany({
+    const internals = await db.segment.findMany({
       where: { featureFlagVariantId: { in: variants.map((each) => each.id) }, deletedAt: { not: null } },
     });
-    expect(inlines.length).toBe(variants.filter((each) => each.segmentId).length);
+    expect(internals.length).toBe(variants.filter((each) => each.segmentId).length);
 
     const again = await ownerFetch(
       post(`/api/v1/organization/${org.id}/featureFlags`, {
@@ -297,7 +297,7 @@ describe('feature flag routes', () => {
     flag = (await json<Flag>(again)).data;
   });
 
-  it('tombstoning the owner tombstones its flags, variants and inline segments', async () => {
+  it('tombstoning the owner tombstones its flags, variants and internal segments', async () => {
     const { entity: doomed } = await createOrganization();
     const created = await superadminFetch(
       post(`/api/v1/organization/${doomed.id}/featureFlags`, {

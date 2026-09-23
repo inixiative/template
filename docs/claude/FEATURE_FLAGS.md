@@ -38,13 +38,13 @@ customer the flag addresses and is enforced at resolution.
 Every user, organization and space is provisioned a platform `CustomerRef` on create
 (`hooks/platformCustomerRef`), with `db:backfill:platformCustomerRefs` for existing rows.
 
-A variant's audience is a `Segment` of the same owner: a shared one the owner named, or an inline
-one carrying `Segment.featureFlagVariantId`. An inline segment is created and edited only through
+A variant's audience is a `Segment` of the same owner: a shared one the owner named, or an internal
+one carrying `Segment.featureFlagVariantId`. An internal segment is created and edited only through
 its variant, deleted with it, excluded from segment lists, pickers and the lens `Segment.id` source,
-and refused as a gate or audience by any other flag or variant. A percentage rollout is an inline
+and refused as a gate or audience by any other flag or variant. A percentage rollout is an internal
 static segment whose rule is `id in [...]`, sampled from the owner's customers of the subject kind
 or from a named segment (`sample: { percent, from? }`). A boolean flag is created with an `on`
-variant over an inline open dynamic segment, so create → toggle `enabled` is the whole kill switch.
+variant over an internal open dynamic segment, so create → toggle `enabled` is the whole kill switch.
 
 ## Resolution
 
@@ -76,13 +76,13 @@ labels and rules are owner-side only.
 ## Writing flags and variants
 
 Row-local invariants live in `hooks/featureFlag` and `hooks/featureFlagVariant`: slug shape and
-namespace, gate/audience owned by the flag's owner and not another variant's inline segment, default
+namespace, gate/audience owned by the flag's owner and not another variant's internal segment, default
 row segment-less, rule row with a segment, exactly one value column. Label uniqueness and the single
-default are partial unique indexes. `writeVariant.ts` owns the inline-segment lifecycle: create with
+default are partial unique indexes. `writeVariant.ts` owns the internal-segment lifecycle: create with
 the rule, re-point, detach (tombstone) and delete, and refuses more than one audience per write.
 
 Permissions on a variant flow through its flag, never its audience; a flag's gate and a segment's
-inline owner are likewise outside the permissions tree. Those relations carry
+internal owner are likewise outside the permissions tree. Those relations carry
 `/// @permissions(hydrate: false)` in the schema so `hydrate` skips them (see PERMISSIONS.md).
 
 ## Invalidation and live updates
@@ -92,9 +92,9 @@ inline owner are likewise outside the permissions tree. Those relations carry
 exempt from `NOOP_FIELDS` so a reorder busts and emits. Any flag or variant write emits
 `featureFlag.changed`, broadcast as a `meReadManyFeatureFlagValues` refetch on one shared channel (the
 values route carries no owner, so the channel cannot either); membership events send the same refetch
-to the affected user. Deleting a variant tombstones its inline segment through the soft-delete cascade
+to the affected user. Deleting a variant tombstones its internal segment through the soft-delete cascade
 and publishes `segment.deleted` for its members; re-pointing a variant's audience tombstones the old
-inline segment and releases it.
+internal segment and releases it.
 
 ## API
 
@@ -104,7 +104,7 @@ Paths relative to `/api/v1` unless noted:
 | --- | --- |
 | Create, list an owner's flags | `/me/featureFlags`, `/organization/:id/featureFlags`, `/space/:id/featureFlags`; platform: `/admin/featureFlag` |
 | Read, update, delete a flag | `/featureFlag/:id` |
-| Add a variant | `POST /featureFlag/:id/featureFlagVariants` with `segmentId` \| `inlineSegment` \| `sample` |
+| Add a variant | `POST /featureFlag/:id/featureFlagVariants` with `segmentId` \| `internalSegment` \| `sample` |
 | Edit, reorder, delete a variant | `PATCH` / `DELETE /featureFlagVariant/:id` (`position` reorders) |
 | Values for the caller | `GET /me/featureFlagValues` |
 | Every owner's flags (superadmin) | `GET /admin/featureFlag`, filter `searchFields[ownerModel]=platform` |

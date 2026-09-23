@@ -31,7 +31,7 @@ export const segmentOwnerWhere = (ownerModel: ProviderModel, ownerId: string): P
   return fk ? { ownerModel, [fk]: ownerId } : { ownerModel };
 };
 
-/** Every live segment the owner holds, inline ones included — the reconcile view, not the nameable one. */
+/** Every live segment the owner holds, internal ones included — the reconcile view, not the nameable one. */
 export const segmentsOf = (
   ownerModel: ProviderModel,
   ownerId: string,

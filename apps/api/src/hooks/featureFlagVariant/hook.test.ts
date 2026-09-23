@@ -68,23 +68,23 @@ describe('featureFlagVariant hook', () => {
     ).rejects.toThrow('label is a slug');
   });
 
-  it('the audience is a live segment of the flag’s owner, and an inline one only its own', async () => {
+  it('the audience is a live segment of the flag’s owner, and an internal one only its own', async () => {
     const { entity: theirs } = await createSegment({ ownerModel: ProviderModel.platform });
     await expect(createFeatureFlagVariant({ segment: theirs }, { featureFlag: flag })).rejects.toThrow(
       'not a live segment of this Organization',
     );
 
     const { entity: first } = await createFeatureFlagVariant({ segment: audience }, { featureFlag: flag });
-    const { entity: inline } = await createSegment({
+    const { entity: internal } = await createSegment({
       ownerModel: ProviderModel.Organization,
       organization,
       featureFlagVariantId: first.id,
     });
-    const own = await db.featureFlagVariant.update({ where: { id: first.id }, data: { segmentId: inline.id } });
-    expect(own.segmentId).toBe(inline.id);
+    const own = await db.featureFlagVariant.update({ where: { id: first.id }, data: { segmentId: internal.id } });
+    expect(own.segmentId).toBe(internal.id);
 
-    await expect(createFeatureFlagVariant({ segment: inline }, { featureFlag: flag })).rejects.toThrow(
-      "another variant's inline audience",
+    await expect(createFeatureFlagVariant({ segment: internal }, { featureFlag: flag })).rejects.toThrow(
+      "another variant's internal audience",
     );
   });
 });
