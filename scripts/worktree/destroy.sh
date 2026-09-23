@@ -1,115 +1,85 @@
 #!/usr/bin/env bash
-# destroy.sh — Tear down a worktree, drop its DBs, free its slot.
-#
-# Usage:
-#   bun run worktree:destroy <name>
-#
-# <name> is the worktree directory name under .worktrees/ (slashes in the
-# branch get converted to dashes — see worktree:list).
-
 set -euo pipefail
 
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-RED='\033[0;31m'
-NC='\033[0m'
-
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
-
-# Resolve the docker binary — Docker Desktop isn't always symlinked onto PATH
-# (a minimal `bun run` PATH in particular misses it), so fall back to the
-# app-bundle path. DB/Redis/MinIO steps below route through "$DOCKER"; if it
-# can't be resolved the existing `if "$DOCKER" ps` guards skip gracefully.
-DOCKER=""
-if command -v docker >/dev/null 2>&1; then
-  DOCKER="docker"
-elif [ -x /Applications/Docker.app/Contents/Resources/bin/docker ]; then
-  DOCKER="/Applications/Docker.app/Contents/Resources/bin/docker"
-fi
+source "$SCRIPT_DIR/lib.sh"
+ROOT_DIR="$(main_checkout_root "$SCRIPT_DIR")"
+PROJECT_NAME="$(project_name "$ROOT_DIR")"
+PG_CONTAINER="${PROJECT_NAME}_postgres"
+MINIO_CONTAINER="${PROJECT_NAME}_minio"
 
 NAME="${1:-}"
 
 if [ -z "$NAME" ]; then
   echo -e "${RED}Usage: $0 <name>${NC}"
-  echo "  Run 'bun run worktree:list' to see available worktrees."
+  echo "  <name>  Worktree directory name under .worktrees/ (branch with slashes → dashes)"
+  echo
+  echo "Run 'bun run worktree:list' to see available worktrees."
   exit 1
 fi
 
 if echo "$NAME" | grep -qE '(\.\.|/)'; then
-  echo -e "${RED}Error: Name cannot contain '..' or path separators${NC}"
-  exit 1
+  die "Error: Name cannot contain '..' or path separators"
 fi
 
 WORKTREE_DIR="$ROOT_DIR/.worktrees/$NAME"
 if [ ! -d "$WORKTREE_DIR" ]; then
-  echo -e "${RED}Error: Worktree '$NAME' not found at $WORKTREE_DIR${NC}"
-  exit 1
+  die "Error: Worktree '$NAME' not found at $WORKTREE_DIR"
 fi
 
-PROJECT_NAME=""
-if [ -f "$ROOT_DIR/.env" ]; then
-  PROJECT_NAME="$(grep -m1 '^PROJECT_NAME=' "$ROOT_DIR/.env" | cut -d= -f2 || true)"
-fi
-[ -z "$PROJECT_NAME" ] && PROJECT_NAME="$(basename "$ROOT_DIR")"
-
-PG_CONTAINER="${PROJECT_NAME}_postgres"
-REDIS_CONTAINER="${PROJECT_NAME}_redis"
-
-# --- 1. Read slot from worktree's .env.local --------------------------------
-WT_ENV="$WORKTREE_DIR/.env.local"
-SLOT=""
-if [ -f "$WT_ENV" ]; then
-  SLOT="$(grep -m1 '^WORKTREE_SLOT=' "$WT_ENV" | cut -d= -f2 || true)"
-fi
+SLOT="$(env_value "$WORKTREE_DIR/.env.local" WORKTREE_SLOT)"
+[ -n "$SLOT" ] || SLOT="$(env_value "$WORKTREE_DIR/.env.test" WORKTREE_SLOT)"
 
 if [ -z "$SLOT" ]; then
-  echo -e "${YELLOW}Warning: No WORKTREE_SLOT found — skipping DB / Redis / port cleanup.${NC}"
+  warn "Warning: No WORKTREE_SLOT found in $WORKTREE_DIR/.env.local"
+  warn "Proceeding with worktree removal only (no DB / bucket / Redis / port cleanup)"
 else
-  DB_LOCAL="${PROJECT_NAME}_wt_${SLOT}"
-  DB_TEST="${PROJECT_NAME}_test_wt_${SLOT}"
+  slot_resources "$SLOT"
 
-  # --- 2. Drop Postgres databases -------------------------------------------
-  if "$DOCKER" ps --format '{{.Names}}' | grep -qx "$PG_CONTAINER"; then
-    echo -e "${BLUE}Dropping databases: $DB_LOCAL, $DB_TEST...${NC}"
-    "$DOCKER" exec "$PG_CONTAINER" psql -U postgres -c "DROP DATABASE IF EXISTS \"${DB_LOCAL}\";" >/dev/null
-    "$DOCKER" exec "$PG_CONTAINER" psql -U postgres -c "DROP DATABASE IF EXISTS \"${DB_TEST}\";"  >/dev/null
-    echo -e "${GREEN}Databases dropped${NC}"
+  DOCKER="$(resolve_docker || true)"
+  if [ -z "$DOCKER" ] || ! "$DOCKER" info >/dev/null 2>&1; then
+    warn "Warning: Docker is not reachable — slot $SLOT databases, buckets, and Redis DB are NOT cleaned up."
+    warn "Start Docker and drop $DB_LOCAL / $DB_TEST by hand, or worktree:create will drop them when it reclaims slot $SLOT."
   else
-    echo -e "${YELLOW}Warning: $PG_CONTAINER not running — skipping DB drop.${NC}"
+    if [ "$(container_state "$PG_CONTAINER")" = "true" ]; then
+      PSQL=("$DOCKER" exec "$PG_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 -q)
+      info "Dropping databases: $DB_LOCAL, $DB_TEST..."
+      if "${PSQL[@]}" -c "DROP DATABASE IF EXISTS \"${DB_LOCAL}\" WITH (FORCE);" \
+        && "${PSQL[@]}" -c "DROP DATABASE IF EXISTS \"${DB_TEST}\" WITH (FORCE);"; then
+        ok "Databases dropped"
+      else
+        warn "Warning: Could not drop databases. worktree:create drops them when it reclaims slot $SLOT."
+      fi
+    else
+      warn "Warning: $PG_CONTAINER not running — databases NOT dropped. worktree:create drops them when it reclaims slot $SLOT."
+    fi
+
+    if [ "$(container_state "$MINIO_CONTAINER")" = "true" ]; then
+      info "Removing MinIO buckets for slot ${SLOT}..."
+      for BUCKET in "$STORAGE_BUCKET_SYSTEM" "$STORAGE_BUCKET_USER" \
+                    "$STORAGE_BUCKET_SYSTEM_TEST" "$STORAGE_BUCKET_USER_TEST"; do
+        "$DOCKER" run --rm --network "${PROJECT_NAME}_default" \
+          -e MC_HOST_local="http://minioadmin:minioadmin@minio:9000" \
+          minio/mc:latest rb --force "local/${BUCKET}" >/dev/null 2>&1 || true
+      done
+      ok "MinIO buckets removed"
+    else
+      warn "Warning: $MINIO_CONTAINER not running — buckets NOT removed."
+    fi
+
+    REDIS_CONTAINER="$(container_on_port 6379)"
+    if [ -z "$REDIS_CONTAINER" ]; then
+      warn "Warning: nothing is serving localhost:6379 — Redis DB $SLOT not flushed."
+    elif "$DOCKER" exec "$REDIS_CONTAINER" redis-cli -n "$SLOT" FLUSHDB >/dev/null; then
+      ok "Redis DB $SLOT flushed ($REDIS_CONTAINER)"
+    else
+      warn "Warning: FLUSHDB $SLOT failed on $REDIS_CONTAINER."
+    fi
   fi
 
-  # --- 2b. Remove MinIO buckets ---------------------------------------------
-  MINIO_CONTAINER="${PROJECT_NAME}_minio"
-  if "$DOCKER" ps --format '{{.Names}}' | grep -qx "$MINIO_CONTAINER"; then
-    STORAGE_BUCKET_SYSTEM="${PROJECT_NAME}-system-wt-${SLOT}"
-    STORAGE_BUCKET_USER="${PROJECT_NAME}-user-wt-${SLOT}"
-    STORAGE_BUCKET_SYSTEM_TEST="${PROJECT_NAME}-system-test-wt-${SLOT}"
-    STORAGE_BUCKET_USER_TEST="${PROJECT_NAME}-user-test-wt-${SLOT}"
-
-    echo -e "${BLUE}Removing MinIO buckets for slot ${SLOT}...${NC}"
-    for BUCKET in "$STORAGE_BUCKET_SYSTEM" "$STORAGE_BUCKET_USER" \
-                   "$STORAGE_BUCKET_SYSTEM_TEST" "$STORAGE_BUCKET_USER_TEST"; do
-      "$DOCKER" run --rm --network "${PROJECT_NAME}_default" \
-        -e MC_HOST_local="http://minioadmin:minioadmin@minio:9000" \
-        minio/mc:latest rb --force "local/${BUCKET}" >/dev/null 2>&1 || true
-    done
-    echo -e "${GREEN}MinIO buckets removed${NC}"
-  fi
-
-  # --- 3. Flush Redis logical DB --------------------------------------------
-  if "$DOCKER" ps --format '{{.Names}}' | grep -qx "$REDIS_CONTAINER"; then
-    echo -e "${BLUE}Flushing Redis DB ${SLOT}...${NC}"
-    "$DOCKER" exec "$REDIS_CONTAINER" redis-cli -n "$SLOT" FLUSHDB >/dev/null \
-      && echo -e "${GREEN}Redis DB ${SLOT} flushed${NC}" \
-      || echo -e "${YELLOW}Warning: Could not flush Redis DB${NC}"
-  fi
-
-  # --- 4. Kill processes on slot ports --------------------------------------
-  PORTS=("3${SLOT}00" "3${SLOT}01" "3${SLOT}02" "8${SLOT}00")
-  echo -e "${BLUE}Killing processes on ports: ${PORTS[*]}...${NC}"
-  for PORT in "${PORTS[@]}"; do
+  PORTS="$(slot_ports "$SLOT")"
+  info "Killing processes on ports: ${PORTS}..."
+  for PORT in $PORTS; do
     PID=$(lsof -ti:"$PORT" 2>/dev/null || true)
     if [ -n "$PID" ]; then
       kill -9 "$PID" 2>/dev/null || true
@@ -118,14 +88,14 @@ else
   done
 fi
 
-# --- 5. Remove the git worktree --------------------------------------------
-echo -e "${BLUE}Removing git worktree...${NC}"
+info "Removing git worktree..."
 git -C "$ROOT_DIR" worktree remove "$WORKTREE_DIR" --force 2>/dev/null || {
-  echo -e "${YELLOW}git worktree remove failed; cleaning up manually.${NC}"
+  warn "git worktree remove failed, cleaning up manually..."
   rm -rf "$WORKTREE_DIR"
   git -C "$ROOT_DIR" worktree prune
 }
 
 echo
-echo -e "${GREEN}Worktree '$NAME' destroyed${NC}"
-[ -n "$SLOT" ] && echo -e "${GREEN}Slot $SLOT freed${NC}"
+ok "Worktree '$NAME' destroyed"
+[ -n "$SLOT" ] && ok "Slot $SLOT freed"
+echo

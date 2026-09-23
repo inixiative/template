@@ -1,13 +1,9 @@
 #!/usr/bin/env bash
-# list.sh — Show all worktrees + the slot/ports they own.
-#
-# Usage:
-#   bun run worktree:list
-
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+source "$SCRIPT_DIR/lib.sh"
+ROOT_DIR="$(main_checkout_root "$SCRIPT_DIR")"
 
 printf "\n%-6s %-35s %-40s %s\n" "Slot" "Name" "Branch" "Ports (web/admin/super/api)"
 printf "%-6s %-35s %-40s %s\n" "----" "----" "------" "----------------------------"
@@ -18,24 +14,19 @@ while IFS= read -r line; do
   [ -z "$branch" ] && branch="(detached)"
 
   name="$(basename "$wt_path")"
-  env_file="$wt_path/.env.local"
-  slot=""
-
-  if [ -f "$env_file" ]; then
-    slot="$(grep -m1 '^WORKTREE_SLOT=' "$env_file" 2>/dev/null | cut -d= -f2 || true)"
-  fi
+  slot="$(env_value "$wt_path/.env.local" WORKTREE_SLOT)"
 
   if [ -z "$slot" ]; then
     if [ "$wt_path" = "$ROOT_DIR" ]; then
       name="(main)"
       slot="0"
-      ports="3000 3001 3002 8000"
+      ports="$(slot_ports 0)"
     else
       slot="-"
       ports="(not configured)"
     fi
   else
-    ports="3${slot}00 3${slot}01 3${slot}02 8${slot}00"
+    ports="$(slot_ports "$slot")"
   fi
 
   printf "%-6s %-35s %-40s %s\n" "$slot" "$name" "$branch" "$ports"

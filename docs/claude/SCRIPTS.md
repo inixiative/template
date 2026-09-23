@@ -15,6 +15,7 @@
 - [Setup Scripts](#setup-scripts)
 - [Deployment Scripts](#deployment-scripts)
 - [Docker](#docker)
+- [Worktrees](#worktrees)
 - [Writing New Scripts](#writing-new-scripts)
 - [AI Workspace](#ai-workspace)
   - [Workflow](#workflow)
@@ -51,10 +52,15 @@ scripts/
 │   ├── pg-init.sh          # Postgres initialization
 │   ├── wait-postgres.sh    # Wait for postgres ready
 │   └── wait-redis.sh       # Wait for redis ready
-└── deployment/
-    ├── deploy.sh           # Deploy to environment
-    ├── with-env.sh         # Run command with env vars
-    └── wait-for-api.sh     # Health check wait
+├── deployment/
+│   ├── deploy.sh           # Deploy to environment
+│   ├── with-env.sh         # Run command with env vars
+│   └── wait-for-api.sh     # Health check wait
+└── worktree/
+    ├── create.sh           # Provision an isolated worktree on a slot (DBs, buckets, env, deps, artifacts)
+    ├── destroy.sh          # Tear a worktree down and free its slot
+    ├── list.sh             # Worktrees with slot, branch, ports
+    └── lib.sh              # Shared helpers (sourced by the three above)
 
 init/
 ├── index.tsx                    # bun run init entrypoint
@@ -304,6 +310,20 @@ bun run stop:db         # docker-compose down
 # Full reset
 bun run reset:db        # down + up + push + seed
 ```
+
+---
+
+## Worktrees
+
+```bash
+bun run worktree:create <base-branch> <new-branch>             # Fork a new branch (fails fast if Docker/Postgres is down)
+bun run worktree:create <existing-branch>                      # Attach an existing branch
+bun run worktree:create <base-branch> <new-branch> --skip-db   # Docs/skills only: no databases, buckets, or schema push; Docker not required
+bun run worktree:list
+bun run worktree:destroy <name>
+```
+
+Each worktree owns a slot (1–9): ports, `${PROJECT_NAME}_wt_<N>` / `${PROJECT_NAME}_test_wt_<N>` Postgres databases, MinIO buckets, a Redis logical DB, slot-specific `.env.local` / `.env.test` synced against the branch's `.env.*.example`, its own `node_modules`, and the gitignored artifacts (route trees, Prisma client, SDK). Green **ready** means every step landed; yellow **WITH GAPS** lists what to rerun. Full guide: `.claude/skills/worktrees/SKILL.md`.
 
 ---
 
