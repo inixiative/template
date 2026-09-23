@@ -29,15 +29,16 @@ The pre-port `tick()` used `GET` then `PEXPIRE`, allowing a refresh to extend a 
 
 ### 2. Fast / slow lane — Zealot #2248 (ZLT-4633), the reworked shape — PORTED
 
-Landed on `INFRA-031-slow-lane`. Template-side decisions, in order of consequence:
-- **Slow jobs enter BullMQ only holding a slot, and feed themselves.** Zealot adds every slow job to BullMQ and spills refusals; its drain is the only admitter, on a 2s tick. Here `admitEnvelope` reserves a slot at enqueue (no slot → outbox), and a finishing slow job admits the next buffered slow row (`feedSlowLane`) — so a per-recipient fan-out neither floods the wait list ahead of fast work nor idles freed slots until the next tick. Worker refusal-spill remains the fallback for an expired reservation or a delayed/bypassed job. The drain stays at 15s as backstop.
-- **Admission is one row per transaction under `FOR UPDATE SKIP LOCKED`**, shared by the drain and the self-feed (`admitNextSlowOutboxRow`), via a `db.findForUpdate` extension (`orderBy`, `take`, `skipLocked`, `lt`).
+Landed in #118, then reshaped (Aron, 2026-09-23) — **priority and pressure, no slot cap**:
+- **Slow jobs wait in the one shared BullMQ queue at the lowest priority** (`SLOW_LANE_PRIORITY = PRIORITY_LIMIT`, `jobs/lanePriority.ts`). BullMQ takes plain waiting jobs before prioritized ones, so fast work is always picked first while idle slots still run slow work — capacity stays fully shared. No slot cap, no worker presence, no Lua lease set, no self-feed, no refusal path. Measured against real Redis (2 workers × 10, 3000 × 60 ms slow jobs): FIFO fast-job wait p50 7.8 s; priority 41 ms. A cap enforced by re-queuing refused slow jobs cut fast wait to 2 ms but cost ~19 re-queues per slow job and 40% of slow throughput, so it was dropped. The trade: a fast job arriving while every slot is busy with slow work waits for one to finish — fine for short slow handlers.
+- **Pressure is one depth budget divided by lane.** `JOBS_MAX_QUEUE_DEPTH` counts waiting + prioritized + active; slow (`prioritized`) may fill `JOBS_SLOW_QUEUE_DEPTH_FRACTION` of it. Each lane has its own overflow flag and spills to the outbox in batches; the drain refills each lane in batches (one read + one delete per lane per pass) at a 2s tick so a quickly-emptied slow share is refilled before slots idle.
 - **Outbox lane is a column** (`JobOutbox.lane`, enum `JobLane`, index `(lane, attempts, id)`), mirroring `data.lane`; Zealot filters by JSON path.
-- **No chunking.** Zealot sends 25 recipients per job; the template keeps its per-recipient `deliverEmail` (row-backed, per-recipient idempotency) and puts fan-outs wider than `EMAIL_SLOW_LANE_MIN_RECIPIENTS` on the slow lane, enqueued concurrently so outbox spills batch. Send-time suppression is already per-recipient (`canDeliver` reads the contact at delivery), so Zealot's snapshot refresh has no counterpart.
-- Redis script in `apps/api/src/jobs/queries/evaluateBulkCapacity.ts`. The `lanes` and `createLock` scripts already live in `@template/db`'s `queries/`; not touched.
-- Env knobs in the Zod schema; test overrides for them are parsed through the same fields (`wrapEnvWithOverrides` parser hook). Modules that read a knob import `#/config/env` so a script entrypoint cannot see raw strings.
-- `apps/api/scripts/slowLaneCheck.ts` is the Gate 5 harness equivalent (real Redis, real BullMQ, Postgres).
+- **No chunking.** The template keeps its per-recipient `deliverEmail` and puts fan-outs wider than `EMAIL_SLOW_LANE_MIN_RECIPIENTS` on the slow lane, enqueued concurrently. Send-time suppression is already per-recipient (`canDeliver` reads the contact at delivery).
+- Env knobs in the Zod schema; test overrides for them are parsed through the same fields. Modules that read a knob import `#/config/env`.
+- `apps/api/scripts/slowLaneCheck.ts` validates the path against real Redis, BullMQ and Postgres.
 - Not ported: Zealot's `JobsWorker:*` blocking-connection rule — template connections set no command timeout (see §1's open question).
+
+The original forecast for this section, superseded by the above:
 
 - `lane` is a **tag on the job data envelope** next to `type`, resolved once as `request ?? enqueue option ?? handler default`; no default = fast. No wrapper constructor. The superadmin manual-enqueue and cron-trigger requests expose the override; every `queue.add` site stamps it (cron register/trigger bypass `enqueueJob`).
 - **No second parking mechanism.** Slow-lane jobs buffer in the outbox (new `lane` column); the drain admits fast rows first, then slow rows while the slot set has room, bounded per pass. No `moveToDelayed` / `DelayedError` / processor token.

@@ -19,8 +19,6 @@ import { startOutboxDrainLoop, stopOutboxDrainLoop } from '#/jobs/outbox/drain';
 import { processJob } from '#/jobs/processJob';
 import { queue } from '#/jobs/queue';
 import { registerCronJobs } from '#/jobs/registerCronJobs';
-import { jobsWorkerConcurrency } from '#/jobs/slowLane/config';
-import { startWorkerPresence, stopWorkerPresence } from '#/jobs/slowLane/presence';
 import { initGracefulShutdown, onShutdown } from '#/lib/shutdown';
 
 // Register database hooks (cache clear, webhooks)
@@ -38,17 +36,11 @@ export const initializeWorker = async (): Promise<void> => {
   // BullMQ Worker needs its own connection (separate from Queue)
   workerRedis = createRedisConnection('Redis:BullMQ:Worker', resolveBullmqRedisUrl());
 
-  await startWorkerPresence();
-  try {
-    jobsWorker = new Worker('jobs', (job: Job) => processJob(job), {
-      connection: workerRedis,
-      concurrency: jobsWorkerConcurrency(),
-      lockDuration: 5 * 60 * 1000,
-    });
-  } catch (err) {
-    await stopWorkerPresence();
-    throw err;
-  }
+  jobsWorker = new Worker('jobs', (job: Job) => processJob(job), {
+    connection: workerRedis,
+    concurrency: process.env.JOBS_WORKER_CONCURRENCY,
+    lockDuration: 5 * 60 * 1000,
+  });
 
   metrics
     .getMeter('template.worker')
@@ -72,7 +64,6 @@ export const initializeWorker = async (): Promise<void> => {
     log.info('Stopping job worker...', LogScope.worker);
     stopOutboxDrainLoop(); // stop arming new drain ticks before tearing down the worker/queue
     if (jobsWorker) await jobsWorker.close(); // stop processing first — no new spills from finishing jobs
-    await stopWorkerPresence(); // only after close: active slow jobs keep this worker counted in the fleet cap
     await flushOutbox(); // then persist any buffered overflow spills
     if (workerRedis) await workerRedis.quit();
     log.info('Job worker stopped', LogScope.worker);

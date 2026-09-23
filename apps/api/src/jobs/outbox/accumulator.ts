@@ -20,12 +20,13 @@ let closing = false; // shutdown: stop arming timers — flushOutbox owns the fi
 let lastFlush: Promise<void> = Promise.resolve();
 
 // Accepted but not yet committed (or rejected) — rows still in `acc` plus rows in a flush queued behind
-// the outbox mutex. The drain's overflow-clear waits on fast spills only: slow work waiting for a fleet
-// slot must not keep new fast enqueues diverted into the outbox. Quarantine reset waits on both.
+// the outbox mutex. Each lane's overflow-clear waits on that lane's pending spills; quarantine reset
+// waits on both.
 let pendingSpills = 0;
 let pendingFastSpills = 0;
 export const hasPendingSpills = (): boolean => pendingSpills > 0;
 export const hasPendingFastSpills = (): boolean => pendingFastSpills > 0;
+export const hasPendingSlowSpills = (): boolean => pendingSpills - pendingFastSpills > 0;
 
 // Within a batch, keep only the latest row per superseding lane; plain (null-dedupeKey) rows all kept.
 const dedupeLatestPerLane = (batch: Pending[]): OutboxRow[] => {

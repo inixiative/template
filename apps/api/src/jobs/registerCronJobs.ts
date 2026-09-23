@@ -8,6 +8,7 @@ import { db } from '@template/db';
 import { LogScope, log } from '@template/shared/logger';
 import { buildJobData } from '#/jobs/buildJobData';
 import { isValidHandlerName, jobHandlers } from '#/jobs/handlers';
+import { withLanePriority } from '#/jobs/lanePriority';
 import { queue as defaultQueue } from '#/jobs/queue';
 import { type JobsQueue, JobType } from '#/jobs/types';
 
@@ -30,14 +31,19 @@ export const registerCronJobs = async (queue: JobsQueue = defaultQueue): Promise
     }
 
     try {
+      const data = buildJobData(jobHandlers[cronJob.handler], {
+        id: cronJob.id,
+        type: JobType.cron,
+        payload: cronJob.payload,
+      });
       await queue.add(
         cronJob.handler,
-        buildJobData(jobHandlers[cronJob.handler], { id: cronJob.id, type: JobType.cron, payload: cronJob.payload }),
-        {
+        data,
+        withLanePriority(data, {
           repeat: { pattern: cronJob.pattern, jobId: cronJob.jobId },
           attempts: cronJob.maxAttempts,
           backoff: { type: 'exponential', delay: cronJob.backoffMs },
-        },
+        }),
       );
       log.info(`Registered cron: ${cronJob.name} (${cronJob.handler}) - ${cronJob.pattern}`, LogScope.job);
     } catch (error) {

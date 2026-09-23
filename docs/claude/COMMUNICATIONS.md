@@ -569,7 +569,7 @@ chain (user or org) down to the `default` floor, carrying the user id for interp
 3. **Find-or-create** a `queued` `CommunicationLog` row keyed on the per-recipient `idempotencyKey`
    — the at-most-once fence, durable beyond BullMQ's retention window (P2002 race → re-read).
 4. Enqueue `deliverEmail` with the log id. A fan-out wider than `EMAIL_SLOW_LANE_MIN_RECIPIENTS` runs on
-   the **slow lane** (enqueued concurrently, sharing the fleet's capped slow-lane slots); smaller sends
+   the **slow lane** (enqueued concurrently, at the lowest queue priority so other work goes first); smaller sends
    stay fast. See [JOBS.md § Fast and Slow Lanes](./JOBS.md#fast-and-slow-lanes).
 
 #### Deliver (`deliverEmail`) — per recipient

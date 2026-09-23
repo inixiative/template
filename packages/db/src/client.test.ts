@@ -6,64 +6,8 @@
  */
 import { describe, expect, it } from 'bun:test';
 import { db } from '@template/db/client';
-import { ContactType, JobLane } from '@template/db/generated/client/enums';
-import { createContact, createJobOutbox, createUser } from '@template/db/test/factories';
-
-describe('db.findForUpdate options', () => {
-  const lockOldestSlow = () =>
-    db.findForUpdate<{ jobId: string }>(
-      'JobOutbox',
-      { lane: JobLane.slow, attempts: { lt: 5 } },
-      { orderBy: { id: 'asc' }, take: 1, skipLocked: true },
-    );
-
-  it('filters with lt, orders, limits, and skips rows another transaction holds', async () => {
-    const tag = crypto.randomUUID();
-    await createJobOutbox({ jobId: `${tag}-fast`, lane: JobLane.fast });
-    await createJobOutbox({ jobId: `${tag}-quarantined`, lane: JobLane.slow, attempts: 5 });
-    await createJobOutbox({ jobId: `${tag}-first`, lane: JobLane.slow });
-    await createJobOutbox({ jobId: `${tag}-second`, lane: JobLane.slow });
-
-    let releaseFirst: () => void = () => {};
-    const firstHolds = new Promise<void>((resolve) => {
-      releaseFirst = resolve;
-    });
-    let markFirstLocked: () => void = () => {};
-    const firstLocked = new Promise<void>((resolve) => {
-      markFirstLocked = resolve;
-    });
-
-    const first = db.parallel([
-      () =>
-        db.txn(async () => {
-          const rows = await lockOldestSlow();
-          markFirstLocked();
-          await firstHolds;
-          return rows.map((row) => row.jobId);
-        }),
-    ]);
-    await firstLocked;
-    const [second] = await db.parallel([() => db.txn(async () => (await lockOldestSlow()).map((row) => row.jobId))]);
-    releaseFirst();
-    const [firstRows] = await first;
-
-    expect(firstRows).toEqual([`${tag}-first`]);
-    expect(second).toEqual([`${tag}-second`]);
-    await db.jobOutbox.deleteMany({ where: { jobId: { startsWith: tag } } });
-  });
-
-  it('rejects an order key the model does not have', async () => {
-    await expect(
-      db.txn(() => db.findForUpdate('JobOutbox', { lane: JobLane.slow }, { orderBy: { nope: 'asc' } })),
-    ).rejects.toThrow("unknown field 'nope'");
-  });
-
-  it('rejects a take that is not a positive integer', async () => {
-    await expect(db.txn(() => db.findForUpdate('JobOutbox', { lane: JobLane.slow }, { take: 0 }))).rejects.toThrow(
-      'take must be a positive integer',
-    );
-  });
-});
+import { ContactType } from '@template/db/generated/client/enums';
+import { createContact, createUser } from '@template/db/test/factories';
 
 describe('db.parallel', () => {
   it('runs each branch in its own scope', async () => {
