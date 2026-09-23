@@ -7,6 +7,7 @@
 import { ageGatedReclaim } from '@template/db/lanes/queries/ageGatedReclaim';
 import { evictingClaim } from '@template/db/lanes/queries/evictingClaim';
 import { fencedRelease } from '@template/db/lanes/queries/fencedRelease';
+import { fencedTransfer } from '@template/db/lanes/queries/fencedTransfer';
 import { getRedisClient } from '@template/db/redis/client';
 import { redisNamespace } from '@template/db/redis/namespaces';
 import { log } from '@template/shared/logger';
@@ -55,6 +56,9 @@ export const releaseLane = (lane: string, jobId: string, previousHolder?: string
 // While we're still the holder we REFRESH the TTL each poll, so the lane never expires out from under
 // a long-running holder — otherwise an expired lane reads as null and a stale older job (running past
 // the TTL) would never see the usurp. An absent lane therefore means "no active claimant", not a usurp.
+export const transferLane = (lane: string, fromJobId: string, toJobId: string): Promise<boolean> =>
+  fencedTransfer(getRedisClient(), lane, fromJobId, toJobId, SUPERSEDED_PREFIX, LANE_TTL_SEC, SUPERSEDED_TTL_SEC);
+
 export const watchLane = (lane: string, jobId: string, onUsurped: () => void): (() => void) =>
   heartbeat(async () => {
     const holder = await getRedisClient().get(lane);

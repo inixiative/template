@@ -6,7 +6,8 @@
  */
 import { db } from '@template/db';
 import { LogScope, log } from '@template/shared/logger';
-import { isValidHandlerName } from '#/jobs/handlers';
+import { buildJobData } from '#/jobs/buildJobData';
+import { isValidHandlerName, jobHandlers } from '#/jobs/handlers';
 import { queue as defaultQueue } from '#/jobs/queue';
 import { type JobsQueue, JobType } from '#/jobs/types';
 
@@ -31,11 +32,7 @@ export const registerCronJobs = async (queue: JobsQueue = defaultQueue): Promise
     try {
       await queue.add(
         cronJob.handler,
-        {
-          id: cronJob.id,
-          type: JobType.cron,
-          payload: cronJob.payload,
-        },
+        buildJobData(jobHandlers[cronJob.handler], { id: cronJob.id, type: JobType.cron, payload: cronJob.payload }),
         {
           repeat: { pattern: cronJob.pattern, jobId: cronJob.jobId },
           attempts: cronJob.maxAttempts,

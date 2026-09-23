@@ -9,6 +9,8 @@ Mechanisms for coordinating async operations. Different concerns, different tool
 | Serialize writes to one resource (no interleaving) | `createSerializedQueue` | in-process |
 | Only one process owns this resource | `createLock` | cross-process (Redis) |
 | Newest job for a key wins; older ones bow out | `claimLane` / `watchLane` | cross-process (Redis) |
+| Slow work holds at most a share of the fleet's worker slots | `claimBulkSlot` / `runSlowLaneJob` | cross-process (Redis) |
+| Many transactions each take a different pending row | `db.findForUpdate(…, { skipLocked: true })` | cross-process (Postgres) |
 | Run a recurring beat without overlapping itself | `heartbeat` | in-process timer |
 
 Combine when needed: a per-resource Redis lock + a per-resource serialized queue is the canonical pair for "one instance owns this AND that instance serializes its own writes" — `createLock` to claim ownership, `createSerializedQueue` to order that owner's writes.
@@ -155,6 +157,16 @@ try {
 
 ---
 
+## Fleet Slot Cap (`claimBulkSlot` / `runSlowLaneJob`)
+
+`apps/api/src/jobs/slowLane/`. A counting semaphore across the whole worker fleet: a sorted set of leases scored by expiry, with a cap derived from live-worker presence, claimed and evaluated in one Redis script (`jobs/queries/evaluateBulkCapacity`). Unlike a lock it admits up to N holders; unlike a baton the incumbent keeps its slot. Leases are renewed by `heartbeat` and expire on their own, so a hard-killed holder frees its slot one lease TTL later. This backs the **fast/slow job lanes** — a different thing from the supersede lanes above, which are about *which* job for a key wins, not *how many* slow jobs may run at once. See [JOBS.md § Fast and Slow Lanes](./JOBS.md#fast-and-slow-lanes).
+
+## Row Hand-off (`db.findForUpdate` with `skipLocked`)
+
+`db.findForUpdate(model, where, { orderBy, take, skipLocked })` inside `db.txn()` locks the rows it returns (`FOR UPDATE`). With `skipLocked: true`, rows another open transaction holds are skipped instead of waited on, so N concurrent transactions each take a different row — a work queue in a table. `where` supports equality, `{ in: [...] }`, and `{ lt: value }`. The slow-lane self-feed and the drain both admit buffered rows this way, one row per transaction.
+
+---
+
 ## Recurring Beat (`heartbeat`)
 
 `@template/shared/utils/heartbeat`. A self-managing timer that runs `beat` every `intervalMs`, scheduling the next tick only *after* the previous settles — a slow async beat never overlaps itself. Returns `stop()`; no trailing beat fires after stop. Rejections route to `onError` instead of becoming unhandled. In-process.
@@ -176,4 +188,4 @@ This is the primitive under both `createLock` (lease renewal) and `watchLane` (u
 ## Cross-references
 
 - [REDIS.md](./REDIS.md) — `createLock` details, namespace conventions
-- [JOBS.md](./JOBS.md) — BullMQ workers, supersede pattern (the consumer of `claimLane`/`watchLane`)
+- [JOBS.md](./JOBS.md) — BullMQ workers, supersede pattern (the consumer of `claimLane`/`watchLane`), fast/slow lanes (the consumer of the fleet slot cap)

@@ -8,7 +8,8 @@ import { db, type Prisma } from '@template/db';
 import { LogScope, log } from '@template/shared/logger';
 import { flushLinger, flushMaxRows, SHUTDOWN_FLUSH_RETRIES } from '#/jobs/outbox/config';
 import { flushQueue } from '#/jobs/outbox/mutex';
-import { type OutboxRow, toCreateInput } from '#/jobs/outbox/types';
+import { type OutboxRow, outboxLaneOf, type SpillOptions, toCreateInput } from '#/jobs/outbox/types';
+import { JobLane } from '#/jobs/types';
 
 // --- accumulator: ALL spills (fan-out AND superseding) coalesce into one batched write ---
 type Pending = { row: OutboxRow; resolve: () => void; reject: (e: unknown) => void };
@@ -17,6 +18,14 @@ let acc: Pending[] = [];
 let timer: ReturnType<typeof setTimeout> | null = null;
 let closing = false; // shutdown: stop arming timers — flushOutbox owns the final drain
 let lastFlush: Promise<void> = Promise.resolve();
+
+// Accepted but not yet committed (or rejected) — rows still in `acc` plus rows in a flush queued behind
+// the outbox mutex. The drain's overflow-clear waits on fast spills only: slow work waiting for a fleet
+// slot must not keep new fast enqueues diverted into the outbox. Quarantine reset waits on both.
+let pendingSpills = 0;
+let pendingFastSpills = 0;
+export const hasPendingSpills = (): boolean => pendingSpills > 0;
+export const hasPendingFastSpills = (): boolean => pendingFastSpills > 0;
 
 // Within a batch, keep only the latest row per superseding lane; plain (null-dedupeKey) rows all kept.
 const dedupeLatestPerLane = (batch: Pending[]): OutboxRow[] => {
@@ -54,6 +63,7 @@ const writeBatch = (batch: Pending[]): Promise<void> =>
         create: toCreateInput(row),
         update: {
           jobId: row.jobId,
+          lane: outboxLaneOf(row),
           data: row.data as Prisma.InputJsonValue,
           options: row.options as Prisma.InputJsonValue,
         },
@@ -81,18 +91,37 @@ const flush = (): void => {
   lastFlush.catch(() => {}); // fire-and-forget (timer/size) path: callers already got the rejection
 };
 
-const accumulate = (row: OutboxRow): Promise<void> =>
+const accumulate = (row: OutboxRow, { flushImmediately = false }: SpillOptions): Promise<void> =>
   new Promise((resolve, reject) => {
-    acc.push({ row, resolve, reject });
+    const isFast = outboxLaneOf(row) === JobLane.fast;
+    pendingSpills++;
+    if (isFast) pendingFastSpills++;
+    const settle = (): void => {
+      pendingSpills--;
+      if (isFast) pendingFastSpills--;
+    };
+    acc.push({
+      row,
+      resolve: () => {
+        settle();
+        resolve();
+      },
+      reject: (e: unknown) => {
+        settle();
+        reject(e);
+      },
+    });
     if (closing) return; // shutdown drains via flushOutbox — its loop catches mid-drain spills, or rejects them if it gives up
-    if (acc.length >= flushMaxRows())
+    if (flushImmediately || acc.length >= flushMaxRows())
       flush(); // size trip — partitions a Promise.all burst inline
     else if (!timer) timer = setTimeout(flush, flushLinger()); // arm for the partial-batch tail
   });
 
 // Spill one job. Everything routes through the accumulator; superseding lanes collapse at flush
 // time. Resolves on COMMIT, never on accumulation — a crash in the flush window must not drop it.
-export const spillToOutbox = (row: OutboxRow): Promise<void> => accumulate(row);
+// `flushImmediately` commits as soon as the row is accepted, carrying every row already pending into
+// the same batch — the slow-lane refusal path uses it so a worker slot waits only for the commit.
+export const spillToOutbox = (row: OutboxRow, options: SpillOptions = {}): Promise<void> => accumulate(row, options);
 
 // Shutdown: persist every buffered row, retrying transient failures and surfacing the rest loudly.
 // Call AFTER intake has stopped (server stopped / worker closed) so no new spills race the flush.

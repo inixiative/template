@@ -5,6 +5,7 @@
  * @uses infrastructure:prisma, infrastructure:redis
  */
 import type { Db } from '@template/db';
+import { JobLane } from '@template/db/generated/client/enums';
 import type { Job, Queue } from 'bullmq';
 import type { Redis } from 'ioredis';
 
@@ -36,9 +37,12 @@ export const JobType = {
 
 export type JobType = (typeof JobType)[keyof typeof JobType];
 
+export { JobLane };
+
 export type JobData<TPayload = unknown> = {
   id?: string;
   type: JobType;
+  lane: JobLane;
   payload: TPayload;
   dedupeKey?: string;
   traceContext?: Record<string, string>;
@@ -46,7 +50,9 @@ export type JobData<TPayload = unknown> = {
 
 export type JobHandlerArgs<TPayload = void> = [TPayload] extends [undefined] ? [] : [payload: TPayload];
 
-export type JobHandler<TPayload = void> = (ctx: WorkerContext, ...args: JobHandlerArgs<TPayload>) => Promise<void>;
+export type JobHandler<TPayload = void> = ((ctx: WorkerContext, ...args: JobHandlerArgs<TPayload>) => Promise<void>) & {
+  lane?: JobLane;
+};
 
 export type JobOptions = {
   priority?: number;

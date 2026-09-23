@@ -80,7 +80,7 @@ type RequestWithBody<T extends RouteArgs> = {
   query: QueryType<T>;
   body: {
     content: { 'application/json': { schema: SanitizedBodySchema<NonNullable<T['bodySchema']>> } };
-    required: true;
+    required: T['bodyRequired'] extends false ? false : true;
   };
 };
 
@@ -96,6 +96,7 @@ export const buildRequest = <const T extends RouteArgs>(
     params,
     query,
     bodySchema,
+    bodyRequired = true,
     sanitizeKeys = [] as readonly string[],
     skipId = false,
     paginate = false,
@@ -145,7 +146,7 @@ export const buildRequest = <const T extends RouteArgs>(
       query: querySchema,
       body: {
         content: { 'application/json': { schema: finalBodySchema } },
-        required: true as const,
+        required: bodyRequired,
       },
     } as T['bodySchema'] extends ZodSchema ? RequestWithBody<T> : RequestWithoutBody<T>;
   }

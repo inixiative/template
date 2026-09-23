@@ -5,10 +5,30 @@
  * @uses primitive:shared
  */
 import { encryptionEnv } from '@template/db/lib/encryption/envValidation';
-import { isTest, wrapEnvWithOverrides } from '@template/shared/utils';
+import { type EnvOverrideParser, isTest, wrapEnvWithOverrides } from '@template/shared/utils';
 import { z } from 'zod';
 
 const { fields: encryptionFields, applyRefinements: applyEncryptionRefinements } = encryptionEnv();
+
+const jobEnvFields = {
+  JOBS_WORKER_CONCURRENCY: z.coerce.number().int().positive().default(10),
+  JOBS_MAX_QUEUE_DEPTH: z.coerce.number().int().positive().default(10_000),
+  JOBS_OUTBOX_FLUSH_MAX_ROWS: z.coerce.number().int().positive().default(1000),
+  JOBS_OUTBOX_FLUSH_LINGER_MS: z.coerce.number().int().nonnegative().default(200),
+  JOBS_OVERFLOW_STUCK_MS: z.coerce.number().int().positive().default(300_000),
+  JOBS_OVERFLOW_TTL_MS: z.coerce.number().int().positive().default(60_000),
+  JOBS_OUTBOX_MAX_SLOW_ADMISSIONS: z.coerce.number().int().nonnegative().default(100),
+  BULK_SLOT_FRACTION: z.coerce.number().min(0).max(1).default(0.5),
+  BULK_SLOTS: z.coerce.number().int().positive().optional(),
+  BULK_LEASE_TTL_MS: z.coerce.number().int().positive().default(60_000),
+  EMAIL_SLOW_LANE_MIN_RECIPIENTS: z.coerce.number().int().nonnegative().default(25),
+};
+
+const parseJobEnvOverride: EnvOverrideParser = (key, override, current) => {
+  if (!(key in jobEnvFields)) return override;
+  const parsedOverride = jobEnvFields[key as keyof typeof jobEnvFields].safeParse(override);
+  return parsedOverride.success ? parsedOverride.data : current;
+};
 
 const preprocessEnv = (env: Record<string, string | undefined>): Record<string, string | undefined> => {
   return Object.fromEntries(
@@ -63,6 +83,7 @@ const baseEnvSchema = z
 
     // Job tuning
     AUDIT_LOG_RETENTION_DAYS: z.coerce.number().int().positive().default(2555),
+    ...jobEnvFields,
 
     // Stripe (optional integration)
     STRIPE_SECRET_KEY: z.string().optional(),
@@ -90,4 +111,4 @@ const parsed = isTest
   ? baseEnvSchema.partial().parse(preprocessEnv(process.env))
   : envSchema.parse(preprocessEnv(process.env));
 // In test the parsed env is wrapped so setEnvOverride/withEnv overrides win over reads.
-process.env = (isTest ? wrapEnvWithOverrides(parsed) : parsed) as unknown as NodeJS.ProcessEnv;
+process.env = (isTest ? wrapEnvWithOverrides(parsed, parseJobEnvOverride) : parsed) as unknown as NodeJS.ProcessEnv;
