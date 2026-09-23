@@ -20,6 +20,7 @@ model FeatureFlag {
 
   subjectModel CustomerModel
   valueType    FeatureFlagValueType
+  sampleOffset Int @default(dbgenerated("floor(random() * 13)::int"))
 
   segmentId String?  @db.VarChar(36)
   /// @permissions(hydrate: false)

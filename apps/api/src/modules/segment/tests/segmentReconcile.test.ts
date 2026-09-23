@@ -28,6 +28,7 @@ import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
 import { registerSegmentMemberOwnerHook } from '#/hooks/segmentMemberOwner/hook';
 import { registerSegmentRuleReferencesHook } from '#/hooks/segmentRuleReferences/hook';
 import { enqueueJob } from '#/jobs/enqueue';
+import { bucketOf, offsetOf } from '#/modules/segment/lib/sample';
 import { evaluateSegment } from '#/modules/segment/services/evaluateSegment';
 import { reconcileCustomerRef } from '#/modules/segment/services/reconcileCustomerRef';
 import { acmeRule, memberIds } from '#/modules/segment/tests/fixtures';
@@ -150,6 +151,34 @@ describe('segment reconcile', () => {
     const mine = (await createTag({ name: 'vip', ownerModel: 'Space' }, { space })).entity;
     const { entity: attachment } = await createTagAttachment({ resourceModel: 'User' }, { user: acme, tag: mine });
     await emitAppEvent('tagAttachment.created', { tagAttachment: attachment });
+    expect(await memberIds(segment.id)).toEqual([acmeRef.id]);
+  });
+
+  it('a sampled segment keeps only the customers whose id lands in the range, on both rails', async () => {
+    const whole = await saveSegment(
+      { type: SegmentType.dynamic, conditions: acmeRule, sample: { from: 0, to: 100 } },
+      { space },
+    );
+    const offset = offsetOf(whole.sample)!;
+    expect(offset).toBeGreaterThanOrEqual(0);
+    expect(await memberIds(whole.id)).toEqual([acmeRef.id]);
+
+    const bucket = bucketOf(acmeRef.id, offset);
+    const excluding = bucket < 50 ? { from: 50, to: 100 } : { from: 0, to: 50 };
+    const including = bucket < 50 ? { from: 0, to: 50 } : { from: 50, to: 100 };
+
+    const segment = await updateSegment(whole, { sample: excluding });
+    expect(segment.sample).toEqual({ ...excluding, offset });
+    expect(await evaluateSegment(segment)).toEqual([]);
+    expect(await memberIds(segment.id)).toEqual([]);
+    expect(await reconcileCustomerRef(acmeRef.id)).toEqual([]);
+
+    const widened = await updateSegment(segment, { sample: including });
+    expect(widened.sample).toEqual({ ...including, offset });
+    expect(await memberIds(segment.id)).toEqual([acmeRef.id]);
+
+    await db.segmentMember.deleteMany({ where: { segmentId: segment.id } });
+    expect((await reconcileCustomerRef(acmeRef.id)).map((each) => each.segmentId)).toContain(widened.id);
     expect(await memberIds(segment.id)).toEqual([acmeRef.id]);
   });
 

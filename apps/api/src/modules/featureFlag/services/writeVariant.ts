@@ -4,14 +4,14 @@
  * @partOf feature:featureFlag
  * @uses infrastructure:prisma, feature:segment, primitive:appEvents
  */
-import { db, type Prisma, polymorphicKeyColumn } from '@template/db';
+import { db, Prisma, polymorphicKeyColumn } from '@template/db';
 import type { FeatureFlag, FeatureFlagVariant, Segment } from '@template/db/generated/client/client';
 import type { SegmentType } from '@template/db/generated/client/enums';
 import { emitAppEvent } from '#/appEvents/emit';
 import { makeError } from '#/lib/errors';
 import { featureFlagOwnerIdOf } from '#/modules/featureFlag/lib/featureFlagOwner';
 
-type InternalSegment = { type: SegmentType; conditions: unknown };
+type InternalSegment = { type: SegmentType; conditions: unknown; sample?: { from: number; to: number } | null };
 
 export type VariantAudience = { segmentId?: string | null; internalSegment?: InternalSegment };
 
@@ -26,6 +26,9 @@ const ownerColumns = (
 
 const internalName = (flag: FeatureFlag, label: string): string => `${flag.slug}/${label}`;
 
+const sampleOf = (flag: FeatureFlag, data: InternalSegment): Prisma.InputJsonValue | typeof Prisma.DbNull =>
+  data.sample ? { ...data.sample, offset: flag.sampleOffset } : Prisma.DbNull;
+
 const createInternal = (flag: FeatureFlag, label: string, data: InternalSegment): Promise<Segment> =>
   db.segment.create({
     data: {
@@ -33,6 +36,7 @@ const createInternal = (flag: FeatureFlag, label: string, data: InternalSegment)
       name: internalName(flag, label),
       type: data.type,
       conditions: data.conditions as Prisma.InputJsonValue,
+      sample: sampleOf(flag, data),
       featureFlagInternal: true,
     },
   });
@@ -49,6 +53,7 @@ const writeInternal = async (
       data: {
         type: data.type,
         conditions: data.conditions as Prisma.InputJsonValue,
+        sample: sampleOf(flag, data),
         name: internalName(flag, variant.label),
       },
     });

@@ -43,10 +43,18 @@ one carrying `Segment.featureFlagInternal`. The variant's `segmentId` is the onl
 the internal segment is named `${flag.slug}/${variant.label}` and excluded from the `Segment.name`
 uniques. It is created and edited only through its variant, tombstoned with it, excluded from segment
 lists, pickers, the lens `Segment.id` source and every subject-facing route, and refused as a gate or
-as the audience of any variant but the one already serving it. A hand-picked rollout is an internal
-static segment whose rule is `id in [...]`; percentage sampling is not part of the variant API yet. A
-boolean flag is created with an `on`
+as the audience of any variant but the one already serving it. A boolean flag is created with an `on`
 variant over an internal open dynamic segment, so create → toggle `enabled` is the whole kill switch.
+
+A percentage rollout is `internalSegment.sample: { from, to }`, a slice of the 0–100 line. Nothing is
+stored or hashed: a `CustomerRef` id is a uuidv7 whose last 15 hex digits are random, three of them read
+as a number are the customer's bucket, and the segment keeps the customers whose bucket sits in
+`[from, to)`. The result is deterministic, recalculates with the rule, admits new customers as they
+arrive, and widening a range keeps everyone already in it. `offset`, the digit position from the tail where the read starts (0–12), is never in the API: a flag
+draws `FeatureFlag.sampleOffset` at random on insert (a column default) and every internal segment of its variants copies
+it, so one flag's arms read the same digits and never overlap while different flags read different
+digits; a shared segment draws its own when its sample is first set and keeps it across edits. `Segment.sample` is applied after rule evaluation on both rails (`evaluateSegment`,
+`reconcileCustomerRef`), so the rules engine and the builder never see it. Reach counts ignore it.
 
 ## Resolution
 

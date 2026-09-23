@@ -13,6 +13,7 @@ import {
   SegmentScalarSchema,
 } from '@template/db';
 import { CustomerModel, ProviderModel, SegmentType } from '@template/db/generated/client/enums';
+import { sampleRangeSchema } from '#/modules/segment/lib/sample';
 import { selectSegmentForCustomer } from '#/modules/segment/queries/segmentIncludes';
 
 export const FEATURE_FLAG_CREATE_IMMUTABLE_FIELDS = ['ownerModel', 'userId', 'organizationId', 'spaceId'] as const;
@@ -22,6 +23,7 @@ export const featureFlagCreateBodySchema = FeatureFlagScalarInputSchema.omit({
   userId: true,
   organizationId: true,
   spaceId: true,
+  sampleOffset: true,
   deletedAt: true,
 });
 
@@ -48,6 +50,7 @@ export const featureFlagReadResponseSchema = FeatureFlagScalarSchema.extend({
 export const internalSegmentSchema = z.object({
   type: z.enum(SegmentType),
   conditions: z.unknown(),
+  sample: sampleRangeSchema.nullable().optional(),
 });
 
 const audienceFields = {

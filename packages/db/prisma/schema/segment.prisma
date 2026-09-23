@@ -44,6 +44,7 @@ model Segment {
   conditionsPrompt String?
 
   featureFlagInternal Boolean @default(false)
+  sample              Json?
 
   members           SegmentMember[]
   auditLogs         AuditLog[]

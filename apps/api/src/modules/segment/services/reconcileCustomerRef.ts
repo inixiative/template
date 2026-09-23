@@ -10,6 +10,7 @@ import type { Segment } from '@template/db/generated/client/client';
 import type { ProviderModel } from '@template/db/generated/client/enums';
 import { withRule } from '@template/shared/rules';
 import { resolvedCustomerRefLens } from '#/modules/customerRef/lib/customerRefLens';
+import { inSample } from '#/modules/segment/lib/sample';
 import { providerOf, segmentsOf } from '#/modules/segment/lib/segmentOwner';
 import { applyMembershipDiff, type MembershipDiff } from '#/modules/segment/services/applyMembershipDiff';
 import { type HydratedCustomerRef, hydrateCustomerRefs } from '#/modules/segment/services/hydrateCustomerRefs';
@@ -45,7 +46,8 @@ export const reconcileCustomerRef = async (customerRefId: string): Promise<Custo
   for (const segment of ordered) {
     const matches = withRule(states.get(segment.id)!.health, {
       degraded: () => null,
-      sound: (rule) => (row ? check(applyLens(rule, lens), row) === true : false),
+      sound: (rule) =>
+        row ? check(applyLens(rule, lens), row) === true && inSample(customerRefId, segment.sample) : false,
     });
     if (matches === null) continue;
     if (row) recordDecision(row, segment, matches);

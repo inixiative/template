@@ -4,15 +4,26 @@ import type { Segment } from '@template/db/generated/client/client';
 import { castArray } from 'lodash-es';
 import { makeError } from '#/lib/errors';
 import { invalidSegmentConditions } from '#/modules/segment/lib/invalidSegmentConditions';
+import { offsetOf, randomOffset, sampleInputSchema } from '#/modules/segment/lib/sample';
 import { validateSegmentConditions } from '#/modules/segment/validations/validateSegmentConditions';
 import { validateSegmentReferences } from '#/modules/segment/validations/validateSegmentReferences';
 
-type SegmentRow = Partial<Omit<Segment, 'conditions'>> & { conditions?: unknown };
+type SegmentRow = Partial<Omit<Segment, 'conditions' | 'sample'>> & { conditions?: unknown; sample?: unknown };
 
 const isCleared = (value: unknown): boolean =>
   value === undefined || value === null || value === Prisma.DbNull || value === Prisma.JsonNull;
 
+const settleSample = (row: SegmentRow, previous?: Segment): void => {
+  if (row.sample === undefined || isCleared(row.sample)) return;
+  const parsed = sampleInputSchema.safeParse(row.sample);
+  if (!parsed.success)
+    throw makeError({ status: 422, message: 'a sample is { from, to } on 0–100 with from below to' });
+  const { from, to, offset } = parsed.data;
+  row.sample = { from, to, offset: offset ?? offsetOf(previous?.sample) ?? randomOffset() };
+};
+
 const validateRow = async (row: SegmentRow, previous?: Segment): Promise<void> => {
+  settleSample(row, previous);
   if (row.conditions === undefined && previous) return;
   if (isCleared(row.conditions)) throw makeError({ status: 422, message: 'a segment requires conditions' });
 
@@ -43,7 +54,7 @@ export const registerSegmentConditionsHook = () => {
       const { args, previous } = options as HookOptions<Segment> & { previous?: Segment | Segment[] };
       const a = args as { where?: Prisma.SegmentWhereInput; data?: SegmentRow | SegmentRow[] };
       const [row] = castArray(a.data ?? []);
-      if (!row || row.conditions === undefined) return;
+      if (!row || (row.conditions === undefined && row.sample === undefined)) return;
       const befores = previous ? castArray(previous) : await db.segment.findMany({ where: a.where });
       for (const before of befores) await validateRow(row, before);
     },

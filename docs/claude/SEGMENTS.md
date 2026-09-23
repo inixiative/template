@@ -38,6 +38,14 @@ through the variant's `segmentId`: created and edited only through that variant,
 excluded from the `Segment.name` uniques, and hidden from lists, pickers, the lens `Segment.id` source
 and the membership routes. See [FEATURE_FLAGS.md](FEATURE_FLAGS.md).
 
+`Segment.sample` keeps only the customers whose id bucket falls in `[from, to)`: three hex digits of the
+id's random tail, read from digit position `offset` counted from the end (0–12), as a point on 0–100.
+The API takes `{ from, to }`; the segmentConditions hook assigns `offset` at random when a sample is
+first set and preserves it on later edits (a variant's internal segment copies its flag's
+`sampleOffset`), so widening a range keeps everyone already in.
+It is a post-filter applied after rule evaluation on both rails (`apps/api/src/modules/segment/lib/sample.ts`),
+so rules, the builder and reach counts know nothing about it. Changing it triggers a reconcile.
+
 ## Static and dynamic membership
 
 Every segment has `conditions`. A static segment is computed after creation or a rule

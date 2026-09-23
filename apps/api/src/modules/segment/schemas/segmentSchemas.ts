@@ -7,6 +7,7 @@
 import { z } from '@hono/zod-openapi';
 import { SegmentMemberScalarSchema, SegmentScalarInputSchema, SegmentScalarSchema } from '@template/db';
 import { customerRefAsProviderSchema } from '#/modules/customerRef/schemas/customerRefSchemas';
+import { sampleRangeSchema } from '#/modules/segment/lib/sample';
 import { selectSegmentForCustomer } from '#/modules/segment/queries/segmentIncludes';
 
 export const SEGMENT_CREATE_IMMUTABLE_FIELDS = ['ownerModel', 'userId', 'organizationId', 'spaceId'] as const;
@@ -17,7 +18,7 @@ export const segmentCreateBodySchema = SegmentScalarInputSchema.omit({
   organizationId: true,
   spaceId: true,
   deletedAt: true,
-});
+}).extend({ sample: sampleRangeSchema.nullable().optional() });
 
 export const segmentUpdateBodySchema = segmentCreateBodySchema.partial();
 

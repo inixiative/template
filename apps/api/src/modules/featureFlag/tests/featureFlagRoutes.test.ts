@@ -36,7 +36,14 @@ type Variant = {
   segmentId: string | null;
   segment: { id: string; members: number; featureFlagInternal: boolean; deletedAt: string | null } | null;
 };
-type Flag = { id: string; slug: string; ownerModel: string; enabled: boolean; variants: Variant[] };
+type Flag = {
+  id: string;
+  slug: string;
+  ownerModel: string;
+  enabled: boolean;
+  sampleOffset: number;
+  variants: Variant[];
+};
 type Value = {
   ownerModel: string;
   ownerId: string;
@@ -194,6 +201,28 @@ describe('feature flag routes', () => {
     expect(internal.status).toBe(201);
     const rollout = (await json<Variant>(internal)).data;
     expect(rollout.segment?.featureFlagInternal).toBe(true);
+
+    const sampled = await ownerFetch(
+      post(`/api/v1/featureFlag/${theme.id}/featureFlagVariants`, {
+        label: 'half',
+        internalSegment: { type: 'dynamic', conditions: { all: [] }, sample: { from: 0, to: 50 } },
+        valueText: 'half',
+      }),
+    );
+    expect(sampled.status).toBe(201);
+    const half = (await json<Variant>(sampled)).data;
+    const halfSegment = await db.segment.findUnique({ where: { id: half.segmentId! } });
+    expect(halfSegment?.sample).toEqual({ from: 0, to: 50, offset: theme.sampleOffset });
+    expect((await ownerFetch(del(`/api/v1/featureFlagVariant/${half.id}`))).status).toBe(204);
+
+    const inverted = await ownerFetch(
+      post(`/api/v1/featureFlag/${theme.id}/featureFlagVariants`, {
+        label: 'inverted',
+        internalSegment: { type: 'dynamic', conditions: { all: [] }, sample: { from: 60, to: 40 } },
+        valueText: 'x',
+      }),
+    );
+    expect(inverted.status).toBe(400);
 
     const both = await ownerFetch(
       post(`/api/v1/featureFlag/${theme.id}/featureFlagVariants`, {
