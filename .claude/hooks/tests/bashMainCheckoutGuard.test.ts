@@ -387,6 +387,88 @@ describe('isMutating', () => {
     expect(isMutating('cat <<EOF\nhello\nEOF\ngit push')).toBe(true);
   });
 
+  test('T3: a script fed to a shell is walked as commands', () => {
+    for (const command of [
+      "bash <<'EOF'\ngit push\nEOF",
+      "bash -s <<'EOF'\necho hi\ngit push\nEOF",
+      "echo 'git push' | bash",
+      "cat <<'EOF' | sh\ngit push\nEOF",
+      'bash -c "$(cat <<\'EOF\'\ngit push\nEOF\n)"',
+      'eval "$(printf \'git push\')"',
+      "printf 'git push' | bash",
+      'sh <<EOF\nbun add x\nEOF',
+      "printf '%s\\n' 'git push' | bash",
+      'echo "git push" | bash -s',
+    ]) {
+      expect(isMutating(command), JSON.stringify(command)).toBe(true);
+    }
+    for (const command of [
+      'cat <<EOF > notes.md\ngit push\nEOF',
+      'echo git push | grep push',
+      "bash <<'EOF'\ngit status\nEOF",
+      'bash f.sh',
+      '. f.sh',
+      "cat <<'EOF'\ngit push\nEOF\nbash",
+    ]) {
+      expect(isMutating(command), JSON.stringify(command)).toBe(false);
+    }
+  });
+
+  test('T4: env -C / --chdir moves the segment directory', () => {
+    expect(isMutating('env -C /tmp git push')).toBe(true);
+    expect(isMutating('env --chdir=/tmp git push')).toBe(true);
+  });
+
+  test('T5: word-0 case and unquoted backslashes', () => {
+    expect(isMutating('gi\\t push')).toBe(true);
+    expect(isMutating('g\\it push')).toBe(true);
+    for (const command of ['GIT push', 'Git commit -m x', 'bUn add x']) {
+      expect(isMutating(command), command).toBe(process.platform === 'darwin');
+    }
+  });
+
+  test('T6: a # glued to a substitution is not a comment', () => {
+    expect(isMutating('echo ${x}#; git push')).toBe(true);
+    expect(isMutating('echo $(true)#; git push')).toBe(true);
+    expect(isMutating('echo `true`#; git push')).toBe(true);
+    expect(isMutating('echo x #; git push')).toBe(false);
+  });
+
+  test('runner value-option tables', () => {
+    for (const command of [
+      'sudo -E git push',
+      'sudo -n git push',
+      'sudo -S git push',
+      'sudo -k git push',
+      'sudo -s git push',
+      'sudo -u me -g wheel git push',
+      'sudo -T 5 git push',
+      'caffeinate -t 600 git push',
+      'caffeinate -w 123 git push',
+      'caffeinate -i git push',
+      'env -u FOO -S x git push',
+      'xargs -L 1 git push',
+      'xargs -P 4 -n 1 git push',
+      'timeout -s KILL 5 git push',
+      'timeout --kill-after=2 5 git push',
+      'nice -n 10 git push',
+      'nohup git push',
+      'command git push',
+      'rtk git push',
+    ]) {
+      expect(isMutating(command), command).toBe(true);
+    }
+  });
+
+  test('bun option tables differ before and after the subcommand', () => {
+    expect(isMutating('bun add -d x')).toBe(true);
+    expect(isMutating('bun add -D x')).toBe(true);
+    expect(isMutating('bun install -d x')).toBe(true);
+    expect(isMutating('bun -d FOO=1 add x')).toBe(true);
+    expect(isMutating('bun -d add')).toBe(false);
+    expect(isMutating('bun install -d')).toBe(false);
+  });
+
   test('Z8: nesting deeper than the cap is reported as a landing rather than dropped', () => {
     const nested = 'echo $(echo $(echo $(echo $(echo $(echo $(echo $(git push)))))))';
     const landings = mutationsIn(nested, mainRoot);
@@ -421,6 +503,22 @@ describe('mutationsIn: effective directory per segment', () => {
     expect(directories(`(cd ${worktreeRoot} && git push)`)).toEqual([worktreeRoot]);
     expect(directories(`(cd ${worktreeRoot}; (cd ..); git push)`)).toEqual([worktreeRoot]);
     expect(directories('echo done 2>&1 && git push')).toEqual([mainRoot]);
+  });
+
+  test('T3: a heredoc script that cds into the worktree lands there', () => {
+    expect(directories(`bash <<'EOF'\ncd ${worktreeRoot}\ngit push\nEOF`)).toEqual([worktreeRoot]);
+    expect(directories(`bash <<'EOF'\ngit push\nEOF`)).toEqual([mainRoot]);
+    expect(directories(`cd ${worktreeRoot} && bash <<'EOF'\ngit push\nEOF`)).toEqual([worktreeRoot]);
+    expect(directories(`echo 'git push' | bash`)).toEqual([mainRoot]);
+  });
+
+  test('T4: env -C resolves the segment directory without lifting main by absolute path', () => {
+    expect(directories(`env -C ${worktreeRoot} git push`)).toEqual([worktreeRoot]);
+    expect(directories(`env --chdir=${worktreeRoot} git push`)).toEqual([worktreeRoot]);
+    expect(directories('env -C . git push')).toEqual([mainRoot]);
+    expect(mutationsIn(`env -C ${mainRoot} git push`, mainRoot)[0].named).toBeUndefined();
+    expect(mutationsIn('env -C /does/not/exist git push', mainRoot)[0].directory).toBeUndefined();
+    expect(directories(`env -C ${worktreeRoot} git status && git push`)).toEqual([mainRoot]);
   });
 
   test('C9: cd options are not mistaken for the target', () => {
@@ -543,7 +641,7 @@ describe('bashMainCheckoutGuard', () => {
     expect(reason).toContain('MAIN checkout');
     expect(reason).toContain(`cd ${worktreeRoot} && bun add @inixiative/json-rules@2.22.0`);
     expect(reason).toContain(`cd ${mainRoot} && bun add @inixiative/json-rules@2.22.0`);
-    expect(reason).toContain('reached by a relative path');
+    expect(reason).toContain(`reached without \`cd ${mainRoot}\``);
   });
 
   test('C9: the deny message quotes the original text and prefixes cd only onto the bare mutation', () => {
@@ -595,6 +693,29 @@ describe('bashMainCheckoutGuard', () => {
     expect(fromMain(`bun add left-pad --cwd ${worktreeRoot}`)).toBeUndefined();
     expect(fromMain(`bun add left-pad --cwd=${worktreeRoot}/apps/api`)).toBeUndefined();
     expect(fromMain('bun add left-pad --cwd apps/api')).toBeDefined();
+  });
+
+  test('T3: scripts fed to a shell from main are denied, and a heredoc that cds into the worktree passes', () => {
+    visitWorktree();
+    expect(fromMain("bash <<'EOF'\ngit push\nEOF")).toBeDefined();
+    expect(fromMain("echo 'git push' | bash")).toBeDefined();
+    expect(fromMain('eval "$(printf \'git push\')"')).toBeDefined();
+    expect(fromMain(`bash <<'EOF'\ncd ${worktreeRoot}\ngit push\nEOF`)).toBeUndefined();
+    expect(fromMain("bash <<'EOF'\ngit status\nEOF")).toBeUndefined();
+  });
+
+  test('T4: env -C to the worktree lifts, env -C to main or . does not', () => {
+    visitWorktree();
+    expect(fromMain(`env -C ${worktreeRoot} git push`)).toBeUndefined();
+    expect(fromMain(`env --chdir=${worktreeRoot} git push`)).toBeUndefined();
+    expect(fromMain(`env -C ${mainRoot} git push`)).toContain('reached without');
+    expect(fromMain('env -C . git push')).toBeDefined();
+  });
+
+  test('T5: word-0 variants from main are denied', () => {
+    visitWorktree();
+    expect(fromMain('gi\\t push')).toBeDefined();
+    if (process.platform === 'darwin') expect(fromMain('GIT push')).toBeDefined();
   });
 
   test('C2: subshell, pipe, and background cds do not lift the outer command', () => {

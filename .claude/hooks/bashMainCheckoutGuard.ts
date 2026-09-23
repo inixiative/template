@@ -23,22 +23,46 @@ type HookInput = {
 
 export const REQUIRE_MAIN_BRANCH = true;
 const MAX_DEPTH = 6;
+const CASE_INSENSITIVE_FS = process.platform === 'darwin';
 
 const MASK = '\u0001';
 const HEREDOC_AT = /^<<(-?)\s*(['"]?)(\w+)\2/;
 const KEYWORDS = new Set(['if', 'then', 'else', 'elif', 'fi', 'do', 'done', 'while', 'until', '!']);
 const SHELLS = new Set(['sh', 'bash', 'zsh', 'dash']);
-const RUNNERS: Record<string, { values: Set<string>; positionals?: number; stopOn?: Set<string> }> = {
-  env: { values: new Set(['-u', '--unset', '-S', '--split-string']) },
+const LITERAL_PRODUCERS = new Set(['cat', 'echo', 'printf']);
+type Runner = { values: Set<string>; positionals?: number; stopOn?: Set<string>; chdir?: Set<string> };
+const RUNNERS: Record<string, Runner> = {
+  env: {
+    values: new Set(['-u', '--unset', '-S', '--split-string', '-C', '--chdir']),
+    chdir: new Set(['-C', '--chdir']),
+  },
   command: { values: new Set(), stopOn: new Set(['-v', '-V']) },
   exec: { values: new Set(['-a']) },
   nohup: { values: new Set() },
-  sudo: { values: new Set(['-u', '-g', '-C', '-h', '-p', '-U', '-r', '-t', '-D', '--user', '--group']) },
+  sudo: {
+    values: new Set([
+      '-u',
+      '-g',
+      '-C',
+      '-h',
+      '-p',
+      '-U',
+      '-r',
+      '-t',
+      '-T',
+      '-D',
+      '--user',
+      '--group',
+      '--host',
+      '--prompt',
+    ]),
+  },
   doas: { values: new Set(['-u']) },
   timeout: { values: new Set(['-k', '-s', '--kill-after', '--signal']), positionals: 1 },
   nice: { values: new Set(['-n', '--adjustment']) },
   time: { values: new Set(['-o', '-f']) },
   xargs: { values: new Set(['-n', '-I', '-P', '-L', '-s', '-d', '-E', '-a', '-i']) },
+  caffeinate: { values: new Set(['-t', '-w']) },
   rtk: { values: new Set() },
   bunx: { values: new Set(['-p', '--package']) },
   npx: { values: new Set(['-p', '--package', '-c', '--call']) },
@@ -52,18 +76,44 @@ const GIT_RESUMED = new Set(['--abort', '--continue', '--quit', '--skip']);
 const BUN_MUTATING = new Set(['add', 'a', 'remove', 'rm', 'update']);
 const BUN_INSTALL = new Set(['install', 'i']);
 const BUN_SCRIPTS = new Set(['db:migrate']);
-const BUN_OPTIONS_WITH_VALUE = new Set([
+const BUN_GLOBAL_OPTIONS_WITH_VALUE = new Set([
   '--cwd',
-  '--filter',
-  '-F',
-  '--backend',
-  '--registry',
   '--config',
   '-c',
-  '--target',
   '--env-file',
   '--port',
   '--shell',
+  '-d',
+  '--define',
+  '-r',
+  '--preload',
+  '-l',
+  '--loader',
+  '--target',
+  '--filter',
+  '-F',
+  '--conditions',
+  '--tsconfig-override',
+  '--main-fields',
+  '--extension-order',
+  '--title',
+  '--backend',
+  '--registry',
+  '--linker',
+  '--omit',
+  '--concurrent-scripts',
+  '--network-concurrency',
+]);
+const BUN_SUBCOMMAND_OPTIONS_WITH_VALUE = new Set([
+  '--cwd',
+  '--config',
+  '-c',
+  '--env-file',
+  '--backend',
+  '--registry',
+  '--target',
+  '--filter',
+  '-F',
   '--linker',
   '--omit',
   '--concurrent-scripts',
@@ -72,9 +122,15 @@ const BUN_OPTIONS_WITH_VALUE = new Set([
 const CD_OPTIONS = new Set(['-P', '-L', '-e', '-@', '--']);
 const SHELL_OPTIONS_WITH_VALUE = new Set(['-o', '+o', '-O', '+O', '--rcfile', '--init-file']);
 
-type Piece =
-  | { kind: 'open' | 'close' }
-  | { kind: 'command'; raw: string; masked: string; terminator: string; substitutions: string[] };
+type CommandPiece = {
+  kind: 'command';
+  raw: string;
+  masked: string;
+  terminator: string;
+  substitutions: string[];
+  heredocs: string[];
+};
+type Piece = { kind: 'open' | 'close' } | CommandPiece;
 
 const isWordBoundary = (ch: string | undefined) => ch === undefined || /[\s;&|(){}]/.test(ch);
 
@@ -84,23 +140,29 @@ export const segmentCommand = (command: string): Piece[] => {
   let raw = '';
   let masked = '';
   let substitutions: string[] = [];
-  let pendingHeredocs: { delimiter: string; stripTabs: boolean }[] = [];
+  let currentHeredocs: { delimiter: string; stripTabs: boolean }[] = [];
+  let pendingHeredocs: { piece: CommandPiece; delimiter: string; stripTabs: boolean }[] = [];
+  let substitutionEnd = -1;
 
   const flush = (terminator: string) => {
     const lead = masked.length - masked.trimStart().length;
     const trail = masked.length - masked.trimEnd().length;
     if (masked.trim()) {
-      pieces.push({
+      const piece: CommandPiece = {
         kind: 'command',
         raw: raw.slice(lead, raw.length - trail),
         masked: masked.trim(),
         terminator,
         substitutions,
-      });
+        heredocs: [],
+      };
+      pieces.push(piece);
+      for (const heredoc of currentHeredocs) pendingHeredocs.push({ piece, ...heredoc });
     }
     raw = '';
     masked = '';
     substitutions = [];
+    currentHeredocs = [];
   };
   const add = (r: string, m = r) => {
     raw += r;
@@ -163,15 +225,18 @@ export const segmentCommand = (command: string): Piece[] => {
       } else j += 1;
     }
   };
-  const skipHeredocBodies = (from: number): number => {
+  const readHeredocBodies = (from: number): number => {
     let i = from;
-    for (const { delimiter, stripTabs } of pendingHeredocs) {
+    for (const { piece, delimiter, stripTabs } of pendingHeredocs) {
+      const body: string[] = [];
       while (i < text.length) {
         const lineEnd = text.indexOf('\n', i);
         const line = text.slice(i, lineEnd === -1 ? text.length : lineEnd).replace(/\r$/, '');
         i = lineEnd === -1 ? text.length : lineEnd + 1;
         if ((stripTabs ? line.replace(/^\t+/, '') : line) === delimiter) break;
+        body.push(stripTabs ? line.replace(/^\t+/, '') : line);
       }
+      piece.heredocs.push(body.join('\n'));
     }
     pendingHeredocs = [];
     return i;
@@ -211,6 +276,7 @@ export const segmentCommand = (command: string): Piece[] => {
       const stop = Math.min(end + 1, text.length);
       add(text.slice(i, stop), masking(i, stop));
       i = stop;
+      substitutionEnd = i;
       continue;
     }
     if (ch === '$' && next === '(') {
@@ -219,6 +285,7 @@ export const segmentCommand = (command: string): Piece[] => {
       const stop = Math.min(end + 1, text.length);
       add(text.slice(i, stop), masking(i, stop));
       i = stop;
+      substitutionEnd = i;
       continue;
     }
     if (ch === '$' && next === '{') {
@@ -235,9 +302,10 @@ export const segmentCommand = (command: string): Piece[] => {
       const stop = Math.min(j + 1, text.length);
       add(text.slice(i, stop), `$${MASK.repeat(stop - i - 1)}`);
       i = stop;
+      substitutionEnd = i;
       continue;
     }
-    if (ch === '#' && isWordBoundary(prev)) {
+    if (ch === '#' && isWordBoundary(prev) && i !== substitutionEnd) {
       const lineEnd = text.indexOf('\n', i);
       i = lineEnd === -1 ? text.length : lineEnd;
       continue;
@@ -249,7 +317,7 @@ export const segmentCommand = (command: string): Piece[] => {
     }
     const heredoc = text.slice(i).match(HEREDOC_AT);
     if (heredoc) {
-      pendingHeredocs.push({ delimiter: heredoc[3], stripTabs: heredoc[1] === '-' });
+      currentHeredocs.push({ delimiter: heredoc[3], stripTabs: heredoc[1] === '-' });
       add(heredoc[0]);
       i += heredoc[0].length;
       continue;
@@ -257,7 +325,7 @@ export const segmentCommand = (command: string): Piece[] => {
     if (ch === '\n' || (ch === '\r' && next === '\n')) {
       flush('\n');
       i += ch === '\r' ? 2 : 1;
-      if (pendingHeredocs.length > 0) i = skipHeredocBodies(i);
+      if (pendingHeredocs.length > 0) i = readHeredocBodies(i);
       continue;
     }
     if (ch === ';') {
@@ -306,6 +374,7 @@ export const segmentCommand = (command: string): Piece[] => {
     i += 1;
   }
   flush('');
+  if (pendingHeredocs.length > 0) readHeredocBodies(text.length);
   return pieces;
 };
 
@@ -313,8 +382,7 @@ type Word = { raw: string; masked: string };
 
 const tokenize = (raw: string, masked: string): Word[] => {
   const words: Word[] = [];
-  const pattern = /\S+/g;
-  for (const match of masked.matchAll(pattern)) {
+  for (const match of masked.matchAll(/\S+/g)) {
     const start = match.index ?? 0;
     words.push({ raw: raw.slice(start, start + match[0].length), masked: match[0] });
   }
@@ -322,34 +390,32 @@ const tokenize = (raw: string, masked: string): Word[] => {
 };
 
 const unquote = (token: string) => {
-  const trimmed = token.startsWith('$') && /^\$'/.test(token) ? token.slice(1) : token;
+  const trimmed = /^\$'/.test(token) ? token.slice(1) : token;
   const match = trimmed.match(/^(["'])([\s\S]*)\1$/);
   return match ? match[2] : trimmed;
 };
 
 const headOf = (word: Word): string | undefined => {
-  if (/\$\(|`|\$\{/.test(word.raw)) return undefined;
-  let head = word.raw.replace(/^\\/, '').replace(/\$'/g, "'").replace(/["']/g, '');
+  if (/\$\(|`|\$\{|\$\w/.test(word.raw)) return undefined;
+  let head = word.raw.replace(/\$'/g, "'").replace(/\\(.)/g, '$1').replace(/["']/g, '');
   if (head.includes('/')) head = basename(head);
-  return head;
+  return CASE_INSENSITIVE_FS ? head.toLowerCase() : head;
 };
 
 const isAssignment = (word: Word) => /^[A-Za-z_]\w*=/.test(word.raw);
 
-type Prefix = { words: Word[]; bare: string; gitDir?: string; gitWorkTree?: string };
+type Prefix = { words: Word[]; bare: string; gitDir?: string; gitWorkTree?: string; chdir?: string };
 
 const stripPrefixes = (words: Word[], raw: string): Prefix => {
   let rest = words;
   let bareStart = 0;
   let gitDir: string | undefined;
   let gitWorkTree: string | undefined;
-  const consumeKeywords = () => {
-    while (rest.length > 0 && KEYWORDS.has(rest[0].raw)) {
-      bareStart += 1;
-      rest = rest.slice(1);
-    }
-  };
-  consumeKeywords();
+  let chdir: string | undefined;
+  while (rest.length > 0 && KEYWORDS.has(rest[0].raw)) {
+    bareStart += 1;
+    rest = rest.slice(1);
+  }
   const bare = tokenize(raw, raw)
     .slice(bareStart)
     .map((w) => w.raw)
@@ -390,7 +456,9 @@ const stripPrefixes = (words: Word[], raw: string): Prefix => {
       }
       if (current.startsWith('-') && current.length > 1) {
         const [name, inline] = current.split(/=(.*)/s);
-        j += inline === undefined && runner.values.has(name) ? 2 : 1;
+        const takesValue = inline === undefined && runner.values.has(name);
+        if (runner.chdir?.has(name)) chdir = takesValue ? rest[j + 1]?.raw : inline;
+        j += takesValue ? 2 : 1;
         continue;
       }
       if (positionals > 0) {
@@ -400,10 +468,10 @@ const stripPrefixes = (words: Word[], raw: string): Prefix => {
       }
       break;
     }
-    if (stopped) return { words: [], bare, gitDir, gitWorkTree };
+    if (stopped) return { words: [], bare, gitDir, gitWorkTree, chdir };
     rest = rest.slice(j);
   }
-  return { words: rest, bare, gitDir, gitWorkTree };
+  return { words: rest, bare, gitDir, gitWorkTree, chdir };
 };
 
 type Checkout = { root: string; isMain: boolean };
@@ -477,12 +545,12 @@ const parseGit = (words: Word[]): Parsed => {
   let i = 1;
   while (i < words.length && words[i].masked.startsWith('-')) {
     const [name, inline] = words[i].masked.split(/=(.*)/s);
-    const value =
-      inline === undefined && GIT_OPTIONS_WITH_VALUE.has(name) ? words[i + 1]?.raw : words[i].raw.split(/=(.*)/s)[1];
+    const takesValue = inline === undefined && GIT_OPTIONS_WITH_VALUE.has(name);
+    const value = takesValue ? words[i + 1]?.raw : words[i].raw.split(/=(.*)/s)[1];
     if (name === '-C') target = value;
     if (name === '--git-dir') gitDir = value;
     if (name === '--work-tree') gitWorkTree = value;
-    i += inline === undefined && GIT_OPTIONS_WITH_VALUE.has(name) ? 2 : 1;
+    i += takesValue ? 2 : 1;
   }
   const positionals = words.slice(i);
   for (const word of positionals) if (word.masked.startsWith('-')) options.add(word.masked);
@@ -498,7 +566,8 @@ const parseBun = (words: Word[]): Parsed => {
     const word = words[i];
     if (word.masked.startsWith('-') && word.masked.length > 1) {
       const [name, inline] = word.masked.split(/=(.*)/s);
-      const takesValue = inline === undefined && BUN_OPTIONS_WITH_VALUE.has(name);
+      const table = positionals.length === 0 ? BUN_GLOBAL_OPTIONS_WITH_VALUE : BUN_SUBCOMMAND_OPTIONS_WITH_VALUE;
+      const takesValue = inline === undefined && table.has(name);
       options.add(name);
       if (name === '--cwd') target = takesValue ? words[i + 1]?.raw : word.raw.split(/=(.*)/s)[1];
       i += takesValue ? 2 : 1;
@@ -562,18 +631,59 @@ export type Landing = {
   reason?: string;
 };
 
+const isRedirection = (word: string) => /^\d*(<<<?-?|<|>>?|<>|[<>]&)/.test(word);
+
 const shellCommandString = (words: Word[]): string | undefined => {
   let dashC = false;
   for (let i = 1; i < words.length; i += 1) {
     const word = words[i];
-    if (word.masked === '--') return dashC ? unquote(words[i + 1]?.raw ?? '') : undefined;
+    if (word.masked === '--') return dashC ? words[i + 1]?.raw : undefined;
     if (word.masked.startsWith('-') || word.masked.startsWith('+')) {
       if (/^-[A-Za-z]*c[A-Za-z]*$/.test(word.masked)) dashC = true;
       if (SHELL_OPTIONS_WITH_VALUE.has(word.masked) || /^[-+][A-Za-z]*[oO]$/.test(word.masked)) i += 1;
       continue;
     }
-    return dashC ? unquote(word.raw) : undefined;
+    return dashC ? word.raw : undefined;
   }
+  return undefined;
+};
+
+const substitutionBody = (rawToken: string): string | undefined => {
+  const token = unquote(rawToken);
+  const dollar = token.match(/^\$\(([\s\S]*)\)$/);
+  if (dollar) return dollar[1];
+  const backtick = token.match(/^`([\s\S]*)`$/);
+  return backtick ? backtick[1] : undefined;
+};
+
+const literalOutputOf = (piece: CommandPiece): string | undefined => {
+  const prefix = stripPrefixes(tokenize(piece.raw, piece.masked), piece.raw);
+  const head = prefix.words[0] ? headOf(prefix.words[0]) : undefined;
+  if (!head || !LITERAL_PRODUCERS.has(head)) return undefined;
+  if (head === 'cat') return piece.heredocs.length > 0 ? piece.heredocs.join('\n') : undefined;
+  let args = prefix.words.slice(1).filter((w) => !/^-[neE]+$/.test(w.masked));
+  if (head === 'printf' && args.length > 1 && args[0].raw.includes('%')) args = args.slice(1);
+  return args.map((w) => unquote(w.raw)).join(' ');
+};
+
+const literalOutput = (command: string): string | undefined => {
+  const first = segmentCommand(command).find((piece): piece is CommandPiece => piece.kind === 'command');
+  return first ? literalOutputOf(first) : undefined;
+};
+
+const scriptFedToShell = (
+  words: Word[],
+  piece: CommandPiece,
+  previous: CommandPiece | undefined,
+): string | undefined => {
+  const inline = shellCommandString(words);
+  if (inline !== undefined) {
+    const body = substitutionBody(inline);
+    return body === undefined ? unquote(inline) : literalOutput(body);
+  }
+  if (words.slice(1).some((w) => !w.masked.startsWith('-') && !isRedirection(w.masked))) return undefined;
+  if (piece.heredocs.length > 0) return piece.heredocs.join('\n');
+  if (previous?.terminator === '|') return literalOutputOf(previous);
   return undefined;
 };
 
@@ -584,18 +694,23 @@ const collectMutations = (command: string, cwd: Target | undefined, landings: La
   }
   let cursor: Target | undefined = cwd;
   const stack: (Target | undefined)[] = [];
+  let previous: CommandPiece | undefined;
   for (const piece of segmentCommand(command)) {
     if (piece.kind !== 'command') {
       if (piece.kind === 'open') stack.push(cursor);
       else if (stack.length > 0) cursor = stack.pop();
       continue;
     }
+    const before = previous;
+    previous = piece;
     for (const substitution of piece.substitutions) collectMutations(substitution, cursor, landings, depth + 1);
     const prefix = stripPrefixes(tokenize(piece.raw, piece.masked), piece.raw);
     const words = prefix.words;
     if (words.length === 0) continue;
     const head = headOf(words[0]);
     if (!head) continue;
+    const segmentCursor = prefix.chdir ? resolveTarget(prefix.chdir, cursor) : cursor;
+    const segmentTarget = prefix.chdir && segmentCursor ? { directory: segmentCursor.directory } : segmentCursor;
     if (head === 'cd' || head === 'pushd' || head === 'popd') {
       const backgrounded = piece.terminator === '|' || piece.terminator === '&';
       if (backgrounded) continue;
@@ -608,26 +723,26 @@ const collectMutations = (command: string, cwd: Target | undefined, landings: La
       continue;
     }
     if (SHELLS.has(head)) {
-      const inner = shellCommandString(words);
-      if (inner) collectMutations(inner, cursor, landings, depth + 1);
+      const script = scriptFedToShell(words, piece, before);
+      if (script) collectMutations(script, segmentTarget, landings, depth + 1);
       continue;
     }
     if (head === 'eval') {
       const inner = words
         .slice(1)
-        .map((w) => unquote(w.raw))
+        .map((w) => {
+          const body = substitutionBody(w.raw);
+          return body === undefined ? unquote(w.raw) : (literalOutput(body) ?? '');
+        })
         .join(' ');
-      collectMutations(inner, cursor, landings, depth + 1);
+      collectMutations(inner, segmentTarget, landings, depth + 1);
       continue;
     }
     const mutation = mutationIn(head, words, prefix);
     if (!mutation) continue;
     if (mutation.redirect) {
-      const directory = resolveRedirect(
-        mutation.redirect.path,
-        cursor,
-        mutation.redirect.via.endsWith('DIR') || mutation.redirect.via === '--git-dir',
-      );
+      const gitDir = mutation.redirect.via === '--git-dir' || mutation.redirect.via === 'GIT_DIR';
+      const directory = resolveRedirect(mutation.redirect.path, segmentTarget, gitDir);
       landings.push({
         command: prefix.bare,
         directory,
@@ -636,12 +751,12 @@ const collectMutations = (command: string, cwd: Target | undefined, landings: La
       });
       continue;
     }
-    const target = mutation.target ? resolveTarget(mutation.target, cursor) : cursor;
+    const target = mutation.target ? resolveTarget(mutation.target, segmentTarget) : segmentTarget;
     landings.push({
       command: prefix.bare,
       directory: target?.directory,
       named: target?.named,
-      namedTarget: mutation.target,
+      namedTarget: mutation.target ?? prefix.chdir,
     });
   }
 };
@@ -755,7 +870,7 @@ const denialFor = (landing: Landing, main: MainCheckout, registered: string[]): 
     if (named && (isWithin(named, main.root) || isWithin(named, main.real))) return undefined;
     return named
       ? `  \`${command}\` would run in the main checkout through ${named}, which is not its own absolute path.`
-      : `  \`${command}\` would run in ${directory}, the main checkout, reached by a relative path.`;
+      : `  \`${command}\` would run in ${directory}, the main checkout, reached without \`cd ${main.root}\`.`;
   }
   return `  \`${command}\` would run in ${directory}, which is neither this repository's main checkout nor one of its registered worktrees.`;
 };

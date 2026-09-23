@@ -40,6 +40,7 @@ sync_env() {
 
   flush_entry() {
     if [ "$missing" -eq 1 ]; then
+      if [ -s "$env_file" ] && [ -n "$(tail -c 1 "$env_file")" ]; then printf '\n' >> "$env_file"; fi
       printf '%s\n' "${entry[@]}" >> "$env_file"
       echo "Added $key to $env_file"
     fi

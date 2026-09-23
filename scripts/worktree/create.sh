@@ -117,19 +117,20 @@ MERGED_BRANCHES="$(git -C "$ROOT_DIR" branch --merged "$MAIN_BRANCH" 2>/dev/null
 
 prune_slot_registry
 
-USED_SLOTS=" "
+SLOT_OWNER=("" "" "" "" "" "" "" "" "" "")
 MERGED_WARNINGS=""
 MERGED_COUNT=0
 
+claim() {
+  local slot="$1" owner="$2"
+  valid_slot "$slot" || return 0
+  [ -n "${SLOT_OWNER[$slot]}" ] || SLOT_OWNER[$slot]="$owner"
+}
+
 while IFS= read -r entry; do
   [ -n "$entry" ] || continue
-  USED_SLOTS="${USED_SLOTS}${entry%% *} "
+  claim "${entry%% *}" "${entry#* }"
 done < <(registry_entries)
-
-while IFS= read -r dup; do
-  [ -n "$dup" ] || continue
-  warn "Slot registry conflict: ${dup%%:*} is registered under slots${dup#*:} — reserving all of them. Fix .worktrees/.slots/ so it owns one."
-done < <(registry_duplicates)
 
 while IFS= read -r wt_path; do
   [ -n "$wt_path" ] && [ -d "$wt_path" ] || continue
@@ -139,7 +140,7 @@ while IFS= read -r wt_path; do
     warn "$(basename "$wt_path") references more than one slot (${wt_slots}) — reserving all of them. Fix its env files so they agree."
   fi
   for i in $wt_slots; do
-    USED_SLOTS="${USED_SLOTS}${i} "
+    claim "$i" "$wt_path"
     if [ -n "$wt_branch" ] && grep -qxF -- "$wt_branch" <<< "$MERGED_BRANCHES"; then
       MERGED_WARNINGS="${MERGED_WARNINGS}  Slot ${i}: $(basename "$wt_path") (${wt_branch}) — bun run worktree:destroy $(basename "$wt_path")\n"
       MERGED_COUNT=$((MERGED_COUNT + 1))
@@ -163,21 +164,50 @@ on_exit() {
   release_slot_lock
   if [ "$rc" -ne 0 ] && [ "$FINISHED" -eq 0 ]; then
     if [ "$CREATED" -eq 1 ]; then
-      warn "The worktree '$WT_NAME' was created before this failure. Remove it and free slot $SLOT with:"
+      warn "The worktree '$WT_NAME' was created before this failure (exit $rc). Remove it and free slot $SLOT with:"
       warn "  bun run worktree:destroy $WT_NAME --force"
     elif [ "$SLOT_REGISTERED" -eq 1 ]; then
       unregister_slot "$SLOT" "$WORKTREE_DIR"
+      [ -d "$WORKTREE_DIR" ] && rm -rf "$WORKTREE_DIR" && git -C "$ROOT_DIR" worktree prune
+      warn "Interrupted before the worktree existed (exit $rc) — slot $SLOT released."
     fi
   fi
 }
 trap on_exit EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 for i in $(seq 1 9); do
-  [[ "$USED_SLOTS" == *" ${i} "* ]] && continue
+  lock="$(lock_root)/slot-$i"
+  if [ -d "$lock" ]; then
+    lock_owner_pid="$(lock_pid "$lock")"
+    if reclaim_stale_lock "$i"; then
+      warn "  slot $i: stale lock (pid ${lock_owner_pid:-none} dead) — reclaimed"
+      owner="$(registry_owner "$i")"
+      if [ -n "$owner" ] && [ ! -d "$owner" ]; then
+        warn "  slot $i: registry entry $owner has no directory (create killed mid-way) — removed"
+        rm -f "$(registry_file "$i")"
+        SLOT_OWNER[$i]=""
+      fi
+    elif [ -d "$lock" ]; then
+      echo "  slot $i: being provisioned by ${SLOT_OWNER[$i]:-another create} (pid ${lock_owner_pid:-unknown}) — skipping"
+      continue
+    fi
+  fi
+  if [ -n "${SLOT_OWNER[$i]}" ]; then
+    if [ -d "${SLOT_OWNER[$i]}" ]; then
+      echo "  slot $i: in use by $(basename "${SLOT_OWNER[$i]}") — free it with: bun run worktree:destroy $(basename "${SLOT_OWNER[$i]}")"
+    else
+      echo "  slot $i: reserved by a fresh registry entry for ${SLOT_OWNER[$i]} — freed automatically after ${REGISTRY_STALE_SECONDS}s if that create never finishes"
+    fi
+    continue
+  fi
   if claim_slot_lock "$i"; then
     SLOT="$i"
     break
   fi
+  echo "  slot $i: locked by another create that started just now — skipping"
 done
 
 if [ -z "$SLOT" ]; then
@@ -300,6 +330,7 @@ Run 'bun run worktree:destroy $(basename "$CLAIMANT")' if that worktree is finis
   info "Provisioning MinIO buckets for slot ${SLOT}..."
   MINIO_PROVISION="$WORKTREE_DIR/scripts/db/minio-provision.sh"
   [ -f "$MINIO_PROVISION" ] || MINIO_PROVISION="$ROOT_DIR/scripts/db/minio-provision.sh"
+  storage_env_from "$MAIN_ENV"
   PATH="$(dirname "$DOCKER"):$PATH" bash "$MINIO_PROVISION" \
     "$STORAGE_BUCKET_SYSTEM" "$STORAGE_BUCKET_USER" \
     "$STORAGE_BUCKET_SYSTEM_TEST" "$STORAGE_BUCKET_USER_TEST"

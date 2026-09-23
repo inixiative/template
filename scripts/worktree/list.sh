@@ -39,9 +39,19 @@ while IFS= read -r line; do
   esac
 done < <(git -C "$ROOT_DIR" worktree list --porcelain; echo)
 
+for i in $(seq 1 9); do
+  status="$(lock_status "$i")"
+  [ -n "$status" ] && warn "Slot $i: $status"
+done
+
+while IFS= read -r problem; do
+  [ -n "$problem" ] || continue
+  warn "Slot registry entry ${problem} — $(registry_repair_hint)"
+done < <(registry_problems)
+
 while IFS= read -r dup; do
   [ -n "$dup" ] || continue
-  warn "Slot registry conflict: ${dup%%:*} is registered under slots${dup#*:} — fix .worktrees/.slots/ so each worktree owns one slot."
+  warn "Slot registry conflict: ${dup%%:*} is registered under slots${dup#*:} — the next create keeps the slot its WORKTREE_SLOT marker names."
 done < <(registry_duplicates)
 
 echo

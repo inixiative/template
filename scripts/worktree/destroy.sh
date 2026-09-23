@@ -35,17 +35,40 @@ if [ ! -d "$WORKTREE_DIR" ]; then
   die "Error: Worktree '$NAME' not found at $WORKTREE_DIR"
 fi
 
+for candidate in "$ROOT_DIR/.worktrees"/*/; do
+  candidate="${candidate%/}"
+  if [ "$candidate" -ef "$WORKTREE_DIR" ] && [ "$(basename "$candidate")" != "$NAME" ]; then
+    warn "Note: '$NAME' is spelled '$(basename "$candidate")' on disk — using that name."
+    NAME="$(basename "$candidate")"
+    WORKTREE_DIR="$candidate"
+  fi
+done
+
+HALF_CREATED=0
 if is_registered_worktree "$WORKTREE_DIR"; then
   REGISTERED=1
-elif [ -f "$WORKTREE_DIR/.git" ]; then
+  worktree_shares_main_git "$WORKTREE_DIR" \
+    || die "Error: $WORKTREE_DIR does not belong to this repository (its git common dir is not $ROOT_DIR/.git). Refusing to delete an independent repository."
+elif GITDIR="$(dot_git_file_target "$WORKTREE_DIR")"; then
   REGISTERED=0
-  warn "Warning: $WORKTREE_DIR is not registered with git (half-created?) — removing the directory and pruning."
+  if gitdir_belongs_to_main "$GITDIR"; then
+    HALF_CREATED=1
+  elif [ -e "$GITDIR" ]; then
+    die "Error: $WORKTREE_DIR is a git worktree whose gitdir ($GITDIR) belongs to another checkout. If that repository moved, run 'git worktree repair' from it. Nothing was deleted."
+  else
+    die "Error: $WORKTREE_DIR is a git worktree whose gitdir ($GITDIR) is missing and is not under this repository's .git/worktrees/. Run 'git worktree repair' from the repository that owns it, or remove the directory by hand. Nothing was deleted."
+  fi
+elif [ -d "$WORKTREE_DIR/.git" ]; then
+  die "Error: $WORKTREE_DIR is an independent git repository (it has its own .git directory), not a worktree of this one. Refusing to delete it."
 else
   die "Error: $WORKTREE_DIR is not a git worktree (no .git file, not registered). Refusing to delete it."
 fi
 
-worktree_shares_main_git "$WORKTREE_DIR" \
-  || die "Error: $WORKTREE_DIR does not belong to this repository (its git common dir is not $ROOT_DIR/.git). Refusing to delete an independent repository."
+[ "$HALF_CREATED" -eq 0 ] || warn "Warning: $WORKTREE_DIR is a half-created worktree of this repository (gitdir $GITDIR is not registered) — removing the directory and pruning."
+
+print_first_lines() {
+  sed -n '1,10{s/^/  /;p;}' <<< "$1"
+}
 
 if [ "$REGISTERED" -eq 1 ]; then
   info "$(branch_merge_status "$WORKTREE_DIR")"
@@ -53,10 +76,10 @@ if [ "$REGISTERED" -eq 1 ]; then
   if [ -n "$DIRTY" ]; then
     if [ "$FORCE" -eq 1 ]; then
       warn "Warning: destroying with uncommitted or untracked changes (--force):"
-      echo "$DIRTY" | head -10 | sed 's/^/  /'
+      print_first_lines "$DIRTY"
     else
       echo -e "${RED}Error: $NAME has uncommitted or untracked changes:${NC}" >&2
-      echo "$DIRTY" | head -10 | sed 's/^/  /' >&2
+      print_first_lines "$DIRTY" >&2
       die "Commit or discard them, or pass --force to destroy anyway."
     fi
   fi
@@ -106,11 +129,8 @@ else
     fi
 
     info "Removing MinIO buckets for slot ${SLOT}..."
-    MINIO_REMOVE="$SCRIPT_DIR/../db/minio-remove.sh"
-    STORAGE_ENDPOINT="$(env_value "$ROOT_DIR/.env.local" STORAGE_ENDPOINT)" \
-    STORAGE_ACCESS_KEY_ID="$(env_value "$ROOT_DIR/.env.local" STORAGE_ACCESS_KEY_ID)" \
-    STORAGE_SECRET_ACCESS_KEY="$(env_value "$ROOT_DIR/.env.local" STORAGE_SECRET_ACCESS_KEY)" \
-    PATH="$(dirname "$DOCKER"):$PATH" bash "$MINIO_REMOVE" \
+    storage_env_from "$ROOT_DIR/.env.local"
+    PATH="$(dirname "$DOCKER"):$PATH" bash "$SCRIPT_DIR/../db/minio-remove.sh" \
       "$STORAGE_BUCKET_SYSTEM" "$STORAGE_BUCKET_USER" \
       "$STORAGE_BUCKET_SYSTEM_TEST" "$STORAGE_BUCKET_USER_TEST" \
       || warn "Warning: bucket removal did not complete."

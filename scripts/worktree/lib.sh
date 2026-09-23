@@ -16,11 +16,27 @@ sedi() {
 }
 
 file_mtime() {
-  if stat --version >/dev/null 2>&1; then stat -c %Y "$1"; else stat -f %m "$1"; fi
+  local t
+  t="$(stat -c %Y "$1" 2>/dev/null || true)"
+  if [[ "$t" =~ ^[0-9]+$ ]]; then echo "$t"; return 0; fi
+  t="$(stat -f %m "$1" 2>/dev/null || true)"
+  if [[ "$t" =~ ^[0-9]+$ ]]; then echo "$t"; return 0; fi
+  warn "Warning: this stat cannot report the mtime of $1 — treating it as brand new." >&2
+  date +%s
+}
+
+file_age() {
+  local age
+  age=$(( $(date +%s) - $(file_mtime "$1") ))
+  [ "$age" -ge 0 ] && echo "$age" || echo 0
 }
 
 real_dir() {
   [ -d "$1" ] && (cd "$1" && pwd -P) || printf '%s\n' "$1"
+}
+
+regex_escape() {
+  printf '%s' "$1" | sed -e 's/[][\.*^$+?(){}|\\]/\\&/g'
 }
 
 main_checkout_root() {
@@ -46,18 +62,32 @@ env_has_key() {
   [ -f "$1" ] && grep -qE "$(env_key_pattern "$2")" "$1"
 }
 
+raw_env_value_of_line() {
+  local value="${1#*=}"
+  printf '%s' "${value#"${value%%[![:space:]]*}"}"
+}
+
+quote_style_of_line() {
+  case "$(raw_env_value_of_line "$1")" in
+    \"*) printf '"' ;;
+    \'*) printf "'" ;;
+  esac
+  return 0
+}
+
 env_value() {
-  local line value
+  local line value pattern
   line="$(env_line "$1" "$2")"
   [ -n "$line" ] || return 0
-  value="${line#*=}"
-  value="${value#"${value%%[![:space:]]*}"}"
+  value="$(raw_env_value_of_line "$line")"
   case "$value" in
     \"*)
       value="${value#\"}"
       pattern='^((\\.|[^"\\])*)"'
       [[ "$value" =~ $pattern ]] && value="${BASH_REMATCH[1]}"
       value="${value//\\\"/\"}"
+      value="${value//\\\$/\$}"
+      value="${value//\\\`/\`}"
       value="${value//\\\\/\\}"
       ;;
     \'*) value="${value#\'}"; value="${value%%\'*}" ;;
@@ -65,6 +95,23 @@ env_value() {
   esac
   [ -n "$value" ] && printf '%s\n' "$value"
   return 0
+}
+
+quote_env_value() {
+  local v="$1" style="$2"
+  if [ "$style" = "'" ] && [[ "$v" != *\'* ]]; then
+    printf "'%s'" "$v"
+    return 0
+  fi
+  if [ -n "$style" ] || [[ "$v" =~ [^A-Za-z0-9_./:@%+=,~-] ]]; then
+    v="${v//\\/\\\\}"
+    v="${v//\"/\\\"}"
+    v="${v//\$/\\\$}"
+    v="${v//\`/\\\`}"
+    printf '"%s"' "$v"
+    return 0
+  fi
+  printf '%s' "$v"
 }
 
 project_name() {
@@ -117,18 +164,29 @@ slot_resources() {
   STORAGE_BUCKET_USER_TEST="${PROJECT_NAME}-user-test-wt-${slot}"
 }
 
+storage_env_from() {
+  local file="$1"
+  STORAGE_ENDPOINT="$(env_value "$file" STORAGE_ENDPOINT)"
+  STORAGE_ACCESS_KEY_ID="$(env_value "$file" STORAGE_ACCESS_KEY_ID)"
+  STORAGE_SECRET_ACCESS_KEY="$(env_value "$file" STORAGE_SECRET_ACCESS_KEY)"
+  export STORAGE_ENDPOINT="${STORAGE_ENDPOINT:-http://localhost:9000}"
+  export STORAGE_ACCESS_KEY_ID="${STORAGE_ACCESS_KEY_ID:-minioadmin}"
+  export STORAGE_SECRET_ACCESS_KEY="${STORAGE_SECRET_ACCESS_KEY:-minioadmin}"
+}
+
 sed_replacement() {
   printf '%s' "$1" | sed -e 's/[\\&|]/\\&/g'
 }
 
 set_env_var() {
-  local file="$1" key="$2" value="$3" prefix="" line now
+  local file="$1" key="$2" value="$3" prefix="" line quoted now
   line="$(env_line "$file" "$key")"
   if [ -n "$line" ]; then
     case "$line" in export*) prefix="export " ;; esac
-    sedi -E "s|$(env_key_pattern "$key").*|${prefix}${key}=$(sed_replacement "$value")|" "$file"
+    quoted="$(quote_env_value "$value" "$(quote_style_of_line "$line")")"
+    sedi -E "s|$(env_key_pattern "$key").*|${prefix}${key}=$(sed_replacement "$quoted")|" "$file"
   else
-    printf '%s=%s\n' "$key" "$value" >> "$file"
+    printf '%s=%s\n' "$key" "$(quote_env_value "$value" "")" >> "$file"
   fi
   now="$(env_value "$file" "$key")"
   [ "$now" = "$value" ] || die "Error: could not set $key in $file — wanted '$value', the file now reads '${now:-<empty>}'."
@@ -219,6 +277,22 @@ worktree_shares_main_git() {
   [ "$common" = "$(real_dir "$ROOT_DIR")/.git" ]
 }
 
+dot_git_file_target() {
+  local dir="$1" target
+  [ -f "$dir/.git" ] || return 1
+  target="$(sed -n '1s/^gitdir:[[:space:]]*//p' "$dir/.git" | tr -d '\r')"
+  [ -n "$target" ] || return 1
+  [[ "$target" == /* ]] || target="$dir/$target"
+  printf '%s\n' "$target"
+}
+
+gitdir_belongs_to_main() {
+  case "$1" in
+    "$ROOT_DIR/.git/worktrees/"*|"$(real_dir "$ROOT_DIR")/.git/worktrees/"*) return 0 ;;
+  esac
+  return 1
+}
+
 worktree_env_files() {
   local f
   for f in "$1/.env.local" "$1/.env.test" "$1"/apps/*/.env.local "$1"/apps/*/.env.test; do
@@ -231,20 +305,49 @@ slots_dir() {
   echo "$ROOT_DIR/.worktrees/.slots"
 }
 
-registry_owner() {
+registry_file() {
+  echo "$(slots_dir)/$1"
+}
+
+registry_raw() {
   local f
-  f="$(slots_dir)/$1"
-  [ -f "$f" ] && head -1 "$f" | tr -d '\r' || true
+  f="$(registry_file "$1")"
+  [ -f "$f" ] || return 0
+  head -1 "$f" | tr -d '\r' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'
+}
+
+registry_owner() {
+  local raw
+  raw="$(registry_raw "$1")"
+  [ -n "$raw" ] || return 0
+  [[ "$raw" == /* ]] || raw="$ROOT_DIR/.worktrees/$raw"
+  printf '%s\n' "$raw"
 }
 
 register_slot() {
   mkdir -p "$(slots_dir)"
-  printf '%s\n' "$2" > "$(slots_dir)/$1"
+  printf '%s\n' "$2" > "$(registry_file "$1")"
 }
 
 unregister_slot() {
-  [ "$(real_dir "$(registry_owner "$1")")" = "$(real_dir "$2")" ] && rm -f "$(slots_dir)/$1"
+  local owner
+  owner="$(registry_owner "$1")"
+  [ -n "$owner" ] && [ "$(real_dir "$owner")" = "$(real_dir "$2")" ] && rm -f "$(registry_file "$1")"
   return 0
+}
+
+registry_repair_hint() {
+  echo "Each file in .worktrees/.slots/ is named after a slot (1-9) and contains one line: the ABSOLUTE path of the worktree that owns it."
+}
+
+validate_slot_registry() {
+  local f
+  for f in "$(slots_dir)"/*; do
+    [ -e "$f" ] || continue
+    [ -f "$f" ] && continue
+    die "Error: $f is not a regular file. $(registry_repair_hint)
+Remove it with: rm -rf '$f'"
+  done
 }
 
 registry_entries() {
@@ -262,26 +365,80 @@ registry_duplicates() {
   registry_entries | awk 'NF > 1 { slot = $1; sub(/^[^ ]+ /, ""); slots[$0] = slots[$0] " " slot; n[$0]++ } END { for (o in slots) if (n[o] > 1) print o ":" slots[o] }'
 }
 
+registry_problems() {
+  local f slot raw
+  for f in "$(slots_dir)"/*; do
+    [ -e "$f" ] || continue
+    slot="$(basename "$f")"
+    if [ ! -f "$f" ]; then echo "$slot: not a regular file"; continue; fi
+    valid_slot "$slot" || { echo "$slot: not a slot number"; continue; }
+    raw="$(registry_raw "$slot")"
+    if [ -z "$raw" ]; then echo "$slot: empty (corrupt)"
+    elif [[ "$raw" != /* ]]; then echo "$slot: relative path '$raw' (should be absolute)"
+    fi
+  done
+  return 0
+}
+
 REGISTRY_STALE_SECONDS="${REGISTRY_STALE_SECONDS:-120}"
 
 prune_slot_registry() {
-  local f slot owner age
+  local f slot raw owner
+  validate_slot_registry
   for f in "$(slots_dir)"/*; do
     [ -f "$f" ] || continue
     slot="$(basename "$f")"
     if ! valid_slot "$slot"; then
-      warn "Slot registry entry '$slot' is not a slot number — removing it."
+      warn "Slot registry entry '$slot' is not a slot number — removing it. $(registry_repair_hint)"
       rm -f "$f"
       continue
     fi
+    raw="$(registry_raw "$slot")"
+    if [ -z "$raw" ]; then
+      warn "Slot registry entry $slot is empty (corrupt) — removing it. $(registry_repair_hint)"
+      rm -f "$f"
+      continue
+    fi
+    if [[ "$raw" != /* ]]; then
+      owner="$ROOT_DIR/.worktrees/$raw"
+      warn "Slot registry entry $slot holds the relative path '$raw' — rewriting it as $owner."
+      printf '%s\n' "$owner" > "$f"
+    fi
     owner="$(registry_owner "$slot")"
-    [ -n "$owner" ] && [ -d "$owner" ] && continue
+    [ -d "$owner" ] && continue
     [ -d "$(lock_root)/slot-$slot" ] && continue
-    age=$(( $(date +%s) - $(file_mtime "$f") ))
-    [ "$age" -gt "$REGISTRY_STALE_SECONDS" ] || continue
-    warn "Slot registry entry $slot (${owner:-empty}) points at a directory that no longer exists — removing it."
+    [ -f "$f" ] || continue
+    [ "$(file_age "$f")" -gt "$REGISTRY_STALE_SECONDS" ] || continue
+    warn "Slot registry entry $slot ($owner) points at a directory that no longer exists — removing it."
     rm -f "$f"
   done
+  resolve_registry_duplicates
+}
+
+resolve_registry_duplicates() {
+  local dup owner slots keep marker slot newest age best
+  while IFS= read -r dup; do
+    [ -n "$dup" ] || continue
+    owner="${dup%%:*}"
+    slots="${dup#*:}"
+    keep=""
+    if [ -d "$owner" ]; then
+      marker="$(worktree_marker_slot "$owner")"
+      [[ " $slots " == *" $marker "* ]] && keep="$marker"
+    fi
+    if [ -z "$keep" ]; then
+      best=""
+      for slot in $slots; do
+        age="$(file_age "$(registry_file "$slot")")"
+        if [ -z "$best" ] || [ "$age" -lt "$best" ]; then best="$age"; keep="$slot"; fi
+      done
+    fi
+    for slot in $slots; do
+      [ "$slot" = "$keep" ] && continue
+      warn "Slot registry: $owner was registered under slots${slots} — keeping $keep$( [ -d "$owner" ] && echo " (its WORKTREE_SLOT marker)" || echo " (newest)"), removing $slot."
+      rm -f "$(registry_file "$slot")"
+    done
+  done < <(registry_duplicates)
 }
 
 worktree_marker_slot() {
@@ -300,13 +457,15 @@ worktree_slots() {
 }
 
 worktree_claims_slot() {
-  local wt="$1" slot="$2" f owner
+  local wt="$1" slot="$2" f owner url pattern
   owner="$(registry_owner "$slot")"
   [ -n "$owner" ] && [ "$(real_dir "$owner")" = "$(real_dir "$wt")" ] && return 0
+  pattern="(^|[^A-Za-z0-9_])$(regex_escape "$PROJECT_NAME")_(test_)?wt_${slot}([^0-9]|\$)"
   while IFS= read -r f; do
     [ -n "$f" ] || continue
     [ "$(env_value "$f" WORKTREE_SLOT)" = "$slot" ] && return 0
-    grep -Eq "(^|[^A-Za-z0-9_])${PROJECT_NAME}_(test_)?wt_${slot}([^0-9]|\$)" "$f" && return 0
+    url="$(env_value "$f" DATABASE_URL)"
+    [ -n "$url" ] && [[ "$url" =~ $pattern ]] && return 0
   done < <(worktree_env_files "$wt")
   return 1
 }
@@ -348,29 +507,48 @@ lock_root() {
   echo "$ROOT_DIR/.worktrees/.locks"
 }
 
+lock_pid() {
+  [ -f "$1/pid" ] && tr -d '\r\n' < "$1/pid" || true
+}
+
 lock_is_stale() {
-  local lock="$1" pid age
-  if [ -f "$lock/pid" ]; then
-    pid="$(tr -d '\r\n' < "$lock/pid")"
+  local lock="$1" pid
+  pid="$(lock_pid "$lock")"
+  if [ -n "$pid" ]; then
     [[ "$pid" =~ ^[0-9]+$ ]] || return 0
     ! kill -0 "$pid" 2>/dev/null
     return
   fi
-  age=$(( $(date +%s) - $(file_mtime "$lock") ))
-  [ "$age" -gt "$STALE_LOCK_SECONDS" ]
+  [ "$(file_age "$lock")" -gt "$STALE_LOCK_SECONDS" ]
+}
+
+lock_status() {
+  local lock pid
+  lock="$(lock_root)/slot-$1"
+  [ -d "$lock" ] || return 0
+  pid="$(lock_pid "$lock")"
+  if [ -z "$pid" ]; then
+    if [ "$(file_age "$lock")" -gt "$STALE_LOCK_SECONDS" ]; then echo "stale lock (no pid, older than ${STALE_LOCK_SECONDS}s) — next create reclaims"; else echo "create in progress (lock without pid yet)"; fi
+  elif [[ "$pid" =~ ^[0-9]+$ ]] && kill -0 "$pid" 2>/dev/null; then
+    echo "create in progress (pid $pid)"
+  else
+    echo "stale lock (pid $pid dead) — next create reclaims"
+  fi
+}
+
+reclaim_stale_lock() {
+  local lock stale
+  lock="$(lock_root)/slot-$1"
+  [ -d "$lock" ] && lock_is_stale "$lock" || return 1
+  stale="$lock.stale.$$"
+  mv "$lock" "$stale" 2>/dev/null || return 1
+  rm -rf "$stale"
 }
 
 claim_slot_lock() {
-  local lock stale
+  local lock
   lock="$(lock_root)/slot-$1"
   mkdir -p "$(lock_root)"
-  if [ -d "$lock" ] && lock_is_stale "$lock"; then
-    stale="$lock.stale.$$"
-    if mv "$lock" "$stale" 2>/dev/null; then
-      warn "Slot $1 has a lock left by a create that is no longer running — reclaiming it."
-      rm -rf "$stale"
-    fi
-  fi
   mkdir "$lock" 2>/dev/null || return 1
   echo $$ > "$lock/pid"
   SLOT_LOCK="$lock"
