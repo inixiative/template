@@ -72,6 +72,9 @@ export const auth = betterAuth({
 
   trustedOrigins: getAllowedOrigins(),
 
+  // Failures before the flow's own errorCallbackURL is known (e.g. state_mismatch) land on web login, not the API.
+  onAPIError: process.env.WEB_URL ? { errorURL: `${process.env.WEB_URL}/login` } : undefined,
+
   secondaryStorage: {
     get: async (key) => {
       const value = await getRedisClient().get(`${redisNamespace.session}:${key}`);

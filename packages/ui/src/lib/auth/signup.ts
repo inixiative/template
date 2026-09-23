@@ -57,6 +57,7 @@ const signUpWithOAuth = async (method: OAuthAuthMethod): Promise<SignUpResult> =
   const { error } = await client.signIn.social({
     provider: method.provider,
     callbackURL,
+    errorCallbackURL: `${window.location.origin}/login`,
   });
   if (error) throw new Error(error.message || 'Sign up failed');
   return { status: 'redirecting' };

@@ -26,13 +26,17 @@ export type LoginFormProps = {
   onSignupClick?: () => void;
 };
 
+// OAuth failures arrive as bare codes (e.g. `state_mismatch`); callback failures as sentences.
+const formatAuthError = (error?: string) =>
+  !error || error.includes(' ') ? error : `Sign in failed (${error}). Please try again.`;
+
 export const LoginForm = ({ hideSignup: _hideSignup, onSignupClick }: LoginFormProps) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState<string>();
+  const search = useSearch({ strict: false }) as { redirectTo?: string; error?: string };
+  const [error, setError] = useState<string | undefined>(() => formatAuthError(search.error));
   const [isLoading, setIsLoading] = useState(false);
 
-  const search = useSearch({ strict: false }) as { redirectTo?: string };
   const signIn = useAppStore((state) => state.auth.signIn);
   const navigatePreserving = useAppStore((state) => state.navigation.navigatePreserving);
   const { providers, isLoading: isLoadingProviders, error: providerError } = useAuthProviders();

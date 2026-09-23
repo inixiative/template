@@ -42,6 +42,7 @@ const signInWithOAuth = async (method: OAuthAuthMethod): Promise<void> => {
   await client.signIn.social({
     provider: method.provider,
     callbackURL,
+    errorCallbackURL: `${window.location.origin}/login`,
   });
 };
 
