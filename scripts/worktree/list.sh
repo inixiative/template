@@ -51,7 +51,7 @@ done < <(registry_problems)
 
 while IFS= read -r dup; do
   [ -n "$dup" ] || continue
-  warn "Slot registry conflict: ${dup%%:*} is registered under slots${dup#*:} — the next create keeps the slot its WORKTREE_SLOT marker names."
+  warn "Slot registry conflict: ${dup%%:*} is registered under slots${dup#*:} — the next create keeps the slot its WORKTREE_SLOT marker names, else the newest entry."
 done < <(registry_duplicates)
 
 echo

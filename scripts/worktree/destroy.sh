@@ -51,8 +51,10 @@ if is_registered_worktree "$WORKTREE_DIR"; then
     || die "Error: $WORKTREE_DIR does not belong to this repository (its git common dir is not $ROOT_DIR/.git). Refusing to delete an independent repository."
 elif GITDIR="$(dot_git_file_target "$WORKTREE_DIR")"; then
   REGISTERED=0
-  if gitdir_belongs_to_main "$GITDIR"; then
+  if gitdir_belongs_to_main "$GITDIR" && [ ! -e "$GITDIR" ]; then
     HALF_CREATED=1
+  elif gitdir_belongs_to_main "$GITDIR"; then
+    die "Error: $WORKTREE_DIR is a worktree of this repository that was moved by hand (its gitdir $GITDIR still exists but git does not know this location). Re-attach it with: git worktree repair '$WORKTREE_DIR' — then destroy it normally. Nothing was deleted."
   elif [ -e "$GITDIR" ]; then
     die "Error: $WORKTREE_DIR is a git worktree whose gitdir ($GITDIR) belongs to another checkout. If that repository moved, run 'git worktree repair' from it. Nothing was deleted."
   else
@@ -64,7 +66,7 @@ else
   die "Error: $WORKTREE_DIR is not a git worktree (no .git file, not registered). Refusing to delete it."
 fi
 
-[ "$HALF_CREATED" -eq 0 ] || warn "Warning: $WORKTREE_DIR is a half-created worktree of this repository (gitdir $GITDIR is not registered) — removing the directory and pruning."
+[ "$HALF_CREATED" -eq 0 ] || warn "Warning: $WORKTREE_DIR is a half-created worktree of this repository (its gitdir $GITDIR no longer exists) — removing the directory and pruning."
 
 print_first_lines() {
   sed -n '1,10{s/^/  /;p;}' <<< "$1"

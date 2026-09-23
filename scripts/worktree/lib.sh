@@ -416,15 +416,19 @@ prune_slot_registry() {
 }
 
 resolve_registry_duplicates() {
-  local dup owner slots keep marker slot newest age best
+  local dup owner slots keep reason marker slot age best
   while IFS= read -r dup; do
     [ -n "$dup" ] || continue
     owner="${dup%%:*}"
     slots="${dup#*:}"
     keep=""
+    reason="(newest)"
     if [ -d "$owner" ]; then
       marker="$(worktree_marker_slot "$owner")"
-      [[ " $slots " == *" $marker "* ]] && keep="$marker"
+      if [ -n "$marker" ] && [[ " $slots " == *" $marker "* ]]; then
+        keep="$marker"
+        reason="(its WORKTREE_SLOT marker)"
+      fi
     fi
     if [ -z "$keep" ]; then
       best=""
@@ -435,7 +439,7 @@ resolve_registry_duplicates() {
     fi
     for slot in $slots; do
       [ "$slot" = "$keep" ] && continue
-      warn "Slot registry: $owner was registered under slots${slots} — keeping $keep$( [ -d "$owner" ] && echo " (its WORKTREE_SLOT marker)" || echo " (newest)"), removing $slot."
+      warn "Slot registry: $owner was registered under slots${slots} — keeping $keep $reason, removing $slot."
       rm -f "$(registry_file "$slot")"
     done
   done < <(registry_duplicates)

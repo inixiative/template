@@ -656,26 +656,28 @@ const substitutionBody = (rawToken: string): string | undefined => {
   return backtick ? backtick[1] : undefined;
 };
 
-const literalOutputOf = (piece: CommandPiece): string | undefined => {
+const producedText = (piece: CommandPiece, stdin: string | undefined): string | undefined => {
   const prefix = stripPrefixes(tokenize(piece.raw, piece.masked), piece.raw);
   const head = prefix.words[0] ? headOf(prefix.words[0]) : undefined;
-  if (!head || !LITERAL_PRODUCERS.has(head)) return undefined;
-  if (head === 'cat') return piece.heredocs.length > 0 ? piece.heredocs.join('\n') : undefined;
-  let args = prefix.words.slice(1).filter((w) => !/^-[neE]+$/.test(w.masked));
-  if (head === 'printf' && args.length > 1 && args[0].raw.includes('%')) args = args.slice(1);
-  return args.map((w) => unquote(w.raw)).join(' ');
+  if (!head) return undefined;
+  const args = prefix.words.slice(1);
+  if (head === 'tee') return stdin;
+  if (head === 'cat') {
+    if (piece.heredocs.length > 0) return piece.heredocs.join('\n');
+    return args.every((w) => w.masked.startsWith('-') || isRedirection(w.masked)) ? stdin : undefined;
+  }
+  if (!LITERAL_PRODUCERS.has(head)) return undefined;
+  let literal = args.filter((w) => !/^-[neE]+$/.test(w.masked));
+  if (head === 'printf' && literal.length > 1 && literal[0].raw.includes('%')) literal = literal.slice(1);
+  return literal.map((w) => unquote(w.raw)).join(' ');
 };
 
 const literalOutput = (command: string): string | undefined => {
   const first = segmentCommand(command).find((piece): piece is CommandPiece => piece.kind === 'command');
-  return first ? literalOutputOf(first) : undefined;
+  return first ? producedText(first, undefined) : undefined;
 };
 
-const scriptFedToShell = (
-  words: Word[],
-  piece: CommandPiece,
-  previous: CommandPiece | undefined,
-): string | undefined => {
+const scriptFedToShell = (words: Word[], piece: CommandPiece, stdin: string | undefined): string | undefined => {
   const inline = shellCommandString(words);
   if (inline !== undefined) {
     const body = substitutionBody(inline);
@@ -683,8 +685,7 @@ const scriptFedToShell = (
   }
   if (words.slice(1).some((w) => !w.masked.startsWith('-') && !isRedirection(w.masked))) return undefined;
   if (piece.heredocs.length > 0) return piece.heredocs.join('\n');
-  if (previous?.terminator === '|') return literalOutputOf(previous);
-  return undefined;
+  return stdin;
 };
 
 const collectMutations = (command: string, cwd: Target | undefined, landings: Landing[], depth: number) => {
@@ -694,15 +695,16 @@ const collectMutations = (command: string, cwd: Target | undefined, landings: La
   }
   let cursor: Target | undefined = cwd;
   const stack: (Target | undefined)[] = [];
-  let previous: CommandPiece | undefined;
+  let piped: string | undefined;
   for (const piece of segmentCommand(command)) {
     if (piece.kind !== 'command') {
       if (piece.kind === 'open') stack.push(cursor);
       else if (stack.length > 0) cursor = stack.pop();
+      piped = undefined;
       continue;
     }
-    const before = previous;
-    previous = piece;
+    const stdin = piped;
+    piped = piece.terminator === '|' ? producedText(piece, stdin) : undefined;
     for (const substitution of piece.substitutions) collectMutations(substitution, cursor, landings, depth + 1);
     const prefix = stripPrefixes(tokenize(piece.raw, piece.masked), piece.raw);
     const words = prefix.words;
@@ -723,7 +725,7 @@ const collectMutations = (command: string, cwd: Target | undefined, landings: La
       continue;
     }
     if (SHELLS.has(head)) {
-      const script = scriptFedToShell(words, piece, before);
+      const script = scriptFedToShell(words, piece, stdin);
       if (script) collectMutations(script, segmentTarget, landings, depth + 1);
       continue;
     }

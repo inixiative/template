@@ -30,15 +30,22 @@ if ! mc ls local >/dev/null 2>&1; then
   exit 1
 fi
 
+bucket_exists() {
+  mc ls "local/${1}" >/dev/null 2>&1
+}
+
 failed=0
 for bucket in "$@"; do
-  if mc rb --force "local/${bucket}" >/dev/null 2>&1; then
-    echo "  MinIO: removed ${bucket}"
-  elif mc ls "local/${bucket}" >/dev/null 2>&1; then
+  if ! bucket_exists "$bucket"; then
+    echo "  MinIO: ${bucket} was already absent"
+    continue
+  fi
+  mc rb --force "local/${bucket}" >/dev/null 2>&1 || true
+  if bucket_exists "$bucket"; then
     echo "  MinIO: could NOT remove ${bucket} (still present)" >&2
     failed=1
   else
-    echo "  MinIO: ${bucket} was already absent"
+    echo "  MinIO: removed ${bucket}"
   fi
 done
 exit "$failed"

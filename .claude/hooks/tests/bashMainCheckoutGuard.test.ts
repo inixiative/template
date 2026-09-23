@@ -414,6 +414,27 @@ describe('isMutating', () => {
     }
   });
 
+  test('final pass: piped text passes through tee and an argument-less cat into a shell', () => {
+    for (const command of [
+      "cat <<'EOF' | tee f | bash\ngit push\nEOF",
+      'cat <<EOF | cat | bash\ngit push\nEOF',
+      "cat <<'EOF' | tee -a log | cat | sh\ngit push\nEOF",
+      "echo 'git push' | tee /dev/null | bash",
+      "printf 'git push' | cat - | bash",
+    ]) {
+      expect(isMutating(command), JSON.stringify(command)).toBe(true);
+    }
+    for (const command of [
+      "echo 'git push' | sed s/x/y/ | bash",
+      'cat <<EOF | cat other.sh | bash\ngit push\nEOF',
+      "cat <<'EOF' | tee f\ngit push\nEOF",
+      "cat <<'EOF' | tee f | grep push\ngit push\nEOF",
+      "cat <<'EOF' | bash; echo done | tee g\ngit status\nEOF",
+    ]) {
+      expect(isMutating(command), JSON.stringify(command)).toBe(false);
+    }
+  });
+
   test('T4: env -C / --chdir moves the segment directory', () => {
     expect(isMutating('env -C /tmp git push')).toBe(true);
     expect(isMutating('env --chdir=/tmp git push')).toBe(true);
@@ -510,6 +531,11 @@ describe('mutationsIn: effective directory per segment', () => {
     expect(directories(`bash <<'EOF'\ngit push\nEOF`)).toEqual([mainRoot]);
     expect(directories(`cd ${worktreeRoot} && bash <<'EOF'\ngit push\nEOF`)).toEqual([worktreeRoot]);
     expect(directories(`echo 'git push' | bash`)).toEqual([mainRoot]);
+  });
+
+  test('final pass: a piped body that cds into the worktree lands there', () => {
+    expect(directories(`cat <<'EOF' | tee f | bash\ncd ${worktreeRoot}\ngit push\nEOF`)).toEqual([worktreeRoot]);
+    expect(directories(`cat <<'EOF' | cat | bash\ngit push\nEOF`)).toEqual([mainRoot]);
   });
 
   test('T4: env -C resolves the segment directory without lifting main by absolute path', () => {
