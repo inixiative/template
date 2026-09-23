@@ -183,13 +183,11 @@ info "Generating env files (root values, the branch's keys, slot $SLOT ports/DBs
 WT_ENV="$WORKTREE_DIR/.env.local"
 WT_TEST_ENV="$WORKTREE_DIR/.env.test"
 
-cp "$MAIN_ENV" "$WT_ENV"
-[ -f "$ROOT_DIR/.env.test" ] && cp "$ROOT_DIR/.env.test" "$WT_TEST_ENV"
+copy_env_without_marker "$MAIN_ENV" "$WT_ENV"
+[ -f "$ROOT_DIR/.env.test" ] && copy_env_without_marker "$ROOT_DIR/.env.test" "$WT_TEST_ENV"
 for src in "$ROOT_DIR"/apps/*/.env.local "$ROOT_DIR"/apps/*/.env.test; do
   [ -f "$src" ] || continue
-  dst="$WORKTREE_DIR/${src#"$ROOT_DIR"/}"
-  mkdir -p "$(dirname "$dst")"
-  cp "$src" "$dst"
+  copy_env_without_marker "$src" "$WORKTREE_DIR/${src#"$ROOT_DIR"/}"
 done
 
 SYNC_ENV="$WORKTREE_DIR/scripts/setup/sync-env.sh"
@@ -252,9 +250,14 @@ while IFS= read -r f; do
 done < <(worktree_env_files "$WORKTREE_DIR")
 
 if [ "$DB_AVAILABLE" -eq 1 ]; then
+  require_env_key DATABASE_URL "$WORKTREE_DIR/apps/api/.env.local" "$WT_ENV"
+  require_env_key DATABASE_URL "$WT_TEST_ENV" "$WORKTREE_DIR/apps/api/.env.test"
+
   info "Creating Postgres databases on $PG_CONTAINER..."
   for DB in "$DB_LOCAL" "$DB_TEST"; do
-    if [ "$("${PSQL[@]}" -c "SELECT 1 FROM pg_database WHERE datname='${DB}';")" = "1" ]; then
+    DB_EXISTS="$("${PSQL[@]}" -c "SELECT 1 FROM pg_database WHERE datname='${DB}';" 2>&1)" \
+      || die "Error: could not list databases on $PG_CONTAINER (psql failed: ${DB_EXISTS}) — not assuming $DB is absent."
+    if [ "$DB_EXISTS" = "1" ]; then
       if CLAIMANT="$(slot_claimant "$SLOT" "$WORKTREE_DIR")"; then
         die "Error: database $DB already exists and the worktree at $CLAIMANT references slot $SLOT — refusing to drop it.
 Run 'bun run worktree:destroy $(basename "$CLAIMANT")' if that worktree is finished, then re-run this command."

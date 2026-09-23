@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'bun:test';
-import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import {
@@ -9,6 +9,7 @@ import {
   isMutating,
   mutationsIn,
   REQUIRE_MAIN_BRANCH,
+  registeredWorktrees,
   type SessionState,
 } from '../bashMainCheckoutGuard';
 
@@ -18,9 +19,30 @@ let sandbox: string;
 let mainRoot: string;
 let worktreeRoot: string;
 let plainDir: string;
+let foreignRoot: string;
+let unregisteredRoot: string;
+let linkToMain: string;
+let linkToWorktree: string;
 let state: SessionState;
 
 const SESSION = 'session-a';
+
+const git = (...args: string[]) => {
+  const result = Bun.spawnSync(['git', ...args], {
+    stdout: 'pipe',
+    stderr: 'pipe',
+    env: {
+      ...process.env,
+      GIT_CONFIG_GLOBAL: '/dev/null',
+      GIT_CONFIG_SYSTEM: '/dev/null',
+      GIT_AUTHOR_NAME: 'guard-test',
+      GIT_AUTHOR_EMAIL: 'guard@test',
+      GIT_COMMITTER_NAME: 'guard-test',
+      GIT_COMMITTER_EMAIL: 'guard@test',
+    },
+  });
+  if (result.exitCode !== 0) throw new Error(result.stderr.toString());
+};
 
 const bash = (command: string, cwd: string, sessionId = SESSION) => ({
   hook_event_name: 'PreToolUse',
@@ -34,6 +56,8 @@ const visitWorktree = (sessionId = SESSION) => guard(bash('ls', worktreeRoot, se
 
 const fromMain = (command: string) => guard(bash(command, mainRoot), state);
 
+const directories = (command: string) => mutationsIn(command, mainRoot).map((landing) => landing.directory);
+
 const withRefs = (head: string, originHead: string, run: () => void) => {
   writeFileSync(join(mainRoot, '.git/HEAD'), `ref: refs/heads/${head}\n`);
   writeFileSync(join(mainRoot, '.git/refs/remotes/origin/HEAD'), `ref: refs/remotes/origin/${originHead}\n`);
@@ -46,23 +70,34 @@ const withRefs = (head: string, originHead: string, run: () => void) => {
 };
 
 beforeAll(() => {
-  sandbox = mkdtempSync(join(tmpdir(), 'main-checkout-guard-'));
+  sandbox = realpathSync(mkdtempSync(join(tmpdir(), 'main-checkout-guard-')));
 
   mainRoot = join(sandbox, 'repo');
-  mkdirSync(join(mainRoot, '.git/worktrees/FEAT-1234'), { recursive: true });
+  git('init', '-q', '-b', 'main', mainRoot);
+  git('-C', mainRoot, 'commit', '-q', '--allow-empty', '-m', 'init');
   mkdirSync(join(mainRoot, '.git/refs/remotes/origin'), { recursive: true });
-  writeFileSync(join(mainRoot, '.git/HEAD'), 'ref: refs/heads/main\n');
   writeFileSync(join(mainRoot, '.git/refs/remotes/origin/HEAD'), 'ref: refs/remotes/origin/main\n');
   mkdirSync(join(mainRoot, 'apps/api'), { recursive: true });
   mkdirSync(join(mainRoot, 'packages/db'), { recursive: true });
 
   worktreeRoot = join(mainRoot, '.worktrees/FEAT-1234');
+  git('-C', mainRoot, 'worktree', 'add', '-q', worktreeRoot, '-b', 'FEAT-1234');
   mkdirSync(join(worktreeRoot, 'apps/api'), { recursive: true });
   mkdirSync(join(worktreeRoot, 'packages/db'), { recursive: true });
-  writeFileSync(join(worktreeRoot, '.git'), `gitdir: ${mainRoot}/.git/worktrees/FEAT-1234\n`);
 
   plainDir = join(sandbox, 'not-a-checkout');
   mkdirSync(plainDir, { recursive: true });
+
+  foreignRoot = join(sandbox, 'other-repo');
+  git('init', '-q', '-b', 'main', foreignRoot);
+
+  unregisteredRoot = join(sandbox, 'unregistered-copy');
+  cpSync(worktreeRoot, unregisteredRoot, { recursive: true });
+
+  linkToMain = join(sandbox, 'link-to-main');
+  symlinkSync(mainRoot, linkToMain);
+  linkToWorktree = join(sandbox, 'link-to-worktree');
+  symlinkSync(worktreeRoot, linkToWorktree);
 });
 
 beforeEach(() => {
@@ -88,6 +123,7 @@ describe('isMutating', () => {
       'git merge feature',
       'git worktree add ../x',
       'git worktree remove x',
+      'git worktree move x ../y',
       'git worktree prune',
       'bunx prisma migrate dev',
       'bun run db:migrate',
@@ -99,6 +135,42 @@ describe('isMutating', () => {
       '(git push)',
     ]) {
       expect(isMutating(command), command).toBe(true);
+    }
+  });
+
+  test('addendum C: bun aliases and install with a package argument', () => {
+    for (const command of [
+      'bun a left-pad',
+      'bun rm left-pad',
+      'bun install left-pad',
+      'bun i left-pad',
+      'bun i -d left-pad',
+      'bun install --force left-pad',
+    ]) {
+      expect(isMutating(command), command).toBe(true);
+    }
+    for (const command of ['bun install', 'bun i', 'bun install --force', 'bun i --frozen-lockfile']) {
+      expect(isMutating(command), command).toBe(false);
+    }
+  });
+
+  test('addendum C: every bun --cwd / run form of the migrate script', () => {
+    for (const command of [
+      'bun --cwd packages/db db:migrate',
+      'bun run --cwd packages/db db:migrate',
+      'bun --cwd packages/db run db:migrate',
+      'bun --cwd packages/db prisma migrate dev',
+      'bun run --cwd packages/db prisma migrate dev',
+    ]) {
+      expect(isMutating(command), command).toBe(true);
+    }
+    for (const command of [
+      'bun --cwd packages/db db:push:dev',
+      'bun --cwd packages/db db:generate',
+      'bun --cwd packages/db run db:deploy',
+      'bun --cwd packages/db prisma generate',
+    ]) {
+      expect(isMutating(command), command).toBe(false);
     }
   });
 
@@ -221,40 +293,41 @@ describe('isMutating', () => {
   });
 });
 
-describe('mutationsIn: effective directory per segment (finding 3)', () => {
+describe('mutationsIn: effective directory per segment (finding 3, addendum C)', () => {
   test('a cd applies to the segments after it, in order', () => {
-    expect(mutationsIn(`cd ${worktreeRoot} && git push`, mainRoot).map((m) => m.directory)).toEqual([worktreeRoot]);
-    expect(mutationsIn(`cd ${worktreeRoot} && cd .. && git push`, mainRoot).map((m) => m.directory)).toEqual([
-      join(mainRoot, '.worktrees'),
-    ]);
-    expect(mutationsIn(`cd ${worktreeRoot}; cd ${mainRoot}; git push`, mainRoot).map((m) => m.directory)).toEqual([
-      mainRoot,
-    ]);
-    expect(mutationsIn('cd .worktrees/FEAT-1234 && git push', mainRoot).map((m) => m.directory)).toEqual([
-      worktreeRoot,
-    ]);
-    expect(mutationsIn(`cd ${worktreeRoot}\ngit push`, mainRoot).map((m) => m.directory)).toEqual([worktreeRoot]);
+    expect(directories(`cd ${worktreeRoot} && git push`)).toEqual([worktreeRoot]);
+    expect(directories(`cd ${worktreeRoot} && cd .. && git push`)).toEqual([join(mainRoot, '.worktrees')]);
+    expect(directories(`cd ${worktreeRoot}; cd ${mainRoot}; git push`)).toEqual([mainRoot]);
+    expect(directories('cd .worktrees/FEAT-1234 && git push')).toEqual([worktreeRoot]);
+    expect(directories(`cd ${worktreeRoot}\ngit push`)).toEqual([worktreeRoot]);
+  });
+
+  test('a separator glued to the path still ends the cd token', () => {
+    expect(directories(`cd ${worktreeRoot};git push`)).toEqual([worktreeRoot]);
+    expect(directories(`cd ${worktreeRoot}&&git push`)).toEqual([worktreeRoot]);
+    expect(directories(`cd ${worktreeRoot}||git push`)).toEqual([worktreeRoot]);
+    expect(directories(`cd ${worktreeRoot}|git push`)).toEqual([worktreeRoot]);
   });
 
   test('git -C and bun --cwd apply only to their own segment', () => {
-    expect(mutationsIn(`git -C ${worktreeRoot} status && git push`, mainRoot).map((m) => m.directory)).toEqual([
-      mainRoot,
-    ]);
-    expect(mutationsIn(`git -C ${worktreeRoot} push && git status`, mainRoot).map((m) => m.directory)).toEqual([
-      worktreeRoot,
-    ]);
-    expect(mutationsIn(`cd ${worktreeRoot} && git -C . push`, mainRoot).map((m) => m.directory)).toEqual([
-      worktreeRoot,
-    ]);
-    expect(mutationsIn(`cd ${worktreeRoot} && bun --cwd . add x`, mainRoot).map((m) => m.directory)).toEqual([
-      worktreeRoot,
-    ]);
-    expect(mutationsIn(`bun --cwd ${worktreeRoot}/apps/api add x`, mainRoot).map((m) => m.directory)).toEqual([
-      join(worktreeRoot, 'apps/api'),
-    ]);
-    expect(mutationsIn('bun run --cwd packages/db db:migrate', mainRoot).map((m) => m.directory)).toEqual([
-      join(mainRoot, 'packages/db'),
-    ]);
+    expect(directories(`git -C ${worktreeRoot} status && git push`)).toEqual([mainRoot]);
+    expect(directories(`git -C ${worktreeRoot} push && git status`)).toEqual([worktreeRoot]);
+    expect(directories(`cd ${worktreeRoot} && git -C . push`)).toEqual([worktreeRoot]);
+    expect(directories(`cd ${worktreeRoot} && bun --cwd . add x`)).toEqual([worktreeRoot]);
+    expect(directories(`bun --cwd ${worktreeRoot}/apps/api add x`)).toEqual([join(worktreeRoot, 'apps/api')]);
+    expect(directories('bun run --cwd packages/db db:migrate')).toEqual([join(mainRoot, 'packages/db')]);
+    expect(directories('bun --cwd packages/db db:migrate')).toEqual([join(mainRoot, 'packages/db')]);
+    expect(directories('bun --cwd packages/db run db:migrate')).toEqual([join(mainRoot, 'packages/db')]);
+  });
+
+  test('every target is resolved through realpath', () => {
+    expect(directories(`cd ${linkToWorktree} && git push`)).toEqual([worktreeRoot]);
+    expect(directories(`cd ${linkToMain} && git push`)).toEqual([mainRoot]);
+    expect(directories(`git -C ${linkToMain} push`)).toEqual([mainRoot]);
+    expect(directories(`bun --cwd ${linkToMain}/apps/api add x`)).toEqual([join(mainRoot, 'apps/api')]);
+    expect(mutationsIn(`cd ${linkToMain} && git push`, mainRoot)[0].named).toBe(linkToMain);
+    expect(mutationsIn(`cd ${mainRoot} && git push`, mainRoot)[0].named).toBe(mainRoot);
+    expect(mutationsIn('cd apps/api && git push', mainRoot)[0].named).toBeUndefined();
   });
 
   test('unknown targets leave the directory unresolved', () => {
@@ -284,6 +357,14 @@ describe('mutationsIn: effective directory per segment (finding 3)', () => {
   });
 });
 
+describe('registeredWorktrees', () => {
+  test('lists the linked worktrees git knows about, realpath-compared, without the main checkout', () => {
+    expect(registeredWorktrees(mainRoot)).toEqual([worktreeRoot]);
+    expect(registeredWorktrees(linkToMain)).toEqual([worktreeRoot]);
+    expect(registeredWorktrees(plainDir)).toEqual([]);
+  });
+});
+
 describe('bashMainCheckoutGuard', () => {
   test('a session that has only ever been in the main checkout is never guarded', () => {
     expect(fromMain('bun add left-pad')).toBeUndefined();
@@ -296,7 +377,8 @@ describe('bashMainCheckoutGuard', () => {
     const reason = fromMain('bun add @inixiative/json-rules@2.22.0');
     expect(reason).toContain('MAIN checkout');
     expect(reason).toContain(`cd ${worktreeRoot} && bun add @inixiative/json-rules@2.22.0`);
-    expect(reason).toContain(`would run in ${mainRoot}, which is the main checkout`);
+    expect(reason).toContain(`cd ${mainRoot} && bun add @inixiative/json-rules@2.22.0`);
+    expect(reason).toContain('reached by a relative path');
   });
 
   test('finding 1: a hidden second line from main is denied', () => {
@@ -319,23 +401,33 @@ describe('bashMainCheckoutGuard', () => {
     }
   });
 
+  test('addendum C: aliases and install-with-package from main are denied', () => {
+    visitWorktree();
+    for (const command of ['bun a x', 'bun rm x', 'bun i x', 'bun install x', 'bun --cwd packages/db db:migrate']) {
+      expect(fromMain(command), command).toBeDefined();
+    }
+    expect(fromMain('bun install')).toBeUndefined();
+    expect(fromMain('bun i')).toBeUndefined();
+  });
+
   test('finding 3: naming a worktree somewhere in the command does not whitelist the whole command', () => {
     visitWorktree();
     expect(fromMain(`git -C ${worktreeRoot} status && git push`)).toBeDefined();
     expect(fromMain(`cd ${worktreeRoot} && cd .. && git push`)).toBeDefined();
-    expect(fromMain(`cd ${worktreeRoot}; cd ${mainRoot}; git push`)).toBeDefined();
-    expect(fromMain(`cd ${mainRoot} && bun add left-pad`)).toBeDefined();
-    expect(fromMain(`git -C "${mainRoot}" push`)).toBeDefined();
+    expect(fromMain(`cd ${worktreeRoot}; cd ../..; git push`)).toBeDefined();
     expect(fromMain('cd . && git push')).toBeDefined();
     expect(fromMain('cd apps/api && bun add left-pad')).toBeDefined();
+    expect(fromMain('git -C . commit -m x')).toBeDefined();
   });
 
-  test('finding 3: a mutation whose effective directory is a worktree passes', () => {
+  test('finding 3: a mutation whose effective directory is a registered worktree passes', () => {
     visitWorktree();
     expect(fromMain(`cd ${worktreeRoot} && git commit -m x`)).toBeUndefined();
     expect(fromMain(`cd "${worktreeRoot}" && git commit -m x`)).toBeUndefined();
     expect(fromMain(`cd '${worktreeRoot}/apps/api'; git push`)).toBeUndefined();
     expect(fromMain('cd .worktrees/FEAT-1234 && git push')).toBeUndefined();
+    expect(fromMain(`cd ${worktreeRoot};git push`)).toBeUndefined();
+    expect(fromMain(`cd ${worktreeRoot}&&git push`)).toBeUndefined();
     expect(fromMain(`git -C ${worktreeRoot} commit -m x`)).toBeUndefined();
     expect(fromMain('git -C .worktrees/FEAT-1234 commit -m x')).toBeUndefined();
     expect(fromMain(`git -C ${worktreeRoot} push && git status`)).toBeUndefined();
@@ -344,16 +436,42 @@ describe('bashMainCheckoutGuard', () => {
     expect(fromMain(`bash -c 'cd ${worktreeRoot} && git push'`)).toBeUndefined();
   });
 
-  test('a cd whose target does not exist or is not a checkout does not bypass the guard', () => {
+  test('addendum C: the main checkout is lifted only by its own absolute path, for cd and -C alike', () => {
+    visitWorktree();
+    expect(fromMain(`cd ${mainRoot} && bun add left-pad`)).toBeUndefined();
+    expect(fromMain(`cd ${mainRoot}/apps/api && git push`)).toBeUndefined();
+    expect(fromMain(`git -C ${mainRoot} push`)).toBeUndefined();
+    expect(fromMain(`git -C "${mainRoot}" push`)).toBeUndefined();
+    expect(fromMain(`bun --cwd ${mainRoot} add left-pad`)).toBeUndefined();
+    expect(fromMain(`cd ${mainRoot} && cd apps/api && git push`)).toBeDefined();
+  });
+
+  test('addendum C: a symlink to the main checkout does not lift, a symlink to a worktree does', () => {
+    visitWorktree();
+    const throughLink = fromMain(`cd ${linkToMain} && git push`);
+    expect(throughLink).toContain(`through ${linkToMain}, which is not its own absolute path`);
+    expect(fromMain(`git -C ${linkToMain} push`)).toBeDefined();
+    expect(fromMain(`bun --cwd ${linkToMain} add x`)).toBeDefined();
+    expect(fromMain(`cd ${linkToWorktree} && git push`)).toBeUndefined();
+    expect(fromMain(`git -C ${linkToWorktree}/apps/api commit -m x`)).toBeUndefined();
+  });
+
+  test('addendum C: an arbitrary directory, an unregistered checkout, or another repository never lifts', () => {
+    visitWorktree();
+    expect(fromMain(`cd ${plainDir} && git push`)).toContain('not a git checkout');
+    expect(fromMain(`git -C ${plainDir} push`)).toBeDefined();
+    expect(fromMain('cd /tmp && bun add x')).toBeDefined();
+    expect(fromMain(`cd ${unregisteredRoot} && git push`)).toContain('registered worktrees');
+    expect(fromMain(`cd ${foreignRoot} && git push`)).toContain('registered worktrees');
+  });
+
+  test('a cd whose target does not exist does not bypass the guard', () => {
     visitWorktree();
     const missing = fromMain('cd /does/not/exist; git push');
     expect(missing).toContain('cannot resolve');
     expect(fromMain('cd /bad || git commit -m x')).toBeDefined();
-    expect(fromMain(`cd ${plainDir} && git push`)).toBeDefined();
     expect(fromMain('cd "$SOMEWHERE" && git push')).toBeDefined();
-    const named = fromMain('git -C /does/not/exist commit -m x');
-    expect(named).toContain('names /does/not/exist');
-    expect(fromMain(`git -C ${plainDir} push`)).toBeDefined();
+    expect(fromMain('git -C /does/not/exist commit -m x')).toContain('names /does/not/exist');
     expect(fromMain(`cd ${worktreeRoot} && git -C /does/not/exist push`)).toBeDefined();
   });
 
@@ -477,6 +595,7 @@ describe('bashMainCheckoutGuard', () => {
     expect(denied.hookSpecificOutput.hookEventName).toBe('PreToolUse');
     expect(denied.hookSpecificOutput.permissionDecision).toBe('deny');
     expect(denied.hookSpecificOutput.permissionDecisionReason).toContain(worktreeRoot);
+    expect(run(bash(`cd ${worktreeRoot} && git push`, mainRoot))).toBe('');
     expect(run(bash('git status', mainRoot))).toBe('');
     expect(run({ session_id: SESSION, tool_name: 'Read', cwd: mainRoot, tool_input: { file_path: 'x' } })).toBe('');
   });

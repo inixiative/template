@@ -8,11 +8,20 @@ PROJECT_NAME="$(project_name "$ROOT_DIR")"
 PG_CONTAINER="${PROJECT_NAME}_postgres"
 MINIO_CONTAINER="${PROJECT_NAME}_minio"
 
-NAME="${1:-}"
+NAME=""
+FORCE=0
+for arg in "$@"; do
+  case "$arg" in
+    --force) FORCE=1 ;;
+    -*) die "Unknown flag: $arg" ;;
+    *) [ -z "$NAME" ] && NAME="$arg" || die "Error: expected one worktree name, got '$NAME' and '$arg'" ;;
+  esac
+done
 
 if [ -z "$NAME" ]; then
-  echo -e "${RED}Usage: $0 <name>${NC}"
-  echo "  <name>  Worktree directory name under .worktrees/ (branch with slashes → dashes)"
+  echo -e "${RED}Usage: $0 <name> [--force]${NC}"
+  echo "  <name>   Worktree directory name under .worktrees/ (branch with slashes → dashes)"
+  echo "  --force  Destroy even when the worktree has uncommitted or untracked changes"
   echo
   echo "Run 'bun run worktree:list' to see available worktrees."
   exit 1
@@ -34,6 +43,21 @@ elif [ -f "$WORKTREE_DIR/.git" ]; then
   warn "Warning: $WORKTREE_DIR is not registered with git (half-created?) — removing the directory and pruning."
 else
   die "Error: $WORKTREE_DIR is not a git worktree (no .git file, not registered). Refusing to delete it."
+fi
+
+if [ "$REGISTERED" -eq 1 ]; then
+  info "$(branch_merge_status "$WORKTREE_DIR")"
+  DIRTY="$(git -C "$WORKTREE_DIR" status --porcelain --untracked-files=all 2>/dev/null || true)"
+  if [ -n "$DIRTY" ]; then
+    if [ "$FORCE" -eq 1 ]; then
+      warn "Warning: destroying with uncommitted or untracked changes (--force):"
+      echo "$DIRTY" | head -10 | sed 's/^/  /'
+    else
+      echo -e "${RED}Error: $NAME has uncommitted or untracked changes:${NC}" >&2
+      echo "$DIRTY" | head -10 | sed 's/^/  /' >&2
+      die "Commit or discard them, or pass --force to destroy anyway."
+    fi
+  fi
 fi
 
 SLOT="$(worktree_marker_slot "$WORKTREE_DIR")"

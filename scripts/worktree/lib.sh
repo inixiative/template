@@ -48,7 +48,7 @@ valid_slot() {
 
 resolve_docker() {
   local candidate
-  for candidate in "$(command -v docker 2>/dev/null || true)" "$HOME/.docker/bin/docker" /Applications/Docker.app/Contents/Resources/bin/docker; do
+  for candidate in "$(command -v docker 2>/dev/null || true)" "${HOME:-/nonexistent}/.docker/bin/docker" /Applications/Docker.app/Contents/Resources/bin/docker; do
     if [ -n "$candidate" ] && [ -x "$candidate" ]; then
       echo "$candidate"
       return 0
@@ -84,10 +84,14 @@ slot_resources() {
   STORAGE_BUCKET_USER_TEST="${PROJECT_NAME}-user-test-wt-${slot}"
 }
 
+sed_replacement() {
+  printf '%s' "$1" | sed -e 's/[\\&|]/\\&/g'
+}
+
 ensure_env_var() {
   local file="$1" key="$2" value="$3"
   if grep -q "^${key}=" "$file"; then
-    sedi "s|^${key}=.*|${key}=${value}|" "$file"
+    sedi "s|^${key}=.*|${key}=$(sed_replacement "$value")|" "$file"
   else
     echo "${key}=${value}" >> "$file"
   fi
@@ -96,7 +100,23 @@ ensure_env_var() {
 replace_env_var_if_present() {
   local file="$1" key="$2" value="$3"
   [ -f "$file" ] && grep -q "^${key}=" "$file" || return 0
-  sedi "s|^${key}=.*|${key}=${value}|" "$file"
+  sedi "s|^${key}=.*|${key}=$(sed_replacement "$value")|" "$file"
+}
+
+require_env_key() {
+  local key="$1" f
+  shift
+  for f in "$@"; do
+    [ -f "$f" ] && grep -qE "^(export[[:space:]]+)?${key}=" "$f" && return 0
+  done
+  die "Error: $key is not set in any of: $* — the slot databases cannot be provisioned without it.
+Add it to the root env file (bun run sync-env) or pass --skip-db for an edit-only worktree."
+}
+
+copy_env_without_marker() {
+  local src="$1" dst="$2"
+  mkdir -p "$(dirname "$dst")"
+  grep -vE '^(export[[:space:]]+)?WORKTREE_SLOT=' "$src" > "$dst" || true
 }
 
 prepend_slot_marker() {
@@ -110,8 +130,8 @@ prepend_slot_marker() {
 rewrite_database_url() {
   local file="$1" db="$2"
   [ -f "$file" ] && grep -q '^DATABASE_URL=' "$file" || return 0
-  sedi -E "s|^(DATABASE_URL=[a-z]+://([^@/[:space:]]+@)?[^/[:space:]]+/)[^?[:space:]]*|\1${db}|" "$file"
-  grep -Eq "^DATABASE_URL=[a-z]+://([^@/[:space:]]+@)?[^/[:space:]]+/${db}([?[:space:]]|\$)" "$file"
+  sedi -E "s#^(DATABASE_URL=[a-z]+://(.*@)?[^/@[:space:]]+/)[^?[:space:]]*#\1$(sed_replacement "$db")#" "$file"
+  grep -Eq "^DATABASE_URL=[a-z]+://(.*@)?[^/@[:space:]]+/${db}([?[:space:]]|\$)" "$file"
 }
 
 rewrite_redis_db() {
@@ -124,12 +144,23 @@ env_file_sources() {
   bash -c 'set -a; . "$1"' _ "$1" >/dev/null 2>&1
 }
 
+real_dir() {
+  [ -d "$1" ] && (cd "$1" && pwd -P) || printf '%s\n' "$1"
+}
+
 linked_worktrees() {
-  git -C "$ROOT_DIR" worktree list --porcelain | sed -n 's/^worktree //p' | grep -vx "$ROOT_DIR" || true
+  local p
+  while IFS= read -r p; do
+    [ -n "$p" ] || continue
+    p="$(real_dir "$p")"
+    [ "$p" = "$(real_dir "$ROOT_DIR")" ] && continue
+    printf '%s\n' "$p"
+  done < <(git -C "$ROOT_DIR" worktree list --porcelain | sed -n 's/^worktree //p')
+  return 0
 }
 
 is_registered_worktree() {
-  linked_worktrees | grep -qx "$1"
+  linked_worktrees | grep -qx "$(real_dir "$1")"
 }
 
 worktree_env_files() {
@@ -201,6 +232,7 @@ worktree_claims_slot() {
 
 slot_claimant() {
   local slot="$1" exclude="${2:-}" wt
+  [ -z "$exclude" ] || exclude="$(real_dir "$exclude")"
   while IFS= read -r wt; do
     [ -n "$wt" ] && [ -d "$wt" ] && [ "$wt" != "$exclude" ] || continue
     if worktree_claims_slot "$wt" "$slot"; then
@@ -283,5 +315,19 @@ require_artifact() {
   local rel="$1" hint="$2"
   if [ ! -e "$WORKTREE_DIR/$rel" ]; then
     GAPS="${GAPS}  - $rel missing — rerun in the worktree: $hint\n"
+  fi
+}
+
+branch_merge_status() {
+  local wt="$1" branch base
+  branch="$(git -C "$wt" branch --show-current 2>/dev/null || true)"
+  base="$(default_branch "$ROOT_DIR")"
+  base="${base:-main}"
+  if [ -z "$branch" ]; then
+    echo "detached HEAD — merge status unknown"
+  elif git -C "$ROOT_DIR" branch --merged "$base" 2>/dev/null | sed 's/^[*+ ]*//' | grep -qx "$branch"; then
+    echo "branch '$branch' is merged into $base"
+  else
+    echo "branch '$branch' is NOT merged into $base ($(git -C "$ROOT_DIR" rev-list --count "$base..$branch" 2>/dev/null || echo '?') commit(s) not in $base)"
   fi
 }

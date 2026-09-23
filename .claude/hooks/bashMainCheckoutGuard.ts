@@ -1,4 +1,14 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 
@@ -12,7 +22,7 @@ type HookInput = {
 
 export const REQUIRE_MAIN_BRANCH = true;
 
-const MASK = '\u0001';
+const MASK = '�';
 const SEPARATOR_AT = /^(?:\r?\n|;|&&|\|\||\||&|\(|\)|\{|\})/;
 const HEREDOC_AT = /^<<(-?)\s*(['"]?)(\w+)\2/;
 const LEADING_KEYWORD = /^(?:if|then|else|elif|fi|do|done|while|until|!)(?=\s|$)\s*/;
@@ -43,7 +53,8 @@ const GIT_WORKTREE_MUTATING = new Set(['add', 'remove', 'move', 'prune']);
 const GIT_OPTIONS_WITH_VALUE = new Set(['-C', '-c', '--git-dir', '--work-tree', '--namespace', '--exec-path']);
 const GIT_RESUMED = /\s--(?:abort|continue|quit|skip)(?=\s|$)/;
 const DRY_RUN = /\s--dry-run(?=\s|$)/;
-const BUN_MUTATING = new Set(['add', 'remove', 'update']);
+const BUN_MUTATING = new Set(['add', 'a', 'remove', 'rm', 'update']);
+const BUN_INSTALL = new Set(['install', 'i']);
 const BUN_SCRIPTS = new Set(['db:migrate']);
 const BUN_OPTIONS_WITH_VALUE = new Set([
   '--cwd',
@@ -175,13 +186,23 @@ const findCheckout = (from: string): Checkout | undefined => {
   }
 };
 
-const resolveDirectory = (rawToken: string, from: string | undefined): string | undefined => {
+const isDirectory = (path: string) => existsSync(path) && statSync(path).isDirectory();
+
+const isWithin = (path: string, root: string) => path === root || path.startsWith(`${root}/`);
+
+type Target = { directory: string; named?: string };
+
+const resolveTarget = (rawToken: string, from: Target | undefined): Target | undefined => {
   const token = unquote(rawToken);
   if (!token || /[$`*?]/.test(token) || token === '-') return undefined;
   const expanded = token === '~' || token.startsWith('~/') ? join(homedir(), token.slice(1)) : token;
-  if (!isAbsolute(expanded) && !from) return undefined;
-  const path = isAbsolute(expanded) ? expanded : resolve(from as string, expanded);
-  return existsSync(path) && statSync(path).isDirectory() ? path : undefined;
+  if (isAbsolute(expanded)) {
+    const named = resolve(expanded);
+    return isDirectory(named) ? { directory: realpathSync(named), named } : undefined;
+  }
+  if (!from) return undefined;
+  const path = resolve(from.directory, expanded);
+  return isDirectory(path) ? { directory: realpathSync(path) } : undefined;
 };
 
 type Mutation = { command: string; target?: string };
@@ -204,6 +225,28 @@ const parseInvocation = (
   return { subcommand: words[i], rest: words.slice(i + 1), target };
 };
 
+const isPrismaMigrateDev = (subcommand: string | undefined, rest: string[]) =>
+  subcommand === 'prisma' && PRISMA_MIGRATE_DEV.test(['prisma', ...rest].join(' '));
+
+const bunMutation = (segment: Segment, words: string[]): Mutation | undefined => {
+  const { masked } = segment;
+  const outer = parseInvocation(words, BUN_OPTIONS_WITH_VALUE, '--cwd');
+  if (!outer.subcommand) return undefined;
+  const outerTarget = rawWord(segment, outer.target);
+  if (BUN_MUTATING.has(outer.subcommand)) return { command: masked, target: outerTarget };
+  if (BUN_INSTALL.has(outer.subcommand) && outer.rest.some((word) => !word.startsWith('-')))
+    return { command: masked, target: outerTarget };
+  if (BUN_SCRIPTS.has(outer.subcommand) || isPrismaMigrateDev(outer.subcommand, outer.rest))
+    return { command: masked, target: outerTarget };
+  if (outer.subcommand !== 'run') return undefined;
+  const inner = parseInvocation(['run', ...outer.rest], BUN_OPTIONS_WITH_VALUE, '--cwd');
+  const target = rawWord(segment, inner.target ?? outer.target);
+  if (!inner.subcommand) return undefined;
+  if (BUN_SCRIPTS.has(inner.subcommand) || isPrismaMigrateDev(inner.subcommand, inner.rest))
+    return { command: masked, target };
+  return undefined;
+};
+
 const mutationIn = (segment: Segment): Mutation | undefined => {
   const { masked } = segment;
   const padded = ` ${masked}`;
@@ -220,27 +263,15 @@ const mutationIn = (segment: Segment): Mutation | undefined => {
     if (subcommand === 'worktree' && GIT_WORKTREE_MUTATING.has(rest[0])) return { command: masked, target };
     return undefined;
   }
-  if (words[0] === 'bun') {
-    const outer = parseInvocation(words, BUN_OPTIONS_WITH_VALUE, '--cwd');
-    if (!outer.subcommand) return undefined;
-    if (BUN_MUTATING.has(outer.subcommand)) return { command: masked, target: rawWord(segment, outer.target) };
-    if (outer.subcommand !== 'run') return undefined;
-    const inner = parseInvocation(['run', ...outer.rest], BUN_OPTIONS_WITH_VALUE, '--cwd');
-    const target = rawWord(segment, inner.target ?? outer.target);
-    if (!inner.subcommand) return undefined;
-    if (BUN_SCRIPTS.has(inner.subcommand)) return { command: masked, target };
-    if (inner.subcommand === 'prisma' && PRISMA_MIGRATE_DEV.test(['prisma', ...inner.rest].join(' ')))
-      return { command: masked, target };
-    return undefined;
-  }
+  if (words[0] === 'bun') return bunMutation(segment, words);
   if (PRISMA_MIGRATE_DEV.test(masked)) return { command: masked };
   return undefined;
 };
 
-export type Landing = { command: string; directory: string | undefined; namedTarget?: string };
+export type Landing = { command: string; directory?: string; named?: string; namedTarget?: string };
 
-const collectMutations = (command: string, cwd: string | undefined, landings: Landing[]) => {
-  let cursor: string | undefined = cwd;
+const collectMutations = (command: string, cwd: Target | undefined, landings: Landing[]) => {
+  let cursor: Target | undefined = cwd;
   for (const segment of segmentCommand(command)) {
     stripPrefixes(segment);
     if (!segment.masked) continue;
@@ -251,7 +282,7 @@ const collectMutations = (command: string, cwd: string | undefined, landings: La
         continue;
       }
       const token = segment.masked.match(/^\S+/)?.[0];
-      cursor = resolveDirectory(token ? (rawWord(segment, token) ?? token) : '~', cursor);
+      cursor = resolveTarget(token ? (rawWord(segment, token) ?? token) : '~', cursor);
       continue;
     }
     if (take(segment, SHELL_C)) {
@@ -265,14 +296,19 @@ const collectMutations = (command: string, cwd: string | undefined, landings: La
     }
     const mutation = mutationIn(segment);
     if (!mutation) continue;
-    const directory = mutation.target ? resolveDirectory(mutation.target, cursor) : cursor;
-    landings.push({ command: mutation.command, directory, namedTarget: mutation.target });
+    const target = mutation.target ? resolveTarget(mutation.target, cursor) : cursor;
+    landings.push({
+      command: mutation.command,
+      directory: target?.directory,
+      named: target?.named,
+      namedTarget: mutation.target,
+    });
   }
 };
 
 export const mutationsIn = (command: string, cwd?: string): Landing[] => {
   const landings: Landing[] = [];
-  collectMutations(command, cwd, landings);
+  collectMutations(command, cwd && isDirectory(cwd) ? { directory: realpathSync(cwd) } : undefined, landings);
   return landings;
 };
 
@@ -289,6 +325,25 @@ export const defaultBranch = (root: string): string => {
   const ref = readFileSync(originHead, 'utf8').trim();
   const prefix = 'ref: refs/remotes/origin/';
   return ref.startsWith(prefix) ? ref.slice(prefix.length) : 'main';
+};
+
+export const registeredWorktrees = (mainRoot: string): string[] => {
+  try {
+    const listing = execFileSync('git', ['-C', mainRoot, 'worktree', 'list', '--porcelain'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    const mainReal = realpathSync(mainRoot);
+    return listing
+      .split('\n')
+      .filter((line) => line.startsWith('worktree '))
+      .map((line) => line.slice('worktree '.length).trim())
+      .filter((path) => isDirectory(path))
+      .map((path) => realpathSync(path))
+      .filter((path) => path !== mainReal);
+  } catch {
+    return [];
+  }
 };
 
 export type SessionState = {
@@ -319,16 +374,25 @@ export const fileSessionState = (dir = join(tmpdir(), 'template-worktree-guard')
 
 export type GuardOptions = { requireMainBranch?: boolean };
 
-const landsOnMain = ({ directory }: Landing) => {
-  if (!directory) return true;
-  const target = findCheckout(directory);
-  return !target || target.isMain;
-};
+type MainCheckout = { root: string; real: string };
 
-const describe = ({ command, directory, namedTarget }: Landing) => {
-  if (directory) return `  \`${command}\` would run in ${directory}, which is the main checkout.`;
-  if (namedTarget) return `  \`${command}\` names ${namedTarget}, which does not exist or cannot be resolved.`;
-  return `  \`${command}\` runs in a directory this hook cannot resolve.`;
+const denialFor = (landing: Landing, main: MainCheckout, registered: string[]): string | undefined => {
+  const { command, directory, named, namedTarget } = landing;
+  if (!directory) {
+    return namedTarget
+      ? `  \`${command}\` names ${namedTarget}, which does not exist or cannot be resolved.`
+      : `  \`${command}\` runs in a directory this hook cannot resolve.`;
+  }
+  if (registered.some((root) => isWithin(directory, root))) return undefined;
+  const checkout = findCheckout(directory);
+  if (!checkout) return `  \`${command}\` would run in ${directory}, which is not a git checkout.`;
+  if (checkout.isMain && isWithin(directory, main.real)) {
+    if (named && (isWithin(named, main.root) || isWithin(named, main.real))) return undefined;
+    return named
+      ? `  \`${command}\` would run in the main checkout through ${named}, which is not its own absolute path.`
+      : `  \`${command}\` would run in ${directory}, the main checkout, reached by a relative path.`;
+  }
+  return `  \`${command}\` would run in ${directory}, which is neither this repository's main checkout nor one of its registered worktrees.`;
 };
 
 export const guard = (input: HookInput, state: SessionState, options: GuardOptions = {}): string | undefined => {
@@ -349,15 +413,19 @@ export const guard = (input: HookInput, state: SessionState, options: GuardOptio
   const branch = currentBranch(checkout.root);
   if (requireMainBranch && branch !== defaultBranch(checkout.root)) return undefined;
 
-  const landings = mutationsIn(command, input.cwd).filter(landsOnMain);
+  const landings = mutationsIn(command, input.cwd);
   if (landings.length === 0) return undefined;
+  const main = { root: checkout.root, real: realpathSync(checkout.root) };
+  const registered = registeredWorktrees(checkout.root);
+  const denials = landings.map((landing) => denialFor(landing, main, registered)).filter((line) => line);
+  if (denials.length === 0) return undefined;
 
   return [
     `This session has been working in the worktree ${worktree}, but the Bash cwd is now the MAIN checkout (${checkout.root}, branch ${branch}) — the session cwd resets to main between calls.`,
-    ...landings.map(describe),
+    ...denials,
     'Dependency changes, commits, pushes, merges, worktree registry changes, and new migrations would land on main. Run it from the worktree:',
     `  cd ${worktree} && ${command}`,
-    `If the main checkout really is the target, check out a working branch there first (it is on ${branch}) or run the command outside this session.`,
+    `If the main checkout really is the target, name it by its own absolute path: cd ${checkout.root} && ${command}`,
   ].join('\n');
 };
 
