@@ -65,8 +65,12 @@ if [ "$ATTACH_ONLY" -eq 1 ]; then
     echo -e "${RED}Error: Branch '$NEW_BRANCH' not found (local or remote).${NC}"
     die "To create a new branch, pass a base too: $0 <base-branch> $NEW_BRANCH"
   fi
-elif ! branch_exists "$BASE_BRANCH"; then
-  die "Error: Base branch '$BASE_BRANCH' not found (local or remote)"
+else
+  branch_exists "$BASE_BRANCH" || die "Error: Base branch '$BASE_BRANCH' not found (local or remote)"
+  if branch_exists "$NEW_BRANCH"; then
+    echo -e "${RED}Error: Branch '$NEW_BRANCH' already exists, so it cannot be forked from '$BASE_BRANCH'.${NC}"
+    die "Attach it as it is with: $0 $NEW_BRANCH — or pick a new branch name."
+  fi
 fi
 
 MAIN_ENV="$ROOT_DIR/.env.local"
@@ -107,8 +111,11 @@ fi
 
 info "Scanning worktrees for allocated slots..."
 
-MAIN_BRANCH="$(git -C "$ROOT_DIR" symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||' || echo main)"
-MERGED_BRANCHES="$(git -C "$ROOT_DIR" branch --merged "$MAIN_BRANCH" 2>/dev/null | sed 's/^[* ]*//' || true)"
+MAIN_BRANCH="$(default_branch "$ROOT_DIR")"
+MAIN_BRANCH="${MAIN_BRANCH:-main}"
+MERGED_BRANCHES="$(git -C "$ROOT_DIR" branch --merged "$MAIN_BRANCH" 2>/dev/null | sed 's/^[*+ ]*//' || true)"
+
+prune_slot_registry
 
 USED_SLOTS=" "
 MERGED_WARNINGS=""
@@ -117,8 +124,11 @@ MERGED_COUNT=0
 while IFS= read -r wt_path; do
   [ -n "$wt_path" ] && [ -d "$wt_path" ] || continue
   wt_branch="$(git -C "$wt_path" branch --show-current 2>/dev/null || true)"
-  for i in $(seq 1 9); do
-    worktree_claims_slot "$wt_path" "$i" || continue
+  wt_slots="$(worktree_slots "$wt_path" | tr '\n' ' ')"
+  if [ "$(echo "$wt_slots" | wc -w | tr -d ' ')" -gt 1 ]; then
+    warn "$(basename "$wt_path") references more than one slot (${wt_slots}) — reserving all of them. Fix its env files so they agree."
+  fi
+  for i in $wt_slots; do
     USED_SLOTS="${USED_SLOTS}${i} "
     if [ -n "$wt_branch" ] && echo "$MERGED_BRANCHES" | grep -qx "$wt_branch"; then
       MERGED_WARNINGS="${MERGED_WARNINGS}  Slot ${i}: $(basename "$wt_path") (${wt_branch}) — bun run worktree:destroy $(basename "$wt_path")\n"
@@ -132,22 +142,9 @@ if [ "$MERGED_COUNT" -gt 0 ]; then
   warn "$MERGED_WARNINGS"
 fi
 
-LOCK_ROOT="$ROOT_DIR/.worktrees/.locks"
-mkdir -p "$LOCK_ROOT"
 SLOT=""
 SLOT_LOCK=""
-release_slot_lock() { [ -n "$SLOT_LOCK" ] && rm -rf "$SLOT_LOCK"; }
 trap release_slot_lock EXIT
-
-claim_slot_lock() {
-  local lock="$LOCK_ROOT/slot-$1"
-  if [ -d "$lock" ] && [ -f "$lock/pid" ] && ! kill -0 "$(cat "$lock/pid")" 2>/dev/null; then
-    rm -rf "$lock"
-  fi
-  mkdir "$lock" 2>/dev/null || return 1
-  echo $$ > "$lock/pid"
-  SLOT_LOCK="$lock"
-}
 
 for i in $(seq 1 9); do
   echo "$USED_SLOTS" | grep -q " ${i} " && continue
@@ -179,16 +176,15 @@ elif [ "$ATTACH_ONLY" -eq 1 ]; then
 else
   git -C "$ROOT_DIR" worktree add -b "$NEW_BRANCH" "$WORKTREE_DIR" "$BASE_BRANCH"
 fi
+register_slot "$SLOT" "$WORKTREE_DIR"
 
 info "Generating env files (root values, the branch's keys, slot $SLOT ports/DBs/buckets)..."
 
 WT_ENV="$WORKTREE_DIR/.env.local"
 WT_TEST_ENV="$WORKTREE_DIR/.env.test"
 
-{ echo "WORKTREE_SLOT=$SLOT"; cat "$MAIN_ENV"; } > "$WT_ENV"
-if [ -f "$ROOT_DIR/.env.test" ]; then
-  { echo "WORKTREE_SLOT=$SLOT"; cat "$ROOT_DIR/.env.test"; } > "$WT_TEST_ENV"
-fi
+cp "$MAIN_ENV" "$WT_ENV"
+[ -f "$ROOT_DIR/.env.test" ] && cp "$ROOT_DIR/.env.test" "$WT_TEST_ENV"
 for src in "$ROOT_DIR"/apps/*/.env.local "$ROOT_DIR"/apps/*/.env.test; do
   [ -f "$src" ] || continue
   dst="$WORKTREE_DIR/${src#"$ROOT_DIR"/}"
@@ -204,7 +200,9 @@ if ! SYNC_OUT="$(cd "$WORKTREE_DIR" && bash "$SYNC_ENV" 2>&1)"; then
 fi
 [ -n "$SYNC_OUT" ] && echo "$SYNC_OUT" | sed 's/^/  /'
 
-ensure_env_var "$WT_ENV" WORKTREE_SLOT "$SLOT"
+prepend_slot_marker "$WT_ENV" "$SLOT"
+prepend_slot_marker "$WT_TEST_ENV" "$SLOT"
+
 ensure_env_var "$WT_ENV" PORT "$API_PORT"
 ensure_env_var "$WT_ENV" API_URL "http://localhost:${API_PORT}"
 ensure_env_var "$WT_ENV" WEB_URL "http://localhost:${WEB_PORT}"
@@ -213,37 +211,45 @@ ensure_env_var "$WT_ENV" SUPERADMIN_URL "http://localhost:${SUPERADMIN_PORT}"
 replace_env_var_if_present "$WT_ENV" BETTER_AUTH_BASE_URL "http://localhost:${API_PORT}"
 ensure_env_var "$WT_ENV" STORAGE_BUCKET_SYSTEM "$STORAGE_BUCKET_SYSTEM"
 ensure_env_var "$WT_ENV" STORAGE_BUCKET_USER "$STORAGE_BUCKET_USER"
-rewrite_database_url "$WT_ENV" "$DB_LOCAL"
+rewrite_database_url "$WT_ENV" "$DB_LOCAL" || die "Error: DATABASE_URL in $WT_ENV could not be pointed at $DB_LOCAL."
 rewrite_redis_db "$WT_ENV" "$REDIS_DB"
 
 if [ -f "$WT_TEST_ENV" ]; then
-  ensure_env_var "$WT_TEST_ENV" WORKTREE_SLOT "$SLOT"
   ensure_env_var "$WT_TEST_ENV" STORAGE_BUCKET_SYSTEM "$STORAGE_BUCKET_SYSTEM_TEST"
   ensure_env_var "$WT_TEST_ENV" STORAGE_BUCKET_USER "$STORAGE_BUCKET_USER_TEST"
   replace_env_var_if_present "$WT_TEST_ENV" API_URL "http://localhost:${API_PORT}"
   replace_env_var_if_present "$WT_TEST_ENV" WEB_URL "http://localhost:${WEB_PORT}"
   replace_env_var_if_present "$WT_TEST_ENV" ADMIN_URL "http://localhost:${ADMIN_PORT}"
   replace_env_var_if_present "$WT_TEST_ENV" SUPERADMIN_URL "http://localhost:${SUPERADMIN_PORT}"
-  rewrite_database_url "$WT_TEST_ENV" "$DB_TEST"
+  rewrite_database_url "$WT_TEST_ENV" "$DB_TEST" || die "Error: DATABASE_URL in $WT_TEST_ENV could not be pointed at $DB_TEST."
   rewrite_redis_db "$WT_TEST_ENV" "$REDIS_DB"
 else
   warn "Warning: neither root .env.test nor a .env.test.example on this branch — .env.test not generated."
 fi
 
 for f in "$WORKTREE_DIR"/apps/*/.env.local; do
+  [ -f "$f" ] || continue
   replace_env_var_if_present "$f" PORT "$API_PORT"
   replace_env_var_if_present "$f" API_URL "http://localhost:${API_PORT}"
   replace_env_var_if_present "$f" WEB_URL "http://localhost:${WEB_PORT}"
   replace_env_var_if_present "$f" ADMIN_URL "http://localhost:${ADMIN_PORT}"
   replace_env_var_if_present "$f" SUPERADMIN_URL "http://localhost:${SUPERADMIN_PORT}"
-  rewrite_database_url "$f" "$DB_LOCAL"
+  rewrite_database_url "$f" "$DB_LOCAL" || die "Error: DATABASE_URL in $f could not be pointed at $DB_LOCAL."
   rewrite_redis_db "$f" "$REDIS_DB"
 done
 for f in "$WORKTREE_DIR"/apps/*/.env.test; do
+  [ -f "$f" ] || continue
   replace_env_var_if_present "$f" API_URL "http://localhost:${API_PORT}"
-  rewrite_database_url "$f" "$DB_TEST"
+  rewrite_database_url "$f" "$DB_TEST" || die "Error: DATABASE_URL in $f could not be pointed at $DB_TEST."
   rewrite_redis_db "$f" "$REDIS_DB"
 done
+
+GAPS=""
+
+while IFS= read -r f; do
+  [ -n "$f" ] || continue
+  env_file_sources "$f" || GAPS="${GAPS}  - ${f#"$WORKTREE_DIR"/} does not source cleanly (unterminated quote or bad line) — fix it by hand, then compare with its .example\n"
+done < <(worktree_env_files "$WORKTREE_DIR")
 
 if [ "$DB_AVAILABLE" -eq 1 ]; then
   info "Creating Postgres databases on $PG_CONTAINER..."
@@ -279,8 +285,6 @@ case "$DB_PKG_REAL" in
   *) die "Error: apps/api/node_modules/@template/db resolves to '${DB_PKG_REAL:-<missing>}', not inside $WORKTREE_DIR.
 Run 'bun install --force' in $WORKTREE_DIR and check 'readlink apps/api/node_modules/@template/db'." ;;
 esac
-
-GAPS=""
 
 run_step "Generating route trees" bun run generate:routes || true
 run_step "Generating Prisma client, prismaMap, and zod schemas" bun run db:generate || true

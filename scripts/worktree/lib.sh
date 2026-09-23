@@ -22,14 +22,28 @@ main_checkout_root() {
   dirname "$common"
 }
 
+default_branch() {
+  git -C "$1" symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||' || true
+}
+
 env_value() {
-  grep -m1 "^${2}=" "$1" 2>/dev/null | cut -d= -f2- || true
+  local line value
+  line="$(grep -m1 -E "^(export[[:space:]]+)?${2}=" "$1" 2>/dev/null | tr -d '\r' || true)"
+  [ -n "$line" ] || return 0
+  value="${line#*=}"
+  value="${value#\"}"; value="${value%\"}"
+  value="${value#\'}"; value="${value%\'}"
+  printf '%s\n' "$value"
 }
 
 project_name() {
   local name=""
   [ -f "$1/.env" ] && name="$(env_value "$1/.env" PROJECT_NAME)"
-  echo "${name:-$(basename "$1")}"
+  echo "${name:-template}"
+}
+
+valid_slot() {
+  [[ "$1" =~ ^[1-9]$ ]]
 }
 
 resolve_docker() {
@@ -85,10 +99,19 @@ replace_env_var_if_present() {
   sedi "s|^${key}=.*|${key}=${value}|" "$file"
 }
 
+prepend_slot_marker() {
+  local file="$1" slot="$2" tmp
+  [ -f "$file" ] || return 0
+  tmp="$(mktemp)"
+  { echo "WORKTREE_SLOT=${slot}"; grep -vE '^(export[[:space:]]+)?WORKTREE_SLOT=' "$file" || true; } > "$tmp"
+  mv "$tmp" "$file"
+}
+
 rewrite_database_url() {
   local file="$1" db="$2"
   [ -f "$file" ] && grep -q '^DATABASE_URL=' "$file" || return 0
-  sedi -E "s|^(DATABASE_URL=[a-z]+://[^@]+@[^/]+/)[^?[:space:]]*|\1${db}|" "$file"
+  sedi -E "s|^(DATABASE_URL=[a-z]+://([^@/[:space:]]+@)?[^/[:space:]]+/)[^?[:space:]]*|\1${db}|" "$file"
+  grep -Eq "^DATABASE_URL=[a-z]+://([^@/[:space:]]+@)?[^/[:space:]]+/${db}([?[:space:]]|\$)" "$file"
 }
 
 rewrite_redis_db() {
@@ -97,8 +120,16 @@ rewrite_redis_db() {
   sedi -E "s#^(REDIS(_QUEUE)?_URL=redis://([^@/]*@)?(localhost|127\.0\.0\.1):[0-9]+)(/[0-9]+)?[[:space:]]*\$#\1/${n}#" "$file"
 }
 
+env_file_sources() {
+  bash -c 'set -a; . "$1"' _ "$1" >/dev/null 2>&1
+}
+
 linked_worktrees() {
   git -C "$ROOT_DIR" worktree list --porcelain | sed -n 's/^worktree //p' | grep -vx "$ROOT_DIR" || true
+}
+
+is_registered_worktree() {
+  linked_worktrees | grep -qx "$1"
 }
 
 worktree_env_files() {
@@ -109,11 +140,60 @@ worktree_env_files() {
   return 0
 }
 
+slots_dir() {
+  echo "$ROOT_DIR/.worktrees/.slots"
+}
+
+registry_owner() {
+  local f
+  f="$(slots_dir)/$1"
+  [ -f "$f" ] && head -1 "$f" | tr -d '\r' || true
+}
+
+register_slot() {
+  mkdir -p "$(slots_dir)"
+  printf '%s\n' "$2" > "$(slots_dir)/$1"
+}
+
+unregister_slot() {
+  [ "$(registry_owner "$1")" = "$2" ] && rm -f "$(slots_dir)/$1"
+  return 0
+}
+
+prune_slot_registry() {
+  local f slot owner
+  for f in "$(slots_dir)"/*; do
+    [ -f "$f" ] || continue
+    slot="$(basename "$f")"
+    owner="$(registry_owner "$slot")"
+    if ! valid_slot "$slot" || [ -z "$owner" ] || ! is_registered_worktree "$owner"; then
+      warn "Slot registry entry $slot (${owner:-empty}) points at no registered worktree — removing it."
+      rm -f "$f"
+    fi
+  done
+}
+
+worktree_marker_slot() {
+  local slot
+  slot="$(env_value "$1/.env.local" WORKTREE_SLOT)"
+  [ -n "$slot" ] || slot="$(env_value "$1/.env.test" WORKTREE_SLOT)"
+  echo "$slot"
+}
+
+worktree_slots() {
+  local wt="$1" i
+  for i in $(seq 1 9); do
+    worktree_claims_slot "$wt" "$i" && echo "$i"
+  done
+  return 0
+}
+
 worktree_claims_slot() {
   local wt="$1" slot="$2" f
+  [ "$(registry_owner "$slot")" = "$wt" ] && return 0
   while IFS= read -r f; do
     [ -n "$f" ] || continue
-    grep -q "^WORKTREE_SLOT=${slot}\$" "$f" && return 0
+    [ "$(env_value "$f" WORKTREE_SLOT)" = "$slot" ] && return 0
     grep -Eq "${PROJECT_NAME}_(test_)?wt_${slot}([^0-9]|\$)" "$f" && return 0
   done < <(worktree_env_files "$wt")
   return 1
@@ -129,6 +209,61 @@ slot_claimant() {
     fi
   done < <(linked_worktrees)
   return 1
+}
+
+kill_port_listeners() {
+  local port="$1" pid killed=0 survivors=""
+  while IFS= read -r pid; do
+    [ -n "$pid" ] || continue
+    kill -9 "$pid" 2>/dev/null || true
+    for _ in 1 2 3 4 5 6 7 8 9 10; do
+      kill -0 "$pid" 2>/dev/null || break
+      sleep 0.1
+    done
+    if kill -0 "$pid" 2>/dev/null; then
+      survivors="${survivors} ${pid}"
+    else
+      echo "  Killed PID $pid on port $port"
+      killed=$((killed + 1))
+    fi
+  done < <(lsof -ti:"$port" 2>/dev/null || true)
+  [ -z "$survivors" ] || warn "  Warning: could not kill PID(s)${survivors} on port $port"
+}
+
+STALE_LOCK_SECONDS="${STALE_LOCK_SECONDS:-60}"
+
+lock_root() {
+  echo "$ROOT_DIR/.worktrees/.locks"
+}
+
+lock_is_stale() {
+  local lock="$1" pid age
+  if [ -f "$lock/pid" ]; then
+    pid="$(tr -d '\r\n' < "$lock/pid")"
+    [[ "$pid" =~ ^[0-9]+$ ]] || return 0
+    ! kill -0 "$pid" 2>/dev/null
+    return
+  fi
+  age=$(( $(date +%s) - $(stat -f %m "$lock" 2>/dev/null || stat -c %Y "$lock" 2>/dev/null || date +%s) ))
+  [ "$age" -gt "$STALE_LOCK_SECONDS" ]
+}
+
+claim_slot_lock() {
+  local lock
+  lock="$(lock_root)/slot-$1"
+  mkdir -p "$(lock_root)"
+  if [ -d "$lock" ] && lock_is_stale "$lock"; then
+    warn "Slot $1 has a lock left by a create that is no longer running — reclaiming it."
+    rm -rf "$lock"
+  fi
+  mkdir "$lock" 2>/dev/null || return 1
+  echo $$ > "$lock/pid"
+  SLOT_LOCK="$lock"
+}
+
+release_slot_lock() {
+  [ -n "${SLOT_LOCK:-}" ] && rm -rf "$SLOT_LOCK"
+  return 0
 }
 
 run_step() {

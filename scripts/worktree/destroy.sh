@@ -18,8 +18,8 @@ if [ -z "$NAME" ]; then
   exit 1
 fi
 
-if echo "$NAME" | grep -qE '(\.\.|/)'; then
-  die "Error: Name cannot contain '..' or path separators"
+if echo "$NAME" | grep -qE '(^\.|\.\.|/)'; then
+  die "Error: Name cannot start with '.' or contain '..' or path separators"
 fi
 
 WORKTREE_DIR="$ROOT_DIR/.worktrees/$NAME"
@@ -27,17 +27,42 @@ if [ ! -d "$WORKTREE_DIR" ]; then
   die "Error: Worktree '$NAME' not found at $WORKTREE_DIR"
 fi
 
-SLOT="$(env_value "$WORKTREE_DIR/.env.local" WORKTREE_SLOT)"
-[ -n "$SLOT" ] || SLOT="$(env_value "$WORKTREE_DIR/.env.test" WORKTREE_SLOT)"
+if is_registered_worktree "$WORKTREE_DIR"; then
+  REGISTERED=1
+elif [ -f "$WORKTREE_DIR/.git" ]; then
+  REGISTERED=0
+  warn "Warning: $WORKTREE_DIR is not registered with git (half-created?) — removing the directory and pruning."
+else
+  die "Error: $WORKTREE_DIR is not a git worktree (no .git file, not registered). Refusing to delete it."
+fi
+
+SLOT="$(worktree_marker_slot "$WORKTREE_DIR")"
+CLAIMED_SLOTS="$(worktree_slots "$WORKTREE_DIR" | tr '\n' ' ')"
+CLAIMED_COUNT="$(echo "$CLAIMED_SLOTS" | wc -w | tr -d ' ')"
+if [ "$CLAIMED_COUNT" -gt 1 ]; then
+  die "Error: $NAME references more than one slot (marker WORKTREE_SLOT='${SLOT:-none}', env files/registry name slots: ${CLAIMED_SLOTS}).
+Refusing to guess which databases are its own. Fix the env files so they agree on one slot, then re-run."
+fi
+[ -n "$SLOT" ] || SLOT="$(echo "$CLAIMED_SLOTS" | tr -d ' ')"
 
 if [ -z "$SLOT" ]; then
   warn "Warning: No WORKTREE_SLOT found in $WORKTREE_DIR/.env.local"
   warn "Proceeding with worktree removal only (no DB / bucket / Redis / port cleanup)"
 else
+  valid_slot "$SLOT" || die "Error: WORKTREE_SLOT='$SLOT' in $WORKTREE_DIR/.env.local is not a slot number (1-9). Fix the file, then re-run."
   slot_resources "$SLOT"
 
+  if CLAIMANT="$(slot_claimant "$SLOT" "$WORKTREE_DIR")"; then
+    warn "Warning: $(basename "$CLAIMANT") also references slot $SLOT — leaving $DB_LOCAL / $DB_TEST, the buckets, and Redis DB $SLOT in place."
+    SHARED_SLOT=1
+  else
+    SHARED_SLOT=0
+  fi
+
   DOCKER="$(resolve_docker || true)"
-  if [ -z "$DOCKER" ] || ! "$DOCKER" info >/dev/null 2>&1; then
+  if [ "$SHARED_SLOT" -eq 1 ]; then
+    :
+  elif [ -z "$DOCKER" ] || ! "$DOCKER" info >/dev/null 2>&1; then
     warn "Warning: Docker is not reachable — slot $SLOT databases, buckets, and Redis DB are NOT cleaned up."
     warn "Start Docker and drop $DB_LOCAL / $DB_TEST by hand, or worktree:create will drop them when it reclaims slot $SLOT."
   else
@@ -80,22 +105,25 @@ else
   PORTS="$(slot_ports "$SLOT")"
   info "Killing processes on ports: ${PORTS}..."
   for PORT in $PORTS; do
-    PID=$(lsof -ti:"$PORT" 2>/dev/null || true)
-    if [ -n "$PID" ]; then
-      kill -9 "$PID" 2>/dev/null || true
-      echo "  Killed PID $PID on port $PORT"
-    fi
+    kill_port_listeners "$PORT"
   done
+  unregister_slot "$SLOT" "$WORKTREE_DIR"
 fi
 
 info "Removing git worktree..."
-git -C "$ROOT_DIR" worktree remove "$WORKTREE_DIR" --force 2>/dev/null || {
-  warn "git worktree remove failed, cleaning up manually..."
+if [ "$REGISTERED" -eq 1 ] && git -C "$ROOT_DIR" worktree remove "$WORKTREE_DIR" --force 2>/dev/null; then
+  :
+else
+  [ "$REGISTERED" -eq 1 ] && warn "git worktree remove failed, cleaning up manually..."
   rm -rf "$WORKTREE_DIR"
   git -C "$ROOT_DIR" worktree prune
-}
+fi
 
 echo
 ok "Worktree '$NAME' destroyed"
-[ -n "$SLOT" ] && ok "Slot $SLOT freed"
+if [ -n "$SLOT" ] && [ "${SHARED_SLOT:-0}" -eq 1 ]; then
+  warn "Slot $SLOT stays with $(basename "$CLAIMANT")"
+elif [ -n "$SLOT" ]; then
+  ok "Slot $SLOT freed"
+fi
 echo
