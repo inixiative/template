@@ -16,12 +16,12 @@ export const extractRows = (args: unknown): Record<string, unknown>[] => {
 };
 
 // orderedList cascades shift sibling rows via raw SQL, which bypasses the
-// mutation lifecycle extension — so the cache hook never fires for them. The
-// `position` field is also globally ignored (see ignoreFields registry), which
-// makes ordering-only updates look like no-ops to the cache hook even for the
-// originating row. We compensate here: queue a cache invalidation per affected
-// row on commit, using the same fetchCacheKeys / clearKey primitives the
-// cache hook uses.
+// mutation lifecycle extension — so the cache hook never fires for them. Unless
+// the model is in ORDER_CARRIES_MEANING, `position` is also an ignored field,
+// which makes ordering-only updates look like no-ops to the cache hook even for
+// the originating row. We compensate here: queue a cache invalidation per
+// affected row on commit, using the same fetchCacheKeys / clearKey primitives
+// the cache hook uses.
 export const queueOrderedListCacheInvalidation = (model: string, rows: Record<string, unknown>[]): void => {
   if (rows.length === 0) return;
 

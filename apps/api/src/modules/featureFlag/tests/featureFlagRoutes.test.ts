@@ -34,7 +34,7 @@ type Variant = {
   label: string;
   position: number;
   segmentId: string | null;
-  segment: { id: string; members: number; featureFlagVariantId: string | null } | null;
+  segment: { id: string; members: number; featureFlagVariantId: string | null; deletedAt: string | null } | null;
 };
 type Flag = { id: string; slug: string; ownerModel: string; enabled: boolean; variants: Variant[] };
 type Value = {
@@ -150,6 +150,11 @@ describe('feature flag routes', () => {
     expect(values.status).toBe(200);
     const mine = (await json<Value[]>(values)).data.find((each) => each.slug === 'custom:dark-mode');
     expect(mine).toMatchObject({ ownerModel: 'Organization', ownerId: org.id, customerId: member.id, value: true });
+
+    const memberships = await memberFetch(get('/api/v1/me/segmentMemberships'));
+    expect(memberships.status).toBe(200);
+    const segmentIds = (await json<{ segmentId: string }[]>(memberships)).data.map((each) => each.segmentId);
+    expect(segmentIds).not.toContain(flag.variants[0]!.segmentId);
   });
 
   it('a string flag takes ordered variants over shared and sampled audiences; a position update reorders', async () => {
@@ -208,6 +213,44 @@ describe('feature flag routes', () => {
     const read = (await json<Flag>(await ownerFetch(get(`/api/v1/featureFlag/${theme.id}`)))).data;
     expect(read.variants.map((each) => each.label)).toEqual(['rollout', 'beta']);
     expect(read.variants[0]!.segment?.members).toBe(1);
+
+    const relabeled = await ownerFetch(patch(`/api/v1/featureFlagVariant/${rollout.id}`, { label: 'staged' }));
+    expect(relabeled.status).toBe(200);
+    const renamed = await db.segment.findUnique({ where: { id: rollout.segmentId! } });
+    expect(renamed?.name).toBe(`custom:theme/staged ${rollout.id}`);
+  });
+
+  it('a tombstoned shared audience shows as deleted on the owner’s read', async () => {
+    const { entity: doomed } = await createSegment({
+      ownerModel: 'Organization',
+      organization: org,
+      type: 'static',
+      conditions: { field: 'id', operator: Operator.in, value: [] },
+    });
+    const created = await ownerFetch(
+      post(`/api/v1/organization/${org.id}/featureFlags`, {
+        slug: 'custom:doomed',
+        name: 'Doomed',
+        subjectModel: 'User',
+        valueType: 'boolean',
+      }),
+    );
+    const doomedFlag = (await json<Flag>(created)).data;
+    const variant = await ownerFetch(
+      post(`/api/v1/featureFlag/${doomedFlag.id}/featureFlagVariants`, {
+        label: 'dead',
+        segmentId: doomed.id,
+        valueBoolean: true,
+      }),
+    );
+    expect(variant.status).toBe(201);
+    expect((await json<Variant>(variant)).data.segment?.deletedAt).toBeNull();
+
+    expect((await ownerFetch(del(`/api/v1/segment/${doomed.id}`))).status).toBe(204);
+    const read = (await json<Flag>(await ownerFetch(get(`/api/v1/featureFlag/${doomedFlag.id}`)))).data;
+    const dead = read.variants.find((each) => each.label === 'dead');
+    expect(dead?.segment?.id).toBe(doomed.id);
+    expect(dead?.segment?.deletedAt).not.toBeNull();
   });
 
   it('deleting a variant tombstones its internal segment; a member cannot manage the flag', async () => {

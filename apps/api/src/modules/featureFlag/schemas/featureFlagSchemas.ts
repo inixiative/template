@@ -29,7 +29,7 @@ export const featureFlagUpdateBodySchema = featureFlagCreateBodySchema
   .omit({ slug: true, subjectModel: true, valueType: true })
   .partial();
 
-export const variantSegmentSchema = SegmentScalarSchema.pick(selectSegmentForCustomer).extend({
+export const variantSegmentSchema = SegmentScalarSchema.pick({ ...selectSegmentForCustomer, deletedAt: true }).extend({
   featureFlagVariantId: z.string().nullable(),
   members: z.number().int().nonnegative(),
 });

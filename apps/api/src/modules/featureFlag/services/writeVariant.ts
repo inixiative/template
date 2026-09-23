@@ -167,9 +167,14 @@ export const updateVariant = async (
 ): Promise<FeatureFlagVariant> => {
   const { segmentId, internalSegment, sample, ...columns } = write;
   assertOneAudience({ segmentId, internalSegment, sample });
+  const next = { ...variant, ...columns } as FeatureFlagVariant;
   return db.txn(async () => {
-    const nextSegmentId = await audienceFor(flag, variant, { segmentId, internalSegment, sample });
+    const nextSegmentId = await audienceFor(flag, next, { segmentId, internalSegment, sample });
     await detachInternal(variant, nextSegmentId);
+    if (nextSegmentId === undefined && columns.label !== undefined && columns.label !== variant.label) {
+      const internal = await ownInternal(variant);
+      if (internal) await db.segment.update({ where: { id: internal.id }, data: { name: internalName(flag, next) } });
+    }
     return db.featureFlagVariant.update({
       where: { id: variant.id },
       data: {

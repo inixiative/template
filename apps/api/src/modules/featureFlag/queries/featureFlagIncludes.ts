@@ -9,7 +9,12 @@ import { selectSegmentForCustomer } from '#/modules/segment/queries/segmentInclu
 
 export const includeVariantSegment = {
   segment: {
-    select: { ...selectSegmentForCustomer, featureFlagVariantId: true, _count: { select: { members: true } } },
+    select: {
+      ...selectSegmentForCustomer,
+      featureFlagVariantId: true,
+      deletedAt: true,
+      _count: { select: { members: true } },
+    },
   },
 } as const satisfies Prisma.FeatureFlagVariantInclude;
 
