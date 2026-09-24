@@ -12,7 +12,7 @@ import type {
   SpaceReadManySegmentMembershipsResponse,
   SpaceReadManySegmentsResponse,
 } from '@template/sdk';
-import { Card, CardContent, CardHeader, CardTitle, Table } from '@template/ui/components';
+import { Page, Table } from '@template/ui/components';
 import { useQuery } from '@template/ui/hooks';
 import { segmentContextQueries } from '@template/ui/lib/segmentContextQueries';
 import { useAppStore } from '@template/ui/store';
@@ -91,39 +91,42 @@ export const SegmentsPage = ({ view }: { view: 'owned' | 'memberships' }) => {
     enabled: view === 'memberships',
   });
 
-  if (view === 'owned' ? owned.isLoading : memberships.isLoading) {
-    return <div className="p-8">Loading...</div>;
-  }
+  const isLoading = view === 'owned' ? owned.isLoading : memberships.isLoading;
 
   return (
-    <div className="p-8 space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>{view === 'owned' ? 'Segments you own' : 'Segments you belong to'}</CardTitle>
-          <p className="text-sm text-muted-foreground mt-1">
-            {view === 'owned'
-              ? 'Named sets of your customers, computed once or continuously'
-              : 'Where a provider has placed you as their customer'}
-          </p>
-        </CardHeader>
-        <CardContent>
-          {view === 'owned' ? (
-            <Table
-              columns={ownedColumns}
-              data={owned.data?.data ?? []}
-              keyExtractor={(segment) => segment.id}
-              emptyMessage="No segments yet"
-            />
-          ) : (
-            <Table
-              columns={membershipColumns}
-              data={memberships.data?.data ?? []}
-              keyExtractor={(membership) => membership.id}
-              emptyMessage="Not a member of any segment"
-            />
-          )}
-        </CardContent>
-      </Card>
-    </div>
+    <Page
+      title={view === 'owned' ? 'Segments you own' : 'Segments you belong to'}
+      description={
+        view === 'owned'
+          ? 'Named sets of your customers, computed once or continuously'
+          : 'Where a provider has placed you as their customer'
+      }
+    >
+      {isLoading ? (
+        <div className="h-40 animate-pulse rounded-xl bg-muted/50" />
+      ) : view === 'owned' ? (
+        <Table
+          columns={ownedColumns}
+          data={owned.data?.data ?? []}
+          keyExtractor={(segment) => segment.id}
+          emptyMessage="No segments yet"
+          empty={{
+            icon: 'lucide:filter',
+            description: 'Segments you define will be listed here along with their rule status.',
+          }}
+        />
+      ) : (
+        <Table
+          columns={membershipColumns}
+          data={memberships.data?.data ?? []}
+          keyExtractor={(membership) => membership.id}
+          emptyMessage="Not a member of any segment"
+          empty={{
+            icon: 'lucide:users-round',
+            description: 'When a provider adds you to one of their segments, it will show up here.',
+          }}
+        />
+      )}
+    </Page>
   );
 };

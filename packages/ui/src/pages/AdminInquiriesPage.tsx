@@ -11,7 +11,7 @@ import {
   type InquiryReceivedItem,
   type InquirySentItem,
 } from '@template/sdk';
-import { Badge, Card, CardContent, CardHeader, CardTitle, Table } from '@template/ui/components';
+import { Badge, EmptyState, Page, Table } from '@template/ui/components';
 import { InquirySourceControls, InquiryTargetControls } from '@template/ui/components/inquiries';
 import { useQuery } from '@template/ui/hooks';
 import { apiQuery } from '@template/ui/lib/apiQuery';
@@ -68,63 +68,67 @@ export const AdminInquiriesPage = ({ view, filters }: AdminInquiriesPageProps) =
       <option value="">All statuses</option>
       <option value="draft">Draft</option>
       <option value="sent">Sent</option>
-      <option value="changesRequested">Changes Requested</option>
+      <option value="changesRequested">Changes requested</option>
       <option value="approved">Approved</option>
       <option value="denied">Denied</option>
       <option value="canceled">Canceled</option>
     </select>
   );
 
-  if (isLoading) return <div className="p-8">Loading...</div>;
-
   return (
-    <div className="p-8 space-y-6">
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0">
-          <CardTitle>{view === 'platform' ? 'Platform Inquiries' : 'All Inquiries'}</CardTitle>
-          {statusDropdown}
-        </CardHeader>
-        <CardContent>
-          {view === 'all' ? (
-            <AdminAllInquiryTable inquiries={inquiries} />
-          ) : (
-            <Table
-              columns={[
-                { key: 'type', label: 'Type', render: (inq: Inquiry) => INQUIRY_TYPE_LABELS[inq.type] },
-                {
-                  key: 'status',
-                  label: 'Status',
-                  render: (inq: Inquiry) => <StatusBadge inq={inq} />,
-                },
-                {
-                  key: 'source',
-                  label: 'Source',
-                  render: (inq: Inquiry) => actorLabel(inq, 'source'),
-                },
-                {
-                  key: 'target',
-                  label: 'Target',
-                  render: (inq: Inquiry) => actorLabel(inq, 'target'),
-                },
-                {
-                  key: 'sentAt',
-                  label: 'Sent',
-                  render: (inq: Inquiry) => (inq.sentAt ? new Date(inq.sentAt).toLocaleDateString() : '—'),
-                },
-                {
-                  key: 'expiresAt',
-                  label: 'Expires',
-                  render: (inq: Inquiry) => (inq.expiresAt ? new Date(inq.expiresAt).toLocaleDateString() : '—'),
-                },
-              ]}
-              data={inquiries}
-              keyExtractor={(inq) => inq.id}
-              emptyMessage="No platform inquiries"
-            />
-          )}
-        </CardContent>
-      </Card>
-    </div>
+    <Page
+      title={view === 'platform' ? 'Platform inquiries' : 'All inquiries'}
+      description={
+        view === 'platform'
+          ? 'Requests addressed to the platform that need an admin decision.'
+          : 'Every inquiry across the platform, with controls for both sides.'
+      }
+      actions={statusDropdown}
+    >
+      {isLoading ? (
+        <div className="h-40 animate-pulse rounded-xl bg-muted/50" />
+      ) : view === 'all' ? (
+        <AdminAllInquiryTable inquiries={inquiries} />
+      ) : (
+        <Table
+          columns={[
+            { key: 'type', label: 'Type', render: (inq: Inquiry) => INQUIRY_TYPE_LABELS[inq.type] },
+            {
+              key: 'status',
+              label: 'Status',
+              render: (inq: Inquiry) => <StatusBadge inq={inq} />,
+            },
+            {
+              key: 'source',
+              label: 'Source',
+              render: (inq: Inquiry) => actorLabel(inq, 'source'),
+            },
+            {
+              key: 'target',
+              label: 'Target',
+              render: (inq: Inquiry) => actorLabel(inq, 'target'),
+            },
+            {
+              key: 'sentAt',
+              label: 'Sent',
+              render: (inq: Inquiry) => (inq.sentAt ? new Date(inq.sentAt).toLocaleDateString() : '—'),
+            },
+            {
+              key: 'expiresAt',
+              label: 'Expires',
+              render: (inq: Inquiry) => (inq.expiresAt ? new Date(inq.expiresAt).toLocaleDateString() : '—'),
+            },
+          ]}
+          data={inquiries}
+          keyExtractor={(inq) => inq.id}
+          emptyMessage="No platform inquiries"
+          empty={{
+            icon: 'lucide:inbox',
+            description: 'Requests that need platform approval will show up here.',
+          }}
+        />
+      )}
+    </Page>
   );
 };
 
@@ -154,16 +158,26 @@ const StatusBadge = ({ inq }: { inq: Inquiry }) => {
 
 const AdminAllInquiryTable = ({ inquiries }: { inquiries: Inquiry[] }) => {
   if (inquiries.length === 0) {
-    return <div className="text-center py-8 text-muted-foreground">No inquiries</div>;
+    return (
+      <EmptyState
+        icon="lucide:inbox"
+        title="No inquiries"
+        description="Inquiries sent between users, organizations and spaces will appear here."
+        className="rounded-xl border border-dashed bg-muted/30"
+      />
+    );
   }
 
   return (
-    <div className="border rounded-lg overflow-hidden">
+    <div className="border rounded-xl overflow-hidden bg-card">
       <table className="w-full">
-        <thead className="bg-muted/50 border-b">
+        <thead className="bg-muted/60 border-b">
           <tr>
             {['Type', 'Status', 'Actor', 'Sent', 'Expires', ''].map((h) => (
-              <th key={h} className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">
+              <th
+                key={h}
+                className="text-left px-4 py-2.5 text-xs font-medium uppercase tracking-wide text-muted-foreground"
+              >
                 {h}
               </th>
             ))}
@@ -189,7 +203,7 @@ const AdminAllInquiryTable = ({ inquiries }: { inquiries: Inquiry[] }) => {
           return (
             // group on tbody so both rows highlight together on hover
             <tbody key={inq.id} className="group border-b last:border-b-0">
-              <tr className="group-hover:bg-muted/30 transition-colors">
+              <tr className="group-hover:bg-muted/40 transition-colors">
                 <td rowSpan={2} className="px-4 py-3 text-sm align-middle">
                   {INQUIRY_TYPE_LABELS[inq.type] ?? inq.type}
                 </td>
@@ -210,7 +224,7 @@ const AdminAllInquiryTable = ({ inquiries }: { inquiries: Inquiry[] }) => {
                   <InquirySourceControls inquiry={inq as unknown as InquirySentItem} />
                 </td>
               </tr>
-              <tr className="group-hover:bg-muted/30 transition-colors">
+              <tr className="group-hover:bg-muted/40 transition-colors">
                 <td className="px-4 pb-3 pt-1 text-sm">
                   <span className="text-xs text-muted-foreground mr-1">↓</span>
                   {targetNode}
