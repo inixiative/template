@@ -36,10 +36,19 @@ export const withEnv = async <T>(
   }
 };
 
-export const wrapEnvWithOverrides = <T extends object>(target: T): T =>
+export type EnvOverrideParser = (key: string, override: string | undefined, current: unknown) => unknown;
+
+const passOverrideThrough: EnvOverrideParser = (_key, override) => override;
+
+export const wrapEnvWithOverrides = <T extends object>(
+  target: T,
+  parseOverride: EnvOverrideParser = passOverrideThrough,
+): T =>
   new Proxy(target, {
     get(t, prop, receiver) {
-      if (typeof prop === 'string' && prop in envOverrides) return envOverrides[prop];
+      if (typeof prop === 'string' && prop in envOverrides) {
+        return parseOverride(prop, envOverrides[prop], Reflect.get(t, prop, receiver));
+      }
       return Reflect.get(t, prop, receiver);
     },
   });

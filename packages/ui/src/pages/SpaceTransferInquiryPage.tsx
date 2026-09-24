@@ -6,7 +6,7 @@
  */
 import type { HydratedRecord } from '@template/db';
 import { spaceCreateInquiry, spaceSentManyInquiries, spaceSentManyInquiriesQueryKey } from '@template/sdk';
-import { Badge, Button, Card, CardContent, CardHeader, CardTitle } from '@template/ui/components';
+import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Page } from '@template/ui/components';
 import { InquirySourceControls } from '@template/ui/components/inquiries';
 import { useCreateInquiryMutation, useQuery } from '@template/ui/hooks';
 import { checkPermission } from '@template/ui/hooks/usePermission';
@@ -78,16 +78,17 @@ export const SpaceTransferInquiryPage = () => {
     setTargetOrgSlug('');
   };
 
-  if (isLoading) {
-    return <div className="p-8">Loading...</div>;
-  }
-
   return (
-    <div className="p-8 space-y-6">
-      {activeInquiry ? (
+    <Page
+      title="Transfer space"
+      description="Request to transfer this space to another organization. The target organization must approve the transfer."
+    >
+      {isLoading ? (
+        <div className="h-40 animate-pulse rounded-xl bg-muted/50" />
+      ) : activeInquiry ? (
         <Card>
           <CardHeader>
-            <CardTitle>Transfer In Progress</CardTitle>
+            <CardTitle>Transfer in progress</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center gap-3">
@@ -98,7 +99,7 @@ export const SpaceTransferInquiryPage = () => {
             </div>
             {activeInquiry.targetOrganization && (
               <div>
-                <p className="text-sm text-muted-foreground">Target Organization</p>
+                <p className="text-sm text-muted-foreground">Target organization</p>
                 <p className="text-sm font-medium">{activeInquiry.targetOrganization.name}</p>
               </div>
             )}
@@ -108,15 +109,12 @@ export const SpaceTransferInquiryPage = () => {
       ) : (
         <Card>
           <CardHeader>
-            <CardTitle>Transfer Space</CardTitle>
+            <CardTitle>New transfer request</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Request to transfer this space to another organization. The target organization must approve the transfer.
-            </p>
             <div className="space-y-2">
               <label className="text-sm font-medium" htmlFor="target-org-slug">
-                Target Organization Slug
+                Target organization slug
               </label>
               <input
                 id="target-org-slug"
@@ -132,11 +130,11 @@ export const SpaceTransferInquiryPage = () => {
               onClick={handleSubmit}
               disabled={createMutation.isPending || !targetOrgSlug.trim()}
             >
-              Request Transfer
+              Request transfer
             </Button>
           </CardContent>
         </Card>
       )}
-    </div>
+    </Page>
   );
 };

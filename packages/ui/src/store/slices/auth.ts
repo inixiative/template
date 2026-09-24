@@ -122,7 +122,7 @@ export const createAuthSlice: StateCreator<AppStore, [], [], AuthSlice> = (set, 
           const { error } = await client.signOut({
             fetchOptions: { headers: token ? { Authorization: `Bearer ${token}` } : {} },
           });
-          if (error) throw new Error(error.message || 'Sign out failed');
+          if (error) throw new Error(error.message || error.statusText);
         } finally {
           clearLocalAuth();
           get().navigation.navigate?.({ to: '/login' });

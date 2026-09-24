@@ -5,6 +5,7 @@
  * @uses none
  */
 import { Icon } from '@iconify/react';
+import { EmptyState, type EmptyStateProps } from '@template/ui/components/primitives/EmptyState';
 import { Pagination, type PaginationProps } from '@template/ui/components/primitives/Pagination';
 import { useInfiniteScrollTrigger } from '@template/ui/hooks/useInfiniteScrollTrigger';
 import { cn } from '@template/ui/lib/utils';
@@ -31,6 +32,7 @@ export type TableProps<T> = {
   keyExtractor: (item: T) => string;
   onRowClick?: (item: T) => void;
   emptyMessage?: string;
+  empty?: Omit<EmptyStateProps, 'show' | 'className' | 'title'> & { title?: string };
   show?: boolean | (() => boolean);
   pagination?: PaginationProps;
   infiniteScroll?: InfiniteScrollProps;
@@ -46,6 +48,7 @@ export const Table = <T,>({
   keyExtractor,
   onRowClick,
   emptyMessage,
+  empty,
   show = true,
   pagination,
   infiniteScroll,
@@ -66,7 +69,13 @@ export const Table = <T,>({
   if (!shouldShow) return null;
 
   if (data.length === 0 && !infiniteScroll?.isLoading) {
-    return <div className="text-center py-8 text-muted-foreground">{emptyMessage || 'No data available'}</div>;
+    return (
+      <EmptyState
+        {...empty}
+        title={empty?.title ?? emptyMessage ?? 'Nothing here yet'}
+        className="rounded-xl border border-dashed bg-muted/30"
+      />
+    );
   }
 
   const isViewport = maxHeight != null;
@@ -75,14 +84,17 @@ export const Table = <T,>({
     <div className={cn('space-y-4', className)} data-section={sectionId}>
       <div
         ref={isViewport ? scrollRef : undefined}
-        className="border rounded-lg overflow-hidden"
+        className="border rounded-xl overflow-hidden bg-card"
         style={isViewport ? { maxHeight, overflow: 'auto' } : undefined}
       >
         <table className="w-full" style={isViewport ? { tableLayout: 'fixed' } : undefined}>
-          <thead className={cn('bg-muted border-b', isViewport && 'sticky top-0 z-10')}>
+          <thead className={cn('bg-muted/60 border-b', isViewport && 'sticky top-0 z-10')}>
             <tr>
               {columns.map((column) => (
-                <th key={column.key} className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">
+                <th
+                  key={column.key}
+                  className="text-left px-4 py-2.5 text-xs font-medium uppercase tracking-wide text-muted-foreground"
+                >
                   {column.label}
                 </th>
               ))}
@@ -93,7 +105,7 @@ export const Table = <T,>({
               <tr
                 key={keyExtractor(item)}
                 data-key={keyExtractor(item)}
-                className={cn('hover:bg-muted/30 transition-colors', onRowClick && 'cursor-pointer')}
+                className={cn('transition-colors hover:bg-muted/40', onRowClick && 'cursor-pointer')}
                 onClick={onRowClick ? () => onRowClick(item) : undefined}
               >
                 {columns.map((column) => (
@@ -114,7 +126,7 @@ export const Table = <T,>({
             <div ref={sentinelRef} aria-hidden="true" />
             {infiniteScroll.isLoading && (
               <div className="flex items-center justify-center py-4 text-muted-foreground">
-                <Icon icon="lucide:loader2" className="h-4 w-4 animate-spin mr-2" />
+                <Icon icon="lucide:loader-2" className="h-4 w-4 animate-spin mr-2" />
                 <span className="text-sm">Loading more...</span>
               </div>
             )}

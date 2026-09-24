@@ -57,3 +57,14 @@ export const initGracefulShutdown = (
 export const isShutdownInProgress = (): boolean => {
   return isShuttingDown;
 };
+
+const SHUTDOWN_POLL_MS = 250;
+
+// Waits `ms`, but returns as soon as shutdown begins — a retry backoff must not outlive the
+// shutdown timeout and leave its work unfinished when the process is force-exited.
+export const sleepUnlessShuttingDown = async (ms: number): Promise<void> => {
+  const deadline = Date.now() + ms;
+  while (!isShuttingDown && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, Math.min(SHUTDOWN_POLL_MS, deadline - Date.now())));
+  }
+};

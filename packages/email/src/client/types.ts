@@ -16,6 +16,7 @@ export type SendEmailOptions = {
   tags?: string[];
   metadata?: Record<string, string>;
   headers?: Record<string, string>;
+  idempotencyKey?: string;
 };
 
 export type SendEmailResult = {

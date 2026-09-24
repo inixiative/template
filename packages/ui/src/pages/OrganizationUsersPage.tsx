@@ -16,7 +16,7 @@ import {
   organizationReadManyUsersQueryKey,
   organizationUserDelete,
 } from '@template/sdk';
-import { Button, Card, CardContent, CardHeader, CardTitle, Table } from '@template/ui/components';
+import { Button, Page, Table } from '@template/ui/components';
 import { InviteUserModal } from '@template/ui/components/users/InviteUserModal';
 import { createOptimisticListTarget, useOptimisticMutation, useQuery } from '@template/ui/hooks';
 import { checkPermission } from '@template/ui/hooks/usePermission';
@@ -84,7 +84,7 @@ export const OrganizationUsersPage = ({ organizationId }: OrganizationUsersPageP
     {
       key: 'user.name',
       label: 'Name',
-      render: (orgUser: OrganizationUser) => orgUser.name || 'N/A',
+      render: (orgUser: OrganizationUser) => <span className="font-medium">{orgUser.name || 'N/A'}</span>,
     },
     {
       key: 'user.email',
@@ -115,7 +115,7 @@ export const OrganizationUsersPage = ({ organizationId }: OrganizationUsersPageP
               onClick={() => deleteMutation.mutate({ path: { id: orgUser.id } })}
               show={checkPermission(permissions, 'organizationUser', orgUserRecord, 'manage')}
             >
-              <Icon icon="lucide:trash2" className="h-4 w-4 text-destructive" />
+              <Icon icon="lucide:trash-2" className="h-4 w-4 text-destructive" />
             </Button>
           </div>
         );
@@ -138,34 +138,37 @@ export const OrganizationUsersPage = ({ organizationId }: OrganizationUsersPageP
 
   const _organization = tenant.context.organization;
 
-  if (isLoading) {
-    return <div className="p-8">Loading...</div>;
-  }
-
   return (
     <>
-      <div className="p-8 space-y-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0">
-            <div>
-              <CardTitle>Organization Users</CardTitle>
-              <p className="text-sm text-muted-foreground mt-1">Manage users and their roles in this organization</p>
-            </div>
-            <Button onClick={() => setIsInviteModalOpen(true)} show={inviteRoles.length > 0}>
-              <Icon icon="lucide:user-plus" className="h-4 w-4 mr-2" />
-              Invite User
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <Table
-              columns={columns}
-              data={users}
-              keyExtractor={(user) => user.id}
-              emptyMessage="No users in this organization yet"
-            />
-          </CardContent>
-        </Card>
-      </div>
+      <Page
+        title="Members"
+        description="Manage who belongs to this organization and the role each person has."
+        actions={
+          <Button onClick={() => setIsInviteModalOpen(true)} show={inviteRoles.length > 0}>
+            <Icon icon="lucide:user-plus" className="h-4 w-4 mr-2" />
+            Invite member
+          </Button>
+        }
+      >
+        {isLoading ? (
+          <div className="h-40 animate-pulse rounded-xl bg-muted/50" />
+        ) : (
+          <Table
+            columns={columns}
+            data={users}
+            keyExtractor={(user) => user.id}
+            emptyMessage="No users in this organization yet"
+            empty={{
+              icon: 'lucide:users',
+              description: 'Invite people to collaborate in this organization.',
+              action:
+                inviteRoles.length > 0
+                  ? { label: 'Invite member', onClick: () => setIsInviteModalOpen(true) }
+                  : undefined,
+            }}
+          />
+        )}
+      </Page>
 
       <InviteUserModal
         isOpen={isInviteModalOpen}

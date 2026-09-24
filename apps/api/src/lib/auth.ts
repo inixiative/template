@@ -9,6 +9,7 @@ import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { bearer } from 'better-auth/plugins';
 import { emitAppEvent } from '#/appEvents/emit';
+import { oauthHandoffPlugins } from '#/lib/auth/oauthHandoffPlugins';
 import { getAllowedOrigins } from '#/middleware/corsMiddleware';
 
 export const auth = betterAuth({
@@ -67,9 +68,12 @@ export const auth = betterAuth({
     },
   },
 
-  plugins: [bearer()],
+  plugins: [bearer(), ...oauthHandoffPlugins()],
 
   trustedOrigins: getAllowedOrigins(),
+
+  // Failures before the flow's own errorCallbackURL is known (e.g. state_mismatch) land on web login, not the API.
+  onAPIError: process.env.WEB_URL ? { errorURL: `${process.env.WEB_URL}/login` } : undefined,
 
   secondaryStorage: {
     get: async (key) => {
@@ -81,6 +85,10 @@ export const auth = betterAuth({
     },
     delete: async (key) => {
       await getRedisClient().del(`${redisNamespace.session}:${key}`);
+    },
+    getAndDelete: async (key) => {
+      const value = await getRedisClient().getdel(`${redisNamespace.session}:${key}`);
+      return value ? JSON.parse(value) : null;
     },
   },
 });

@@ -3,6 +3,7 @@ export { ConcurrencyType, concurrencyLimits, getConcurrency } from './concurrenc
 export { containsAny } from './containsAny';
 export { type Environment, isLocal, isPR, isProd, isStaging, isTest } from './env';
 export {
+  type EnvOverrideParser,
   installEnvOverrideProxy,
   resetEnvOverrides,
   setEnvOverride,

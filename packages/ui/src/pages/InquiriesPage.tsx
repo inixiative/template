@@ -5,7 +5,7 @@
  * @uses primitive:sdk
  */
 import type { InquiryReceivedItem, InquirySentItem } from '@template/sdk';
-import { Badge, Card, CardContent, CardHeader, CardTitle, Table } from '@template/ui/components';
+import { Badge, Page, Table } from '@template/ui/components';
 import { InquirySourceControls, InquiryTargetControls } from '@template/ui/components/inquiries';
 import { useQuery } from '@template/ui/hooks';
 import { receivedInquiryContextQueries, sentInquiryContextQueries } from '@template/ui/lib/inquiries/contextQueries';
@@ -71,13 +71,14 @@ export const InquiriesPage = ({ direction, filters, title, emptyMessage }: Inqui
   const sentQuery = useQuery({ ...sentSlot, enabled: direction === 'sent' });
   const receivedQuery = useQuery({ ...receivedSlot, enabled: direction === 'received' });
 
-  const data = direction === 'sent' ? sentQuery.data : receivedQuery.data;
+  const activeQuery = direction === 'sent' ? sentQuery : receivedQuery;
+  const data = activeQuery.data;
   const inquiries = (data?.data ?? []) as Row[];
 
   // Derive page title: registry label for single-type filter, else prop title, else default
   const singleType = filters?.types?.length === 1 ? filters.types[0] : undefined;
   const registryLabel = singleType ? getInquiryInterface(singleType)?.label : undefined;
-  const pageTitle = title ?? registryLabel ?? (direction === 'sent' ? 'Sent Inquiries' : 'Received Inquiries');
+  const pageTitle = title ?? registryLabel ?? (direction === 'sent' ? 'Sent inquiries' : 'Received inquiries');
 
   const columns = [
     {
@@ -145,48 +146,61 @@ export const InquiriesPage = ({ direction, filters, title, emptyMessage }: Inqui
   const defaultEmptyMessage = `No ${direction} inquiries`;
 
   return (
-    <div className="p-8 space-y-6">
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0">
-          <CardTitle>{pageTitle}</CardTitle>
-          <div className="flex items-center gap-3">
-            {!filters?.statuses && (
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as InquiryStatus | '')}
-                className="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              >
-                <option value="">All statuses</option>
-                <option value="draft">Draft</option>
-                <option value="sent">Sent</option>
-                <option value="changesRequested">Changes Requested</option>
-                <option value="approved">Approved</option>
-                <option value="denied">Denied</option>
-                <option value="canceled">Canceled</option>
-              </select>
-            )}
-            {filters?.includeExpired === undefined && (
-              <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={hideExpired}
-                  onChange={(e) => setHideExpired(e.target.checked)}
-                  className="h-4 w-4"
-                />
-                Hide expired
-              </label>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent>
-          <Table
-            columns={columns}
-            data={inquiries}
-            keyExtractor={(inq) => inq.id}
-            emptyMessage={emptyMessage ?? defaultEmptyMessage}
-          />
-        </CardContent>
-      </Card>
-    </div>
+    <Page
+      title={pageTitle}
+      description={
+        direction === 'sent'
+          ? 'Requests you have sent and where each one stands.'
+          : 'Requests sent to you that may need your response.'
+      }
+      actions={
+        <>
+          {!filters?.statuses && (
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as InquiryStatus | '')}
+              className="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <option value="">All statuses</option>
+              <option value="draft">Draft</option>
+              <option value="sent">Sent</option>
+              <option value="changesRequested">Changes requested</option>
+              <option value="approved">Approved</option>
+              <option value="denied">Denied</option>
+              <option value="canceled">Canceled</option>
+            </select>
+          )}
+          {filters?.includeExpired === undefined && (
+            <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={hideExpired}
+                onChange={(e) => setHideExpired(e.target.checked)}
+                className="h-4 w-4"
+              />
+              Hide expired
+            </label>
+          )}
+        </>
+      }
+    >
+      {activeQuery.isLoading ? (
+        <div className="h-40 animate-pulse rounded-xl bg-muted/50" />
+      ) : (
+        <Table
+          columns={columns}
+          data={inquiries}
+          keyExtractor={(inq) => inq.id}
+          emptyMessage={emptyMessage ?? defaultEmptyMessage}
+          empty={{
+            icon: direction === 'sent' ? 'lucide:send' : 'lucide:inbox',
+            description:
+              direction === 'sent'
+                ? 'Requests you send will be tracked here until they are resolved.'
+                : 'Requests addressed to you will appear here for review.',
+          }}
+        />
+      )}
+    </Page>
   );
 };

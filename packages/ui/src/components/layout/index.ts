@@ -6,6 +6,7 @@ export * from './Header';
 export * from './MasterDetailLayout';
 export * from './Modal';
 export * from './navigationTypes';
+export * from './Page';
 export * from './ResponsiveDrawer';
 export * from './Sidebar';
 export * from './UserMenu';

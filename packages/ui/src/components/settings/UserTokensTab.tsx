@@ -56,7 +56,7 @@ export const UserTokensTab = () => {
               onClick={() => handleDelete(token.id)}
               show={checkPermission(permissions, 'token', tokenRecord, 'leave')}
             >
-              <Icon icon="lucide:trash2" className="h-4 w-4" />
+              <Icon icon="lucide:trash-2" className="h-4 w-4" />
             </Button>
           </div>
         );

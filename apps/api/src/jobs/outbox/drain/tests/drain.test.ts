@@ -1,9 +1,13 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, spyOn } from 'bun:test';
-import { claimLane, getJobSupersededBy, laneKey, redisNamespace, watchLane } from '@template/db';
+import { claimLane, getJobSupersededBy, laneKey, watchLane } from '@template/db';
 import { cleanupTouchedTables, createJobOutbox } from '@template/db/test';
 import { setEnvOverride } from '@template/shared/utils';
+import { SLOW_LANE_PRIORITY } from '#/jobs/lanePriority';
 import {
   flushOutbox,
+  hasPendingFastSpills,
+  hasPendingSlowSpills,
+  hasPendingSpills,
   isOverflowing,
   type OutboxRow,
   queueDepth,
@@ -11,19 +15,21 @@ import {
   spillToOutbox,
   tripIfFull,
 } from '#/jobs/outbox';
+import { flagKey } from '#/jobs/outbox/config';
 import { runDrainOutboxPass } from '#/jobs/outbox/drain';
 import { flushQueue } from '#/jobs/outbox/mutex';
 import { queue } from '#/jobs/queue';
-import { JobType, type WorkerContext } from '#/jobs/types';
+import { JobLane, JobType, type WorkerContext } from '#/jobs/types';
 import { createTestWorker } from '#tests/createTestWorker';
 
-const FLAG_KEY = `${redisNamespace.job}:overflow`;
+const FLAG_KEY = flagKey(JobLane.fast);
+const SLOW_FLAG_KEY = flagKey(JobLane.slow);
 
 const fanRow = (jobId: string): OutboxRow => ({
   handlerName: 'sendWebhook',
   jobId,
   dedupeKey: null,
-  data: { type: JobType.adhoc, payload: { jobId } },
+  data: { type: JobType.adhoc, lane: JobLane.fast, payload: { jobId } },
   options: {},
 });
 
@@ -49,7 +55,7 @@ describe('jobs overflow buffer (spill + drain)', () => {
 
   // ioredis-mock can't run BullMQ's Lua scripts, so spy the queue boundary and drive the real
   // outbox logic against an in-memory job map. The overflow flag still uses the (mock) Redis.
-  const queued = new Map<string, { id: string; name: string; data: unknown }>();
+  const queued = new Map<string, { id: string; name: string; data: unknown; priority?: number }>();
   const poison = new Set<string>(); // handlerNames whose queue.add throws — drives the quarantine path
   let restoreQueueSpies = (): void => {};
 
@@ -59,17 +65,17 @@ describe('jobs overflow buffer (spill + drain)', () => {
     const add = spyOn(queue, 'add').mockImplementation((async (
       name: string,
       data: unknown,
-      opts?: { jobId?: string },
+      opts?: { jobId?: string; priority?: number },
     ) => {
       if (poison.has(name)) throw new Error(`poison handler: ${name}`);
       const id = opts?.jobId ?? `${name}-${queued.size}`;
-      if (!queued.has(id)) queued.set(id, { id, name, data });
+      if (!queued.has(id)) queued.set(id, { id, name, data, priority: opts?.priority });
       return { id };
     }) as never);
-    const counts = spyOn(queue, 'getJobCounts').mockImplementation((async () => ({
-      waiting: queued.size,
-      active: 0,
-    })) as never);
+    const counts = spyOn(queue, 'getJobCounts').mockImplementation((async () => {
+      const prioritized = [...queued.values()].filter((job) => job.priority).length;
+      return { waiting: queued.size - prioritized, prioritized, active: 0 };
+    }) as never);
     const getJob = spyOn(queue, 'getJob').mockImplementation((async (id: string) => queued.get(id)) as never);
     const getJobs = spyOn(queue, 'getJobs').mockImplementation((async () => [...queued.values()]) as never);
     restoreQueueSpies = () => {
@@ -113,7 +119,7 @@ describe('jobs overflow buffer (spill + drain)', () => {
       handlerName: 'cleanStaleData',
       jobId: `sup-${n}`,
       dedupeKey: 'lane-1',
-      data: { type: JobType.adhoc, payload: { n }, dedupeKey: 'lane-1' },
+      data: { type: JobType.adhoc, lane: JobLane.fast, payload: { n }, dedupeKey: 'lane-1' },
       options: {},
     });
 
@@ -131,7 +137,7 @@ describe('jobs overflow buffer (spill + drain)', () => {
       handlerName: 'cleanStaleData',
       jobId: `b-${n}`,
       dedupeKey: 'lane-batch',
-      data: { type: JobType.adhoc, payload: { n }, dedupeKey: 'lane-batch' },
+      data: { type: JobType.adhoc, lane: JobLane.fast, payload: { n }, dedupeKey: 'lane-batch' },
       options: {},
     });
 
@@ -190,7 +196,7 @@ describe('jobs overflow buffer (spill + drain)', () => {
       handlerName: 'recordAppEvent',
       jobId: 'older',
       dedupeKey: 'lane-displaced',
-      data: { type: JobType.adhoc, payload: {}, dedupeKey: 'lane-displaced' },
+      data: { type: JobType.adhoc, lane: JobLane.fast, payload: {}, dedupeKey: 'lane-displaced' },
       options: {},
     });
     await claimLane(lane, 'older'); // the spill-time claim
@@ -213,7 +219,7 @@ describe('jobs overflow buffer (spill + drain)', () => {
       handlerName: 'poisonHandler',
       jobId: 'p-lane',
       dedupeKey: 'lane-poison',
-      data: { type: JobType.adhoc, payload: {}, dedupeKey: 'lane-poison' },
+      data: { type: JobType.adhoc, lane: JobLane.fast, payload: {}, dedupeKey: 'lane-poison' },
       options: {},
     });
     await claimLane(lane, 'p-lane'); // the spill-time claim
@@ -256,7 +262,7 @@ describe('jobs overflow buffer (spill + drain)', () => {
       handlerName: 'poisonHandler',
       jobId: 'p1',
       dedupeKey: null,
-      data: { type: JobType.adhoc, payload: {} },
+      data: { type: JobType.adhoc, lane: JobLane.fast, payload: {} },
       options: {},
     });
     await spillToOutbox(fanRow('good'));
@@ -274,7 +280,11 @@ describe('jobs overflow buffer (spill + drain)', () => {
     setEnvOverride('JOBS_MAX_QUEUE_DEPTH', '3');
     await ctx.queue.redis.set(FLAG_KEY, String(Date.now()));
     await ctx.queue.add('sendWebhook', { type: JobType.adhoc, payload: {} }); // hold depth at low-water so the flag-clear branch doesn't reset
-    await createJobOutbox({ jobId: 'quarantined', data: { type: JobType.adhoc, payload: {} }, attempts: 5 });
+    await createJobOutbox({
+      jobId: 'quarantined',
+      data: { type: JobType.adhoc, lane: JobLane.fast, payload: {} },
+      attempts: 5,
+    });
     await spillToOutbox(fanRow('fresh'));
 
     await runDrainOutboxPass();
@@ -288,7 +298,11 @@ describe('jobs overflow buffer (spill + drain)', () => {
 
   it('resets quarantined rows and clears the flag on full recovery', async () => {
     await ctx.queue.redis.set(FLAG_KEY, String(Date.now()));
-    await createJobOutbox({ jobId: 'q-only', data: { type: JobType.adhoc, payload: {} }, attempts: 5 });
+    await createJobOutbox({
+      jobId: 'q-only',
+      data: { type: JobType.adhoc, lane: JobLane.fast, payload: {} },
+      attempts: 5,
+    });
 
     await runDrainOutboxPass();
 
@@ -316,11 +330,124 @@ describe('jobs overflow buffer (spill + drain)', () => {
       handlerName: 'cleanStaleData',
       jobId: 'taken',
       dedupeKey: 'fresh-lane',
-      data: { type: JobType.adhoc, payload: {}, dedupeKey: 'fresh-lane' },
+      data: { type: JobType.adhoc, lane: JobLane.fast, payload: {}, dedupeKey: 'fresh-lane' },
       options: {},
     };
 
     await expect(spillToOutbox(collide)).rejects.toThrow();
+  });
+
+  describe('lanes', () => {
+    const slowRow = (jobId: string): OutboxRow => ({
+      handlerName: 'sendWebhook',
+      jobId,
+      dedupeKey: null,
+      data: { type: JobType.adhoc, lane: JobLane.slow, payload: { jobId } },
+      options: {},
+    });
+
+    it('persists the lane column from the envelope', async () => {
+      await spillToOutbox(fanRow('lane-fast'));
+      await spillToOutbox(slowRow('lane-slow'));
+      const rows = await ctx.db.jobOutbox.findMany({ orderBy: { id: 'asc' } });
+      expect(rows.map((row) => [row.jobId, row.lane])).toEqual([
+        ['lane-fast', JobLane.fast],
+        ['lane-slow', JobLane.slow],
+      ]);
+    });
+
+    it('re-admits fast rows first and slow rows at the slow priority', async () => {
+      await spillToOutbox(slowRow('old-slow'));
+      await spillToOutbox(fanRow('new-fast'));
+
+      await runDrainOutboxPass();
+
+      expect([...queued.values()].map((job) => [job.id, job.priority])).toEqual([
+        ['new-fast', undefined],
+        ['old-slow', SLOW_LANE_PRIORITY],
+      ]);
+    });
+
+    it('fills the slow lane only up to its share of the depth budget', async () => {
+      setEnvOverride('JOBS_MAX_QUEUE_DEPTH', '10');
+      setEnvOverride('JOBS_SLOW_QUEUE_DEPTH_FRACTION', '0.3');
+      for (const id of ['s1', 's2', 's3', 's4', 's5']) await spillToOutbox(slowRow(id));
+
+      await runDrainOutboxPass();
+
+      expect([...queued.keys()]).toEqual(['s1', 's2', 's3']);
+      expect(await ctx.db.jobOutbox.count()).toBe(2);
+    });
+
+    it('gives slow rows only the budget left after fast rows', async () => {
+      setEnvOverride('JOBS_MAX_QUEUE_DEPTH', '4');
+      setEnvOverride('JOBS_SLOW_QUEUE_DEPTH_FRACTION', '1');
+      for (const id of ['f1', 'f2', 'f3']) await spillToOutbox(fanRow(id));
+      for (const id of ['s1', 's2']) await spillToOutbox(slowRow(id));
+
+      await runDrainOutboxPass();
+
+      expect([...queued.keys()]).toEqual(['f1', 'f2', 'f3', 's1']);
+    });
+
+    it('clears each lane flag independently once that lane is drained below its low-water', async () => {
+      setEnvOverride('JOBS_MAX_QUEUE_DEPTH', '10');
+      setEnvOverride('JOBS_SLOW_QUEUE_DEPTH_FRACTION', '0.5');
+      await ctx.queue.redis.set(FLAG_KEY, String(Date.now()));
+      await ctx.queue.redis.set(SLOW_FLAG_KEY, String(Date.now()));
+      for (const id of ['s1', 's2', 's3', 's4', 's5', 's6']) await spillToOutbox(slowRow(id));
+
+      await runDrainOutboxPass();
+
+      expect(await isOverflowing(JobLane.fast)).toBe(false);
+      expect(await isOverflowing(JobLane.slow)).toBe(true);
+      expect(await ctx.db.jobOutbox.count()).toBe(1);
+    });
+
+    it('resets quarantined rows only once no slow row is admittable either', async () => {
+      setEnvOverride('JOBS_MAX_QUEUE_DEPTH', '10');
+      setEnvOverride('JOBS_SLOW_QUEUE_DEPTH_FRACTION', '0.1');
+      await ctx.queue.add('sendWebhook', {}, { jobId: 'slow-in-queue', priority: SLOW_LANE_PRIORITY });
+      await createJobOutbox({
+        jobId: 'q',
+        lane: JobLane.fast,
+        data: { type: JobType.adhoc, payload: {} },
+        attempts: 5,
+      });
+      await spillToOutbox(slowRow('blocked'));
+
+      await runDrainOutboxPass();
+      expect((await ctx.db.jobOutbox.findFirst({ where: { jobId: 'q' } }))?.attempts).toBe(5);
+
+      await ctx.db.jobOutbox.deleteMany({ where: { jobId: 'blocked' } });
+      await runDrainOutboxPass();
+      expect((await ctx.db.jobOutbox.findFirst({ where: { jobId: 'q' } }))?.attempts).toBe(0);
+    });
+
+    it('tracks pending spills per lane', async () => {
+      setEnvOverride('JOBS_OUTBOX_FLUSH_MAX_ROWS', '100');
+      setEnvOverride('JOBS_OUTBOX_FLUSH_LINGER_MS', '60000');
+      const slow = spillToOutbox(slowRow('pending-slow'));
+      expect(hasPendingSlowSpills()).toBe(true);
+      expect(hasPendingFastSpills()).toBe(false);
+
+      const fast = spillToOutbox(fanRow('pending-fast'));
+      expect(hasPendingFastSpills()).toBe(true);
+
+      await flushOutbox();
+      await Promise.all([slow, fast]);
+      expect(hasPendingSpills()).toBe(false);
+    });
+
+    it('re-adds a stored invalid job id under a fresh one instead of quarantining it', async () => {
+      await createJobOutbox({ jobId: 'a:b:c:d', lane: JobLane.fast, data: { type: JobType.adhoc, payload: {} } });
+
+      await runDrainOutboxPass();
+
+      expect(await ctx.db.jobOutbox.count()).toBe(0);
+      expect([...queued.keys()]).toHaveLength(1);
+      expect([...queued.keys()][0]).not.toContain(':');
+    });
   });
 
   it('rejects spills accepted mid-drain when the shutdown flush gives up (no hung awaits)', async () => {

@@ -36,7 +36,7 @@ export type AvatarImageProps = React.ImgHTMLAttributes<HTMLImageElement>;
 export const AvatarImage = React.forwardRef<HTMLImageElement, AvatarImageProps>(({ className, alt, ...props }, ref) => {
   const [isError, setIsError] = React.useState(false);
 
-  if (isError) return null;
+  if (isError || !props.src) return null;
 
   return (
     <img

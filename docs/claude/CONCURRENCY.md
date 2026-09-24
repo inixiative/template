@@ -9,6 +9,7 @@ Mechanisms for coordinating async operations. Different concerns, different tool
 | Serialize writes to one resource (no interleaving) | `createSerializedQueue` | in-process |
 | Only one process owns this resource | `createLock` | cross-process (Redis) |
 | Newest job for a key wins; older ones bow out | `claimLane` / `watchLane` | cross-process (Redis) |
+| Background work yields to foreground work in one shared queue | job lanes (`withLanePriority`) | cross-process (BullMQ priority) |
 | Run a recurring beat without overlapping itself | `heartbeat` | in-process timer |
 
 Combine when needed: a per-resource Redis lock + a per-resource serialized queue is the canonical pair for "one instance owns this AND that instance serializes its own writes" — `createLock` to claim ownership, `createSerializedQueue` to order that owner's writes.
@@ -155,6 +156,12 @@ try {
 
 ---
 
+## Job Lanes (`withLanePriority`)
+
+`apps/api/src/jobs/lanePriority.ts`. Not a lock or a semaphore — an ordering. Slow jobs are added to the shared BullMQ queue at the lowest priority, and BullMQ always takes plain waiting jobs before prioritized ones, so background work only ever runs in slots foreground work isn't using. No slot is reserved; capacity stays shared. This backs the **fast/slow job lanes** — a different thing from the supersede lanes above, which decide *which* job for a key wins. See [JOBS.md § Fast and Slow Lanes](./JOBS.md#fast-and-slow-lanes).
+
+---
+
 ## Recurring Beat (`heartbeat`)
 
 `@template/shared/utils/heartbeat`. A self-managing timer that runs `beat` every `intervalMs`, scheduling the next tick only *after* the previous settles — a slow async beat never overlaps itself. Returns `stop()`; no trailing beat fires after stop. Rejections route to `onError` instead of becoming unhandled. In-process.
@@ -176,4 +183,4 @@ This is the primitive under both `createLock` (lease renewal) and `watchLane` (u
 ## Cross-references
 
 - [REDIS.md](./REDIS.md) — `createLock` details, namespace conventions
-- [JOBS.md](./JOBS.md) — BullMQ workers, supersede pattern (the consumer of `claimLane`/`watchLane`)
+- [JOBS.md](./JOBS.md) — BullMQ workers, supersede pattern (the consumer of `claimLane`/`watchLane`), fast/slow lanes

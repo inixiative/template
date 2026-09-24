@@ -11,8 +11,7 @@ import type {
   OrganizationReadManyTokensResponse,
   SpaceReadManyTokensResponse,
 } from '@template/sdk';
-import { Button, Table } from '@template/ui/components';
-import { DetailPanel, MasterDetailLayout } from '@template/ui/components/layout';
+import { Button, Page, Table } from '@template/ui/components';
 import { CreateTokenModal } from '@template/ui/components/settings/CreateTokenModal';
 import { createOptimisticListTarget, useOptimisticMutation, useQuery } from '@template/ui/hooks';
 import { tokenContextQueries } from '@template/ui/lib/tokenContextQueries';
@@ -85,7 +84,7 @@ export const TokensPage = () => {
       render: (item: Token) => (
         <div className="flex justify-end gap-2">
           <Button variant="ghost" size="sm" onClick={() => deleteMutation.mutate({ path: { id: item.id } })}>
-            <Icon icon="lucide:trash2" className="h-4 w-4 text-destructive" />
+            <Icon icon="lucide:trash-2" className="h-4 w-4 text-destructive" />
           </Button>
         </div>
       ),
@@ -97,41 +96,34 @@ export const TokensPage = () => {
     setIsModalOpen(false);
   };
 
-  if (isLoading) {
-    return <div className="p-8">Loading...</div>;
-  }
-
   return (
     <>
-      <MasterDetailLayout
-        detail={
-          <DetailPanel
-            header={
-              <div className="px-6 py-4 flex items-center justify-between border-b">
-                <div>
-                  <h1 className="text-2xl font-bold">API Tokens</h1>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Create and manage API tokens for programmatic access
-                  </p>
-                </div>
-                <Button onClick={() => setIsModalOpen(true)}>
-                  <Icon icon="lucide:plus" className="h-4 w-4 mr-2" />
-                  Create Token
-                </Button>
-              </div>
-            }
-          >
-            <div className="p-6">
-              <Table
-                columns={columns}
-                data={tokens}
-                keyExtractor={(item) => item.id}
-                emptyMessage="No API tokens created yet"
-              />
-            </div>
-          </DetailPanel>
+      <Page
+        title="API tokens"
+        description="Create and manage API tokens for programmatic access"
+        actions={
+          <Button onClick={() => setIsModalOpen(true)}>
+            <Icon icon="lucide:plus" className="h-4 w-4 mr-2" />
+            Create token
+          </Button>
         }
-      />
+      >
+        {isLoading ? (
+          <div className="h-40 animate-pulse rounded-xl bg-muted/50" />
+        ) : (
+          <Table
+            columns={columns}
+            data={tokens}
+            keyExtractor={(item) => item.id}
+            emptyMessage="No API tokens created yet"
+            empty={{
+              icon: 'lucide:key-round',
+              description: 'Tokens let scripts and integrations call the API on your behalf.',
+              action: { label: 'Create token', onClick: () => setIsModalOpen(true) },
+            }}
+          />
+        )}
+      </Page>
 
       <CreateTokenModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSubmit={handleCreate} />
     </>

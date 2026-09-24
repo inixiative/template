@@ -22,6 +22,7 @@ export type RouteArgs = Omit<RouteConfig, 'path' | 'method' | 'responses' | 'req
   query?: ZodSchema;
   responseSchema?: ZodResponseSchema;
   bodySchema?: ZodSchema;
+  bodyRequired?: boolean;
   sanitizeKeys?: readonly string[];
   skipId?: boolean;
   many?: boolean;

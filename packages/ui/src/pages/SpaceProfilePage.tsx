@@ -5,7 +5,7 @@
  * @uses primitive:sdk
  */
 import { type SpaceUpdateData, spaceProtected, spaceProtectedQueryKey, spaceUpdate } from '@template/sdk';
-import { DetailPanel, MasterDetailLayout } from '@template/ui/components/layout';
+import { Page } from '@template/ui/components';
 import { ProfileFormCard } from '@template/ui/components/settings';
 import { useOptimisticMutation, useQuery } from '@template/ui/hooks';
 import { apiMutation } from '@template/ui/lib/apiMutation';
@@ -56,34 +56,21 @@ export const SpaceProfilePage = () => {
     });
   };
 
-  if (isLoading) {
-    return <div className="p-8">Loading...</div>;
-  }
-
   return (
-    <MasterDetailLayout
-      detail={
-        <DetailPanel
-          header={
-            <div className="px-6 py-4 border-b">
-              <h1 className="text-2xl font-bold">Profile</h1>
-              <p className="text-sm text-muted-foreground mt-1">Manage your space settings and preferences</p>
-            </div>
-          }
-        >
-          <div className="p-6">
-            <ProfileFormCard
-              name={name}
-              onNameChange={setName}
-              slug={slug}
-              onSlugChange={setSlug}
-              showSlug
-              onSave={handleSave}
-              isSaving={updateMutation.isPending}
-            />
-          </div>
-        </DetailPanel>
-      }
-    />
+    <Page title="Profile" description="Manage your space settings and preferences">
+      {isLoading ? (
+        <div className="h-40 animate-pulse rounded-xl bg-muted/50" />
+      ) : (
+        <ProfileFormCard
+          name={name}
+          onNameChange={setName}
+          slug={slug}
+          onSlugChange={setSlug}
+          showSlug
+          onSave={handleSave}
+          isSaving={updateMutation.isPending}
+        />
+      )}
+    </Page>
   );
 };
