@@ -21,6 +21,7 @@
     "./generated/prismaMap": "./src/generated/prismaMap.gen.ts",
     "./lens": "./src/lens/index.ts",
     "./lens/*": "./src/lens/*.ts",
+    "./streams": "./src/streams/index.ts",
     "./prisma/seed": "./prisma/seed.ts",
     "./prisma/seeds": "./prisma/seeds/index.ts"
   },

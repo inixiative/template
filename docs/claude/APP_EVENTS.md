@@ -63,10 +63,17 @@ type EmailHandoff = {
   data: Record<string, unknown>;
 };
 
-type WSHandoff = {
-  target: { channels: string[] } | { userIds: string[] } | { streams: string[] };
+type WSMessageHandoff = {
+  target: { channels: string[] } | { userIds: string[] };
   message: { data: Record<string, unknown> };
 };
+
+type WSStreamAppendHandoff = {
+  target: { stream: string; userIds?: string[] };
+  append: { type: string; payload: unknown };
+};
+
+type WSHandoff = WSMessageHandoff | WSStreamAppendHandoff;
 
 type AppEventHandlerDefinition<T> = {
   email?: (data: T) => EmailHandoff[] | null;
@@ -103,20 +110,37 @@ websocket: (data) => [{
 }],
 ```
 
-`deliverWSHandoffs` sends the payload through `sendToChannel`, `sendToUser` or
-`appendToStream`. The frontend handles query-refetch hints and data-stream appends. New payload
-kinds require their own consumer and recovery design. Subscription and stream-open checks use
-the underlying authorized route; see [WEBSOCKETS.md](WEBSOCKETS.md).
+`deliverWSHandoffs` sends a message handoff through `sendToChannel` or `sendToUser`, and a
+stream handoff through `appendToStream`. The frontend handles query-refetch hints and
+data-stream actions. New payload kinds require their own consumer and recovery design.
+Subscription and stream-open checks use the underlying authorized route; see
+[WEBSOCKETS.md](WEBSOCKETS.md).
 
-Stream-targeted example, from the contact handlers. For a `{ streams }` target, `message.data`
-is the append payload itself; the transport wraps it in the data frame:
+Stream handoffs are never built by hand. `streamAppend` (`apps/api/src/appEvents/streamAppend.ts`)
+takes a shared stream definition, its params, an action type and a payload. The action type must
+be one the definition declares, the payload is typed by that action's schema and parsed with it
+before the handoff exists, and a `perRecipient` definition additionally requires the recipient
+`userIds`. From the contact handlers (the scaffolding example stream):
 
 ```typescript
-websocket: ({ contact }) => organizationContactsHandoffs(contact, { remove: contact.id }),
+websocket: ({ contact }) => organizationContactRemove(contact),
+
+// organizationContactRemove:
+streamAppend(organizationContactsStream, { id: contact.organizationId }, 'remove', {
+  id: contact.id,
+  updatedAt: contact.updatedAt.toISOString(),
+});
 ```
 
-An append goes to every connection holding the stream, and it has to match the shape of the
-route's response. See [WEBSOCKETS.md](WEBSOCKETS.md#data-streams).
+A `shared` stream's append goes to every connection holding the stream, so it has to match the
+shape of the route's response for every caller. `appendToStream` publishes each stream's appends
+through a per-stream `createSerializedQueue`, so one instance emits them in order. See
+[WEBSOCKETS.md](WEBSOCKETS.md#data-streams).
+
+Revoking access (membership, role or token removal) does not yet emit an app event that closes
+streams immediately; the periodic re-authorization in
+[WEBSOCKETS.md](WEBSOCKETS.md#authorization-and-re-authorization) closes them within one
+interval.
 
 Segments also publish member-side `customerRef.segmentsAdded` / `customerRef.segmentsRemoved`
 events. For User customers those target the user's sockets with a membership-query refetch.

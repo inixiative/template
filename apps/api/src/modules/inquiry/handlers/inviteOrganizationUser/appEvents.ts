@@ -4,7 +4,7 @@
  * @partOf feature:inquiry
  * @uses feature:tenancy
  */
-import { WS_CHANNELS, type WSEvent } from '@template/shared/ws';
+import { WS_CHANNELS, type WSQueryEvent } from '@template/shared/ws';
 import type { WSHandoff } from '#/appEvents/types';
 import type { InquiryAppEvents } from '#/modules/inquiry/handlers/types';
 
@@ -13,7 +13,7 @@ import type { InquiryAppEvents } from '#/modules/inquiry/handlers/types';
 // rides as the handoff's message payload.
 const refetchInquiry = (id: string): WSHandoff => {
   const key = { _id: 'inquiryRead', path: { id } };
-  const event: WSEvent = { category: 'query', action: 'refetch', key };
+  const event: WSQueryEvent = { category: 'query', action: 'refetch', key };
   return { target: { channels: [WS_CHANNELS.inquiryRead.name(id)] }, message: { data: event } };
 };
 

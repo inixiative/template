@@ -5,6 +5,7 @@
  * @uses primitive:requestContext, primitive:batch
  */
 import type { Context, MiddlewareHandler, Next } from 'hono';
+import { isSystemProbe } from '#/lib/utils/authProbe';
 import { organizationIdentity, principalIdentity, spaceIdentity } from '#/middleware/rateLimit/identities';
 import { rateLimitMax } from '#/middleware/rateLimit/limits';
 import { rateLimit } from '#/middleware/rateLimit/rateLimit';
@@ -25,5 +26,6 @@ const limiter = rateLimit([
 // transaction prepareRequest resolves from the batch registry is not.
 const isBatchSubRequest = (c: Context<AppEnv>): boolean => c.get('txn') !== undefined;
 
+// Server-initiated re-authorization probes spend no caller budget; client-driven probes and reads still do.
 export const apiRateLimit: MiddlewareHandler<AppEnv> = (c: Context<AppEnv>, next: Next) =>
-  isBatchSubRequest(c) ? next() : limiter(c, next);
+  isBatchSubRequest(c) || isSystemProbe(c) ? next() : limiter(c, next);

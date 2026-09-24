@@ -6,25 +6,29 @@
  */
 import { ContactScalarSchema } from '@template/db';
 import type { Contact } from '@template/db/generated/client/client';
-import { type ListStreamAppend, WS_CHANNELS } from '@template/shared/ws';
-import type { z } from 'zod';
+import { organizationContactsStream } from '@template/db/streams';
+import { toJsonWire } from '@template/shared/ws';
+import { streamAppend } from '#/appEvents/streamAppend';
 import type { WSHandoff } from '#/appEvents/types';
 
-export type OrganizationContactsAppend = ListStreamAppend<z.infer<typeof ContactScalarSchema>>;
+export const organizationContactUpsert = (contact: Contact): WSHandoff[] | null =>
+  contact.organizationId
+    ? [
+        streamAppend(
+          organizationContactsStream,
+          { id: contact.organizationId },
+          'upsert',
+          toJsonWire(ContactScalarSchema.parse(contact)),
+        ),
+      ]
+    : null;
 
-export const organizationContactsHandoffs = (
-  contact: Contact,
-  append: OrganizationContactsAppend,
-): WSHandoff[] | null => {
-  if (!contact.organizationId) return null;
-  return [
-    {
-      target: { streams: [WS_CHANNELS.organizationReadManyContacts.name(contact.organizationId)] },
-      message: { data: append },
-    },
-  ];
-};
-
-export const contactUpsertAppend = (contact: Contact): OrganizationContactsAppend => ({
-  upsert: ContactScalarSchema.parse(contact),
-});
+export const organizationContactRemove = (contact: Contact): WSHandoff[] | null =>
+  contact.organizationId
+    ? [
+        streamAppend(organizationContactsStream, { id: contact.organizationId }, 'remove', {
+          id: contact.id,
+          updatedAt: contact.updatedAt.toISOString(),
+        }),
+      ]
+    : null;

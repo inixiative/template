@@ -4,9 +4,10 @@
  * @partOf primitive:websockets
  * @uses none
  */
-import { dataFrame } from '#/ws/dataFrame';
+import { streamSnapshotFrame } from '#/ws/dataFrame';
 import { sendTo } from '#/ws/delivery';
 import { byId } from '#/ws/registry';
+import { rejectDataStream } from '#/ws/rejectDataStream';
 import { fetchStreamSnapshot } from '#/ws/streamSnapshot';
 import { subscribeToStream, unsubscribeFromStream } from '#/ws/streamSubscriptions';
 import type { WSSocket } from '#/ws/types';
@@ -18,20 +19,16 @@ export const openDataStream = async (ws: WSSocket, stream: string): Promise<void
   const held: string[] = [];
   ws.data.heldAppends.set(stream, held);
 
-  const snapshot = await fetchStreamSnapshot(ws.data.headers, stream).catch((error: unknown) => {
+  const read = await fetchStreamSnapshot(ws.data.headers, stream).catch((error: unknown) => {
     unsubscribeFromStream(ws, stream);
     throw error;
   });
   if (!byId.has(ws.data.connectionId)) return;
 
-  if (!snapshot) {
-    unsubscribeFromStream(ws, stream);
-    sendTo(ws, { type: 'openRejected', stream });
-    return;
-  }
+  if (read.access !== 'granted') return rejectDataStream(ws, stream, read.access);
   ws.data.heldAppends.delete(stream);
   sendTo(ws, { type: 'opened', stream });
-  sendTo(ws, dataFrame('snapshot', stream, snapshot.payload));
+  sendTo(ws, streamSnapshotFrame(stream, read.payload));
   for (const message of held) ws.send(message);
 };
 
