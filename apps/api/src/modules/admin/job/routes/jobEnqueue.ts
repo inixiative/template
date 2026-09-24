@@ -6,6 +6,7 @@
  */
 import { z } from '@hono/zod-openapi';
 import { JobHandlerName } from '#/jobs/handlers';
+import { JobLane } from '#/jobs/types';
 import { createRoute } from '#/lib/routeTemplates';
 import { Modules } from '#/modules/modules';
 
@@ -20,6 +21,7 @@ const JobEnqueueBodySchema = z.object({
       delay: z.number().optional(),
       attempts: z.number().optional(),
       backoff: z.number().optional(),
+      lane: z.enum(Object.values(JobLane) as [JobLane, ...JobLane[]]).optional(),
     })
     .optional(),
 });

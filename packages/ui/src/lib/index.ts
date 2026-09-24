@@ -4,6 +4,7 @@ export * from './buildBreadcrumbs';
 export * from './buildFilterQuery';
 export * from './checkContextPermission';
 export * from './dataStatePersistence';
+export * from './describeError';
 export * from './enumOptions';
 export * from './findRoute';
 export { getContextParams } from './getContextParams';

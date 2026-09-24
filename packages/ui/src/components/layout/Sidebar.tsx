@@ -87,15 +87,22 @@ export const Sidebar = ({ className }: SidebarProps) => {
             type="button"
             onClick={() => fullPath && navigatePreserving(fullPath, 'context')}
             className={cn(
-              'flex-1 flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors',
+              'relative flex-1 flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors',
               DEPTH_PADDING[depth],
               isActive
                 ? 'bg-accent text-accent-foreground font-medium'
                 : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground',
+              isActive &&
+                depth === 0 &&
+                'before:absolute before:inset-y-2 before:left-0 before:w-0.5 before:rounded-full before:bg-primary',
               !item.path && 'cursor-default',
             )}
           >
-            {iconSlug && <Icon icon={iconSlug} className="h-4 w-4 shrink-0" />}
+            {iconSlug ? (
+              <Icon icon={iconSlug} className="h-4 w-4 shrink-0" />
+            ) : (
+              depth === 0 && <span className="h-4 w-4 shrink-0" aria-hidden="true" />
+            )}
             <span className="flex-1 text-left truncate">{item.label}</span>
           </button>
           {hasChildren && (
@@ -103,6 +110,8 @@ export const Sidebar = ({ className }: SidebarProps) => {
               type="button"
               onClick={() => toggleItem(item.label)}
               className="p-2 hover:bg-accent/50 rounded-md transition-colors"
+              aria-label={isExpanded ? `Collapse ${item.label}` : `Expand ${item.label}`}
+              aria-expanded={isExpanded}
             >
               {isExpanded ? (
                 <Icon icon="lucide:chevron-down" className="h-4 w-4 text-muted-foreground" />

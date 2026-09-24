@@ -33,7 +33,7 @@ const signUpWithEmail = async (method: EmailAuthMethod): Promise<SignUpResult> =
   });
 
   if (error) {
-    throw new Error(error.message || 'Sign up failed');
+    throw new Error(error.message || error.statusText);
   }
 
   if (!data?.token) {
@@ -57,8 +57,9 @@ const signUpWithOAuth = async (method: OAuthAuthMethod): Promise<SignUpResult> =
   const { error } = await client.signIn.social({
     provider: method.provider,
     callbackURL,
+    errorCallbackURL: `${window.location.origin}/login`,
   });
-  if (error) throw new Error(error.message || 'Sign up failed');
+  if (error) throw new Error(error.message || error.statusText);
   return { status: 'redirecting' };
 };
 

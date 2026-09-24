@@ -9,7 +9,7 @@ import { LogScope, log } from '@template/shared/logger';
 import { runDrainOutboxPass } from '#/jobs/outbox/drain/pass';
 import { makeUnrefInterval } from '#/lib/utils/makeUnrefInterval';
 
-const DRAIN_INTERVAL_MS = 15_000;
+const DRAIN_INTERVAL_MS = 2_000;
 const DRAIN_LOCK = { service: 'outbox-drain', identifier: 'drain', ttlMs: 300_000, heartbeatMs: 60_000, maxMissed: 3 };
 
 // No re-entrancy guard: createLock's NX acquire already skips a tick whose predecessor is still draining.
@@ -32,7 +32,7 @@ const drainLoop = makeUnrefInterval({ intervalMs: DRAIN_INTERVAL_MS, tick: () =>
 export const startOutboxDrainLoop = (): void => {
   if (drainLoop.isRunning()) return;
   drainLoop.start();
-  log.info('Started overflow-buffer drain loop (in-process, every 15s)', LogScope.job);
+  log.info('Started overflow-buffer drain loop (in-process, every 2s)', LogScope.job);
 };
 
 export const stopOutboxDrainLoop = drainLoop.stop;

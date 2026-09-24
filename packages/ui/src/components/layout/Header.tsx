@@ -5,6 +5,8 @@
  * @uses none
  */
 import { Icon } from '@iconify/react';
+import { AppIdentity } from '@template/ui/components/layout/AppIdentity';
+import { Breadcrumbs } from '@template/ui/components/layout/Breadcrumbs';
 import { ShareButton } from '@template/ui/components/utility/ShareButton';
 import { cn } from '@template/ui/lib/utils';
 import { useAppStore } from '@template/ui/store';
@@ -15,19 +17,16 @@ export type HeaderProps = {
 };
 
 export const Header = ({ onMenuClick, className }: HeaderProps) => {
-  // Read from Zustand store
-  const shortName = useAppStore((state) => state.ui.shortName);
   const context = useAppStore((state) => state.tenant.context);
 
-  const logo = <div className="text-lg font-bold">{shortName}</div>;
   return (
     <header
       className={cn(
-        'flex items-center justify-between h-16 px-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60',
+        'flex items-center justify-between gap-4 h-14 px-4 lg:px-6 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60',
         className,
       )}
     >
-      <div className="flex items-center gap-4">
+      <div className="flex min-w-0 items-center gap-3">
         {onMenuClick && (
           <button
             type="button"
@@ -38,7 +37,8 @@ export const Header = ({ onMenuClick, className }: HeaderProps) => {
             <Icon icon="lucide:menu" className="h-5 w-5" />
           </button>
         )}
-        {logo}
+        <AppIdentity className="shrink-0 text-base lg:hidden" />
+        <Breadcrumbs className="hidden min-w-0 sm:block" />
       </div>
       <div className="flex items-center gap-2">{context && context.type !== 'public' && <ShareButton />}</div>
     </header>
