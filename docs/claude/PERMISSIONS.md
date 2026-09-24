@@ -788,7 +788,11 @@ router.patch('/:id', validatePermission('manage'), handler);
 
 How it works:
 1. Gets the loaded `resource` and `resourceType` from context
-2. Hydrates the resource with relations for ReBAC traversal (org -> space, etc.)
+2. Hydrates the resource with relations for ReBAC traversal (org -> space, etc.). A relation tagged
+   `/// @permissions(hydrate: false)` in the Prisma schema is not part of the permissions tree and is
+   never walked (a flag's gate, a variant's audience, a member's customer reference); prisma-map
+   surfaces the tag as `annotations.permissions.hydrate`. A relation cycle
+   throws rather than recursing — tag one edge to break it.
 3. Checks permission via `check(permix, rebacSchema, resourceType, hydrated, action)`
 4. Throws 403 if check fails
 
@@ -917,6 +921,13 @@ Additionally, org/space admins can delete tokens within their scope via delegati
 ---
 
 ## Future Work
+
+### Relation sides
+
+A model between two parties (CustomerRef: provider and customer) has two ancestry chains, and each
+action belongs to one. Planned: `/// @permissions(side: provider|customer)` on the edges, hydration
+and the action's fan-out driven by the side being acted on. Design and open questions in
+`tickets/DEV-004-prisma-map-doc-comment-tags.md`.
 
 ### Groups
 

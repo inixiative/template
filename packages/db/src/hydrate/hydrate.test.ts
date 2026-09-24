@@ -3,9 +3,15 @@ import { db } from '@template/db';
 import { TokenOwnerModel } from '@template/db/generated/client/enums';
 import { fetchOne } from '@template/db/hydrate/fetchOne';
 import { hydrate } from '@template/db/hydrate/hydrate';
+import { cacheKey } from '@template/db/redis';
 import {
   cleanupTouchedTables,
+  createCustomerRef,
+  createFeatureFlag,
+  createFeatureFlagVariant,
   createOrganizationUser,
+  createSegment,
+  createSegmentMember,
   createSession,
   createToken,
   createUser,
@@ -80,6 +86,49 @@ describe('hydrate', () => {
     // Cache key format: cache:organization:id:<value>
     const orgKeys = [...pending.keys()].filter((k) => k.includes(':organization:'));
     expect(orgKeys.length).toBe(1);
+  });
+
+  it('skips edges tagged @permissions(hydrate: false): a variant reaches its flag, never its audience', async () => {
+    const { entity: flag } = await createFeatureFlag({});
+    const { entity: audience } = await createSegment({ ownerModel: 'platform' });
+    const { entity: variant } = await createFeatureFlagVariant({ segmentId: audience.id }, { featureFlag: flag });
+
+    const hydratedVariant = await hydrate(db, 'featureFlagVariant', {
+      id: variant.id,
+      featureFlagId: flag.id,
+      segmentId: audience.id,
+    });
+    expect((hydratedVariant.featureFlag as { id: string }).id).toBe(flag.id);
+    expect(hydratedVariant.segment).toBeUndefined();
+  });
+
+  it('a segment member reaches its segment and owner, never the customer reference', async () => {
+    const { entity: segment } = await createSegment({ ownerModel: 'platform' });
+    const { entity: customerRef } = await createCustomerRef({ customerModel: 'User', providerModel: 'platform' });
+    const { entity: member } = await createSegmentMember({}, { segment, customerRef });
+
+    const result = await hydrate(db, 'segmentMember', {
+      id: member.id,
+      segmentId: member.segmentId,
+      customerRefId: member.customerRefId,
+    });
+
+    expect((result.segment as { id: string }).id).toBe(segment.id);
+    expect(result.customerRef).toBeUndefined();
+  });
+
+  it('throws on a relation cycle instead of walking it', async () => {
+    const { entity: session, context } = await createSession();
+
+    await expect(
+      hydrate(
+        db,
+        'session',
+        { id: session.id, userId: session.userId },
+        new Map(),
+        new Set([cacheKey('user', context.user!.id)]),
+      ),
+    ).rejects.toThrow('Relation cycle while hydrating session.user');
   });
 
   it('handles null FK gracefully', async () => {

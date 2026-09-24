@@ -4,6 +4,7 @@
  * @partOf primitive:ui
  * @uses none
  */
+import { keepSlugCharacters } from '@template/shared/utils';
 import { Input, type InputProps } from '@template/ui/components/primitives/Input';
 import * as React from 'react';
 
@@ -12,7 +13,7 @@ export interface SlugInputProps extends Omit<InputProps, 'onChange' | 'type'> {
 }
 
 const SlugInput = React.forwardRef<HTMLInputElement, SlugInputProps>(({ onChange, onPaste, ...props }, ref) => {
-  const normalize = (raw: string) => raw.toLowerCase().replace(/[^a-z0-9-]/g, '');
+  const normalize = keepSlugCharacters;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const normalized = normalize(e.target.value);

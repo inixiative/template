@@ -11,7 +11,7 @@ import type { ProviderModel } from '@template/db/generated/client/enums';
 import { rootLens } from '@template/db/lens';
 import { RuleDegradedError, RuleEvaluationError, withRule } from '@template/shared/rules';
 import { resolvedCustomerRefLens } from '#/modules/customerRef/lib/customerRefLens';
-import { customerRefProviderFk, segmentOwnerId } from '#/modules/segment/lib/segmentOwner';
+import { providerWhere, segmentOwnerId } from '#/modules/segment/lib/segmentOwner';
 import { segmentRuleState } from '#/modules/segment/services/segmentRuleHealth';
 
 const isInfrastructureFault = (error: unknown): boolean =>
@@ -31,7 +31,7 @@ export const compileSegmentWhere = async (
     now: new Date(),
   });
   const where = await executePrismaQueryPlan(plan, db as never);
-  return { AND: [where, { [customerRefProviderFk(ownerModel)]: ownerId }] };
+  return { AND: [where, providerWhere(ownerModel, ownerId)] };
 };
 
 const segmentWhere = async (segment: Segment): Promise<Record<string, unknown>> => {

@@ -16,6 +16,7 @@ export const segmentCreateBodySchema = SegmentScalarInputSchema.omit({
   userId: true,
   organizationId: true,
   spaceId: true,
+  featureFlagInternal: true,
   deletedAt: true,
 });
 

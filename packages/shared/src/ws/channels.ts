@@ -17,6 +17,10 @@ export const WS_CHANNELS = {
     type: 'query',
     name: (id: string) => channelKey({ _id: 'segmentReadManySegmentMembers', path: { id } }),
   },
+  meReadManyFeatureFlagValues: {
+    type: 'query',
+    name: () => channelKey({ _id: 'meReadManyFeatureFlagValues' }),
+  },
 } as const;
 
 export type WSChannelFamily = keyof typeof WS_CHANNELS;

@@ -7,6 +7,8 @@
 import { getOrderedListFieldsByModel } from '@template/db/registries/orderedList';
 import { isEqual, omit } from 'lodash-es';
 
+const ORDER_CARRIES_MEANING = ['FeatureFlagVariant'];
+
 export type FieldRegistry = Record<string, string[]>;
 
 export const unionRegistries = (...registries: FieldRegistry[]): FieldRegistry => {
@@ -33,7 +35,10 @@ const NOOP_FIELDS_BASE: FieldRegistry = {
 // Semantically-meaningless change fields: a mutation touching only these is not worth recording or
 // firing. Ordered-list position columns fold in; sensitive columns do NOT (those are REDACT_FIELDS —
 // audit masks them, webhook drops them via WEBHOOK_NOOP_FIELDS).
-export const NOOP_FIELDS: FieldRegistry = unionRegistries(NOOP_FIELDS_BASE, getOrderedListFieldsByModel());
+export const NOOP_FIELDS: FieldRegistry = unionRegistries(
+  NOOP_FIELDS_BASE,
+  omit(getOrderedListFieldsByModel(), ORDER_CARRIES_MEANING),
+);
 
 export const filterFields = <T extends Record<string, unknown>>(
   model: string,

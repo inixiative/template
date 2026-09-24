@@ -15,10 +15,13 @@ export type EmailLensOwner = { ownerModel: ProviderModel; ownerId: string; organ
 
 const tag = platformOrBound('Tag', 'ownerModel');
 const segment = boundAndLive('Segment', 'ownerModel');
+const nameableSegment: Condition = {
+  all: [segment, { field: 'featureFlagInternal', operator: Operator.equals, value: false }],
+};
 const platformDefaults: NarrowingDefaults = {
   models: {
     Tag: { where: tag, sources: { id: { where: tag } } },
-    Segment: { where: segment, sources: { id: { where: segment } } },
+    Segment: { where: segment, sources: { id: { where: nameableSegment } } },
   },
 };
 

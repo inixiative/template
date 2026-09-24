@@ -4,7 +4,9 @@
  * @partOf primitive:ui
  * @uses none
  */
+
 import { Icon } from '@iconify/react';
+import { isSlug, toSlug } from '@template/shared/utils';
 import { Button, Input, Label, Modal, SlugInput } from '@template/ui/components';
 import { useDebounce, useValidateUniqueness } from '@template/ui/hooks';
 import { memo, useState } from 'react';
@@ -31,11 +33,7 @@ export const CreateOrganizationModal = memo(
       setName(newName);
 
       if (!slugTouched) {
-        const autoSlug = newName
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, '-')
-          .replace(/^-+|-+$/g, '');
-        setSlug(autoSlug);
+        setSlug(toSlug(newName));
       }
     };
 
@@ -47,10 +45,7 @@ export const CreateOrganizationModal = memo(
     const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault();
 
-      const slugRegex = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-      if (!slugRegex.test(slug)) {
-        return;
-      }
+      if (!isSlug(slug)) return;
 
       if (isChecking || !isAvailable) {
         return;

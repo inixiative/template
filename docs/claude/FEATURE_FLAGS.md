@@ -1,0 +1,134 @@
+# Feature Flags
+
+<!-- toc:start -->
+
+## Contents
+
+- [What a flag is](#what-a-flag-is)
+- [Owners, subjects and audiences](#owners-subjects-and-audiences)
+- [Resolution](#resolution)
+- [Reading a flag](#reading-a-flag)
+- [Writing flags and variants](#writing-flags-and-variants)
+- [Invalidation and live updates](#invalidation-and-live-updates)
+- [API](#api)
+- [Source map](#source-map)
+
+<!-- toc:end -->
+
+## What a flag is
+
+A `FeatureFlag` is a slug owned by a provider that resolves to a typed value for each of that
+provider's customers. Its `valueType` (`boolean | string | number | json`) is immutable, as are
+`slug` and `subjectModel`. Its rules are `FeatureFlagVariant` rows walked in `position` order;
+every rule is "the subject is a member of this segment" and nothing else. One variant may be
+`isDefault`: it has no segment and serves whoever no rule matched. Exactly the value column
+matching the flag's type is set on each variant.
+
+Two namespaces resolve the same way. A bare slug (`dark-mode`) may be created only by the
+platform. Every other owner's slug carries `custom:` (`custom:dark-mode`). Inheritance down the
+provider chain is undefined in v1; see FEAT-022.
+
+## Owners, subjects and audiences
+
+The owner is a `ProviderModel` (`platform | User | Organization | Space`); the platform is the
+one owner with no key column. A subject is a `CustomerRef` whose provider is the owner, so a
+flag never addresses staff (`OrganizationUser` / `SpaceUser`). `subjectModel` names which kind of
+customer the flag addresses and is enforced at resolution.
+
+Every user, organization and space is provisioned a platform `CustomerRef` on create
+(`hooks/platformCustomerRef`), with `db:backfill:platformCustomerRefs` for existing rows.
+
+A variant's audience is a `Segment` of the same owner: a shared one the owner named, or an internal
+one carrying `Segment.featureFlagInternal`. The variant's `segmentId` is the only edge between the two;
+the internal segment is named `${flag.slug}/${variant.label}` and excluded from the `Segment.name`
+uniques. It is created and edited only through its variant, tombstoned with it, excluded from segment
+lists, pickers, the lens `Segment.id` source and every subject-facing route, and refused as a gate or
+as the audience of any variant but the one already serving it (checked under a row lock inside the
+write's transaction, so two variants cannot both claim an orphaned internal segment). A boolean flag is created with an `on`
+variant over an internal open dynamic segment, so create → toggle `enabled` is the whole kill switch.
+
+A percentage rollout is `sample: { from, to }` on a variant, a slice of the 0–100 line, over whatever
+audience the variant already has. Nothing is stored or hashed: a `CustomerRef` id is a uuidv7 whose last
+15 hex digits are random, three of them read as a number are the subject's bucket, and the fold serves
+the variant when the subject is a member of its segment and the bucket sits in `[from, to)`. So it is
+deterministic, needs no reconcile, admits new customers as they arrive, and widening a range keeps
+everyone already in. `FeatureFlag.sampleOffset`, the digit position from the tail where the read starts
+(0–12), is a random column default and never in the API; every variant of a flag reads the same digits,
+so its arms never overlap, and different flags read different digits. Segments know nothing about
+sampling; a sampled arm has no member rows of its own (reach is the audience's members times the range
+width). `apps/api/src/modules/segment/lib/sample.ts` holds the read.
+
+## Resolution
+
+`resolveFlags(refs)` folds, per customer ref and per flag that addresses its kind:
+
+1. `enabled` false → the type's zero (`false`, `""`, `0`, `null`). Never the default variant.
+2. The flag's gate `segmentId` is set and the ref is not a live member → default variant, else zero.
+3. Rule variants in `position` order; the first whose live segment contains the ref wins.
+4. No match → default variant, else zero.
+
+A soft-deleted segment never matches. Nothing is stored per subject: membership is materialized by
+FEAT-021, values are a fold over cached rows (the owner's flags, each flag's variants, the ref's
+memberships, each referenced segment's row).
+
+Reordering variants moves what overlapping subjects are served and nothing else; an owner who wants
+experiment arms to hold still makes the segments disjoint.
+
+## Reading a flag
+
+On a request, `requestFeatureFlags(c)` resolves once for the caller's refs (their own, plus the
+platform refs of the organizations and spaces they act in) and memoizes on `c.var.featureFlags`,
+cloned into batch sub-requests. `checkFlag(owner, slug, type, resolved, subject?)` returns the value
+typed as `type`; a missing flag or a mismatched type is `null`, logged once per slug. Off-request
+callers (jobs, event handlers, email render) call `resolveFlags` directly.
+
+`GET /me/featureFlagValues` is the subject-facing read: owner, customer, slug, type, value. Variant
+labels and rules are owner-side only.
+
+## Writing flags and variants
+
+Row-local invariants live in `hooks/featureFlag` and `hooks/featureFlagVariant`: slug shape and
+namespace, gate/audience owned by the flag's owner and not another variant's internal segment, default
+row segment-less, rule row with a segment, exactly one value column. Label uniqueness and the single
+default are partial unique indexes. `writeVariant.ts` owns the internal-segment lifecycle: create with
+the rule, re-point, detach (tombstone) and delete, and refuses more than one audience per write.
+
+Permissions on a variant flow through its flag, never its audience; a flag's gate is likewise outside
+the permissions tree. Those relations carry `/// @permissions(hydrate: false)` in the schema so
+`hydrate` skips them (see PERMISSIONS.md).
+
+## Invalidation and live updates
+
+`cacheReference` busts `<owner>:featureFlags`, `featureFlag:<id>:variants`, `segment:<id>` and
+`customerRef:<id>:segmentMembers` on the corresponding row writes; `FeatureFlagVariant.position` is
+exempt from `NOOP_FIELDS` so a reorder busts and emits. Any flag or variant write emits
+`featureFlag.changed`, broadcast as a `meReadManyFeatureFlagValues` refetch on one shared channel (the
+values route carries no owner, so the channel cannot either); membership events send the same refetch
+to the affected user. A variant's tombstone reaches its internal segment through the `featureFlagVariant`
+hook with the same timestamp (the soft-delete cascade walks parent→child FKs and the segment is not the
+variant's child), so a flag or owner tombstone reaches it too and reviving the variant revives it;
+`deleteVariant` publishes `segment.deleted` for the members. Re-pointing a variant's audience tombstones
+the old internal segment.
+
+## API
+
+Paths relative to `/api/v1` unless noted:
+
+| Operation | Routes |
+| --- | --- |
+| Create, list an owner's flags | `/me/featureFlags`, `/organization/:id/featureFlags`, `/space/:id/featureFlags`; platform: `/admin/featureFlag` |
+| Read, update, delete a flag | `/featureFlag/:id` |
+| Add a variant | `POST /featureFlag/:id/featureFlagVariants` with `segmentId` \| `internalSegment` |
+| Edit, reorder, delete a variant | `PATCH` / `DELETE /featureFlagVariant/:id` (`position` reorders) |
+| Values for the caller | `GET /me/featureFlagValues` |
+| Every owner's flags (superadmin) | `GET /admin/featureFlag`, filter `searchFields[ownerModel]=platform` |
+
+## Source map
+
+- `packages/db/prisma/schema/featureFlag.prisma`, `segment.prisma` (`featureFlagInternal`).
+- `apps/api/src/modules/featureFlag/`: schemas, services (`resolveFlags`, `checkFlag`,
+  `requestFeatureFlags`, `writeVariant`, `createFeatureFlag`), routes, tests.
+- `apps/api/src/hooks/featureFlag`, `featureFlagVariant`, `featureFlagChanged`, `platformCustomerRef`.
+- `packages/shared/src/utils/slug.ts`: slug and `custom:` schema shared by API and UI.
+
+Decision history: [FEAT-003](../../tickets/FEAT-003-feature-flags.md); inheritance: FEAT-022.

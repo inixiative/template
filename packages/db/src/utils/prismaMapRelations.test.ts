@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { getAccessorRelations, getModelRelations } from '@template/db/utils/prismaMapRelations';
+import { getAccessorRelations, getModelRelations, shouldHydrate } from '@template/db/utils/prismaMapRelations';
 
 describe('getModelRelations', () => {
   it('returns relations for a model', () => {
@@ -64,6 +64,16 @@ describe('getModelRelations', () => {
     const targetUserRel = relations.find((r) => r.relationName === 'targetUser');
     expect(targetUserRel).toBeDefined();
     expect(targetUserRel?.foreignKey).toEqual({ id: 'targetUserId' });
+  });
+
+  it('carries `/// @tagClass(key: value)` annotations and names the permission edges', () => {
+    const audience = getModelRelations('FeatureFlagVariant').find((r) => r.relationName === 'segment');
+    expect(audience?.annotations).toEqual({ permissions: { hydrate: false } });
+    expect(shouldHydrate(audience!)).toBe(false);
+
+    const segment = getModelRelations('SegmentMember').find((r) => r.relationName === 'segment');
+    expect(segment?.annotations).toBeUndefined();
+    expect(shouldHydrate(segment!)).toBe(true);
   });
 
   it('throws for unknown model', () => {

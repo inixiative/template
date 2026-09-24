@@ -3,7 +3,14 @@ import { Operator } from '@inixiative/json-rules';
 import { clearHookRegistry, db, Prisma } from '@template/db';
 import type { Organization, Space, User } from '@template/db/generated/client/client';
 import { ProviderModel, SegmentType } from '@template/db/generated/client/enums';
-import { cleanupTouchedTables, createOrganizationUser, createSegment, createSpace } from '@template/db/test';
+import {
+  cleanupTouchedTables,
+  createFeatureFlag,
+  createFeatureFlagVariant,
+  createOrganizationUser,
+  createSegment,
+  createSpace,
+} from '@template/db/test';
 import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
 
 const acmeRule = { field: 'customerUser.email', operator: Operator.endsWith, value: '@acme.test' };
@@ -41,6 +48,34 @@ describe('segmentConditions hook', () => {
         { space },
       ),
     ).rejects.toThrow('Invalid segment conditions');
+  });
+
+  it('a platform segment may name only platform segments', async () => {
+    const { entity: theirs } = await createSegment({ conditions: acmeRule }, { space });
+    const naming = (id: string) => ({
+      field: 'segmentMembers',
+      arrayOperator: 'any',
+      condition: { field: 'segment.id', operator: Operator.equals, value: id },
+    });
+    await expect(
+      createSegment({ ownerModel: ProviderModel.platform, conditions: naming(theirs.id) }, {}),
+    ).rejects.toThrow('this platform does not own');
+
+    const { entity: ours } = await createSegment({ ownerModel: ProviderModel.platform, conditions: acmeRule }, {});
+    const { entity } = await createSegment({ ownerModel: ProviderModel.platform, conditions: naming(ours.id) }, {});
+    expect(entity.ownerModel).toBe('platform');
+  });
+
+  it('a rule may not name an internal segment, even the owner’s own', async () => {
+    const { entity: flag } = await createFeatureFlag({ slug: 'custom:x', ownerModel: ProviderModel.Space, space });
+    const { entity: internal } = await createSegment({ conditions: acmeRule, featureFlagInternal: true }, { space });
+    await createFeatureFlagVariant({ segment: internal }, { featureFlag: flag });
+    const naming = {
+      field: 'segmentMembers',
+      arrayOperator: 'any',
+      condition: { field: 'segment.id', operator: Operator.equals, value: internal.id },
+    };
+    await expect(createSegment({ conditions: naming }, { space })).rejects.toThrow('does not own');
   });
 
   it('accepts a valid rule and writes the normalized tree back', async () => {

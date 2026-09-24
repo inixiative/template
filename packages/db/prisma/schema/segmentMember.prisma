@@ -14,6 +14,7 @@ model SegmentMember {
   segment   Segment @relation(fields: [segmentId], references: [id], onDelete: Cascade)
 
   customerRefId String      @db.VarChar(36)
+  /// @permissions(hydrate: false)
   customerRef   CustomerRef @relation(fields: [customerRefId], references: [id], onDelete: Cascade)
 
   // ==========================================================================

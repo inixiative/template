@@ -17,14 +17,29 @@
 
 ## Purpose and ownership
 
-A segment is a named set of a provider's `CustomerRef` rows. Its owner is a User,
-Organization or Space (`ProviderModel`), and every member must be a customer reference
+A segment is a named set of a provider's `CustomerRef` rows. Its owner is the platform, a User,
+an Organization or a Space (`ProviderModel`), and every member must be a customer reference
 belonging to that provider. Segment rules do not describe an unrestricted set of users.
+
+The platform is the one owner without a key column: its rows carry `ownerModel = platform` and
+no FK, and a platform customer is a `CustomerRef` with `providerModel = platform`. The lens binds
+that owner by its discriminator (`polymorphicIs` grows one `in`-bound arm per no-key value), and
+`providerWhere` / `providerOf` in `segmentOwner.ts` give the same rows their Prisma shape. Only a
+superadmin reaches a platform segment: the rebac owner walk finds no relation on it, so the
+superadmin bypass is the sole admission.
 
 `CustomerRef` is the rule root. `customerRefLens` declares the fields and relations that
 rules may read, including contacts, tags, received communications and other segment
 memberships. `resolvedCustomerRefLens(ownerModel, ownerId)` binds the provider scope.
 Shared lens conditions also restrict related tags and communications to the permitted owner.
+
+A segment carrying `featureFlagInternal` is a feature flag variant's internal audience, reached only
+through the variant's `segmentId`: created and edited only through that variant, tombstoned with it,
+excluded from the `Segment.name` uniques, and hidden from lists, pickers, the lens `Segment.id` source
+and the membership routes. See [FEATURE_FLAGS.md](FEATURE_FLAGS.md).
+
+Percentage sampling is a feature-flag variant concern (`FeatureFlagVariant.sample`, applied in the
+resolver fold); segments and reconciliation know nothing about it. See [FEATURE_FLAGS.md](FEATURE_FLAGS.md).
 
 ## Static and dynamic membership
 
@@ -64,8 +79,9 @@ Paths below are relative to `/api/v1`:
 | Read, update, delete a segment | `/segment/:id` |
 | List members | `/segment/:id/segmentMembers` |
 | List owned segments or memberships | `/me`, `/user/:id`, `/organization/:id`, `/space/:id`, each with `/segments` or `/segmentMemberships` |
-| Create a segment | `/me/segments`, `/organization/:id/segments`, `/space/:id/segments` |
-| Estimate rule reach without saving | `POST /me/segments/reach`, `/organization/:id/segments/reach`, `/space/:id/segments/reach` |
+| Create a segment | `/me/segments`, `/organization/:id/segments`, `/space/:id/segments`; platform-owned: `POST /admin/segment` |
+| Estimate rule reach without saving | `POST /me/segments/reach`, `/organization/:id/segments/reach`, `/space/:id/segments/reach`, `/admin/segment/reach` |
+| Every owner's segments (superadmin) | `GET /admin/segment`, filter with `searchFields[ownerModel]=platform` |
 
 Reach accepts `{ conditions }` and returns `{ count }`, using the same rule and reference
 admission checks as saving. Existing route permissions govern each owner context.
@@ -103,7 +119,7 @@ can inspect. See [COMMUNICATIONS.md](COMMUNICATIONS.md#the-email-lens).
 - The rule editor, provider-side customer lists for User/Organization, and `CustomerRef.lastActiveAt`
   remain separate work.
 - Whether `customerRefLens` should become a general customer lens is an unresolved design question.
-- Feature flags and flag-selected email variants are not implemented.
+- Flag-selected email variants are not implemented; feature flags are, see [FEATURE_FLAGS.md](FEATURE_FLAGS.md).
 
 ## Source map
 

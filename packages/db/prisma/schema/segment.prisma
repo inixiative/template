@@ -43,10 +43,14 @@ model Segment {
   conditions       Json
   conditionsPrompt String?
 
+  featureFlagInternal Boolean @default(false)
+
   members           SegmentMember[]
   auditLogs         AuditLog[]
   ruleReferences    RuleReference[] @relation("RuleReferenceOwnerSegment")
   referencedByRules RuleReference[] @relation("RuleReferenceReferencedSegment")
+  featureFlagGates    FeatureFlag[]        @relation("FeatureFlagGate")
+  featureFlagVariants FeatureFlagVariant[] @relation("FeatureFlagVariantAudience")
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
@@ -54,9 +58,10 @@ model Segment {
 
   // Per-owner uniqueness on name — partial uniques (see Contact for rationale).
   // Each partial doubles as that owner's lookup index.
-  @@unique([userId, name], where: { userId: { not: null } })
-  @@unique([organizationId, name], where: { organizationId: { not: null } })
-  @@unique([spaceId, name], where: { spaceId: { not: null } })
+  @@unique([userId, name], where: { userId: { not: null }, deletedAt: null, featureFlagInternal: false })
+  @@unique([organizationId, name], where: { organizationId: { not: null }, deletedAt: null, featureFlagInternal: false })
+  @@unique([spaceId, name], where: { spaceId: { not: null }, deletedAt: null, featureFlagInternal: false })
+  @@unique([name], where: raw("\"ownerModel\" = 'platform' AND \"deletedAt\" IS NULL AND \"featureFlagInternal\" = false"))
   @@index([ownerModel])
   @@index([type])
 }

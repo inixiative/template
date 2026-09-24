@@ -100,6 +100,31 @@ describe('segment reconcile', () => {
     expect(await memberIds(segment.id)).toEqual([acmeRef.id]);
   });
 
+  it('the platform owns segments over its own customer refs and never another provider’s', async () => {
+    const platformAcme = (
+      await createCustomerRef({ customerModel: 'User', providerModel: 'platform', customerUser: acme })
+    ).entity;
+    const platformOrg = (
+      await createCustomerRef({
+        customerModel: 'Organization',
+        providerModel: 'platform',
+        customerOrganization: organization,
+      })
+    ).entity;
+
+    const segment = await saveSegment(
+      { ownerModel: ProviderModel.platform, type: SegmentType.dynamic, conditions: acmeRule },
+      {},
+    );
+    expect(await memberIds(segment.id)).toEqual([platformAcme.id]);
+    expect(await reconcileCustomerRef(platformAcme.id)).toEqual([]);
+    expect(await reconcileCustomerRef(platformOrg.id)).toEqual([]);
+
+    await expect(createSegmentMember({}, { segment, customerRef: acmeRef })).rejects.toThrow(
+      "is not a customer of the segment's platform",
+    );
+  });
+
   it('does not select customers of another provider', async () => {
     const elsewhere = (await createSpace({}, { organization })).entity;
     const stranger = (await createUser({ email: `stranger-${getNextSeq()}@acme.test` })).entity;

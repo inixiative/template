@@ -15,4 +15,14 @@ export { isUuidV7, uuidV7Schema } from './isUuidV7';
 export { resolveAll } from './resolveAll';
 export { type RetryOptions, withRetry } from './retry';
 export { createSerializedQueue, type SerializedQueue } from './serializedQueue';
+export {
+  CUSTOM_FLAG_PREFIX,
+  featureFlagSlugSchema,
+  isCustomFlagSlug,
+  isFeatureFlagSlug,
+  isSlug,
+  keepSlugCharacters,
+  slugSchema,
+  toSlug,
+} from './slug';
 export { stableHash } from './stableHash';

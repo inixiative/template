@@ -15,7 +15,7 @@ import type { ModelName } from '@template/db/utils/modelNames';
 // - Immutable fields (type fields are immutable)
 
 // Special non-model values for ownership
-type SpecialOwner = 'default' | 'admin' | 'platform';
+export type SpecialOwner = 'default' | 'admin' | 'platform';
 
 // Valid type values in polymorphic fields (strongly typed)
 export type PolymorphicValue = ModelName | SpecialOwner;
@@ -184,6 +184,7 @@ export const PolymorphismRegistry: Partial<Record<ModelName, PolymorphicConfig>>
       {
         field: 'providerModel',
         fkMap: {
+          platform: [],
           User: ['providerUserId'],
           Organization: ['providerOrganizationId'],
           Space: ['providerSpaceId'],
@@ -191,9 +192,9 @@ export const PolymorphismRegistry: Partial<Record<ModelName, PolymorphicConfig>>
       },
     ],
     allowedCombinations: {
-      User: ['User', 'Organization', 'Space'],
-      Organization: ['User', 'Organization', 'Space'],
-      Space: ['User', 'Organization', 'Space'],
+      User: ['platform', 'User', 'Organization', 'Space'],
+      Organization: ['platform', 'User', 'Organization', 'Space'],
+      Space: ['platform', 'User', 'Organization', 'Space'],
     },
   },
 
@@ -298,6 +299,8 @@ export const PolymorphismRegistry: Partial<Record<ModelName, PolymorphicConfig>>
           CustomerRef: ['subjectCustomerRefId'],
           Integration: ['subjectIntegrationId'],
           Segment: ['subjectSegmentId'],
+          FeatureFlag: ['subjectFeatureFlagId'],
+          FeatureFlagVariant: ['subjectFeatureFlagVariantId'],
         },
       },
     ],
@@ -308,6 +311,21 @@ export const PolymorphismRegistry: Partial<Record<ModelName, PolymorphicConfig>>
       {
         field: 'ownerModel',
         fkMap: {
+          platform: [],
+          User: ['userId'],
+          Organization: ['organizationId'],
+          Space: ['spaceId'],
+        },
+      },
+    ],
+  },
+
+  FeatureFlag: {
+    axes: [
+      {
+        field: 'ownerModel',
+        fkMap: {
+          platform: [],
           User: ['userId'],
           Organization: ['organizationId'],
           Space: ['spaceId'],

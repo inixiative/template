@@ -9,9 +9,11 @@ import { fetchOne } from '@template/db/hydrate/fetchOne';
 import type { HydratedRecord } from '@template/db/hydrate/types';
 import { cacheKey } from '@template/db/redis';
 import type { AccessorName } from '@template/db/utils/modelNames';
-import { getAccessorRelations, type Identifier } from '@template/db/utils/prismaMapRelations';
+import { getAccessorRelations, type Identifier, shouldHydrate } from '@template/db/utils/prismaMapRelations';
 
 type PendingMap = Map<string, Promise<HydratedRecord | null>>;
+
+const recordKey = (accessor: AccessorName, record: HydratedRecord): string => cacheKey(accessor, record.id as string);
 
 const resolveIdentifier = (record: HydratedRecord, fk: Identifier): Identifier | null => {
   if (typeof fk === 'string') {
@@ -35,9 +37,11 @@ export const hydrate = async <T extends HydratedRecord>(
   accessor: AccessorName,
   record: T,
   pending: PendingMap = new Map(),
+  hydrating: Set<string> = new Set(),
 ): Promise<T & HydratedRecord> => {
-  const relations = getAccessorRelations(accessor);
+  const relations = getAccessorRelations(accessor).filter(shouldHydrate);
   const result: HydratedRecord = { ...record };
+  const path = new Set([...hydrating, recordKey(accessor, record)]);
 
   const relationBatch = relations.map(async (rel) => {
     if (!rel.foreignKey) return { name: rel.relationName, value: null };
@@ -52,8 +56,13 @@ export const hydrate = async <T extends HydratedRecord>(
 
     const related = await pending.get(key)!;
     if (!related) return { name: rel.relationName, value: null };
+    if (path.has(recordKey(rel.targetAccessor, related))) {
+      throw new Error(
+        `Relation cycle while hydrating ${accessor}.${rel.relationName}: ${[...path, recordKey(rel.targetAccessor, related)].join(' -> ')}. Tag one edge /// @permissions(hydrate: false)`,
+      );
+    }
 
-    const hydrated = await hydrate(db, rel.targetAccessor, related, pending);
+    const hydrated = await hydrate(db, rel.targetAccessor, related, pending, path);
     return { name: rel.relationName, value: hydrated };
   });
 

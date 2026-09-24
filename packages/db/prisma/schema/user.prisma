@@ -46,6 +46,7 @@ model User {
   communicationsReceived CommunicationLog[]    @relation("CommunicationRecipientUser")
   segments               Segment[]
 
+  featureFlags           FeatureFlag[]
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
   // ==========================================================================
