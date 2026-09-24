@@ -32,7 +32,6 @@ export const cicdConfig = {
   version: 1,
   production: {
     branch: 'main',
-    deploy: 'auto',
   },
   staging: {
     enabled: false,
@@ -43,20 +42,16 @@ export const cicdConfig = {
     drafts: { deploy: 'manual' },
     requiredApprovals: 1,
     allowBotApprovals: false,
-    cleanupOnClose: true,
     maxActive: 2,
-  },
-  checks: {
-    pre: true,
-    post: true,
   },
   database: {
     strategy: 'schema-push',
+    seedOnRelease: true,
   },
 };
 ```
 
-These defaults are committed in cicd.config.ts. Staging retains its branch while disabled. Pre/post checks and close-event cleanup cannot be disabled. The planner chooses an action but does not assert CI, authorization, resource limits or provider availability have been satisfied. Synthetic data and disabled external side effects remain the planned preview defaults.
+These defaults are committed in cicd.config.ts. Staging retains its branch while disabled. Automatic production deploys, pre/post checks and close-event cleanup are invariants, not settings, so the file has no keys for them. The planner chooses an action but does not assert CI, authorization, resource limits or provider availability have been satisfied. Synthetic data and disabled external side effects remain the planned preview defaults.
 
 Init edits this file through its Delivery section. Both init and shell environment selection read staging from this file, falling back to the legacy field only when no delivery file exists. Resource IDs remain in the existing project configuration initially; secrets never enter either file. Generated workflow/provider settings must be deterministic and checked for drift. There must be exactly one owner of deployment triggers for each target.
 
@@ -71,7 +66,7 @@ bun run check:cicd
 
 Example event file: `{"kind":"pull-request","number":123,"draft":false,"sameRepository":true,"closed":false}`. Plans explicitly report `execution: "plan-only"` and `authorization: "not-evaluated"`. They make no provider calls. The init editor saves local policy; it does not alter GitHub branch protection or cloud deployment triggers. Main-only Vercel autodeploy remains the current provider behavior until the coordinated workflows are installed.
 
-The database release entrypoint remains `scripts/db/release.sh`. It now reads the explicit strategy, refuses missing/conflicting migration history, omits `--accept-data-loss` and stops on schema or seed failure. No database was migrated or baselined by this PR.
+The database release entrypoint remains `scripts/db/release.sh`. It now reads the explicit strategy, refuses missing/conflicting migration history, omits `--accept-data-loss` and stops on schema or seed failure. Releases seed by default: the non-prime seeds carry system data (cron jobs, email components and templates) that production needs; `seedOnRelease: false` is the explicit opt-out. `database.strategy` is the single switch for schema behavior: release and `setup.sh` both read it, and launch (which requires a committed migration baseline) sets it to `migrations`. Repositories that already commit migrations must set `strategy: 'migrations'` when adopting this file, or release refuses to run. No database was migrated or baselined by this PR.
 
 ## Planned commands and shared execution
 

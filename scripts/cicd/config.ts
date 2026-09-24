@@ -18,20 +18,18 @@ const deployMode = z.enum(['auto', 'manual']);
 export const cicdSchema = z
   .strictObject({
     version: z.literal(1),
-    production: z.strictObject({ branch: branchSchema, deploy: z.literal('auto') }),
+    production: z.strictObject({ branch: branchSchema }),
     staging: z.strictObject({ enabled: z.boolean(), branch: branchSchema }),
     pullRequests: z.strictObject({
       deploy: deployMode,
       drafts: z.strictObject({ deploy: deployMode }),
       requiredApprovals: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
       allowBotApprovals: z.boolean(),
-      cleanupOnClose: z.literal(true),
       maxActive: z.number().int().min(1).max(20),
     }),
-    checks: z.strictObject({ pre: z.literal(true), post: z.literal(true) }),
     database: z.strictObject({
       strategy: z.enum(['schema-push', 'migrations']),
-      seedOnRelease: z.boolean().default(false),
+      seedOnRelease: z.boolean(),
     }),
   })
   .refine((value) => value.production.branch !== value.staging.branch, {

@@ -4,7 +4,6 @@ export const cicdConfig = {
   version: 1,
   production: {
     branch: 'main',
-    deploy: 'auto',
   },
   staging: {
     enabled: false,
@@ -17,15 +16,10 @@ export const cicdConfig = {
     },
     requiredApprovals: 1,
     allowBotApprovals: false,
-    cleanupOnClose: true,
     maxActive: 2,
-  },
-  checks: {
-    pre: true,
-    post: true,
   },
   database: {
     strategy: 'schema-push',
-    seedOnRelease: false,
+    seedOnRelease: true,
   },
 } satisfies CicdConfig;

@@ -60,13 +60,13 @@ describe('delivery policy', () => {
     expect(planDelivery(fresh(), { kind: 'teardown', number: 12 }).target).toBe('pr-12');
     expect(() => planDelivery(fresh(), { kind: 'teardown', number: -1 })).toThrow();
   });
-  test('unknown settings, fractional approval counts, disabled checks and shared branches fail closed', () => {
+  test('unknown settings, fractional approval counts and shared branches fail closed', () => {
     expect(() => cicdSchema.parse({ ...fresh(), secrets: {} })).toThrow();
+    expect(() => cicdSchema.parse({ ...fresh(), checks: { pre: false, post: true } })).toThrow();
     expect(() => updateCicdSettings(fresh(), ['--approvals=1.5'])).toThrow();
     expect(() => updateCicdSettings(fresh(), ['--pr=auto', '--pr=manual'])).toThrow();
     expect(() => updateCicdSettings(fresh(), ['--unknown=true'])).toThrow();
     expect(() => updateCicdSettings(fresh(), ['--staging-branch=main'])).toThrow();
-    expect(() => cicdSchema.parse({ ...fresh(), checks: { pre: false, post: true } })).toThrow();
     expect(updateCicdSettings(fresh(), ['--approvals=100']).pullRequests.requiredApprovals).toBe(100);
   });
   test('headless settings persist independently without stale reads', async () => {
@@ -138,21 +138,24 @@ describe('merge approvals', () => {
 
 describe('database release policy', () => {
   test('pre-migration releases use schema push without accepting data loss', () => {
-    const commands = databaseReleaseCommands('schema-push', []);
+    const commands = databaseReleaseCommands('schema-push', [], true);
     expect(commands[0].slice(-2)).toEqual(['db', 'push']);
     expect(commands.flat()).not.toContain('--accept-data-loss');
   });
-  test('releases do not seed unless seeding is explicitly enabled', () => {
-    expect(databaseReleaseCommands('schema-push', []).flat()).not.toContain('db:seed');
-    expect(databaseReleaseCommands('migrations', ['0_init/migration.sql']).flat()).not.toContain('db:seed');
-  });
-  test('seeding on release is opt-in and applies to both strategies', () => {
+  test('releases seed system data under both strategies', () => {
     expect(databaseReleaseCommands('schema-push', [], true)[1]?.slice(-1)).toEqual(['db:seed']);
     expect(databaseReleaseCommands('migrations', ['0_init/migration.sql'], true)[1]?.slice(-1)).toEqual(['db:seed']);
   });
+  test('seeding can be turned off explicitly', () => {
+    expect(databaseReleaseCommands('schema-push', [], false).flat()).not.toContain('db:seed');
+    expect(databaseReleaseCommands('migrations', ['0_init/migration.sql'], false).flat()).not.toContain('db:seed');
+  });
   test('migration mode requires a baseline and schema push cannot bypass existing migrations', () => {
-    expect(() => databaseReleaseCommands('migrations', [])).toThrow('baseline');
-    expect(() => databaseReleaseCommands('schema-push', ['0_init/migration.sql'])).toThrow('Select migrations');
-    expect(databaseReleaseCommands('migrations', ['0_init/migration.sql'])[0].slice(-2)).toEqual(['migrate', 'deploy']);
+    expect(() => databaseReleaseCommands('migrations', [], true)).toThrow('baseline');
+    expect(() => databaseReleaseCommands('schema-push', ['0_init/migration.sql'], true)).toThrow('Select migrations');
+    expect(databaseReleaseCommands('migrations', ['0_init/migration.sql'], true)[0].slice(-2)).toEqual([
+      'migrate',
+      'deploy',
+    ]);
   });
 });
