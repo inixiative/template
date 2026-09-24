@@ -27,6 +27,7 @@ const GIT_WORKTREE_LIFECYCLE = new Set(['add', 'remove', 'move', 'prune']);
 const GIT_OPTIONS_WITH_VALUE = new Set(['-C', '-c', '--git-dir', '--work-tree']);
 const BUN_MUTATING = new Set(['add', 'a', 'remove', 'rm', 'update']);
 const BUN_INSTALL = new Set(['install', 'i']);
+const MIGRATION_SCRIPTS = new Set(['db:migrate']);
 const BUN_OPTIONS_WITH_VALUE = new Set([
   '--filter',
   '-F',
@@ -113,7 +114,7 @@ const bunLanding = (words: string[], cursor: Cursor): Omit<Landing, 'command'> |
   const mutating =
     BUN_MUTATING.has(subcommand ?? '') ||
     (BUN_INSTALL.has(subcommand ?? '') && rest.length > 0) ||
-    script === 'db:migrate' ||
+    MIGRATION_SCRIPTS.has(script ?? '') ||
     isPrismaMigrateDev(positionals);
   return mutating ? { ...here, lifecycle: false } : undefined;
 };
