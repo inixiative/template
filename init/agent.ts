@@ -10,6 +10,7 @@
 // Infisical (planetscale, railway) read the prior projectId from the persisted
 // config file, so they can run standalone after a one-time full init.
 
+import { configureCicd } from './tasks/cicdSettings';
 import { setupInfisical } from './tasks/infisicalSetup';
 import { setupPlanetScale } from './tasks/planetscaleSetup';
 import { renameProject, updateProjectConfig } from './tasks/projectConfig';
@@ -18,7 +19,7 @@ import { updateConfigField } from './utils/configHelpers';
 import { getProjectConfig } from './utils/getProjectConfig';
 import { isComplete, markComplete } from './utils/progressTracking';
 
-const SECTIONS = ['project', 'infisical', 'planetscale', 'railway', 'monitoring'] as const;
+const SECTIONS = ['project', 'infisical', 'planetscale', 'railway', 'monitoring', 'cicd'] as const;
 type Section = (typeof SECTIONS)[number];
 
 const parseSection = (): Section | null => {
@@ -127,6 +128,11 @@ const runRailway = async (): Promise<void> => {
 if (import.meta.main) {
   const section = parseSection();
   console.log(section ? `🤖 Agent init — section: ${section}\n` : '🤖 Agent init — full flow\n');
+
+  if (section === 'cicd') {
+    console.log(JSON.stringify(await configureCicd(process.argv.slice(2)), null, 2));
+    process.exit(0);
+  }
 
   if (!section || section === 'project') await runProject();
   if (!section || section === 'infisical') await runInfisical();

@@ -104,8 +104,8 @@ export const LaunchView: React.FC<LaunchViewProps> = ({ onComplete, onCancel }) 
               <Text color="cyan" bold>
                 All checks passed. Ready to launch.
               </Text>
-              <Text dimColor>This will set launched=true in project.config.ts.</Text>
-              <Text dimColor>After launch: db:push and db:seed are blocked in setup.sh.</Text>
+              <Text dimColor>This sets database.strategy=migrations in cicd.config.ts and launched=true.</Text>
+              <Text dimColor>After launch: releases run migrate deploy; setup.sh skips db:push and db:seed.</Text>
               <Text dimColor>Use db:migrate for schema changes instead.</Text>
               <Box marginTop={1}>
                 <Text dimColor>{prompt(['enter', 'cancel'])}</Text>
@@ -133,7 +133,7 @@ export const LaunchView: React.FC<LaunchViewProps> = ({ onComplete, onCancel }) 
         <Text color="green" bold>
           ✓ Launched!
         </Text>
-        <Text color="green"> project.config.ts updated: launched = true</Text>
+        <Text color="green"> cicd.config.ts: database.strategy = migrations; project.config.ts: launched = true</Text>
         <Box marginTop={1}>
           <Text dimColor>From now on, use db:migrate for schema changes.</Text>
         </Box>

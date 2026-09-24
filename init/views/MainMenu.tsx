@@ -299,7 +299,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectTask }) => {
         { label: 'Optional Integrations (coming soon)', value: 'integrations', status: 'pending' },
         { label: 'DNS Configuration (coming soon)', value: 'dns', status: 'pending' },
         { label: 'Database Seeding (coming soon)', value: 'seeding', status: 'pending' },
-        { label: 'GitHub Actions Setup (coming soon)', value: 'github-actions', status: 'pending' },
+        { label: 'Delivery policy (CI/CD)', value: 'cicd', status: 'pending' },
         { label: 'Launch (coming soon)', value: 'launch', status: launchStatus },
         { label: 'Documentation Generation (coming soon)', value: 'documentation', status: 'pending' },
         { label: 'Exit', value: 'exit', status: 'pending' },

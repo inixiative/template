@@ -15,18 +15,10 @@ if [ -f "$ROOT_DIR/.env" ]; then
   set +a
 fi
 
-# Check if project has been launched. Run the config through the actual
-# TypeScript module loader rather than grepping — comments / multi-line
-# shapes / regex alternation typos can all fool a grep pattern.
-LAUNCHED="$(bun run "$ROOT_DIR/scripts/checkLaunched.ts")" || {
-  echo "[setup] failed to evaluate project.config.ts; aborting" >&2
+DATABASE_STRATEGY="$(bun run "$ROOT_DIR/scripts/cicd/databaseStrategy.ts")" || {
+  echo "[setup] failed to evaluate cicd.config.ts; aborting" >&2
   exit 1
 }
-if [ "$LAUNCHED" = "true" ]; then
-  IS_LAUNCHED=1
-else
-  IS_LAUNCHED=0
-fi
 
 "$SCRIPT_DIR/check-prereqs.sh"
 "$SCRIPT_DIR/sync-env.sh"
@@ -43,9 +35,9 @@ P="${PROJECT_NAME:-template}"
 echo "Generating database client..."
 bun run db:generate
 
-if [ "$IS_LAUNCHED" -gt 0 ]; then
+if [ "$DATABASE_STRATEGY" = "migrations" ]; then
   echo ""
-  echo "Project is launched — skipping db:push and db:seed."
+  echo "database.strategy is migrations — skipping db:push and db:seed."
   echo "Use db:migrate for schema changes."
   echo ""
 else

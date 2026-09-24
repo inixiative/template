@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { loadCicdConfig } from '../../scripts/cicd/config';
 
 // Monotonic counter for dynamic-import cache-busting. Date.now() has
 // millisecond resolution, which is too coarse for tight markComplete loops
@@ -867,6 +868,7 @@ export const getProjectConfig = async (): Promise<ProjectConfig> => {
     const module = await import(`${configPath}?n=${cacheBustCounter}`);
     const config = module.projectConfig as LegacyProjectConfig;
     const resendConfig = config.resend ?? config.email;
+    const delivery = existsSync(join(process.cwd(), 'cicd.config.ts')) ? await loadCicdConfig() : undefined;
 
     return {
       monitoring: config.monitoring,
@@ -954,7 +956,9 @@ export const getProjectConfig = async (): Promise<ProjectConfig> => {
       },
       features: {
         staging: {
-          enabled: (config.features?.staging?.enabled ?? defaultFeatures.staging.enabled) === true,
+          enabled:
+            (delivery?.staging.enabled ?? config.features?.staging?.enabled ?? defaultFeatures.staging.enabled) ===
+            true,
         },
         apps: {
           web: {

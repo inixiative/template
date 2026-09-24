@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "jsx": "react-jsx"
+  },
+  "include": [
+    "./**/*.ts",
+    "../../cicd.config.ts",
+    "../db/release.ts",
+    "../../init/tasks/cicdSettings.ts",
+    "../../init/views/CicdSetupView.tsx"
+  ]
+}

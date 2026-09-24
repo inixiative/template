@@ -10,6 +10,7 @@ import {
   type ProviderOption,
   REDIS_PROVIDERS,
 } from '../providers';
+import { configureCicd } from '../tasks/cicdSettings';
 import { checkProviderPrereq } from '../utils/checkPrerequisites';
 import { useConfig } from '../utils/configState';
 import {
@@ -224,9 +225,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onComplete, onCancel
             { label: 'Disabled', value: 'disabled' },
           ]}
           onSelect={async (item) => {
-            await writeAndSync((c) => {
-              c.features.staging.enabled = item.value === 'enabled';
-            });
+            await configureCicd([`--staging=${item.value === 'enabled' ? 'on' : 'off'}`]);
+            await syncConfig();
             setScreen({ kind: 'menu' });
           }}
         />
