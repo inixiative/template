@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@temp
 import { Input } from '@template/ui/components/primitives/Input';
 import { Label } from '@template/ui/components/primitives/Label';
 import { useAuthProviders } from '@template/ui/hooks';
+import { type DescribedError, describeError } from '@template/ui/lib/describeError';
 import { toast } from '@template/ui/lib/toast';
 import { useAppStore } from '@template/ui/store';
 import { useState } from 'react';
@@ -26,15 +27,13 @@ export type LoginFormProps = {
   onSignupClick?: () => void;
 };
 
-// OAuth failures arrive as bare codes (e.g. `state_mismatch`); callback failures as sentences.
-const formatAuthError = (error?: string) =>
-  !error || error.includes(' ') ? error : `Sign in failed (${error}). Please try again.`;
-
 export const LoginForm = ({ hideSignup: _hideSignup, onSignupClick }: LoginFormProps) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const search = useSearch({ strict: false }) as { redirectTo?: string; error?: string };
-  const [error, setError] = useState<string | undefined>(() => formatAuthError(search.error));
+  const [error, setError] = useState<DescribedError | undefined>(() =>
+    search.error ? describeError(search.error, 'Log in failed. Please try again.') : undefined,
+  );
   const [isLoading, setIsLoading] = useState(false);
 
   const signIn = useAppStore((state) => state.auth.signIn);
@@ -50,9 +49,9 @@ export const LoginForm = ({ hideSignup: _hideSignup, onSignupClick }: LoginFormP
       await signIn({ type: 'email', email, password });
       navigatePreserving(search.redirectTo || '/dashboard', 'context');
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Log in failed. Please try again.';
-      setError(message);
-      toast.error(message);
+      const described = describeError(err, 'Log in failed. Please try again.');
+      setError(described);
+      toast.error(described.message, { description: described.detail });
     } finally {
       setIsLoading(false);
     }
@@ -71,9 +70,9 @@ export const LoginForm = ({ hideSignup: _hideSignup, onSignupClick }: LoginFormP
         callbackURL: `${window.location.origin}/auth/callback`,
       });
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'OAuth log in failed. Please try again.';
-      setError(message);
-      toast.error(message);
+      const described = describeError(err, 'Log in failed. Please try again.');
+      setError(described);
+      toast.error(described.message, { description: described.detail });
       setIsLoading(false);
     }
   };
@@ -81,7 +80,10 @@ export const LoginForm = ({ hideSignup: _hideSignup, onSignupClick }: LoginFormP
   const enabledProviders = providers?.filter((p) => p.enabled) || [];
   const showProviders = enabledProviders.length > 0;
   const displayError = providerError
-    ? 'Unable to load authentication providers. You can still log in with email and password.'
+    ? describeError(
+        providerError,
+        'Unable to load authentication providers. You can still log in with email and password.',
+      )
     : error;
 
   return (
@@ -96,7 +98,8 @@ export const LoginForm = ({ hideSignup: _hideSignup, onSignupClick }: LoginFormP
         <div className="space-y-4">
           {displayError && (
             <div className="bg-error/10 border border-error text-error-foreground rounded-md p-3 text-sm">
-              {displayError}
+              {displayError.message}
+              {displayError.detail && <div className="mt-1 text-xs opacity-80 break-all">{displayError.detail}</div>}
             </div>
           )}
 

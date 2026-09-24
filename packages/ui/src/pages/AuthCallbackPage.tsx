@@ -7,6 +7,7 @@
 import { useNavigate } from '@tanstack/react-router';
 import { fetchAndHydrateMe } from '@template/ui/lib/auth/fetchAndHydrateMe';
 import { completeOAuthSignIn } from '@template/ui/lib/auth/signin';
+import { describeError } from '@template/ui/lib/describeError';
 import { log } from '@template/ui/lib/logger';
 import { useAppStore } from '@template/ui/store';
 import { useEffect, useRef } from 'react';
@@ -40,7 +41,7 @@ export const AuthCallbackPage = () => {
         log.error('OAuth callback failed:', error);
         navigate({
           to: '/login',
-          search: { error: error instanceof Error ? error.message : 'Authentication failed' },
+          search: { error: describeError(error).message },
         });
       }
     };

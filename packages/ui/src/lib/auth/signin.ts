@@ -23,7 +23,7 @@ const signInWithEmail = async (method: EmailAuthMethod): Promise<void> => {
   });
 
   if (error) {
-    throw new Error(error.message || 'Sign in failed');
+    throw new Error(error.message || error.statusText);
   }
 
   if (!data?.token) {
@@ -52,7 +52,7 @@ export const completeOAuthSignIn = async (oneTimeToken: string): Promise<void> =
   const { data, error } = await client.oneTimeToken.verify({ token: oneTimeToken });
 
   if (error) {
-    throw new Error(error.message || 'OAuth sign in failed');
+    throw new Error(error.message || error.statusText);
   }
 
   setToken(data.session.token, new Date(data.session.expiresAt));
