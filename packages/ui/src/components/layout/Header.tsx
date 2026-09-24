@@ -5,6 +5,7 @@
  * @uses none
  */
 import { Icon } from '@iconify/react';
+import { AppIdentity } from '@template/ui/components/layout/AppIdentity';
 import { Breadcrumbs } from '@template/ui/components/layout/Breadcrumbs';
 import { ShareButton } from '@template/ui/components/utility/ShareButton';
 import { cn } from '@template/ui/lib/utils';
@@ -12,11 +13,10 @@ import { useAppStore } from '@template/ui/store';
 
 export type HeaderProps = {
   onMenuClick?: () => void;
-  brand?: React.ReactNode;
   className?: string;
 };
 
-export const Header = ({ onMenuClick, brand, className }: HeaderProps) => {
+export const Header = ({ onMenuClick, className }: HeaderProps) => {
   const context = useAppStore((state) => state.tenant.context);
 
   return (
@@ -37,7 +37,7 @@ export const Header = ({ onMenuClick, brand, className }: HeaderProps) => {
             <Icon icon="lucide:menu" className="h-5 w-5" />
           </button>
         )}
-        {brand && <div className="shrink-0 text-base font-bold tracking-tight lg:hidden">{brand}</div>}
+        <AppIdentity className="shrink-0 text-base lg:hidden" />
         <Breadcrumbs className="hidden min-w-0 sm:block" />
       </div>
       <div className="flex items-center gap-2">{context && context.type !== 'public' && <ShareButton />}</div>
