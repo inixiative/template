@@ -11,8 +11,8 @@ import type {
   OrganizationReadManyWebhookSubscriptionsResponse,
   SpaceReadManyWebhookSubscriptionsResponse,
 } from '@template/sdk';
-import { Button, Table } from '@template/ui/components';
-import { DetailPanel, MasterDetailLayout } from '@template/ui/components/layout';
+import { Button, Page, Table } from '@template/ui/components';
+import { CreateWebhookModal } from '@template/ui/components/settings/CreateWebhookModal';
 import { createOptimisticListTarget, useOptimisticMutation, useQuery } from '@template/ui/hooks';
 import { webhookContextQueries } from '@template/ui/lib/webhookContextQueries';
 import { useAppStore } from '@template/ui/store';
@@ -25,7 +25,7 @@ type WebhookSubscription =
   | SpaceReadManyWebhookSubscriptionsResponse['data'][number];
 
 export const WebhooksPage = () => {
-  const [_isModalOpen, setIsModalOpen] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const context = useAppStore((state) => state.tenant.context) as AuthenticatedContext;
   const webhookQueries = webhookContextQueries(context);
 
@@ -80,51 +80,45 @@ export const WebhooksPage = () => {
       render: (item: WebhookSubscription) => (
         <div className="flex justify-end gap-2">
           <Button variant="ghost" size="sm" onClick={() => deleteMutation.mutate({ path: { id: item.id } })}>
-            <Icon icon="lucide:trash2" className="h-4 w-4 text-destructive" />
+            <Icon icon="lucide:trash-2" className="h-4 w-4 text-destructive" />
           </Button>
         </div>
       ),
     },
   ];
 
-  const _handleCreate = (data: Pick<MeCreateWebhookSubscriptionData['body'], 'model' | 'url'>) => {
+  const handleCreate = (data: Pick<MeCreateWebhookSubscriptionData['body'], 'model' | 'url'>) => {
     createMutation.mutate({ body: data });
     setIsModalOpen(false);
   };
 
-  if (isLoading) {
-    return <div className="p-8">Loading...</div>;
-  }
-
   return (
-    <MasterDetailLayout
-      detail={
-        <DetailPanel
-          header={
-            <div className="px-6 py-4 flex items-center justify-between border-b">
-              <div>
-                <h1 className="text-2xl font-bold">Webhooks</h1>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Configure webhooks to receive real-time notifications
-                </p>
-              </div>
-              <Button onClick={() => setIsModalOpen(true)}>
-                <Icon icon="lucide:plus" className="h-4 w-4 mr-2" />
-                Create Webhook
-              </Button>
-            </div>
-          }
-        >
-          <div className="p-6">
-            <Table
-              columns={columns}
-              data={webhooks}
-              keyExtractor={(item) => item.id}
-              emptyMessage="No webhooks configured yet"
-            />
-          </div>
-        </DetailPanel>
+    <Page
+      title="Webhooks"
+      description="Configure webhooks to receive real-time notifications"
+      actions={
+        <Button onClick={() => setIsModalOpen(true)}>
+          <Icon icon="lucide:plus" className="h-4 w-4 mr-2" />
+          Create webhook
+        </Button>
       }
-    />
+    >
+      {isLoading ? (
+        <div className="h-40 animate-pulse rounded-xl bg-muted/50" />
+      ) : (
+        <Table
+          columns={columns}
+          data={webhooks}
+          keyExtractor={(item) => item.id}
+          emptyMessage="No webhooks configured yet"
+          empty={{
+            icon: 'lucide:webhook',
+            description: 'Webhooks send an HTTP request to your URL whenever a subscribed model changes.',
+            action: { label: 'Create webhook', onClick: () => setIsModalOpen(true) },
+          }}
+        />
+      )}
+      <CreateWebhookModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSubmit={handleCreate} />
+    </Page>
   );
 };
