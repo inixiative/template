@@ -4,7 +4,13 @@
  * @partOf primitive:websockets
  * @uses feature:auth
  */
-import { parseChannelKey, WS_CHANNELS } from '@template/shared/ws';
+import {
+  channelKey,
+  parseChannelKey,
+  WS_CHANNELS,
+  type WSChannelFamily,
+  type WSChannelType,
+} from '@template/shared/ws';
 import { app } from '#/app';
 import { AUTH_PROBE_HEADER, AUTH_PROBE_SECRET } from '#/lib/utils/authProbe';
 
@@ -50,25 +56,34 @@ const loadOperations = async (): Promise<Map<string, { method: string; path: str
   return operations;
 };
 
-// A query channel is authorized by its own route: probe the operation with the connection's
-// credential — 2xx over HTTP means the caller may watch it.
-export const canSubscribe = async (headers: WSHeaders, channel: string): Promise<boolean> => {
+export type ChannelRoute = { method: string; path: string };
+
+export const resolveChannelRoute = async (channel: string, type: WSChannelType): Promise<ChannelRoute | null> => {
+  if (typeof channel !== 'string') return null;
   const key = parseChannelKey(channel);
-  if (!(key._id in WS_CHANNELS)) return false;
+  if (channelKey(key) !== channel) return null;
+  if (!Object.hasOwn(WS_CHANNELS, key._id) || WS_CHANNELS[key._id as WSChannelFamily].type !== type) return null;
   const op = (await loadOperations()).get(key._id);
-  if (!op) return false;
+  if (!op) return null;
 
   let path = op.path;
   for (const [field, value] of Object.entries(key.path ?? {})) {
     const filled = encodeURIComponent(String(value));
     const next = path.replace(`{${field}}`, filled).replace(`:${field}`, filled);
-    if (next === path) return false; // surplus segment — not a param of this route
+    if (next === path) return null; // surplus segment — not a param of this route
     path = next;
   }
-  if (path.includes('{') || path.includes('/:')) return false;
+  if (path.includes('{') || path.includes('/:')) return null;
+  return { method: op.method, path };
+};
 
-  const res = await app.request(path, {
-    method: op.method,
+// A query channel is authorized by its own route: probe the operation with the connection's
+// credential — 2xx over HTTP means the caller may watch it.
+export const canSubscribe = async (headers: WSHeaders, channel: string): Promise<boolean> => {
+  const route = await resolveChannelRoute(channel, 'query');
+  if (!route) return false;
+  const res = await app.request(route.path, {
+    method: route.method,
     headers: { ...headers, [AUTH_PROBE_HEADER]: AUTH_PROBE_SECRET },
   });
   return res.ok;

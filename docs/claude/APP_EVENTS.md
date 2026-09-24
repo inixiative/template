@@ -64,7 +64,7 @@ type EmailHandoff = {
 };
 
 type WSHandoff = {
-  target: { channels: string[] } | { userIds: string[] };
+  target: { channels: string[] } | { userIds: string[] } | { streams: string[] };
   message: { data: Record<string, unknown> };
 };
 
@@ -103,10 +103,20 @@ websocket: (data) => [{
 }],
 ```
 
-`deliverWSHandoffs` sends the payload through `sendToChannel` or `sendToUser`. The current
-frontend consumer handles query-refetch hints, while the envelope itself accepts arbitrary
-payloads. New payload kinds require their own consumer and recovery design. Subscription
-checks use the underlying authorized route; see [WEBSOCKETS.md](WEBSOCKETS.md).
+`deliverWSHandoffs` sends the payload through `sendToChannel`, `sendToUser` or
+`appendToStream`. The frontend handles query-refetch hints and data-stream appends. New payload
+kinds require their own consumer and recovery design. Subscription and stream-open checks use
+the underlying authorized route; see [WEBSOCKETS.md](WEBSOCKETS.md).
+
+Stream-targeted example, from the contact handlers. For a `{ streams }` target, `message.data`
+is the append payload itself; the transport wraps it in the data frame:
+
+```typescript
+websocket: ({ contact }) => organizationContactsHandoffs(contact, { remove: contact.id }),
+```
+
+An append goes to every connection holding the stream, and it has to match the shape of the
+route's response. See [WEBSOCKETS.md](WEBSOCKETS.md#data-streams).
 
 Segments also publish member-side `customerRef.segmentsAdded` / `customerRef.segmentsRemoved`
 events. For User customers those target the user's sockets with a membership-query refetch.

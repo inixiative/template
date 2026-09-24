@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { QueryClient } from '@tanstack/react-query';
 import type { ChannelKeyInput, WSEvent } from '@template/shared/ws';
+import { dataStreamQueryKey } from '@template/ui/lib/ws/dataStreamQueryKey';
 import { dispatchMessage } from '@template/ui/lib/ws/dispatch';
 import { useAppStore } from '@template/ui/store';
 
@@ -38,5 +39,34 @@ describe('dispatchMessage', () => {
   it('ignores unknown categories and actions', () => {
     expect(() => dispatchMessage({ category: 'presence', action: 'join' } as never)).not.toThrow();
     expect(() => dispatchMessage({ category: 'query', action: 'explode' } as never)).not.toThrow();
+  });
+
+  describe('data streams', () => {
+    const stream = 'organizationReadManyContacts:id:org-1';
+    const row = (id: string) => ({ id, label: id });
+    const snapshot = (...ids: string[]) => ({ data: ids.map(row) });
+
+    it('stores a snapshot as the stream query data', () => {
+      dispatchMessage({ category: 'data', action: 'snapshot', stream, payload: snapshot('a') });
+      expect(qc().getQueryData<unknown>(dataStreamQueryKey(stream))).toEqual(snapshot('a'));
+    });
+
+    it('folds an append into the snapshot with the family reducer', () => {
+      dispatchMessage({ category: 'data', action: 'snapshot', stream, payload: snapshot('a') });
+      dispatchMessage({ category: 'data', action: 'append', stream, payload: { upsert: row('b') } });
+      expect(qc().getQueryData<unknown>(dataStreamQueryKey(stream))).toEqual(snapshot('b', 'a'));
+    });
+
+    it('drops an append that arrives with no snapshot to fold into', () => {
+      dispatchMessage({ category: 'data', action: 'append', stream, payload: { upsert: row('b') } });
+      expect(qc().getQueryData<unknown>(dataStreamQueryKey(stream))).toBeUndefined();
+    });
+
+    it('drops an append for a stream family with no reducer', () => {
+      const unknown = 'nope:id:x';
+      dispatchMessage({ category: 'data', action: 'snapshot', stream: unknown, payload: snapshot('a') });
+      dispatchMessage({ category: 'data', action: 'append', stream: unknown, payload: { upsert: row('b') } });
+      expect(qc().getQueryData<unknown>(dataStreamQueryKey(unknown))).toEqual(snapshot('a'));
+    });
   });
 });
