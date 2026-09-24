@@ -13,5 +13,5 @@ export const makeCicdConfig = (): CicdConfig => ({
     maxActive: 2,
   },
   checks: { pre: true, post: true },
-  database: { strategy: 'schema-push' },
+  database: { strategy: 'schema-push', seedOnRelease: false },
 });

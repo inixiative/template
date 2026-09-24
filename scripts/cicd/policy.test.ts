@@ -141,7 +141,14 @@ describe('database release policy', () => {
     const commands = databaseReleaseCommands('schema-push', []);
     expect(commands[0].slice(-2)).toEqual(['db', 'push']);
     expect(commands.flat()).not.toContain('--accept-data-loss');
-    expect(commands[1].slice(-1)).toEqual(['db:seed']);
+  });
+  test('releases do not seed unless seeding is explicitly enabled', () => {
+    expect(databaseReleaseCommands('schema-push', []).flat()).not.toContain('db:seed');
+    expect(databaseReleaseCommands('migrations', ['0_init/migration.sql']).flat()).not.toContain('db:seed');
+  });
+  test('seeding on release is opt-in and applies to both strategies', () => {
+    expect(databaseReleaseCommands('schema-push', [], true)[1]?.slice(-1)).toEqual(['db:seed']);
+    expect(databaseReleaseCommands('migrations', ['0_init/migration.sql'], true)[1]?.slice(-1)).toEqual(['db:seed']);
   });
   test('migration mode requires a baseline and schema push cannot bypass existing migrations', () => {
     expect(() => databaseReleaseCommands('migrations', [])).toThrow('baseline');

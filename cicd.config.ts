@@ -26,5 +26,6 @@ export const cicdConfig = {
   },
   database: {
     strategy: 'schema-push',
+    seedOnRelease: false,
   },
 } satisfies CicdConfig;

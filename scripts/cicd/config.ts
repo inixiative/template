@@ -29,7 +29,10 @@ export const cicdSchema = z
       maxActive: z.number().int().min(1).max(20),
     }),
     checks: z.strictObject({ pre: z.literal(true), post: z.literal(true) }),
-    database: z.strictObject({ strategy: z.enum(['schema-push', 'migrations']) }),
+    database: z.strictObject({
+      strategy: z.enum(['schema-push', 'migrations']),
+      seedOnRelease: z.boolean().default(false),
+    }),
   })
   .refine((value) => value.production.branch !== value.staging.branch, {
     message: 'Production and staging must track different branches',
