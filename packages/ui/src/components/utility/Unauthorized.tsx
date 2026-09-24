@@ -15,7 +15,7 @@ export type UnauthorizedProps = {
 };
 
 export const Unauthorized = ({
-  title = 'Access Denied',
+  title = 'Access denied',
   message = "You don't have permission to access this page in the current context.",
 }: UnauthorizedProps) => {
   const isAuthenticated = useAppStore((state) => state.auth.isAuthenticated);
