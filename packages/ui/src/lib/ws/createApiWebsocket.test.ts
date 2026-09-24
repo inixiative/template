@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 import '@template/ui/store';
+import { QueryClient, QueryObserver, skipToken } from '@tanstack/react-query';
 import { createApiWebsocket } from '@template/ui/lib/ws/createApiWebsocket';
+import { dataStreamQueryKey } from '@template/ui/lib/ws/dataStreamQueryKey';
+import { useAppStore } from '@template/ui/store';
 
 let instances: FakeWebSocket[] = [];
 
@@ -101,5 +104,152 @@ describe('createApiWebsocket', () => {
     expect(reconnected).toBe(0);
     receive(ws, { type: 'subscribed', channel: 'ch1' });
     expect(reconnected).toBe(1);
+  });
+
+  describe('data streams', () => {
+    const stream = 'organizationReadManyContacts:id:org-1';
+    let client: QueryClient;
+    beforeEach(() => {
+      client = new QueryClient();
+      useAppStore.setState({ client });
+    });
+
+    const connected = () => {
+      const api = createApiWebsocket('ws://x');
+      api.connect();
+      const ws = instances[0];
+      open(ws);
+      return { api, ws };
+    };
+
+    it('opens once per stream across holders and closes when the last holder releases it', () => {
+      const { api, ws } = connected();
+      api.open(stream);
+      api.open(stream);
+      api.close(stream);
+      expect(sends(ws).filter((frame) => frame.action === 'open')).toEqual([{ action: 'open', stream }]);
+      expect(sends(ws).some((frame) => frame.action === 'close')).toBe(false);
+
+      api.close(stream);
+      expect(sends(ws).at(-1)).toEqual({ action: 'close', stream });
+    });
+
+    it('re-opens held streams after identity on reconnect, for a fresh snapshot', () => {
+      const { api, ws } = connected();
+      api.authenticate('tok');
+      api.open(stream);
+      ws.sent.length = 0;
+      open(ws);
+
+      expect(sends(ws)).toEqual([
+        { action: 'authenticate', headers: { authorization: 'Bearer tok' } },
+        { action: 'open', stream },
+      ]);
+    });
+
+    it('re-opens held streams on an identity change so they are re-authorized', () => {
+      const { api, ws } = connected();
+      api.open(stream);
+      ws.sent.length = 0;
+      api.logout();
+
+      expect(sends(ws)).toEqual([{ action: 'logout' }, { action: 'open', stream }]);
+    });
+
+    it('drops a rejected stream from replay and surfaces the rejection on its query', () => {
+      const unobserve = new QueryObserver(client, {
+        queryKey: dataStreamQueryKey(stream),
+        queryFn: skipToken,
+      }).subscribe(() => {});
+      const { api, ws } = connected();
+      api.open(stream);
+      receive(ws, { category: 'data', action: 'snapshot', stream, payload: { data: [] } });
+
+      receive(ws, { type: 'openRejected', stream });
+      const state = client.getQueryState(dataStreamQueryKey(stream));
+      expect(state?.status).toBe('error');
+      expect(state?.data).toBeUndefined();
+
+      ws.sent.length = 0;
+      open(ws);
+      expect(sends(ws).some((frame) => frame.action === 'open')).toBe(false);
+      unobserve();
+    });
+
+    it('ignores data frames for a stream it no longer holds', () => {
+      const { api, ws } = connected();
+      api.open(stream);
+      api.close(stream);
+
+      receive(ws, { category: 'data', action: 'snapshot', stream, payload: { data: [] } });
+
+      expect(client.getQueryData<unknown>(dataStreamQueryKey(stream))).toBeUndefined();
+    });
+
+    it('routes a held stream snapshot into its query', () => {
+      const { api, ws } = connected();
+      api.open(stream);
+
+      receive(ws, { category: 'data', action: 'snapshot', stream, payload: { data: [] } });
+
+      expect(client.getQueryData<unknown>(dataStreamQueryKey(stream))).toEqual({ data: [] });
+    });
+
+    const observe = () =>
+      new QueryObserver(client, { queryKey: dataStreamQueryKey(stream), queryFn: skipToken }).subscribe(() => {});
+
+    it('never sends an open ahead of the identity frame on a connection that is not yet open', () => {
+      const api = createApiWebsocket('ws://x');
+      api.connect();
+      const ws = instances[0];
+      api.authenticate('tok');
+      api.open(stream);
+      open(ws);
+
+      const actions = sends(ws).map((frame) => frame.action);
+      expect(actions.filter((action) => action === 'open')).toHaveLength(1);
+      expect(actions.indexOf('authenticate')).toBeLessThan(actions.indexOf('open'));
+    });
+
+    it('ignores a rejection answering an open that a later open superseded', () => {
+      const unobserve = observe();
+      const { api, ws } = connected();
+      api.open(stream);
+      api.authenticate('tok');
+
+      receive(ws, { type: 'openRejected', stream });
+      receive(ws, { type: 'opened', stream });
+      receive(ws, { category: 'data', action: 'snapshot', stream, payload: { data: [] } });
+
+      expect(client.getQueryState(dataStreamQueryKey(stream))?.status).toBe('success');
+      unobserve();
+    });
+
+    it('keeps its holder count across a rejection, and a new holder retries the open', () => {
+      const { api, ws } = connected();
+      api.open(stream);
+      api.open(stream);
+      receive(ws, { type: 'openRejected', stream });
+
+      api.open(stream);
+      api.close(stream);
+
+      expect(sends(ws).filter((frame) => frame.action === 'open')).toHaveLength(2);
+      expect(sends(ws).some((frame) => frame.action === 'close')).toBe(false);
+    });
+
+    it('surfaces a failed open as an error and retries it on the next connection', () => {
+      const unobserve = observe();
+      const { api, ws } = connected();
+      api.open(stream);
+
+      receive(ws, { type: 'error', action: 'open', stream });
+      expect(client.getQueryState(dataStreamQueryKey(stream))?.status).toBe('error');
+
+      ws.sent.length = 0;
+      open(ws);
+      expect(sends(ws)).toContainEqual({ action: 'open', stream });
+      unobserve();
+    });
   });
 });

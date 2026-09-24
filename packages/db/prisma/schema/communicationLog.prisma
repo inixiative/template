@@ -36,6 +36,7 @@ model CommunicationLog {
   idempotencyKey    String    @unique
   providerMessageId String?
   error             String?
+  reasonCode        CommunicationReasonCode?
   sentAt            DateTime?
 
   componentVersions CommunicationComponentVersion[]
@@ -76,6 +77,19 @@ enum CommunicationChannel {
   sms
   push
   inApp
+}
+
+enum CommunicationReasonCode {
+  render_failed
+  rate_limit_exhausted
+  transient_exhausted
+  ambiguous_timeout
+  quota_exceeded
+  permanent
+  auth
+  validation
+  not_found
+  send_error
 }
 
 enum CommunicationStatus {

@@ -99,7 +99,7 @@ export const auth = betterAuth({
     },
   },
 
-  plugins: [bearer()],  // Allows session token in Authorization header
+  plugins: [bearer(), ...oauthHandoffPlugins()],  // Bearer sessions + one-time-token OAuth handoff
 
   secondaryStorage: {
     // Redis for frequently-accessed data (permissions, org lists)
@@ -171,29 +171,25 @@ Located in `packages/ui/src/lib/auth/signin.ts` and `/apps/*/app/routes/_public/
 2. **Frontend calls BetterAuth** via `client.signIn.social({ provider, callbackURL })`
 3. **BetterAuth redirects** to OAuth provider (Google, GitHub, etc.)
 4. **User authenticates** with provider
-5. **Provider redirects back** to `/auth/callback?token=...`
-6. **Callback route extracts token**:
-   - Read token from query param or hash
-   - Store in localStorage via `setToken()`
+5. **Provider redirects to the API** at `{API_URL}/api/auth/callback/<provider>` — register this as the redirect URI with the provider
+6. **API mints a one-time token** and redirects to `/auth/callback#ott=...`
+7. **Callback page exchanges it** via `completeOAuthSignIn()`:
+   - `POST /api/auth/one-time-token/verify` returns the session
+   - Store the session token in localStorage via `setToken()`
    - Hydrate user data via `fetchAndHydrateMe()`
    - Navigate to redirectTo destination
 
-##### Bearer Token Pattern
+##### Bearer Token Handoff
 
-OAuth flow returns a **bearer token** (not just session cookie):
+The SPA authenticates with bearer tokens, but the OAuth callback is a browser redirect: the session BetterAuth
+creates there exists only as a cookie on the API origin, which the SPA never sends. `oauthHandoffPlugins()`
+(`apps/api/src/lib/auth/oauthHandoffPlugins.ts`) bridges the two:
 
-```typescript
-// Callback route (apps/web/app/routes/_public/auth.callback.tsx)
-const url = new URL(window.location.href);
-const token = url.searchParams.get('token') || url.hash.match(/token=([^&]+)/)?.[1];
+- `oneTimeToken({ setOttHeaderOnNewSession: true })` mints a single-use token (1 minute, stored hashed) for every new session
+- `oauthCallbackToken` moves that token onto the callback redirect as `#ott=` — a fragment, so it never reaches server logs or referrers
+- The browser can't mint tokens itself (`disableClientRequest`); verify consumes atomically via Redis `GETDEL` (`secondaryStorage.getAndDelete`)
 
-if (token) {
-  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-  setToken(token, expiresAt);
-  await fetchAndHydrateMe(store.setState, store.getState);
-  navigate({ to: redirectTo });
-}
-```
+The session token itself never appears in a URL.
 
 All API requests include the bearer token:
 
@@ -1117,7 +1113,7 @@ const signInWithOAuth = async (method: OAuthAuthMethod): Promise<void> => {
 // apps/web/app/routes/_public/auth.callback.tsx
 import { useEffect } from 'react';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
-import { setToken } from '@template/ui/lib/auth/token';
+import { completeOAuthSignIn } from '@template/ui/lib/auth/signin';
 import { fetchAndHydrateMe } from '@template/ui/lib/auth/fetchAndHydrateMe';
 import { useAppStore } from '@template/ui/store';
 
@@ -1133,14 +1129,13 @@ function AuthCallbackPage() {
     const completeOAuth = async () => {
       try {
         const url = new URL(window.location.href);
-        const token = url.searchParams.get('token') || url.hash.match(/token=([^&]+)/)?.[1];
+        const oneTimeToken = new URLSearchParams(url.hash.slice(1)).get('ott');
+        url.hash = '';
+        window.history.replaceState({}, '', url.toString());
 
-        if (!token) {
-          throw new Error('No authentication token received');
-        }
+        if (!oneTimeToken) throw new Error('No authentication token received');
 
-        const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-        setToken(token, expiresAt);
+        await completeOAuthSignIn(oneTimeToken);
 
         await fetchAndHydrateMe(store.setState, store.getState);
 
@@ -1173,14 +1168,15 @@ function AuthCallbackPage() {
 2. `signIn({ type: 'oauth', provider: 'google' })`
 3. BetterAuth redirects to Google OAuth
 4. User authenticates with Google
-5. Google redirects to `/auth/callback?token=...`
-6. Callback route extracts bearer token, stores in localStorage
+5. Google redirects to the API callback, which redirects to `/auth/callback#ott=...`
+6. Callback page exchanges the one-time token for the session token, stores it in localStorage
 7. Hydrates user data via `/me` API call
 8. Navigates to redirectTo destination
 
 **Security:**
 - BetterAuth handles OAuth state/nonce validation
-- Bearer token pattern (not session cookies)
+- Bearer token pattern (not session cookies); the session token never travels in a URL
+- The one-time token is single-use, so the callback page guards against StrictMode's double effect
 - Callback routes in all 3 apps (web, admin, superadmin)
 
 ##### Provider Configuration

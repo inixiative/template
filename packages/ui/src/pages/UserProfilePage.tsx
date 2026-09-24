@@ -5,7 +5,7 @@
  * @uses primitive:sdk
  */
 import { meRead, meReadQueryKey } from '@template/sdk';
-import { DetailPanel, MasterDetailLayout } from '@template/ui/components/layout';
+import { Page } from '@template/ui/components';
 import { ProfileFormCard } from '@template/ui/components/settings';
 import { useQuery } from '@template/ui/hooks';
 import { apiQuery } from '@template/ui/lib/apiQuery';
@@ -18,31 +18,18 @@ export const UserProfilePage = () => {
 
   const profile = data?.data;
 
-  if (isLoading) {
-    return <div className="p-8">Loading...</div>;
-  }
-
   return (
-    <MasterDetailLayout
-      detail={
-        <DetailPanel
-          header={
-            <div className="px-6 py-4 border-b">
-              <h1 className="text-2xl font-bold">Profile</h1>
-              <p className="text-sm text-muted-foreground mt-1">Manage your user settings and preferences</p>
-            </div>
-          }
-        >
-          <div className="p-6">
-            <ProfileFormCard
-              name={profile?.name ?? ''}
-              canEditName={false}
-              readOnlyMessage="User profile editing coming soon"
-              showThemeToggle
-            />
-          </div>
-        </DetailPanel>
-      }
-    />
+    <Page title="Profile" description="Manage your user settings and preferences">
+      {isLoading ? (
+        <div className="h-40 animate-pulse rounded-xl bg-muted/50" />
+      ) : (
+        <ProfileFormCard
+          name={profile?.name ?? ''}
+          canEditName={false}
+          readOnlyMessage="User profile editing coming soon"
+          showThemeToggle
+        />
+      )}
+    </Page>
   );
 };

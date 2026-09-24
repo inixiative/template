@@ -12,13 +12,16 @@ import { EmailRenderError } from '@template/email/errors/EmailRenderError';
 import { lookupTemplate, rowOwner, templateLens } from '@template/email/render';
 import { declaredFields } from '@template/email/rules';
 import { log } from '@template/shared/logger';
+import { ConcurrencyType, getConcurrency, resolveAll } from '@template/shared/utils';
 import { pick } from 'lodash-es';
 import { enqueueJob } from '#/jobs/enqueue';
 import { makeJob } from '#/jobs/makeJob';
+import { JobLane } from '#/jobs/types';
 import { emailRegistry } from '#/lib/email';
 import { bindLens } from '#/lib/email/bindLens';
 import { bindWhere } from '#/lib/email/bindWhere';
 import { emailLensFor } from '#/lib/email/emailLensFor';
+import { fanOutLane } from '#/lib/email/fanOutLane';
 import { deliverJobId, plannerJobId } from '#/lib/email/idempotency';
 import { pickSender } from '#/lib/email/pickSender';
 import type { Recipient } from '#/lib/email/recipient';
@@ -142,20 +145,28 @@ export const sendEmail = makeJob<SendEmailPayload>(async (_ctx, payload) => {
     for (const l of existing) logByKey.set(l.idempotencyKey, l.id);
   }
 
-  let fanned = 0;
-  for (const { user, recipient, idempotencyKey } of plan) {
+  // A fan-out wider than the threshold is slow work: its deliveries share the fleet's slow-lane slots.
+  // Slow enqueues mostly buffer to the outbox, so they run concurrently — sequential awaits would
+  // each wait out the accumulator's linger instead of committing as one batch.
+  const lane = fanOutLane(plan.length);
+  const deliveries = plan.flatMap(({ user, recipient, idempotencyKey }) => {
     const communicationLogId = logByKey.get(idempotencyKey);
-    if (!communicationLogId) continue;
-    const userRow = user as Record<string, unknown>;
-    const cc = entry.cc ? await emailsOf(addressLens(bindWhere(entry.cc.where, userRow))) : undefined;
-    const bcc = entry.bcc ? await emailsOf(addressLens(bindWhere(entry.bcc.where, userRow))) : undefined;
-    await enqueueJob(
-      'deliverEmail',
-      { template, sender, recipient, cc, bcc, data: dataVars, communicationLogId },
-      { id: idempotencyKey },
-    );
-    fanned += 1;
-  }
+    if (!communicationLogId) return [];
+    return [
+      async () => {
+        const userRow = user as Record<string, unknown>;
+        const cc = entry.cc ? await emailsOf(addressLens(bindWhere(entry.cc.where, userRow))) : undefined;
+        const bcc = entry.bcc ? await emailsOf(addressLens(bindWhere(entry.bcc.where, userRow))) : undefined;
+        await enqueueJob(
+          'deliverEmail',
+          { template, sender, recipient, cc, bcc, data: dataVars, communicationLogId },
+          { id: idempotencyKey, lane },
+        );
+      },
+    ];
+  });
+  await resolveAll(deliveries, lane === JobLane.slow ? getConcurrency([ConcurrencyType.queue]) : 1);
+  const fanned = deliveries.length;
 
-  log.info(`Email fanned out: template=${template} jobs=${fanned}`);
+  log.info(`Email fanned out: template=${template} jobs=${fanned} lane=${lane}`);
 });

@@ -4,6 +4,6 @@
  * @partOf primitive:appEvents
  * @uses primitive:websockets
  */
-import type { WSEvent } from '@template/shared/ws';
+import type { WSQueryEvent } from '@template/shared/ws';
 
-export const refetch = (key: WSEvent['key']): WSEvent => ({ category: 'query', action: 'refetch', key });
+export const refetch = (key: WSQueryEvent['key']): WSQueryEvent => ({ category: 'query', action: 'refetch', key });

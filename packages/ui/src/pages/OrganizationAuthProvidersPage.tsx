@@ -16,8 +16,7 @@ import {
   organizationReadAuthProvider,
   organizationReadAuthProviderQueryKey,
 } from '@template/sdk';
-import { Badge, Button, Table } from '@template/ui/components';
-import { DetailPanel, MasterDetailLayout } from '@template/ui/components/layout';
+import { Badge, Button, Page, Table } from '@template/ui/components';
 import { AuthProviderModal } from '@template/ui/components/settings/AuthProviderModal';
 import { createOptimisticListTarget, useOptimisticMutation, useQuery } from '@template/ui/hooks';
 import { apiMutation } from '@template/ui/lib/apiMutation';
@@ -130,7 +129,7 @@ export const OrganizationAuthProvidersPage = () => {
             <Icon icon="lucide:pencil" className="h-4 w-4" />
           </Button>
           <Button variant="ghost" size="sm" onClick={() => deleteMutation.mutate({ path: { id: item.id } })}>
-            <Icon icon="lucide:trash2" className="h-4 w-4 text-destructive" />
+            <Icon icon="lucide:trash-2" className="h-4 w-4 text-destructive" />
           </Button>
         </div>
       ),
@@ -155,41 +154,35 @@ export const OrganizationAuthProvidersPage = () => {
     setEditingProvider(null);
   };
 
-  if (isLoading) {
-    return <div className="p-8">Loading...</div>;
-  }
-
   return (
     <>
-      <MasterDetailLayout
-        detail={
-          <DetailPanel
-            header={
-              <div className="px-6 py-4 flex items-center justify-between border-b">
-                <div>
-                  <h1 className="text-2xl font-bold">Authentication Providers</h1>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Configure custom SSO and OAuth providers for your organization
-                  </p>
-                </div>
-                <Button onClick={() => setIsModalOpen(true)}>
-                  <Icon icon="lucide:plus" className="h-4 w-4 mr-2" />
-                  Add Provider
-                </Button>
-              </div>
-            }
-          >
-            <div className="p-6">
-              <Table
-                columns={columns}
-                data={providers}
-                keyExtractor={(item) => item.id}
-                emptyMessage="No custom auth providers configured. Platform email/password authentication is enabled by default."
-              />
-            </div>
-          </DetailPanel>
+      <Page
+        title="Authentication providers"
+        description="Configure custom SSO and OAuth providers for your organization"
+        actions={
+          <Button onClick={() => setIsModalOpen(true)}>
+            <Icon icon="lucide:plus" className="h-4 w-4 mr-2" />
+            Add provider
+          </Button>
         }
-      />
+      >
+        {isLoading ? (
+          <div className="h-40 animate-pulse rounded-xl bg-muted/50" />
+        ) : (
+          <Table
+            columns={columns}
+            data={providers}
+            keyExtractor={(item) => item.id}
+            emptyMessage="No custom auth providers configured"
+            empty={{
+              icon: 'lucide:shield-check',
+              description:
+                'Platform email/password authentication is enabled by default. Add SSO or OAuth for your members.',
+              action: { label: 'Add provider', onClick: () => setIsModalOpen(true) },
+            }}
+          />
+        )}
+      </Page>
 
       <AuthProviderModal
         isOpen={isModalOpen}

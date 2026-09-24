@@ -302,7 +302,9 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **Admin Routes** - Manual job enqueueing, cron trigger override, job status inspection, queue stats
 
-- ✅ **Overflow Buffer** — `JobOutbox` stores overflowed ad-hoc job intent; batched flushes and a serialized, lock-protected drain meter it back to BullMQ. Fast/slow lane admission and a global worker-presence cap remain planned in INFRA-031.
+- ✅ **Overflow Buffer** — `JobOutbox` stores overflowed ad-hoc job intent; batched flushes and a serialized, lock-protected drain meter it back to BullMQ.
+
+- ✅ **Fast/Slow Lanes** — A lane label on every job envelope. Slow work (e.g. a large email fan-out) waits in the same BullMQ queue at the lowest priority, so fast work is always picked first while idle slots still run slow work, and it may fill only its share of the queue's depth budget before spilling to the outbox. Tunable by env knob.
 
 ---
 
@@ -329,6 +331,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 ## Real-Time Communication
 
 - ✅ **Authenticated WebSockets** — Bun transport with message-based authentication through the HTTP `/me` route; spoof authority follows the same middleware. Credentials are not sent as a token query parameter.
+- ✅ **WebSocket Data Streams** — open/snapshot/append/close streams keyed to a read route: the route's response authorizes the open and is the snapshot, app-event handlers push appends through Redis, and clients re-open for a fresh snapshot after reconnect or an identity change. The frontend holds each stream in a TanStack query (`useDataStream`); the first example is `organizationReadManyContacts`.
 - ✅ **Authorized Query Channels** — `WS_CHANNELS` declares channel families and supplies `LIVE_QUERIES`. Subscribe probes the corresponding HTTP route; unauthorized, unknown or malformed channels are rejected. Effective identity changes drop previous subscriptions.
 - ✅ **Refetch and Recovery** — Mounted live queries subscribe automatically. After reconnect, identity and subscriptions are replayed before recovery invalidation. Hints are not persisted or replayed; delivery is not guaranteed while disconnected.
 - ✅ **Redis Pub/Sub** — Channel and user-targeted messages reach connected clients across API instances, with local-only fallback on Redis failure.

@@ -60,6 +60,30 @@ describe('admin/job', () => {
       expect(data.name).toBe('cleanStaleData');
     });
 
+    it('accepts a lane override', async () => {
+      const response = await fetch(
+        post('/api/admin/job', {
+          handler: 'cleanStaleData',
+          payload: { model: 'WebhookEvent', retentionDays: 90 },
+          options: { lane: 'slow' },
+        }),
+      );
+
+      expect(response.status).toBe(201);
+    });
+
+    it('rejects an unknown lane', async () => {
+      const response = await fetch(
+        post('/api/admin/job', {
+          handler: 'cleanStaleData',
+          payload: { model: 'WebhookEvent', retentionDays: 90 },
+          options: { lane: 'medium' },
+        }),
+      );
+
+      expect(response.status).toBe(400);
+    });
+
     it('rejects invalid handler name', async () => {
       const response = await fetch(
         post('/api/admin/job', {
