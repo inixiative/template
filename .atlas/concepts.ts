@@ -20,6 +20,8 @@ export const CONCEPTS: ConceptRegistry = {
 
   // classless cross-cutting tag (derived): the BE admin surface IS superadmin.
   superadmin: {},
+  // classless cross-cutting tag: the ordering / mutual-exclusion primitives (serialized queue, lock, supersede lanes).
+  mutex: { docs: ['CONCURRENCY.md'] },
 
   'primitive:authz': { package: ['permissions'], docs: ['PERMISSIONS.md'] },
   'primitive:batch': { module: ['batch'], docs: ['BATCH.md'] },

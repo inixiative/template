@@ -6,15 +6,18 @@
  */
 import type { ChannelKeyInput } from '@template/shared/ws/channelKey';
 
-// Server → client WS events: flat, discriminated by category + action. `key` is the query the
-// event concerns — channelKey(key) routes it, and the FE acts on it per action. Both ends type
-// against this one contract; the FE dispatch map mirrors it as handlers[category][action].
-//
-// Delivery contract: nothing is persisted or replayed — anything emitted while a client is
-// disconnected is dropped. Every consumer must own a recovery path that doesn't depend on the push
-// (query channels: refetch-on-reconnect; data streams: re-open for a fresh snapshot).
 export type WSQueryEvent = { category: 'query'; action: 'refetch'; key: ChannelKeyInput };
 
-export type WSDataEvent = { category: 'data'; action: 'snapshot' | 'append'; stream: string; payload: unknown };
+export type WSStreamSnapshotEvent = { category: 'data'; action: 'snapshot'; stream: string; payload: unknown };
+
+export type WSStreamAppendEvent = {
+  category: 'data';
+  action: 'append';
+  stream: string;
+  type: string;
+  payload: unknown;
+};
+
+export type WSDataEvent = WSStreamSnapshotEvent | WSStreamAppendEvent;
 
 export type WSEvent = WSQueryEvent | WSDataEvent;

@@ -31,7 +31,6 @@ export {
 export { useBreadcrumbs } from './useBreadcrumbs';
 export { useDarkMode } from './useDarkMode';
 export { type DataFilters, useDataFilters } from './useDataFilters';
-export { useDataStream } from './useDataStream';
 export { type DebouncedCallback, useDebounce, useDebouncedCallback } from './useDebounce';
 export { type InfiniteDataResult, type UseInfiniteDataOptions, useInfiniteData } from './useInfiniteData';
 export {
@@ -54,5 +53,7 @@ export { useMutation, useQuery } from './useQuery';
 export { useScrollState } from './useScrollState';
 export { useSectionHash } from './useSectionHash';
 export { useSpaceTheme } from './useSpaceTheme';
+export { type StreamFolding, type StreamReducers, useStream } from './useStream';
+export { useStreamAction } from './useStreamAction';
 export { useThemePersistence } from './useThemePersistence';
 export { useValidateUniqueness } from './useValidateUniqueness';

@@ -6,8 +6,9 @@
  */
 import { getRedisPub, getRedisSub } from '@template/db';
 import { LogScope, log } from '@template/shared/logger';
-import { dataFrame } from '#/ws/dataFrame';
+import { streamAppendFrame } from '#/ws/dataFrame';
 import { broadcastLocal, sendToChannelLocal, sendToStreamLocal, sendToUserLocal } from '#/ws/delivery';
+import { inStreamOrder } from '#/ws/streamPublishOrder';
 import type { WSOutbound } from '#/ws/types';
 
 const WS_CHANNEL = 'ws:broadcast';
@@ -15,13 +16,16 @@ const WS_CHANNEL = 'ws:broadcast';
 type PubSubMessage = {
   type: 'user' | 'channel' | 'stream' | 'broadcast';
   target?: string;
+  userIds?: string[];
   event: WSOutbound;
 };
+
+export type StreamAppend = { type: string; payload: unknown };
 
 let initialized = false;
 let pubsubEnabled = false;
 
-const deliverLocal = ({ type, target, event }: PubSubMessage): void => {
+const deliverLocal = ({ type, target, userIds, event }: PubSubMessage): void => {
   switch (type) {
     case 'user':
       if (target) sendToUserLocal(target, event);
@@ -30,7 +34,7 @@ const deliverLocal = ({ type, target, event }: PubSubMessage): void => {
       if (target) sendToChannelLocal(target, event);
       break;
     case 'stream':
-      if (target) sendToStreamLocal(target, event);
+      if (target) sendToStreamLocal(target, event, userIds);
       break;
     case 'broadcast':
       broadcastLocal(event);
@@ -38,9 +42,7 @@ const deliverLocal = ({ type, target, event }: PubSubMessage): void => {
   }
 };
 
-// Socket-holding processes (the API server) call this at boot to receive cross-instance
-// fan-out. Publishers (including the job worker, which holds no sockets) don't need it —
-// publish always goes through Redis.
+// Only socket-holding processes subscribe; publishers (the job worker too) always publish through Redis.
 export const initWebSocketPubSub = async (): Promise<void> => {
   if (initialized) return;
 
@@ -77,16 +79,17 @@ const publish = async (message: PubSubMessage): Promise<void> => {
   }
 };
 
-// Returned promises let callers (the appEvents websocket channel) await delivery so failures
-// surface through the channel's allSettled isolation instead of escaping unhandled.
 export const sendToUser = (userId: string, event: WSOutbound): Promise<void> =>
   publish({ type: 'user', target: userId, event });
 
 export const sendToChannel = (channel: string, event: WSOutbound): Promise<void> =>
   publish({ type: 'channel', target: channel, event });
 
-export const appendToStream = (stream: string, payload: unknown): Promise<void> =>
-  publish({ type: 'stream', target: stream, event: dataFrame('append', stream, payload) });
+// Serialized per stream so this instance publishes a stream's appends in emission order, fallback included.
+export const appendToStream = (stream: string, append: StreamAppend, userIds?: string[]): Promise<void> =>
+  inStreamOrder(stream, () =>
+    publish({ type: 'stream', target: stream, userIds, event: streamAppendFrame(stream, append.type, append.payload) }),
+  );
 
 export const broadcast = (event: WSOutbound): Promise<void> => publish({ type: 'broadcast', event });
 

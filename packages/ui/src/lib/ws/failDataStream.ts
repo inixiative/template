@@ -7,6 +7,7 @@
 import { dataStreamQueryKey } from '@template/ui/lib/ws/dataStreamQueryKey';
 import { useAppStore } from '@template/ui/store';
 
+// A rejection means the caller lost access, so its data is wiped; a transient failure keeps the last snapshot.
 export const failDataStream = (stream: string, reason: 'rejected' | 'failed'): void => {
   const query = useAppStore
     .getState()
@@ -15,7 +16,7 @@ export const failDataStream = (stream: string, reason: 'rejected' | 'failed'): v
   query?.setState({
     status: 'error',
     fetchStatus: 'idle',
-    data: undefined,
+    ...(reason === 'rejected' ? { data: undefined } : {}),
     error: new Error(`data stream open ${reason}: ${stream}`),
     errorUpdatedAt: Date.now(),
   });
