@@ -25,9 +25,13 @@ describe('admitEnvelope', () => {
       return { id: opts?.jobId };
     }) as never);
     const getJobCounts = spyOn(queue, 'getJobCounts').mockImplementation((async () => ({ ...counts })) as never);
+    const getCountsPerPriority = spyOn(queue, 'getCountsPerPriority').mockImplementation((async () => ({
+      [SLOW_LANE_PRIORITY]: counts.prioritized,
+    })) as never);
     restore = () => {
       add.mockRestore();
       getJobCounts.mockRestore();
+      getCountsPerPriority.mockRestore();
     };
   });
 

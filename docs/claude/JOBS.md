@@ -315,13 +315,13 @@ A producer that knows the work's size sets the lane per enqueue instead — `sen
 
 ### Priority: Fast Work Is Always Picked First
 
-BullMQ moves a job to active from the plain wait list first and from the prioritized set only when the wait list is empty. Slow jobs are added with `priority: SLOW_LANE_PRIORITY` (BullMQ's `PRIORITY_LIMIT`, the lowest priority it allows) by `withLanePriority` (`jobs/lanePriority.ts`), which every add site applies. So a fast job never queues behind a slow backlog — it waits at most for the next slot to free, roughly half of one slow job's duration — and any job given an explicit priority still ranks ahead of slow work. Within the slow lane BullMQ keeps FIFO order.
+BullMQ moves a job to active from the plain wait list first and from the prioritized set only when the wait list is empty. Slow jobs are added with `priority: SLOW_LANE_PRIORITY` (BullMQ's `PRIORITY_LIMIT`, the lowest priority it allows) by `withLanePriority` (`jobs/lanePriority.ts`), which every add site applies. So a fast job never queues behind a slow backlog — it waits at most for the next slot to free, roughly half of one slow job's duration — and a job given an explicit priority (the admin enqueue accepts one below `SLOW_LANE_PRIORITY`) is served after all unprioritized fast work and ahead of all slow work. The slow priority itself is reserved for the slow lane. Within one priority BullMQ keeps FIFO order.
 
 There is no slot cap: a slow job that starts always runs. The cost is that a fast job arriving while every slot holds a slow job waits for one to finish, which is short for per-recipient work (hundreds of ms) and long for multi-second handlers — keep slow handlers short.
 
 ### Pressure: One Budget, Divided by Lane
 
-The overflow buffer's depth budget (`JOBS_MAX_QUEUE_DEPTH`) is shared by both lanes and counts everything waiting or running (`waiting + prioritized + active`). Slow jobs — BullMQ's `prioritized` count — may fill only `JOBS_SLOW_QUEUE_DEPTH_FRACTION` of it. Each lane has its own overflow flag:
+The overflow buffer's depth budget (`JOBS_MAX_QUEUE_DEPTH`) is shared by both lanes and counts everything waiting or running (`waiting + prioritized + active`). Slow jobs — BullMQ's count for the slow priority band — may fill only `JOBS_SLOW_QUEUE_DEPTH_FRACTION` of it. Each lane has its own overflow flag:
 
 - **Fast** spills when the whole budget is full.
 - **Slow** spills when its share is full, or when the whole budget is.
@@ -394,7 +394,7 @@ One Redis key per lane — `job:overflow` (the whole budget) and `job:overflow:s
 
 ### Queue Depth Probe
 
-`queueDepths()` returns `{ total, slow }`: `total` counts `waiting + prioritized + active`, `slow` counts `prioritized` (NOT `delayed` — scheduled cron repeats are a standing floor, not pressure), cached ~1s (`DEPTH_CACHE_MS`). Pass `fresh = true` to bypass the cache (used by `tripIfFull` and the drain). A job given an explicit priority also lands in `prioritized` and counts against the slow share.
+`queueDepths()` returns `{ total, slow }`: `total` counts `waiting + prioritized + active`, `slow` counts the jobs waiting at `SLOW_LANE_PRIORITY` via BullMQ's `getCountsPerPriority` (neither counts `delayed` — scheduled cron repeats are a standing floor, not pressure), cached ~1s (`DEPTH_CACHE_MS`). Pass `fresh = true` to bypass the cache (used by `tripIfFull` and the drain). A job given an explicit priority between the lanes lands in `prioritized` and counts against the whole budget, not the slow share.
 
 All `JobOutbox` writes — accumulator flushes AND the drain — run through one shared serialized queue (`flushQueue` / `runOnOutboxQueue`, via `createSerializedQueue`), so a flush and a drain can never touch the table concurrently.
 

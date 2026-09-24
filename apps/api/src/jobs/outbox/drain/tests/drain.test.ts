@@ -10,7 +10,7 @@ import {
   hasPendingSpills,
   isOverflowing,
   type OutboxRow,
-  queueDepth,
+  queueDepths,
   shouldSpill,
   spillToOutbox,
   tripIfFull,
@@ -76,11 +76,15 @@ describe('jobs overflow buffer (spill + drain)', () => {
       const prioritized = [...queued.values()].filter((job) => job.priority).length;
       return { waiting: queued.size - prioritized, prioritized, active: 0 };
     }) as never);
+    const perPriority = spyOn(queue, 'getCountsPerPriority').mockImplementation((async () => ({
+      [SLOW_LANE_PRIORITY]: [...queued.values()].filter((job) => job.priority === SLOW_LANE_PRIORITY).length,
+    })) as never);
     const getJob = spyOn(queue, 'getJob').mockImplementation((async (id: string) => queued.get(id)) as never);
     const getJobs = spyOn(queue, 'getJobs').mockImplementation((async () => [...queued.values()]) as never);
     restoreQueueSpies = () => {
       add.mockRestore();
       counts.mockRestore();
+      perPriority.mockRestore();
       getJob.mockRestore();
       getJobs.mockRestore();
     };
@@ -153,7 +157,7 @@ describe('jobs overflow buffer (spill + drain)', () => {
     await ctx.queue.add('sendWebhook', { type: JobType.adhoc, payload: {} });
     await ctx.queue.add('sendWebhook', { type: JobType.adhoc, payload: {} });
 
-    await queueDepth(true); // prime the cache to the current depth
+    await queueDepths(true); // prime the cache to the current depth
     await tripIfFull();
 
     expect(await isOverflowing()).toBe(true);

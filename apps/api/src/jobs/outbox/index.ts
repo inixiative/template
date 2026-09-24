@@ -21,5 +21,5 @@ export {
   withOverflowRenew,
 } from '#/jobs/outbox/flag';
 export { runOnOutboxQueue } from '#/jobs/outbox/mutex';
-export { laneDepth, type QueueDepths, queueDepth, queueDepths } from '#/jobs/outbox/queueDepth';
+export { laneDepth, type QueueDepths, queueDepths } from '#/jobs/outbox/queueDepth';
 export { type OutboxRow, outboxLaneOf, type SpillOptions, shouldSpill } from '#/jobs/outbox/types';
