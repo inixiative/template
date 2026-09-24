@@ -6,7 +6,15 @@
  */
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { PrismaPg } from '@prisma/adapter-pg';
-import type { AfterCommitFn, Db, OpenTransaction, Scope, ScopeContext } from '@template/db/clientTypes';
+import type {
+  AfterCommitFn,
+  Db,
+  FinallyFn,
+  FindForUpdateOptions,
+  OpenTransaction,
+  Scope,
+  ScopeContext,
+} from '@template/db/clientTypes';
 import { assertNoNestedWrites } from '@template/db/extensions/assertNoNestedWrites';
 import { captureBridgedContext, hasHooksFor, runInBridgedContext } from '@template/db/extensions/hookRegistry';
 import { mutationLifeCycleExtension } from '@template/db/extensions/mutationLifeCycle';
@@ -20,6 +28,7 @@ import {
 import { Prisma, PrismaClient } from '@template/db/generated/client/client';
 import { prismaMap } from '@template/db/generated/prismaMap';
 import { auditActorContext } from '@template/db/lib/auditActorContext';
+import { acquireFindForUpdateLock } from '@template/db/lock/acquireFindForUpdateLock';
 import { type ModelName, toModelName } from '@template/db/utils/modelNames';
 import { LogScope, log } from '@template/shared/logger';
 import { type ConcurrencyType, getConcurrency, resolveAll } from '@template/shared/utils';
@@ -44,6 +53,17 @@ const throwIfFailures = (context: string, errors: unknown[]): void => {
   }
 
   throw new AggregateError(errors, `${context}: ${errors.length} callback failures`);
+};
+
+// Every callback runs even when one throws, and a failure is logged, never thrown: the finally
+// queue runs on the rollback path too, where rethrowing would mask the transaction's own error.
+const drainFinally = async (openTransaction: OpenTransaction | null): Promise<void> => {
+  if (!openTransaction?.finallyFns.length) return;
+  const fns = openTransaction.finallyFns.splice(0);
+  const results = await Promise.allSettled(fns.map((fn) => Promise.resolve().then(fn)));
+  for (const result of results) {
+    if (result.status === 'rejected') log.error('db.onFinally() callback failed', result.reason, LogScope.db);
+  }
 };
 
 const createClient = (): Db => {
@@ -77,36 +97,49 @@ const dbMethods = {
     const bridgedContext = captureBridgedContext();
 
     const run = async () => {
-      const { result, openTransaction } = await db.raw.$transaction(
-        async (transactionClient) => {
-          const openTransaction: OpenTransaction = {
-            scope,
-            client: transactionClient as Db,
-            prismaTransactionId: null,
-            afterCommitBatches: [],
-            bridgedContext,
-          };
-          scope.openTransaction = openTransaction;
-          const registrationToken = openTransactionRegistration(openTransaction);
-          try {
-            // Tells the mutation extension which Prisma transaction id belongs to this transaction;
-            // a write it cannot match to a registration is one db.txn() did not open.
-            await openTransaction.client[registrationProbe.model].findFirst({
-              where: { [registrationProbe.field]: registrationToken },
-            });
-            if (!openTransaction.prismaTransactionId) {
-              throw new Error(
-                'db.txn() failed to register its transaction with the mutation extension — the mutationLifeCycle extension is missing from this client',
-              );
+      let opened: OpenTransaction | null = null;
+      let settled: { result: T; openTransaction: OpenTransaction };
+      try {
+        settled = await db.raw.$transaction(
+          async (transactionClient) => {
+            const openTransaction: OpenTransaction = {
+              scope,
+              client: transactionClient as Db,
+              prismaTransactionId: null,
+              afterCommitBatches: [],
+              finallyFns: [],
+              heldLockKeys: new Set(),
+              bridgedContext,
+            };
+            opened = openTransaction;
+            scope.openTransaction = openTransaction;
+            const registrationToken = openTransactionRegistration(openTransaction);
+            try {
+              // Tells the mutation extension which Prisma transaction id belongs to this transaction;
+              // a write it cannot match to a registration is one db.txn() did not open.
+              await openTransaction.client[registrationProbe.model].findFirst({
+                where: { [registrationProbe.field]: registrationToken },
+              });
+              if (!openTransaction.prismaTransactionId) {
+                throw new Error(
+                  'db.txn() failed to register its transaction with the mutation extension — the mutationLifeCycle extension is missing from this client',
+                );
+              }
+              return { result: await fn(), openTransaction };
+            } finally {
+              closeTransactionRegistration(registrationToken, openTransaction);
+              scope.openTransaction = null;
             }
-            return { result: await fn(), openTransaction };
-          } finally {
-            closeTransactionRegistration(registrationToken, openTransaction);
-            scope.openTransaction = null;
-          }
-        },
-        options?.timeout ? { timeout: options.timeout } : undefined,
-      );
+          },
+          options?.timeout ? { timeout: options.timeout } : undefined,
+        );
+      } finally {
+        // why: after $transaction settles — the callback's own finally runs before the commit, and a
+        // why: lock dropped there lets a waiter read pre-commit state — and before the on-commit
+        // why: batches, so no waiter stalls behind slow side effects.
+        await drainFinally(opened);
+      }
+      const { result, openTransaction } = settled;
 
       // Batches belong to this transaction, so a nested db.txn (e.g. a mutation from inside an
       // onCommit handler) drains its own and a rollback discards these with the object.
@@ -153,6 +186,12 @@ const dbMethods = {
     });
   },
 
+  onFinally: (callbacks: FinallyFn | FinallyFn[]): void => {
+    const openTransaction = store.getStore()?.openTransaction;
+    if (!openTransaction) throw new Error('db.onFinally() requires db.txn()');
+    openTransaction.finallyFns.push(...castArray(callbacks));
+  },
+
   parallel: async <T>(
     thunks: Array<() => Promise<T>>,
     options?: { concurrency?: number; resolution?: 'all' | 'allSettled' },
@@ -192,8 +231,15 @@ const dbMethods = {
   isInTxn: (): boolean => !!store.getStore()?.openTransaction,
 
   // Raw SELECT * FOR UPDATE — scalar columns only, no relations/includes; load related data separately.
-  findForUpdate: <T = unknown>(model: ModelName, where: Record<string, unknown>): Promise<T[]> => {
-    if (!dbMethods.isInTxn()) throw new Error('db.findForUpdate() requires db.txn()');
+  // A row that does not exist yet locks nothing, so find-then-create races; `upserting: true` fences
+  // the where-key itself (see acquireFindForUpdateLock) and returns 0 or 1 rows.
+  findForUpdate: async <T = unknown>(
+    model: ModelName,
+    where: Record<string, unknown>,
+    options?: FindForUpdateOptions,
+  ): Promise<T[]> => {
+    const openTransaction = store.getStore()?.openTransaction;
+    if (!openTransaction) throw new Error('db.findForUpdate() requires db.txn()');
     const keys = Object.keys(where);
     if (!keys.length) throw new Error('db.findForUpdate() requires at least one predicate');
     const meta = prismaMap.models[model];
@@ -219,6 +265,7 @@ const dbMethods = {
       }
       return Prisma.sql`${column} = ${value}`;
     });
+    if (options?.upserting) await acquireFindForUpdateLock(openTransaction, model, where, options.waitMs);
     return db.$queryRaw<T[]>(
       Prisma.sql`SELECT * FROM ${Prisma.raw(`"${table}"`)} WHERE ${Prisma.join(conds, ' AND ')} FOR UPDATE`,
     );

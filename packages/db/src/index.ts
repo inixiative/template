@@ -1,6 +1,6 @@
 // Database client with scope/transaction methods
 export { db } from './client';
-export type { Db } from './clientTypes';
+export type { Db, FinallyFn, FindForUpdateOptions } from './clientTypes';
 // Mutation lifecycle hooks
 export {
   clearHookRegistry,
@@ -43,6 +43,7 @@ export {
 // Distributed lock
 export {
   createLock,
+  FindForUpdateLockTimeoutError,
   type Lock,
   type LockLostReason,
   type LockOptions,

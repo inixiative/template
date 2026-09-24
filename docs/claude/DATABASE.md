@@ -523,6 +523,8 @@ db.raw.user.findMany()  // Always raw, bypasses txn
 db.scope(id, fn)        // Create AsyncLocalStorage context
 db.txn(fn)              // Start transaction
 db.onCommit(fns)        // Queue callbacks for after commit
+db.onFinally(fns)       // Queue callbacks for when the txn ends, commit or rollback
+db.findForUpdate(model, where, opts?) // SELECT ... FOR UPDATE; { upserting: true } fences a missing row
 db.getScopeId()         // Get current scope ID
 db.isInTxn()            // Check if in transaction
 ```
@@ -550,6 +552,36 @@ db.onCommit(async () => {
   await sendEmail();
 });
 ```
+
+### Finally Callbacks
+
+`db.onFinally(fns)` queues callbacks that run when the transaction ends, whether it commits or rolls
+back. They drain after the database transaction has settled (never before the commit lands) and
+before the `onCommit` callbacks, without waiting for them. Every callback runs even if one throws;
+failures are logged and never replace the transaction's own result or error. Like `onCommit`, it
+throws outside `db.txn()`, and a nested `db.txn()` registers on the outermost transaction.
+
+### Row Locks and Create-If-Missing
+
+`db.findForUpdate(model, where)` runs `SELECT * ... FOR UPDATE` inside `db.txn()`. A row that does
+not exist yet locks nothing, so find-then-create races: two callers both see nothing and both
+insert. Do not answer that with a bare `upsert` or a caught unique violation — fence the key:
+
+```typescript
+await db.txn(async () => {
+  const [existing] = await db.findForUpdate<User>('User', { email }, { upserting: true });
+  return existing ?? db.user.create({ data: { email, name } });
+});
+```
+
+`upserting: true` takes a Redis lock (`createLock`, service `find-for-update`, keyed on the model
+plus the where entries sorted by key, hashed) **before** the `SELECT`, and releases it through
+`db.onFinally` once the transaction ends. The where must be scalar equalities only — no arrays,
+`in`, operator objects, `null` or `undefined`. A caller that cannot get the lock waits up to
+`waitMs` (default 3000ms, inside Prisma's 5000ms interactive default) and then throws
+`FindForUpdateLockTimeoutError`, rolling its transaction back. Fencing the same key twice in one
+transaction does not wait on itself. The `no-create-race-machinery` CI rule fails a change that
+adds a bare `.upsert(` or a unique-violation catch to a file.
 
 ---
 
