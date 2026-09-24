@@ -57,6 +57,8 @@ beforeEach(() => {
     unspoof: () => {},
     subscribe: () => {},
     unsubscribe: () => {},
+    open: () => {},
+    close: () => {},
   } satisfies ApiWebsocket;
   store = createTestStore({ websocket });
 });

@@ -1,11 +1,14 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { QueryClient, QueryObserver } from '@tanstack/react-query';
 import type { ApiWebsocket } from '@template/ui/lib/ws/createApiWebsocket';
+import { dataStreamQueryKey } from '@template/ui/lib/ws/dataStreamQueryKey';
 import { useAppStore } from '@template/ui/store';
 
 const recordingWebsocket = () => {
   const subs: string[] = [];
   const unsubs: string[] = [];
+  const opens: string[] = [];
+  const closes: string[] = [];
   const websocket = {
     connect: () => {},
     authenticate: () => {},
@@ -14,8 +17,10 @@ const recordingWebsocket = () => {
     logout: () => {},
     subscribe: (channel: string) => subs.push(channel),
     unsubscribe: (channel: string) => unsubs.push(channel),
+    open: (stream: string) => opens.push(stream),
+    close: (stream: string) => closes.push(stream),
   } satisfies ApiWebsocket;
-  return { subs, unsubs, websocket };
+  return { subs, unsubs, opens, closes, websocket };
 };
 
 const mount = (client: QueryClient, queryKey: unknown[]) =>
@@ -43,5 +48,14 @@ describe('client slice — live query pipe', () => {
   it('ignores queries not in the registry', () => {
     mount(client, [{ _id: 'adminBotRead', path: { id: 'b1' } }]);
     expect(rec.subs).toEqual([]);
+  });
+
+  it('opens a data stream on mount and closes it on unmount, without subscribing a channel', () => {
+    const unmount = mount(client, [...dataStreamQueryKey('organizationReadManyContacts:id:o1')]);
+    expect(rec.opens).toEqual(['organizationReadManyContacts:id:o1']);
+    expect(rec.subs).toEqual([]);
+
+    unmount();
+    expect(rec.closes).toEqual(['organizationReadManyContacts:id:o1']);
   });
 });

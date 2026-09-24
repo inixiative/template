@@ -15,6 +15,7 @@
 - [Setup Scripts](#setup-scripts)
 - [Deployment Scripts](#deployment-scripts)
 - [Docker](#docker)
+- [Worktrees](#worktrees)
 - [Writing New Scripts](#writing-new-scripts)
 - [AI Workspace](#ai-workspace)
   - [Workflow](#workflow)
@@ -48,13 +49,23 @@ scripts/
 │   ├── dump.sh             # Export database
 │   ├── restore.sh          # Import database
 │   ├── clone.sh            # Clone remote → local (with webhook cleanup)
+│   ├── push-dev.sh         # db:push:dev — worktree-aware, refuses non-local DATABASE_URLs
+│   ├── release.sh          # Release-time database step
 │   ├── pg-init.sh          # Postgres initialization
+│   ├── minio-init.sh       # MinIO container entrypoint (creates the four base buckets)
+│   ├── minio-provision.sh  # Ensure buckets exist (setup + worktree:create)
+│   ├── minio-remove.sh     # Remove buckets, reporting each (worktree:destroy)
 │   ├── wait-postgres.sh    # Wait for postgres ready
 │   └── wait-redis.sh       # Wait for redis ready
-└── deployment/
-    ├── deploy.sh           # Deploy to environment
-    ├── with-env.sh         # Run command with env vars
-    └── wait-for-api.sh     # Health check wait
+├── deployment/
+│   ├── deploy.sh           # Deploy to environment
+│   ├── with-env.sh         # Run command with env vars
+│   └── wait-for-api.sh     # Health check wait
+└── worktree/
+    ├── create.sh           # Provision an isolated worktree on a slot (DBs, buckets, env, deps, artifacts)
+    ├── destroy.sh          # Tear a worktree down and free its slot
+    ├── list.sh             # Worktrees with slot, branch, ports
+    └── lib.sh              # Shared helpers (sourced by the three above)
 
 init/
 ├── index.tsx                    # bun run init entrypoint
@@ -304,6 +315,20 @@ bun run stop:db         # docker-compose down
 # Full reset
 bun run reset:db        # down + up + push + seed
 ```
+
+---
+
+## Worktrees
+
+```bash
+bun run worktree:create <base-branch> <new-branch>             # Fork a new branch (fails fast if Docker/Postgres is down)
+bun run worktree:create <existing-branch>                      # Attach an existing branch
+bun run worktree:create <base-branch> <new-branch> --skip-db   # Docs/skills only: no databases, buckets, or schema push; Docker not required
+bun run worktree:list
+bun run worktree:destroy <name> [--force]                      # --force: destroy despite uncommitted or untracked changes
+```
+
+Each worktree owns a slot (1–9), recorded in `.worktrees/.slots/<N>` and as `WORKTREE_SLOT=<N>` on the first line of its `.env.local` / `.env.test`: ports, `${PROJECT_NAME}_wt_<N>` / `${PROJECT_NAME}_test_wt_<N>` Postgres databases, MinIO buckets, a Redis logical DB, slot-specific env files synced against the branch's `.env.*.example` (multi-line quoted values included), its own `node_modules`, and the gitignored artifacts (route trees, Prisma client, SDK). Create fails fast when Docker/Postgres is down, refuses to fork onto a branch that already exists, warns about worktrees whose branch is merged (including branches checked out in a worktree), reclaims a slot lock whose owner is gone (dead pid, or no pid file and older than 60s; `stat -c`/`stat -f` chosen per platform), counts a registry entry as a claim even before its directory exists and prunes it only when the directory is missing, no lock is held, and it is older than 120s, prints the `worktree:destroy <name> --force` cleanup line on any failure or signal after the worktree exists (and releases the slot before it), reclaims a dead-pid lock and its directory-less registry entry with a notice while skipping a live one, aborts when the database inventory query fails, requires `DATABASE_URL` for both sides unless `--skip-db`, and drops a leftover slot database only when no registered worktree references that slot. Destroy requires a worktree whose git common dir is this repository's `.git` (or a half-created directory whose `.git` file points under this repository's `.git/worktrees/` at a gitdir that is gone; a `.git` file whose gitdir still exists, here or elsewhere, gets a `git worktree repair` hint and nothing is deleted), normalises the name to its on-disk spelling, prints whether the branch is merged into the default branch, refuses a dirty worktree unless `--force`, requires a registered worktree (or a half-created one with a `.git` file — never `.locks`/`.slots`), validates the slot, refuses when the worktree's env files name more than one slot, skips the DB/bucket/Redis cleanup when another worktree shares the slot, and kills every listener on the slot's ports (reporting each pid; a survivor is a warning). Green **ready** means every step landed; yellow **WITH GAPS** lists what to rerun. The `bashMainCheckoutGuard` hook (`.claude/hooks/`, PreToolUse on Bash + SessionStart) enforces two rules. (1) `git worktree add/remove/move/prune` is denied in every session — use the scripts. (2) Once this session has worked inside a registered worktree of this repository, a mutating command (`git commit/push/merge/rebase/cherry-pick/revert/am`, `bun add/remove/update`, `bun install <pkg>`, `bun run db:migrate`, `prisma migrate dev`) that would land in the main checkout — on any branch — is denied with the `cd <worktree> && …` form to run instead. A leading `cd`, `git -C`, or `bun --cwd` moves where a command lands; naming the main checkout by its absolute path is an explicit choice and is allowed. Full guide: `.claude/skills/worktrees/SKILL.md`.
 
 ---
 

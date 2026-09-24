@@ -6,13 +6,14 @@
  */
 import { getRedisPub, getRedisSub } from '@template/db';
 import { LogScope, log } from '@template/shared/logger';
-import { broadcastLocal, sendToChannelLocal, sendToUserLocal } from '#/ws/delivery';
+import { dataFrame } from '#/ws/dataFrame';
+import { broadcastLocal, sendToChannelLocal, sendToStreamLocal, sendToUserLocal } from '#/ws/delivery';
 import type { WSOutbound } from '#/ws/types';
 
 const WS_CHANNEL = 'ws:broadcast';
 
 type PubSubMessage = {
-  type: 'user' | 'channel' | 'broadcast';
+  type: 'user' | 'channel' | 'stream' | 'broadcast';
   target?: string;
   event: WSOutbound;
 };
@@ -27,6 +28,9 @@ const deliverLocal = ({ type, target, event }: PubSubMessage): void => {
       break;
     case 'channel':
       if (target) sendToChannelLocal(target, event);
+      break;
+    case 'stream':
+      if (target) sendToStreamLocal(target, event);
       break;
     case 'broadcast':
       broadcastLocal(event);
@@ -80,6 +84,9 @@ export const sendToUser = (userId: string, event: WSOutbound): Promise<void> =>
 
 export const sendToChannel = (channel: string, event: WSOutbound): Promise<void> =>
   publish({ type: 'channel', target: channel, event });
+
+export const appendToStream = (stream: string, payload: unknown): Promise<void> =>
+  publish({ type: 'stream', target: stream, event: dataFrame('append', stream, payload) });
 
 export const broadcast = (event: WSOutbound): Promise<void> => publish({ type: 'broadcast', event });
 

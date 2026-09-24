@@ -36,7 +36,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "bun test src/",
+    "test": "NODE_ENV=test bun test src/",
     "generate:msw": "bun scripts/generateMswHandlers.ts"
   },
   "dependencies": {

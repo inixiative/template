@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'bun:test';
-import { broadcastLocal, sendToChannelLocal, sendToUserLocal } from '#/ws/delivery';
+import { broadcastLocal, sendToChannelLocal, sendToStreamLocal, sendToUserLocal } from '#/ws/delivery';
 import { addConnection, byId, clearRegistry } from '#/ws/registry';
+import { subscribeToStream } from '#/ws/streamSubscriptions';
 import { subscribeToChannel } from '#/ws/subscriptions';
 import { createTestSocket } from '#tests/createTestSocket';
 
@@ -62,5 +63,35 @@ describe('delivery', () => {
     expect(dead.sent).toEqual([]);
     expect(byId.has('dead')).toBe(false);
     expect(byId.has('live')).toBe(true);
+  });
+
+  it('sendToStreamLocal delivers only to connections holding that stream open', () => {
+    const a = createTestSocket({ connectionId: 'a' });
+    const b = createTestSocket({ connectionId: 'b' });
+    addConnection(a.socket);
+    addConnection(b.socket);
+    subscribeToStream(a.socket, 'st1');
+    subscribeToChannel(b.socket, 'st1');
+
+    sendToStreamLocal('st1', { category: 'data', action: 'append', stream: 'st1', payload: 1 });
+
+    expect(parse(a.sent)).toEqual([{ category: 'data', action: 'append', stream: 'st1', payload: 1 }]);
+    expect(b.sent).toEqual([]);
+  });
+
+  it('sendToStreamLocal holds a message for a connection whose snapshot is still in flight', () => {
+    const priming = createTestSocket({ connectionId: 'priming' });
+    const open = createTestSocket({ connectionId: 'open' });
+    addConnection(priming.socket);
+    addConnection(open.socket);
+    subscribeToStream(priming.socket, 'st1');
+    subscribeToStream(open.socket, 'st1');
+    priming.socket.data.heldAppends.set('st1', []);
+
+    sendToStreamLocal('st1', { n: 1 });
+
+    expect(priming.sent).toEqual([]);
+    expect(priming.socket.data.heldAppends.get('st1')).toEqual([JSON.stringify({ n: 1 })]);
+    expect(parse(open.sent)).toEqual([{ n: 1 }]);
   });
 });

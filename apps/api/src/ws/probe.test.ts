@@ -54,6 +54,14 @@ describe('ws subscribe probe (real app)', () => {
     expect(await canSubscribe(adminBearer, 'somethingElse:id:x')).toBe(false);
   });
 
+  it('rejects a data stream family — streams are opened, not subscribed', async () => {
+    expect(await canSubscribe(adminBearer, WS_CHANNELS.organizationReadManyContacts.name(inquiryId))).toBe(false);
+  });
+
+  it('rejects a name that is only an inherited object key', async () => {
+    expect(await canSubscribe(adminBearer, 'constructor')).toBe(false);
+  });
+
   it('rejects a malformed channel missing the route param', async () => {
     expect(await canSubscribe(adminBearer, 'inquiryRead')).toBe(false);
   });

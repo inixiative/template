@@ -1,131 +1,174 @@
 #!/usr/bin/env bash
-# destroy.sh — Tear down a worktree, drop its DBs, free its slot.
-#
-# Usage:
-#   bun run worktree:destroy <name>
-#
-# <name> is the worktree directory name under .worktrees/ (slashes in the
-# branch get converted to dashes — see worktree:list).
-
 set -euo pipefail
 
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-RED='\033[0;31m'
-NC='\033[0m'
-
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+source "$SCRIPT_DIR/lib.sh"
+ROOT_DIR="$(main_checkout_root "$SCRIPT_DIR")"
+PROJECT_NAME="$(project_name "$ROOT_DIR")"
+PG_CONTAINER="${PROJECT_NAME}_postgres"
 
-# Resolve the docker binary — Docker Desktop isn't always symlinked onto PATH
-# (a minimal `bun run` PATH in particular misses it), so fall back to the
-# app-bundle path. DB/Redis/MinIO steps below route through "$DOCKER"; if it
-# can't be resolved the existing `if "$DOCKER" ps` guards skip gracefully.
-DOCKER=""
-if command -v docker >/dev/null 2>&1; then
-  DOCKER="docker"
-elif [ -x /Applications/Docker.app/Contents/Resources/bin/docker ]; then
-  DOCKER="/Applications/Docker.app/Contents/Resources/bin/docker"
-fi
-
-NAME="${1:-}"
+NAME=""
+FORCE=0
+for arg in "$@"; do
+  case "$arg" in
+    --force) FORCE=1 ;;
+    -*) die "Unknown flag: $arg" ;;
+    *) [ -z "$NAME" ] && NAME="$arg" || die "Error: expected one worktree name, got '$NAME' and '$arg'" ;;
+  esac
+done
 
 if [ -z "$NAME" ]; then
-  echo -e "${RED}Usage: $0 <name>${NC}"
-  echo "  Run 'bun run worktree:list' to see available worktrees."
+  echo -e "${RED}Usage: $0 <name> [--force]${NC}"
+  echo "  <name>   Worktree directory name under .worktrees/ (branch with slashes → dashes)"
+  echo "  --force  Destroy even when the worktree has uncommitted or untracked changes"
+  echo
+  echo "Run 'bun run worktree:list' to see available worktrees."
   exit 1
 fi
 
-if echo "$NAME" | grep -qE '(\.\.|/)'; then
-  echo -e "${RED}Error: Name cannot contain '..' or path separators${NC}"
-  exit 1
+if [[ "$NAME" =~ (^\.|\.\.|/) ]]; then
+  die "Error: Name cannot start with '.' or contain '..' or path separators"
 fi
 
 WORKTREE_DIR="$ROOT_DIR/.worktrees/$NAME"
 if [ ! -d "$WORKTREE_DIR" ]; then
-  echo -e "${RED}Error: Worktree '$NAME' not found at $WORKTREE_DIR${NC}"
-  exit 1
+  die "Error: Worktree '$NAME' not found at $WORKTREE_DIR"
 fi
 
-PROJECT_NAME=""
-if [ -f "$ROOT_DIR/.env" ]; then
-  PROJECT_NAME="$(grep -m1 '^PROJECT_NAME=' "$ROOT_DIR/.env" | cut -d= -f2 || true)"
-fi
-[ -z "$PROJECT_NAME" ] && PROJECT_NAME="$(basename "$ROOT_DIR")"
+for candidate in "$ROOT_DIR/.worktrees"/*/; do
+  candidate="${candidate%/}"
+  if [ "$candidate" -ef "$WORKTREE_DIR" ] && [ "$(basename "$candidate")" != "$NAME" ]; then
+    warn "Note: '$NAME' is spelled '$(basename "$candidate")' on disk — using that name."
+    NAME="$(basename "$candidate")"
+    WORKTREE_DIR="$candidate"
+  fi
+done
 
-PG_CONTAINER="${PROJECT_NAME}_postgres"
-REDIS_CONTAINER="${PROJECT_NAME}_redis"
-
-# --- 1. Read slot from worktree's .env.local --------------------------------
-WT_ENV="$WORKTREE_DIR/.env.local"
-SLOT=""
-if [ -f "$WT_ENV" ]; then
-  SLOT="$(grep -m1 '^WORKTREE_SLOT=' "$WT_ENV" | cut -d= -f2 || true)"
-fi
-
-if [ -z "$SLOT" ]; then
-  echo -e "${YELLOW}Warning: No WORKTREE_SLOT found — skipping DB / Redis / port cleanup.${NC}"
-else
-  DB_LOCAL="${PROJECT_NAME}_wt_${SLOT}"
-  DB_TEST="${PROJECT_NAME}_test_wt_${SLOT}"
-
-  # --- 2. Drop Postgres databases -------------------------------------------
-  if "$DOCKER" ps --format '{{.Names}}' | grep -qx "$PG_CONTAINER"; then
-    echo -e "${BLUE}Dropping databases: $DB_LOCAL, $DB_TEST...${NC}"
-    "$DOCKER" exec "$PG_CONTAINER" psql -U postgres -c "DROP DATABASE IF EXISTS \"${DB_LOCAL}\";" >/dev/null
-    "$DOCKER" exec "$PG_CONTAINER" psql -U postgres -c "DROP DATABASE IF EXISTS \"${DB_TEST}\";"  >/dev/null
-    echo -e "${GREEN}Databases dropped${NC}"
+HALF_CREATED=0
+if is_registered_worktree "$WORKTREE_DIR"; then
+  REGISTERED=1
+  worktree_shares_main_git "$WORKTREE_DIR" \
+    || die "Error: $WORKTREE_DIR does not belong to this repository (its git common dir is not $ROOT_DIR/.git). Refusing to delete an independent repository."
+elif GITDIR="$(dot_git_file_target "$WORKTREE_DIR")"; then
+  REGISTERED=0
+  if gitdir_belongs_to_main "$GITDIR" && [ ! -e "$GITDIR" ]; then
+    HALF_CREATED=1
+  elif gitdir_belongs_to_main "$GITDIR"; then
+    die "Error: $WORKTREE_DIR is a worktree of this repository that was moved by hand (its gitdir $GITDIR still exists but git does not know this location). Re-attach it with: git worktree repair '$WORKTREE_DIR' — then destroy it normally. Nothing was deleted."
+  elif [ -e "$GITDIR" ]; then
+    die "Error: $WORKTREE_DIR is a git worktree whose gitdir ($GITDIR) belongs to another checkout. If that repository moved, run 'git worktree repair' from it. Nothing was deleted."
   else
-    echo -e "${YELLOW}Warning: $PG_CONTAINER not running — skipping DB drop.${NC}"
+    die "Error: $WORKTREE_DIR is a git worktree whose gitdir ($GITDIR) is missing and is not under this repository's .git/worktrees/. Run 'git worktree repair' from the repository that owns it, or remove the directory by hand. Nothing was deleted."
   fi
-
-  # --- 2b. Remove MinIO buckets ---------------------------------------------
-  MINIO_CONTAINER="${PROJECT_NAME}_minio"
-  if "$DOCKER" ps --format '{{.Names}}' | grep -qx "$MINIO_CONTAINER"; then
-    STORAGE_BUCKET_SYSTEM="${PROJECT_NAME}-system-wt-${SLOT}"
-    STORAGE_BUCKET_USER="${PROJECT_NAME}-user-wt-${SLOT}"
-    STORAGE_BUCKET_SYSTEM_TEST="${PROJECT_NAME}-system-test-wt-${SLOT}"
-    STORAGE_BUCKET_USER_TEST="${PROJECT_NAME}-user-test-wt-${SLOT}"
-
-    echo -e "${BLUE}Removing MinIO buckets for slot ${SLOT}...${NC}"
-    for BUCKET in "$STORAGE_BUCKET_SYSTEM" "$STORAGE_BUCKET_USER" \
-                   "$STORAGE_BUCKET_SYSTEM_TEST" "$STORAGE_BUCKET_USER_TEST"; do
-      "$DOCKER" run --rm --network "${PROJECT_NAME}_default" \
-        -e MC_HOST_local="http://minioadmin:minioadmin@minio:9000" \
-        minio/mc:latest rb --force "local/${BUCKET}" >/dev/null 2>&1 || true
-    done
-    echo -e "${GREEN}MinIO buckets removed${NC}"
-  fi
-
-  # --- 3. Flush Redis logical DB --------------------------------------------
-  if "$DOCKER" ps --format '{{.Names}}' | grep -qx "$REDIS_CONTAINER"; then
-    echo -e "${BLUE}Flushing Redis DB ${SLOT}...${NC}"
-    "$DOCKER" exec "$REDIS_CONTAINER" redis-cli -n "$SLOT" FLUSHDB >/dev/null \
-      && echo -e "${GREEN}Redis DB ${SLOT} flushed${NC}" \
-      || echo -e "${YELLOW}Warning: Could not flush Redis DB${NC}"
-  fi
-
-  # --- 4. Kill processes on slot ports --------------------------------------
-  PORTS=("3${SLOT}00" "3${SLOT}01" "3${SLOT}02" "8${SLOT}00")
-  echo -e "${BLUE}Killing processes on ports: ${PORTS[*]}...${NC}"
-  for PORT in "${PORTS[@]}"; do
-    PID=$(lsof -ti:"$PORT" 2>/dev/null || true)
-    if [ -n "$PID" ]; then
-      kill -9 "$PID" 2>/dev/null || true
-      echo "  Killed PID $PID on port $PORT"
-    fi
-  done
+elif [ -d "$WORKTREE_DIR/.git" ]; then
+  die "Error: $WORKTREE_DIR is an independent git repository (it has its own .git directory), not a worktree of this one. Refusing to delete it."
+else
+  die "Error: $WORKTREE_DIR is not a git worktree (no .git file, not registered). Refusing to delete it."
 fi
 
-# --- 5. Remove the git worktree --------------------------------------------
-echo -e "${BLUE}Removing git worktree...${NC}"
-git -C "$ROOT_DIR" worktree remove "$WORKTREE_DIR" --force 2>/dev/null || {
-  echo -e "${YELLOW}git worktree remove failed; cleaning up manually.${NC}"
-  rm -rf "$WORKTREE_DIR"
-  git -C "$ROOT_DIR" worktree prune
+[ "$HALF_CREATED" -eq 0 ] || warn "Warning: $WORKTREE_DIR is a half-created worktree of this repository (its gitdir $GITDIR no longer exists) — removing the directory and pruning."
+
+print_first_lines() {
+  sed -n '1,10{s/^/  /;p;}' <<< "$1"
 }
 
+if [ "$REGISTERED" -eq 1 ]; then
+  info "$(branch_merge_status "$WORKTREE_DIR")"
+  DIRTY="$(git -C "$WORKTREE_DIR" status --porcelain --untracked-files=all 2>/dev/null || true)"
+  if [ -n "$DIRTY" ]; then
+    if [ "$FORCE" -eq 1 ]; then
+      warn "Warning: destroying with uncommitted or untracked changes (--force):"
+      print_first_lines "$DIRTY"
+    else
+      echo -e "${RED}Error: $NAME has uncommitted or untracked changes:${NC}" >&2
+      print_first_lines "$DIRTY" >&2
+      die "Commit or discard them, or pass --force to destroy anyway."
+    fi
+  fi
+fi
+
+SLOT="$(worktree_marker_slot "$WORKTREE_DIR")"
+CLAIMED_SLOTS="$(worktree_slots "$WORKTREE_DIR" | tr '\n' ' ')"
+CLAIMED_COUNT="$(echo "$CLAIMED_SLOTS" | wc -w | tr -d ' ')"
+if [ "$CLAIMED_COUNT" -gt 1 ]; then
+  die "Error: $NAME references more than one slot (marker WORKTREE_SLOT='${SLOT:-none}', env files/registry name slots: ${CLAIMED_SLOTS}).
+Refusing to guess which databases are its own. Fix the env files so they agree on one slot, then re-run."
+fi
+[ -n "$SLOT" ] || SLOT="$(echo "$CLAIMED_SLOTS" | tr -d ' ')"
+
+if [ -z "$SLOT" ]; then
+  warn "Warning: No WORKTREE_SLOT found in $WORKTREE_DIR/.env.local"
+  warn "Proceeding with worktree removal only (no DB / bucket / Redis / port cleanup)"
+else
+  valid_slot "$SLOT" || die "Error: WORKTREE_SLOT='$SLOT' in $WORKTREE_DIR/.env.local is not a slot number (1-9). Fix the file, then re-run."
+  slot_resources "$SLOT"
+
+  if CLAIMANT="$(slot_claimant "$SLOT" "$WORKTREE_DIR")"; then
+    warn "Warning: $(basename "$CLAIMANT") also references slot $SLOT — leaving $DB_LOCAL / $DB_TEST, the buckets, and Redis DB $SLOT in place."
+    SHARED_SLOT=1
+  else
+    SHARED_SLOT=0
+  fi
+
+  DOCKER="$(resolve_docker || true)"
+  if [ "$SHARED_SLOT" -eq 1 ]; then
+    :
+  elif [ -z "$DOCKER" ] || ! "$DOCKER" info >/dev/null 2>&1; then
+    warn "Warning: Docker is not reachable — slot $SLOT databases, buckets, and Redis DB are NOT cleaned up."
+    warn "Start Docker and drop $DB_LOCAL / $DB_TEST by hand, or worktree:create will drop them when it reclaims slot $SLOT."
+  else
+    if [ "$(container_state "$PG_CONTAINER")" = "true" ]; then
+      PSQL=("$DOCKER" exec "$PG_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 -q)
+      info "Dropping databases: $DB_LOCAL, $DB_TEST..."
+      if "${PSQL[@]}" -c "DROP DATABASE IF EXISTS \"${DB_LOCAL}\" WITH (FORCE);" \
+        && "${PSQL[@]}" -c "DROP DATABASE IF EXISTS \"${DB_TEST}\" WITH (FORCE);"; then
+        ok "Databases dropped"
+      else
+        warn "Warning: Could not drop databases. worktree:create drops them when it reclaims slot $SLOT."
+      fi
+    else
+      warn "Warning: $PG_CONTAINER not running — databases NOT dropped. worktree:create drops them when it reclaims slot $SLOT."
+    fi
+
+    info "Removing MinIO buckets for slot ${SLOT}..."
+    storage_env_from "$ROOT_DIR/.env.local"
+    PATH="$(dirname "$DOCKER"):$PATH" bash "$SCRIPT_DIR/../db/minio-remove.sh" \
+      "$STORAGE_BUCKET_SYSTEM" "$STORAGE_BUCKET_USER" \
+      "$STORAGE_BUCKET_SYSTEM_TEST" "$STORAGE_BUCKET_USER_TEST" \
+      || warn "Warning: bucket removal did not complete."
+
+    REDIS_CONTAINER="$(container_on_port 6379)"
+    if [ -z "$REDIS_CONTAINER" ]; then
+      warn "Warning: nothing is serving localhost:6379 — Redis DB $SLOT not flushed."
+    elif "$DOCKER" exec "$REDIS_CONTAINER" redis-cli -n "$SLOT" FLUSHDB >/dev/null; then
+      ok "Redis DB $SLOT flushed ($REDIS_CONTAINER)"
+    else
+      warn "Warning: FLUSHDB $SLOT failed on $REDIS_CONTAINER."
+    fi
+  fi
+
+  PORTS="$(slot_ports "$SLOT")"
+  info "Killing processes on ports: ${PORTS}..."
+  for PORT in $PORTS; do
+    kill_port_listeners "$PORT"
+  done
+  unregister_slot "$SLOT" "$WORKTREE_DIR"
+fi
+
+info "Removing git worktree..."
+if [ "$REGISTERED" -eq 1 ] && git -C "$ROOT_DIR" worktree remove "$WORKTREE_DIR" --force 2>/dev/null; then
+  :
+else
+  [ "$REGISTERED" -eq 1 ] && warn "git worktree remove failed, cleaning up manually..."
+  rm -rf "$WORKTREE_DIR"
+  git -C "$ROOT_DIR" worktree prune
+fi
+
 echo
-echo -e "${GREEN}Worktree '$NAME' destroyed${NC}"
-[ -n "$SLOT" ] && echo -e "${GREEN}Slot $SLOT freed${NC}"
+ok "Worktree '$NAME' destroyed"
+if [ -n "$SLOT" ] && [ "${SHARED_SLOT:-0}" -eq 1 ]; then
+  warn "Slot $SLOT stays with $(basename "$CLAIMANT")"
+elif [ -n "$SLOT" ]; then
+  ok "Slot $SLOT freed"
+fi
+echo

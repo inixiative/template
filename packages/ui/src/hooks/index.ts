@@ -31,6 +31,7 @@ export {
 export { useBreadcrumbs } from './useBreadcrumbs';
 export { useDarkMode } from './useDarkMode';
 export { type DataFilters, useDataFilters } from './useDataFilters';
+export { useDataStream } from './useDataStream';
 export { type DebouncedCallback, useDebounce, useDebouncedCallback } from './useDebounce';
 export { type InfiniteDataResult, type UseInfiniteDataOptions, useInfiniteData } from './useInfiniteData';
 export {
@@ -45,6 +46,7 @@ export { useInquiryPermission } from './useInquiryPermission';
 export { useLanguage } from './useLanguage';
 export { useMediaQuery } from './useMediaQuery';
 export { createOptimisticListTarget, useOptimisticMutation } from './useOptimisticMutation';
+export { useOrganizationContactsStream } from './useOrganizationContactsStream';
 export { usePageMeta } from './usePageMeta';
 export { type PaginatedData, type UsePaginatedDataOptions, usePaginatedData } from './usePaginatedData';
 export { checkPermission, usePermission } from './usePermission';

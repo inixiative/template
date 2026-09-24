@@ -9,6 +9,8 @@ import { createSerializedQueue } from '@template/shared/utils';
 import type { Server } from 'bun';
 import { makeUnrefInterval } from '#/lib/utils/makeUnrefInterval';
 import { normalizeEmail } from '#/modules/user/utils/normalizeEmail';
+import { closeDataStream, openDataStream } from '#/ws/dataStreams';
+import { sendTo } from '#/ws/delivery';
 import { setIdentity } from '#/ws/identity';
 import { cleanupStaleConnections, updateLastPing } from '#/ws/lifecycle';
 import { canSubscribe, resolveIdentity, sanitizeWSHeaders } from '#/ws/probe';
@@ -41,15 +43,13 @@ export const acceptWebSocket = (req: Request, server: WSServer): Response | unde
     userId: null,
     headers: {},
     channels: new Set(),
+    streams: new Set(),
+    heldAppends: new Map(),
     connectedAt: now,
     lastPing: now,
     queue: createSerializedQueue(),
   };
   return server.upgrade(req, { data }) ? undefined : new Response('Upgrade failed', { status: 426 });
-};
-
-const send = (ws: WSSocket, payload: Record<string, unknown>): void => {
-  ws.send(JSON.stringify(payload));
 };
 
 // Parse an untrusted client frame. Malformed JSON → null (dropped). This is the
@@ -73,39 +73,47 @@ const dispatch = async (ws: WSSocket, msg: WSMessage): Promise<void> => {
       // A spoof header /me doesn't honor (non-superadmin) is a rejection, not a silent keep.
       const spoofEmail = headers['x-spoof-user-email'];
       if (spoofEmail && (!me || normalizeEmail(me.email) !== normalizeEmail(spoofEmail))) {
-        send(ws, { type: 'spoofRejected' });
+        sendTo(ws, { type: 'spoofRejected' });
         return;
       }
       setIdentity(ws, me?.id ?? null);
       ws.data.headers = me ? headers : {};
-      send(ws, { type: 'identity', userId: me?.id ?? null });
+      sendTo(ws, { type: 'identity', userId: me?.id ?? null });
       return;
     }
     case 'logout': {
       setIdentity(ws, null);
       ws.data.headers = {};
-      send(ws, { type: 'identity', userId: null });
+      sendTo(ws, { type: 'identity', userId: null });
       return;
     }
     case 'subscribe': {
       const granted = await canSubscribe(ws.data.headers, msg.channel);
       if (!byId.has(ws.data.connectionId)) return;
       if (!granted) {
-        send(ws, { type: 'subscribeRejected', channel: msg.channel });
+        sendTo(ws, { type: 'subscribeRejected', channel: msg.channel });
         return;
       }
       subscribeToChannel(ws, msg.channel);
-      send(ws, { type: 'subscribed', channel: msg.channel });
+      sendTo(ws, { type: 'subscribed', channel: msg.channel });
       return;
     }
     case 'unsubscribe': {
       unsubscribeFromChannel(ws, msg.channel);
-      send(ws, { type: 'unsubscribed', channel: msg.channel });
+      sendTo(ws, { type: 'unsubscribed', channel: msg.channel });
+      return;
+    }
+    case 'open': {
+      await openDataStream(ws, msg.stream);
+      return;
+    }
+    case 'close': {
+      closeDataStream(ws, msg.stream);
       return;
     }
     case 'ping': {
       updateLastPing(ws);
-      send(ws, { type: 'pong' });
+      sendTo(ws, { type: 'pong' });
       return;
     }
   }
@@ -132,7 +140,7 @@ const overFrameLimit = (ws: WSSocket): boolean => {
 export const websocketHandler = {
   open(ws: WSSocket) {
     addConnection(ws);
-    send(ws, { type: 'connected', connectionId: ws.data.connectionId });
+    sendTo(ws, { type: 'connected', connectionId: ws.data.connectionId });
   },
   close(ws: WSSocket) {
     removeConnection(ws);
@@ -155,7 +163,7 @@ export const websocketHandler = {
           `ws dispatch failed (${msg.action}): ${err instanceof Error ? err.message : String(err)}`,
           LogScope.ws,
         );
-        send(ws, { type: 'error', action: msg.action });
+        sendTo(ws, { type: 'error', action: msg.action, ...('stream' in msg ? { stream: msg.stream } : {}) });
       });
   },
 };

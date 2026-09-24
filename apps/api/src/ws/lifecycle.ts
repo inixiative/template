@@ -4,7 +4,7 @@
  * @partOf primitive:websockets
  * @uses none
  */
-import { byChannel, byId, byUser, clearRegistry, removeConnection } from '#/ws/registry';
+import { byChannel, byId, byStream, byUser, clearRegistry, removeConnection } from '#/ws/registry';
 import type { WSSocket } from '#/ws/types';
 
 const STALE_TIMEOUT_MS = 5 * 60 * 1000;
@@ -28,10 +28,11 @@ export const cleanupStaleConnections = (): number => {
   return cleaned;
 };
 
-export const getConnectionStats = (): { connections: number; users: number; channels: number } => ({
+export const getConnectionStats = (): { connections: number; users: number; channels: number; streams: number } => ({
   connections: byId.size,
   users: byUser.size,
   channels: byChannel.size,
+  streams: byStream.size,
 });
 
 // Graceful shutdown: tell clients to reconnect, close sockets, clear the registry.

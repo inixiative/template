@@ -30,6 +30,8 @@ export const createTestSocket = (data?: Partial<WSData>): TestSocketHandle => {
       userId: data?.userId ?? null,
       headers: data?.headers ?? {},
       channels: data?.channels ?? new Set<string>(),
+      streams: data?.streams ?? new Set<string>(),
+      heldAppends: data?.heldAppends ?? new Map<string, string[]>(),
       connectedAt: data?.connectedAt ?? now,
       lastPing: data?.lastPing ?? now,
       queue: data?.queue ?? createSerializedQueue(),

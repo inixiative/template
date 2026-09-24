@@ -4,7 +4,7 @@
  * @partOf primitive:appEvents
  */
 import type { WSHandoff } from '#/appEvents/types';
-import { sendToChannel, sendToUser } from '#/ws/pubsub';
+import { appendToStream, sendToChannel, sendToUser } from '#/ws/pubsub';
 
 export const deliverWSHandoffs = async (handoffs: WSHandoff[]): Promise<void> => {
   await Promise.all(
@@ -14,6 +14,9 @@ export const deliverWSHandoffs = async (handoffs: WSHandoff[]): Promise<void> =>
         : []),
       ...('userIds' in handoff.target
         ? handoff.target.userIds.map((userId) => sendToUser(userId, handoff.message.data))
+        : []),
+      ...('streams' in handoff.target
+        ? handoff.target.streams.map((stream) => appendToStream(stream, handoff.message.data))
         : []),
     ]),
   );

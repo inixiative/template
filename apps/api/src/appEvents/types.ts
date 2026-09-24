@@ -27,13 +27,13 @@ export type EmailHandoff = {
   data: Record<string, unknown>;
 };
 
-// Generic websocket envelope: target a set of channels OR a set of users, with an
+// Generic websocket envelope: target a set of channels, users OR data streams, with an
 // arbitrary message payload. A declarative query-refetch (WSEvent) is just one kind
 // of `message.data` — the producer computes the channel(s) (e.g. channelKey(queryKey))
-// and wraps the event. Broader than refetch-only: also serves user-targeted pushes,
-// presence, toasts, etc.
+// and wraps the event. For a streams target, `message.data` is the append payload; the
+// transport wraps it in the stream's data frame.
 export type WSHandoff = {
-  target: { channels: string[] } | { userIds: string[] };
+  target: { channels: string[] } | { userIds: string[] } | { streams: string[] };
   message: { data: Record<string, unknown> };
 };
 
