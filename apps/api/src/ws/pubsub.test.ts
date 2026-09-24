@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-import { initWebSocketPubSub, isPubSubEnabled, sendToChannel } from '#/ws/pubsub';
+import { appendToStream, initWebSocketPubSub, isPubSubEnabled, sendToChannel } from '#/ws/pubsub';
 import { addConnection, clearRegistry } from '#/ws/registry';
+import { subscribeToStream } from '#/ws/streamSubscriptions';
 import { subscribeToChannel } from '#/ws/subscriptions';
 import { createTestSocket } from '#tests/createTestSocket';
 
@@ -42,5 +43,21 @@ describe('ws pubsub (redis round trip)', () => {
 
     await new Promise((resolve) => setTimeout(resolve, 100));
     expect(handle.sent).toEqual([]);
+  });
+
+  it('delivers a stream append to a locally open stream via redis, wrapped in its data frame', async () => {
+    const handle = createTestSocket({ connectionId: 'pubsub-stream' });
+    addConnection(handle.socket);
+    subscribeToStream(handle.socket, 'pubsub:stream');
+
+    await appendToStream('pubsub:stream', { upsert: { id: 'x' } });
+
+    await waitFor(() => handle.sent.length > 0);
+    expect(JSON.parse(handle.sent[0]!)).toEqual({
+      category: 'data',
+      action: 'append',
+      stream: 'pubsub:stream',
+      payload: { upsert: { id: 'x' } },
+    });
   });
 });

@@ -6,7 +6,8 @@
  */
 // Storage layer for the local WS connection registry — the maps + generic index
 // primitives + create/delete. Sibling files attach meaning: identity.ts (byUser),
-// subscriptions.ts (byChannel), delivery.ts (reads + sends), lifecycle.ts (sweeps).
+// subscriptions.ts (byChannel), streamSubscriptions.ts (byStream), delivery.ts (reads + sends),
+// lifecycle.ts (sweeps).
 // Cross-instance fan-out is pubsub's job; it re-injects remote emits through
 // delivery's *Local functions. This file stays single-instance and pure.
 
@@ -15,6 +16,7 @@ import type { WSSocket } from '#/ws/types';
 export const byId = new Map<string, WSSocket>();
 export const byUser = new Map<string, Set<string>>();
 export const byChannel = new Map<string, Set<string>>();
+export const byStream = new Map<string, Set<string>>();
 
 export const indexInto = (map: Map<string, Set<string>>, key: string, connectionId: string): void => {
   let set = map.get(key);
@@ -39,12 +41,14 @@ export const addConnection = (ws: WSSocket): void => {
 };
 
 // Removes the connection and cleans every index it appears in (user + all
-// channels). registry owns the full index shape, so full cleanup lives here.
+// channels + all streams). registry owns the full index shape, so full cleanup lives here.
 export const removeConnection = (ws: WSSocket): void => {
-  const { connectionId, userId, channels } = ws.data;
+  const { connectionId, userId, channels, streams, heldAppends } = ws.data;
   byId.delete(connectionId);
   if (userId) deindexFrom(byUser, userId, connectionId);
   for (const channel of channels) deindexFrom(byChannel, channel, connectionId);
+  for (const stream of streams) deindexFrom(byStream, stream, connectionId);
+  heldAppends.clear();
 };
 
 // Clears all registry state. Used by drainConnections on shutdown + tests.
@@ -52,4 +56,5 @@ export const clearRegistry = (): void => {
   byId.clear();
   byUser.clear();
   byChannel.clear();
+  byStream.clear();
 };

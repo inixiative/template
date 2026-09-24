@@ -6,6 +6,7 @@
  */
 import { createWebSocketClient, type WSEvent } from '@template/shared/ws';
 import { dispatchMessage } from '@template/ui/lib/ws/dispatch';
+import { failDataStream } from '@template/ui/lib/ws/failDataStream';
 
 const HEARTBEAT_MS = 30_000;
 const PONG_TIMEOUT_MS = 5_000;
@@ -19,12 +20,18 @@ export type ApiWebsocket = {
   logout: () => void;
   subscribe: (channel: string) => void;
   unsubscribe: (channel: string) => void;
+  open: (stream: string) => void;
+  close: (stream: string) => void;
 };
 
 export const createApiWebsocket = (url: string, onReconnect?: () => void): ApiWebsocket => {
-  // The channels this socket is subscribed to, refcounted across callers. Single source of truth —
-  // replayed on every (re)open since the BE forgets subscriptions when a connection drops.
+  // The channels this socket is subscribed to and the data streams it holds open, refcounted across
+  // callers. Single source of truth — replayed on every (re)open since the BE forgets both when a
+  // connection drops; a re-opened stream answers with a fresh snapshot.
   const channels = new Map<string, number>();
+  const streams = new Map<string, number>();
+  const rejectedStreams = new Set<string>();
+  const pendingOpens = new Map<string, number>();
   // Last identity frame (authenticate/spoof/unspoof; null after logout) — a (re)opened connection
   // starts anonymous on the BE, so identity must be replayed before anything identity-dependent.
   let identityFrame: Record<string, unknown> | null = null;
@@ -35,8 +42,23 @@ export const createApiWebsocket = (url: string, onReconnect?: () => void): ApiWe
   let pendingAcks: Set<string> | null = null;
   let reconnectAckTimer: ReturnType<typeof setTimeout> | undefined;
 
+  // Opens go out only on a live connection, after its identity frame; onOpen replays the rest.
+  const sendOpen = (stream: string): void => {
+    if (socket.status() !== 'open') return;
+    pendingOpens.set(stream, (pendingOpens.get(stream) ?? 0) + 1);
+    socket.send({ action: 'open', stream });
+  };
+
+  const settleOpen = (stream: string): boolean => {
+    const pending = (pendingOpens.get(stream) ?? 1) - 1;
+    if (pending > 0) pendingOpens.set(stream, pending);
+    else pendingOpens.delete(stream);
+    return pending <= 0 && streams.has(stream);
+  };
+
   const replaySubscriptions = (): void => {
     for (const channel of channels.keys()) socket.send({ action: 'subscribe', channel });
+    for (const stream of streams.keys()) if (!rejectedStreams.has(stream)) sendOpen(stream);
   };
 
   const finishReconnect = (): void => {
@@ -55,7 +77,7 @@ export const createApiWebsocket = (url: string, onReconnect?: () => void): ApiWe
   const socket = createWebSocketClient({
     url,
     onMessage: (data) => {
-      const frame = data as { type?: string; channel?: string };
+      const frame = data as { type?: string; action?: string; channel?: string; stream?: string; category?: string };
       switch (frame.type) {
         case 'pong':
           return void clearTimeout(pongTimer);
@@ -67,7 +89,22 @@ export const createApiWebsocket = (url: string, onReconnect?: () => void): ApiWe
           return void settleReconnectAck(frame.channel as string);
         case 'subscribed':
           return void settleReconnectAck(frame.channel as string);
+        case 'opened':
+          return void settleOpen(frame.stream as string);
+        case 'openRejected':
+          if (!settleOpen(frame.stream as string)) return;
+          console.error(`ws stream open rejected: ${frame.stream}`);
+          rejectedStreams.add(frame.stream as string);
+          return void failDataStream(frame.stream as string, 'rejected');
+        case 'error':
+          if (frame.action !== 'open' || !settleOpen(frame.stream as string)) return;
+          return void failDataStream(frame.stream as string, 'failed');
       }
+      if (
+        frame.category === 'data' &&
+        (!streams.has(frame.stream as string) || rejectedStreams.has(frame.stream as string))
+      )
+        return;
       dispatchMessage(data as WSEvent);
     },
     onOpen: () => {
@@ -84,12 +121,16 @@ export const createApiWebsocket = (url: string, onReconnect?: () => void): ApiWe
       reconnectAckTimer = setTimeout(finishReconnect, RECONNECT_ACK_TIMEOUT_MS);
     },
     // A pong pending from the previous connection must not tear down the next one.
-    onClose: () => clearTimeout(pongTimer),
+    onClose: () => {
+      clearTimeout(pongTimer);
+      pendingOpens.clear();
+    },
   });
 
   // Any identity change drops every grant on the BE — resubscribe, re-authorized as the new one.
   const sendIdentity = (frame: Record<string, unknown> | null): void => {
     identityFrame = frame;
+    rejectedStreams.clear();
     socket.send(frame ?? { action: 'logout' });
     replaySubscriptions();
   };
@@ -137,6 +178,24 @@ export const createApiWebsocket = (url: string, onReconnect?: () => void): ApiWe
         socket.send({ action: 'unsubscribe', channel });
       } else {
         channels.set(channel, refs - 1);
+      }
+    },
+    open: (stream) => {
+      const refs = streams.get(stream) ?? 0;
+      streams.set(stream, refs + 1);
+      if (refs > 0 && !rejectedStreams.has(stream)) return;
+      rejectedStreams.delete(stream);
+      sendOpen(stream);
+    },
+    close: (stream) => {
+      const refs = streams.get(stream) ?? 0;
+      if (refs === 0) return;
+      if (refs === 1) {
+        streams.delete(stream);
+        rejectedStreams.delete(stream);
+        if (socket.status() === 'open') socket.send({ action: 'close', stream });
+      } else {
+        streams.set(stream, refs - 1);
       }
     },
   };
