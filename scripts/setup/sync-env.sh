@@ -80,11 +80,15 @@ sync_env() {
 }
 
 sync_env ".env.local" ".env.local.example"
-sync_env ".env.test" ".env.test.example"
+if [ "${SYNC_TEST_ENV_FILES:-true}" != "false" ]; then
+  sync_env ".env.test" ".env.test.example"
+fi
 
 for app in api web admin superadmin; do
   app_dir="apps/$app"
   [ -d "$app_dir" ] || continue
   sync_env "$app_dir/.env.local" "$app_dir/.env.local.example"
-  sync_env "$app_dir/.env.test" "$app_dir/.env.test.example"
+  if [ "${SYNC_TEST_ENV_FILES:-true}" != "false" ]; then
+    sync_env "$app_dir/.env.test" "$app_dir/.env.test.example"
+  fi
 done

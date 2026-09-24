@@ -241,10 +241,14 @@ info "Generating env files (root values, the branch's keys, slot $SLOT ports/DBs
 WT_ENV="$WORKTREE_DIR/.env.local"
 WT_TEST_ENV="$WORKTREE_DIR/.env.test"
 
+SYNC_TEST_ENV_FILES="$( [ -f "$ROOT_DIR/.env" ] && env_value "$ROOT_DIR/.env" SYNC_TEST_ENV_FILES )"
+export SYNC_TEST_ENV_FILES="${SYNC_TEST_ENV_FILES:-true}"
+
 copy_env_without_marker "$MAIN_ENV" "$WT_ENV"
-[ -f "$ROOT_DIR/.env.test" ] && copy_env_without_marker "$ROOT_DIR/.env.test" "$WT_TEST_ENV"
+[ "$SYNC_TEST_ENV_FILES" != "false" ] && [ -f "$ROOT_DIR/.env.test" ] && copy_env_without_marker "$ROOT_DIR/.env.test" "$WT_TEST_ENV"
 for src in "$ROOT_DIR"/apps/*/.env.local "$ROOT_DIR"/apps/*/.env.test; do
   [ -f "$src" ] || continue
+  [ "$SYNC_TEST_ENV_FILES" = "false" ] && [[ "$src" == *.env.test ]] && continue
   copy_env_without_marker "$src" "$WORKTREE_DIR/${src#"$ROOT_DIR"/}"
 done
 
@@ -265,6 +269,10 @@ ensure_env_var "$WT_ENV" WEB_URL "http://localhost:${WEB_PORT}"
 ensure_env_var "$WT_ENV" ADMIN_URL "http://localhost:${ADMIN_PORT}"
 ensure_env_var "$WT_ENV" SUPERADMIN_URL "http://localhost:${SUPERADMIN_PORT}"
 replace_env_var_if_present "$WT_ENV" BETTER_AUTH_BASE_URL "http://localhost:${API_PORT}"
+replace_env_var_if_present "$WT_ENV" VITE_API_URL "http://localhost:${API_PORT}"
+replace_env_var_if_present "$WT_ENV" VITE_WEB_URL "http://localhost:${WEB_PORT}"
+replace_env_var_if_present "$WT_ENV" VITE_ADMIN_URL "http://localhost:${ADMIN_PORT}"
+replace_env_var_if_present "$WT_ENV" VITE_SUPERADMIN_URL "http://localhost:${SUPERADMIN_PORT}"
 ensure_env_var "$WT_ENV" STORAGE_BUCKET_SYSTEM "$STORAGE_BUCKET_SYSTEM"
 ensure_env_var "$WT_ENV" STORAGE_BUCKET_USER "$STORAGE_BUCKET_USER"
 rewrite_database_url "$WT_ENV" "$DB_LOCAL"
@@ -279,14 +287,20 @@ if [ -f "$WT_TEST_ENV" ]; then
   replace_env_var_if_present "$WT_TEST_ENV" SUPERADMIN_URL "http://localhost:${SUPERADMIN_PORT}"
   rewrite_database_url "$WT_TEST_ENV" "$DB_TEST"
   rewrite_redis_db "$WT_TEST_ENV" "$REDIS_DB"
+elif [ "$SYNC_TEST_ENV_FILES" = "false" ]; then
+  info "Test env files skipped (SYNC_TEST_ENV_FILES=false in the root .env)."
 else
   warn "Warning: neither root .env.test nor a .env.test.example on this branch — .env.test not generated."
 fi
 
 for f in "$WORKTREE_DIR"/apps/*/.env.local; do
   [ -f "$f" ] || continue
-  replace_env_var_if_present "$f" PORT "$API_PORT"
+  [ "$f" = "$WORKTREE_DIR/apps/api/.env.local" ] && replace_env_var_if_present "$f" PORT "$API_PORT"
   replace_env_var_if_present "$f" API_URL "http://localhost:${API_PORT}"
+  replace_env_var_if_present "$f" VITE_API_URL "http://localhost:${API_PORT}"
+  replace_env_var_if_present "$f" VITE_WEB_URL "http://localhost:${WEB_PORT}"
+  replace_env_var_if_present "$f" VITE_ADMIN_URL "http://localhost:${ADMIN_PORT}"
+  replace_env_var_if_present "$f" VITE_SUPERADMIN_URL "http://localhost:${SUPERADMIN_PORT}"
   replace_env_var_if_present "$f" WEB_URL "http://localhost:${WEB_PORT}"
   replace_env_var_if_present "$f" ADMIN_URL "http://localhost:${ADMIN_PORT}"
   replace_env_var_if_present "$f" SUPERADMIN_URL "http://localhost:${SUPERADMIN_PORT}"
@@ -339,6 +353,7 @@ fi
 info "Installing dependencies (bun install --force --ignore-scripts)..."
 (cd "$WORKTREE_DIR" && bun install --force --ignore-scripts 2>&1 | tail -5; exit "${PIPESTATUS[0]}") \
   || die "Error: bun install failed in $WORKTREE_DIR. Fix the issue, then run 'bun install --force' there."
+run_trusted_postinstalls "$WORKTREE_DIR"
 
 WT_REAL="$(cd "$WORKTREE_DIR" && pwd -P)"
 DB_PKG_REAL="$(cd "$WORKTREE_DIR/apps/api/node_modules/@template/db" 2>/dev/null && pwd -P || true)"

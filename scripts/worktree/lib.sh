@@ -178,6 +178,10 @@ sed_replacement() {
   printf '%s' "$1" | sed -e 's/[\\&|]/\\&/g'
 }
 
+redact_credentials() {
+  printf '%s' "$1" | sed -E 's#(://)[^/@[:space:]]*@#\1***@#'
+}
+
 set_env_var() {
   local file="$1" key="$2" value="$3" prefix="" line quoted now
   line="$(env_line "$file" "$key")"
@@ -189,7 +193,7 @@ set_env_var() {
     printf '%s=%s\n' "$key" "$(quote_env_value "$value" "")" >> "$file"
   fi
   now="$(env_value "$file" "$key")"
-  [ "$now" = "$value" ] || die "Error: could not set $key in $file — wanted '$value', the file now reads '${now:-<empty>}'."
+  [ "$now" = "$value" ] || die "Error: could not set $key in $file — wanted '$(redact_credentials "$value")', the file now reads '$(redact_credentials "${now:-<empty>}")'."
 }
 
 ensure_env_var() {
@@ -231,7 +235,7 @@ rewrite_database_url() {
   url="$(env_value "$file" DATABASE_URL)"
   [ -n "$url" ] || die "Error: DATABASE_URL in $file is empty — cannot point it at $db."
   pattern='^([a-z]+://(.*@)?[^/@[:space:]]+/)([^?]*)(.*)$'
-  [[ "$url" =~ $pattern ]] || die "Error: DATABASE_URL in $file ('$url') is not scheme://[user:password@]host[:port]/database — cannot point it at $db."
+  [[ "$url" =~ $pattern ]] || die "Error: DATABASE_URL in $file ('$(redact_credentials "$url")') is not scheme://[user:password@]host[:port]/database — cannot point it at $db."
   set_env_var "$file" DATABASE_URL "${BASH_REMATCH[1]}${db}${BASH_REMATCH[4]}"
 }
 
@@ -596,4 +600,27 @@ require_artifact() {
   if [ ! -e "$WORKTREE_DIR/$rel" ]; then
     GAPS="${GAPS}  - $rel missing — rerun in the worktree: $hint\n"
   fi
+}
+
+trusted_dependencies() {
+  (cd "$1" && bun -e "for (const name of require('./package.json').trustedDependencies ?? []) console.log(name)")
+}
+
+installed_package_dirs() {
+  local dir="$1" pkg="$2" candidate
+  for candidate in "$dir/node_modules/$pkg" "$dir"/node_modules/.bun/"${pkg//\//+}"@*/node_modules/"$pkg"; do
+    [ -f "$candidate/package.json" ] && printf '%s\n' "$candidate"
+  done
+  return 0
+}
+
+run_trusted_postinstalls() {
+  local dir="$1" pkg pkg_dir
+  while IFS= read -r pkg; do
+    [ -n "$pkg" ] || continue
+    while IFS= read -r pkg_dir; do
+      (cd "$pkg_dir" && bun -e "process.exit(require('./package.json').scripts?.postinstall ? 0 : 1)") || continue
+      (cd "$pkg_dir" && bun run postinstall >/dev/null 2>&1) || die "Error: postinstall for trusted dependency $pkg failed in $pkg_dir."
+    done < <(installed_package_dirs "$dir" "$pkg")
+  done < <(trusted_dependencies "$dir")
 }
