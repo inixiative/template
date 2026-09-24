@@ -27,6 +27,10 @@ EXCLUDE='/generated/|\.test\.ts|/tests?/|/__tests__/'
 # = scan all *.ts under apps/ + packages/. `.git` is a dir in a normal checkout and a file
 # in a worktree, so test for either (-e).
 FILES=()
+collect() {
+  grep -qE "$EXCLUDE" <<<"$1" || FILES+=("$1")
+}
+
 if [[ -e "$ROOT_DIR/.git" ]]; then
   BASE_REF="${GITHUB_BASE_REF:-main}"
   MERGE_BASE=$(git merge-base "origin/${BASE_REF}" HEAD 2>/dev/null || true)
@@ -35,7 +39,7 @@ if [[ -e "$ROOT_DIR/.git" ]]; then
     while IFS= read -r file; do
       [[ -f "$file" ]] || continue
       case "$file" in
-        apps/*.ts | packages/*.ts) FILES+=("$file") ;;
+        apps/*.ts | packages/*.ts) collect "$file" ;;
       esac
     done < <(git diff --name-only --diff-filter=AM "$MERGE_BASE"...HEAD 2>/dev/null || true)
   fi
@@ -47,20 +51,9 @@ else
 
   if [[ "${#search_dirs[@]}" -gt 0 ]]; then
     while IFS= read -r file; do
-      FILES+=("$file")
+      collect "$file"
     done < <(find "${search_dirs[@]}" -type f -name '*.ts' | sort)
   fi
-fi
-
-# Drop exempt paths.
-if [[ "${#FILES[@]}" -gt 0 ]]; then
-  FILTERED=()
-  for file in "${FILES[@]}"; do
-    if ! grep -qE "$EXCLUDE" <<<"$file"; then
-      FILTERED+=("$file")
-    fi
-  done
-  FILES=("${FILTERED[@]}")
 fi
 
 if [[ "${#FILES[@]}" -eq 0 ]]; then
