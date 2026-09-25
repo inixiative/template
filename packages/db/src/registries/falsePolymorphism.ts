@@ -52,7 +52,7 @@ export const isFalsePolymorphismRef = (ref: FlexibleRef): ref is FalsePolymorphi
 
 // Resolve FalsePolymorphismRef to FK field using the registry
 export const resolveFalsePolymorphismRef = (ref: FalsePolymorphismRef): string | null => {
-  const config = PolymorphismRegistry[ref.model];
+  const config = getPolymorphismConfig(ref.model);
   if (!config) return null;
 
   const axis = config.axes.find((a) => a.field === ref.axis);
@@ -63,7 +63,7 @@ export const resolveFalsePolymorphismRef = (ref: FalsePolymorphismRef): string |
   return fkFields?.[0] ?? null;
 };
 
-export const PolymorphismRegistry: Partial<Record<ModelName, PolymorphicConfig>> = {
+export const PolymorphismRegistry = {
   Token: {
     axes: [
       {
@@ -316,6 +316,17 @@ export const PolymorphismRegistry: Partial<Record<ModelName, PolymorphicConfig>>
     ],
   },
 
+  IntegrationRecord: {
+    axes: [
+      {
+        field: 'model',
+        fkMap: {
+          CustomerRef: ['customerRefId'],
+        },
+      },
+    ],
+  },
+
   CommunicationLog: {
     axes: [
       {
@@ -332,8 +343,9 @@ export const PolymorphismRegistry: Partial<Record<ModelName, PolymorphicConfig>>
       },
     ],
   },
-};
+} satisfies Partial<Record<ModelName, PolymorphicConfig>>;
+
+const polymorphicConfigs: Partial<Record<ModelName, PolymorphicConfig>> = PolymorphismRegistry;
 
 // Helper to get config for a model
-export const getPolymorphismConfig = (model: ModelName): PolymorphicConfig | null =>
-  PolymorphismRegistry[model] ?? null;
+export const getPolymorphismConfig = (model: ModelName): PolymorphicConfig | null => polymorphicConfigs[model] ?? null;

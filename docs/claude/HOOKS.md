@@ -21,6 +21,7 @@
   - [How It Works](#how-it-works)
   - [Webhook Payload](#webhook-payload)
   - [Circuit Breaker](#circuit-breaker)
+  - [Poisoned Records](#poisoned-records)
   - [Ignored Fields](#ignored-fields)
   - [Related Models](#related-models)
 - [Cache Invalidation](#cache-invalidation)
@@ -245,6 +246,17 @@ After 5 consecutive failures, subscription auto-disables:
 const FAILURE_THRESHOLD = 5;
 // If last 5 events all failed → isActive = false
 ```
+
+### Poisoned Records
+
+On a subscription with an `integrationId`, one record the receiver keeps rejecting is poisoned
+instead of tripping the circuit. A rejection is an `error` event with `httpStatus` 400 or 422
+(`RECORD_REJECTION` in `sendWebhook.ts`). Other terminal failures such as redirects, 401, 403 or 429
+do not count, and neither does `unreachable`. When a record has 3 rejections since its own last
+success, and some other record has delivered since the first of them, `poisonIntegrationRecord`
+stamps `IntegrationRecord.poisonedAt`. Later deliveries of that record are skipped before signing,
+with no `WebhookEvent` and nothing fed to the circuit. Nothing clears the stamp yet. See
+`tickets/INFRA-032-webhook-poisoned-records.md`.
 
 ### Ignored Fields
 

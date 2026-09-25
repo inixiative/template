@@ -1,0 +1,37 @@
+// ============================================================================
+// INTEGRATION RECORD - One record's standing in one integration
+// ============================================================================
+// Record is false-polymorphic over WebhookModel: `model` names the record's
+// model and exactly one typed FK is set to match it
+// (PolymorphismRegistry.IntegrationRecord). The only standing today is
+// poisoned: the integration rejected this record terminally while its
+// subscription kept delivering other records, so sendWebhook skips it.
+// Nothing clears poisonedAt yet.
+
+model IntegrationRecord {
+  id        String   @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  integrationId String      @db.VarChar(36)
+  integration   Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  // Record — false polymorphism, exactly one FK matches the discriminator.
+  model         WebhookModel
+  customerRefId String?      @db.VarChar(36)
+
+  customerRef CustomerRef? @relation(fields: [customerRefId], references: [id], onDelete: Cascade)
+
+  poisonedAt     DateTime?
+  poisonedReason String?
+
+  // ==========================================================================
+  // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
+  // ==========================================================================
+
+  // Per-record uniqueness — partial uniques (see Contact for rationale). Each
+  // partial doubles as the lookup index for that record column.
+  @@unique([integrationId, customerRefId], where: { customerRefId: { not: null } })
+  @@index([integrationId])
+  @@index([customerRefId])
+}

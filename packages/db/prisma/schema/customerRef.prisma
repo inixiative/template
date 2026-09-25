@@ -29,8 +29,9 @@ model CustomerRef {
   providerOrganization Organization? @relation("customerRefs", fields: [providerOrganizationId], references: [id], onDelete: Cascade)
   providerSpace        Space?        @relation("customerRefs", fields: [providerSpaceId], references: [id], onDelete: Cascade)
 
-  auditLogs      AuditLog[]
-  segmentMembers SegmentMember[]
+  auditLogs          AuditLog[]
+  segmentMembers     SegmentMember[]
+  integrationRecords IntegrationRecord[]
 
   // Per-relationship communication-kind opt-ins. Gates messages alongside
   // the per-Contact list — both must accept the kind for delivery.

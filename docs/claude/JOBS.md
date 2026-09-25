@@ -118,6 +118,7 @@ await enqueueJob('sendWebhook', {
 | Signing | RSA-SHA256 (`X-Webhook-Signature` header) |
 | Timeout | 5 seconds per delivery |
 | Circuit breaker | Disables after 5 consecutive failures |
+| Poisoned records | Integration-owned subscriptions skip a record after 3 rejections (HTTP 400/422) while other records deliver |
 | Logging | Creates `WebhookEvent` record per attempt |
 
 ### reconcileSegment / reconcileCustomerRefSegments / sweepSegments

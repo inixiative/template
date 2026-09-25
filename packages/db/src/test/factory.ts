@@ -5,7 +5,7 @@
  */
 import { db } from '@template/db/client';
 import { prismaMap } from '@template/db/generated/prismaMap';
-import { PolymorphismRegistry } from '@template/db/registries/falsePolymorphism';
+import { getPolymorphismConfig } from '@template/db/registries/falsePolymorphism';
 import { mergeDependencies } from '@template/db/test/dependencyInference';
 import type {
   BuildContext,
@@ -162,7 +162,7 @@ export const createFactory = <K extends ModelName>(modelName: K, config: Factory
         //    from incidental ctx if the discriminator forbids it (e.g.
         //    Inquiry { targetModel: 'admin' } must not gain a
         //    targetOrganizationId just because orgCtx carries one).
-        const polyConfig = PolymorphismRegistry[modelName];
+        const polyConfig = getPolymorphismConfig(modelName);
         const fkAllowed = (fkField: string): boolean => {
           if (!polyConfig) return true;
           const axis = polyConfig.axes.find((a) => Object.values(a.fkMap).flat().includes(fkField));
