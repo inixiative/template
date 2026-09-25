@@ -32,6 +32,33 @@ const WORKER_SERVICE_CONFIG = {
   startCommand: 'bun run --cwd apps/api start:worker',
 };
 
+const connectServiceToGitHubAndVerify = async (
+  serviceId: string,
+  environmentId: string,
+  githubRepo: string,
+  organization: string,
+  configProjectName: string,
+): Promise<void> => {
+  const isAlreadyConnected = await railwayApi.isServiceConnectedToGitHub(serviceId, environmentId);
+  if (!isAlreadyConnected) {
+    await railwayApi.connectServiceToGitHub(serviceId, environmentId, githubRepo, 'main');
+  }
+
+  const isConnected = await railwayApi.isServiceConnectedToGitHub(serviceId, environmentId);
+  if (!isConnected) {
+    throw new Error(
+      'GitHub connection failed. Please ensure:\n' +
+        '  1. Railway GitHub App is installed on your GitHub account\n' +
+        '  2. Railway has access to the repository: ' +
+        organization +
+        '/' +
+        configProjectName +
+        '\n' +
+        '  3. Visit https://github.com/settings/installations to grant access',
+    );
+  }
+};
+
 /**
  * Setup Railway infrastructure (API + Worker + Redis)
  */
@@ -451,27 +478,13 @@ export const setupRailway = async (
 
     // Step 18: Connect prod API to GitHub
     if (!(await isComplete('railway', 'connectProdApiGithub'))) {
-      const isAlreadyConnected = await railwayApi.isServiceConnectedToGitHub(prodApiServiceId, prodEnv.id);
-      if (!isAlreadyConnected) {
-        await railwayApi.connectServiceToGitHub(prodApiServiceId, prodEnv.id, githubRepo, 'main');
-      }
-
-      // Verify GitHub connection succeeded
-      const isConnected = await railwayApi.isServiceConnectedToGitHub(prodApiServiceId, prodEnv.id);
-
-      if (!isConnected) {
-        throw new Error(
-          'GitHub connection failed. Please ensure:\n' +
-            '  1. Railway GitHub App is installed on your GitHub account\n' +
-            '  2. Railway has access to the repository: ' +
-            config.project.organization +
-            '/' +
-            configProjectName +
-            '\n' +
-            '  3. Visit https://github.com/settings/installations to grant access',
-        );
-      }
-
+      await connectServiceToGitHubAndVerify(
+        prodApiServiceId,
+        prodEnv.id,
+        githubRepo,
+        config.project.organization,
+        configProjectName,
+      );
       await markComplete('railway', 'connectProdApiGithub');
       await onStepComplete?.();
     }
@@ -534,26 +547,13 @@ export const setupRailway = async (
 
     // Step 24: Connect staging API to GitHub
     if (stagingEnabled && !(await isComplete('railway', 'connectStagingApiGithub'))) {
-      const isAlreadyConnected = await railwayApi.isServiceConnectedToGitHub(stagingApiServiceId, stagingEnv.id);
-      if (!isAlreadyConnected) {
-        await railwayApi.connectServiceToGitHub(stagingApiServiceId, stagingEnv.id, githubRepo, 'main');
-      }
-
-      // Verify GitHub connection succeeded
-      const isConnected = await railwayApi.isServiceConnectedToGitHub(stagingApiServiceId, stagingEnv.id);
-      if (!isConnected) {
-        throw new Error(
-          'GitHub connection failed. Please ensure:\n' +
-            '  1. Railway GitHub App is installed on your GitHub account\n' +
-            '  2. Railway has access to the repository: ' +
-            config.project.organization +
-            '/' +
-            configProjectName +
-            '\n' +
-            '  3. Visit https://github.com/settings/installations to grant access',
-        );
-      }
-
+      await connectServiceToGitHubAndVerify(
+        stagingApiServiceId,
+        stagingEnv.id,
+        githubRepo,
+        config.project.organization,
+        configProjectName,
+      );
       await markComplete('railway', 'connectStagingApiGithub');
       await onStepComplete?.();
     }
@@ -634,26 +634,13 @@ export const setupRailway = async (
 
     // Step 32: Connect prod Worker to GitHub
     if (!(await isComplete('railway', 'connectProdWorkerGithub'))) {
-      const isAlreadyConnected = await railwayApi.isServiceConnectedToGitHub(prodWorkerServiceId, prodEnv.id);
-      if (!isAlreadyConnected) {
-        await railwayApi.connectServiceToGitHub(prodWorkerServiceId, prodEnv.id, githubRepo, 'main');
-      }
-
-      // Verify GitHub connection succeeded
-      const isConnected = await railwayApi.isServiceConnectedToGitHub(prodWorkerServiceId, prodEnv.id);
-      if (!isConnected) {
-        throw new Error(
-          'GitHub connection failed. Please ensure:\n' +
-            '  1. Railway GitHub App is installed on your GitHub account\n' +
-            '  2. Railway has access to the repository: ' +
-            config.project.organization +
-            '/' +
-            configProjectName +
-            '\n' +
-            '  3. Visit https://github.com/settings/installations to grant access',
-        );
-      }
-
+      await connectServiceToGitHubAndVerify(
+        prodWorkerServiceId,
+        prodEnv.id,
+        githubRepo,
+        config.project.organization,
+        configProjectName,
+      );
       await markComplete('railway', 'connectProdWorkerGithub');
       await onStepComplete?.();
     }
@@ -716,26 +703,13 @@ export const setupRailway = async (
 
     // Step 38: Connect staging Worker to GitHub
     if (stagingEnabled && !(await isComplete('railway', 'connectStagingWorkerGithub'))) {
-      const isAlreadyConnected = await railwayApi.isServiceConnectedToGitHub(stagingWorkerServiceId, stagingEnv.id);
-      if (!isAlreadyConnected) {
-        await railwayApi.connectServiceToGitHub(stagingWorkerServiceId, stagingEnv.id, githubRepo, 'main');
-      }
-
-      // Verify GitHub connection succeeded
-      const isConnected = await railwayApi.isServiceConnectedToGitHub(stagingWorkerServiceId, stagingEnv.id);
-      if (!isConnected) {
-        throw new Error(
-          'GitHub connection failed. Please ensure:\n' +
-            '  1. Railway GitHub App is installed on your GitHub account\n' +
-            '  2. Railway has access to the repository: ' +
-            config.project.organization +
-            '/' +
-            configProjectName +
-            '\n' +
-            '  3. Visit https://github.com/settings/installations to grant access',
-        );
-      }
-
+      await connectServiceToGitHubAndVerify(
+        stagingWorkerServiceId,
+        stagingEnv.id,
+        githubRepo,
+        config.project.organization,
+        configProjectName,
+      );
       await markComplete('railway', 'connectStagingWorkerGithub');
       await onStepComplete?.();
     }
