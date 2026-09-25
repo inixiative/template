@@ -51,6 +51,7 @@ export { usePageMeta } from './usePageMeta';
 export { type PaginatedData, type UsePaginatedDataOptions, usePaginatedData } from './usePaginatedData';
 export { checkPermission, usePermission } from './usePermission';
 export { useMutation, useQuery } from './useQuery';
+export { useRegisterNavigation } from './useRegisterNavigation';
 export { useScrollState } from './useScrollState';
 export { useSectionHash } from './useSectionHash';
 export { useSpaceTheme } from './useSpaceTheme';
