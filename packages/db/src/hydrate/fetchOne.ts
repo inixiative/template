@@ -7,7 +7,7 @@
 import type { Db } from '@template/db/clientTypes';
 import type { HydratedRecord } from '@template/db/hydrate/types';
 import { cache, cacheKey } from '@template/db/redis';
-import type { RuntimeDelegate } from '@template/db/utils/delegates';
+import { runtimeDelegate } from '@template/db/utils/delegates';
 import type { AccessorName } from '@template/db/utils/modelNames';
 import type { Identifier } from '@template/db/utils/prismaMapRelations';
 
@@ -20,7 +20,7 @@ export const fetchOne = async <T extends HydratedRecord>(
   ttl: number = DEFAULT_TTL,
 ): Promise<T | null> => {
   const key = cacheKey(accessor, identifier);
-  const delegate = db[accessor] as unknown as RuntimeDelegate;
+  const delegate = runtimeDelegate(db, accessor);
 
   return cache<T | null>(
     key,
