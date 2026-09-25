@@ -14,6 +14,7 @@ import { makeController } from '#/lib/utils/makeController';
 import { inquiryHandlers } from '#/modules/inquiry/handlers';
 import { includeInquirySent } from '#/modules/inquiry/queries/inquiryIncludes';
 import { inquiryUpdateRoute } from '#/modules/inquiry/routes/inquiryUpdate';
+import { sendInquiry } from '#/modules/inquiry/services/sendInquiry';
 import { validateInquiryIsEditable } from '#/modules/inquiry/validations/validateInquiryStatus';
 
 export const inquiryUpdateController = makeController(inquiryUpdateRoute, async (c, respond) => {
@@ -32,13 +33,16 @@ export const inquiryUpdateController = makeController(inquiryUpdateRoute, async 
   if (!check(permix, rebacSchema, 'inquiry', partial, 'send'))
     throw makeError({ status: 403, message: 'Access denied' });
 
-  const updated = await db.inquiry.update({
-    where: { id: inquiry.id },
-    data: {
-      content: content as Prisma.InputJsonValue | undefined,
-      ...(status === InquiryStatus.draft && { status, expiresAt: null }),
-    },
-    include: includeInquirySent,
+  const updated = await db.txn(async () => {
+    const saved = await db.inquiry.update({
+      where: { id: inquiry.id },
+      data: {
+        content: content as Prisma.InputJsonValue | undefined,
+        ...(status === InquiryStatus.draft && { status, expiresAt: null }),
+      },
+      include: includeInquirySent,
+    });
+    return status === InquiryStatus.sent ? sendInquiry(c, saved) : saved;
   });
 
   return respond.ok(updated);

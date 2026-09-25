@@ -12,7 +12,7 @@ import { sourceMutations } from '@template/ui/lib/inquiries/queryKeys';
 
 type UpdateVars = {
   inquiry: InquiryMeta;
-  body: { content?: Record<string, unknown>; status?: 'draft' };
+  body: { content?: Record<string, unknown>; status?: 'draft' | 'sent' };
 };
 
 export const useUpdateInquiryMutation = () => {

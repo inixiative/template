@@ -77,7 +77,7 @@ describe('PATCH /api/v1/inquiry/:id', () => {
     expect(response.status).toBe(200);
   });
 
-  it('rejects sending via PATCH', async () => {
+  it('sends a draft via PATCH with the content edit', async () => {
     const { entity: invitee } = await createUser();
     const { entity: inquiry } = await createInquiry({
       type: InquiryType.inviteOrganizationUser,
@@ -89,13 +89,19 @@ describe('PATCH /api/v1/inquiry/:id', () => {
       content: { organizationId: org.id, role: 'member' },
     });
 
-    const response = await fetch(patch(`/api/v1/inquiry/${inquiry.id}`, { status: InquiryStatus.sent }));
-    expect(response.status).toBe(400);
+    const response = await fetch(
+      patch(`/api/v1/inquiry/${inquiry.id}`, {
+        content: { organizationId: org.id, role: 'admin' },
+        status: InquiryStatus.sent,
+      }),
+    );
+    expect(response.status).toBe(200);
 
     const stored = await db.inquiry.findUniqueOrThrow({ where: { id: inquiry.id } });
-    expect(stored.status).toBe(InquiryStatus.draft);
-    expect(stored.sentAt).toBeNull();
-    expect(stored.expiresAt).toBeNull();
+    expect(stored.status).toBe(InquiryStatus.sent);
+    expect(stored.sentAt).not.toBeNull();
+    expect(stored.expiresAt).not.toBeNull();
+    expect(stored.content).toEqual({ organizationId: org.id, role: 'admin' });
   });
 
   it('unsends a sent inquiry back to draft', async () => {

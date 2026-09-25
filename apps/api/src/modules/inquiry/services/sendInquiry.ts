@@ -13,19 +13,26 @@ import type { Inquiry } from '#/modules/inquiry/handlers/types';
 import { includeInquirySent } from '#/modules/inquiry/queries/inquiryIncludes';
 import { computeExpiresAt } from '#/modules/inquiry/services/computeExpiresAt';
 import { resolveInquiry } from '#/modules/inquiry/services/resolution';
-import { validateInquiryIsDraft } from '#/modules/inquiry/validations/validateInquiryStatus';
+import { validateInquiryIsSendable } from '#/modules/inquiry/validations/validateInquiryStatus';
 import type { AppEnv } from '#/types/appEnv';
 
 export const sendInquiry = async (c: Context<AppEnv>, inquiry: Inquiry) => {
   const db = c.get('db');
 
-  validateInquiryIsDraft(inquiry);
+  if (inquiry.status === InquiryStatus.sent)
+    return db.inquiry.findUniqueOrThrow({ where: { id: inquiry.id }, include: includeInquirySent });
+
+  validateInquiryIsSendable(inquiry);
 
   if (!inquiry.targetModel) throw makeError({ status: 400, message: 'Target must be set before sending' });
 
   const sent = await db.inquiry.update({
     where: { id: inquiry.id },
-    data: { status: InquiryStatus.sent, sentAt: new Date(), expiresAt: computeExpiresAt(inquiry.type) },
+    data: {
+      status: InquiryStatus.sent,
+      sentAt: inquiry.sentAt ?? new Date(),
+      expiresAt: computeExpiresAt(inquiry.type),
+    },
     include: includeInquirySent,
   });
 
