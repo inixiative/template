@@ -77,6 +77,55 @@ describe('PATCH /api/v1/inquiry/:id', () => {
     expect(response.status).toBe(200);
   });
 
+  it('sends a draft via PATCH with the content edit', async () => {
+    const { entity: invitee } = await createUser();
+    const { entity: inquiry } = await createInquiry({
+      type: InquiryType.inviteOrganizationUser,
+      status: InquiryStatus.draft,
+      sourceModel: InquiryResourceModel.Organization,
+      sourceOrganizationId: org.id,
+      targetModel: InquiryResourceModel.User,
+      targetUserId: invitee.id,
+      content: { organizationId: org.id, role: 'member' },
+    });
+
+    const response = await fetch(
+      patch(`/api/v1/inquiry/${inquiry.id}`, {
+        content: { organizationId: org.id, role: 'admin' },
+        status: InquiryStatus.sent,
+      }),
+    );
+    expect(response.status).toBe(200);
+
+    const stored = await db.inquiry.findUniqueOrThrow({ where: { id: inquiry.id } });
+    expect(stored.status).toBe(InquiryStatus.sent);
+    expect(stored.sentAt).not.toBeNull();
+    expect(stored.expiresAt).not.toBeNull();
+    expect(stored.content).toEqual({ organizationId: org.id, role: 'admin' });
+  });
+
+  it('unsends a sent inquiry back to draft', async () => {
+    const { entity: invitee } = await createUser();
+    const { entity: inquiry } = await createInquiry({
+      type: InquiryType.inviteOrganizationUser,
+      status: InquiryStatus.sent,
+      sentAt: new Date(),
+      expiresAt: new Date(Date.now() + 86_400_000),
+      sourceModel: InquiryResourceModel.Organization,
+      sourceOrganizationId: org.id,
+      targetModel: InquiryResourceModel.User,
+      targetUserId: invitee.id,
+      content: { organizationId: org.id, role: 'member' },
+    });
+
+    const response = await fetch(patch(`/api/v1/inquiry/${inquiry.id}`, { status: InquiryStatus.draft }));
+    expect(response.status).toBe(200);
+
+    const stored = await db.inquiry.findUniqueOrThrow({ where: { id: inquiry.id } });
+    expect(stored.status).toBe(InquiryStatus.draft);
+    expect(stored.expiresAt).toBeNull();
+  });
+
   it('rejects role elevation via content update', async () => {
     const { entity: adminUser } = await createUser();
     const { entity: adminOu } = await createOrganizationUser({ role: 'admin' }, { user: adminUser, organization: org });

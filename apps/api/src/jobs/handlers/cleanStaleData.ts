@@ -4,7 +4,7 @@
  * @partOf primitive:jobs
  * @uses infrastructure:prisma
  */
-import { type ModelName, toAccessor } from '@template/db';
+import { type ModelName, runtimeDelegate } from '@template/db';
 import { log } from '@template/shared/logger';
 import { type ArchiveConfig, archiveStaleRecords } from '#/jobs/handlers/archiveStaleRecords';
 import { makeSingletonJob } from '#/jobs/makeSingletonJob';
@@ -30,8 +30,6 @@ export type CleanStaleDataPayload = {
   archive?: ArchiveConfig;
 };
 
-type DeletableDelegate = { deleteMany: (args: { where: Record<string, unknown> }) => Promise<{ count: number }> };
-
 export const cleanStaleData: JobHandler<CleanStaleDataPayload> = makeSingletonJob(
   async (ctx: WorkerContext, payload: CleanStaleDataPayload) => {
     const { db } = ctx;
@@ -44,11 +42,8 @@ export const cleanStaleData: JobHandler<CleanStaleDataPayload> = makeSingletonJo
       await archiveStaleRecords(model, where, archive);
     }
 
-    const accessor = toAccessor(model);
-    const delegate = (db as unknown as Record<string, DeletableDelegate>)[accessor];
-    if (!delegate?.deleteMany) {
-      throw new Error(`cleanStaleData: no Prisma delegate for model "${model}" (accessor "${accessor}")`);
-    }
+    const delegate = runtimeDelegate(db, model);
+    if (!delegate) throw new Error(`cleanStaleData: no Prisma delegate for model "${model}"`);
 
     const result = await delegate.deleteMany({ where });
     log.info(`cleanStaleData: deleted ${result.count} ${model} rows older than ${retentionDays} days`);

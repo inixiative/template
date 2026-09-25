@@ -99,6 +99,7 @@ export {
   query,
   type Result,
   type RuntimeDelegate,
+  runtimeDelegate,
   update,
 } from './utils/delegates';
 // Prisma error narrowing

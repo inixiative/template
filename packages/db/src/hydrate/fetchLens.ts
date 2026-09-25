@@ -16,8 +16,8 @@ import {
 import type { Db } from '@template/db/clientTypes';
 import { requireWhere } from '@template/db/hydrate/requireWhere';
 import { includeFromLens, rootLens } from '@template/db/lens';
-import type { RuntimeDelegate } from '@template/db/utils/delegates';
-import { type ModelName, toAccessor } from '@template/db/utils/modelNames';
+import { runtimeDelegate } from '@template/db/utils/delegates';
+import type { ModelName } from '@template/db/utils/modelNames';
 
 export const fetchLens = async <T extends Record<string, unknown> = Record<string, unknown>>(
   db: Db,
@@ -38,7 +38,7 @@ export const fetchLens = async <T extends Record<string, unknown> = Record<strin
   requireWhere(where);
 
   const include = includeFromLens(lens);
-  const delegate = db[toAccessor(model)] as unknown as RuntimeDelegate;
+  const delegate = runtimeDelegate(db, model);
   const rows = (await delegate.findMany(include ? { where, include } : { where })) as T[];
 
   return rows.filter((row) => check(condition, row) === true);

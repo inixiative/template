@@ -30,7 +30,6 @@
     "@types/react": "*",
     "@types/react-dom": "*",
     "@vitejs/plugin-react": "*",
-    "autoprefixer": "^10.4.27",
     "postcss": "^8.5.12",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.0.0",

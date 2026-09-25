@@ -4,7 +4,9 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
+import type { Db } from '@template/db/clientTypes';
 import type { Prisma } from '@template/db/generated/client/client';
+import { type AccessorName, isModelName, type ModelName, toAccessor } from '@template/db/utils/modelNames';
 
 export type Operation =
   | 'findUnique'
@@ -140,6 +142,9 @@ export type RuntimeDelegate = {
   deleteMany: (args?: { where?: WhereInput }) => Promise<{ count: number }>;
   count: (args?: CountArgs) => Promise<number>;
 };
+
+export const runtimeDelegate = (client: Db, model: ModelName | AccessorName): RuntimeDelegate =>
+  client[isModelName(model) ? toAccessor(model) : model] as unknown as RuntimeDelegate;
 
 export const query = {
   findFirst: <T extends HasFindFirst>(

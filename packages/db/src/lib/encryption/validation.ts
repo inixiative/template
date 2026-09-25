@@ -6,7 +6,7 @@
  */
 import type { Db } from '@template/db/clientTypes';
 import { ENCRYPTED_MODELS, getFieldNames } from '@template/db/lib/encryption/registry';
-import type { RuntimeDelegate } from '@template/db/utils/delegates';
+import { runtimeDelegate } from '@template/db/utils/delegates';
 
 export const validateEncryptionVersions = async (db: Db) => {
   const errors: string[] = [];
@@ -41,7 +41,7 @@ export const validateEncryptionVersions = async (db: Db) => {
         errors.push(`${modelName}.${fields.encryptedField}: Current and previous keys must be different`);
       }
 
-      const distinctVersions = await (db[modelConfig.model] as unknown as RuntimeDelegate).findMany({
+      const distinctVersions = await runtimeDelegate(db, modelConfig.model).findMany({
         distinct: [fields.versionField],
         select: { [fields.versionField]: true },
       });

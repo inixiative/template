@@ -6,8 +6,8 @@
  */
 import type { SourceQuery } from '@inixiative/json-rules';
 import { db } from '@template/db/client';
-import type { RuntimeDelegate } from '@template/db/utils/delegates';
-import { type ModelName, toAccessor } from '@template/db/utils/modelNames';
+import { runtimeDelegate } from '@template/db/utils/delegates';
+import type { ModelName } from '@template/db/utils/modelNames';
 import type { RuleReference } from '@template/shared/rules';
 import { groupBy, partition } from 'lodash-es';
 
@@ -26,7 +26,7 @@ export const admitRuleReferences = async (
       unadmitted.push(...refs);
       continue;
     }
-    const delegate = db[toAccessor(model as ModelName)] as unknown as RuntimeDelegate;
+    const delegate = runtimeDelegate(db, model as ModelName);
     const rows = (await delegate.findMany({
       where: { AND: [source.prisma.where, { id: { in: refs.map((ref) => ref.id) } }] },
     })) as { id: string }[];

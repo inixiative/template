@@ -6,7 +6,7 @@
  * @uses primitive:shared, infrastructure:prisma
  */
 
-import { type AccessorName, db, type RuntimeDelegate } from '@template/db';
+import { type AccessorName, db, runtimeDelegate } from '@template/db';
 import { LogScope, log } from '@template/shared/logger';
 import { ConcurrencyType, getConcurrency, resolveAll } from '@template/shared/utils';
 import { isUuidV7 } from '@template/shared/utils/isUuidV7';
@@ -53,7 +53,7 @@ const checkUUIDUniqueness = () => {
 };
 
 const seedTable = async (seedFile: SeedFile): Promise<void> => {
-  const delegate = db[seedFile.model] as unknown as RuntimeDelegate;
+  const delegate = runtimeDelegate(db, seedFile.model);
 
   if (!delegate) {
     log.error(`Model not found: ${seedFile.model}`, LogScope.seed);
