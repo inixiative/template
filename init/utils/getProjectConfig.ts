@@ -66,6 +66,10 @@ const INFISICAL_PROGRESS_KEYS = [
   'storeSuperadminAppNameSecret',
   'ensureProdApiAuthSecret',
   'ensureStagingApiAuthSecret',
+  'ensureProdWebhookSigningKeys',
+  'ensureStagingWebhookSigningKeys',
+  'ensureProdEncryptionKeys',
+  'ensureStagingEncryptionKeys',
 ] as const;
 
 const PLANETSCALE_PROGRESS_KEYS = [
@@ -219,6 +223,19 @@ const CLOUDFLARE_PAGES_PROGRESS_KEYS = [
   'syncSuperadminEnvProd',
   'syncSuperadminEnvStaging',
 ] as const;
+
+export const PROGRESS_KEYS = {
+  project: PROJECT_PROGRESS_KEYS,
+  infisical: INFISICAL_PROGRESS_KEYS,
+  planetscale: PLANETSCALE_PROGRESS_KEYS,
+  railway: RAILWAY_PROGRESS_KEYS,
+  railwayPostgres: RAILWAY_POSTGRES_PROGRESS_KEYS,
+  railwayBuckets: RAILWAY_BUCKETS_PROGRESS_KEYS,
+  cloudflarePages: CLOUDFLARE_PAGES_PROGRESS_KEYS,
+  resend: RESEND_PROGRESS_KEYS,
+  bouncer: BOUNCER_PROGRESS_KEYS,
+  vercel: VERCEL_PROGRESS_KEYS,
+} as const;
 
 type ProgressShape<Keys extends readonly string[]> = Record<Keys[number], boolean>;
 
