@@ -77,7 +77,7 @@ describe('PATCH /api/v1/inquiry/:id', () => {
     expect(response.status).toBe(200);
   });
 
-  it('does not send a draft when status is patched', async () => {
+  it('rejects sending via PATCH', async () => {
     const { entity: invitee } = await createUser();
     const { entity: inquiry } = await createInquiry({
       type: InquiryType.inviteOrganizationUser,
@@ -90,11 +90,33 @@ describe('PATCH /api/v1/inquiry/:id', () => {
     });
 
     const response = await fetch(patch(`/api/v1/inquiry/${inquiry.id}`, { status: InquiryStatus.sent }));
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(400);
 
     const stored = await db.inquiry.findUniqueOrThrow({ where: { id: inquiry.id } });
     expect(stored.status).toBe(InquiryStatus.draft);
     expect(stored.sentAt).toBeNull();
+    expect(stored.expiresAt).toBeNull();
+  });
+
+  it('unsends a sent inquiry back to draft', async () => {
+    const { entity: invitee } = await createUser();
+    const { entity: inquiry } = await createInquiry({
+      type: InquiryType.inviteOrganizationUser,
+      status: InquiryStatus.sent,
+      sentAt: new Date(),
+      expiresAt: new Date(Date.now() + 86_400_000),
+      sourceModel: InquiryResourceModel.Organization,
+      sourceOrganizationId: org.id,
+      targetModel: InquiryResourceModel.User,
+      targetUserId: invitee.id,
+      content: { organizationId: org.id, role: 'member' },
+    });
+
+    const response = await fetch(patch(`/api/v1/inquiry/${inquiry.id}`, { status: InquiryStatus.draft }));
+    expect(response.status).toBe(200);
+
+    const stored = await db.inquiry.findUniqueOrThrow({ where: { id: inquiry.id } });
+    expect(stored.status).toBe(InquiryStatus.draft);
     expect(stored.expiresAt).toBeNull();
   });
 

@@ -6,6 +6,7 @@
  */
 import type { HydratedRecord, Prisma } from '@template/db';
 import { hydrate } from '@template/db';
+import { InquiryStatus } from '@template/db/generated/client/enums';
 import { check, rebacSchema } from '@template/permissions/rebac';
 import { getResource } from '#/lib/context/getResource';
 import { makeError } from '#/lib/errors';
@@ -19,7 +20,7 @@ export const inquiryUpdateController = makeController(inquiryUpdateRoute, async 
   const db = c.get('db');
   const permix = c.get('permix');
   const inquiry = getResource<'inquiry'>(c);
-  const { content } = c.req.valid('json');
+  const { content, status } = c.req.valid('json');
 
   validateInquiryIsEditable(inquiry);
 
@@ -33,7 +34,10 @@ export const inquiryUpdateController = makeController(inquiryUpdateRoute, async 
 
   const updated = await db.inquiry.update({
     where: { id: inquiry.id },
-    data: { content: content as Prisma.InputJsonValue | undefined },
+    data: {
+      content: content as Prisma.InputJsonValue | undefined,
+      ...(status === InquiryStatus.draft && { status, expiresAt: null }),
+    },
     include: includeInquirySent,
   });
 
