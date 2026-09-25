@@ -1,4 +1,22 @@
 {
   "extends": "../../tsconfig.frontend.json",
-  "include": ["app", "vite.config.ts"]
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "#/*": ["./app/*"],
+      "@template/db": ["../../packages/db/src/index.ts"],
+      "@template/db/*": ["../../packages/db/src/*"],
+      "@template/permissions": ["../../packages/permissions/src/index.ts"],
+      "@template/permissions/*": ["../../packages/permissions/src/*"],
+      "@template/shared": ["../../packages/shared/src/index.ts"],
+      "@template/shared/*": ["../../packages/shared/src/*"],
+      "@template/ui": ["../../packages/ui/src/index.ts"],
+      "@template/ui/*": ["../../packages/ui/src/*"],
+      "@template/sdk": ["../../packages/sdk/src/index.ts"],
+      "@template/sdk/openapi.gen.json": ["../../packages/sdk/openapi.gen.json"],
+      "@template/sdk/*": ["../../packages/sdk/src/*"]
+    }
+  },
+  "include": ["app", "vite.config.ts"],
+  "exclude": ["app/client.tsx", "app/ssr.tsx"]
 }
