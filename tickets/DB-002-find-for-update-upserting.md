@@ -71,6 +71,15 @@ Each patch is a per-call-site answer to a primitive's gap.
   `jobs/outbox/accumulator.ts`) where the upsert is covering a create race rather than expressing
   an idempotent write.
 
+## Zealot-ahead items ported
+
+- `db.txn(fn, { maxWait })` passes through to Prisma's interactive transaction beside `timeout`
+  (nested calls reuse the outer transaction and ignore both). Test: `transactions.test.ts`.
+- `cache()` / `upsertCache()` meter writes over 256KB: `cache.value.large` and
+  `cache.value.large.bytes` counters tagged by domain and writer, plus a `cache.large_write` warn
+  record carrying the full key and ttl. Reporting only; the write still lands. Counters go through
+  the new `incrementCounter` in `@template/shared/telemetry`, beside `recordDuration`.
+
 ## Related
 
 - Zealot ZLT-5042

@@ -88,7 +88,7 @@ const dbMethods = {
     return store.run(newScope(scopeId ?? null, context ?? null), async () => await fn());
   },
 
-  txn: async <T>(fn: () => Promise<T>, options?: { timeout?: number }): Promise<T> => {
+  txn: async <T>(fn: () => Promise<T>, options?: { timeout?: number; maxWait?: number }): Promise<T> => {
     const existing = store.getStore();
     if (existing?.openTransaction) return fn();
 
@@ -131,7 +131,10 @@ const dbMethods = {
               scope.openTransaction = null;
             }
           },
-          options?.timeout ? { timeout: options.timeout } : undefined,
+          {
+            ...(options?.timeout ? { timeout: options.timeout } : {}),
+            ...(options?.maxWait ? { maxWait: options.maxWait } : {}),
+          },
         );
       } finally {
         // why: after $transaction settles — the callback's own finally runs before the commit, and a

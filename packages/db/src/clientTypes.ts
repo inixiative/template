@@ -22,7 +22,7 @@ export type ScopeContext = 'api' | 'worker';
 export type DbMethods = {
   raw: Db;
   scope: <T>(scopeId: string | undefined, fn: () => Promise<T>, context?: ScopeContext) => Promise<T>;
-  txn: <T>(fn: () => Promise<T>, options?: { timeout?: number }) => Promise<T>;
+  txn: <T>(fn: () => Promise<T>, options?: { timeout?: number; maxWait?: number }) => Promise<T>;
   onCommit: (callbacks: AfterCommitFn | AfterCommitFn[], types?: ConcurrencyType | ConcurrencyType[]) => void;
   onFinally: (callbacks: FinallyFn | FinallyFn[]) => void;
   parallel: {
