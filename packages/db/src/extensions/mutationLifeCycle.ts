@@ -16,7 +16,8 @@ import {
 } from '@template/db/extensions/hookRegistry';
 import { claimPendingRegistration, getCurrentTransaction } from '@template/db/extensions/transactionRegistry';
 import { Prisma } from '@template/db/generated/client/client';
-import { runtimeDelegate } from '@template/db/utils/delegates';
+import type { RuntimeDelegate } from '@template/db/utils/delegates';
+import { toAccessor } from '@template/db/utils/modelNames';
 import { LogScope, log } from '@template/shared/logger';
 
 export type {
@@ -67,18 +68,21 @@ type Interception = {
 
 const dataOf = (args: MutationArgs) => args.data;
 
+const txnDelegate = (openTransaction: OpenTransaction, model: Prisma.ModelName) =>
+  (openTransaction.client as unknown as Record<string, RuntimeDelegate>)[toAccessor(model)];
+
 export const mutationLifeCycleExtension = () => {
   const fetchExistingRecord = async (
     openTransaction: OpenTransaction,
     model: Prisma.ModelName,
     where: Record<string, unknown>,
-  ) => (await runtimeDelegate(openTransaction.client, model).findUnique({ where })) ?? undefined;
+  ) => (await txnDelegate(openTransaction, model).findUnique({ where })) ?? undefined;
 
   const fetchExistingRecords = (
     openTransaction: OpenTransaction,
     model: Prisma.ModelName,
     where: Record<string, unknown>,
-  ) => runtimeDelegate(openTransaction.client, model).findMany({ where });
+  ) => txnDelegate(openTransaction, model).findMany({ where });
 
   const timed = async <T>(model: Prisma.ModelName, operation: string, fn: () => Promise<T>): Promise<T> => {
     const start = performance.now();

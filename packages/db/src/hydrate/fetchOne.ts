@@ -4,23 +4,21 @@
  * @partOf infrastructure:prisma
  * @uses infrastructure:redis
  */
-import type { Db } from '@template/db/clientTypes';
+import { db } from '@template/db/client';
 import type { HydratedRecord } from '@template/db/hydrate/types';
 import { cache, cacheKey } from '@template/db/redis';
-import { runtimeDelegate } from '@template/db/utils/delegates';
 import type { AccessorName } from '@template/db/utils/modelNames';
 import type { Identifier } from '@template/db/utils/prismaMapRelations';
 
 const DEFAULT_TTL = 60 * 60; // 1 hour
 
 export const fetchOne = async <T extends HydratedRecord>(
-  db: Db,
   accessor: AccessorName,
   identifier: Identifier,
   ttl: number = DEFAULT_TTL,
 ): Promise<T | null> => {
   const key = cacheKey(accessor, identifier);
-  const delegate = runtimeDelegate(db, accessor);
+  const delegate = db.delegate(accessor);
 
   return cache<T | null>(
     key,

@@ -19,7 +19,6 @@ import type {
   Serialized,
   WhereUniqueOf,
 } from '@template/db/test/factoryTypes';
-import { runtimeDelegate } from '@template/db/utils/delegates';
 import { toAccessor } from '@template/db/utils/modelNames';
 
 const serializeEntity = <T>(obj: T): Serialized<T> => {
@@ -186,7 +185,7 @@ export const createFactory = <K extends ModelName>(modelName: K, config: Factory
       }
     }
 
-    const delegate = runtimeDelegate(db, modelName);
+    const delegate = db.delegate(modelName);
     const entity: ModelOf<K> = persist
       ? upsertWhere
         ? ((await delegate.upsert({ where: upsertWhere, create: merged, update: {} })) as ModelOf<K>)

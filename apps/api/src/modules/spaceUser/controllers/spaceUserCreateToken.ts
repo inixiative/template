@@ -4,7 +4,7 @@
  * @partOf feature:tenancy
  * @uses primitive:authz, primitive:routeTemplates, feature:auth
  */
-import { db, type HydratedRecord, hydrate } from '@template/db';
+import { type HydratedRecord, hydrate } from '@template/db';
 import { roleToStandardAction } from '@template/permissions';
 import { check, rebacSchema } from '@template/permissions/rebac';
 import { getResource } from '#/lib/context/getResource';
@@ -18,7 +18,7 @@ export const spaceUserCreateTokenController = makeController(spaceUserCreateToke
   const spaceUser = getResource<'spaceUser'>(c);
   const body = c.req.valid('json');
 
-  const hydrated = await hydrate(db, 'spaceUser', spaceUser);
+  const hydrated = await hydrate('spaceUser', spaceUser);
   const checkLeave = check(permix, rebacSchema, 'spaceUser', spaceUser, 'leave');
   // Option A: User can create tokens at or below their own role level
   const space = hydrated.space as HydratedRecord;

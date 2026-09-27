@@ -38,7 +38,7 @@ export const createInquiry = async (c: ValidatedContext<'json', InquiryCreateBod
   validateInquiryHandler(handler, source.sourceModel, body.targetModel);
   const target = await resolveInquiryTarget(c);
 
-  const partial = await hydrate(db, 'inquiry', {
+  const partial = await hydrate('inquiry', {
     id: '',
     type: body.type,
     content,

@@ -6,7 +6,8 @@
  */
 import type { AsyncLocalStorage } from 'node:async_hooks';
 import type { PrismaClient } from '@template/db/generated/client/client';
-import type { ModelName } from '@template/db/utils/modelNames';
+import type { RuntimeDelegate } from '@template/db/utils/delegates';
+import type { AccessorName, ModelName } from '@template/db/utils/modelNames';
 import type { ConcurrencyType } from '@template/shared/utils';
 
 export type AfterCommitFn = () => Promise<void> | void;
@@ -21,6 +22,7 @@ export type ScopeContext = 'api' | 'worker';
 
 export type DbMethods = {
   raw: Db;
+  delegate: (model: ModelName | AccessorName) => RuntimeDelegate;
   scope: <T>(scopeId: string | undefined, fn: () => Promise<T>, context?: ScopeContext) => Promise<T>;
   txn: <T>(fn: () => Promise<T>, options?: { timeout?: number; maxWait?: number }) => Promise<T>;
   onCommit: (callbacks: AfterCommitFn | AfterCommitFn[], types?: ConcurrencyType | ConcurrencyType[]) => void;

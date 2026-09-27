@@ -13,14 +13,12 @@ import {
   projectByPath,
   toPrisma,
 } from '@inixiative/json-rules';
-import type { Db } from '@template/db/clientTypes';
+import { db } from '@template/db/client';
 import { requireWhere } from '@template/db/hydrate/requireWhere';
 import { includeFromLens, rootLens } from '@template/db/lens';
-import { runtimeDelegate } from '@template/db/utils/delegates';
 import type { ModelName } from '@template/db/utils/modelNames';
 
 export const fetchLens = async <T extends Record<string, unknown> = Record<string, unknown>>(
-  db: Db,
   lens: Lens | LensNarrowing,
 ): Promise<T[]> => {
   const root = 'parent' in lens ? rootLens(lens) : lens;
@@ -38,7 +36,7 @@ export const fetchLens = async <T extends Record<string, unknown> = Record<strin
   requireWhere(where);
 
   const include = includeFromLens(lens);
-  const delegate = runtimeDelegate(db, model);
+  const delegate = db.delegate(model);
   const rows = (await delegate.findMany(include ? { where, include } : { where })) as T[];
 
   return rows.filter((row) => check(condition, row) === true);
