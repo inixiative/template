@@ -18,7 +18,7 @@ export {
   type SingleAction,
   unregisterDbHook,
   unregisterDbInvariant,
-} from './extensions/mutationLifeCycle';
+} from './extensions/hookRegistry';
 // Automatic soft-delete read/write scoping (app registers the scoper at bootstrap)
 export { registerSoftDeleteScoper, type SoftDeleteScoper } from './extensions/softDeleteScopeRegistry';
 // Prisma namespace for advanced types (Prisma.UserWhereInput, etc.)

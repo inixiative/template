@@ -6,7 +6,7 @@ import {
   HookTiming,
   registerDbHook,
   unregisterDbHook,
-} from '@template/db/extensions/mutationLifeCycle';
+} from '@template/db/extensions/hookRegistry';
 
 describe('mutationLifeCycle', () => {
   describe('registerDbHook', () => {

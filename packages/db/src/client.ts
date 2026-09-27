@@ -17,7 +17,7 @@ import type {
 } from '@template/db/clientTypes';
 import { assertNoNestedWrites } from '@template/db/extensions/assertNoNestedWrites';
 import { captureBridgedContext, hasHooksFor, runInBridgedContext } from '@template/db/extensions/hookRegistry';
-import { mutationLifeCycleExtension } from '@template/db/extensions/mutationLifeCycle';
+import { mutationLifeCycleExtension } from '@template/db/extensions/mutationLifeCycle/mutationLifeCycleExtension';
 import { softDeleteScopeExtension } from '@template/db/extensions/softDeleteScopeExtension';
 import { telemetryExtension } from '@template/db/extensions/telemetryExtension';
 import {
@@ -73,7 +73,7 @@ const createClient = (): Db => {
   // You would add read replicas here via additional $extends
   return prisma
     .$extends(telemetryExtension)
-    .$extends(mutationLifeCycleExtension())
+    .$extends(mutationLifeCycleExtension)
     .$extends(softDeleteScopeExtension()) as unknown as Db;
 };
 
@@ -151,29 +151,16 @@ const dbMethods = {
       // Batches belong to this transaction, so a nested db.txn (e.g. a mutation from inside an
       // onCommit handler) drains its own and a rollback discards these with the object.
       const batches = openTransaction.afterCommitBatches;
-      const totalCallbacks = batches.reduce((sum, b) => sum + b.fns.length, 0);
-      if (totalCallbacks > 0) {
-        const start = performance.now();
-        for (const batch of batches) {
-          const results = await db.parallel(
-            batch.fns.map((fn) => () => Promise.resolve(fn())),
-            { concurrency: batch.concurrency, resolution: 'allSettled' },
-          );
+      for (const batch of batches) {
+        const results = await db.parallel(
+          batch.fns.map((fn) => () => Promise.resolve(fn())),
+          { concurrency: batch.concurrency, resolution: 'allSettled' },
+        );
 
-          throwIfFailures(
-            'db.onCommit() callback failed',
-            results.filter((result) => result.status === 'rejected').map((result) => result.reason),
-          );
-        }
-        const duration = performance.now() - start;
-        const slowThreshold = scope.scopeContext === 'worker' ? 30000 : 5000;
-        if (duration > slowThreshold) {
-          const types = [...new Set(batches.flatMap((b) => b.types ?? []))];
-          log.warn(
-            `afterCommit slow: ${totalCallbacks} callbacks (${types.join(', ') || 'untyped'}) took ${(duration / 1000).toFixed(2)}s`,
-            LogScope.db,
-          );
-        }
+        throwIfFailures(
+          'db.onCommit() callback failed',
+          results.filter((result) => result.status === 'rejected').map((result) => result.reason),
+        );
       }
       return result;
     };

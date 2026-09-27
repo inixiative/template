@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db/client';
-import { DbAction, registerDbInvariant, unregisterDbInvariant } from '@template/db/extensions/mutationLifeCycle';
+import { DbAction, registerDbInvariant, unregisterDbInvariant } from '@template/db/extensions/hookRegistry';
 import { createOrganization, createUser } from '@template/db/test/factories';
 
 const INVARIANT_NAME = 'test:userNameInvariant';
