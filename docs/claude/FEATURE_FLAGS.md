@@ -8,6 +8,7 @@
 - [Owners, subjects and audiences](#owners-subjects-and-audiences)
 - [Resolution](#resolution)
 - [Reading a flag](#reading-a-flag)
+- [Flags in the UI](#flags-in-the-ui)
 - [Writing flags and variants](#writing-flags-and-variants)
 - [Invalidation and live updates](#invalidation-and-live-updates)
 - [API](#api)
@@ -84,6 +85,48 @@ callers (jobs, event handlers, email render) call `resolveFlags` directly.
 
 `GET /me/featureFlagValues` is the subject-facing read: owner, customer, slug, type, value. Variant
 labels and rules are owner-side only.
+
+## Flags in the UI
+
+Frontend work, planned in Stage H. The API shapes above are fixed; nothing below is built yet.
+
+**One read, selected by context.** The client fetches `GET /me/featureFlagValues` once. It already
+carries a row per flag per subject the caller has: their own refs, and the platform refs of every
+organization and space they belong to. Each row names its customer. The client picks the row for the
+context it is in:
+
+- a `User`-subject flag reads the user's own row;
+- an `Organization`-subject flag reads the current organization's row; in a space, the space's
+  organization;
+- a `Space`-subject flag reads the current space's row, and does not apply outside a space;
+- a `custom:` flag applies only when its owner is the current context's organization or space.
+
+Switching organization or space re-selects from the same payload, so flags turn on and off on the switch
+without a request. `featureFlag.changed` refetches the payload.
+
+**Disabled and missing read as the type's zero.** A disabled flag resolves to the type's zero, so a
+boolean flag reads `false`, never its default variant. No row for the context, a missing slug, or a type
+mismatch also reads as the zero. On/off flags are therefore plain booleans in the UI.
+
+**`useFeatureFlag(slug, type)`** returns the selected value for the current context, typed by `type`.
+
+**Nav items.** `NavItem` gains `flag?: string`, next to `access`. The sidebar drops the item when the flag
+reads false in the current context, the same way it drops an item whose `access` returns false. It is a
+declared slug rather than a check inside `access` so superadmin can list what each flag gates. Hiding a
+nav entry is cosmetic: the route's loader and the API handler check the same slug (`checkFlag`) so a
+direct URL does not get through.
+
+**Slug registry.** Slugs referenced from code (nav items, routes, `checkFlag` calls) live in one registry
+in `packages/shared`. It types the slugs, and a CI rule fails when a referenced platform slug has no
+seeded flag row, so a typo cannot silently hide a page.
+
+**Superadmin.** The flag detail page shows two panels:
+
+- **Gates**: the nav entries and routes that reference the slug, read from the registry.
+- **Who sees it**: disabled → nobody; otherwise each variant's audience, from `SegmentMember` (already
+  materialized, including the internal open segment a boolean flag is created with). A sampled arm is
+  its audience filtered by the same three hex digits the fold reads, computed in SQL at read time.
+  Nothing new is stored.
 
 ## Writing flags and variants
 
