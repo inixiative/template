@@ -239,9 +239,6 @@ export const PROGRESS_KEYS = {
 
 type ProgressShape<Keys extends readonly string[]> = Record<Keys[number], boolean>;
 
-// Each entry ORs together: a bare legacy key (single flag), or an array of
-// legacy keys that must ALL be true (an AND group), matching the ad-hoc
-// fallback logic each provider used before it was normalized to shape.
 type LegacyFallback<Keys extends readonly string[]> = Partial<
   Record<Keys[number], readonly (string | readonly string[])[]>
 >;
@@ -473,7 +470,6 @@ const normalizeBouncerProgress = (
 const defaultInfisicalProgress = makeDefaultProgress(INFISICAL_PROGRESS_KEYS);
 
 const INFISICAL_LEGACY_FALLBACK: LegacyFallback<typeof INFISICAL_PROGRESS_KEYS> = {
-  // Legacy bundled flag fans out so older in-progress configs still resume cleanly.
   createRootApiFolder: ['createApps'],
   createRootWebFolder: ['createApps'],
   createRootAdminFolder: ['createApps'],
@@ -601,7 +597,6 @@ const PLANETSCALE_LEGACY_FALLBACK: LegacyFallback<typeof PLANETSCALE_PROGRESS_KE
   storeRegionSecret: ['setInfisicalToken'],
   storeTokenIdSecret: ['setInfisicalToken'],
   storeTokenSecret: ['setInfisicalToken'],
-  // Legacy bundled flags fan out to the new atomic flags so existing in-progress configs still resume correctly.
   createProdRole: ['createPasswords'],
   createStagingRole: ['createPasswords'],
   storeProdConnectionString: ['storeConnectionStrings'],
