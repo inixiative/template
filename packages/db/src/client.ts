@@ -260,7 +260,7 @@ const dbMethods = {
       }
       return Prisma.sql`${column} = ${value}`;
     });
-    if (options?.upserting) await acquireFindForUpdateLock(openTransaction, model, where, options.waitMs);
+    if (options?.upserting) await acquireFindForUpdateLock(openTransaction, modelName, where, options.waitMs);
     return db.$queryRaw<T[]>(
       Prisma.sql`SELECT * FROM ${Prisma.raw(`"${table}"`)} WHERE ${Prisma.join(conds, ' AND ')} FOR UPDATE`,
     );
