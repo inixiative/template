@@ -110,7 +110,7 @@ mismatch also reads as the zero. On/off flags are therefore plain booleans in th
 
 **`useFeatureFlag(slug, type)`** returns the selected value for the current context, typed by `type`.
 
-**Nav items.** `NavItem` gains `flag?: string`, next to `access`. The sidebar drops the item when the flag
+**Nav items.** `NavItem` gains `flag?: string`, next to `access`. It names a platform flag (a bare slug); `custom:` flags do not gate nav, because the nav ships with the product. Customer-built navigation in spaces could change that later. The sidebar drops the item when the flag
 reads false in the current context, the same way it drops an item whose `access` returns false. It is a
 declared slug rather than a check inside `access` so superadmin can list what each flag gates. Hiding a
 nav entry is cosmetic: the route's loader and the API handler check the same slug (`checkFlag`) so a

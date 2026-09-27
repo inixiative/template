@@ -189,7 +189,7 @@ Finding that shapes this stage: `polymorphicIs` (`packages/db/src/registries/pol
 ## Stage H — frontend (separate PR, planned here so the API shape is fixed)
 
 - `useFeatureFlag(slug, type)` over `meReadManyFeatureFlagValues` in `packages/ui`; ws handler names the query key. It selects the row for the current context (user; current organization, or the space's organization; current space; `custom:` only when the owner is the current org/space), so an org/space switch re-selects without a request. Disabled, missing, and no-row-for-context all read as the type's zero.
-- `NavItem.flag?: string` in `packages/ui/src/components/layout/navigationTypes.ts`; `Sidebar.tsx` drops the item when it reads false, beside the `access` check. Route loaders and handlers check the same slug.
+- `NavItem.flag?: string` (platform slugs only) in `packages/ui/src/components/layout/navigationTypes.ts`; `Sidebar.tsx` drops the item when it reads false, beside the `access` check. Route loaders and handlers check the same slug.
 - Slug registry in `packages/shared` for code-referenced flags, plus a CI rule that every referenced platform slug has a seeded row.
 - Superadmin: `apps/superadmin/app/routes/_authenticated/featureFlags.tsx` with two tabs on `/admin/featureFlags`. The flag detail page adds **Gates** (registry entries naming the slug) and **Who sees it** (disabled → nobody; each variant's `SegmentMember` audience, sampled arms filtered in SQL by the fold's hex digits).
 - Owner pages (me / org / space): flags list, variants with reach, segment picker (excludes internal), `sample` form, JSON conditions textarea until the segment builder exists.
