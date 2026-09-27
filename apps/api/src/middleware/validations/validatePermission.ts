@@ -1,10 +1,3 @@
-/**
- * @atlas
- * @kind validator, middleware
- * @partOf primitive:authz
- * @uses infrastructure:prisma, primitive:errors
- */
-import type { AccessorName } from '@template/db';
 import { hydrate } from '@template/db';
 import type { Action } from '@template/permissions/client';
 import { check, rebacSchema } from '@template/permissions/rebac';
@@ -13,7 +6,7 @@ import { makeMiddleware } from '#/lib/utils/makeMiddleware';
 
 export const validatePermission = makeMiddleware<Action>((action) => async (c, next) => {
   const resource = c.get('resource');
-  const resourceType = c.get('resourceType') as AccessorName | undefined;
+  const resourceType = c.get('resourceType');
   const permix = c.get('permix');
 
   // No resource loaded = nothing to check (let route handle it)

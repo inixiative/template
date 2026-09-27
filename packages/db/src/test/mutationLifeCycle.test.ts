@@ -77,7 +77,7 @@ describe('mutationLifeCycle', () => {
 
       registerDbHook('test-hook-array', ['User', 'Session'], HookTiming.before, [DbAction.create], hookFn);
 
-      for (const model of ['User', 'Session', 'Account']) {
+      for (const model of ['User', 'Session', 'Account'] as const) {
         await executeHooks(HookTiming.before, { model, operation: 'create', action: DbAction.create, args: {} });
       }
 
@@ -319,7 +319,7 @@ describe('mutationLifeCycle', () => {
     it('handles no registered hooks gracefully', async () => {
       await expect(
         executeHooks(HookTiming.before, {
-          model: 'NonExistentModel',
+          model: 'CronJob',
           operation: 'create',
           action: DbAction.create,
           args: {},

@@ -40,7 +40,7 @@ export type PolymorphicConfig = {
 export type FalsePolymorphismRef = {
   model: ModelName; // The polymorphic model (e.g., CustomerRef)
   axis: string; // Which axis (e.g., customerModel, providerModel)
-  value: PolymorphicValue; // The type value (e.g., User, Organization, Space)
+  value: string; // The type value (e.g., User, Organization, Space)
 };
 
 // Flexible reference: either a direct model name or a false polymorphism reference
@@ -58,7 +58,7 @@ export const resolveFalsePolymorphismRef = (ref: FalsePolymorphismRef): string |
   const axis = config.axes.find((a) => a.field === ref.axis);
   if (!axis) return null;
 
-  const fkFields = axis.fkMap[ref.value];
+  const fkFields = (axis.fkMap as Partial<Record<string, string[]>>)[ref.value];
   // Return the first FK field (usually there's just one per type)
   return fkFields?.[0] ?? null;
 };

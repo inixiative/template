@@ -31,9 +31,10 @@ const modelNameSet = new Set<string>(modelNames);
 
 export const isModelName = (value: string): value is ModelName => modelNameSet.has(value);
 
-export const toModelName = (accessor: string): ModelName | undefined => {
-  const capitalized = upperFirst(accessor);
-  return isModelName(capitalized) ? capitalized : undefined;
+export const toModelName = (model: string): ModelName => {
+  const modelName = upperFirst(model);
+  if (!isModelName(modelName)) throw new Error(`Unknown model '${model}'`);
+  return modelName;
 };
 
 // ─────────────────────────────────────────────────────────────────────────────

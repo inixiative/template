@@ -7,7 +7,6 @@
 import type { AsyncLocalStorage } from 'node:async_hooks';
 import type { PrismaClient } from '@template/db/generated/client/client';
 import type { RuntimeDelegate } from '@template/db/utils/delegates';
-import type { ModelName } from '@template/db/utils/modelNames';
 import type { ConcurrencyType } from '@template/shared/utils';
 
 export type AfterCommitFn = () => Promise<void> | void;
@@ -39,7 +38,7 @@ export type DbMethods = {
   getScope: () => ScopeContext | null;
   isInTxn: () => boolean;
   findForUpdate: <T = unknown>(
-    model: ModelName,
+    model: string,
     where: Record<string, unknown>,
     options?: FindForUpdateOptions,
   ) => Promise<T[]>;

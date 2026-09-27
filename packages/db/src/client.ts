@@ -30,7 +30,7 @@ import { prismaMap } from '@template/db/generated/prismaMap';
 import { auditActorContext } from '@template/db/lib/auditActorContext';
 import { acquireFindForUpdateLock } from '@template/db/lock/acquireFindForUpdateLock';
 import type { RuntimeDelegate } from '@template/db/utils/delegates';
-import { type AccessorName, type ModelName, toAccessor, toModelName } from '@template/db/utils/modelNames';
+import { type AccessorName, isAccessorName, toAccessor, toModelName } from '@template/db/utils/modelNames';
 import { LogScope, log } from '@template/shared/logger';
 import { type ConcurrencyType, getConcurrency, resolveAll } from '@template/shared/utils';
 import { castArray } from 'lodash-es';
@@ -241,7 +241,7 @@ const dbMethods = {
   // A row that does not exist yet locks nothing, so find-then-create races; `upserting: true` fences
   // the where-key itself (see acquireFindForUpdateLock) and returns 0 or 1 rows.
   findForUpdate: async <T = unknown>(
-    model: ModelName,
+    model: string,
     where: Record<string, unknown>,
     options?: FindForUpdateOptions,
   ): Promise<T[]> => {
@@ -249,14 +249,15 @@ const dbMethods = {
     if (!openTransaction) throw new Error('db.findForUpdate() requires db.txn()');
     const keys = Object.keys(where);
     if (!keys.length) throw new Error('db.findForUpdate() requires at least one predicate');
-    const meta = prismaMap.models[model];
-    const table = meta?.dbName ?? model;
+    const modelName = toModelName(model);
+    const meta = prismaMap.models[modelName];
+    const table = meta.dbName ?? modelName;
     // why: prismaMap carries no per-field dbName, so a predicate on an @map'd column would build
     // why: SQL against a name that does not exist. No column in this schema is mapped; the field
     // why: check is what keeps that true, by refusing any predicate the map cannot account for.
     const columnFor = (key: string): string => {
-      const fields = meta?.fields as Record<string, unknown> | undefined;
-      if (!fields?.[key]) throw new Error(`db.findForUpdate(): unknown field '${key}' on model '${model}'`);
+      const fields = meta.fields as Record<string, unknown>;
+      if (!fields[key]) throw new Error(`db.findForUpdate(): unknown field '${key}' on model '${model}'`);
       return key;
     };
     const conds = keys.map((key) => {
@@ -303,8 +304,8 @@ const bareDelegate = (model: string | symbol): unknown => {
   if (cached) return cached;
 
   const target = (db.raw as unknown as Record<string | symbol, unknown>)[model];
-  const modelName = typeof model === 'string' ? toModelName(model) : undefined;
-  if (!target || typeof target !== 'object' || !modelName) return target;
+  if (!target || typeof target !== 'object' || typeof model !== 'string' || !isAccessorName(model)) return target;
+  const modelName = toModelName(model);
 
   const delegate = new Proxy(target as Record<string, unknown>, {
     get(t, op) {

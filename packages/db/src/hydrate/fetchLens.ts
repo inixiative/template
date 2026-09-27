@@ -16,7 +16,7 @@ import {
 import { db } from '@template/db/client';
 import { requireWhere } from '@template/db/hydrate/requireWhere';
 import { includeFromLens, rootLens } from '@template/db/lens';
-import type { ModelName } from '@template/db/utils/modelNames';
+import { toModelName } from '@template/db/utils/modelNames';
 
 export const fetchLens = async <T extends Record<string, unknown> = Record<string, unknown>>(
   lens: Lens | LensNarrowing,
@@ -27,7 +27,7 @@ export const fetchLens = async <T extends Record<string, unknown> = Record<strin
   const visit = rootKey ? byPath.get(rootKey) : undefined;
   if (!visit) return [];
 
-  const model = root.model as ModelName;
+  const model = toModelName(root.model);
   const clauses = visit.whereClauses;
   const condition: Condition = clauses.length === 1 ? clauses[0] : { all: clauses };
 
