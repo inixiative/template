@@ -1,16 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { db, FindForUpdateLockTimeoutError } from '@template/db';
 import type { User } from '@template/db/generated/client/client';
+import { createUser } from '@template/db/test/factories';
 import { getNextSeq } from '@template/db/test/factory';
 import { cleanupTouchedTables, registerTestTracker } from '@template/db/test/testTracker';
 
-const findOrCreateUser = (email: string) =>
+const findOrCreateUser = (email: string, model = 'User') =>
   db.txn(async () => {
-    const [existing] = await db.findForUpdate<User>('User', { email }, { upserting: true });
+    const [existing] = await db.findForUpdate<User>(model, { email }, { upserting: true });
     if (existing) return { user: existing, created: false };
     // Widen the gap between the empty read and the insert so an unfenced race is certain.
     await new Promise((resolve) => setTimeout(resolve, 50));
-    const user = await db.user.create({ data: { email, name: 'Upserting' } });
+    const { entity: user } = await createUser({ email, name: 'Upserting' });
     return { user, created: true };
   });
 
@@ -30,6 +31,14 @@ describe('db.findForUpdate upserting mode', () => {
     const email = `upserting-race-${getNextSeq()}@test.com`;
     const results = await db.parallel(Array.from({ length: 5 }, () => () => findOrCreateUser(email)));
 
+    expect(results.filter((result) => result.created)).toHaveLength(1);
+    expect(new Set(results.map((result) => result.user.id)).size).toBe(1);
+    expect(await db.user.count({ where: { email } })).toBe(1);
+  });
+
+  it('serializes model and accessor aliases for the same missing row', async () => {
+    const email = `upserting-alias-${getNextSeq()}@test.com`;
+    const results = await db.parallel([() => findOrCreateUser(email, 'User'), () => findOrCreateUser(email, 'user')]);
     expect(results.filter((result) => result.created)).toHaveLength(1);
     expect(new Set(results.map((result) => result.user.id)).size).toBe(1);
     expect(await db.user.count({ where: { email } })).toBe(1);
@@ -110,9 +119,9 @@ describe('db.findForUpdate upserting mode', () => {
   });
 
   it('keys the lock on sorted entries, so where-object order does not matter', async () => {
-    const { id: userId, email } = await db.txn(() =>
-      db.user.create({ data: { email: `upserting-order-${getNextSeq()}@test.com`, name: 'Order' } }),
-    );
+    const {
+      entity: { id: userId, email },
+    } = await db.txn(() => createUser({ email: `upserting-order-${getNextSeq()}@test.com`, name: 'Order' }));
     const other = await db.parallel<unknown>(
       [
         () =>

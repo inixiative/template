@@ -1,0 +1,13 @@
+# Template GitHub issue review — 2026-09-27
+
+Reviewed all three pre-existing open issues against Template main `337ae5721159b7b683170424bce24bc454d0d1a1`, including issue comments. This is a source review, not a claim about hosted deployment or downstream Zealot status.
+
+| Issue | Finding | Disposition |
+| --- | --- | --- |
+| [#65 — Tenant-owned integrations](https://github.com/inixiative/template/issues/65) | Implemented by `9ff0d1ed`: `Integration` is a row with User/Organization/Space ownership and scoped name uniqueness. `Token.integrationId` and `WebhookSubscription.integrationId` reference those rows. `auditActorMiddleware` resolves token-bound or ownership-validated integration attribution; the webhook hook suppresses delivery to the originating integration ID. Existing webhook tests cover suppression and no-origin delivery. | Complete; closed after this review. |
+| [#75 — Zealot backmerge tracker](https://github.com/inixiative/template/issues/75) | Waves 1–2 are already checked off. The unchecked audit delta is now implemented: shared `hookRows`, `NOOP_FIELDS`/`REDACT_FIELDS` registries, and their audit consumers exist. The comment's non-PII token snapshot also exists (`actorTokenName`, `actorTokenKeyPrefix`). Email `system.now`/`system.year`, locale support, and slot parsing are present, but these do not prove every upstream email delta is identical. | Keep open; the audit-log checkbox was updated with evidence. Remaining candidates include MCP delivery, AI-review pipeline, lockfile gate, silent-success skill, and optional inline-job serialization. No new Zealot scan was performed. |
+| [#88 — Gloss design](https://github.com/inixiative/template/issues/88) | The comments document a successful harvester trial and narrow the remaining item to advisory anchor-liveness checking. The separate `inixiative/gloss` main has harvester/check/history/staleness code, but `src/check.ts` checks markers/sections/orphan files and does not check quoted-code anchor liveness. Template main itself has no tracked Gloss rollout. Local untracked hook files are not merged implementation. | Keep open; existing package implementation does not establish completion of the remaining anchor check or Template rollout. |
+
+## New follow-up
+
+[#126 — Interrupt WebSocket subscriptions on permission changes](https://github.com/inixiative/template/issues/126), mirrored in [AUTH-005](../tickets/AUTH-005-websocket-permission-change-interruption.md). The contacts stream is scaffolding; the owner accepted this as a nonblocking follow-up. PR #124 is separate, unmerged stream-hardening work, not part of the alias-lock fix or the September 27 downstream sync.
