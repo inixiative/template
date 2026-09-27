@@ -68,8 +68,10 @@ headers and body. A list channel therefore covers all query-filter variants of t
 A subscription is authorized by the underlying HTTP route. `canSubscribe` in
 `apps/api/src/ws/probe.ts` resolves the name with `resolveOperationRoute`
 (`apps/api/src/ws/operationRoute.ts`), which requires a canonical name
-(`channelKey(parseChannelKey(name)) === name`), fills the operation's path parameters and rejects
-`.` and `..` values so a name can never normalize onto a different route. It then probes the
+(`channelKey(parseChannelKey(name)) === name`) and hands its operationId and path parameters to
+`resolveOperation` (`apps/api/src/lib/openapi/resolveOperation.ts`, shared by any in-process caller
+of a route). That fills the path parameters from the app's OpenAPI doc and rejects `.` and `..`
+values so a name can never normalize onto a different route. It then probes the
 route with the socket's sanitized credentials. Only a 2xx grants the subscription. The server
 sends `subscribed` or `subscribeRejected`; the frontend removes rejected channels from its
 desired set.

@@ -63,17 +63,25 @@ type EmailHandoff = {
   data: Record<string, unknown>;
 };
 
-type WSMessageHandoff = {
-  target: { channels: string[] } | { userIds: string[] };
+type WSChannelsHandoff = {
+  kind: 'channels';
+  target: { channels: string[] };
+  message: { data: Record<string, unknown> };
+};
+
+type WSUsersHandoff = {
+  kind: 'users';
+  target: { userIds: string[] };
   message: { data: Record<string, unknown> };
 };
 
 type WSStreamAppendHandoff = {
+  kind: 'stream';
   target: { stream: string; userIds?: string[] };
   append: { type: string; payload: unknown };
 };
 
-type WSHandoff = WSMessageHandoff | WSStreamAppendHandoff;
+type WSHandoff = WSChannelsHandoff | WSUsersHandoff | WSStreamAppendHandoff;
 
 type AppEventHandlerDefinition<T> = {
   email?: (data: T) => EmailHandoff[] | null;

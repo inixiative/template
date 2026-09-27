@@ -5,6 +5,7 @@ import { inviteOrganizationUserAppEvents } from '#/modules/inquiry/handlers/invi
 const refetchHandoff = (id: string) => {
   const key = { _id: 'inquiryRead', path: { id } };
   return {
+    kind: 'channels',
     target: { channels: [channelKey(key)] },
     message: { data: { category: 'query', action: 'refetch', key } },
   };

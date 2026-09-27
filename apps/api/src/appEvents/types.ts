@@ -30,17 +30,25 @@ export type EmailHandoff = {
   data: Record<string, unknown>;
 };
 
-export type WSMessageHandoff = {
-  target: { channels: string[] } | { userIds: string[] };
+export type WSChannelsHandoff = {
+  kind: 'channels';
+  target: { channels: string[] };
+  message: { data: WSQueryEvent };
+};
+
+export type WSUsersHandoff = {
+  kind: 'users';
+  target: { userIds: string[] };
   message: { data: WSQueryEvent };
 };
 
 export type WSStreamAppendHandoff = {
+  kind: 'stream';
   target: { stream: string; userIds?: string[] };
   append: ValidatedStreamAppend;
 };
 
-export type WSHandoff = WSMessageHandoff | WSStreamAppendHandoff;
+export type WSHandoff = WSChannelsHandoff | WSUsersHandoff | WSStreamAppendHandoff;
 
 export type ObserveAdapter = {
   record: (event: AppEventPayload) => Promise<void>;

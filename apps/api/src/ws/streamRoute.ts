@@ -5,9 +5,10 @@
  * @uses none
  */
 import { type RegisteredStream, streamDefinitionFor } from '@template/db/streams';
-import { type OperationRoute, resolveOperationRoute } from '#/ws/operationRoute';
+import type { ResolvedOperation } from '#/lib/openapi/resolveOperation';
+import { resolveOperationRoute } from '#/ws/operationRoute';
 
-export type StreamRoute = { definition: RegisteredStream; route: OperationRoute };
+export type StreamRoute = { definition: RegisteredStream; route: ResolvedOperation };
 
 export const resolveStreamRoute = async (stream: string): Promise<StreamRoute | null> => {
   const route = await resolveOperationRoute(stream);

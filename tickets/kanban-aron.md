@@ -28,6 +28,7 @@ kanban
     FEAT-011-dates-timezones
     COMM-001-email-system
     FEAT-008-permissions-builder
+    API-004-route-exposure-tags
   In Progress
     INFRA-027-rate-limiter-atomicity-fail-open-scopes
     INFRA-029-preset-facet-knobs
@@ -56,6 +57,7 @@ kanban
 **Infrastructure:**
 - [INFRA-002: Rules Builder](./INFRA-002-rules-builder.md) ⭐ - Visual rules builder (rules-builder repo)
 - [INFRA-012: Typed Prisma Results](./INFRA-012-typed-prisma-results-with-zod-json-registry.md) - Branded IDs + zod JSON typing via Prisma `$extends`
+- [API-004: Route exposure tags](./API-004-route-exposure-tags.md) - Which surfaces (WebSocket, MCP) may reach a route, and whether its result is per-caller: route tags vs per-surface registries
 - [INFRA-021: Jobs Overflow Buffer](./INFRA-021-jobs-overflow-buffer.md) ⭐ - Durable outbox in front of BullMQ at the `enqueueJob` chokepoint; bounds Redis depth on fan-outs (createLock singleton refactor landed)
 
 **Rules / Lens Platform** (json-rules + rules-builder):
@@ -110,8 +112,8 @@ See [Backlog Board](./kanban-backlog.md) for future enhancements (localization, 
 
 ## Quick Stats
 
-- **Total Tickets**: 19
-- **Todo**: 13
+- **Total Tickets**: 20
+- **Todo**: 14
 - **In Progress**: 6
 - **Review**: 1
 - **Blocked**: 2 (waiting on rules builder)
@@ -137,5 +139,4 @@ FEAT-021 (Segments, PR #105)
 
 ---
 
-_Last Updated: 2026-08-31_
-_Last Updated: 2026-09-09_
+_Last Updated: 2026-09-27_

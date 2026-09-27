@@ -17,6 +17,7 @@ export const streamAppend = <D extends StreamDefinition, K extends StreamActionT
   payload: StreamActionInput<D, K>,
   ...[userIds]: Recipients<D>
 ): WSStreamAppendHandoff => ({
+  kind: 'stream',
   target: { stream: definition.name(params), ...(userIds ? { userIds } : {}) },
   append: {
     type,

@@ -14,7 +14,7 @@ import type { InquiryAppEvents } from '#/modules/inquiry/handlers/types';
 const refetchInquiry = (id: string): WSHandoff => {
   const key = { _id: 'inquiryRead', path: { id } };
   const event: WSQueryEvent = { category: 'query', action: 'refetch', key };
-  return { target: { channels: [WS_CHANNELS.inquiryRead.name(id)] }, message: { data: event } };
+  return { kind: 'channels', target: { channels: [WS_CHANNELS.inquiryRead.name(id)] }, message: { data: event } };
 };
 
 export const inviteOrganizationUserAppEvents: InquiryAppEvents = {
