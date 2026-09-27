@@ -27,7 +27,7 @@ export const getModelRelations = (modelName: ModelName): RelationInfo[] =>
   getRelations(models, modelName).map((relation) => ({
     relationName: relation.relationName,
     targetModel: relation.targetModel as ModelName,
-    targetAccessor: toAccessor(relation.targetModel as ModelName),
+    targetAccessor: toAccessor(relation.targetModel),
     foreignKey: relation.foreignKey,
   }));
 

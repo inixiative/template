@@ -6,11 +6,10 @@
  */
 import { type SourceQuery, type SourceValues, sourceValuesFromQueryRows } from '@inixiative/json-rules';
 import { db } from '@template/db';
-import type { ModelName } from '@template/db/utils/modelNames';
 import { type EmailLens, emailSourceQueries } from '@template/email/rules';
 
 const sourceValuesOf = async (query: SourceQuery): Promise<SourceValues> => {
-  const delegate = db.delegate(query.model as ModelName);
+  const delegate = db.delegate(query.model);
   const rows = (await delegate.findMany({
     where: query.prisma.where,
     select: query.prisma.select,

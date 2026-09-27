@@ -30,7 +30,7 @@ import { prismaMap } from '@template/db/generated/prismaMap';
 import { auditActorContext } from '@template/db/lib/auditActorContext';
 import { acquireFindForUpdateLock } from '@template/db/lock/acquireFindForUpdateLock';
 import type { RuntimeDelegate } from '@template/db/utils/delegates';
-import { type AccessorName, isModelName, type ModelName, toAccessor, toModelName } from '@template/db/utils/modelNames';
+import { type AccessorName, type ModelName, toAccessor, toModelName } from '@template/db/utils/modelNames';
 import { LogScope, log } from '@template/shared/logger';
 import { type ConcurrencyType, getConcurrency, resolveAll } from '@template/shared/utils';
 import { castArray } from 'lodash-es';
@@ -83,13 +83,8 @@ const dbMethods = {
     return __raw;
   },
 
-  delegate: (model: ModelName | AccessorName): RuntimeDelegate => {
-    const delegate = (db as unknown as Record<string, RuntimeDelegate | undefined>)[
-      isModelName(model) ? toAccessor(model) : model
-    ];
-    if (!delegate) throw new Error(`db.delegate(): unknown model '${model}'`);
-    return delegate;
-  },
+  delegate: (model: string): RuntimeDelegate =>
+    (db as unknown as Record<AccessorName, RuntimeDelegate>)[toAccessor(model)],
 
   scope: async <T>(scopeId: string | undefined, fn: () => Promise<T>, context?: ScopeContext): Promise<T> => {
     if (store.getStore()) return fn();

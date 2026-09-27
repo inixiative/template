@@ -4,7 +4,7 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
-import { db, type ModelName } from '@template/db';
+import { db } from '@template/db';
 import { type ChildRelation, childRelations } from '#/hooks/softDeleteCascade/childRelations';
 import { HARD_DELETE_ON_TOMBSTONE } from '#/hooks/softDeleteCascade/hardDeleteOnTombstone';
 
@@ -16,9 +16,9 @@ const fkWhere = (child: ChildRelation, row: Row) =>
 export const tombstoneChildren = async (model: string, row: Row) => {
   for (const child of childRelations(model)) {
     if (HARD_DELETE_ON_TOMBSTONE[model]?.includes(child.model)) {
-      await db.delegate(child.model as ModelName).deleteMany({ where: fkWhere(child, row) });
+      await db.delegate(child.model).deleteMany({ where: fkWhere(child, row) });
     } else if (child.hasDeletedAt) {
-      await db.delegate(child.model as ModelName).updateManyAndReturn({
+      await db.delegate(child.model).updateManyAndReturn({
         where: { ...fkWhere(child, row), deletedAt: null },
         data: { deletedAt: row.deletedAt },
       });
@@ -29,7 +29,7 @@ export const tombstoneChildren = async (model: string, row: Row) => {
 export const reviveChildren = async (model: string, row: Row, priorDeletedAt: unknown) => {
   for (const child of childRelations(model)) {
     if (!child.hasDeletedAt) continue;
-    await db.delegate(child.model as ModelName).updateManyAndReturn({
+    await db.delegate(child.model).updateManyAndReturn({
       where: { ...fkWhere(child, row), deletedAt: priorDeletedAt },
       data: { deletedAt: null },
     });

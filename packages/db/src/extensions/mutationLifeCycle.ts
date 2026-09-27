@@ -17,7 +17,7 @@ import {
 import { claimPendingRegistration, getCurrentTransaction } from '@template/db/extensions/transactionRegistry';
 import { Prisma } from '@template/db/generated/client/client';
 import type { RuntimeDelegate } from '@template/db/utils/delegates';
-import { toAccessor } from '@template/db/utils/modelNames';
+import { type AccessorName, toAccessor } from '@template/db/utils/modelNames';
 import { LogScope, log } from '@template/shared/logger';
 
 export type {
@@ -68,8 +68,8 @@ type Interception = {
 
 const dataOf = (args: MutationArgs) => args.data;
 
-const txnDelegate = (openTransaction: OpenTransaction, model: Prisma.ModelName) =>
-  (openTransaction.client as unknown as Record<string, RuntimeDelegate>)[toAccessor(model)];
+const txnDelegate = (openTransaction: OpenTransaction, model: string) =>
+  (openTransaction.client as unknown as Record<AccessorName, RuntimeDelegate>)[toAccessor(model)];
 
 export const mutationLifeCycleExtension = () => {
   const fetchExistingRecord = async (
