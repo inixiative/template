@@ -17,7 +17,9 @@ const JobEnqueueBodySchema = z.object({
   payload: z.record(z.string(), z.unknown()).optional(),
   options: z
     .object({
-      priority: z.number().optional(),
+      // Reaches all three bands: none = fast lane, SLOW_LANE_PRIORITY = slow lane, anything between = between.
+      // Integer because BullMQ's priority score is priority * 2^32 + counter.
+      priority: z.number().int().min(0).optional(),
       delay: z.number().optional(),
       attempts: z.number().optional(),
       backoff: z.number().optional(),

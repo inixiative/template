@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
 import type { Inquiry, Organization, OrganizationUser, User } from '@template/db/generated/client/client';
 import { InquiryResourceModel, InquiryStatus, InquiryType } from '@template/db/generated/client/enums';
 import {
@@ -8,6 +8,7 @@ import {
   createOrganizationUser,
   createUser,
 } from '@template/db/test';
+import { inquiryHandlers } from '#/modules/inquiry/handlers';
 import { organizationRouter } from '#/modules/organization';
 import { createTestApp, type MountFn } from '#tests/createTestApp';
 import { get, json, post } from '#tests/utils/request';
@@ -84,6 +85,82 @@ describe('GET /api/v1/organization/:id/inquiries/sent', () => {
   });
 });
 
+describe('POST /api/v1/organization/:id/inquiries — create and send with autoApprove', () => {
+  let fetch: ReturnType<typeof createTestApp>['fetch'];
+  let db: ReturnType<typeof createTestApp>['db'];
+  let org: Organization;
+  const origAutoApprove = inquiryHandlers.inviteOrganizationUser.autoApprove;
+
+  beforeAll(async () => {
+    const { entity: adminUser } = await createUser();
+    const { entity: o } = await createOrganization();
+    org = o;
+    const { entity: adminOu } = await createOrganizationUser({ role: 'admin' }, { user: adminUser, organization: org });
+
+    const harness = createTestApp({ mockUser: adminUser, mockOrganizationUsers: [adminOu], mount });
+    fetch = harness.fetch;
+    db = harness.db;
+  });
+
+  beforeEach(() => {
+    inquiryHandlers.inviteOrganizationUser.autoApprove = async () => true;
+  });
+
+  afterEach(() => {
+    inquiryHandlers.inviteOrganizationUser.autoApprove = origAutoApprove;
+  });
+
+  afterAll(async () => {
+    await cleanupTouchedTables(db);
+  });
+
+  it('auto-approves through the send path and runs handler side effects', async () => {
+    const { entity: invitee } = await createUser();
+
+    const response = await fetch(
+      post(`/api/v1/organization/${org.id}/inquiries`, {
+        type: InquiryType.inviteOrganizationUser,
+        targetModel: InquiryResourceModel.User,
+        status: InquiryStatus.sent,
+        content: { organizationId: org.id, role: 'member' },
+        targetUserId: invitee.id,
+      }),
+    );
+    const { data } = await json<Inquiry>(response);
+
+    expect(response.status).toBe(201);
+    expect(data.status).toBe(InquiryStatus.approved);
+
+    const record = await db.inquiry.findUniqueOrThrow({ where: { id: data.id } });
+    expect(record.status).toBe(InquiryStatus.approved);
+    expect(record.sentAt).not.toBeNull();
+
+    const membership = await db.organizationUser.findUnique({
+      where: { organizationId_userId: { organizationId: org.id, userId: invitee.id } },
+    });
+    expect(membership?.role).toBe('member');
+  });
+
+  it('leaves a draft untouched by autoApprove', async () => {
+    const { entity: invitee } = await createUser();
+
+    const response = await fetch(
+      post(`/api/v1/organization/${org.id}/inquiries`, {
+        type: InquiryType.inviteOrganizationUser,
+        targetModel: InquiryResourceModel.User,
+        content: { organizationId: org.id, role: 'member' },
+        targetUserId: invitee.id,
+      }),
+    );
+    const { data } = await json<Inquiry>(response);
+
+    expect(response.status).toBe(201);
+    expect(data.status).toBe(InquiryStatus.draft);
+    expect(data.sentAt).toBeNull();
+    expect(data.expiresAt).toBeNull();
+  });
+});
+
 describe('POST /api/v1/organization/:id/inquiries — inviteOrganizationUser (low roles)', () => {
   let fetch: ReturnType<typeof createTestApp>['fetch'];
   let db: ReturnType<typeof createTestApp>['db'];
@@ -143,6 +220,8 @@ describe('POST /api/v1/organization/:id/inquiries — inviteOrganizationUser (lo
     expect(response.status).toBe(201);
     expect(data.status).toBe(InquiryStatus.sent);
     expect(data.sentAt).toBeTruthy();
+    expect(data.expiresAt).not.toBeNull();
+    expect(new Date(data.expiresAt!).getTime()).toBeGreaterThan(Date.now());
   });
 
   it('rejects duplicate open invite to same user', async () => {

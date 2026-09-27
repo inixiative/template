@@ -4,7 +4,7 @@
  * @partOf primitive:authz
  * @uses infrastructure:prisma, primitive:errors
  */
-import { db, hydrate, type OrganizationId, type SpaceId, type UserId } from '@template/db';
+import { hydrate, type OrganizationId, type SpaceId, type UserId } from '@template/db';
 import type { Action } from '@template/permissions/client';
 import { check, rebacSchema } from '@template/permissions/rebac';
 import { makeError } from '#/lib/errors';
@@ -36,7 +36,7 @@ export const validateOwnerPermission = makeMiddleware<Options>((options) => asyn
   if (ownerModel === 'User' || ownerModel === 'OrganizationUser') {
     const userId = resource?.[userIdField] as UserId | undefined;
     if (userId) {
-      const hydratedUser = await hydrate(db, 'user', { id: userId });
+      const hydratedUser = await hydrate('user', { id: userId });
       if (check(permix, rebacSchema, 'user', hydratedUser, action)) return next();
     }
   }
@@ -44,7 +44,7 @@ export const validateOwnerPermission = makeMiddleware<Options>((options) => asyn
   if (ownerModel === 'Organization') {
     const orgId = resource?.[orgIdField] as OrganizationId | undefined;
     if (orgId) {
-      const hydratedOrg = await hydrate(db, 'organization', { id: orgId });
+      const hydratedOrg = await hydrate('organization', { id: orgId });
       if (check(permix, rebacSchema, 'organization', hydratedOrg, action)) return next();
     }
   }
@@ -52,7 +52,7 @@ export const validateOwnerPermission = makeMiddleware<Options>((options) => asyn
   if (ownerModel === 'Space') {
     const spaceId = resource?.[spaceIdField] as SpaceId | undefined;
     if (spaceId) {
-      const hydratedSpace = await hydrate(db, 'space', { id: spaceId });
+      const hydratedSpace = await hydrate('space', { id: spaceId });
       if (check(permix, rebacSchema, 'space', hydratedSpace, action)) return next();
     }
   }

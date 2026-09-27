@@ -6,12 +6,10 @@
  */
 import { MutationCache, QueryCache, QueryClient } from '@tanstack/react-query';
 import { handleApiError, shouldSkipToast } from '@template/ui/lib/handleApiError';
+import { useAppStore } from '@template/ui/store';
 
-// The app's QueryClient. Created once at the app root (beside the router) and handed to both the
-// provider and the store — see each app's main.tsx. Construction lives outside the store so the
-// store never depends on it (its error handlers read the store, not the other way around).
-export const createAppQueryClient = (): QueryClient =>
-  new QueryClient({
+export const createAppQueryClient = (): QueryClient => {
+  const queryClient = new QueryClient({
     queryCache: new QueryCache({
       onError: (error, query) => {
         if (shouldSkipToast(query.meta)) return;
@@ -35,3 +33,6 @@ export const createAppQueryClient = (): QueryClient =>
       },
     },
   });
+  useAppStore.getState().setClient(queryClient);
+  return queryClient;
+};

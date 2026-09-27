@@ -1,13 +1,14 @@
 /**
  * @atlas
  * @partOf primitive:caching, infrastructure:redis, infrastructure:prisma
- * @uses none
+ * @uses infrastructure:observability
  */
 import { createLock } from '@template/db/lock/createLock';
 import { getRedisClient } from '@template/db/redis/client';
 import { redisNamespace } from '@template/db/redis/namespaces';
 import { type AccessorName, isModelName, type ModelName, toAccessor } from '@template/db/utils/modelNames';
 import { log } from '@template/shared/logger';
+import { incrementCounter } from '@template/shared/telemetry';
 import { compact, isNil } from 'lodash-es';
 import superjson from 'superjson';
 
@@ -15,6 +16,8 @@ const DEFAULT_TTL = 60 * 60 * 24; // 24 hours
 const NEGATIVE_TTL = 60; // 1 minute for null/undefined results
 
 type Identifier = string | Record<string, string>;
+
+type CacheWriter = 'cache' | 'upsertCache';
 
 // The domain is a model or accessor name; normalize it to the accessor so a write
 // keyed 'User' and a clear keyed 'user' agree (Redis is case-sensitive). Tags are
@@ -42,6 +45,30 @@ export const cacheKey = (
   }
 
   return compact([redisNamespace.cache, toAccessorName(domain), ...idParts, ...tags, wildcard && '*']).join(':');
+};
+
+// Where a cached value stops looking like a row set and starts looking like a dump. Not a limit:
+// nothing refuses at it, and smaller writes are not metered at all.
+const LARGE_CACHE_VALUE_BYTES = 256 * 1024;
+
+// The domain segment, never the key: cacheKey interpolates ids after it, so a key-tagged metric
+// would be unbounded cardinality.
+const cacheDomainOf = (key: string): string => key.split(':')[1] ?? 'unknown';
+
+// Cache, session, lock, lane and bull share one Redis, so an oversized value competes for memory
+// with keys nothing can recreate; under an eviction policy the pressure surfaces only as unrelated
+// keys disappearing. Reporting only: declining the write would leave nothing under the key and
+// send every later caller back through single-flight to recompute serially.
+const meterLargeWrite = (key: string, payload: string, ttlSeconds: number, writer: CacheWriter): void => {
+  const bytes = Buffer.byteLength(payload, 'utf8');
+  if (bytes <= LARGE_CACHE_VALUE_BYTES) return;
+
+  const domain = cacheDomainOf(key);
+  incrementCounter('cache.value.large', 1, { domain, writer });
+  incrementCounter('cache.value.large.bytes', bytes, { domain, writer }, 'By');
+  // The counters carry bounded tags only; the record names the entry and its ttl, because what a
+  // key costs the keyspace is bytes held — 300KB for a day outweighs 2MB for a minute.
+  log.warn({ event: 'cache.large_write', cacheKey: key, domain, bytes, ttlSeconds, writer }, 'Large cache write');
 };
 
 const validateKey = (key: string): void => {
@@ -162,6 +189,7 @@ export const cache = async <T>(
 
     if (effectiveTtl > 0) {
       const payload = superjson.stringify(value);
+      meterLargeWrite(key, payload, effectiveTtl, 'cache');
       const write = redis.setex(key, effectiveTtl, payload).catch((error) => {
         log.error(`Cache write error for key ${key}:`, error);
       });
@@ -191,7 +219,9 @@ export const upsertCache = async <T>(
   try {
     const redis = getRedisClient();
     if (!force && (await redis.exists(key))) return false;
-    await redis.setex(key, ttl, superjson.stringify(value));
+    const payload = superjson.stringify(value);
+    meterLargeWrite(key, payload, ttl, 'upsertCache');
+    await redis.setex(key, ttl, payload);
     return true;
   } catch {
     return false;

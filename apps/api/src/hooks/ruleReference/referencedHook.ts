@@ -10,7 +10,6 @@ import {
   db,
   type HookOptions,
   HookTiming,
-  type ModelName,
   type Prisma,
   RULE_REFERENCEABLE_MODELS,
   registerDbHook,
@@ -75,7 +74,7 @@ export const registerRuleReferenceReferencedHook = () => {
       const column = resolveFalsePolymorphismRef({
         model: 'RuleReference',
         axis: 'referencedModel',
-        value: model as ModelName,
+        value: model,
       });
       if (!column) return;
       for (const [stamp, rows] of Object.entries(groupBy(flipped, deletedAtStamp))) {

@@ -5,7 +5,7 @@
  * @uses primitive:shared
  */
 import type { LensNarrowing } from '@inixiative/json-rules';
-import type { ModelName } from '@template/db';
+import { type ModelName, toModelName } from '@template/db';
 import { dialect, rootLens, searchablePaths } from '@template/db/lens';
 import {
   FIELD_OPERATORS,
@@ -336,7 +336,7 @@ export const buildWhereClause = (options: BuildWhereOptions): Record<string, unk
     orNullFields = [],
   } = options;
   const lens = rootLens(filterLens);
-  const model = lens.model as ModelName;
+  const model = toModelName(lens.model);
   const searchableFields = searchablePaths(filterLens);
   const conditions: Record<string, unknown>[] = [];
 
