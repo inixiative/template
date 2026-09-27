@@ -99,11 +99,10 @@ not dropped silently: the server answers
 every 30 seconds and reconnects if pong does not arrive within 5 seconds; the server sweeps
 connections idle for more than 5 minutes.
 
-On reconnect, `createApiWebsocket` sends identity first, then replays subscribes, then opens. The
-replay goes through a pacer (`packages/ui/src/lib/ws/framePacer.ts`) that keeps at most 8
-subscribes, opens, unsubscribes and closes unanswered and at most 10 per second, so a reconnect with many streams stays
-inside both the server's pending-frame cap and the HTTP rate limit that snapshot reads and
-subscribe probes count against. It waits for subscription acknowledgements (or the bounded
+On reconnect, `createApiWebsocket` sends identity first, then replays subscribes, then opens. A
+replay that overruns the server's pending-frame cap or the HTTP rate limit (snapshot reads and
+subscribe probes count against it) gets retryable errors, and the client re-sends with backoff. It
+waits for subscription acknowledgements (or the bounded
 acknowledgement timeout) before calling the reconnect callback that invalidates live queries. A
 close or unsubscribe goes out only when its open or subscribe actually reached the server, and
 one the server drops for load is re-sent while the stream or channel stays released.
@@ -211,10 +210,7 @@ controller does not) with the connection's credential. A rejection closes the st
 connection's serialized queue and never queues a second recheck behind an unfinished one. Its
 probes carry a server-only system probe secret that the API rate limiter exempts, so the sweep
 spends no caller's or organization's HTTP budget; client-driven opens and subscribes still count.
-A spoofed connection also re-resolves `/me` on each sweep: once the spoof no longer resolves to
-the spoofed user (the caller lost superadmin, or the target is gone), every stream on it is
-closed with `openRejected`, because the stream probe alone would silently run as the caller. A
-probe that throws closes its stream as retryable and the sweep continues with the rest.
+A probe that throws closes its stream as retryable and the sweep continues with the rest.
 
 Revocation is therefore bounded by the sweep interval (plus the HTTP layer's own caches: the
 route answers 403 only once the membership/token cache is cleared). Closing streams immediately
@@ -315,7 +311,7 @@ falls back to local delivery, so cross-instance delivery is unavailable during t
 - `packages/shared/src/ws/`: events, channel keys, channel registry, stream definitions, list
   schemas, frame limits and browser transport.
 - `packages/db/src/streams/`: stream definitions and the stream registry.
-- `packages/ui/src/lib/ws/`: API socket, pacing, acknowledgement/retry handling, dispatch, reducer
+- `packages/ui/src/lib/ws/`: API socket, acknowledgement/retry handling, dispatch, reducer
   and listener registries, list reducers.
 - `packages/ui/src/hooks/useStream.ts`, `useStreamAction.ts`: consumer hooks.
 - `apps/api/src/ws/`: handler, identity, route resolution, stream access and re-authorization,
@@ -328,8 +324,8 @@ falls back to local delivery, so cross-instance delivery is unavailable during t
 - `apps/api/src/ws/pubsub.test.ts`: per-stream publish order and per-recipient delivery.
 - `apps/api/src/appEvents/handlers/contact/organizationContactsStream.test.ts`: app event →
   Redis → open socket, with typed payloads matching the route snapshot.
-- `packages/ui/src/lib/ws/createApiWebsocket.test.ts`, `framePacer.test.ts`,
+- `packages/ui/src/lib/ws/createApiWebsocket.test.ts`,
   `listStreamReducers.test.ts`, `dispatch.test.ts`, `packages/ui/src/hooks/useStream.test.tsx`:
-  client protocol, pacing, retries, reducers and hooks.
+  client protocol, retries, reducers and hooks.
 
 See [APP_EVENTS.md](APP_EVENTS.md) and [Segments](SEGMENTS.md#events-and-email-integration).

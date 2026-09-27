@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 import '@template/ui/store';
 import { QueryClient, QueryObserver, skipToken } from '@tanstack/react-query';
-import { WS_FRAME_LIMIT, type WSFrameErrorFrame, type WSStreamAckFrame } from '@template/shared/ws';
+import { type WSFrameErrorFrame, type WSStreamAckFrame } from '@template/shared/ws';
 import { type ApiWebsocketTiming, createApiWebsocket } from '@template/ui/lib/ws/createApiWebsocket';
 import { dataStreamQueryKey } from '@template/ui/lib/ws/dataStreamQueryKey';
 import { useAppStore } from '@template/ui/store';
@@ -45,8 +45,6 @@ const fastTiming: Partial<ApiWebsocketTiming> = {
   retryBaseMs: 5,
   retryMaxMs: 20,
   openAckTimeoutMs: 30,
-  pacedInFlight: 100,
-  pacedPerSecond: 1_000,
 };
 
 describe('createApiWebsocket', () => {
@@ -372,31 +370,18 @@ describe('createApiWebsocket', () => {
       unobserve();
     });
 
-    it('paces a large reconnect replay so the server never holds more than the in-flight window', () => {
-      const { api, ws } = connected({ ...fastTiming, pacedInFlight: 4, pacedPerSecond: 1_000 });
-      const names = Array.from({ length: 12 }, (_, i) => `organizationReadManyContacts:id:org-${i}`);
+    it('replays identity, then subscribes, then opens on reconnect', () => {
+      const { api, ws } = connected();
+      const names = Array.from({ length: 3 }, (_, i) => `organizationReadManyContacts:id:org-${i}`);
       for (const name of names) api.open(name);
-      for (let i = 0; i < 12; i++) api.subscribe(`ch${i}`);
+      for (let i = 0; i < 3; i++) api.subscribe(`ch${i}`);
       ws.sent.length = 0;
       open(ws);
 
-      expect(sends(ws).filter((frame) => frame.action !== 'authenticate')).toHaveLength(4);
-      for (let i = 0; i < 12; i++) receive(ws, { type: 'subscribed', channel: `ch${i}` });
-      for (const name of names) receive(ws, { type: 'opened', stream: name });
-
-      expect(sends(ws).filter((frame) => frame.action === 'subscribe')).toHaveLength(12);
-      expect(opensOf(ws)).toHaveLength(12);
+      expect(sends(ws).filter((frame) => frame.action === 'subscribe')).toHaveLength(3);
+      expect(opensOf(ws)).toHaveLength(3);
       const actions = sends(ws).map((frame) => frame.action);
       expect(actions.indexOf('open')).toBeGreaterThan(actions.lastIndexOf('subscribe'));
-    });
-
-    it('paces opens to the per-second budget', async () => {
-      const { api, ws } = connected({ ...fastTiming, pacedInFlight: 100, pacedPerSecond: 3, openAckTimeoutMs: 10_000 });
-      for (let i = 0; i < 5; i++) api.open(`organizationReadManyContacts:id:org-${i}`);
-
-      expect(opensOf(ws)).toHaveLength(3);
-      await wait(1_050);
-      expect(opensOf(ws)).toHaveLength(5);
     });
 
     it('resync re-opens a live stream once, and never a rejected one', () => {
@@ -456,15 +441,6 @@ describe('createApiWebsocket', () => {
       await wait(20);
 
       expect(sends(ws)).toEqual([{ action: 'unsubscribe', channel: 'ch1' }]);
-    });
-
-    it('open/close churn with default pacing stays inside the server frame budget', () => {
-      const { api, ws } = connected({});
-      for (let i = 0; i < 130; i++) {
-        api.open(`organizationReadManyContacts:id:churn-${i}`);
-        api.close(`organizationReadManyContacts:id:churn-${i}`);
-      }
-      expect(ws.sent.length).toBeLessThanOrEqual(WS_FRAME_LIMIT / 2);
     });
 
     it('backs off identity re-sends after repeated load drops', async () => {

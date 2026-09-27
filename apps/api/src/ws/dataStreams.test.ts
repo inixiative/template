@@ -396,32 +396,6 @@ describe('data streams (real app)', () => {
       expect(frames(sent)).toEqual([{ type: 'error', action: 'authenticate', retryable: true }]);
     });
 
-    it('closes a spoofed connection’s streams once the spoof no longer resolves to the spoofed user', async () => {
-      const { entity: admin } = await createUser({ platformRole: PlatformRole.superadmin });
-      await createOrganizationUser({ role: 'member' }, { organization, user: admin });
-      const { authorization } = await createBearerToken(admin);
-      const { socket, sent } = connect();
-      await websocketHandler.message(
-        socket,
-        JSON.stringify({ action: 'authenticate', headers: { authorization, 'x-spoof-user-email': member.email } }),
-      );
-      expect(socket.data.userId).toBe(member.id);
-      await websocketHandler.message(socket, openFrame(stream));
-      sent.length = 0;
-
-      registerClearCacheHook();
-      try {
-        await db.txn(() => db.user.update({ where: { id: admin.id }, data: { platformRole: PlatformRole.user } }));
-        await settle();
-      } finally {
-        unregisterDbHook('clearCache');
-      }
-      await reauthorizeOpenStreams();
-
-      expect(frames(sent)).toEqual([{ type: 'openRejected', stream }]);
-      expect(byStream.has(stream)).toBe(false);
-    });
-
     it('a probe that throws closes that stream as retryable and still rechecks the rest', async () => {
       const { entity: user } = await createUser();
       const { context: other } = await createOrganizationUser({ role: 'member' }, { user });

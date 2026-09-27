@@ -7,7 +7,6 @@
 import { createWebSocketClient, type WSEvent } from '@template/shared/ws';
 import { dispatchMessage } from '@template/ui/lib/ws/dispatch';
 import { failDataStream } from '@template/ui/lib/ws/failDataStream';
-import { createFramePacer } from '@template/ui/lib/ws/framePacer';
 
 export type ApiWebsocketTiming = {
   heartbeatMs: number;
@@ -16,8 +15,6 @@ export type ApiWebsocketTiming = {
   openAckTimeoutMs: number;
   retryBaseMs: number;
   retryMaxMs: number;
-  pacedInFlight: number;
-  pacedPerSecond: number;
 };
 
 const DEFAULT_TIMING: ApiWebsocketTiming = {
@@ -27,8 +24,6 @@ const DEFAULT_TIMING: ApiWebsocketTiming = {
   openAckTimeoutMs: 10_000,
   retryBaseMs: 1_000,
   retryMaxMs: 30_000,
-  pacedInFlight: 8,
-  pacedPerSecond: 10,
 };
 
 export type ApiWebsocket = {
@@ -84,11 +79,12 @@ export const createApiWebsocket = (
   };
 
   const sendSubscribe = (channel: string): void => {
-    pacer.enqueue({ action: 'subscribe', channel }, () => sentSubscribes.add(channel));
+    socket.send({ action: 'subscribe', channel });
+    sentSubscribes.add(channel);
   };
 
   const sendRelease = (frame: Record<string, unknown>): void => {
-    if (socket.status() === 'open') pacer.enqueue(frame);
+    if (socket.status() === 'open') socket.send(frame);
   };
 
   const clearTimers = (timers: Map<string, ReturnType<typeof setTimeout>>, key?: string): void => {
@@ -102,7 +98,6 @@ export const createApiWebsocket = (
   const onOpenAckTimeout = (stream: string): void => {
     openAckTimers.delete(stream);
     if (!pendingOpens.delete(stream)) return;
-    pacer.settle();
     if (!isLive(stream)) return;
     failDataStream(stream, 'failed');
     scheduleRetry(stream);
@@ -110,15 +105,14 @@ export const createApiWebsocket = (
 
   const sendOpen = (stream: string): void => {
     if (socket.status() !== 'open') return;
-    pacer.enqueue({ action: 'open', stream }, () => {
-      sentOpens.add(stream);
-      pendingOpens.set(stream, (pendingOpens.get(stream) ?? 0) + 1);
-      clearTimers(openAckTimers, stream);
-      openAckTimers.set(
-        stream,
-        setTimeout(() => onOpenAckTimeout(stream), timing.openAckTimeoutMs),
-      );
-    });
+    socket.send({ action: 'open', stream });
+    sentOpens.add(stream);
+    pendingOpens.set(stream, (pendingOpens.get(stream) ?? 0) + 1);
+    clearTimers(openAckTimers, stream);
+    openAckTimers.set(
+      stream,
+      setTimeout(() => onOpenAckTimeout(stream), timing.openAckTimeoutMs),
+    );
   };
 
   const scheduleRetry = (stream: string): void => {
@@ -138,13 +132,11 @@ export const createApiWebsocket = (
   const forgetStream = (stream: string): void => {
     clearTimers(retryTimers, stream);
     retryAttempts.delete(stream);
-    pacer.cancel((frame) => frame.action === 'open' && frame.stream === stream);
   };
 
   const acceptOpenAnswer = (stream: string): boolean => {
     const outstanding = pendingOpens.get(stream);
     if (outstanding === undefined) return streams.has(stream);
-    pacer.settle();
     if (outstanding > 1) {
       pendingOpens.set(stream, outstanding - 1);
       return false;
@@ -183,21 +175,18 @@ export const createApiWebsocket = (
     }
     const { channel, stream } = frame;
     if (frame.action === 'subscribe' && channel) {
-      pacer.settle();
       setTimeout(() => {
         if (channels.has(channel) && socket.status() === 'open') sendSubscribe(channel);
       }, timing.retryBaseMs);
       return;
     }
     if (frame.action === 'unsubscribe' && channel) {
-      pacer.settle();
       setTimeout(() => {
         if (!channels.has(channel)) sendRelease({ action: 'unsubscribe', channel });
       }, timing.retryBaseMs);
       return;
     }
     if (frame.action === 'close' && stream) {
-      pacer.settle();
       setTimeout(() => {
         if (!streams.has(stream)) sendRelease({ action: 'close', stream });
       }, timing.retryBaseMs);
@@ -220,15 +209,13 @@ export const createApiWebsocket = (
         return void recoverFromRejectedSpoof();
       case 'subscribeRejected':
         console.error(`ws subscribe rejected: ${frame.channel}`);
-        pacer.settle();
         channels.delete(frame.channel as string);
         return void settleReconnectAck(frame.channel as string);
       case 'subscribed':
-        pacer.settle();
         return void settleReconnectAck(frame.channel as string);
       case 'unsubscribed':
       case 'closed':
-        return void pacer.settle();
+        return;
       case 'identity':
         identityAttempts = 0;
         return;
@@ -259,7 +246,6 @@ export const createApiWebsocket = (
       else onControlFrame(frame);
     },
     onOpen: () => {
-      pacer.reset();
       if (identityFrame) socket.send(identityFrame);
       replaySubscriptions();
       const reconnecting = everOpened;
@@ -277,15 +263,7 @@ export const createApiWebsocket = (
       sentSubscribes.clear();
       clearTimers(openAckTimers);
       clearTimers(retryTimers);
-      pacer.reset();
     },
-  });
-
-  const pacer = createFramePacer({
-    send: (frame) => socket.send(frame),
-    maxInFlight: timing.pacedInFlight,
-    maxPerWindow: timing.pacedPerSecond,
-    windowMs: 1_000,
   });
 
   const sendIdentity = (frame: Record<string, unknown> | null): void => {
@@ -293,7 +271,6 @@ export const createApiWebsocket = (
     rejectedStreams.clear();
     clearTimers(retryTimers);
     socket.send(frame ?? { action: 'logout' });
-    pacer.clearQueued();
     replaySubscriptions();
   };
 
@@ -333,7 +310,6 @@ export const createApiWebsocket = (
       if (refs === 0) return;
       if (refs > 1) return void channels.set(channel, refs - 1);
       channels.delete(channel);
-      pacer.cancel((frame) => frame.action === 'subscribe' && frame.channel === channel);
       if (sentSubscribes.delete(channel)) sendRelease({ action: 'unsubscribe', channel });
     },
     open: (stream) => {
