@@ -7,6 +7,7 @@
 
 import type { AsyncLocalStorage } from 'node:async_hooks';
 import type { BridgedContext } from '@template/db/clientTypes';
+import type { ModelName } from '@template/db/utils/modelNames';
 import { LogScope, log } from '@template/shared/logger';
 import { castArray } from 'lodash-es';
 
@@ -29,7 +30,7 @@ export type SingleAction = DbAction.create | DbAction.update | DbAction.delete |
 export type ManyAction = DbAction.createManyAndReturn | DbAction.updateManyAndReturn | DbAction.deleteMany;
 
 type HookOptionsBase = {
-  model: string;
+  model: ModelName;
   operation: string;
   args: unknown;
 };
@@ -165,7 +166,7 @@ export const clearHookRegistry = () => {
 export type DbInvariantAction = Exclude<DbAction, DbAction.delete | DbAction.deleteMany>;
 
 export type DbInvariantOptions = {
-  model: string;
+  model: ModelName;
   action: DbInvariantAction;
   data: unknown;
 };
@@ -203,7 +204,7 @@ export const unregisterDbInvariant = (name: string) => {
   invariantRegistrations.delete(name);
 };
 
-export const runInvariants = async (model: string, action: DbInvariantAction, data: unknown): Promise<void> => {
+export const runInvariants = async (model: ModelName, action: DbInvariantAction, data: unknown): Promise<void> => {
   const registrations = new Set([...(registeredInvariants[model] ?? []), ...(registeredInvariants['*'] ?? [])]);
   for (const { invariant } of registrations) {
     await invariant({ model, action, data });

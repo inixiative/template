@@ -611,14 +611,6 @@ The mutation lifecycle wraps these Prisma operations:
 
 `createMany`/`updateMany` are disabled because they don't return records, breaking hooks that need `result` (webhooks, cache invalidation).
 
-### Slow Mutation Logging
-
-Mutations exceeding 5 seconds log a warning:
-
-```
-[db] slow mutation: User.update took 6.23s [scope: abc12345]
-```
-
 ---
 
 ## Limitations

@@ -41,21 +41,21 @@ export const registerRulesHook = () => {
     HookTiming.before,
     [DbAction.create, DbAction.createManyAndReturn],
     async ({ model, args }) => {
-      processCreateArgs(args, model as ModelName);
+      processCreateArgs(args, model);
     },
   );
 
   registerDbHook('rules:upsert', models, HookTiming.before, [DbAction.upsert], async (options) => {
     const { model, args, previous } = options as HookOptions & { action: SingleAction };
-    processCreateArgs(args, model as ModelName);
+    processCreateArgs(args, model);
     if (previous) {
-      processUpdateArgs(args, model as ModelName, previous);
+      processUpdateArgs(args, model, previous);
     }
   });
 
   registerDbHook('rules:update', models, HookTiming.before, [DbAction.update], async (options) => {
     const { model, args, previous } = options as HookOptions & { action: SingleAction };
-    processUpdateArgs(args, model as ModelName, previous);
+    processUpdateArgs(args, model, previous);
   });
 
   registerDbHook(
@@ -64,11 +64,11 @@ export const registerRulesHook = () => {
     HookTiming.after,
     [DbAction.updateManyAndReturn],
     async ({ model, result }) => {
-      const rule = getRule(model as ModelName);
+      const rule = getRule(model);
       if (rule === true) return;
 
       for (const record of result as Record<string, unknown>[]) {
-        validateData(record, model as ModelName);
+        validateData(record, model);
       }
     },
   );
