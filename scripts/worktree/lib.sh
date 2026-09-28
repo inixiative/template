@@ -247,6 +247,13 @@ rewrite_redis_db() {
   done
 }
 
+local_redis_port() {
+  local url pattern='^redis://([^@/]*@)?(localhost|127\.0\.0\.1):([0-9]+)(/[0-9]+)?$'
+  url="$(env_value "$1" REDIS_URL)"
+  [[ "$url" =~ $pattern ]] && printf '%s\n' "${BASH_REMATCH[3]}"
+  return 0
+}
+
 env_file_sources() {
   bash -c 'set -a; . "$1"' _ "$1" >/dev/null 2>&1
 }
