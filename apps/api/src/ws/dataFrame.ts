@@ -13,10 +13,16 @@ export const streamSnapshotFrame = (stream: string, payload: unknown): WSStreamS
   payload,
 });
 
-export const streamAppendFrame = (stream: string, type: string, payload: unknown): WSStreamAppendEvent => ({
+export const streamAppendFrame = (
+  stream: string,
+  type: string,
+  payload: unknown,
+  revive?: boolean,
+): WSStreamAppendEvent => ({
   category: 'data',
   action: 'append',
   stream,
   type,
   payload,
+  ...(revive ? { revive: true } : {}),
 });

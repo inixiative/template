@@ -20,7 +20,7 @@ type PubSubMessage = {
   event: WSOutbound;
 };
 
-export type StreamAppend = { type: string; payload: unknown };
+export type StreamAppend = { type: string; payload: unknown; revive?: true };
 
 let initialized = false;
 let pubsubEnabled = false;
@@ -88,7 +88,12 @@ export const sendToChannel = (channel: string, event: WSOutbound): Promise<void>
 // Serialized per stream so this instance publishes a stream's appends in emission order, fallback included.
 export const appendToStream = (stream: string, append: StreamAppend, userIds?: string[]): Promise<void> =>
   inStreamOrder(stream, () =>
-    publish({ type: 'stream', target: stream, userIds, event: streamAppendFrame(stream, append.type, append.payload) }),
+    publish({
+      type: 'stream',
+      target: stream,
+      userIds,
+      event: streamAppendFrame(stream, append.type, append.payload, append.revive),
+    }),
   );
 
 export const broadcast = (event: WSOutbound): Promise<void> => publish({ type: 'broadcast', event });

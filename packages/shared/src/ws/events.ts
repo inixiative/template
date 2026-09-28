@@ -16,6 +16,7 @@ export type WSStreamAppendEvent = {
   stream: string;
   type: string;
   payload: unknown;
+  revive?: true;
 };
 
 export type WSDataEvent = WSStreamSnapshotEvent | WSStreamAppendEvent;

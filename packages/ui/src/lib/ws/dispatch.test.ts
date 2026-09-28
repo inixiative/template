@@ -134,6 +134,23 @@ describe('dispatchMessage', () => {
       ).toEqual(['0001']);
     });
 
+    it('restores a removed row only from an upsert frame flagged revive', async () => {
+      const removed = await contactStreamRow({ id: '0002' });
+      const kept = await contactStreamRow({ id: '0001' });
+      const held = () =>
+        qc()
+          .getQueryData<{ data: Array<{ id: string }> }>(key)
+          ?.data.map((row) => row.id);
+      dispatchMessage({ category: 'data', action: 'snapshot', stream, payload: { data: [removed, kept] } });
+      dispatchMessage(append('remove', { id: '0002' }));
+
+      dispatchMessage(append('upsert', removed));
+      expect(held()).toEqual(['0001']);
+
+      dispatchMessage({ category: 'data', action: 'append', stream, type: 'upsert', payload: removed, revive: true });
+      expect(held()).toEqual(['0002', '0001']);
+    });
+
     it('ignores frames for a stream family outside the registry', () => {
       const unknown = 'nope:id:x';
       dispatchMessage({ category: 'data', action: 'snapshot', stream: unknown, payload: { data: [] } });

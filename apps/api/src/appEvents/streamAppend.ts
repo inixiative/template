@@ -8,16 +8,23 @@ import type { StreamDefinition, StreamOp, StreamOpPayload, StreamParams } from '
 import type { WSStreamAppendHandoff } from '#/appEvents/types';
 import type { ValidatedStreamAppend } from '#/appEvents/validatedStreamAppend';
 
-type Recipients<D extends StreamDefinition> = D['audience'] extends 'perRecipient' ? [userIds: string[]] : [];
+type AppendOptions = { revive?: boolean };
+
+type Options<D extends StreamDefinition> = D['audience'] extends 'perRecipient'
+  ? [options: AppendOptions & { userIds: string[] }]
+  : [options?: AppendOptions];
 
 export const streamAppend = <D extends StreamDefinition, K extends StreamOp<D>>(
   definition: D,
   params: StreamParams<D>,
   type: K,
   payload: StreamOpPayload<D, K>,
-  ...[userIds]: Recipients<D>
-): WSStreamAppendHandoff => ({
-  kind: 'stream',
-  target: { stream: definition.name(params), ...(userIds ? { userIds } : {}) },
-  append: { type, payload } as unknown as ValidatedStreamAppend,
-});
+  ...[options]: Options<D>
+): WSStreamAppendHandoff => {
+  const userIds = options && 'userIds' in options ? options.userIds : undefined;
+  return {
+    kind: 'stream',
+    target: { stream: definition.name(params), ...(userIds ? { userIds } : {}) },
+    append: { type, payload, ...(options?.revive ? { revive: true } : {}) } as unknown as ValidatedStreamAppend,
+  };
+};

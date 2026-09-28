@@ -61,9 +61,17 @@ describe('organization contacts stream producers', () => {
     expect(organizationContactRemove(contact)).toBeNull();
   });
 
+  it('carries a revive flag on the append only when asked', () => {
+    const plain = streamAppend(organizationContactsStream, { id: 'org-1' }, 'upsert', { id: 'c1' });
+    const revived = streamAppend(organizationContactsStream, { id: 'org-1' }, 'upsert', { id: 'c1' }, { revive: true });
+
+    expect(plain.append).toEqual({ type: 'upsert', payload: { id: 'c1' } });
+    expect(revived.append).toEqual({ type: 'upsert', payload: { id: 'c1' }, revive: true });
+  });
+
   it('accepts only the ops its stream kind defines', () => {
     const typecheckOnly = () =>
-      // @ts-expect-error — `append` is a log op; a list stream folds upsert, remove and revive.
+      // @ts-expect-error — `append` is a log op; a list stream folds upsert and remove.
       streamAppend(organizationContactsStream, { id: 'org-1' }, 'append', {});
     expect(typecheckOnly).toBeFunction();
   });

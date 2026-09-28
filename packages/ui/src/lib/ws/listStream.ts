@@ -6,6 +6,7 @@
  */
 import type { PaginateResponse } from '@template/sdk';
 import type { StreamRow } from '@template/shared/ws';
+import type { AppendFlags } from '@template/ui/lib/ws/streamFolds';
 
 const MAX_TOMBSTONES = 500;
 
@@ -29,8 +30,11 @@ const isBeyondLoadedRows = (state: ListStreamState, id: string): boolean => {
 const trimToPage = <R extends StreamRow>(data: R[], pageSize: number | undefined): R[] =>
   pageSize && data.length > pageSize ? data.slice(0, pageSize) : data;
 
-const upsert = <S extends ListStreamState<R>, R extends StreamRow>(state: S, row: R): S => {
-  if (state.__removed?.includes(row.id)) return state;
+const upsert = <S extends ListStreamState<R>, R extends StreamRow>(state: S, row: R, flags: AppendFlags = {}): S => {
+  if (state.__removed?.includes(row.id)) {
+    if (!flags.revive) return state;
+    return upsert({ ...state, __removed: state.__removed.filter((id) => id !== row.id) }, row);
+  }
   const index = state.data.findIndex((held) => held.id === row.id);
   if (index !== -1) return { ...state, data: state.data.map((held, i) => (i === index ? row : held)) };
   if (isBeyondLoadedRows(state, row.id)) return state;
@@ -58,13 +62,10 @@ const remove = <S extends ListStreamState>(state: S, { id }: StreamRow): S => {
   };
 };
 
-const revive = <S extends ListStreamState<R>, R extends StreamRow>(state: S, row: R): S =>
-  upsert({ ...state, __removed: state.__removed?.filter((id) => id !== row.id) }, row);
-
 const snapshot = <S extends ListStreamState>(previous: S | undefined, next: S): S => {
   const present = new Set(next.data.map((row) => row.id));
   const __removed = previous?.__removed?.filter((id) => !present.has(id));
   return __removed?.length ? { ...next, __removed } : next;
 };
 
-export const listStream = { snapshot, ops: { upsert, remove, revive } };
+export const listStream = { snapshot, ops: { upsert, remove } };

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { type ListStreamState, listStream } from '@template/ui/lib/ws/listStream';
 
-const { upsert, remove, revive } = listStream.ops;
+const { upsert, remove } = listStream.ops;
 
 type Row = { id: string; name?: string };
 const row = (id: string, name?: string): Row => ({ id, ...(name ? { name } : {}) });
@@ -49,9 +49,9 @@ describe('listStream', () => {
     expect(ids(late)).toEqual(['0001']);
   });
 
-  it('brings a removed row back only on an explicit revive', () => {
+  it('brings a removed row back only on an upsert flagged revive', () => {
     const removed = remove(page([row('0002'), row('0001')]), { id: '0002' });
-    const revived = revive(removed, row('0002'));
+    const revived = upsert(removed, row('0002'), { revive: true });
 
     expect(ids(revived)).toEqual(['0002', '0001']);
     expect(revived.pagination?.total).toBe(2);

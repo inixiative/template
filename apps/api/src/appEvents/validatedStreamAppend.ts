@@ -6,4 +6,6 @@
  */
 declare const validatedByStreamAppend: unique symbol;
 
-export type ValidatedStreamAppend = { type: string; payload: unknown } & { readonly [validatedByStreamAppend]: true };
+export type ValidatedStreamAppend = { type: string; payload: unknown; revive?: true } & {
+  readonly [validatedByStreamAppend]: true;
+};

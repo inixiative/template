@@ -168,7 +168,7 @@ export const STREAM_DEFINITIONS = {
 
 - `family` is the route's operationId.
 - `kind` fixes how the client folds the stream, and which ops it accepts (`streamOps.ts`):
-  - `list`: `upsert` (a row), `remove` (`{ id }`), `revive` (a row). Rows are keyed by `id`.
+  - `list`: `upsert` (a row), `remove` (`{ id }`). Rows are keyed by `id`.
   - `log`: `append` (an entry).
 - `params` is the zod schema of the route's path parameters; `name(params)` builds the stream name.
 - `audience` is required: `'shared'` or `'perRecipient'` (see [Audience](#audience)).
@@ -238,7 +238,9 @@ in the order Redis received the publishes, which need not be the order their wri
 
 A removal is final. The list fold keeps a bounded set of tombstones (`__removed`, last 500 ids)
 and ignores any later `upsert` for a removed id, so a late update from another instance cannot
-resurrect a row. Only an explicit `revive` clears a tombstone. A fresh snapshot (resync, retry or
+resurrect a row. Only an upsert flagged `revive` clears a tombstone: the flag rides on the append
+frame (`{ type: 'upsert', payload, revive: true }`), outside the route-shaped row, set with
+`streamAppend(definition, params, 'upsert', row, { revive: true })`. A fresh snapshot (resync, retry or
 reconnect) keeps the tombstones, dropping only those whose row the snapshot shows alive. Among
 upserts of a live row the last one to arrive wins.
 
@@ -248,8 +250,8 @@ Appends are app-event output, like refetch hints, built only with `streamAppend`
 type is branded (`ValidatedStreamAppend`), so a hand-built stream handoff does not typecheck, and
 message handoffs are typed as `WSQueryEvent`, so a data frame cannot be smuggled through a
 `{ userIds }` or `{ channels }` message. In `streamAppend` (`apps/api/src/appEvents/streamAppend.ts`)
-the op is checked against the definition's kind, the payload is typed by the op, and a
-`perRecipient` definition requires `userIds`:
+the op is checked against the definition's kind, the payload is typed by the op, and the options
+argument carries `revive` and, required for a `perRecipient` definition, `userIds`:
 
 ```typescript
 websocket: ({ contact }) => organizationContactUpsert(contact),

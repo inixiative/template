@@ -9,7 +9,7 @@ import type { StreamDefinition } from '@template/shared/ws/defineStream';
 export type StreamRow = { id: string };
 
 export type StreamOps = {
-  list: { upsert: StreamRow; remove: StreamRow; revive: StreamRow };
+  list: { upsert: StreamRow; remove: StreamRow };
   log: { append: unknown };
 };
 
