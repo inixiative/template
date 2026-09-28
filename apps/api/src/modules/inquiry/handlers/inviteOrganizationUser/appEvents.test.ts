@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'bun:test';
 import { channelKey } from '@template/shared/ws';
+import type { WSChannelsHandoff } from '#/appEvents/types';
 import { inviteOrganizationUserAppEvents } from '#/modules/inquiry/handlers/inviteOrganizationUser/appEvents';
 
-const refetchHandoff = (id: string) => {
+const refetchHandoff = (id: string): WSChannelsHandoff => {
   const key = { _id: 'inquiryRead', path: { id } };
   return {
     kind: 'channels',

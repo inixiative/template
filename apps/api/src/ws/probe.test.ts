@@ -75,12 +75,12 @@ describe('ws subscribe probe (real app)', () => {
 
   it('resolveIdentity returns the token user as provenance of /me', async () => {
     const me = await resolveIdentity(adminBearer);
-    expect(me?.id).toBe(superadmin.id);
+    expect(me).toMatchObject({ status: 'resolved', id: superadmin.id });
   });
 
   it('resolveIdentity honors the spoof header — identity becomes the target', async () => {
     const me = await resolveIdentity({ ...adminBearer, 'x-spoof-user-email': targetUser.email });
-    expect(me?.id).toBe(targetUser.id);
+    expect(me).toMatchObject({ status: 'resolved', id: targetUser.id });
   });
 
   it('a spoofed probe carries the TARGET authority, not the admin', async () => {

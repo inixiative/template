@@ -42,8 +42,11 @@ describe('organization contacts stream producers', () => {
 
     const [handoff] = organizationContactUpsert(contact) ?? [];
 
-    expect(handoff?.target).toEqual({ stream: organizationContactsStream.name({ id: context.organization.id }) });
-    expect(handoff?.append).toEqual({ type: 'upsert', payload: routeRow(organizationReadManyContactsRoute, contact) });
+    expect(handoff).toEqual<object>({
+      kind: 'stream',
+      target: { stream: organizationContactsStream.name({ id: context.organization.id }) },
+      append: { type: 'upsert', payload: routeRow(organizationReadManyContactsRoute, contact) },
+    });
   });
 
   it('removes by id', async () => {
@@ -51,7 +54,11 @@ describe('organization contacts stream producers', () => {
 
     const [handoff] = organizationContactRemove(contact) ?? [];
 
-    expect(handoff?.append).toEqual({ type: 'remove', payload: { id: contact.id } });
+    expect(handoff).toEqual<object>({
+      kind: 'stream',
+      target: { stream: organizationContactsStream.name({ id: 'org-1' }) },
+      append: { type: 'remove', payload: { id: contact.id } },
+    });
   });
 
   it('produces nothing for a contact no organization owns', async () => {
@@ -71,8 +78,8 @@ describe('organization contacts stream producers', () => {
     const plain = streamAppend(organizationContactsStream, { id: 'org-1' }, 'upsert', row);
     const revived = streamAppend(organizationContactsStream, { id: 'org-1' }, 'upsert', row, { revive: true });
 
-    expect(plain.append).toEqual({ type: 'upsert', payload: row });
-    expect(revived.append).toEqual({ type: 'upsert', payload: row, revive: true });
+    expect(plain.append).toStrictEqual<object>({ type: 'upsert', payload: row });
+    expect(revived.append).toStrictEqual<object>({ type: 'upsert', payload: row, revive: true });
   });
 
   it('refuses a perRecipient append that names no recipients', () => {
@@ -82,6 +89,7 @@ describe('organization contacts stream producers', () => {
       params: z.object({}),
     }) as StreamDefinition;
 
+    // @ts-expect-error a perRecipient stream requires userIds
     expect(() => streamAppend(perRecipient, {}, 'remove', { id: 'c1' })).toThrow('requires userIds');
   });
 });

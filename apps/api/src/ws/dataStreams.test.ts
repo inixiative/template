@@ -32,14 +32,14 @@ const until = async (predicate: () => boolean, attempts = 10_000): Promise<void>
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 50));
 
-const withStreamRouteStatus = async <T>(status: number, run: () => Promise<T>): Promise<T> => {
+const withStreamRouteStatus = async (status: number, run: () => Promise<unknown> | undefined): Promise<void> => {
   const realRequest = app.request.bind(app);
   const spy = spyOn(app, 'request').mockImplementation(((input: string, init?: RequestInit) =>
     String(input).endsWith('/contacts')
       ? Promise.resolve(new Response('unavailable', { status }))
       : realRequest(input, init)) as never);
   try {
-    return await run();
+    await run();
   } finally {
     spy.mockRestore();
   }
@@ -303,7 +303,7 @@ describe('data streams (real app)', () => {
     });
 
     it('closes a stream whose route now answers 403, and stops its appends', async () => {
-      const { context } = await createOrganizationUser({ role: 'member' }, { organization });
+      const { entity: membership, context } = await createOrganizationUser({ role: 'member' }, { organization });
       const revocable = connect((await createBearerToken(context.user)).authorization);
       const staying = connect(memberBearer);
       await websocketHandler.message(revocable.socket, openFrame(stream));
@@ -313,7 +313,7 @@ describe('data streams (real app)', () => {
 
       registerClearCacheHook();
       try {
-        await db.txn(() => db.organizationUser.delete({ where: { id: context.organizationUser.id } }));
+        await db.txn(() => db.organizationUser.delete({ where: { id: membership.id } }));
         await settle();
       } finally {
         unregisterDbHook('clearCache');
@@ -350,14 +350,14 @@ describe('data streams (real app)', () => {
     });
   });
   describe('adversarial review', () => {
-    const withMeStatus = async <T>(status: number, run: () => Promise<T>): Promise<T> => {
+    const withMeStatus = async (status: number, run: () => Promise<unknown> | undefined): Promise<void> => {
       const realRequest = app.request.bind(app);
       const spy = spyOn(app, 'request').mockImplementation(((input: string, init?: RequestInit) =>
         String(input).endsWith('/api/v1/me')
           ? Promise.resolve(new Response('busy', { status }))
           : realRequest(input, init)) as never);
       try {
-        return await run();
+        await run();
       } finally {
         spy.mockRestore();
       }
