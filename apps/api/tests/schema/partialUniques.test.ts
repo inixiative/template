@@ -126,22 +126,19 @@ describe('partial unique constraints', () => {
       const { entity: customer } = await createUser();
       const { entity: org } = await createOrganization();
       const { entity: providerSpace } = await createSpace({}, { organization: org });
-      // Pass relations in overrides (keyed by relation name) — context (ctx)
-      // is keyed by depAccessor (lowerFirst(ModelName)), so it can't
-      // disambiguate two FKs to the same model (e.g. customerSpace +
-      // providerSpace both map to ctx.space).
+      // Context is keyed by model accessor, so it can't disambiguate customerSpace from providerSpace; pass FKs.
       await createCustomerRef({
         customerModel: 'User',
         providerModel: 'Space',
-        customerUser: customer,
-        providerSpace,
+        customerUserId: customer.id,
+        providerSpaceId: providerSpace.id,
       });
       const dupe = async () =>
         createCustomerRef({
           customerModel: 'User',
           providerModel: 'Space',
-          customerUser: customer,
-          providerSpace,
+          customerUserId: customer.id,
+          providerSpaceId: providerSpace.id,
         });
       await expect(dupe()).rejects.toThrow();
     });

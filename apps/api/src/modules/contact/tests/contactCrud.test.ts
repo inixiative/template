@@ -154,7 +154,7 @@ describe('Contact CRUD', () => {
   describe('GET /contact/:id', () => {
     it('reads own contact', async () => {
       const { entity: contact } = await createContact({
-        user,
+        userId: user.id,
         ownerModel: 'User',
         type: 'email',
         value: { address: `read${getNextSeq()}@example.com` },
@@ -168,7 +168,7 @@ describe('Contact CRUD', () => {
     it('rejects reading another user contact (403)', async () => {
       const { entity: otherUser } = await createUser();
       const { entity: contact } = await createContact({
-        user: otherUser,
+        userId: otherUser.id,
         ownerModel: 'User',
         type: 'email',
         value: { address: `priv${getNextSeq()}@example.com` },
@@ -180,7 +180,7 @@ describe('Contact CRUD', () => {
     it('grants read on another user contact when permissionRules.read passes', async () => {
       const { entity: otherUser } = await createUser();
       const { entity: contact } = await createContact({
-        user: otherUser,
+        userId: otherUser.id,
         ownerModel: 'User',
         type: 'website',
         value: { url: `https://pub${getNextSeq()}.example.com` },
@@ -193,7 +193,7 @@ describe('Contact CRUD', () => {
 
     it('reads org contact as org member', async () => {
       const { entity: contact } = await createContact({
-        organization: org,
+        organizationId: org.id,
         ownerModel: 'Organization',
         type: 'email',
         value: { address: `orgmail${getNextSeq()}@example.com` },
@@ -206,7 +206,7 @@ describe('Contact CRUD', () => {
   describe('PATCH /contact/:id', () => {
     it('updates own contact label + position', async () => {
       const { entity: contact } = await createContact({
-        user,
+        userId: user.id,
         ownerModel: 'User',
         type: 'email',
         value: { address: `upd${getNextSeq()}@example.com` },
@@ -220,7 +220,7 @@ describe('Contact CRUD', () => {
 
     it('locks the email mirroring the user login against update (403)', async () => {
       const { entity: contact } = await createContact({
-        user,
+        userId: user.id,
         ownerModel: 'User',
         type: 'email',
         value: { address: user.email as string },
@@ -232,7 +232,7 @@ describe('Contact CRUD', () => {
     it('rejects updating another user contact (403)', async () => {
       const { entity: otherUser } = await createUser();
       const { entity: contact } = await createContact({
-        user: otherUser,
+        userId: otherUser.id,
         ownerModel: 'User',
         type: 'email',
         value: { address: `noupd${getNextSeq()}@example.com` },
@@ -244,7 +244,7 @@ describe('Contact CRUD', () => {
     it('permissionRules grants read but writes still owner-gated', async () => {
       const { entity: otherUser } = await createUser();
       const { entity: contact } = await createContact({
-        user: otherUser,
+        userId: otherUser.id,
         ownerModel: 'User',
         type: 'website',
         value: { url: `https://wpub${getNextSeq()}.example.com` },
@@ -259,7 +259,7 @@ describe('Contact CRUD', () => {
   describe('DELETE /contact/:id', () => {
     it('deletes own contact', async () => {
       const { entity: contact } = await createContact({
-        user,
+        userId: user.id,
         ownerModel: 'User',
         type: 'email',
         value: { address: `del${getNextSeq()}@example.com` },
@@ -271,7 +271,7 @@ describe('Contact CRUD', () => {
     it('locks deleting the email mirroring the user login (403)', async () => {
       const { entity: contact } = await upsertContact(
         { userId_type_valueKey: { userId: user.id, type: 'email', valueKey: (user.email as string).toLowerCase() } },
-        { user, ownerModel: 'User', type: 'email', value: { address: user.email as string } },
+        { userId: user.id, ownerModel: 'User', type: 'email', value: { address: user.email as string } },
       );
       const response = await fetch(del(`/api/v1/contact/${contact.id}`));
       expect(response.status).toBe(403);
@@ -280,7 +280,7 @@ describe('Contact CRUD', () => {
     it('rejects deleting another user contact (403)', async () => {
       const { entity: otherUser } = await createUser();
       const { entity: contact } = await createContact({
-        user: otherUser,
+        userId: otherUser.id,
         ownerModel: 'User',
         type: 'email',
         value: { address: `nodel${getNextSeq()}@example.com` },

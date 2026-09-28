@@ -50,7 +50,7 @@ describe('auditLog hook', () => {
     });
 
     const res = await fetch(new Request('http://localhost/test/user', { method: 'POST' }));
-    const { id } = await res.json<{ id: string }>();
+    const { id } = (await res.json()) as { id: string };
 
     const log = await db.auditLog.findFirst({
       where: { subjectUserId: id, action: AuditAction.create },
@@ -127,7 +127,7 @@ describe('auditLog hook', () => {
     });
 
     const res = await fetch(new Request('http://localhost/test/user', { method: 'POST' }));
-    const { id } = await res.json<{ id: string }>();
+    const { id } = (await res.json()) as { id: string };
 
     const log = await db.auditLog.findFirst({
       where: { subjectUserId: id, action: AuditAction.create },
@@ -162,7 +162,7 @@ describe('auditLog hook', () => {
     });
 
     const res = await fetch(new Request('http://localhost/test/user', { method: 'POST' }));
-    const { id } = await res.json<{ id: string }>();
+    const { id } = (await res.json()) as { id: string };
 
     const log = await db.auditLog.findFirst({
       where: { subjectUserId: id, action: AuditAction.create },
@@ -201,7 +201,7 @@ describe('auditLog hook', () => {
     });
 
     const res = await fetch(new Request('http://localhost/test/user', { method: 'POST' }));
-    const { id } = await res.json<{ id: string }>();
+    const { id } = (await res.json()) as { id: string };
 
     const log = await db.auditLog.findFirst({
       where: { subjectUserId: id, action: AuditAction.create },
@@ -242,7 +242,7 @@ describe('auditLog hook', () => {
     });
 
     const res = await fetch(new Request('http://localhost/test/user', { method: 'POST' }));
-    const { id } = await res.json<{ id: string }>();
+    const { id } = (await res.json()) as { id: string };
 
     await db.token.delete({ where: { id: token.id } });
 
@@ -301,7 +301,7 @@ describe('auditLog hook', () => {
     });
 
     const res = await fetch(new Request('http://localhost/test/resolve', { method: 'POST' }));
-    const { id } = await res.json<{ id: string }>();
+    const { id } = (await res.json()) as { id: string };
 
     const log = await db.auditLog.findFirst({
       where: { subjectUserId: id, action: AuditAction.create },
@@ -327,7 +327,7 @@ describe('auditLog hook', () => {
     });
 
     const res = await fetch(new Request('http://localhost/test/org', { method: 'POST' }));
-    const { id } = await res.json<{ id: string }>();
+    const { id } = (await res.json()) as { id: string };
 
     const log = await db.auditLog.findFirst({
       where: { subjectOrganizationId: id, action: AuditAction.delete },
@@ -357,7 +357,7 @@ describe('auditLog hook', () => {
     });
 
     const res = await fetch(new Request('http://localhost/test/org/hard-delete', { method: 'POST' }));
-    const { id } = await res.json<{ id: string }>();
+    const { id } = (await res.json()) as { id: string };
 
     const logs = await db.auditLog.findMany({
       where: { subjectModel: 'Organization', action: AuditAction.delete },

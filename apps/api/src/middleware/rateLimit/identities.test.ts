@@ -21,8 +21,12 @@ const echo: MountFn = (app) => {
   );
 };
 
+type Identities = { principal: string; user: string | null; organization: string | null; space: string | null };
+
 const who = (fetch: (req: Request) => Promise<Response>) =>
-  fetch(new Request('http://t/who', { headers: { 'x-forwarded-for': '203.0.113.7' } })).then((r) => r.json());
+  fetch(new Request('http://t/who', { headers: { 'x-forwarded-for': '203.0.113.7' } })).then(
+    (r) => r.json() as Promise<Identities>,
+  );
 
 const bareRelations = { user: null, organization: null, organizationUser: null, space: null, spaceUser: null };
 

@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import type { z } from '@hono/zod-openapi';
 import type { Organization, OrganizationUser, User } from '@template/db/generated/client/client';
 import { AuthProviderType, PlatformRole } from '@template/db/generated/client/enums';
 import {
@@ -9,9 +10,18 @@ import {
   createUser,
 } from '@template/db/test';
 import { adminAuthProviderRouter, authProviderRouter } from '#/modules/authProvider';
+import type { adminAuthProviderReadManyRoute } from '#/modules/authProvider/routes/adminAuthProviderReadMany';
+import type { authProviderReadManyRoute } from '#/modules/authProvider/routes/authProviderReadMany';
+import type { authProviderUpdateRoute } from '#/modules/authProvider/routes/authProviderUpdate';
 import { organizationRouter } from '#/modules/organization';
+import type { organizationReadAuthProviderRoute } from '#/modules/organization/routes/organizationReadAuthProvider';
 import { createTestApp } from '#tests/createTestApp';
 import { del, get, json, patch, post } from '#tests/utils/request';
+
+type PlatformProviders = z.infer<typeof authProviderReadManyRoute.responseSchema>[];
+type AdminAuthProviders = z.infer<typeof adminAuthProviderReadManyRoute.responseSchema>[];
+type OrgAuthProviders = z.infer<typeof organizationReadAuthProviderRoute.responseSchema>;
+type AuthProvider = z.infer<typeof authProviderUpdateRoute.responseSchema>;
 
 describe('AuthProvider Endpoints', () => {
   let superadminFetch: ReturnType<typeof createTestApp>['fetch'];
@@ -66,7 +76,7 @@ describe('AuthProvider Endpoints', () => {
   describe('GET /api/v1/authProvider (public)', () => {
     it('returns platform providers without auth', async () => {
       const response = await publicFetch(get('/api/v1/authProvider'));
-      const { data } = await json(response);
+      const { data } = await json<PlatformProviders>(response);
 
       expect(response.status).toBe(200);
       expect(Array.isArray(data)).toBe(true);
@@ -74,7 +84,7 @@ describe('AuthProvider Endpoints', () => {
 
     it('returns only enabled platform providers', async () => {
       const response = await publicFetch(get('/api/v1/authProvider'));
-      const { data } = await json(response);
+      const { data } = await json<PlatformProviders>(response);
 
       expect(response.status).toBe(200);
       data.forEach((provider) => {
@@ -84,7 +94,7 @@ describe('AuthProvider Endpoints', () => {
 
     it('returns providers with required fields', async () => {
       const response = await publicFetch(get('/api/v1/authProvider'));
-      const { data } = await json(response);
+      const { data } = await json<PlatformProviders>(response);
 
       expect(response.status).toBe(200);
       data.forEach((provider) => {
@@ -110,12 +120,12 @@ describe('AuthProvider Endpoints', () => {
       );
 
       const response = await superadminFetch(get('/api/admin/authProvider?page=1&pageSize=10'));
-      const { data, pagination } = await json(response);
+      const { data, pagination } = await json<AdminAuthProviders>(response);
 
       expect(response.status).toBe(200);
       expect(Array.isArray(data)).toBe(true);
       expect(data.length).toBeGreaterThanOrEqual(1);
-      expect(pagination.page).toBe(1);
+      expect(pagination?.page).toBe(1);
     });
 
     it('filters by organizationId', async () => {
@@ -140,7 +150,7 @@ describe('AuthProvider Endpoints', () => {
       );
 
       const response = await superadminFetch(get(`/api/admin/authProvider?organizationId=${org.id}`));
-      const { data } = await json(response);
+      const { data } = await json<AdminAuthProviders>(response);
 
       expect(response.status).toBe(200);
       expect(data.every((p) => p.organizationId === org.id)).toBe(true);
@@ -158,7 +168,7 @@ describe('AuthProvider Endpoints', () => {
       );
 
       const response = await superadminFetch(get(`/api/admin/authProvider?organizationId=${org.id}`));
-      const { data, pagination: _pagination } = await json(response);
+      const { data, pagination: _pagination } = await json<AdminAuthProviders>(response);
 
       const found = data.find((p) => p.id === provider.id);
       expect(found).toBeDefined();
@@ -181,7 +191,7 @@ describe('AuthProvider Endpoints', () => {
       );
 
       const response = await userFetch(get(`/api/v1/organization/${org.id}/authProvider`));
-      const { data } = await json(response);
+      const { data } = await json<OrgAuthProviders>(response);
 
       expect(response.status).toBe(200);
       expect(data).toHaveProperty('platform');
@@ -201,7 +211,7 @@ describe('AuthProvider Endpoints', () => {
       }).fetch;
 
       const response = await newUserFetch(get(`/api/v1/organization/${context.organization.id}/authProvider`));
-      const { data } = await json(response);
+      const { data } = await json<OrgAuthProviders>(response);
 
       expect(response.status).toBe(200);
       expect(data.organization).toEqual([]);
@@ -222,7 +232,7 @@ describe('AuthProvider Endpoints', () => {
       );
 
       const response = await userFetch(get(`/api/v1/organization/${org.id}/authProvider`));
-      const { data } = await json(response);
+      const { data } = await json<OrgAuthProviders>(response);
 
       expect(response.status).toBe(200);
       const provider = data.organization.find((p) => p.provider === 'google');
@@ -250,7 +260,7 @@ describe('AuthProvider Endpoints', () => {
           },
         }),
       );
-      const { data } = await json(response);
+      const { data } = await json<AuthProvider>(response);
 
       expect(response.status).toBe(201);
       expect(data.id).toBeDefined();
@@ -273,7 +283,7 @@ describe('AuthProvider Endpoints', () => {
           secrets: { signingCert: 'test-cert' },
         }),
       );
-      const { data } = await json(response);
+      const { data } = await json<AuthProvider>(response);
 
       expect(response.status).toBe(201);
       expect(data.enabled).toBe(true);
@@ -289,7 +299,7 @@ describe('AuthProvider Endpoints', () => {
           secrets: { clientSecret: 'ms-secret' },
         }),
       );
-      const { data } = await json(response);
+      const { data } = await json<AuthProvider>(response);
 
       expect(response.status).toBe(201);
       expect(data).not.toHaveProperty('encryptedSecrets');
@@ -317,7 +327,7 @@ describe('AuthProvider Endpoints', () => {
           secrets: { clientSecret: 'new-secret' },
         }),
       );
-      const { data } = await json(response);
+      const { data } = await json<AuthProvider>(response);
 
       expect(response.status).toBe(200);
       expect(data.name).toBe('Google OAuth Updated');
@@ -343,7 +353,7 @@ describe('AuthProvider Endpoints', () => {
           enabled: false,
         }),
       );
-      const { data } = await json(response);
+      const { data } = await json<AuthProvider>(response);
 
       expect(response.status).toBe(200);
       expect(data.enabled).toBe(false);
