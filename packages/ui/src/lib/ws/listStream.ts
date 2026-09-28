@@ -6,7 +6,7 @@
  */
 import type { PaginateResponse } from '@template/sdk';
 import type { StreamRow } from '@template/shared/ws';
-import type { AppendFlags } from '@template/ui/lib/ws/streamFolds';
+import type { FoldContext } from '@template/ui/lib/ws/streamFolds';
 
 const MAX_TOMBSTONES = 500;
 
@@ -27,16 +27,25 @@ const isBeyondLoadedRows = (state: ListStreamState, id: string): boolean => {
   return (state.pagination?.total ?? state.data.length) > state.data.length && !!oldest && id < oldest.id;
 };
 
+const versionOf = (row: StreamRow): number => Date.parse(String((row as { updatedAt?: unknown }).updatedAt));
+
+const isOlderThan = (row: StreamRow, held: StreamRow): boolean => versionOf(row) < versionOf(held);
+
 const trimToPage = <R extends StreamRow>(data: R[], pageSize: number | undefined): R[] =>
   pageSize && data.length > pageSize ? data.slice(0, pageSize) : data;
 
-const upsert = <S extends ListStreamState<R>, R extends StreamRow>(state: S, row: R, flags: AppendFlags = {}): S => {
+const upsert = <S extends ListStreamState<R>, R extends StreamRow>(state: S, row: R, context: FoldContext = {}): S => {
   if (state.__removed?.includes(row.id)) {
-    if (!flags.revive) return state;
-    return upsert({ ...state, __removed: state.__removed.filter((id) => id !== row.id) }, row);
+    if (!context.revive) return state;
+    const revived = { ...state, __removed: state.__removed.filter((id) => id !== row.id) };
+    if (isBeyondLoadedRows(revived, row.id)) return { ...revived, pagination: withTotal(revived.pagination, 1) };
+    return upsert(revived, row, { ordering: context.ordering });
   }
   const index = state.data.findIndex((held) => held.id === row.id);
-  if (index !== -1) return { ...state, data: state.data.map((held, i) => (i === index ? row : held)) };
+  if (index !== -1) {
+    if (context.ordering === 'updatedAt' && isOlderThan(row, state.data[index] as R)) return state;
+    return { ...state, data: state.data.map((held, i) => (i === index ? row : held)) };
+  }
   if (isBeyondLoadedRows(state, row.id)) return state;
 
   const insertAt = state.data.findIndex((held) => held.id < row.id);

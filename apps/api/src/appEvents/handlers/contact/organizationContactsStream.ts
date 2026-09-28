@@ -6,6 +6,7 @@
  */
 import type { Contact } from '@template/db/generated/client/client';
 import { STREAM_DEFINITIONS } from '@template/shared/ws';
+import { routeRow } from '#/appEvents/routeRow';
 import { streamAppend } from '#/appEvents/streamAppend';
 import type { WSHandoff } from '#/appEvents/types';
 import { organizationReadManyContactsRoute } from '#/modules/organization/routes/organizationReadManyContacts';
@@ -19,7 +20,7 @@ export const organizationContactUpsert = (contact: Contact): WSHandoff[] | null 
           stream,
           { id: contact.organizationId },
           'upsert',
-          organizationReadManyContactsRoute.responseSchema.parse(contact),
+          routeRow(organizationReadManyContactsRoute, contact),
         ),
       ]
     : null;

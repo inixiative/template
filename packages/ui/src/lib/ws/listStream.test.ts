@@ -3,7 +3,7 @@ import { type ListStreamState, listStream } from '@template/ui/lib/ws/listStream
 
 const { upsert, remove } = listStream.ops;
 
-type Row = { id: string; name?: string };
+type Row = { id: string; name?: string; updatedAt?: string };
 const row = (id: string, name?: string): Row => ({ id, ...(name ? { name } : {}) });
 const page = (data: Row[], total = data.length, pageSize = 10): ListStreamState<Row> => ({
   data,
@@ -27,6 +27,26 @@ describe('listStream', () => {
 
     expect(twice.data).toEqual([row('0002'), updated]);
     expect(twice.pagination?.total).toBe(2);
+  });
+
+  it('by updatedAt, ignores an update older than the held row and applies an equal or newer one', () => {
+    const version = (day: number, name?: string): Row => ({
+      ...row('0001', name),
+      updatedAt: `2026-01-0${day}T00:00:00.000Z`,
+    });
+    const state = page([version(2)]);
+    const byUpdatedAt = { ordering: 'updatedAt' } as const;
+
+    expect(upsert(state, version(1), byUpdatedAt)).toBe(state);
+    expect(upsert(state, version(2, 'same'), byUpdatedAt).data).toEqual([version(2, 'same')]);
+    expect(upsert(state, version(3), byUpdatedAt).data).toEqual([version(3)]);
+  });
+
+  it('by arrival, lets the last update to arrive win', () => {
+    const newer: Row = { id: '0001', updatedAt: '2026-01-02T00:00:00.000Z' };
+    const older: Row = { id: '0001', updatedAt: '2026-01-01T00:00:00.000Z' };
+
+    expect(upsert(page([newer]), older, { ordering: 'arrival' }).data).toEqual([older]);
   });
 
   it('ignores an upsert for a row beyond the loaded page', () => {
@@ -56,6 +76,18 @@ describe('listStream', () => {
     expect(ids(revived)).toEqual(['0002', '0001']);
     expect(revived.pagination?.total).toBe(2);
     expect(ids(upsert(revived, row('0002', 'later')))).toEqual(['0002', '0001']);
+  });
+
+  it('restores the total when a revive brings back a row beyond the loaded page', () => {
+    const state = page([row('0009'), row('0008')], 5, 2);
+    const removed = remove(state, { id: '0001' });
+    const revived = upsert(removed, row('0001'), { revive: true });
+    const again = upsert(revived, row('0001'), { revive: true });
+
+    expect(removed.pagination?.total).toBe(4);
+    expect(revived.pagination?.total).toBe(5);
+    expect(revived.__removed ?? []).not.toContain('0001');
+    expect(again).toBe(revived);
   });
 
   it('counts a removal of an off-page row against the total, once', () => {

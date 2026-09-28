@@ -194,6 +194,66 @@ describe('createApiWebsocket', () => {
       expect(sends(ws).filter((frame) => frame.action === 'open' || frame.action === 'close')).toEqual([]);
     });
 
+    it('re-opens a stream re-held inside the settle window after the server rejected its open', async () => {
+      const { api, ws } = connected({ ...fastTiming, streamSettleMs: 20 });
+      api.open(stream);
+      await wait(30);
+      api.close(stream);
+      receive(ws, { type: 'openRejected', stream } satisfies WSStreamAckFrame);
+      api.open(stream);
+      await wait(30);
+
+      expect(opensOf(ws)).toHaveLength(2);
+    });
+
+    it('re-opens a stream re-held inside the settle window after a retryable open error', async () => {
+      const { api, ws } = connected({ ...fastTiming, streamSettleMs: 20 });
+      api.open(stream);
+      await wait(30);
+      api.close(stream);
+      receive(ws, { type: 'error', action: 'open', stream, retryable: true } satisfies WSFrameErrorFrame);
+      api.open(stream);
+      await wait(30);
+
+      expect(opensOf(ws)).toHaveLength(2);
+    });
+
+    it('keeps a pending retry through a release and re-hold inside the settle window', async () => {
+      const { api, ws } = connected({
+        ...fastTiming,
+        streamSettleMs: 5,
+        retryBaseMs: 40,
+        retryMaxMs: 40,
+        openAckTimeoutMs: 10_000,
+      });
+      api.open(stream);
+      await wait(10);
+      receive(ws, { type: 'opened', stream });
+      receive(ws, { type: 'error', action: 'open', stream, retryable: true } satisfies WSFrameErrorFrame);
+      api.close(stream);
+      api.open(stream);
+      await wait(80);
+
+      expect(opensOf(ws)).toHaveLength(2);
+    });
+
+    it('re-opens after an ack timeout even when the stream is re-held during the retry backoff', async () => {
+      const { api, ws } = connected({
+        ...fastTiming,
+        streamSettleMs: 5,
+        openAckTimeoutMs: 20,
+        retryBaseMs: 40,
+        retryMaxMs: 40,
+      });
+      api.open(stream);
+      await wait(30);
+      api.close(stream);
+      api.open(stream);
+      await wait(80);
+
+      expect(opensOf(ws).length).toBeGreaterThanOrEqual(2);
+    });
+
     it('keeps a stream open across a release and re-hold within the settle window', async () => {
       const { api, ws } = connected({ ...fastTiming, streamSettleMs: 20 });
       api.open(stream);

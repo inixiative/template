@@ -109,11 +109,6 @@ const dispatch = async (ws: WSSocket, msg: WSMessage): Promise<void> => {
       closeDataStream(ws, msg.stream);
       return;
     }
-    case 'ping': {
-      updateLastPing(ws);
-      sendTo(ws, { type: 'pong' });
-      return;
-    }
   }
 };
 
@@ -133,6 +128,12 @@ export const websocketHandler = {
     }
     const msg = parseFrame(raw);
     if (!msg) return;
+    // Liveness must not wait behind queued snapshot reads or the re-authorization sweep.
+    if (msg.action === 'ping') {
+      updateLastPing(ws);
+      sendTo(ws, { type: 'pong' });
+      return;
+    }
     if (ws.data.queue.size() >= WS_MAX_PENDING_FRAMES) {
       sendTo(ws, frameError(msg));
       return;

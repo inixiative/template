@@ -151,6 +151,24 @@ describe('dispatchMessage', () => {
       expect(held()).toEqual(['0002', '0001']);
     });
 
+    it('keeps state on the newest version while action listeners still hear a stale update', async () => {
+      const current = await contactStreamRow({ id: '0001' });
+      const stale = {
+        ...current,
+        label: 'stale',
+        updatedAt: new Date(Date.parse(current.updatedAt) - 1000).toISOString(),
+      };
+      const heard: unknown[] = [];
+      const removeListener = addStreamListener(stream, 'upsert', (payload) => heard.push(payload));
+      dispatchMessage({ category: 'data', action: 'snapshot', stream, payload: { data: [current] } });
+
+      dispatchMessage(append('upsert', stale));
+      removeListener();
+
+      expect(qc().getQueryData<{ data: unknown[] }>(key)?.data).toEqual([current]);
+      expect(heard).toEqual([stale]);
+    });
+
     it('ignores frames for a stream family outside the registry', () => {
       const unknown = 'nope:id:x';
       dispatchMessage({ category: 'data', action: 'snapshot', stream: unknown, payload: { data: [] } });

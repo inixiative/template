@@ -4,13 +4,13 @@
  * @partOf primitive:ui, primitive:websockets
  * @uses primitive:shared
  */
-import type { StreamKind, StreamOps } from '@template/shared/ws';
+import type { StreamKind, StreamOps, StreamOrdering } from '@template/shared/ws';
 import { listStream } from '@template/ui/lib/ws/listStream';
 import { logStream } from '@template/ui/lib/ws/logStream';
 
-export type AppendFlags = { revive?: true };
+export type FoldContext = { revive?: true; ordering?: StreamOrdering };
 
-type Fold = (state: unknown, payload: unknown, flags: AppendFlags) => unknown;
+type Fold = (state: unknown, payload: unknown, context: FoldContext) => unknown;
 
 export type StreamFold = { snapshot: (previous: unknown, next: unknown) => unknown; ops: Record<string, Fold> };
 

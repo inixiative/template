@@ -24,7 +24,9 @@ export const applyStreamAppend = (event: WSStreamAppendEvent): void => {
   useAppStore
     .getState()
     .client?.setQueryData(dataStreamQueryKey(event.stream), (state: unknown) =>
-      state === undefined ? undefined : fold(state, event.payload, { revive: event.revive }),
+      state === undefined
+        ? undefined
+        : fold(state, event.payload, { revive: event.revive, ordering: definition.ordering }),
     );
   notifyStreamListeners(event.stream, event.type, event.payload);
 };

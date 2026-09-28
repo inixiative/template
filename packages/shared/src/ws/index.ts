@@ -24,4 +24,12 @@ export {
   streamDefinitionFor,
   streamDefinitionOf,
 } from './streamDefinitions';
-export type { StreamKind, StreamOp, StreamOpPayload, StreamOps, StreamRow } from './streamOps';
+export type {
+  StreamKind,
+  StreamOp,
+  StreamOpPayload,
+  StreamOps,
+  StreamOrdering,
+  StreamRow,
+  VersionedStreamRow,
+} from './streamOps';

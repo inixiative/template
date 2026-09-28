@@ -96,8 +96,10 @@ Frames are serialized per connection. The server bounds the pending queue
 constants in `packages/shared/src/ws/frameLimits.ts`). A frame arriving while the queue is full is
 not dropped silently: the server answers
 `{ type: 'error', action, stream?, channel?, retryable: true }`. The frontend sends a heartbeat
-every 30 seconds and reconnects if pong does not arrive within 5 seconds; the server sweeps
-connections idle for more than 5 minutes.
+every 30 seconds and reconnects if pong does not arrive within 5 seconds. `ping` is answered
+before the per-connection queue, so a slow snapshot read or the re-authorization sweep never
+delays `pong` into a spurious reconnect. The server sweeps connections idle for more than 5
+minutes.
 
 On reconnect, `createApiWebsocket` sends identity first, then replays subscribes, then opens. A
 replay that overruns the server's pending-frame cap or the HTTP rate limit (snapshot reads and
@@ -107,7 +109,8 @@ acknowledgement timeout) before calling the reconnect callback that invalidates 
 close or unsubscribe goes out only when its open or subscribe actually reached the server, and
 one the server drops for load is re-sent while the stream or channel stays released.
 
-Stream opens and closes settle for `streamSettleMs` (100 ms) before a frame goes out, so holder
+Stream opens and closes settle for `streamSettleMs` (100 ms, a `lodash-es` `debounce` per stream)
+before the client reconciles held against sent, so holder
 churn nets out: a stream opened and released inside the window (a row scrolled past) sends
 nothing, and a stream released and re-held inside it (a remount) stays open without a new
 snapshot. Without it, fast churn across many streams exceeds `WS_FRAME_LIMIT` and the server
@@ -170,6 +173,9 @@ export const STREAM_DEFINITIONS = {
 - `kind` fixes how the client folds the stream, and which ops it accepts (`streamOps.ts`):
   - `list`: `upsert` (a row), `remove` (`{ id }`). Rows are keyed by `id`.
   - `log`: `append` (an entry).
+- `ordering` (list streams) decides which of two upserts of a live row wins. The default,
+  `'updatedAt'`, keeps the newer `updatedAt`, and its rows must carry one. `'arrival'` lets the
+  last update to arrive win, for rows with no version.
 - `params` is the zod schema of the route's path parameters; `name(params)` builds the stream name.
 - `audience` is required: `'shared'` or `'perRecipient'` (see [Audience](#audience)).
 
@@ -242,7 +248,9 @@ resurrect a row. Only an upsert flagged `revive` clears a tombstone: the flag ri
 frame (`{ type: 'upsert', payload, revive: true }`), outside the route-shaped row, set with
 `streamAppend(definition, params, 'upsert', row, { revive: true })`. A fresh snapshot (resync, retry or
 reconnect) keeps the tombstones, dropping only those whose row the snapshot shows alive. Among
-upserts of a live row the last one to arrive wins.
+upserts of a live row, the definition's `ordering` decides: by default an update older than the
+held row (by `updatedAt`) is ignored, so the folded state only moves forward. Action listeners
+(`useStreamAction`) still hear every append, stale ones included.
 
 ### Producing appends
 
@@ -250,15 +258,18 @@ Appends are app-event output, like refetch hints, built only with `streamAppend`
 type is branded (`ValidatedStreamAppend`), so a hand-built stream handoff does not typecheck, and
 message handoffs are typed as `WSQueryEvent`, so a data frame cannot be smuggled through a
 `{ userIds }` or `{ channels }` message. In `streamAppend` (`apps/api/src/appEvents/streamAppend.ts`)
-the op is checked against the definition's kind, the payload is typed by the op, and the options
-argument carries `revive` and, required for a `perRecipient` definition, `userIds`:
+the op is checked against the definition's kind and the payload is typed by the op. An upsert
+row must come from `routeRow(route, value)` (`apps/api/src/appEvents/routeRow.ts`), which parses
+it with the route's `responseSchema` and brands it, so a raw model or hand-built object does not
+typecheck. The options argument carries `revive` (upserts only) and `userIds`, which a
+`perRecipient` definition requires both in its type and at runtime:
 
 ```typescript
 websocket: ({ contact }) => organizationContactUpsert(contact),
 
 // organizationContactUpsert:
 streamAppend(STREAM_DEFINITIONS.organizationReadManyContacts, { id: contact.organizationId }, 'upsert',
-  organizationReadManyContactsRoute.responseSchema.parse(contact));
+  routeRow(organizationReadManyContactsRoute, contact));
 ```
 
 `deliverWSHandoffs` calls `appendToStream`, which wraps the action in the append frame and
@@ -283,7 +294,7 @@ useStreamAction<{ id: string }>(stream, 'remove', (removal) => toast(removal.id)
   query-cache observer and each listener hold the stream, and it closes when the last one
   releases it.
 - `listStream` (`packages/ui/src/lib/ws/listStream.ts`) keeps rows in the list routes' default
-  `id desc` order. An upsert replaces a held row, inserts a row that belongs among the loaded rows,
+  `id desc` order. An upsert replaces a held row (unless `ordering` finds it older), inserts a row that belongs among the loaded rows,
   and ignores one beyond the loaded page. A remove drops a held row, or, for an off-page row, only
   decrements `pagination.total` (once). Inserts beyond `pageSize` evict the oldest held row, so a
   long-lived stream stays one page. `logStream` appends entries in arrival order.

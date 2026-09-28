@@ -6,7 +6,7 @@
  * @constructs streamDefinition
  */
 import { channelKey } from '@template/shared/ws/channelKey';
-import type { StreamKind } from '@template/shared/ws/streamOps';
+import type { StreamKind, StreamOrdering } from '@template/shared/ws/streamOps';
 import type { z } from 'zod';
 
 export type StreamAudience = 'shared' | 'perRecipient';
@@ -18,10 +18,12 @@ export type StreamDefinition<
   TKind extends StreamKind = StreamKind,
   TParams extends StreamParamsSchema = StreamParamsSchema,
   TAudience extends StreamAudience = StreamAudience,
+  TOrdering extends StreamOrdering = StreamOrdering,
 > = {
   family: TFamily;
   kind: TKind;
   audience: TAudience;
+  ordering: TOrdering;
   params: TParams;
   name: (params: z.input<TParams>) => string;
 };
@@ -33,11 +35,13 @@ export const defineStream = <
   const TKind extends StreamKind,
   TParams extends StreamParamsSchema,
   const TAudience extends StreamAudience,
+  const TOrdering extends StreamOrdering = 'updatedAt',
 >(
   family: TFamily,
-  config: { kind: TKind; audience: TAudience; params: TParams },
-): StreamDefinition<TFamily, TKind, TParams, TAudience> => ({
+  config: { kind: TKind; audience: TAudience; params: TParams; ordering?: TOrdering },
+): StreamDefinition<TFamily, TKind, TParams, TAudience, TOrdering> => ({
   family,
   ...config,
+  ordering: config.ordering ?? ('updatedAt' as TOrdering),
   name: (params) => channelKey({ _id: family, path: config.params.parse(params) }),
 });

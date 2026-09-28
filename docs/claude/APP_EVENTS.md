@@ -127,9 +127,10 @@ Subscription and stream-open checks use the underlying authorized route; see
 Stream handoffs are never built by hand. `streamAppend` (`apps/api/src/appEvents/streamAppend.ts`)
 takes a shared stream definition, its params, an op and a payload. The op must be one the
 definition's kind defines (`list`: `upsert`, `remove`; `log`: `append`), the payload is typed by
-that op, and the options argument carries `revive` (an upsert that may restore a removed row) and,
-for a `perRecipient` definition, the required recipient `userIds`.
-Rows are shaped by the route's own `responseSchema`, exactly as the route's response is. From the
+that op, and the options argument carries `revive` (upserts only: may restore a removed row) and,
+for a `perRecipient` definition, the required recipient `userIds`. An upsert row must come from
+`routeRow(route, value)`, which parses it with the route's own `responseSchema` exactly as the
+route's response is. From the
 contact handlers (the scaffolding example stream):
 
 ```typescript

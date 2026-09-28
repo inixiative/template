@@ -2,12 +2,14 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import type { Organization, User } from '@template/db/generated/client/client';
 import { buildContact, cleanupTouchedTables, createContact, createOrganizationUser } from '@template/db/test';
-import { STREAM_DEFINITIONS } from '@template/shared/ws';
+import { defineStream, STREAM_DEFINITIONS, type StreamDefinition } from '@template/shared/ws';
+import { z } from 'zod';
 import { emitAppEvent } from '#/appEvents/emit';
 import {
   organizationContactRemove,
   organizationContactUpsert,
 } from '#/appEvents/handlers/contact/organizationContactsStream';
+import { routeRow } from '#/appEvents/routeRow';
 import { streamAppend } from '#/appEvents/streamAppend';
 import { organizationReadManyContactsRoute } from '#/modules/organization/routes/organizationReadManyContacts';
 import { websocketHandler } from '#/ws/handler';
@@ -41,10 +43,7 @@ describe('organization contacts stream producers', () => {
     const [handoff] = organizationContactUpsert(contact) ?? [];
 
     expect(handoff?.target).toEqual({ stream: organizationContactsStream.name({ id: context.organization.id }) });
-    expect(handoff?.append).toEqual({
-      type: 'upsert',
-      payload: organizationReadManyContactsRoute.responseSchema.parse(contact),
-    });
+    expect(handoff?.append).toEqual({ type: 'upsert', payload: routeRow(organizationReadManyContactsRoute, contact) });
   });
 
   it('removes by id', async () => {
@@ -61,19 +60,29 @@ describe('organization contacts stream producers', () => {
     expect(organizationContactRemove(contact)).toBeNull();
   });
 
-  it('carries a revive flag on the append only when asked', () => {
-    const plain = streamAppend(organizationContactsStream, { id: 'org-1' }, 'upsert', { id: 'c1' });
-    const revived = streamAppend(organizationContactsStream, { id: 'org-1' }, 'upsert', { id: 'c1' }, { revive: true });
+  it('carries a revive flag on the append only when asked', async () => {
+    const { context } = await createOrganizationUser({ role: 'member' });
+    const { entity: contact } = await createContact(
+      { ownerModel: 'Organization', organizationId: context.organization.id },
+      { organization: context.organization },
+    );
+    const row = routeRow(organizationReadManyContactsRoute, contact);
 
-    expect(plain.append).toEqual({ type: 'upsert', payload: { id: 'c1' } });
-    expect(revived.append).toEqual({ type: 'upsert', payload: { id: 'c1' }, revive: true });
+    const plain = streamAppend(organizationContactsStream, { id: 'org-1' }, 'upsert', row);
+    const revived = streamAppend(organizationContactsStream, { id: 'org-1' }, 'upsert', row, { revive: true });
+
+    expect(plain.append).toEqual({ type: 'upsert', payload: row });
+    expect(revived.append).toEqual({ type: 'upsert', payload: row, revive: true });
   });
 
-  it('accepts only the ops its stream kind defines', () => {
-    const typecheckOnly = () =>
-      // @ts-expect-error — `append` is a log op; a list stream folds upsert and remove.
-      streamAppend(organizationContactsStream, { id: 'org-1' }, 'append', {});
-    expect(typecheckOnly).toBeFunction();
+  it('refuses a perRecipient append that names no recipients', () => {
+    const perRecipient = defineStream('meReadManyContacts', {
+      kind: 'list',
+      audience: 'perRecipient',
+      params: z.object({}),
+    }) as StreamDefinition;
+
+    expect(() => streamAppend(perRecipient, {}, 'remove', { id: 'c1' })).toThrow('requires userIds');
   });
 });
 
