@@ -17,7 +17,7 @@ describe('recipientLens', () => {
   it('an address lens reaches only the email', () => {
     const lens = addressLens({ field: 'id', operator: 'equals', value: 'u1' });
     expect(lens.parent).toEqual(lensFor('User'));
-    expect(lens.root.picks).toEqual(['email']);
+    expect(lens.root?.picks).toEqual(['email']);
   });
 });
 

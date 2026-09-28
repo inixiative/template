@@ -62,7 +62,7 @@ export type TypedBuildResult<
   entity: ModelWithOverrides<K, O> & {
     __serialize(): Serialized<ModelWithOverrides<K, O>>;
   };
-  context: BuildContext & { [D in Deps[number]]: ModelOf<D> };
+  context: BuildContext & { [D in Deps[number] as Uncapitalize<D>]: ModelOf<D> };
 };
 
 import type { Identifier } from '@template/db/utils/prismaMapRelations';

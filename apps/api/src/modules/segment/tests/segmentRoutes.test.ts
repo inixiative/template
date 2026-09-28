@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import type { z } from '@hono/zod-openapi';
 import { Operator } from '@inixiative/json-rules';
 import { clearHookRegistry, db } from '@template/db';
 import type {
@@ -25,6 +26,7 @@ import { registerSegmentMemberOwnerHook } from '#/hooks/segmentMemberOwner/hook'
 import { meRouter } from '#/modules/me';
 import { organizationRouter } from '#/modules/organization';
 import { segmentRouter } from '#/modules/segment';
+import type { segmentMemberWithCustomerSchema } from '#/modules/segment/schemas/segmentSchemas';
 import { spaceRouter } from '#/modules/space';
 import { userRouter } from '#/modules/user';
 import { createTestApp, type MountFn } from '#tests/createTestApp';
@@ -39,6 +41,7 @@ const membersOf = (segmentId: string) => ({
 });
 
 type Membership = SegmentMember & { segment: Segment };
+type SegmentMemberWithCustomer = z.infer<typeof segmentMemberWithCustomerSchema>;
 
 describe('segment routes', () => {
   let ownerFetch: ReturnType<typeof createTestApp>['fetch'];
@@ -69,16 +72,16 @@ describe('segment routes', () => {
       await createCustomerRef({
         customerModel: 'User',
         providerModel: 'Space',
-        customerUser: customer,
-        providerSpace: space,
+        customerUserId: customer.id,
+        providerSpaceId: space.id,
       })
     ).entity;
     outsiderRef = (
       await createCustomerRef({
         customerModel: 'User',
         providerModel: 'Space',
-        customerUser: outsider,
-        providerSpace: space,
+        customerUserId: outsider.id,
+        providerSpaceId: space.id,
       })
     ).entity;
 
@@ -124,7 +127,7 @@ describe('segment routes', () => {
     expect(segment.spaceId).toBe(space.id);
 
     const members = await ownerFetch(get(`/api/v1/segment/${segment.id}/segmentMembers`));
-    const { data } = await json<(SegmentMember & { customerRef: CustomerRef })[]>(members);
+    const { data } = await json<SegmentMemberWithCustomer[]>(members);
     expect(data.map((member) => member.customerRefId)).toEqual([customerRef.id]);
     expect(data[0]!.customerRef.customerUser).toBeTruthy();
   });
@@ -169,8 +172,8 @@ describe('segment routes', () => {
       await createCustomerRef({
         customerModel: 'User',
         providerModel: 'Space',
-        customerUser: outsider,
-        providerSpace: elsewhere,
+        customerUserId: outsider.id,
+        providerSpaceId: elsewhere.id,
       })
     ).entity;
     const response = await ownerFetch(

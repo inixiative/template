@@ -7,8 +7,9 @@ import { getResource } from '#/lib/context/getResource';
 import { readRoute } from '#/lib/routeTemplates';
 import { makeController } from '#/lib/utils/makeController';
 import { Modules } from '#/modules/modules';
+import type { AppEnv } from '#/types/appEnv';
 import { createTestApp, type MountFn } from '#tests/createTestApp';
-import { get } from '#tests/utils/request';
+import { get, json } from '#tests/utils/request';
 
 // Drives resourceContextMiddleware via the real readRoute template (which
 // auto-attaches the middleware via prepareMiddleware) so the test surface
@@ -36,11 +37,11 @@ const cronJobReadController = makeController(cronJobReadRoute, async (c, respond
 });
 
 const mountRoutes: MountFn = (app) => {
-  const orgRouter = new OpenAPIHono();
+  const orgRouter = new OpenAPIHono<AppEnv>();
   orgRouter.openapi(orgReadRoute, orgReadController);
   app.route('/api/v1/organization', orgRouter);
 
-  const cronJobRouter = new OpenAPIHono();
+  const cronJobRouter = new OpenAPIHono<AppEnv>();
   cronJobRouter.openapi(cronJobReadRoute, cronJobReadController);
   app.route('/api/v1/cronJob', cronJobRouter);
 };
@@ -90,9 +91,9 @@ describe('resourceContextMiddleware', () => {
   it('loads the resource into context when the id exists', async () => {
     const response = await fetch(get(`/api/v1/organization/${org.id}`));
     expect(response.status).toBe(200);
-    const body = await response.json();
-    expect(body.data.id).toBe(org.id);
-    expect(body.data.name).toBe(org.name);
+    const { data } = await json<Organization>(response);
+    expect(data.id).toBe(org.id);
+    expect(data.name).toBe(org.name);
   });
 
   it('returns 400 when the id is not a uuidv7 (and no lookup query is set)', async () => {
@@ -108,8 +109,8 @@ describe('resourceContextMiddleware', () => {
   it('supports lookup by another field — `?lookup=slug` accepts non-uuid id', async () => {
     const response = await fetch(get(`/api/v1/organization/${org.slug}?lookup=slug`));
     expect(response.status).toBe(200);
-    const body = await response.json();
-    expect(body.data.id).toBe(org.id);
+    const { data } = await json<Organization>(response);
+    expect(data.id).toBe(org.id);
   });
 
   it('returns 404 for a soft-deleted resource when the caller is not a superadmin', async () => {
@@ -120,14 +121,14 @@ describe('resourceContextMiddleware', () => {
   it('loads a soft-deleted resource when the caller is a superadmin', async () => {
     const response = await adminFetch(get(`/api/v1/organization/${deletedOrg.id}`));
     expect(response.status).toBe(200);
-    const body = await response.json();
-    expect(body.data.id).toBe(deletedOrg.id);
+    const { data } = await json<Organization>(response);
+    expect(data.id).toBe(deletedOrg.id);
   });
 
   it('leaves models without a deletedAt column unaffected', async () => {
     const response = await fetch(get(`/api/v1/cronJob/${cronJob.id}`));
     expect(response.status).toBe(200);
-    const body = await response.json();
-    expect(body.data.id).toBe(cronJob.id);
+    const { data } = await json<CronJob>(response);
+    expect(data.id).toBe(cronJob.id);
   });
 });
