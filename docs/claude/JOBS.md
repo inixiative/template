@@ -66,13 +66,15 @@ jobs/
 │   ├── queueDepth.ts   # Cached waiting+active depth probe
 │   └── types.ts        # OutboxRow + shouldSpill
 ├── admitEnvelope.ts    # Routes a built envelope: BullMQ (at its lane's priority) or the outbox
+├── admitToSlot.ts      # Job-start check: slow slot cap, and returning a line-jumper to its priority
 ├── buildJobData.ts     # The one job-data envelope every producer builds (lane resolved here)
 ├── enqueue.ts          # enqueueJob function
 ├── lanePriority.ts     # Slow lane → lowest BullMQ priority
 ├── makeJob.ts          # Job wrapper constructors
-├── processJob.ts       # Per-job processor: scopes, tracing, lane dispatch
+├── processJob.ts       # Per-job processor: slot admission, scopes, tracing
 ├── queue.ts            # BullMQ queue setup
 ├── registerCronJobs.ts # Cron registration on worker startup
+├── slowSlotPool.ts     # Per-worker count of slots running slow jobs
 ├── types.ts            # Type definitions
 ├── validateJobId.ts    # BullMQ custom-id rules, shared by enqueue and the drain
 └── worker.ts           # Worker entry point
@@ -300,7 +302,7 @@ In test (`isTest`), `enqueueJob` skips BullMQ entirely and runs the handler inli
 
 ## Fast and Slow Lanes
 
-One large send is thousands of jobs on the same worker pool every other kind of work shares; in plain FIFO order, everything else waits behind it. Slow work instead waits in the same queue at the lowest priority, so any idle slot runs it and fast work always goes first, and it may fill only its share of the queue's depth budget. Capacity stays shared: with no fast work waiting, every slot runs slow work.
+One large send is thousands of jobs on the same worker pool every other kind of work shares; in plain FIFO order, everything else waits behind it. Slow work instead waits in the same queue at the lowest priority, so fast work is always picked first; it runs in at most its share of each worker's slots, so the rest stay free for fast work; and it may fill only its share of the queue's depth budget.
 
 ### Choosing a Lane
 
@@ -316,9 +318,15 @@ A producer that knows the work's size sets the lane per enqueue instead — `sen
 
 ### Priority: Fast Work Is Always Picked First
 
-BullMQ moves a job to active from the plain wait list first and from the prioritized set only when the wait list is empty. Slow jobs are added with `priority: SLOW_LANE_PRIORITY` (BullMQ's `PRIORITY_LIMIT`, the lowest priority it allows) by `withLanePriority` (`jobs/lanePriority.ts`), which every add site applies. So a fast job never queues behind a slow backlog — it waits at most for the next slot to free, roughly half of one slow job's duration — and a job given an explicit priority (the admin enqueue accepts one) is served after all unprioritized fast work and, below `SLOW_LANE_PRIORITY`, ahead of all slow work; at `SLOW_LANE_PRIORITY` it waits and counts as slow work. Within one priority BullMQ keeps FIFO order.
+BullMQ moves a job to active from the plain wait list first and from the prioritized set only when the wait list is empty. Slow jobs are added with `priority: SLOW_LANE_PRIORITY` (`2^21 - 1`, one below BullMQ's `PRIORITY_LIMIT`) by `withLanePriority` (`jobs/lanePriority.ts`), which every add site applies. BullMQ scores a prioritized job `priority × 2^32 + counter` in a Redis double; at `PRIORITY_LIMIT` that passes `2^53`, equal-priority jobs collide, and the slow lane loses its FIFO order. The admin enqueue caps `priority` at `SLOW_LANE_PRIORITY` for the same reason. So a fast job never queues behind a slow backlog, and a job given an explicit priority (the admin enqueue accepts one) is served after all unprioritized fast work and, below `SLOW_LANE_PRIORITY`, ahead of all slow work; at `SLOW_LANE_PRIORITY` it waits and counts as slow work. Within one priority BullMQ keeps FIFO order.
 
-There is no slot cap: a slow job that starts always runs. The cost is that a fast job arriving while every slot holds a slow job waits for one to finish, which is short for per-recipient work (hundreds of ms) and long for multi-second handlers — keep slow handlers short.
+### Slots: Slow Work Uses at Most Its Share
+
+Priority decides which job starts next, but BullMQ never preempts a running job, so ordering alone would let slow work fill every slot and make a fast job wait for a slow one to finish. Each worker therefore runs slow jobs in at most `JOBS_SLOW_SLOT_FRACTION` of its `JOBS_WORKER_CONCURRENCY` slots (at least one), counted by the worker's own `SlowSlotPool` (`jobs/slowSlotPool.ts`). When a slow job starts on a worker whose slow share is full, `admitToSlot` (`jobs/admitToSlot.ts`) moves it to delayed for `SLOW_SLOT_RETRY_MS` and it returns to the slow band at its stored priority. The other slots stay free for fast work. Fast work is not capped: it may use every slot, including the slow share when no slow work is running.
+
+`admitToSlot` also keeps a job at its priority when BullMQ does not. Stalled-job recovery and a manual retry (`job.retry()`, `queue.retryJobs()`, the Bull Board retry button) put a job on the plain wait list whatever its priority, ahead of all fast work. A job with a priority can legitimately start only when the plain wait list is empty, so a prioritized job that starts while fast work is waiting is moved back with `job.moveToWait`, which returns it to its priority band. Automatic retries and delayed promotion already keep the priority.
+
+The slot share needs no shared state: every worker applies the same fraction to its own concurrency, so the fleet-wide share follows.
 
 ### Pressure: One Budget, Divided by Lane
 
@@ -327,7 +335,7 @@ The overflow buffer's depth budget (`JOBS_MAX_QUEUE_DEPTH`) is shared by both la
 - **Fast** spills when the whole budget is full.
 - **Slow** spills when its share is full, or when the whole budget is.
 
-The drain refills fast rows up to the budget's free room, then slow rows up to what is left of both the budget and the slow share — batched, one read and one delete per lane per pass. Each lane's flag clears below its own low-water once none of its rows wait. Every slow row re-enters BullMQ at the slow priority.
+The drain refills fast rows up to the budget's free room, then slow rows up to what is left of both the budget and the slow share — batched, one read and one delete per lane per pass. Each lane's flag clears below its own low-water once none of its rows wait. Every slow row re-enters BullMQ at the slow priority. A slow job held back by the slot share spends about `SLOW_SLOT_RETRY_MS` in `delayed`, outside the slow count, so the count can briefly read low by the number of jobs held back.
 
 ### Lane Configuration
 
@@ -336,12 +344,13 @@ Defined in the env schema (`apps/api/src/config/env.ts`) with defaults in `apps/
 | Env var | Default | Description |
 |---------|---------|-------------|
 | `JOBS_WORKER_CONCURRENCY` | `10` | BullMQ worker concurrency |
+| `JOBS_SLOW_SLOT_FRACTION` | `0.5` | Share of each worker's slots slow jobs may run in (at least one) |
 | `JOBS_SLOW_QUEUE_DEPTH_FRACTION` | `0.5` | Share of `JOBS_MAX_QUEUE_DEPTH` slow jobs may fill before spilling |
 | `EMAIL_SLOW_LANE_MIN_RECIPIENTS` | `25` | `sendEmail` fan-outs wider than this are slow |
 
 ### Validating Against Real Infrastructure
 
-`apps/api/scripts/slowLaneCheck.ts` runs the whole path against real Redis, a real BullMQ worker pair, and Postgres: it enqueues a large slow send through `enqueueJob`, injects fast jobs mid-send, and reports fast-job start latency, peak slow jobs held in the queue against their share, how many spilled to the outbox, completions, duplicates, and losses. Set a small `JOBS_MAX_QUEUE_DEPTH` to exercise the spill-and-drain path. It obliterates the queue and empties `JobOutbox`, so it refuses to run without `ENVIRONMENT=local` and `SLOW_LANE_CHECK_CONFIRM=wipe`:
+`apps/api/scripts/slowLaneCheck.ts` runs the whole path against real Redis, a real BullMQ worker pair, and Postgres, and exits non-zero on any failure. It enqueues a slow send of multi-second jobs through `enqueueJob`, waits until slow work fills its slot share, then injects fast jobs and asserts that slow work ran in exactly its share of slots and never more, that fast jobs started within `SLOW_LANE_CHECK_FAST_WAIT_MS` (p95), and that every slow job ran once. It also checks that 200 jobs at `SLOW_LANE_PRIORITY` keep distinct scores and FIFO order (reporting the collision at `PRIORITY_LIMIT` beside it), and that a manually retried slow job runs after waiting fast work with its priority intact. Set a small `JOBS_MAX_QUEUE_DEPTH` to exercise the spill-and-drain path. It obliterates the queue and empties `JobOutbox`, so it refuses to run without `ENVIRONMENT=local` and `SLOW_LANE_CHECK_CONFIRM=wipe`:
 
 ```bash
 bun run with test api env ENVIRONMENT=local SLOW_LANE_CHECK_CONFIRM=wipe \
@@ -349,7 +358,7 @@ bun run with test api env ENVIRONMENT=local SLOW_LANE_CHECK_CONFIRM=wipe \
   bun apps/api/scripts/slowLaneCheck.ts
 ```
 
-`SLOW_LANE_CHECK_JOBS`, `SLOW_LANE_CHECK_JOB_MS`, and `SLOW_LANE_CHECK_WORKERS` vary the run.
+`SLOW_LANE_CHECK_JOBS`, `SLOW_LANE_CHECK_JOB_MS`, `SLOW_LANE_CHECK_WORKERS`, and `SLOW_LANE_CHECK_FAST_WAIT_MS` vary the run. Setting `JOBS_SLOW_SLOT_FRACTION=1` removes the reservation and the fast-wait assertion fails.
 
 ---
 

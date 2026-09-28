@@ -19,6 +19,7 @@ import { startOutboxDrainLoop, stopOutboxDrainLoop } from '#/jobs/outbox/drain';
 import { processJob } from '#/jobs/processJob';
 import { queue } from '#/jobs/queue';
 import { registerCronJobs } from '#/jobs/registerCronJobs';
+import { createSlowSlotPool } from '#/jobs/slowSlotPool';
 import { initGracefulShutdown, onShutdown } from '#/lib/shutdown';
 
 // Register database hooks (cache clear, webhooks)
@@ -36,7 +37,8 @@ export const initializeWorker = async (): Promise<void> => {
   // BullMQ Worker needs its own connection (separate from Queue)
   workerRedis = createRedisConnection('Redis:BullMQ:Worker', resolveBullmqRedisUrl());
 
-  jobsWorker = new Worker('jobs', (job: Job) => processJob(job), {
+  const slowSlots = createSlowSlotPool(process.env.JOBS_WORKER_CONCURRENCY);
+  jobsWorker = new Worker('jobs', (job: Job) => processJob(job, { slowSlots }), {
     connection: workerRedis,
     concurrency: process.env.JOBS_WORKER_CONCURRENCY,
     lockDuration: 5 * 60 * 1000,
@@ -46,7 +48,7 @@ export const initializeWorker = async (): Promise<void> => {
     .getMeter('template.worker')
     .createObservableGauge('messaging.queue.messages')
     .addCallback(async (result) => {
-      const counts = await queue.getJobCounts('wait', 'active', 'delayed', 'failed');
+      const counts = await queue.getJobCounts('wait', 'prioritized', 'active', 'delayed', 'failed');
       for (const [state, count] of Object.entries(counts))
         result.observe(count, { 'messaging.destination.name': 'jobs', state });
     });
