@@ -137,9 +137,13 @@ else
       "$STORAGE_BUCKET_SYSTEM_TEST" "$STORAGE_BUCKET_USER_TEST" \
       || warn "Warning: bucket removal did not complete."
 
-    REDIS_CONTAINER="$(container_on_port 6379)"
-    if [ -z "$REDIS_CONTAINER" ]; then
-      warn "Warning: nothing is serving localhost:6379 — Redis DB $SLOT not flushed."
+    REDIS_PORT="$(local_redis_port "$WORKTREE_DIR/.env.local")"
+    REDIS_CONTAINER=""
+    [ -z "$REDIS_PORT" ] || REDIS_CONTAINER="$(container_on_port "$REDIS_PORT")"
+    if [ -z "$REDIS_PORT" ]; then
+      warn "Warning: $WORKTREE_DIR/.env.local has no localhost REDIS_URL — Redis DB $SLOT not flushed."
+    elif [ -z "$REDIS_CONTAINER" ]; then
+      warn "Warning: nothing is serving localhost:$REDIS_PORT — Redis DB $SLOT not flushed."
     elif "$DOCKER" exec "$REDIS_CONTAINER" redis-cli -n "$SLOT" FLUSHDB >/dev/null; then
       ok "Redis DB $SLOT flushed ($REDIS_CONTAINER)"
     else
