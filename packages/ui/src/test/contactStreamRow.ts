@@ -1,11 +1,10 @@
-import { organizationContactsStream } from '@template/db/streams';
 import { buildContact } from '@template/db/test';
-import type { StreamActionPayload } from '@template/shared/ws';
+import type { OrganizationContactsStream } from '@template/ui/hooks/useOrganizationContactsStream';
 
-export type ContactStreamRow = StreamActionPayload<typeof organizationContactsStream, 'upsert'>;
+export type ContactStreamRow = OrganizationContactsStream['data'][number];
 
 export const contactStreamRow = async (
-  overrides: { id?: string; updatedAt?: string; organizationId?: string } = {},
+  overrides: { id?: string; organizationId?: string } = {},
 ): Promise<ContactStreamRow> => {
   const { entity } = await buildContact({
     ownerModel: 'Organization',
@@ -22,7 +21,6 @@ export const contactStreamRow = async (
     deliverabilityCheckedAt: null,
     acceptedKinds: [],
     ...(overrides.id ? { id: overrides.id } : {}),
-    ...(overrides.updatedAt ? { updatedAt: new Date(overrides.updatedAt) } : {}),
   });
-  return organizationContactsStream.actions.upsert.parse({ ...entity.__serialize(), permissionRules: null });
+  return { ...entity.__serialize(), permissionRules: null };
 };

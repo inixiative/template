@@ -1,16 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 import { QueryClient } from '@tanstack/react-query';
-import { organizationContactsStream } from '@template/db/streams';
-import type { ChannelKeyInput, WSEvent } from '@template/shared/ws';
+import { type ChannelKeyInput, STREAM_DEFINITIONS, type WSEvent } from '@template/shared/ws';
 import { dataStreamQueryKey } from '@template/ui/lib/ws/dataStreamQueryKey';
 import { dispatchMessage } from '@template/ui/lib/ws/dispatch';
-import { listStreamRebase, listStreamReducers } from '@template/ui/lib/ws/listStreamReducers';
 import { addStreamListener } from '@template/ui/lib/ws/streamListeners';
-import {
-  type RegisteredReducers,
-  registerStreamReducers,
-  type SnapshotRebase,
-} from '@template/ui/lib/ws/streamReducers';
 import { useAppStore } from '@template/ui/store';
 import { contactStreamRow } from '@template/ui/test/contactStreamRow';
 
@@ -60,22 +53,13 @@ describe('dispatchMessage', () => {
   });
 
   describe('data streams', () => {
-    const stream = organizationContactsStream.name({ id: 'org-1' });
+    const stream = STREAM_DEFINITIONS.organizationReadManyContacts.name({ id: 'org-1' });
     const key = dataStreamQueryKey(stream);
-    let unregister: () => void;
     let consoleError: ReturnType<typeof spyOn>;
     beforeEach(() => {
-      unregister = registerStreamReducers(
-        stream,
-        listStreamReducers as unknown as RegisteredReducers,
-        listStreamRebase as unknown as SnapshotRebase,
-      );
       consoleError = spyOn(console, 'error').mockImplementation(() => {});
     });
-    afterEach(() => {
-      unregister();
-      consoleError.mockRestore();
-    });
+    afterEach(() => consoleError.mockRestore());
 
     const snapshot = async () => ({ data: [await contactStreamRow({ id: '0001' })] });
     const append = (type: string, payload: unknown): WSEvent => ({
@@ -86,19 +70,13 @@ describe('dispatchMessage', () => {
       payload,
     });
 
-    it('stores a validated snapshot as the stream query data', async () => {
+    it('stores a snapshot as the stream query data', async () => {
       const payload = await snapshot();
       dispatchMessage({ category: 'data', action: 'snapshot', stream, payload });
       expect(qc().getQueryData<unknown>(key)).toEqual(payload);
     });
 
-    it('fails the stream on a snapshot that does not match its schema', async () => {
-      qc().setQueryData(key, await snapshot());
-      dispatchMessage({ category: 'data', action: 'snapshot', stream, payload: { data: [{ id: 1 }] } });
-      expect(qc().getQueryState(key)?.status).toBe('error');
-    });
-
-    it('folds a validated append into the snapshot with the registered reducer', async () => {
+    it('folds an append into the snapshot by the stream kind', async () => {
       dispatchMessage({ category: 'data', action: 'snapshot', stream, payload: await snapshot() });
       const created = await contactStreamRow({ id: '0002' });
       dispatchMessage(append('upsert', created));
@@ -114,24 +92,23 @@ describe('dispatchMessage', () => {
       expect(qc().getQueryData<unknown>(key)).toBeUndefined();
     });
 
-    it('requests a fresh snapshot instead of folding an invalid or unknown append', async () => {
+    it('requests a fresh snapshot instead of folding an op its kind does not define', async () => {
       const payload = await snapshot();
       dispatchMessage({ category: 'data', action: 'snapshot', stream, payload });
 
-      dispatchMessage(append('remove', { id: '0001' }));
-      dispatchMessage(append('explode', {}));
+      dispatchMessage(append('append', {}));
 
       expect(qc().getQueryData<unknown>(key)).toEqual(payload);
-      expect(resyncs).toEqual([stream, stream]);
+      expect(resyncs).toEqual([stream]);
     });
 
-    it('notifies action listeners with the validated payload, isolating a throwing one', async () => {
+    it('notifies action listeners with the payload, isolating a throwing one', async () => {
       const heard: unknown[] = [];
       const removeThrowing = addStreamListener(stream, 'remove', () => {
         throw new Error('listener bug');
       });
       const removeListener = addStreamListener(stream, 'remove', (payload) => heard.push(payload));
-      const removal = { id: '0001', updatedAt: new Date().toISOString() };
+      const removal = { id: '0001' };
 
       dispatchMessage(append('remove', removal));
       removeListener();
@@ -141,11 +118,11 @@ describe('dispatchMessage', () => {
       expect(heard).toEqual([removal]);
     });
 
-    it('keeps tombstones across a fresh snapshot, so a late stale upsert still cannot resurrect a row', async () => {
-      const removed = await contactStreamRow({ id: '0002', updatedAt: '2026-01-02T00:00:00.000Z' });
+    it('keeps tombstones across a fresh snapshot, so a late upsert still cannot resurrect a row', async () => {
+      const removed = await contactStreamRow({ id: '0002' });
       const kept = await contactStreamRow({ id: '0001' });
       dispatchMessage({ category: 'data', action: 'snapshot', stream, payload: { data: [removed, kept] } });
-      dispatchMessage(append('remove', { id: '0002', updatedAt: '2026-01-03T00:00:00.000Z' }));
+      dispatchMessage(append('remove', { id: '0002' }));
       dispatchMessage({ category: 'data', action: 'snapshot', stream, payload: { data: [kept] } });
 
       dispatchMessage(append('upsert', removed));

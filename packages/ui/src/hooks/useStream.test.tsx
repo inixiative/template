@@ -1,19 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { organizationContactsStream } from '@template/db/streams';
+import { STREAM_DEFINITIONS } from '@template/shared/ws';
+import type { OrganizationContactsStream } from '@template/ui/hooks/useOrganizationContactsStream';
 import { useOrganizationContactsStream } from '@template/ui/hooks/useOrganizationContactsStream';
 import { useStream } from '@template/ui/hooks/useStream';
 import { useStreamAction } from '@template/ui/hooks/useStreamAction';
 import { dispatchMessage } from '@template/ui/lib/ws/dispatch';
 import { failDataStream } from '@template/ui/lib/ws/failDataStream';
-import { listStreamReducers } from '@template/ui/lib/ws/listStreamReducers';
 import { useAppStore } from '@template/ui/store';
 import { contactStreamRow } from '@template/ui/test/contactStreamRow';
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 
 const organizationId = 'org-1';
-const stream = organizationContactsStream.name({ id: organizationId });
+const stream = STREAM_DEFINITIONS.organizationReadManyContacts.name({ id: organizationId });
 const initialState = useAppStore.getState();
 
 describe('useStream / useStreamAction', () => {
@@ -65,8 +65,9 @@ describe('useStream / useStreamAction', () => {
     act(() => dispatchMessage({ category: 'data', action: 'append', stream, type: 'upsert', payload: created }));
     await waitFor(() => expect(result.current.data?.data).toEqual([created, existing]));
 
-    const removal = { id: existing.id, updatedAt: new Date(Date.parse(existing.updatedAt) + 1).toISOString() };
-    act(() => dispatchMessage({ category: 'data', action: 'append', stream, type: 'remove', payload: removal }));
+    act(() =>
+      dispatchMessage({ category: 'data', action: 'append', stream, type: 'remove', payload: { id: existing.id } }),
+    );
     await waitFor(() => expect(result.current.data?.data).toEqual([created]));
   });
 
@@ -74,13 +75,9 @@ describe('useStream / useStreamAction', () => {
     const heard: string[] = [];
     const { result, unmount } = renderHook(
       () => {
-        const contacts = useStream(organizationContactsStream, { id: organizationId }, { reduce: listStreamReducers });
-        useStreamAction(organizationContactsStream, { id: organizationId }, 'remove', (removal) =>
-          heard.push(`a:${removal.id}`),
-        );
-        useStreamAction(organizationContactsStream, { id: organizationId }, 'remove', (removal) =>
-          heard.push(`b:${removal.id}`),
-        );
+        const contacts = useStream<OrganizationContactsStream>(stream);
+        useStreamAction<{ id: string }>(stream, 'remove', (removal) => heard.push(`a:${removal.id}`));
+        useStreamAction<{ id: string }>(stream, 'remove', (removal) => heard.push(`b:${removal.id}`));
         return contacts;
       },
       { wrapper },
@@ -88,8 +85,9 @@ describe('useStream / useStreamAction', () => {
     const existing = await contactStreamRow({ id: '0001' });
 
     act(() => dispatchMessage({ category: 'data', action: 'snapshot', stream, payload: { data: [existing] } }));
-    const removal = { id: existing.id, updatedAt: new Date(Date.parse(existing.updatedAt) + 1).toISOString() };
-    act(() => dispatchMessage({ category: 'data', action: 'append', stream, type: 'remove', payload: removal }));
+    act(() =>
+      dispatchMessage({ category: 'data', action: 'append', stream, type: 'remove', payload: { id: existing.id } }),
+    );
 
     await waitFor(() => expect(result.current.data?.data).toEqual([]));
     expect(heard).toEqual(['a:0001', 'b:0001']);
@@ -97,13 +95,6 @@ describe('useStream / useStreamAction', () => {
 
     unmount();
     expect(closes).toEqual([stream, stream, stream]);
-  });
-
-  it('requires a reducer for every action the stream defines', () => {
-    const typecheckOnly = () =>
-      // @ts-expect-error — `remove` is missing, so the reducer map is not exhaustive.
-      useStream(organizationContactsStream, { id: organizationId }, { reduce: { upsert: listStreamReducers.upsert } });
-    expect(typecheckOnly).toBeFunction();
   });
 
   it('surfaces a rejected open as an error with no data', async () => {

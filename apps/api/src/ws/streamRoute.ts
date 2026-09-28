@@ -4,7 +4,7 @@
  * @partOf primitive:websockets
  * @uses none
  */
-import { type RegisteredStream, streamDefinitionFor } from '@template/db/streams';
+import { type RegisteredStream, streamDefinitionFor } from '@template/shared/ws';
 import type { ResolvedOperation } from '#/lib/openapi/resolveOperation';
 import { resolveOperationRoute } from '#/ws/operationRoute';
 

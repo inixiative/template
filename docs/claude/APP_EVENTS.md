@@ -125,18 +125,18 @@ Subscription and stream-open checks use the underlying authorized route; see
 [WEBSOCKETS.md](WEBSOCKETS.md).
 
 Stream handoffs are never built by hand. `streamAppend` (`apps/api/src/appEvents/streamAppend.ts`)
-takes a shared stream definition, its params, an action type and a payload. The action type must
-be one the definition declares, the payload is typed by that action's schema and parsed with it
-before the handoff exists, and a `perRecipient` definition additionally requires the recipient
-`userIds`. From the contact handlers (the scaffolding example stream):
+takes a shared stream definition, its params, an op and a payload. The op must be one the
+definition's kind defines (`list`: `upsert`, `remove`, `revive`; `log`: `append`), the payload is
+typed by that op, and a `perRecipient` definition additionally requires the recipient `userIds`.
+Rows are shaped by the route's own `responseSchema`, exactly as the route's response is. From the
+contact handlers (the scaffolding example stream):
 
 ```typescript
 websocket: ({ contact }) => organizationContactRemove(contact),
 
 // organizationContactRemove:
-streamAppend(organizationContactsStream, { id: contact.organizationId }, 'remove', {
+streamAppend(STREAM_DEFINITIONS.organizationReadManyContacts, { id: contact.organizationId }, 'remove', {
   id: contact.id,
-  updatedAt: contact.updatedAt.toISOString(),
 });
 ```
 

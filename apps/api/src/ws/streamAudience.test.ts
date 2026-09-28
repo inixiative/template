@@ -2,9 +2,8 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { db } from '@template/db';
-import { STREAM_DEFINITIONS, type StreamFamily } from '@template/db/streams';
 import { cleanupTouchedTables, createContact, createOrganizationUser, createUser } from '@template/db/test';
-import { defineStream, listStreamSchemas, type StreamParams } from '@template/shared/ws';
+import { defineStream, STREAM_DEFINITIONS, type StreamFamily, type StreamParams } from '@template/shared/ws';
 import { z } from 'zod';
 import { isPerCallerScope, scopeNarrowing } from '#/middleware/resources/scopeNarrowing';
 import { type AudienceCaller, expectStreamAudience } from '#tests/expectStreamAudience';
@@ -72,9 +71,9 @@ describe('stream audience', () => {
 
   it('fails a shared stream over a route whose rows depend on the caller', async () => {
     const perCaller = defineStream('meReadManyContacts', {
+      kind: 'list',
       audience: 'shared',
       params: z.object({}),
-      ...listStreamSchemas(z.object({ id: z.string(), updatedAt: z.string() })),
     });
     const { entity: alice } = await createUser();
     const { entity: bob } = await createUser();
@@ -90,9 +89,9 @@ describe('stream audience', () => {
 
   it('passes the same route once it is declared perRecipient', async () => {
     const perRecipient = defineStream('meReadManyContacts', {
+      kind: 'list',
       audience: 'perRecipient',
       params: z.object({}),
-      ...listStreamSchemas(z.object({ id: z.string(), updatedAt: z.string() })),
     });
     const { entity: alice } = await createUser();
     const { entity: bob } = await createUser();

@@ -3,7 +3,6 @@ import { createHash, randomBytes } from 'node:crypto';
 import { db, unregisterDbHook } from '@template/db';
 import type { Contact, Organization, User } from '@template/db/generated/client/client';
 import { PlatformRole, TokenOwnerModel } from '@template/db/generated/client/enums';
-import { organizationContactsStream } from '@template/db/streams';
 import {
   cleanupTouchedTables,
   createContact,
@@ -11,7 +10,7 @@ import {
   createToken,
   createUser,
 } from '@template/db/test';
-import { WS_CHANNELS, WS_MAX_PENDING_FRAMES } from '@template/shared/ws';
+import { STREAM_DEFINITIONS, WS_CHANNELS, WS_MAX_PENDING_FRAMES } from '@template/shared/ws';
 import { app } from '#/app';
 import { registerClearCacheHook } from '#/hooks/cache/hook';
 import { streamAppendFrame } from '#/ws/dataFrame';
@@ -62,7 +61,7 @@ describe('data streams (real app)', () => {
       { organization },
     ));
     memberBearer = (await createBearerToken(member)).authorization;
-    stream = organizationContactsStream.name({ id: organization.id });
+    stream = STREAM_DEFINITIONS.organizationReadManyContacts.name({ id: organization.id });
   });
 
   afterEach(() => clearRegistry());
@@ -89,7 +88,6 @@ describe('data streams (real app)', () => {
     expect(snapshot).toMatchObject({ category: 'data', action: 'snapshot', stream });
     expect(snapshot.payload.data.map((row: { id: string }) => row.id)).toEqual([contact.id]);
     expect(snapshot.payload.pagination.total).toBe(1);
-    expect(organizationContactsStream.snapshot.safeParse(snapshot.payload).success).toBe(true);
     expect([...(byStream.get(stream) ?? [])]).toEqual([socket.data.connectionId]);
   });
 
@@ -144,7 +142,7 @@ describe('data streams (real app)', () => {
     const { entity: flooder } = await createUser();
     const { socket, sent } = connect((await createBearerToken(flooder)).authorization);
     const names = Array.from({ length: WS_MAX_PENDING_FRAMES + 8 }, () =>
-      organizationContactsStream.name({ id: crypto.randomUUID() }),
+      STREAM_DEFINITIONS.organizationReadManyContacts.name({ id: crypto.randomUUID() }),
     );
     await Promise.all(names.map((name) => websocketHandler.message(socket, openFrame(name))));
 
@@ -187,7 +185,7 @@ describe('data streams (real app)', () => {
     const pending = websocketHandler.message(socket, openFrame(stream));
     await until(() => byStream.has(stream));
 
-    const append = streamAppendFrame(stream, 'remove', { id: 'in-flight', updatedAt: new Date().toISOString() });
+    const append = streamAppendFrame(stream, 'remove', { id: 'in-flight' });
     sendToStreamLocal(stream, append);
     expect(sent).toEqual([]);
     await pending;
@@ -205,7 +203,7 @@ describe('data streams (real app)', () => {
     await websocketHandler.message(socket, openFrame(stream));
     sent.length = 0;
 
-    const append = streamAppendFrame(stream, 'remove', { id: 'x', updatedAt: new Date().toISOString() });
+    const append = streamAppendFrame(stream, 'remove', { id: 'x' });
     sendToStreamLocal(stream, append);
 
     expect(frames(sent)).toEqual([append]);
@@ -321,7 +319,7 @@ describe('data streams (real app)', () => {
         unregisterDbHook('clearCache');
       }
       await reauthorizeOpenStreams();
-      sendToStreamLocal(stream, streamAppendFrame(stream, 'remove', { id: 'x', updatedAt: new Date().toISOString() }));
+      sendToStreamLocal(stream, streamAppendFrame(stream, 'remove', { id: 'x' }));
 
       expect(frames(revocable.sent)).toEqual([{ type: 'openRejected', stream }]);
       expect(revocable.socket.data.streams.has(stream)).toBe(false);
@@ -400,7 +398,7 @@ describe('data streams (real app)', () => {
       const { entity: user } = await createUser();
       const { context: other } = await createOrganizationUser({ role: 'member' }, { user });
       await createOrganizationUser({ role: 'member' }, { organization, user });
-      const otherStream = organizationContactsStream.name({ id: other.organization.id });
+      const otherStream = STREAM_DEFINITIONS.organizationReadManyContacts.name({ id: other.organization.id });
       const { socket, sent } = connect((await createBearerToken(user)).authorization);
       await websocketHandler.message(socket, openFrame(otherStream));
       await websocketHandler.message(socket, openFrame(stream));

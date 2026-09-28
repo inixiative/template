@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 import '@template/ui/store';
 import { QueryClient, QueryObserver, skipToken } from '@tanstack/react-query';
-import { type WSFrameErrorFrame, type WSStreamAckFrame } from '@template/shared/ws';
+import type { WSFrameErrorFrame, WSStreamAckFrame } from '@template/shared/ws';
 import { type ApiWebsocketTiming, createApiWebsocket } from '@template/ui/lib/ws/createApiWebsocket';
 import { dataStreamQueryKey } from '@template/ui/lib/ws/dataStreamQueryKey';
 import { useAppStore } from '@template/ui/store';
@@ -45,7 +45,9 @@ const fastTiming: Partial<ApiWebsocketTiming> = {
   retryBaseMs: 5,
   retryMaxMs: 20,
   openAckTimeoutMs: 30,
+  streamSettleMs: 1,
 };
+const settled = () => wait(5);
 
 describe('createApiWebsocket', () => {
   let wsSpy: ReturnType<typeof spyOn>;
@@ -166,16 +168,45 @@ describe('createApiWebsocket', () => {
 
     const snapshotFrame = { category: 'data', action: 'snapshot', stream, payload: { data: [] } };
 
-    it('opens once per stream across holders and closes when the last holder releases it', () => {
+    it('opens once per stream across holders and closes when the last holder releases it', async () => {
       const { api, ws } = connected();
       api.open(stream);
       api.open(stream);
       api.close(stream);
+      await settled();
       expect(opensOf(ws)).toEqual([{ action: 'open', stream }]);
       expect(sends(ws).some((frame) => frame.action === 'close')).toBe(false);
 
       api.close(stream);
+      await settled();
       expect(sends(ws).at(-1)).toEqual({ action: 'close', stream });
+    });
+
+    it('sends nothing for streams opened and released within the settle window', async () => {
+      const { api, ws } = connected({ ...fastTiming, streamSettleMs: 20 });
+      const names = Array.from({ length: 130 }, (_, i) => `organizationReadManyContacts:id:org-${i}`);
+      for (const name of names) {
+        api.open(name);
+        api.close(name);
+      }
+      await wait(30);
+
+      expect(sends(ws).filter((frame) => frame.action === 'open' || frame.action === 'close')).toEqual([]);
+    });
+
+    it('keeps a stream open across a release and re-hold within the settle window', async () => {
+      const { api, ws } = connected({ ...fastTiming, streamSettleMs: 20 });
+      api.open(stream);
+      await wait(30);
+      receive(ws, { type: 'opened', stream });
+      api.close(stream);
+      api.open(stream);
+      receive(ws, snapshotFrame);
+      await wait(30);
+
+      expect(opensOf(ws)).toHaveLength(1);
+      expect(sends(ws).some((frame) => frame.action === 'close')).toBe(false);
+      expect(client.getQueryData<unknown>(dataStreamQueryKey(stream))).toEqual({ data: [] });
     });
 
     it('re-opens held streams after identity on reconnect, for a fresh snapshot', () => {
@@ -211,10 +242,11 @@ describe('createApiWebsocket', () => {
       expect(sends(ws)).toEqual([{ action: 'logout' }, { action: 'open', stream }]);
     });
 
-    it('drops a rejected stream from replay and wipes its data', () => {
+    it('drops a rejected stream from replay and wipes its data', async () => {
       const unobserve = observe();
       const { api, ws } = connected();
       api.open(stream);
+      await settled();
       receive(ws, { type: 'opened', stream } satisfies WSStreamAckFrame);
       receive(ws, snapshotFrame);
 
@@ -250,9 +282,10 @@ describe('createApiWebsocket', () => {
       expect(opensOf(ws)).toEqual([{ action: 'open', stream }]);
     });
 
-    it('routes a held stream snapshot into its query', () => {
+    it('routes a held stream snapshot into its query', async () => {
       const { api, ws } = connected();
       api.open(stream);
+      await settled();
 
       receive(ws, snapshotFrame);
 
@@ -272,10 +305,11 @@ describe('createApiWebsocket', () => {
       expect(actions.indexOf('authenticate')).toBeLessThan(actions.indexOf('open'));
     });
 
-    it('ignores a rejection answering an open that a later open superseded', () => {
+    it('ignores a rejection answering an open that a later open superseded', async () => {
       const unobserve = observe();
       const { api, ws } = connected();
       api.open(stream);
+      await settled();
       api.authenticate('tok');
 
       receive(ws, { type: 'openRejected', stream });
@@ -286,14 +320,16 @@ describe('createApiWebsocket', () => {
       unobserve();
     });
 
-    it('keeps its holder count across a rejection, and a new holder retries the open', () => {
+    it('keeps its holder count across a rejection, and a new holder retries the open', async () => {
       const { api, ws } = connected();
       api.open(stream);
       api.open(stream);
+      await settled();
       receive(ws, { type: 'openRejected', stream });
 
       api.open(stream);
       api.close(stream);
+      await settled();
 
       expect(opensOf(ws)).toHaveLength(2);
       expect(sends(ws).some((frame) => frame.action === 'close')).toBe(false);
@@ -303,6 +339,7 @@ describe('createApiWebsocket', () => {
       const unobserve = observe();
       const { api, ws } = connected();
       api.open(stream);
+      await settled();
       receive(ws, { type: 'opened', stream });
       receive(ws, snapshotFrame);
       ws.sent.length = 0;
@@ -322,6 +359,7 @@ describe('createApiWebsocket', () => {
       try {
         const { api, ws } = connected({ ...fastTiming, retryBaseMs: 20, retryMaxMs: 1_000, openAckTimeoutMs: 10_000 });
         api.open(stream);
+        await settled();
         const fail = () => receive(ws, { type: 'error', action: 'open', stream, retryable: true });
 
         fail();
@@ -355,10 +393,11 @@ describe('createApiWebsocket', () => {
       unobserve();
     });
 
-    it('closes a stream the server stops authorizing mid-stream', () => {
+    it('closes a stream the server stops authorizing mid-stream', async () => {
       const unobserve = observe();
       const { api, ws } = connected();
       api.open(stream);
+      await settled();
       receive(ws, { type: 'opened', stream });
       receive(ws, snapshotFrame);
 
@@ -384,9 +423,10 @@ describe('createApiWebsocket', () => {
       expect(actions.indexOf('open')).toBeGreaterThan(actions.lastIndexOf('subscribe'));
     });
 
-    it('resync re-opens a live stream once, and never a rejected one', () => {
+    it('resync re-opens a live stream once, and never a rejected one', async () => {
       const { api, ws } = connected();
       api.open(stream);
+      await settled();
       receive(ws, { type: 'opened', stream });
       ws.sent.length = 0;
 
@@ -415,8 +455,10 @@ describe('createApiWebsocket', () => {
     it('re-sends a close the server dropped for load while the stream stays released', async () => {
       const { api, ws } = connected();
       api.open(stream);
+      await settled();
       receive(ws, { type: 'opened', stream });
       api.close(stream);
+      await settled();
       ws.sent.length = 0;
 
       receive(ws, { type: 'error', action: 'close', stream, retryable: true } satisfies WSFrameErrorFrame);

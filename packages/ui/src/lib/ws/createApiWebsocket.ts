@@ -15,6 +15,7 @@ export type ApiWebsocketTiming = {
   openAckTimeoutMs: number;
   retryBaseMs: number;
   retryMaxMs: number;
+  streamSettleMs: number;
 };
 
 const DEFAULT_TIMING: ApiWebsocketTiming = {
@@ -24,6 +25,7 @@ const DEFAULT_TIMING: ApiWebsocketTiming = {
   openAckTimeoutMs: 10_000,
   retryBaseMs: 1_000,
   retryMaxMs: 30_000,
+  streamSettleMs: 100,
 };
 
 export type ApiWebsocket = {
@@ -61,6 +63,7 @@ export const createApiWebsocket = (
   const openAckTimers = new Map<string, ReturnType<typeof setTimeout>>();
   const retryTimers = new Map<string, ReturnType<typeof setTimeout>>();
   const retryAttempts = new Map<string, number>();
+  const settleTimers = new Map<string, ReturnType<typeof setTimeout>>();
   const sentOpens = new Set<string>();
   const sentSubscribes = new Set<string>();
   let identityAttempts = 0;
@@ -126,6 +129,19 @@ export const createApiWebsocket = (
         retryTimers.delete(stream);
         if (isLive(stream) && !pendingOpens.has(stream)) sendOpen(stream);
       }, delay),
+    );
+  };
+
+  // Holder churn inside the window nets out, so a stream opened and released in passing sends no frames.
+  const settle = (stream: string): void => {
+    clearTimers(settleTimers, stream);
+    settleTimers.set(
+      stream,
+      setTimeout(() => {
+        settleTimers.delete(stream);
+        if (isLive(stream) && !sentOpens.has(stream)) sendOpen(stream);
+        else if (!streams.has(stream) && sentOpens.delete(stream)) sendRelease({ action: 'close', stream });
+      }, timing.streamSettleMs),
     );
   };
 
@@ -195,6 +211,7 @@ export const createApiWebsocket = (
     if (frame.action !== 'open' || !frame.stream || !acceptOpenAnswer(frame.stream)) return;
     if (!frame.retryable) {
       rejectedStreams.add(frame.stream);
+      sentOpens.delete(frame.stream);
       return void failDataStream(frame.stream, 'rejected');
     }
     failDataStream(frame.stream, 'failed');
@@ -226,6 +243,7 @@ export const createApiWebsocket = (
         if (!acceptOpenAnswer(frame.stream as string)) return;
         console.error(`ws stream open rejected: ${frame.stream}`);
         rejectedStreams.add(frame.stream as string);
+        sentOpens.delete(frame.stream as string);
         clearTimers(retryTimers, frame.stream);
         return void failDataStream(frame.stream as string, 'rejected');
       case 'error':
@@ -239,7 +257,7 @@ export const createApiWebsocket = (
     onMessage: (data) => {
       const frame = data as InboundFrame;
       if (frame.category === 'data') {
-        if (isLive(frame.stream as string)) dispatchMessage(data as WSEvent);
+        if (sentOpens.has(frame.stream as string)) dispatchMessage(data as WSEvent);
         return;
       }
       if (frame.category) dispatchMessage(data as WSEvent);
@@ -318,7 +336,7 @@ export const createApiWebsocket = (
       if (refs > 0 && !rejectedStreams.has(stream)) return;
       rejectedStreams.delete(stream);
       forgetStream(stream);
-      sendOpen(stream);
+      settle(stream);
     },
     close: (stream) => {
       const refs = streams.get(stream) ?? 0;
@@ -327,7 +345,7 @@ export const createApiWebsocket = (
       streams.delete(stream);
       rejectedStreams.delete(stream);
       forgetStream(stream);
-      if (sentOpens.delete(stream)) sendRelease({ action: 'close', stream });
+      settle(stream);
     },
     resync: (stream) => {
       if (isLive(stream) && !pendingOpens.has(stream)) sendOpen(stream);

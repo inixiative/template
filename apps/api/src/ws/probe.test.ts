@@ -4,9 +4,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import type { User } from '@template/db/generated/client/client';
 import { InquiryResourceModel, InquiryStatus, InquiryType, PlatformRole } from '@template/db/generated/client/enums';
-import { organizationContactsStream } from '@template/db/streams';
 import { cleanupTouchedTables, createInquiry, createOrganization, createUser } from '@template/db/test';
-import { WS_CHANNELS } from '@template/shared/ws';
+import { STREAM_DEFINITIONS, WS_CHANNELS } from '@template/shared/ws';
 import { canSubscribe, resolveIdentity } from '#/ws/probe';
 import { createBearerToken } from '#tests/utils/createBearerToken';
 
@@ -56,7 +55,9 @@ describe('ws subscribe probe (real app)', () => {
   });
 
   it('rejects a data stream family — streams are opened, not subscribed', async () => {
-    expect(await canSubscribe(adminBearer, organizationContactsStream.name({ id: inquiryId }))).toBe(false);
+    expect(
+      await canSubscribe(adminBearer, STREAM_DEFINITIONS.organizationReadManyContacts.name({ id: inquiryId })),
+    ).toBe(false);
   });
 
   it('rejects a name that is only an inherited object key', async () => {

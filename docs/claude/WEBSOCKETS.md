@@ -30,8 +30,8 @@ The frontend consumes two event classes (`WSEvent`, dispatched as `handlers[cate
   route. Reconnect recovery refetches registered live queries.
 - **Data streams** — `{ category: 'data', action: 'snapshot', stream, payload }` once per open,
   then `{ category: 'data', action: 'append', stream, type, payload }` for each change. The socket
-  carries the data itself, and every frame is validated against a shared, typed stream definition
-  on both ends. See [Data streams](#data-streams).
+  carries the data itself: the snapshot is the route's response and each append is a row shaped by
+  the route's `responseSchema`, folded by the stream's kind. See [Data streams](#data-streams).
 
 Neither class is persisted or replayed. Every consumer owns a recovery path that does not depend
 on the push: query channels refetch on reconnect, and data streams re-open for a fresh snapshot.
@@ -52,7 +52,7 @@ refetching the whole resource on every change would be wasteful or too slow: str
 output token by token, a live activity feed, a progress log. A stream carries the rows
 themselves, which makes the server responsible for everything a refetch gets for free: each
 append is authorized for every holder, shaped exactly like the route's response, ordered against
-other writers, and folded by a client reducer. If a refetch per change is affordable, use a
+other writers, and folded on the client by its kind. If a refetch per change is affordable, use a
 channel.
 
 ## Channel registry and authorization
@@ -107,6 +107,12 @@ acknowledgement timeout) before calling the reconnect callback that invalidates 
 close or unsubscribe goes out only when its open or subscribe actually reached the server, and
 one the server drops for load is re-sent while the stream or channel stays released.
 
+Stream opens and closes settle for `streamSettleMs` (100 ms) before a frame goes out, so holder
+churn nets out: a stream opened and released inside the window (a row scrolled past) sends
+nothing, and a stream released and re-held inside it (a remount) stays open without a new
+snapshot. Without it, fast churn across many streams exceeds `WS_FRAME_LIMIT` and the server
+closes the socket.
+
 ## Publishing a refetch
 
 Register a channel family in `WS_CHANNELS` and return a handoff from a business-event handler:
@@ -125,7 +131,7 @@ sockets; those sends do not require adding that operation to the channel registr
 ## Data streams
 
 A data stream is a live view of one route's default response. Its name is the channel key of
-that route (`organizationContactsStream.name({ id })` →
+that route (`STREAM_DEFINITIONS.organizationReadManyContacts.name({ id })` →
 `organizationReadManyContacts:id:<organizationId>`), so the route it stands for is explicit.
 
 ```
@@ -140,37 +146,38 @@ transient (429/5xx), full queue, exception → { type: 'error', action: 'open', 
 Closing the socket or changing the user or credential closes every stream on it. There is no
 replay.
 
-**The contacts stream is scaffolding.** `organizationContactsStream` exists to exercise the
+**The contacts stream is scaffolding.** `organizationReadManyContacts` exists to exercise the
 primitive end to end and is the only registered stream. Remove it (definition, producers in the
 contact handlers, `useOrganizationContactsStream`, and their tests) once a real stream consumer
-lands. Streaming model output is the canonical first real use.
+lands. Streaming model output (a `log` stream) is the canonical first real use.
 
 ### Stream definitions
 
-A stream is declared once, in shared code both ends import, with `defineStream`
-(`packages/shared/src/ws/defineStream.ts`):
+A stream is declared once, in the shared registry both ends import
+(`packages/shared/src/ws/streamDefinitions.ts`), with `defineStream`:
 
 ```typescript
-export const organizationContactsStream = defineStream('organizationReadManyContacts', {
-  audience: 'shared',
-  params: z.object({ id: z.string() }),
-  ...listStreamSchemas(jsonWireSchema(ContactScalarSchema)),
-});
+export const STREAM_DEFINITIONS = {
+  organizationReadManyContacts: defineStream('organizationReadManyContacts', {
+    kind: 'list',
+    audience: 'shared',
+    params: z.object({ id: z.string() }),
+  }),
+} as const;
 ```
 
 - `family` is the route's operationId.
+- `kind` fixes how the client folds the stream, and which ops it accepts (`streamOps.ts`):
+  - `list`: `upsert` (a row), `remove` (`{ id }`), `revive` (a row). Rows are keyed by `id`.
+  - `log`: `append` (an entry).
 - `params` is the zod schema of the route's path parameters; `name(params)` builds the stream name.
-- `snapshot` is the zod schema of the route's response on the wire.
-- `actions` maps each action type to the zod schema of its payload.
 - `audience` is required: `'shared'` or `'perRecipient'` (see [Audience](#audience)).
 
-Definitions live in `packages/db/src/streams/` (exported as `@template/db/streams`) because they
-are built from the generated model schemas, which `packages/shared` cannot import;
-`STREAM_DEFINITIONS` there is the stream registry the server resolves names against.
-`jsonWireSchema` turns a model schema's `Date` fields into ISO strings (what JSON carries) and
-drops strictness so a newer server field never fails an older client. `listStreamSchemas(row)`
-provides the list shape: a `{ data, pagination? }` snapshot and the actions
-`upsert: row` and `remove: { id, updatedAt }`.
+There is no stream-specific wire schema. The snapshot is the route's JSON response, and an append
+row is parsed with the same route's `responseSchema` and serialized by the same `JSON.stringify`
+that `c.json` uses, so both reach the client as the SDK's response type
+(`OrganizationReadManyContactsResponse`). The client trusts server frames the way it trusts an
+HTTP response and does not re-validate them.
 
 ### Audience
 
@@ -220,8 +227,8 @@ on membership, role or token removal through an app event is a planned follow-up
 
 The connection subscribes to the stream before the snapshot request. Appends that arrive during
 the request are held (`heldAppends`) and sent after the snapshot, so a client never sees an append
-before its snapshot. An append can repeat a change the snapshot already contains, so every
-reducer must be idempotent.
+before its snapshot. An append can repeat a change the snapshot already contains, so every fold
+must be idempotent.
 
 Within one API instance, `appendToStream` publishes through a `createSerializedQueue` per stream
 key (`apps/api/src/ws/streamPublishOrder.ts`): a stream's appends go out in the order the instance
@@ -229,15 +236,11 @@ emitted them, including when a publish fails and falls back to local delivery. A
 Redis pub/sub is the ordering boundary: two instances publishing to the same stream are delivered
 in the order Redis received the publishes, which need not be the order their writes committed.
 
-That gap is closed per row by the payloads, not by a second ordering system: upserts carry the
-row's `updatedAt`, and removals carry the removed row's `updatedAt` (its last write, the
-soft-delete stamp when there is one). The list reducer keeps a bounded set of tombstones
-(`__removed`, last 500 ids) and drops any upsert or removal whose version is not newer than what it
-has seen for that row, so a late upsert cannot resurrect a removed row. A fresh snapshot (resync,
-retry or reconnect) keeps the tombstones through `listStreamRebase`; a tombstone yields only to a
-newer copy of its row in the snapshot. `updatedAt` is stamped by
-the writing process, so the guard inherits that clock; a removal that the client never saw
-(published before it subscribed) leaves no tombstone.
+A removal is final. The list fold keeps a bounded set of tombstones (`__removed`, last 500 ids)
+and ignores any later `upsert` for a removed id, so a late update from another instance cannot
+resurrect a row. Only an explicit `revive` clears a tombstone. A fresh snapshot (resync, retry or
+reconnect) keeps the tombstones, dropping only those whose row the snapshot shows alive. Among
+upserts of a live row the last one to arrive wins.
 
 ### Producing appends
 
@@ -245,16 +248,15 @@ Appends are app-event output, like refetch hints, built only with `streamAppend`
 type is branded (`ValidatedStreamAppend`), so a hand-built stream handoff does not typecheck, and
 message handoffs are typed as `WSQueryEvent`, so a data frame cannot be smuggled through a
 `{ userIds }` or `{ channels }` message. In `streamAppend` (`apps/api/src/appEvents/streamAppend.ts`)
-the action type is checked against the definition,
-the payload is typed by the action's schema and parsed with it before the handoff exists, and a
+the op is checked against the definition's kind, the payload is typed by the op, and a
 `perRecipient` definition requires `userIds`:
 
 ```typescript
 websocket: ({ contact }) => organizationContactUpsert(contact),
 
 // organizationContactUpsert:
-streamAppend(organizationContactsStream, { id: contact.organizationId }, 'upsert',
-  toJsonWire(ContactScalarSchema.parse(contact)));
+streamAppend(STREAM_DEFINITIONS.organizationReadManyContacts, { id: contact.organizationId }, 'upsert',
+  organizationReadManyContactsRoute.responseSchema.parse(contact));
 ```
 
 `deliverWSHandoffs` calls `appendToStream`, which wraps the action in the append frame and
@@ -263,28 +265,29 @@ publishes through Redis.
 ### Frontend
 
 ```typescript
-const contacts = useStream(organizationContactsStream, { id }, listStreamFolding); // { reduce, rebase }
-useStreamAction(organizationContactsStream, { id }, 'remove', (removal) => toast(removal.id));
+const contacts = useOrganizationContactsStream(organizationId);
+// = useStream<OrganizationContactsStream>(STREAM_DEFINITIONS.organizationReadManyContacts.name({ id }))
+useStreamAction<{ id: string }>(stream, 'remove', (removal) => toast(removal.id));
 ```
 
-- `useStream(definition, params, { reduce, rebase? })` returns a TanStack query result holding the
-  snapshot. `reduce` maps **every** action type to a `(state, payload) => state` reducer; a
-  missing handler is a type error. `rebase(previous, snapshot)` merges state a fresh snapshot
-  must keep (the list folding keeps tombstones). `listStreamFolding` bundles both for lists.
-- `useStreamAction(definition, params, type, listener)` registers a side-effect listener for one
-  action type; any number may be mounted.
-- Reducers and listeners share one open stream through the existing holder refcounting: the
+- `useStream<TSnapshot>(stream)` returns a TanStack query result holding the folded snapshot. A
+  typed per-stream hook names the SDK response type, as `useOrganizationContactsStream` does.
+- `useStreamAction<TPayload>(stream, op, listener)` registers a side-effect listener for one op;
+  any number may be mounted.
+- Folding is by kind, not per caller: `STREAM_FOLDS` (`packages/ui/src/lib/ws/streamFolds.ts`) maps
+  each kind to its `snapshot` and `ops` folds, typed so every op of a kind has one. Custom
+  behavior means a new kind.
+- Holders and listeners share one open stream through the existing holder refcounting: the
   query-cache observer and each listener hold the stream, and it closes when the last one
-  unmounts. When several `useStream` holders pass different reducers, the first mounted folds.
-- `listStreamReducers` (`packages/ui/src/lib/ws/listStreamReducers.ts`) is the list reducer. Rows
-  stay in the list routes' default `id desc` order. An upsert replaces a held row (unless older),
-  inserts a row that belongs among the loaded rows, and ignores one beyond the loaded page. A
-  remove drops a held row, or, for an off-page row, only decrements `pagination.total` (once).
-  Inserts beyond `pageSize` evict the oldest held row, so a long-lived stream stays one page.
+  releases it.
+- `listStream` (`packages/ui/src/lib/ws/listStream.ts`) keeps rows in the list routes' default
+  `id desc` order. An upsert replaces a held row, inserts a row that belongs among the loaded rows,
+  and ignores one beyond the loaded page. A remove drops a held row, or, for an off-page row, only
+  decrements `pagination.total` (once). Inserts beyond `pageSize` evict the oldest held row, so a
+  long-lived stream stays one page. `logStream` appends entries in arrival order.
 
-`dispatchMessage` validates every snapshot and append against the definition. An invalid
-snapshot puts the stream's query in the error state; an invalid or unknown append is dropped and
-the client re-opens the stream for a fresh snapshot (`websocket.resync`).
+An append whose op the stream's kind does not define is dropped and the client re-opens the
+stream for a fresh snapshot (`websocket.resync`).
 
 `openRejected` puts the query in the error state and wipes its data; the stream stays held (the
 holder count is kept) but is not replayed until a new holder mounts or the identity changes. A
@@ -293,7 +296,7 @@ re-opens with exponential backoff (1s doubling to 30s, jittered), resetting once
 succeeds. An open that gets no answer within 10 seconds is treated the same way. Each open is
 counted until its answer arrives, so an answer to an open that a later open superseded is
 ignored. Data frames are routed by `category` before any control-frame handling, and frames for a
-stream the client no longer holds, or that was rejected, are ignored.
+stream the client has not opened, has closed, or that was rejected, are ignored.
 
 ## Frontend and horizontal scaling
 
@@ -308,11 +311,10 @@ falls back to local delivery, so cross-instance delivery is unavailable during t
 
 ## Source and verification
 
-- `packages/shared/src/ws/`: events, channel keys, channel registry, stream definitions, list
-  schemas, frame limits and browser transport.
-- `packages/db/src/streams/`: stream definitions and the stream registry.
-- `packages/ui/src/lib/ws/`: API socket, acknowledgement/retry handling, dispatch, reducer
-  and listener registries, list reducers.
+- `packages/shared/src/ws/`: events, channel keys, channel and stream registries, stream kinds and
+  ops, frame limits and browser transport.
+- `packages/ui/src/lib/ws/`: API socket, acknowledgement/retry and settle handling, dispatch,
+  kind folds (`listStream`, `logStream`) and the listener registry.
 - `packages/ui/src/hooks/useStream.ts`, `useStreamAction.ts`: consumer hooks.
 - `apps/api/src/ws/`: handler, identity, route resolution, stream access and re-authorization,
   registries, delivery, ordering and Redis pub/sub.
@@ -323,9 +325,9 @@ falls back to local delivery, so cross-instance delivery is unavailable during t
 - `apps/api/src/ws/streamAudience.test.ts`: the audience enforcement.
 - `apps/api/src/ws/pubsub.test.ts`: per-stream publish order and per-recipient delivery.
 - `apps/api/src/appEvents/handlers/contact/organizationContactsStream.test.ts`: app event →
-  Redis → open socket, with typed payloads matching the route snapshot.
+  Redis → open socket, with append rows matching the route snapshot.
 - `packages/ui/src/lib/ws/createApiWebsocket.test.ts`,
-  `listStreamReducers.test.ts`, `dispatch.test.ts`, `packages/ui/src/hooks/useStream.test.tsx`:
-  client protocol, retries, reducers and hooks.
+  `listStream.test.ts`, `dispatch.test.ts`, `packages/ui/src/hooks/useStream.test.tsx`:
+  client protocol, retries, settling, folds and hooks.
 
 See [APP_EVENTS.md](APP_EVENTS.md) and [Segments](SEGMENTS.md#events-and-email-integration).

@@ -4,31 +4,25 @@
  * @partOf primitive:appEvents
  * @uses feature:contact, primitive:websockets
  */
-import { ContactScalarSchema } from '@template/db';
 import type { Contact } from '@template/db/generated/client/client';
-import { organizationContactsStream } from '@template/db/streams';
-import { toJsonWire } from '@template/shared/ws';
+import { STREAM_DEFINITIONS } from '@template/shared/ws';
 import { streamAppend } from '#/appEvents/streamAppend';
 import type { WSHandoff } from '#/appEvents/types';
+import { organizationReadManyContactsRoute } from '#/modules/organization/routes/organizationReadManyContacts';
+
+const stream = STREAM_DEFINITIONS.organizationReadManyContacts;
 
 export const organizationContactUpsert = (contact: Contact): WSHandoff[] | null =>
   contact.organizationId
     ? [
         streamAppend(
-          organizationContactsStream,
+          stream,
           { id: contact.organizationId },
           'upsert',
-          toJsonWire(ContactScalarSchema.parse(contact)),
+          organizationReadManyContactsRoute.responseSchema.parse(contact),
         ),
       ]
     : null;
 
 export const organizationContactRemove = (contact: Contact): WSHandoff[] | null =>
-  contact.organizationId
-    ? [
-        streamAppend(organizationContactsStream, { id: contact.organizationId }, 'remove', {
-          id: contact.id,
-          updatedAt: contact.updatedAt.toISOString(),
-        }),
-      ]
-    : null;
+  contact.organizationId ? [streamAppend(stream, { id: contact.organizationId }, 'remove', { id: contact.id })] : null;

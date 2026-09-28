@@ -1,19 +1,22 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import type { Organization, User } from '@template/db/generated/client/client';
-import { organizationContactsStream } from '@template/db/streams';
 import { buildContact, cleanupTouchedTables, createContact, createOrganizationUser } from '@template/db/test';
+import { STREAM_DEFINITIONS } from '@template/shared/ws';
 import { emitAppEvent } from '#/appEvents/emit';
 import {
   organizationContactRemove,
   organizationContactUpsert,
 } from '#/appEvents/handlers/contact/organizationContactsStream';
 import { streamAppend } from '#/appEvents/streamAppend';
+import { organizationReadManyContactsRoute } from '#/modules/organization/routes/organizationReadManyContacts';
 import { websocketHandler } from '#/ws/handler';
 import { initWebSocketPubSub } from '#/ws/pubsub';
 import { clearRegistry } from '#/ws/registry';
 import { createTestSocket } from '#tests/createTestSocket';
 import { createBearerToken } from '#tests/utils/createBearerToken';
+
+const organizationContactsStream = STREAM_DEFINITIONS.organizationReadManyContacts;
 
 const waitFor = async (predicate: () => boolean, timeoutMs = 3000): Promise<void> => {
   const start = Date.now();
@@ -28,7 +31,7 @@ describe('organization contacts stream producers', () => {
     await cleanupTouchedTables(db);
   });
 
-  it('targets the owning organization stream with a typed upsert of the wire row', async () => {
+  it('targets the owning organization stream with an upsert of the row the route serves', async () => {
     const { context } = await createOrganizationUser({ role: 'member' });
     const { entity: contact } = await createContact(
       { ownerModel: 'Organization', organizationId: context.organization.id },
@@ -38,18 +41,18 @@ describe('organization contacts stream producers', () => {
     const [handoff] = organizationContactUpsert(contact) ?? [];
 
     expect(handoff?.target).toEqual({ stream: organizationContactsStream.name({ id: context.organization.id }) });
-    expect(handoff?.append).toEqual({ type: 'upsert', payload: contact.__serialize() });
+    expect(handoff?.append).toEqual({
+      type: 'upsert',
+      payload: organizationReadManyContactsRoute.responseSchema.parse(contact),
+    });
   });
 
-  it('carries the removed row’s last write time so a client can order it against upserts', async () => {
+  it('removes by id', async () => {
     const { entity: contact } = await buildContact({ ownerModel: 'Organization', organizationId: 'org-1' });
 
     const [handoff] = organizationContactRemove(contact) ?? [];
 
-    expect(handoff?.append).toEqual({
-      type: 'remove',
-      payload: { id: contact.id, updatedAt: contact.updatedAt.toISOString() },
-    });
+    expect(handoff?.append).toEqual({ type: 'remove', payload: { id: contact.id } });
   });
 
   it('produces nothing for a contact no organization owns', async () => {
@@ -58,11 +61,11 @@ describe('organization contacts stream producers', () => {
     expect(organizationContactRemove(contact)).toBeNull();
   });
 
-  it('validates the payload against the action schema before it is handed off', () => {
-    expect(() =>
-      streamAppend(organizationContactsStream, { id: 'org-1' }, 'remove', { id: 'x', updatedAt: 'yesterday' }),
-    ).toThrow();
-    expect(() => streamAppend(organizationContactsStream, { id: 'org-1' }, 'remove', { id: 'x' } as never)).toThrow();
+  it('accepts only the ops its stream kind defines', () => {
+    const typecheckOnly = () =>
+      // @ts-expect-error — `append` is a log op; a list stream folds upsert, remove and revive.
+      streamAppend(organizationContactsStream, { id: 'org-1' }, 'append', {});
+    expect(typecheckOnly).toBeFunction();
   });
 });
 
@@ -96,7 +99,7 @@ describe('organization contacts stream (app event → redis → open socket)', (
   const appends = (sent: string[]) =>
     sent.map((message) => JSON.parse(message)).filter((frame) => frame.action === 'append');
 
-  it('pushes contact changes as typed appends whose rows match what the route snapshot serves', async () => {
+  it('pushes contact changes as appends whose rows match what the route snapshot serves', async () => {
     const { entity: contact } = await createContact(
       { ownerModel: 'Organization', organizationId: organization.id },
       { organization },
@@ -112,18 +115,8 @@ describe('organization contacts stream (app event → redis → open socket)', (
     expect(routeRow).toBeDefined();
     expect(appends(sent)).toEqual([
       { category: 'data', action: 'append', stream, type: 'upsert', payload: routeRow },
-      {
-        category: 'data',
-        action: 'append',
-        stream,
-        type: 'remove',
-        payload: { id: contact.id, updatedAt: contact.updatedAt.toISOString() },
-      },
+      { category: 'data', action: 'append', stream, type: 'remove', payload: { id: contact.id } },
     ]);
-    for (const frame of appends(sent)) {
-      const schema = organizationContactsStream.actions[frame.type as 'upsert' | 'remove'];
-      expect(schema.safeParse(frame.payload).success).toBe(true);
-    }
   });
 
   it('pushes a newly created contact to an already open stream', async () => {
