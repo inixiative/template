@@ -67,8 +67,8 @@ describe('segment reconcile', () => {
       await createCustomerRef({
         customerModel: 'User',
         providerModel: 'Space',
-        customerUser: user,
-        providerSpace: provider,
+        customerUserId: user.id,
+        providerSpaceId: provider.id,
       })
     ).entity;
 
@@ -169,16 +169,16 @@ describe('segment reconcile', () => {
       await createCustomerRef({
         customerModel: 'User',
         providerModel: ProviderModel.User,
-        customerUser: acme,
-        providerUser: provider,
+        customerUserId: acme.id,
+        providerUserId: provider.id,
       })
     ).entity;
     const viaOrganization = (
       await createCustomerRef({
         customerModel: 'User',
         providerModel: ProviderModel.Organization,
-        customerUser: acme,
-        providerOrganization: organization,
+        customerUserId: acme.id,
+        providerOrganizationId: organization.id,
       })
     ).entity;
 
@@ -284,8 +284,8 @@ describe('segment reconcile', () => {
     const foreign = await createCommunicationLog({
       kind: CommunicationKind.marketing,
       senderType: SenderType.Space,
-      recipientUser: other,
-      senderSpace: elsewhere,
+      recipientUserId: other.id,
+      senderSpaceId: elsewhere.id,
     });
     await emitAppEvent('communication.settled', { communicationLog: foreign.entity });
     expect(await memberIds(segment.id)).toEqual([]);
@@ -293,8 +293,8 @@ describe('segment reconcile', () => {
     const ours = await createCommunicationLog({
       kind: CommunicationKind.marketing,
       senderType: SenderType.Space,
-      recipientUser: other,
-      senderSpace: space,
+      recipientUserId: other.id,
+      senderSpaceId: space.id,
     });
     await emitAppEvent('communication.settled', { communicationLog: ours.entity });
     expect(await memberIds(segment.id)).toEqual([otherRef.id]);

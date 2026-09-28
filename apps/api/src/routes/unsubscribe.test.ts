@@ -19,7 +19,7 @@ const post = (token: string) =>
   fetch(new Request(`http://localhost/unsubscribe?token=${encodeURIComponent(token)}`, { method: 'POST' }));
 
 const emailContact = (user: { id: string }, address: string, acceptedKinds: ('platform' | 'marketing')[]) =>
-  createContact({ ownerModel: 'User', type: ContactType.email, value: { address }, acceptedKinds }, { user });
+  createContact({ ownerModel: 'User', userId: user.id, type: ContactType.email, value: { address }, acceptedKinds });
 
 afterAll(async () => {
   await cleanupTouchedTables(db);

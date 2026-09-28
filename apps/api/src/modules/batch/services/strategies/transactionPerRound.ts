@@ -8,7 +8,7 @@ import { db } from '@template/db';
 import { refreshBatchContext, registerBatch, unregisterBatch } from '#/modules/batch/services/batchRegistry';
 import { interpolateRequest } from '#/modules/batch/services/interpolation';
 import { executeRequest } from '#/modules/batch/services/strategies/executeRequest';
-import type { StrategyExecutor } from '#/modules/batch/services/strategies/types';
+import type { RequestResult, StrategyExecutor } from '#/modules/batch/services/strategies/types';
 
 export const transactionPerRound: StrategyExecutor = async (
   app,
@@ -18,8 +18,7 @@ export const transactionPerRound: StrategyExecutor = async (
   baseContext,
   timeout,
 ) => {
-  // biome-ignore lint/suspicious/noExplicitAny: batch results are heterogeneous — each request returns a different shape
-  const results: any[][] = [];
+  const results: RequestResult[][] = [];
   const totalRequests = rounds.reduce((sum, round) => sum + round.length, 0);
   const timeoutPerRound = Math.ceil(timeout / rounds.length);
   let completedRounds = 0;

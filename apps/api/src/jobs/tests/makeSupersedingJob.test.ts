@@ -107,15 +107,15 @@ describe('makeSupersedingJob', () => {
   });
 
   test('should re-assert a lapsed baton at start so the run is visible to lane reads', async () => {
-    let holderDuringRun: string | null = null;
+    const holdersDuringRun: (string | null)[] = [];
     const innerHandler = mock(async (handlerCtx: WorkerContext, payload: { value: number }) => {
-      holderDuringRun = await handlerCtx.queue.redis.get(laneKey(handlerCtx.job.name, `test-${payload.value}`));
+      holdersDuringRun.push(await handlerCtx.queue.redis.get(laneKey(handlerCtx.job.name, `test-${payload.value}`)));
     });
 
     const handler = makeSupersedingJob(innerHandler, (p) => `test-${p.value}`);
     await handler(ctx, { value: 1 }); // no enqueue-time claim — the baton lapsed while queued
 
-    expect(holderDuringRun).toBe(ctx.job.id!);
+    expect(holdersDuringRun).toEqual([ctx.job.id!]);
   });
 
   test('should displace an older holder at start — newest wins after both batons lapse', async () => {
@@ -129,9 +129,9 @@ describe('makeSupersedingJob', () => {
       olderUsurped = true;
     });
 
-    let holderDuringRun: string | null = null;
+    const holdersDuringRun: (string | null)[] = [];
     const innerHandler = mock(async (handlerCtx: WorkerContext, payload: { value: number }) => {
-      holderDuringRun = await handlerCtx.queue.redis.get(laneKey(handlerCtx.job.name, `test-${payload.value}`));
+      holdersDuringRun.push(await handlerCtx.queue.redis.get(laneKey(handlerCtx.job.name, `test-${payload.value}`)));
     });
     const handler = makeSupersedingJob(innerHandler, (p) => `test-${p.value}`);
     await handler(ctx, { value: 1 });
@@ -139,7 +139,7 @@ describe('makeSupersedingJob', () => {
     await new Promise((r) => setTimeout(r, 700));
     stopOlder();
 
-    expect(holderDuringRun).toBe(ctx.job.id!);
+    expect(holdersDuringRun).toEqual([ctx.job.id!]);
     expect(await getJobSupersededBy('0-older')).toBe(ctx.job.id!);
     expect(olderUsurped).toBe(true);
   });
@@ -163,6 +163,6 @@ describe('makeSupersedingJob', () => {
 
     const handler = makeSupersedingJob(innerHandler, () => 'test-key');
 
-    await expect(handler(ctx, {})).rejects.toThrow('Test error');
+    await expect(handler(ctx)).rejects.toThrow('Test error');
   });
 });
