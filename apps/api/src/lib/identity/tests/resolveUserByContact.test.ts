@@ -23,7 +23,7 @@ describe('resolveUserByContact', () => {
         valueKey: targetJid,
         value: { jid: targetJid },
       },
-      { context: { user } },
+      { user },
     );
 
     const resolvedId = await resolveUserByContact({

@@ -13,8 +13,6 @@ import { organizationRouter } from '#/modules/organization';
 import { createTestApp, type MountFn } from '#tests/createTestApp';
 import { get, json, post } from '#tests/utils/request';
 
-type InquiryList = { data: Inquiry[]; pagination: unknown };
-
 const mount: MountFn[] = [(app) => app.route('/api/v1/organization', organizationRouter)];
 
 describe('GET /api/v1/organization/:id/inquiries/sent', () => {
@@ -68,7 +66,7 @@ describe('GET /api/v1/organization/:id/inquiries/sent', () => {
     });
 
     const response = await fetch(get(`/api/v1/organization/${org.id}/inquiries/sent`));
-    const { data } = await json<InquiryList>(response);
+    const { data } = await json<Inquiry[]>(response);
 
     expect(response.status).toBe(200);
     expect(data.some((i) => i.id === mine.id)).toBe(true);
@@ -488,7 +486,7 @@ describe('GET /api/v1/organization/:id/inquiries/received', () => {
     });
 
     const response = await fetch(get(`/api/v1/organization/${org.id}/inquiries/received`));
-    const { data } = await json<InquiryList>(response);
+    const { data } = await json<Inquiry[]>(response);
 
     expect(response.status).toBe(200);
     expect(data.some((i) => i.id === mine.id)).toBe(true);

@@ -61,7 +61,7 @@ export const mkEmail = (userId: string) =>
     },
   });
 
-export const liveOrders = (userId: string, type = ContactType.phone) =>
+export const liveOrders = (userId: string, type: ContactType = ContactType.phone) =>
   db.contact.findMany({
     where: { userId, type, deletedAt: null },
     orderBy: { position: 'asc' },

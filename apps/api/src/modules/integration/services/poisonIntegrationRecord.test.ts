@@ -21,8 +21,8 @@ describe('poisonIntegrationRecord', () => {
     const { entity: customerRef } = await createCustomerRef({
       customerModel: 'User',
       providerModel: 'User',
-      customerUser: customer,
-      providerUser: provider,
+      customerUserId: customer.id,
+      providerUserId: provider.id,
     });
     const { entity: integration } = await createIntegration({
       ownerModel: IntegrationOwnerModel.User,
@@ -44,7 +44,7 @@ describe('poisonIntegrationRecord', () => {
 
   it('stamps an existing record that is not poisoned yet', async () => {
     const { customerRef, integration } = await setup();
-    const { entity: existing } = await createIntegrationRecord({ integration, customerRef });
+    const { entity: existing } = await createIntegrationRecord({}, { integration, customerRef });
 
     const poisoned = await poisonIntegrationRecord({
       integrationId: integration.id,

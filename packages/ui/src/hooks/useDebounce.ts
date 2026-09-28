@@ -27,16 +27,14 @@ export const useDebounce = <T>(value: T, delay: number = 300): T => {
 
 /** The debounced function never returns the callback's value — the call is deferred, so there is nothing
  * to hand back. `cancel()` drops a pending call; the hook also cancels on unmount. */
-// biome-ignore lint/suspicious/noExplicitAny: generic callback constraint — any[] required to match any function signature
-export type DebouncedCallback<T extends (...args: any[]) => unknown> = ((...args: Parameters<T>) => void) & {
+export type DebouncedCallback<Args extends unknown[]> = ((...args: Args) => void) & {
   cancel: () => void;
 };
 
-// biome-ignore lint/suspicious/noExplicitAny: generic callback constraint — any[] required to match any function signature
-export const useDebouncedCallback = <T extends (...args: any[]) => unknown>(
-  callback: T,
+export const useDebouncedCallback = <Args extends unknown[]>(
+  callback: (...args: Args) => unknown,
   delay: number = 300,
-): DebouncedCallback<T> => {
+): DebouncedCallback<Args> => {
   const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const callbackRef = useRef(callback);
   callbackRef.current = callback;
@@ -50,7 +48,7 @@ export const useDebouncedCallback = <T extends (...args: any[]) => unknown>(
   // Stable identity — never changes across renders. Refs track the current callback / delay so the
   // debounced function never stales.
   return useMemo(() => {
-    const debounced = (...args: Parameters<T>) => {
+    const debounced = (...args: Args) => {
       clearTimeout(timerRef.current);
       timerRef.current = setTimeout(() => callbackRef.current(...args), delayRef.current);
     };

@@ -151,13 +151,17 @@ describe('cursorPaginate — filter binding', () => {
   const rows: Row[] = ['u-1', 'u-2', 'u-3', 'u-4', 'u-5'].map((id) => ({ id }));
 
   it('walks page two with a cursor minted under the same filter', async () => {
-    const first = await cursorPaginate(cursorContext(userLens, { pageSize: 2 }), makeSeekDelegate(rows), {
-      where: { name: 'aron' },
-    });
+    const first = await cursorPaginate<AnyDelegate, Row>(
+      cursorContext(userLens, { pageSize: 2 }),
+      makeSeekDelegate(rows),
+      {
+        where: { name: 'aron' },
+      },
+    );
     expect(first.data).toEqual([{ id: 'u-1' }, { id: 'u-2' }]);
     expect(first.pagination.hasMore).toBe(true);
 
-    const second = await cursorPaginate(
+    const second = await cursorPaginate<AnyDelegate, Row>(
       cursorContext(userLens, { pageSize: 2, cursor: first.pagination.nextCursor }),
       makeSeekDelegate(rows),
       { where: { name: 'aron' } },
@@ -168,9 +172,13 @@ describe('cursorPaginate — filter binding', () => {
   // why: the cursor is only meaningful inside the sequence it was minted from. Replaying it
   // why: under a different filter seeks into a different sequence and silently skips rows.
   it('rejects a cursor minted under a different filter with a 400', async () => {
-    const first = await cursorPaginate(cursorContext(userLens, { pageSize: 2 }), makeSeekDelegate(rows), {
-      where: { name: 'aron' },
-    });
+    const first = await cursorPaginate<AnyDelegate, Row>(
+      cursorContext(userLens, { pageSize: 2 }),
+      makeSeekDelegate(rows),
+      {
+        where: { name: 'aron' },
+      },
+    );
 
     const replay = cursorPaginate(
       cursorContext(userLens, { pageSize: 2, cursor: first.pagination.nextCursor }),

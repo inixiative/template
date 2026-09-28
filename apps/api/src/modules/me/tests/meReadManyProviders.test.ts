@@ -57,8 +57,8 @@ describe('GET /me/providers', () => {
     await createCustomerRef({
       customerModel: 'User',
       providerModel: 'Space',
-      customerUser: user,
-      providerSpace: space,
+      customerUserId: user.id,
+      providerSpaceId: space.id,
     });
 
     const response = await fetch(get('/api/v1/me/providers'));
@@ -92,8 +92,8 @@ describe('GET /me/providers', () => {
     await createCustomerRef({
       customerModel: 'User',
       providerModel: 'Space',
-      customerUser: otherUser,
-      providerSpace: otherSpace,
+      customerUserId: otherUser.id,
+      providerSpaceId: otherSpace.id,
     });
 
     const response = await fetch(get('/api/v1/me/providers'));

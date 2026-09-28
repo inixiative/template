@@ -5,14 +5,14 @@
  * @uses none
  */
 import { validatePathNotation } from '#/lib/prisma/pathNotation';
+import type { BatchRequest } from '#/modules/batch/services/strategies/types';
 
 const INTERPOLATION_PATTERN = /<<(\d+)\.(\d+)\.([a-zA-Z0-9_.]+)>>/;
 const INTERPOLATION_PATTERN_GLOBAL = /<<(\d+)\.(\d+)\.([a-zA-Z0-9_.]+)>>/g;
 const MALFORMED_PATTERN_REGEX = /<<[^>]*>>/g;
 
 type InterpolationContext = {
-  // biome-ignore lint/suspicious/noExplicitAny: batch results are heterogeneous — each request returns a different shape
-  results: any[][];
+  results: unknown[][];
   currentRound?: number;
 };
 
@@ -51,10 +51,9 @@ const validateInterpolationSyntax = (value: string): void => {
 
 const FORBIDDEN_KEYS = ['__proto__', 'constructor', 'prototype'];
 
-// biome-ignore lint/suspicious/noExplicitAny: dynamic field navigation on heterogeneous batch results
-const navigateFieldPath = (obj: any, path: string): any => {
+const navigateFieldPath = (value: unknown, path: string): unknown => {
   const parts = path.split('.');
-  let result = obj;
+  let result = value;
   for (const part of parts) {
     if (FORBIDDEN_KEYS.includes(part)) {
       throw new Error(`Forbidden field access: ${part}`);
@@ -62,20 +61,21 @@ const navigateFieldPath = (obj: any, path: string): any => {
     if (result === null || result === undefined) {
       return undefined;
     }
-    if (!Object.hasOwn(result, part)) {
+    const container: Record<string, unknown> = Object(result);
+    if (!Object.hasOwn(container, part)) {
       return undefined;
     }
-    result = result[part];
+    result = container[part];
   }
   return result;
 };
 
-// biome-ignore lint/suspicious/noExplicitAny: recursive JSON-like value — can be string, array, object, or primitive
-export const interpolateValue = (value: any, context: InterpolationContext): any => {
-  if (typeof value === 'string') {
-    validateInterpolationSyntax(value);
+const interpolateString = (value: string, context: InterpolationContext): string => {
+  validateInterpolationSyntax(value);
 
-    return value.replace(INTERPOLATION_PATTERN_GLOBAL, (match, roundIdx, reqIdx, fieldPath) => {
+  return value.replace(
+    INTERPOLATION_PATTERN_GLOBAL,
+    (match: string, roundIdx: string, reqIdx: string, fieldPath: string) => {
       if (!validatePathNotation(fieldPath)) {
         throw new Error(`Invalid interpolation path: ${match}`);
       }
@@ -118,7 +118,16 @@ export const interpolateValue = (value: any, context: InterpolationContext): any
       }
 
       return String(result);
-    });
+    },
+  );
+};
+
+const interpolateHeaders = (headers: Record<string, string>, context: InterpolationContext): Record<string, string> =>
+  Object.fromEntries(Object.entries(headers).map(([key, value]) => [key, interpolateString(value, context)]));
+
+export const interpolateValue = (value: unknown, context: InterpolationContext): unknown => {
+  if (typeof value === 'string') {
+    return interpolateString(value, context);
   }
 
   if (Array.isArray(value)) {
@@ -126,8 +135,7 @@ export const interpolateValue = (value: any, context: InterpolationContext): any
   }
 
   if (value !== null && typeof value === 'object') {
-    // biome-ignore lint/suspicious/noExplicitAny: accumulating interpolated values of heterogeneous types
-    const result: Record<string, any> = {};
+    const result: Record<string, unknown> = {};
     for (const [key, val] of Object.entries(value)) {
       result[key] = interpolateValue(val, context);
     }
@@ -137,12 +145,11 @@ export const interpolateValue = (value: any, context: InterpolationContext): any
   return value;
 };
 
-// biome-ignore lint/suspicious/noExplicitAny: batch request has dynamic shape — path/body/headers vary per endpoint
-export const interpolateRequest = (request: any, context: InterpolationContext): any => {
+export const interpolateRequest = (request: BatchRequest, context: InterpolationContext): BatchRequest => {
   return {
     ...request,
-    path: interpolateValue(request.path, context),
+    path: interpolateString(request.path, context),
     body: request.body ? interpolateValue(request.body, context) : undefined,
-    headers: request.headers ? interpolateValue(request.headers, context) : undefined,
+    headers: request.headers ? interpolateHeaders(request.headers, context) : undefined,
   };
 };
