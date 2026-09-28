@@ -1,7 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import type { Organization, Space } from '@template/db/generated/client/client';
-import { cleanupTouchedTables, createOrganization, createSpace } from '@template/db/test';
+import { PlatformRole } from '@template/db/generated/client/enums';
+import { cleanupTouchedTables, createOrganization, createSpace, createUser } from '@template/db/test';
 import { adminSpaceRouter } from '#/modules/space';
 import { createTestApp } from '#tests/createTestApp';
 import { get, json } from '#tests/utils/request';
@@ -16,6 +17,7 @@ describe('GET /api/admin/space', () => {
   let _space3: Space;
 
   beforeAll(async () => {
+    const { entity: superadmin } = await createUser({ platformRole: PlatformRole.superadmin });
     const { entity: o1 } = await createOrganization();
     org1 = o1;
     const { entity: o2 } = await createOrganization();
@@ -29,7 +31,7 @@ describe('GET /api/admin/space', () => {
     _space3 = s3;
 
     const harness = createTestApp({
-      mockSuperadmin: true,
+      mockUser: superadmin,
       mount: [(app) => app.route('/api/admin/space', adminSpaceRouter)],
     });
     fetch = harness.fetch;

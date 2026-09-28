@@ -16,7 +16,7 @@ import { registerSoftDeleteCascadeHook } from '#/hooks/softDeleteCascade/hook';
 import { liveIncludes, liveWhere } from '#/lib/prisma/softDeleteScope';
 
 const tombstone = (model: 'user' | 'organization' | 'contact' | 'organizationUser', id: string) =>
-  db[model].update({ where: { id }, data: { deletedAt: new Date() } });
+  db.delegate(model).update({ where: { id }, data: { deletedAt: new Date() } });
 
 const asSuperadmin = <T>(fn: () => Promise<T>): Promise<T> =>
   auditActorContext.scope({ ...nullAuditActor, platformSuperadmin: true }, async () => {

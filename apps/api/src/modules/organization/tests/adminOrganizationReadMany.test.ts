@@ -6,9 +6,9 @@ import { cleanupTouchedTables, createOrganization, createUser } from '@template/
 import { adminOrganizationRouter } from '#/modules/organization';
 import type { adminOrganizationReadManyRoute } from '#/modules/organization/routes/adminOrganizationReadMany';
 import { createTestApp } from '#tests/createTestApp';
-import { get, json } from '#tests/utils/request';
+import { get, json, jsonError } from '#tests/utils/request';
 
-type ReadManyResponse = z.infer<typeof adminOrganizationReadManyRoute.responseSchema>;
+type ReadManyResponse = z.infer<typeof adminOrganizationReadManyRoute.responseSchema>[];
 
 describe('GET /api/admin/organization', () => {
   let fetch: ReturnType<typeof createTestApp>['fetch'];
@@ -50,8 +50,8 @@ describe('GET /api/admin/organization', () => {
     expect(response.status).toBe(200);
     expect(Array.isArray(data)).toBe(true);
     expect(data.length).toBeGreaterThanOrEqual(3);
-    expect(pagination.page).toBe(1);
-    expect(pagination.pageSize).toBe(10);
+    expect(pagination?.page).toBe(1);
+    expect(pagination?.pageSize).toBe(10);
   });
 
   it('sorts by name ascending', async () => {
@@ -123,7 +123,7 @@ describe('GET /api/admin/organization', () => {
     const response = await fetch(get('/api/admin/organization?searchFields[invalidField]=test'));
 
     expect(response.status).toBe(400);
-    const { message } = await response.json();
+    const { message } = await jsonError(response);
     expect(message).toContain('Invalid query parameters');
   });
 

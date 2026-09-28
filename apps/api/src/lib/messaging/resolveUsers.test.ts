@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { ArrayOperator, Operator } from '@inixiative/json-rules';
+import type { User } from '@template/db/generated/client/client';
 import { TagResource } from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
@@ -15,7 +16,7 @@ import { createTestApp } from '#tests/createTestApp';
 describe('resolveUsers', () => {
   let alice: { id: string };
   let bob: { id: string };
-  let carol: { id: string };
+  let carol: User;
   let foundersTag: { id: string };
   let testDb: ReturnType<typeof createTestApp>['db'];
 
