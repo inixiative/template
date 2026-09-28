@@ -6,7 +6,8 @@
     "rules": {
       "preset": "recommended",
       "suspicious": {
-        "noConfusingVoidType": "off"
+        "noConfusingVoidType": "off",
+        "noExplicitAny": "error"
       },
       "a11y": {
         "noStaticElementInteractions": "off",
