@@ -20,6 +20,7 @@ export const customerRefSegmentsRemoved = makeAppEvent<CustomerRefSegmentsRemove
     data.customerModel === 'User'
       ? [
           {
+            kind: 'users',
             target: { userIds: [data.customerId] },
             message: { data: refetch({ _id: 'meReadManySegmentMemberships' }) },
           },

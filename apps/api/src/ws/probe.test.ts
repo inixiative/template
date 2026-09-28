@@ -5,7 +5,7 @@ import { db } from '@template/db';
 import type { User } from '@template/db/generated/client/client';
 import { InquiryResourceModel, InquiryStatus, InquiryType, PlatformRole } from '@template/db/generated/client/enums';
 import { cleanupTouchedTables, createInquiry, createOrganization, createUser } from '@template/db/test';
-import { WS_CHANNELS } from '@template/shared/ws';
+import { STREAM_DEFINITIONS, WS_CHANNELS } from '@template/shared/ws';
 import { canSubscribe, resolveIdentity } from '#/ws/probe';
 import { createBearerToken } from '#tests/utils/createBearerToken';
 
@@ -55,11 +55,18 @@ describe('ws subscribe probe (real app)', () => {
   });
 
   it('rejects a data stream family — streams are opened, not subscribed', async () => {
-    expect(await canSubscribe(adminBearer, WS_CHANNELS.organizationReadManyContacts.name(inquiryId))).toBe(false);
+    expect(
+      await canSubscribe(adminBearer, STREAM_DEFINITIONS.organizationReadManyContacts.name({ id: inquiryId })),
+    ).toBe(false);
   });
 
   it('rejects a name that is only an inherited object key', async () => {
     expect(await canSubscribe(adminBearer, 'constructor')).toBe(false);
+  });
+
+  it('rejects a dot-segment param that would normalize onto another route', async () => {
+    expect(await canSubscribe(adminBearer, 'inquiryRead:id:..')).toBe(false);
+    expect(await canSubscribe(adminBearer, 'inquiryRead:id:.')).toBe(false);
   });
 
   it('rejects a malformed channel missing the route param', async () => {
@@ -68,12 +75,12 @@ describe('ws subscribe probe (real app)', () => {
 
   it('resolveIdentity returns the token user as provenance of /me', async () => {
     const me = await resolveIdentity(adminBearer);
-    expect(me?.id).toBe(superadmin.id);
+    expect(me).toMatchObject({ status: 'resolved', id: superadmin.id });
   });
 
   it('resolveIdentity honors the spoof header — identity becomes the target', async () => {
     const me = await resolveIdentity({ ...adminBearer, 'x-spoof-user-email': targetUser.email });
-    expect(me?.id).toBe(targetUser.id);
+    expect(me).toMatchObject({ status: 'resolved', id: targetUser.id });
   });
 
   it('a spoofed probe carries the TARGET authority, not the admin', async () => {

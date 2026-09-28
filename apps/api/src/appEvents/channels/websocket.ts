@@ -6,18 +6,19 @@
 import type { WSHandoff } from '#/appEvents/types';
 import { appendToStream, sendToChannel, sendToUser } from '#/ws/pubsub';
 
+const deliver = (handoff: WSHandoff): Promise<void>[] => {
+  switch (handoff.kind) {
+    case 'stream':
+      return [appendToStream(handoff.target.stream, handoff.append, handoff.target.userIds)];
+    case 'channels':
+      return handoff.target.channels.map((channel) => sendToChannel(channel, handoff.message.data));
+    case 'users':
+      return handoff.target.userIds.map((userId) => sendToUser(userId, handoff.message.data));
+    default:
+      throw new Error(`Unknown websocket handoff kind: ${(handoff satisfies never as { kind?: unknown }).kind}`);
+  }
+};
+
 export const deliverWSHandoffs = async (handoffs: WSHandoff[]): Promise<void> => {
-  await Promise.all(
-    handoffs.flatMap((handoff) => [
-      ...('channels' in handoff.target
-        ? handoff.target.channels.map((channel) => sendToChannel(channel, handoff.message.data))
-        : []),
-      ...('userIds' in handoff.target
-        ? handoff.target.userIds.map((userId) => sendToUser(userId, handoff.message.data))
-        : []),
-      ...('streams' in handoff.target
-        ? handoff.target.streams.map((stream) => appendToStream(stream, handoff.message.data))
-        : []),
-    ]),
-  );
+  await Promise.all(handoffs.flatMap(deliver));
 };

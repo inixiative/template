@@ -73,10 +73,26 @@ describe('delivery', () => {
     subscribeToStream(a.socket, 'st1');
     subscribeToChannel(b.socket, 'st1');
 
-    sendToStreamLocal('st1', { category: 'data', action: 'append', stream: 'st1', payload: 1 });
+    sendToStreamLocal('st1', { category: 'data', action: 'append', stream: 'st1', type: 'upsert', payload: 1 });
 
-    expect(parse(a.sent)).toEqual([{ category: 'data', action: 'append', stream: 'st1', payload: 1 }]);
+    expect(parse(a.sent)).toEqual([{ category: 'data', action: 'append', stream: 'st1', type: 'upsert', payload: 1 }]);
     expect(b.sent).toEqual([]);
+  });
+
+  it('sendToStreamLocal with recipients skips holders outside them, including anonymous ones', () => {
+    const alice = createTestSocket({ connectionId: 'alice', userId: 'u-alice' });
+    const bob = createTestSocket({ connectionId: 'bob', userId: 'u-bob' });
+    const anonymous = createTestSocket({ connectionId: 'anon', userId: null });
+    for (const { socket } of [alice, bob, anonymous]) {
+      addConnection(socket);
+      subscribeToStream(socket, 'st1');
+    }
+
+    sendToStreamLocal('st1', { n: 1 }, ['u-alice']);
+
+    expect(parse(alice.sent)).toEqual([{ n: 1 }]);
+    expect(bob.sent).toEqual([]);
+    expect(anonymous.sent).toEqual([]);
   });
 
   it('sendToStreamLocal holds a message for a connection whose snapshot is still in flight', () => {

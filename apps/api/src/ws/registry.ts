@@ -4,13 +4,6 @@
  * @partOf primitive:websockets
  * @uses none
  */
-// Storage layer for the local WS connection registry — the maps + generic index
-// primitives + create/delete. Sibling files attach meaning: identity.ts (byUser),
-// subscriptions.ts (byChannel), streamSubscriptions.ts (byStream), delivery.ts (reads + sends),
-// lifecycle.ts (sweeps).
-// Cross-instance fan-out is pubsub's job; it re-injects remote emits through
-// delivery's *Local functions. This file stays single-instance and pure.
-
 import type { WSSocket } from '#/ws/types';
 
 export const byId = new Map<string, WSSocket>();
@@ -40,8 +33,6 @@ export const addConnection = (ws: WSSocket): void => {
   if (userId) indexInto(byUser, userId, connectionId);
 };
 
-// Removes the connection and cleans every index it appears in (user + all
-// channels + all streams). registry owns the full index shape, so full cleanup lives here.
 export const removeConnection = (ws: WSSocket): void => {
   const { connectionId, userId, channels, streams, heldAppends } = ws.data;
   byId.delete(connectionId);
@@ -51,7 +42,6 @@ export const removeConnection = (ws: WSSocket): void => {
   heldAppends.clear();
 };
 
-// Clears all registry state. Used by drainConnections on shutdown + tests.
 export const clearRegistry = (): void => {
   byId.clear();
   byUser.clear();

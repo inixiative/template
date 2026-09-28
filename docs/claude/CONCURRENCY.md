@@ -12,6 +12,8 @@ Mechanisms for coordinating async operations. Different concerns, different tool
 | Background work yields to foreground work in one shared queue | job lanes (`withLanePriority`) | cross-process (BullMQ priority) |
 | Run a recurring beat without overlapping itself | `heartbeat` | in-process timer |
 
+The ordering and mutual-exclusion primitives — `createSerializedQueue`, `createLock` and `claimLane` / `watchLane` — carry the atlas tag `mutex`: `bunx atlas query --partOf mutex` lists them.
+
 Combine when needed: a per-resource Redis lock + a per-resource serialized queue is the canonical pair for "one instance owns this AND that instance serializes its own writes" — `createLock` to claim ownership, `createSerializedQueue` to order that owner's writes.
 
 ---
@@ -37,6 +39,8 @@ Illustrative example — an encrypted-blob auth adapter where two writers share 
 - `keys.set` and `creds.update` both rewrite the entire encrypted blob
 - Both fire during normal operation (key rotation, session updates)
 - Without the queue, an in-memory `stored` value would be read+modified by overlapping writes and silently lose data on persist
+
+WebSocket data streams use one queue per stream key (`apps/api/src/ws/streamPublishOrder.ts`) so an instance publishes a stream's appends in the order they were emitted, including when a publish falls back to local delivery. See [WEBSOCKETS.md](./WEBSOCKETS.md#ordering).
 
 ### When NOT to use
 
