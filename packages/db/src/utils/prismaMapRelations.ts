@@ -26,13 +26,11 @@ export type RelationInfo = {
 export const getModelRelations = (modelName: ModelName): RelationInfo[] =>
   getRelations(models, modelName).map((relation) => ({
     relationName: relation.relationName,
-    targetModel: relation.targetModel as ModelName,
-    targetAccessor: toAccessor(relation.targetModel as ModelName),
+    targetModel: toModelName(relation.targetModel),
+    targetAccessor: toAccessor(relation.targetModel),
     foreignKey: relation.foreignKey,
   }));
 
 export const getAccessorRelations = (accessor: AccessorName): RelationInfo[] => {
-  const modelName = toModelName(accessor);
-  if (!modelName) throw new Error(`Unknown accessor: ${accessor}`);
-  return getModelRelations(modelName);
+  return getModelRelations(toModelName(accessor));
 };

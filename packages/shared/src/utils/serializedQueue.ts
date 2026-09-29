@@ -1,7 +1,7 @@
 /**
  * @atlas
  * @kind utils
- * @partOf primitive:shared
+ * @partOf primitive:shared, mutex
  * @uses none
  */
 import { LogScope, log } from '@template/shared/logger';

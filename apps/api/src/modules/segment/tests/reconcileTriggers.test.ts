@@ -52,8 +52,8 @@ describe('reconcile triggers — membership follows the events', () => {
       await createCustomerRef({
         customerModel: 'User',
         providerModel: 'Space',
-        customerUser: user,
-        providerSpace: space,
+        customerUserId: user.id,
+        providerSpaceId: space.id,
       })
     ).entity;
 

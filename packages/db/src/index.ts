@@ -1,6 +1,6 @@
 // Database client with scope/transaction methods
 export { db } from './client';
-export type { Db } from './clientTypes';
+export type { Db, FinallyFn, FindForUpdateOptions } from './clientTypes';
 // Mutation lifecycle hooks
 export {
   clearHookRegistry,
@@ -18,7 +18,7 @@ export {
   type SingleAction,
   unregisterDbHook,
   unregisterDbInvariant,
-} from './extensions/mutationLifeCycle';
+} from './extensions/hookRegistry';
 // Automatic soft-delete read/write scoping (app registers the scoper at bootstrap)
 export { registerSoftDeleteScoper, type SoftDeleteScoper } from './extensions/softDeleteScopeRegistry';
 // Prisma namespace for advanced types (Prisma.UserWhereInput, etc.)
@@ -43,6 +43,7 @@ export {
 // Distributed lock
 export {
   createLock,
+  FindForUpdateLockTimeoutError,
   type Lock,
   type LockLostReason,
   type LockOptions,

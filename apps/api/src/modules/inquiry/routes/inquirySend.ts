@@ -14,6 +14,6 @@ export const inquirySendRoute = actionRoute({
   action: 'send',
   method: 'post',
   responseSchema: inquirySentResponseSchema,
-  description: 'Sends a draft inquiry to the target.',
+  description: 'Sends a draft or changes-requested inquiry to the target; no-op if already sent.',
   middleware: [validatePermission('send')],
 });

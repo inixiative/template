@@ -121,7 +121,13 @@ describe('makeAppEvent', () => {
       const handler = makeAppEvent({
         websocket: (data) => {
           received = data;
-          return [{ target: { userIds: ['user-1'] }, message: { data: { test: true } } }];
+          return [
+            {
+              kind: 'users',
+              target: { userIds: ['user-1'] },
+              message: { data: { category: 'query', action: 'refetch', key: { _id: 'test' } } },
+            },
+          ];
         },
       });
 

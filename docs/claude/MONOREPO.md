@@ -201,7 +201,7 @@ import { log } from '@template/shared/logger';
 import { setupOrgContext } from '@template/permissions';
 
 // Within a shared package - ALSO use @template/
-// packages/db/src/extensions/mutationLifeCycle.ts
+// packages/db/src/extensions/mutationLifeCycle/mutationLifeCycleExtension.ts
 import { log } from '@template/shared/logger';  // Not '../../../shared/...'
 ```
 

@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it, spyOn } from 'bun:test';
+import { afterAll, afterEach, beforeAll, describe, expect, it, type Mock, spyOn } from 'bun:test';
 import { clearHookRegistry, db } from '@template/db';
 import { IntegrationOwnerModel, WebhookModel } from '@template/db/generated/client/enums';
 import { auditActorContext, nullAuditActor } from '@template/db/lib/auditActorContext';
@@ -16,7 +16,7 @@ afterAll(async () => {
 describe('webhook hook', () => {
   describe('with enabled models', () => {
     let userId: string;
-    let enqueueSpy: ReturnType<typeof spyOn>;
+    let enqueueSpy: Mock<typeof enqueueModule.enqueueJob>;
 
     beforeAll(async () => {
       const { entity: user, context } = await createUser();
@@ -132,7 +132,7 @@ describe('webhook hook', () => {
 });
 
 describe('webhook hook — origin suppression', () => {
-  let enqueueSpy: ReturnType<typeof spyOn>;
+  let enqueueSpy: Mock<typeof enqueueModule.enqueueJob>;
   let writeUserId: string;
   let sfIntegrationId: string;
   let sfSub: { id: string };

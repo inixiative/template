@@ -4,7 +4,7 @@
  * @partOf primitive:requestContext
  * @uses infrastructure:prisma, primitive:shared, primitive:errors
  */
-import { type AccessorName, type Db, toModelName } from '@template/db';
+import { type AccessorName, type Db, isAccessorName, toModelName } from '@template/db';
 import { isUuidV7 } from '@template/shared/utils';
 import type { MiddlewareHandler } from 'hono';
 import { isSuperadmin } from '#/lib/context/isSuperadmin';
@@ -32,9 +32,9 @@ export const resourceContextMiddleware = (): MiddlewareHandler => async (c, next
 
   // Get accessor from route path (e.g., /api/v1/organization/:id → 'organization')
   const pathParts = c.req.path.split('/');
-  const accessor = pathParts[3] as AccessorName | undefined;
-  const modelName = accessor ? toModelName(accessor) : undefined;
-  if (!accessor || !modelName) return next();
+  const accessor = pathParts[3];
+  if (!accessor || !isAccessorName(accessor)) return next();
+  const modelName = toModelName(accessor);
 
   // Soft-deleted rows are invisible outside superadmin — enforced once here for
   // every resource route instead of per-controller deletedAt checks. Revival

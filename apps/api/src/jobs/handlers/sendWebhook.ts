@@ -5,9 +5,12 @@
  * @uses infrastructure:prisma, feature:webhooks
  */
 import crypto from 'node:crypto';
+import type { Db, Prisma } from '@template/db';
 import type { WebhookEvent, WebhookEventAction, WebhookEventStatus } from '@template/db/generated/client/client';
 import { log } from '@template/shared/logger';
 import type { JobHandler } from '#/jobs/types';
+import { isIntegrationRecordPoisoned } from '#/modules/integration/services/isIntegrationRecordPoisoned';
+import { poisonIntegrationRecord } from '#/modules/integration/services/poisonIntegrationRecord';
 
 export type SendWebhookPayload = {
   subscriptionId: string;
@@ -27,6 +30,18 @@ export const sendWebhook: JobHandler<SendWebhookPayload> = async (ctx, payload) 
     return;
   }
 
+  if (
+    subscription.integrationId &&
+    (await isIntegrationRecordPoisoned({
+      integrationId: subscription.integrationId,
+      model: subscription.model,
+      resourceId,
+    }))
+  ) {
+    log.info(`Webhook record ${resourceId} is poisoned for integration ${subscription.integrationId} - skipping`);
+    return;
+  }
+
   // timestamp (event time, carried from the hook) is inside the signed body so receivers can reject replays
   const body = { model: subscription.model, action, payload: data, timestamp };
   const bodyJson = JSON.stringify(body);
@@ -39,6 +54,7 @@ export const sendWebhook: JobHandler<SendWebhookPayload> = async (ctx, payload) 
 
   let status: WebhookEventStatus = 'success';
   let error: string | undefined;
+  let httpStatus: number | undefined;
 
   try {
     const response = await fetch(subscription.url, {
@@ -51,6 +67,7 @@ export const sendWebhook: JobHandler<SendWebhookPayload> = async (ctx, payload) 
       redirect: 'manual',
       signal: AbortSignal.timeout(5000),
     });
+    httpStatus = response.status;
 
     if (response.type === 'opaqueredirect' || (response.status >= 300 && response.status < 400)) {
       error = `Blocked redirect from webhook URL (HTTP ${response.status})`;
@@ -65,7 +82,15 @@ export const sendWebhook: JobHandler<SendWebhookPayload> = async (ctx, payload) 
   }
 
   await db.webhookEvent.create({
-    data: { status, action, resourceId, error, payload: data as object, webhookSubscriptionId: subscriptionId },
+    data: {
+      status,
+      action,
+      resourceId,
+      error,
+      httpStatus,
+      payload: data as object,
+      webhookSubscriptionId: subscriptionId,
+    },
   });
 
   if (status === 'success') {
@@ -74,6 +99,20 @@ export const sendWebhook: JobHandler<SendWebhookPayload> = async (ctx, payload) 
   }
 
   log.info(`Webhook delivery failed: ${error}`);
+
+  if (
+    subscription.integrationId &&
+    isRecordRejection({ status, httpStatus }) &&
+    (await isRecordRejected(db, subscriptionId, resourceId))
+  ) {
+    await poisonIntegrationRecord({
+      integrationId: subscription.integrationId,
+      model: subscription.model,
+      resourceId,
+      reason: error ?? 'rejected by the integration',
+    });
+    log.info(`Webhook record ${resourceId} poisoned for integration ${subscription.integrationId}`);
+  }
 
   // Circuit breaker: disable subscription if last N deliveries all failed
   const FAILURE_THRESHOLD = 5;
@@ -91,4 +130,47 @@ export const sendWebhook: JobHandler<SendWebhookPayload> = async (ctx, payload) 
     await db.webhookSubscription.update({ where: { id: subscriptionId }, data: { isActive: false } });
     log.info(`Webhook subscription ${subscriptionId} disabled after ${FAILURE_THRESHOLD} consecutive failures`);
   }
+};
+
+const RECORD_FAILURE_THRESHOLD = 3;
+
+// Only a refusal of the record's content counts; redirects, auth, conflicts and rate limits say nothing about the record.
+const RECORD_REJECTION = { status: 'error', httpStatus: { in: [400, 422] } } satisfies Prisma.WebhookEventWhereInput;
+
+const isRecordRejection = (event: { status: WebhookEventStatus; httpStatus?: number }): boolean =>
+  event.status === RECORD_REJECTION.status &&
+  event.httpStatus != null &&
+  RECORD_REJECTION.httpStatus.in.includes(event.httpStatus);
+
+// Ordered by id, not createdAt: ids are uuidv7, so events in the same millisecond still order exactly.
+const isRecordRejected = async (db: Db, subscriptionId: string, resourceId: string): Promise<boolean> => {
+  const lastSuccess = await db.webhookEvent.findFirst({
+    where: { webhookSubscriptionId: subscriptionId, resourceId, status: 'success' },
+    orderBy: { id: 'desc' },
+    select: { id: true },
+  });
+  const rejections = await db.webhookEvent.findMany({
+    where: {
+      webhookSubscriptionId: subscriptionId,
+      resourceId,
+      ...RECORD_REJECTION,
+      ...(lastSuccess ? { id: { gt: lastSuccess.id } } : {}),
+    },
+    orderBy: { id: 'asc' },
+    take: RECORD_FAILURE_THRESHOLD,
+    select: { id: true },
+  });
+  const [firstRejection] = rejections;
+  if (!firstRejection || rejections.length < RECORD_FAILURE_THRESHOLD) return false;
+
+  const otherDelivered = await db.webhookEvent.findFirst({
+    where: {
+      webhookSubscriptionId: subscriptionId,
+      resourceId: { not: resourceId },
+      status: 'success',
+      id: { gt: firstRejection.id },
+    },
+    select: { id: true },
+  });
+  return otherDelivered != null;
 };

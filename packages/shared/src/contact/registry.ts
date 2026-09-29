@@ -31,8 +31,7 @@ import {
   youtubeDef,
 } from '@template/shared/contact/defs';
 
-// biome-ignore lint/suspicious/noExplicitAny: per-type generics are heterogeneous; consumers narrow via ContactType.
-export const ContactRegistry: Record<ContactType, ContactTypeDef<any, any>> = {
+const contactDefs = {
   phone: phoneDef,
   email: emailDef,
   website: websiteDef,
@@ -56,3 +55,9 @@ export const ContactRegistry: Record<ContactType, ContactTypeDef<any, any>> = {
   viber: viberDef,
   skype: skypeDef,
 };
+
+type ContactDefs = typeof contactDefs;
+export type ContactInput<K extends ContactType> = Parameters<ContactDefs[K]['parseInput']>[0];
+export type ContactValue<K extends ContactType> = ReturnType<ContactDefs[K]['parseInput']>;
+
+export const ContactRegistry: { [K in ContactType]: ContactTypeDef<ContactInput<K>, ContactValue<K>> } = contactDefs;

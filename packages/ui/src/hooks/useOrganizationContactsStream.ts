@@ -2,11 +2,14 @@
  * @atlas
  * @kind hook
  * @partOf primitive:ui, primitive:websockets
- * @uses primitive:sdk
+ * @uses primitive:shared, primitive:sdk
  */
 import type { OrganizationReadManyContactsResponse } from '@template/sdk';
-import { WS_CHANNELS } from '@template/shared/ws';
-import { useDataStream } from '@template/ui/hooks/useDataStream';
+import { STREAM_DEFINITIONS } from '@template/shared/ws';
+import { useStream } from '@template/ui/hooks/useStream';
+import type { ListStreamState } from '@template/ui/lib/ws/listStream';
+
+export type OrganizationContactsStream = ListStreamState<OrganizationReadManyContactsResponse['data'][number]>;
 
 export const useOrganizationContactsStream = (organizationId: string) =>
-  useDataStream<OrganizationReadManyContactsResponse>(WS_CHANNELS.organizationReadManyContacts.name(organizationId));
+  useStream<OrganizationContactsStream>(STREAM_DEFINITIONS.organizationReadManyContacts.name({ id: organizationId }));

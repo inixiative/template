@@ -4,32 +4,27 @@
  * @partOf superadmin
  * @uses primitive:ui
  */
-import { createRootRoute, Outlet, useNavigate } from '@tanstack/react-router';
+import { createRootRoute, Outlet } from '@tanstack/react-router';
 import { RootNotFound, RouteError, Toaster } from '@template/ui/components';
-import { useApiWebsocket, useDarkMode, useLanguage, usePageMeta, useThemePersistence } from '@template/ui/hooks';
+import {
+  useApiWebsocket,
+  useDarkMode,
+  useLanguage,
+  usePageMeta,
+  useRegisterNavigation,
+  useThemePersistence,
+} from '@template/ui/hooks';
 import { useAppStore } from '@template/ui/store';
-import { useLayoutEffect } from 'react';
 import { navConfig } from '#/config/nav';
 
 const RootComponent = () => {
-  const navigate = useNavigate();
   const theme = useAppStore((state) => state.ui.theme);
-  const setNavigate = useAppStore((state) => state.navigation.setNavigate);
-  const setNavConfig = useAppStore((state) => state.navigation.setNavConfig);
 
-  // Initialize navigation in store synchronously before paint
-  // navigate, setNavigate, setNavConfig are all stable refs
-  useLayoutEffect(() => {
-    setNavigate(navigate);
-    setNavConfig(navConfig);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [navigate, setNavConfig, setNavigate]);
-
+  useRegisterNavigation(navConfig);
   usePageMeta();
   useLanguage();
   useThemePersistence();
   useApiWebsocket();
-
   useDarkMode(theme);
 
   return (

@@ -19,5 +19,5 @@
     }
   },
   "include": ["src/**/*", "tests/**/*", "../../packages/db/src/types/**/*"],
-  "exclude": ["node_modules", "dist", "**/*.test.ts"]
+  "exclude": ["node_modules", "dist"]
 }

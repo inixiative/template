@@ -7,7 +7,14 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { log, withLogContext } from '@template/shared/logger';
 import { observeLogRecords } from '@template/shared/logger/records';
-import { captureTraceContext, recordDuration, SpanKind, withRemoteTrace, withSpan } from '@template/shared/telemetry';
+import {
+  captureTraceContext,
+  incrementCounter,
+  recordDuration,
+  SpanKind,
+  withRemoteTrace,
+  withSpan,
+} from '@template/shared/telemetry';
 import { parseOtlpHeaders, readTelemetryConfig, signalExportOptions } from '@template/shared/telemetry/config';
 import { createFetchExporter } from '@template/shared/telemetry/fetchExporter';
 import { initializeTelemetry } from '@template/shared/telemetry/initialize';
@@ -80,6 +87,32 @@ describe('OTLP pipeline', () => {
     const point = metric?.histogram?.dataPoints[0];
     expect(point?.count).toBe(3);
     expect(point?.bucketCounts.filter((count) => count > 0)).toEqual([1, 1, 1]);
+  });
+
+  it('exports counters as monotonic sums of every increment', async () => {
+    const name = 'test.counter.bytes';
+    for (const value of [1, 2, 3]) incrementCounter(name, value, { domain: 'user' }, 'By');
+    await sdk.forceFlush();
+    type ExportedMetrics = {
+      resourceMetrics?: {
+        scopeMetrics: {
+          metrics: {
+            name: string;
+            unit: string;
+            sum?: { isMonotonic: boolean; dataPoints: { asInt?: number | string; asDouble?: number }[] };
+          }[];
+        }[];
+      }[];
+    };
+    const metric = batches
+      .flatMap((batch) => (batch.body as ExportedMetrics).resourceMetrics ?? [])
+      .flatMap((resource) => resource.scopeMetrics)
+      .flatMap((scope) => scope.metrics)
+      .find((metric) => metric.name === name);
+    expect(metric?.unit).toBe('By');
+    expect(metric?.sum?.isMonotonic).toBe(true);
+    const point = metric?.sum?.dataPoints[0];
+    expect(Number(point?.asInt ?? point?.asDouble)).toBe(6);
   });
 
   it('exports correlated structured logs, traces and metrics to separate destinations', async () => {

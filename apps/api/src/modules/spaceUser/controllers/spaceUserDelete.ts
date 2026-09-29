@@ -15,7 +15,7 @@ export const spaceUserDeleteController = makeController(spaceUserDeleteRoute, as
   const spaceUser = getResource<'spaceUser'>(c);
   const permix = c.get('permix');
 
-  const hydrated = await hydrate(db, 'spaceUser', spaceUser);
+  const hydrated = await hydrate('spaceUser', spaceUser);
   const space = hydrated.space as HydratedRecord;
 
   const canLeave = check(permix, rebacSchema, 'spaceUser', spaceUser, 'leave');
