@@ -11,6 +11,7 @@ import { triggerCronJob } from '#/modules/admin/cronJob/services/triggerCronJob'
 
 export const cronJobTriggerController = makeController(cronJobTriggerRoute, async (c, respond) => {
   const cronJob = getResource<'cronJob'>(c);
-  await triggerCronJob(cronJob);
+  const { lane } = c.req.valid('json');
+  await triggerCronJob(cronJob, lane);
   return respond.noContent();
 });

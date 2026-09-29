@@ -4,6 +4,7 @@ import { cleanupTouchedTables, createContact, createUser } from '@template/db/te
 import { messageContact } from '#/jobs/handlers/messageContact';
 import { type MessageContent, type MessageDispatchOptions, messageProviderRegistry } from '#/lib/messaging/providers';
 import { createTestApp } from '#tests/createTestApp';
+import { createTestWorker } from '#tests/createTestWorker';
 
 type DispatchedCall = {
   contactId: string;
@@ -15,7 +16,7 @@ type DispatchedCall = {
 describe('messageContact handler', () => {
   let testDb: ReturnType<typeof createTestApp>['db'];
   const dispatched: DispatchedCall[] = [];
-  const mockLog = () => {};
+  const worker = createTestWorker();
 
   beforeAll(() => {
     const harness = createTestApp({});
@@ -48,10 +49,7 @@ describe('messageContact handler', () => {
       { user },
     );
 
-    await messageContact(
-      { db: testDb, log: mockLog },
-      { contactId: contact.id, kind: 'platform', content: { text: 'hi' } },
-    );
+    await messageContact(worker, { contactId: contact.id, kind: 'platform', content: { text: 'hi' } });
 
     expect(dispatched).toHaveLength(1);
     expect(dispatched[0].contactId).toBe(contact.id);
@@ -65,10 +63,7 @@ describe('messageContact handler', () => {
       { user },
     );
 
-    await messageContact(
-      { db: testDb, log: mockLog },
-      { contactId: contact.id, kind: 'marketing', content: { text: 'promo' } },
-    );
+    await messageContact(worker, { contactId: contact.id, kind: 'marketing', content: { text: 'promo' } });
 
     expect(dispatched).toHaveLength(0);
   });
@@ -80,10 +75,7 @@ describe('messageContact handler', () => {
       { user },
     );
 
-    await messageContact(
-      { db: testDb, log: mockLog },
-      { contactId: contact.id, kind: 'system', content: { text: 'ack' } },
-    );
+    await messageContact(worker, { contactId: contact.id, kind: 'system', content: { text: 'ack' } });
 
     expect(dispatched).toHaveLength(1);
   });
@@ -95,15 +87,12 @@ describe('messageContact handler', () => {
       { user },
     );
 
-    await messageContact(
-      { db: testDb, log: mockLog },
-      {
-        contactId: contact.id,
-        kind: 'platform',
-        content: { text: 'thread reply' },
-        replyTo: { chatMessageId: 'msg-123' },
-      },
-    );
+    await messageContact(worker, {
+      contactId: contact.id,
+      kind: 'platform',
+      content: { text: 'thread reply' },
+      replyTo: { chatMessageId: 'msg-123' },
+    });
 
     expect(dispatched[0].options.replyTo).toEqual({ chatMessageId: 'msg-123' });
   });
@@ -116,19 +105,17 @@ describe('messageContact handler', () => {
     );
 
     expect(
-      messageContact(
-        { db: testDb, log: mockLog },
-        { contactId: contact.id, kind: 'platform', content: { text: 'hi' } },
-      ),
+      messageContact(worker, { contactId: contact.id, kind: 'platform', content: { text: 'hi' } }),
     ).rejects.toThrow(/No message provider adapter for contact.type=signal/);
   });
 
   it('throws when contact does not exist', async () => {
     expect(
-      messageContact(
-        { db: testDb, log: mockLog },
-        { contactId: '00000000-0000-0000-0000-000000000000', kind: 'platform', content: { text: 'hi' } },
-      ),
+      messageContact(worker, {
+        contactId: '00000000-0000-0000-0000-000000000000',
+        kind: 'platform',
+        content: { text: 'hi' },
+      }),
     ).rejects.toThrow();
   });
 });

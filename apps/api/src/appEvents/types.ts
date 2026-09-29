@@ -4,6 +4,9 @@
  * @partOf primitive:appEvents
  * @uses feature:email, primitive:shared
  */
+import type { WSQueryEvent } from '@template/shared/ws';
+import type { ValidatedStreamAppend } from '#/appEvents/validatedStreamAppend';
+
 export type AppEventActor = {
   actorUserId: string | null;
   actorSpoofUserId: string | null;
@@ -27,15 +30,25 @@ export type EmailHandoff = {
   data: Record<string, unknown>;
 };
 
-// Generic websocket envelope: target a set of channels OR a set of users, with an
-// arbitrary message payload. A declarative query-refetch (WSEvent) is just one kind
-// of `message.data` — the producer computes the channel(s) (e.g. channelKey(queryKey))
-// and wraps the event. Broader than refetch-only: also serves user-targeted pushes,
-// presence, toasts, etc.
-export type WSHandoff = {
-  target: { channels: string[] } | { userIds: string[] };
-  message: { data: Record<string, unknown> };
+export type WSChannelsHandoff = {
+  kind: 'channels';
+  target: { channels: string[] };
+  message: { data: WSQueryEvent };
 };
+
+export type WSUsersHandoff = {
+  kind: 'users';
+  target: { userIds: string[] };
+  message: { data: WSQueryEvent };
+};
+
+export type WSStreamAppendHandoff = {
+  kind: 'stream';
+  target: { stream: string; userIds?: string[] };
+  append: ValidatedStreamAppend;
+};
+
+export type WSHandoff = WSChannelsHandoff | WSUsersHandoff | WSStreamAppendHandoff;
 
 export type ObserveAdapter = {
   record: (event: AppEventPayload) => Promise<void>;

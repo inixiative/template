@@ -5,7 +5,6 @@
  * @uses primitive:shared
  */
 import { db } from '@template/db/client';
-import type { ModelName } from '@template/db/utils/modelNames';
 import { type RuleReference, referenceKey } from '@template/shared/rules';
 import { groupBy, map } from 'lodash-es';
 
@@ -17,7 +16,7 @@ import { groupBy, map } from 'lodash-es';
 export const lockedLiveReferences = async (references: RuleReference[]): Promise<Set<string>> => {
   const live = new Set<string>();
   for (const [model, group] of Object.entries(groupBy(references, 'model'))) {
-    const rows = await db.findForUpdate<{ id: string; deletedAt: Date | null }>(model as ModelName, {
+    const rows = await db.findForUpdate<{ id: string; deletedAt: Date | null }>(model, {
       id: { in: [...new Set(map(group, 'id'))] },
     });
     for (const row of rows) if (row.deletedAt == null) live.add(referenceKey({ model, id: row.id }));

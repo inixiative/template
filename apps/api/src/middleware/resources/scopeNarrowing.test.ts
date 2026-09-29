@@ -33,8 +33,9 @@ const runMiddlewares = async (
     c.set('filterLens', inquiryNarrowing());
     await next();
   });
-  app.get(path, ...middlewares, (c) => {
-    captured = c.get('filterLens');
+  app.use(path, ...middlewares);
+  app.get(path, (c) => {
+    captured = c.get('filterLens') ?? undefined;
     return c.json({ ok: true });
   });
   await app.fetch(new Request(`http://test${path}`));

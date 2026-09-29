@@ -20,6 +20,7 @@ export const customerRefSegmentsAdded = makeAppEvent<CustomerRefSegmentsAddedPay
     data.customerModel === 'User'
       ? [
           {
+            kind: 'users',
             target: { userIds: [data.customerId] },
             message: { data: refetch({ _id: 'meReadManySegmentMemberships' }) },
           },

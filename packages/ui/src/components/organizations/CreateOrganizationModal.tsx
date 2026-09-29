@@ -91,9 +91,9 @@ export const CreateOrganizationModal = memo(
               {slug && (
                 <div className="absolute right-3 top-1/2 -translate-y-1/2">
                   {isChecking ? (
-                    <Icon icon="lucide:loader2" className="h-4 w-4 animate-spin text-muted-foreground" />
+                    <Icon icon="lucide:loader-2" className="h-4 w-4 animate-spin text-muted-foreground" />
                   ) : isAvailable ? (
-                    <Icon icon="lucide:check-circle2" className="h-4 w-4 text-green-600" />
+                    <Icon icon="lucide:circle-check" className="h-4 w-4 text-green-600" />
                   ) : (
                     <Icon icon="lucide:alert-circle" className="h-4 w-4 text-destructive" />
                   )}

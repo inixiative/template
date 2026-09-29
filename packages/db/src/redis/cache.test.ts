@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { cache, cacheKey, clearKey, upsertCache } from '@template/db/redis/cache';
 import { getRedisClient } from '@template/db/redis/client';
+import { log } from '@template/shared/logger';
+import { type LogRecord, observeLogRecords } from '@template/shared/logger/records';
 
 beforeEach(async () => {
   await getRedisClient().flushall();
@@ -282,5 +284,41 @@ describe('upsertCache', () => {
     expect(await cache(key, async () => ({ v: 9 }))).toEqual({ v: 1 });
     expect(await upsertCache(key, { v: 3 }, { force: true })).toBe(true);
     expect(await cache(key, async () => ({ v: 9 }))).toEqual({ v: 3 });
+  });
+});
+
+describe('large cache writes', () => {
+  const largeWrites = async (write: () => Promise<unknown>): Promise<LogRecord[]> => {
+    const records: LogRecord[] = [];
+    const previousLevel = log.level;
+    log.level = 'warn';
+    const stop = observeLogRecords((record) => records.push(record));
+    try {
+      await write();
+    } finally {
+      stop();
+      log.level = previousLevel;
+    }
+    return records.filter((record) => record.fields.event === 'cache.large_write');
+  };
+
+  it('reports a value over 256KB with its key, domain and ttl, and still writes it', async () => {
+    const key = cacheKey('user', 'large');
+    const value = 'x'.repeat(300 * 1024);
+    const [record, ...rest] = await largeWrites(() => cache(key, async () => value, 120));
+    expect(rest).toHaveLength(0);
+    expect(record?.fields).toMatchObject({ cacheKey: key, domain: 'user', ttlSeconds: 120, writer: 'cache' });
+    expect(record?.fields.bytes as number).toBeGreaterThan(256 * 1024);
+    expect(await getRedisClient().exists(key)).toBe(1);
+  });
+
+  it('reports upsertCache writes too', async () => {
+    const key = cacheKey('user', 'large-upsert');
+    const [record] = await largeWrites(() => upsertCache(key, 'x'.repeat(300 * 1024)));
+    expect(record?.fields).toMatchObject({ cacheKey: key, writer: 'upsertCache' });
+  });
+
+  it('says nothing about a small value', async () => {
+    expect(await largeWrites(() => cache(cacheKey('user', 'small'), async () => ({ n: 1 })))).toHaveLength(0);
   });
 });

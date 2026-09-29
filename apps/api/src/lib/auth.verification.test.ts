@@ -66,5 +66,5 @@ test('signup delivers a verification email through app events and keeps the acco
 
   const signIn = await auth.api.signInEmail({ body: { email, password }, asResponse: true });
   expect(signIn.status).toBe(403);
-  expect((await signIn.json()).code).toBe('EMAIL_NOT_VERIFIED');
+  expect(((await signIn.json()) as { code: string }).code).toBe('EMAIL_NOT_VERIFIED');
 });

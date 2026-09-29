@@ -25,14 +25,14 @@ export const EmptyState = ({ icon, title, description, action, className, show =
   if (!shouldShow) return null;
 
   return (
-    <div className={cn('flex flex-col items-center justify-center py-12 px-4 text-center', className)}>
+    <div className={cn('flex flex-col items-center justify-center px-6 py-14 text-center', className)}>
       {icon && (
-        <div className="rounded-full bg-muted p-3 mb-4">
-          <Icon icon={icon} className="h-6 w-6 text-muted-foreground" />
+        <div className="mb-4 rounded-xl bg-background p-3 shadow-sm ring-1 ring-border">
+          <Icon icon={icon} className="h-6 w-6 text-primary" />
         </div>
       )}
-      <h3 className="text-lg font-semibold mb-1">{title}</h3>
-      {description && <p className="text-sm text-muted-foreground mb-4 max-w-sm">{description}</p>}
+      <h3 className="mb-1 text-base font-semibold">{title}</h3>
+      {description && <p className="mb-5 max-w-sm text-sm text-muted-foreground">{description}</p>}
       {action && (
         <Button onClick={action.onClick} size="sm">
           {action.label}

@@ -1,7 +1,7 @@
 /**
  * @atlas
  * @kind constructor
- * @partOf infrastructure:prisma, infrastructure:redis
+ * @partOf infrastructure:prisma, infrastructure:redis, mutex
  * @uses none
  */
 // Single-node Redis lock. Footguns:

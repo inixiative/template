@@ -4,7 +4,7 @@
  * @partOf feature:tenancy
  * @uses primitive:authz, primitive:routeTemplates, feature:auth
  */
-import { db, hydrate } from '@template/db';
+import { hydrate } from '@template/db';
 import { check, rebacSchema } from '@template/permissions/rebac';
 import { getResource } from '#/lib/context/getResource';
 import { makeError } from '#/lib/errors';
@@ -17,7 +17,7 @@ export const spaceCreateTokenController = makeController(spaceCreateTokenRoute, 
   const space = getResource<'space'>(c);
   const body = c.req.valid('json');
 
-  const hydrated = await hydrate(db, 'space', space);
+  const hydrated = await hydrate('space', space);
 
   if (!check(permix, rebacSchema, 'space', { ...hydrated, role: body.role }, 'assign')) {
     throw makeError({ status: 403, message: `Cannot create ${body.role} token` });

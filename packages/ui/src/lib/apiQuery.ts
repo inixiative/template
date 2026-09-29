@@ -5,7 +5,7 @@
  * @uses none
  */
 import type { QueryFunctionContext } from '@tanstack/react-query';
-import { apiFetchInternal } from '@template/ui/lib/apiFetchInternal';
+import { apiFetchInternal, type RequestOptionsFor } from '@template/ui/lib/apiFetchInternal';
 import type { SdkFunction } from '@template/ui/lib/sdkTypes';
 import { useAppStore } from '@template/ui/store';
 
@@ -14,7 +14,7 @@ export const apiQuery = <TFn extends SdkFunction>(fn: TFn) => {
     const { auth } = useAppStore.getState();
 
     return apiFetchInternal<Awaited<ReturnType<TFn>>, Parameters<TFn>[0]>(
-      fn as (opts: Parameters<TFn>[0]) => Promise<Awaited<ReturnType<TFn>>>,
+      fn as (opts: RequestOptionsFor<Parameters<TFn>[0]>) => Promise<Awaited<ReturnType<TFn>>>,
       {
         spoofUserEmail: auth.spoofUserEmail,
       },

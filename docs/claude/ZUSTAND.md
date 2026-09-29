@@ -577,6 +577,7 @@ const queryClient = useQueryClient();
   isInitialized: boolean;
   appName: string;        // From VITE_APP_NAME
   shortName: string;      // From VITE_APP_SHORT_NAME
+  logo: string;           // From VITE_APP_LOGO_URL (optional; shown next to shortName in the shell)
   description: string;    // From VITE_APP_DESCRIPTION
 }
 ```

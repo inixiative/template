@@ -7,10 +7,11 @@
 import { setToken } from '@template/ui/lib/auth/token';
 import type { AuthMethod, EmailAuthMethod, OAuthAuthMethod, SamlAuthMethod } from '@template/ui/lib/auth/types';
 import { createAuthClient } from 'better-auth/client';
+import { oneTimeTokenClient } from 'better-auth/client/plugins';
 
 const getAuthClient = () => {
   const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-  return createAuthClient({ baseURL });
+  return createAuthClient({ baseURL, plugins: [oneTimeTokenClient()] });
 };
 
 const signInWithEmail = async (method: EmailAuthMethod): Promise<void> => {
@@ -22,7 +23,7 @@ const signInWithEmail = async (method: EmailAuthMethod): Promise<void> => {
   });
 
   if (error) {
-    throw new Error(error.message || 'Sign in failed');
+    throw new Error(error.message || error.statusText);
   }
 
   if (!data?.token) {
@@ -41,7 +42,20 @@ const signInWithOAuth = async (method: OAuthAuthMethod): Promise<void> => {
   await client.signIn.social({
     provider: method.provider,
     callbackURL,
+    errorCallbackURL: `${window.location.origin}/login`,
   });
+};
+
+export const completeOAuthSignIn = async (oneTimeToken: string): Promise<void> => {
+  const client = getAuthClient();
+
+  const { data, error } = await client.oneTimeToken.verify({ token: oneTimeToken });
+
+  if (error) {
+    throw new Error(error.message || error.statusText);
+  }
+
+  setToken(data.session.token, new Date(data.session.expiresAt));
 };
 
 const signInWithSaml = async (_method: SamlAuthMethod): Promise<void> => {

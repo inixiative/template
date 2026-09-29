@@ -30,6 +30,7 @@ model Integration {
   appEvents            AppEvent[]
   auditLogsAsOrigin    AuditLog[]            @relation("AuditLogOriginIntegration")
   auditLogsAsSubject   AuditLog[]            @relation("AuditLogSubjectIntegration")
+  integrationRecords   IntegrationRecord[]
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below

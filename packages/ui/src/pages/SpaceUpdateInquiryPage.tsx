@@ -6,7 +6,7 @@
  */
 import type { HydratedRecord } from '@template/db';
 import { spaceCreateInquiry, spaceSentManyInquiries, spaceSentManyInquiriesQueryKey } from '@template/sdk';
-import { Badge, Button, Card, CardContent, CardHeader, CardTitle } from '@template/ui/components';
+import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Page } from '@template/ui/components';
 import { InquirySourceControls } from '@template/ui/components/inquiries';
 import { useCreateInquiryMutation, useQuery } from '@template/ui/hooks';
 import { checkPermission } from '@template/ui/hooks/usePermission';
@@ -83,18 +83,19 @@ export const SpaceUpdateInquiryPage = () => {
     setSlug('');
   };
 
-  if (isLoading) {
-    return <div className="p-8">Loading...</div>;
-  }
-
   const activeContent = activeInquiry?.content as { name?: string; slug?: string } | null | undefined;
 
   return (
-    <div className="p-8 space-y-6">
-      {activeInquiry ? (
+    <Page
+      title="Update space"
+      description="Request a new name or slug for this space. Changes take effect once a platform admin approves them."
+    >
+      {isLoading ? (
+        <div className="h-40 animate-pulse rounded-xl bg-muted/50" />
+      ) : activeInquiry ? (
         <Card>
           <CardHeader>
-            <CardTitle>Update Request In Progress</CardTitle>
+            <CardTitle>Update request in progress</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center gap-3">
@@ -105,13 +106,13 @@ export const SpaceUpdateInquiryPage = () => {
             </div>
             {activeContent?.name && (
               <div>
-                <p className="text-sm text-muted-foreground">Proposed Name</p>
+                <p className="text-sm text-muted-foreground">Proposed name</p>
                 <p className="text-sm font-medium">{activeContent.name}</p>
               </div>
             )}
             {activeContent?.slug && (
               <div>
-                <p className="text-sm text-muted-foreground">Proposed Slug</p>
+                <p className="text-sm text-muted-foreground">Proposed slug</p>
                 <p className="text-sm font-medium">{activeContent.slug}</p>
               </div>
             )}
@@ -121,12 +122,12 @@ export const SpaceUpdateInquiryPage = () => {
       ) : (
         <Card>
           <CardHeader>
-            <CardTitle>Request Space Update</CardTitle>
+            <CardTitle>New update request</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <label className="text-sm font-medium" htmlFor="update-name">
-                New Name
+                New name
               </label>
               <input
                 id="update-name"
@@ -139,7 +140,7 @@ export const SpaceUpdateInquiryPage = () => {
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium" htmlFor="update-slug">
-                New Slug
+                New slug
               </label>
               <input
                 id="update-slug"
@@ -155,11 +156,11 @@ export const SpaceUpdateInquiryPage = () => {
               onClick={handleSubmit}
               disabled={createMutation.isPending || (!name.trim() && !slug.trim())}
             >
-              Submit Request
+              Submit request
             </Button>
           </CardContent>
         </Card>
       )}
-    </div>
+    </Page>
   );
 };

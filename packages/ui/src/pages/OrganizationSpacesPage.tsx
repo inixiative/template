@@ -9,7 +9,7 @@ import {
   organizationReadManySpaces,
   organizationReadManySpacesQueryKey,
 } from '@template/sdk';
-import { Card, CardContent, CardHeader, CardTitle, Table } from '@template/ui/components';
+import { Page, Table } from '@template/ui/components';
 import { useQuery } from '@template/ui/hooks';
 import { apiQuery } from '@template/ui/lib/apiQuery';
 import { useAppStore } from '@template/ui/store';
@@ -36,6 +36,7 @@ export const OrganizationSpacesPage = ({ organizationId }: OrganizationSpacesPag
     {
       key: 'name',
       label: 'Space',
+      render: (space: Space) => <span className="font-medium">{space.name}</span>,
     },
     {
       key: 'role',
@@ -52,27 +53,23 @@ export const OrganizationSpacesPage = ({ organizationId }: OrganizationSpacesPag
     },
   ];
 
-  if (isLoading) {
-    return <div className="p-8">Loading...</div>;
-  }
-
   return (
-    <div className="p-8 space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Spaces</CardTitle>
-          <p className="text-sm text-muted-foreground mt-1">Spaces within this organization</p>
-        </CardHeader>
-        <CardContent>
-          <Table
-            columns={columns}
-            data={spaces}
-            keyExtractor={(space) => space.id}
-            onRowClick={(space: Space) => tenant.setSpace(space.id)}
-            emptyMessage="No spaces in this organization yet"
-          />
-        </CardContent>
-      </Card>
-    </div>
+    <Page title="Spaces" description="Spaces within this organization. Open one to work in its context.">
+      {isLoading ? (
+        <div className="h-40 animate-pulse rounded-xl bg-muted/50" />
+      ) : (
+        <Table
+          columns={columns}
+          data={spaces}
+          keyExtractor={(space) => space.id}
+          onRowClick={(space: Space) => tenant.setSpace(space.id)}
+          emptyMessage="No spaces in this organization yet"
+          empty={{
+            icon: 'lucide:layout-grid',
+            description: 'Spaces created in this organization will appear here.',
+          }}
+        />
+      )}
+    </Page>
   );
 };

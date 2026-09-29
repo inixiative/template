@@ -102,6 +102,16 @@ describe('websocketHandler', () => {
     expect(lastFrame(sent)).toEqual({ type: 'pong' });
   });
 
+  it('answers ping even while the connection queue is blocked', async () => {
+    const { socket, sent } = createTestSocket({ connectionId: 'c1' });
+    websocketHandler.open(socket);
+    void socket.data.queue.run(() => new Promise<void>(() => {}));
+
+    await websocketHandler.message(socket, JSON.stringify({ action: 'ping' }));
+
+    expect(lastFrame(sent)).toEqual({ type: 'pong' });
+  });
+
   it('authenticate resolves identity as provenance of the credential (/me)', async () => {
     const { entity: user } = await createUser();
     const { authorization } = await createBearerToken(user);

@@ -57,8 +57,11 @@ describe('space/webhookSubscriptions', () => {
   });
 
   beforeEach(() => {
-    spyOn(globalThis, 'fetch').mockImplementation((() =>
-      Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 200 }))) as typeof fetch);
+    spyOn(globalThis, 'fetch').mockImplementation(
+      Object.assign(() => Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 200 })), {
+        preconnect: globalThis.fetch.preconnect,
+      }),
+    );
   });
 
   afterEach(() => {

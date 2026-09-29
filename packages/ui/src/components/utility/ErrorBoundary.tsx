@@ -7,6 +7,7 @@
 import { Icon } from '@iconify/react';
 import { Card, CardContent, CardHeader, CardTitle } from '@template/ui/components/primitives/Card';
 import { reportBrowserError } from '@template/ui/lib/browserTelemetry';
+import { describeError } from '@template/ui/lib/describeError';
 import { Component, type ReactNode } from 'react';
 
 type ErrorBoundaryProps = {
@@ -38,19 +39,6 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     return this.props.children;
   }
 }
-
-const describeError = (error: unknown): { message: string; detail?: string } => {
-  if (error instanceof Error) return { message: error.message, detail: error.stack };
-  if (error && typeof error === 'object') {
-    const obj = error as Record<string, unknown>;
-    const message =
-      (typeof obj.message === 'string' && obj.message) ||
-      (typeof obj.error === 'string' && obj.error) ||
-      'Request failed';
-    return { message, detail: JSON.stringify(error, null, 2) };
-  }
-  return { message: String(error) };
-};
 
 export const RouteError = ({ error }: { error: unknown }) => {
   const { message, detail } = describeError(error);

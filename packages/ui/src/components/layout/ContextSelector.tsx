@@ -112,7 +112,7 @@ export const ContextSelector = ({ onManageOrganizations, locked = false, classNa
                   onClick={() => tenant.setOrganization(org.id)}
                   className={cn('cursor-pointer', isCurrentOrg && 'bg-accent text-accent-foreground')}
                 >
-                  <Icon icon="lucide:building2" className="h-4 w-4 mr-2" />
+                  <Icon icon="lucide:building-2" className="h-4 w-4 mr-2" />
                   <span className="flex-1 truncate">{org.name}</span>
                   {isCurrentOrg && <Icon icon="lucide:check" className="h-4 w-4 ml-2" />}
                 </DropdownMenuItem>
@@ -131,7 +131,7 @@ export const ContextSelector = ({ onManageOrganizations, locked = false, classNa
                   onClick={() => tenant.setSpace(space.id)}
                   className={cn('cursor-pointer', isCurrentSpace && 'bg-accent text-accent-foreground')}
                 >
-                  <Icon icon="lucide:building2" className="h-4 w-4 mr-2" />
+                  <Icon icon="lucide:building-2" className="h-4 w-4 mr-2" />
                   <span className="flex-1 truncate">{space.name}</span>
                   {isCurrentSpace && <Icon icon="lucide:check" className="h-4 w-4 ml-2" />}
                 </DropdownMenuItem>
@@ -145,7 +145,7 @@ export const ContextSelector = ({ onManageOrganizations, locked = false, classNa
                   onClick={() => toggleOrg(org.id)}
                   className="flex items-center gap-2 px-2 py-1.5 text-sm cursor-pointer rounded-sm hover:bg-accent hover:text-accent-foreground"
                 >
-                  <Icon icon="lucide:building2" className="h-4 w-4 mr-2" />
+                  <Icon icon="lucide:building-2" className="h-4 w-4 mr-2" />
                   <span className="flex-1 truncate">
                     {org.name} ({spaces.length})
                   </span>

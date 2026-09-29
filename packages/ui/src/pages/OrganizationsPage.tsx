@@ -14,7 +14,7 @@ import {
   organizationCreate,
   organizationDelete,
 } from '@template/sdk';
-import { Button, Card, CardContent, CardHeader, CardTitle, Table } from '@template/ui/components';
+import { Button, Page, Table } from '@template/ui/components';
 import { CreateOrganizationModal } from '@template/ui/components/organizations/CreateOrganizationModal';
 import { createOptimisticListTarget, useOptimisticMutation, useQuery } from '@template/ui/hooks';
 import { checkPermission } from '@template/ui/hooks/usePermission';
@@ -81,6 +81,7 @@ export const OrganizationsPage = () => {
       {
         key: 'name',
         label: 'Organization',
+        render: (org: Organization) => <span className="font-medium">{org.name}</span>,
       },
       {
         key: 'role',
@@ -112,7 +113,7 @@ export const OrganizationsPage = () => {
                 }}
                 show={checkPermission(permissions, 'organization', org, 'own')}
               >
-                <Icon icon="lucide:trash2" className="h-4 w-4 text-destructive" />
+                <Icon icon="lucide:trash-2" className="h-4 w-4 text-destructive" />
               </Button>
             </div>
           );
@@ -127,35 +128,35 @@ export const OrganizationsPage = () => {
     setIsCreateModalOpen(false);
   };
 
-  if (isLoading) {
-    return <div className="p-8">Loading...</div>;
-  }
-
   return (
     <>
-      <div className="p-8 space-y-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0">
-            <div>
-              <CardTitle>Your Organizations</CardTitle>
-              <p className="text-sm text-muted-foreground mt-1">View organizations you belong to</p>
-            </div>
-            <Button onClick={() => setIsCreateModalOpen(true)}>
-              <Icon icon="lucide:plus" className="h-4 w-4 mr-2" />
-              Create Organization
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <Table
-              columns={columns}
-              data={organizations}
-              keyExtractor={(org) => org.id}
-              onRowClick={(org: Organization) => navigatePreserving(`/dashboard?org=${org.id}`, 'spoof')}
-              emptyMessage="You don't belong to any organizations yet"
-            />
-          </CardContent>
-        </Card>
-      </div>
+      <Page
+        title="Organizations"
+        description="Organizations you belong to. Open one to work in its context."
+        actions={
+          <Button onClick={() => setIsCreateModalOpen(true)}>
+            <Icon icon="lucide:plus" className="h-4 w-4 mr-2" />
+            Create organization
+          </Button>
+        }
+      >
+        {isLoading ? (
+          <div className="h-40 animate-pulse rounded-xl bg-muted/50" />
+        ) : (
+          <Table
+            columns={columns}
+            data={organizations}
+            keyExtractor={(org) => org.id}
+            onRowClick={(org: Organization) => navigatePreserving(`/dashboard?org=${org.id}`, 'spoof')}
+            emptyMessage="You don't belong to any organizations yet"
+            empty={{
+              icon: 'lucide:building-2',
+              description: 'Create one to share members, spaces and settings with other people.',
+              action: { label: 'Create organization', onClick: () => setIsCreateModalOpen(true) },
+            }}
+          />
+        )}
+      </Page>
 
       <CreateOrganizationModal
         isOpen={isCreateModalOpen}

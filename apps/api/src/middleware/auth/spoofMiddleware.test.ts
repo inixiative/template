@@ -8,6 +8,8 @@ import { spoofMiddleware } from '#/middleware/auth/spoofMiddleware';
 import { prepareRequest } from '#/middleware/prepareRequest';
 import type { AppEnv } from '#/types/appEnv';
 
+type Echo = { userId: string | null; spoofedById: string | null; tokenId: string | null };
+
 const buildApp = (initial: { user: User; token?: Token }) => {
   const app = new OpenAPIHono<AppEnv>();
   app.use('*', prepareRequest);
@@ -42,7 +44,7 @@ describe('spoofMiddleware via token auth', () => {
     );
 
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body = (await res.json()) as Echo;
     expect(body.userId).toBe(target.id);
     expect(body.spoofedById).toBe(admin.id);
     expect(body.tokenId).toBe(token.id);
@@ -58,7 +60,7 @@ describe('spoofMiddleware via token auth', () => {
     );
 
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body = (await res.json()) as Echo;
     expect(body.userId).toBe(caller.id);
     expect(body.spoofedById).toBeNull();
   });

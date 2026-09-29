@@ -7,5 +7,5 @@
 import { InquiriesPage } from '@template/ui/pages/InquiriesPage';
 
 export const OrganizationSpaceApplicationsPage = () => (
-  <InquiriesPage direction="sent" filters={{ types: ['createSpace'] }} title="Space Applications" />
+  <InquiriesPage direction="sent" filters={{ types: ['createSpace'] }} title="Space applications" />
 );

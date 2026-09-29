@@ -5,6 +5,14 @@
  * @uses none
  * @constructs jobHandler
  */
-import type { JobHandler } from '#/jobs/types';
+import type { JobHandler, JobLane } from '#/jobs/types';
 
-export const makeJob = <TPayload = void>(handler: JobHandler<TPayload>): JobHandler<TPayload> => handler;
+type MakeJobOptions = { lane?: JobLane };
+
+export const makeJob = <TPayload = void>(
+  handler: JobHandler<TPayload>,
+  { lane }: MakeJobOptions = {},
+): JobHandler<TPayload> => {
+  handler.lane = lane;
+  return handler;
+};

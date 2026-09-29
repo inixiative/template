@@ -5,7 +5,7 @@
  * @uses none
  */
 import type { LensNarrowing } from '@inixiative/json-rules';
-import type { Context } from 'hono';
+import type { Context, MiddlewareHandler } from 'hono';
 import { makeMiddleware } from '#/lib/utils/makeMiddleware';
 import type { AppEnv } from '#/types/appEnv';
 
@@ -13,12 +13,20 @@ import type { AppEnv } from '#/types/appEnv';
 export type WhereScope = Pick<LensNarrowing, 'root' | 'mapDefaults'>;
 type Scope = (c: Context<AppEnv>) => WhereScope | Promise<WhereScope>;
 
-export const scopeNarrowing = makeMiddleware<Scope>((scope) => async (c, next) => {
-  const current = c.get('filterLens');
-  if (!current) throw new Error('scopeNarrowing: no narrowing on context — declare a `narrowing` on the route');
-  const { root, mapDefaults } = await scope(c);
-  // Stack the scope as a child narrowing layer under the route's filterLens.
-  // buildWhereClause composes the whole chain via projectByPath.
-  c.set('filterLens', { parent: current, root, mapDefaults });
-  await next();
-});
+const PER_CALLER_SCOPE = Symbol('perCallerScope');
+
+export const isPerCallerScope = (middleware: unknown): boolean =>
+  typeof middleware === 'function' && PER_CALLER_SCOPE in middleware;
+
+export const scopeNarrowing = makeMiddleware<Scope>((scope) =>
+  Object.assign(
+    async (c: Context<AppEnv>, next: () => Promise<void>) => {
+      const current = c.get('filterLens');
+      if (!current) throw new Error('scopeNarrowing: no narrowing on context — declare a `narrowing` on the route');
+      const { root, mapDefaults } = await scope(c);
+      c.set('filterLens', { parent: current, root, mapDefaults });
+      await next();
+    },
+    { [PER_CALLER_SCOPE]: true },
+  ),
+) as (scope: Scope) => MiddlewareHandler;

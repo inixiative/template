@@ -5,16 +5,22 @@
  * @uses primitive:shared
  */
 import type { WSEvent } from '@template/shared/ws';
-import { useAppStore } from '@template/ui/store';
+import { applyStreamAppend } from '@template/ui/lib/ws/applyStreamAppend';
+import { applyStreamSnapshot } from '@template/ui/lib/ws/applyStreamSnapshot';
+import { refetchQuery } from '@template/ui/lib/ws/refetchQuery';
 
-const handlers = {
-  query: {
-    refetch: (event: WSEvent) => {
-      useAppStore.getState().client?.invalidateQueries({ queryKey: [event.key] });
-    },
-  },
+type Handlers = {
+  [C in WSEvent['category']]: {
+    [A in Extract<WSEvent, { category: C }>['action']]: (event: Extract<WSEvent, { category: C; action: A }>) => void;
+  };
+};
+
+const handlers: Handlers = {
+  query: { refetch: refetchQuery },
+  data: { snapshot: applyStreamSnapshot, append: applyStreamAppend },
 };
 
 export const dispatchMessage = (event: WSEvent): void => {
-  handlers[event.category]?.[event.action]?.(event);
+  const byAction = handlers[event.category] as Record<string, (event: WSEvent) => void> | undefined;
+  byAction?.[event.action]?.(event);
 };

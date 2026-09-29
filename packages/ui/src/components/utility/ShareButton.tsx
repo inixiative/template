@@ -34,7 +34,7 @@ export const ShareButton = ({ className }: ShareButtonProps) => {
         </span>
       ) : (
         <span className="flex items-center gap-1.5 text-xs">
-          <Icon icon="lucide:share2" className="h-4 w-4" />
+          <Icon icon="lucide:share-2" className="h-4 w-4" />
           Share
         </span>
       )}
