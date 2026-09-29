@@ -40,7 +40,7 @@ export const auditActorStore = new AsyncLocalStorage<AuditActor>();
 
 export const auditActorContext = {
   // Await inside the store — a returned lazy thenable would otherwise execute after the scope exits.
-  scope: <T>(actor: AuditActor, fn: () => T | Promise<T>): Promise<T> =>
+  scope: <T>(actor: AuditActor, fn: () => T | PromiseLike<T>): Promise<T> =>
     auditActorStore.run(actor, async () => await fn()),
   getScope: (): AuditActor | null => auditActorStore.getStore() ?? null,
   extend: (partial: Partial<AuditActor>): void => {

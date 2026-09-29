@@ -60,10 +60,6 @@ export type AnyDelegate = HasFindFirst & HasFindUnique & HasFindMany & HasCount;
 
 export type AnyCrudDelegate = AnyDelegate & HasCreate & HasUpdate & HasDelete;
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Runtime Delegate Access (when model name is only known at runtime)
-// ─────────────────────────────────────────────────────────────────────────────
-
 type Record_ = Record<string, unknown>;
 
 // Structural arg types that match Prisma's expected shapes

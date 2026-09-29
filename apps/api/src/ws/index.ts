@@ -4,4 +4,5 @@ export { acceptWebSocket, startStaleSweep, websocketHandler } from '#/ws/handler
 export { drainConnections, getConnectionStats } from '#/ws/lifecycle';
 export { canSubscribe } from '#/ws/probe';
 export { broadcast, initWebSocketPubSub, isPubSubEnabled, sendToChannel, sendToUser } from '#/ws/pubsub';
+export { startStreamReauthorizeSweep } from '#/ws/streamReauthorizeSweep';
 export type { WSData, WSMessage, WSSocket } from '#/ws/types';

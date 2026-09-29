@@ -17,7 +17,7 @@ export const spaceUserUpdateController = makeController(spaceUserUpdateRoute, as
   const body = c.req.valid('json');
   const permix = c.get('permix');
 
-  const hydrated = await hydrate(db, 'spaceUser', spaceUser);
+  const hydrated = await hydrate('spaceUser', spaceUser);
   const space = hydrated.space as HydratedRecord;
   const targetRole = greaterRole(spaceUser.role, body.role);
 

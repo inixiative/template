@@ -6,7 +6,7 @@
  */
 import type { UserId } from '@template/db';
 import { castArray } from 'lodash-es';
-import { createPermix } from 'permix';
+import { createPermix, type PermixRules } from 'permix';
 
 // Base actions - most resources use these
 export const StandardAction = {
@@ -40,7 +40,16 @@ export type Entitlements = Record<string, boolean> | null;
 
 export type ActionState = Partial<Record<Action, boolean | ((data?: unknown) => boolean)>>;
 export type PermissionEntry = { resource: string; id?: string; actions: ActionState };
-type PermissionState = Record<string, ActionState>;
+type PermissionDefinition = Record<string, { action: Action }>;
+
+const deniedActions: Record<Action, false> = {
+  read: false,
+  operate: false,
+  manage: false,
+  own: false,
+  send: false,
+  resolve: false,
+};
 
 export type Permix = {
   check: (resource: string, action: Action, id?: string, data?: unknown) => boolean;
@@ -53,10 +62,10 @@ export type Permix = {
 };
 
 export const createPermissions = (): Permix => {
-  const permix = createPermix<Record<string, { action: Action }>>();
+  const permix = createPermix<PermissionDefinition>();
   let isSuperadmin = false;
   let userId: UserId | null = null;
-  let accumulated: PermissionState = {};
+  let accumulated: PermixRules<PermissionDefinition> = {};
 
   return {
     check: (resource, action, id, data) => {
@@ -70,11 +79,9 @@ export const createPermissions = (): Permix => {
       const entries = castArray(perms);
       for (const { resource, id, actions } of entries) {
         const key = id ? `${resource}:${id}` : resource;
-        accumulated[key] = { ...actions };
+        accumulated[key] = { ...deniedActions, ...actions };
       }
-      // TODO: make this typesafe — PermixSetup requires all actions present but ActionState is Partial
-      // biome-ignore lint/suspicious/noExplicitAny: PermixSetup<> requires exhaustive actions; ActionState is Partial which TypeScript can't reconcile without widening
-      await permix.setup(accumulated as any);
+      await permix.setup(accumulated);
     },
     setSuperadmin: (value) => {
       isSuperadmin = value;

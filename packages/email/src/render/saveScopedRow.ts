@@ -29,7 +29,7 @@ export const saveScopedRow = async <Model extends keyof ScopedEmailRow>(
   ctx: OwnerScope,
 ): Promise<ScopedEmailRow[Model]> => {
   type Row = ScopedEmailRow[Model];
-  const delegate = (model === 'emailTemplate' ? db.emailTemplate : db.emailComponent) as unknown as ScopedDelegate<Row>;
+  const delegate = db[model] as unknown as ScopedDelegate<Row>;
 
   const scope = {
     ownerModel: ctx.ownerModel,

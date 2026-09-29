@@ -1,7 +1,7 @@
 /**
  * @atlas
  * @kind service
- * @partOf infrastructure:redis
+ * @partOf infrastructure:redis, mutex
  * @uses none
  */
 import { ageGatedReclaim } from '@template/db/lanes/queries/ageGatedReclaim';

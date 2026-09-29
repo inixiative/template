@@ -8,6 +8,7 @@ config:
 ---
 kanban
   Backlog
+    AUTH-005-websocket-permission-change-interruption
     FEAT-017-audit-log-hardening-lineage-and-explorer
     FEAT-019-extensible-actor-attribution
     FEAT-016-inquiry-lineage-and-nesting
@@ -79,6 +80,7 @@ kanban
 - [FEAT-019: Extensible Actor Attribution](./FEAT-019-extensible-actor-attribution.md) - actorMeta extension point + on-behalf-of for integration tokens; attribution-only, never authz
 
 **Security & Encryption:**
+- [AUTH-005: WebSocket Permission Changes](./AUTH-005-websocket-permission-change-interruption.md) - Event-driven subscription interruption; deferred scaffolding follow-up, tracked in GitHub #126
 - [FEAT-013: Encryption](./FEAT-013-encryption.md) - Key escrow/backup, lifecycle management, feature visibility
 
 **AI Developer Experience:**
@@ -126,14 +128,14 @@ kanban
 
 ## Quick Stats
 
-- **Total Backlog Items**: 30
+- **Total Backlog Items**: 31
 - **Polish**: 3
 - **Enterprise**: 2
 - **Financial**: 2
 - **Communication**: 3
 - **Infrastructure**: 8
 - **Audit & Compliance**: 1
-- **Security & Encryption**: 1
+- **Security & Encryption**: 2
 - **AI Developer Experience**: 2
 - **Frontend Architecture**: 3
 - **Documentation & Discovery**: 2
@@ -153,4 +155,4 @@ These features are valuable but not critical for MVP or initial production launc
 
 ---
 
-_Last Updated: 2026-08-21_
+_Last Updated: 2026-09-27_

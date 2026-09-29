@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import type { User } from '@template/db/generated/client/client';
 import { cleanupTouchedTables, createUser } from '@template/db/test';
+import { SLOW_LANE_PRIORITY } from '#/jobs/lanePriority';
 import { adminJobRouter } from '#/modules/admin/job';
 import type { JobEnqueueResponse } from '#/modules/admin/job/routes/jobEnqueue';
 import { createTestApp } from '#tests/createTestApp';
@@ -82,6 +83,26 @@ describe('admin/job', () => {
       );
 
       expect(response.status).toBe(400);
+    });
+
+    it('accepts the slow-lane priority and rejects anything past it', async () => {
+      const at = await fetch(
+        post('/api/admin/job', {
+          handler: 'cleanStaleData',
+          payload: { model: 'WebhookEvent', retentionDays: 90 },
+          options: { priority: SLOW_LANE_PRIORITY },
+        }),
+      );
+      const past = await fetch(
+        post('/api/admin/job', {
+          handler: 'cleanStaleData',
+          payload: { model: 'WebhookEvent', retentionDays: 90 },
+          options: { priority: SLOW_LANE_PRIORITY + 1 },
+        }),
+      );
+
+      expect(at.status).toBe(201);
+      expect(past.status).toBe(400);
     });
 
     it('rejects invalid handler name', async () => {

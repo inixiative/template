@@ -19,7 +19,7 @@ export type RuleReferenceOwner = { model: ModelName; id: string };
 type Edge = { id: string; referencedModel: string; referencedId: string };
 
 const fkColumn = (axis: 'ownerModel' | 'referencedModel', model: string): string => {
-  const column = resolveFalsePolymorphismRef({ model: 'RuleReference', axis, value: model as ModelName });
+  const column = resolveFalsePolymorphismRef({ model: 'RuleReference', axis, value: model });
   if (!column) {
     throw new Error(
       `RuleReference has no ${axis} FK for ${model} — add the column to ruleReference.prisma and PolymorphismRegistry`,

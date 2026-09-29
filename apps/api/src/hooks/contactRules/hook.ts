@@ -1,15 +1,22 @@
 import { DbAction, type HookOptions, HookTiming, type Prisma, registerDbHook, type SingleAction } from '@template/db';
+import type { ContactType } from '@template/db/generated/client/enums';
 import { ContactRegistry } from '@template/shared/contact';
 import { castArray } from 'lodash-es';
 import { makeError } from '#/lib/errors';
 
 type ContactRow = Partial<Prisma.ContactGetPayload<Record<string, never>>> & Record<string, unknown>;
 
+const normalizeContactValue = <K extends ContactType>(type: K, value: unknown) => {
+  const def = ContactRegistry[type];
+  const canonical = def.valueSchema.parse(def.parseInput(def.inputSchema.parse(value)));
+  return { value: canonical, valueKey: def.toValueKey(canonical) };
+};
+
 // Validate + normalize a single Contact row in place. The row mutation makes
 // `valueKey` and the canonical `value` shape persist when Prisma writes.
 const processContactRow = async (row: ContactRow): Promise<void> => {
   if (!row.type) return; // Pure update of unrelated fields — nothing to do here.
-  const def = ContactRegistry[row.type as keyof typeof ContactRegistry];
+  const def = ContactRegistry[row.type];
   if (!def) throw makeError({ status: 422, message: `Unknown Contact type: ${row.type}` });
 
   // Subtype rules
@@ -36,11 +43,9 @@ const processContactRow = async (row: ContactRow): Promise<void> => {
   // uniqueness is enforced by the @@unique([ownerModel, userId, …, type, valueKey])
   // constraint; Prisma throws P2002 on conflict, no manual pre-check needed.
   if (row.value !== undefined) {
-    const input = def.inputSchema.parse(row.value);
-    const canonical = def.parseInput(input);
-    const validated = def.valueSchema.parse(canonical);
-    row.value = validated;
-    row.valueKey = def.toValueKey(validated);
+    const normalized = normalizeContactValue(row.type, row.value);
+    row.value = normalized.value;
+    row.valueKey = normalized.valueKey;
   }
 
   // `position` is handled separately by the orderedList hook — Contact is

@@ -24,6 +24,6 @@ export const registerImmutableFieldsHook = () => {
     '*',
     HookTiming.before,
     [DbAction.update, DbAction.updateManyAndReturn, DbAction.upsert],
-    async ({ model, args }) => processArgs(args, model as ModelName),
+    async ({ model, args }) => processArgs(args, model),
   );
 };

@@ -12,10 +12,8 @@ import { serializeBracketQuery } from '@template/ui/lib/serializeBracketQuery';
 
 export type ExtractSuccess<T> = T extends { data: infer _D; error?: never }
   ? T
-  : // biome-ignore lint/suspicious/noExplicitAny: conditional type discriminant — any is required for union narrowing
-    T extends { data: any } | { error: any }
-    ? // biome-ignore lint/suspicious/noExplicitAny: conditional type discriminant — any is required for union narrowing
-      Extract<T, { data: any }>
+  : T extends { data: unknown } | { error: unknown }
+    ? Extract<T, { data: unknown }>
     : T;
 
 type UnwrapResponse<T> =
@@ -90,8 +88,7 @@ export const apiFetchInternal = <T, TVariables extends Record<string, unknown> |
     // defaultPathSerializer only handles {id} style. Fix all parametric endpoints.
     scopedClient.interceptors.request.use((request, opts) => {
       routeTemplate = opts.url;
-      // biome-ignore lint/suspicious/noExplicitAny: hey-api interceptor opts type is not publicly typed
-      const path = (opts as any).path as Record<string, unknown> | undefined;
+      const path = opts.path;
       if (!path) return request;
       let url = request.url;
       for (const [key, value] of Object.entries(path))

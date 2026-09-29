@@ -5,6 +5,7 @@ import { cleanupTouchedTables, createContact, createUser } from '@template/db/te
 import { messageUser } from '#/jobs/handlers/messageUser';
 import { type MessageContent, messageProviderRegistry } from '#/lib/messaging/providers';
 import { createTestApp } from '#tests/createTestApp';
+import { createTestWorker } from '#tests/createTestWorker';
 
 type DispatchedCall = {
   contactId: string;
@@ -15,7 +16,7 @@ type DispatchedCall = {
 describe('messageUser handler', () => {
   let testDb: ReturnType<typeof createTestApp>['db'];
   const dispatched: DispatchedCall[] = [];
-  const mockLog = () => {};
+  const worker = createTestWorker();
 
   beforeAll(() => {
     const harness = createTestApp({});
@@ -54,14 +55,11 @@ describe('messageUser handler', () => {
       { user },
     );
 
-    await messageUser(
-      { db: testDb, log: mockLog },
-      {
-        rule: { field: 'id', operator: Operator.equals, value: user.id },
-        kind: 'platform',
-        content: { text: 'hi' },
-      },
-    );
+    await messageUser(worker, {
+      rule: { field: 'id', operator: Operator.equals, value: user.id },
+      kind: 'platform',
+      content: { text: 'hi' },
+    });
 
     expect(dispatched.map((d) => d.contactType).sort()).toEqual([ContactType.telegram, ContactType.whatsapp]);
   });
@@ -82,14 +80,11 @@ describe('messageUser handler', () => {
       { user },
     );
 
-    await messageUser(
-      { db: testDb, log: mockLog },
-      {
-        rule: { field: 'id', operator: Operator.equals, value: user.id },
-        kind: 'marketing',
-        content: { text: 'promo' },
-      },
-    );
+    await messageUser(worker, {
+      rule: { field: 'id', operator: Operator.equals, value: user.id },
+      kind: 'marketing',
+      content: { text: 'promo' },
+    });
 
     expect(dispatched).toHaveLength(1);
     expect(dispatched[0].contactType).toBe(ContactType.telegram);
@@ -108,14 +103,11 @@ describe('messageUser handler', () => {
       { user: bob },
     );
 
-    await messageUser(
-      { db: testDb, log: mockLog },
-      {
-        rule: { field: 'id', operator: Operator.in, value: [alice.id, bob.id] },
-        kind: 'platform',
-        content: { text: 'hi' },
-      },
-    );
+    await messageUser(worker, {
+      rule: { field: 'id', operator: Operator.in, value: [alice.id, bob.id] },
+      kind: 'platform',
+      content: { text: 'hi' },
+    });
 
     expect(dispatched).toHaveLength(2);
   });
@@ -133,14 +125,11 @@ describe('messageUser handler', () => {
       { user: bob },
     );
 
-    await messageUser(
-      { db: testDb, log: mockLog },
-      {
-        rule: { field: 'id', operator: Operator.in, value: [alice.id, bob.id] },
-        kind: 'platform',
-        content: { text: 'Hi {{recipient.name}} from {{data.sender}}', data: { sender: 'Tribe' } },
-      },
-    );
+    await messageUser(worker, {
+      rule: { field: 'id', operator: Operator.in, value: [alice.id, bob.id] },
+      kind: 'platform',
+      content: { text: 'Hi {{recipient.name}} from {{data.sender}}', data: { sender: 'Tribe' } },
+    });
 
     const texts = dispatched.map((d) => d.content.text).sort();
     expect(texts).toEqual(['Hi Alice from Tribe', 'Hi Bob from Tribe']);
@@ -153,14 +142,11 @@ describe('messageUser handler', () => {
       { user },
     );
 
-    await messageUser(
-      { db: testDb, log: mockLog },
-      {
-        rule: { field: 'id', operator: Operator.equals, value: user.id },
-        kind: 'system',
-        content: { text: 'security alert' },
-      },
-    );
+    await messageUser(worker, {
+      rule: { field: 'id', operator: Operator.equals, value: user.id },
+      kind: 'system',
+      content: { text: 'security alert' },
+    });
 
     expect(dispatched).toHaveLength(1);
   });
@@ -173,26 +159,20 @@ describe('messageUser handler', () => {
     );
 
     expect(
-      messageUser(
-        { db: testDb, log: mockLog },
-        {
-          rule: { field: 'id', operator: Operator.equals, value: user.id },
-          kind: 'platform',
-          content: { text: 'hi' },
-        },
-      ),
+      messageUser(worker, {
+        rule: { field: 'id', operator: Operator.equals, value: user.id },
+        kind: 'platform',
+        content: { text: 'hi' },
+      }),
     ).rejects.toThrow(/No message provider adapter for contact.type=signal/);
   });
 
   it('no-ops when the rule matches no users', async () => {
-    await messageUser(
-      { db: testDb, log: mockLog },
-      {
-        rule: { field: 'id', operator: Operator.equals, value: '00000000-0000-0000-0000-000000000000' },
-        kind: 'platform',
-        content: { text: 'hi' },
-      },
-    );
+    await messageUser(worker, {
+      rule: { field: 'id', operator: Operator.equals, value: '00000000-0000-0000-0000-000000000000' },
+      kind: 'platform',
+      content: { text: 'hi' },
+    });
 
     expect(dispatched).toHaveLength(0);
   });

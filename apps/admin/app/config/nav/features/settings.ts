@@ -11,13 +11,13 @@ export const settingsItem: NavItem = {
   label: 'Settings',
   path: '/settings',
   icon: 'lucide:settings',
-  access: (permissions, context) => permissions.check(...getContextParams(context), 'operate'),
+  access: (permissions, context) => permissions.check(...getContextParams(context), 'read'),
   items: [
     {
       label: 'Profile',
       path: '/profile',
       icon: 'lucide:user',
-      access: (permissions, context) => permissions.check(...getContextParams(context), 'manage'),
+      access: (permissions, context) => permissions.check(...getContextParams(context), 'read'),
     },
     {
       label: 'Tokens',

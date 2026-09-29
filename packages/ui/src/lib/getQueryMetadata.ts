@@ -6,6 +6,7 @@
  */
 
 import { resolveRef } from '@template/sdk/lenses/resolveRef';
+import type { SdkSchema } from '@template/sdk/lenses/sdkSchema';
 import openApiSpec from '@template/sdk/openapi.gen.json';
 
 export type EnumFilter = {
@@ -20,8 +21,23 @@ export type QueryMetadata = {
   enumFilters?: EnumFilter[];
 };
 
-// biome-ignore lint/suspicious/noExplicitAny: dynamic JSON traversal of untyped OpenAPI spec
-type Schema = any;
+type SpecNode = SdkSchema & {
+  readonly $ref?: string;
+  readonly anyOf?: readonly SpecNode[];
+  readonly properties?: { readonly [key: string]: SpecNode };
+  readonly items?: SpecNode;
+};
+
+type SpecParameter = { readonly name?: string; readonly schema?: SpecNode };
+
+type SpecOperation = { readonly operationId?: string; readonly parameters?: readonly SpecParameter[] };
+
+type Spec = { readonly paths?: { readonly [path: string]: { readonly [method: string]: SpecOperation } } };
+
+const spec = openApiSpec as Spec;
+
+const stringValues = (values: SdkSchema['enum']): string[] | undefined =>
+  values?.filter((v): v is string => typeof v === 'string');
 
 const RELATION_KEYS = new Set(['some', 'every', 'none']);
 // A json leaf's keys are exactly the json operators — distinguishes it from a
@@ -30,37 +46,40 @@ const JSON_LEAF_KEYS = new Set(['path', 'equals', 'not', 'string_contains', 'str
 
 // A scalar/enum leaf is a `bare value | <Type>Filter` union (anyOf). A json leaf is a
 // plain object keyed by json operators. A relation is an object keyed by field names.
-const isJsonLeaf = (schema: Schema): boolean => {
+const isJsonLeaf = (schema: SpecNode): boolean => {
   const props = schema?.properties;
   return !!props && Object.keys(props).every((k) => JSON_LEAF_KEYS.has(k));
 };
 
 // Enum leaves carry a bare `{ enum: [...] }` arm (the clean narrowed set); fall back to
 // the operator arm's `in.items.enum` / `equals.enum` (stripping equals' trailing null).
-const enumValuesOf = (leaf: Schema): string[] | undefined => {
+const enumValuesOf = (leaf: SpecNode): string[] | undefined => {
   // Not a castArray: the array branch resolves refs, the fallback is the leaf itself.
-  const fallback: Schema[] = [leaf];
-  const arms: Schema[] = Array.isArray(leaf.anyOf) ? leaf.anyOf.map(resolveRef) : fallback;
+  const fallback: (SpecNode | undefined)[] = [leaf];
+  const arms = leaf.anyOf ? leaf.anyOf.map(resolveRef) : fallback;
   const bareEnum = arms.find((a) => Array.isArray(a?.enum));
-  if (bareEnum) return bareEnum.enum;
+  if (bareEnum) return stringValues(bareEnum.enum);
   const op = arms.find((a) => a?.properties);
   const fromIn = op?.properties?.in?.items?.enum;
-  if (Array.isArray(fromIn)) return fromIn;
-  const fromEquals = op?.properties?.equals?.enum;
-  return Array.isArray(fromEquals) ? fromEquals.filter((v): v is string => v !== null) : undefined;
+  if (Array.isArray(fromIn)) return stringValues(fromIn);
+  return stringValues(op?.properties?.equals?.enum);
 };
 
 // Flatten the nested `searchFields` schema → flat dotted paths + enum filters.
-const walkSearchFields = (schema: Schema, prefix: string, out: { searchable: string[]; enums: EnumFilter[] }): void => {
+const walkSearchFields = (
+  schema: SpecNode | undefined,
+  prefix: string,
+  out: { searchable: string[]; enums: EnumFilter[] },
+): void => {
   const props = resolveRef(schema)?.properties;
   if (!props) return;
 
-  for (const [key, raw] of Object.entries<Schema>(props)) {
+  for (const [key, raw] of Object.entries(props)) {
     const path = prefix ? `${prefix}.${key}` : key;
     const child = resolveRef(raw);
 
     // scalar/enum leaf (bare | operator union)
-    if (Array.isArray(child?.anyOf)) {
+    if (child?.anyOf) {
       out.searchable.push(path);
       const values = enumValuesOf(child);
       if (values) out.enums.push({ field: path, values, operators: ['in', 'notIn'] });
@@ -81,21 +100,20 @@ const walkSearchFields = (schema: Schema, prefix: string, out: { searchable: str
 };
 
 // orderBy is an enum (or array) of `<field>:asc|desc` — strip direction to unique fields.
-const extractOrderableFields = (schema: Schema): string[] => {
+const extractOrderableFields = (schema: SpecNode): string[] => {
   const resolved = resolveRef(schema);
   for (const variant of resolved?.anyOf ?? [resolved]) {
-    const values: string[] | undefined = variant?.enum ?? variant?.items?.enum;
-    if (Array.isArray(values)) return [...new Set(values.map((v) => v.split(':')[0]))];
+    const values = stringValues(variant?.enum ?? variant?.items?.enum);
+    if (values) return [...new Set(values.map((v) => v.split(':')[0]))];
   }
   return [];
 };
 
 export const getQueryMetadata = (path: string, method: string = 'get'): QueryMetadata => {
-  const spec = openApiSpec as Schema;
   const operation = spec.paths?.[path]?.[method.toLowerCase()];
   if (!operation) return {};
 
-  const params: Schema[] = operation.parameters ?? [];
+  const params = operation.parameters ?? [];
   const searchFields = params.find((p) => p.name === 'searchFields');
   const orderBy = params.find((p) => p.name === 'orderBy');
 
@@ -110,9 +128,8 @@ export const getQueryMetadata = (path: string, method: string = 'get'): QueryMet
 };
 
 export const getQueryMetadataByOperation = (operationId: string): QueryMetadata => {
-  const spec = openApiSpec as Schema;
-  for (const [path, pathItem] of Object.entries<Schema>(spec.paths ?? {})) {
-    for (const [method, operation] of Object.entries<Schema>(pathItem)) {
+  for (const [path, pathItem] of Object.entries(spec.paths ?? {})) {
+    for (const [method, operation] of Object.entries(pathItem)) {
       if (operation?.operationId === operationId) return getQueryMetadata(path, method);
     }
   }

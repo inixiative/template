@@ -57,7 +57,7 @@ describe('searchable', () => {
   });
 
   it('throws for invalid model name', () => {
-    expect(() => searchable({ notAModel: ['name'] })).toThrow('not a valid Prisma model');
+    expect(() => searchable({ notAModel: ['name'] })).toThrow("Unknown model 'notAModel'");
   });
 
   it('throws for invalid field on model', () => {
