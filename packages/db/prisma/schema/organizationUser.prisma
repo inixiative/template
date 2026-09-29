@@ -18,6 +18,7 @@ model OrganizationUser {
   user               User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   spaceUsers         SpaceUser[]
   tokens             Token[]
+  integrations       Integration[]
   auditLogsAsSubject AuditLog[]   @relation("AuditLogSubjectOrganizationUser")
 
   // ==========================================================================

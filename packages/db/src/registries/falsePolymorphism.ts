@@ -98,8 +98,10 @@ export const PolymorphismRegistry: Partial<Record<ModelName, PolymorphicConfig>>
         field: 'ownerModel',
         fkMap: {
           User: ['userId'],
+          OrganizationUser: ['organizationId', 'userId'],
           Organization: ['organizationId'],
-          Space: ['spaceId'],
+          Space: ['organizationId', 'spaceId'],
+          SpaceUser: ['organizationId', 'spaceId', 'userId'],
         },
       },
     ],

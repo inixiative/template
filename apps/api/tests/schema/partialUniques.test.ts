@@ -7,8 +7,10 @@ import {
   createCustomerRef,
   createEmailComponent,
   createEmailTemplate,
+  createIntegration,
   createOrganization,
   createSpace,
+  createSpaceUser,
   createTag,
   createTagAttachment,
   createTagCategory,
@@ -161,6 +163,55 @@ describe('partial unique constraints', () => {
           { user },
         );
       await expect(dupe()).rejects.toThrow();
+    });
+  });
+
+  describe('Integration: one partial unique per ownerModel', () => {
+    it('allows the same name across all five owner kinds', async () => {
+      const { context } = await createSpaceUser();
+      const { user, organization, space } = context;
+      const name = seq('integration');
+      await createIntegration({ name, ownerModel: 'User', userId: user.id });
+      await createIntegration({
+        name,
+        ownerModel: 'OrganizationUser',
+        organizationId: organization.id,
+        userId: user.id,
+      });
+      await createIntegration({ name, ownerModel: 'Organization', organizationId: organization.id });
+      await createIntegration({ name, ownerModel: 'Space', organizationId: organization.id, spaceId: space.id });
+      await createIntegration({
+        name,
+        ownerModel: 'SpaceUser',
+        organizationId: organization.id,
+        spaceId: space.id,
+        userId: user.id,
+      });
+      expect(await db.integration.count({ where: { name } })).toBe(5);
+    });
+
+    it('blocks two integrations with the same name on the same organization member', async () => {
+      const { context } = await createSpaceUser();
+      const { user, organization } = context;
+      const name = seq('integration-dupe');
+      await createIntegration({
+        name,
+        ownerModel: 'OrganizationUser',
+        organizationId: organization.id,
+        userId: user.id,
+      });
+      const dupe = async () =>
+        createIntegration({ name, ownerModel: 'OrganizationUser', organizationId: organization.id, userId: user.id });
+      await expect(dupe()).rejects.toThrow();
+    });
+
+    it('allows the same name again once the first is soft-deleted', async () => {
+      const { entity: user } = await createUser();
+      const name = seq('integration-revived');
+      const first = await createIntegration({ name, ownerModel: 'User', userId: user.id });
+      await db.integration.update({ where: { id: first.entity.id }, data: { deletedAt: new Date() } });
+      const second = await createIntegration({ name, ownerModel: 'User', userId: user.id });
+      expect(second.entity.deletedAt).toBeNull();
     });
   });
 
