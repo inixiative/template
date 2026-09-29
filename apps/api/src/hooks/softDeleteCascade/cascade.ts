@@ -4,9 +4,8 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
-import { db, type ModelName, type RuntimeDelegate, toAccessor } from '@template/db';
+import { db, isHardDeletedOnTombstone, type ModelName, type RuntimeDelegate, toAccessor } from '@template/db';
 import { type ChildRelation, childRelations } from '#/hooks/softDeleteCascade/childRelations';
-import { HARD_DELETE_ON_TOMBSTONE } from '#/hooks/softDeleteCascade/hardDeleteOnTombstone';
 
 type Row = Record<string, unknown>;
 
@@ -16,10 +15,25 @@ const fkWhere = (child: ChildRelation, row: Row) =>
 const delegateFor = (model: string): RuntimeDelegate =>
   db[toAccessor(model as ModelName)] as unknown as RuntimeDelegate;
 
+// deleteMany does not re-enter the lifecycle, so a hard delete ends the cascade: its own
+// descendants must be taken first, or they are left to raw foreign keys below every policy here.
+const hardDelete = async (model: string, where: Record<string, unknown>) => {
+  const doomed = (await delegateFor(model).findMany({ where, select: { id: true } })) as { id: string }[];
+  if (doomed.length) {
+    const ids = doomed.map((row) => row.id);
+    for (const child of childRelations(model)) {
+      if (!isHardDeletedOnTombstone(child.model)) continue;
+      const [from] = child.fromFields;
+      if (child.fromFields.length === 1 && from) await hardDelete(child.model, { [from]: { in: ids } });
+    }
+  }
+  await delegateFor(model).deleteMany({ where });
+};
+
 export const tombstoneChildren = async (model: string, row: Row) => {
   for (const child of childRelations(model)) {
-    if (HARD_DELETE_ON_TOMBSTONE[model]?.includes(child.model)) {
-      await delegateFor(child.model).deleteMany({ where: fkWhere(child, row) });
+    if (isHardDeletedOnTombstone(child.model)) {
+      await hardDelete(child.model, fkWhere(child, row));
     } else if (child.hasDeletedAt) {
       await delegateFor(child.model).updateManyAndReturn({
         where: { ...fkWhere(child, row), deletedAt: null },
