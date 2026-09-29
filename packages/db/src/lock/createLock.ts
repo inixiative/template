@@ -10,15 +10,33 @@
 //     + we wake up thinking we hold it. Mitigation: ttlMs >> expected pause duration.
 //   - verify() is point-in-time; the race between verify-returns-true and the next op
 //     completing is microseconds but non-zero. For exactly-once semantics, fence at the resource.
+import { createClaim } from '@template/db/lock/createClaim';
 import { fencedDelete } from '@template/db/lock/queries/fencedDelete';
 import { fencedRefresh } from '@template/db/lock/queries/fencedRefresh';
-import type { Lock, LockLostReason, LockOptions, LockReleaseResult } from '@template/db/lock/types';
+import type {
+  Claim,
+  ClaimOptions,
+  Lock,
+  LockLostReason,
+  LockOptions,
+  LockRedis,
+  LockReleaseResult,
+} from '@template/db/lock/types';
 import { getRedisClient } from '@template/db/redis/client';
 import { redisNamespace } from '@template/db/redis/namespaces';
 import { log } from '@template/shared/logger';
 import { heartbeat } from '@template/shared/utils';
 
-export const createLock = (opts: LockOptions): Lock => {
+export function createLock(opts: ClaimOptions): Claim;
+export function createLock(opts: LockOptions): Lock;
+export function createLock(opts: LockOptions | ClaimOptions): Lock | Claim {
+  const redisClient = opts.redis ?? getRedisClient();
+  const lockKey = 'key' in opts ? opts.key : `${redisNamespace.lock}:${opts.service}:${opts.identifier}`;
+  if (opts.heartbeat === false) return createClaim(opts, redisClient, lockKey);
+  return createRenewingLock(opts, redisClient, lockKey);
+}
+
+const createRenewingLock = (opts: LockOptions, redis: LockRedis, key: string): Lock => {
   const { ttlMs = 30_000, heartbeatMs = 10_000, maxMissed = 1, onLockLost } = opts;
 
   if (maxMissed < 1) {
@@ -33,8 +51,6 @@ export const createLock = (opts: LockOptions): Lock => {
     );
   }
 
-  const redis = opts.redis ?? getRedisClient();
-  const key = 'key' in opts ? opts.key : `${redisNamespace.lock}:${opts.service}:${opts.identifier}`;
   const processId = crypto.randomUUID();
   let stop: (() => void) | null = null;
   let missed = 0;

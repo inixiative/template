@@ -1,3 +1,13 @@
+export { createClaim } from './createClaim';
 export { createLock } from './createLock';
 export { maxSafeHeartbeatMs } from './maxSafeHeartbeatMs';
-export type { Lock, LockLostReason, LockOptions, LockRedis, LockReleaseResult } from './types';
+export type {
+  Claim,
+  ClaimOptions,
+  ClaimResult,
+  Lock,
+  LockLostReason,
+  LockOptions,
+  LockRedis,
+  LockReleaseResult,
+} from './types';
