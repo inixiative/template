@@ -219,6 +219,15 @@ Actual code files always use aliases.
 
 ### TypeScript Configuration
 
+Compiler options come from the shared `@inixiative/config` presets, not from local config. Backend
+workspaces (`apps/api`, `packages/db`, `packages/email`, `packages/permissions`, `packages/shared`,
+`init`) extend `@inixiative/config/tsconfig/base.json`. Browser workspaces extend
+`@inixiative/config/tsconfig/react.json`: `packages/ui` and `packages/sdk` directly, and the three
+frontend apps through `tsconfig.frontend.json`, which adds the `vite/client` types. A workspace
+tsconfig holds only `extends`, `paths`, and `include`/`exclude`, plus `jsx` in `init`, whose Ink CLI
+renders JSX without the DOM. `baseUrl` is deprecated in TypeScript 6, so `paths` entries are
+written relative to the tsconfig that declares them.
+
 Each package's `tsconfig.json` must map **all packages** to ensure consistent import resolution across the monorepo.
 
 **Standard mappings for each package:**
@@ -226,7 +235,6 @@ Each package's `tsconfig.json` must map **all packages** to ensure consistent im
 ```json
 {
   "compilerOptions": {
-    "baseUrl": ".",
     "paths": {
       "@template/<package>/*": ["./src/*"],          // Self-reference
       "@template/db/*": ["../db/src/*"],             // Database package
