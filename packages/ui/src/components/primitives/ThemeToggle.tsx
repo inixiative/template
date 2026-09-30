@@ -22,11 +22,9 @@ export const ThemeToggle = () => {
   const setTheme = useAppStore((state) => state.ui.setTheme);
 
   return (
-    <div className="space-y-2">
-      <span id="theme-toggle-label" className="text-sm font-medium">
-        Theme
-      </span>
-      <div role="group" aria-labelledby="theme-toggle-label" className="grid grid-cols-3 gap-1 rounded-lg bg-muted p-1">
+    <fieldset className="space-y-2">
+      <legend className="text-sm font-medium">Theme</legend>
+      <div className="grid grid-cols-3 gap-1 rounded-lg bg-muted p-1">
         {options.map((option) => (
           <button
             key={option.value}
@@ -45,6 +43,6 @@ export const ThemeToggle = () => {
           </button>
         ))}
       </div>
-    </div>
+    </fieldset>
   );
 };

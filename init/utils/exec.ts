@@ -1,5 +1,5 @@
-import { exec, execFile } from 'child_process';
-import { promisify } from 'util';
+import { exec, execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 
 export const execAsync = promisify(exec);
 // No shell: arguments are passed verbatim, so values containing quotes, `$`,

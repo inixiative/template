@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'bun:test';
-import type { Condition } from '@inixiative/json-rules';
 import { lensFor } from '@template/db/lens';
 import { interpolate } from '@template/email/render/interpolate';
 import type { RuleErrorSink } from '@template/email/render/settle';

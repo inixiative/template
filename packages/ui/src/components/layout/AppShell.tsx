@@ -20,7 +20,12 @@ export type AppShellProps = {
   children: React.ReactNode;
 };
 
-export const AppShell = ({ onSupport, lockedContext = false, showSpoofControls = true, children }: AppShellProps) => {
+export const AppShell = ({
+  onSupport,
+  lockedContext = false,
+  showSpoofControls = true,
+  children,
+}: AppShellProps) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   return (
@@ -58,7 +63,12 @@ export const AppShell = ({ onSupport, lockedContext = false, showSpoofControls =
       </aside>
 
       {isMobileMenuOpen && (
-        <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={() => setIsMobileMenuOpen(false)} />
+        <button
+          type="button"
+          aria-label="Close menu"
+          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
       )}
 
       <div className="flex flex-col flex-1 overflow-hidden">

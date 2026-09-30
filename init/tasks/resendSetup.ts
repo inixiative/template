@@ -1,4 +1,4 @@
-import { resolveMx, resolveTxt } from 'dns/promises';
+import { resolveMx, resolveTxt } from 'node:dns/promises';
 import {
   getDomain,
   type ResendDnsRecord,
