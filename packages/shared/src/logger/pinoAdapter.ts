@@ -10,10 +10,20 @@ import type { LoggerAdapter } from '@template/shared/logger/types';
 import { pino } from 'pino';
 
 const nativeOptions = {
-  formatters: { bindings: (bindings: Record<string, unknown>) => redactLogValue(bindings) as Record<string, unknown> },
+  formatters: {
+    bindings: (bindings: Record<string, unknown>) =>
+      redactLogValue(bindings) as Record<string, unknown>,
+  },
   hooks: {
-    logMethod(this: import('pino').Logger, args: Parameters<import('pino').LogFn>, method: import('pino').LogFn) {
-      return method.apply(this, args.map((arg) => redactLogValue(arg)) as Parameters<import('pino').LogFn>);
+    logMethod(
+      this: import('pino').Logger,
+      args: Parameters<import('pino').LogFn>,
+      method: import('pino').LogFn,
+    ) {
+      return method.apply(
+        this,
+        args.map((arg) => redactLogValue(arg)) as Parameters<import('pino').LogFn>,
+      );
     },
   },
 };
@@ -35,6 +45,8 @@ export const pinoAdapter: LoggerAdapter = {
   success: (fields, msg) => pinoSink.info(fields as object, msg as string),
   box: (fields, msg) => pinoSink.info(fields as object, msg as string),
   child: () => {
-    throw new Error('child() not supported — use logScope(id, fn), or import pinoLogger directly for SDK use');
+    throw new Error(
+      'child() not supported — use logScope(id, fn), or import pinoLogger directly for SDK use',
+    );
   },
 };

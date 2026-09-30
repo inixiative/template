@@ -149,7 +149,9 @@ describe('AuthProvider Endpoints', () => {
         { organization: otherOrg },
       );
 
-      const response = await superadminFetch(get(`/api/admin/authProvider?organizationId=${org.id}`));
+      const response = await superadminFetch(
+        get(`/api/admin/authProvider?organizationId=${org.id}`),
+      );
       const { data } = await json<AdminAuthProviders>(response);
 
       expect(response.status).toBe(200);
@@ -167,7 +169,9 @@ describe('AuthProvider Endpoints', () => {
         { organization: org },
       );
 
-      const response = await superadminFetch(get(`/api/admin/authProvider?organizationId=${org.id}`));
+      const response = await superadminFetch(
+        get(`/api/admin/authProvider?organizationId=${org.id}`),
+      );
       const { data, pagination: _pagination } = await json<AdminAuthProviders>(response);
 
       const found = data.find((p) => p.id === provider.id);
@@ -202,7 +206,10 @@ describe('AuthProvider Endpoints', () => {
     });
 
     it('returns empty org array for org with no custom providers', async () => {
-      const { entity: newOrgUser, context } = await createOrganizationUser({ role: 'owner' }, { user });
+      const { entity: newOrgUser, context } = await createOrganizationUser(
+        { role: 'owner' },
+        { user },
+      );
 
       const newUserFetch = createTestApp({
         mockUser: user,
@@ -210,7 +217,9 @@ describe('AuthProvider Endpoints', () => {
         mount: [(app) => app.route('/api/v1/organization', organizationRouter)],
       }).fetch;
 
-      const response = await newUserFetch(get(`/api/v1/organization/${context.organization.id}/authProvider`));
+      const response = await newUserFetch(
+        get(`/api/v1/organization/${context.organization.id}/authProvider`),
+      );
       const { data } = await json<OrgAuthProviders>(response);
 
       expect(response.status).toBe(200);

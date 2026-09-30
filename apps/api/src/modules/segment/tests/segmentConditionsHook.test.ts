@@ -3,7 +3,12 @@ import { Operator } from '@inixiative/json-rules';
 import { clearHookRegistry, db, Prisma } from '@template/db';
 import type { Organization, Space, User } from '@template/db/generated/client/client';
 import { ProviderModel, SegmentType } from '@template/db/generated/client/enums';
-import { cleanupTouchedTables, createOrganizationUser, createSegment, createSpace } from '@template/db/test';
+import {
+  cleanupTouchedTables,
+  createOrganizationUser,
+  createSegment,
+  createSpace,
+} from '@template/db/test';
 import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
 
 const acmeRule = { field: 'customerUser.email', operator: Operator.endsWith, value: '@acme.test' };
@@ -28,16 +33,22 @@ describe('segmentConditions hook', () => {
 
   it('refuses a segment without conditions, whatever its type', async () => {
     for (const type of [SegmentType.static, SegmentType.dynamic]) {
-      await expect(createSegment({ type, conditions: Prisma.DbNull as never }, { space })).rejects.toThrow(
-        'requires conditions',
-      );
+      await expect(
+        createSegment({ type, conditions: Prisma.DbNull as never }, { space }),
+      ).rejects.toThrow('requires conditions');
     }
   });
 
   it('refuses conditions outside the segment lens vocabulary', async () => {
     await expect(
       createSegment(
-        { conditions: { field: 'customerUser.platformRole', operator: Operator.equals, value: 'user' } },
+        {
+          conditions: {
+            field: 'customerUser.platformRole',
+            operator: Operator.equals,
+            value: 'user',
+          },
+        },
         { space },
       ),
     ).rejects.toThrow('Invalid segment conditions');
@@ -49,14 +60,17 @@ describe('segmentConditions hook', () => {
       { space },
     );
     expect(entity.conditions).toEqual({
-      all: [acmeRule, { field: 'customerUser.contacts', arrayOperator: 'any', condition: { all: [] } }],
+      all: [
+        acmeRule,
+        { field: 'customerUser.contacts', arrayOperator: 'any', condition: { all: [] } },
+      ],
     });
   });
 
   it('refuses an empty arm inside any', async () => {
-    await expect(createSegment({ conditions: { any: [acmeRule, { all: [] }] } }, { space })).rejects.toThrow(
-      'matches every row',
-    );
+    await expect(
+      createSegment({ conditions: { any: [acmeRule, { all: [] }] } }, { space }),
+    ).rejects.toThrow('matches every row');
   });
 
   it('refuses a segment that references its own membership', async () => {
@@ -103,7 +117,9 @@ describe('segmentConditions hook', () => {
     const { context } = await createOrganizationUser();
     const elsewhere = (await createSpace({}, { organization: context.organization })).entity;
     const { entity: foreign } = await createSegment({ conditions: acmeRule }, { space: elsewhere });
-    await expect(createSegment({ conditions: membersOf(foreign.id) }, { space })).rejects.toThrow('does not own');
+    await expect(createSegment({ conditions: membersOf(foreign.id) }, { space })).rejects.toThrow(
+      'does not own',
+    );
 
     const { entity: own } = await createSegment({ conditions: acmeRule }, { space });
     const { entity } = await createSegment({ conditions: membersOf(own.id) }, { space });
@@ -111,7 +127,10 @@ describe('segmentConditions hook', () => {
   });
 
   it('validates a user-owned and an organization-owned segment against their own customer lens', async () => {
-    const mine = await createSegment({ ownerModel: ProviderModel.User, conditions: acmeRule }, { user });
+    const mine = await createSegment(
+      { ownerModel: ProviderModel.User, conditions: acmeRule },
+      { user },
+    );
     expect(mine.entity.userId).toBe(user.id);
     const ours = await createSegment(
       { ownerModel: ProviderModel.Organization, conditions: acmeRule },
@@ -125,7 +144,10 @@ describe('segmentConditions hook', () => {
     await expect(
       db.segment.update({ where: { id: entity.id }, data: { conditions: Prisma.DbNull as never } }),
     ).rejects.toThrow('requires conditions');
-    const renamed = await db.segment.update({ where: { id: entity.id }, data: { type: SegmentType.dynamic } });
+    const renamed = await db.segment.update({
+      where: { id: entity.id },
+      data: { type: SegmentType.dynamic },
+    });
     expect(renamed.conditions).toEqual(acmeRule);
   });
 });

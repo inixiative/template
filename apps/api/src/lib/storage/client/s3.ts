@@ -98,7 +98,8 @@ export const createS3Client = (config: S3StorageConfig): StorageClient => {
         metadata: result.Metadata ?? {},
       };
     } catch (err) {
-      if (err instanceof Error && (err.name === 'NotFound' || err.name === 'NoSuchKey')) return null;
+      if (err instanceof Error && (err.name === 'NotFound' || err.name === 'NoSuchKey'))
+        return null;
       throw err;
     }
   };

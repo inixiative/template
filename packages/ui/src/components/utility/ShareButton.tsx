@@ -26,7 +26,13 @@ export const ShareButton = ({ className }: ShareButtonProps) => {
   };
 
   return (
-    <Button variant="ghost" size="sm" onClick={handleShare} className={className} aria-label="Share this page">
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={handleShare}
+      className={className}
+      aria-label="Share this page"
+    >
       {copied ? (
         <span className="flex items-center gap-1.5 text-xs">
           <Icon icon="lucide:check" className="h-4 w-4" />

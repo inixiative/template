@@ -70,12 +70,17 @@ export const UserMenu = ({ className, showSpoofControls = true }: UserMenuProps)
         >
           <Avatar className="h-8 w-8 rounded-lg">
             <AvatarImage src={user?.image ?? undefined} alt={user?.name ?? 'User'} />
-            <AvatarFallback className="rounded-lg">{user?.name?.charAt(0).toUpperCase() ?? 'U'}</AvatarFallback>
+            <AvatarFallback className="rounded-lg">
+              {user?.name?.charAt(0).toUpperCase() ?? 'U'}
+            </AvatarFallback>
           </Avatar>
           <div className="flex-1 text-left min-w-0">
             <div className="text-sm font-semibold truncate">{user?.name ?? 'User'}</div>
             <div
-              className={cn('text-xs truncate', isSpoofing ? 'text-destructive font-medium' : 'text-muted-foreground')}
+              className={cn(
+                'text-xs truncate',
+                isSpoofing ? 'text-destructive font-medium' : 'text-muted-foreground',
+              )}
             >
               {isSpoofing ? 'Spoofing' : (user?.email ?? '')}
             </div>

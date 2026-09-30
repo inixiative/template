@@ -25,7 +25,9 @@ export const segmentContextQueries = makeContextQueries()({
   user: () => ({
     owned: query({
       queryKey: meReadManySegmentsQueryKey(),
-      queryFn: apiQuery((opts: Parameters<typeof meReadManySegments>[0]) => meReadManySegments(opts)),
+      queryFn: apiQuery((opts: Parameters<typeof meReadManySegments>[0]) =>
+        meReadManySegments(opts),
+      ),
     }),
     memberships: query({
       queryKey: meReadManySegmentMembershipsQueryKey(),

@@ -8,7 +8,10 @@ import { createRoute } from '#/lib/routeTemplates';
 import { validateNotToken } from '#/middleware/validations/validateNotToken';
 import { Modules } from '#/modules/modules';
 import { Tags } from '#/modules/tags';
-import { tokenCreateBodySchema, tokenCreateResponseSchema } from '#/modules/token/schemas/tokenSchemas';
+import {
+  tokenCreateBodySchema,
+  tokenCreateResponseSchema,
+} from '#/modules/token/schemas/tokenSchemas';
 
 export const meCreateTokenRoute = createRoute({
   model: Modules.me,

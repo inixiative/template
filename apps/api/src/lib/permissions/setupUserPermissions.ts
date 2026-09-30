@@ -26,7 +26,11 @@ export const setupUserPermissions = async (c: Context<AppEnv>) => {
   // User token → restricted by token role
   if (token?.ownerModel === 'User') {
     await permix.setup(
-      getUserPermissions(user.id as UserId, validateRole(token.role), token.entitlements as Entitlements),
+      getUserPermissions(
+        user.id as UserId,
+        validateRole(token.role),
+        token.entitlements as Entitlements,
+      ),
     );
     return;
   }

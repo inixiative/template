@@ -20,14 +20,22 @@ import { liveWhere } from '#/lib/prisma/softDeleteScope';
 import { walkWhere } from '#/lib/prisma/whereWalker';
 
 type Visit = { modelName: string; mapName: string; whereClauses: Condition[] };
-type PlanStep = { operation: string; model?: string; args?: { by?: string[]; where?: Record<string, unknown> } };
+type PlanStep = {
+  operation: string;
+  model?: string;
+  args?: { by?: string[]; where?: Record<string, unknown> };
+};
 
 // Count-operator plans group the related model by its FK back to the visit's
 // model. The subquery is correct unscoped (the id-set is ANDed with the
 // caller's where anyway) but would scan globally — fold the caller's scope in
 // through the back-relation so the scan stays inside it. Root visits only:
 // that's whose rows `scope` describes.
-const scopePlan = (plan: { steps: unknown[] }, rootModel: string, scope: Record<string, unknown>) => {
+const scopePlan = (
+  plan: { steps: unknown[] },
+  rootModel: string,
+  scope: Record<string, unknown>,
+) => {
   const step = plan.steps[0] as PlanStep;
   const fk = step.args?.by?.[0];
   if (!step.model || !fk || !step.args) return;
@@ -35,7 +43,9 @@ const scopePlan = (plan: { steps: unknown[] }, rootModel: string, scope: Record<
     ([, def]) => def.kind === 'object' && def.type === rootModel && def.fromFields?.includes(fk),
   );
   if (!back) return;
-  step.args.where = step.args.where ? { AND: [step.args.where, { [back[0]]: scope }] } : { [back[0]]: scope };
+  step.args.where = step.args.where
+    ? { AND: [step.args.where, { [back[0]]: scope }] }
+    : { [back[0]]: scope };
 };
 
 // Count plans run before paginate's outer liveWhere; scope each groupBy to live rows or a soft-deleted child satisfies count narrowing (fail-open).
@@ -90,7 +100,8 @@ const visitWheres = async (
       }
       if (Object.keys(where).length > 0) clauses.push(where);
     }
-    if (clauses.length) wheres.set(key === rootKey ? '' : key.slice((rootKey as string).length + 1), clauses);
+    if (clauses.length)
+      wheres.set(key === rootKey ? '' : key.slice((rootKey as string).length + 1), clauses);
   }
   return wheres;
 };

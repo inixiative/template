@@ -21,7 +21,8 @@ export type RuleVocabulary = { vocabularyIssues: (rule: Condition) => string[] }
 /** A row a stored rule names by id. `model` is the lens's model name for that source. */
 export type RuleReference = { model: string; id: string };
 
-export const referenceKey = (reference: RuleReference): string => `${reference.model}|${reference.id}`;
+export const referenceKey = (reference: RuleReference): string =>
+  `${reference.model}|${reference.id}`;
 
 /** One way a stored rule has stopped having a correct evaluation. */
 export type RuleIssue =
@@ -51,13 +52,19 @@ export type RuleArms<T> = {
 export const ruleVocabularyIssues = (lens: RuleLens | RuleVocabulary, rule: Condition): string[] =>
   'vocabularyIssues' in lens
     ? lens.vocabularyIssues(rule)
-    : checkRuleAgainstLens(rule, lens).violations.map((violation) => `${violation.path}: ${violation.reason}`);
+    : checkRuleAgainstLens(rule, lens).violations.map(
+        (violation) => `${violation.path}: ${violation.reason}`,
+      );
 
 export const ruleIssues = ({ lens, rule, references, live, bindings }: RuleHealth): RuleIssue[] => {
   const issues: RuleIssue[] = [];
   for (const name of requiredBindings(rule)) {
     if (bindings && Object.hasOwn(bindings, name)) continue;
-    issues.push({ kind: 'binding', name, detail: `rule requires a binding that was not supplied: ${name}` });
+    issues.push({
+      kind: 'binding',
+      name,
+      detail: `rule requires a binding that was not supplied: ${name}`,
+    });
   }
   for (const issue of ruleVocabularyIssues(lens, rule)) {
     issues.push({ kind: 'vocabulary', detail: `rule is outside the lens vocabulary — ${issue}` });

@@ -16,4 +16,5 @@ export const isAuthProbe = (c: Context): boolean => {
   return presented === AUTH_PROBE_SECRET || presented === SYSTEM_PROBE_SECRET;
 };
 
-export const isSystemProbe = (c: Context): boolean => c.req.header(AUTH_PROBE_HEADER) === SYSTEM_PROBE_SECRET;
+export const isSystemProbe = (c: Context): boolean =>
+  c.req.header(AUTH_PROBE_HEADER) === SYSTEM_PROBE_SECRET;

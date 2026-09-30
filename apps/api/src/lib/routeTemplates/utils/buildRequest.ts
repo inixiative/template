@@ -11,7 +11,10 @@ import { searchablePaths } from '@template/db/lens';
 import { buildOrderBySchema } from '#/lib/routeTemplates/filters/buildOrderBySchema';
 import { buildSearchFieldsSchema } from '#/lib/routeTemplates/filters/buildSearchFieldsSchema';
 import { idParamsSchema } from '#/lib/routeTemplates/idParamsSchema';
-import { cursorPaginateRequestSchema, paginateRequestSchema } from '#/lib/routeTemplates/paginationSchemas';
+import {
+  cursorPaginateRequestSchema,
+  paginateRequestSchema,
+} from '#/lib/routeTemplates/paginationSchemas';
 import { createAdvancedSearchSchema, simpleSearchSchema } from '#/lib/routeTemplates/searchSchema';
 import type { RouteArgs, ZodSchema } from '#/lib/routeTemplates/types';
 import { hasIdParam } from '#/lib/routeTemplates/utils/hasIdParam';
@@ -27,7 +30,9 @@ type BaseSanitizeKey = 'id' | 'uuid' | 'createdAt' | 'updatedAt' | 'deletedAt';
 type Cast<T, U> = T extends unknown ? U : never;
 
 // Transform `unknown` to Prisma's JSON input type via cast through unknown
-type TransformUnknown<T> = unknown extends T ? Cast<T, Prisma.NullableJsonNullValueInput | Prisma.InputJsonValue> : T;
+type TransformUnknown<T> = unknown extends T
+  ? Cast<T, Prisma.NullableJsonNullValueInput | Prisma.InputJsonValue>
+  : T;
 
 // Transform all properties in an object type
 type TransformShape<S> = {
@@ -37,7 +42,9 @@ type TransformShape<S> = {
 };
 
 // Type that represents a sanitized body schema with base keys removed and JSON fields cast to Prisma types
-type SanitizedBodySchema<T extends ZodSchema> = z.ZodObject<TransformShape<Omit<T['shape'], BaseSanitizeKey>>>;
+type SanitizedBodySchema<T extends ZodSchema> = z.ZodObject<
+  TransformShape<Omit<T['shape'], BaseSanitizeKey>>
+>;
 
 // Need ID when: not skipId AND (has submodel OR not many)
 type NeedsId<T extends RouteArgs> = T['skipId'] extends true
@@ -58,10 +65,14 @@ type PaginateShape = (typeof paginateRequestSchema)['shape'];
 type CursorPaginateShape = (typeof cursorPaginateRequestSchema)['shape'];
 
 type MergedQuery<Q extends ZodSchema> =
-  Q extends z.ZodObject<infer Shape> ? z.ZodObject<Shape & PaginateShape> : typeof paginateRequestSchema;
+  Q extends z.ZodObject<infer Shape>
+    ? z.ZodObject<Shape & PaginateShape>
+    : typeof paginateRequestSchema;
 
 type MergedCursorQuery<Q extends ZodSchema> =
-  Q extends z.ZodObject<infer Shape> ? z.ZodObject<Shape & CursorPaginateShape> : typeof cursorPaginateRequestSchema;
+  Q extends z.ZodObject<infer Shape>
+    ? z.ZodObject<Shape & CursorPaginateShape>
+    : typeof cursorPaginateRequestSchema;
 
 type QueryType<T extends RouteArgs> = T['paginate'] extends 'cursor'
   ? T['query'] extends ZodSchema
@@ -123,7 +134,9 @@ export const buildRequest = <const T extends RouteArgs>(
   }
 
   if (many && paginate)
-    querySchema = querySchema.merge(paginate === 'cursor' ? cursorPaginateRequestSchema : paginateRequestSchema);
+    querySchema = querySchema.merge(
+      paginate === 'cursor' ? cursorPaginateRequestSchema : paginateRequestSchema,
+    );
 
   if (filterLens) {
     const orderBy = buildOrderBySchema(filterLens);
@@ -133,12 +146,19 @@ export const buildRequest = <const T extends RouteArgs>(
   // admin routes skip search field validation at runtime, so expose searchFields even without a lens.
   if (admin || searchableFields?.length) {
     const searchFields =
-      (filterLens && buildSearchFieldsSchema(filterLens)) || createAdvancedSearchSchema(searchableFields ?? []);
+      (filterLens && buildSearchFieldsSchema(filterLens)) ||
+      createAdvancedSearchSchema(searchableFields ?? []);
     querySchema = querySchema.merge(z.object({ search: simpleSearchSchema, searchFields }));
   }
 
-  const sanitizedBodySchema = bodySchema ? sanitizeRequestSchema(bodySchema, sanitizeKeys) : undefined;
-  const finalBodySchema = sanitizedBodySchema ? (many ? z.array(sanitizedBodySchema) : sanitizedBodySchema) : undefined;
+  const sanitizedBodySchema = bodySchema
+    ? sanitizeRequestSchema(bodySchema, sanitizeKeys)
+    : undefined;
+  const finalBodySchema = sanitizedBodySchema
+    ? many
+      ? z.array(sanitizedBodySchema)
+      : sanitizedBodySchema
+    : undefined;
 
   if (finalBodySchema) {
     return {

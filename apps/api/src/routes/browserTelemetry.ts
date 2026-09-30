@@ -27,7 +27,11 @@ browserTelemetryRouter.post('/', async (c) => {
   const config = readTelemetryConfig('api');
   if (!config) return c.body(null, 404);
   const origin = c.req.header('origin');
-  const allowedOrigins = [process.env.WEB_URL, process.env.ADMIN_URL, process.env.SUPERADMIN_URL].flatMap((value) => {
+  const allowedOrigins = [
+    process.env.WEB_URL,
+    process.env.ADMIN_URL,
+    process.env.SUPERADMIN_URL,
+  ].flatMap((value) => {
     if (!value) return [];
     try {
       const url = new URL(value);
@@ -39,9 +43,14 @@ browserTelemetryRouter.post('/', async (c) => {
   if (!origin || !allowedOrigins.includes(origin)) return c.body(null, 403);
   const parsed = browserTelemetrySchema.safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) return c.body(null, 400);
-  if (parsed.data.spans.some((span) => Math.abs(Date.now() - span.startTimeMs) > 3_600_000)) return c.body(null, 400);
-  const nanos = (milliseconds: number) => (BigInt(Math.trunc(milliseconds * 1000)) * 1000n).toString();
-  const attribute = (key: string, value: unknown) => ({ key, value: { stringValue: String(redactLogValue(value)) } });
+  if (parsed.data.spans.some((span) => Math.abs(Date.now() - span.startTimeMs) > 3_600_000))
+    return c.body(null, 400);
+  const nanos = (milliseconds: number) =>
+    (BigInt(Math.trunc(milliseconds * 1000)) * 1000n).toString();
+  const attribute = (key: string, value: unknown) => ({
+    key,
+    value: { stringValue: String(redactLogValue(value)) },
+  });
   const spans = parsed.data.spans.map((span) => ({
     traceId: span.traceId,
     spanId: span.spanId,
@@ -86,7 +95,10 @@ browserTelemetryRouter.post('/', async (c) => {
           {
             resource: {
               attributes: [
-                attribute('service.name', `${config.serviceName.replace(/-api$/, '')}-${parsed.data.app}`),
+                attribute(
+                  'service.name',
+                  `${config.serviceName.replace(/-api$/, '')}-${parsed.data.app}`,
+                ),
                 attribute('deployment.environment.name', config.environment),
                 attribute('telemetry.source', 'browser'),
               ],

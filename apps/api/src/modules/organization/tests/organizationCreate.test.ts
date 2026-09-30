@@ -43,7 +43,9 @@ describe('POST /api/v1/organization', () => {
     expect(response.status).toBe(201);
     expect(data.name).toBe(`Test Org ${seq}`);
     expect(data.slug).toBe(`test-org-${seq}`);
-    expect((data as unknown as { organizationUsers?: unknown[] }).organizationUsers).toBeUndefined();
+    expect(
+      (data as unknown as { organizationUsers?: unknown[] }).organizationUsers,
+    ).toBeUndefined();
 
     const orgUser = await db.organizationUser.findUnique({
       where: { organizationId_userId: { organizationId: data.id, userId: user.id } },
@@ -56,7 +58,9 @@ describe('POST /api/v1/organization', () => {
     const seq = getNextSeq();
     await fetch(post('/api/v1/organization', { name: 'First', slug: `dup-slug-${seq}` }));
 
-    const response = await fetch(post('/api/v1/organization', { name: 'Second', slug: `dup-slug-${seq}` }));
+    const response = await fetch(
+      post('/api/v1/organization', { name: 'Second', slug: `dup-slug-${seq}` }),
+    );
     const body = await jsonError(response);
 
     expect(response.status).toBe(409);

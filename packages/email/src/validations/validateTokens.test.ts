@@ -28,7 +28,8 @@ const lens: EmailLens = {
   system: systemSlot(),
 };
 
-const messages = (content: string) => validateTokens(content, { lens }).map((issue) => issue.message);
+const messages = (content: string) =>
+  validateTokens(content, { lens }).map((issue) => issue.message);
 
 describe('validateTokens — what the lens can decide is decided at save', () => {
   it('accepts a required path and a system token', () => {
@@ -36,9 +37,13 @@ describe('validateTokens — what the lens can decide is decided at save', () =>
   });
 
   it('refuses an unknown root, an unknown path, and a mustache the engine does not understand', () => {
-    expect(messages('{{Recipient.name}}')[0]).toContain('is not a token or block the engine understands');
+    expect(messages('{{Recipient.name}}')[0]).toContain(
+      'is not a token or block the engine understands',
+    );
     expect(messages('{{foo.bar}}')[0]).toContain('names no scope root');
-    expect(messages('{{recipient.nickname}}')[0]).toContain("is not provided by this template's lens");
+    expect(messages('{{recipient.nickname}}')[0]).toContain(
+      "is not provided by this template's lens",
+    );
     expect(messages('{{recipient.name.first}}')[0]).toContain('reads through a scalar');
     expect(messages('{{recipient.account}}')[0]).toContain('is an object, not a value');
     expect(messages('{{system.nope}}')[0]).toContain("is not provided by this template's lens");
@@ -49,26 +54,36 @@ describe('validateTokens — what the lens can decide is decided at save', () =>
     expect(messages(guardedToken('recipient.phone', 'no phone'))).toEqual([]);
     expect(messages('{{recipient.account.plan}}')[0]).toContain('may be empty');
     expect(
-      messages('{{#if rule={"field":"recipient.account","operator":"exists"}}}{{recipient.account.plan}}{{/if}}'),
+      messages(
+        '{{#if rule={"field":"recipient.account","operator":"exists"}}}{{recipient.account.plan}}{{/if}}',
+      ),
     ).toEqual([]);
   });
 
   it('a negated or absent-polarity rule guards nothing, and the else branch is never guarded', () => {
     expect(
-      messages('{{#if rule={"field":"recipient.phone","operator":"notExists"}}}{{recipient.phone}}{{/if}}')[0],
+      messages(
+        '{{#if rule={"field":"recipient.phone","operator":"notExists"}}}{{recipient.phone}}{{/if}}',
+      )[0],
     ).toContain('may be empty');
     expect(
-      messages('{{#if rule={"field":"recipient.phone","operator":"exists"}}}ok{{else}}{{recipient.phone}}{{/if}}')[0],
+      messages(
+        '{{#if rule={"field":"recipient.phone","operator":"exists"}}}ok{{else}}{{recipient.phone}}{{/if}}',
+      )[0],
     ).toContain('may be empty');
     expect(
-      messages('{{#if rule={"any":[{"field":"recipient.phone","operator":"exists"}]}}}{{recipient.phone}}{{/if}}')[0],
+      messages(
+        '{{#if rule={"any":[{"field":"recipient.phone","operator":"exists"}]}}}{{recipient.phone}}{{/if}}',
+      )[0],
     ).toContain('may be empty');
   });
 
   it('a guard on a prefix covers the token only when the prefix is where the optionality lives', () => {
-    expect(messages('{{#if rule={"field":"recipient","operator":"exists"}}}{{recipient.phone}}{{/if}}')[0]).toContain(
-      'may be empty',
-    );
+    expect(
+      messages(
+        '{{#if rule={"field":"recipient","operator":"exists"}}}{{recipient.phone}}{{/if}}',
+      )[0],
+    ).toContain('may be empty');
   });
 
   it('data is Json: every path beneath it is optional and needs a guard', () => {
@@ -79,24 +94,26 @@ describe('validateTokens — what the lens can decide is decided at save', () =>
   it('lists are iterated, not addressed; loop bindings resolve through the lens', () => {
     expect(messages('{{recipient.contacts.value}}')[0]).toContain('iterate it with {{#each}}');
     expect(messages('{{#each recipient.contacts as=c}}{{c.value}}{{/each}}')).toEqual([]);
-    expect(messages('{{#each recipient.contacts as=c}}{{c}}{{/each}}')[0]).toContain('names the loop element');
+    expect(messages('{{#each recipient.contacts as=c}}{{c}}{{/each}}')[0]).toContain(
+      'names the loop element',
+    );
     expect(messages('{{#each recipient.tags as=t}}{{t}}{{/each}}')).toEqual([]);
     expect(messages('{{#each recipient.contacts as=c index=i}}{{i}}{{/each}}')).toEqual([]);
   });
 
   it('without a lens only the grammar is decided', () => {
-    expect(validateTokens('{{recipient.anything}} {{Nope}}').map((issue) => issue.message)[0]).toContain(
-      'is not a token or block',
-    );
+    expect(
+      validateTokens('{{recipient.anything}} {{Nope}}').map((issue) => issue.message)[0],
+    ).toContain('is not a token or block');
     expect(validateTokens('{{recipient.anything}}')).toEqual([]);
   });
 });
 
 describe('validateTokens — guards the review found gameable', () => {
   it('a guard on the Json root does not cover a path beneath it', () => {
-    expect(messages('{{#if rule={"field":"data","operator":"exists"}}}{{data.anything}}{{/if}}')[0]).toContain(
-      'may be empty',
-    );
+    expect(
+      messages('{{#if rule={"field":"data","operator":"exists"}}}{{data.anything}}{{/if}}')[0],
+    ).toContain('may be empty');
   });
 
   it('a scalar list outside a loop is a list, not a value', () => {

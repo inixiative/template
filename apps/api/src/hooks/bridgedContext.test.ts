@@ -112,8 +112,12 @@ describe('bridged hook context across a frame that loses async-local storage', (
 
     // (b) hook frame: both hooks ran, on both email models, inside the transaction.
     expect(observations.length).toBeGreaterThan(0);
-    expect(new Set(observations.map((entry) => entry.hook))).toEqual(new Set(['probeMatrixA', 'probeMatrixB']));
-    expect(new Set(observations.map((entry) => entry.model))).toEqual(new Set(['EmailComponent', 'EmailTemplate']));
+    expect(new Set(observations.map((entry) => entry.hook))).toEqual(
+      new Set(['probeMatrixA', 'probeMatrixB']),
+    );
+    expect(new Set(observations.map((entry) => entry.model))).toEqual(
+      new Set(['EmailComponent', 'EmailTemplate']),
+    );
 
     for (const entry of observations) {
       const where = `${entry.hook}/${entry.model}`;

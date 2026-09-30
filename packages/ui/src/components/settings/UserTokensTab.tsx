@@ -40,7 +40,8 @@ export const UserTokensTab = () => {
     {
       key: 'lastUsed',
       label: 'Last Used',
-      render: (token: Token) => (token.lastUsed ? new Date(token.lastUsed).toLocaleDateString() : 'Never'),
+      render: (token: Token) =>
+        token.lastUsed ? new Date(token.lastUsed).toLocaleDateString() : 'Never',
     },
     {
       key: 'actions',
@@ -79,7 +80,9 @@ export const UserTokensTab = () => {
           <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <div>
               <CardTitle>API Tokens</CardTitle>
-              <p className="text-sm text-muted-foreground mt-1">Create and manage API tokens for programmatic access</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Create and manage API tokens for programmatic access
+              </p>
             </div>
             <Button onClick={() => setIsCreateModalOpen(true)}>
               <Icon icon="lucide:plus" className="h-4 w-4 mr-2" />

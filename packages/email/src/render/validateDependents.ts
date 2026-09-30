@@ -5,7 +5,10 @@
  * @uses infrastructure:prisma
  */
 import { db } from '@template/db';
-import { DependentTemplateError, type DependentTemplateIssue } from '@template/email/errors/DependentTemplateError';
+import {
+  DependentTemplateError,
+  type DependentTemplateIssue,
+} from '@template/email/errors/DependentTemplateError';
 import { expand } from '@template/email/render/expand';
 import { ownerCascade, ownerWhere } from '@template/email/render/owner';
 import type { LensForSlug } from '@template/email/render/save';

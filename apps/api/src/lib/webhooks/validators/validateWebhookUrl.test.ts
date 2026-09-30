@@ -7,7 +7,9 @@ describe('validateWebhookUrl', () => {
 
     it('allows public https URLs', () => {
       expect(() => validateWebhookUrl('https://example.com/hooks', enforce)).not.toThrow();
-      expect(() => validateWebhookUrl('https://hooks.example.com:8443/path?x=1', enforce)).not.toThrow();
+      expect(() =>
+        validateWebhookUrl('https://hooks.example.com:8443/path?x=1', enforce),
+      ).not.toThrow();
     });
 
     it('rejects malformed URLs', () => {
@@ -15,17 +17,27 @@ describe('validateWebhookUrl', () => {
     });
 
     it('rejects non-http(s) schemes', () => {
-      expect(() => validateWebhookUrl('ftp://example.com', enforce)).toThrow('must use http or https');
-      expect(() => validateWebhookUrl('file:///etc/passwd', enforce)).toThrow('must use http or https');
+      expect(() => validateWebhookUrl('ftp://example.com', enforce)).toThrow(
+        'must use http or https',
+      );
+      expect(() => validateWebhookUrl('file:///etc/passwd', enforce)).toThrow(
+        'must use http or https',
+      );
     });
 
     it('rejects plain http', () => {
-      expect(() => validateWebhookUrl('http://example.com/hooks', enforce)).toThrow('must use https');
+      expect(() => validateWebhookUrl('http://example.com/hooks', enforce)).toThrow(
+        'must use https',
+      );
     });
 
     it('rejects localhost hostnames', () => {
-      expect(() => validateWebhookUrl('https://localhost/hooks', enforce)).toThrow('private or internal');
-      expect(() => validateWebhookUrl('https://api.localhost/hooks', enforce)).toThrow('private or internal');
+      expect(() => validateWebhookUrl('https://localhost/hooks', enforce)).toThrow(
+        'private or internal',
+      );
+      expect(() => validateWebhookUrl('https://api.localhost/hooks', enforce)).toThrow(
+        'private or internal',
+      );
     });
 
     it('rejects private literal addresses', () => {
@@ -42,7 +54,9 @@ describe('validateWebhookUrl', () => {
         '[fe80::1]',
         '[::ffff:10.0.0.1]',
       ]) {
-        expect(() => validateWebhookUrl(`https://${host}/hooks`, enforce)).toThrow('private or internal');
+        expect(() => validateWebhookUrl(`https://${host}/hooks`, enforce)).toThrow(
+          'private or internal',
+        );
       }
     });
 
@@ -62,7 +76,9 @@ describe('validateWebhookUrl', () => {
 
     it('still rejects malformed URLs and non-http schemes', () => {
       expect(() => validateWebhookUrl('not a url', relaxed)).toThrow('must be a valid URL');
-      expect(() => validateWebhookUrl('file:///etc/passwd', relaxed)).toThrow('must use http or https');
+      expect(() => validateWebhookUrl('file:///etc/passwd', relaxed)).toThrow(
+        'must use http or https',
+      );
     });
   });
 });

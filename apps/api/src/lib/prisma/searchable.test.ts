@@ -69,10 +69,14 @@ describe('searchable', () => {
   });
 
   it('throws when using a scalar as a relation', () => {
-    expect(() => searchable({ organization: [{ name: ['something'] }] })).toThrow('is not a relation');
+    expect(() => searchable({ organization: [{ name: ['something'] }] })).toThrow(
+      'is not a relation',
+    );
   });
 
   it('throws for multiple root keys', () => {
-    expect(() => searchable({ organization: ['name'], user: ['email'] })).toThrow('exactly one model');
+    expect(() => searchable({ organization: ['name'], user: ['email'] })).toThrow(
+      'exactly one model',
+    );
   });
 });

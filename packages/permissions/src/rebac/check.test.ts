@@ -160,7 +160,11 @@ describe('rebac check', () => {
     };
 
     it('grants access when first condition matches', async () => {
-      await permix.setup({ resource: 'db:organization', id: 'customer-org', actions: { own: true } });
+      await permix.setup({
+        resource: 'db:organization',
+        id: 'customer-org',
+        actions: { own: true },
+      });
       const record = {
         id: 'ref-1',
         customerOrganization: { id: 'customer-org' },
@@ -226,7 +230,11 @@ describe('rebac check', () => {
     });
 
     it('denies access when only first condition matches', async () => {
-      await permix.setup({ resource: 'db:organization', id: 'customer-org', actions: { own: true } });
+      await permix.setup({
+        resource: 'db:organization',
+        id: 'customer-org',
+        actions: { own: true },
+      });
       const record = {
         id: 'ref-1',
         customerOrganization: { id: 'customer-org' },
@@ -298,10 +306,16 @@ describe('rebac check', () => {
         'db:space': {
           actions: {
             // Can only access if parent org has enterprise plan
-            access: { rule: { field: 'organization.plan', operator: Operator.equals, value: 'enterprise' } },
+            access: {
+              rule: { field: 'organization.plan', operator: Operator.equals, value: 'enterprise' },
+            },
             // Check deeply nested entitlement
             useFeature: {
-              rule: { field: 'organization.entitlements.advancedFeatures', operator: Operator.equals, value: true },
+              rule: {
+                field: 'organization.entitlements.advancedFeatures',
+                operator: Operator.equals,
+                value: true,
+              },
             },
           },
         },
@@ -309,7 +323,11 @@ describe('rebac check', () => {
           actions: {
             // Check 3 levels deep
             accessPremium: {
-              rule: { field: 'space.organization.plan', operator: Operator.equals, value: 'enterprise' },
+              rule: {
+                field: 'space.organization.plan',
+                operator: Operator.equals,
+                value: 'enterprise',
+              },
             },
           },
         },
@@ -404,7 +422,11 @@ describe('rebac check', () => {
     };
 
     it('provider org owner can manage customerRef', async () => {
-      await permix.setup({ resource: 'db:organization', id: 'provider-org', actions: { own: true } });
+      await permix.setup({
+        resource: 'db:organization',
+        id: 'provider-org',
+        actions: { own: true },
+      });
       const record = {
         id: 'ref-1',
         customerOrganization: { id: 'customer-org' },
@@ -416,7 +438,11 @@ describe('rebac check', () => {
     });
 
     it('customer org member can read but not manage customerRef', async () => {
-      await permix.setup({ resource: 'db:organization', id: 'customer-org', actions: { read: true } });
+      await permix.setup({
+        resource: 'db:organization',
+        id: 'customer-org',
+        actions: { read: true },
+      });
       const record = {
         id: 'ref-1',
         customerOrganization: { id: 'customer-org' },
@@ -655,7 +681,9 @@ describe('rebac check', () => {
 
     it('returns false for undefined model', () => {
       const record = { id: 'unknown-1' };
-      expect(check(permix, schema, 'unknownModel' as unknown as AccessorName, record, 'own')).toBe(false);
+      expect(check(permix, schema, 'unknownModel' as unknown as AccessorName, record, 'own')).toBe(
+        false,
+      );
     });
 
     it('returns false for undefined action', async () => {
@@ -706,7 +734,9 @@ describe('rebac check', () => {
 
     it('handles deeply nested delegation chains', async () => {
       const deepSchema: RebacSchema = {
-        permissions: { 'db:organization': { actions: { own: null, a: 'own', b: 'a', c: 'b', d: 'c' } } },
+        permissions: {
+          'db:organization': { actions: { own: null, a: 'own', b: 'a', c: 'b', d: 'c' } },
+        },
       };
       await permix.setup({ resource: 'db:organization', id: 'org-1', actions: { own: true } });
       const record = { id: 'org-1' };
@@ -715,7 +745,9 @@ describe('rebac check', () => {
 
     it('handles deeply nested delegation without permission', () => {
       const deepSchema: RebacSchema = {
-        permissions: { 'db:organization': { actions: { own: null, a: 'own', b: 'a', c: 'b', d: 'c' } } },
+        permissions: {
+          'db:organization': { actions: { own: null, a: 'own', b: 'a', c: 'b', d: 'c' } },
+        },
       };
       const record = { id: 'org-1' };
       expect(check(permix, deepSchema, 'organization', record, 'd')).toBe(false);
@@ -741,9 +773,9 @@ describe('rebac check', () => {
 
       // No grants — forces schema evaluation down the cyclic relation walk.
       const noGrants = { check: () => false, isSuperadmin: () => false, getUserId: () => null };
-      expect(() => cyclicCheck(noGrants, cyclicSchema, { resource: 'space', record: space }, 'own')).toThrow(
-        /Cycle detected/,
-      );
+      expect(() =>
+        cyclicCheck(noGrants, cyclicSchema, { resource: 'space', record: space }, 'own'),
+      ).toThrow(/Cycle detected/);
     });
   });
 
@@ -849,7 +881,10 @@ describe('rebac check', () => {
         // Either self or some attribute predicate would grant
         permissionRules: {
           read: {
-            any: [{ self: 'userId' }, { rule: { field: 'shareToken', operator: Operator.equals, value: 'public' } }],
+            any: [
+              { self: 'userId' },
+              { rule: { field: 'shareToken', operator: Operator.equals, value: 'public' } },
+            ],
           },
         },
       };
@@ -915,7 +950,9 @@ describe('rebac check', () => {
         permissions: {
           'db:user': { actions: { read: { rel: 'crm:account', action: 'read' } } },
           'crm:account': {
-            actions: { read: { rule: { field: 'tier', operator: Operator.equals, value: 'gold' } } },
+            actions: {
+              read: { rule: { field: 'tier', operator: Operator.equals, value: 'gold' } },
+            },
           },
         },
       };

@@ -1,5 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import type { OrganizationUser, OrganizationUser as OrgUserType, User } from '@template/db/generated/client/client';
+import type {
+  OrganizationUser,
+  OrganizationUser as OrgUserType,
+  User,
+} from '@template/db/generated/client/client';
 import { cleanupTouchedTables, createOrganizationUser } from '@template/db/test';
 import { organizationUserRouter } from '#/modules/organizationUser';
 import { createTestApp } from '#tests/createTestApp';

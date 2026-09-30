@@ -42,7 +42,10 @@ describe('DELETE /token/:id', () => {
   });
 
   it('deletes an Organization token', async () => {
-    const { entity: token } = await createToken({ ownerModel: 'Organization' }, { organization: org });
+    const { entity: token } = await createToken(
+      { ownerModel: 'Organization' },
+      { organization: org },
+    );
 
     const response = await fetch(del(`/api/v1/token/${token.id}`));
     expect(response.status).toBe(204);
@@ -52,7 +55,10 @@ describe('DELETE /token/:id', () => {
   });
 
   it('deletes an OrganizationUser token', async () => {
-    const { entity: token } = await createToken({ ownerModel: 'OrganizationUser' }, { organizationUser: orgUser });
+    const { entity: token } = await createToken(
+      { ownerModel: 'OrganizationUser' },
+      { organizationUser: orgUser },
+    );
 
     const response = await fetch(del(`/api/v1/token/${token.id}`));
     expect(response.status).toBe(204);

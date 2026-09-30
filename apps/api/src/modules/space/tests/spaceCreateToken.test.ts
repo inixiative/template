@@ -1,6 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
-import type { Organization, OrganizationUser, Space, SpaceUser, User } from '@template/db/generated/client/client';
+import type {
+  Organization,
+  OrganizationUser,
+  Space,
+  SpaceUser,
+  User,
+} from '@template/db/generated/client/client';
 import { cleanupTouchedTables, createOrganizationUser, createSpace } from '@template/db/test';
 import { spaceRouter } from '#/modules/space';
 import { createTestApp } from '#tests/createTestApp';
@@ -48,7 +54,9 @@ describe('POST /api/v1/space/:id/tokens', () => {
   });
 
   it('creates a space token', async () => {
-    const response = await fetch(post(`/api/v1/space/${space.id}/tokens`, { name: 'New Token', role: 'member' }));
+    const response = await fetch(
+      post(`/api/v1/space/${space.id}/tokens`, { name: 'New Token', role: 'member' }),
+    );
     expect(response.status).toBe(201);
 
     const { data } = await json<{ id: string; name: string; key: string }>(response);

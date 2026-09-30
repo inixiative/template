@@ -3,7 +3,12 @@ import { Operator } from '@inixiative/json-rules';
 import { clearHookRegistry, db, registerSoftDeleteScoper } from '@template/db';
 import type { Space } from '@template/db/generated/client/client';
 import { SegmentType } from '@template/db/generated/client/enums';
-import { cleanupTouchedTables, createOrganizationUser, createSegment, createSpace } from '@template/db/test';
+import {
+  cleanupTouchedTables,
+  createOrganizationUser,
+  createSegment,
+  createSpace,
+} from '@template/db/test';
 import { RuleDegradedError } from '@template/shared/rules';
 import { registerRuleReferenceReferencedHook } from '#/hooks/ruleReference/referencedHook';
 import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
@@ -42,7 +47,10 @@ describe('segment rule health — the segments a rule names, as edges', () => {
 
   it('saving a membership rule writes one Segment → Segment edge, and re-saving set-diffs it', async () => {
     const { entity: target } = await createSegment({ conditions: acmeRule }, { space });
-    const { entity: dependent } = await createSegment({ conditions: membersOf(target.id) }, { space });
+    const { entity: dependent } = await createSegment(
+      { conditions: membersOf(target.id) },
+      { space },
+    );
 
     const edges = await edgesOf(dependent.id);
     expect(edges).toHaveLength(1);
@@ -60,14 +68,20 @@ describe('segment rule health — the segments a rule names, as edges', () => {
 
   it('a sound rule reports no issues and evaluates', async () => {
     const { entity: target } = await createSegment({ conditions: acmeRule }, { space });
-    const { entity: dependent } = await createSegment({ conditions: membersOf(target.id) }, { space });
+    const { entity: dependent } = await createSegment(
+      { conditions: membersOf(target.id) },
+      { space },
+    );
 
     expect((await withSegmentRuleIssues(dependent)).ruleIssues).toEqual([]);
     expect(await evaluateSegment(dependent)).toEqual([]);
   });
 
   it('a rule naming a segment that is gone is degraded: it evaluates nothing, and the read says why', async () => {
-    const { entity: target } = await createSegment({ type: SegmentType.dynamic, conditions: acmeRule }, { space });
+    const { entity: target } = await createSegment(
+      { type: SegmentType.dynamic, conditions: acmeRule },
+      { space },
+    );
     const { entity: dependent } = await createSegment(
       { type: SegmentType.dynamic, conditions: membersOf(target.id) },
       { space },
@@ -85,13 +99,18 @@ describe('segment rule health — the segments a rule names, as edges', () => {
     ]);
     await expect(evaluateSegment(dependent)).rejects.toBeInstanceOf(RuleDegradedError);
 
-    await db.withDeleted(() => db.segment.update({ where: { id: target.id }, data: { deletedAt: null } }));
+    await db.withDeleted(() =>
+      db.segment.update({ where: { id: target.id }, data: { deletedAt: null } }),
+    );
     expect((await withSegmentRuleIssues(dependent)).ruleIssues).toEqual([]);
     expect(await evaluateSegment(dependent)).toEqual([]);
   });
 
   it('degradation propagates up the graph: naming a degraded segment degrades the namer, and clears with it', async () => {
-    const { entity: target } = await createSegment({ type: SegmentType.dynamic, conditions: acmeRule }, { space });
+    const { entity: target } = await createSegment(
+      { type: SegmentType.dynamic, conditions: acmeRule },
+      { space },
+    );
     const { entity: middle } = await createSegment(
       { type: SegmentType.dynamic, conditions: membersOf(target.id) },
       { space },
@@ -112,7 +131,9 @@ describe('segment rule health — the segments a rule names, as edges', () => {
     ]);
     await expect(evaluateSegment(top)).rejects.toBeInstanceOf(RuleDegradedError);
 
-    await db.withDeleted(() => db.segment.update({ where: { id: target.id }, data: { deletedAt: null } }));
+    await db.withDeleted(() =>
+      db.segment.update({ where: { id: target.id }, data: { deletedAt: null } }),
+    );
     expect((await withSegmentRuleIssues(top)).ruleIssues).toEqual([]);
     expect(await evaluateSegment(top)).toEqual([]);
   });
@@ -121,9 +142,9 @@ describe('segment rule health — the segments a rule names, as edges', () => {
     const { entity: a } = await createSegment({ conditions: acmeRule }, { space });
     const { entity: b } = await createSegment({ conditions: membersOf(a.id) }, { space });
 
-    await expect(db.segment.update({ where: { id: a.id }, data: { conditions: membersOf(b.id) } })).rejects.toThrow(
-      'form a loop',
-    );
+    await expect(
+      db.segment.update({ where: { id: a.id }, data: { conditions: membersOf(b.id) } }),
+    ).rejects.toThrow('form a loop');
   });
 });
 
@@ -159,7 +180,10 @@ describe('segment rule health — edge upkeep', () => {
 
   it('a save that keeps a reference that has since died is allowed; a new dead reference is not', async () => {
     const { entity: target } = await createSegment({ conditions: acmeRule }, { space });
-    const { entity: dependent } = await createSegment({ conditions: membersOf(target.id) }, { space });
+    const { entity: dependent } = await createSegment(
+      { conditions: membersOf(target.id) },
+      { space },
+    );
     await db.segment.update({ where: { id: target.id }, data: { deletedAt: new Date() } });
 
     const renamed = await db.segment.update({

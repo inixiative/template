@@ -42,7 +42,8 @@ export const settingsItem: NavItem = {
       label: 'Update',
       path: '/update',
       icon: 'lucide:refresh-cw',
-      access: (permissions, context) => !!context.space && permissions.check(...getContextParams(context), 'manage'),
+      access: (permissions, context) =>
+        !!context.space && permissions.check(...getContextParams(context), 'manage'),
     },
     {
       label: 'Transfer',
@@ -51,7 +52,10 @@ export const settingsItem: NavItem = {
       access: (permissions, context) =>
         !!context.space &&
         !!context.organization &&
-        permissions.check(...getContextParams({ type: 'organization', organization: context.organization }), 'own'),
+        permissions.check(
+          ...getContextParams({ type: 'organization', organization: context.organization }),
+          'own',
+        ),
     },
   ],
 };

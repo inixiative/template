@@ -9,19 +9,22 @@ import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
 import { spaceCreateIntegrationRoute } from '#/modules/space/routes/spaceCreateIntegration';
 
-export const spaceCreateIntegrationController = makeController(spaceCreateIntegrationRoute, async (c, respond) => {
-  const db = c.get('db');
-  const space = getResource<'space'>(c);
-  const body = c.req.valid('json');
+export const spaceCreateIntegrationController = makeController(
+  spaceCreateIntegrationRoute,
+  async (c, respond) => {
+    const db = c.get('db');
+    const space = getResource<'space'>(c);
+    const body = c.req.valid('json');
 
-  const integration = await db.integration.create({
-    data: {
-      ...body,
-      ownerModel: 'Space',
-      organizationId: space.organizationId,
-      spaceId: space.id,
-    } as Prisma.IntegrationUncheckedCreateInput,
-  });
+    const integration = await db.integration.create({
+      data: {
+        ...body,
+        ownerModel: 'Space',
+        organizationId: space.organizationId,
+        spaceId: space.id,
+      } as Prisma.IntegrationUncheckedCreateInput,
+    });
 
-  return respond.created(integration);
-});
+    return respond.created(integration);
+  },
+);

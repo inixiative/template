@@ -82,7 +82,10 @@ type RegisteredFactory = {
 
 const factoryRegistry = new Map<ModelName, RegisteredFactory>();
 
-export const createFactory = <K extends ModelName>(modelName: K, config: FactoryConfig<K>): Factory<K> => {
+export const createFactory = <K extends ModelName>(
+  modelName: K,
+  config: FactoryConfig<K>,
+): Factory<K> => {
   const dependencies = mergeDependencies(modelName, config.dependencies);
 
   factoryRegistry.set(modelName, {
@@ -124,7 +127,9 @@ export const createFactory = <K extends ModelName>(modelName: K, config: Factory
       const registered = factoryRegistry.get(dep.modelName);
 
       if (!registered) {
-        throw new Error(`Dependency factory not registered: ${dep.modelName}. Import it before using.`);
+        throw new Error(
+          `Dependency factory not registered: ${dep.modelName}. Import it before using.`,
+        );
       }
 
       const depAccessor = toAccessor(dep.modelName);
@@ -188,7 +193,11 @@ export const createFactory = <K extends ModelName>(modelName: K, config: Factory
     const delegate = db.delegate(modelName);
     const entity: ModelOf<K> = persist
       ? upsertWhere
-        ? ((await delegate.upsert({ where: upsertWhere, create: merged, update: {} })) as ModelOf<K>)
+        ? ((await delegate.upsert({
+            where: upsertWhere,
+            create: merged,
+            update: {},
+          })) as ModelOf<K>)
         : ((await delegate.create({ data: merged })) as ModelOf<K>)
       : (merged as ModelOf<K>);
 
@@ -213,6 +222,7 @@ export const createFactory = <K extends ModelName>(modelName: K, config: Factory
   return {
     build: (overrides, context) => generate(false, overrides, context),
     create: (overrides, context) => generate(true, overrides, context) as Promise<BuildResult<K>>,
-    upsert: (where, overrides, context) => generate(true, overrides, context, where) as Promise<BuildResult<K>>,
+    upsert: (where, overrides, context) =>
+      generate(true, overrides, context, where) as Promise<BuildResult<K>>,
   };
 };

@@ -4,12 +4,21 @@ import { DelayedError, type Job, WaitingError } from 'bullmq';
 import { admitToSlot } from '#/jobs/admitToSlot';
 import { SLOW_LANE_PRIORITY } from '#/jobs/lanePriority';
 import { queue } from '#/jobs/queue';
-import { readSlowDeferred, recordSlowDeferral, SLOW_PARK_MIN_MS, slowParkDelayMs } from '#/jobs/slowLaneSignals';
+import {
+  readSlowDeferred,
+  recordSlowDeferral,
+  SLOW_PARK_MIN_MS,
+  slowParkDelayMs,
+} from '#/jobs/slowLaneSignals';
 import { createSlowSlotPool, slowSlotCapacity } from '#/jobs/slowSlotPool';
 import { JobLane, JobType } from '#/jobs/types';
 import { createMockJob } from '#tests/createTestWorker';
 
-const jobIn = (lane: JobLane, priority = lane === JobLane.slow ? SLOW_LANE_PRIORITY : 0, id = `${lane}-job`) =>
+const jobIn = (
+  lane: JobLane,
+  priority = lane === JobLane.slow ? SLOW_LANE_PRIORITY : 0,
+  id = `${lane}-job`,
+) =>
   createMockJob({
     id,
     name: 'sendWebhook',
@@ -26,9 +35,15 @@ describe('admitToSlot', () => {
 
   beforeEach(() => {
     waiting = 0;
-    const getWaitingCount = spyOn(queue, 'getWaitingCount').mockImplementation((async () => waiting) as never);
-    const getJobCounts = spyOn(queue, 'getJobCounts').mockImplementation((async () => ({ waiting })) as never);
-    const getCountsPerPriority = spyOn(queue, 'getCountsPerPriority').mockImplementation((async () => ({})) as never);
+    const getWaitingCount = spyOn(queue, 'getWaitingCount').mockImplementation(
+      (async () => waiting) as never,
+    );
+    const getJobCounts = spyOn(queue, 'getJobCounts').mockImplementation((async () => ({
+      waiting,
+    })) as never);
+    const getCountsPerPriority = spyOn(queue, 'getCountsPerPriority').mockImplementation(
+      (async () => ({})) as never,
+    );
     restore = () => {
       getWaitingCount.mockRestore();
       getJobCounts.mockRestore();
@@ -67,7 +82,10 @@ describe('admitToSlot', () => {
     await expect(admitToSlot(third, queue, slots)).rejects.toBeInstanceOf(DelayedError);
 
     expect(slots.held()).toBe(2);
-    const [timestamp, token] = (third.moveToDelayed as ReturnType<typeof mock>).mock.calls[0] as [number, string];
+    const [timestamp, token] = (third.moveToDelayed as ReturnType<typeof mock>).mock.calls[0] as [
+      number,
+      string,
+    ];
     expect(token).toBe('worker-token');
     expect(timestamp).toBeGreaterThanOrEqual(before + SLOW_PARK_MIN_MS);
     expect(timestamp).toBeLessThanOrEqual(Date.now() + process.env.JOBS_SLOW_PARK_MAX_MS);
@@ -77,7 +95,11 @@ describe('admitToSlot', () => {
   it('a parked slow job leaves the deferred count when a worker picks it back up and admits it', async () => {
     const slots = createSlowSlotPool(2);
     const parked = jobIn(JobLane.slow, SLOW_LANE_PRIORITY, 'parked');
-    const releaseFirst = await admitToSlot(jobIn(JobLane.slow, SLOW_LANE_PRIORITY, 'first'), queue, slots);
+    const releaseFirst = await admitToSlot(
+      jobIn(JobLane.slow, SLOW_LANE_PRIORITY, 'first'),
+      queue,
+      slots,
+    );
     await expect(admitToSlot(parked, queue, slots)).rejects.toBeInstanceOf(DelayedError);
     expect(await readSlowDeferred(queue.redis, queue.name)).toBe(1);
 

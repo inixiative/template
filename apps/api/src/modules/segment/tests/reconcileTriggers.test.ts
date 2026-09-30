@@ -36,7 +36,8 @@ describe('reconcile triggers — the lens defines the propagation graph', () => 
     for (const model of customerRefReachedModels()) {
       const events = RECONCILE_TRIGGERS[model as ModelName] ?? [];
       expect(events.length, `${model} has no reconcile trigger`).toBeGreaterThan(0);
-      for (const event of events) expect(names.has(event), `${event} is not an app event`).toBe(true);
+      for (const event of events)
+        expect(names.has(event), `${event} is not an app event`).toBe(true);
     }
   });
 });
@@ -84,11 +85,17 @@ describe('reconcile triggers — membership follows the events', () => {
     const segment = await liveSegment(taggedRule(tag.id));
     expect(await memberIds(segment.id)).toEqual([]);
 
-    const { entity: attachment } = await createTagAttachment({ resourceModel: 'User' }, { user: member, tag });
+    const { entity: attachment } = await createTagAttachment(
+      { resourceModel: 'User' },
+      { user: member, tag },
+    );
     await emitAppEvent('tagAttachment.created', { tagAttachment: attachment });
     expect(await memberIds(segment.id)).toEqual([memberRef.id]);
 
-    const detached = await db.tagAttachment.update({ where: { id: attachment.id }, data: { deletedAt: new Date() } });
+    const detached = await db.tagAttachment.update({
+      where: { id: attachment.id },
+      data: { deletedAt: new Date() },
+    });
     await emitAppEvent('tagAttachment.deleted', { tagAttachment: detached });
     expect(await memberIds(segment.id)).toEqual([]);
   });
@@ -96,12 +103,18 @@ describe('reconcile triggers — membership follows the events', () => {
   it('deleting a tag reconciles every resource it was attached to', async () => {
     const doomed = (await createTag()).entity;
     const segment = await liveSegment(taggedRule(doomed.id));
-    const { entity: attachment } = await createTagAttachment({ resourceModel: 'User' }, { user: member, tag: doomed });
+    const { entity: attachment } = await createTagAttachment(
+      { resourceModel: 'User' },
+      { user: member, tag: doomed },
+    );
     await emitAppEvent('tagAttachment.created', { tagAttachment: attachment });
     expect(await memberIds(segment.id)).toEqual([memberRef.id]);
 
     const tagAttachments = await db.tagAttachment.findMany({ where: { tagId: doomed.id } });
-    const deleted = await db.tag.update({ where: { id: doomed.id }, data: { deletedAt: new Date() } });
+    const deleted = await db.tag.update({
+      where: { id: doomed.id },
+      data: { deletedAt: new Date() },
+    });
     await emitAppEvent('tag.deleted', { tag: deleted, tagAttachments });
     expect(await memberIds(segment.id)).toEqual([]);
   });

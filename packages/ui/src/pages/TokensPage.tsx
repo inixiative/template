@@ -66,7 +66,9 @@ export const TokensPage = () => {
       key: 'createdAt',
       label: 'Created',
       render: (item: Token) => (
-        <span className="text-muted-foreground">{new Date(item.createdAt).toLocaleDateString()}</span>
+        <span className="text-muted-foreground">
+          {new Date(item.createdAt).toLocaleDateString()}
+        </span>
       ),
     },
     {
@@ -83,7 +85,11 @@ export const TokensPage = () => {
       label: '',
       render: (item: Token) => (
         <div className="flex justify-end gap-2">
-          <Button variant="ghost" size="sm" onClick={() => deleteMutation.mutate({ path: { id: item.id } })}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => deleteMutation.mutate({ path: { id: item.id } })}
+          >
             <Icon icon="lucide:trash-2" className="h-4 w-4 text-destructive" />
           </Button>
         </div>
@@ -125,7 +131,11 @@ export const TokensPage = () => {
         )}
       </Page>
 
-      <CreateTokenModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSubmit={handleCreate} />
+      <CreateTokenModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSubmit={handleCreate}
+      />
     </>
   );
 };

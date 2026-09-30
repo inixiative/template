@@ -22,7 +22,13 @@ export const childRelations = (model: string): ChildRelation[] => {
 
   const children = modelNames().flatMap((child) =>
     Object.entries(modelFields(child) ?? {}).flatMap(([field, def]) => {
-      if (def.kind !== 'object' || def.type !== model || !def.fromFields?.length || !def.toFields?.length) return [];
+      if (
+        def.kind !== 'object' ||
+        def.type !== model ||
+        !def.fromFields?.length ||
+        !def.toFields?.length
+      )
+        return [];
       if (CASCADE_EXEMPT[child]?.includes(field)) return [];
       return [
         {

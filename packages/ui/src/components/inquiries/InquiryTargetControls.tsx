@@ -23,7 +23,8 @@ export const InquiryTargetControls = ({ inquiry, size = 'sm' }: InquiryTargetCon
   const [isOpen, setIsOpen] = useState(false);
 
   const isTerminal = isTerminalInquiry(inquiry);
-  const canResolve = !isTerminal && (inquiry.status === 'sent' || inquiry.status === 'changesRequested');
+  const canResolve =
+    !isTerminal && (inquiry.status === 'sent' || inquiry.status === 'changesRequested');
   const isPersistedInquiry = !!inquiry.id && inquiry.id !== '__optimistic__';
 
   const entry = getInquiryInterface(inquiry.type);

@@ -24,7 +24,10 @@ describe('liveWhere', () => {
   });
 
   it('an explicit `deletedAt: undefined` opts out (the admin tri-state `all` branch)', () => {
-    expect(liveWhere('User', { deletedAt: undefined, name: 'x' })).toEqual({ deletedAt: undefined, name: 'x' });
+    expect(liveWhere('User', { deletedAt: undefined, name: 'x' })).toEqual({
+      deletedAt: undefined,
+      name: 'x',
+    });
   });
 
   it('a deletedAt under a relation key does not count as a root mention', () => {
@@ -84,7 +87,9 @@ describe('liveWhere', () => {
   });
 
   it('boolean combinators stay on the same model', () => {
-    expect(liveWhere('User', { OR: [{ contacts: { some: { name: 'x' } } }, { name: 'y' }] })).toEqual({
+    expect(
+      liveWhere('User', { OR: [{ contacts: { some: { name: 'x' } } }, { name: 'y' }] }),
+    ).toEqual({
       OR: [{ contacts: { some: { name: 'x', deletedAt: null } } }, { name: 'y' }],
       deletedAt: null,
     });

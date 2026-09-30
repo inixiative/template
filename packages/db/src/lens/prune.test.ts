@@ -6,7 +6,10 @@ import { prune } from '@template/db/lens/prune';
 describe('prune', () => {
   it('keeps only the available fields (single)', () => {
     const lens: LensNarrowing = { parent: lensFor('Inquiry'), root: { picks: ['id', 'status'] } };
-    expect(prune({ id: 'i1', status: 'sent', content: { x: 1 } }, lens)).toEqual({ id: 'i1', status: 'sent' });
+    expect(prune({ id: 'i1', status: 'sent', content: { x: 1 } }, lens)).toEqual({
+      id: 'i1',
+      status: 'sent',
+    });
   });
 
   it('prunes each element of an array', () => {
@@ -27,14 +30,27 @@ describe('prune', () => {
       parent: lensFor('Inquiry'),
       root: {
         picks: ['id', 'sourceUser'],
-        relations: { sourceUser: { picks: ['id'], where: { field: 'deletedAt', operator: 'notExists' } } },
+        relations: {
+          sourceUser: { picks: ['id'], where: { field: 'deletedAt', operator: 'notExists' } },
+        },
       },
       mapDefaults: {
-        prisma: { models: { Inquiry: { where: { field: 'status', operator: 'equals', value: 'sent' } } } },
+        prisma: {
+          models: { Inquiry: { where: { field: 'status', operator: 'equals', value: 'sent' } } },
+        },
       },
     };
-    const row = { id: 'i1', status: 'sent', content: 1, sourceUser: { id: 'u1', name: 'Bob', deletedAt: null } };
-    expect(prune(row, lens)).toEqual({ id: 'i1', status: 'sent', sourceUser: { id: 'u1', deletedAt: null } });
+    const row = {
+      id: 'i1',
+      status: 'sent',
+      content: 1,
+      sourceUser: { id: 'u1', name: 'Bob', deletedAt: null },
+    };
+    expect(prune(row, lens)).toEqual({
+      id: 'i1',
+      status: 'sent',
+      sourceUser: { id: 'u1', deletedAt: null },
+    });
   });
 
   it("drops the related rows a visit's where hides: a list element is filtered out, a to-one becomes null", () => {
@@ -47,7 +63,10 @@ describe('prune', () => {
             picks: [],
             where: { field: 'deletedAt', operator: 'notExists' },
             relations: {
-              tag: { picks: ['id', 'name'], where: { field: 'ownerModel', operator: 'equals', value: 'platform' } },
+              tag: {
+                picks: ['id', 'name'],
+                where: { field: 'ownerModel', operator: 'equals', value: 'platform' },
+              },
             },
           },
         },
@@ -122,8 +141,14 @@ describe('prune', () => {
         },
       },
     };
-    const targeted = { parent: scoped, root: { where: { field: 'id', operator: 'equals', value: 'u1' } } };
-    const attachment = (deletedAt: string | null, tag: Record<string, unknown>) => ({ deletedAt, tag });
+    const targeted = {
+      parent: scoped,
+      root: { where: { field: 'id', operator: 'equals', value: 'u1' } },
+    };
+    const attachment = (deletedAt: string | null, tag: Record<string, unknown>) => ({
+      deletedAt,
+      tag,
+    });
     const own = { id: 't1', name: 'vip', ownerModel: 'Organization', organizationId: 'org-1' };
     const theirs = { id: 't2', name: 'vip', ownerModel: 'Organization', organizationId: 'org-2' };
     const platform = { id: 't3', name: 'vip', ownerModel: 'platform' };
@@ -145,7 +170,10 @@ describe('prune', () => {
         id: 'u1',
         name: 'Ann',
         tagAttachments: [
-          { deletedAt: null, tag: { id: 't1', name: 'vip', ownerModel: 'Organization', organizationId: 'org-1' } },
+          {
+            deletedAt: null,
+            tag: { id: 't1', name: 'vip', ownerModel: 'Organization', organizationId: 'org-1' },
+          },
           { deletedAt: null, tag: null },
           { deletedAt: null, tag: { id: 't3', name: 'vip', ownerModel: 'platform' } },
         ],
@@ -165,7 +193,10 @@ describe('prune', () => {
   it('prunes a nested to-many relation', () => {
     const lens: LensNarrowing = {
       parent: lensFor('Inquiry'),
-      root: { picks: ['id', 'auditLogsAsSubject'], relations: { auditLogsAsSubject: { picks: ['id'] } } },
+      root: {
+        picks: ['id', 'auditLogsAsSubject'],
+        relations: { auditLogsAsSubject: { picks: ['id'] } },
+      },
     };
     const row = {
       id: 'i1',
@@ -174,6 +205,9 @@ describe('prune', () => {
         { id: 'a2', detail: 'y' },
       ],
     };
-    expect(prune(row, lens)).toEqual({ id: 'i1', auditLogsAsSubject: [{ id: 'a1' }, { id: 'a2' }] });
+    expect(prune(row, lens)).toEqual({
+      id: 'i1',
+      auditLogsAsSubject: [{ id: 'a1' }, { id: 'a2' }],
+    });
   });
 });

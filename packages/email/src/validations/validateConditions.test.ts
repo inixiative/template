@@ -3,7 +3,10 @@ import { createLens, type FieldMap } from '@inixiative/json-rules';
 import { ConditionValidationError } from '@template/email/errors/ConditionValidationError';
 import { EACH_MAX_DEPTH } from '@template/email/render/limits';
 import type { EmailLens } from '@template/email/rules/emailLens';
-import { assertValidConditions, validateConditions } from '@template/email/validations/validateConditions';
+import {
+  assertValidConditions,
+  validateConditions,
+} from '@template/email/validations/validateConditions';
 
 const rule = (o: Record<string, unknown>) => JSON.stringify(o);
 
@@ -27,7 +30,9 @@ describe('validateConditions', () => {
   });
 
   it('flags an unterminated block', () => {
-    const issues = validateConditions(`{{#if rule=${rule({ field: 'recipient.x', operator: 'equals', value: 1 })}}}A`);
+    const issues = validateConditions(
+      `{{#if rule=${rule({ field: 'recipient.x', operator: 'equals', value: 1 })}}}A`,
+    );
     expect(issues).toHaveLength(1);
     expect(issues[0].message).toContain('unterminated');
   });
@@ -40,7 +45,9 @@ describe('validateConditions', () => {
   });
 
   it('assertValidConditions throws ConditionValidationError on invalid input', () => {
-    expect(() => assertValidConditions('{{#if rule={bad}}}x{{/if}}')).toThrow(ConditionValidationError);
+    expect(() => assertValidConditions('{{#if rule={bad}}}x{{/if}}')).toThrow(
+      ConditionValidationError,
+    );
   });
 
   it('assertValidConditions passes for valid input', () => {
@@ -72,11 +79,14 @@ describe('validateConditions', () => {
 
 describe('validateConditions — {{#each}} blocks', () => {
   it('returns no issues for a valid loop over a reserved root', () => {
-    expect(validateConditions('{{#each data.items as=item index=i}}{{item.name}}{{/each}}')).toEqual([]);
+    expect(
+      validateConditions('{{#each data.items as=item index=i}}{{item.name}}{{/each}}'),
+    ).toEqual([]);
   });
 
   it('returns no issues for a nested loop rooted at the enclosing as=', () => {
-    const tpl = '{{#each data.brands as=brand}}{{#each brand.missions as=mission}}{{mission.name}}{{/each}}{{/each}}';
+    const tpl =
+      '{{#each data.brands as=brand}}{{#each brand.missions as=mission}}{{mission.name}}{{/each}}{{/each}}';
     expect(validateConditions(tpl)).toEqual([]);
   });
 
@@ -92,7 +102,9 @@ describe('validateConditions — {{#each}} blocks', () => {
 
   it('flags an as= that collides with an enclosing binding', () => {
     const tpl = '{{#each data.items as=item}}{{#each item.kids as=item}}x{{/each}}{{/each}}';
-    expect(validateConditions(tpl).some((x) => x.message.includes('collides with an enclosing'))).toBe(true);
+    expect(
+      validateConditions(tpl).some((x) => x.message.includes('collides with an enclosing')),
+    ).toBe(true);
   });
 
   it('flags an index= that collides with this block own as=', () => {
@@ -123,7 +135,9 @@ describe('validateConditions — {{#each}} blocks', () => {
 
   it('validates {{#if}} rules against the loop element scope', () => {
     const bad = rule({ field: 'item.vip' }); // missing operator
-    const issues = validateConditions(`{{#each data.items as=item}}{{#if rule=${bad}}}x{{/if}}{{/each}}`);
+    const issues = validateConditions(
+      `{{#each data.items as=item}}{{#if rule=${bad}}}x{{/if}}{{/each}}`,
+    );
     expect(issues.length).toBeGreaterThan(0);
   });
 
@@ -167,7 +181,11 @@ const testMap: FieldMap = {
 
 const slot = (model: string) => createLens({ mapName: 'test', model, maps: { test: testMap } });
 
-const testLens: EmailLens = { recipient: slot('Recipient'), sender: slot('Sender'), system: slot('System') };
+const testLens: EmailLens = {
+  recipient: slot('Recipient'),
+  sender: slot('Sender'),
+  system: slot('System'),
+};
 
 describe('validateConditions — whitespace-tolerant markers', () => {
   it('allows whitespace after rule= and before the closing }}', () => {
@@ -182,22 +200,31 @@ describe('validateConditions — whitespace-tolerant markers', () => {
 describe('validateConditions — lens validation of reserved-rooted rules', () => {
   it('an absolute-rooted {{#if}} rule validates against the lens', () => {
     expect(
-      validateConditions('{{#if rule={"field":"recipient.tier","operator":"equals","value":"gold"}}}A{{/if}}', {
-        lens: testLens,
-      }),
+      validateConditions(
+        '{{#if rule={"field":"recipient.tier","operator":"equals","value":"gold"}}}A{{/if}}',
+        {
+          lens: testLens,
+        },
+      ),
     ).toEqual([]);
     expect(
-      validateConditions('{{#if rule={"field":"recipient.notAField","operator":"equals","value":"x"}}}A{{/if}}', {
-        lens: testLens,
-      }).length,
+      validateConditions(
+        '{{#if rule={"field":"recipient.notAField","operator":"equals","value":"x"}}}A{{/if}}',
+        {
+          lens: testLens,
+        },
+      ).length,
     ).toBeGreaterThan(0);
   });
 
   it('a system-rooted rule validates against the lens like any other reserved root', () => {
     expect(
-      validateConditions('{{#if rule={"field":"system.unsubscribeUrl","operator":"notEmpty"}}}A{{/if}}', {
-        lens: testLens,
-      }),
+      validateConditions(
+        '{{#if rule={"field":"system.unsubscribeUrl","operator":"notEmpty"}}}A{{/if}}',
+        {
+          lens: testLens,
+        },
+      ),
     ).toEqual([]);
   });
 
@@ -223,7 +250,8 @@ describe('validateConditions — lens validation of reserved-rooted rules', () =
       `{{#each recipient.memberships filter=${filterJson} as=m index=i}}X{{/each}}`,
       `{{#each recipient.memberships index=i as=m filter=${filterJson}}}X{{/each}}`,
     ];
-    for (const content of orderings) expect(validateConditions(content, { lens: testLens })).toEqual([]);
+    for (const content of orderings)
+      expect(validateConditions(content, { lens: testLens })).toEqual([]);
   });
 });
 
@@ -273,7 +301,9 @@ describe('validateConditions — unknown binding roots', () => {
       { lens: testLens },
     );
 
-    expect(issues.some((x) => x.message.includes('path does not resolve through the narrowed lens'))).toBe(true);
+    expect(
+      issues.some((x) => x.message.includes('path does not resolve through the narrowed lens')),
+    ).toBe(true);
     expect(issues.some((x) => x.message.includes('unknown binding'))).toBe(false);
   });
 
@@ -311,7 +341,11 @@ describe('validateConditions — binding refs desugar to absolute paths for the 
       '{{#each recipient.memberships as=m filter={"all":[{"field":"m.tier","operator":"equals","value":"gold"},{"field":"sender.id","operator":"equals","value":"s"}]}}}X{{/each}}',
       { lens: testLens },
     );
-    expect(cross.some((x) => x.message.includes('reads the sender lens from inside a loop over recipient'))).toBe(true);
+    expect(
+      cross.some((x) =>
+        x.message.includes('reads the sender lens from inside a loop over recipient'),
+      ),
+    ).toBe(true);
     const whole = validateConditions(
       '{{#each recipient.memberships as=m}}{{#if rule={"field":"m","operator":"exists"}}}Y{{/if}}{{/each}}',
     );
@@ -361,7 +395,9 @@ describe('validateConditions — binding refs desugar to absolute paths for the 
   });
 
   it('a filter= whose JSON braces never close is a filter error, not an unterminated block', () => {
-    const issues = validateConditions('{{#each recipient.memberships as=m filter={{{}}X{{/each}}', { lens: testLens });
+    const issues = validateConditions('{{#each recipient.memberships as=m filter={{{}}X{{/each}}', {
+      lens: testLens,
+    });
     expect(issues.some((x) => x.message.includes('unterminated'))).toBe(false);
     expect(issues.some((x) => x.message.includes('filter JSON'))).toBe(true);
   });
@@ -387,7 +423,9 @@ describe('validateConditions — {{#each}} nesting depth cap', () => {
     );
 
     expect(depthIssues).toHaveLength(1);
-    expect(depthIssues[0]?.message).toBe(`{{#each}} blocks may not nest more than ${EACH_MAX_DEPTH} deep`);
+    expect(depthIssues[0]?.message).toBe(
+      `{{#each}} blocks may not nest more than ${EACH_MAX_DEPTH} deep`,
+    );
   });
 
   it('reports the breach once even when nested far past the cap', () => {
@@ -398,7 +436,11 @@ describe('validateConditions — {{#each}} nesting depth cap', () => {
 
 describe('validateConditions — per-entity straddle check', () => {
   it('an each wrapping a bare component ref is fine (nothing to straddle)', () => {
-    expect(validateConditions('{{#each data.items as=m}}{{#component:card}}{{/component:card}}{{/each}}')).toEqual([]);
+    expect(
+      validateConditions(
+        '{{#each data.items as=m}}{{#component:card}}{{/component:card}}{{/each}}',
+      ),
+    ).toEqual([]);
   });
 
   it('an each wrapping a component ref WITH an override is fine (overrides are caller-owned)', () => {

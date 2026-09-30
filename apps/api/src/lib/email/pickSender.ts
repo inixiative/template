@@ -13,7 +13,8 @@ export const pickSender = (spec: SenderSpec, entity: Record<string, unknown>): S
     Object.entries(spec).map(([key, field]) => {
       if (key === 'type') return [key, field];
       const value = entity[field];
-      if (isNil(value)) throw new Error(`Sender ${key} reads entity field "${field}", which is empty`);
+      if (isNil(value))
+        throw new Error(`Sender ${key} reads entity field "${field}", which is empty`);
       return [key, value];
     }),
   ) as Sender;

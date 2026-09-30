@@ -6,7 +6,16 @@
  */
 import { type ConsolaInstance, createConsola, LogLevels } from 'consola';
 
-type LogLevel = 'silent' | 'fatal' | 'error' | 'warn' | 'log' | 'info' | 'debug' | 'trace' | 'verbose';
+type LogLevel =
+  | 'silent'
+  | 'fatal'
+  | 'error'
+  | 'warn'
+  | 'log'
+  | 'info'
+  | 'debug'
+  | 'trace'
+  | 'verbose';
 
 export enum FrontendScope {
   web = 'web',

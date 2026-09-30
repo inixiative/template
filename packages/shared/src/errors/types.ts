@@ -14,7 +14,11 @@ export const HTTP_ERROR_MAP = {
   409: { label: 'CONFLICT', name: 'Conflict', guidance: 'fixInput' },
   410: { label: 'RESOURCE_GONE', name: 'Gone', guidance: 'fixInput' },
   413: { label: 'PAYLOAD_TOO_LARGE', name: 'Payload Too Large', guidance: 'fixInput' },
-  415: { label: 'UNSUPPORTED_MEDIA_TYPE', name: 'Unsupported Media Type', guidance: 'contactSupport' },
+  415: {
+    label: 'UNSUPPORTED_MEDIA_TYPE',
+    name: 'Unsupported Media Type',
+    guidance: 'contactSupport',
+  },
   422: { label: 'VALIDATION_ERROR', name: 'Unprocessable Entity', guidance: 'fixInput' },
   429: { label: 'RATE_LIMITED', name: 'Too Many Requests', guidance: 'tryAgain' },
 

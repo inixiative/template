@@ -86,7 +86,9 @@ describe('POST /api/admin/emailTemplate/ruleSurface', () => {
     });
 
     const { data } = await json<Surface>(
-      await fetch(post('/api/admin/emailTemplate/ruleSurface', { slug: 'inquiry-invite-organization-user' })),
+      await fetch(
+        post('/api/admin/emailTemplate/ruleSurface', { slug: 'inquiry-invite-organization-user' }),
+      ),
     );
 
     expect(data.source.maps[data.source.mapName]?.models.Email?.fields.data).toMatchObject({
@@ -101,7 +103,9 @@ describe('POST /api/admin/emailTemplate/ruleSurface', () => {
   it('falls back to the engine default lens when no default-tier row declares one', async () => {
     await db.emailTemplate.deleteMany({ where: { slug: 'inquiry-invite-organization-user' } });
     const { data } = await json<Surface>(
-      await fetch(post('/api/admin/emailTemplate/ruleSurface', { slug: 'inquiry-invite-organization-user' })),
+      await fetch(
+        post('/api/admin/emailTemplate/ruleSurface', { slug: 'inquiry-invite-organization-user' }),
+      ),
     );
 
     expect(fieldsOf(data, 'Email')).toEqual(['data', 'recipient', 'sender', 'system']);
@@ -119,7 +123,9 @@ describe('POST /api/admin/emailTemplate/ruleSurface', () => {
   });
 
   it('serves a recipient plus an unknown data bag for a slug the registry does not know', async () => {
-    const { data } = await json<Surface>(await fetch(post('/api/admin/emailTemplate/ruleSurface', { slug: 'adhoc' })));
+    const { data } = await json<Surface>(
+      await fetch(post('/api/admin/emailTemplate/ruleSurface', { slug: 'adhoc' })),
+    );
 
     expect(fieldsOf(data, 'Email')).toEqual(['data', 'recipient', 'system']);
     expect(data.source.maps[data.source.mapName]?.models.Email?.fields.data).toEqual({
@@ -157,9 +163,13 @@ describe('POST /api/admin/emailTemplate/ruleSurface — the picker offers what t
     const { entity: theirs } = await createOrganization();
     const platformTag = (await createTag()).entity;
     const myTag = (await createTag({ ownerModel: 'Organization' }, { organization: mine })).entity;
-    const theirTag = (await createTag({ ownerModel: 'Organization' }, { organization: theirs })).entity;
-    const mySegment = (await createSegment({ ownerModel: 'Organization' }, { organization: mine })).entity;
-    const theirSegment = (await createSegment({ ownerModel: 'Organization' }, { organization: theirs })).entity;
+    const theirTag = (await createTag({ ownerModel: 'Organization' }, { organization: theirs }))
+      .entity;
+    const mySegment = (await createSegment({ ownerModel: 'Organization' }, { organization: mine }))
+      .entity;
+    const theirSegment = (
+      await createSegment({ ownerModel: 'Organization' }, { organization: theirs })
+    ).entity;
 
     const { data } = await json<Surface>(
       await fetch(

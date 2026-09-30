@@ -26,4 +26,6 @@ export const organizationContactUpsert = (contact: Contact): WSHandoff[] | null 
     : null;
 
 export const organizationContactRemove = (contact: Contact): WSHandoff[] | null =>
-  contact.organizationId ? [streamAppend(stream, { id: contact.organizationId }, 'remove', { id: contact.id })] : null;
+  contact.organizationId
+    ? [streamAppend(stream, { id: contact.organizationId }, 'remove', { id: contact.id })]
+    : null;

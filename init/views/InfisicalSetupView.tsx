@@ -206,7 +206,10 @@ export const InfisicalSetupView: React.FC<InfisicalSetupViewProps> = ({ onComple
     );
   }
 
-  const progressItems = getInfisicalProgressSummaries(config).map(({ label, completed }) => ({ label, completed }));
+  const progressItems = getInfisicalProgressSummaries(config).map(({ label, completed }) => ({
+    label,
+    completed,
+  }));
   const error = config.infisical.error;
 
   return (

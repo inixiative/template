@@ -4,7 +4,8 @@ import { evaluateConditions } from '@template/email/render/evaluateConditions';
 // why: rules are checked against the real lens at evaluation, so these use paths it admits — `data.*`
 // why: is the free-form Json bucket; a made-up recipient column is a vocabulary violation, not a match.
 
-const rule = (field: string, operator: string, value: unknown) => JSON.stringify({ field, operator, value });
+const rule = (field: string, operator: string, value: unknown) =>
+  JSON.stringify({ field, operator, value });
 
 describe('evaluateConditions — else / else if', () => {
   const tiered = `{{#if rule=${rule('data.tier', 'equals', 'gold')}}}G{{else if rule=${rule('data.tier', 'equals', 'silver')}}}S{{else}}B{{/if}}`;
@@ -110,15 +111,22 @@ describe('evaluateConditions — reference liveness', () => {
 
   it('a branch whose rule names a row outside the live set is a rule error, never a match', () => {
     const errors: string[] = [];
-    expect(evaluateConditions(tpl, vars, (message) => errors.push(message.detail), new Set(['Tag|tag-other']))).toBe(
-      'BASE',
-    );
+    expect(
+      evaluateConditions(
+        tpl,
+        vars,
+        (message) => errors.push(message.detail),
+        new Set(['Tag|tag-other']),
+      ),
+    ).toBe('BASE');
     expect(errors).toEqual(['rule names a Tag that no longer resolves: tag-1']);
   });
 
   it('fails closed on an empty live set — absence is the answer, not an unchecked pass', () => {
     const errors: string[] = [];
-    expect(evaluateConditions(tpl, vars, (message) => errors.push(message.detail), new Set())).toBe('BASE');
+    expect(evaluateConditions(tpl, vars, (message) => errors.push(message.detail), new Set())).toBe(
+      'BASE',
+    );
     expect(errors).toEqual(['rule names a Tag that no longer resolves: tag-1']);
   });
 
@@ -139,21 +147,27 @@ describe('evaluateConditions — bindings and unterminated rules', () => {
     const errors: string[] = [];
     const tpl = `{{#if rule=${rule}}}X{{else}}Y{{/if}}`;
     expect(
-      evaluateConditions(tpl, { recipient: { id: 'u1', tagAttachments: [{ tag: { id: 'u1' } }] } }, (m) =>
-        errors.push(m.detail),
+      evaluateConditions(
+        tpl,
+        { recipient: { id: 'u1', tagAttachments: [{ tag: { id: 'u1' } }] } },
+        (m) => errors.push(m.detail),
       ),
     ).toBe('X');
-    expect(evaluateConditions(tpl, { recipient: { id: 'u1', tagAttachments: [] } }, (m) => errors.push(m.detail))).toBe(
-      'Y',
-    );
+    expect(
+      evaluateConditions(tpl, { recipient: { id: 'u1', tagAttachments: [] } }, (m) =>
+        errors.push(m.detail),
+      ),
+    ).toBe('Y');
     expect(errors).toHaveLength(0);
   });
 
   it('a rule that requires a binding nobody supplies is a rule error, never a match', () => {
     const rule = JSON.stringify({ field: 'recipient.name', operator: 'equals', bind: 'name' });
     const errors: string[] = [];
-    const out = evaluateConditions(`{{#if rule=${rule}}}X{{else}}Y{{/if}}`, { recipient: { name: 'Ada' } }, (m) =>
-      errors.push(m.detail),
+    const out = evaluateConditions(
+      `{{#if rule=${rule}}}X{{else}}Y{{/if}}`,
+      { recipient: { name: 'Ada' } },
+      (m) => errors.push(m.detail),
     );
     expect(out).toBe('Y');
     expect(errors).toEqual(['rule requires a binding that was not supplied: name']);
@@ -161,11 +175,14 @@ describe('evaluateConditions — bindings and unterminated rules', () => {
 });
 
 describe('evaluateConditions — check() throwing at evaluation time', () => {
-  const THROWING_RULE = '{{#if rule={"field":"recipient.plan","operator":"nope","value":"pro"}}}A{{else}}B{{/if}}';
+  const THROWING_RULE =
+    '{{#if rule={"field":"recipient.plan","operator":"nope","value":"pro"}}}A{{else}}B{{/if}}';
 
   it('reports the thrown rule error via onError and skips the branch by default', () => {
     const errors: string[] = [];
-    const output = evaluateConditions(THROWING_RULE, { recipient: { plan: 'pro' } }, (m) => errors.push(m.detail));
+    const output = evaluateConditions(THROWING_RULE, { recipient: { plan: 'pro' } }, (m) =>
+      errors.push(m.detail),
+    );
 
     expect(output).toBe('B');
     expect(errors).toHaveLength(1);
@@ -184,9 +201,11 @@ describe('evaluateConditions — check() throwing at evaluation time', () => {
 describe('evaluateConditions — unterminated block', () => {
   it('renders nothing from an unterminated {{#if}} on and sinks the issue', () => {
     const errors: string[] = [];
-    expect(evaluateConditions('before {{#if rule=true}}A', { recipient: {} }, (m) => errors.push(m.kind))).toBe(
-      'before ',
-    );
+    expect(
+      evaluateConditions('before {{#if rule=true}}A', { recipient: {} }, (m) =>
+        errors.push(m.kind),
+      ),
+    ).toBe('before ');
     expect(errors).toEqual(['rule']);
   });
 
@@ -212,8 +231,10 @@ describe('evaluateConditions — {{#each}} filter errors, the each-analog of the
 
   it('a throwing filter check() sinks once and excludes every element by default', () => {
     const errors: string[] = [];
-    const output = evaluateConditions(THROWING_FILTER, { data: { items: [{ x: 1 }, { x: 1 }] } }, (m) =>
-      errors.push(m.detail),
+    const output = evaluateConditions(
+      THROWING_FILTER,
+      { data: { items: [{ x: 1 }, { x: 1 }] } },
+      (m) => errors.push(m.detail),
     );
 
     expect(output).toBe('');
@@ -237,9 +258,11 @@ describe('evaluateConditions — {{#each}} filter errors, the each-analog of the
 
 describe('evaluateConditions — {{#each}} resolved structurally, never substituted', () => {
   it('iterates and filters, but leaves binding + reserved-root tokens inside the body unsubstituted', () => {
-    expect(evaluateConditions('{{#each data.items as=item}}[{{item}}]{{/each}}', { data: { items: ['a', 'b'] } })).toBe(
-      '[{{item}}][{{item}}]',
-    );
+    expect(
+      evaluateConditions('{{#each data.items as=item}}[{{item}}]{{/each}}', {
+        data: { items: ['a', 'b'] },
+      }),
+    ).toBe('[{{item}}][{{item}}]');
   });
 
   it('filter= still excludes elements structurally', () => {
@@ -252,7 +275,9 @@ describe('evaluateConditions — {{#each}} resolved structurally, never substitu
   });
 
   it('an empty array still renders empty with no structural change', () => {
-    expect(evaluateConditions('{{#each data.items as=item}}X{{/each}}', { data: { items: [] } })).toBe('');
+    expect(
+      evaluateConditions('{{#each data.items as=item}}X{{/each}}', { data: { items: [] } }),
+    ).toBe('');
   });
 });
 

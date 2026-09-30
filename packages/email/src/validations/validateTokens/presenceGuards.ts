@@ -15,7 +15,8 @@ const guardsOf = (condition: Condition, out: Set<string>): void => {
     for (const child of node.all as Condition[]) guardsOf(child, out);
     return;
   }
-  if (Array.isArray(node.any) || 'if' in node || 'arrayOperator' in node || 'aggregate' in node) return;
+  if (Array.isArray(node.any) || 'if' in node || 'arrayOperator' in node || 'aggregate' in node)
+    return;
   if (typeof node.field !== 'string' || !node.field) return;
   const operator = node.operator;
   if (PRESENCE_OPERATORS.has(operator as string)) out.add(node.field);

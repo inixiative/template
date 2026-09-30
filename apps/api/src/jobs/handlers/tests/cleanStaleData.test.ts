@@ -1,6 +1,11 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
 import type { User } from '@template/db/generated/client/client';
-import { cleanupTouchedTables, createUser, createWebhookEvent, createWebhookSubscription } from '@template/db/test';
+import {
+  cleanupTouchedTables,
+  createUser,
+  createWebhookEvent,
+  createWebhookSubscription,
+} from '@template/db/test';
 import { cleanStaleData } from '#/jobs/handlers/cleanStaleData';
 import type { WorkerContext } from '#/jobs/types';
 import { createTestWorker } from '#tests/createTestWorker';
@@ -78,14 +83,20 @@ describe('cleanStaleData handler', () => {
     );
 
     // Only purge old SUCCESSES — keep errored ones for investigation.
-    await cleanStaleData(ctx, { model: 'WebhookEvent', retentionDays: 90, filters: { status: 'success' } });
+    await cleanStaleData(ctx, {
+      model: 'WebhookEvent',
+      retentionDays: 90,
+      filters: { status: 'success' },
+    });
 
     expect(await ctx.db.webhookEvent.findUnique({ where: { id: oldSuccess.id } })).toBeNull();
     expect(await ctx.db.webhookEvent.findUnique({ where: { id: oldError.id } })).not.toBeNull();
   });
 
   it('handles empty result set without error', async () => {
-    await expect(cleanStaleData(ctx, { model: 'WebhookEvent', retentionDays: 90 })).resolves.toBeUndefined();
+    await expect(
+      cleanStaleData(ctx, { model: 'WebhookEvent', retentionDays: 90 }),
+    ).resolves.toBeUndefined();
   });
 
   it('throws when archive is configured (stub not implemented)', async () => {

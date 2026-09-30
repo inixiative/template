@@ -2,7 +2,14 @@ import { describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import { ContactOwnerModel, ContactType } from '@template/db/generated/client/enums';
 import { createUser, getNextSeq } from '@template/db/test';
-import { email, liveOrders, phone, phoneRow, positions, posOf } from '#/hooks/orderedList/tests/setup';
+import {
+  email,
+  liveOrders,
+  phone,
+  phoneRow,
+  positions,
+  posOf,
+} from '#/hooks/orderedList/tests/setup';
 
 describe('create', () => {
   it('appends to end when position omitted', async () => {
@@ -52,7 +59,9 @@ describe('createManyAndReturn', () => {
   it('sequential append (all omitted)', async () => {
     const { entity: u } = await createUser();
     await phone(u.id); // existing: 1
-    const res = await db.contact.createManyAndReturn({ data: [phoneRow(u.id), phoneRow(u.id), phoneRow(u.id)] });
+    const res = await db.contact.createManyAndReturn({
+      data: [phoneRow(u.id), phoneRow(u.id), phoneRow(u.id)],
+    });
     expect(res.map((r) => r.position).sort()).toEqual([2, 3, 4]);
   });
 

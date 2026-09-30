@@ -32,7 +32,10 @@ const until = async (predicate: () => boolean, attempts = 10_000): Promise<void>
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 50));
 
-const withStreamRouteStatus = async (status: number, run: () => Promise<unknown> | undefined): Promise<void> => {
+const withStreamRouteStatus = async (
+  status: number,
+  run: () => Promise<unknown> | undefined,
+): Promise<void> => {
   const realRequest = app.request.bind(app);
   const spy = spyOn(app, 'request').mockImplementation(((input: string, init?: RequestInit) =>
     String(input).endsWith('/contacts')
@@ -112,7 +115,9 @@ describe('data streams (real app)', () => {
   it('answers a 5xx or 429 snapshot with a retryable error, not a rejection', async () => {
     for (const status of [500, 503, 429]) {
       const { socket, sent } = connect(memberBearer);
-      await withStreamRouteStatus(status, () => websocketHandler.message(socket, openFrame(stream)));
+      await withStreamRouteStatus(status, () =>
+        websocketHandler.message(socket, openFrame(stream)),
+      );
 
       expect(frames(sent)).toEqual([{ type: 'error', action: 'open', stream, retryable: true }]);
       expect(byStream.has(stream)).toBe(false);
@@ -150,7 +155,12 @@ describe('data streams (real app)', () => {
     expect(answered).toHaveLength(names.length);
     expect(new Set(answered.map((frame) => frame.stream))).toEqual(new Set(names));
     for (const name of names.slice(WS_MAX_PENDING_FRAMES)) {
-      expect(answered).toContainEqual({ type: 'error', action: 'open', stream: name, retryable: true });
+      expect(answered).toContainEqual({
+        type: 'error',
+        action: 'open',
+        stream: name,
+        retryable: true,
+      });
     }
   });
 
@@ -190,11 +200,9 @@ describe('data streams (real app)', () => {
     expect(sent).toEqual([]);
     await pending;
 
-    expect(frames(sent).map((frame) => (frame.type === 'opened' ? 'opened' : frame.action))).toEqual([
-      'opened',
-      'snapshot',
-      'append',
-    ]);
+    expect(
+      frames(sent).map((frame) => (frame.type === 'opened' ? 'opened' : frame.action)),
+    ).toEqual(['opened', 'snapshot', 'append']);
     expect(frames(sent)[2]).toEqual(append);
   });
 
@@ -250,7 +258,10 @@ describe('data streams (real app)', () => {
     );
     const { socket, sent } = connect();
     const authenticate = (authorization: string) =>
-      websocketHandler.message(socket, JSON.stringify({ action: 'authenticate', headers: { authorization } }));
+      websocketHandler.message(
+        socket,
+        JSON.stringify({ action: 'authenticate', headers: { authorization } }),
+      );
 
     await authenticate(memberBearer);
     await websocketHandler.message(socket, openFrame(stream));
@@ -303,7 +314,10 @@ describe('data streams (real app)', () => {
     });
 
     it('closes a stream whose route now answers 403, and stops its appends', async () => {
-      const { entity: membership, context } = await createOrganizationUser({ role: 'member' }, { organization });
+      const { entity: membership, context } = await createOrganizationUser(
+        { role: 'member' },
+        { organization },
+      );
       const revocable = connect((await createBearerToken(context.user)).authorization);
       const staying = connect(memberBearer);
       await websocketHandler.message(revocable.socket, openFrame(stream));
@@ -343,14 +357,19 @@ describe('data streams (real app)', () => {
       const probe = spyOn(app, 'request');
       try {
         await Promise.all([reauthorizeOpenStreams(), reauthorizeOpenStreams()]);
-        expect(probe.mock.calls.filter(([input]) => String(input).endsWith('/contacts'))).toHaveLength(1);
+        expect(
+          probe.mock.calls.filter(([input]) => String(input).endsWith('/contacts')),
+        ).toHaveLength(1);
       } finally {
         probe.mockRestore();
       }
     });
   });
   describe('adversarial review', () => {
-    const withMeStatus = async (status: number, run: () => Promise<unknown> | undefined): Promise<void> => {
+    const withMeStatus = async (
+      status: number,
+      run: () => Promise<unknown> | undefined,
+    ): Promise<void> => {
       const realRequest = app.request.bind(app);
       const spy = spyOn(app, 'request').mockImplementation(((input: string, init?: RequestInit) =>
         String(input).endsWith('/api/v1/me')
@@ -369,7 +388,10 @@ describe('data streams (real app)', () => {
       const { authorization } = await createBearerToken(user);
       const { socket, sent } = connect();
       const authenticate = () =>
-        websocketHandler.message(socket, JSON.stringify({ action: 'authenticate', headers: { authorization } }));
+        websocketHandler.message(
+          socket,
+          JSON.stringify({ action: 'authenticate', headers: { authorization } }),
+        );
       await authenticate();
       await websocketHandler.message(socket, openFrame(stream));
       sent.length = 0;
@@ -388,7 +410,10 @@ describe('data streams (real app)', () => {
       await withMeStatus(503, () =>
         websocketHandler.message(
           socket,
-          JSON.stringify({ action: 'authenticate', headers: { authorization, 'x-spoof-user-email': member.email } }),
+          JSON.stringify({
+            action: 'authenticate',
+            headers: { authorization, 'x-spoof-user-email': member.email },
+          }),
         ),
       );
       expect(frames(sent)).toEqual([{ type: 'error', action: 'authenticate', retryable: true }]);
@@ -398,7 +423,9 @@ describe('data streams (real app)', () => {
       const { entity: user } = await createUser();
       const { context: other } = await createOrganizationUser({ role: 'member' }, { user });
       await createOrganizationUser({ role: 'member' }, { organization, user });
-      const otherStream = STREAM_DEFINITIONS.organizationReadManyContacts.name({ id: other.organization.id });
+      const otherStream = STREAM_DEFINITIONS.organizationReadManyContacts.name({
+        id: other.organization.id,
+      });
       const { socket, sent } = connect((await createBearerToken(user)).authorization);
       await websocketHandler.message(socket, openFrame(otherStream));
       await websocketHandler.message(socket, openFrame(stream));

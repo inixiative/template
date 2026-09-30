@@ -5,7 +5,10 @@
  * @uses none
  */
 import { END, END_EACH, IF } from '@template/email/render/conditionParser/grammar';
-import { type Kind, nextStructuralToken } from '@template/email/render/conditionParser/nextStructuralToken';
+import {
+  type Kind,
+  nextStructuralToken,
+} from '@template/email/render/conditionParser/nextStructuralToken';
 import { readEachMarker } from '@template/email/render/conditionParser/readEachMarker';
 import { readRuleMarker } from '@template/email/render/conditionParser/readRuleMarker';
 

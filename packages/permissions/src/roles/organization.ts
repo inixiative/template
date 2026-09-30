@@ -15,7 +15,11 @@ export const organizationRoles = {
   viewer: { organization: { read: true } },
 } as const;
 
-export const getOrgPermissions = (role: Role, orgId: OrganizationId, entitlements?: Entitlements): PermissionEntry => {
+export const getOrgPermissions = (
+  role: Role,
+  orgId: OrganizationId,
+  entitlements?: Entitlements,
+): PermissionEntry => {
   const baseActions = organizationRoles[role].organization;
   return {
     resource: 'db:organization',

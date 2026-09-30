@@ -141,7 +141,12 @@ const RAILWAY_PROGRESS_KEYS = [
   'ensureStagingWorkerDeployment',
 ] as const;
 
-const RESEND_PROGRESS_KEYS = ['storeApiKey', 'storeFromAddress', 'addDomain', 'confirmDns'] as const;
+const RESEND_PROGRESS_KEYS = [
+  'storeApiKey',
+  'storeFromAddress',
+  'addDomain',
+  'confirmDns',
+] as const;
 
 const BOUNCER_PROGRESS_KEYS = ['storeApiKey'] as const;
 
@@ -257,7 +262,9 @@ const normalizeProgress = <Keys extends readonly string[]>(
     keys.map((key) => {
       const fallbacks = legacyFallback[key as Keys[number]] ?? [];
       const matchesLegacy = fallbacks.some((entry) =>
-        Array.isArray(entry) ? entry.every((legacyKey) => raw[legacyKey] === true) : raw[entry as string] === true,
+        Array.isArray(entry)
+          ? entry.every((legacyKey) => raw[legacyKey] === true)
+          : raw[entry as string] === true,
       );
       return [key, raw[key] === true || matchesLegacy];
     }),
@@ -265,7 +272,11 @@ const normalizeProgress = <Keys extends readonly string[]>(
 };
 
 export type ProjectConfig = {
-  monitoring?: { mode: 'off' | 'otlp' | 'split'; configProjectName: string; progress: Record<string, boolean> };
+  monitoring?: {
+    mode: 'off' | 'otlp' | 'split';
+    configProjectName: string;
+    progress: Record<string, boolean>;
+  };
   launched: boolean;
   project: {
     name: string;
@@ -459,7 +470,8 @@ const RESEND_LEGACY_FALLBACK: LegacyFallback<typeof RESEND_PROGRESS_KEYS> = {
 
 const normalizeResendProgress = (
   progress: Partial<Record<string, boolean>> | undefined,
-): ProjectConfig['resend']['progress'] => normalizeProgress(RESEND_PROGRESS_KEYS, progress, RESEND_LEGACY_FALLBACK);
+): ProjectConfig['resend']['progress'] =>
+  normalizeProgress(RESEND_PROGRESS_KEYS, progress, RESEND_LEGACY_FALLBACK);
 
 const defaultBouncerProgress = makeDefaultProgress(BOUNCER_PROGRESS_KEYS);
 
@@ -543,7 +555,8 @@ const VERCEL_LEGACY_FALLBACK: LegacyFallback<typeof VERCEL_PROGRESS_KEYS> = {
 
 const normalizeVercelProgress = (
   progress: Partial<Record<string, boolean>> | undefined,
-): ProjectConfig['vercel']['progress'] => normalizeProgress(VERCEL_PROGRESS_KEYS, progress, VERCEL_LEGACY_FALLBACK);
+): ProjectConfig['vercel']['progress'] =>
+  normalizeProgress(VERCEL_PROGRESS_KEYS, progress, VERCEL_LEGACY_FALLBACK);
 
 const RAILWAY_LEGACY_FALLBACK: LegacyFallback<typeof RAILWAY_PROGRESS_KEYS> = {
   ensureProdEnvironment: ['renameProductionEnv'],
@@ -589,7 +602,8 @@ const RAILWAY_LEGACY_FALLBACK: LegacyFallback<typeof RAILWAY_PROGRESS_KEYS> = {
 
 const normalizeRailwayProgress = (
   progress: Partial<Record<string, boolean>> | undefined,
-): ProjectConfig['railway']['progress'] => normalizeProgress(RAILWAY_PROGRESS_KEYS, progress, RAILWAY_LEGACY_FALLBACK);
+): ProjectConfig['railway']['progress'] =>
+  normalizeProgress(RAILWAY_PROGRESS_KEYS, progress, RAILWAY_LEGACY_FALLBACK);
 
 const PLANETSCALE_LEGACY_FALLBACK: LegacyFallback<typeof PLANETSCALE_PROGRESS_KEYS> = {
   recordTokenId: ['createToken'],
@@ -662,7 +676,8 @@ export const getProjectConfig = async (): Promise<ProjectConfig> => {
       },
       bouncer: {
         configProjectName: (config as Record<string, unknown>).bouncer
-          ? (((config as Record<string, unknown>).bouncer as Record<string, string>).configProjectName ?? '')
+          ? (((config as Record<string, unknown>).bouncer as Record<string, string>)
+              .configProjectName ?? '')
           : '',
         progress: normalizeBouncerProgress(
           ((config as Record<string, unknown>).bouncer as Record<string, unknown>)?.progress as
@@ -725,18 +740,24 @@ export const getProjectConfig = async (): Promise<ProjectConfig> => {
         },
         apps: {
           web: {
-            enabled: (config.features?.apps?.web?.enabled ?? defaultFeatures.apps.web.enabled) === true,
+            enabled:
+              (config.features?.apps?.web?.enabled ?? defaultFeatures.apps.web.enabled) === true,
           },
           admin: {
-            enabled: (config.features?.apps?.admin?.enabled ?? defaultFeatures.apps.admin.enabled) === true,
+            enabled:
+              (config.features?.apps?.admin?.enabled ?? defaultFeatures.apps.admin.enabled) ===
+              true,
           },
           superadmin: {
-            enabled: (config.features?.apps?.superadmin?.enabled ?? defaultFeatures.apps.superadmin.enabled) === true,
+            enabled:
+              (config.features?.apps?.superadmin?.enabled ??
+                defaultFeatures.apps.superadmin.enabled) === true,
           },
         },
         gitConnectFrontend: {
           enabled:
-            (config.features?.gitConnectFrontend?.enabled ?? defaultFeatures.gitConnectFrontend.enabled) === true,
+            (config.features?.gitConnectFrontend?.enabled ??
+              defaultFeatures.gitConnectFrontend.enabled) === true,
         },
       },
       providers: {
@@ -865,17 +886,23 @@ export const writeProjectConfig = async (config: ProjectConfig): Promise<void> =
       },
       apps: {
         web: {
-          enabled: (config.features?.apps?.web?.enabled ?? defaultFeatures.apps.web.enabled) === true,
+          enabled:
+            (config.features?.apps?.web?.enabled ?? defaultFeatures.apps.web.enabled) === true,
         },
         admin: {
-          enabled: (config.features?.apps?.admin?.enabled ?? defaultFeatures.apps.admin.enabled) === true,
+          enabled:
+            (config.features?.apps?.admin?.enabled ?? defaultFeatures.apps.admin.enabled) === true,
         },
         superadmin: {
-          enabled: (config.features?.apps?.superadmin?.enabled ?? defaultFeatures.apps.superadmin.enabled) === true,
+          enabled:
+            (config.features?.apps?.superadmin?.enabled ??
+              defaultFeatures.apps.superadmin.enabled) === true,
         },
       },
       gitConnectFrontend: {
-        enabled: (config.features?.gitConnectFrontend?.enabled ?? defaultFeatures.gitConnectFrontend.enabled) === true,
+        enabled:
+          (config.features?.gitConnectFrontend?.enabled ??
+            defaultFeatures.gitConnectFrontend.enabled) === true,
       },
     },
     providers: {

@@ -8,7 +8,10 @@ import type { InquiryReceivedItem, InquirySentItem } from '@template/sdk';
 import { Badge, Page, Table } from '@template/ui/components';
 import { InquirySourceControls, InquiryTargetControls } from '@template/ui/components/inquiries';
 import { useQuery } from '@template/ui/hooks';
-import { receivedInquiryContextQueries, sentInquiryContextQueries } from '@template/ui/lib/inquiries/contextQueries';
+import {
+  receivedInquiryContextQueries,
+  sentInquiryContextQueries,
+} from '@template/ui/lib/inquiries/contextQueries';
 import {
   INQUIRY_STATUS_COLORS,
   INQUIRY_TYPE_LABELS,
@@ -59,7 +62,8 @@ export const InquiriesPage = ({ direction, filters, title, emptyMessage }: Inqui
   // hideExpired drives includeExpired in the merged filters → translates to expiresAt[gte]=now server-side
   const merged = mergeInquiryFilters(filters, {
     statuses: statusFilter ? [statusFilter] : undefined,
-    includeExpired: filters?.includeExpired !== undefined ? undefined : hideExpired ? false : undefined,
+    includeExpired:
+      filters?.includeExpired !== undefined ? undefined : hideExpired ? false : undefined,
   });
   const searchFields = inquiryFiltersToSearchFields(merged, expiredCutoff);
   const hasSearchFields = Object.keys(searchFields).length > 0;
@@ -78,7 +82,8 @@ export const InquiriesPage = ({ direction, filters, title, emptyMessage }: Inqui
   // Derive page title: registry label for single-type filter, else prop title, else default
   const singleType = filters?.types?.length === 1 ? filters.types[0] : undefined;
   const registryLabel = singleType ? getInquiryInterface(singleType)?.label : undefined;
-  const pageTitle = title ?? registryLabel ?? (direction === 'sent' ? 'Sent inquiries' : 'Received inquiries');
+  const pageTitle =
+    title ?? registryLabel ?? (direction === 'sent' ? 'Sent inquiries' : 'Received inquiries');
 
   const columns = [
     {

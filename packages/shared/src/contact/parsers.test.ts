@@ -22,9 +22,11 @@ describe('parseSimpleHandleUrl', () => {
   });
 
   it('preserves case when caseInsensitive=false', () => {
-    expect(parseSimpleHandleUrl('example.com', 'https://example.com/JohnDoe', { caseInsensitive: false })).toBe(
-      'JohnDoe',
-    );
+    expect(
+      parseSimpleHandleUrl('example.com', 'https://example.com/JohnDoe', {
+        caseInsensitive: false,
+      }),
+    ).toBe('JohnDoe');
   });
 
   it('strips leading @', () => {
@@ -36,7 +38,9 @@ describe('parseSimpleHandleUrl', () => {
   });
 
   it('rejects unknown prefix when prefix supplied', () => {
-    expect(() => parseSimpleHandleUrl('example.com', 'https://example.com/wrong/x', { prefix: 'profile' })).toThrow();
+    expect(() =>
+      parseSimpleHandleUrl('example.com', 'https://example.com/wrong/x', { prefix: 'profile' }),
+    ).toThrow();
   });
 });
 
@@ -153,7 +157,9 @@ describe('parseThreadsUrl', () => {
 
 describe('parseTiktokUrl', () => {
   it('extracts handle and strips @', () => {
-    expect(parseTiktokUrl('https://tiktok.com/@charlidamelio')).toEqual({ handle: 'charlidamelio' });
+    expect(parseTiktokUrl('https://tiktok.com/@charlidamelio')).toEqual({
+      handle: 'charlidamelio',
+    });
   });
 });
 

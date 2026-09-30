@@ -56,7 +56,10 @@ export function useInfiniteDataQuery<TItem>(
     enabled,
   });
 
-  const data = React.useMemo(() => query.data?.pages.flatMap((page) => page.data) ?? [], [query.data]);
+  const data = React.useMemo(
+    () => query.data?.pages.flatMap((page) => page.data) ?? [],
+    [query.data],
+  );
 
   const pageCount = query.data?.pages.length ?? 0;
 
@@ -70,7 +73,8 @@ export function useInfiniteDataQuery<TItem>(
   }, [query.data]);
 
   const locateItem = React.useCallback(
-    (flatIndex: number): InfiniteDataPageLocation | null => locateItemInPages(query.data?.pages ?? [], flatIndex),
+    (flatIndex: number): InfiniteDataPageLocation | null =>
+      locateItemInPages(query.data?.pages ?? [], flatIndex),
     [query.data],
   );
 

@@ -6,7 +6,10 @@
  */
 import { DbAction } from '@template/db/extensions/hookRegistry';
 import { intercept, type MutationArgs } from '@template/db/extensions/mutationLifeCycle/intercept';
-import { fetchExistingRecord, fetchExistingRecords } from '@template/db/extensions/mutationLifeCycle/loadPrevious';
+import {
+  fetchExistingRecord,
+  fetchExistingRecords,
+} from '@template/db/extensions/mutationLifeCycle/loadPrevious';
 import { claimPendingRegistration } from '@template/db/extensions/transactionRegistry';
 import { Prisma } from '@template/db/generated/client/client';
 
@@ -32,7 +35,10 @@ export const mutationLifeCycleExtension = Prisma.defineExtension({
 
       createManyAndReturn: intercept(DbAction.createManyAndReturn, { invariantData: dataOf }),
 
-      update: intercept(DbAction.update, { invariantData: dataOf, loadPrevious: fetchExistingRecord }),
+      update: intercept(DbAction.update, {
+        invariantData: dataOf,
+        loadPrevious: fetchExistingRecord,
+      }),
 
       async updateMany({ model }) {
         throw new Error(

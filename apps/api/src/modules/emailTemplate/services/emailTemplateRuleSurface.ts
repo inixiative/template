@@ -10,9 +10,16 @@ import { type EmailRuleDecoration, emailRuleDecoration, emailSurface } from '@te
 import { emailLensAt } from '#/lib/email/emailLensFor';
 import { emailSourceValues } from '#/lib/email/emailSourceValues';
 
-export type EmailTemplateRuleSurface = { source: Lens; sourceValues: SourceValues[]; decoration: EmailRuleDecoration };
+export type EmailTemplateRuleSurface = {
+  source: Lens;
+  sourceValues: SourceValues[];
+  decoration: EmailRuleDecoration;
+};
 
-export const emailTemplateRuleSurface = async (slug: string, owner: OwnerScope): Promise<EmailTemplateRuleSurface> => {
+export const emailTemplateRuleSurface = async (
+  slug: string,
+  owner: OwnerScope,
+): Promise<EmailTemplateRuleSurface> => {
   const lens = await emailLensAt(slug, owner);
   return {
     source: emailSurface(lens),

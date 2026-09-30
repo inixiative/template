@@ -122,8 +122,13 @@ const interpolateString = (value: string, context: InterpolationContext): string
   );
 };
 
-const interpolateHeaders = (headers: Record<string, string>, context: InterpolationContext): Record<string, string> =>
-  Object.fromEntries(Object.entries(headers).map(([key, value]) => [key, interpolateString(value, context)]));
+const interpolateHeaders = (
+  headers: Record<string, string>,
+  context: InterpolationContext,
+): Record<string, string> =>
+  Object.fromEntries(
+    Object.entries(headers).map(([key, value]) => [key, interpolateString(value, context)]),
+  );
 
 export const interpolateValue = (value: unknown, context: InterpolationContext): unknown => {
   if (typeof value === 'string') {
@@ -145,7 +150,10 @@ export const interpolateValue = (value: unknown, context: InterpolationContext):
   return value;
 };
 
-export const interpolateRequest = (request: BatchRequest, context: InterpolationContext): BatchRequest => {
+export const interpolateRequest = (
+  request: BatchRequest,
+  context: InterpolationContext,
+): BatchRequest => {
   return {
     ...request,
     path: interpolateString(request.path, context),

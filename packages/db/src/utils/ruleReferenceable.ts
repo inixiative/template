@@ -7,6 +7,10 @@
 import { getPolymorphismConfig } from '@template/db/registries/falsePolymorphism';
 import { toModelName } from '@template/db/utils/modelNames';
 
-const referencedAxis = getPolymorphismConfig('RuleReference')?.axes.find((axis) => axis.field === 'referencedModel');
+const referencedAxis = getPolymorphismConfig('RuleReference')?.axes.find(
+  (axis) => axis.field === 'referencedModel',
+);
 
-export const RULE_REFERENCEABLE_MODELS = Object.keys(referencedAxis?.fkMap ?? {}).map((model) => toModelName(model));
+export const RULE_REFERENCEABLE_MODELS = Object.keys(referencedAxis?.fkMap ?? {}).map((model) =>
+  toModelName(model),
+);

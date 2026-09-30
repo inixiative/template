@@ -89,7 +89,9 @@ describe('coerceValueForField', () => {
     });
 
     it('throws on Invalid Date instances', () => {
-      expect(() => coerceValueForField(scalar('DateTime'), new Date('not-a-date'))).toThrow(/Invalid Date/);
+      expect(() => coerceValueForField(scalar('DateTime'), new Date('not-a-date'))).toThrow(
+        /Invalid Date/,
+      );
     });
 
     it('coerces ISO strings', () => {

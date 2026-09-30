@@ -4,7 +4,12 @@
  * @partOf feature:segment
  * @uses infrastructure:prisma, primitive:shared
  */
-import { applyLens, type Condition, executePrismaQueryPlan, toPrisma } from '@inixiative/json-rules';
+import {
+  applyLens,
+  type Condition,
+  executePrismaQueryPlan,
+  toPrisma,
+} from '@inixiative/json-rules';
 import { db, Prisma } from '@template/db';
 import type { Segment } from '@template/db/generated/client/client';
 import type { ProviderModel } from '@template/db/generated/client/enums';
@@ -15,7 +20,8 @@ import { customerRefProviderFk, segmentOwnerId } from '#/modules/segment/lib/seg
 import { segmentRuleState } from '#/modules/segment/services/segmentRuleHealth';
 
 const isInfrastructureFault = (error: unknown): boolean =>
-  error instanceof Prisma.PrismaClientInitializationError || error instanceof Prisma.PrismaClientRustPanicError;
+  error instanceof Prisma.PrismaClientInitializationError ||
+  error instanceof Prisma.PrismaClientRustPanicError;
 
 export const compileSegmentWhere = async (
   ownerModel: ProviderModel,
@@ -37,7 +43,8 @@ export const compileSegmentWhere = async (
 const segmentWhere = async (segment: Segment): Promise<Record<string, unknown>> => {
   const { health, issues } = await segmentRuleState(segment);
   return withRule(health, {
-    degraded: () => Promise.reject(new RuleDegradedError({ model: 'Segment', id: segment.id }, issues)),
+    degraded: () =>
+      Promise.reject(new RuleDegradedError({ model: 'Segment', id: segment.id }, issues)),
     sound: (rule) => compileSegmentWhere(segment.ownerModel, segmentOwnerId(segment), rule),
   });
 };

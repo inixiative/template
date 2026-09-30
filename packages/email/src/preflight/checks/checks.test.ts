@@ -38,24 +38,31 @@ describe('preflight checks', () => {
     expect(preheaderPresent(input())[0]?.code).toBe('preheader.missing');
     expect(
       preheaderPresent(
-        input({ mjml: '<mjml><mj-head><!-- <mj-preview>Commented out</mj-preview> --></mj-head></mjml>' }),
+        input({
+          mjml: '<mjml><mj-head><!-- <mj-preview>Commented out</mj-preview> --></mj-head></mjml>',
+        }),
       )[0]?.code,
     ).toBe('preheader.missing');
-    expect(preheaderPresent(input({ mjml: '<mjml><mj-head><mj-preview>Peek</mj-preview></mj-head></mjml>' }))).toEqual(
-      [],
-    );
+    expect(
+      preheaderPresent(
+        input({ mjml: '<mjml><mj-head><mj-preview>Peek</mj-preview></mj-head></mjml>' }),
+      ),
+    ).toEqual([]);
   });
 
   it('looks for an unsubscribe link in the rendered anchors, wherever it came from', () => {
     expect(unsubscribeLinkPresent(input())[0]?.code).toBe('unsubscribe.missing');
     expect(
       unsubscribeLinkPresent(
-        input({ html: '<table><tr><td><a href="https://example.com/unsubscribe">Opt out</a></td></tr></table>' }),
+        input({
+          html: '<table><tr><td><a href="https://example.com/unsubscribe">Opt out</a></td></tr></table>',
+        }),
       ),
     ).toEqual([]);
-    expect(unsubscribeLinkPresent(input({ html: '<p>See https://example.com/unsubscribe</p>' }))[0]?.code).toBe(
-      'unsubscribe.missing',
-    );
+    expect(
+      unsubscribeLinkPresent(input({ html: '<p>See https://example.com/unsubscribe</p>' }))[0]
+        ?.code,
+    ).toBe('unsubscribe.missing');
   });
 
   it('reports each rendered image without alt text, located by its src', () => {
@@ -66,9 +73,11 @@ describe('preflight checks', () => {
       'https://cdn.example/b.png',
       'https://cdn.example/c.png',
     ]);
-    expect(findings.every((finding) => finding.code === 'image.alt.missing' && finding.severity === 'warning')).toBe(
-      true,
-    );
+    expect(
+      findings.every(
+        (finding) => finding.code === 'image.alt.missing' && finding.severity === 'warning',
+      ),
+    ).toBe(true);
   });
 
   it('flags an MJML image with no alt, because the renderer emits alt="" for it', async () => {
@@ -77,7 +86,9 @@ describe('preflight checks', () => {
       { validationLevel: 'skip' },
     );
 
-    expect(imagesHaveAlt(input({ html })).map((finding) => finding.code)).toEqual(['image.alt.missing']);
+    expect(imagesHaveAlt(input({ html })).map((finding) => finding.code)).toEqual([
+      'image.alt.missing',
+    ]);
   });
 
   it('asks the lens whether each field path resolves, and is silent without a lens', () => {
@@ -85,28 +96,37 @@ describe('preflight checks', () => {
       input({ fieldPaths: ['recipient.name', 'recipient.not_a_field'], lens: surface() }),
     );
     expect(
-      findings.filter((finding) => finding.code === 'token.unresolved').map((finding) => finding.location),
+      findings
+        .filter((finding) => finding.code === 'token.unresolved')
+        .map((finding) => finding.location),
     ).toEqual(['recipient.not_a_field']);
     expect(unresolvedLensPaths(input({ fieldPaths: ['recipient.not_a_field'] }))).toEqual([]);
   });
 
   it('uses the requested severity when the supplied lens cannot resolve a path', () => {
     const findings = unresolvedLensPaths(
-      input({ fieldPaths: ['recipient.nickname'], lens: surface(), tokenUnresolvedSeverity: 'warning' }),
+      input({
+        fieldPaths: ['recipient.nickname'],
+        lens: surface(),
+        tokenUnresolvedSeverity: 'warning',
+      }),
     );
 
     expect(findings).toEqual([
       {
         code: 'token.unresolved',
         severity: 'warning',
-        message: "{{recipient.nickname}} does not resolve for this template's recipient, sender or data.",
+        message:
+          "{{recipient.nickname}} does not resolve for this template's recipient, sender or data.",
         location: 'recipient.nickname',
       },
     ]);
   });
 
   it('reports a path beneath a Json field as token.opaque', () => {
-    const findings = unresolvedLensPaths(input({ fieldPaths: ['data.mission.uuid'], lens: surface() }));
+    const findings = unresolvedLensPaths(
+      input({ fieldPaths: ['data.mission.uuid'], lens: surface() }),
+    );
 
     expect(findings).toHaveLength(1);
     expect(findings[0]?.code).toBe('token.opaque');
@@ -126,8 +146,8 @@ describe('preflight checks', () => {
   });
 
   it('decodes entities and drops scripts and styles when extracting visible text', () => {
-    expect(visibleText('<style>p{}</style><p>Hello&nbsp;<b>there</b> &amp; you</p><script>1</script>')).toBe(
-      'Hello there & you',
-    );
+    expect(
+      visibleText('<style>p{}</style><p>Hello&nbsp;<b>there</b> &amp; you</p><script>1</script>'),
+    ).toBe('Hello there & you');
   });
 });

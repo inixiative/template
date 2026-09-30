@@ -10,7 +10,10 @@ import type { WSHeaders } from '#/ws/probe';
 import { type RouteAccess, routeAccessOf } from '#/ws/routeAccess';
 import { resolveStreamRoute } from '#/ws/streamRoute';
 
-export const reprobeStreamAccess = async (headers: WSHeaders, stream: string): Promise<RouteAccess> => {
+export const reprobeStreamAccess = async (
+  headers: WSHeaders,
+  stream: string,
+): Promise<RouteAccess> => {
   const resolved = await resolveStreamRoute(stream);
   if (!resolved) return 'rejected';
   const res = await app.request(resolved.route.path, {

@@ -37,7 +37,11 @@ describe('bridged hook context', () => {
     );
 
     await callerStore.run({ label: 'read-at-open' }, () =>
-      db.txn(() => callerStore.exit(() => db.user.create({ data: { email: nextEmail('bridge'), name: 'Bridged' } }))),
+      db.txn(() =>
+        callerStore.exit(() =>
+          db.user.create({ data: { email: nextEmail('bridge'), name: 'Bridged' } }),
+        ),
+      ),
     );
 
     expect(observedInHook).toBe('read-at-open');
@@ -75,20 +79,30 @@ describe('bridged hook context', () => {
       HookTiming.after,
       [DbAction.create],
       async () => {
-        observed.push(callerStore.getStore()?.label ?? null, secondCallerStore.getStore()?.label ?? null);
+        observed.push(
+          callerStore.getStore()?.label ?? null,
+          secondCallerStore.getStore()?.label ?? null,
+        );
       },
       [callerStore],
     );
 
-    registerDbHook('context-bridge-second', 'User', HookTiming.after, [DbAction.create], async () => {}, [
-      secondCallerStore,
-    ]);
+    registerDbHook(
+      'context-bridge-second',
+      'User',
+      HookTiming.after,
+      [DbAction.create],
+      async () => {},
+      [secondCallerStore],
+    );
 
     await callerStore.run({ label: 'first' }, () =>
       secondCallerStore.run({ label: 'second' }, () =>
         db.txn(() =>
           callerStore.exit(() =>
-            secondCallerStore.exit(() => db.user.create({ data: { email: nextEmail('multi'), name: 'Multi' } })),
+            secondCallerStore.exit(() =>
+              db.user.create({ data: { email: nextEmail('multi'), name: 'Multi' } }),
+            ),
           ),
         ),
       ),

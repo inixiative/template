@@ -38,7 +38,12 @@ export const saveScopedRow = async <Model extends keyof ScopedEmailRow>(
     userId: ctx.userId ?? null,
   } as Partial<Row>;
 
-  const where = { slug: input.slug, locale: input.locale, ...scope, deletedAt: null } as Partial<Row>;
+  const where = {
+    slug: input.slug,
+    locale: input.locale,
+    ...scope,
+    deletedAt: null,
+  } as Partial<Row>;
   const data = { ...input, ...scope } as Partial<Row>;
 
   const existing = await delegate.findFirst({ where });

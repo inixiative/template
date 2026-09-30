@@ -10,7 +10,11 @@ import type { RouteAccess } from '#/ws/routeAccess';
 import { unsubscribeFromStream } from '#/ws/streamSubscriptions';
 import type { WSSocket } from '#/ws/types';
 
-export const rejectDataStream = (ws: WSSocket, stream: string, access: Exclude<RouteAccess, 'granted'>): void => {
+export const rejectDataStream = (
+  ws: WSSocket,
+  stream: string,
+  access: Exclude<RouteAccess, 'granted'>,
+): void => {
   unsubscribeFromStream(ws, stream);
   const frame: WSStreamAckFrame | WSFrameErrorFrame =
     access === 'rejected'

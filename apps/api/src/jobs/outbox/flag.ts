@@ -6,7 +6,13 @@
  */
 import { LogScope, log } from '@template/shared/logger';
 import { heartbeat } from '@template/shared/utils';
-import { flagKey, laneDepthCap, lowWater, overflowStuckMs, overflowTtlSec } from '#/jobs/outbox/config';
+import {
+  flagKey,
+  laneDepthCap,
+  lowWater,
+  overflowStuckMs,
+  overflowTtlSec,
+} from '#/jobs/outbox/config';
 import { laneDepth, queueDepths } from '#/jobs/outbox/queueDepth';
 import { queue } from '#/jobs/queue';
 import { JobLane } from '#/jobs/types';
@@ -29,13 +35,15 @@ const setOverflow = (lane: JobLane): Promise<unknown> =>
   queue.redis.set(flagKey(lane), String(Date.now()), 'EX', overflowTtlSec(), 'NX');
 export const renewOverflow = (lane: JobLane = JobLane.fast): Promise<unknown> =>
   queue.redis.expire(flagKey(lane), overflowTtlSec());
-export const clearOverflow = (lane: JobLane = JobLane.fast): Promise<unknown> => queue.redis.del(flagKey(lane));
+export const clearOverflow = (lane: JobLane = JobLane.fast): Promise<unknown> =>
+  queue.redis.del(flagKey(lane));
 
 // Trip a lane's flag inline when a direct add crosses its cap. Fresh probe (not cached): on a ramp the
 // stale cache would trip late and let the queue overshoot — and tripIfFull only runs pre-overflow.
 export const tripIfFull = async (): Promise<void> => {
   const depths = await queueDepths(true);
-  for (const lane of LANES) if (laneDepth(depths, lane) >= laneDepthCap(lane)) await setOverflow(lane);
+  for (const lane of LANES)
+    if (laneDepth(depths, lane) >= laneDepthCap(lane)) await setOverflow(lane);
 };
 
 // Operational alert: overflow that won't clear means the drain can't keep up with arrivals.

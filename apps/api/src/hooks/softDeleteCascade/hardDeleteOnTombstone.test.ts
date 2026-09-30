@@ -14,9 +14,12 @@ import { deleteBehaviorViolations } from '#/hooks/softDeleteCascade/validateDele
 
 registerSoftDeleteCascadeHook();
 
-const tombstoneUser = (id: string) => db.user.update({ where: { id }, data: { deletedAt: new Date() } });
-const tombstoneOrg = (id: string) => db.organization.update({ where: { id }, data: { deletedAt: new Date() } });
-const tombstoneIntegration = (id: string) => db.integration.update({ where: { id }, data: { deletedAt: new Date() } });
+const tombstoneUser = (id: string) =>
+  db.user.update({ where: { id }, data: { deletedAt: new Date() } });
+const tombstoneOrg = (id: string) =>
+  db.organization.update({ where: { id }, data: { deletedAt: new Date() } });
+const tombstoneIntegration = (id: string) =>
+  db.integration.update({ where: { id }, data: { deletedAt: new Date() } });
 
 describe('hardDeleteOnTombstone — rows that cannot outlive their parent', () => {
   afterAll(async () => {
@@ -44,7 +47,10 @@ describe('hardDeleteOnTombstone — rows that cannot outlive their parent', () =
 
   it('hard-deletes an organization’s tokens when the organization is tombstoned', async () => {
     const { entity: org } = await createOrganization();
-    const { entity: token } = await createToken({ ownerModel: TokenOwnerModel.Organization }, { organization: org });
+    const { entity: token } = await createToken(
+      { ownerModel: TokenOwnerModel.Organization },
+      { organization: org },
+    );
 
     await tombstoneOrg(org.id);
 
@@ -55,7 +61,10 @@ describe('hardDeleteOnTombstone — rows that cannot outlive their parent', () =
     const { entity: user, context } = await createUser();
     const { entity: integration } = await createIntegration({ userId: user.id });
     const { entity: token } = await createToken({ integrationId: integration.id }, { user });
-    const { entity: subscription } = await createWebhookSubscription({ integrationId: integration.id }, context);
+    const { entity: subscription } = await createWebhookSubscription(
+      { integrationId: integration.id },
+      context,
+    );
 
     await tombstoneIntegration(integration.id);
 
@@ -80,10 +89,14 @@ describe('validateDeleteBehavior', () => {
   });
 
   it('refuses a model that is also registered as soft-delete', () => {
-    expect(deleteBehaviorViolations(['User']).join('\n')).toContain('both hard-delete-on-tombstone and soft-delete');
+    expect(deleteBehaviorViolations(['User']).join('\n')).toContain(
+      'both hard-delete-on-tombstone and soft-delete',
+    );
   });
 
   it('refuses a model that is not in the schema', () => {
-    expect(deleteBehaviorViolations(['NotAModel']).join('\n')).toContain('is not a model in the schema');
+    expect(deleteBehaviorViolations(['NotAModel']).join('\n')).toContain(
+      'is not a model in the schema',
+    );
   });
 });

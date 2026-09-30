@@ -2,7 +2,13 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import type { LensNarrowing } from '@inixiative/json-rules';
 import { db } from '@template/db';
 import { lensFor } from '@template/db/lens';
-import { cleanupTouchedTables, createContact, createSession, createToken, createUser } from '@template/db/test';
+import {
+  cleanupTouchedTables,
+  createContact,
+  createSession,
+  createToken,
+  createUser,
+} from '@template/db/test';
 import { lensWhere } from '#/lib/prisma/lensWhere';
 
 const ACTIVE_TOKENS: LensNarrowing = {
@@ -53,13 +59,18 @@ describe('lensWhere — relation-node wheres', () => {
           spaces: {
             picks: ['name'],
             relations: {
-              tokens: { picks: ['name'], where: { field: 'isActive', operator: 'equals', value: true } },
+              tokens: {
+                picks: ['name'],
+                where: { field: 'isActive', operator: 'equals', value: true },
+              },
             },
           },
         },
       },
     };
-    expect(await lensWhere(nested, { spaces: { some: { tokens: { some: { name: 'x' } } } } })).toEqual({
+    expect(
+      await lensWhere(nested, { spaces: { some: { tokens: { some: { name: 'x' } } } } }),
+    ).toEqual({
       spaces: { some: { tokens: { some: { name: 'x', isActive: { equals: true } } } } },
     });
   });
@@ -72,7 +83,10 @@ describe('lensWhere — root wheres (path "")', () => {
   it('applies the route layer root.where to every row', async () => {
     const lens: LensNarrowing = {
       parent: lensFor('User'),
-      root: { picks: [], where: { field: 'platformRole', operator: 'equals', value: 'superadmin' } },
+      root: {
+        picks: [],
+        where: { field: 'platformRole', operator: 'equals', value: 'superadmin' },
+      },
     };
     expect(await lensWhere(lens, {})).toEqual(role);
   });
@@ -81,7 +95,10 @@ describe('lensWhere — root wheres (path "")', () => {
     const lens: LensNarrowing = {
       parent: {
         parent: lensFor('User'),
-        root: { picks: [], where: { field: 'platformRole', operator: 'equals', value: 'superadmin' } },
+        root: {
+          picks: [],
+          where: { field: 'platformRole', operator: 'equals', value: 'superadmin' },
+        },
       },
       root: { where: { field: 'emailVerified', operator: 'equals', value: true } },
     };
@@ -94,7 +111,9 @@ describe('lensWhere — root wheres (path "")', () => {
     const lens: LensNarrowing = {
       parent: lensFor('User'),
       root: { picks: [] },
-      mapDefaults: { prisma: { models: { User: { where: { field: 'name', operator: 'equals', value: 'x' } } } } },
+      mapDefaults: {
+        prisma: { models: { User: { where: { field: 'name', operator: 'equals', value: 'x' } } } },
+      },
     };
     expect(await lensWhere(lens, {})).toEqual({ name: { equals: 'x' } });
   });
@@ -143,7 +162,10 @@ describe('lensWhere — query-plan execution (count operators)', () => {
   it('counts only live related rows — a soft-deleted child does not satisfy the count', async () => {
     const { entity: onlyTombstoned } = await createUser();
     const { entity: hasLive } = await createUser();
-    const { entity: deadContact } = await createContact({ ownerModel: 'User' }, { user: onlyTombstoned });
+    const { entity: deadContact } = await createContact(
+      { ownerModel: 'User' },
+      { user: onlyTombstoned },
+    );
     await db.contact.update({ where: { id: deadContact.id }, data: { deletedAt: new Date() } });
     await createContact({ ownerModel: 'User' }, { user: hasLive });
 

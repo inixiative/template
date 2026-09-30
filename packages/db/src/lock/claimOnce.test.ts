@@ -49,7 +49,12 @@ describe('createLock with heartbeat: false — one-shot claim', () => {
   });
 
   it('defaults a holder when the caller supplies none', async () => {
-    const result = await createLock({ service: 's', identifier: newId(), heartbeat: false, ttlMs: 200 }).acquire();
+    const result = await createLock({
+      service: 's',
+      identifier: newId(),
+      heartbeat: false,
+      ttlMs: 200,
+    }).acquire();
     expect(result.claimed).toBe(true);
     expect(result.holder).toMatch(/^[0-9a-f-]{36}$/);
   });
@@ -59,7 +64,8 @@ describe('createLock with heartbeat: false — one-shot claim', () => {
     const results = await Promise.all(['a', 'b', 'c', 'd', 'e'].map((h) => claim(id, h).acquire()));
     const winners = results.filter((r) => r.claimed);
     expect(winners).toHaveLength(1);
-    for (const loser of results.filter((r) => !r.claimed)) expect(loser.holder).toBe(winners[0]?.holder ?? '');
+    for (const loser of results.filter((r) => !r.claimed))
+      expect(loser.holder).toBe(winners[0]?.holder ?? '');
   });
 });
 

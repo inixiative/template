@@ -1,6 +1,11 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import type { Organization, Space } from '@template/db/generated/client/client';
-import { InquiryResourceModel, InquiryStatus, InquiryType, PlatformRole } from '@template/db/generated/client/enums';
+import {
+  InquiryResourceModel,
+  InquiryStatus,
+  InquiryType,
+  PlatformRole,
+} from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
   createInquiry,
@@ -48,7 +53,9 @@ describe('handler: updateSpace — approve', () => {
       content: { slug: 'updated-slug' },
     });
 
-    const response = await adminFetch(post(`/api/v1/inquiry/${inquiry.id}/resolve`, { status: 'approved' }));
+    const response = await adminFetch(
+      post(`/api/v1/inquiry/${inquiry.id}/resolve`, { status: 'approved' }),
+    );
     expect(response.status).toBe(200);
 
     const updated = await db.space.findUniqueOrThrow({ where: { id: space.id } });

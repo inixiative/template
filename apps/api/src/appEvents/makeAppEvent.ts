@@ -27,7 +27,9 @@ const throwIfFailures = (errors: unknown[]): void => {
 export const makeAppEvent = <T>(handler: AppEventHandlerDefinition<T>): AppEventHandlerFn => {
   return async (event: AppEventPayload) => {
     const data = event.data as T;
-    const tasks: (() => Promise<unknown>)[] = [() => observeRegistry.broadcast((adapter) => adapter.record(event))];
+    const tasks: (() => Promise<unknown>)[] = [
+      () => observeRegistry.broadcast((adapter) => adapter.record(event)),
+    ];
 
     // Flatten each handoff into its own task so the outer Promise.allSettled
     // isolates per-handoff failures — one bad email recipient doesn't fail the
@@ -59,6 +61,8 @@ export const makeAppEvent = <T>(handler: AppEventHandlerDefinition<T>): AppEvent
     }
 
     const results = await db.parallel(tasks, { resolution: 'allSettled' });
-    throwIfFailures(results.filter((result) => result.status === 'rejected').map((result) => result.reason));
+    throwIfFailures(
+      results.filter((result) => result.status === 'rejected').map((result) => result.reason),
+    );
   };
 };

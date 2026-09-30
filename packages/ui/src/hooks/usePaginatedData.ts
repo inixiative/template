@@ -46,7 +46,13 @@ const DEFAULT_PAGE_SIZE = 20;
 const DEBOUNCE_MS = 300;
 
 export const usePaginatedData = (options: UsePaginatedDataOptions): PaginatedData => {
-  const { config, sectionId, shareableUrl = false, scrollRestore, defaultPageSize: defaultPageSizeOption } = options;
+  const {
+    config,
+    sectionId,
+    shareableUrl = false,
+    scrollRestore,
+    defaultPageSize: defaultPageSizeOption,
+  } = options;
 
   const defaultPageSize = defaultPageSizeOption ?? DEFAULT_PAGE_SIZE;
   const shouldRestoreScroll = scrollRestore ?? sectionId != null;
@@ -57,7 +63,9 @@ export const usePaginatedData = (options: UsePaginatedDataOptions): PaginatedDat
   const [page, setPageRaw] = useState(initialState.page ?? 1);
   const [pageSize, setPageSizeRaw] = useState(initialState.pageSize ?? defaultPageSize);
 
-  const initialOrderBy = initialState.orderBy ? parseOrderByStrings(initialState.orderBy) : undefined;
+  const initialOrderBy = initialState.orderBy
+    ? parseOrderByStrings(initialState.orderBy)
+    : undefined;
 
   const dataFilters = useDataFilters(config, () => setPageRaw(1), {
     search: initialState.search,
@@ -86,13 +94,16 @@ export const usePaginatedData = (options: UsePaginatedDataOptions): PaginatedDat
   // Debounced write of page/search/sort to history.state (and optionally URL) whenever any persisted
   // field changes. currentState is the dep so the debounce restarts on every change; stateKey is a dep
   // so a remounted table with a different sectionId writes to the right slot.
-  const writeState = useDebouncedCallback((key: string | undefined, state: typeof currentState, toUrl: boolean) => {
-    if (toUrl) {
-      writeToHistoryStateAndUrl(key, state);
-    } else if (key) {
-      writeToHistoryState(key, state);
-    }
-  }, DEBOUNCE_MS);
+  const writeState = useDebouncedCallback(
+    (key: string | undefined, state: typeof currentState, toUrl: boolean) => {
+      if (toUrl) {
+        writeToHistoryStateAndUrl(key, state);
+      } else if (key) {
+        writeToHistoryState(key, state);
+      }
+    },
+    DEBOUNCE_MS,
+  );
 
   useEffect(() => {
     writeState(stateKey, currentState, shareableUrl);

@@ -9,7 +9,10 @@ type RailwayBucketsProgressGroup = {
   requiresStaging?: boolean;
 };
 
-const countCompletedActions = (progress: RailwayBucketsProgress, actions: readonly RailwayBucketsAction[]): number => {
+const countCompletedActions = (
+  progress: RailwayBucketsProgress,
+  actions: readonly RailwayBucketsAction[],
+): number => {
   return actions.filter((action) => progress[action]).length;
 };
 
@@ -39,7 +42,9 @@ export type RailwayBucketsProgressSummary = {
   skipped: boolean;
 };
 
-export const getRailwayBucketsProgressSummaries = (config: ProjectConfig): RailwayBucketsProgressSummary[] => {
+export const getRailwayBucketsProgressSummaries = (
+  config: ProjectConfig,
+): RailwayBucketsProgressSummary[] => {
   const stagingEnabled = config.features.staging.enabled;
   return railwayBucketsProgressGroups.map((group) => {
     const skipped = !!group.requiresStaging && !stagingEnabled;

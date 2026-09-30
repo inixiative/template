@@ -23,6 +23,11 @@ export const RootNotFound = ({
   };
 
   return (
-    <NotFound title={title} description={description} actionLabel="Go to dashboard" onAction={handleGoToDashboard} />
+    <NotFound
+      title={title}
+      description={description}
+      actionLabel="Go to dashboard"
+      onAction={handleGoToDashboard}
+    />
   );
 };

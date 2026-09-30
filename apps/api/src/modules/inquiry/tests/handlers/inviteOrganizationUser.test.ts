@@ -1,6 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import type { Inquiry, Organization } from '@template/db/generated/client/client';
-import { InquiryResourceModel, InquiryStatus, InquiryType } from '@template/db/generated/client/enums';
+import {
+  InquiryResourceModel,
+  InquiryStatus,
+  InquiryType,
+} from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
   createInquiry,
@@ -44,7 +48,9 @@ describe('handler: inviteOrganizationUser', () => {
     });
 
     const targetFetch = createTestApp({ mockUser: invitee, mount }).fetch;
-    const response = await targetFetch(post(`/api/v1/inquiry/${inquiry.id}/resolve`, { status: 'approved' }));
+    const response = await targetFetch(
+      post(`/api/v1/inquiry/${inquiry.id}/resolve`, { status: 'approved' }),
+    );
     const { data } = await json<Inquiry>(response);
 
     expect(response.status).toBe(200);
@@ -92,7 +98,9 @@ describe('handler: inviteOrganizationUser', () => {
 
     const targetFetch = createTestApp({ mockUser: invitee, mount }).fetch;
     // Attempt to escalate to 'admin' via resolution payload
-    await targetFetch(post(`/api/v1/inquiry/${inquiry.id}/resolve`, { status: 'approved', role: 'admin' }));
+    await targetFetch(
+      post(`/api/v1/inquiry/${inquiry.id}/resolve`, { status: 'approved', role: 'admin' }),
+    );
 
     const membership = await db.organizationUser.findUnique({
       where: { organizationId_userId: { organizationId: org.id, userId: invitee.id } },

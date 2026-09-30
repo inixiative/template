@@ -14,8 +14,17 @@ const TEMPLATE = 'claim-policy-template';
 const documentMjml = (content: string) =>
   `<mjml><mj-body><mj-section><mj-column>${content}</mj-column></mj-section></mj-body></mjml>`;
 
-const providerError = (classification: EmailProviderError['classification'], status: number | null) =>
-  new EmailProviderError('Resend', classification, status, `code_${classification}`, `${classification} failure`);
+const providerError = (
+  classification: EmailProviderError['classification'],
+  status: number | null,
+) =>
+  new EmailProviderError(
+    'Resend',
+    classification,
+    status,
+    `code_${classification}`,
+    `${classification} failure`,
+  );
 
 describe('deliverEmailMessage — claim policy', () => {
   const attempts: SendEmailOptions[] = [];
@@ -164,7 +173,9 @@ describe('deliverEmailMessage — claim policy', () => {
     });
 
     try {
-      await expect(deliverEmailMessage(payloadFor(log.id), { sleep })).rejects.toThrow('verifier unavailable');
+      await expect(deliverEmailMessage(payloadFor(log.id), { sleep })).rejects.toThrow(
+        'verifier unavailable',
+      );
     } finally {
       verify.mockRestore();
     }

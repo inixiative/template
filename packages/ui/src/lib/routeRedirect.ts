@@ -20,7 +20,11 @@ export const redirectPreservingContext = (context: BeforeLoadContext, to: string
   throw redirect({ to, search: preserved });
 };
 
-const navigateToAuth = (path: '/login' | '/signup', getStore: () => AppStore, preserveSearch?: boolean) => {
+const navigateToAuth = (
+  path: '/login' | '/signup',
+  getStore: () => AppStore,
+  preserveSearch?: boolean,
+) => {
   const redirectTo = `${window.location.pathname}${window.location.search}${window.location.hash}`;
   const searchAndHash = `${window.location.search}${window.location.hash}`;
   const query = preserveSearch ? searchAndHash : `?redirectTo=${encodeURIComponent(redirectTo)}`;

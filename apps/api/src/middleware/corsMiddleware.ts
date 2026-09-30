@@ -38,7 +38,13 @@ const validateOrigin = (origin: string): string | null => {
 export const corsMiddleware = cors({
   origin: validateOrigin,
   allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowHeaders: ['Content-Type', 'Authorization', 'x-spoof-user-email', 'traceparent', 'tracestate'],
+  allowHeaders: [
+    'Content-Type',
+    'Authorization',
+    'x-spoof-user-email',
+    'traceparent',
+    'tracestate',
+  ],
   exposeHeaders: ['request-id', 'traceparent'],
   credentials: true,
 });

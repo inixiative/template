@@ -67,7 +67,9 @@ describe('database telemetry', () => {
       );
       expect(hookTrace).toBe(requestTrace);
       expect(queuedContext.traceparent).toContain(requestTrace);
-      expect(records.find((record) => record.fields.event === 'hook.ran')?.fields.requestId).toBe('database-request');
+      expect(records.find((record) => record.fields.event === 'hook.ran')?.fields.requestId).toBe(
+        'database-request',
+      );
       await sdk.forceFlush();
       const output = batches.join('');
       expect(output).toContain('User.create');

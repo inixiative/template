@@ -16,7 +16,9 @@ describe('clientIp', () => {
   });
 
   it('buckets IPv6 to its /64 so a client cannot rotate addresses for free', () => {
-    expect(clientIp(ctx({ 'x-forwarded-for': '2001:db8:1234:5678:9abc:def0:1:2' }))).toBe('2001:db8:1234:5678');
+    expect(clientIp(ctx({ 'x-forwarded-for': '2001:db8:1234:5678:9abc:def0:1:2' }))).toBe(
+      '2001:db8:1234:5678',
+    );
   });
 
   it('strips an IPv6 zone id before bucketing', () => {
@@ -29,9 +31,9 @@ describe('clientIp', () => {
   });
 
   it('clientAddress keeps the full trusted address for the audit trail', () => {
-    expect(clientAddress(ctx({ 'x-forwarded-for': 'evil-spoof, 2001:db8:1234:5678:9abc:def0:1:2' }))).toBe(
-      '2001:db8:1234:5678:9abc:def0:1:2',
-    );
+    expect(
+      clientAddress(ctx({ 'x-forwarded-for': 'evil-spoof, 2001:db8:1234:5678:9abc:def0:1:2' })),
+    ).toBe('2001:db8:1234:5678:9abc:def0:1:2');
     expect(clientAddress(ctx({}))).toBeNull();
   });
 

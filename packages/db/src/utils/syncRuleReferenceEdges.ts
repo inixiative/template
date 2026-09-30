@@ -28,7 +28,8 @@ const fkColumn = (axis: 'ownerModel' | 'referencedModel', model: string): string
   return column;
 };
 
-const edgeKey = (edge: Edge): string => referenceKey({ model: edge.referencedModel, id: edge.referencedId });
+const edgeKey = (edge: Edge): string =>
+  referenceKey({ model: edge.referencedModel, id: edge.referencedId });
 
 /**
  * Recompute one owner's edges from the rows its rules name, inside the caller's transaction. The
@@ -50,10 +51,16 @@ export const syncRuleReferenceEdges = async (
   const live = await lockedLiveReferences(references);
   const added = references.filter((ref) => !held.has(referenceKey(ref)));
   const fresh = added.find((ref) => !live.has(referenceKey(ref)));
-  if (fresh) throw new RuleReferenceError(`rule names a ${fresh.model} that does not exist or is deleted: ${fresh.id}`);
+  if (fresh)
+    throw new RuleReferenceError(
+      `rule names a ${fresh.model} that does not exist or is deleted: ${fresh.id}`,
+    );
   if (sources) {
     const [outside] = (await admitRuleReferences(sources, added)).unadmitted;
-    if (outside) throw new RuleReferenceError(`rule names a ${outside.model} outside this owner's view: ${outside.id}`);
+    if (outside)
+      throw new RuleReferenceError(
+        `rule names a ${outside.model} outside this owner's view: ${outside.id}`,
+      );
   }
 
   const named = new Set(references.map(referenceKey));
@@ -68,7 +75,10 @@ export const syncRuleReferenceEdges = async (
       [fkColumn('referencedModel', ref.model)]: ref.id,
     }));
 
-  if (toDelete.length) await db.ruleReference.deleteMany({ where: { id: { in: toDelete.map((edge) => edge.id) } } });
+  if (toDelete.length)
+    await db.ruleReference.deleteMany({ where: { id: { in: toDelete.map((edge) => edge.id) } } });
   if (toCreate.length)
-    await db.ruleReference.createManyAndReturn({ data: toCreate as Prisma.RuleReferenceCreateManyInput[] });
+    await db.ruleReference.createManyAndReturn({
+      data: toCreate as Prisma.RuleReferenceCreateManyInput[],
+    });
 };

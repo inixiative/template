@@ -4,7 +4,12 @@
  * @partOf primitive:appEvents
  * @uses primitive:websockets
  */
-import type { StreamDefinition, StreamOp, StreamOpPayload, StreamParams } from '@template/shared/ws';
+import type {
+  StreamDefinition,
+  StreamOp,
+  StreamOpPayload,
+  StreamParams,
+} from '@template/shared/ws';
 import type { RouteRow } from '#/appEvents/routeRow';
 import type { WSStreamAppendHandoff } from '#/appEvents/types';
 import type { ValidatedStreamAppend } from '#/appEvents/validatedStreamAppend';
@@ -33,6 +38,10 @@ export const streamAppend = <D extends StreamDefinition, K extends StreamOp<D>>(
   return {
     kind: 'stream',
     target: { stream: definition.name(params), ...(userIds ? { userIds } : {}) },
-    append: { type, payload, ...(options?.revive ? { revive: true } : {}) } as unknown as ValidatedStreamAppend,
+    append: {
+      type,
+      payload,
+      ...(options?.revive ? { revive: true } : {}),
+    } as unknown as ValidatedStreamAppend,
   };
 };

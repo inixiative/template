@@ -25,7 +25,10 @@ const targetTable = args.find((arg) => !arg.startsWith('--'));
 const includePrime = args.includes('--prime');
 
 const checkUUIDUniqueness = () => {
-  const idDictionary: Record<string, Array<{ model: string; record: Record<string, unknown> }>> = {};
+  const idDictionary: Record<
+    string,
+    Array<{ model: string; record: Record<string, unknown> }>
+  > = {};
 
   for (const { model, records } of seeds) {
     for (const record of records) {
@@ -79,7 +82,9 @@ const seedTable = async (seedFile: SeedFile): Promise<void> => {
       const { prime, ...data } = record;
       const id = data.id as string;
 
-      const updateData = seedFile.createOnly ? {} : omit(data, ['id', ...(seedFile.updateOmitFields ?? [])]);
+      const updateData = seedFile.createOnly
+        ? {}
+        : omit(data, ['id', ...(seedFile.updateOmitFields ?? [])]);
 
       await delegate.upsert({ where: { id }, create: data, update: updateData });
       log.success(`  - Upserted: ${id}`, LogScope.seed);

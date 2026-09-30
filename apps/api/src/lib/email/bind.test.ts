@@ -9,12 +9,25 @@ const inquiry = registry['inquiry-invite-organization-user'];
 describe('bindLens', () => {
   it('binds the entity where from the handoff by name', () => {
     const lens = bindLens(inquiry.entity, { inquiryId: 'inq-1' });
-    expect((lens.root as { where: unknown }).where).toEqual({ field: 'id', operator: 'equals', value: 'inq-1' });
+    expect((lens.root as { where: unknown }).where).toEqual({
+      field: 'id',
+      operator: 'equals',
+      value: 'inq-1',
+    });
   });
 
   it('keeps the static picks/relations surface', () => {
-    const root = bindLens(inquiry.entity, { inquiryId: 'inq-1' }).root as { picks: string[]; relations: unknown };
-    expect(root.picks).toEqual(['id', 'content', 'sourceOrganizationId', 'targetUserId', 'sourceOrganization']);
+    const root = bindLens(inquiry.entity, { inquiryId: 'inq-1' }).root as {
+      picks: string[];
+      relations: unknown;
+    };
+    expect(root.picks).toEqual([
+      'id',
+      'content',
+      'sourceOrganizationId',
+      'targetUserId',
+      'sourceOrganization',
+    ]);
     expect(root.relations).toEqual({ sourceOrganization: { picks: ['name'] } });
   });
 
@@ -84,6 +97,8 @@ describe('bindOptional', () => {
   });
 
   it('a required name is still refused when absent, optional or not beside it', () => {
-    expect(() => bindWhere(where as never, { locale: 'en' })).toThrow('Email bind "targetUserId" was not supplied');
+    expect(() => bindWhere(where as never, { locale: 'en' })).toThrow(
+      'Email bind "targetUserId" was not supplied',
+    );
   });
 });

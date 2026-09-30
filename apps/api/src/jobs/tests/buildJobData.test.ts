@@ -12,7 +12,9 @@ describe('buildJobData lane precedence', () => {
   const undeclared = makeJob(async () => {});
 
   it('request lane wins over everything', () => {
-    expect(buildJobData(slowByDefault, { ...request, lane: JobLane.fast }, JobLane.slow).lane).toBe(JobLane.fast);
+    expect(buildJobData(slowByDefault, { ...request, lane: JobLane.fast }, JobLane.slow).lane).toBe(
+      JobLane.fast,
+    );
   });
 
   it('enqueue option wins over the handler default', () => {
@@ -29,7 +31,12 @@ describe('buildJobData lane precedence', () => {
 
   it('keeps the rest of the envelope intact', () => {
     expect(
-      buildJobData(undeclared, { ...request, id: 'cron-1', dedupeKey: 'k', traceContext: { traceparent: 't' } }),
+      buildJobData(undeclared, {
+        ...request,
+        id: 'cron-1',
+        dedupeKey: 'k',
+        traceContext: { traceparent: 't' },
+      }),
     ).toEqual({
       id: 'cron-1',
       type: JobType.adhoc,

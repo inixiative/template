@@ -23,10 +23,12 @@ export const includeAuditLogResponse = {
   contextSpace: true,
 } as const satisfies Prisma.AuditLogInclude;
 
-export const auditLogResponseSchema = AuditLogScalarSchema.omit({ componentVersions: true }).extend({
-  actorUser: UserScalarSchema.nullable(),
-  actorSpoofUser: UserScalarSchema.nullable(),
-  actorToken: auditActorTokenSchema.nullable(),
-  contextOrganization: OrganizationScalarSchema.nullable(),
-  contextSpace: SpaceScalarSchema.nullable(),
-});
+export const auditLogResponseSchema = AuditLogScalarSchema.omit({ componentVersions: true }).extend(
+  {
+    actorUser: UserScalarSchema.nullable(),
+    actorSpoofUser: UserScalarSchema.nullable(),
+    actorToken: auditActorTokenSchema.nullable(),
+    contextOrganization: OrganizationScalarSchema.nullable(),
+    contextSpace: SpaceScalarSchema.nullable(),
+  },
+);

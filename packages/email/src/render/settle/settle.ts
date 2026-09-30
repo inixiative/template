@@ -10,7 +10,12 @@ import { settleEach } from '@template/email/render/settle/settleEach';
 import { settleText } from '@template/email/render/settle/settleText';
 import type { RuleErrorSink, Scope, SettleOptions } from '@template/email/render/settle/types';
 
-export const settle = (content: string, scope: Scope, options: SettleOptions, onError?: RuleErrorSink): string => {
+export const settle = (
+  content: string,
+  scope: Scope,
+  options: SettleOptions,
+  onError?: RuleErrorSink,
+): string => {
   let result = '';
   let i = 0;
   while (i < content.length) {

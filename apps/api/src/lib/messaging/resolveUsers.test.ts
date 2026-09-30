@@ -32,9 +32,18 @@ describe('resolveUsers', () => {
     carol = c.entity;
 
     // Each user gets one whatsapp contact (so messageUser can fan out later).
-    await createContact({ ownerModel: 'User', type: 'whatsapp', value: { jid: '111' } }, { user: a.entity });
-    await createContact({ ownerModel: 'User', type: 'whatsapp', value: { jid: '222' } }, { user: b.entity });
-    await createContact({ ownerModel: 'User', type: 'whatsapp', value: { jid: '333' } }, { user: c.entity });
+    await createContact(
+      { ownerModel: 'User', type: 'whatsapp', value: { jid: '111' } },
+      { user: a.entity },
+    );
+    await createContact(
+      { ownerModel: 'User', type: 'whatsapp', value: { jid: '222' } },
+      { user: b.entity },
+    );
+    await createContact(
+      { ownerModel: 'User', type: 'whatsapp', value: { jid: '333' } },
+      { user: c.entity },
+    );
 
     // alice + bob are tagged "founders" (resource: userMessages).
     const tag = await createTag({
@@ -42,8 +51,14 @@ describe('resolveUsers', () => {
       resources: [TagResource.userMessages],
     });
     foundersTag = tag.entity;
-    await createTagAttachment({ resourceModel: TagResource.User }, { user: a.entity, tag: tag.entity });
-    await createTagAttachment({ resourceModel: TagResource.User }, { user: b.entity, tag: tag.entity });
+    await createTagAttachment(
+      { resourceModel: TagResource.User },
+      { user: a.entity, tag: tag.entity },
+    );
+    await createTagAttachment(
+      { resourceModel: TagResource.User },
+      { user: b.entity, tag: tag.entity },
+    );
   });
 
   afterAll(async () => {

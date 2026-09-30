@@ -18,7 +18,9 @@ export const useStreamAction = <TPayload>(
   listenerRef.current = listener;
 
   useEffect(() => {
-    const removeListener = addStreamListener(stream, type, (payload) => listenerRef.current(payload as TPayload));
+    const removeListener = addStreamListener(stream, type, (payload) =>
+      listenerRef.current(payload as TPayload),
+    );
     websocket.open(stream);
     return () => {
       removeListener();

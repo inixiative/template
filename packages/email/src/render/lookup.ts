@@ -13,7 +13,9 @@ const latestSnapshotInclude = {
   auditLogs: { take: 1, orderBy: { id: 'desc' }, select: { id: true } },
 } satisfies Prisma.EmailTemplateInclude;
 
-export type TemplateWithSnapshot = Prisma.EmailTemplateGetPayload<{ include: typeof latestSnapshotInclude }>;
+export type TemplateWithSnapshot = Prisma.EmailTemplateGetPayload<{
+  include: typeof latestSnapshotInclude;
+}>;
 
 type LookupResult = {
   template: TemplateWithSnapshot | null;
@@ -33,7 +35,10 @@ export const lookupAtOwner = async (
       ? db.emailComponent.findMany({ where: { slug: { in: componentSlugs }, ...where } })
       : Promise.resolve([]),
     templateSlug
-      ? db.emailTemplate.findFirst({ where: { slug: templateSlug, ...where }, include: latestSnapshotInclude })
+      ? db.emailTemplate.findFirst({
+          where: { slug: templateSlug, ...where },
+          include: latestSnapshotInclude,
+        })
       : Promise.resolve(null),
   ]);
 

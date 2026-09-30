@@ -28,7 +28,10 @@ type InquiryCreateBody = Omit<
   'id' | 'createdAt' | 'updatedAt' | 'deletedAt' | (typeof inquiryCreateSanitizeKeys)[number]
 >;
 
-export const createInquiry = async (c: ValidatedContext<'json', InquiryCreateBody>, source: InquirySourceFields) => {
+export const createInquiry = async (
+  c: ValidatedContext<'json', InquiryCreateBody>,
+  source: InquirySourceFields,
+) => {
   const db = c.get('db');
   const permix = c.get('permix');
   const { targetEmail: _targetEmail, status, ...body } = c.req.valid('json');

@@ -27,7 +27,10 @@ export enum HookTiming {
 }
 
 export type SingleAction = DbAction.create | DbAction.update | DbAction.delete | DbAction.upsert;
-export type ManyAction = DbAction.createManyAndReturn | DbAction.updateManyAndReturn | DbAction.deleteMany;
+export type ManyAction =
+  | DbAction.createManyAndReturn
+  | DbAction.updateManyAndReturn
+  | DbAction.deleteMany;
 
 type HookOptionsBase = {
   model: ModelName;
@@ -90,7 +93,12 @@ export const registerDbHook = <T = Record<string, unknown>>(
   }
 
   hookRegistry.add(name);
-  hookRegistrations.set(name, { targets: castArray(model), timing, actions, hook: hook as HookFunction });
+  hookRegistrations.set(name, {
+    targets: castArray(model),
+    timing,
+    actions,
+    hook: hook as HookFunction,
+  });
   for (const store of bridges) bridgedStores.add(store);
 
   for (const target of castArray(model)) {
@@ -129,7 +137,8 @@ export const unregisterDbHook = (name: string) => {
 // follow auditLog) relies on registration order, which per-model re-registration can silently break.
 // TODO (not urgent, mechanism TBD): a way for a hook to require running after another, with a cycle
 // check over the declared orderings.
-export const hasHooksFor = (model: string): boolean => '*' in registeredHooks || model in registeredHooks;
+export const hasHooksFor = (model: string): boolean =>
+  '*' in registeredHooks || model in registeredHooks;
 
 export const executeHooks = async (timing: HookTiming, options: HookOptions) => {
   const modelHooks = registeredHooks[options.model]?.[timing]?.[options.action] || [];
@@ -142,9 +151,13 @@ export const executeHooks = async (timing: HookTiming, options: HookOptions) => 
 
 // Read in the caller frame at db.txn() open, where storage is still reliable. Values are carried by
 // reference, so a hook mutating one is mutating the caller's object.
-export const captureBridgedContext = (): BridgedContext => [...bridgedStores].map((store) => [store, store.getStore()]);
+export const captureBridgedContext = (): BridgedContext =>
+  [...bridgedStores].map((store) => [store, store.getStore()]);
 
-export const runInBridgedContext = <TResult>(bridgedContext: BridgedContext, fn: () => TResult): TResult => {
+export const runInBridgedContext = <TResult>(
+  bridgedContext: BridgedContext,
+  fn: () => TResult,
+): TResult => {
   const enter = (index: number): TResult => {
     if (index === bridgedContext.length) return fn();
     const [store, value] = bridgedContext[index]!;
@@ -179,7 +192,11 @@ const registeredInvariants: Record<string, DbInvariantRegistration[]> = {};
 
 const invariantRegistrations = new Map<string, DbInvariantRegistration>();
 
-export const registerDbInvariant = (name: string, model: string | string[] | '*', invariant: DbInvariant) => {
+export const registerDbInvariant = (
+  name: string,
+  model: string | string[] | '*',
+  invariant: DbInvariant,
+) => {
   if (invariantRegistrations.has(name)) {
     log.warn(`Invariant '${name}' already registered - skipping duplicate`, LogScope.hook);
     return;
@@ -204,8 +221,15 @@ export const unregisterDbInvariant = (name: string) => {
   invariantRegistrations.delete(name);
 };
 
-export const runInvariants = async (model: ModelName, action: DbInvariantAction, data: unknown): Promise<void> => {
-  const registrations = new Set([...(registeredInvariants[model] ?? []), ...(registeredInvariants['*'] ?? [])]);
+export const runInvariants = async (
+  model: ModelName,
+  action: DbInvariantAction,
+  data: unknown,
+): Promise<void> => {
+  const registrations = new Set([
+    ...(registeredInvariants[model] ?? []),
+    ...(registeredInvariants['*'] ?? []),
+  ]);
   for (const { invariant } of registrations) {
     await invariant({ model, action, data });
   }

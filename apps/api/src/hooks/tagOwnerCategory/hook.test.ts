@@ -74,13 +74,17 @@ describe('tagOwnerCategory hook', () => {
       { name: tagName('update-target'), ownerModel: TagResource.User, resources: [] },
       { user: a, tagCategory: cat.entity },
     );
-    const update = async () => db.tag.update({ where: { id: tag.entity.id }, data: { userId: b.id } });
+    const update = async () =>
+      db.tag.update({ where: { id: tag.entity.id }, data: { userId: b.id } });
     await expect(update()).rejects.toThrow(/userId/);
   });
 
   it('allows an Organization tag in a matching Organization category', async () => {
     const { entity: org } = await createOrganization();
-    const cat = await createTagCategory({ ownerModel: TagResource.Organization }, { organization: org });
+    const cat = await createTagCategory(
+      { ownerModel: TagResource.Organization },
+      { organization: org },
+    );
     const tag = await createTag(
       { name: tagName('org-ok'), ownerModel: TagResource.Organization, resources: [] },
       { organization: org, tagCategory: cat.entity },

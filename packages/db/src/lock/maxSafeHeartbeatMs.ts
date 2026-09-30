@@ -21,7 +21,8 @@ export const maxSafeHeartbeatMs = ({
   maxMissed?: number;
   commandTimeoutMs: number;
 }): number => {
-  const heartbeatMs = Math.ceil((ttlMs - commandTimeoutMs) / (maxMissed + 1) - commandTimeoutMs) - 1;
+  const heartbeatMs =
+    Math.ceil((ttlMs - commandTimeoutMs) / (maxMissed + 1) - commandTimeoutMs) - 1;
   if (heartbeatMs <= 0) {
     throw new Error(
       `createLock: ttlMs ${ttlMs} leaves no room for a heartbeat with a ${commandTimeoutMs} ms command timeout`,

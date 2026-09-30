@@ -14,9 +14,12 @@ export const securityForRoute = ({
   internal,
   middleware,
   security,
-}: Pick<RouteArgs, 'internal' | 'middleware' | 'security'>): NonNullable<RouteConfig['security']> => {
+}: Pick<RouteArgs, 'internal' | 'middleware' | 'security'>): NonNullable<
+  RouteConfig['security']
+> => {
   if (security) return security;
   if (internal) return securityRequirements('internalSecret');
-  if (castArray(middleware ?? []).includes(validateNotToken)) return securityRequirements('sessionToken');
+  if (castArray(middleware ?? []).includes(validateNotToken))
+    return securityRequirements('sessionToken');
   return securityRequirements('sessionToken', 'apiToken');
 };

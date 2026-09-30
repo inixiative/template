@@ -14,9 +14,13 @@ export const SLOW_DEFERRED_GRACE_MS = 5 * 60_000;
 export const SLOW_PARK_MIN_MS = 2_000;
 export const SLOW_PARK_MS_PER_QUEUED = 20;
 
-type SignalRedis = Pick<Redis, 'zadd' | 'zrem' | 'zcount' | 'zremrangebyscore' | 'set' | 'get' | 'del'>;
+type SignalRedis = Pick<
+  Redis,
+  'zadd' | 'zrem' | 'zcount' | 'zremrangebyscore' | 'set' | 'get' | 'del'
+>;
 
-export const slowDeferredKey = (queueName: string): string => `${redisNamespace.job}:${queueName}:slow:deferred`;
+export const slowDeferredKey = (queueName: string): string =>
+  `${redisNamespace.job}:${queueName}:slow:deferred`;
 
 export const slowLastFinishedKey = (queueName: string): string =>
   `${redisNamespace.job}:${queueName}:slow:lastFinished`;
@@ -38,15 +42,27 @@ export const recordDelayedSlowAdd = async (
   try {
     await recordSlowDeferral(queue.redis, queue.name, jobId, Date.now() + delayMs);
   } catch (err) {
-    log.warn('Failed to record a delayed slow add in the slow-lane deferral list', { err, jobId }, LogScope.job);
+    log.warn(
+      'Failed to record a delayed slow add in the slow-lane deferral list',
+      { err, jobId },
+      LogScope.job,
+    );
   }
 };
 
-export const releaseSlowDeferral = async (redis: SignalRedis, queueName: string, jobId: string): Promise<void> => {
+export const releaseSlowDeferral = async (
+  redis: SignalRedis,
+  queueName: string,
+  jobId: string,
+): Promise<void> => {
   await redis.zrem(slowDeferredKey(queueName), jobId);
 };
 
-export const readSlowDeferred = (redis: SignalRedis, queueName: string, now: number = Date.now()): Promise<number> =>
+export const readSlowDeferred = (
+  redis: SignalRedis,
+  queueName: string,
+  now: number = Date.now(),
+): Promise<number> =>
   redis.zcount(slowDeferredKey(queueName), now - SLOW_DEFERRED_GRACE_MS, '+inf');
 
 export const pruneSlowDeferred = async (
@@ -54,7 +70,11 @@ export const pruneSlowDeferred = async (
   queueName: string,
   now: number = Date.now(),
 ): Promise<void> => {
-  await redis.zremrangebyscore(slowDeferredKey(queueName), '-inf', `(${now - SLOW_DEFERRED_GRACE_MS}`);
+  await redis.zremrangebyscore(
+    slowDeferredKey(queueName),
+    '-inf',
+    `(${now - SLOW_DEFERRED_GRACE_MS}`,
+  );
 };
 
 export const recordSlowFinished = async (

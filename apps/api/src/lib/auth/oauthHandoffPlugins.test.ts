@@ -20,7 +20,12 @@ const createAuth = () =>
         clientId: 'google-client-id',
         clientSecret: 'google-client-secret',
         getUserInfo: async () => ({
-          user: { id: 'google-sub-1', email: 'oauth@example.com', name: 'OAuth User', emailVerified: true },
+          user: {
+            id: 'google-sub-1',
+            email: 'oauth@example.com',
+            name: 'OAuth User',
+            emailVerified: true,
+          },
           data: {},
         }),
       },
@@ -88,15 +93,21 @@ describe('oauthHandoffPlugins', () => {
   test('the one-time token is single-use', async () => {
     const auth = createAuth();
     const callback = await completeGoogleCallback(auth);
-    const ott = new URLSearchParams(new URL(callback.headers.get('location')!).hash.slice(1)).get('ott')!;
+    const ott = new URLSearchParams(new URL(callback.headers.get('location')!).hash.slice(1)).get(
+      'ott',
+    )!;
 
     await auth.api.verifyOneTimeToken({ body: { token: ott } });
-    await expect(auth.api.verifyOneTimeToken({ body: { token: ott } })).rejects.toThrow('Invalid token');
+    await expect(auth.api.verifyOneTimeToken({ body: { token: ott } })).rejects.toThrow(
+      'Invalid token',
+    );
   });
 
   test('leaves failed callbacks untouched', async () => {
     const auth = createAuth();
-    const callback = await auth.handler(new Request(`${baseURL}/api/auth/callback/google?error=access_denied`));
+    const callback = await auth.handler(
+      new Request(`${baseURL}/api/auth/callback/google?error=access_denied`),
+    );
 
     expect(callback.status).toBe(302);
     expect(callback.headers.get('location')).not.toContain('ott=');
@@ -105,7 +116,9 @@ describe('oauthHandoffPlugins', () => {
   test('browsers cannot mint one-time tokens directly', async () => {
     const auth = createAuth();
     const callback = await completeGoogleCallback(auth);
-    const ott = new URLSearchParams(new URL(callback.headers.get('location')!).hash.slice(1)).get('ott')!;
+    const ott = new URLSearchParams(new URL(callback.headers.get('location')!).hash.slice(1)).get(
+      'ott',
+    )!;
     const { session } = await auth.api.verifyOneTimeToken({ body: { token: ott } });
 
     const generate = await auth.handler(

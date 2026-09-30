@@ -1,5 +1,11 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import type { Organization, OrganizationUser, Space, SpaceUser, User } from '@template/db/generated/client/client';
+import type {
+  Organization,
+  OrganizationUser,
+  Space,
+  SpaceUser,
+  User,
+} from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
   createOrganization,
@@ -41,25 +47,37 @@ describe('SpaceUser Token Permissions', () => {
 
     // Create users with matching org and space roles
     // Pass full context so factory reuses user/org entities
-    const { entity: ou1, context: c1 } = await createOrganizationUser({ role: 'owner' }, { organization: org });
+    const { entity: ou1, context: c1 } = await createOrganizationUser(
+      { role: 'owner' },
+      { organization: org },
+    );
     ownerOrgUser = ou1;
     ownerUser = c1.user;
     const { entity: su1 } = await createSpaceUser({ role: 'owner' }, { ...c1, space });
     ownerSpaceUser = su1;
 
-    const { entity: ou2, context: c2 } = await createOrganizationUser({ role: 'admin' }, { organization: org });
+    const { entity: ou2, context: c2 } = await createOrganizationUser(
+      { role: 'admin' },
+      { organization: org },
+    );
     adminOrgUser = ou2;
     adminUser = c2.user;
     const { entity: su2 } = await createSpaceUser({ role: 'admin' }, { ...c2, space });
     adminSpaceUser = su2;
 
-    const { entity: ou3, context: c3 } = await createOrganizationUser({ role: 'member' }, { organization: org });
+    const { entity: ou3, context: c3 } = await createOrganizationUser(
+      { role: 'member' },
+      { organization: org },
+    );
     memberOrgUser = ou3;
     memberUser = c3.user;
     const { entity: su3 } = await createSpaceUser({ role: 'member' }, { ...c3, space });
     memberSpaceUser = su3;
 
-    const { entity: ou4, context: c4 } = await createOrganizationUser({ role: 'viewer' }, { organization: org });
+    const { entity: ou4, context: c4 } = await createOrganizationUser(
+      { role: 'viewer' },
+      { organization: org },
+    );
     _viewerOrgUser = ou4;
     _viewerUser = c4.user;
     const { entity: su4 } = await createSpaceUser({ role: 'viewer' }, { ...c4, space });
@@ -87,7 +105,10 @@ describe('SpaceUser Token Permissions', () => {
     it('owner can create owner-role token', async () => {
       const { fetch } = createApp(ownerUser, [ownerOrgUser], [ownerSpaceUser]);
       const response = await fetch(
-        post(`/api/v1/spaceUser/${ownerSpaceUser.id}/tokens`, { name: 'Owner Token', role: 'owner' }),
+        post(`/api/v1/spaceUser/${ownerSpaceUser.id}/tokens`, {
+          name: 'Owner Token',
+          role: 'owner',
+        }),
       );
       expect(response.status).toBe(201);
     });
@@ -95,7 +116,10 @@ describe('SpaceUser Token Permissions', () => {
     it('owner can create member-role token', async () => {
       const { fetch } = createApp(ownerUser, [ownerOrgUser], [ownerSpaceUser]);
       const response = await fetch(
-        post(`/api/v1/spaceUser/${ownerSpaceUser.id}/tokens`, { name: 'Member Token', role: 'member' }),
+        post(`/api/v1/spaceUser/${ownerSpaceUser.id}/tokens`, {
+          name: 'Member Token',
+          role: 'member',
+        }),
       );
       expect(response.status).toBe(201);
     });
@@ -103,7 +127,10 @@ describe('SpaceUser Token Permissions', () => {
     it('admin can create admin-role token', async () => {
       const { fetch } = createApp(adminUser, [adminOrgUser], [adminSpaceUser]);
       const response = await fetch(
-        post(`/api/v1/spaceUser/${adminSpaceUser.id}/tokens`, { name: 'Admin Token', role: 'admin' }),
+        post(`/api/v1/spaceUser/${adminSpaceUser.id}/tokens`, {
+          name: 'Admin Token',
+          role: 'admin',
+        }),
       );
       expect(response.status).toBe(201);
     });
@@ -111,7 +138,10 @@ describe('SpaceUser Token Permissions', () => {
     it('admin can create member-role token', async () => {
       const { fetch } = createApp(adminUser, [adminOrgUser], [adminSpaceUser]);
       const response = await fetch(
-        post(`/api/v1/spaceUser/${adminSpaceUser.id}/tokens`, { name: 'Member Token', role: 'member' }),
+        post(`/api/v1/spaceUser/${adminSpaceUser.id}/tokens`, {
+          name: 'Member Token',
+          role: 'member',
+        }),
       );
       expect(response.status).toBe(201);
     });
@@ -119,7 +149,10 @@ describe('SpaceUser Token Permissions', () => {
     it('admin cannot create owner-role token', async () => {
       const { fetch } = createApp(adminUser, [adminOrgUser], [adminSpaceUser]);
       const response = await fetch(
-        post(`/api/v1/spaceUser/${adminSpaceUser.id}/tokens`, { name: 'Owner Token', role: 'owner' }),
+        post(`/api/v1/spaceUser/${adminSpaceUser.id}/tokens`, {
+          name: 'Owner Token',
+          role: 'owner',
+        }),
       );
       expect(response.status).toBe(403);
     });
@@ -127,7 +160,10 @@ describe('SpaceUser Token Permissions', () => {
     it('member can create member-role token', async () => {
       const { fetch } = createApp(memberUser, [memberOrgUser], [memberSpaceUser]);
       const response = await fetch(
-        post(`/api/v1/spaceUser/${memberSpaceUser.id}/tokens`, { name: 'Member Token', role: 'member' }),
+        post(`/api/v1/spaceUser/${memberSpaceUser.id}/tokens`, {
+          name: 'Member Token',
+          role: 'member',
+        }),
       );
       expect(response.status).toBe(201);
     });
@@ -135,7 +171,10 @@ describe('SpaceUser Token Permissions', () => {
     it('member cannot create admin-role token', async () => {
       const { fetch } = createApp(memberUser, [memberOrgUser], [memberSpaceUser]);
       const response = await fetch(
-        post(`/api/v1/spaceUser/${memberSpaceUser.id}/tokens`, { name: 'Admin Token', role: 'admin' }),
+        post(`/api/v1/spaceUser/${memberSpaceUser.id}/tokens`, {
+          name: 'Admin Token',
+          role: 'admin',
+        }),
       );
       expect(response.status).toBe(403);
     });
@@ -197,7 +236,10 @@ describe('SpaceUser Token Permissions', () => {
         { role: 'member' },
         { organization: org },
       );
-      const { entity: otherMemberSpaceUser } = await createSpaceUser({ role: 'member' }, { ...otherCtx, space });
+      const { entity: otherMemberSpaceUser } = await createSpaceUser(
+        { role: 'member' },
+        { ...otherCtx, space },
+      );
       const { entity: token } = await createToken(
         { ownerModel: 'SpaceUser', role: 'member' },
         { spaceUser: otherMemberSpaceUser },

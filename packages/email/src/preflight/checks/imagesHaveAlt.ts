@@ -14,6 +14,7 @@ export const imagesHaveAlt: SyncPreflightCheck = ({ html }) =>
     .map((image) => ({
       code: 'image.alt.missing',
       severity: 'warning' as const,
-      message: 'An image has no alt text — it reads as nothing when images are blocked or read aloud.',
+      message:
+        'An image has no alt text — it reads as nothing when images are blocked or read aloud.',
       location: image.getAttribute('src') ?? 'html',
     }));
