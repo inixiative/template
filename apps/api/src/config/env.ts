@@ -19,6 +19,7 @@ const jobEnvFields = {
   JOBS_OVERFLOW_TTL_MS: z.coerce.number().int().positive().default(60_000),
   JOBS_SLOW_QUEUE_DEPTH_FRACTION: z.coerce.number().min(0).max(1).default(0.5),
   JOBS_SLOW_SLOT_FRACTION: z.coerce.number().min(0).max(1).default(0.5),
+  JOBS_SLOW_PARK_MAX_MS: z.coerce.number().int().min(1_000).default(60_000),
   EMAIL_SLOW_LANE_MIN_RECIPIENTS: z.coerce.number().int().nonnegative().default(25),
 };
 

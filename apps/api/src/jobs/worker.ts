@@ -18,6 +18,7 @@ import { flushOutbox } from '#/jobs/outbox';
 import { startOutboxDrainLoop, stopOutboxDrainLoop } from '#/jobs/outbox/drain';
 import { processJob } from '#/jobs/processJob';
 import { queue } from '#/jobs/queue';
+import { readSlowLaneState } from '#/jobs/readSlowLaneState';
 import { registerCronJobs } from '#/jobs/registerCronJobs';
 import { createSlowSlotPool } from '#/jobs/slowSlotPool';
 import { initGracefulShutdown, onShutdown } from '#/lib/shutdown';
@@ -44,14 +45,25 @@ export const initializeWorker = async (): Promise<void> => {
     lockDuration: 5 * 60 * 1000,
   });
 
-  metrics
-    .getMeter('template.worker')
-    .createObservableGauge('messaging.queue.messages')
-    .addCallback(async (result) => {
-      const counts = await queue.getJobCounts('wait', 'prioritized', 'active', 'delayed', 'failed');
-      for (const [state, count] of Object.entries(counts))
-        result.observe(count, { 'messaging.destination.name': 'jobs', state });
-    });
+  const meter = metrics.getMeter('template.worker');
+  meter.createObservableGauge('messaging.queue.messages').addCallback(async (result) => {
+    const counts = await queue.getJobCounts('wait', 'prioritized', 'active', 'delayed', 'failed');
+    for (const [state, count] of Object.entries(counts))
+      result.observe(count, { 'messaging.destination.name': 'jobs', state });
+  });
+  const slowQueued = meter.createObservableGauge('jobs.slow.queued');
+  const slowDeferred = meter.createObservableGauge('jobs.slow.deferred');
+  const slowIdle = meter.createObservableGauge('jobs.slow.idle_ms', { unit: 'ms' });
+  meter.addBatchObservableCallback(
+    async (result) => {
+      const slowLane = await readSlowLaneState();
+      const attributes = { 'messaging.destination.name': 'jobs' };
+      result.observe(slowQueued, slowLane.queued, attributes);
+      result.observe(slowDeferred, slowLane.deferred, attributes);
+      result.observe(slowIdle, slowLane.idleMs, attributes);
+    },
+    [slowQueued, slowDeferred, slowIdle],
+  );
 
   log.info('Job worker initialized', LogScope.worker);
 

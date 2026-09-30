@@ -14,6 +14,8 @@ import { clearOverflow, warnIfOverflowStuck, withOverflowRenew } from '#/jobs/ou
 import { runOnOutboxQueue } from '#/jobs/outbox/mutex';
 import { laneDepth, type QueueDepths, queueDepths } from '#/jobs/outbox/queueDepth';
 import { queue } from '#/jobs/queue';
+import { readSlowLaneState } from '#/jobs/readSlowLaneState';
+import { recordDelayedSlowAdd } from '#/jobs/slowLaneSignals';
 import { type JobData, JobLane } from '#/jobs/types';
 import { isValidJobId } from '#/jobs/validateJobId';
 
@@ -52,6 +54,7 @@ const admitLaneRows = async (lane: JobLane, room: number): Promise<number> => {
         // Claim TTL stretches by the re-added job's delay, same as the direct enqueue path.
         if (baton) previousHolder = await claimLane(baton, jobId, opts.delay);
         await queue.add(row.handlerName, data, { ...opts, jobId });
+        if (lane === JobLane.slow && opts.delay) await recordDelayedSlowAdd(queue, jobId, opts.delay);
         drained.push(row.id);
       } catch (e) {
         // The re-add failed, so roll back the lane claim (fenced) — the row stays buffered for a
@@ -136,6 +139,6 @@ export const runDrainOutboxPass = async (): Promise<void> => {
     const slowRoom = Math.min(room - fastAdmitted, laneDepthCap(JobLane.slow) - depths.slow);
     await admitLaneRows(JobLane.slow, slowRoom);
 
-    await settleFlags(await queueDepths(true));
+    await settleFlags((await readSlowLaneState()).depths);
   });
 };

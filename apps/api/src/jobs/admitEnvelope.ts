@@ -6,9 +6,11 @@
  */
 import { claimLane, laneKey, releaseLane } from '@template/db';
 import { log } from '@template/shared/logger';
+import { isSlowJobData } from '#/jobs/buildJobData';
 import { withLanePriority } from '#/jobs/lanePriority';
 import { isLaneOverflowing, outboxLaneOf, shouldSpill, spillToOutbox, tripIfFull } from '#/jobs/outbox';
 import { queue } from '#/jobs/queue';
+import { recordDelayedSlowAdd } from '#/jobs/slowLaneSignals';
 import { type JobData, type JobOptions, JobType } from '#/jobs/types';
 
 export type EnvelopeAdmission = {
@@ -60,6 +62,7 @@ export const admitEnvelope = async ({
     if (baton) await releaseLane(baton, jobId, previousHolder).catch(() => {});
     throw err;
   }
+  if (jobOptions.delay && isSlowJobData(data)) await recordDelayedSlowAdd(queue, jobId, jobOptions.delay);
   if (data.type === JobType.adhoc) await tripIfFull();
 
   log.info(`Enqueued job ${handlerName} (${jobId})`);

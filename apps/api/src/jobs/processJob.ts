@@ -9,8 +9,10 @@ import { auditActorContext, nullAuditActor } from '@template/db/lib/auditActorCo
 import { addLogBroadcast, LogScope, log, logScope } from '@template/shared/logger';
 import type { Job } from 'bullmq';
 import { admitToSlot } from '#/jobs/admitToSlot';
+import { isSlowJobData } from '#/jobs/buildJobData';
 import { isValidHandlerName, type JobHandlers, jobHandlers } from '#/jobs/handlers';
 import { queue } from '#/jobs/queue';
+import { recordSlowFinished } from '#/jobs/slowLaneSignals';
 import { createSlowSlotPool, type SlowSlotPool } from '#/jobs/slowSlotPool';
 import { traceJob } from '#/jobs/traceJob';
 import type { WorkerContext } from '#/jobs/types';
@@ -69,5 +71,10 @@ export const processJob = async (
     await runJob(job, handler);
   } finally {
     releaseSlot();
+    if (isSlowJobData(job.data)) {
+      await recordSlowFinished(queue.redis, queue.name).catch((err) =>
+        log.warn('Failed to record slow-lane finish', { err, jobId: job.id }, LogScope.worker),
+      );
+    }
   }
 };

@@ -322,20 +322,40 @@ BullMQ moves a job to active from the plain wait list first and from the priorit
 
 ### Slots: Slow Work Uses at Most Its Share
 
-Priority decides which job starts next, but BullMQ never preempts a running job, so ordering alone would let slow work fill every slot and make a fast job wait for a slow one to finish. Each worker therefore runs slow jobs in at most `JOBS_SLOW_SLOT_FRACTION` of its `JOBS_WORKER_CONCURRENCY` slots (at least one), counted by the worker's own `SlowSlotPool` (`jobs/slowSlotPool.ts`). When a slow job starts on a worker whose slow share is full, `admitToSlot` (`jobs/admitToSlot.ts`) moves it to delayed for `SLOW_SLOT_RETRY_MS` and it returns to the slow band at its stored priority. The other slots stay free for fast work. Fast work is not capped: it may use every slot, including the slow share when no slow work is running.
+Priority decides which job starts next, but BullMQ never preempts a running job, so ordering alone would let slow work fill every slot and make a fast job wait for a slow one to finish. Each worker therefore runs slow jobs in at most `JOBS_SLOW_SLOT_FRACTION` of its `JOBS_WORKER_CONCURRENCY` slots (at least one), counted by the worker's own `SlowSlotPool` (`jobs/slowSlotPool.ts`). When a slow job starts on a worker whose slow share is full, `admitToSlot` (`jobs/admitToSlot.ts`) parks it: it moves to delayed and returns to the slow band at its stored priority when it comes due. `moveToDelayed` skips the attempt count, so parking never uses up retries. The park is uniform between `SLOW_PARK_MIN_MS` (2 s) and a window that widens by 20 ms for each queued slow job, capped at `JOBS_SLOW_PARK_MAX_MS` (60 s), so refused jobs do not come due together and a large send is not refetched and refused every second. Each park counts `jobs.slow.parked`. The other slots stay free for fast work. Fast work is not capped: it may use every slot, including the slow share when no slow work is running.
 
 `admitToSlot` also keeps a job at its priority when BullMQ does not. Stalled-job recovery and a manual retry (`job.retry()`, `queue.retryJobs()`, the Bull Board retry button) put a job on the plain wait list whatever its priority, ahead of all fast work. A job with a priority can legitimately start only when the plain wait list is empty, so a prioritized job that starts while fast work is waiting is moved back with `job.moveToWait`, which returns it to its priority band. Automatic retries and delayed promotion already keep the priority.
 
 The slot share needs no shared state: every worker applies the same fraction to its own concurrency, so the fleet-wide share follows.
 
+The slow slot is released in `processJob`'s `finally` however the handler ends, and a slow job's finish, success or failure, stamps the lane's idle clock (`recordSlowFinished`). A Redis error while stamping is logged and never fails the job.
+
 ### Pressure: One Budget, Divided by Lane
 
-The overflow buffer's depth budget (`JOBS_MAX_QUEUE_DEPTH`) is shared by both lanes and counts everything waiting or running (`waiting + prioritized + active`). Slow jobs — BullMQ's count for the slow priority band — may fill only `JOBS_SLOW_QUEUE_DEPTH_FRACTION` of it. Each lane has its own overflow flag:
+The overflow buffer's depth budget (`JOBS_MAX_QUEUE_DEPTH`) is shared by both lanes and counts everything waiting or running (`waiting + prioritized + active`) plus the slow jobs the lane deferred into `delayed`. Slow jobs — BullMQ's count for the slow priority band plus those deferred slow jobs — may fill only `JOBS_SLOW_QUEUE_DEPTH_FRACTION` of it. Each lane has its own overflow flag:
 
 - **Fast** spills when the whole budget is full.
 - **Slow** spills when its share is full, or when the whole budget is.
 
-The drain refills fast rows up to the budget's free room, then slow rows up to what is left of both the budget and the slow share — batched, one read and one delete per lane per pass. Each lane's flag clears below its own low-water once none of its rows wait. Every slow row re-enters BullMQ at the slow priority. A slow job held back by the slot share spends about `SLOW_SLOT_RETRY_MS` in `delayed`, outside the slow count, so the count can briefly read low by the number of jobs held back.
+The drain refills fast rows up to the budget's free room, then slow rows up to what is left of both the budget and the slow share — batched, one read and one delete per lane per pass. Each lane's flag clears below its own low-water once none of its rows wait. Every slow row re-enters BullMQ at the slow priority.
+
+#### The Deferral List
+
+While the slot share has a send parked, nearly all of it sits in BullMQ's `delayed` set at any moment. A count that skipped `delayed` read a queued send as an empty lane: the drain admitted past the slow share and every signal read zero. But `delayed` cannot simply be counted — it also holds scheduled cron repeats, backoff retries and deliberately delayed fast jobs, and BullMQ keeps it as one set ordered by due time with no priority to count by.
+
+So the slow lane keeps its own list of the slow jobs it put there (`jobs/slowLaneSignals.ts`): a Redis sorted set per queue, `job:<queue>:slow:deferred`, of job ids scored by due time. A job goes on it when `admitToSlot` parks it (recorded before `moveToDelayed`, so a parked job is never outside the count) or when a slow job is added with a delay (`admitEnvelope`, or the drain re-adding a delayed slow row), and comes off when a worker picks it back up — when `admitToSlot` admits it to a slow slot or sends it back as a line-jumper. Keyed by job id, so parking the same job again moves its score instead of counting it twice. The list is a signal, not part of delivery: a Redis error while writing it is logged and never fails or blocks the job.
+
+It cannot go by due time: BullMQ promotes delayed jobs only when a worker fetches, and parked jobs were measured sitting in `delayed` 2–21 s past due, so a count by due-time band undercounts. An entry stays counted until a worker picks the job up; only one nobody picks up within `SLOW_DEFERRED_GRACE_MS` (five minutes) of its due time — a delayed job deleted by hand, say — stops counting, and the drain pass prunes it. The depth probe caps the list at BullMQ's own `delayed` count, because a listed job that was promoted and is waiting to be fetched is in the slow band too.
+
+#### Slow-Lane Signals
+
+The worker registers three observable gauges beside `messaging.queue.messages`, read from one snapshot (`readSlowLaneState`):
+
+- `jobs.slow.queued` — the slow band plus the deferred slow jobs: the number the slow share is enforced against.
+- `jobs.slow.deferred` — the deferred part alone: jobs parked by the slot share and delayed slow adds.
+- `jobs.slow.idle_ms` — how long slow work has been queued without a slow job finishing. It is 0 while nothing slow is queued (reading it then clears the stamp, so the next send's clock starts when its work is first seen, not at a finish from an earlier send). A draining send keeps it near one job's duration; a climbing value while `jobs.slow.queued` is above 0 is a slow lane that is not moving — hung handlers, or no workers — which the queue depth alone cannot tell apart from a large send draining normally.
+
+The counter `jobs.slow.parked` counts refusals by the slot share. The drain pass reads the same snapshot at the end of every pass, so the flag-settling decisions use the same depths the gauges show and the idle clock advances every ~2 s.
 
 ### Lane Configuration
 
@@ -346,19 +366,20 @@ Defined in the env schema (`apps/api/src/config/env.ts`) with defaults in `apps/
 | `JOBS_WORKER_CONCURRENCY` | `10` | BullMQ worker concurrency |
 | `JOBS_SLOW_SLOT_FRACTION` | `0.5` | Share of each worker's slots slow jobs may run in (at least one) |
 | `JOBS_SLOW_QUEUE_DEPTH_FRACTION` | `0.5` | Share of `JOBS_MAX_QUEUE_DEPTH` slow jobs may fill before spilling |
+| `JOBS_SLOW_PARK_MAX_MS` | `60000` | Longest park for a slow job refused by a full slot share (min `1000`); parks start at 2 s and widen by 20 ms per queued slow job |
 | `EMAIL_SLOW_LANE_MIN_RECIPIENTS` | `25` | `sendEmail` fan-outs wider than this are slow |
 
 ### Validating Against Real Infrastructure
 
-`apps/api/scripts/slowLaneCheck.ts` runs the whole path against real Redis, a real BullMQ worker pair, and Postgres, and exits non-zero on any failure. It enqueues a slow send of multi-second jobs through `enqueueJob`, waits until slow work fills its slot share, then injects fast jobs and asserts that slow work ran in exactly its share of slots and never more, that fast jobs started within `SLOW_LANE_CHECK_FAST_WAIT_MS` (p95), and that every slow job ran once. It also checks that 200 jobs at `SLOW_LANE_PRIORITY` keep distinct scores and FIFO order (reporting the collision at `PRIORITY_LIMIT` beside it), and that a manually retried slow job runs after waiting fast work with its priority intact. Set a small `JOBS_MAX_QUEUE_DEPTH` to exercise the spill-and-drain path. It obliterates the queue and empties `JobOutbox`, so it refuses to run without `ENVIRONMENT=local` and `SLOW_LANE_CHECK_CONFIRM=wipe`:
+`apps/api/scripts/slowLaneCheck.ts` runs the whole path against real Redis, a real BullMQ worker pair, and Postgres, and exits non-zero on any failure. It enqueues a slow send of multi-second jobs through `enqueueJob`, waits until slow work fills its slot share, then injects fast jobs and asserts that slow work ran in exactly its share of slots and never more, that fast jobs started within `SLOW_LANE_CHECK_FAST_WAIT_MS` (p95), and that every slow job ran once. It then spills a send larger than the slow share (`SLOW_LANE_CHECK_SEND_JOBS`, 200, of `SLOW_LANE_CHECK_SEND_JOB_MS`, 5 s) to `JobOutbox` and lets the real drain loop meter it in. Every 250 ms it compares the slow count the lane enforces (`queueDepths().slow`) with the slow jobs actually in Redis (`prioritized + delayed`), and it counts parks from the queue's `delayed` events. It fails if the send does not exceed the share, if the drain lets more than 110% of the slow share into Redis, if the signal reads under 0.8 or over 1.25 of the truth, if a queued slow job is parked more than 1.1× once per `SLOW_PARK_MIN_MS`, if the slow slots are busy less than 80% of the send (parked jobs coming back too late leave slots idle), or if a payload is lost or runs twice. A hung-handler case holds one slow slot for 3 s with five slow jobs queued and fails unless `jobs.slow.idle_ms` reads at least 80% of the hang, never more queued than jobs exist, and 0 once the lane empties. It also checks that 200 jobs at `SLOW_LANE_PRIORITY` keep distinct scores and FIFO order (reporting the collision at `PRIORITY_LIMIT` beside it), and that a manually retried slow job runs after waiting fast work with its priority intact. Its polling loops stop through a shared object (`loops.isRunning`), never a captured `let` — under Bun a loop was observed reading a captured `let` flag stale for 30 s — and every teardown await runs under a 30 s deadline. It obliterates the queue and empties `JobOutbox`, so it refuses to run without `ENVIRONMENT=local` and `SLOW_LANE_CHECK_CONFIRM=wipe`:
 
 ```bash
 bun run with test api env ENVIRONMENT=local SLOW_LANE_CHECK_CONFIRM=wipe \
-  REDIS_URL=redis://localhost:6379/9 REDIS_BULLMQ_URL=redis://localhost:6379/9 JOBS_MAX_QUEUE_DEPTH=600 \
+  REDIS_URL=redis://localhost:6379/9 REDIS_BULLMQ_URL=redis://localhost:6379/9 JOBS_MAX_QUEUE_DEPTH=200 \
   bun apps/api/scripts/slowLaneCheck.ts
 ```
 
-`SLOW_LANE_CHECK_JOBS`, `SLOW_LANE_CHECK_JOB_MS`, `SLOW_LANE_CHECK_WORKERS`, and `SLOW_LANE_CHECK_FAST_WAIT_MS` vary the run. Setting `JOBS_SLOW_SLOT_FRACTION=1` removes the reservation and the fast-wait assertion fails.
+Point `REDIS_URL` at your own Redis (`REDIS_PORT` in the root `.env`). `SLOW_LANE_CHECK_JOBS`, `SLOW_LANE_CHECK_JOB_MS`, `SLOW_LANE_CHECK_WORKERS`, `SLOW_LANE_CHECK_FAST_WAIT_MS`, `SLOW_LANE_CHECK_SEND_JOBS`, and `SLOW_LANE_CHECK_SEND_JOB_MS` vary the run. Setting `JOBS_SLOW_SLOT_FRACTION=1` removes the reservation and the fast-wait assertion fails.
 
 ---
 
@@ -390,7 +411,7 @@ A pass:
 1. Reads the lane depths (`queueDepths`). Fetches up to the budget's free room of non-quarantined **fast** rows oldest-first (FIFO) and re-enqueues them, re-claiming the supersede lane first when `dedupeKey` is set. A stored job id BullMQ would reject is replaced with a fresh one rather than failing forever.
 2. Does the same for **slow** rows, up to what is left of the budget and of the slow share, re-adding each at the slow priority.
 3. Deletes drained rows per lane in one statement; increments `attempts` on rows that failed re-enqueue. After `MAX_DRAIN_ATTEMPTS` (5) failures a row is quarantined (skipped) so a poison row at the head can't starve newer rows.
-4. Under the outbox mutex: clears each lane's flag once that lane is below its own low-water with no admittable row and no pending spill of that lane; resets quarantined rows to `attempts: 0` only when the queue is below low-water and neither lane has an admittable row or a pending spill.
+4. Reads the slow-lane snapshot (`readSlowLaneState`: prunes the deferral list, fresh lane depths, idle clock). Under the outbox mutex: clears each lane's flag once that lane is below its own low-water with no admittable row and no pending spill of that lane; resets quarantined rows to `attempts: 0` only when the queue is below low-water and neither lane has an admittable row or a pending spill.
 
 The whole pass runs inside `withOverflowRenew` so a long pass can't let either flag's TTL lapse mid-tick.
 
@@ -404,7 +425,7 @@ One Redis key per lane — `job:overflow` (the whole budget) and `job:overflow:s
 
 ### Queue Depth Probe
 
-`queueDepths()` returns `{ total, slow }`: `total` counts `waiting + prioritized + active`, `slow` counts the jobs waiting at `SLOW_LANE_PRIORITY` via BullMQ's `getCountsPerPriority` (neither counts `delayed` — scheduled cron repeats are a standing floor, not pressure), cached ~1s (`DEPTH_CACHE_MS`). Pass `fresh = true` to bypass the cache (used by `tripIfFull` and the drain). A job given an explicit priority between the lanes lands in `prioritized` and counts against the whole budget, not the slow share.
+`queueDepths()` returns `{ total, slow, slowDeferred }`: `slowDeferred` is the slow lane's deferral list capped at BullMQ's `delayed` count (see [The Deferral List](#the-deferral-list)); `total` counts `waiting + prioritized + active + slowDeferred`; `slow` counts the jobs waiting at `SLOW_LANE_PRIORITY` via BullMQ's `getCountsPerPriority` plus `slowDeferred`. The rest of `delayed` stays out — scheduled cron repeats and backoff retries are a standing floor, not pressure. Cached ~1s (`DEPTH_CACHE_MS`). Pass `fresh = true` to bypass the cache (used by `tripIfFull` and the drain). A job given an explicit priority between the lanes lands in `prioritized` and counts against the whole budget, not the slow share.
 
 All `JobOutbox` writes — accumulator flushes AND the drain — run through one shared serialized queue (`flushQueue` / `runOnOutboxQueue`, via `createSerializedQueue`), so a flush and a drain can never touch the table concurrently.
 

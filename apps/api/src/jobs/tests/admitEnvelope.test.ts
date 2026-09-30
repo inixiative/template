@@ -2,10 +2,12 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, spyOn
 import { db } from '@template/db';
 import { cleanupTouchedTables } from '@template/db/test';
 import { setEnvOverride } from '@template/shared/utils';
+import { PRIORITY_LIMIT } from 'bullmq';
 import { admitEnvelope } from '#/jobs/admitEnvelope';
 import { SLOW_LANE_PRIORITY } from '#/jobs/lanePriority';
 import { flagKey } from '#/jobs/outbox/config';
 import { queue } from '#/jobs/queue';
+import { readSlowDeferred } from '#/jobs/slowLaneSignals';
 import { type JobData, JobLane, JobType } from '#/jobs/types';
 
 const envelope = (lane: JobLane): JobData => ({ type: JobType.adhoc, lane, payload: { lane } });
@@ -49,7 +51,7 @@ describe('admitEnvelope', () => {
     await cleanupTouchedTables(db);
   });
 
-  const admit = (lane: JobLane, jobId: string, options: { priority?: number } = {}) =>
+  const admit = (lane: JobLane, jobId: string, options: { priority?: number; delay?: number } = {}) =>
     admitEnvelope({ handlerName: 'sendWebhook', jobId, data: envelope(lane), options, bypass: false });
 
   it('adds a slow job straight to the shared queue at the lowest priority', async () => {
@@ -65,6 +67,24 @@ describe('admitEnvelope', () => {
     await admit(JobLane.slow, 'slow-asked-urgent', { priority: 1 });
 
     expect(added.map((a) => a.priority)).toEqual([undefined, 1, SLOW_LANE_PRIORITY]);
+  });
+
+  it('clamps a requested priority above the slow lane to the slow priority', async () => {
+    await admit(JobLane.fast, 'fast-asked-last', { priority: PRIORITY_LIMIT });
+
+    expect(added.map((a) => a.priority)).toEqual([SLOW_LANE_PRIORITY]);
+  });
+
+  it('counts a slow job added with a delay as deferred slow work from the moment it is added', async () => {
+    setEnvOverride('JOBS_MAX_QUEUE_DEPTH', '2');
+    setEnvOverride('JOBS_SLOW_QUEUE_DEPTH_FRACTION', '0.5');
+
+    await admit(JobLane.fast, 'fast-delayed', { delay: 30_000 });
+    expect(await readSlowDeferred(queue.redis, queue.name)).toBe(0);
+
+    await admit(JobLane.slow, 'slow-delayed', { delay: 30_000 });
+    expect(await readSlowDeferred(queue.redis, queue.name)).toBe(1);
+    expect(await queue.redis.get(flagKey(JobLane.slow))).not.toBeNull();
   });
 
   it('spills slow work once the slow lane is over pressure, while fast work still goes direct', async () => {

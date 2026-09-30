@@ -19,6 +19,12 @@ export const SLOW_LANE_PRIORITY = 2 ** 21 - 1;
 // The one place a lane becomes a BullMQ option. A slow job's own requested priority is replaced: the
 // slow lane is always last. A fast job keeps the priority it was given, including the slow value: a job
 // at SLOW_LANE_PRIORITY waits and counts as slow work (queueDepths counts that band) whatever its lane tag
-// says, which is what the caller asked for.
-export const withLanePriority = <T extends JobsOptions>(data: Pick<JobData, 'lane'>, options: T): T =>
-  isSlowJobData(data) ? { ...options, priority: SLOW_LANE_PRIORITY } : options;
+// says, which is what the caller asked for. A priority above SLOW_LANE_PRIORITY is clamped to it, so no job
+// sorts behind the slow lane or outside the slow band count.
+export const withLanePriority = <T extends JobsOptions>(data: Pick<JobData, 'lane'>, options: T): T => {
+  if (isSlowJobData(data)) return { ...options, priority: SLOW_LANE_PRIORITY };
+  if (options.priority !== undefined && options.priority > SLOW_LANE_PRIORITY) {
+    return { ...options, priority: SLOW_LANE_PRIORITY };
+  }
+  return options;
+};
