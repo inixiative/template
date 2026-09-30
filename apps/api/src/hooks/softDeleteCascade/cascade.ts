@@ -4,19 +4,33 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
-import { db } from '@template/db';
+import { db, isHardDeletedOnTombstone } from '@template/db';
 import { type ChildRelation, childRelations } from '#/hooks/softDeleteCascade/childRelations';
-import { HARD_DELETE_ON_TOMBSTONE } from '#/hooks/softDeleteCascade/hardDeleteOnTombstone';
 
 type Row = Record<string, unknown>;
 
 const fkWhere = (child: ChildRelation, row: Row) =>
   Object.fromEntries(child.fromFields.map((from, i) => [from, row[child.toFields[i] ?? 'id']]));
 
+// Depth-first: deleteMany is not one of the hook's actions, so a hard delete does not re-enter the
+// cascade and everything below it would fall to raw FK behavior.
+const hardDelete = async (model: string, where: Record<string, unknown>) => {
+  const doomed = (await db.delegate(model).findMany({ where, select: { id: true } })) as { id: string }[];
+  if (doomed.length) {
+    const ids = doomed.map((row) => row.id);
+    for (const child of childRelations(model)) {
+      if (!isHardDeletedOnTombstone(child.model)) continue;
+      const [from] = child.fromFields;
+      if (child.fromFields.length === 1 && from) await hardDelete(child.model, { [from]: { in: ids } });
+    }
+  }
+  await db.delegate(model).deleteMany({ where });
+};
+
 export const tombstoneChildren = async (model: string, row: Row) => {
   for (const child of childRelations(model)) {
-    if (HARD_DELETE_ON_TOMBSTONE[model]?.includes(child.model)) {
-      await db.delegate(child.model).deleteMany({ where: fkWhere(child, row) });
+    if (isHardDeletedOnTombstone(child.model)) {
+      await hardDelete(child.model, fkWhere(child, row));
     } else if (child.hasDeletedAt) {
       await db.delegate(child.model).updateManyAndReturn({
         where: { ...fkWhere(child, row), deletedAt: null },

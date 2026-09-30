@@ -7,6 +7,7 @@
 import { DbAction, type HookOptions, HookTiming, registerDbHook } from '@template/db';
 import { castArray } from 'lodash-es';
 import { reviveChildren, tombstoneChildren } from '#/hooks/softDeleteCascade/cascade';
+import { validateDeleteBehavior } from '#/hooks/softDeleteCascade/validateDeleteBehavior';
 import { hasDeletedAt, modelNames } from '#/lib/prisma/fieldMetadata';
 
 type Row = Record<string, unknown>;
@@ -17,6 +18,7 @@ type Row = Record<string, unknown>;
 // its own timestamp and stays dead. Hard-deleted relations (revocation
 // registry) are gone for good; revive does not resurrect them.
 export const registerSoftDeleteCascadeHook = () => {
+  validateDeleteBehavior();
   registerDbHook(
     'softDeleteCascade',
     modelNames().filter(hasDeletedAt),
