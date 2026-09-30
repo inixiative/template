@@ -1,32 +1,22 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.5.0/schema.json",
-  "assist": { "actions": { "source": { "organizeImports": "on" } } },
+  "$schema": "https://biomejs.dev/schemas/2.5.2/schema.json",
+  "extends": ["@inixiative/config/biome/base.json", "@inixiative/config/biome/react.json"],
+  "files": {
+    "includes": [
+      "!**/.claude",
+      "!**/public",
+      "!docs/**/*.html",
+      "!packages/shared/styles/theme.css",
+      "!scripts/ci/rule-violations"
+    ]
+  },
   "linter": {
-    "enabled": true,
     "rules": {
-      "preset": "recommended",
       "suspicious": {
-        "noConfusingVoidType": "off",
         "noExplicitAny": "error"
       },
-      "a11y": {
-        "noStaticElementInteractions": "off",
-        "useKeyWithClickEvents": "off",
-        "useFocusableInteractive": "off",
-        "useSemanticElements": "off",
-        "noLabelWithoutControl": "off"
-      },
-      "complexity": {
-        "noForEach": "off",
-        "useArrowFunction": "error"
-      },
-      "correctness": {
-        "useExhaustiveDependencies": "warn"
-      },
       "style": {
-        "noNonNullAssertion": "off",
         "noDefaultExport": "error",
-        "useNodejsImportProtocol": "off",
         "useFilenamingConvention": {
           "level": "error",
           "options": {
@@ -37,40 +27,6 @@
         }
       }
     }
-  },
-  "formatter": {
-    "enabled": true,
-    "indentStyle": "space",
-    "indentWidth": 2,
-    "lineWidth": 120
-  },
-  "javascript": {
-    "formatter": {
-      "quoteStyle": "single",
-      "trailingCommas": "all",
-      "semicolons": "always"
-    }
-  },
-  "files": {
-    "includes": [
-      "**",
-      "!**/node_modules",
-      "!**/dist",
-      "!**/_old",
-      "!**/.next",
-      "!**/.turbo",
-      "!**/.claude",
-      "!**/public",
-      "!**/*.gen.ts",
-      "!**/*.gen.json",
-      "!**/*.generated.ts",
-      "!**/generated",
-      "!tmp",
-      "!.worktrees",
-      "!docs/**/*.html",
-      "!packages/shared/styles/theme.css",
-      "!scripts/ci/rule-violations"
-    ]
   },
   "overrides": [
     {
@@ -148,17 +104,6 @@
         "rules": {
           "style": {
             "useFilenamingConvention": "off"
-          }
-        }
-      }
-    },
-    {
-      "includes": ["**/*.d.ts"],
-      "linter": {
-        "rules": {
-          "style": {},
-          "complexity": {
-            "useArrowFunction": "off"
           }
         }
       }

@@ -1,7 +1,6 @@
 {
   "extends": "../../tsconfig.frontend.json",
   "compilerOptions": {
-    "baseUrl": ".",
     "paths": {
       "#/*": ["./app/*"],
       "@template/db": ["../../packages/db/src/index.ts"],
