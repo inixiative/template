@@ -6,6 +6,7 @@
  */
 import { db, isHardDeletedOnTombstone } from '@template/db';
 import { type ChildRelation, childRelations } from '#/hooks/softDeleteCascade/childRelations';
+import { REGENERATE_ON_REVIVE } from '#/hooks/softDeleteCascade/regenerateOnRevive';
 
 type Row = Record<string, unknown>;
 
@@ -45,6 +46,10 @@ export const tombstoneChildren = async (model: string, row: Row) => {
 
 export const reviveChildren = async (model: string, row: Row, priorDeletedAt: unknown) => {
   for (const child of childRelations(model)) {
+    if (isHardDeletedOnTombstone(child.model)) {
+      await REGENERATE_ON_REVIVE[child.model]?.(model, row);
+      continue;
+    }
     if (!child.hasDeletedAt) continue;
     await db.delegate(child.model).updateManyAndReturn({
       where: { ...fkWhere(child, row), deletedAt: priorDeletedAt },

@@ -8,11 +8,13 @@ import type { SourceQuery } from '@inixiative/json-rules';
 import { db } from '@template/db/client';
 import type { Prisma } from '@template/db/generated/client/client';
 import { resolveFalsePolymorphismRef } from '@template/db/registries/falsePolymorphism';
+import { isSoftDeleteModel } from '@template/db/registries/softDeleteModels';
 import { admitRuleReferences } from '@template/db/utils/admitRuleReferences';
 import { lockedLiveReferences } from '@template/db/utils/lockedLiveReferences';
 import type { ModelName } from '@template/db/utils/modelNames';
 import { RuleReferenceError } from '@template/db/utils/ruleReferenceError';
 import { type RuleReference, referenceKey } from '@template/shared/rules';
+import { groupBy } from 'lodash-es';
 
 export type RuleReferenceOwner = { model: ModelName; id: string };
 
@@ -30,6 +32,33 @@ const fkColumn = (axis: 'ownerModel' | 'referencedModel', model: string): string
 
 const edgeKey = (edge: Edge): string =>
   referenceKey({ model: edge.referencedModel, id: edge.referencedId });
+
+type TargetState = { deletedAt: Date | null };
+
+const edgeData = (owner: RuleReferenceOwner, ref: RuleReference, target: TargetState) => ({
+  ownerModel: owner.model,
+  [fkColumn('ownerModel', owner.model)]: owner.id,
+  referencedModel: ref.model,
+  referencedId: ref.id,
+  [fkColumn('referencedModel', ref.model)]: ref.id,
+  referencedDeletedAt: target.deletedAt,
+});
+
+const targetStates = async (references: RuleReference[]): Promise<Map<string, TargetState>> => {
+  const states = new Map<string, TargetState>();
+  for (const [model, group] of Object.entries(groupBy(references, 'model'))) {
+    const soft = isSoftDeleteModel(model);
+    const rows = (await db.withDeleted(() =>
+      db.delegate(model).findMany({
+        where: { id: { in: [...new Set(group.map((ref) => ref.id))] } },
+        select: { id: true, ...(soft ? { deletedAt: true } : {}) },
+      }),
+    )) as { id: string; deletedAt?: Date | null }[];
+    for (const row of rows)
+      states.set(referenceKey({ model, id: row.id }), { deletedAt: row.deletedAt ?? null });
+  }
+  return states;
+};
 
 /**
  * Recompute one owner's edges from the rows its rules name, inside the caller's transaction. The
@@ -67,18 +96,42 @@ export const syncRuleReferenceEdges = async (
   const toDelete = existing.filter((edge) => !named.has(edgeKey(edge)));
   const toCreate = references
     .filter((ref) => !held.has(referenceKey(ref)))
-    .map((ref) => ({
-      ownerModel: owner.model,
-      [ownerColumn]: owner.id,
-      referencedModel: ref.model,
-      referencedId: ref.id,
-      [fkColumn('referencedModel', ref.model)]: ref.id,
-    }));
+    .map((ref) => edgeData(owner, ref, { deletedAt: null }));
 
   if (toDelete.length)
     await db.ruleReference.deleteMany({ where: { id: { in: toDelete.map((edge) => edge.id) } } });
   if (toCreate.length)
     await db.ruleReference.createManyAndReturn({
       data: toCreate as Prisma.RuleReferenceCreateManyInput[],
+    });
+};
+
+/**
+ * Rebuild one owner's edges from the rows its rule names today, with no admission gate: the owner
+ * is coming back (a revive), not being authored. A soft-deleted target gets an edge carrying its
+ * `referencedDeletedAt`, so an owner whose target died while it was away comes back degraded rather
+ * than refused. A purged target gets no edge — the client cannot write the null-FK shape only
+ * SET NULL produces, and does not need to: health reads the references off the rule and the live
+ * set off the edges, so a named row with no edge is never live and the rule fails closed.
+ */
+export const regenerateRuleReferenceEdges = async (
+  owner: RuleReferenceOwner,
+  references: RuleReference[],
+): Promise<void> => {
+  const ownerColumn = fkColumn('ownerModel', owner.model);
+  await db.ruleReference.deleteMany({
+    where: { [ownerColumn]: owner.id } as Prisma.RuleReferenceWhereInput,
+  });
+
+  const unique = [...new Map(references.map((ref) => [referenceKey(ref), ref])).values()];
+  if (!unique.length) return;
+  const states = await targetStates(unique);
+  const data = unique.flatMap((ref) => {
+    const target = states.get(referenceKey(ref));
+    return target ? [edgeData(owner, ref, target)] : [];
+  });
+  if (data.length)
+    await db.ruleReference.createManyAndReturn({
+      data: data as Prisma.RuleReferenceCreateManyInput[],
     });
 };

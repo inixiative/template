@@ -15,8 +15,9 @@ type Row = Record<string, unknown>;
 // Each cascaded write re-enters the lifecycle, so the tree walks itself: the
 // whole subtree shares one tombstone timestamp, and revival restores exactly
 // the rows that died with the parent — a child deleted independently keeps
-// its own timestamp and stays dead. Hard-deleted relations (revocation
-// registry) are gone for good; revive does not resurrect them.
+// its own timestamp and stays dead. Hard-deleted relations are gone for good
+// unless they are derived from the parent (REGENERATE_ON_REVIVE): a revocation
+// stays revoked, a rule reference is rebuilt from the revived owner's rule.
 export const registerSoftDeleteCascadeHook = () => {
   validateDeleteBehavior();
   registerDbHook(

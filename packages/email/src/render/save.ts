@@ -18,10 +18,14 @@ import { collectSlugsFromNodes } from '@template/email/render/nodes';
 import { parseBlocks } from '@template/email/render/parseBlocks';
 import { saveComponents } from '@template/email/render/saveComponents';
 import { saveTemplate } from '@template/email/render/saveTemplate';
-import { stripComponentBodies } from '@template/email/render/stripComponentBodies';
 import type { OwnerScope } from '@template/email/render/types';
 import { validateDependents } from '@template/email/render/validateDependents';
-import { type EmailLens, syncRuleReferences } from '@template/email/rules';
+import {
+  componentRuleContents,
+  type EmailLens,
+  syncRuleReferences,
+  templateRuleContents,
+} from '@template/email/rules';
 import { assertValidConditions } from '@template/email/validations/validateConditions';
 import { validateMjml } from '@template/email/validations/validateMjml';
 import { validateNoCycle } from '@template/email/validations/validateNoCycle';
@@ -118,13 +122,13 @@ export const saveEmailTemplate = async (
       for (const component of components) {
         await syncRuleReferences(
           { model: 'EmailComponent', id: component.id },
-          [component.mjml],
+          componentRuleContents(component),
           options.lens,
         );
       }
       await syncRuleReferences(
         { model: 'EmailTemplate', id: template.id },
-        [template.subject ?? '', stripComponentBodies(template.mjml)],
+        templateRuleContents(template),
         options.lens,
       );
 

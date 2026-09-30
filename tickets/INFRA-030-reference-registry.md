@@ -4,7 +4,7 @@
 **Assignee**: Aron
 **Priority**: Medium
 **Created**: 2026-08-31
-**Updated**: 2026-08-31
+**Updated**: 2026-09-30
 
 > Zealot hit this as ZLT-4441 / #2116 (write-only edge table + DB hook, reviewed 2026-08-31 with the
 > rulings below) after the ZLT-4331 review proved per-surface tree scanning doesn't scale: a delete
@@ -268,6 +268,25 @@ template keeps two:
 "Dynamic" is gone: a value read through `path` / `bind` names no row, so the registry records no
 edge for that leaf and evaluation is not refused for it. A bound value is valid exactly when its
 binding is supplied, which the first path already decides.
+
+## Ruling (Aron, 2026-09-30) — the owner takes its edges with it
+
+A soft-deleted owner's rule is not evaluated, so its edges would only hold the referenced side and
+count as degraded. `RuleReference` is in `HARD_DELETE_ON_TOMBSTONE`: tombstoning an owner hard-deletes
+its edges. The referenced relations (`tag`, `organization`, `space`, `referencedSegment`) are
+`CASCADE_EXEMPT` — tombstoning a *named* row keeps the edges that name it, and
+`ruleReference:referenced` stamps them. Segment is both, and gets both behaviours.
+
+Reviving the owner regenerates its edges from the rule it holds now (`REGENERATE_ON_REVIVE` in the
+cascade, `regenerateRuleReferenceEdges` in `@template/db`). Regeneration is not a save: there is no
+admission gate, because the owner is coming back rather than being authored. A target that was
+soft-deleted while the owner was away gets an edge already carrying `referencedDeletedAt`. A target
+that was purged gets no edge: the client cannot write the null-FK shape only `SET NULL` produces, and
+does not need to, since health reads references off the rule and the live set off the edges, so a
+named row with no edge is never live. A revocation (`Session`, `Token`) has no regenerator and stays
+gone. The contents an email owner's rules live in (`templateRuleContents` / `componentRuleContents`)
+are one answer shared by save and revive, so a revived owner holds exactly the edges its last save
+wrote. Zealot has the same shape (ZLT-5163).
 
 ## Zealot follow-through
 
