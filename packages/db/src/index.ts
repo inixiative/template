@@ -138,7 +138,11 @@ export {
   ruleReferenceIssues,
 } from './utils/ruleReferenceHealth';
 export { ruleReferences } from './utils/ruleReferences';
-export { type RuleReferenceOwner, syncRuleReferenceEdges } from './utils/syncRuleReferenceEdges';
+export {
+  type RuleReferenceOwner,
+  regenerateRuleReferenceEdges,
+  syncRuleReferenceEdges,
+} from './utils/syncRuleReferenceEdges';
 export {
   type RuleValidation,
   type ValidateRuleForLensOptions,

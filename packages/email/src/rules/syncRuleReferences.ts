@@ -4,7 +4,14 @@
  * @partOf feature:email
  * @uses infrastructure:prisma
  */
-import { type RuleReferenceOwner, syncRuleReferenceEdges } from '@template/db';
+
+import {
+  type RuleReferenceOwner,
+  regenerateRuleReferenceEdges,
+  syncRuleReferenceEdges,
+} from '@template/db';
+import type { EmailComponent, EmailTemplate } from '@template/db/generated/client/client';
+import { stripComponentBodies } from '@template/email/render/stripComponentBodies';
 import {
   defaultEmailLens,
   type EmailLens,
@@ -24,3 +31,20 @@ export const syncRuleReferences = (
     emailSourceQueries(judged),
   );
 };
+
+// The contents an owner's rules live in — the one answer save and revive share, so a regenerated
+// owner holds exactly the edges its last save wrote.
+export const templateRuleContents = (
+  template: Pick<EmailTemplate, 'subject' | 'mjml'>,
+): string[] => [template.subject ?? '', stripComponentBodies(template.mjml)];
+
+export const componentRuleContents = (component: Pick<EmailComponent, 'mjml'>): string[] => [
+  component.mjml,
+];
+
+export const regenerateRuleReferences = (
+  owner: RuleReferenceOwner,
+  contents: string[],
+  lens: EmailLens | undefined,
+) =>
+  regenerateRuleReferenceEdges(owner, contentRuleReferences(lens ?? defaultEmailLens, ...contents));
