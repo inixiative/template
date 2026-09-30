@@ -3,6 +3,7 @@ import type React from 'react';
 import { useCallback, useState } from 'react';
 import { ConfigProvider } from './utils/configState';
 import { BouncerSetupView } from './views/BouncerSetupView';
+import { CicdSetupView } from './views/CicdSetupView';
 import { CloudflarePagesSetupView } from './views/CloudflarePagesSetupView';
 import { InfisicalSetupView } from './views/InfisicalSetupView';
 import { LaunchView } from './views/LaunchView';
@@ -61,6 +62,7 @@ export const App: React.FC = () => {
 
         {state === 'task' && (
           <>
+            {currentTask === 'cicd' && <CicdSetupView onComplete={handleTaskComplete} onCancel={handleTaskCancel} />}
             {currentTask === 'monitoring' && (
               <TelemetrySetupView onComplete={handleTaskComplete} onCancel={handleTaskCancel} />
             )}
@@ -96,7 +98,8 @@ export const App: React.FC = () => {
               <BouncerSetupView onComplete={handleTaskComplete} onCancel={handleTaskCancel} />
             )}
             {currentTask === 'launch' && <LaunchView onComplete={handleTaskComplete} onCancel={handleTaskCancel} />}
-            {currentTask !== 'monitoring' &&
+            {currentTask !== 'cicd' &&
+              currentTask !== 'monitoring' &&
               currentTask !== 'settings' &&
               currentTask !== 'project-config' &&
               currentTask !== 'infisical' &&
