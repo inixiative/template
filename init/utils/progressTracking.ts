@@ -1,4 +1,4 @@
-import { getProjectConfig, PROGRESS_KEYS, writeProjectConfig } from './getProjectConfig';
+import { getProjectConfig, type PROGRESS_KEYS, writeProjectConfig } from './getProjectConfig';
 
 export type ProgressSection = keyof typeof PROGRESS_KEYS;
 

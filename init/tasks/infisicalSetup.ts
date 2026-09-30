@@ -1,4 +1,4 @@
-import { createPrivateKey, createPublicKey, generateKeyPairSync, randomBytes } from 'crypto';
+import { createPrivateKey, createPublicKey, generateKeyPairSync, randomBytes } from 'node:crypto';
 import { ENCRYPTED_MODELS } from '../../packages/db/src/lib/encryption/registry';
 import { infisicalApi, toInfisicalSlug } from '../api/infisical';
 import { updateConfigField } from '../utils/configHelpers';

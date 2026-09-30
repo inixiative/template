@@ -1,7 +1,7 @@
 import { mock } from 'bun:test';
-import { exec as _exec, execSync as _execSync } from 'child_process';
-import { homedir } from 'os';
-import { join } from 'path';
+import { exec as _exec, execSync as _execSync } from 'node:child_process';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 
 // Capture real function references as values — import bindings are live in ESM,
 // so mock.module('child_process', ...) would replace them in-place, causing

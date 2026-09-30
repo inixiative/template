@@ -125,13 +125,11 @@ describe('scopedRule — a loop-bound rule becomes the array rule it always was'
 
   it('if/then/else and all/any are transparent', () => {
     const out = scopedRule(
-      // biome-ignore lint/suspicious/noThenProperty: rule DSL object, not a Promise
       { if: eq('item.a', 1), then: eq('item.b', 2), else: { any: [eq('item.c', 3)] } },
       oneLoop,
     ).rule;
     expect((out as { condition: unknown }).condition).toEqual({
       if: eq('a', 1),
-      // biome-ignore lint/suspicious/noThenProperty: rule DSL object, not a Promise
       then: eq('b', 2),
       else: { any: [eq('c', 3)] },
     });
