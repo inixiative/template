@@ -10,15 +10,19 @@ model Integration {
 
   name String
 
-  // Owner (fake polymorphism: User, Organization, or Space)
+  provider Provider?
+
+  // Owner (fake polymorphism: User, OrganizationUser, Organization, Space, or SpaceUser)
   ownerModel     IntegrationOwnerModel
   userId         String?               @db.VarChar(36)
   organizationId String?               @db.VarChar(36)
   spaceId        String?               @db.VarChar(36)
 
-  user         User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  space        Space?        @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  user             User?             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization     Organization?     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationUser OrganizationUser? @relation(fields: [organizationId, userId], references: [organizationId, userId], onDelete: Cascade)
+  space            Space?            @relation(fields: [organizationId, spaceId], references: [organizationId, id], onDelete: Cascade)
+  spaceUser        SpaceUser?        @relation(fields: [organizationId, spaceId, userId], references: [organizationId, spaceId, userId], onDelete: Cascade)
 
   // Attribution — rows that originated from or reference this integration
   tokens               Token[]
@@ -32,14 +36,36 @@ model Integration {
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
   // ==========================================================================
 
-  @@unique([userId, name], where: { userId: { not: null } })
-  @@unique([organizationId, name], where: { organizationId: { not: null } })
-  @@unique([spaceId, name], where: { spaceId: { not: null } })
+  @@unique([userId, name], where: raw("\"ownerModel\" = 'User' AND \"deletedAt\" IS NULL"), map: "Integration_user_name_key")
+  @@unique([organizationId, userId, name], where: raw("\"ownerModel\" = 'OrganizationUser' AND \"deletedAt\" IS NULL"), map: "Integration_orguser_name_key")
+  @@unique([organizationId, name], where: raw("\"ownerModel\" = 'Organization' AND \"deletedAt\" IS NULL"), map: "Integration_organization_name_key")
+  @@unique([spaceId, name], where: raw("\"ownerModel\" = 'Space' AND \"deletedAt\" IS NULL"), map: "Integration_space_name_key")
+  @@unique([spaceId, userId, name], where: raw("\"ownerModel\" = 'SpaceUser' AND \"deletedAt\" IS NULL"), map: "Integration_spaceuser_name_key")
   @@index([ownerModel])
+  @@index([userId])
+  @@index([organizationId])
+  @@index([spaceId])
+  @@index([provider])
 }
 
 enum IntegrationOwnerModel {
   User
+  OrganizationUser
   Organization
   Space
+  SpaceUser
+}
+
+enum Provider {
+  slack
+  teams
+  linear
+  notion
+  jira
+  drive
+  confluence
+  anthropic
+  openai
+  archive
+  github
 }

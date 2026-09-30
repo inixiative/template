@@ -18,6 +18,7 @@ export const spaceCreateIntegrationController = makeController(spaceCreateIntegr
     data: {
       ...body,
       ownerModel: 'Space',
+      organizationId: space.organizationId,
       spaceId: space.id,
     } as Prisma.IntegrationUncheckedCreateInput,
   });
