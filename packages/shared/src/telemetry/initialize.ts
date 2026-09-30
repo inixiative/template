@@ -43,7 +43,7 @@ const startTelemetry = (config: TelemetryConfig) => {
     spanLimits: { attributeValueLengthLimit: 4096, attributeCountLimit: 64 },
     spanProcessors: [
       new BatchSpanProcessor(
-        createFetchExporter({ ...targets.traces, serialize: JsonTraceSerializer.serializeRequest }),
+        createFetchExporter({ ...targets.traces, signal: 'traces', serialize: JsonTraceSerializer.serializeRequest }),
         { maxQueueSize: 2048, maxExportBatchSize: 32 },
       ),
     ],
@@ -53,7 +53,11 @@ const startTelemetry = (config: TelemetryConfig) => {
     readers: [
       new PeriodicExportingMetricReader({
         exporter: {
-          ...createFetchExporter({ ...targets.metrics, serialize: JsonMetricsSerializer.serializeRequest }),
+          ...createFetchExporter({
+            ...targets.metrics,
+            signal: 'metrics',
+            serialize: JsonMetricsSerializer.serializeRequest,
+          }),
           selectAggregationTemporality: () => AggregationTemporality.DELTA,
         },
         exportIntervalMillis: 30_000,
@@ -65,7 +69,7 @@ const startTelemetry = (config: TelemetryConfig) => {
     resource,
     processors: [
       new BatchLogRecordProcessor(
-        createFetchExporter({ ...targets.logs, serialize: JsonLogsSerializer.serializeRequest }),
+        createFetchExporter({ ...targets.logs, signal: 'logs', serialize: JsonLogsSerializer.serializeRequest }),
         { maxQueueSize: 2048, maxExportBatchSize: 32 },
       ),
     ],
