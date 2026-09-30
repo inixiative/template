@@ -35,6 +35,7 @@ kanban
     INFRA-009-adapter-primitives
     INFRA-020-audit-logs-cold-storage
     INFRA-010-cloudflare-waf-and-asset-serving
+    INFRA-033-segment-reconcile-perf-budget
     DOC-001-scalar-api-docs-ui
     DOC-002-ai-discoverable-api-metadata
     FE-002-editor-slice-pattern
@@ -74,6 +75,7 @@ kanban
 - [INFRA-020: Audit Log Cold Storage](./INFRA-020-audit-logs-cold-storage.md) - Ship audit logs to cold storage before hot-deletion
 - [INFRA-031: Jobs lane + lock port from Zealot](./INFRA-031-jobs-lane-and-lock-port-from-zealot.md) - Gate 5 lane tag, outbox lane admission, presence set, createLock refresh fix, row-state claim policy
 - [INFRA-010: Cloudflare WAF & Asset Serving](./INFRA-010-cloudflare-waf-and-asset-serving.md) - WAF rules, DDoS protection, CDN, init script integration
+- [INFRA-033: Segment Reconcile Perf Budget](./INFRA-033-segment-reconcile-perf-budget.md) - Measure DB load of both reconcile rails; set the scale threshold for field-level trigger narrowing
 
 **Audit & Compliance:**
 - [FEAT-017: Audit Log Hardening, Inquiry Lineage, and Explorer](./FEAT-017-audit-log-hardening-lineage-and-explorer.md) - Durable audit writes, inquiry causality, and admin audit browsing
