@@ -7,7 +7,12 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { LogLevel } from '@template/shared/logger/types';
 
-export type LogRecord = { level: LogLevel; message: string; fields: Record<string, unknown>; timestamp: Date };
+export type LogRecord = {
+  level: LogLevel;
+  message: string;
+  fields: Record<string, unknown>;
+  timestamp: Date;
+};
 let serviceFields: Record<string, unknown> = {};
 export const setLogService = (fields: Record<string, unknown>): void => {
   serviceFields = fields;

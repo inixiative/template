@@ -8,7 +8,9 @@ describe('makeUnrefInterval', () => {
 
   it('unrefs the timer so a pending tick cannot hold a shutdown open', () => {
     let unrefCalls = 0;
-    spyOn(globalThis, 'setInterval').mockImplementation((() => ({ unref: () => (unrefCalls += 1) })) as never);
+    spyOn(globalThis, 'setInterval').mockImplementation((() => ({
+      unref: () => (unrefCalls += 1),
+    })) as never);
 
     makeUnrefInterval({ intervalMs: 1000, tick: () => {} }).start();
 

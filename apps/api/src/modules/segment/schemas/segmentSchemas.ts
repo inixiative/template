@@ -5,11 +5,20 @@
  * @uses feature:customer
  */
 import { z } from '@hono/zod-openapi';
-import { SegmentMemberScalarSchema, SegmentScalarInputSchema, SegmentScalarSchema } from '@template/db';
+import {
+  SegmentMemberScalarSchema,
+  SegmentScalarInputSchema,
+  SegmentScalarSchema,
+} from '@template/db';
 import { customerRefAsProviderSchema } from '#/modules/customerRef/schemas/customerRefSchemas';
 import { selectSegmentForCustomer } from '#/modules/segment/queries/segmentIncludes';
 
-export const SEGMENT_CREATE_IMMUTABLE_FIELDS = ['ownerModel', 'userId', 'organizationId', 'spaceId'] as const;
+export const SEGMENT_CREATE_IMMUTABLE_FIELDS = [
+  'ownerModel',
+  'userId',
+  'organizationId',
+  'spaceId',
+] as const;
 
 export const segmentCreateBodySchema = SegmentScalarInputSchema.omit({
   ownerModel: true,
@@ -31,7 +40,9 @@ export const ruleIssueSchema = z.discriminatedUnion('kind', [
   }),
 ]);
 
-export const segmentReadResponseSchema = SegmentScalarSchema.extend({ ruleIssues: z.array(ruleIssueSchema) });
+export const segmentReadResponseSchema = SegmentScalarSchema.extend({
+  ruleIssues: z.array(ruleIssueSchema),
+});
 
 export const segmentMemberWithCustomerSchema = SegmentMemberScalarSchema.extend({
   customerRef: customerRefAsProviderSchema,

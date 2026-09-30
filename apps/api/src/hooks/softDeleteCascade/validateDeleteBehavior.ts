@@ -13,14 +13,18 @@ const optionalForeignKey = (model: string, fromFields: readonly string[]): boole
   return fromFields.every((name) => fields?.[name]?.isRequired !== true);
 };
 
-export const deleteBehaviorViolations = (models: readonly string[] = HARD_DELETE_ON_TOMBSTONE): string[] => {
+export const deleteBehaviorViolations = (
+  models: readonly string[] = HARD_DELETE_ON_TOMBSTONE,
+): string[] => {
   const known = new Set(modelNames());
   const listed = new Set(models);
   const violations: string[] = [];
 
   for (const model of models) {
     if (!known.has(model)) {
-      violations.push(`${model} is listed in HARD_DELETE_ON_TOMBSTONE but is not a model in the schema.`);
+      violations.push(
+        `${model} is listed in HARD_DELETE_ON_TOMBSTONE but is not a model in the schema.`,
+      );
       continue;
     }
 
@@ -49,5 +53,7 @@ export const deleteBehaviorViolations = (models: readonly string[] = HARD_DELETE
 export const validateDeleteBehavior = () => {
   const violations = deleteBehaviorViolations();
   if (violations.length)
-    throw new Error(`[softDeleteCascade] delete behavior is inconsistent:\n  ${violations.join('\n  ')}`);
+    throw new Error(
+      `[softDeleteCascade] delete behavior is inconsistent:\n  ${violations.join('\n  ')}`,
+    );
 };

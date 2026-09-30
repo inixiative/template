@@ -3,7 +3,10 @@ import SelectInput from 'ink-select-input';
 import type React from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { getBouncerProgressSummaries } from '../tasks/bouncerSteps';
-import { getCloudflarePagesLiveActions, getCloudflarePagesProgressSummaries } from '../tasks/cloudflarePagesSteps';
+import {
+  getCloudflarePagesLiveActions,
+  getCloudflarePagesProgressSummaries,
+} from '../tasks/cloudflarePagesSteps';
 import { getInfisicalProgressSummaries } from '../tasks/infisicalSteps';
 import { getPlanetScaleProgressSummaries } from '../tasks/planetscaleSteps';
 import { getRailwayBucketsProgressSummaries } from '../tasks/railwayBucketsSteps';
@@ -46,7 +49,9 @@ const getStatusFromSummaries = (
 ): { status: MenuItem['status']; details: string[] } => {
   const completed = Object.values(progress).filter((value) => value === true).length;
   const total = Object.keys(progress).length;
-  const details = summaries.filter((summary) => summary.completedCount > 0).map((summary) => summary.label);
+  const details = summaries
+    .filter((summary) => summary.completedCount > 0)
+    .map((summary) => summary.label);
 
   if (error) {
     details.push(`Error: ${error}`);
@@ -57,7 +62,9 @@ const getStatusFromSummaries = (
   return { status: 'completed', details };
 };
 
-const getInfisicalStatus = (config: ProjectConfig): { status: MenuItem['status']; details: string[] } => {
+const getInfisicalStatus = (
+  config: ProjectConfig,
+): { status: MenuItem['status']; details: string[] } => {
   return getStatusFromSummaries(
     config.infisical.progress,
     getInfisicalProgressSummaries(config),
@@ -65,7 +72,9 @@ const getInfisicalStatus = (config: ProjectConfig): { status: MenuItem['status']
   );
 };
 
-const getPlanetScaleStatus = (config: ProjectConfig): { status: MenuItem['status']; details: string[] } => {
+const getPlanetScaleStatus = (
+  config: ProjectConfig,
+): { status: MenuItem['status']; details: string[] } => {
   return getStatusFromSummaries(
     config.planetscale.progress,
     getPlanetScaleProgressSummaries(config),
@@ -73,11 +82,19 @@ const getPlanetScaleStatus = (config: ProjectConfig): { status: MenuItem['status
   );
 };
 
-const getRailwayStatus = (config: ProjectConfig): { status: MenuItem['status']; details: string[] } => {
-  return getStatusFromSummaries(config.railway.progress, getRailwayProgressSummaries(config), config.railway.error);
+const getRailwayStatus = (
+  config: ProjectConfig,
+): { status: MenuItem['status']; details: string[] } => {
+  return getStatusFromSummaries(
+    config.railway.progress,
+    getRailwayProgressSummaries(config),
+    config.railway.error,
+  );
 };
 
-const getRailwayPostgresStatus = (config: ProjectConfig): { status: MenuItem['status']; details: string[] } => {
+const getRailwayPostgresStatus = (
+  config: ProjectConfig,
+): { status: MenuItem['status']; details: string[] } => {
   // Skipped groups don't count toward "is the section complete?" — derive a
   // synthetic progress map containing only the actions in non-skipped groups.
   const summaries = getRailwayPostgresProgressSummaries(config);
@@ -89,18 +106,23 @@ const getRailwayPostgresStatus = (config: ProjectConfig): { status: MenuItem['st
   }
   const filteredProgress: Record<string, boolean> = {};
   const stagingEnabled = config.features.staging.enabled;
-  filteredProgress.ensureProdPostgresService = config.railwayPostgres.progress.ensureProdPostgresService;
+  filteredProgress.ensureProdPostgresService =
+    config.railwayPostgres.progress.ensureProdPostgresService;
   filteredProgress.storeProdPostgresUrl = config.railwayPostgres.progress.storeProdPostgresUrl;
   if (stagingEnabled) {
-    filteredProgress.ensureStagingPostgresService = config.railwayPostgres.progress.ensureStagingPostgresService;
-    filteredProgress.storeStagingPostgresUrl = config.railwayPostgres.progress.storeStagingPostgresUrl;
+    filteredProgress.ensureStagingPostgresService =
+      config.railwayPostgres.progress.ensureStagingPostgresService;
+    filteredProgress.storeStagingPostgresUrl =
+      config.railwayPostgres.progress.storeStagingPostgresUrl;
   }
   // Only count summaries that are NOT skipped against completion total.
   const liveSummaries = summaries.filter((s) => !s.skipped);
   return getStatusFromSummaries(filteredProgress, liveSummaries, config.railwayPostgres.error);
 };
 
-const getRailwayBucketsStatus = (config: ProjectConfig): { status: MenuItem['status']; details: string[] } => {
+const getRailwayBucketsStatus = (
+  config: ProjectConfig,
+): { status: MenuItem['status']; details: string[] } => {
   const summaries = getRailwayBucketsProgressSummaries(config);
   const stagingEnabled = config.features.staging.enabled;
   const filteredProgress: Record<string, boolean> = {};
@@ -108,28 +130,49 @@ const getRailwayBucketsStatus = (config: ProjectConfig): { status: MenuItem['sta
   filteredProgress.ensureProdUserBucket = config.railwayBuckets.progress.ensureProdUserBucket;
   filteredProgress.storeProdCredentials = config.railwayBuckets.progress.storeProdCredentials;
   if (stagingEnabled) {
-    filteredProgress.ensureStagingSystemBucket = config.railwayBuckets.progress.ensureStagingSystemBucket;
-    filteredProgress.ensureStagingUserBucket = config.railwayBuckets.progress.ensureStagingUserBucket;
-    filteredProgress.storeStagingCredentials = config.railwayBuckets.progress.storeStagingCredentials;
+    filteredProgress.ensureStagingSystemBucket =
+      config.railwayBuckets.progress.ensureStagingSystemBucket;
+    filteredProgress.ensureStagingUserBucket =
+      config.railwayBuckets.progress.ensureStagingUserBucket;
+    filteredProgress.storeStagingCredentials =
+      config.railwayBuckets.progress.storeStagingCredentials;
   }
   const liveSummaries = summaries.filter((s) => !s.skipped);
   return getStatusFromSummaries(filteredProgress, liveSummaries, config.railwayBuckets.error);
 };
 
-const getVercelStatus = (config: ProjectConfig): { status: MenuItem['status']; details: string[] } => {
-  return getStatusFromSummaries(config.vercel.progress, getVercelProgressSummaries(config), config.vercel.error);
+const getVercelStatus = (
+  config: ProjectConfig,
+): { status: MenuItem['status']; details: string[] } => {
+  return getStatusFromSummaries(
+    config.vercel.progress,
+    getVercelProgressSummaries(config),
+    config.vercel.error,
+  );
 };
 
 const getLaunchStatus = (config: ProjectConfig): MenuItem['status'] => {
   return config.launched ? 'completed' : 'pending';
 };
 
-const getResendStatus = (config: ProjectConfig): { status: MenuItem['status']; details: string[] } => {
-  return getStatusFromSummaries(config.resend.progress, getResendProgressSummaries(config), config.resend.error);
+const getResendStatus = (
+  config: ProjectConfig,
+): { status: MenuItem['status']; details: string[] } => {
+  return getStatusFromSummaries(
+    config.resend.progress,
+    getResendProgressSummaries(config),
+    config.resend.error,
+  );
 };
 
-const getBouncerStatus = (config: ProjectConfig): { status: MenuItem['status']; details: string[] } => {
-  return getStatusFromSummaries(config.bouncer.progress, getBouncerProgressSummaries(config), config.bouncer.error);
+const getBouncerStatus = (
+  config: ProjectConfig,
+): { status: MenuItem['status']; details: string[] } => {
+  return getStatusFromSummaries(
+    config.bouncer.progress,
+    getBouncerProgressSummaries(config),
+    config.bouncer.error,
+  );
 };
 
 const DEFAULT_ITEMS: MenuItem[] = [
@@ -301,7 +344,11 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectTask }) => {
         { label: 'Database Seeding (coming soon)', value: 'seeding', status: 'pending' },
         { label: 'GitHub Actions Setup (coming soon)', value: 'github-actions', status: 'pending' },
         { label: 'Launch (coming soon)', value: 'launch', status: launchStatus },
-        { label: 'Documentation Generation (coming soon)', value: 'documentation', status: 'pending' },
+        {
+          label: 'Documentation Generation (coming soon)',
+          value: 'documentation',
+          status: 'pending',
+        },
         { label: 'Exit', value: 'exit', status: 'pending' },
       ];
 
@@ -315,10 +362,17 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectTask }) => {
     updateItems();
   }, [config]);
 
-  const itemComponent = ({ isSelected = false, label }: { isSelected?: boolean; label: string }) => {
+  const itemComponent = ({
+    isSelected = false,
+    label,
+  }: {
+    isSelected?: boolean;
+    label: string;
+  }) => {
     // Find the item to get its status
     const item = items.find((i) => i.label === label);
-    const statusIcon = item?.status === 'completed' ? '✓' : item?.status === 'incomplete' ? '⋯' : ' ';
+    const statusIcon =
+      item?.status === 'completed' ? '✓' : item?.status === 'incomplete' ? '⋯' : ' ';
     const prefix = isSelected ? '❯ ' : '  ';
 
     return (

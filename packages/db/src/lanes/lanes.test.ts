@@ -1,5 +1,12 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { claimLane, getJobSupersededBy, laneKey, reclaimLane, releaseLane, watchLane } from '@template/db/lanes/lanes';
+import {
+  claimLane,
+  getJobSupersededBy,
+  laneKey,
+  reclaimLane,
+  releaseLane,
+  watchLane,
+} from '@template/db/lanes/lanes';
 import { getRedisClient } from '@template/db/redis/client';
 
 // The supersede lane "baton": one Redis key per lane = its current holder (a jobId). Latest claim wins

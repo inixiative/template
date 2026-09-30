@@ -68,7 +68,9 @@ export const OrganizationsPage = () => {
       createOptimisticListTarget<Organization, Omit<OrganizationCreateData, 'url'>>({
         queryKey: meReadManyOrganizationsQueryKey(),
         operation: 'create',
-        optimisticExtras: { organizationUser: { role: 'owner' } as Organization['organizationUser'] },
+        optimisticExtras: {
+          organizationUser: { role: 'owner' } as Organization['organizationUser'],
+        },
       }),
     ],
     mutationOptions: {
@@ -86,7 +88,9 @@ export const OrganizationsPage = () => {
       {
         key: 'role',
         label: 'Your Role',
-        render: (org: Organization) => <span className="capitalize">{org.organizationUser?.role ?? '—'}</span>,
+        render: (org: Organization) => (
+          <span className="capitalize">{org.organizationUser?.role ?? '—'}</span>
+        ),
       },
       {
         key: 'spacesCount',
@@ -147,7 +151,9 @@ export const OrganizationsPage = () => {
             columns={columns}
             data={organizations}
             keyExtractor={(org) => org.id}
-            onRowClick={(org: Organization) => navigatePreserving(`/dashboard?org=${org.id}`, 'spoof')}
+            onRowClick={(org: Organization) =>
+              navigatePreserving(`/dashboard?org=${org.id}`, 'spoof')
+            }
             emptyMessage="You don't belong to any organizations yet"
             empty={{
               icon: 'lucide:building-2',

@@ -27,6 +27,11 @@ export const organizationCreateAuthProviderRoute = createRoute({
     encryptedSecretsMetadata: true,
     encryptedSecretsKeyVersion: true,
   }),
-  sanitizeKeys: ['organizationId', 'encryptedSecrets', 'encryptedSecretsMetadata', 'encryptedSecretsKeyVersion'],
+  sanitizeKeys: [
+    'organizationId',
+    'encryptedSecrets',
+    'encryptedSecretsMetadata',
+    'encryptedSecretsKeyVersion',
+  ],
   middleware: [validatePermission('own')],
 });

@@ -6,7 +6,9 @@
  */
 import { z } from 'zod';
 
-const samplingEnvironment = z.object({ OTEL_TRACES_SAMPLER_ARG: z.coerce.number().min(0).max(1).default(1) });
+const samplingEnvironment = z.object({
+  OTEL_TRACES_SAMPLER_ARG: z.coerce.number().min(0).max(1).default(1),
+});
 
 export const parseOtlpHeaders = (value = ''): Record<string, string> =>
   Object.fromEntries(
@@ -18,15 +20,27 @@ export const parseOtlpHeaders = (value = ''): Record<string, string> =>
         if (separator < 1) throw new Error('OTLP headers must use key=value pairs');
         const key = entry.slice(0, separator).trim();
         const decoded = decodeURIComponent(entry.slice(separator + 1).trim());
-        if (!/^[a-zA-Z0-9-]+$/.test(key) || /[\r\n]/.test(decoded)) throw new Error('Invalid OTLP header');
+        if (!/^[a-zA-Z0-9-]+$/.test(key) || /[\r\n]/.test(decoded))
+          throw new Error('Invalid OTLP header');
         return [key, decoded];
       }),
   );
 
-export const resolveOtlpEndpoint = (endpoint: string, signal: 'traces' | 'metrics' | 'logs'): string => {
+export const resolveOtlpEndpoint = (
+  endpoint: string,
+  signal: 'traces' | 'metrics' | 'logs',
+): string => {
   const url = new URL(endpoint);
-  if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.search || url.hash)
-    throw new Error('OTLP endpoint must be an HTTP(S) base URL without credentials, query, or fragment');
+  if (
+    !['http:', 'https:'].includes(url.protocol) ||
+    url.username ||
+    url.password ||
+    url.search ||
+    url.hash
+  )
+    throw new Error(
+      'OTLP endpoint must be an HTTP(S) base URL without credentials, query, or fragment',
+    );
   url.pathname = `${url.pathname.replace(/\/$/, '')}/v1/${signal}`;
   return url.toString();
 };
@@ -40,8 +54,13 @@ export const signalExportOptions = (
   const specificHeaders = process.env[`OTEL_EXPORTER_OTLP_${signal.toUpperCase()}_HEADERS`];
   if (specificEndpoint) {
     resolveOtlpEndpoint(specificEndpoint, signal);
-    if (new URL(specificEndpoint).origin !== new URL(endpoint).origin && specificHeaders === undefined)
-      throw new Error(`Separate ${signal} endpoint requires explicit signal headers to avoid leaking credentials`);
+    if (
+      new URL(specificEndpoint).origin !== new URL(endpoint).origin &&
+      specificHeaders === undefined
+    )
+      throw new Error(
+        `Separate ${signal} endpoint requires explicit signal headers to avoid leaking credentials`,
+      );
   }
   return {
     url: specificEndpoint || resolveOtlpEndpoint(endpoint, signal),
@@ -68,7 +87,8 @@ export const readTelemetryConfig = (role: 'api' | 'worker') => {
     sampleRatio,
     serviceName: `${process.env.OTEL_SERVICE_NAME || 'template'}-${role}`,
     environment,
-    serviceVersion: process.env.OTEL_SERVICE_VERSION || process.env.RAILWAY_GIT_COMMIT_SHA || 'development',
+    serviceVersion:
+      process.env.OTEL_SERVICE_VERSION || process.env.RAILWAY_GIT_COMMIT_SHA || 'development',
     role,
   };
 };

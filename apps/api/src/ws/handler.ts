@@ -46,14 +46,18 @@ export const acceptWebSocket = (req: Request, server: WSServer): Response | unde
     lastPing: now,
     queue: createSerializedQueue(),
   };
-  return server.upgrade(req, { data }) ? undefined : new Response('Upgrade failed', { status: 426 });
+  return server.upgrade(req, { data })
+    ? undefined
+    : new Response('Upgrade failed', { status: 426 });
 };
 
 const parseFrame = (raw: string | Buffer): WSMessage | null => {
   try {
     const parsed: unknown = JSON.parse(raw.toString());
     if (typeof parsed !== 'object' || parsed === null) return null;
-    return typeof (parsed as { action?: unknown }).action === 'string' ? (parsed as WSMessage) : null;
+    return typeof (parsed as { action?: unknown }).action === 'string'
+      ? (parsed as WSMessage)
+      : null;
   } catch {
     return null;
   }

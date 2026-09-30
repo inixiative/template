@@ -127,7 +127,10 @@ describe('makeSingletonJob', () => {
       durationMs: expect.any(Number),
       leaseHeldToRelease: false,
     });
-    expect(errorSpy).not.toHaveBeenCalledWith('singletonJob.completedAfterLockLoss', expect.anything());
+    expect(errorSpy).not.toHaveBeenCalledWith(
+      'singletonJob.completedAfterLockLoss',
+      expect.anything(),
+    );
   });
 
   test('warns without reporting lock loss when the release cannot be confirmed', async () => {

@@ -9,7 +9,8 @@ describe('resolveUserByContact', () => {
     await cleanupTouchedTables(db);
   });
 
-  const jid = (phoneSuffix: number) => `1555${String(phoneSuffix).padStart(7, '0').slice(-7)}@s.whatsapp.net`;
+  const jid = (phoneSuffix: number) =>
+    `1555${String(phoneSuffix).padStart(7, '0').slice(-7)}@s.whatsapp.net`;
 
   it('returns the existing userId when a Contact is already registered for the JID', async () => {
     const seq = getNextSeq();

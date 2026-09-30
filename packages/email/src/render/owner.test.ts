@@ -12,8 +12,13 @@ describe('emailOwnerProvider — the provider whose tags and segments a row sees
       ownerModel: 'Space',
       ownerId: 's',
     });
-    expect(emailOwnerProvider({ ownerModel: 'User', userId: 'u' })).toEqual({ ownerModel: 'User', ownerId: 'u' });
-    expect(emailOwnerProvider({ ownerModel: 'OrganizationUser', organizationId: 'o', userId: 'u' })).toEqual({
+    expect(emailOwnerProvider({ ownerModel: 'User', userId: 'u' })).toEqual({
+      ownerModel: 'User',
+      ownerId: 'u',
+    });
+    expect(
+      emailOwnerProvider({ ownerModel: 'OrganizationUser', organizationId: 'o', userId: 'u' }),
+    ).toEqual({
       ownerModel: 'User',
       ownerId: 'u',
     });

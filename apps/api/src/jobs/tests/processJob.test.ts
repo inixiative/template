@@ -7,7 +7,11 @@ import { type JobData, JobLane, JobType } from '#/jobs/types';
 import { createMockJob } from '#tests/createTestWorker';
 
 const jobWith = (id: string, data: Partial<JobData> & { lane?: JobLane }) =>
-  createMockJob({ id, name: 'sendWebhook', data: { type: JobType.adhoc, payload: { id }, ...data } });
+  createMockJob({
+    id,
+    name: 'sendWebhook',
+    data: { type: JobType.adhoc, payload: { id }, ...data },
+  });
 
 describe('processJob', () => {
   afterEach(async () => {
@@ -38,7 +42,10 @@ describe('processJob', () => {
     };
 
     await expect(
-      processJob(jobWith('slow-fails', { lane: JobLane.slow }), { handlers: handlers as never, slowSlots }),
+      processJob(jobWith('slow-fails', { lane: JobLane.slow }), {
+        handlers: handlers as never,
+        slowSlots,
+      }),
     ).rejects.toThrow('handler failed');
 
     expect(slowSlots.held()).toBe(0);

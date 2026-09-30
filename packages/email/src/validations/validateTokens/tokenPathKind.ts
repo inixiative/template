@@ -9,7 +9,11 @@ import { type EmailLens, OPAQUE_SLOT, slotOf, splitRoot } from '@template/email/
 import { lensPathFields } from '@template/email/rules/walkLensPath';
 import type { TokenPathKind } from '@template/email/validations/validateTokens/types';
 
-export const tokenPathKind = (path: string, lens: Lens | LensNarrowing, viaEach: boolean): TokenPathKind => {
+export const tokenPathKind = (
+  path: string,
+  lens: Lens | LensNarrowing,
+  viaEach: boolean,
+): TokenPathKind => {
   const fields = lensPathFields(path, lens);
   const segments = path.split('.');
   let optionalDepth = 0;
@@ -20,7 +24,11 @@ export const tokenPathKind = (path: string, lens: Lens | LensNarrowing, viaEach:
     const last = i === segments.length - 1;
 
     if (field.kind === 'scalar' && field.type === 'Json') {
-      return { kind: 'ok', optionalDepth: last && field.isRequired !== false ? 0 : segments.length, scalarList: false };
+      return {
+        kind: 'ok',
+        optionalDepth: last && field.isRequired !== false ? 0 : segments.length,
+        scalarList: false,
+      };
     }
 
     if ((field.kind === 'object' || field.kind === 'bridge') && field.type) {
@@ -38,11 +46,16 @@ export const tokenPathKind = (path: string, lens: Lens | LensNarrowing, viaEach:
   return { kind: 'ok', optionalDepth, scalarList: false };
 };
 
-export const emailTokenPathKind = (path: string, lens: EmailLens, viaEach: boolean): TokenPathKind => {
+export const emailTokenPathKind = (
+  path: string,
+  lens: EmailLens,
+  viaEach: boolean,
+): TokenPathKind => {
   const { root, rest } = splitRoot(path);
   const slot = slotOf(lens, root);
   if (!slot) return { kind: 'missing', index: 0 };
-  if (slot === OPAQUE_SLOT) return { kind: 'ok', optionalDepth: rest ? path.split('.').length : 0, scalarList: false };
+  if (slot === OPAQUE_SLOT)
+    return { kind: 'ok', optionalDepth: rest ? path.split('.').length : 0, scalarList: false };
   if (!rest) return { kind: 'object' };
   const kind = tokenPathKind(rest, slot, viaEach);
   switch (kind.kind) {

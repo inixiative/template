@@ -5,7 +5,11 @@
  * @uses primitive:shared
  */
 import { join } from 'node:path';
-import type { EmailVerifier, VerificationResult, VerificationStatus } from '@template/email/client/verification/types';
+import type {
+  EmailVerifier,
+  VerificationResult,
+  VerificationStatus,
+} from '@template/email/client/verification/types';
 import { fetchVersion, VCR } from '@template/shared/vcr';
 
 type BouncerResponse = {
@@ -35,7 +39,8 @@ class BouncerVerifierClient implements EmailVerifier {
   // shifts, cassettes auto-refresh.
   readonly vcr = new VCR(FIXTURES_DIR, {
     service: 'bouncer',
-    version: () => fetchVersion('https://docs.usebouncer.com/api-reference/real-time/verify-email.md'),
+    version: () =>
+      fetchVersion('https://docs.usebouncer.com/api-reference/real-time/verify-email.md'),
     sanitizers: { verify: { keys: SANITIZE_KEYS } },
   });
   private readonly apiKey: string;

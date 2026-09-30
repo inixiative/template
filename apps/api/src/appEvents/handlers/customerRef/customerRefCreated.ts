@@ -11,5 +11,8 @@ import { reconcileCustomerOf } from '#/modules/segment/lib/reconcileCustomer';
 export type CustomerRefCreatedPayload = { customerRef: CustomerRef };
 
 export const customerRefCreated = makeAppEvent<CustomerRefCreatedPayload>({
-  cb: [({ customerRef }) => reconcileCustomerOf({ model: 'CustomerRef', axis: 'customerModel' }, customerRef)],
+  cb: [
+    ({ customerRef }) =>
+      reconcileCustomerOf({ model: 'CustomerRef', axis: 'customerModel' }, customerRef),
+  ],
 });

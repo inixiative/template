@@ -17,4 +17,5 @@ export const deliverJobId = (
   sender: Sender,
   recipientEmail: string,
   contents: unknown,
-): string => `${eventName}:${template}:${stableHash(sender)}:${recipientEmail}:${stableHash(contents)}`;
+): string =>
+  `${eventName}:${template}:${stableHash(sender)}:${recipientEmail}:${stableHash(contents)}`;

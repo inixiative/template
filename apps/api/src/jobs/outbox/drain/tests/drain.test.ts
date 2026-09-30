@@ -77,10 +77,15 @@ describe('jobs overflow buffer (spill + drain)', () => {
       return { waiting: queued.size - prioritized, prioritized, active: 0 };
     }) as never);
     const perPriority = spyOn(queue, 'getCountsPerPriority').mockImplementation((async () => ({
-      [SLOW_LANE_PRIORITY]: [...queued.values()].filter((job) => job.priority === SLOW_LANE_PRIORITY).length,
+      [SLOW_LANE_PRIORITY]: [...queued.values()].filter(
+        (job) => job.priority === SLOW_LANE_PRIORITY,
+      ).length,
     })) as never);
-    const getJob = spyOn(queue, 'getJob').mockImplementation((async (id: string) => queued.get(id)) as never);
-    const getJobs = spyOn(queue, 'getJobs').mockImplementation((async () => [...queued.values()]) as never);
+    const getJob = spyOn(queue, 'getJob').mockImplementation((async (id: string) =>
+      queued.get(id)) as never);
+    const getJobs = spyOn(queue, 'getJobs').mockImplementation((async () => [
+      ...queued.values(),
+    ]) as never);
     restoreQueueSpies = () => {
       add.mockRestore();
       counts.mockRestore();
@@ -145,7 +150,11 @@ describe('jobs overflow buffer (spill + drain)', () => {
       options: {},
     });
 
-    await Promise.all([spillToOutbox(supRow(1)), spillToOutbox(supRow(2)), spillToOutbox(supRow(3))]);
+    await Promise.all([
+      spillToOutbox(supRow(1)),
+      spillToOutbox(supRow(2)),
+      spillToOutbox(supRow(3)),
+    ]);
 
     const rows = await ctx.db.jobOutbox.findMany({ where: { dedupeKey: 'lane-batch' } });
     expect(rows).toHaveLength(1);
@@ -411,7 +420,11 @@ describe('jobs overflow buffer (spill + drain)', () => {
     it('resets quarantined rows only once no slow row is admittable either', async () => {
       setEnvOverride('JOBS_MAX_QUEUE_DEPTH', '10');
       setEnvOverride('JOBS_SLOW_QUEUE_DEPTH_FRACTION', '0.1');
-      await ctx.queue.add('sendWebhook', {}, { jobId: 'slow-in-queue', priority: SLOW_LANE_PRIORITY });
+      await ctx.queue.add(
+        'sendWebhook',
+        {},
+        { jobId: 'slow-in-queue', priority: SLOW_LANE_PRIORITY },
+      );
       await createJobOutbox({
         jobId: 'q',
         lane: JobLane.fast,
@@ -444,7 +457,11 @@ describe('jobs overflow buffer (spill + drain)', () => {
     });
 
     it('re-adds a stored invalid job id under a fresh one instead of quarantining it', async () => {
-      await createJobOutbox({ jobId: 'a:b:c:d', lane: JobLane.fast, data: { type: JobType.adhoc, payload: {} } });
+      await createJobOutbox({
+        jobId: 'a:b:c:d',
+        lane: JobLane.fast,
+        data: { type: JobType.adhoc, payload: {} },
+      });
 
       await runDrainOutboxPass();
 

@@ -33,7 +33,12 @@ export const ResponsiveDrawer = ({
   if (isDesktop) {
     return (
       <>
-        <div className="fixed inset-0 bg-black/50 z-40 transition-opacity" onClick={onClose} />
+        <button
+          type="button"
+          aria-label="Close drawer"
+          className="fixed inset-0 bg-black/50 z-40 transition-opacity"
+          onClick={onClose}
+        />
         <div
           className={cn(
             'fixed top-0 right-0 bottom-0 w-96 bg-background border-l z-50 overflow-y-auto',
@@ -46,7 +51,10 @@ export const ResponsiveDrawer = ({
             <button
               type="button"
               onClick={onClose}
-              className={cn('p-2 hover:bg-accent rounded-md transition-colors', !title && 'ml-auto')}
+              className={cn(
+                'p-2 hover:bg-accent rounded-md transition-colors',
+                !title && 'ml-auto',
+              )}
               aria-label="Close drawer"
             >
               <Icon icon="lucide:x" className="h-5 w-5" />

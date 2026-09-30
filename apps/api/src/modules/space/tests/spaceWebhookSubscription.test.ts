@@ -1,4 +1,14 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  mock,
+  spyOn,
+} from 'bun:test';
 import { db } from '@template/db';
 import type {
   Organization,
@@ -58,9 +68,12 @@ describe('space/webhookSubscriptions', () => {
 
   beforeEach(() => {
     spyOn(globalThis, 'fetch').mockImplementation(
-      Object.assign(() => Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 200 })), {
-        preconnect: globalThis.fetch.preconnect,
-      }),
+      Object.assign(
+        () => Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 200 })),
+        {
+          preconnect: globalThis.fetch.preconnect,
+        },
+      ),
     );
   });
 

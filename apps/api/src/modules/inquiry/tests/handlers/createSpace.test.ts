@@ -1,6 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import type { Inquiry, Organization } from '@template/db/generated/client/client';
-import { InquiryResourceModel, InquiryStatus, InquiryType } from '@template/db/generated/client/enums';
+import {
+  InquiryResourceModel,
+  InquiryStatus,
+  InquiryType,
+} from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
   createInquiry,
@@ -24,7 +28,10 @@ describe('handler: createSpace — validate', () => {
     const { entity: owner } = await createUser();
     const { entity: o } = await createOrganization();
     org = o;
-    const { entity: ou } = await createOrganizationUser({ role: 'owner' }, { user: owner, organization: org });
+    const { entity: ou } = await createOrganizationUser(
+      { role: 'owner' },
+      { user: owner, organization: org },
+    );
 
     const harness = createTestApp({ mockUser: owner, mockOrganizationUsers: [ou], mount });
     fetch = harness.fetch;

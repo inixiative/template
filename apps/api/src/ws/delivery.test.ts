@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it } from 'bun:test';
-import { broadcastLocal, sendToChannelLocal, sendToStreamLocal, sendToUserLocal } from '#/ws/delivery';
+import {
+  broadcastLocal,
+  sendToChannelLocal,
+  sendToStreamLocal,
+  sendToUserLocal,
+} from '#/ws/delivery';
 import { addConnection, byId, clearRegistry } from '#/ws/registry';
 import { subscribeToStream } from '#/ws/streamSubscriptions';
 import { subscribeToChannel } from '#/ws/subscriptions';
@@ -73,9 +78,17 @@ describe('delivery', () => {
     subscribeToStream(a.socket, 'st1');
     subscribeToChannel(b.socket, 'st1');
 
-    sendToStreamLocal('st1', { category: 'data', action: 'append', stream: 'st1', type: 'upsert', payload: 1 });
+    sendToStreamLocal('st1', {
+      category: 'data',
+      action: 'append',
+      stream: 'st1',
+      type: 'upsert',
+      payload: 1,
+    });
 
-    expect(parse(a.sent)).toEqual([{ category: 'data', action: 'append', stream: 'st1', type: 'upsert', payload: 1 }]);
+    expect(parse(a.sent)).toEqual([
+      { category: 'data', action: 'append', stream: 'st1', type: 'upsert', payload: 1 },
+    ]);
     expect(b.sent).toEqual([]);
   });
 

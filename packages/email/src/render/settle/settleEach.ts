@@ -22,10 +22,20 @@ import {
   evaluateScopedRule,
 } from '@template/email/rules/emailLens';
 import { resolveBindingPath } from '@template/email/rules/resolveBindingPath';
-import { iteratesLens, loopFrames, narrowToElements, scopedRule } from '@template/email/rules/scopedRule';
+import {
+  iteratesLens,
+  loopFrames,
+  narrowToElements,
+  scopedRule,
+} from '@template/email/rules/scopedRule';
 import { withRule } from '@template/shared/rules';
 
-export const settleEach = (block: EachBlock, scope: Scope, options: SettleOptions, onError?: RuleErrorSink): string => {
+export const settleEach = (
+  block: EachBlock,
+  scope: Scope,
+  options: SettleOptions,
+  onError?: RuleErrorSink,
+): string => {
   const issue = (detail: string): '' => {
     onError?.({ kind: 'each', path: block.path, detail });
     return '';
@@ -37,7 +47,8 @@ export const settleEach = (block: EachBlock, scope: Scope, options: SettleOption
   const bodyOptions: SettleOptions = { ...options, eachDepth };
 
   if (block.attributeErrors?.length) {
-    for (const message of block.attributeErrors) onError?.({ kind: 'each', path: block.path, detail: message });
+    for (const message of block.attributeErrors)
+      onError?.({ kind: 'each', path: block.path, detail: message });
     return '';
   }
   if (block.asMissing || !block.as || !isValidBindingIdentifier(block.as)) {
@@ -50,7 +61,10 @@ export const settleEach = (block: EachBlock, scope: Scope, options: SettleOption
   const index = block.index;
   if (index !== undefined && !isValidBindingIdentifier(index))
     return issue('invalid index= attribute on {{#each}} block');
-  if (index !== undefined && (RESERVED_BINDING_NAMES.has(index) || Object.hasOwn(scope, index) || index === as)) {
+  if (
+    index !== undefined &&
+    (RESERVED_BINDING_NAMES.has(index) || Object.hasOwn(scope, index) || index === as)
+  ) {
     return issue(`index= "${index}" collides with a reserved or enclosing binding`);
   }
   if (block.filterError !== undefined) return issue(`invalid filter JSON - ${block.filterError}`);
@@ -60,7 +74,8 @@ export const settleEach = (block: EachBlock, scope: Scope, options: SettleOption
   if (index !== undefined) bodyOptions.bindings.set(index, undefined);
 
   const arrayValue = resolvePath(block.path, scope);
-  if (!Array.isArray(arrayValue)) return issue(`{{#each ${block.path}}} did not resolve to an array`);
+  if (!Array.isArray(arrayValue))
+    return issue(`{{#each ${block.path}}} did not resolve to an array`);
   if (arrayValue.length > EACH_MAX_ELEMENTS) {
     return issue(
       `{{#each ${block.path}}} resolved to ${arrayValue.length} elements, over the ${EACH_MAX_ELEMENTS}-element limit`,
@@ -87,7 +102,8 @@ export const settleEach = (block: EachBlock, scope: Scope, options: SettleOption
 
   const emitted: unknown[] = [];
   const frames = loopFrames(bodyOptions.bindings);
-  const judged = filter === undefined ? undefined : scopedRule(filter, bodyOptions.bindings, { lens }).rule;
+  const judged =
+    filter === undefined ? undefined : scopedRule(filter, bodyOptions.bindings, { lens }).rule;
   for (const element of arrayValue) {
     const judgeable = lensed && typeof element === 'object' && element !== null;
     if (filter === undefined) {

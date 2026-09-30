@@ -1,5 +1,12 @@
 import { afterEach, describe, expect, it } from 'bun:test';
-import { addConnection, byChannel, byId, byUser, clearRegistry, removeConnection } from '#/ws/registry';
+import {
+  addConnection,
+  byChannel,
+  byId,
+  byUser,
+  clearRegistry,
+  removeConnection,
+} from '#/ws/registry';
 import { subscribeToChannel } from '#/ws/subscriptions';
 import { createTestSocket } from '#tests/createTestSocket';
 

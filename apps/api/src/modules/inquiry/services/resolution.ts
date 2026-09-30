@@ -44,7 +44,8 @@ export const resolveInquiry = async (
         approvalOutput = (await handler.handleApprove(db, fresh, merged)) ?? {};
       }
 
-      const expiresAt = status === InquiryStatus.changesRequested ? computeExpiresAt(fresh.type) : null;
+      const expiresAt =
+        status === InquiryStatus.changesRequested ? computeExpiresAt(fresh.type) : null;
 
       const updated = await db.inquiry.update({
         where: { id: fresh.id },

@@ -25,7 +25,9 @@ export type PreflightInput = {
   tokenUnresolvedSeverity?: PreflightSeverity;
 };
 
-export type PreflightCheck = (input: PreflightInput) => PreflightFinding[] | Promise<PreflightFinding[]>;
+export type PreflightCheck = (
+  input: PreflightInput,
+) => PreflightFinding[] | Promise<PreflightFinding[]>;
 
 export type SyncPreflightCheck = (input: PreflightInput) => PreflightFinding[];
 

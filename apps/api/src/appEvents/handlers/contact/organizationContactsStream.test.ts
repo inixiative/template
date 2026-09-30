@@ -1,7 +1,12 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import type { Organization, User } from '@template/db/generated/client/client';
-import { buildContact, cleanupTouchedTables, createContact, createOrganizationUser } from '@template/db/test';
+import {
+  buildContact,
+  cleanupTouchedTables,
+  createContact,
+  createOrganizationUser,
+} from '@template/db/test';
 import { defineStream, STREAM_DEFINITIONS, type StreamDefinition } from '@template/shared/ws';
 import { z } from 'zod';
 import { emitAppEvent } from '#/appEvents/emit';
@@ -50,7 +55,10 @@ describe('organization contacts stream producers', () => {
   });
 
   it('removes by id', async () => {
-    const { entity: contact } = await buildContact({ ownerModel: 'Organization', organizationId: 'org-1' });
+    const { entity: contact } = await buildContact({
+      ownerModel: 'Organization',
+      organizationId: 'org-1',
+    });
 
     const [handoff] = organizationContactRemove(contact) ?? [];
 
@@ -76,7 +84,9 @@ describe('organization contacts stream producers', () => {
     const row = routeRow(organizationReadManyContactsRoute, contact);
 
     const plain = streamAppend(organizationContactsStream, { id: 'org-1' }, 'upsert', row);
-    const revived = streamAppend(organizationContactsStream, { id: 'org-1' }, 'upsert', row, { revive: true });
+    const revived = streamAppend(organizationContactsStream, { id: 'org-1' }, 'upsert', row, {
+      revive: true,
+    });
 
     expect(plain.append).toStrictEqual<object>({ type: 'upsert', payload: row });
     expect(revived.append).toStrictEqual<object>({ type: 'upsert', payload: row, revive: true });
@@ -90,7 +100,9 @@ describe('organization contacts stream producers', () => {
     }) as StreamDefinition;
 
     // @ts-expect-error a perRecipient stream requires userIds
-    expect(() => streamAppend(perRecipient, {}, 'remove', { id: 'c1' })).toThrow('requires userIds');
+    expect(() => streamAppend(perRecipient, {}, 'remove', { id: 'c1' })).toThrow(
+      'requires userIds',
+    );
   });
 });
 
@@ -113,10 +125,14 @@ describe('organization contacts stream (app event → redis → open socket)', (
 
   const openStream = async () => {
     const stream = organizationContactsStream.name({ id: organization.id });
-    const handle = createTestSocket({ headers: { authorization: (await createBearerToken(member)).authorization } });
+    const handle = createTestSocket({
+      headers: { authorization: (await createBearerToken(member)).authorization },
+    });
     websocketHandler.open(handle.socket);
     await websocketHandler.message(handle.socket, JSON.stringify({ action: 'open', stream }));
-    const snapshot = handle.sent.map((message) => JSON.parse(message)).find((frame) => frame.action === 'snapshot');
+    const snapshot = handle.sent
+      .map((message) => JSON.parse(message))
+      .find((frame) => frame.action === 'snapshot');
     handle.sent.length = 0;
     return { ...handle, stream, snapshotRows: snapshot.payload.data as Array<{ id: string }> };
   };

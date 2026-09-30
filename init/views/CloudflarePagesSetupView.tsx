@@ -167,7 +167,8 @@ export const CloudflarePagesSetupView: React.FC<Props> = ({ onComplete, onCancel
       </Box>
       <Box marginBottom={1}>
         <Text dimColor>
-          Per-app Pages projects linked to GitHub. VITE_-prefixed env vars sync from Infisical at /{'<app>'}.
+          Per-app Pages projects linked to GitHub. VITE_-prefixed env vars sync from Infisical at /
+          {'<app>'}.
         </Text>
       </Box>
       <Box marginBottom={1}>

@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it } from 'bun:test';
-import { cleanupStaleConnections, drainConnections, getConnectionStats, updateLastPing } from '#/ws/lifecycle';
+import {
+  cleanupStaleConnections,
+  drainConnections,
+  getConnectionStats,
+  updateLastPing,
+} from '#/ws/lifecycle';
 import { addConnection, byId, clearRegistry } from '#/ws/registry';
 import { subscribeToStream } from '#/ws/streamSubscriptions';
 import { subscribeToChannel } from '#/ws/subscriptions';
@@ -16,7 +21,10 @@ describe('lifecycle', () => {
   });
 
   it('cleanupStaleConnections closes + removes stale, keeps fresh, returns the count', () => {
-    const stale = createTestSocket({ connectionId: 'stale', lastPing: Date.now() - 10 * 60 * 1000 });
+    const stale = createTestSocket({
+      connectionId: 'stale',
+      lastPing: Date.now() - 10 * 60 * 1000,
+    });
     const fresh = createTestSocket({ connectionId: 'fresh', lastPing: Date.now() });
     addConnection(stale.socket);
     addConnection(fresh.socket);

@@ -24,9 +24,13 @@ const serializeValue = (value: UpsertingValue): string => {
 // object or a null names a set the lock key cannot stand for, so upserting mode refuses them.
 // Entries are sorted by key so the same where locks the same key whatever its object order, and
 // hashed so the key stays bounded and carries no raw column values.
-export const findForUpdateLockIdentifier = (model: string, where: Record<string, unknown>): string => {
+export const findForUpdateLockIdentifier = (
+  model: string,
+  where: Record<string, unknown>,
+): string => {
   const entries = Object.entries(where).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
-  if (!entries.length) throw new Error('db.findForUpdate() upserting mode requires at least one field');
+  if (!entries.length)
+    throw new Error('db.findForUpdate() upserting mode requires at least one field');
   const serialized = entries.map(([key, value]) => {
     if (!isUpsertingValue(value)) {
       throw new Error(

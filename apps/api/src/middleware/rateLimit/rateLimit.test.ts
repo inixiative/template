@@ -18,8 +18,11 @@ const ipRule = (over: Partial<RateLimitRule> = {}): RateLimitRule => ({
   ...over,
 });
 
-const hit = (fetchFromApp: (req: Request) => Promise<Response>, xff: string, extra: Record<string, string> = {}) =>
-  fetchFromApp(new Request('http://t/rl', { headers: { 'x-forwarded-for': xff, ...extra } }));
+const hit = (
+  fetchFromApp: (req: Request) => Promise<Response>,
+  xff: string,
+  extra: Record<string, string> = {},
+) => fetchFromApp(new Request('http://t/rl', { headers: { 'x-forwarded-for': xff, ...extra } }));
 
 describe('rateLimit', () => {
   beforeEach(async () => {
@@ -51,7 +54,8 @@ describe('rateLimit', () => {
           app.get(
             '/rl',
             rateLimit([ipRule({ max: 1 })], {
-              onLimited: (c, retryAfterSeconds) => c.redirect(`http://t/limited?after=${retryAfterSeconds}`, 302),
+              onLimited: (c, retryAfterSeconds) =>
+                c.redirect(`http://t/limited?after=${retryAfterSeconds}`, 302),
             }),
             (c) => c.text('ok'),
           );
@@ -75,7 +79,12 @@ describe('rateLimit', () => {
 
   it('AND-checks every rule so the strictest wins', async () => {
     const { fetch } = createTestApp({
-      mount: [mount([ipRule({ max: 100 }), { scope: 'test:global', windowMs: 60_000, max: 1, key: () => 'all' }])],
+      mount: [
+        mount([
+          ipRule({ max: 100 }),
+          { scope: 'test:global', windowMs: 60_000, max: 1, key: () => 'all' },
+        ]),
+      ],
     });
 
     expect((await hit(fetch, '4.4.4.4')).status).toBe(200);

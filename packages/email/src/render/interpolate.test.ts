@@ -34,18 +34,23 @@ describe('interpolate', () => {
     });
 
     it('resolves all four lenses together', () => {
-      const result = interpolate('{{sender.name}}→{{recipient.name}}:{{data.code}} [{{system.appName}}]', {
-        sender: { name: 'Acme' },
-        recipient: { name: 'Jo' },
-        data: { code: '42' },
-        system: { appName: 'Tmpl' },
-      });
+      const result = interpolate(
+        '{{sender.name}}→{{recipient.name}}:{{data.code}} [{{system.appName}}]',
+        {
+          sender: { name: 'Acme' },
+          recipient: { name: 'Jo' },
+          data: { code: '42' },
+          system: { appName: 'Tmpl' },
+        },
+      );
       expect(result).toBe('Acme→Jo:42 [Tmpl]');
     });
 
     it('renders empty and sinks a token issue when the value is missing — never the literal token', () => {
       const issues: string[] = [];
-      const result = interpolate('Hello {{recipient.name}}', {}, (issue) => issues.push(`${issue.kind}:${issue.path}`));
+      const result = interpolate('Hello {{recipient.name}}', {}, (issue) =>
+        issues.push(`${issue.kind}:${issue.path}`),
+      );
       expect(result).toBe('Hello ');
       expect(issues).toEqual(['token:recipient.name']);
     });
@@ -81,7 +86,8 @@ describe('interpolate', () => {
     });
 
     it('does not resolve prototype-chain or inherited-function paths', () => {
-      const template = '{{data.constructor.name}}|{{data.__proto__.x}}|{{data.prototype}}|{{data.toString}}';
+      const template =
+        '{{data.constructor.name}}|{{data.__proto__.x}}|{{data.prototype}}|{{data.toString}}';
       const result = interpolate(template, { data: {} });
       expect(result).toBe('|||');
     });
@@ -134,16 +140,23 @@ describe('interpolate', () => {
 
     it('substitutes variables after conditional evaluation', () => {
       const rule = JSON.stringify({ field: 'data.premium', operator: 'equals', value: true });
-      const result = interpolate(`Hi {{recipient.name}}{{#if rule=${rule}}}, thanks for being premium{{/if}}!`, {
-        recipient: { name: 'John' },
-        data: { premium: true },
-      });
+      const result = interpolate(
+        `Hi {{recipient.name}}{{#if rule=${rule}}}, thanks for being premium{{/if}}!`,
+        {
+          recipient: { name: 'John' },
+          data: { premium: true },
+        },
+      );
       expect(result).toBe('Hi John, thanks for being premium!');
     });
 
     it('handles multiple conditionals', () => {
       const adminRule = JSON.stringify({ field: 'data.role', operator: 'equals', value: 'admin' });
-      const premiumRule = JSON.stringify({ field: 'data.premium', operator: 'equals', value: true });
+      const premiumRule = JSON.stringify({
+        field: 'data.premium',
+        operator: 'equals',
+        value: true,
+      });
 
       const result = interpolate(
         `{{#if rule=${adminRule}}}[Admin]{{/if}}{{#if rule=${premiumRule}}}[Premium]{{/if}} User`,
@@ -190,8 +203,10 @@ describe('interpolate', () => {
 
     it('drops a malformed-rule block by default and reports it via onError', () => {
       const errors: string[] = [];
-      const result = interpolate('{{#if rule={invalid json}}}Content{{else}}Fallback{{/if}}', { recipient: {} }, (m) =>
-        errors.push(m.detail),
+      const result = interpolate(
+        '{{#if rule={invalid json}}}Content{{else}}Fallback{{/if}}',
+        { recipient: {} },
+        (m) => errors.push(m.detail),
       );
       expect(result).toBe('Fallback');
       expect(errors).toHaveLength(1);
@@ -221,9 +236,11 @@ describe('interpolate', () => {
 
     it('renders unknown and nested system tokens empty and sinks them', () => {
       const issues: string[] = [];
-      expect(interpolate('{{system.unknown}} {{system.now.iso}}', {}, (issue) => issues.push(issue.path ?? ''))).toBe(
-        ' ',
-      );
+      expect(
+        interpolate('{{system.unknown}} {{system.now.iso}}', {}, (issue) =>
+          issues.push(issue.path ?? ''),
+        ),
+      ).toBe(' ');
       expect(issues).toEqual(['system.unknown', 'system.now.iso']);
     });
 
@@ -258,7 +275,9 @@ describe('interpolate', () => {
 
     it('resolves inside a conditional body', () => {
       const rule = JSON.stringify({ field: 'data.plan', operator: 'equals', value: 'pro' });
-      const result = interpolate(`{{#if rule=${rule}}}{{system.year}}{{/if}}`, { data: { plan: 'pro' } });
+      const result = interpolate(`{{#if rule=${rule}}}{{system.year}}{{/if}}`, {
+        data: { plan: 'pro' },
+      });
       expect(result).toBe(utcYear);
     });
 
@@ -274,7 +293,10 @@ describe('interpolate', () => {
         (() => new RealDate(RealDate.UTC(2026 + ticks++, 11, 31, 23, 59, 59))) as never,
       );
       try {
-        const [first, second, year] = interpolate('{{system.now}} / {{system.now}} / {{system.year}}', {}).split(' / ');
+        const [first, second, year] = interpolate(
+          '{{system.now}} / {{system.now}} / {{system.year}}',
+          {},
+        ).split(' / ');
         expect(second).toBe(first as string);
         expect(year).toBe('2026');
       } finally {
@@ -286,21 +308,26 @@ describe('interpolate', () => {
 
 describe('interpolate — {{#each}} grammar', () => {
   it('substitutes a bare binding token per element when the element is a primitive', () => {
-    expect(interpolate('{{#each data.items as=item}}[{{item}}]{{/each}}', { data: { items: ['a', 'b', 'c'] } })).toBe(
-      '[a][b][c]',
-    );
+    expect(
+      interpolate('{{#each data.items as=item}}[{{item}}]{{/each}}', {
+        data: { items: ['a', 'b', 'c'] },
+      }),
+    ).toBe('[a][b][c]');
   });
 
   it('tolerates as=/index=/filter= attributes in any order', () => {
     const filterJson = '{"field":"item.ok","operator":"equals","value":true}';
-    const result = interpolate(`{{#each data.items index=i filter=${filterJson} as=item}}{{i}}:{{item.n}} {{/each}}`, {
-      data: {
-        items: [
-          { n: 1, ok: true },
-          { n: 2, ok: false },
-        ],
+    const result = interpolate(
+      `{{#each data.items index=i filter=${filterJson} as=item}}{{i}}:{{item.n}} {{/each}}`,
+      {
+        data: {
+          items: [
+            { n: 1, ok: true },
+            { n: 2, ok: false },
+          ],
+        },
       },
-    });
+    );
     expect(result).toBe('0:1 ');
   });
 
@@ -322,7 +349,9 @@ describe('interpolate — {{#each}} scope', () => {
 
   it('an inherited Object.prototype property is not mistaken for an in-scope binding', () => {
     const errors: string[] = [];
-    const result = interpolate('{{constructor}} {{constructor.name}}', {}, (m) => errors.push(m.detail));
+    const result = interpolate('{{constructor}} {{constructor.name}}', {}, (m) =>
+      errors.push(m.detail),
+    );
     expect(result).toBe(' ');
     expect(errors).toHaveLength(2);
   });
@@ -354,8 +383,10 @@ describe('interpolate — {{#each}} scope', () => {
 
   it('an attribute missing = fails closed without being treated as an unterminated block', () => {
     const errors: string[] = [];
-    const result = interpolate('{{#each data.items as item}}X{{/each}}', { data: { items: ['unsafe'] } }, (m) =>
-      errors.push(m.detail),
+    const result = interpolate(
+      '{{#each data.items as item}}X{{/each}}',
+      { data: { items: ['unsafe'] } },
+      (m) => errors.push(m.detail),
     );
     expect(result).toBe('');
     expect(errors).toEqual([
@@ -378,9 +409,11 @@ describe('interpolate — {{#each}} scope', () => {
 
 describe('interpolate — prototype-chain token safety on bindings', () => {
   it('renders a constructor token on an each binding empty', () => {
-    expect(interpolate('{{#each data.items as=item}}{{item.constructor}}{{/each}}', { data: { items: [{}] } })).toBe(
-      '',
-    );
+    expect(
+      interpolate('{{#each data.items as=item}}{{item.constructor}}{{/each}}', {
+        data: { items: [{}] },
+      }),
+    ).toBe('');
   });
 
   it('renders function-valued each-binding properties empty', () => {
@@ -396,7 +429,9 @@ describe('interpolate — {{#each}} semantics', () => {
   it('an empty array renders empty with no sink', () => {
     const errors: string[] = [];
     expect(
-      interpolate('{{#each data.items as=item}}X{{/each}}', { data: { items: [] } }, (m) => errors.push(m.detail)),
+      interpolate('{{#each data.items as=item}}X{{/each}}', { data: { items: [] } }, (m) =>
+        errors.push(m.detail),
+      ),
     ).toBe('');
     expect(errors).toEqual([]);
   });
@@ -404,8 +439,10 @@ describe('interpolate — {{#each}} semantics', () => {
   it('a malformed filter still sinks when the loop path is empty or missing', () => {
     for (const variables of [{ data: { items: [] } }, { data: {} }]) {
       const errors: string[] = [];
-      const result = interpolate('{{#each data.items as=item filter={bad json}}}X{{/each}}', variables, (m) =>
-        errors.push(m.detail),
+      const result = interpolate(
+        '{{#each data.items as=item filter={bad json}}}X{{/each}}',
+        variables,
+        (m) => errors.push(m.detail),
       );
       expect(result).toBe('');
       expect(errors).toHaveLength(1);
@@ -488,8 +525,10 @@ describe('interpolate — {{#each}} structural-error posture', () => {
 
   it('a kind-mismatched close ({{#each}}...{{/if}}) degrades to unterminated-each and sinks', () => {
     const errors: string[] = [];
-    const result = interpolate('{{#each data.items as=item}}X{{/if}}', { data: { items: [1] } }, (m) =>
-      errors.push(m.detail),
+    const result = interpolate(
+      '{{#each data.items as=item}}X{{/if}}',
+      { data: { items: [1] } },
+      (m) => errors.push(m.detail),
     );
     expect(result).toBe('{{#each data.items as=item}}X{{/if}}');
     expect(errors.length).toBeGreaterThan(0);
@@ -497,8 +536,12 @@ describe('interpolate — {{#each}} structural-error posture', () => {
 
   it('an orphan close at depth 0 stays inert and silent for {{/each}} and {{/if}} alike', () => {
     const errors: string[] = [];
-    expect(interpolate('hello {{/each}} world', {}, (m) => errors.push(m.detail))).toBe('hello {{/each}} world');
-    expect(interpolate('hello {{/if}} world', {}, (m) => errors.push(m.detail))).toBe('hello {{/if}} world');
+    expect(interpolate('hello {{/each}} world', {}, (m) => errors.push(m.detail))).toBe(
+      'hello {{/each}} world',
+    );
+    expect(interpolate('hello {{/if}} world', {}, (m) => errors.push(m.detail))).toBe(
+      'hello {{/if}} world',
+    );
     expect(errors).toEqual([]);
   });
 });
@@ -524,7 +567,11 @@ describe('interpolate — substitution exactly-once (injection)', () => {
 describe('interpolate — reserved-root carve-out characterization', () => {
   it('an array value is non-primitive: empty, with a token issue', () => {
     const issues: string[] = [];
-    expect(interpolate('{{data.tags}}', { data: { tags: ['a', 'b'] } }, (issue) => issues.push(issue.detail))).toBe('');
+    expect(
+      interpolate('{{data.tags}}', { data: { tags: ['a', 'b'] } }, (issue) =>
+        issues.push(issue.detail),
+      ),
+    ).toBe('');
     expect(issues).toEqual(['{{data.tags}} resolved to a non-primitive value']);
   });
 
@@ -538,7 +585,9 @@ describe('interpolate — reserved-root carve-out characterization', () => {
   });
 
   it('a reserved token span crossing an if marker boundary is reassembled, never substituted', () => {
-    const result = interpolate('{{data.{{#if rule=true}}x{{/if}}}}', { data: { x: 'SHOULD_NOT_APPEAR' } });
+    const result = interpolate('{{data.{{#if rule=true}}x{{/if}}}}', {
+      data: { x: 'SHOULD_NOT_APPEAR' },
+    });
     expect(result).toBe('{{data.x}}');
   });
 });
@@ -601,7 +650,9 @@ describe('interpolate — {{#each}} expansion bounds', () => {
       (m) => errors.push(m.detail),
     );
     expect(result).toBe('');
-    expect(errors).toEqual([`{{#each}} blocks nested more than ${EACH_MAX_DEPTH} deep are not supported`]);
+    expect(errors).toEqual([
+      `{{#each}} blocks nested more than ${EACH_MAX_DEPTH} deep are not supported`,
+    ]);
   });
 
   it('the depth cap resets across sibling loops — only true nesting counts', () => {

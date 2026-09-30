@@ -18,7 +18,10 @@ export type ReleaseSlot = () => void;
 const hasJumpedFastWork = async (job: Job, queue: JobsQueue): Promise<boolean> =>
   (job.priority ?? 0) > 0 && (await queue.getWaitingCount()) > 0;
 
-const trackDeferral = async (write: () => Promise<void>, jobId: string | undefined): Promise<void> => {
+const trackDeferral = async (
+  write: () => Promise<void>,
+  jobId: string | undefined,
+): Promise<void> => {
   try {
     await write();
   } catch (err) {
@@ -26,11 +29,16 @@ const trackDeferral = async (write: () => Promise<void>, jobId: string | undefin
   }
 };
 
-export const admitToSlot = async (job: Job, queue: JobsQueue, slowSlots: SlowSlotPool): Promise<ReleaseSlot> => {
+export const admitToSlot = async (
+  job: Job,
+  queue: JobsQueue,
+  slowSlots: SlowSlotPool,
+): Promise<ReleaseSlot> => {
   const isSlow = isSlowJobData(job.data);
   const jobId = job.id ?? '';
   if (await hasJumpedFastWork(job, queue)) {
-    if (isSlow) await trackDeferral(() => releaseSlowDeferral(queue.redis, queue.name, jobId), job.id);
+    if (isSlow)
+      await trackDeferral(() => releaseSlowDeferral(queue.redis, queue.name, jobId), job.id);
     await job.moveToWait(job.token);
     throw new WaitingError();
   }

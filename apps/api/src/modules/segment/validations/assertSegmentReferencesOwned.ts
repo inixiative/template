@@ -9,7 +9,11 @@ import { admitRuleReferences, ruleReferences } from '@template/db';
 import type { Segment } from '@template/db/generated/client/client';
 import type { ProviderModel } from '@template/db/generated/client/enums';
 import { referenceKey } from '@template/shared/rules';
-import { customerRefLens, ownedSegments, resolvedCustomerRefLens } from '#/modules/customerRef/lib/customerRefLens';
+import {
+  customerRefLens,
+  ownedSegments,
+  resolvedCustomerRefLens,
+} from '#/modules/customerRef/lib/customerRefLens';
 import { invalidSegmentConditions } from '#/modules/segment/lib/invalidSegmentConditions';
 
 type Candidate = {
@@ -37,7 +41,8 @@ export const assertSegmentReferencesOwned = async ({
     if (unadmitted.length) {
       throw invalidSegmentConditions(
         unadmitted.map(
-          (reference) => `references a ${reference.model} this ${ownerModel} does not own: ${reference.id}`,
+          (reference) =>
+            `references a ${reference.model} this ${ownerModel} does not own: ${reference.id}`,
         ),
       );
     }

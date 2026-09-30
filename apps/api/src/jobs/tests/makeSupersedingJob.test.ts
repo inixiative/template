@@ -109,7 +109,9 @@ describe('makeSupersedingJob', () => {
   test('should re-assert a lapsed baton at start so the run is visible to lane reads', async () => {
     const holdersDuringRun: (string | null)[] = [];
     const innerHandler = mock(async (handlerCtx: WorkerContext, payload: { value: number }) => {
-      holdersDuringRun.push(await handlerCtx.queue.redis.get(laneKey(handlerCtx.job.name, `test-${payload.value}`)));
+      holdersDuringRun.push(
+        await handlerCtx.queue.redis.get(laneKey(handlerCtx.job.name, `test-${payload.value}`)),
+      );
     });
 
     const handler = makeSupersedingJob(innerHandler, (p) => `test-${p.value}`);
@@ -131,7 +133,9 @@ describe('makeSupersedingJob', () => {
 
     const holdersDuringRun: (string | null)[] = [];
     const innerHandler = mock(async (handlerCtx: WorkerContext, payload: { value: number }) => {
-      holdersDuringRun.push(await handlerCtx.queue.redis.get(laneKey(handlerCtx.job.name, `test-${payload.value}`)));
+      holdersDuringRun.push(
+        await handlerCtx.queue.redis.get(laneKey(handlerCtx.job.name, `test-${payload.value}`)),
+      );
     });
     const handler = makeSupersedingJob(innerHandler, (p) => `test-${p.value}`);
     await handler(ctx, { value: 1 });
@@ -148,7 +152,9 @@ describe('makeSupersedingJob', () => {
     const dedupeKeyFn = (p: { id: string }) => `dedupe-${p.id}`;
     const innerHandler = mock(async () => {});
 
-    const handler = makeSupersedingJob(innerHandler, dedupeKeyFn) as SupersedingJobHandler<{ id: string }>;
+    const handler = makeSupersedingJob(innerHandler, dedupeKeyFn) as SupersedingJobHandler<{
+      id: string;
+    }>;
 
     expect(handler.dedupeKeyFn).toBe(dedupeKeyFn);
     expect(handler.dedupeKeyFn?.({ id: 'abc' })).toBe('dedupe-abc');

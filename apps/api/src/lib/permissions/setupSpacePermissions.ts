@@ -5,7 +5,12 @@
  * @uses infrastructure:prisma
  */
 import type { SpaceId } from '@template/db';
-import { type Entitlements, getSpacePermissions, intersectEntitlements, lesserRole } from '@template/permissions';
+import {
+  type Entitlements,
+  getSpacePermissions,
+  intersectEntitlements,
+  lesserRole,
+} from '@template/permissions';
 import type { Context } from 'hono';
 import { validateRole } from '#/lib/permissions/validateRole';
 import type { AppEnv } from '#/types/appEnv';
@@ -18,7 +23,11 @@ export const setupSpacePermissions = async (c: Context<AppEnv>) => {
   // Space token → single space, token permissions only
   if (token?.ownerModel === 'Space' && token.spaceId) {
     await permix.setup(
-      getSpacePermissions(validateRole(token.role), token.spaceId as SpaceId, token.entitlements as Entitlements),
+      getSpacePermissions(
+        validateRole(token.role),
+        token.spaceId as SpaceId,
+        token.entitlements as Entitlements,
+      ),
     );
     return;
   }
@@ -31,7 +40,10 @@ export const setupSpacePermissions = async (c: Context<AppEnv>) => {
         getSpacePermissions(
           lesserRole(validateRole(spaceUser.role), validateRole(token.role)),
           token.spaceId as SpaceId,
-          intersectEntitlements(spaceUser.entitlements as Entitlements, token.entitlements as Entitlements),
+          intersectEntitlements(
+            spaceUser.entitlements as Entitlements,
+            token.entitlements as Entitlements,
+          ),
         ),
       );
     }
@@ -48,7 +60,10 @@ export const setupSpacePermissions = async (c: Context<AppEnv>) => {
       ? lesserRole(validateRole(spaceUser.role), validateRole(token.role))
       : validateRole(spaceUser.role);
     const entitlements = token
-      ? intersectEntitlements(spaceUser.entitlements as Entitlements, token.entitlements as Entitlements)
+      ? intersectEntitlements(
+          spaceUser.entitlements as Entitlements,
+          token.entitlements as Entitlements,
+        )
       : (spaceUser.entitlements as Entitlements);
 
     await permix.setup(getSpacePermissions(role, spaceId, entitlements));

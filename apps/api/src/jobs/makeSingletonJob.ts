@@ -13,7 +13,9 @@ const SINGLETON_LOCK_TTL_MS = 300_000;
 const SINGLETON_LOCK_HEARTBEAT_MS = 60_000;
 const SINGLETON_LOCK_MAX_MISSED = 3;
 
-export const makeSingletonJob = <TPayload = void>(handler: JobHandler<TPayload>): JobHandler<TPayload> => {
+export const makeSingletonJob = <TPayload = void>(
+  handler: JobHandler<TPayload>,
+): JobHandler<TPayload> => {
   const singleton: JobHandler<TPayload> = async (ctx, ...args: JobHandlerArgs<TPayload>) => {
     // Lock lane prefers `data.id` (cron path: row's uuidv7) so one handler can serve
     // multiple singleton lanes (e.g. one cron job per row); falls back to `job.name`
@@ -60,7 +62,9 @@ export const makeSingletonJob = <TPayload = void>(handler: JobHandler<TPayload>)
         });
       }
       if (hasLostLock) {
-        const event = hasHandlerSucceeded ? 'singletonJob.completedAfterLockLoss' : 'singletonJob.failedAfterLockLoss';
+        const event = hasHandlerSucceeded
+          ? 'singletonJob.completedAfterLockLoss'
+          : 'singletonJob.failedAfterLockLoss';
         const leaseHeldToRelease = releaseResult === 'released';
         const context = { ...scope, durationMs: Date.now() - startedAt, leaseHeldToRelease };
         if (leaseHeldToRelease) log.warn(event, context);

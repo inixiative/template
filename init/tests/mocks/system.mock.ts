@@ -1,7 +1,7 @@
 import { mock } from 'bun:test';
-import { exec as _exec, execSync as _execSync } from 'child_process';
-import { homedir } from 'os';
-import { join } from 'path';
+import { exec as _exec, execSync as _execSync } from 'node:child_process';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 
 // Capture real function references as values — import bindings are live in ESM,
 // so mock.module('child_process', ...) would replace them in-place, causing
@@ -15,7 +15,9 @@ type ExecResult = {
   stdout?: string;
 };
 
-const cliPath = ['/opt/homebrew/bin', join(homedir(), '.bun/bin'), process.env.PATH].filter(Boolean).join(':');
+const cliPath = ['/opt/homebrew/bin', join(homedir(), '.bun/bin'), process.env.PATH]
+  .filter(Boolean)
+  .join(':');
 
 const matchesCommand = (matcher: CommandMatcher, command: string): boolean => {
   if (typeof matcher === 'function') return matcher(command);
@@ -40,8 +42,14 @@ const withCliPath = (options?: unknown) => {
 };
 
 export const createMockSystem = () => {
-  const execStubs: Array<{ matcher: CommandMatcher; result: ExecResult | ((command: string) => ExecResult) }> = [];
-  const execSyncStubs: Array<{ matcher: CommandMatcher; result: string | ((command: string) => string) }> = [];
+  const execStubs: Array<{
+    matcher: CommandMatcher;
+    result: ExecResult | ((command: string) => ExecResult);
+  }> = [];
+  const execSyncStubs: Array<{
+    matcher: CommandMatcher;
+    result: string | ((command: string) => string);
+  }> = [];
 
   const mockExec = mock((command: string, optsOrCallback?: unknown, maybeCallback?: unknown) => {
     const callback =
@@ -74,10 +82,16 @@ export const createMockSystem = () => {
 
   return {
     mocks: { exec: mockExec, execSync: mockExecSync },
-    stubExec: (matcher: CommandMatcher, result: ExecResult | ((command: string) => ExecResult) = {}) => {
+    stubExec: (
+      matcher: CommandMatcher,
+      result: ExecResult | ((command: string) => ExecResult) = {},
+    ) => {
       execStubs.push({ matcher, result });
     },
-    stubExecSync: (matcher: CommandMatcher, result: string | ((command: string) => string) = '') => {
+    stubExecSync: (
+      matcher: CommandMatcher,
+      result: string | ((command: string) => string) = '',
+    ) => {
       execSyncStubs.push({ matcher, result });
     },
     install: () => {

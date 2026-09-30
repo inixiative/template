@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db/client';
-import { DbAction, registerDbInvariant, unregisterDbInvariant } from '@template/db/extensions/hookRegistry';
+import {
+  DbAction,
+  registerDbInvariant,
+  unregisterDbInvariant,
+} from '@template/db/extensions/hookRegistry';
 import { createOrganization, createUser } from '@template/db/test/factories';
 
 const INVARIANT_NAME = 'test:userNameInvariant';
@@ -25,7 +29,9 @@ describe('registerDbInvariant', () => {
     const { entity: user } = await createUser({ name: 'Original' });
 
     expect(db.isInTxn()).toBe(false);
-    await expect(db.user.update({ where: { id: user.id }, data: { name: 'blocked' } })).rejects.toThrow(REJECTION);
+    await expect(
+      db.user.update({ where: { id: user.id }, data: { name: 'blocked' } }),
+    ).rejects.toThrow(REJECTION);
 
     const unchanged = await db.raw.user.findUniqueOrThrow({ where: { id: user.id } });
     expect(unchanged.name).toBe('Original');
@@ -37,9 +43,9 @@ describe('registerDbInvariant', () => {
   it('enforces an invariant inside db.txn', async () => {
     const { entity: user } = await createUser({ name: 'Original' });
 
-    await expect(db.txn(() => db.user.update({ where: { id: user.id }, data: { name: 'blocked' } }))).rejects.toThrow(
-      REJECTION,
-    );
+    await expect(
+      db.txn(() => db.user.update({ where: { id: user.id }, data: { name: 'blocked' } })),
+    ).rejects.toThrow(REJECTION);
 
     const row = await db.user.findUniqueOrThrow({ where: { id: user.id } });
     expect(row.name).toBe('Original');
@@ -91,9 +97,14 @@ describe('registerDbInvariant', () => {
     });
 
     try {
-      const [bulkUser] = await db.user.createManyAndReturn({ data: [{ email: bulkEmail(), name: 'Bulk' }] });
+      const [bulkUser] = await db.user.createManyAndReturn({
+        data: [{ email: bulkEmail(), name: 'Bulk' }],
+      });
       if (!bulkUser) throw new Error('Expected createManyAndReturn to return the created user');
-      await db.user.updateManyAndReturn({ where: { id: bulkUser.id }, data: { name: 'Bulk Updated' } });
+      await db.user.updateManyAndReturn({
+        where: { id: bulkUser.id },
+        data: { name: 'Bulk Updated' },
+      });
 
       expect(actions).toEqual([DbAction.createManyAndReturn, DbAction.updateManyAndReturn]);
 

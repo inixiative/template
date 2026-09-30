@@ -45,7 +45,9 @@ describe('useStream / useStreamAction', () => {
   });
 
   it('holds the stream open while mounted and closes it on unmount', () => {
-    const { result, unmount } = renderHook(() => useOrganizationContactsStream(organizationId), { wrapper });
+    const { result, unmount } = renderHook(() => useOrganizationContactsStream(organizationId), {
+      wrapper,
+    });
 
     expect(opens).toEqual([stream]);
     expect(result.current.isPending).toBe(true);
@@ -59,14 +61,35 @@ describe('useStream / useStreamAction', () => {
     const created = await contactStreamRow({ id: '0002' });
     const { result } = renderHook(() => useOrganizationContactsStream(organizationId), { wrapper });
 
-    act(() => dispatchMessage({ category: 'data', action: 'snapshot', stream, payload: { data: [existing] } }));
+    act(() =>
+      dispatchMessage({
+        category: 'data',
+        action: 'snapshot',
+        stream,
+        payload: { data: [existing] },
+      }),
+    );
     await waitFor(() => expect(result.current.data?.data).toEqual([existing]));
 
-    act(() => dispatchMessage({ category: 'data', action: 'append', stream, type: 'upsert', payload: created }));
+    act(() =>
+      dispatchMessage({
+        category: 'data',
+        action: 'append',
+        stream,
+        type: 'upsert',
+        payload: created,
+      }),
+    );
     await waitFor(() => expect(result.current.data?.data).toEqual([created, existing]));
 
     act(() =>
-      dispatchMessage({ category: 'data', action: 'append', stream, type: 'remove', payload: { id: existing.id } }),
+      dispatchMessage({
+        category: 'data',
+        action: 'append',
+        stream,
+        type: 'remove',
+        payload: { id: existing.id },
+      }),
     );
     await waitFor(() => expect(result.current.data?.data).toEqual([created]));
   });
@@ -76,17 +99,34 @@ describe('useStream / useStreamAction', () => {
     const { result, unmount } = renderHook(
       () => {
         const contacts = useStream<OrganizationContactsStream>(stream);
-        useStreamAction<{ id: string }>(stream, 'remove', (removal) => heard.push(`a:${removal.id}`));
-        useStreamAction<{ id: string }>(stream, 'remove', (removal) => heard.push(`b:${removal.id}`));
+        useStreamAction<{ id: string }>(stream, 'remove', (removal) =>
+          heard.push(`a:${removal.id}`),
+        );
+        useStreamAction<{ id: string }>(stream, 'remove', (removal) =>
+          heard.push(`b:${removal.id}`),
+        );
         return contacts;
       },
       { wrapper },
     );
     const existing = await contactStreamRow({ id: '0001' });
 
-    act(() => dispatchMessage({ category: 'data', action: 'snapshot', stream, payload: { data: [existing] } }));
     act(() =>
-      dispatchMessage({ category: 'data', action: 'append', stream, type: 'remove', payload: { id: existing.id } }),
+      dispatchMessage({
+        category: 'data',
+        action: 'snapshot',
+        stream,
+        payload: { data: [existing] },
+      }),
+    );
+    act(() =>
+      dispatchMessage({
+        category: 'data',
+        action: 'append',
+        stream,
+        type: 'remove',
+        payload: { id: existing.id },
+      }),
     );
 
     await waitFor(() => expect(result.current.data?.data).toEqual([]));
@@ -100,7 +140,9 @@ describe('useStream / useStreamAction', () => {
   it('surfaces a rejected open as an error with no data', async () => {
     const { result } = renderHook(() => useOrganizationContactsStream(organizationId), { wrapper });
 
-    act(() => dispatchMessage({ category: 'data', action: 'snapshot', stream, payload: { data: [] } }));
+    act(() =>
+      dispatchMessage({ category: 'data', action: 'snapshot', stream, payload: { data: [] } }),
+    );
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
     act(() => failDataStream(stream, 'rejected'));

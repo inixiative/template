@@ -75,13 +75,21 @@ describe('makeAppEvent', () => {
     });
 
     it('redacts sensitive keys anywhere in the persisted payload', async () => {
-      const event = createEvent('test', { userId: 'u1', keyHash: 'super-secret', nested: { password: 'p' } });
+      const event = createEvent('test', {
+        userId: 'u1',
+        keyHash: 'super-secret',
+        nested: { password: 'p' },
+      });
 
       await makeAppEvent({})(event);
 
       const rows = await db.appEvent.findMany({ where: { name: 'test' } });
       expect(rows).toHaveLength(1);
-      expect(rows[0].data).toEqual({ userId: 'u1', keyHash: '[REDACTED]', nested: { password: '[REDACTED]' } });
+      expect(rows[0].data).toEqual({
+        userId: 'u1',
+        keyHash: '[REDACTED]',
+        nested: { password: '[REDACTED]' },
+      });
     });
   });
 

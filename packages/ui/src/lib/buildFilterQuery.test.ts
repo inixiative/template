@@ -24,7 +24,10 @@ describe('buildFilterQuery', () => {
 
     it('emits OR the same way', () => {
       const filters: FilterMap = {
-        OR: [{ status: { operator: 'equals', value: 'a' } }, { status: { operator: 'equals', value: 'b' } }],
+        OR: [
+          { status: { operator: 'equals', value: 'a' } },
+          { status: { operator: 'equals', value: 'b' } },
+        ],
       };
       const query = buildFilterQuery('', [], filters, []);
       expect(query).toEqual({
@@ -51,7 +54,10 @@ describe('buildFilterQuery', () => {
 
     it('drops empty groups and re-indexes the rest; drops the combinator when all groups are empty', () => {
       const withOneLive: FilterMap = {
-        AND: [{ status: { operator: 'in', value: [] } }, { status: { operator: 'equals', value: 'a' } }],
+        AND: [
+          { status: { operator: 'in', value: [] } },
+          { status: { operator: 'equals', value: 'a' } },
+        ],
       };
       expect(buildFilterQuery('', [], withOneLive, [])).toEqual({
         'searchFields[AND][0][status][equals]': 'a',
@@ -63,7 +69,14 @@ describe('buildFilterQuery', () => {
 
     it('combinators nest', () => {
       const filters: FilterMap = {
-        AND: [{ OR: [{ status: { operator: 'equals', value: 'a' } }, { status: { operator: 'equals', value: 'b' } }] }],
+        AND: [
+          {
+            OR: [
+              { status: { operator: 'equals', value: 'a' } },
+              { status: { operator: 'equals', value: 'b' } },
+            ],
+          },
+        ],
       };
       const query = buildFilterQuery('', [], filters, []);
       expect(query).toEqual({
@@ -93,8 +106,13 @@ describe('buildFilterQuery', () => {
     it('an absent combinator (undefined) is skipped, not dereferenced', () => {
       // The reference-board default load: `filters.AND = enrichments?.map(...)` is undefined when
       // no form-field filter is active, and the key is assigned rather than omitted.
-      const filters = { status: { operator: 'equals', value: 'active' }, AND: undefined } as unknown as FilterMap;
-      expect(buildFilterQuery('', [], filters, [])).toEqual({ 'searchFields[status][equals]': 'active' });
+      const filters = {
+        status: { operator: 'equals', value: 'active' },
+        AND: undefined,
+      } as unknown as FilterMap;
+      expect(buildFilterQuery('', [], filters, [])).toEqual({
+        'searchFields[status][equals]': 'active',
+      });
     });
 
     it('a scalar clause under a combinator key is dropped, not mapped over', () => {
@@ -120,14 +138,18 @@ describe('buildFilterQuery', () => {
     });
 
     it('a non-map group under a combinator key is dropped, not recursed into', () => {
-      const filters = { AND: ['nope', null, { status: { operator: 'equals', value: 'a' } }] } as unknown as FilterMap;
+      const filters = {
+        AND: ['nope', null, { status: { operator: 'equals', value: 'a' } }],
+      } as unknown as FilterMap;
       expect(buildFilterQuery('', [], filters, [])).toEqual({
         'searchFields[AND][0][status][equals]': 'a',
       });
     });
 
     it('a group-array under a plain field key is dropped, not treated as clauses', () => {
-      const filters = { tokens: [{ name: { operator: 'contains', value: 'x' } }] } as unknown as FilterMap;
+      const filters = {
+        tokens: [{ name: { operator: 'contains', value: 'x' } }],
+      } as unknown as FilterMap;
       expect(buildFilterQuery('', [], filters, [])).toEqual({});
     });
   });

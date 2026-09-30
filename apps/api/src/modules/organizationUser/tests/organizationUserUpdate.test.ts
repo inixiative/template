@@ -36,9 +36,14 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
   });
 
   it('updates the role', async () => {
-    const { entity: member } = await createOrganizationUser({ role: 'member' }, { organization: org });
+    const { entity: member } = await createOrganizationUser(
+      { role: 'member' },
+      { organization: org },
+    );
 
-    const response = await fetch(patch(`/api/v1/organizationUser/${member.id}`, { role: 'viewer' }));
+    const response = await fetch(
+      patch(`/api/v1/organizationUser/${member.id}`, { role: 'viewer' }),
+    );
     const { data } = await json<UpdateOrgUserResponse>(response);
 
     expect(response.status).toBe(200);

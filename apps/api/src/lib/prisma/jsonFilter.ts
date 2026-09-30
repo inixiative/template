@@ -20,7 +20,10 @@ const toSegments = (value: BracketQueryValue): string[] => {
 };
 
 // Translate a JsonFilter request object into a Prisma JSON where value.
-export const buildJsonWhere = (input: BracketQueryRecord, fieldPath: string): Record<string, unknown> => {
+export const buildJsonWhere = (
+  input: BracketQueryRecord,
+  fieldPath: string,
+): Record<string, unknown> => {
   const out: Record<string, unknown> = {};
   for (const [op, value] of Object.entries(input)) {
     if (value === undefined) continue;

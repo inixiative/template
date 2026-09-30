@@ -1,10 +1,18 @@
-import { DbAction, type HookOptions, HookTiming, type Prisma, registerDbHook, type SingleAction } from '@template/db';
+import {
+  DbAction,
+  type HookOptions,
+  HookTiming,
+  type Prisma,
+  registerDbHook,
+  type SingleAction,
+} from '@template/db';
 import type { ContactType } from '@template/db/generated/client/enums';
 import { ContactRegistry } from '@template/shared/contact';
 import { castArray } from 'lodash-es';
 import { makeError } from '#/lib/errors';
 
-type ContactRow = Partial<Prisma.ContactGetPayload<Record<string, never>>> & Record<string, unknown>;
+type ContactRow = Partial<Prisma.ContactGetPayload<Record<string, never>>> &
+  Record<string, unknown>;
 
 const normalizeContactValue = <K extends ContactType>(type: K, value: unknown) => {
   const def = ContactRegistry[type];
@@ -23,17 +31,28 @@ const processContactRow = async (row: ContactRow): Promise<void> => {
   const sub = row.subtype ?? null;
   switch (def.subtype.mode) {
     case 'forbidden':
-      if (sub !== null) throw makeError({ status: 422, message: `Contact type '${row.type}' must not have a subtype` });
+      if (sub !== null)
+        throw makeError({
+          status: 422,
+          message: `Contact type '${row.type}' must not have a subtype`,
+        });
       break;
     case 'required':
-      if (sub === null) throw makeError({ status: 422, message: `Contact type '${row.type}' requires a subtype` });
+      if (sub === null)
+        throw makeError({ status: 422, message: `Contact type '${row.type}' requires a subtype` });
       if (!def.subtype.values.includes(sub)) {
-        throw makeError({ status: 422, message: `Invalid subtype '${sub}' for type '${row.type}'` });
+        throw makeError({
+          status: 422,
+          message: `Invalid subtype '${sub}' for type '${row.type}'`,
+        });
       }
       break;
     case 'optional':
       if (sub !== null && !def.subtype.values.includes(sub)) {
-        throw makeError({ status: 422, message: `Invalid subtype '${sub}' for type '${row.type}'` });
+        throw makeError({
+          status: 422,
+          message: `Invalid subtype '${sub}' for type '${row.type}'`,
+        });
       }
       break;
   }
@@ -82,20 +101,26 @@ export const registerContactRulesHook = () => {
   // need normalization — only one fires depending on row existence, but we
   // can't know until Prisma runs, so treat both: validate `create` as a fresh
   // row, validate `update` shadow-merged with previous (if available).
-  registerDbHook('contactRules:upsert', 'Contact', HookTiming.before, [DbAction.upsert], async (options) => {
-    const { args, previous } = options as HookOptions & { action: SingleAction };
-    if (!args || typeof args !== 'object') return;
-    const a = args as Record<string, unknown>;
-    const create = a.create as ContactRow | undefined;
-    const update = a.update as ContactRow | undefined;
-    if (create) await processContactRow(create);
-    if (update) {
-      const prev = previous as ContactRow | undefined;
-      const merged: ContactRow = { ...(prev ?? {}), ...update };
-      await processContactRow(merged);
-      mirrorComputed(update, merged);
-    }
-  });
+  registerDbHook(
+    'contactRules:upsert',
+    'Contact',
+    HookTiming.before,
+    [DbAction.upsert],
+    async (options) => {
+      const { args, previous } = options as HookOptions & { action: SingleAction };
+      if (!args || typeof args !== 'object') return;
+      const a = args as Record<string, unknown>;
+      const create = a.create as ContactRow | undefined;
+      const update = a.update as ContactRow | undefined;
+      if (create) await processContactRow(create);
+      if (update) {
+        const prev = previous as ContactRow | undefined;
+        const merged: ContactRow = { ...(prev ?? {}), ...update };
+        await processContactRow(merged);
+        mirrorComputed(update, merged);
+      }
+    },
+  );
 
   // Update paths — args.data is the partial update; merge with previous for
   // type-aware validation, then mirror hook-computed fields back into args.data.

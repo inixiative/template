@@ -13,7 +13,10 @@ import {
   isBracketSymbol,
 } from '@template/shared/bracketQuery';
 
-export const serializeBracketQuery = (obj: Record<string, unknown>, prefix = ''): URLSearchParams => {
+export const serializeBracketQuery = (
+  obj: Record<string, unknown>,
+  prefix = '',
+): URLSearchParams => {
   const params = new URLSearchParams();
   // Typed leaf encoding, shared by bare values and array items. Numbers are only
   // marked when nested — top-level scalars (page, pageSize) must stay plain params

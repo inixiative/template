@@ -29,10 +29,13 @@ const parseJobEnvOverride: EnvOverrideParser = (key, override, current) => {
   return parsedOverride.success ? parsedOverride.data : current;
 };
 
-const preprocessEnv = (env: Record<string, string | undefined>): Record<string, string | undefined> => {
+const preprocessEnv = (
+  env: Record<string, string | undefined>,
+): Record<string, string | undefined> => {
   return Object.fromEntries(
     Object.entries(env).filter(
-      ([key, value]) => value !== '' || (key.startsWith('OTEL_EXPORTER_OTLP_') && key.endsWith('_HEADERS')),
+      ([key, value]) =>
+        value !== '' || (key.startsWith('OTEL_EXPORTER_OTLP_') && key.endsWith('_HEADERS')),
     ),
   );
 };
@@ -50,7 +53,9 @@ const baseEnvSchema = z
 
     // Core (defaults)
     PORT: z.coerce.number().default(8000),
-    LOG_LEVEL: z.enum(['silent', 'fatal', 'error', 'warn', 'log', 'info', 'debug', 'trace', 'verbose']).optional(),
+    LOG_LEVEL: z
+      .enum(['silent', 'fatal', 'error', 'warn', 'log', 'info', 'debug', 'trace', 'verbose'])
+      .optional(),
 
     // URLs
     API_URL: z.string().url(),
@@ -110,4 +115,6 @@ const parsed = isTest
   ? baseEnvSchema.partial().parse(preprocessEnv(process.env))
   : envSchema.parse(preprocessEnv(process.env));
 // In test the parsed env is wrapped so setEnvOverride/withEnv overrides win over reads.
-process.env = (isTest ? wrapEnvWithOverrides(parsed, parseJobEnvOverride) : parsed) as unknown as NodeJS.ProcessEnv;
+process.env = (isTest
+  ? wrapEnvWithOverrides(parsed, parseJobEnvOverride)
+  : parsed) as unknown as NodeJS.ProcessEnv;

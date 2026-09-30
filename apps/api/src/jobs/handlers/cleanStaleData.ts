@@ -43,6 +43,8 @@ export const cleanStaleData: JobHandler<CleanStaleDataPayload> = makeSingletonJo
     }
 
     const result = await db.delegate(model).deleteMany({ where });
-    log.info(`cleanStaleData: deleted ${result.count} ${model} rows older than ${retentionDays} days`);
+    log.info(
+      `cleanStaleData: deleted ${result.count} ${model} rows older than ${retentionDays} days`,
+    );
   },
 );

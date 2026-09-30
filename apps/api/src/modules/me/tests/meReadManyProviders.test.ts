@@ -88,7 +88,10 @@ describe('GET /me/providers', () => {
   it('excludes providers for other users', async () => {
     const { entity: otherUser } = await createUser();
     const { context: otherContext } = await createOrganizationUser({}, { user: otherUser });
-    const { entity: otherSpace } = await createSpace({}, { organization: otherContext.organization });
+    const { entity: otherSpace } = await createSpace(
+      {},
+      { organization: otherContext.organization },
+    );
     await createCustomerRef({
       customerModel: 'User',
       providerModel: 'Space',

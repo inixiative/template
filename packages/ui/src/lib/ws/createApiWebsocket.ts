@@ -322,13 +322,15 @@ export const createApiWebsocket = (
         pongTimer = setTimeout(() => socket.reconnect(), timing.pongTimeoutMs);
       }, timing.heartbeatMs);
     },
-    authenticate: (token) => sendIdentity({ action: 'authenticate', headers: { authorization: `Bearer ${token}` } }),
+    authenticate: (token) =>
+      sendIdentity({ action: 'authenticate', headers: { authorization: `Bearer ${token}` } }),
     spoof: (token, email) =>
       sendIdentity({
         action: 'authenticate',
         headers: { authorization: `Bearer ${token}`, 'x-spoof-user-email': email },
       }),
-    unspoof: (token) => sendIdentity({ action: 'authenticate', headers: { authorization: `Bearer ${token}` } }),
+    unspoof: (token) =>
+      sendIdentity({ action: 'authenticate', headers: { authorization: `Bearer ${token}` } }),
     logout: () => sendIdentity(null),
     subscribe: (channel) => {
       const refs = channels.get(channel) ?? 0;

@@ -4,7 +4,11 @@
  * @partOf feature:email
  * @uses none
  */
-import type { EmailComponent, EmailOwnerModel, EmailTemplate } from '@template/db/generated/client/client';
+import type {
+  EmailComponent,
+  EmailOwnerModel,
+  EmailTemplate,
+} from '@template/db/generated/client/client';
 
 export type OwnerScope = {
   ownerModel: EmailOwnerModel;

@@ -11,4 +11,5 @@
 export type PrismaTransaction = { kind: string; id: string | number };
 
 export const readPrismaTransaction = (params: unknown): PrismaTransaction | undefined =>
-  (params as { __internalParams?: { transaction?: PrismaTransaction } }).__internalParams?.transaction;
+  (params as { __internalParams?: { transaction?: PrismaTransaction } }).__internalParams
+    ?.transaction;

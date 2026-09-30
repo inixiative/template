@@ -1,6 +1,26 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
-import type { Organization, OrganizationUser, User, WebhookSubscription } from '@template/db/generated/client/client';
-import { cleanupTouchedTables, createOrganizationUser, createWebhookSubscription, getNextSeq } from '@template/db/test';
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  mock,
+  spyOn,
+} from 'bun:test';
+import type {
+  Organization,
+  OrganizationUser,
+  User,
+  WebhookSubscription,
+} from '@template/db/generated/client/client';
+import {
+  cleanupTouchedTables,
+  createOrganizationUser,
+  createWebhookSubscription,
+  getNextSeq,
+} from '@template/db/test';
 import { organizationRouter } from '#/modules/organization';
 import { createTestApp } from '#tests/createTestApp';
 import { get, json, post } from '#tests/utils/request';
@@ -29,9 +49,12 @@ describe('organization/webhookSubscriptions', () => {
 
   beforeEach(() => {
     spyOn(globalThis, 'fetch').mockImplementation(
-      Object.assign(() => Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 200 })), {
-        preconnect: globalThis.fetch.preconnect,
-      }),
+      Object.assign(
+        () => Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 200 })),
+        {
+          preconnect: globalThis.fetch.preconnect,
+        },
+      ),
     );
   });
 

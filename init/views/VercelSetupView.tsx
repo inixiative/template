@@ -297,7 +297,10 @@ export const VercelSetupView: React.FC<VercelSetupViewProps> = ({ onComplete, on
             </Text>
 
             <Box marginTop={1}>
-              <Text>Vercel projects are ready, but need GitHub connected to enable automatic deployments.</Text>
+              <Text>
+                Vercel projects are ready, but need GitHub connected to enable automatic
+                deployments.
+              </Text>
             </Box>
 
             <Box marginTop={1}>
@@ -362,8 +365,12 @@ export const VercelSetupView: React.FC<VercelSetupViewProps> = ({ onComplete, on
       {!running && (
         <Box marginTop={1}>
           {setupState === 'new' && <Text color="cyan">⚡ Ready to provision Vercel projects</Text>}
-          {setupState === 'stale' && <Text color="yellow">⚠ Project name changed - setup needs to be restarted</Text>}
-          {setupState === 'incomplete' && <Text color="yellow">⋯ Setup in progress - continue where you left off</Text>}
+          {setupState === 'stale' && (
+            <Text color="yellow">⚠ Project name changed - setup needs to be restarted</Text>
+          )}
+          {setupState === 'incomplete' && (
+            <Text color="yellow">⋯ Setup in progress - continue where you left off</Text>
+          )}
           {setupState === 'complete' && <Text color="green">✓ Vercel setup complete</Text>}
         </Box>
       )}
@@ -379,7 +386,9 @@ export const VercelSetupView: React.FC<VercelSetupViewProps> = ({ onComplete, on
         <Box flexDirection="column" marginTop={1}>
           {setupState === 'new' && <Text dimColor>{prompt(['enter', 'cancel'])}</Text>}
           {setupState === 'stale' && <Text dimColor>{prompt(['restart', 'cancel'])}</Text>}
-          {setupState === 'incomplete' && <Text dimColor>{prompt(['enter', 'restart', 'cancel'])}</Text>}
+          {setupState === 'incomplete' && (
+            <Text dimColor>{prompt(['enter', 'restart', 'cancel'])}</Text>
+          )}
           {setupState === 'complete' && <Text dimColor>{prompt(['enter', 'restart'])}</Text>}
         </Box>
       )}

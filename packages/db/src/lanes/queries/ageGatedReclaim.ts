@@ -34,4 +34,12 @@ export const ageGatedReclaim = (
   supersededPrefix: string,
   supersededTtlSec: number,
 ): Promise<unknown> =>
-  redis.eval(AGE_GATED_RECLAIM, 1, lane, jobId, String(laneTtlSec), supersededPrefix, String(supersededTtlSec));
+  redis.eval(
+    AGE_GATED_RECLAIM,
+    1,
+    lane,
+    jobId,
+    String(laneTtlSec),
+    supersededPrefix,
+    String(supersededTtlSec),
+  );

@@ -47,13 +47,23 @@ describe('buildSearchFieldsSchema', () => {
 
   it('accepts AND at the root, and keeps each child strict', () => {
     ok({ AND: [{ name: { contains: 'a' } }] });
-    ok({ AND: [{ name: { contains: 'a' } }, { organizationUsers: { some: { role: { equals: 'admin' } } } }] });
+    ok({
+      AND: [
+        { name: { contains: 'a' } },
+        { organizationUsers: { some: { role: { equals: 'admin' } } } },
+      ],
+    });
     bad({ AND: [{ notAField: { equals: 'x' } }] });
   });
 
   it('accepts OR at the root on the same terms', () => {
     ok({ OR: [{ name: { contains: 'a' } }] });
-    ok({ OR: [{ name: { contains: 'a' } }, { organizationUsers: { some: { role: { equals: 'admin' } } } }] });
+    ok({
+      OR: [
+        { name: { contains: 'a' } },
+        { organizationUsers: { some: { role: { equals: 'admin' } } } },
+      ],
+    });
     bad({ OR: [{ notAField: { equals: 'x' } }] });
   });
 
@@ -72,18 +82,26 @@ describe('buildSearchFieldsSchema', () => {
 });
 
 describe('buildSearchFieldsSchema (json)', () => {
-  const jsonLens: LensNarrowing = { parent: lensFor('Contact'), root: { picks: ['permissionRules'] } };
+  const jsonLens: LensNarrowing = {
+    parent: lensFor('Contact'),
+    root: { picks: ['permissionRules'] },
+  };
   const schema = buildSearchFieldsSchema(jsonLens);
 
   it('json field gets the open-ended JsonFilter', () => {
     expect(schema).toBeDefined();
     expect(schema?.safeParse({ permissionRules: { string_contains: 'x' } }).success).toBe(true);
-    expect(schema?.safeParse({ permissionRules: { path: ['a', 'b'], equals: 'x' } }).success).toBe(true);
+    expect(schema?.safeParse({ permissionRules: { path: ['a', 'b'], equals: 'x' } }).success).toBe(
+      true,
+    );
   });
 });
 
 describe('buildSearchFieldsSchema — null + boolean values', () => {
-  const lens: LensNarrowing = { parent: lensFor('User'), root: { picks: ['name', 'emailVerified'] } };
+  const lens: LensNarrowing = {
+    parent: lensFor('User'),
+    root: { picks: ['name', 'emailVerified'] },
+  };
   const schema = buildSearchFieldsSchema(lens);
   if (!schema) throw new Error('expected a schema');
 

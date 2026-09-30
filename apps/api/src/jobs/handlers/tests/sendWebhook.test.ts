@@ -1,4 +1,14 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  mock,
+  spyOn,
+} from 'bun:test';
 import crypto from 'node:crypto';
 import type { User } from '@template/db/generated/client/client';
 import {
@@ -141,7 +151,10 @@ describe('sendWebhook handler', () => {
     it('creates error event on HTTP error response', async () => {
       spyOn(globalThis, 'fetch').mockImplementation(
         Object.assign(
-          () => Promise.resolve(new Response('Server Error', { status: 500, statusText: 'Internal Server Error' })),
+          () =>
+            Promise.resolve(
+              new Response('Server Error', { status: 500, statusText: 'Internal Server Error' }),
+            ),
           { preconnect: fetch.preconnect },
         ),
       );
@@ -172,9 +185,12 @@ describe('sendWebhook handler', () => {
 
     it('blocks a redirect instead of following it (SSRF)', async () => {
       spyOn(globalThis, 'fetch').mockImplementation(
-        Object.assign(() => Promise.resolve(new Response('', { status: 302, statusText: 'Found' })), {
-          preconnect: fetch.preconnect,
-        }),
+        Object.assign(
+          () => Promise.resolve(new Response('', { status: 302, statusText: 'Found' })),
+          {
+            preconnect: fetch.preconnect,
+          },
+        ),
       );
 
       const testUrl = getUniqueUrl('/redirect');
@@ -203,7 +219,9 @@ describe('sendWebhook handler', () => {
 
     it('creates error event on network failure', async () => {
       spyOn(globalThis, 'fetch').mockImplementation(
-        Object.assign(() => Promise.reject(new Error('Connection refused')), { preconnect: fetch.preconnect }),
+        Object.assign(() => Promise.reject(new Error('Connection refused')), {
+          preconnect: fetch.preconnect,
+        }),
       );
 
       const testUrl = getUniqueUrl('/unreachable');
@@ -271,7 +289,9 @@ describe('sendWebhook handler', () => {
   describe('circuit breaker', () => {
     it('disables subscription after 5 consecutive failures', async () => {
       spyOn(globalThis, 'fetch').mockImplementation(
-        Object.assign(() => Promise.reject(new Error('Connection refused')), { preconnect: fetch.preconnect }),
+        Object.assign(() => Promise.reject(new Error('Connection refused')), {
+          preconnect: fetch.preconnect,
+        }),
       );
 
       const testUrl = getUniqueUrl('/circuit-break');
@@ -309,7 +329,9 @@ describe('sendWebhook handler', () => {
 
     it('does not disable if a recent success exists', async () => {
       spyOn(globalThis, 'fetch').mockImplementation(
-        Object.assign(() => Promise.reject(new Error('Connection refused')), { preconnect: fetch.preconnect }),
+        Object.assign(() => Promise.reject(new Error('Connection refused')), {
+          preconnect: fetch.preconnect,
+        }),
       );
 
       const testUrl = getUniqueUrl('/no-circuit-break');
@@ -355,7 +377,9 @@ describe('sendWebhook handler', () => {
 
     it('does not disable if fewer than 5 total events', async () => {
       spyOn(globalThis, 'fetch').mockImplementation(
-        Object.assign(() => Promise.reject(new Error('Connection refused')), { preconnect: fetch.preconnect }),
+        Object.assign(() => Promise.reject(new Error('Connection refused')), {
+          preconnect: fetch.preconnect,
+        }),
       );
 
       const testUrl = getUniqueUrl('/few-events');
@@ -412,7 +436,10 @@ describe('sendWebhook handler', () => {
         customerUserId: customer.id,
         providerUserId: user.id,
       });
-      const { entity: integration } = await createIntegration({ ownerModel: 'User', userId: user.id });
+      const { entity: integration } = await createIntegration({
+        ownerModel: 'User',
+        userId: user.id,
+      });
       const { entity: sub, context } = await createWebhookSubscription({
         ownerModel: 'User',
         userId: user.id,
@@ -509,7 +536,10 @@ describe('sendWebhook handler', () => {
     it('never counts unreachable events, and an unreachable blip mid-streak does not reset it', async () => {
       const { sub, context, integration, customerRef } = await createRecordSubscription();
       await createWebhookEvent(rejection(customerRef.id), context);
-      await createWebhookEvent({ status: 'unreachable', resourceId: customerRef.id, error: 'HTTP 503' }, context);
+      await createWebhookEvent(
+        { status: 'unreachable', resourceId: customerRef.id, error: 'HTTP 503' },
+        context,
+      );
       await createWebhookEvent({ status: 'success', resourceId: crypto.randomUUID() }, context);
       rejectDeliveries();
 
@@ -536,9 +566,15 @@ describe('sendWebhook handler', () => {
     it("orders by id: a rejection in the same millisecond but before the record's success does not count", async () => {
       const { sub, context, integration, customerRef } = await createRecordSubscription();
       await createWebhookEvent({ ...rejection(customerRef.id), createdAt: at(1_000) }, context);
-      await createWebhookEvent({ status: 'success', resourceId: customerRef.id, createdAt: at(1_000) }, context);
+      await createWebhookEvent(
+        { status: 'success', resourceId: customerRef.id, createdAt: at(1_000) },
+        context,
+      );
       await createWebhookEvent({ ...rejection(customerRef.id), createdAt: at(2_000) }, context);
-      await createWebhookEvent({ status: 'success', resourceId: crypto.randomUUID(), createdAt: at(3_000) }, context);
+      await createWebhookEvent(
+        { status: 'success', resourceId: crypto.randomUUID(), createdAt: at(3_000) },
+        context,
+      );
       rejectDeliveries();
 
       await deliver(sub.id, customerRef.id);
@@ -548,10 +584,16 @@ describe('sendWebhook handler', () => {
 
     it("orders by id: a rejection in the same millisecond but after the record's success counts", async () => {
       const { sub, context, integration, customerRef } = await createRecordSubscription();
-      await createWebhookEvent({ status: 'success', resourceId: customerRef.id, createdAt: at(1_000) }, context);
+      await createWebhookEvent(
+        { status: 'success', resourceId: customerRef.id, createdAt: at(1_000) },
+        context,
+      );
       await createWebhookEvent({ ...rejection(customerRef.id), createdAt: at(1_000) }, context);
       await createWebhookEvent({ ...rejection(customerRef.id), createdAt: at(2_000) }, context);
-      await createWebhookEvent({ status: 'success', resourceId: crypto.randomUUID(), createdAt: at(3_000) }, context);
+      await createWebhookEvent(
+        { status: 'success', resourceId: crypto.randomUUID(), createdAt: at(3_000) },
+        context,
+      );
       rejectDeliveries();
 
       await deliver(sub.id, customerRef.id);
@@ -574,13 +616,19 @@ describe('sendWebhook handler', () => {
       const otherResourceId = crypto.randomUUID();
       await deliver(sub.id, otherResourceId);
 
-      const delivered = await db.webhookEvent.findMany({ where: { webhookSubscriptionId: sub.id } });
-      expect(delivered.map((event) => [event.resourceId, event.status])).toEqual([[otherResourceId, 'success']]);
+      const delivered = await db.webhookEvent.findMany({
+        where: { webhookSubscriptionId: sub.id },
+      });
+      expect(delivered.map((event) => [event.resourceId, event.status])).toEqual([
+        [otherResourceId, 'success'],
+      ]);
       expect(receivedWebhooks.length).toBe(1);
     });
 
     it('never poisons on a subscription without an integration', async () => {
-      const { sub, context, customerRef } = await createRecordSubscription({ withIntegration: false });
+      const { sub, context, customerRef } = await createRecordSubscription({
+        withIntegration: false,
+      });
       await createWebhookEvent(rejection(customerRef.id), context);
       await createWebhookEvent(rejection(customerRef.id), context);
       await createWebhookEvent({ status: 'success', resourceId: crypto.randomUUID() }, context);
@@ -588,7 +636,9 @@ describe('sendWebhook handler', () => {
 
       await deliver(sub.id, customerRef.id);
 
-      expect(await db.integrationRecord.count({ where: { customerRefId: customerRef.id } })).toBe(0);
+      expect(await db.integrationRecord.count({ where: { customerRefId: customerRef.id } })).toBe(
+        0,
+      );
     });
 
     it('a record rejected five times in a row no longer disables a subscription that delivers other records', async () => {
@@ -601,7 +651,9 @@ describe('sendWebhook handler', () => {
 
       expect((await findRecord(integration.id, customerRef.id))?.poisonedAt).toBeInstanceOf(Date);
       expect(
-        await db.webhookEvent.count({ where: { webhookSubscriptionId: sub.id, resourceId: customerRef.id } }),
+        await db.webhookEvent.count({
+          where: { webhookSubscriptionId: sub.id, resourceId: customerRef.id },
+        }),
       ).toBe(3);
       const updated = await db.webhookSubscription.findUnique({ where: { id: sub.id } });
       expect(updated?.isActive).toBe(true);

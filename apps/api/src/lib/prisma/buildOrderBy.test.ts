@@ -7,7 +7,10 @@ describe('buildOrderBy', () => {
   });
 
   it('parses client orderBy and appends tiebreaker', () => {
-    expect(buildOrderBy({ clientOrderBy: ['name:asc'] })).toEqual([{ name: 'asc' }, { id: 'desc' }]);
+    expect(buildOrderBy({ clientOrderBy: ['name:asc'] })).toEqual([
+      { name: 'asc' },
+      { id: 'desc' },
+    ]);
   });
 
   it('caller keys win over client + tiebreaker on the same top-level key', () => {

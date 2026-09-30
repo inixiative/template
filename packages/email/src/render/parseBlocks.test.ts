@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'bun:test';
-import { ParseBlocksError, type ParseBlocksErrorReason } from '@template/email/errors/ParseBlocksError';
+import {
+  ParseBlocksError,
+  type ParseBlocksErrorReason,
+} from '@template/email/errors/ParseBlocksError';
 import { componentTagPattern, SLUG_PATTERN } from '@template/email/render/blockTags';
 import { type ComponentNode, isOverrideSlot, type SlotNode } from '@template/email/render/nodes';
 import { parseBlocks } from '@template/email/render/parseBlocks';
@@ -9,14 +12,18 @@ const reasonOf = (fn: () => void): ParseBlocksErrorReason | string | undefined =
   try {
     fn();
   } catch (error) {
-    return error instanceof ParseBlocksError ? error.reason : `not-a-ParseBlocksError:${String(error)}`;
+    return error instanceof ParseBlocksError
+      ? error.reason
+      : `not-a-ParseBlocksError:${String(error)}`;
   }
   return undefined;
 };
 
 describe('parseBlocks', () => {
   it('returns a single text node for plain content', () => {
-    expect(parseBlocks('<mj-text>Hello</mj-text>')).toEqual([{ type: 'text', value: '<mj-text>Hello</mj-text>' }]);
+    expect(parseBlocks('<mj-text>Hello</mj-text>')).toEqual([
+      { type: 'text', value: '<mj-text>Hello</mj-text>' },
+    ]);
   });
 
   it('leaves interpolation and conditionals as opaque text', () => {
@@ -66,7 +73,9 @@ describe('parseBlocks', () => {
   });
 
   it('keeps sibling components at the same level', () => {
-    const nodes = parseBlocks('{{#component:header}}{{/component:header}}{{#component:footer}}{{/component:footer}}');
+    const nodes = parseBlocks(
+      '{{#component:header}}{{/component:header}}{{#component:footer}}{{/component:footer}}',
+    );
     expect(nodes.map((n) => (n as ComponentNode).slug)).toEqual(['header', 'footer']);
   });
 
@@ -128,11 +137,15 @@ describe('parseBlocks', () => {
 
 describe('parseBlocks — hardening: tag balance (kind + name must match)', () => {
   it('throws on a close tag of the wrong KIND (component vs slot)', () => {
-    expect(reasonOf(() => parseBlocks('{{#component:card}}{{/slot:card}}'))).toBe('mismatched_close');
+    expect(reasonOf(() => parseBlocks('{{#component:card}}{{/slot:card}}'))).toBe(
+      'mismatched_close',
+    );
   });
 
   it('throws on a close tag of the wrong NAME', () => {
-    expect(reasonOf(() => parseBlocks('{{#component:card}}{{/component:other}}'))).toBe('mismatched_close');
+    expect(reasonOf(() => parseBlocks('{{#component:card}}{{/component:other}}'))).toBe(
+      'mismatched_close',
+    );
   });
 
   it('throws on a stray close tag with no open at all', () => {
@@ -140,19 +153,21 @@ describe('parseBlocks — hardening: tag balance (kind + name must match)', () =
   });
 
   it('throws on a close tag that pops past a still-open sibling (mismatched nesting)', () => {
-    expect(reasonOf(() => parseBlocks('{{#component:outer}}{{#component:inner}}{{/component:outer}}'))).toBe(
-      'mismatched_close',
-    );
+    expect(
+      reasonOf(() => parseBlocks('{{#component:outer}}{{#component:inner}}{{/component:outer}}')),
+    ).toBe('mismatched_close');
   });
 
   it('throws on an unclosed open at end of input', () => {
-    expect(reasonOf(() => parseBlocks('{{#component:footer}}<mj-text>Footer</mj-text>'))).toBe('unclosed_open');
+    expect(reasonOf(() => parseBlocks('{{#component:footer}}<mj-text>Footer</mj-text>'))).toBe(
+      'unclosed_open',
+    );
   });
 
   it('throws on an unclosed slot nested inside a properly-closed component', () => {
-    expect(() => parseBlocks('{{#component:card}}{{#slot:body}}<mj-text>Hi</mj-text>{{/component:card}}')).toThrow(
-      ParseBlocksError,
-    );
+    expect(() =>
+      parseBlocks('{{#component:card}}{{#slot:body}}<mj-text>Hi</mj-text>{{/component:card}}'),
+    ).toThrow(ParseBlocksError);
   });
 });
 
@@ -170,7 +185,9 @@ describe('parseBlocks — hardening: whitespace-spaced tags are rejected, not si
   });
 
   it('throws on a space between {{ and # (leading-space evasion)', () => {
-    expect(reasonOf(() => parseBlocks('{{ #component:card}}{{/component:card}}'))).toBe('mismatched_close');
+    expect(reasonOf(() => parseBlocks('{{ #component:card}}{{/component:card}}'))).toBe(
+      'mismatched_close',
+    );
   });
 
   it('throws on a space between {{ and / on a close tag', () => {
@@ -184,21 +201,29 @@ describe('parseBlocks — hardening: whitespace-spaced tags are rejected, not si
 
 describe('parseBlocks — hardening: slug alphabet ^[a-z0-9-]+$ enforced at parse', () => {
   it('classifies an uppercase component slug as invalid_slug', () => {
-    expect(reasonOf(() => parseBlocks('{{#component:Card}}{{/component:Card}}'))).toBe('invalid_slug');
-  });
-
-  it('classifies an underscore slug as invalid_slug', () => {
-    expect(reasonOf(() => parseBlocks('{{#component:card_1}}{{/component:card_1}}'))).toBe('invalid_slug');
-  });
-
-  it('throws on a slot name outside the alphabet', () => {
-    expect(reasonOf(() => parseBlocks('{{#component:card}}{{#slot:Body}}x{{/slot:Body}}{{/component:card}}'))).toBe(
+    expect(reasonOf(() => parseBlocks('{{#component:Card}}{{/component:Card}}'))).toBe(
       'invalid_slug',
     );
   });
 
+  it('classifies an underscore slug as invalid_slug', () => {
+    expect(reasonOf(() => parseBlocks('{{#component:card_1}}{{/component:card_1}}'))).toBe(
+      'invalid_slug',
+    );
+  });
+
+  it('throws on a slot name outside the alphabet', () => {
+    expect(
+      reasonOf(() =>
+        parseBlocks('{{#component:card}}{{#slot:Body}}x{{/slot:Body}}{{/component:card}}'),
+      ),
+    ).toBe('invalid_slug');
+  });
+
   it('accepts lowercase letters, digits, and hyphens', () => {
-    expect(() => parseBlocks('{{#component:card-v2-final}}{{/component:card-v2-final}}')).not.toThrow();
+    expect(() =>
+      parseBlocks('{{#component:card-v2-final}}{{/component:card-v2-final}}'),
+    ).not.toThrow();
   });
 
   it('exports the slug alphabet for other grammars to share', () => {
@@ -209,18 +234,22 @@ describe('parseBlocks — hardening: slug alphabet ^[a-z0-9-]+$ enforced at pars
 
 describe('parseBlocks — hardening: :default modifier is slot-only', () => {
   it('rejects :default on a component open tag', () => {
-    expect(reasonOf(() => parseBlocks('{{#component:card:default}}{{/component:card:default}}'))).toBe(
+    expect(
+      reasonOf(() => parseBlocks('{{#component:card:default}}{{/component:card:default}}')),
+    ).toBe('invalid_modifier');
+  });
+
+  it('rejects :default on a component close tag', () => {
+    expect(reasonOf(() => parseBlocks('{{#component:card}}{{/component:card:default}}'))).toBe(
       'invalid_modifier',
     );
   });
 
-  it('rejects :default on a component close tag', () => {
-    expect(reasonOf(() => parseBlocks('{{#component:card}}{{/component:card:default}}'))).toBe('invalid_modifier');
-  });
-
   it('still accepts :default on a slot', () => {
     expect(() =>
-      parseBlocks('{{#component:card}}{{#slot:body:default}}x{{/slot:body:default}}{{/component:card}}'),
+      parseBlocks(
+        '{{#component:card}}{{#slot:body:default}}x{{/slot:body:default}}{{/component:card}}',
+      ),
     ).not.toThrow();
   });
 });
@@ -229,7 +258,9 @@ describe('parseBlocks — hardening: duplicate override slots on one ref are rej
   it('throws when the same override slot name fills a ref twice', () => {
     expect(
       reasonOf(() =>
-        parseBlocks('{{#component:card}}{{#slot:body}}A{{/slot:body}}{{#slot:body}}B{{/slot:body}}{{/component:card}}'),
+        parseBlocks(
+          '{{#component:card}}{{#slot:body}}A{{/slot:body}}{{#slot:body}}B{{/slot:body}}{{/component:card}}',
+        ),
       ),
     ).toBe('duplicate_slot');
   });
@@ -245,24 +276,33 @@ describe('parseBlocks — hardening: duplicate override slots on one ref are rej
   it('lets an unclosed ref outrank a duplicate slot inside it', () => {
     expect(
       reasonOf(() =>
-        parseBlocks('{{#component:card}}{{#slot:foo}}{{/slot:foo}}{{#slot:foo}}{{/slot:foo}}{{#slot:bar}}'),
+        parseBlocks(
+          '{{#component:card}}{{#slot:foo}}{{/slot:foo}}{{#slot:foo}}{{/slot:foo}}{{#slot:bar}}',
+        ),
       ),
     ).toBe('unclosed_open');
   });
 
   it('lets a mismatched close outrank a duplicate slot inside the same ref', () => {
     expect(
-      reasonOf(() => parseBlocks('{{#component:card}}{{#slot:foo}}{{/slot:foo}}{{#slot:foo}}{{/slot:foo}}{{/slot:x}}')),
+      reasonOf(() =>
+        parseBlocks(
+          '{{#component:card}}{{#slot:foo}}{{/slot:foo}}{{#slot:foo}}{{/slot:foo}}{{/slot:x}}',
+        ),
+      ),
     ).toBe('mismatched_close');
   });
 });
 
 describe('assertNoDuplicateExposedSlots', () => {
-  const check = (src: string, slug?: string) => () => assertNoDuplicateExposedSlots(parseBlocks(src), slug);
+  const check = (src: string, slug?: string) => () =>
+    assertNoDuplicateExposedSlots(parseBlocks(src), slug);
 
   it('accepts a body exposing distinct slot names', () => {
     expect(
-      check('{{#slot:heading:default}}h{{/slot:heading:default}}{{#slot:body:default}}b{{/slot:body:default}}'),
+      check(
+        '{{#slot:heading:default}}h{{/slot:heading:default}}{{#slot:body:default}}b{{/slot:body:default}}',
+      ),
     ).not.toThrow();
   });
 
@@ -342,7 +382,9 @@ describe('parseBlocks exports', () => {
     expect(first).not.toBe(second);
     expect(first.global).toBe(true);
     expect([
-      ...'{{#component:card}}{{#slot:body:default}}{{/slot:body:default}}{{/component:card}}'.matchAll(first),
+      ...'{{#component:card}}{{#slot:body:default}}{{/slot:body:default}}{{/component:card}}'.matchAll(
+        first,
+      ),
     ]).toHaveLength(4);
   });
 

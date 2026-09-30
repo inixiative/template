@@ -20,7 +20,10 @@ export {
   unregisterDbInvariant,
 } from './extensions/hookRegistry';
 // Automatic soft-delete read/write scoping (app registers the scoper at bootstrap)
-export { registerSoftDeleteScoper, type SoftDeleteScoper } from './extensions/softDeleteScopeRegistry';
+export {
+  registerSoftDeleteScoper,
+  type SoftDeleteScoper,
+} from './extensions/softDeleteScopeRegistry';
 // Prisma namespace for advanced types (Prisma.UserWhereInput, etc.)
 export { Prisma } from './generated/client/client';
 // Scalar schemas (model schemas without relations)

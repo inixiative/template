@@ -1,6 +1,11 @@
 import { afterAll, describe, expect, it } from 'bun:test';
 import { clearHookRegistry, db } from '@template/db';
-import { ContactType, TagResource, WebhookModel, WebhookOwnerModel } from '@template/db/generated/client/enums';
+import {
+  ContactType,
+  TagResource,
+  WebhookModel,
+  WebhookOwnerModel,
+} from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
   createContact,
@@ -44,12 +49,20 @@ describe('partial unique constraints', () => {
       const { entity: user } = await createUser();
       const handle = seq('shared');
       await createContact(
-        { ownerModel: 'User', type: ContactType.linkedin, value: { classifier: 'personal', handle } },
+        {
+          ownerModel: 'User',
+          type: ContactType.linkedin,
+          value: { classifier: 'personal', handle },
+        },
         { user },
       );
       const dupe = async () =>
         createContact(
-          { ownerModel: 'User', type: ContactType.linkedin, value: { classifier: 'personal', handle } },
+          {
+            ownerModel: 'User',
+            type: ContactType.linkedin,
+            value: { classifier: 'personal', handle },
+          },
           { user },
         );
       await expect(dupe()).rejects.toThrow();
@@ -60,11 +73,19 @@ describe('partial unique constraints', () => {
       const { entity: b } = await createUser();
       const handle = seq('cross-user');
       await createContact(
-        { ownerModel: 'User', type: ContactType.linkedin, value: { classifier: 'personal', handle } },
+        {
+          ownerModel: 'User',
+          type: ContactType.linkedin,
+          value: { classifier: 'personal', handle },
+        },
         { user: a },
       );
       const second = await createContact(
-        { ownerModel: 'User', type: ContactType.linkedin, value: { classifier: 'personal', handle } },
+        {
+          ownerModel: 'User',
+          type: ContactType.linkedin,
+          value: { classifier: 'personal', handle },
+        },
         { user: b },
       );
       expect(second.entity.userId).toBe(b.id);
@@ -80,7 +101,8 @@ describe('partial unique constraints', () => {
         { tagCategory: cat.entity },
       );
       await createTagAttachment({ resourceModel: TagResource.User }, { user, tag: tag.entity });
-      const dupe = async () => createTagAttachment({ resourceModel: TagResource.User }, { user, tag: tag.entity });
+      const dupe = async () =>
+        createTagAttachment({ resourceModel: TagResource.User }, { user, tag: tag.entity });
       await expect(dupe()).rejects.toThrow();
     });
   });
@@ -116,9 +138,15 @@ describe('partial unique constraints', () => {
       const { entity: user } = await createUser();
       const cat = await createTagCategory({ ownerModel: TagResource.User }, { user });
       const name = seq('dup-tag');
-      await createTag({ name, ownerModel: TagResource.User, resources: [] }, { user, tagCategory: cat.entity });
+      await createTag(
+        { name, ownerModel: TagResource.User, resources: [] },
+        { user, tagCategory: cat.entity },
+      );
       const dupe = async () =>
-        createTag({ name, ownerModel: TagResource.User, resources: [] }, { user, tagCategory: cat.entity });
+        createTag(
+          { name, ownerModel: TagResource.User, resources: [] },
+          { user, tagCategory: cat.entity },
+        );
       await expect(dupe()).rejects.toThrow();
     });
   });
@@ -175,8 +203,17 @@ describe('partial unique constraints', () => {
         organizationId: organization.id,
         userId: user.id,
       });
-      await createIntegration({ name, ownerModel: 'Organization', organizationId: organization.id });
-      await createIntegration({ name, ownerModel: 'Space', organizationId: organization.id, spaceId: space.id });
+      await createIntegration({
+        name,
+        ownerModel: 'Organization',
+        organizationId: organization.id,
+      });
+      await createIntegration({
+        name,
+        ownerModel: 'Space',
+        organizationId: organization.id,
+        spaceId: space.id,
+      });
       await createIntegration({
         name,
         ownerModel: 'SpaceUser',
@@ -198,7 +235,12 @@ describe('partial unique constraints', () => {
         userId: user.id,
       });
       const dupe = async () =>
-        createIntegration({ name, ownerModel: 'OrganizationUser', organizationId: organization.id, userId: user.id });
+        createIntegration({
+          name,
+          ownerModel: 'OrganizationUser',
+          organizationId: organization.id,
+          userId: user.id,
+        });
       await expect(dupe()).rejects.toThrow();
     });
 
@@ -206,7 +248,10 @@ describe('partial unique constraints', () => {
       const { entity: user } = await createUser();
       const name = seq('integration-revived');
       const first = await createIntegration({ name, ownerModel: 'User', userId: user.id });
-      await db.integration.update({ where: { id: first.entity.id }, data: { deletedAt: new Date() } });
+      await db.integration.update({
+        where: { id: first.entity.id },
+        data: { deletedAt: new Date() },
+      });
       const second = await createIntegration({ name, ownerModel: 'User', userId: user.id });
       expect(second.entity.deletedAt).toBeNull();
     });
@@ -231,7 +276,10 @@ describe('partial unique constraints', () => {
       const { entity: org1 } = await createOrganization();
       const { entity: org2 } = await createOrganization();
       const slug = seq('comp-cross-org');
-      await createEmailComponent({ slug, locale: 'en', ownerModel: 'Organization' }, { organization: org1 });
+      await createEmailComponent(
+        { slug, locale: 'en', ownerModel: 'Organization' },
+        { organization: org1 },
+      );
       const second = await createEmailComponent(
         { slug, locale: 'en', ownerModel: 'Organization' },
         { organization: org2 },

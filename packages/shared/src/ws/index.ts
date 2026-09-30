@@ -13,7 +13,13 @@ export {
   type StreamParams,
   type StreamParamsSchema,
 } from './defineStream';
-export type { WSDataEvent, WSEvent, WSQueryEvent, WSStreamAppendEvent, WSStreamSnapshotEvent } from './events';
+export type {
+  WSDataEvent,
+  WSEvent,
+  WSQueryEvent,
+  WSStreamAppendEvent,
+  WSStreamSnapshotEvent,
+} from './events';
 export { WS_FRAME_LIMIT, WS_FRAME_WINDOW_MS, WS_MAX_PENDING_FRAMES } from './frameLimits';
 export { LIVE_QUERIES } from './liveQueries';
 export type { WSFrameErrorFrame, WSStreamAckFrame } from './streamControl';

@@ -8,7 +8,11 @@ import { EmailRenderError } from '@template/email/errors/EmailRenderError';
 import { lookupCascade } from '@template/email/render/lookupCascade';
 import type { OwnerScope } from '@template/email/render/types';
 
-export const validateNoCycle = async (savingSlug: string, outgoingRefs: string[], ctx: OwnerScope): Promise<void> => {
+export const validateNoCycle = async (
+  savingSlug: string,
+  outgoingRefs: string[],
+  ctx: OwnerScope,
+): Promise<void> => {
   const stack: { slug: string; path: string[] }[] = outgoingRefs.map((ref) => ({
     slug: ref,
     path: [savingSlug, ref],

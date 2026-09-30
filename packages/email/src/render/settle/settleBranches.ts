@@ -16,7 +16,13 @@ import {
   emailRuleVocabulary,
   evaluateScopedRule,
 } from '@template/email/rules/emailLens';
-import { iteratesLens, loopFrames, loopIndices, narrowToElements, scopedRule } from '@template/email/rules/scopedRule';
+import {
+  iteratesLens,
+  loopFrames,
+  loopIndices,
+  narrowToElements,
+  scopedRule,
+} from '@template/email/rules/scopedRule';
 import { withRule } from '@template/shared/rules';
 
 export const settleBranches = (

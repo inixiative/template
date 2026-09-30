@@ -49,7 +49,8 @@ export const registerClearCacheHook = () => {
       for (const resultData of results) {
         const previousData = previousById[resultData.id as string];
 
-        if (isUpdateAction(action) && isNoOpUpdate(model, resultData, previousData, NOOP_FIELDS)) continue;
+        if (isUpdateAction(action) && isNoOpUpdate(model, resultData, previousData, NOOP_FIELDS))
+          continue;
 
         collect(resultData);
         if (previousData) collect(previousData);

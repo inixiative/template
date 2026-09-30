@@ -4,7 +4,11 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
-import { InquiryResourceModel, InquiryStatus, InquiryType } from '@template/db/generated/client/enums';
+import {
+  InquiryResourceModel,
+  InquiryStatus,
+  InquiryType,
+} from '@template/db/generated/client/enums';
 import { createFactory } from '@template/db/test/factory';
 
 const inquiryFactory = createFactory('Inquiry', {

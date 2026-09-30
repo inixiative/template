@@ -16,7 +16,10 @@ type RailwayBucketsSetupViewProps = {
 
 type SetupState = 'new' | 'incomplete' | 'complete';
 
-export const RailwayBucketsSetupView: React.FC<RailwayBucketsSetupViewProps> = ({ onComplete, onCancel }) => {
+export const RailwayBucketsSetupView: React.FC<RailwayBucketsSetupViewProps> = ({
+  onComplete,
+  onCancel,
+}) => {
   const { config, syncConfig } = useConfig();
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -87,8 +90,9 @@ export const RailwayBucketsSetupView: React.FC<RailwayBucketsSetupViewProps> = (
 
       <Box marginBottom={1} flexDirection="column">
         <Text dimColor>
-          Creates S3-compatible Railway Buckets via GraphQL and captures their per-environment credentials into
-          Infisical at /api. Bucket creation is fully automated — no manual UI steps required.
+          Creates S3-compatible Railway Buckets via GraphQL and captures their per-environment
+          credentials into Infisical at /api. Bucket creation is fully automated — no manual UI
+          steps required.
         </Text>
       </Box>
 
@@ -117,7 +121,8 @@ export const RailwayBucketsSetupView: React.FC<RailwayBucketsSetupViewProps> = (
       {!running && setupState === 'complete' && (
         <Box marginBottom={1}>
           <Text color="green" bold>
-            ✓ Buckets ready — STORAGE_* secrets stored in Infisical for {stagingEnabled ? 'prod + staging' : 'prod'}.
+            ✓ Buckets ready — STORAGE_* secrets stored in Infisical for{' '}
+            {stagingEnabled ? 'prod + staging' : 'prod'}.
           </Text>
         </Box>
       )}

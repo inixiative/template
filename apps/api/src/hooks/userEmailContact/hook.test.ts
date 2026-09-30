@@ -28,7 +28,9 @@ describe('userEmailContact hook', () => {
 
   it('leaves the contact unverified — channel-ownership verification is COMM-004, not auth', async () => {
     const { entity: user } = await createUser({ emailVerified: true });
-    const contact = await db.contact.findFirstOrThrow({ where: { userId: user.id, type: 'email' } });
+    const contact = await db.contact.findFirstOrThrow({
+      where: { userId: user.id, type: 'email' },
+    });
     expect(contact.verifiedAt).toBeNull();
   });
 

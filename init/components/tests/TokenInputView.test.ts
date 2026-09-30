@@ -75,8 +75,14 @@ describe('TokenInputView - getSecretAsync via VCR', () => {
 
     const { getSecretAsync } = await import(`../../tasks/infisicalSetup?v=${Date.now()}`);
 
-    const tokenId = await getSecretAsync('PLANETSCALE_TOKEN_ID', { projectId: liveProjectId, environment: 'root' });
-    const token = await getSecretAsync('PLANETSCALE_TOKEN', { projectId: liveProjectId, environment: 'root' });
+    const tokenId = await getSecretAsync('PLANETSCALE_TOKEN_ID', {
+      projectId: liveProjectId,
+      environment: 'root',
+    });
+    const token = await getSecretAsync('PLANETSCALE_TOKEN', {
+      projectId: liveProjectId,
+      environment: 'root',
+    });
 
     expect(tokenId).toEqual(expect.any(String));
     expect(token).toEqual(expect.any(String));

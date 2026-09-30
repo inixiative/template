@@ -18,9 +18,13 @@ const message = (slug: string, type: EmailErrorType, path?: string[]): string =>
     case 'template_missing':
       return `Template not found: ${slug}`;
     case 'circular_ref':
-      return path?.length ? `Circular reference detected: ${path.join(' → ')}` : `Circular reference detected: ${slug}`;
+      return path?.length
+        ? `Circular reference detected: ${path.join(' → ')}`
+        : `Circular reference detected: ${slug}`;
     case 'render_failed':
-      return path?.length ? `Template render failed: ${slug} — ${path.join('; ')}` : `Template render failed: ${slug}`;
+      return path?.length
+        ? `Template render failed: ${slug} — ${path.join('; ')}`
+        : `Template render failed: ${slug}`;
     case 'unsubscribe_unavailable':
       return `Template ${slug} is not a system email and the recipient has no contact to unsubscribe`;
   }

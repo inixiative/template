@@ -24,14 +24,28 @@ const tagOwned = platformOrBound('Tag', 'ownerModel');
 const segmentOwned = boundAndLive('Segment', 'ownerModel');
 
 const contacts: ModelNarrowing = {
-  picks: ['type', 'subtype', 'valueKey', 'deliverability', 'acceptedKinds', 'verifiedAt', 'createdAt'],
+  picks: [
+    'type',
+    'subtype',
+    'valueKey',
+    'deliverability',
+    'acceptedKinds',
+    'verifiedAt',
+    'createdAt',
+  ],
   where: live,
 };
 
 const tagAttachments: ModelNarrowing = {
   picks: [],
   where: live,
-  relations: { tag: { picks: ['id', 'name'], where: live, sources: { id: { label: 'name', where: tagOwned } } } },
+  relations: {
+    tag: {
+      picks: ['id', 'name'],
+      where: live,
+      sources: { id: { label: 'name', where: tagOwned } },
+    },
+  },
 };
 
 const communicationsReceived: ModelNarrowing = {
@@ -44,7 +58,10 @@ const communicationsReceived: ModelNarrowing = {
   },
 };
 
-const customer = (picks: string[], relations: Record<string, ModelNarrowing> = {}): ModelNarrowing => ({
+const customer = (
+  picks: string[],
+  relations: Record<string, ModelNarrowing> = {},
+): ModelNarrowing => ({
   picks,
   where: live,
   relations: { contacts, tagAttachments, ...relations },
@@ -74,7 +91,10 @@ export const customerRefLens: LensNarrowing = omitForeignKeys({
   },
 });
 
-export const resolvedCustomerRefLens = (ownerModel: ProviderModel, ownerId: string): LensNarrowing =>
+export const resolvedCustomerRefLens = (
+  ownerModel: ProviderModel,
+  ownerId: string,
+): LensNarrowing =>
   resolveLensBindings(customerRefLens, polymorphicBindings(ownerModel, ownerId)) as LensNarrowing;
 
 /** The segments the lens lets this owner name — its own live ones — read through the Segment source it declares. */
@@ -86,7 +106,9 @@ export const ownedSegments = async (
   const source = sourceQueries(resolvedCustomerRefLens(ownerModel, ownerId)).find(
     (query) => query.model === 'Segment' && query.field === 'id',
   )!;
-  return db.segment.findMany({ where: { AND: [source.prisma.where as Prisma.SegmentWhereInput, where] } });
+  return db.segment.findMany({
+    where: { AND: [source.prisma.where as Prisma.SegmentWhereInput, where] },
+  });
 };
 
 export const customerRefReachedModels = (): Set<string> =>
@@ -95,7 +117,11 @@ export const customerRefReachedModels = (): Set<string> =>
 const membershipProbe = {
   field: 'segmentMembers',
   arrayOperator: 'any',
-  condition: { field: 'segment.id', operator: Operator.equals, value: '00000000-0000-7000-8000-000000000000' },
+  condition: {
+    field: 'segment.id',
+    operator: Operator.equals,
+    value: '00000000-0000-7000-8000-000000000000',
+  },
 } as Condition;
 
 if (

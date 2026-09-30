@@ -54,8 +54,12 @@ const expandDraft = (mjml: string, ctx: OwnerScope): Promise<string> => {
   });
 };
 
-const admittedReferences = async (lens: EmailLens, ...contents: string[]): Promise<RuleReference[]> =>
-  (await admitRuleReferences(emailSourceQueries(lens), contentRuleReferences(lens, ...contents))).admitted;
+const admittedReferences = async (
+  lens: EmailLens,
+  ...contents: string[]
+): Promise<RuleReference[]> =>
+  (await admitRuleReferences(emailSourceQueries(lens), contentRuleReferences(lens, ...contents)))
+    .admitted;
 
 const sampleVariables = (lens: EmailLens): Variables => ({
   ...SAMPLE_VARIABLES,
@@ -87,10 +91,14 @@ export const emailTemplatePreflight = async (
   };
 
   const expandedMjml = await expandDraft(input.mjml, ctx);
-  const liveRefs = await withoutDegradedSegments(await admittedReferences(lens, expandedMjml, input.subject ?? ''));
+  const liveRefs = await withoutDegradedSegments(
+    await admittedReferences(lens, expandedMjml, input.subject ?? ''),
+  );
   const options = { locale, lens, liveRefs };
   const interpolatedMjml = interpolate(expandedMjml, variables, onRenderWarning, options);
-  const subject = input.subject ? interpolate(input.subject, variables, onRenderWarning, options) : '';
+  const subject = input.subject
+    ? interpolate(input.subject, variables, onRenderWarning, options)
+    : '';
   const { html } = await mjml2html(interpolatedMjml, { validationLevel: 'skip' });
 
   const result = await runPreflight({

@@ -27,7 +27,9 @@ const resolveOriginIntegrationId = async (c: Context<AppEnv>): Promise<string | 
   });
   if (owned) return owned.id;
 
-  log.warn('x-integration-id not owned by the request principal — ignoring', { assertedIntegrationId: asserted });
+  log.warn('x-integration-id not owned by the request principal — ignoring', {
+    assertedIntegrationId: asserted,
+  });
   return null;
 };
 

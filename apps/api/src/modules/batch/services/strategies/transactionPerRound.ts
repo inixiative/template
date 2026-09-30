@@ -5,7 +5,11 @@
  * @uses infrastructure:prisma
  */
 import { db } from '@template/db';
-import { refreshBatchContext, registerBatch, unregisterBatch } from '#/modules/batch/services/batchRegistry';
+import {
+  refreshBatchContext,
+  registerBatch,
+  unregisterBatch,
+} from '#/modules/batch/services/batchRegistry';
 import { interpolateRequest } from '#/modules/batch/services/interpolation';
 import { executeRequest } from '#/modules/batch/services/strategies/executeRequest';
 import type { RequestResult, StrategyExecutor } from '#/modules/batch/services/strategies/types';
@@ -36,8 +40,17 @@ export const transactionPerRound: StrategyExecutor = async (
 
           try {
             const roundPromises = round.map(async (request) => {
-              const interpolatedRequest = interpolateRequest(request, { results, currentRound: roundIndex });
-              return await executeRequest(app, interpolatedRequest, batchId, sharedHeaders, baseRequest);
+              const interpolatedRequest = interpolateRequest(request, {
+                results,
+                currentRound: roundIndex,
+              });
+              return await executeRequest(
+                app,
+                interpolatedRequest,
+                batchId,
+                sharedHeaders,
+                baseRequest,
+              );
             });
 
             const roundResults = await Promise.all(roundPromises);

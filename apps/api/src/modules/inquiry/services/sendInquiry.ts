@@ -24,7 +24,8 @@ export const sendInquiry = async (c: Context<AppEnv>, inquiry: Inquiry) => {
 
   validateInquiryIsSendable(inquiry);
 
-  if (!inquiry.targetModel) throw makeError({ status: 400, message: 'Target must be set before sending' });
+  if (!inquiry.targetModel)
+    throw makeError({ status: 400, message: 'Target must be set before sending' });
 
   const sent = await db.inquiry.update({
     where: { id: inquiry.id },

@@ -5,23 +5,35 @@
  * @uses infrastructure:prisma, feature:email
  */
 
-import { DbAction, db, type HookOptions, HookTiming, type Prisma, registerDbHook } from '@template/db';
+import {
+  DbAction,
+  db,
+  type HookOptions,
+  HookTiming,
+  type Prisma,
+  registerDbHook,
+} from '@template/db';
 import type { AuditSubjectModel } from '@template/db/generated/client/enums';
 import { auditActorStore } from '@template/db/lib/auditActorContext';
 import { castArray, isEqual } from 'lodash-es';
 import { processAuditData } from '#/hooks/auditLog/utils';
-import { resolveComponentVersions, type VersionedRecord } from '#/hooks/emailVersioning/resolveComponentVersions';
+import {
+  resolveComponentVersions,
+  type VersionedRecord,
+} from '#/hooks/emailVersioning/resolveComponentVersions';
 import { createVersionBumpSnapshot } from '#/hooks/emailVersioning/snapshot';
 
 type EmailModel = Extract<AuditSubjectModel, 'EmailTemplate' | 'EmailComponent'>;
 
 // '*' (not per-model) is load-bearing: must run AFTER the global audit hook whose snapshot it
 // augments, and executeHooks runs model hooks before global hooks. (The audit hook is '*' too.)
-const isEmailModel = (model: string): model is EmailModel => model === 'EmailTemplate' || model === 'EmailComponent';
+const isEmailModel = (model: string): model is EmailModel =>
+  model === 'EmailTemplate' || model === 'EmailComponent';
 
 const findLatestSnapshot = (model: EmailModel, id: string) =>
   db.auditLog.findFirst({
-    where: model === 'EmailTemplate' ? { subjectEmailTemplateId: id } : { subjectEmailComponentId: id },
+    where:
+      model === 'EmailTemplate' ? { subjectEmailTemplateId: id } : { subjectEmailComponentId: id },
     orderBy: { id: 'desc' },
   });
 
@@ -46,7 +58,8 @@ const wroteSnapshot = (model: EmailModel, change: Change): boolean =>
     processAuditData(model, change.record as Record<string, unknown>),
   );
 
-const isSoftDelete = (change: Change): boolean => change.previous?.deletedAt == null && change.record.deletedAt != null;
+const isSoftDelete = (change: Change): boolean =>
+  change.previous?.deletedAt == null && change.record.deletedAt != null;
 
 const degradedFrom = (versions: Record<string, string | null>): string[] =>
   Object.entries(versions)
@@ -62,9 +75,15 @@ const syncDegradedRefs = async (
   const degraded = degradedFrom(versions);
   if (isEqual([...record.degradedComponentRefs].sort(), degraded)) return;
   if (model === 'EmailTemplate') {
-    await db.emailTemplate.update({ where: { id: record.id }, data: { degradedComponentRefs: degraded } });
+    await db.emailTemplate.update({
+      where: { id: record.id },
+      data: { degradedComponentRefs: degraded },
+    });
   } else {
-    await db.emailComponent.update({ where: { id: record.id }, data: { degradedComponentRefs: degraded } });
+    await db.emailComponent.update({
+      where: { id: record.id },
+      data: { degradedComponentRefs: degraded },
+    });
   }
 };
 

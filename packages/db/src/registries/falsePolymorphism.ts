@@ -350,4 +350,5 @@ export const PolymorphismRegistry = {
 const polymorphicConfigs: Partial<Record<ModelName, PolymorphicConfig>> = PolymorphismRegistry;
 
 // Helper to get config for a model
-export const getPolymorphismConfig = (model: ModelName): PolymorphicConfig | null => polymorphicConfigs[model] ?? null;
+export const getPolymorphismConfig = (model: ModelName): PolymorphicConfig | null =>
+  polymorphicConfigs[model] ?? null;

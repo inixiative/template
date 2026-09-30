@@ -38,15 +38,25 @@ export const makeSupersedingJob = <TPayload = void>(
       }
       await reclaimLane(lane, job.id!);
     } catch (err) {
-      log.error(`Supersession check failed at job start (${job.id}) — continuing`, err, LogScope.job);
+      log.error(
+        `Supersession check failed at job start (${job.id}) — continuing`,
+        err,
+        LogScope.job,
+      );
     }
 
-    const stopWatch = watchLane(lane, job.id!, () => abortController.abort(new SupersededError(job.id)));
+    const stopWatch = watchLane(lane, job.id!, () =>
+      abortController.abort(new SupersededError(job.id)),
+    );
 
     try {
-      return await Promise.race([handler({ ...ctx, signal: abortController.signal }, ...args), abortPromise]);
+      return await Promise.race([
+        handler({ ...ctx, signal: abortController.signal }, ...args),
+        abortPromise,
+      ]);
     } catch (err) {
-      if (err instanceof SupersededError || (err instanceof Error && err.name === 'AbortError')) return;
+      if (err instanceof SupersededError || (err instanceof Error && err.name === 'AbortError'))
+        return;
       throw err;
     } finally {
       stopWatch();

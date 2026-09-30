@@ -49,7 +49,9 @@ export const InviteUserModal = memo(
               placeholder="user@example.com"
               autoFocus
             />
-            <p className="text-xs text-muted-foreground">An invitation will be sent to this email address</p>
+            <p className="text-xs text-muted-foreground">
+              An invitation will be sent to this email address
+            </p>
           </div>
 
           <div className="space-y-2">

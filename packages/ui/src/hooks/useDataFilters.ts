@@ -57,7 +57,8 @@ export const useDataFilters = (
     setOrderByState((prev) => {
       const existing = prev.find((o) => o.field === field);
       if (!existing) return [...prev, { field, direction: 'asc' }];
-      if (existing.direction === 'asc') return prev.map((o) => (o.field === field ? { ...o, direction: 'desc' } : o));
+      if (existing.direction === 'asc')
+        return prev.map((o) => (o.field === field ? { ...o, direction: 'desc' } : o));
       return prev.filter((o) => o.field !== field);
     });
     onFiltersChange?.();

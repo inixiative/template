@@ -38,7 +38,12 @@ export type SendEmailPayload = {
 const senderColumns = (sender: Sender) => {
   switch (sender.type) {
     case 'User':
-      return { senderType: sender.type, senderUserId: sender.userId, senderOrganizationId: null, senderSpaceId: null };
+      return {
+        senderType: sender.type,
+        senderUserId: sender.userId,
+        senderOrganizationId: null,
+        senderSpaceId: null,
+      };
     case 'Organization':
       return {
         senderType: sender.type,
@@ -47,7 +52,12 @@ const senderColumns = (sender: Sender) => {
         senderSpaceId: null,
       };
     case 'Space':
-      return { senderType: sender.type, senderUserId: null, senderOrganizationId: null, senderSpaceId: sender.spaceId };
+      return {
+        senderType: sender.type,
+        senderUserId: null,
+        senderOrganizationId: null,
+        senderSpaceId: sender.spaceId,
+      };
     case 'OrganizationUser':
       return {
         senderType: sender.type,
@@ -63,7 +73,12 @@ const senderColumns = (sender: Sender) => {
         senderSpaceId: sender.spaceId,
       };
     default:
-      return { senderType: sender.type, senderUserId: null, senderOrganizationId: null, senderSpaceId: null };
+      return {
+        senderType: sender.type,
+        senderUserId: null,
+        senderOrganizationId: null,
+        senderSpaceId: null,
+      };
   }
 };
 
@@ -71,11 +86,14 @@ export const sendEmail = makeJob<SendEmailPayload>(async (_ctx, payload) => {
   const { eventName, template, data } = payload;
 
   const entry = registry[template];
-  if (!entry) throw new Error(`No email registry entry for template "${template}" (event=${eventName})`);
+  if (!entry)
+    throw new Error(`No email registry entry for template "${template}" (event=${eventName})`);
   const fields = declaredFields(entry.data);
   for (const name of fields ?? []) {
     if (data[name] === undefined)
-      throw new Error(`Email "${template}" declares data field "${name}" and the event did not supply it`);
+      throw new Error(
+        `Email "${template}" declares data field "${name}" and the event did not supply it`,
+      );
   }
 
   const entityLens = bindLens(entry.entity, data);
@@ -88,7 +106,9 @@ export const sendEmail = makeJob<SendEmailPayload>(async (_ctx, payload) => {
   }
 
   const entityRow = entity as Record<string, unknown>;
-  const dataVars = fields ? pick(data, fields) : (prune(entity, entityLens) as Record<string, unknown>);
+  const dataVars = fields
+    ? pick(data, fields)
+    : (prune(entity, entityLens) as Record<string, unknown>);
 
   const emailsOf = async (lens: LensNarrowing): Promise<string[] | undefined> => {
     const rows = await fetchLens(lens);
@@ -108,7 +128,11 @@ export const sendEmail = makeJob<SendEmailPayload>(async (_ctx, payload) => {
   const users = await fetchLens(lens);
   const plan = users.map((user) => {
     const recipient = prune(user, lens) as Recipient;
-    return { user, recipient, idempotencyKey: deliverJobId(eventName, template, sender, recipient.email, dataVars) };
+    return {
+      user,
+      recipient,
+      idempotencyKey: deliverJobId(eventName, template, sender, recipient.email, dataVars),
+    };
   });
   if (!plan.length) {
     log.info(`Email fanned out: template=${template} jobs=0`);
@@ -121,7 +145,8 @@ export const sendEmail = makeJob<SendEmailPayload>(async (_ctx, payload) => {
     select: { id: true, userId: true },
   });
   const contactByUser = new Map<string, string>();
-  for (const c of contactRows) if (c.userId && !contactByUser.has(c.userId)) contactByUser.set(c.userId, c.id);
+  for (const c of contactRows)
+    if (c.userId && !contactByUser.has(c.userId)) contactByUser.set(c.userId, c.id);
 
   const created = await db.communicationLog.createManyAndReturn({
     data: plan.map((p) => ({
@@ -155,8 +180,12 @@ export const sendEmail = makeJob<SendEmailPayload>(async (_ctx, payload) => {
     return [
       async () => {
         const userRow = user as Record<string, unknown>;
-        const cc = entry.cc ? await emailsOf(addressLens(bindWhere(entry.cc.where, userRow))) : undefined;
-        const bcc = entry.bcc ? await emailsOf(addressLens(bindWhere(entry.bcc.where, userRow))) : undefined;
+        const cc = entry.cc
+          ? await emailsOf(addressLens(bindWhere(entry.cc.where, userRow)))
+          : undefined;
+        const bcc = entry.bcc
+          ? await emailsOf(addressLens(bindWhere(entry.bcc.where, userRow)))
+          : undefined;
         await enqueueJob(
           'deliverEmail',
           { template, sender, recipient, cc, bcc, data: dataVars, communicationLogId },

@@ -5,7 +5,11 @@
  * @uses none
  */
 import { getEncryptedFieldsByModel } from '@template/db/lib/encryption/registry';
-import { type FieldRegistry, NOOP_FIELDS, unionRegistries } from '@template/db/registries/ignoreFields';
+import {
+  type FieldRegistry,
+  NOOP_FIELDS,
+  unionRegistries,
+} from '@template/db/registries/ignoreFields';
 
 const REDACT_FIELDS_BASE: FieldRegistry = {
   Account: ['password'],
@@ -14,7 +18,10 @@ const REDACT_FIELDS_BASE: FieldRegistry = {
 
 // Value-sensitive columns: plaintext-sensitive plus every encrypted column (registering a model for
 // encryption is all it takes). Audit MASKS these (records that they changed); webhook DROPS them.
-export const REDACT_FIELDS: FieldRegistry = unionRegistries(REDACT_FIELDS_BASE, getEncryptedFieldsByModel());
+export const REDACT_FIELDS: FieldRegistry = unionRegistries(
+  REDACT_FIELDS_BASE,
+  getEncryptedFieldsByModel(),
+);
 
 export const getRedactFields = (model: string): string[] => REDACT_FIELDS[model] ?? [];
 
@@ -24,7 +31,10 @@ export const WEBHOOK_NOOP_FIELDS: FieldRegistry = unionRegistries(NOOP_FIELDS, R
 
 // Every sensitive field name across all models — used to mask matching keys in an app-event payload,
 // which is an author-built object with no model binding.
-export const SENSITIVE_KEYS: ReadonlySet<string> = new Set([...Object.values(REDACT_FIELDS).flat(), 'verificationUrl']);
+export const SENSITIVE_KEYS: ReadonlySet<string> = new Set([
+  ...Object.values(REDACT_FIELDS).flat(),
+  'verificationUrl',
+]);
 
 export const REDACTED = '[REDACTED]';
 

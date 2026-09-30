@@ -110,7 +110,9 @@ describe('GET /api/v1/space/:id/tokens', () => {
   });
 
   it('returns 403 for user without space access', async () => {
-    const { entity: otherOrgUser, context: otherCtx } = await createOrganizationUser({ role: 'member' });
+    const { entity: otherOrgUser, context: otherCtx } = await createOrganizationUser({
+      role: 'member',
+    });
 
     const otherHarness = createTestApp({
       mockUser: otherCtx.user,

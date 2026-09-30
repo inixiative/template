@@ -15,13 +15,16 @@ const fkWhere = (child: ChildRelation, row: Row) =>
 // Depth-first: deleteMany is not one of the hook's actions, so a hard delete does not re-enter the
 // cascade and everything below it would fall to raw FK behavior.
 const hardDelete = async (model: string, where: Record<string, unknown>) => {
-  const doomed = (await db.delegate(model).findMany({ where, select: { id: true } })) as { id: string }[];
+  const doomed = (await db.delegate(model).findMany({ where, select: { id: true } })) as {
+    id: string;
+  }[];
   if (doomed.length) {
     const ids = doomed.map((row) => row.id);
     for (const child of childRelations(model)) {
       if (!isHardDeletedOnTombstone(child.model)) continue;
       const [from] = child.fromFields;
-      if (child.fromFields.length === 1 && from) await hardDelete(child.model, { [from]: { in: ids } });
+      if (child.fromFields.length === 1 && from)
+        await hardDelete(child.model, { [from]: { in: ids } });
     }
   }
   await db.delegate(model).deleteMany({ where });

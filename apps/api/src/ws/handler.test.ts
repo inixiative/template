@@ -1,7 +1,17 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
-import { InquiryResourceModel, InquiryStatus, InquiryType, PlatformRole } from '@template/db/generated/client/enums';
-import { cleanupTouchedTables, createInquiry, createOrganization, createUser } from '@template/db/test';
+import {
+  InquiryResourceModel,
+  InquiryStatus,
+  InquiryType,
+  PlatformRole,
+} from '@template/db/generated/client/enums';
+import {
+  cleanupTouchedTables,
+  createInquiry,
+  createOrganization,
+  createUser,
+} from '@template/db/test';
 import { WS_CHANNELS } from '@template/shared/ws';
 import { websocketHandler } from '#/ws/handler';
 import { byChannel, byId, byUser, clearRegistry } from '#/ws/registry';
@@ -80,7 +90,10 @@ describe('websocketHandler', () => {
   it('rejects a subscribe to a channel outside the registry', async () => {
     const { socket, sent } = createTestSocket({ connectionId: 'c1' });
     websocketHandler.open(socket);
-    await websocketHandler.message(socket, JSON.stringify({ action: 'subscribe', channel: 'nope:id:x' }));
+    await websocketHandler.message(
+      socket,
+      JSON.stringify({ action: 'subscribe', channel: 'nope:id:x' }),
+    );
     expect(byChannel.has('nope:id:x')).toBe(false);
     expect(lastFrame(sent)).toEqual({ type: 'subscribeRejected', channel: 'nope:id:x' });
   });
@@ -89,7 +102,10 @@ describe('websocketHandler', () => {
     const { socket, sent } = createTestSocket({ connectionId: 'c1' });
     websocketHandler.open(socket);
     subscribeToChannel(socket, 'ch1');
-    await websocketHandler.message(socket, JSON.stringify({ action: 'unsubscribe', channel: 'ch1' }));
+    await websocketHandler.message(
+      socket,
+      JSON.stringify({ action: 'unsubscribe', channel: 'ch1' }),
+    );
     expect(byChannel.has('ch1')).toBe(false);
     expect(lastFrame(sent)).toEqual({ type: 'unsubscribed', channel: 'ch1' });
   });
@@ -118,7 +134,10 @@ describe('websocketHandler', () => {
 
     const { socket, sent } = createTestSocket({ connectionId: 'c1' });
     websocketHandler.open(socket);
-    await websocketHandler.message(socket, JSON.stringify({ action: 'authenticate', headers: { authorization } }));
+    await websocketHandler.message(
+      socket,
+      JSON.stringify({ action: 'authenticate', headers: { authorization } }),
+    );
     expect(socket.data.userId).toBe(user.id);
     expect(lastFrame(sent)).toEqual({ type: 'identity', userId: user.id });
   });
@@ -184,7 +203,10 @@ describe('websocketHandler', () => {
 
     const { socket } = createTestSocket({ connectionId: 'c1', headers: { authorization } });
     websocketHandler.open(socket);
-    const pending = websocketHandler.message(socket, JSON.stringify({ action: 'subscribe', channel }));
+    const pending = websocketHandler.message(
+      socket,
+      JSON.stringify({ action: 'subscribe', channel }),
+    );
     websocketHandler.close(socket);
     await pending;
 

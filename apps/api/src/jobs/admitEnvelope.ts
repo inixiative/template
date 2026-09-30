@@ -8,7 +8,13 @@ import { claimLane, laneKey, releaseLane } from '@template/db';
 import { log } from '@template/shared/logger';
 import { isSlowJobData } from '#/jobs/buildJobData';
 import { withLanePriority } from '#/jobs/lanePriority';
-import { isLaneOverflowing, outboxLaneOf, shouldSpill, spillToOutbox, tripIfFull } from '#/jobs/outbox';
+import {
+  isLaneOverflowing,
+  outboxLaneOf,
+  shouldSpill,
+  spillToOutbox,
+  tripIfFull,
+} from '#/jobs/outbox';
 import { queue } from '#/jobs/queue';
 import { recordDelayedSlowAdd } from '#/jobs/slowLaneSignals';
 import { type JobData, type JobOptions, JobType } from '#/jobs/types';
@@ -41,7 +47,13 @@ export const admitEnvelope = async ({
     // outbox dwell. The drain re-claims under the same jobId when it re-adds (self-claim, no-op).
     const previousHolder = baton ? await claimLane(baton, jobId, jobOptions.delay) : null;
     try {
-      await spillToOutbox({ handlerName, jobId, dedupeKey: data.dedupeKey ?? null, data, options: jobOptions });
+      await spillToOutbox({
+        handlerName,
+        jobId,
+        dedupeKey: data.dedupeKey ?? null,
+        data,
+        options: jobOptions,
+      });
     } catch (err) {
       if (baton) await releaseLane(baton, jobId, previousHolder).catch(() => {});
       throw err;
@@ -62,7 +74,8 @@ export const admitEnvelope = async ({
     if (baton) await releaseLane(baton, jobId, previousHolder).catch(() => {});
     throw err;
   }
-  if (jobOptions.delay && isSlowJobData(data)) await recordDelayedSlowAdd(queue, jobId, jobOptions.delay);
+  if (jobOptions.delay && isSlowJobData(data))
+    await recordDelayedSlowAdd(queue, jobId, jobOptions.delay);
   if (data.type === JobType.adhoc) await tripIfFull();
 
   log.info(`Enqueued job ${handlerName} (${jobId})`);

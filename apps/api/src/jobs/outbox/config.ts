@@ -13,8 +13,10 @@ export const maxQueueDepth = (): number => process.env.JOBS_MAX_QUEUE_DEPTH;
 // fast work may use the whole budget.
 export const maxSlowQueueDepth = (): number =>
   Math.max(1, Math.floor(maxQueueDepth() * process.env.JOBS_SLOW_QUEUE_DEPTH_FRACTION));
-export const laneDepthCap = (lane: JobLane): number => (lane === JobLane.slow ? maxSlowQueueDepth() : maxQueueDepth());
-export const lowWater = (lane: JobLane = JobLane.fast): number => Math.floor(laneDepthCap(lane) * 0.8);
+export const laneDepthCap = (lane: JobLane): number =>
+  lane === JobLane.slow ? maxSlowQueueDepth() : maxQueueDepth();
+export const lowWater = (lane: JobLane = JobLane.fast): number =>
+  Math.floor(laneDepthCap(lane) * 0.8);
 export const flushMaxRows = (): number => process.env.JOBS_OUTBOX_FLUSH_MAX_ROWS;
 export const flushLinger = (): number => process.env.JOBS_OUTBOX_FLUSH_LINGER_MS;
 export const overflowStuckMs = (): number => process.env.JOBS_OVERFLOW_STUCK_MS;

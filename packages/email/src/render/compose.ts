@@ -9,7 +9,11 @@ import type { CommunicationKind, EmailOwnerModel } from '@template/db/generated/
 import { EmailRenderError } from '@template/email/errors/EmailRenderError';
 import { expand, expandWith } from '@template/email/render/expand';
 import { lookupCascade } from '@template/email/render/lookupCascade';
-import { lookupComponent, lookupTemplate, templateLens } from '@template/email/render/lookupTemplate';
+import {
+  lookupComponent,
+  lookupTemplate,
+  templateLens,
+} from '@template/email/render/lookupTemplate';
 import { rowOwner } from '@template/email/render/owner';
 import type { OwnerScope } from '@template/email/render/types';
 import type { RuleReference } from '@template/shared/rules';
@@ -31,7 +35,10 @@ export type ComposeComponentResult = {
   mjml: string;
 };
 
-const liveRuleReferencesOf = async (templateId: string, componentIds: string[]): Promise<RuleReference[]> => {
+const liveRuleReferencesOf = async (
+  templateId: string,
+  componentIds: string[],
+): Promise<RuleReference[]> => {
   const edges = (await db.ruleReference.findMany({
     where: {
       OR: [
@@ -43,7 +50,10 @@ const liveRuleReferencesOf = async (templateId: string, componentIds: string[]):
   return liveRuleReferences(edges);
 };
 
-export const composeTemplate = async (slug: string, ctx: OwnerScope): Promise<ComposeTemplateResult> => {
+export const composeTemplate = async (
+  slug: string,
+  ctx: OwnerScope,
+): Promise<ComposeTemplateResult> => {
   const template = await lookupTemplate(slug, ctx);
   if (!template) throw new EmailRenderError(slug, 'template_missing');
 
@@ -56,7 +66,9 @@ export const composeTemplate = async (slug: string, ctx: OwnerScope): Promise<Co
     }
     return components;
   });
-  const liveRuleRefs = await liveRuleReferencesOf(template.id, [...new Set(Object.values(componentResolutions))]);
+  const liveRuleRefs = await liveRuleReferencesOf(template.id, [
+    ...new Set(Object.values(componentResolutions)),
+  ]);
 
   return {
     id: template.id,
@@ -72,7 +84,10 @@ export const composeTemplate = async (slug: string, ctx: OwnerScope): Promise<Co
   };
 };
 
-export const composeComponent = async (slug: string, ctx: OwnerScope): Promise<ComposeComponentResult> => {
+export const composeComponent = async (
+  slug: string,
+  ctx: OwnerScope,
+): Promise<ComposeComponentResult> => {
   const component = await lookupComponent(slug, ctx);
   if (!component) throw new EmailRenderError(slug, 'component_missing');
 

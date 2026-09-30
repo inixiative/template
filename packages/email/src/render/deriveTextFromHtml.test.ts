@@ -66,28 +66,36 @@ describe('deriveTextFromHtml — markup that is not an element tag', () => {
   });
 
   it('keeps the destination of an unquoted href', () => {
-    expect(deriveTextFromHtml('<a href=https://example.test>read</a>')).toBe('read (https://example.test)');
+    expect(deriveTextFromHtml('<a href=https://example.test>read</a>')).toBe(
+      'read (https://example.test)',
+    );
   });
 
   it('extracts href, not a data-href that appears first', () => {
-    expect(deriveTextFromHtml('<a data-href="internal" href="https://x.test">go</a>')).toBe('go (https://x.test)');
+    expect(deriveTextFromHtml('<a data-href="internal" href="https://x.test">go</a>')).toBe(
+      'go (https://x.test)',
+    );
   });
 });
 
 describe('deriveTextFromHtml — visible layout boundaries', () => {
   it('adjacent table cells keep a boundary instead of concatenating', () => {
-    expect(deriveTextFromHtml('<table><tr><td>First</td><td>Second</td></tr></table>')).toBe('First   Second');
+    expect(deriveTextFromHtml('<table><tr><td>First</td><td>Second</td></tr></table>')).toBe(
+      'First   Second',
+    );
   });
 
   it('block elements inside a link label keep their separation', () => {
-    expect(deriveTextFromHtml('<a href="/x"><p>First</p><p>Second</p></a>')).toBe('First\n\nSecond\n\n(/x)');
+    expect(deriveTextFromHtml('<a href="/x"><p>First</p><p>Second</p></a>')).toBe(
+      'First\n\nSecond\n\n(/x)',
+    );
   });
 });
 
 describe('deriveTextFromHtml — link label equal to its target up to entity encoding', () => {
   it('does not print the URL twice when label and href differ only by encoding', () => {
-    expect(deriveTextFromHtml('<a href="https://x.test/?a=1&b=2">https://x.test/?a=1&amp;b=2</a>')).toBe(
-      'https://x.test/?a=1&b=2',
-    );
+    expect(
+      deriveTextFromHtml('<a href="https://x.test/?a=1&b=2">https://x.test/?a=1&amp;b=2</a>'),
+    ).toBe('https://x.test/?a=1&b=2');
   });
 });

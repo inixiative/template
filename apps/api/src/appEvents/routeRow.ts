@@ -10,5 +10,7 @@ declare const shapedByRoute: unique symbol;
 
 export type RouteRow<T> = T & { readonly [shapedByRoute]: true };
 
-export const routeRow = <S extends z.ZodType>(route: { responseSchema: S }, value: unknown): RouteRow<z.output<S>> =>
-  route.responseSchema.parse(value) as RouteRow<z.output<S>>;
+export const routeRow = <S extends z.ZodType>(
+  route: { responseSchema: S },
+  value: unknown,
+): RouteRow<z.output<S>> => route.responseSchema.parse(value) as RouteRow<z.output<S>>;

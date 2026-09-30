@@ -6,7 +6,13 @@
  */
 import { validateRule } from '@inixiative/json-rules';
 import type { ConditionIssue } from '@template/email/errors/ConditionValidationError';
-import { type Branch, EACH, IF, parseEachBlock, parseIfBlock } from '@template/email/render/conditionParser';
+import {
+  type Branch,
+  EACH,
+  IF,
+  parseEachBlock,
+  parseIfBlock,
+} from '@template/email/render/conditionParser';
 import { EACH_MAX_DEPTH } from '@template/email/render/limits';
 import { type BindingChain, resolveBindingPath } from '@template/email/rules/resolveBindingPath';
 import { bindsAs } from '@template/email/validations/validateConditions/bindsAs';
@@ -36,7 +42,10 @@ export const collect = (
     if (kind === 'if') {
       const block = parseIfBlock(content, openIdx);
       if (!block) {
-        issues.push({ path: `${at}[${blockIdx}]`, message: 'unterminated {{#if}} block — missing {{/if}}' });
+        issues.push({
+          path: `${at}[${blockIdx}]`,
+          message: 'unterminated {{#if}} block — missing {{/if}}',
+        });
         i = openIdx + IF.length;
         blockIdx++;
         continue;
@@ -50,7 +59,10 @@ export const collect = (
         });
       }
       if (block.branches.filter((b) => b.kind === 'else').length > 1) {
-        issues.push({ path: `${at}[${blockIdx}]`, message: 'multiple {{else}} branches in one block' });
+        issues.push({
+          path: `${at}[${blockIdx}]`,
+          message: 'multiple {{else}} branches in one block',
+        });
       }
 
       block.branches.forEach((branch: Branch, branchIndex) => {
@@ -60,8 +72,10 @@ export const collect = (
             issues.push({ path, message: `invalid rule JSON — ${branch.ruleError}` });
           } else {
             const result = validateRule(branch.rule, { target: 'check' });
-            for (const err of result.errors) issues.push({ path: `${path}:${err.path}`, message: err.message });
-            if (result.errors.length === 0) validateFieldRoots(branch.rule!, options.lens, bindingScope, path, issues);
+            for (const err of result.errors)
+              issues.push({ path: `${path}:${err.path}`, message: err.message });
+            if (result.errors.length === 0)
+              validateFieldRoots(branch.rule!, options.lens, bindingScope, path, issues);
           }
         }
         collect(branch.body, path, issues, bindingScope, options, eachDepth);
@@ -74,7 +88,10 @@ export const collect = (
 
     const block = parseEachBlock(content, openIdx);
     if (!block) {
-      issues.push({ path: `${at}[${blockIdx}]`, message: 'unterminated {{#each}} block — missing {{/each}}' });
+      issues.push({
+        path: `${at}[${blockIdx}]`,
+        message: 'unterminated {{#each}} block — missing {{/each}}',
+      });
       i = openIdx + EACH.length;
       blockIdx++;
       continue;
@@ -82,12 +99,18 @@ export const collect = (
 
     const path = `${at}[${blockIdx}]`;
     if (options.isSubject) {
-      issues.push({ path, message: '{{#each}} is not allowed in the subject line — conditionals only' });
+      issues.push({
+        path,
+        message: '{{#each}} is not allowed in the subject line — conditionals only',
+      });
     }
 
     const blockDepth = eachDepth + 1;
     if (blockDepth === EACH_MAX_DEPTH + 1) {
-      issues.push({ path, message: `{{#each}} blocks may not nest more than ${EACH_MAX_DEPTH} deep` });
+      issues.push({
+        path,
+        message: `{{#each}} blocks may not nest more than ${EACH_MAX_DEPTH} deep`,
+      });
     }
 
     validateEachAttributes(block, bindingScope, path, issues);
@@ -95,10 +118,14 @@ export const collect = (
     const elementPath = resolveBindingPath(block.path, bindingScope);
 
     if (block.filterError !== undefined) {
-      issues.push({ path: `${path}.filter`, message: `invalid filter JSON — ${block.filterError}` });
+      issues.push({
+        path: `${path}.filter`,
+        message: `invalid filter JSON — ${block.filterError}`,
+      });
     } else if (block.filter) {
       const result = validateRule(block.filter, { target: 'check' });
-      for (const err of result.errors) issues.push({ path: `${path}.filter:${err.path}`, message: err.message });
+      for (const err of result.errors)
+        issues.push({ path: `${path}.filter:${err.path}`, message: err.message });
       if (result.errors.length === 0) {
         const filterScope: BindingChain = new Map(bindingScope);
         if (bindsAs(block.as)) filterScope.set(block.as, elementPath);

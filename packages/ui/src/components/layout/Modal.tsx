@@ -19,21 +19,36 @@ export type ModalProps = {
   className?: string;
 };
 
-export const Modal = ({ open, isOpen, onClose, size = 'small', title, children, className }: ModalProps) => {
+export const Modal = ({
+  open,
+  isOpen,
+  onClose,
+  size = 'small',
+  title,
+  children,
+  className,
+}: ModalProps) => {
   const isModalOpen = open ?? isOpen ?? false;
 
   if (!isModalOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <button
+        type="button"
+        aria-label="Close modal"
+        className="absolute inset-0 bg-black/50"
+        onClick={onClose}
+      />
       <div
+        role="dialog"
+        aria-modal="true"
         className={cn(
-          'bg-background rounded-lg shadow-lg max-h-[90vh] overflow-hidden flex flex-col',
+          'relative bg-background rounded-lg shadow-lg max-h-[90vh] overflow-hidden flex flex-col',
           size === 'small' && 'w-full max-w-md',
           size === 'large' && 'w-full max-w-3xl',
           className,
         )}
-        onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => {
           if (e.key === 'Escape') {
             onClose();

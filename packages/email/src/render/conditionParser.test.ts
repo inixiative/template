@@ -9,7 +9,8 @@ import {
   parseIfBlock,
 } from '@template/email/render/conditionParser';
 
-const rule = (field: string, operator: string, value: unknown): string => JSON.stringify({ field, operator, value });
+const rule = (field: string, operator: string, value: unknown): string =>
+  JSON.stringify({ field, operator, value });
 
 const openIndex = (content: string): number => content.indexOf(IF);
 const eachIndex = (content: string): number => content.indexOf(EACH);
@@ -45,7 +46,11 @@ describe('parseIfBlock — simple if', () => {
     expect(block!.branches).toHaveLength(1);
     expect(block!.branches[0]!.kind).toBe('if');
     expect(block!.branches[0]!.body).toBe('BODY');
-    expect(block!.branches[0]!.rule).toEqual({ field: 'recipient.tier', operator: 'equals', value: 'gold' });
+    expect(block!.branches[0]!.rule).toEqual({
+      field: 'recipient.tier',
+      operator: 'equals',
+      value: 'gold',
+    });
     expect(block!.end).toBe(content.length);
   });
 
@@ -63,7 +68,11 @@ describe('parseIfBlock — simple if', () => {
     const block = parseIfBlock(content, openIndex(content));
 
     expect(block).not.toBeNull();
-    expect(block!.branches[0]!.rule).toEqual({ field: 'recipient.tier', operator: 'equals', value: 'gold' });
+    expect(block!.branches[0]!.rule).toEqual({
+      field: 'recipient.tier',
+      operator: 'equals',
+      value: 'gold',
+    });
     expect(block!.branches[0]!.body).toBe('BODY');
     expect(block!.end).toBe(content.length);
   });
@@ -324,12 +333,16 @@ describe('conditionParser — literal end-tags inside {{else if rule=…}} JSON'
 describe('isStructurallyBalanced', () => {
   it('accepts plain text and properly nested if/each blocks', () => {
     expect(isStructurallyBalanced('plain')).toBe(true);
-    expect(isStructurallyBalanced('{{#each data.a as=x}}{{#if rule=true}}Y{{/if}}{{/each}}')).toBe(true);
+    expect(isStructurallyBalanced('{{#each data.a as=x}}{{#if rule=true}}Y{{/if}}{{/each}}')).toBe(
+      true,
+    );
   });
 
   it('rejects an open without its close, a close without its open, and kind-crossed pairs', () => {
     expect(isStructurallyBalanced('{{#each data.a as=x}}Y')).toBe(false);
     expect(isStructurallyBalanced('Y{{/each}}')).toBe(false);
-    expect(isStructurallyBalanced('{{#each data.a as=x}}{{#if rule=true}}Y{{/each}}{{/if}}')).toBe(false);
+    expect(isStructurallyBalanced('{{#each data.a as=x}}{{#if rule=true}}Y{{/each}}{{/if}}')).toBe(
+      false,
+    );
   });
 });

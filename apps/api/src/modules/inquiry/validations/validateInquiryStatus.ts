@@ -22,7 +22,11 @@ export const validateInquiryIsSendable = (inquiry: Inquiry): void => {
 
 // draft | sent | changesRequested — can still be acted on by the source
 export const validateInquiryIsEditable = (inquiry: Inquiry): void => {
-  const editable: InquiryStatus[] = [InquiryStatus.draft, InquiryStatus.sent, InquiryStatus.changesRequested];
+  const editable: InquiryStatus[] = [
+    InquiryStatus.draft,
+    InquiryStatus.sent,
+    InquiryStatus.changesRequested,
+  ];
   if (!editable.includes(inquiry.status as InquiryStatus))
     throw makeError({ status: 400, message: 'Inquiry cannot be updated in its current state' });
   validateInquiryNotExpired(inquiry);
@@ -44,7 +48,14 @@ export const validateInquiryNotExpired = (inquiry: Inquiry): void => {
 
 // not yet resolved or canceled
 export const validateInquiryIsCancelable = (inquiry: Inquiry): void => {
-  const terminal: InquiryStatus[] = [InquiryStatus.approved, InquiryStatus.denied, InquiryStatus.canceled];
+  const terminal: InquiryStatus[] = [
+    InquiryStatus.approved,
+    InquiryStatus.denied,
+    InquiryStatus.canceled,
+  ];
   if (terminal.includes(inquiry.status as InquiryStatus))
-    throw makeError({ status: 400, message: 'Cannot cancel a resolved or already canceled inquiry' });
+    throw makeError({
+      status: 400,
+      message: 'Cannot cancel a resolved or already canceled inquiry',
+    });
 };

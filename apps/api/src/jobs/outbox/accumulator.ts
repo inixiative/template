@@ -8,7 +8,12 @@ import { db, type Prisma } from '@template/db';
 import { LogScope, log } from '@template/shared/logger';
 import { flushLinger, flushMaxRows, SHUTDOWN_FLUSH_RETRIES } from '#/jobs/outbox/config';
 import { flushQueue } from '#/jobs/outbox/mutex';
-import { type OutboxRow, outboxLaneOf, type SpillOptions, toCreateInput } from '#/jobs/outbox/types';
+import {
+  type OutboxRow,
+  outboxLaneOf,
+  type SpillOptions,
+  toCreateInput,
+} from '#/jobs/outbox/types';
 import { JobLane } from '#/jobs/types';
 
 // --- accumulator: ALL spills (fan-out AND superseding) coalesce into one batched write ---
@@ -57,10 +62,19 @@ const writeBatch = (batch: Pending[]): Promise<void> =>
     const rows = dedupeLatestPerLane(batch);
     const plain = rows.filter((r) => r.dedupeKey === null);
     const keyed = rows.filter((r) => r.dedupeKey !== null);
-    if (plain.length) await db.jobOutbox.createManyAndReturn({ data: plain.map(toCreateInput), skipDuplicates: true });
+    if (plain.length)
+      await db.jobOutbox.createManyAndReturn({
+        data: plain.map(toCreateInput),
+        skipDuplicates: true,
+      });
     for (const row of keyed) {
       await db.jobOutbox.upsert({
-        where: { handlerName_dedupeKey: { handlerName: row.handlerName, dedupeKey: row.dedupeKey as string } },
+        where: {
+          handlerName_dedupeKey: {
+            handlerName: row.handlerName,
+            dedupeKey: row.dedupeKey as string,
+          },
+        },
         create: toCreateInput(row),
         update: {
           jobId: row.jobId,
@@ -122,7 +136,8 @@ const accumulate = (row: OutboxRow, { flushImmediately = false }: SpillOptions):
 // time. Resolves on COMMIT, never on accumulation — a crash in the flush window must not drop it.
 // `flushImmediately` commits as soon as the row is accepted, carrying every row already pending into
 // the same batch — the slow-lane refusal path uses it so a worker slot waits only for the commit.
-export const spillToOutbox = (row: OutboxRow, options: SpillOptions = {}): Promise<void> => accumulate(row, options);
+export const spillToOutbox = (row: OutboxRow, options: SpillOptions = {}): Promise<void> =>
+  accumulate(row, options);
 
 // Shutdown: persist every buffered row, retrying transient failures and surfacing the rest loudly.
 // Call AFTER intake has stopped (server stopped / worker closed) so no new spills race the flush.
@@ -135,11 +150,18 @@ const flushBatchWithRetry = async (batch: Pending[]): Promise<void> => {
       return;
     } catch (e) {
       lastErr = e;
-      log.warn(`flushOutbox: flush failed (attempt ${attempt}/${SHUTDOWN_FLUSH_RETRIES})`, LogScope.job);
+      log.warn(
+        `flushOutbox: flush failed (attempt ${attempt}/${SHUTDOWN_FLUSH_RETRIES})`,
+        LogScope.job,
+      );
     }
   }
   for (const p of batch) p.reject(lastErr);
-  log.error(`flushOutbox: gave up persisting ${batch.length} buffered job(s)`, lastErr, LogScope.job);
+  log.error(
+    `flushOutbox: gave up persisting ${batch.length} buffered job(s)`,
+    lastErr,
+    LogScope.job,
+  );
   throw lastErr;
 };
 
@@ -165,7 +187,9 @@ export const flushOutbox = async (): Promise<void> => {
     if (acc.length) {
       const stranded = acc;
       acc = [];
-      const err = new Error(`flushOutbox: shutdown flush gave up before ${stranded.length} spill(s) persisted`);
+      const err = new Error(
+        `flushOutbox: shutdown flush gave up before ${stranded.length} spill(s) persisted`,
+      );
       for (const p of stranded) p.reject(err);
       log.error(err.message, err, LogScope.job);
     }

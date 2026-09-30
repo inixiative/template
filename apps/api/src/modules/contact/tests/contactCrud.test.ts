@@ -1,6 +1,11 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { clearHookRegistry } from '@template/db';
-import type { Contact, Organization, OrganizationUser, User } from '@template/db/generated/client/client';
+import type {
+  Contact,
+  Organization,
+  OrganizationUser,
+  User,
+} from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
   createContact,
@@ -33,7 +38,10 @@ describe('Contact CRUD', () => {
     const harness = createTestApp({
       mockUser: user,
       mockOrganizationUsers: [orgUser],
-      mount: [(app) => app.route('/api/v1/contact', contactRouter), (app) => app.route('/api/v1/me', meRouter)],
+      mount: [
+        (app) => app.route('/api/v1/contact', contactRouter),
+        (app) => app.route('/api/v1/me', meRouter),
+      ],
     });
     fetch = harness.fetch;
     db = harness.db;
@@ -211,7 +219,9 @@ describe('Contact CRUD', () => {
         type: 'email',
         value: { address: `upd${getNextSeq()}@example.com` },
       });
-      const response = await fetch(patch(`/api/v1/contact/${contact.id}`, { label: 'Work', position: 1 }));
+      const response = await fetch(
+        patch(`/api/v1/contact/${contact.id}`, { label: 'Work', position: 1 }),
+      );
       const { data } = await json<Contact>(response);
       expect(response.status).toBe(200);
       expect(data.label).toBe('Work');
@@ -270,8 +280,19 @@ describe('Contact CRUD', () => {
 
     it('locks deleting the email mirroring the user login (403)', async () => {
       const { entity: contact } = await upsertContact(
-        { userId_type_valueKey: { userId: user.id, type: 'email', valueKey: (user.email as string).toLowerCase() } },
-        { userId: user.id, ownerModel: 'User', type: 'email', value: { address: user.email as string } },
+        {
+          userId_type_valueKey: {
+            userId: user.id,
+            type: 'email',
+            valueKey: (user.email as string).toLowerCase(),
+          },
+        },
+        {
+          userId: user.id,
+          ownerModel: 'User',
+          type: 'email',
+          value: { address: user.email as string },
+        },
       );
       const response = await fetch(del(`/api/v1/contact/${contact.id}`));
       expect(response.status).toBe(403);

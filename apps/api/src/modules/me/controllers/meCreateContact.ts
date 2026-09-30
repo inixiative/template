@@ -9,20 +9,23 @@ import { emitAppEvent } from '#/appEvents/emit';
 import { makeController } from '#/lib/utils/makeController';
 import { meCreateContactRoute } from '#/modules/me/routes/meCreateContact';
 
-export const meCreateContactController = makeController(meCreateContactRoute, async (c, respond) => {
-  const user = c.get('user')!;
-  const db = c.get('db');
-  const body = c.req.valid('json');
+export const meCreateContactController = makeController(
+  meCreateContactRoute,
+  async (c, respond) => {
+    const user = c.get('user')!;
+    const db = c.get('db');
+    const body = c.req.valid('json');
 
-  const contact = await db.contact.create({
-    data: {
-      ...body,
-      ownerModel: 'User',
-      userId: user.id,
-    } as Prisma.ContactUncheckedCreateInput,
-  });
+    const contact = await db.contact.create({
+      data: {
+        ...body,
+        ownerModel: 'User',
+        userId: user.id,
+      } as Prisma.ContactUncheckedCreateInput,
+    });
 
-  await emitAppEvent('contact.created', { contact });
+    await emitAppEvent('contact.created', { contact });
 
-  return respond.created(contact);
-});
+    return respond.created(contact);
+  },
+);

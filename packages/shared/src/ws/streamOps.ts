@@ -19,6 +19,9 @@ export type StreamOps<O extends StreamOrdering = StreamOrdering> = {
 
 export type StreamKind = keyof StreamOps;
 
-export type StreamOp<D extends StreamDefinition> = keyof StreamOps<D['ordering']>[D['kind']] & string;
+export type StreamOp<D extends StreamDefinition> = keyof StreamOps<D['ordering']>[D['kind']] &
+  string;
 
-export type StreamOpPayload<D extends StreamDefinition, K extends StreamOp<D>> = StreamOps<D['ordering']>[D['kind']][K];
+export type StreamOpPayload<D extends StreamDefinition, K extends StreamOp<D>> = StreamOps<
+  D['ordering']
+>[D['kind']][K];

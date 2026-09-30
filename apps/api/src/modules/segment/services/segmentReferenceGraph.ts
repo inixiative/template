@@ -45,7 +45,10 @@ export const findReferenceCycle = (references: ReferenceMap, start: string): str
   return walk(start, []);
 };
 
-export const sortByDependency = <T extends { id: string }>(segments: T[], references: ReferenceMap): T[] => {
+export const sortByDependency = <T extends { id: string }>(
+  segments: T[],
+  references: ReferenceMap,
+): T[] => {
   const byId = new Map(segments.map((segment) => [segment.id, segment]));
   const ordered: T[] = [];
   const done = new Set<string>();

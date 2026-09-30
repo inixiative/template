@@ -3,7 +3,14 @@
  * @kind hook
  * @partOf infrastructure:prisma
  */
-import { DbAction, db, type HookOptions, HookTiming, registerDbHook, type SingleAction } from '@template/db';
+import {
+  DbAction,
+  db,
+  type HookOptions,
+  HookTiming,
+  registerDbHook,
+  type SingleAction,
+} from '@template/db';
 
 export const registerLastLoginAtHook = () => {
   registerDbHook(

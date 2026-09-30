@@ -42,10 +42,16 @@ const isGuarded = (path: string, optionalDepth: number, guarded: Set<string>): b
   return false;
 };
 
-const tokenProblem = (token: string, root: string, segments: string, walk: Walk): string | undefined => {
+const tokenProblem = (
+  token: string,
+  root: string,
+  segments: string,
+  walk: Walk,
+): string | undefined => {
   if (root === 'system' && !walk.options.lens) {
     const name = segments.slice(1);
-    if (!name.includes('.') && (SYSTEM_TOKEN_NAMES.has(name) || isRailProvidedSystemField(name))) return undefined;
+    if (!name.includes('.') && (SYSTEM_TOKEN_NAMES.has(name) || isRailProvidedSystemField(name)))
+      return undefined;
     return 'is not a system token the rail provides';
   }
 
@@ -70,7 +76,8 @@ const tokenProblem = (token: string, root: string, segments: string, walk: Walk)
         ? 'names the loop element, which is an object — pick a field'
         : `"${resolved}" is an object, not a value — pick a field`;
     case 'ok':
-      if (viaEach && !segments && !kind.scalarList) return 'names the loop element, which is an object — pick a field';
+      if (viaEach && !segments && !kind.scalarList)
+        return 'names the loop element, which is an object — pick a field';
       if (!viaEach && kind.scalarList) return `"${resolved}" is a list — iterate it with {{#each}}`;
       if (kind.optionalDepth > 0 && !isGuarded(resolved, kind.optionalDepth, walk.guarded)) {
         return `"${resolved}" may be empty — guard it with {{#if rule={"field":"${resolved}","operator":"exists"}}} … {{else}} … {{/if}}`;
@@ -124,7 +131,10 @@ const walkContent = (content: string, walk: Walk): void => {
       continue;
     }
     if (walk.options.isSubject) {
-      walk.issues.push({ path: `offset ${openIdx}`, message: '{{#each}} is not allowed in the subject line' });
+      walk.issues.push({
+        path: `offset ${openIdx}`,
+        message: '{{#each}} is not allowed in the subject line',
+      });
     }
     const bindings: BindingChain = new Map(walk.bindings);
     const eachRoots = new Set(walk.eachRoots);
@@ -139,7 +149,10 @@ const walkContent = (content: string, walk: Walk): void => {
   checkText(content.slice(i), walk);
 };
 
-export const validateTokens = (content: string, options: ValidateTokensOptions = {}): TokenIssue[] => {
+export const validateTokens = (
+  content: string,
+  options: ValidateTokensOptions = {},
+): TokenIssue[] => {
   const issues: TokenIssue[] = [];
   for (const offset of unknownMustaches(content)) {
     issues.push({
@@ -147,6 +160,12 @@ export const validateTokens = (content: string, options: ValidateTokensOptions =
       message: `"${content.slice(offset, offset + 24)}" is not a token or block the engine understands`,
     });
   }
-  walkContent(content, { bindings: new Map(), eachRoots: new Set(), guarded: new Set(), issues, options });
+  walkContent(content, {
+    bindings: new Map(),
+    eachRoots: new Set(),
+    guarded: new Set(),
+    issues,
+    options,
+  });
   return issues;
 };

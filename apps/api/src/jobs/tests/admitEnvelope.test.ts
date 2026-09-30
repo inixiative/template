@@ -26,10 +26,14 @@ describe('admitEnvelope', () => {
       added.push({ jobId: opts?.jobId, priority: opts?.priority });
       return { id: opts?.jobId };
     }) as never);
-    const getJobCounts = spyOn(queue, 'getJobCounts').mockImplementation((async () => ({ ...counts })) as never);
-    const getCountsPerPriority = spyOn(queue, 'getCountsPerPriority').mockImplementation((async () => ({
-      [SLOW_LANE_PRIORITY]: counts.prioritized,
+    const getJobCounts = spyOn(queue, 'getJobCounts').mockImplementation((async () => ({
+      ...counts,
     })) as never);
+    const getCountsPerPriority = spyOn(queue, 'getCountsPerPriority').mockImplementation(
+      (async () => ({
+        [SLOW_LANE_PRIORITY]: counts.prioritized,
+      })) as never,
+    );
     restore = () => {
       add.mockRestore();
       getJobCounts.mockRestore();
@@ -51,8 +55,18 @@ describe('admitEnvelope', () => {
     await cleanupTouchedTables(db);
   });
 
-  const admit = (lane: JobLane, jobId: string, options: { priority?: number; delay?: number } = {}) =>
-    admitEnvelope({ handlerName: 'sendWebhook', jobId, data: envelope(lane), options, bypass: false });
+  const admit = (
+    lane: JobLane,
+    jobId: string,
+    options: { priority?: number; delay?: number } = {},
+  ) =>
+    admitEnvelope({
+      handlerName: 'sendWebhook',
+      jobId,
+      data: envelope(lane),
+      options,
+      bypass: false,
+    });
 
   it('adds a slow job straight to the shared queue at the lowest priority', async () => {
     const result = await admit(JobLane.slow, 'slow-job');
@@ -107,7 +121,9 @@ describe('admitEnvelope', () => {
     await admit(JobLane.slow, 'slow-spilled');
 
     expect(added).toHaveLength(0);
-    expect((await db.jobOutbox.findMany({ orderBy: { id: 'asc' } })).map((row) => [row.jobId, row.lane])).toEqual([
+    expect(
+      (await db.jobOutbox.findMany({ orderBy: { id: 'asc' } })).map((row) => [row.jobId, row.lane]),
+    ).toEqual([
       ['fast-spilled', JobLane.fast],
       ['slow-spilled', JobLane.slow],
     ]);

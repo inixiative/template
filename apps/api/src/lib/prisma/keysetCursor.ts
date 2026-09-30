@@ -17,7 +17,11 @@ type DecodedCursor = { v: number; k: SortKey[]; p: unknown[]; f: string };
 // Dates and BigInts have no JSON representation that survives a round trip, and both are
 // legitimate sort keys.
 const replacer = (_key: string, value: unknown) =>
-  value instanceof Date ? value.toISOString() : typeof value === 'bigint' ? value.toString() : value;
+  value instanceof Date
+    ? value.toISOString()
+    : typeof value === 'bigint'
+      ? value.toString()
+      : value;
 
 // The token is base64url-encoded and not signed — a client can hand-craft or edit one. It carries
 // the sort chain and a hash of the composed filter, so decode fails closed on a sort-chain, arity
@@ -40,10 +44,13 @@ export const decodeCursor = (cursor: string): DecodedCursor => {
     parsed?.v !== CURSOR_VERSION ||
     !Array.isArray(parsed.k) ||
     !parsed.k.every(
-      (el): el is SortKey => Array.isArray(el) && typeof el[0] === 'string' && (el[1] === 'asc' || el[1] === 'desc'),
+      (el): el is SortKey =>
+        Array.isArray(el) && typeof el[0] === 'string' && (el[1] === 'asc' || el[1] === 'desc'),
     ) ||
     !Array.isArray(parsed.p) ||
-    !parsed.p.every((v) => typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') ||
+    !parsed.p.every(
+      (v) => typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean',
+    ) ||
     // why: cursor value count must equal key-chain length — a mismatch silently drops the
     // why: filter and traps the caller on page 1 forever.
     parsed.p.length !== parsed.k.length ||
@@ -57,10 +64,15 @@ export const decodeCursor = (cursor: string): DecodedCursor => {
 
 // A cursor arrives as JSON, so a BigInt column's boundary value comes back as a string and would
 // compare as text.
-export const hydrateCursorValues = (model: string, chain: SortKey[], values: unknown[]): unknown[] =>
+export const hydrateCursorValues = (
+  model: string,
+  chain: SortKey[],
+  values: unknown[],
+): unknown[] =>
   chain.map(([key], i) => {
     const value = values[i];
-    if (lookupField(model, key)?.type !== 'BigInt' || typeof value === 'bigint' || value == null) return value;
+    if (lookupField(model, key)?.type !== 'BigInt' || typeof value === 'bigint' || value == null)
+      return value;
     try {
       return BigInt(value as string | number);
     } catch {
@@ -78,7 +90,10 @@ export const assertChainMatches = (cursorChain: SortKey[], resolvedChain: SortKe
       return resolved !== undefined && key === resolved[0] && dir === resolved[1];
     });
   if (!same) {
-    throw makeError({ status: 400, message: 'Pagination cursor does not match the requested sort order' });
+    throw makeError({
+      status: 400,
+      message: 'Pagination cursor does not match the requested sort order',
+    });
   }
 };
 
@@ -86,7 +101,10 @@ export const assertChainMatches = (cursorChain: SortKey[], resolvedChain: SortKe
 // why: filter is a different sequence, so a replayed cursor seeks into the wrong rows silently.
 export const assertFilterMatches = (cursorHash: string, resolvedHash: string): void => {
   if (cursorHash !== resolvedHash) {
-    throw makeError({ status: 400, message: 'Pagination cursor does not match the requested filter' });
+    throw makeError({
+      status: 400,
+      message: 'Pagination cursor does not match the requested filter',
+    });
   }
 };
 

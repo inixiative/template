@@ -9,12 +9,17 @@ import type { AppEnv } from '#/types/appEnv';
 export const webhookSubscriptionRouter = new OpenAPIHono<AppEnv>();
 
 // Public route (no auth)
-webhookSubscriptionRouter.openapi(toOpenApi(webhookSubscriptionInfoRoute), webhookSubscriptionInfoController);
+webhookSubscriptionRouter.openapi(
+  toOpenApi(webhookSubscriptionInfoRoute),
+  webhookSubscriptionInfoController,
+);
 
 // Protected routes (create via /me or /organization submodels)
 webhookSubscriptionRouter.use('*', validateActor);
 
-await autoRegisterRoutes(webhookSubscriptionRouter, import.meta.dirname, { skip: ['webhookSubscriptionInfo'] });
+await autoRegisterRoutes(webhookSubscriptionRouter, import.meta.dirname, {
+  skip: ['webhookSubscriptionInfo'],
+});
 
 export const adminWebhookSubscriptionRouter = new OpenAPIHono<AppEnv>();
 

@@ -9,7 +9,12 @@ import type { Condition } from '@inixiative/json-rules';
 import { resolveFalsePolymorphismRef } from '@template/db/registries/falsePolymorphism';
 import type { ModelName } from '@template/db/utils/modelNames';
 import { ruleReferences } from '@template/db/utils/ruleReferences';
-import { type RuleHealth, type RuleLens, type RuleReference, referenceKey } from '@template/shared/rules';
+import {
+  type RuleHealth,
+  type RuleLens,
+  type RuleReference,
+  referenceKey,
+} from '@template/shared/rules';
 
 /** The shape a rule-reference edge has to arrive in for its health to be readable. No relations. */
 export type RuleReferenceRow = {
@@ -47,7 +52,14 @@ export const ruleReferenceIssues = (edges: RuleReferenceRow[]): RuleReferenceIss
     const reason = edge.referencedDeletedAt != null ? 'deleted' : purged(edge) ? 'purged' : null;
     if (!reason) return [];
     const { referencedModel, referencedId } = edge;
-    return [{ key: referenceKey({ model: referencedModel, id: referencedId }), referencedModel, referencedId, reason }];
+    return [
+      {
+        key: referenceKey({ model: referencedModel, id: referencedId }),
+        referencedModel,
+        referencedId,
+        reason,
+      },
+    ];
   });
 
 /** The references these edges name that are still usable — absence is the answer, so callers fail closed. */

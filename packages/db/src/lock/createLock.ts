@@ -31,7 +31,8 @@ export function createLock(opts: ClaimOptions): Claim;
 export function createLock(opts: LockOptions): Lock;
 export function createLock(opts: LockOptions | ClaimOptions): Lock | Claim {
   const redisClient = opts.redis ?? getRedisClient();
-  const lockKey = 'key' in opts ? opts.key : `${redisNamespace.lock}:${opts.service}:${opts.identifier}`;
+  const lockKey =
+    'key' in opts ? opts.key : `${redisNamespace.lock}:${opts.service}:${opts.identifier}`;
   if (opts.heartbeat === false) return createClaim(opts, redisClient, lockKey);
   return createRenewingLock(opts, redisClient, lockKey);
 }
@@ -119,7 +120,9 @@ const createRenewingLock = (opts: LockOptions, redis: LockRedis, key: string): L
   const acquire = async (): Promise<boolean> => {
     const result = await redis.set(key, processId, 'PX', ttlMs, 'NX');
     if (result !== 'OK') return false;
-    stop = heartbeat(tick, heartbeatMs, { onError: (err) => log.error(`Lock heartbeat error: ${key}`, err) });
+    stop = heartbeat(tick, heartbeatMs, {
+      onError: (err) => log.error(`Lock heartbeat error: ${key}`, err),
+    });
     return true;
   };
 

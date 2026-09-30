@@ -13,7 +13,13 @@ import { setupTelemetry } from '../tasks/telemetrySetup';
 import { useConfig } from '../utils/configState';
 import { prompt } from '../utils/prompts';
 
-export const TelemetrySetupView = ({ onComplete, onCancel }: { onComplete: () => void; onCancel: () => void }) => {
+export const TelemetrySetupView = ({
+  onComplete,
+  onCancel,
+}: {
+  onComplete: () => void;
+  onCancel: () => void;
+}) => {
   const { syncConfig } = useConfig();
   const [input, setInput] = useState<TelemetrySetupInput>({ mode: 'off' });
   const [step, setStep] = useState('mode');
@@ -60,7 +66,8 @@ export const TelemetrySetupView = ({ onComplete, onCancel }: { onComplete: () =>
     <Box flexDirection="column" padding={1}>
       <Text bold>Monitoring — structured logs, traces, and metrics</Text>
       <Text>
-        Stores settings in Infisical. Apply them through your normal deployment; browser settings require a rebuild.
+        Stores settings in Infisical. Apply them through your normal deployment; browser settings
+        require a rebuild.
       </Text>
       {error && <Text color="red">{error}</Text>}
       {running ? (
@@ -95,7 +102,10 @@ export const TelemetrySetupView = ({ onComplete, onCancel }: { onComplete: () =>
           }}
         />
       ) : step === 'done' ? (
-        <SelectInput items={[{ label: 'Settings stored — return to menu', value: 'done' }]} onSelect={onComplete} />
+        <SelectInput
+          items={[{ label: 'Settings stored — return to menu', value: 'done' }]}
+          onSelect={onComplete}
+        />
       ) : (
         <Box flexDirection="column">
           <Text>{labels[step]}</Text>

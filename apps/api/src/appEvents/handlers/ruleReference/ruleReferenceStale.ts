@@ -4,7 +4,10 @@
  * @partOf primitive:appEvents
  * @uses none
  */
-import type { RuleReferenceOwnerModel, RuleReferenceReferencedModel } from '@template/db/generated/client/enums';
+import type {
+  RuleReferenceOwnerModel,
+  RuleReferenceReferencedModel,
+} from '@template/db/generated/client/enums';
 import { makeAppEvent } from '#/appEvents/makeAppEvent';
 
 export type RuleReferenceStalePayload = {

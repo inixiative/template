@@ -54,7 +54,10 @@ export const OrganizationSpacesPage = ({ organizationId }: OrganizationSpacesPag
   ];
 
   return (
-    <Page title="Spaces" description="Spaces within this organization. Open one to work in its context.">
+    <Page
+      title="Spaces"
+      description="Spaces within this organization. Open one to work in its context."
+    >
       {isLoading ? (
         <div className="h-40 animate-pulse rounded-xl bg-muted/50" />
       ) : (

@@ -16,11 +16,14 @@ const liveStagingEnvironmentId = process.env.RAILWAY_STAGING_ENVIRONMENT_ID ?? '
 const liveProdApiServiceId = process.env.RAILWAY_PROD_API_SERVICE_ID ?? 'api-prod-123';
 const liveStagingApiServiceId = process.env.RAILWAY_STAGING_API_SERVICE_ID ?? 'api-staging-123';
 const liveProdWorkerServiceId = process.env.RAILWAY_PROD_WORKER_SERVICE_ID ?? 'worker-prod-123';
-const liveStagingWorkerServiceId = process.env.RAILWAY_STAGING_WORKER_SERVICE_ID ?? 'worker-staging-123';
+const liveStagingWorkerServiceId =
+  process.env.RAILWAY_STAGING_WORKER_SERVICE_ID ?? 'worker-staging-123';
 const liveProdRedisServiceId = process.env.RAILWAY_PROD_REDIS_SERVICE_ID ?? 'redis-prod-123';
-const liveStagingRedisServiceId = process.env.RAILWAY_STAGING_REDIS_SERVICE_ID ?? 'redis-staging-123';
+const liveStagingRedisServiceId =
+  process.env.RAILWAY_STAGING_REDIS_SERVICE_ID ?? 'redis-staging-123';
 const liveProdRedisVolumeId = process.env.RAILWAY_PROD_REDIS_VOLUME_ID ?? 'volume-prod-123';
-const liveStagingRedisVolumeId = process.env.RAILWAY_STAGING_REDIS_VOLUME_ID ?? 'volume-staging-123';
+const liveStagingRedisVolumeId =
+  process.env.RAILWAY_STAGING_REDIS_VOLUME_ID ?? 'volume-staging-123';
 
 const seedRailwayResumeState = (missingActions: string[]) => {
   config.setConfig({
@@ -139,7 +142,10 @@ describe('Railway Resume Scenario', () => {
     const result = await setupRailway(liveWorkspaceId);
 
     expect(config.mocks.markComplete).toHaveBeenCalledWith('railway', 'ensureProdApiDeployment');
-    expect(config.mocks.markComplete).not.toHaveBeenCalledWith('railway', 'ensureStagingApiDeployment');
+    expect(config.mocks.markComplete).not.toHaveBeenCalledWith(
+      'railway',
+      'ensureStagingApiDeployment',
+    );
 
     expect(result.prodApiUrl).toEqual(expect.any(String));
     expect(result.stagingApiUrl).toEqual(expect.any(String));

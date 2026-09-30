@@ -23,7 +23,10 @@ type InquiryTargetBody = {
 
 export type InquiryTargetFields =
   | { targetModel: (typeof InquiryResourceModel)['User']; targetUserId: UserId }
-  | { targetModel: (typeof InquiryResourceModel)['Organization']; targetOrganizationId: OrganizationId }
+  | {
+      targetModel: (typeof InquiryResourceModel)['Organization'];
+      targetOrganizationId: OrganizationId;
+    }
   | { targetModel: (typeof InquiryResourceModel)['Space']; targetSpaceId: SpaceId }
   | { targetModel: (typeof InquiryResourceModel)['admin'] };
 
@@ -49,16 +52,23 @@ export const resolveInquiryTarget = async <C extends ValidatedContext<'json', In
 
   if (targetModel === InquiryResourceModel.Organization) {
     if (body.targetOrganizationId) {
-      const org = await db.organization.findUnique({ where: { id: body.targetOrganizationId as OrganizationId } });
+      const org = await db.organization.findUnique({
+        where: { id: body.targetOrganizationId as OrganizationId },
+      });
       if (!org) throw makeError({ status: 404, message: 'Target organization not found' });
       return { ...nullTargetFields, targetModel, targetOrganizationId: org.id as OrganizationId };
     }
     if (body.targetOrganizationSlug) {
-      const org = await db.organization.findUnique({ where: { slug: body.targetOrganizationSlug as string } });
+      const org = await db.organization.findUnique({
+        where: { slug: body.targetOrganizationSlug as string },
+      });
       if (!org) throw makeError({ status: 404, message: 'Target organization not found' });
       return { ...nullTargetFields, targetModel, targetOrganizationId: org.id as OrganizationId };
     }
-    throw makeError({ status: 422, message: 'targetOrganizationId or targetOrganizationSlug is required' });
+    throw makeError({
+      status: 422,
+      message: 'targetOrganizationId or targetOrganizationSlug is required',
+    });
   }
 
   if (targetModel === InquiryResourceModel.Space) {
@@ -69,12 +79,18 @@ export const resolveInquiryTarget = async <C extends ValidatedContext<'json', In
     }
     if (body.targetOrganizationSlug && body.targetSpaceSlug) {
       const space = await db.space.findFirst({
-        where: { slug: body.targetSpaceSlug as string, organization: { slug: body.targetOrganizationSlug as string } },
+        where: {
+          slug: body.targetSpaceSlug as string,
+          organization: { slug: body.targetOrganizationSlug as string },
+        },
       });
       if (!space) throw makeError({ status: 404, message: 'Target space not found' });
       return { ...nullTargetFields, targetModel, targetSpaceId: space.id as SpaceId };
     }
-    throw makeError({ status: 422, message: 'targetSpaceId or targetOrganizationSlug + targetSpaceSlug is required' });
+    throw makeError({
+      status: 422,
+      message: 'targetSpaceId or targetOrganizationSlug + targetSpaceSlug is required',
+    });
   }
 
   return { ...nullTargetFields, targetModel };

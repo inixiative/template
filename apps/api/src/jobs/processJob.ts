@@ -24,7 +24,10 @@ type ProcessJobSeams = {
 
 const processSlowSlots = createSlowSlotPool();
 
-const runJob = async (job: Job, handler: NonNullable<Partial<JobHandlers>[keyof JobHandlers]>): Promise<void> => {
+const runJob = async (
+  job: Job,
+  handler: NonNullable<Partial<JobHandlers>[keyof JobHandlers]>,
+): Promise<void> => {
   const scopeId = `${job.name}:${job.id}`;
   await traceJob(job, () =>
     logScope(LogScope.worker, () =>
@@ -39,13 +42,18 @@ const runJob = async (job: Job, handler: NonNullable<Partial<JobHandlers>[keyof 
             log.info(`Processing job ${job.name} (${job.id})`);
 
             const payload = (job.data as { payload?: unknown }).payload;
-            await auditActorContext.scope({ ...nullAuditActor, actorJobName: job.name }, async () => {
-              if (payload === undefined) {
-                await (handler as (handlerCtx: WorkerContext) => Promise<void>)(ctx);
-              } else {
-                await (handler as (handlerCtx: WorkerContext, handlerPayload: unknown) => Promise<void>)(ctx, payload);
-              }
-            });
+            await auditActorContext.scope(
+              { ...nullAuditActor, actorJobName: job.name },
+              async () => {
+                if (payload === undefined) {
+                  await (handler as (handlerCtx: WorkerContext) => Promise<void>)(ctx);
+                } else {
+                  await (
+                    handler as (handlerCtx: WorkerContext, handlerPayload: unknown) => Promise<void>
+                  )(ctx, payload);
+                }
+              },
+            );
 
             log.info(`Completed job ${job.name} (${job.id})`);
           },

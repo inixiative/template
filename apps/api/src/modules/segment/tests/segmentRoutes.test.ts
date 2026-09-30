@@ -196,7 +196,11 @@ describe('segment routes', () => {
       post(`/api/v1/space/${space.id}/segments`, {
         name: `bad-${getNextSeq()}`,
         type: 'dynamic',
-        conditions: { field: 'customerUser.platformRole', operator: Operator.equals, value: 'superadmin' },
+        conditions: {
+          field: 'customerUser.platformRole',
+          operator: Operator.equals,
+          value: 'superadmin',
+        },
       }),
     );
     expect(response.status).toBe(422);
@@ -204,7 +208,9 @@ describe('segment routes', () => {
 
   it('reach counts the customers a candidate rule would match, without saving anything', async () => {
     const before = await db.segment.count();
-    const response = await ownerFetch(post(`/api/v1/space/${space.id}/segments/reach`, { conditions: acmeRule }));
+    const response = await ownerFetch(
+      post(`/api/v1/space/${space.id}/segments/reach`, { conditions: acmeRule }),
+    );
     expect(response.status).toBe(200);
     expect((await json<{ count: number }>(response)).data).toEqual({ count: 1 });
     expect(await db.segment.count()).toBe(before);
@@ -213,7 +219,11 @@ describe('segment routes', () => {
   it('reach refuses a rule the save gate would refuse', async () => {
     const response = await ownerFetch(
       post(`/api/v1/space/${space.id}/segments/reach`, {
-        conditions: { field: 'customerUser.platformRole', operator: Operator.equals, value: 'superadmin' },
+        conditions: {
+          field: 'customerUser.platformRole',
+          operator: Operator.equals,
+          value: 'superadmin',
+        },
       }),
     );
     expect(response.status).toBe(422);
@@ -233,7 +243,9 @@ describe('segment routes', () => {
     expect(mine.status).toBe(200);
     expect((await json<{ count: number }>(mine)).data).toEqual({ count: 0 });
 
-    const orgs = await ownerFetch(post(`/api/v1/organization/${org.id}/segments/reach`, { conditions: acmeRule }));
+    const orgs = await ownerFetch(
+      post(`/api/v1/organization/${org.id}/segments/reach`, { conditions: acmeRule }),
+    );
     expect(orgs.status).toBe(200);
     expect((await json<{ count: number }>(orgs)).data).toEqual({ count: 0 });
   });
@@ -248,8 +260,13 @@ describe('segment routes', () => {
     expect(deleted).toHaveLength(1);
 
     const removed = await db.appEvent.findMany({
-      where: { name: 'customerRef.segmentsRemoved', data: { path: ['customerRefId'], equals: customerRef.id } },
+      where: {
+        name: 'customerRef.segmentsRemoved',
+        data: { path: ['customerRefId'], equals: customerRef.id },
+      },
     });
-    expect(removed.map((event) => (event.data as { segmentIds: string[] }).segmentIds)).toContainEqual([segment.id]);
+    expect(
+      removed.map((event) => (event.data as { segmentIds: string[] }).segmentIds),
+    ).toContainEqual([segment.id]);
   });
 });

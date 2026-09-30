@@ -17,12 +17,19 @@ const NULLABLE_OPS = new Set(['equals', 'not']);
 
 // `{ contains?: …, in?: […], … }` for a set of operators over a value schema.
 // strict so an unsupported operator is rejected (→ additionalProperties:false in the spec).
-const operatorObject = (operators: readonly string[], value: z.ZodTypeAny): z.ZodObject<z.ZodRawShape> =>
+const operatorObject = (
+  operators: readonly string[],
+  value: z.ZodTypeAny,
+): z.ZodObject<z.ZodRawShape> =>
   z
     .object(
       Object.fromEntries(
         operators.map((op) => {
-          const opValue = ARRAY_OPS.has(op) ? z.array(value) : NULLABLE_OPS.has(op) ? value.nullable() : value;
+          const opValue = ARRAY_OPS.has(op)
+            ? z.array(value)
+            : NULLABLE_OPS.has(op)
+              ? value.nullable()
+              : value;
           return [op, opValue.optional()];
         }),
       ),

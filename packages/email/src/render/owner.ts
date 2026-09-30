@@ -40,7 +40,11 @@ const tierKeys = (ctx: OwnerScope, tier: EmailOwnerModel) => {
     case 'SpaceUser':
       return { spaceId: ctx.spaceId ?? null, userId: ctx.userId ?? null };
     case 'OrganizationUser':
-      return { organizationId: ctx.organizationId ?? null, userId: ctx.userId ?? null, spaceId: null };
+      return {
+        organizationId: ctx.organizationId ?? null,
+        userId: ctx.userId ?? null,
+        spaceId: null,
+      };
     case 'User':
       return { userId: ctx.userId ?? null, organizationId: null, spaceId: null };
     default:
@@ -61,7 +65,9 @@ export const cascadeLookups = <T>(
   build: (tier: EmailOwnerModel) => Promise<T>,
 ): (() => Promise<T>)[] => ownerCascade(ctx.ownerModel).map((tier) => () => build(tier));
 
-export const firstResolved = async <T>(lookups: (() => Promise<T | null | undefined>)[]): Promise<T | null> => {
+export const firstResolved = async <T>(
+  lookups: (() => Promise<T | null | undefined>)[],
+): Promise<T | null> => {
   for (const lookup of lookups) {
     const result = await lookup();
     if (result) return result;
@@ -69,7 +75,10 @@ export const firstResolved = async <T>(lookups: (() => Promise<T | null | undefi
   return null;
 };
 
-export type EmailOwnerRef = Pick<OwnerScope, 'ownerModel' | 'organizationId' | 'spaceId' | 'userId'>;
+export type EmailOwnerRef = Pick<
+  OwnerScope,
+  'ownerModel' | 'organizationId' | 'spaceId' | 'userId'
+>;
 
 export const rowOwner = (row: EmailOwnerRef & { locale: string }): OwnerScope => ({
   ownerModel: row.ownerModel,
@@ -82,7 +91,9 @@ export const rowOwner = (row: EmailOwnerRef & { locale: string }): OwnerScope =>
 export const emailOwnerProvider = (owner: EmailOwnerRef): EmailLensOwner => {
   switch (owner.ownerModel) {
     case 'Organization':
-      return owner.organizationId ? { ownerModel: 'Organization', ownerId: owner.organizationId } : null;
+      return owner.organizationId
+        ? { ownerModel: 'Organization', ownerId: owner.organizationId }
+        : null;
     case 'Space':
       return owner.spaceId
         ? { ownerModel: 'Space', ownerId: owner.spaceId, organizationId: owner.organizationId }

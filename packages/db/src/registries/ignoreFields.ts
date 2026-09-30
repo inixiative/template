@@ -33,13 +33,17 @@ const NOOP_FIELDS_BASE: FieldRegistry = {
 // Semantically-meaningless change fields: a mutation touching only these is not worth recording or
 // firing. Ordered-list position columns fold in; sensitive columns do NOT (those are REDACT_FIELDS —
 // audit masks them, webhook drops them via WEBHOOK_NOOP_FIELDS).
-export const NOOP_FIELDS: FieldRegistry = unionRegistries(NOOP_FIELDS_BASE, getOrderedListFieldsByModel());
+export const NOOP_FIELDS: FieldRegistry = unionRegistries(
+  NOOP_FIELDS_BASE,
+  getOrderedListFieldsByModel(),
+);
 
 export const filterFields = <T extends Record<string, unknown>>(
   model: string,
   data: T,
   registry: FieldRegistry,
-): Partial<T> => omit(data, [...(registry._global ?? []), ...(registry[model] ?? [])]) as Partial<T>;
+): Partial<T> =>
+  omit(data, [...(registry._global ?? []), ...(registry[model] ?? [])]) as Partial<T>;
 
 export const isNoOpUpdate = <T extends Record<string, unknown>>(
   model: string,
@@ -48,5 +52,8 @@ export const isNoOpUpdate = <T extends Record<string, unknown>>(
   registry: FieldRegistry,
 ): boolean => {
   if (!previousData) return false;
-  return isEqual(filterFields(model, currentData, registry), filterFields(model, previousData, registry));
+  return isEqual(
+    filterFields(model, currentData, registry),
+    filterFields(model, previousData, registry),
+  );
 };
