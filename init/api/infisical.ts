@@ -5,7 +5,9 @@ import { execAsync, execFileAsync } from '../utils/exec';
 
 const INFISICAL_API = 'https://app.infisical.com/api';
 const FIXTURES_DIR = join(import.meta.dir, '../tests/fixtures/infisical');
-const CLI_PATH = ['/opt/homebrew/bin', join(homedir(), '.bun/bin'), process.env.PATH].filter(Boolean).join(':');
+const CLI_PATH = ['/opt/homebrew/bin', join(homedir(), '.bun/bin'), process.env.PATH]
+  .filter(Boolean)
+  .join(':');
 
 export type InfisicalApp = 'api' | 'web' | 'admin' | 'superadmin';
 
@@ -23,7 +25,9 @@ export const getInfisicalToken = async (): Promise<string> => {
     if (!tokenMatch) throw new Error('Failed to parse token from infisical user get token');
     return tokenMatch[1];
   } catch (error) {
-    throw new Error(`Failed to get Infisical token: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    throw new Error(
+      `Failed to get Infisical token: ${error instanceof Error ? error.message : 'Unknown error'}`,
+    );
   }
 };
 
@@ -73,7 +77,9 @@ class InfisicalApi {
 
   async listOrganizations(): Promise<InfisicalOrganization[]> {
     return this.vcr.capture('listOrganizations', async () => {
-      const response = await this.request<{ organizations?: InfisicalOrganization[] }>('/v1/organization');
+      const response = await this.request<{ organizations?: InfisicalOrganization[] }>(
+        '/v1/organization',
+      );
       return response.organizations ?? [];
     });
   }
@@ -103,17 +109,24 @@ class InfisicalApi {
       const existing = listResponse.workspaces?.find((p) => p.name === name);
       if (existing) return existing;
 
-      const createResponse = await this.request<{ workspace?: InfisicalProject; project?: InfisicalProject }>(
-        '/v2/workspace',
-        { method: 'POST', body: JSON.stringify({ projectName: name, slug: toInfisicalSlug(name) }) },
-      );
+      const createResponse = await this.request<{
+        workspace?: InfisicalProject;
+        project?: InfisicalProject;
+      }>('/v2/workspace', {
+        method: 'POST',
+        body: JSON.stringify({ projectName: name, slug: toInfisicalSlug(name) }),
+      });
       const project = createResponse.workspace ?? createResponse.project;
       if (!project) throw new Error(`Failed to create Infisical project "${name}"`);
       return project;
     });
   }
 
-  async upsertEnvironment(projectId: string, name: string, slug: string): Promise<InfisicalEnvironment> {
+  async upsertEnvironment(
+    projectId: string,
+    name: string,
+    slug: string,
+  ): Promise<InfisicalEnvironment> {
     return this.vcr.capture('upsertEnvironment', async () => {
       try {
         const createResponse = await this.request<{ environment: InfisicalEnvironment }>(
@@ -122,7 +135,8 @@ class InfisicalApi {
         );
         return createResponse.environment;
       } catch (error) {
-        if (error instanceof Error && error.message.includes('already exists')) return { id: '', name, slug };
+        if (error instanceof Error && error.message.includes('already exists'))
+          return { id: '', name, slug };
         throw error;
       }
     });
@@ -130,7 +144,9 @@ class InfisicalApi {
 
   async deleteEnvironment(projectId: string, environmentId: string): Promise<void> {
     return this.vcr.capture('deleteEnvironment', async () => {
-      await this.request(`/v1/projects/${projectId}/environments/${environmentId}`, { method: 'DELETE' });
+      await this.request(`/v1/projects/${projectId}/environments/${environmentId}`, {
+        method: 'DELETE',
+      });
     });
   }
 
@@ -149,10 +165,17 @@ class InfisicalApi {
   }
 
   async getProject(projectId: string): Promise<InfisicalProject> {
-    return this.vcr.capture('getProject', () => this.request<InfisicalProject>(`/v1/workspace/${projectId}`));
+    return this.vcr.capture('getProject', () =>
+      this.request<InfisicalProject>(`/v1/workspace/${projectId}`),
+    );
   }
 
-  async createFolder(projectId: string, environment: string, name: string, path: string = '/'): Promise<unknown> {
+  async createFolder(
+    projectId: string,
+    environment: string,
+    name: string,
+    path: string = '/',
+  ): Promise<unknown> {
     return this.vcr.capture('createFolder', async () => {
       try {
         return await this.request('/v2/folders', {
@@ -216,13 +239,26 @@ class InfisicalApi {
         if (error instanceof Error && error.message.includes('already exists')) {
           await this.request(`/v3/secrets/raw/${key}`, {
             method: 'PATCH',
-            body: JSON.stringify({ workspaceId: projectId, environment, secretPath: path, secretValue: value, type }),
+            body: JSON.stringify({
+              workspaceId: projectId,
+              environment,
+              secretPath: path,
+              secretValue: value,
+              type,
+            }),
           });
         } else if (error instanceof Error && error.message.includes('secretKeyCiphertext')) {
           // E2EE-enabled project — CLI handles the encryption
           await execFileAsync(
             'infisical',
-            ['secrets', 'set', `--projectId=${projectId}`, `--env=${environment}`, `--path=${path}`, `${key}=${value}`],
+            [
+              'secrets',
+              'set',
+              `--projectId=${projectId}`,
+              `--env=${environment}`,
+              `--path=${path}`,
+              `${key}=${value}`,
+            ],
             { env: { ...process.env, PATH: CLI_PATH } },
           );
         } else {
@@ -232,7 +268,12 @@ class InfisicalApi {
     });
   }
 
-  async getSecret(projectId: string, environment: string, key: string, path: string = '/'): Promise<string> {
+  async getSecret(
+    projectId: string,
+    environment: string,
+    key: string,
+    path: string = '/',
+  ): Promise<string> {
     return this.vcr.capture('getSecret', async () => {
       const response = await this.request<{ secret: { secretValue: string } }>(
         `/v3/secrets/raw/${key}?workspaceId=${projectId}&environment=${environment}&secretPath=${encodeURIComponent(path)}`,

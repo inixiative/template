@@ -19,10 +19,14 @@ describe('preventHardDelete hook', () => {
   });
 
   it('refuses hard deletes on append-only history models', async () => {
-    expect(await attempt(db.auditLog.deleteMany({ where: { id: 'no-such-id' } }))).toMatch(/append-only history/);
+    expect(await attempt(db.auditLog.deleteMany({ where: { id: 'no-such-id' } }))).toMatch(
+      /append-only history/,
+    );
   });
 
   it('refuses hard deletes on soft-delete models', async () => {
-    expect(await attempt(db.user.deleteMany({ where: { email: 'nobody@example.com' } }))).toMatch(/is soft-delete/);
+    expect(await attempt(db.user.deleteMany({ where: { email: 'nobody@example.com' } }))).toMatch(
+      /is soft-delete/,
+    );
   });
 });

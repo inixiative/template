@@ -9,15 +9,18 @@ import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
 import { organizationDeleteRoute } from '#/modules/organization/routes/organizationDelete';
 
-export const organizationDeleteController = makeController(organizationDeleteRoute, async (c, respond) => {
-  const db = c.get('db');
-  const org = getResource<'organization'>(c);
+export const organizationDeleteController = makeController(
+  organizationDeleteRoute,
+  async (c, respond) => {
+    const db = c.get('db');
+    const org = getResource<'organization'>(c);
 
-  const organization = await db.organization.update({
-    where: { id: org.id },
-    data: { deletedAt: new Date() },
-  });
-  await emitAppEvent('organization.deleted', { organization });
+    const organization = await db.organization.update({
+      where: { id: org.id },
+      data: { deletedAt: new Date() },
+    });
+    await emitAppEvent('organization.deleted', { organization });
 
-  return respond.noContent();
-});
+    return respond.noContent();
+  },
+);

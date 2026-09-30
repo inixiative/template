@@ -21,7 +21,10 @@ describe('hydrate', () => {
   test("inlines a bare ref's cascade body, preserving the body's own :default markers verbatim", async () => {
     const headerBody =
       '<mj-section><mj-column>{{#slot:greeting:default}}<mj-text>Welcome!</mj-text>{{/slot:greeting:default}}</mj-column></mj-section>';
-    const hydrated = await hydrate('{{#component:header}}{{/component:header}}', resolverFrom({ header: headerBody }));
+    const hydrated = await hydrate(
+      '{{#component:header}}{{/component:header}}',
+      resolverFrom({ header: headerBody }),
+    );
 
     expect(hydrated).toBe(`{{#component:header}}${headerBody}{{/component:header}}`);
   });
@@ -75,13 +78,16 @@ describe('hydrate', () => {
       '{{#component:card}}{{/component:card}}',
       resolverFrom({ card: '<x>{{#slot:body:default}}{{/slot:body:default}}</x>' }),
     );
-    expect(hydrated).toBe('{{#component:card}}<x>{{#slot:body:default}}{{/slot:body:default}}</x>{{/component:card}}');
+    expect(hydrated).toBe(
+      '{{#component:card}}<x>{{#slot:body:default}}{{/slot:body:default}}</x>{{/component:card}}',
+    );
   });
 });
 
 describe('hydrate + decompose round-trip: decompose(hydrate(row)) → zero writes, same mjml', () => {
   const roundTrips =
-    (stored: string, resolve: ResolveHydrateBodies, cascadeBodies: Record<string, string>) => async () => {
+    (stored: string, resolve: ResolveHydrateBodies, cascadeBodies: Record<string, string>) =>
+    async () => {
       const hydrated = await hydrate(stored, resolve);
       const result = decompose(hydrated, (slug) => cascadeBodies[slug]);
 
@@ -134,8 +140,14 @@ describe('hydrate + decompose round-trip: decompose(hydrate(row)) → zero write
     'a component ref nested inside an override (attributes to the caller, not the wrapper)',
     roundTrips(
       '{{#component:card}}{{#slot:body}}{{#component:promo}}{{/component:promo}}{{/slot:body}}{{/component:card}}',
-      resolverFrom({ card: '<x>{{#slot:body:default}}D{{/slot:body:default}}</x>', promo: '<mj-text>Promo</mj-text>' }),
-      { card: '<x>{{#slot:body:default}}D{{/slot:body:default}}</x>', promo: '<mj-text>Promo</mj-text>' },
+      resolverFrom({
+        card: '<x>{{#slot:body:default}}D{{/slot:body:default}}</x>',
+        promo: '<mj-text>Promo</mj-text>',
+      }),
+      {
+        card: '<x>{{#slot:body:default}}D{{/slot:body:default}}</x>',
+        promo: '<mj-text>Promo</mj-text>',
+      },
     ),
   );
 
@@ -222,7 +234,9 @@ describe('hydrate — persisted cycles are bounded', () => {
       'cycle-a': '{{#component:cycle-b}}{{/component:cycle-b}}',
       'cycle-b': '{{#component:cycle-a}}{{/component:cycle-a}}',
     });
-    await expect(hydrate('{{#component:cycle-a}}{{/component:cycle-a}}', cyclic)).rejects.toMatchObject({
+    await expect(
+      hydrate('{{#component:cycle-a}}{{/component:cycle-a}}', cyclic),
+    ).rejects.toMatchObject({
       name: 'EmailRenderError',
       type: 'circular_ref',
     });
@@ -230,7 +244,9 @@ describe('hydrate — persisted cycles are bounded', () => {
 
   test('a self-referential body is caught too', async () => {
     const selfRef = resolverFrom({ loop: '{{#component:loop}}{{/component:loop}}' });
-    await expect(hydrate('{{#component:loop}}{{/component:loop}}', selfRef)).rejects.toBeInstanceOf(EmailRenderError);
+    await expect(hydrate('{{#component:loop}}{{/component:loop}}', selfRef)).rejects.toBeInstanceOf(
+      EmailRenderError,
+    );
   });
 
   test('a component nested inside its OWN override slot is NOT a cycle (caller-path attribution)', async () => {
@@ -262,7 +278,9 @@ describe('hydrateCascade (DB-backed)', () => {
       name: 'Hydrate Header',
       subject: 'Hello',
       kind: 'system',
-      mjml: mjml('{{#component:hydrate-header-cmp}}<mj-text>Header</mj-text>{{/component:hydrate-header-cmp}}'),
+      mjml: mjml(
+        '{{#component:hydrate-header-cmp}}<mj-text>Header</mj-text>{{/component:hydrate-header-cmp}}',
+      ),
       ownerModel: 'default',
     });
 

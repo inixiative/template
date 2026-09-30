@@ -3,7 +3,12 @@ import { type Condition, type LensNarrowing, Operator } from '@inixiative/json-r
 import { db } from '@template/db';
 import { fetchLens } from '@template/db/hydrate/fetchLens';
 import { lensFor } from '@template/db/lens/lensFor';
-import { cleanupTouchedTables, createOrganizationUser, createUser, registerTestTracker } from '@template/db/test';
+import {
+  cleanupTouchedTables,
+  createOrganizationUser,
+  createUser,
+  registerTestTracker,
+} from '@template/db/test';
 
 const eq = (field: string, value: unknown): Condition =>
   ({ field, operator: Operator.equals, value }) as unknown as Condition;
@@ -32,7 +37,9 @@ describe('fetchLens', () => {
     const { entity: alice } = await createUser({ name: 'Alice' });
     await createUser({ name: 'Bob' });
 
-    const rows = await fetchLens<{ id: string; name: string; email: string }>(usersWhere(eq('id', alice.id)));
+    const rows = await fetchLens<{ id: string; name: string; email: string }>(
+      usersWhere(eq('id', alice.id)),
+    );
 
     expect(rows).toHaveLength(1);
     expect(rows[0].id).toBe(alice.id);

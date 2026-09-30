@@ -2,7 +2,12 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import type { Organization, Space } from '@template/db/generated/client/client';
 import { PlatformRole } from '@template/db/generated/client/enums';
-import { cleanupTouchedTables, createOrganization, createSpace, createUser } from '@template/db/test';
+import {
+  cleanupTouchedTables,
+  createOrganization,
+  createSpace,
+  createUser,
+} from '@template/db/test';
 import { adminSpaceRouter } from '#/modules/space';
 import { createTestApp } from '#tests/createTestApp';
 import { get, json } from '#tests/utils/request';

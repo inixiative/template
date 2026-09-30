@@ -20,9 +20,10 @@ describe('runPreflight', () => {
   });
 
   it('runs only the checks it is given, including async ones', async () => {
-    const result = await runPreflight({ mjml: '', subject: 'x', html: '', fieldPaths: [], renderWarnings: [] }, [
-      async () => [{ code: 'net.slow', severity: 'warning', message: 'slow' }],
-    ]);
+    const result = await runPreflight(
+      { mjml: '', subject: 'x', html: '', fieldPaths: [], renderWarnings: [] },
+      [async () => [{ code: 'net.slow', severity: 'warning', message: 'slow' }]],
+    );
     expect(result).toEqual({
       findings: [{ code: 'net.slow', severity: 'warning', message: 'slow' }],
       summary: { errors: 0, warnings: 1 },
@@ -30,31 +31,45 @@ describe('runPreflight', () => {
   });
 
   it('keeps fulfilled findings when a synchronous check throws', async () => {
-    const result = await runPreflight({ mjml: '', subject: 'x', html: '', fieldPaths: [], renderWarnings: [] }, [
-      () => [{ code: 'net.slow', severity: 'warning', message: 'slow' }],
-      () => {
-        throw new Error('parser exploded');
-      },
-    ]);
+    const result = await runPreflight(
+      { mjml: '', subject: 'x', html: '', fieldPaths: [], renderWarnings: [] },
+      [
+        () => [{ code: 'net.slow', severity: 'warning', message: 'slow' }],
+        () => {
+          throw new Error('parser exploded');
+        },
+      ],
+    );
 
     expect(result.findings).toEqual([
-      { code: 'preflight.failed', severity: 'error', message: 'Preflight check failed: parser exploded' },
+      {
+        code: 'preflight.failed',
+        severity: 'error',
+        message: 'Preflight check failed: parser exploded',
+      },
       { code: 'net.slow', severity: 'warning', message: 'slow' },
     ]);
     expect(result.summary).toEqual({ errors: 1, warnings: 1 });
   });
 
   it('keeps fulfilled findings and reports a failed check when another check rejects', async () => {
-    const result = await runPreflight({ mjml: '', subject: 'x', html: '', fieldPaths: [], renderWarnings: [] }, [
-      async () => [{ code: 'net.slow', severity: 'warning', message: 'slow' }],
-      async () => {
-        throw new Error('provider unavailable');
-      },
-    ]);
+    const result = await runPreflight(
+      { mjml: '', subject: 'x', html: '', fieldPaths: [], renderWarnings: [] },
+      [
+        async () => [{ code: 'net.slow', severity: 'warning', message: 'slow' }],
+        async () => {
+          throw new Error('provider unavailable');
+        },
+      ],
+    );
 
     expect(result).toEqual({
       findings: [
-        { code: 'preflight.failed', severity: 'error', message: 'Preflight check failed: provider unavailable' },
+        {
+          code: 'preflight.failed',
+          severity: 'error',
+          message: 'Preflight check failed: provider unavailable',
+        },
         { code: 'net.slow', severity: 'warning', message: 'slow' },
       ],
       summary: { errors: 1, warnings: 1 },
@@ -67,7 +82,9 @@ describe('runPreflight', () => {
       subject: 'Your weekly digest',
       html: '<p>Hello</p><a href="https://example.com/unsubscribe">Unsubscribe</a>',
       fieldPaths: [],
-      renderWarnings: ['{{recipient}} resolved to a non-primitive value and was left unsubstituted'],
+      renderWarnings: [
+        '{{recipient}} resolved to a non-primitive value and was left unsubstituted',
+      ],
     });
 
     expect(result.findings).toEqual([

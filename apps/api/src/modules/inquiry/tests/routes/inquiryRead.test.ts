@@ -1,6 +1,15 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import type { Inquiry, Organization, OrganizationUser, User } from '@template/db/generated/client/client';
-import { InquiryResourceModel, InquiryStatus, InquiryType } from '@template/db/generated/client/enums';
+import type {
+  Inquiry,
+  Organization,
+  OrganizationUser,
+  User,
+} from '@template/db/generated/client/client';
+import {
+  InquiryResourceModel,
+  InquiryStatus,
+  InquiryType,
+} from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
   createInquiry,
@@ -26,10 +35,17 @@ describe('GET /api/v1/inquiry/:id', () => {
     admin = u;
     const { entity: o } = await createOrganization();
     org = o;
-    const { entity: ou } = await createOrganizationUser({ role: 'admin' }, { user: admin, organization: org });
+    const { entity: ou } = await createOrganizationUser(
+      { role: 'admin' },
+      { user: admin, organization: org },
+    );
     adminOrgUser = ou;
 
-    const harness = createTestApp({ mockUser: admin, mockOrganizationUsers: [adminOrgUser], mount });
+    const harness = createTestApp({
+      mockUser: admin,
+      mockOrganizationUsers: [adminOrgUser],
+      mount,
+    });
     fetch = harness.fetch;
     db = harness.db;
   });

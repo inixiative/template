@@ -8,7 +8,12 @@ import type {
   SpaceUser,
   User,
 } from '@template/db/generated/client/client';
-import { cleanupTouchedTables, createOrganizationUser, createSpace, createUser } from '@template/db/test';
+import {
+  cleanupTouchedTables,
+  createOrganizationUser,
+  createSpace,
+  createUser,
+} from '@template/db/test';
 import { spaceRouter } from '#/modules/space';
 import { createTestApp } from '#tests/createTestApp';
 import { get, json } from '#tests/utils/request';

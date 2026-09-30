@@ -47,7 +47,9 @@ const extractEndpoints = (sdkContent: string): EndpointInfo[] => {
 };
 
 const generateHandlers = (endpoints: EndpointInfo[]): string => {
-  const apiEndpoints = endpoints.filter((e) => e.url.startsWith('/api/v1') || e.url.startsWith('/api/admin'));
+  const apiEndpoints = endpoints.filter(
+    (e) => e.url.startsWith('/api/v1') || e.url.startsWith('/api/admin'),
+  );
 
   const handlerCases: string[] = [];
 

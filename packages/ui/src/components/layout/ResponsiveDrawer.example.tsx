@@ -41,10 +41,16 @@ export const ResponsiveDrawerWithCustomBreakpoint = () => {
     <div>
       <Button onClick={() => setIsOpen(true)}>Open Settings</Button>
 
-      <ResponsiveDrawer open={isOpen} onClose={() => setIsOpen(false)} title="Settings" breakpoint="lg">
+      <ResponsiveDrawer
+        open={isOpen}
+        onClose={() => setIsOpen(false)}
+        title="Settings"
+        breakpoint="lg"
+      >
         <div className="space-y-4">
           <p>
-            This drawer switches to a modal at the lg breakpoint (1024px) instead of the default md breakpoint (768px).
+            This drawer switches to a modal at the lg breakpoint (1024px) instead of the default md
+            breakpoint (768px).
           </p>
         </div>
       </ResponsiveDrawer>

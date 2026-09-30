@@ -32,7 +32,12 @@ export const rebacSchema: RebacSchema = {
         assign: {
           any: [
             { all: [{ rule: { field: 'role', operator: Operator.in, value: highRoles } }, 'own'] },
-            { all: [{ rule: { field: 'role', operator: Operator.notIn, value: highRoles } }, 'manage'] },
+            {
+              all: [
+                { rule: { field: 'role', operator: Operator.notIn, value: highRoles } },
+                'manage',
+              ],
+            },
           ],
         },
       },
@@ -47,7 +52,12 @@ export const rebacSchema: RebacSchema = {
         assign: {
           any: [
             { all: [{ rule: { field: 'role', operator: Operator.in, value: highRoles } }, 'own'] },
-            { all: [{ rule: { field: 'role', operator: Operator.notIn, value: highRoles } }, 'manage'] },
+            {
+              all: [
+                { rule: { field: 'role', operator: Operator.notIn, value: highRoles } },
+                'manage',
+              ],
+            },
           ],
         },
       },
@@ -163,12 +173,17 @@ export const rebacSchema: RebacSchema = {
             // Source user can act on their own inquiry (cancel, edit, re-send)
             // Add type strings here when user-sourced inquiry types exist
             {
-              all: [{ rule: { field: 'type', operator: Operator.in, value: [] } }, { self: 'sourceUserId' }],
+              all: [
+                { rule: { field: 'type', operator: Operator.in, value: [] } },
+                { self: 'sourceUserId' },
+              ],
             },
             // inviteOrganizationUser: high roles (owner/admin) require own
             {
               all: [
-                { rule: { field: 'type', operator: Operator.in, value: ['inviteOrganizationUser'] } },
+                {
+                  rule: { field: 'type', operator: Operator.in, value: ['inviteOrganizationUser'] },
+                },
                 { rule: { field: 'content.role', operator: Operator.in, value: highRoles } },
                 { rel: 'sourceOrganization', action: 'own' },
               ],
@@ -176,7 +191,9 @@ export const rebacSchema: RebacSchema = {
             // inviteOrganizationUser: normal roles require manage
             {
               all: [
-                { rule: { field: 'type', operator: Operator.in, value: ['inviteOrganizationUser'] } },
+                {
+                  rule: { field: 'type', operator: Operator.in, value: ['inviteOrganizationUser'] },
+                },
                 { rule: { field: 'content.role', operator: Operator.notIn, value: highRoles } },
                 { rel: 'sourceOrganization', action: 'manage' },
               ],

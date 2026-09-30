@@ -124,7 +124,9 @@ describe('listStream', () => {
   });
 
   it('keeps tombstones across a fresh snapshot, except for rows the snapshot shows alive', () => {
-    const removed = remove(remove(page([row('0003'), row('0002'), row('0001')]), { id: '0003' }), { id: '0002' });
+    const removed = remove(remove(page([row('0003'), row('0002'), row('0001')]), { id: '0003' }), {
+      id: '0002',
+    });
     const next = listStream.snapshot(removed, page([row('0002'), row('0001')]));
 
     expect(next.__removed).toEqual(['0003']);

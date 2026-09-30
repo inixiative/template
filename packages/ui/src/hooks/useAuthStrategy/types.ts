@@ -32,4 +32,7 @@ export type EmbedAuthCompleteMessage = {
   success: boolean;
 };
 
-export type EmbedMessage = EmbedAuthRequiredMessage | EmbedAuthTokenMessage | EmbedAuthCompleteMessage;
+export type EmbedMessage =
+  | EmbedAuthRequiredMessage
+  | EmbedAuthTokenMessage
+  | EmbedAuthCompleteMessage;

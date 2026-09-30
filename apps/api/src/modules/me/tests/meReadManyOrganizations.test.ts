@@ -2,7 +2,12 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import type { z } from '@hono/zod-openapi';
 import type { User } from '@template/db/generated/client/client';
 import { Role } from '@template/db/generated/client/enums';
-import { cleanupTouchedTables, createOrganization, createOrganizationUser, createUser } from '@template/db/test';
+import {
+  cleanupTouchedTables,
+  createOrganization,
+  createOrganizationUser,
+  createUser,
+} from '@template/db/test';
 import { meRouter } from '#/modules/me';
 import type { meReadManyOrganizationsRoute } from '#/modules/me/routes/meReadManyOrganizations';
 import { createTestApp } from '#tests/createTestApp';
@@ -90,8 +95,14 @@ describe('GET /me/organizations', () => {
 
   it('hides a soft-deleted membership row from the relation include', async () => {
     const { entity: org } = await createOrganization({ name: 'Stale Membership Org' });
-    const { entity: membership } = await createOrganizationUser({ role: Role.member }, { user, organization: org });
-    await db.organizationUser.update({ where: { id: membership.id }, data: { deletedAt: new Date() } });
+    const { entity: membership } = await createOrganizationUser(
+      { role: Role.member },
+      { user, organization: org },
+    );
+    await db.organizationUser.update({
+      where: { id: membership.id },
+      data: { deletedAt: new Date() },
+    });
 
     const response = await fetch(get('/api/v1/me/organizations'));
     const { data } = await json<ReadManyOrgsResponse>(response);

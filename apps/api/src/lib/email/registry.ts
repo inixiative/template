@@ -55,17 +55,23 @@ const inquiryInvite: ModelNarrowing = {
   relations: { sourceOrganization: { picks: ['name'] } },
 };
 
-const userRecipient = (bind: string): RecipientTarget => ({ where: { field: 'id', operator: 'equals', bind } });
+const userRecipient = (bind: string): RecipientTarget => ({
+  where: { field: 'id', operator: 'equals', bind },
+});
 
 const assertSubstitutes = (entries: Record<string, EmailEntry>): Record<string, EmailEntry> => {
   for (const [slug, entry] of Object.entries(entries)) {
     const substitute = entry.render?.substitute;
     if (substitute === undefined) continue;
-    if (substitute === slug) throw new Error(`Email registry: "${slug}" names itself as its substitute`);
+    if (substitute === slug)
+      throw new Error(`Email registry: "${slug}" names itself as its substitute`);
     const target = entries[substitute];
-    if (!target) throw new Error(`Email registry: "${slug}" names an unregistered substitute "${substitute}"`);
+    if (!target)
+      throw new Error(`Email registry: "${slug}" names an unregistered substitute "${substitute}"`);
     if (target.render?.substitute !== undefined) {
-      throw new Error(`Email registry: substitute "${substitute}" of "${slug}" may not itself declare a substitute`);
+      throw new Error(
+        `Email registry: substitute "${substitute}" of "${slug}" may not itself declare a substitute`,
+      );
     }
   }
   return entries;

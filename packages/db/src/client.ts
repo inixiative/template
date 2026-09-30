@@ -16,7 +16,11 @@ import type {
   ScopeContext,
 } from '@template/db/clientTypes';
 import { assertNoNestedWrites } from '@template/db/extensions/assertNoNestedWrites';
-import { captureBridgedContext, hasHooksFor, runInBridgedContext } from '@template/db/extensions/hookRegistry';
+import {
+  captureBridgedContext,
+  hasHooksFor,
+  runInBridgedContext,
+} from '@template/db/extensions/hookRegistry';
 import { mutationLifeCycleExtension } from '@template/db/extensions/mutationLifeCycle/mutationLifeCycleExtension';
 import { softDeleteScopeExtension } from '@template/db/extensions/softDeleteScopeExtension';
 import { telemetryExtension } from '@template/db/extensions/telemetryExtension';
@@ -30,7 +34,12 @@ import { prismaMap } from '@template/db/generated/prismaMap';
 import { auditActorContext } from '@template/db/lib/auditActorContext';
 import { acquireFindForUpdateLock } from '@template/db/lock/acquireFindForUpdateLock';
 import type { RuntimeDelegate } from '@template/db/utils/delegates';
-import { type AccessorName, isAccessorName, toAccessor, toModelName } from '@template/db/utils/modelNames';
+import {
+  type AccessorName,
+  isAccessorName,
+  toAccessor,
+  toModelName,
+} from '@template/db/utils/modelNames';
 import { LogScope, log } from '@template/shared/logger';
 import { type ConcurrencyType, getConcurrency, resolveAll } from '@template/shared/utils';
 import { castArray } from 'lodash-es';
@@ -63,7 +72,8 @@ const drainFinally = async (openTransaction: OpenTransaction | null): Promise<vo
   const fns = openTransaction.finallyFns.splice(0);
   const results = await Promise.allSettled(fns.map((fn) => Promise.resolve().then(fn)));
   for (const result of results) {
-    if (result.status === 'rejected') log.error('db.onFinally() callback failed', result.reason, LogScope.db);
+    if (result.status === 'rejected')
+      log.error('db.onFinally() callback failed', result.reason, LogScope.db);
   }
 };
 
@@ -86,13 +96,20 @@ const dbMethods = {
   delegate: (model: string): RuntimeDelegate =>
     (db as unknown as Record<AccessorName, RuntimeDelegate>)[toAccessor(model)],
 
-  scope: async <T>(scopeId: string | undefined, fn: () => Promise<T>, context?: ScopeContext): Promise<T> => {
+  scope: async <T>(
+    scopeId: string | undefined,
+    fn: () => Promise<T>,
+    context?: ScopeContext,
+  ): Promise<T> => {
     if (store.getStore()) return fn();
     // Await inside the store — a returned lazy thenable would otherwise execute after the scope exits.
     return store.run(newScope(scopeId ?? null, context ?? null), async () => await fn());
   },
 
-  txn: async <T>(fn: () => Promise<T>, options?: { timeout?: number; maxWait?: number }): Promise<T> => {
+  txn: async <T>(
+    fn: () => Promise<T>,
+    options?: { timeout?: number; maxWait?: number },
+  ): Promise<T> => {
     const existing = store.getStore();
     if (existing?.openTransaction) return fn();
 
@@ -168,7 +185,10 @@ const dbMethods = {
     return existing ? run() : store.run(scope, run);
   },
 
-  onCommit: (callbacks: AfterCommitFn | AfterCommitFn[], types?: ConcurrencyType | ConcurrencyType[]): void => {
+  onCommit: (
+    callbacks: AfterCommitFn | AfterCommitFn[],
+    types?: ConcurrencyType | ConcurrencyType[],
+  ): void => {
     const openTransaction = store.getStore()?.openTransaction;
     if (!openTransaction) throw new Error('db.onCommit() requires db.txn()');
     const callbackList = castArray(callbacks);
@@ -216,7 +236,8 @@ const dbMethods = {
     );
   },
 
-  withDeleted: <T>(fn: () => T | Promise<T>): Promise<Awaited<T>> => auditActorContext.withSoftDeleteBypass(fn),
+  withDeleted: <T>(fn: () => T | Promise<T>): Promise<Awaited<T>> =>
+    auditActorContext.withSoftDeleteBypass(fn),
 
   getScopeId: (): string | null => store.getStore()?.scopeId ?? null,
 
@@ -244,15 +265,21 @@ const dbMethods = {
     // why: check is what keeps that true, by refusing any predicate the map cannot account for.
     const columnFor = (key: string): string => {
       const fields = meta.fields as Record<string, unknown>;
-      if (!fields[key]) throw new Error(`db.findForUpdate(): unknown field '${key}' on model '${model}'`);
+      if (!fields[key])
+        throw new Error(`db.findForUpdate(): unknown field '${key}' on model '${model}'`);
       return key;
     };
     const conds = keys.map((key) => {
       const column = Prisma.raw(`"${columnFor(key)}"`);
       const value = where[key];
-      if (value !== null && typeof value === 'object' && 'in' in (value as Record<string, unknown>)) {
+      if (
+        value !== null &&
+        typeof value === 'object' &&
+        'in' in (value as Record<string, unknown>)
+      ) {
         const list = (value as { in: unknown[] }).in;
-        if (!Array.isArray(list)) throw new Error(`db.findForUpdate(): the 'in' for '${key}' must be an array`);
+        if (!Array.isArray(list))
+          throw new Error(`db.findForUpdate(): the 'in' for '${key}' must be an array`);
         // why: an empty list locks nothing, which is what a batch caller with no rows means. Widening
         // why: to the whole table would be the one unrecoverable reading, and `IN ()` is a syntax error.
         if (!list.length) return Prisma.sql`1 = 0`;
@@ -260,7 +287,8 @@ const dbMethods = {
       }
       return Prisma.sql`${column} = ${value}`;
     });
-    if (options?.upserting) await acquireFindForUpdateLock(openTransaction, modelName, where, options.waitMs);
+    if (options?.upserting)
+      await acquireFindForUpdateLock(openTransaction, modelName, where, options.waitMs);
     return db.$queryRaw<T[]>(
       Prisma.sql`SELECT * FROM ${Prisma.raw(`"${table}"`)} WHERE ${Prisma.join(conds, ' AND ')} FOR UPDATE`,
     );
@@ -291,7 +319,8 @@ const bareDelegate = (model: string | symbol): unknown => {
   if (cached) return cached;
 
   const target = (db.raw as unknown as Record<string | symbol, unknown>)[model];
-  if (!target || typeof target !== 'object' || typeof model !== 'string' || !isAccessorName(model)) return target;
+  if (!target || typeof target !== 'object' || typeof model !== 'string' || !isAccessorName(model))
+    return target;
   const modelName = toModelName(model);
 
   const delegate = new Proxy(target as Record<string, unknown>, {
@@ -304,9 +333,12 @@ const bareDelegate = (model: string | symbol): unknown => {
           return (member as (a: unknown) => Promise<unknown>).call(t, args);
         }
         return dbMethods.txn(() => {
-          const live = (db as unknown as Record<string | symbol, Record<string, (a: unknown) => Promise<unknown>>>)[
-            model
-          ];
+          const live = (
+            db as unknown as Record<
+              string | symbol,
+              Record<string, (a: unknown) => Promise<unknown>>
+            >
+          )[model];
           return live[op as string]!(args);
         });
       };
@@ -320,7 +352,8 @@ export const db: Db = new Proxy({} as Db, {
   get(_, prop: string) {
     if (prop in dbMethods) return (dbMethods as Record<string, unknown>)[prop];
     const openTransaction = store.getStore()?.openTransaction;
-    if (openTransaction) return (openTransaction.client as unknown as Record<string, unknown>)[prop];
+    if (openTransaction)
+      return (openTransaction.client as unknown as Record<string, unknown>)[prop];
     return bareDelegate(prop);
   },
 });

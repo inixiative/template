@@ -32,17 +32,25 @@ describe('checkExpectations (the "can this belong to this template" walk)', () =
   const lens: EmailLens = { recipient: lensFor('User'), system: systemSlot() };
 
   it('accepts paths that resolve against the lens, across scalars and through relations', () => {
-    const checks = checkExpectations(['recipient.email', 'recipient.displayName', 'recipient.contacts.label'], lens);
+    const checks = checkExpectations(
+      ['recipient.email', 'recipient.displayName', 'recipient.contacts.label'],
+      lens,
+    );
     expect(checks.every((check) => check.ok)).toBe(true);
   });
 
   it('rejects paths the lens never exposed — including ones that merely resemble real fields', () => {
-    const checks = checkExpectations(['recipient.notAColumn', 'recipient.contacts.notAField', 'sender.name'], lens);
+    const checks = checkExpectations(
+      ['recipient.notAColumn', 'recipient.contacts.notAField', 'sender.name'],
+      lens,
+    );
     expect(checks.map((check) => check.ok)).toEqual([false, false, false]);
   });
 
   it('accepts the open-ended tail beneath a Json column (covered by the opacity warning instead)', () => {
-    expect(checkExpectations(['recipient.contacts.permissionRules.anything.below'], lens)[0]?.ok).toBe(true);
+    expect(
+      checkExpectations(['recipient.contacts.permissionRules.anything.below'], lens)[0]?.ok,
+    ).toBe(true);
   });
 
   it('resolves system.* against the system lens like any other root', () => {
@@ -61,7 +69,10 @@ describe('checkExpectations (the "can this belong to this template" walk)', () =
 describe('collectUnprovidedPathWarnings (save-time token lint)', () => {
   it('phrases each unprovided path for the author and stays silent on provided ones', () => {
     const lens: EmailLens = { recipient: lensFor('User') };
-    const warnings = collectUnprovidedPathWarnings(['recipient.email', 'recipient.notAColumn'], lens);
+    const warnings = collectUnprovidedPathWarnings(
+      ['recipient.email', 'recipient.notAColumn'],
+      lens,
+    );
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toContain('{{recipient.notAColumn}}');
     expect(warnings[0]).toContain('literal text');

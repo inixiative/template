@@ -9,11 +9,15 @@ import type { Prisma } from '@template/db/generated/client/client';
 export type ModelName = Prisma.ModelName;
 
 // DefaultSelection gives full model with required scalars (like User, Organization exports)
-export type ModelOf<K extends ModelName> = runtime.Types.Result.DefaultSelection<Prisma.TypeMap['model'][K]['payload']>;
+export type ModelOf<K extends ModelName> = runtime.Types.Result.DefaultSelection<
+  Prisma.TypeMap['model'][K]['payload']
+>;
 
-export type CreateInputOf<K extends ModelName> = Prisma.TypeMap['model'][K]['operations']['create']['args']['data'];
+export type CreateInputOf<K extends ModelName> =
+  Prisma.TypeMap['model'][K]['operations']['create']['args']['data'];
 
-export type WhereUniqueOf<K extends ModelName> = Prisma.TypeMap['model'][K]['operations']['upsert']['args']['where'];
+export type WhereUniqueOf<K extends ModelName> =
+  Prisma.TypeMap['model'][K]['operations']['upsert']['args']['where'];
 
 export type Serialized<T> = T extends Date
   ? string
@@ -46,7 +50,10 @@ export type BuildContext = {
   [K in ModelName as Uncapitalize<K>]?: ModelOf<K>;
 };
 
-export type BuildResult<K extends ModelName, O extends Partial<CreateInputOf<K>> | undefined = undefined> = {
+export type BuildResult<
+  K extends ModelName,
+  O extends Partial<CreateInputOf<K>> | undefined = undefined,
+> = {
   entity: ModelWithOverrides<K, O> & {
     __serialize(): Serialized<ModelWithOverrides<K, O>>;
   };
@@ -83,7 +90,10 @@ export type Factory<K extends ModelName> = {
     overrides?: O,
     context?: BuildContext,
   ) => Promise<BuildResult<K, O>>;
-  create: (overrides?: Partial<CreateInputOf<K>>, context?: BuildContext) => Promise<BuildResult<K>>;
+  create: (
+    overrides?: Partial<CreateInputOf<K>>,
+    context?: BuildContext,
+  ) => Promise<BuildResult<K>>;
   upsert: (
     where: WhereUniqueOf<K>,
     overrides?: Partial<CreateInputOf<K>>,

@@ -1,7 +1,16 @@
 import { afterAll, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
-import { InquiryResourceModel, InquiryStatus, InquiryType } from '@template/db/generated/client/enums';
-import { cleanupTouchedTables, createInquiry, createOrganization, createUser } from '@template/db/test';
+import {
+  InquiryResourceModel,
+  InquiryStatus,
+  InquiryType,
+} from '@template/db/generated/client/enums';
+import {
+  cleanupTouchedTables,
+  createInquiry,
+  createOrganization,
+  createUser,
+} from '@template/db/test';
 import { validateUniqueInquiry } from '#/modules/inquiry/validations/validateUniqueInquiry';
 
 afterAll(async () => {

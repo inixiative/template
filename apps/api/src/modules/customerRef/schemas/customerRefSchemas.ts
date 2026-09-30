@@ -4,7 +4,12 @@
  * @partOf feature:customer
  * @uses none
  */
-import { CustomerRefScalarSchema, OrganizationScalarSchema, SpaceScalarSchema, UserScalarSchema } from '@template/db';
+import {
+  CustomerRefScalarSchema,
+  OrganizationScalarSchema,
+  SpaceScalarSchema,
+  UserScalarSchema,
+} from '@template/db';
 import { Tags } from '#/modules/tags';
 
 // Customer side - who is the customer (User, Org, or Space)

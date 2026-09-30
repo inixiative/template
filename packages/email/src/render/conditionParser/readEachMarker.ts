@@ -48,14 +48,22 @@ export const readEachMarker = (content: string, i: number): EachMarker | null =>
     const eq = content.indexOf('=', cursor);
     const whitespaceOffset = content.slice(cursor, nextBrace).search(/\s/);
     const nextWhitespace = whitespaceOffset === -1 ? -1 : cursor + whitespaceOffset;
-    if (eq === -1 || eq > nextBrace || (nextWhitespace !== -1 && nextWhitespace < eq) || eq === cursor) {
+    if (
+      eq === -1 ||
+      eq > nextBrace ||
+      (nextWhitespace !== -1 && nextWhitespace < eq) ||
+      eq === cursor
+    ) {
       const { value, next } = readBareWord(content, cursor);
-      attributeErrors.push(`malformed attribute "${value}" on {{#each}} block (expected name=value)`);
+      attributeErrors.push(
+        `malformed attribute "${value}" on {{#each}} block (expected name=value)`,
+      );
       cursor = next;
       continue;
     }
     const attrName = content.slice(cursor, eq).trim();
-    if (seenAttributes.has(attrName)) attributeErrors.push(`duplicate ${attrName}= attribute on {{#each}} block`);
+    if (seenAttributes.has(attrName))
+      attributeErrors.push(`duplicate ${attrName}= attribute on {{#each}} block`);
     seenAttributes.add(attrName);
     if (attrName !== 'as' && attrName !== 'index' && attrName !== 'filter') {
       attributeErrors.push(`unknown ${attrName}= attribute on {{#each}} block`);
@@ -72,7 +80,9 @@ export const readEachMarker = (content: string, i: number): EachMarker | null =>
           cursor = close;
           continue;
         }
-        ({ rule: filter, ruleError: filterError } = parseRuleJson(content.slice(valueStart, braceEnd + 1)));
+        ({ rule: filter, ruleError: filterError } = parseRuleJson(
+          content.slice(valueStart, braceEnd + 1),
+        ));
         cursor = braceEnd + 1;
         continue;
       }

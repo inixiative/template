@@ -10,7 +10,13 @@ export {
   hasPendingSpills,
   spillToOutbox,
 } from '#/jobs/outbox/accumulator';
-export { laneDepthCap, lowWater, MAX_DRAIN_ATTEMPTS, maxQueueDepth, maxSlowQueueDepth } from '#/jobs/outbox/config';
+export {
+  laneDepthCap,
+  lowWater,
+  MAX_DRAIN_ATTEMPTS,
+  maxQueueDepth,
+  maxSlowQueueDepth,
+} from '#/jobs/outbox/config';
 export {
   clearOverflow,
   isLaneOverflowing,

@@ -22,11 +22,13 @@ describe('recipientLens', () => {
 });
 
 describe('registry — declarative invariants', () => {
-  const entityPicks = (entry: (typeof registry)[string]) => (entry.entity.root as { picks: string[] }).picks;
+  const entityPicks = (entry: (typeof registry)[string]) =>
+    (entry.entity.root as { picks: string[] }).picks;
 
   it('every recipient bind names a field the entity picks', () => {
     for (const entry of Object.values(registry)) {
-      for (const name of requiredBindings(entry.recipients.where)) expect(entityPicks(entry)).toContain(name);
+      for (const name of requiredBindings(entry.recipients.where))
+        expect(entityPicks(entry)).toContain(name);
     }
   });
 

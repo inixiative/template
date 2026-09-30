@@ -24,15 +24,23 @@ export const openTransactionRegistration = (openTransaction: OpenTransaction): s
   return registrationToken;
 };
 
-export const closeTransactionRegistration = (registrationToken: string, openTransaction: OpenTransaction): void => {
+export const closeTransactionRegistration = (
+  registrationToken: string,
+  openTransaction: OpenTransaction,
+): void => {
   pendingRegistrations.delete(registrationToken);
-  if (openTransaction.prismaTransactionId) itxToOpenTransaction.delete(openTransaction.prismaTransactionId);
+  if (openTransaction.prismaTransactionId)
+    itxToOpenTransaction.delete(openTransaction.prismaTransactionId);
   openTransaction.prismaTransactionId = null;
 };
 
 const registrationTokenFrom = (args: unknown): string | undefined => {
-  const identifier = (args as { where?: Record<string, unknown> } | undefined)?.where?.[registrationProbe.field];
-  return typeof identifier === 'string' && pendingRegistrations.has(identifier) ? identifier : undefined;
+  const identifier = (args as { where?: Record<string, unknown> } | undefined)?.where?.[
+    registrationProbe.field
+  ];
+  return typeof identifier === 'string' && pendingRegistrations.has(identifier)
+    ? identifier
+    : undefined;
 };
 
 // Runs on every findFirst, so the token lookup is the cheap first gate.
@@ -52,7 +60,11 @@ export const claimPendingRegistration = (params: { args: unknown }): void => {
 };
 
 // Null = no transaction: the mutation came in on db.raw, which opts out of the life cycle.
-export const getCurrentTransaction = (model: string, operation: string, params: unknown): OpenTransaction | null => {
+export const getCurrentTransaction = (
+  model: string,
+  operation: string,
+  params: unknown,
+): OpenTransaction | null => {
   const prismaTransaction = readPrismaTransaction(params);
   if (!prismaTransaction) return null;
 

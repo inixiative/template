@@ -16,29 +16,44 @@ export type ListStreamState<R extends StreamRow = StreamRow> = {
   __removed?: string[];
 };
 
-const withTotal = (pagination: PaginateResponse | undefined, delta: number): PaginateResponse | undefined => {
+const withTotal = (
+  pagination: PaginateResponse | undefined,
+  delta: number,
+): PaginateResponse | undefined => {
   if (pagination?.total === undefined) return pagination;
   const total = Math.max(0, pagination.total + delta);
-  return { ...pagination, total, totalPages: pagination.pageSize ? Math.ceil(total / pagination.pageSize) : undefined };
+  return {
+    ...pagination,
+    total,
+    totalPages: pagination.pageSize ? Math.ceil(total / pagination.pageSize) : undefined,
+  };
 };
 
 const isBeyondLoadedRows = (state: ListStreamState, id: string): boolean => {
   const oldest = state.data.at(-1);
-  return (state.pagination?.total ?? state.data.length) > state.data.length && !!oldest && id < oldest.id;
+  return (
+    (state.pagination?.total ?? state.data.length) > state.data.length && !!oldest && id < oldest.id
+  );
 };
 
-const versionOf = (row: StreamRow): number => Date.parse(String((row as { updatedAt?: unknown }).updatedAt));
+const versionOf = (row: StreamRow): number =>
+  Date.parse(String((row as { updatedAt?: unknown }).updatedAt));
 
 const isOlderThan = (row: StreamRow, held: StreamRow): boolean => versionOf(row) < versionOf(held);
 
 const trimToPage = <R extends StreamRow>(data: R[], pageSize: number | undefined): R[] =>
   pageSize && data.length > pageSize ? data.slice(0, pageSize) : data;
 
-const upsert = <S extends ListStreamState<R>, R extends StreamRow>(state: S, row: R, context: FoldContext = {}): S => {
+const upsert = <S extends ListStreamState<R>, R extends StreamRow>(
+  state: S,
+  row: R,
+  context: FoldContext = {},
+): S => {
   if (state.__removed?.includes(row.id)) {
     if (!context.revive) return state;
     const revived = { ...state, __removed: state.__removed.filter((id) => id !== row.id) };
-    if (isBeyondLoadedRows(revived, row.id)) return { ...revived, pagination: withTotal(revived.pagination, 1) };
+    if (isBeyondLoadedRows(revived, row.id))
+      return { ...revived, pagination: withTotal(revived.pagination, 1) };
     return upsert(revived, row, { ordering: context.ordering });
   }
   const index = state.data.findIndex((held) => held.id === row.id);

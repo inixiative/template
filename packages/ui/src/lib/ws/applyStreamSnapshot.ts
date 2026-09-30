@@ -15,5 +15,7 @@ export const applyStreamSnapshot = (event: WSStreamSnapshotEvent): void => {
   const fold = streamFoldFor(definition.kind).snapshot;
   useAppStore
     .getState()
-    .client?.setQueryData(dataStreamQueryKey(event.stream), (previous: unknown) => fold(previous, event.payload));
+    .client?.setQueryData(dataStreamQueryKey(event.stream), (previous: unknown) =>
+      fold(previous, event.payload),
+    );
 };

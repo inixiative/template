@@ -6,7 +6,10 @@
  */
 export type LogStreamState<E = unknown> = { data: E[] };
 
-const append = <S extends LogStreamState<E>, E>(state: S, entry: E): S => ({ ...state, data: [...state.data, entry] });
+const append = <S extends LogStreamState<E>, E>(state: S, entry: E): S => ({
+  ...state,
+  data: [...state.data, entry],
+});
 
 const snapshot = <S extends LogStreamState>(_previous: S | undefined, next: S): S => next;
 

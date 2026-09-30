@@ -62,7 +62,11 @@ describe('cache', () => {
     const key = cacheKey('user', 'rich-types');
     const value = { map: new Map([['a', 1]]), set: new Set([1, 2, 3]), big: 42n };
     await cache(key, async () => value);
-    const hit = await cache<typeof value>(key, async () => ({ map: new Map(), set: new Set(), big: 0n }));
+    const hit = await cache<typeof value>(key, async () => ({
+      map: new Map(),
+      set: new Set(),
+      big: 0n,
+    }));
     expect(hit.map).toBeInstanceOf(Map);
     expect(hit.map.get('a')).toBe(1);
     expect(hit.set).toBeInstanceOf(Set);
@@ -307,7 +311,12 @@ describe('large cache writes', () => {
     const value = 'x'.repeat(300 * 1024);
     const [record, ...rest] = await largeWrites(() => cache(key, async () => value, 120));
     expect(rest).toHaveLength(0);
-    expect(record?.fields).toMatchObject({ cacheKey: key, domain: 'user', ttlSeconds: 120, writer: 'cache' });
+    expect(record?.fields).toMatchObject({
+      cacheKey: key,
+      domain: 'user',
+      ttlSeconds: 120,
+      writer: 'cache',
+    });
     expect(record?.fields.bytes as number).toBeGreaterThan(256 * 1024);
     expect(await getRedisClient().exists(key)).toBe(1);
   });
@@ -319,6 +328,8 @@ describe('large cache writes', () => {
   });
 
   it('says nothing about a small value', async () => {
-    expect(await largeWrites(() => cache(cacheKey('user', 'small'), async () => ({ n: 1 })))).toHaveLength(0);
+    expect(
+      await largeWrites(() => cache(cacheKey('user', 'small'), async () => ({ n: 1 }))),
+    ).toHaveLength(0);
   });
 });

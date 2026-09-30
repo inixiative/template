@@ -30,7 +30,10 @@ export const syncStoreFromSearchParams = ({
 }: SyncStoreFromSearchParamsInput): void => {
   if (searchParams.spaceId && tenant.context.space?.id !== searchParams.spaceId) {
     tenant.setSpace(searchParams.spaceId);
-  } else if (searchParams.organizationId && tenant.context.organization?.id !== searchParams.organizationId) {
+  } else if (
+    searchParams.organizationId &&
+    tenant.context.organization?.id !== searchParams.organizationId
+  ) {
     tenant.setOrganization(searchParams.organizationId);
   }
 };

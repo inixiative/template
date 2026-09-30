@@ -19,7 +19,8 @@ export const lockedLiveReferences = async (references: RuleReference[]): Promise
     const rows = await db.findForUpdate<{ id: string; deletedAt: Date | null }>(model, {
       id: { in: [...new Set(map(group, 'id'))] },
     });
-    for (const row of rows) if (row.deletedAt == null) live.add(referenceKey({ model, id: row.id }));
+    for (const row of rows)
+      if (row.deletedAt == null) live.add(referenceKey({ model, id: row.id }));
   }
   return live;
 };

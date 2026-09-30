@@ -87,7 +87,8 @@ export const registerRuleReferenceReferencedHook = () => {
           } as Prisma.RuleReferenceWhereInput,
           data: { referencedDeletedAt },
         });
-        if (referencedDeletedAt) for (const edge of edges) await publishStale(edge, referencedDeletedAt);
+        if (referencedDeletedAt)
+          for (const edge of edges) await publishStale(edge, referencedDeletedAt);
       }
     },
   );

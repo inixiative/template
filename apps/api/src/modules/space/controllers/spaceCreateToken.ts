@@ -12,25 +12,28 @@ import { makeController } from '#/lib/utils/makeController';
 import { createToken } from '#/modules/me/services/createToken';
 import { spaceCreateTokenRoute } from '#/modules/space/routes/spaceCreateToken';
 
-export const spaceCreateTokenController = makeController(spaceCreateTokenRoute, async (c, respond) => {
-  const permix = c.get('permix');
-  const space = getResource<'space'>(c);
-  const body = c.req.valid('json');
+export const spaceCreateTokenController = makeController(
+  spaceCreateTokenRoute,
+  async (c, respond) => {
+    const permix = c.get('permix');
+    const space = getResource<'space'>(c);
+    const body = c.req.valid('json');
 
-  const hydrated = await hydrate('space', space);
+    const hydrated = await hydrate('space', space);
 
-  if (!check(permix, rebacSchema, 'space', { ...hydrated, role: body.role }, 'assign')) {
-    throw makeError({ status: 403, message: `Cannot create ${body.role} token` });
-  }
+    if (!check(permix, rebacSchema, 'space', { ...hydrated, role: body.role }, 'assign')) {
+      throw makeError({ status: 403, message: `Cannot create ${body.role} token` });
+    }
 
-  const token = await createToken(c, {
-    name: body.name,
-    ownerModel: 'Space',
-    organizationId: space.organizationId,
-    spaceId: space.id,
-    role: body.role,
-    expiresAt: body.expiresAt,
-  });
+    const token = await createToken(c, {
+      name: body.name,
+      ownerModel: 'Space',
+      organizationId: space.organizationId,
+      spaceId: space.id,
+      role: body.role,
+      expiresAt: body.expiresAt,
+    });
 
-  return respond.created(token);
-});
+    return respond.created(token);
+  },
+);

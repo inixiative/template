@@ -53,7 +53,10 @@ const deniedActions: Record<Action, false> = {
 
 export type Permix = {
   check: (resource: string, action: Action, id?: string, data?: unknown) => boolean;
-  setup: (perms: PermissionEntry | PermissionEntry[], options?: { replace?: boolean }) => Promise<void>;
+  setup: (
+    perms: PermissionEntry | PermissionEntry[],
+    options?: { replace?: boolean },
+  ) => Promise<void>;
   setSuperadmin: (value: boolean) => void;
   isSuperadmin: () => boolean;
   setUserId: (id: UserId) => void;

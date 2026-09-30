@@ -28,14 +28,16 @@ export const securitySchemes = {
     type: 'apiKey',
     in: 'header',
     name: 'x-internal-secret',
-    description: 'Shared secret for service-to-service calls under `/api/internal`. Not issued to API consumers.',
+    description:
+      'Shared secret for service-to-service calls under `/api/internal`. Not issued to API consumers.',
   },
 } as const;
 
 export type SecuritySchemeName = keyof typeof securitySchemes;
 
-export const securityRequirements = (...names: SecuritySchemeName[]): NonNullable<RouteConfig['security']> =>
-  names.map((name) => ({ [name]: [] }));
+export const securityRequirements = (
+  ...names: SecuritySchemeName[]
+): NonNullable<RouteConfig['security']> => names.map((name) => ({ [name]: [] }));
 
 export const registerSecuritySchemes = (app: OpenAPIHono<AppEnv>) => {
   for (const [name, scheme] of Object.entries(securitySchemes)) {

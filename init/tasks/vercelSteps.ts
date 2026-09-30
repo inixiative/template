@@ -13,7 +13,10 @@ type VercelProgressGroup = {
   getLabel: (config: ProjectConfig, completedCount: number, totalCount: number) => string;
 };
 
-const countCompletedActions = (progress: VercelProgress, actions: readonly VercelAction[]): number => {
+const countCompletedActions = (
+  progress: VercelProgress,
+  actions: readonly VercelAction[],
+): number => {
   return actions.filter((action) => progress[action]).length;
 };
 
@@ -30,7 +33,9 @@ const vercelWebSteps: readonly VercelProgressItem[] = [
   {
     action: 'createWebProject',
     getLabel: (config) =>
-      config.vercel.webProjectId ? `Web: Project created (${config.vercel.webProjectId})` : 'Web: Project created',
+      config.vercel.webProjectId
+        ? `Web: Project created (${config.vercel.webProjectId})`
+        : 'Web: Project created',
   },
   {
     action: 'configureWebRootDirectory',

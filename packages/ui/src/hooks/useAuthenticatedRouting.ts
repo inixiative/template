@@ -5,12 +5,18 @@
  * @uses none
  */
 import { useLocation } from '@tanstack/react-router';
-import { applyAuthorizedContext, hasContextChanged } from '@template/ui/hooks/useAuthenticatedRouting/contextAccess';
+import {
+  applyAuthorizedContext,
+  hasContextChanged,
+} from '@template/ui/hooks/useAuthenticatedRouting/contextAccess';
 import {
   parseRoutingSearchParams,
   syncStoreFromSearchParams,
 } from '@template/ui/hooks/useAuthenticatedRouting/querySync';
-import { buildSearchParamUpdates, replaceUrlSearchParams } from '@template/ui/hooks/useAuthenticatedRouting/urlSync';
+import {
+  buildSearchParamUpdates,
+  replaceUrlSearchParams,
+} from '@template/ui/hooks/useAuthenticatedRouting/urlSync';
 import { checkContextPermission } from '@template/ui/lib/checkContextPermission';
 import { findRoute } from '@template/ui/lib/findRoute';
 import { useAppStore } from '@template/ui/store';

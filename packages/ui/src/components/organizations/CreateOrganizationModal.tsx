@@ -24,7 +24,11 @@ export const CreateOrganizationModal = memo(
     const [slugTouched, setSlugTouched] = useState(false);
 
     const debouncedSlug = useDebounce(slug, 300);
-    const { isAvailable, isChecking } = useValidateUniqueness('organization', 'slug', debouncedSlug);
+    const { isAvailable, isChecking } = useValidateUniqueness(
+      'organization',
+      'slug',
+      debouncedSlug,
+    );
 
     const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       const newName = e.target.value;
@@ -91,7 +95,10 @@ export const CreateOrganizationModal = memo(
               {slug && (
                 <div className="absolute right-3 top-1/2 -translate-y-1/2">
                   {isChecking ? (
-                    <Icon icon="lucide:loader-2" className="h-4 w-4 animate-spin text-muted-foreground" />
+                    <Icon
+                      icon="lucide:loader-2"
+                      className="h-4 w-4 animate-spin text-muted-foreground"
+                    />
                   ) : isAvailable ? (
                     <Icon icon="lucide:circle-check" className="h-4 w-4 text-green-600" />
                   ) : (
@@ -111,7 +118,10 @@ export const CreateOrganizationModal = memo(
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" disabled={!name.trim() || !slug.trim() || !isAvailable || isChecking}>
+            <Button
+              type="submit"
+              disabled={!name.trim() || !slug.trim() || !isAvailable || isChecking}
+            >
               Create
             </Button>
           </div>

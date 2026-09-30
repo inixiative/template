@@ -11,7 +11,10 @@ import {
 } from '@template/shared/bracketQuery';
 
 export type BracketQueryPrimitive = string | number | boolean | null;
-export type BracketQueryValue = BracketQueryPrimitive | BracketQueryPrimitive[] | BracketQueryRecord;
+export type BracketQueryValue =
+  | BracketQueryPrimitive
+  | BracketQueryPrimitive[]
+  | BracketQueryRecord;
 export type BracketQueryRecord = {
   [key: string]: BracketQueryValue | undefined;
 };
@@ -38,14 +41,22 @@ export const parseBracketNotation = (url: string): BracketQueryRecord => {
     // `[$]` = number. Drop the marker from the key path and cast the value below.
     const lastSegment = rawKeys[rawKeys.length - 1];
     const marker =
-      lastSegment === BRACKET_SYMBOL_SEGMENT ? 'symbol' : lastSegment === BRACKET_NUMBER_SEGMENT ? 'number' : undefined;
+      lastSegment === BRACKET_SYMBOL_SEGMENT
+        ? 'symbol'
+        : lastSegment === BRACKET_NUMBER_SEGMENT
+          ? 'number'
+          : undefined;
     const keys = marker ? rawKeys.slice(0, -1) : rawKeys;
     if (keys.length < 1) continue;
 
     let current: BracketQueryRecord = result;
     for (let i = 0; i < keys.length - 1; i++) {
       const currentValue = current[keys[i]];
-      if (typeof currentValue !== 'object' || currentValue === null || Array.isArray(currentValue)) {
+      if (
+        typeof currentValue !== 'object' ||
+        currentValue === null ||
+        Array.isArray(currentValue)
+      ) {
         current[keys[i]] = {};
       }
       current = current[keys[i]] as BracketQueryRecord;
@@ -59,7 +70,11 @@ export const parseBracketNotation = (url: string): BracketQueryRecord => {
     // doesn't cast is malformed — skip the leaf rather than silently storing the
     // raw string. `=== undefined` so the valid null symbol survives.
     const cast =
-      marker === 'symbol' ? castBracketSymbol(decoded) : marker === 'number' ? castBracketNumber(decoded) : undefined;
+      marker === 'symbol'
+        ? castBracketSymbol(decoded)
+        : marker === 'number'
+          ? castBracketNumber(decoded)
+          : undefined;
     if (marker && cast === undefined) continue;
     const decodedValue: BracketQueryPrimitive = cast !== undefined ? cast : decoded;
     const leafKey = keys[keys.length - 1];

@@ -22,44 +22,51 @@ export const rotateEncryptionKeys: JobHandler<void> = makeSingletonJob(async (ct
       const modelConfig = ENCRYPTED_MODELS[modelName];
       const delegate = db.delegate(modelConfig.model);
 
-      return (Object.keys(modelConfig.keys) as Array<keyof typeof modelConfig.keys>).map(async (keyName) => {
-        const keyConfig = modelConfig.keys[keyName] as EncryptedFieldConfig<ModelName>;
-        const targetVersion = Number.parseInt(process.env[`${keyConfig.envPrefix}_ENCRYPTION_VERSION`]!, 10);
-        const fromVersion = targetVersion - 1;
+      return (Object.keys(modelConfig.keys) as Array<keyof typeof modelConfig.keys>).map(
+        async (keyName) => {
+          const keyConfig = modelConfig.keys[keyName] as EncryptedFieldConfig<ModelName>;
+          const targetVersion = Number.parseInt(
+            process.env[`${keyConfig.envPrefix}_ENCRYPTION_VERSION`]!,
+            10,
+          );
+          const fromVersion = targetVersion - 1;
 
-        const fields = getFieldNames(String(keyName));
-        const staleRecords = await delegate.findMany({
-          where: { [fields.versionField]: fromVersion },
-        });
-        if (!staleRecords.length) return [];
+          const fields = getFieldNames(String(keyName));
+          const staleRecords = await delegate.findMany({
+            where: { [fields.versionField]: fromVersion },
+          });
+          if (!staleRecords.length) return [];
 
-        log.info(`Starting rotation: ${modelName}.${String(keyName)} ${fromVersion} → ${targetVersion}`);
-        log.info(`Found ${staleRecords.length} total records to rotate`);
+          log.info(
+            `Starting rotation: ${modelName}.${String(keyName)} ${fromVersion} → ${targetVersion}`,
+          );
+          log.info(`Found ${staleRecords.length} total records to rotate`);
 
-        return staleRecords.map((record: Record<string, unknown>) => async () => {
-          try {
-            const decryptRecord = record as DecryptFieldInput<typeof modelName, typeof keyName>;
-            const decrypted = await decryptField(modelName, keyName, decryptRecord);
-            const recordWithData = { ...record, [keyName]: decrypted };
-            const encryptedData = await encryptField(modelName, keyName, recordWithData);
+          return staleRecords.map((record: Record<string, unknown>) => async () => {
+            try {
+              const decryptRecord = record as DecryptFieldInput<typeof modelName, typeof keyName>;
+              const decrypted = await decryptField(modelName, keyName, decryptRecord);
+              const recordWithData = { ...record, [keyName]: decrypted };
+              const encryptedData = await encryptField(modelName, keyName, recordWithData);
 
-            const updated = await delegate.updateManyAndReturn({
-              where: {
-                id: record.id,
-                [fields.versionField]: fromVersion,
-              },
-              data: encryptedData as Record<string, unknown>,
-            });
+              const updated = await delegate.updateManyAndReturn({
+                where: {
+                  id: record.id,
+                  [fields.versionField]: fromVersion,
+                },
+                data: encryptedData as Record<string, unknown>,
+              });
 
-            return updated.length > 0;
-          } catch (error) {
-            log.info(
-              `Failed to rotate ${modelName} record ${record.id}: ${error instanceof Error ? error.message : String(error)}`,
-            );
-            return false;
-          }
-        });
-      });
+              return updated.length > 0;
+            } catch (error) {
+              log.info(
+                `Failed to rotate ${modelName} record ${record.id}: ${error instanceof Error ? error.message : String(error)}`,
+              );
+              return false;
+            }
+          });
+        },
+      );
     }),
   );
 
@@ -68,9 +75,13 @@ export const rotateEncryptionKeys: JobHandler<void> = makeSingletonJob(async (ct
   const successCount = results.filter(Boolean).length;
   const failedCount = allRotations.length - successCount;
 
-  log.info(`Rotation complete: ${successCount}/${allRotations.length} records rotated successfully`);
+  log.info(
+    `Rotation complete: ${successCount}/${allRotations.length} records rotated successfully`,
+  );
 
   if (failedCount > 0) {
-    throw new Error(`Rotation incomplete: ${failedCount}/${allRotations.length} records failed to rotate`);
+    throw new Error(
+      `Rotation incomplete: ${failedCount}/${allRotations.length} records failed to rotate`,
+    );
   }
 });

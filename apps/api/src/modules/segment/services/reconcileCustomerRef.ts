@@ -10,15 +10,26 @@ import type { CustomerRef, Segment } from '@template/db/generated/client/client'
 import type { ProviderModel } from '@template/db/generated/client/enums';
 import { withRule } from '@template/shared/rules';
 import { ownedSegments, resolvedCustomerRefLens } from '#/modules/customerRef/lib/customerRefLens';
-import { applyMembershipDiff, type MembershipDiff } from '#/modules/segment/services/applyMembershipDiff';
-import { type HydratedCustomerRef, hydrateCustomerRefs } from '#/modules/segment/services/hydrateCustomerRefs';
+import {
+  applyMembershipDiff,
+  type MembershipDiff,
+} from '#/modules/segment/services/applyMembershipDiff';
+import {
+  type HydratedCustomerRef,
+  hydrateCustomerRefs,
+} from '#/modules/segment/services/hydrateCustomerRefs';
 import { isContinuous } from '#/modules/segment/services/reconcileSegment';
-import { buildReferenceMap, sortByDependency } from '#/modules/segment/services/segmentReferenceGraph';
+import {
+  buildReferenceMap,
+  sortByDependency,
+} from '#/modules/segment/services/segmentReferenceGraph';
 import { segmentRuleStates } from '#/modules/segment/services/segmentRuleHealth';
 
 export type CustomerRefReconciliation = { segmentId: string; diff: MembershipDiff }[];
 
-const providerOf = (customerRef: CustomerRef): { ownerModel: ProviderModel; ownerId: string } | null => {
+const providerOf = (
+  customerRef: CustomerRef,
+): { ownerModel: ProviderModel; ownerId: string } | null => {
   const target = polymorphicTarget(customerRef, 'CustomerRef', 'providerModel');
   return target ? { ownerModel: target.kind as ProviderModel, ownerId: target.id } : null;
 };
@@ -32,13 +43,17 @@ const recordDecision = (row: HydratedCustomerRef, segment: Segment, matches: boo
   if (!matches && index !== -1) row.segmentMembers.splice(index, 1);
 };
 
-export const reconcileCustomerRef = async (customerRefId: string): Promise<CustomerRefReconciliation> => {
+export const reconcileCustomerRef = async (
+  customerRefId: string,
+): Promise<CustomerRefReconciliation> => {
   const customerRef = await db.customerRef.findUnique({ where: { id: customerRefId } });
   if (!customerRef) return [];
   const provider = providerOf(customerRef);
   if (!provider) return [];
 
-  const segments = (await dynamicSegmentsOf(provider.ownerModel, provider.ownerId)).filter(isContinuous);
+  const segments = (await dynamicSegmentsOf(provider.ownerModel, provider.ownerId)).filter(
+    isContinuous,
+  );
   if (!segments.length) return [];
 
   const [row] = await hydrateCustomerRefs(provider.ownerModel, provider.ownerId, [customerRefId]);

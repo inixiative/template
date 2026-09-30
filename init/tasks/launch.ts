@@ -47,7 +47,9 @@ const sectionHasError = (config: ProjectConfig, key: keyof ProjectConfig): strin
  * Run all preflight checks against the current config.
  * Returns check results and whether all passed.
  */
-export const runPreflightChecks = (config: ProjectConfig): { checks: PreflightCheck[]; allPassed: boolean } => {
+export const runPreflightChecks = (
+  config: ProjectConfig,
+): { checks: PreflightCheck[]; allPassed: boolean } => {
   const checks: PreflightCheck[] = [];
 
   // Check each required section

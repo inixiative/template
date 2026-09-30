@@ -5,8 +5,20 @@
  * @uses primitive:sdk
  */
 import type { HydratedRecord } from '@template/db';
-import { spaceCreateInquiry, spaceSentManyInquiries, spaceSentManyInquiriesQueryKey } from '@template/sdk';
-import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Page } from '@template/ui/components';
+import {
+  spaceCreateInquiry,
+  spaceSentManyInquiries,
+  spaceSentManyInquiriesQueryKey,
+} from '@template/sdk';
+import {
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Page,
+} from '@template/ui/components';
 import { InquirySourceControls } from '@template/ui/components/inquiries';
 import { useCreateInquiryMutation, useQuery } from '@template/ui/hooks';
 import { checkPermission } from '@template/ui/hooks/usePermission';
@@ -83,7 +95,10 @@ export const SpaceUpdateInquiryPage = () => {
     setSlug('');
   };
 
-  const activeContent = activeInquiry?.content as { name?: string; slug?: string } | null | undefined;
+  const activeContent = activeInquiry?.content as
+    | { name?: string; slug?: string }
+    | null
+    | undefined;
 
   return (
     <Page

@@ -43,7 +43,11 @@ describe('emailTemplatePreflight', () => {
   it('a complete draft comes back clean', async () => {
     const result = await emailTemplatePreflight({ mjml: COMPLETE, subject: 'Your weekly digest' });
 
-    expect(result).toEqual({ findings: [], summary: { errors: 0, warnings: 0 }, renderWarnings: [] });
+    expect(result).toEqual({
+      findings: [],
+      summary: { errors: 0, warnings: 0 },
+      renderWarnings: [],
+    });
   });
 
   it('a sloppy draft without a slug reports unresolved tokens as warnings', async () => {
@@ -61,7 +65,9 @@ describe('emailTemplatePreflight', () => {
     expect(result.findings.find((finding) => finding.code === 'token.unresolved')?.location).toBe(
       'recipient.nickname_that_does_not_exist',
     );
-    expect(result.findings.find((finding) => finding.code === 'token.unresolved')?.severity).toBe('warning');
+    expect(result.findings.find((finding) => finding.code === 'token.unresolved')?.severity).toBe(
+      'warning',
+    );
     expect(result.findings.find((finding) => finding.code === 'image.alt.missing')?.location).toBe(
       'https://cdn.example/hero.png',
     );
@@ -69,9 +75,14 @@ describe('emailTemplatePreflight', () => {
   });
 
   it('turns render warnings from the sample render into error findings', async () => {
-    const result = await emailTemplatePreflight({ mjml: RENDER_WARNING, subject: 'Your weekly digest' });
+    const result = await emailTemplatePreflight({
+      mjml: RENDER_WARNING,
+      subject: 'Your weekly digest',
+    });
 
-    expect(result.renderWarnings).toEqual(['{{#each recipient.contacts}} did not resolve to an array']);
+    expect(result.renderWarnings).toEqual([
+      '{{#each recipient.contacts}} did not resolve to an array',
+    ]);
     expect(result.findings.filter((finding) => finding.code === 'render.warning')).toEqual([
       {
         code: 'render.warning',
@@ -92,7 +103,10 @@ describe('emailTemplatePreflight', () => {
     });
 
     const result = await emailTemplatePreflight({
-      mjml: COMPLETE.replace('Hello {{recipient.name}}', 'About {{data.content}} / {{data.notAColumn}}'),
+      mjml: COMPLETE.replace(
+        'Hello {{recipient.name}}',
+        'About {{data.content}} / {{data.notAColumn}}',
+      ),
       subject: 'Your weekly digest',
       slug: 'inquiry-invite-organization-user',
     });
@@ -129,7 +143,9 @@ describe('POST /api/admin/emailTemplate/preflight', () => {
     );
 
     expect(data.summary.errors).toBe(0);
-    expect(data.findings.find((finding) => finding.code === 'token.unresolved')?.severity).toBe('warning');
+    expect(data.findings.find((finding) => finding.code === 'token.unresolved')?.severity).toBe(
+      'warning',
+    );
   });
 
   it('rejects a body without mjml', async () => {
@@ -159,13 +175,18 @@ describe("emailTemplatePreflight — rules are judged through the owner's lens",
   it("a tag outside the owner's view is reported as a rule the draft cannot evaluate", async () => {
     const { entity: theirs } = await createOrganization();
     const { entity: mine } = await createOrganization();
-    const { entity: theirTag } = await createTag({ ownerModel: 'Organization' }, { organization: theirs });
+    const { entity: theirTag } = await createTag(
+      { ownerModel: 'Organization' },
+      { organization: theirs },
+    );
     const result = await emailTemplatePreflight({
       mjml: taggedDraft(theirTag.id),
       subject: 'Digest',
       ownerModel: 'Organization',
       organizationId: mine.id,
     });
-    expect(result.renderWarnings).toEqual([`rule names a Tag that no longer resolves: ${theirTag.id}`]);
+    expect(result.renderWarnings).toEqual([
+      `rule names a Tag that no longer resolves: ${theirTag.id}`,
+    ]);
   });
 });

@@ -50,11 +50,18 @@ describe('emailVersioning', () => {
 
   it('backpropagates a fresh template snapshot when a child component changes', async () => {
     const { template, components } = await saveEmailTemplate(greetingTemplate());
-    const templatesBefore = await db.auditLog.count({ where: { subjectEmailTemplateId: template.id } });
+    const templatesBefore = await db.auditLog.count({
+      where: { subjectEmailTemplateId: template.id },
+    });
 
-    await db.emailComponent.update({ where: { id: components[0].id }, data: { mjml: '<mj-text>Updated</mj-text>' } });
+    await db.emailComponent.update({
+      where: { id: components[0].id },
+      data: { mjml: '<mj-text>Updated</mj-text>' },
+    });
 
-    const newComponentSnapshot = await latestSnapshot({ subjectEmailComponentId: components[0].id });
+    const newComponentSnapshot = await latestSnapshot({
+      subjectEmailComponentId: components[0].id,
+    });
     const templateSnapshots = await db.auditLog.findMany({
       where: { subjectEmailTemplateId: template.id },
       orderBy: { createdAt: 'desc' },
@@ -68,7 +75,10 @@ describe('emailVersioning', () => {
     const { template, components } = await saveEmailTemplate(greetingTemplate());
     const v1 = await latestSnapshot({ subjectEmailTemplateId: template.id });
 
-    await db.emailComponent.update({ where: { id: components[0].id }, data: { mjml: '<mj-text>Updated</mj-text>' } });
+    await db.emailComponent.update({
+      where: { id: components[0].id },
+      data: { mjml: '<mj-text>Updated</mj-text>' },
+    });
     const v2 = await latestSnapshot({ subjectEmailTemplateId: template.id });
 
     const composedV2 = await recomposeSnapshot(v2!.id);
@@ -86,7 +96,9 @@ describe('emailVersioning', () => {
       where: { subjectEmailTemplateId: template.id },
       orderBy: { createdAt: 'desc' },
     });
-    const componentsBefore = await db.auditLog.count({ where: { subjectEmailComponentId: components[0].id } });
+    const componentsBefore = await db.auditLog.count({
+      where: { subjectEmailComponentId: components[0].id },
+    });
 
     await saveEmailTemplate(greetingTemplate());
 
@@ -94,7 +106,9 @@ describe('emailVersioning', () => {
       where: { subjectEmailTemplateId: template.id },
       orderBy: { createdAt: 'desc' },
     });
-    const componentsAfter = await db.auditLog.count({ where: { subjectEmailComponentId: components[0].id } });
+    const componentsAfter = await db.auditLog.count({
+      where: { subjectEmailComponentId: components[0].id },
+    });
 
     expect(templatesAfter.length).toBe(templatesBefore.length);
     expect(componentsAfter).toBe(componentsBefore);
@@ -115,7 +129,10 @@ describe('emailVersioning', () => {
     const snap1 = await latestSnapshot({ subjectEmailTemplateId: template.id });
     expect(await recomposeSnapshot(snap1!.id)).toBe(live1);
 
-    await db.emailComponent.update({ where: { id: components[0].id }, data: { mjml: '<mj-text>Updated</mj-text>' } });
+    await db.emailComponent.update({
+      where: { id: components[0].id },
+      data: { mjml: '<mj-text>Updated</mj-text>' },
+    });
 
     const liveTemplate = await db.emailTemplate.findUniqueOrThrow({ where: { id: template.id } });
     const live2 = await expand(liveTemplate.mjml, ctx);
@@ -126,7 +143,10 @@ describe('emailVersioning', () => {
   it('pins null and flags the live row when a referenced component is removed with no fallback', async () => {
     const { template, components } = await saveEmailTemplate(greetingTemplate());
 
-    await db.emailComponent.update({ where: { id: components[0].id }, data: { deletedAt: new Date() } });
+    await db.emailComponent.update({
+      where: { id: components[0].id },
+      data: { deletedAt: new Date() },
+    });
 
     const templateSnapshot = await latestSnapshot({ subjectEmailTemplateId: template.id });
     expect(templateSnapshot?.componentVersions).toEqual({ greeting: null });

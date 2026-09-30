@@ -29,5 +29,7 @@ const BUILDER_ONLY_KEYS = [
   'filterLens',
 ] as const;
 
-export const toOpenApi = <T extends RouteConfig>(route: T): Omit<T, (typeof BUILDER_ONLY_KEYS)[number]> =>
+export const toOpenApi = <T extends RouteConfig>(
+  route: T,
+): Omit<T, (typeof BUILDER_ONLY_KEYS)[number]> =>
   omit(route, BUILDER_ONLY_KEYS) as Omit<T, (typeof BUILDER_ONLY_KEYS)[number]>;

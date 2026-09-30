@@ -16,10 +16,24 @@ registerOrderedListHook();
 const { fetch } = createTestApp({ mount: [(app) => app.route('/unsubscribe', unsubscribeRouter)] });
 
 const post = (token: string) =>
-  fetch(new Request(`http://localhost/unsubscribe?token=${encodeURIComponent(token)}`, { method: 'POST' }));
+  fetch(
+    new Request(`http://localhost/unsubscribe?token=${encodeURIComponent(token)}`, {
+      method: 'POST',
+    }),
+  );
 
-const emailContact = (user: { id: string }, address: string, acceptedKinds: ('platform' | 'marketing')[]) =>
-  createContact({ ownerModel: 'User', userId: user.id, type: ContactType.email, value: { address }, acceptedKinds });
+const emailContact = (
+  user: { id: string },
+  address: string,
+  acceptedKinds: ('platform' | 'marketing')[],
+) =>
+  createContact({
+    ownerModel: 'User',
+    userId: user.id,
+    type: ContactType.email,
+    value: { address },
+    acceptedKinds,
+  });
 
 afterAll(async () => {
   await cleanupTouchedTables(db);
@@ -29,12 +43,20 @@ afterAll(async () => {
 describe('unsubscribe endpoint', () => {
   it('drops the signed kind from the contact on a one-click POST', async () => {
     const { entity: user } = await createUser();
-    const { entity: contact } = await emailContact(user, `unsub-${Date.now()}@example.com`, ['platform', 'marketing']);
+    const { entity: contact } = await emailContact(user, `unsub-${Date.now()}@example.com`, [
+      'platform',
+      'marketing',
+    ]);
 
-    const res = await post(signUnsubscribe({ userId: user.id, contactId: contact.id, kind: 'marketing' }));
+    const res = await post(
+      signUnsubscribe({ userId: user.id, contactId: contact.id, kind: 'marketing' }),
+    );
     expect(res.status).toBe(200);
 
-    const after = await db.contact.findUniqueOrThrow({ where: { id: contact.id }, select: { acceptedKinds: true } });
+    const after = await db.contact.findUniqueOrThrow({
+      where: { id: contact.id },
+      select: { acceptedKinds: true },
+    });
     expect(after.acceptedKinds).toEqual(['platform']);
   });
 
@@ -44,12 +66,19 @@ describe('unsubscribe endpoint', () => {
 
   it('is a no-op for a kind the contact never accepted', async () => {
     const { entity: user } = await createUser();
-    const { entity: contact } = await emailContact(user, `unsub2-${Date.now()}@example.com`, ['platform']);
+    const { entity: contact } = await emailContact(user, `unsub2-${Date.now()}@example.com`, [
+      'platform',
+    ]);
 
-    const res = await post(signUnsubscribe({ userId: user.id, contactId: contact.id, kind: 'marketing' }));
+    const res = await post(
+      signUnsubscribe({ userId: user.id, contactId: contact.id, kind: 'marketing' }),
+    );
     expect(res.status).toBe(200);
 
-    const after = await db.contact.findUniqueOrThrow({ where: { id: contact.id }, select: { acceptedKinds: true } });
+    const after = await db.contact.findUniqueOrThrow({
+      where: { id: contact.id },
+      select: { acceptedKinds: true },
+    });
     expect(after.acceptedKinds).toEqual(['platform']);
   });
 });

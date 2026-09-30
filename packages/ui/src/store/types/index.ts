@@ -12,4 +12,9 @@ import type { PermissionsSlice } from '@template/ui/store/types/permissions';
 import type { TenantSlice } from '@template/ui/store/types/tenant';
 import type { UISlice } from '@template/ui/store/types/ui';
 
-export type AppStore = ClientSlice & AuthSlice & NavigationSlice & PermissionsSlice & TenantSlice & UISlice;
+export type AppStore = ClientSlice &
+  AuthSlice &
+  NavigationSlice &
+  PermissionsSlice &
+  TenantSlice &
+  UISlice;

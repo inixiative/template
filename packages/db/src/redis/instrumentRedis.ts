@@ -4,7 +4,13 @@
  * @partOf infrastructure:observability
  * @uses none
  */
-import { context, recordDuration, SpanKind, SpanStatusCode, trace } from '@template/shared/telemetry';
+import {
+  context,
+  recordDuration,
+  SpanKind,
+  SpanStatusCode,
+  trace,
+} from '@template/shared/telemetry';
 import type Redis from 'ioredis';
 
 export const instrumentRedis = (redis: Redis): Redis => {
@@ -30,7 +36,9 @@ export const instrumentRedis = (redis: Redis): Redis => {
     )
       return sendCommand.call(this, command, stream);
     const attributes = { 'db.system.name': 'redis', 'db.operation.name': operation };
-    const span = trace.getTracer('template').startSpan(`redis.${operation}`, { kind: SpanKind.CLIENT, attributes });
+    const span = trace
+      .getTracer('template')
+      .startSpan(`redis.${operation}`, { kind: SpanKind.CLIENT, attributes });
     const start = performance.now();
     const finish = (outcome: 'success' | 'error', error?: unknown) => {
       if (outcome === 'error') {
@@ -38,10 +46,15 @@ export const instrumentRedis = (redis: Redis): Redis => {
         span.setAttribute('error.type', error instanceof Error ? error.name : 'UnknownError');
       }
       span.end();
-      recordDuration('db.client.operation.duration', (performance.now() - start) / 1000, { ...attributes, outcome });
+      recordDuration('db.client.operation.duration', (performance.now() - start) / 1000, {
+        ...attributes,
+        outcome,
+      });
     };
     try {
-      const result = context.with(trace.setSpan(context.active(), span), () => sendCommand.call(this, command, stream));
+      const result = context.with(trace.setSpan(context.active(), span), () =>
+        sendCommand.call(this, command, stream),
+      );
       void Promise.resolve(result).then(
         () => finish('success'),
         (error) => finish('error', error),

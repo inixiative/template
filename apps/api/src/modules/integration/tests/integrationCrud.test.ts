@@ -2,7 +2,12 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { clearHookRegistry } from '@template/db';
 import type { Integration, Organization, User } from '@template/db/generated/client/client';
 import { Role } from '@template/db/generated/client/enums';
-import { cleanupTouchedTables, createOrganizationUser, createUser, getNextSeq } from '@template/db/test';
+import {
+  cleanupTouchedTables,
+  createOrganizationUser,
+  createUser,
+  getNextSeq,
+} from '@template/db/test';
 import { integrationRouter } from '#/modules/integration';
 import { meRouter } from '#/modules/me';
 import { organizationRouter } from '#/modules/organization';
@@ -40,7 +45,9 @@ describe('Integration CRUD', () => {
 
   describe('POST create via owner submodels', () => {
     it('creates a user-owned integration via /me/integrations', async () => {
-      const response = await fetch(post('/api/v1/me/integrations', { name: `Personal ${getNextSeq()}` }));
+      const response = await fetch(
+        post('/api/v1/me/integrations', { name: `Personal ${getNextSeq()}` }),
+      );
       const { data } = await json<Integration>(response);
       expect(response.status).toBe(201);
       expect(data.ownerModel).toBe('User');
@@ -60,7 +67,9 @@ describe('Integration CRUD', () => {
 
   describe('GET /integration/:id', () => {
     it('reads own user integration', async () => {
-      const integration = await db.integration.create({ data: { name: 'Own', ownerModel: 'User', userId: user.id } });
+      const integration = await db.integration.create({
+        data: { name: 'Own', ownerModel: 'User', userId: user.id },
+      });
       const response = await fetch(get(`/api/v1/integration/${integration.id}`));
       expect(response.status).toBe(200);
     });
@@ -80,7 +89,9 @@ describe('Integration CRUD', () => {
       const integration = await db.integration.create({
         data: { name: 'Before', ownerModel: 'User', userId: user.id },
       });
-      const response = await fetch(patch(`/api/v1/integration/${integration.id}`, { name: 'After' }));
+      const response = await fetch(
+        patch(`/api/v1/integration/${integration.id}`, { name: 'After' }),
+      );
       const { data } = await json<Integration>(response);
       expect(response.status).toBe(200);
       expect(data.name).toBe('After');
@@ -91,7 +102,9 @@ describe('Integration CRUD', () => {
       const integration = await db.integration.create({
         data: { name: 'NoTouch', ownerModel: 'User', userId: otherUser.id },
       });
-      const response = await fetch(patch(`/api/v1/integration/${integration.id}`, { name: 'Hacked' }));
+      const response = await fetch(
+        patch(`/api/v1/integration/${integration.id}`, { name: 'Hacked' }),
+      );
       expect(response.status).toBe(403);
     });
   });
@@ -104,7 +117,9 @@ describe('Integration CRUD', () => {
       const response = await fetch(del(`/api/v1/integration/${integration.id}`));
       expect(response.status).toBe(204);
 
-      const row = await db.integration.findFirst({ where: { id: integration.id, deletedAt: { not: null } } });
+      const row = await db.integration.findFirst({
+        where: { id: integration.id, deletedAt: { not: null } },
+      });
       expect(row).not.toBeNull();
 
       const readResponse = await fetch(get(`/api/v1/integration/${integration.id}`));
@@ -114,9 +129,15 @@ describe('Integration CRUD', () => {
 
   describe('policy: read gates on read, mutate gates on admin', () => {
     it('an org member reads an org integration but cannot mutate it', async () => {
-      const { entity: memberOrgUser, context: memberContext } = await createOrganizationUser({ role: Role.member });
+      const { entity: memberOrgUser, context: memberContext } = await createOrganizationUser({
+        role: Role.member,
+      });
       const integration = await db.integration.create({
-        data: { name: 'OrgOwned', ownerModel: 'Organization', organizationId: memberContext.organization.id },
+        data: {
+          name: 'OrgOwned',
+          ownerModel: 'Organization',
+          organizationId: memberContext.organization.id,
+        },
       });
 
       const memberApp = createTestApp({

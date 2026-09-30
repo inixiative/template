@@ -99,7 +99,10 @@ const createLogger = (bindings: Record<string, unknown> = {}, scope?: string): L
     success: method('success'),
     box: method('box'),
     child: (child = {}) =>
-      createLogger({ ...bindings, ...child }, scope ? `${scope}:${childLabel(child)}` : childLabel(child)),
+      createLogger(
+        { ...bindings, ...child },
+        scope ? `${scope}:${childLabel(child)}` : childLabel(child),
+      ),
   };
 };
 export const log = createLogger();

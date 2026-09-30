@@ -4,7 +4,13 @@ import { infisicalApi, toInfisicalSlug } from '../api/infisical';
 import { updateConfigField } from '../utils/configHelpers';
 import { execFileAsync } from '../utils/exec';
 import { getProjectConfig } from '../utils/getProjectConfig';
-import { clearError, clearProgress, isComplete, markComplete, setError } from '../utils/progressTracking';
+import {
+  clearError,
+  clearProgress,
+  isComplete,
+  markComplete,
+  setError,
+} from '../utils/progressTracking';
 import {
   infisicalApiAuthSecretSteps,
   infisicalAppNameSecretSteps,
@@ -37,7 +43,9 @@ export const setupInfisical = async (
     }
 
     // Check if config is stale (project name changed since last setup)
-    const isStale = config.infisical.configProjectName && config.infisical.configProjectName !== configProjectName;
+    const isStale =
+      config.infisical.configProjectName &&
+      config.infisical.configProjectName !== configProjectName;
 
     if (isStale) {
       // Clearing stale config (project name changed)
@@ -63,7 +71,8 @@ export const setupInfisical = async (
       const response = await infisicalApi.getOrganization(selectedOrgId);
 
       // Handle nested response structure (API returns { organization: {...} })
-      const selectedOrg = (response as unknown as { organization?: typeof response }).organization || response;
+      const selectedOrg =
+        (response as unknown as { organization?: typeof response }).organization || response;
       const _orgName = selectedOrg.name || 'Unknown';
       const orgSlug = selectedOrg.slug || selectedOrgId;
 
@@ -98,7 +107,8 @@ export const setupInfisical = async (
       // Get final project details to capture actual slug
       const finalProjectDetails = await infisicalApi.getProject(projectId);
       projectSlug =
-        (finalProjectDetails as unknown as { workspace?: { slug: string } }).workspace?.slug || project.slug;
+        (finalProjectDetails as unknown as { workspace?: { slug: string } }).workspace?.slug ||
+        project.slug;
 
       // Update config with project details
       await updateConfigField('infisical', 'projectId', projectId);
@@ -119,12 +129,19 @@ export const setupInfisical = async (
         // Get full project details to find dev environment ID
         const projectDetails = await infisicalApi.getProject(projectId);
         const workspace = (
-          projectDetails as unknown as { workspace?: { environments?: Array<{ slug: string; id: string }> } }
+          projectDetails as unknown as {
+            workspace?: { environments?: Array<{ slug: string; id: string }> };
+          }
         ).workspace;
-        const devEnv = workspace?.environments?.find((e: { slug: string; id: string }) => e.slug === 'dev');
+        const devEnv = workspace?.environments?.find(
+          (e: { slug: string; id: string }) => e.slug === 'dev',
+        );
 
         if (devEnv) {
-          await infisicalApi.updateEnvironment(projectId, devEnv.id, { name: 'Root', slug: 'root' });
+          await infisicalApi.updateEnvironment(projectId, devEnv.id, {
+            name: 'Root',
+            slug: 'root',
+          });
           // Suppressed for TUI: console.log('    ✓ Renamed dev → root');
         } else {
           // Suppressed for TUI: console.log('    ⚠ Dev environment not found (may already be renamed)');
@@ -242,8 +259,12 @@ export const setupInfisical = async (
         // self-heals even if marked complete (a valid-but-mismatched pair breaks every receiver).
         const privateObj = createPrivateKey(existing);
         const derivedPublic = createPublicKey(privateObj).export({ type: 'spki', format: 'pem' });
-        const storedPublic = createPublicKey(existingPublic).export({ type: 'spki', format: 'pem' });
-        hasValidKey = !!existing && privateObj.asymmetricKeyType === 'rsa' && derivedPublic === storedPublic;
+        const storedPublic = createPublicKey(existingPublic).export({
+          type: 'spki',
+          format: 'pem',
+        });
+        hasValidKey =
+          !!existing && privateObj.asymmetricKeyType === 'rsa' && derivedPublic === storedPublic;
       } catch {
         // Missing, non-RSA, or mismatched-pair key — regenerate.
       }
@@ -254,8 +275,20 @@ export const setupInfisical = async (
         const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
         const privatePem = privateKey.export({ type: 'pkcs8', format: 'pem' }) as string;
         const publicPem = publicKey.export({ type: 'spki', format: 'pem' }) as string;
-        await setSecretAsync(projectId, step.environment, 'WEBHOOK_SIGNING_PRIVATE_KEY', privatePem, '/api');
-        await setSecretAsync(projectId, step.environment, 'WEBHOOK_SIGNING_PUBLIC_KEY', publicPem, '/api');
+        await setSecretAsync(
+          projectId,
+          step.environment,
+          'WEBHOOK_SIGNING_PRIVATE_KEY',
+          privatePem,
+          '/api',
+        );
+        await setSecretAsync(
+          projectId,
+          step.environment,
+          'WEBHOOK_SIGNING_PUBLIC_KEY',
+          publicPem,
+          '/api',
+        );
       }
 
       await markComplete('infisical', step.action);
@@ -300,7 +333,10 @@ export const setupInfisical = async (
       for (const prefix of prefixes) {
         const versionKey = `${prefix}_ENCRYPTION_VERSION`;
         const currentKey = `${prefix}_ENCRYPTION_KEY_CURRENT`;
-        const [existingVersion, existingCurrent] = await Promise.all([fetchOne(versionKey), fetchOne(currentKey)]);
+        const [existingVersion, existingCurrent] = await Promise.all([
+          fetchOne(versionKey),
+          fetchOne(currentKey),
+        ]);
 
         if (existingVersion && existingCurrent) continue;
         if (existingVersion || existingCurrent) {

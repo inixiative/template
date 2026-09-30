@@ -9,7 +9,10 @@ const newId = () => `test-${crypto.randomUUID()}`;
 const keyFor = (id: string) => `${redisNamespace.lock}:s:${id}`;
 const fastOpts = { ttlMs: 100, heartbeatMs: 30, maxMissed: 1 };
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
-const waitFor = async (condition: () => boolean | Promise<boolean>, timeoutMs = 500): Promise<void> => {
+const waitFor = async (
+  condition: () => boolean | Promise<boolean>,
+  timeoutMs = 500,
+): Promise<void> => {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (await condition()) return;
@@ -26,7 +29,9 @@ const stubRedis = (eval_: (...args: unknown[]) => Promise<unknown>): LockRedis =
 describe('createLock', () => {
   describe('construction validation', () => {
     it('throws when maxMissed < 1', () => {
-      expect(() => createLock({ service: 's', identifier: newId(), maxMissed: 0 })).toThrow('maxMissed must be >= 1');
+      expect(() => createLock({ service: 's', identifier: newId(), maxMissed: 0 })).toThrow(
+        'maxMissed must be >= 1',
+      );
     });
 
     it('throws when heartbeatMs <= 0', () => {
@@ -37,7 +42,13 @@ describe('createLock', () => {
 
     it('throws when (maxMissed + 1) * heartbeatMs >= ttlMs', () => {
       expect(() =>
-        createLock({ service: 's', identifier: newId(), ttlMs: 100, heartbeatMs: 50, maxMissed: 1 }),
+        createLock({
+          service: 's',
+          identifier: newId(),
+          ttlMs: 100,
+          heartbeatMs: 50,
+          maxMissed: 1,
+        }),
       ).toThrow('unsafe config');
     });
 
@@ -49,8 +60,12 @@ describe('createLock', () => {
 
   describe('maxSafeHeartbeatMs', () => {
     it('is the timeout-aware ceiling and passes the constructor', () => {
-      expect(maxSafeHeartbeatMs({ ttlMs: 300_000, maxMissed: 1, commandTimeoutMs: 5_000 })).toBe(142_499);
-      expect(maxSafeHeartbeatMs({ ttlMs: 300_000, maxMissed: 2, commandTimeoutMs: 5_000 })).toBe(93_333);
+      expect(maxSafeHeartbeatMs({ ttlMs: 300_000, maxMissed: 1, commandTimeoutMs: 5_000 })).toBe(
+        142_499,
+      );
+      expect(maxSafeHeartbeatMs({ ttlMs: 300_000, maxMissed: 2, commandTimeoutMs: 5_000 })).toBe(
+        93_333,
+      );
       expect(() => maxSafeHeartbeatMs({ ttlMs: 10_000, commandTimeoutMs: 5_000 })).toThrow(
         'createLock: ttlMs 10000 leaves no room for a heartbeat with a 5000 ms command timeout',
       );
@@ -59,7 +74,11 @@ describe('createLock', () => {
           service: 's',
           identifier: newId(),
           ttlMs: 300_000,
-          heartbeatMs: maxSafeHeartbeatMs({ ttlMs: 300_000, maxMissed: 1, commandTimeoutMs: 5_000 }),
+          heartbeatMs: maxSafeHeartbeatMs({
+            ttlMs: 300_000,
+            maxMissed: 1,
+            commandTimeoutMs: 5_000,
+          }),
           maxMissed: 1,
         }),
       ).not.toThrow();
@@ -106,7 +125,12 @@ describe('createLock', () => {
           return 1;
         },
       } as unknown as LockRedis;
-      const lock = createLock({ key: 'lock:exact-custom-key', redis, ttlMs: 60_000, heartbeatMs: 10_000 });
+      const lock = createLock({
+        key: 'lock:exact-custom-key',
+        redis,
+        ttlMs: 60_000,
+        heartbeatMs: 10_000,
+      });
 
       expect(await lock.acquire()).toBe(true);
       expect(await lock.verify()).toBe(true);
@@ -162,7 +186,12 @@ describe('createLock', () => {
       const redis = stubRedis(async () => {
         throw new Error('delete unavailable');
       });
-      const lock = createLock({ key: 'lock:test:release-unconfirmed', redis, ttlMs: 60_000, heartbeatMs: 10_000 });
+      const lock = createLock({
+        key: 'lock:test:release-unconfirmed',
+        redis,
+        ttlMs: 60_000,
+        heartbeatMs: 10_000,
+      });
 
       expect(await lock.acquire()).toBe(true);
       await expect(lock.release()).resolves.toBe('unconfirmed');

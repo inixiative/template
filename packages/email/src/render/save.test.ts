@@ -54,7 +54,10 @@ describe('saveEmailTemplate', () => {
       ownerModel: 'default' as const,
     };
     const first = await saveEmailTemplate(input);
-    await db.emailTemplate.update({ where: { id: first.template.id }, data: { deletedAt: new Date() } });
+    await db.emailTemplate.update({
+      where: { id: first.template.id },
+      data: { deletedAt: new Date() },
+    });
 
     const second = await saveEmailTemplate({ ...input, mjml: mjml('<mj-text>v2</mj-text>') });
 
@@ -68,10 +71,24 @@ describe('saveEmailTemplate', () => {
   it("a User-owned save lands on that user's row, never on another user's same-slug row", async () => {
     const { entity: alice } = await createUser();
     const { entity: bob } = await createUser();
-    const input = { slug: 'mine', name: 'Mine', subject: 'Hi', kind: 'system' as const, ownerModel: 'User' as const };
+    const input = {
+      slug: 'mine',
+      name: 'Mine',
+      subject: 'Hi',
+      kind: 'system' as const,
+      ownerModel: 'User' as const,
+    };
 
-    const first = await saveEmailTemplate({ ...input, userId: alice.id, mjml: mjml('<mj-text>alice</mj-text>') });
-    const second = await saveEmailTemplate({ ...input, userId: bob.id, mjml: mjml('<mj-text>bob</mj-text>') });
+    const first = await saveEmailTemplate({
+      ...input,
+      userId: alice.id,
+      mjml: mjml('<mj-text>alice</mj-text>'),
+    });
+    const second = await saveEmailTemplate({
+      ...input,
+      userId: bob.id,
+      mjml: mjml('<mj-text>bob</mj-text>'),
+    });
 
     expect(second.template.id).not.toBe(first.template.id);
     expect(first.template.userId).toBe(alice.id);
@@ -127,7 +144,9 @@ describe('saveEmailTemplate', () => {
         name: 'Promo',
         subject: 'News',
         kind: 'marketing',
-        mjml: mjml(`<mj-text>News</mj-text>{{#if rule=${rule}}}<mj-text>{{system.unsubscribeUrl}}</mj-text>{{/if}}`),
+        mjml: mjml(
+          `<mj-text>News</mj-text>{{#if rule=${rule}}}<mj-text>{{system.unsubscribeUrl}}</mj-text>{{/if}}`,
+        ),
         ownerModel: 'default',
       }),
     ).rejects.toThrow(/unconditional/i);
@@ -139,7 +158,9 @@ describe('saveEmailTemplate', () => {
       name: 'With Header',
       subject: 'Hello',
       kind: 'system',
-      mjml: mjml('{{#component:header}}<mj-text>Header</mj-text>{{/component:header}}<mj-text>Body</mj-text>'),
+      mjml: mjml(
+        '{{#component:header}}<mj-text>Header</mj-text>{{/component:header}}<mj-text>Body</mj-text>',
+      ),
       ownerModel: 'default',
     });
 
@@ -157,7 +178,9 @@ describe('saveEmailTemplate', () => {
         name: 'Doc Component',
         subject: 'Hello',
         kind: 'system',
-        mjml: mjml('{{#component:whole}}<mjml><mj-body><mj-text>Nope</mj-text></mj-body></mjml>{{/component:whole}}'),
+        mjml: mjml(
+          '{{#component:whole}}<mjml><mj-body><mj-text>Nope</mj-text></mj-body></mjml>{{/component:whole}}',
+        ),
         ownerModel: 'default',
       }),
     ).rejects.toThrow(MjmlValidationError);
@@ -170,7 +193,9 @@ describe('saveEmailTemplate', () => {
         name: 'Bad Fragment',
         subject: 'Hello',
         kind: 'system',
-        mjml: mjml('{{#component:broken}}<mj-not-a-real-tag>x</mj-not-a-real-tag>{{/component:broken}}'),
+        mjml: mjml(
+          '{{#component:broken}}<mj-not-a-real-tag>x</mj-not-a-real-tag>{{/component:broken}}',
+        ),
         ownerModel: 'default',
       }),
     ).rejects.toThrow();
@@ -367,7 +392,9 @@ describe('saveEmailTemplate', () => {
       name: 'Space No Inherit',
       subject: 'Hello',
       kind: 'system',
-      mjml: mjml('{{#component:org-private}}<mj-text>Org Private</mj-text>{{/component:org-private}}'),
+      mjml: mjml(
+        '{{#component:org-private}}<mj-text>Org Private</mj-text>{{/component:org-private}}',
+      ),
       ownerModel: 'Space',
       organizationId: org.id,
       spaceId: space.id,
@@ -463,7 +490,10 @@ describe('saveEmailTemplate — the lens decides at save', () => {
       saveEmailTemplate(input('t', '<mj-text>{{recipient.nickname}}</mj-text>'), { lens }),
     ).rejects.toBeInstanceOf(TokenValidationError);
     await expect(
-      saveEmailTemplate(input('t', '<mj-text>{{recipient.email}}</mj-text>', 'Code {{data.code}}'), { lens }),
+      saveEmailTemplate(
+        input('t', '<mj-text>{{recipient.email}}</mj-text>', 'Code {{data.code}}'),
+        { lens },
+      ),
     ).rejects.toThrow(/may be empty/);
     const ok = await saveEmailTemplate(
       input('t', `<mj-text>{{recipient.email}} ${guardedToken('data.code', 'none')}</mj-text>`),
@@ -475,7 +505,10 @@ describe('saveEmailTemplate — the lens decides at save', () => {
   it('a component is judged through the template that embeds it', async () => {
     await expect(
       saveEmailTemplate(
-        input('t', '{{#component:greeting}}<mj-text>{{sender.nickname}}</mj-text>{{/component:greeting}}'),
+        input(
+          't',
+          '{{#component:greeting}}<mj-text>{{sender.nickname}}</mj-text>{{/component:greeting}}',
+        ),
         {
           lens,
         },
@@ -486,7 +519,10 @@ describe('saveEmailTemplate — the lens decides at save', () => {
   it('a component save that would break a same-owner template embedding it is refused', async () => {
     const lensFor = async (slug: string) => (slug === 'strict' ? strict : lens);
     await saveEmailTemplate(
-      input('strict', '{{#component:greeting}}<mj-text>{{recipient.email}}</mj-text>{{/component:greeting}}'),
+      input(
+        'strict',
+        '{{#component:greeting}}<mj-text>{{recipient.email}}</mj-text>{{/component:greeting}}',
+      ),
       {
         lens: strict,
         lensFor,
@@ -495,7 +531,10 @@ describe('saveEmailTemplate — the lens decides at save', () => {
 
     await expect(
       saveEmailTemplate(
-        input('loose', '{{#component:greeting}}<mj-text>{{sender.name}}</mj-text>{{/component:greeting}}'),
+        input(
+          'loose',
+          '{{#component:greeting}}<mj-text>{{sender.name}}</mj-text>{{/component:greeting}}',
+        ),
         {
           lens,
           lensFor,

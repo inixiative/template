@@ -27,11 +27,16 @@ export const sentInquiryContextQueries = makeContextQueries<InquiryQueryParams>(
   user: (_args, params) =>
     query({
       queryKey: meSentManyInquiriesQueryKey({ query: params?.query }),
-      queryFn: apiQuery((opts: Parameters<typeof meSentManyInquiries>[0]) => meSentManyInquiries(opts)),
+      queryFn: apiQuery((opts: Parameters<typeof meSentManyInquiries>[0]) =>
+        meSentManyInquiries(opts),
+      ),
     }),
   organization: ({ organization }, params) =>
     query({
-      queryKey: organizationSentManyInquiriesQueryKey({ path: { id: organization.id }, query: params?.query }),
+      queryKey: organizationSentManyInquiriesQueryKey({
+        path: { id: organization.id },
+        query: params?.query,
+      }),
       queryFn: apiQuery((opts: Parameters<typeof organizationSentManyInquiries>[0]) =>
         organizationSentManyInquiries({ ...opts, path: { id: organization.id } }),
       ),
@@ -49,18 +54,26 @@ export const receivedInquiryContextQueries = makeContextQueries<InquiryQueryPara
   user: (_args, params) =>
     query({
       queryKey: meReceivedManyInquiriesQueryKey({ query: params?.query }),
-      queryFn: apiQuery((opts: Parameters<typeof meReceivedManyInquiries>[0]) => meReceivedManyInquiries(opts)),
+      queryFn: apiQuery((opts: Parameters<typeof meReceivedManyInquiries>[0]) =>
+        meReceivedManyInquiries(opts),
+      ),
     }),
   organization: ({ organization }, params) =>
     query({
-      queryKey: organizationReceivedManyInquiriesQueryKey({ path: { id: organization.id }, query: params?.query }),
+      queryKey: organizationReceivedManyInquiriesQueryKey({
+        path: { id: organization.id },
+        query: params?.query,
+      }),
       queryFn: apiQuery((opts: Parameters<typeof organizationReceivedManyInquiries>[0]) =>
         organizationReceivedManyInquiries({ ...opts, path: { id: organization.id } }),
       ),
     }),
   space: ({ space }, params) =>
     query({
-      queryKey: spaceReceivedManyInquiriesQueryKey({ path: { id: space.id }, query: params?.query }),
+      queryKey: spaceReceivedManyInquiriesQueryKey({
+        path: { id: space.id },
+        query: params?.query,
+      }),
       queryFn: apiQuery((opts: Parameters<typeof spaceReceivedManyInquiries>[0]) =>
         spaceReceivedManyInquiries({ ...opts, path: { id: space.id } }),
       ),

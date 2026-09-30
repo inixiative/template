@@ -178,11 +178,15 @@ describe('buildQuery — relation field filters', () => {
 
 describe('buildQuery — orderBy', () => {
   it('single field asc', () => {
-    expect(q('', [], {}, [{ field: 'createdAt', direction: 'asc' }]).orderBy).toEqual(['createdAt:asc']);
+    expect(q('', [], {}, [{ field: 'createdAt', direction: 'asc' }]).orderBy).toEqual([
+      'createdAt:asc',
+    ]);
   });
 
   it('single field desc', () => {
-    expect(q('', [], {}, [{ field: 'createdAt', direction: 'desc' }]).orderBy).toEqual(['createdAt:desc']);
+    expect(q('', [], {}, [{ field: 'createdAt', direction: 'desc' }]).orderBy).toEqual([
+      'createdAt:desc',
+    ]);
   });
 
   it('multiple fields preserve order', () => {

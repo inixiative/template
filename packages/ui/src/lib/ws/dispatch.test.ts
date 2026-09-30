@@ -7,7 +7,11 @@ import { addStreamListener } from '@template/ui/lib/ws/streamListeners';
 import { useAppStore } from '@template/ui/store';
 import { contactStreamRow } from '@template/ui/test/contactStreamRow';
 
-const refetchEvent = (key: ChannelKeyInput): WSEvent => ({ category: 'query', action: 'refetch', key });
+const refetchEvent = (key: ChannelKeyInput): WSEvent => ({
+  category: 'query',
+  action: 'refetch',
+  key,
+});
 
 const qc = () => useAppStore.getState().client!;
 const prime = (queryKey: unknown[]) => qc().prefetchQuery({ queryKey, queryFn: async () => ({}) });
@@ -121,7 +125,12 @@ describe('dispatchMessage', () => {
     it('keeps tombstones across a fresh snapshot, so a late upsert still cannot resurrect a row', async () => {
       const removed = await contactStreamRow({ id: '0002' });
       const kept = await contactStreamRow({ id: '0001' });
-      dispatchMessage({ category: 'data', action: 'snapshot', stream, payload: { data: [removed, kept] } });
+      dispatchMessage({
+        category: 'data',
+        action: 'snapshot',
+        stream,
+        payload: { data: [removed, kept] },
+      });
       dispatchMessage(append('remove', { id: '0002' }));
       dispatchMessage({ category: 'data', action: 'snapshot', stream, payload: { data: [kept] } });
 
@@ -141,13 +150,25 @@ describe('dispatchMessage', () => {
         qc()
           .getQueryData<{ data: Array<{ id: string }> }>(key)
           ?.data.map((row) => row.id);
-      dispatchMessage({ category: 'data', action: 'snapshot', stream, payload: { data: [removed, kept] } });
+      dispatchMessage({
+        category: 'data',
+        action: 'snapshot',
+        stream,
+        payload: { data: [removed, kept] },
+      });
       dispatchMessage(append('remove', { id: '0002' }));
 
       dispatchMessage(append('upsert', removed));
       expect(held()).toEqual(['0001']);
 
-      dispatchMessage({ category: 'data', action: 'append', stream, type: 'upsert', payload: removed, revive: true });
+      dispatchMessage({
+        category: 'data',
+        action: 'append',
+        stream,
+        type: 'upsert',
+        payload: removed,
+        revive: true,
+      });
       expect(held()).toEqual(['0002', '0001']);
     });
 
@@ -160,7 +181,12 @@ describe('dispatchMessage', () => {
       };
       const heard: unknown[] = [];
       const removeListener = addStreamListener(stream, 'upsert', (payload) => heard.push(payload));
-      dispatchMessage({ category: 'data', action: 'snapshot', stream, payload: { data: [current] } });
+      dispatchMessage({
+        category: 'data',
+        action: 'snapshot',
+        stream,
+        payload: { data: [current] },
+      });
 
       dispatchMessage(append('upsert', stale));
       removeListener();
@@ -171,7 +197,12 @@ describe('dispatchMessage', () => {
 
     it('ignores frames for a stream family outside the registry', () => {
       const unknown = 'nope:id:x';
-      dispatchMessage({ category: 'data', action: 'snapshot', stream: unknown, payload: { data: [] } });
+      dispatchMessage({
+        category: 'data',
+        action: 'snapshot',
+        stream: unknown,
+        payload: { data: [] },
+      });
       expect(qc().getQueryData<unknown>(dataStreamQueryKey(unknown))).toBeUndefined();
     });
   });

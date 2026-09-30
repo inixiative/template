@@ -51,7 +51,11 @@ const isFilterState = (value: unknown): value is FilterState => {
   return isArrayFieldOperator(operator) ? Array.isArray(leaf) : isFilterValue(leaf);
 };
 
-const mergePath = (obj: Record<string, unknown>, path: string[], value: Record<string, unknown>): void => {
+const mergePath = (
+  obj: Record<string, unknown>,
+  path: string[],
+  value: Record<string, unknown>,
+): void => {
   const [head, ...rest] = path;
   if (!obj[head] || typeof obj[head] !== 'object' || Array.isArray(obj[head])) {
     obj[head] = {};
@@ -94,7 +98,8 @@ const addFilters = (nested: Record<string, unknown>, filters: FilterMap): void =
       // is `null`/`false`/`0` — those are filters, and the serializer's `[:]`/`[$]` markers carry
       // them. An empty array (`in: []`) is the one "no filter" case that still gates.
       if (Array.isArray(clause.value)) {
-        if (clause.value.length > 0) mergePath(nested, field.split('.'), { [clause.operator]: clause.value });
+        if (clause.value.length > 0)
+          mergePath(nested, field.split('.'), { [clause.operator]: clause.value });
       } else {
         mergePath(nested, field.split('.'), { [clause.operator]: clause.value });
       }

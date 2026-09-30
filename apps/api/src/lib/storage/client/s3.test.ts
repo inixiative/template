@@ -38,7 +38,8 @@ describe('s3 storage adapter', () => {
     for (const [k, v] of Object.entries(fields)) formData.append(k, v);
     formData.append('file', new Blob([body], { type: contentType }));
     const resp = await fetch(url, { method: 'POST', body: formData });
-    if (resp.status !== 204) throw new Error(`Upload failed with ${resp.status}: ${await resp.text()}`);
+    if (resp.status !== 204)
+      throw new Error(`Upload failed with ${resp.status}: ${await resp.text()}`);
   };
 
   it('full upload → head → download → delete flow', async () => {
@@ -72,7 +73,12 @@ describe('s3 storage adapter', () => {
     const content = 'copy me';
 
     await uploadObject(src, content);
-    await storage.copyObject({ sourceBucket: 'user', sourceKey: src, targetBucket: 'user', targetKey: dst });
+    await storage.copyObject({
+      sourceBucket: 'user',
+      sourceKey: src,
+      targetBucket: 'user',
+      targetKey: dst,
+    });
 
     expect((await storage.headObject({ bucket: 'user', key: src }))?.size).toBe(content.length);
     expect((await storage.headObject({ bucket: 'user', key: dst }))?.size).toBe(content.length);
@@ -85,7 +91,11 @@ describe('s3 storage adapter', () => {
     const key = `${testPrefix}/tagged.txt`;
     await uploadObject(key, 'tag me');
 
-    await storage.tagObject({ bucket: 'user', key, tags: { uploadedBy: 'test', purpose: 'smoke' } });
+    await storage.tagObject({
+      bucket: 'user',
+      key,
+      tags: { uploadedBy: 'test', purpose: 'smoke' },
+    });
 
     await storage.deleteObject({ bucket: 'user', key });
   });

@@ -53,7 +53,9 @@ describe('paginate — lens bindings', () => {
       root: { picks: [], where: { field: 'name', operator: 'equals', bind: 'who' } },
     };
 
-    expect(paginate(makeContext(lens), makeDelegate({}))).rejects.toThrow(/lens requires bindings not provided: who/);
+    expect(paginate(makeContext(lens), makeDelegate({}))).rejects.toThrow(
+      /lens requires bindings not provided: who/,
+    );
   });
 
   it('passes a bind-free lens through untouched, no bindings needed', async () => {
@@ -121,7 +123,10 @@ describe('paginate — soft-delete scope', () => {
 
   it('a model without its own column gets no injection (the cascade hook owns consistency)', async () => {
     const captured: Captured = {};
-    const lens: LensNarrowing = { parent: lensFor('WebhookSubscription'), root: { picks: ['url'] } };
+    const lens: LensNarrowing = {
+      parent: lensFor('WebhookSubscription'),
+      root: { picks: ['url'] },
+    };
 
     await paginate(makeContext(lens), makeDelegate(captured));
 
@@ -136,7 +141,8 @@ type Row = { id: string };
 const makeSeekDelegate = (rows: Row[]): AnyDelegate =>
   ({
     findMany: async (args: Record<string, unknown>) => {
-      const keyset = (args.where as { AND?: [unknown, { OR?: { id?: { gt?: string } }[] }] }).AND?.[1]?.OR?.[0]?.id?.gt;
+      const keyset = (args.where as { AND?: [unknown, { OR?: { id?: { gt?: string } }[] }] })
+        .AND?.[1]?.OR?.[0]?.id?.gt;
       const after = keyset ? rows.filter((row) => row.id > keyset) : rows;
       return after.slice(0, args.take as number);
     },
@@ -212,15 +218,21 @@ describe('paginate — searchPaths', () => {
 
   it('narrows the global search fan-out to the route-authored subset', async () => {
     const captured: Captured = {};
-    await paginate(makeContext(lens, { search: 'acme' }), makeDelegate(captured), { searchPaths: ['name'] });
+    await paginate(makeContext(lens, { search: 'acme' }), makeDelegate(captured), {
+      searchPaths: ['name'],
+    });
 
-    expect(JSON.stringify(captured.findManyArgs?.where)).toContain('"OR":[{"name":{"contains":"acme"');
+    expect(JSON.stringify(captured.findManyArgs?.where)).toContain(
+      '"OR":[{"name":{"contains":"acme"',
+    );
     expect(JSON.stringify(captured.findManyArgs?.where)).not.toContain('tokens');
   });
 
   it('does not leak searchPaths into the Prisma findMany args', async () => {
     const captured: Captured = {};
-    await paginate(makeContext(lens, { search: 'acme' }), makeDelegate(captured), { searchPaths: ['name'] });
+    await paginate(makeContext(lens, { search: 'acme' }), makeDelegate(captured), {
+      searchPaths: ['name'],
+    });
 
     expect(captured.findManyArgs).not.toHaveProperty('searchPaths');
   });

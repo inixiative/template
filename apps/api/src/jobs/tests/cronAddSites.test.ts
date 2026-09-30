@@ -16,7 +16,9 @@ describe('cron add sites stamp the resolved lane', () => {
       added.push({ name, data });
       return { id: name };
     }) as never);
-    const removeRepeatable = spyOn(queue, 'removeRepeatable').mockImplementation((async () => true) as never);
+    const removeRepeatable = spyOn(queue, 'removeRepeatable').mockImplementation(
+      (async () => true) as never,
+    );
     restore = () => {
       add.mockRestore();
       removeRepeatable.mockRestore();
@@ -35,7 +37,11 @@ describe('cron add sites stamp the resolved lane', () => {
   });
 
   it('registerCronJobs builds the same envelope as enqueue, lane included', async () => {
-    await createCronJob({ name: `register-${getNextSeq()}`, handler: 'sweepSegments', enabled: true });
+    await createCronJob({
+      name: `register-${getNextSeq()}`,
+      handler: 'sweepSegments',
+      enabled: true,
+    });
     added.length = 0;
     const recorded: Array<{ name: string; data: JobData }> = [];
     const recordingQueue = {

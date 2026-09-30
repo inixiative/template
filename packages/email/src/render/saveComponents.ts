@@ -28,7 +28,11 @@ const componentValidationDocuments = (mjml: string): string[] => [
 const validateComponentMjml = async (mjml: string): Promise<void> => {
   if (/<\/?mjml(\s|>)/i.test(mjml) || /<\/?mj-body(\s|>)/i.test(mjml)) {
     throw new MjmlValidationError([
-      { line: 1, tagName: 'mjml', message: 'Email components must be MJML fragments, not complete MJML documents' },
+      {
+        line: 1,
+        tagName: 'mjml',
+        message: 'Email components must be MJML fragments, not complete MJML documents',
+      },
     ]);
   }
 
@@ -63,7 +67,10 @@ const depthFirstOrder = (inputs: EmailComponent[]): EmailComponent[] => {
   return ordered;
 };
 
-export const saveComponents = async (inputs: EmailComponent[], ctx: OwnerScope): Promise<EmailComponent[]> => {
+export const saveComponents = async (
+  inputs: EmailComponent[],
+  ctx: OwnerScope,
+): Promise<EmailComponent[]> => {
   const saved: EmailComponent[] = [];
   for (const input of depthFirstOrder(inputs)) {
     saved.push(await saveComponent(input, ctx));
@@ -76,5 +83,9 @@ const saveComponent = async (input: EmailComponent, ctx: OwnerScope): Promise<Em
   assertNoDuplicateExposedSlots(parseBlocks(input.mjml), input.slug);
   assertValidConditions(input.mjml);
 
-  return saveScopedRow('emailComponent', { ...input, expectations: deriveComponentExpectations(input.mjml) }, ctx);
+  return saveScopedRow(
+    'emailComponent',
+    { ...input, expectations: deriveComponentExpectations(input.mjml) },
+    ctx,
+  );
 };

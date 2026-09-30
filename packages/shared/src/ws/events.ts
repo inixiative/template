@@ -8,7 +8,12 @@ import type { ChannelKeyInput } from '@template/shared/ws/channelKey';
 
 export type WSQueryEvent = { category: 'query'; action: 'refetch'; key: ChannelKeyInput };
 
-export type WSStreamSnapshotEvent = { category: 'data'; action: 'snapshot'; stream: string; payload: unknown };
+export type WSStreamSnapshotEvent = {
+  category: 'data';
+  action: 'snapshot';
+  stream: string;
+  payload: unknown;
+};
 
 export type WSStreamAppendEvent = {
   category: 'data';

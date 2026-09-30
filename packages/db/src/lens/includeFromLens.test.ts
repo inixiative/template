@@ -81,7 +81,10 @@ describe('includeFromLens', () => {
     it('includes a to-one relation referenced by a dotted-path where', () => {
       const lens: LensNarrowing = {
         parent: lensFor('Inquiry'),
-        root: { picks: ['id'], where: where({ field: 'sourceUser.name', operator: Operator.equals, value: 'x' }) },
+        root: {
+          picks: ['id'],
+          where: where({ field: 'sourceUser.name', operator: Operator.equals, value: 'x' }),
+        },
       };
       expect(includeFromLens(lens)).toEqual({ sourceUser: true });
     });
@@ -89,7 +92,10 @@ describe('includeFromLens', () => {
     it('includes a relation referenced by a field-to-field `path` comparison', () => {
       const lens: LensNarrowing = {
         parent: lensFor('Contact'),
-        root: { picks: ['id'], where: where({ field: 'valueKey', operator: Operator.notEquals, path: 'user.email' }) },
+        root: {
+          picks: ['id'],
+          where: where({ field: 'valueKey', operator: Operator.notEquals, path: 'user.email' }),
+        },
       };
       expect(includeFromLens(lens)).toEqual({ user: true });
     });
@@ -131,7 +137,10 @@ describe('includeFromLens', () => {
     it('adds nothing for a scalar-only where', () => {
       const lens: LensNarrowing = {
         parent: lensFor('User'),
-        root: { picks: ['id'], where: where({ field: 'id', operator: Operator.equals, value: 'x' }) },
+        root: {
+          picks: ['id'],
+          where: where({ field: 'id', operator: Operator.equals, value: 'x' }),
+        },
       };
       expect(includeFromLens(lens)).toBeUndefined();
     });

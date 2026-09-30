@@ -63,12 +63,17 @@ const processSingleRecord = (
   resultData: Record<string, unknown> & { id: string },
   previousData?: Record<string, unknown>,
 ) => {
-  if (webhookAction === WebhookAction.update && isNoOpUpdate(model, resultData, previousData, WEBHOOK_NOOP_FIELDS)) {
+  if (
+    webhookAction === WebhookAction.update &&
+    isNoOpUpdate(model, resultData, previousData, WEBHOOK_NOOP_FIELDS)
+  ) {
     return [];
   }
 
   const origin = auditActorContext.getScope()?.integrationId ?? null;
-  const targets = origin ? subscriptions.filter((sub) => sub.integrationId !== origin) : subscriptions;
+  const targets = origin
+    ? subscriptions.filter((sub) => sub.integrationId !== origin)
+    : subscriptions;
   if (targets.length === 0) return [];
 
   const payload: WebhookPayload = {
@@ -107,7 +112,9 @@ export const registerWebhookHook = () => {
         ? relatedRefs.map((ref) => (isFalsePolymorphismRef(ref) ? ref.model : ref))
         : [model];
 
-      const enabledTargets = webhookTargets.filter((m) => (webhookEnabledModels as readonly string[]).includes(m));
+      const enabledTargets = webhookTargets.filter((m) =>
+        (webhookEnabledModels as readonly string[]).includes(m),
+      );
       if (enabledTargets.length === 0) return;
 
       let allCallbacks: (() => Promise<void>)[] = [];

@@ -5,7 +5,10 @@
  * @uses primitive:shared
  */
 import { join } from 'node:path';
-import { classifyResendError, type ResendErrorResponse } from '@template/email/client/classifyResendError';
+import {
+  classifyResendError,
+  type ResendErrorResponse,
+} from '@template/email/client/classifyResendError';
 import type { EmailClient, SendEmailOptions, SendEmailResult } from '@template/email/client/types';
 import { EmailProviderError } from '@template/email/errors/EmailProviderError';
 import { VCR } from '@template/shared/vcr';
@@ -34,7 +37,13 @@ const getResendClient = (apiKey: string): Resend => {
 };
 
 const toProviderError = (error: ResendErrorResponse): EmailProviderError =>
-  new EmailProviderError('Resend', classifyResendError(error), error.statusCode, error.name, error.message);
+  new EmailProviderError(
+    'Resend',
+    classifyResendError(error),
+    error.statusCode,
+    error.name,
+    error.message,
+  );
 
 const chunk = <T>(arr: T[], size: number): T[][] => {
   const chunks: T[][] = [];

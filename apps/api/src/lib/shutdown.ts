@@ -65,6 +65,8 @@ const SHUTDOWN_POLL_MS = 250;
 export const sleepUnlessShuttingDown = async (ms: number): Promise<void> => {
   const deadline = Date.now() + ms;
   while (!isShuttingDown && Date.now() < deadline) {
-    await new Promise((resolve) => setTimeout(resolve, Math.min(SHUTDOWN_POLL_MS, deadline - Date.now())));
+    await new Promise((resolve) =>
+      setTimeout(resolve, Math.min(SHUTDOWN_POLL_MS, deadline - Date.now())),
+    );
   }
 };

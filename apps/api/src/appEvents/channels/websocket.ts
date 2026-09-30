@@ -15,7 +15,9 @@ const deliver = (handoff: WSHandoff): Promise<void>[] => {
     case 'users':
       return handoff.target.userIds.map((userId) => sendToUser(userId, handoff.message.data));
     default:
-      throw new Error(`Unknown websocket handoff kind: ${(handoff satisfies never as { kind?: unknown }).kind}`);
+      throw new Error(
+        `Unknown websocket handoff kind: ${(handoff satisfies never as { kind?: unknown }).kind}`,
+      );
   }
 };
 

@@ -8,7 +8,9 @@ import type { AccessorName, HydratedRecord } from '@template/db';
 import { useAppStore } from '@template/ui/store';
 import type { TenantContext } from '@template/ui/store/types/tenant';
 
-export const getContextParams = (context: TenantContext): readonly [AccessorName, HydratedRecord] => {
+export const getContextParams = (
+  context: TenantContext,
+): readonly [AccessorName, HydratedRecord] => {
   if (context.type === 'organization' && context.organization) {
     return ['organization', context.organization as unknown as HydratedRecord];
   }

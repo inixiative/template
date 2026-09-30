@@ -1,6 +1,11 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import type { Organization } from '@template/db/generated/client/client';
-import { InquiryResourceModel, InquiryStatus, InquiryType, PlatformRole } from '@template/db/generated/client/enums';
+import {
+  InquiryResourceModel,
+  InquiryStatus,
+  InquiryType,
+  PlatformRole,
+} from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
   createInquiry,
@@ -45,10 +50,14 @@ describe('handler: createSpace — approve', () => {
       content: { name: 'Approved Space', slug: 'approved-space' },
     });
 
-    const response = await adminFetch(post(`/api/v1/inquiry/${inquiry.id}/resolve`, { status: 'approved' }));
+    const response = await adminFetch(
+      post(`/api/v1/inquiry/${inquiry.id}/resolve`, { status: 'approved' }),
+    );
     expect(response.status).toBe(200);
 
-    const space = await db.space.findFirst({ where: { slug: 'approved-space', organizationId: org.id } });
+    const space = await db.space.findFirst({
+      where: { slug: 'approved-space', organizationId: org.id },
+    });
     expect(space).toBeTruthy();
     expect(space?.name).toBe('Approved Space');
   });

@@ -6,7 +6,12 @@
  */
 import { IntegrationScalarInputSchema, IntegrationScalarSchema } from '@template/db';
 
-export const INTEGRATION_IMMUTABLE_FIELDS = ['ownerModel', 'userId', 'organizationId', 'spaceId'] as const;
+export const INTEGRATION_IMMUTABLE_FIELDS = [
+  'ownerModel',
+  'userId',
+  'organizationId',
+  'spaceId',
+] as const;
 
 export const integrationCreateBodySchema = IntegrationScalarInputSchema.omit({
   ownerModel: true,

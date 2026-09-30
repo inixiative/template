@@ -43,9 +43,27 @@ const writeBucketCredentials = async (
   // Bucket names differ — one per bucket. urlStyle is path|virtual; map to STORAGE_FORCE_PATH_STYLE.
   const forcePathStyle = system.urlStyle?.toLowerCase() === 'path' ? 'true' : 'false';
 
-  await setSecretAsync(infisicalProjectId, infisicalEnvironment, 'STORAGE_ENDPOINT', system.endpoint, '/api');
-  await setSecretAsync(infisicalProjectId, infisicalEnvironment, 'STORAGE_REGION', system.region, '/api');
-  await setSecretAsync(infisicalProjectId, infisicalEnvironment, 'STORAGE_ACCESS_KEY_ID', system.accessKeyId, '/api');
+  await setSecretAsync(
+    infisicalProjectId,
+    infisicalEnvironment,
+    'STORAGE_ENDPOINT',
+    system.endpoint,
+    '/api',
+  );
+  await setSecretAsync(
+    infisicalProjectId,
+    infisicalEnvironment,
+    'STORAGE_REGION',
+    system.region,
+    '/api',
+  );
+  await setSecretAsync(
+    infisicalProjectId,
+    infisicalEnvironment,
+    'STORAGE_ACCESS_KEY_ID',
+    system.accessKeyId,
+    '/api',
+  );
   await setSecretAsync(
     infisicalProjectId,
     infisicalEnvironment,
@@ -53,9 +71,27 @@ const writeBucketCredentials = async (
     system.secretAccessKey,
     '/api',
   );
-  await setSecretAsync(infisicalProjectId, infisicalEnvironment, 'STORAGE_FORCE_PATH_STYLE', forcePathStyle, '/api');
-  await setSecretAsync(infisicalProjectId, infisicalEnvironment, 'STORAGE_BUCKET_SYSTEM', system.bucket, '/api');
-  await setSecretAsync(infisicalProjectId, infisicalEnvironment, 'STORAGE_BUCKET_USER', user.bucket, '/api');
+  await setSecretAsync(
+    infisicalProjectId,
+    infisicalEnvironment,
+    'STORAGE_FORCE_PATH_STYLE',
+    forcePathStyle,
+    '/api',
+  );
+  await setSecretAsync(
+    infisicalProjectId,
+    infisicalEnvironment,
+    'STORAGE_BUCKET_SYSTEM',
+    system.bucket,
+    '/api',
+  );
+  await setSecretAsync(
+    infisicalProjectId,
+    infisicalEnvironment,
+    'STORAGE_BUCKET_USER',
+    user.bucket,
+    '/api',
+  );
 };
 
 /**
@@ -84,8 +120,10 @@ export const setupRailwayBuckets = async (onStepComplete?: () => Promise<void>):
     const project = config.project.name;
 
     if (!projectId) throw new Error('Railway project not configured. Run Railway Setup first.');
-    if (!prodEnvironmentId) throw new Error('Railway prod environment missing. Re-run Railway Setup.');
-    if (!infisicalProjectId) throw new Error('Infisical not configured. Run Infisical Setup first.');
+    if (!prodEnvironmentId)
+      throw new Error('Railway prod environment missing. Re-run Railway Setup.');
+    if (!infisicalProjectId)
+      throw new Error('Infisical not configured. Run Infisical Setup first.');
 
     let prodSystemBucketId = config.railwayBuckets.prodSystemServiceId;
     let prodUserBucketId = config.railwayBuckets.prodUserServiceId;
@@ -137,7 +175,8 @@ export const setupRailwayBuckets = async (onStepComplete?: () => Promise<void>):
     // ─── STAGING (gated on features.staging.enabled) ─────────────────────────
 
     if (stagingEnabled && !(await isComplete('railwayBuckets', 'ensureStagingSystemBucket'))) {
-      if (!stagingEnvironmentId) throw new Error('Staging env missing despite staging being enabled');
+      if (!stagingEnvironmentId)
+        throw new Error('Staging env missing despite staging being enabled');
       if (!stagingSystemBucketId) {
         const bucket = await retryWithTimeout(
           () => railwayApi.ensureBucket(projectId, `${project}-staging-system`),
@@ -164,8 +203,10 @@ export const setupRailwayBuckets = async (onStepComplete?: () => Promise<void>):
     }
 
     if (stagingEnabled && !(await isComplete('railwayBuckets', 'storeStagingCredentials'))) {
-      if (!stagingSystemBucketId || !stagingUserBucketId) throw new Error('Staging bucket IDs missing');
-      if (!stagingEnvironmentId) throw new Error('Staging env missing despite staging being enabled');
+      if (!stagingSystemBucketId || !stagingUserBucketId)
+        throw new Error('Staging bucket IDs missing');
+      if (!stagingEnvironmentId)
+        throw new Error('Staging env missing despite staging being enabled');
       await writeBucketCredentials(
         infisicalProjectId,
         'staging',

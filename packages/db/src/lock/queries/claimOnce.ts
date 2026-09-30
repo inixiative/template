@@ -11,5 +11,9 @@ import type { LockRedis } from '@template/db/lock/types';
 const CLAIM_ONCE =
   "if redis.call('set', KEYS[1], ARGV[1], 'PX', ARGV[2], 'NX') then return nil else return redis.call('get', KEYS[1]) end";
 
-export const claimOnce = (redis: LockRedis, key: string, holder: string, ttlMs: number): Promise<unknown> =>
-  redis.eval(CLAIM_ONCE, 1, key, holder, String(ttlMs));
+export const claimOnce = (
+  redis: LockRedis,
+  key: string,
+  holder: string,
+  ttlMs: number,
+): Promise<unknown> => redis.eval(CLAIM_ONCE, 1, key, holder, String(ttlMs));

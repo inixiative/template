@@ -405,7 +405,9 @@ export const ResendSetupView: React.FC<ResendSetupViewProps> = ({ onComplete, on
 
       {viewState === 'from-input' && !running && (
         <Box flexDirection="column" marginTop={1}>
-          <Text dimColor>The address your emails will be sent from (e.g. noreply@yourdomain.com)</Text>
+          <Text dimColor>
+            The address your emails will be sent from (e.g. noreply@yourdomain.com)
+          </Text>
           <Box marginTop={1}>
             <Text>From address: </Text>
             <TextInput
@@ -424,7 +426,8 @@ export const ResendSetupView: React.FC<ResendSetupViewProps> = ({ onComplete, on
         <Box flexDirection="column" marginTop={1}>
           <Text bold>DNS Records</Text>
           <Text dimColor>
-            Add these records to your DNS provider for <Text color="cyan">{fromAddress.split('@')[1]}</Text>:
+            Add these records to your DNS provider for{' '}
+            <Text color="cyan">{fromAddress.split('@')[1]}</Text>:
           </Text>
           <Box flexDirection="column" marginTop={1} marginBottom={1}>
             {dnsRecords.map((record) => (
@@ -446,7 +449,9 @@ export const ResendSetupView: React.FC<ResendSetupViewProps> = ({ onComplete, on
                 )}
               </Box>
             ))}
-            {dnsRecords.length === 0 && <Text dimColor>No DNS records returned - check Resend dashboard.</Text>}
+            {dnsRecords.length === 0 && (
+              <Text dimColor>No DNS records returned - check Resend dashboard.</Text>
+            )}
           </Box>
           {verificationResult && !verificationResult.verified && (
             <Box flexDirection="column" marginBottom={1}>
@@ -464,7 +469,8 @@ export const ResendSetupView: React.FC<ResendSetupViewProps> = ({ onComplete, on
               ))}
               {verificationResult.failedRecords.length === 0 && (
                 <Text dimColor>
-                  {'  '}Domain status: {verificationResult.domain.status} (records may still be propagating)
+                  {'  '}Domain status: {verificationResult.domain.status} (records may still be
+                  propagating)
                 </Text>
               )}
             </Box>

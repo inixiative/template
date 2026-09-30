@@ -22,7 +22,12 @@ export type RailwayService = {
   domains?: string[];
 };
 export type RailwayRedis = { id: string; name: string; projectId: string; environmentId?: string };
-export type RailwayPostgres = { id: string; name: string; projectId: string; environmentId?: string };
+export type RailwayPostgres = {
+  id: string;
+  name: string;
+  projectId: string;
+  environmentId?: string;
+};
 export type RailwayDeployment = {
   id: string;
   status: 'BUILDING' | 'DEPLOYING' | 'SUCCESS' | 'FAILED' | 'CRASHED';
@@ -35,17 +40,23 @@ class RailwayApi {
     version: () => cliVersion('railway'),
     sanitizers: {
       getRedisUrl: {
-        fn: (s) => (typeof s === 'string' ? s.replace(/:\/\/([^:]+):([^@]+)@/g, '://REDACTED:REDACTED@') : s),
+        fn: (s) =>
+          typeof s === 'string' ? s.replace(/:\/\/([^:]+):([^@]+)@/g, '://REDACTED:REDACTED@') : s,
       },
       getPostgresUrl: {
-        fn: (s) => (typeof s === 'string' ? s.replace(/:\/\/([^:]+):([^@]+)@/g, '://REDACTED:REDACTED@') : s),
+        fn: (s) =>
+          typeof s === 'string' ? s.replace(/:\/\/([^:]+):([^@]+)@/g, '://REDACTED:REDACTED@') : s,
       },
       getRailwayUserToken: { fn: () => 'REDACTED' },
       getRailwayWorkspaceToken: { fn: () => 'REDACTED' },
     },
   });
 
-  async railwayGraphQLWithToken<T>(token: string, query: string, variables?: Record<string, unknown>): Promise<T> {
+  async railwayGraphQLWithToken<T>(
+    token: string,
+    query: string,
+    variables?: Record<string, unknown>,
+  ): Promise<T> {
     const response = await fetch(RAILWAY_API, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -73,10 +84,14 @@ class RailwayApi {
     return this.vcr.capture('getRailwayUserToken', async () => {
       const config = await getProjectConfig();
       const projectId = config.infisical.projectId;
-      if (!projectId) throw new Error('Infisical project not configured. Run Infisical setup first.');
+      if (!projectId)
+        throw new Error('Infisical project not configured. Run Infisical setup first.');
 
       try {
-        const token = await getSecretAsync('RAILWAY_USER_TOKEN', { projectId, environment: 'root' });
+        const token = await getSecretAsync('RAILWAY_USER_TOKEN', {
+          projectId,
+          environment: 'root',
+        });
         if (token) return token;
       } catch (_error) {}
 
@@ -98,10 +113,14 @@ class RailwayApi {
     return this.vcr.capture('getRailwayWorkspaceToken', async () => {
       const config = await getProjectConfig();
       const projectId = config.infisical.projectId;
-      if (!projectId) throw new Error('Infisical project not configured. Run Infisical setup first.');
+      if (!projectId)
+        throw new Error('Infisical project not configured. Run Infisical setup first.');
 
       try {
-        const token = await getSecretAsync('RAILWAY_WORKSPACE_TOKEN', { projectId, environment: 'root' });
+        const token = await getSecretAsync('RAILWAY_WORKSPACE_TOKEN', {
+          projectId,
+          environment: 'root',
+        });
         if (token) return token;
       } catch (_error) {}
 
@@ -135,7 +154,8 @@ class RailwayApi {
         const data = JSON.parse(jsonLine);
         return { id: data.id, name: data.name, workspaceId, createdAt: new Date().toISOString() };
       } catch (error) {
-        if (error instanceof Error) throw new Error(`Failed to create Railway project: ${error.message}`);
+        if (error instanceof Error)
+          throw new Error(`Failed to create Railway project: ${error.message}`);
         throw error;
       }
     });
@@ -182,7 +202,9 @@ class RailwayApi {
         { serviceId, environmentId, input: { source: { repo } } },
       );
       if (!updateData.serviceInstanceUpdate) {
-        throw new Error(`Failed to set source on service ${serviceId} for ${repo} in environment ${environmentId}`);
+        throw new Error(
+          `Failed to set source on service ${serviceId} for ${repo} in environment ${environmentId}`,
+        );
       }
 
       const projectIdData = await this.railwayGraphQLUser<{ service: { projectId: string } }>(
@@ -192,7 +214,9 @@ class RailwayApi {
       const projectId = projectIdData.service.projectId;
 
       const existing = await this.railwayGraphQLUser<{
-        deploymentTriggers: { edges: Array<{ node: { id: string; branch: string; repository: string } }> };
+        deploymentTriggers: {
+          edges: Array<{ node: { id: string; branch: string; repository: string } }>;
+        };
       }>(
         `
           query Triggers($projectId: String!, $serviceId: String!, $environmentId: String!) {
@@ -286,7 +310,10 @@ class RailwayApi {
     });
   }
 
-  async getServiceVolume(projectId: string, serviceName: string): Promise<{ id: string; name: string } | null> {
+  async getServiceVolume(
+    projectId: string,
+    serviceName: string,
+  ): Promise<{ id: string; name: string } | null> {
     return this.vcr.capture('getServiceVolume', async () => {
       const volumes = await this.getProjectVolumes(projectId);
       if (volumes.length === 0) return null;
@@ -362,17 +389,21 @@ class RailwayApi {
     return this.vcr.capture('createEnvironment', async () => {
       try {
         const duplicateFlag = sourceEnvironmentId ? `--duplicate ${sourceEnvironmentId}` : '';
-        const { stdout } = await execAsync(`railway environment new "${escapeName(name)}" ${duplicateFlag} --json`, {
-          encoding: 'utf-8',
-          cwd: process.cwd(),
-          env: { ...process.env, RAILWAY_PROJECT_ID: projectId },
-        });
+        const { stdout } = await execAsync(
+          `railway environment new "${escapeName(name)}" ${duplicateFlag} --json`,
+          {
+            encoding: 'utf-8',
+            cwd: process.cwd(),
+            env: { ...process.env, RAILWAY_PROJECT_ID: projectId },
+          },
+        );
         const jsonLine = stdout.split('\n').find((line) => line.trim().startsWith('{'));
         if (!jsonLine) throw new Error(`No JSON output found. Raw output: ${stdout}`);
         const data = JSON.parse(jsonLine);
         return { id: data.id || data.environmentId, name: data.name || name };
       } catch (error) {
-        if (error instanceof Error) throw new Error(`Failed to create environment: ${error.message}`);
+        if (error instanceof Error)
+          throw new Error(`Failed to create environment: ${error.message}`);
         throw error;
       }
     });
@@ -381,13 +412,17 @@ class RailwayApi {
   async deleteEnvironment(projectId: string, environmentName: string): Promise<void> {
     return this.vcr.capture('deleteEnvironment', async () => {
       try {
-        await execAsync(`railway environment delete "${escapeName(environmentName)}" --yes --json`, {
-          encoding: 'utf-8',
-          cwd: process.cwd(),
-          env: { ...process.env, RAILWAY_PROJECT_ID: projectId },
-        });
+        await execAsync(
+          `railway environment delete "${escapeName(environmentName)}" --yes --json`,
+          {
+            encoding: 'utf-8',
+            cwd: process.cwd(),
+            env: { ...process.env, RAILWAY_PROJECT_ID: projectId },
+          },
+        );
       } catch (error) {
-        if (error instanceof Error) throw new Error(`Failed to delete environment: ${error.message}`);
+        if (error instanceof Error)
+          throw new Error(`Failed to delete environment: ${error.message}`);
         throw error;
       }
     });
@@ -407,7 +442,11 @@ class RailwayApi {
     });
   }
 
-  async createRedis(projectId: string, environmentId: string, environmentName: string): Promise<RailwayRedis> {
+  async createRedis(
+    projectId: string,
+    environmentId: string,
+    environmentName: string,
+  ): Promise<RailwayRedis> {
     return this.vcr.capture('createRedis', async () => {
       try {
         await execAsync(`railway environment link "${escapeName(environmentName)}"`, {
@@ -423,7 +462,12 @@ class RailwayApi {
         const jsonLine = stdout.split('\n').find((line) => line.trim().startsWith('{'));
         if (!jsonLine) throw new Error(`No JSON output found. Raw output: ${stdout}`);
         const data = JSON.parse(jsonLine);
-        return { id: data.serviceId || data.id, name: data.name || 'redis', projectId, environmentId };
+        return {
+          id: data.serviceId || data.id,
+          name: data.name || 'redis',
+          projectId,
+          environmentId,
+        };
       } catch (error) {
         if (error instanceof Error) throw new Error(`Failed to provision Redis: ${error.message}`);
         throw error;
@@ -439,11 +483,14 @@ class RailwayApi {
   ): Promise<string> {
     return this.vcr.capture('getRedisUrl', async () => {
       try {
-        const { stdout } = await execAsync(`railway variables list -s ${serviceId} -e ${environmentName} --json`, {
-          encoding: 'utf-8',
-          cwd: process.cwd(),
-          env: { ...process.env, RAILWAY_PROJECT_ID: projectId },
-        });
+        const { stdout } = await execAsync(
+          `railway variables list -s ${serviceId} -e ${environmentName} --json`,
+          {
+            encoding: 'utf-8',
+            cwd: process.cwd(),
+            env: { ...process.env, RAILWAY_PROJECT_ID: projectId },
+          },
+        );
         const variables = JSON.parse(stdout.trim());
         const redisUrl = variables.REDIS_URL;
         if (!redisUrl) throw new Error('REDIS_URL not found in service variables');
@@ -455,7 +502,11 @@ class RailwayApi {
     });
   }
 
-  async createPostgres(projectId: string, environmentId: string, environmentName: string): Promise<RailwayPostgres> {
+  async createPostgres(
+    projectId: string,
+    environmentId: string,
+    environmentName: string,
+  ): Promise<RailwayPostgres> {
     return this.vcr.capture('createPostgres', async () => {
       try {
         await execAsync(`railway environment link "${escapeName(environmentName)}"`, {
@@ -471,9 +522,15 @@ class RailwayApi {
         const jsonLine = stdout.split('\n').find((line) => line.trim().startsWith('{'));
         if (!jsonLine) throw new Error(`No JSON output found. Raw output: ${stdout}`);
         const data = JSON.parse(jsonLine);
-        return { id: data.serviceId || data.id, name: data.name || 'postgres', projectId, environmentId };
+        return {
+          id: data.serviceId || data.id,
+          name: data.name || 'postgres',
+          projectId,
+          environmentId,
+        };
       } catch (error) {
-        if (error instanceof Error) throw new Error(`Failed to provision Postgres: ${error.message}`);
+        if (error instanceof Error)
+          throw new Error(`Failed to provision Postgres: ${error.message}`);
         throw error;
       }
     });
@@ -487,11 +544,14 @@ class RailwayApi {
   ): Promise<string> {
     return this.vcr.capture('getPostgresUrl', async () => {
       try {
-        const { stdout } = await execAsync(`railway variables list -s ${serviceId} -e ${environmentName} --json`, {
-          encoding: 'utf-8',
-          cwd: process.cwd(),
-          env: { ...process.env, RAILWAY_PROJECT_ID: projectId },
-        });
+        const { stdout } = await execAsync(
+          `railway variables list -s ${serviceId} -e ${environmentName} --json`,
+          {
+            encoding: 'utf-8',
+            cwd: process.cwd(),
+            env: { ...process.env, RAILWAY_PROJECT_ID: projectId },
+          },
+        );
         const variables = JSON.parse(stdout.trim());
         // Prefer the private URL (Railway-internal network, faster + free egress).
         const url = variables.DATABASE_PRIVATE_URL || variables.DATABASE_URL;
@@ -523,7 +583,10 @@ class RailwayApi {
     });
   }
 
-  async getLatestDeployment(serviceId: string, environmentId: string): Promise<RailwayDeployment | null> {
+  async getLatestDeployment(
+    serviceId: string,
+    environmentId: string,
+  ): Promise<RailwayDeployment | null> {
     return this.vcr.capture('getLatestDeployment', async () => {
       const data = await this.railwayGraphQLUser<{
         serviceInstance: { latestDeployment: RailwayDeployment | null };
@@ -556,7 +619,9 @@ class RailwayApi {
         { serviceId, environmentId, latestCommit: true },
       );
       if (!data.serviceInstanceDeploy) {
-        throw new Error(`Failed to trigger deployment for service ${serviceId} in environment ${environmentId}`);
+        throw new Error(
+          `Failed to trigger deployment for service ${serviceId} in environment ${environmentId}`,
+        );
       }
     });
   }

@@ -17,7 +17,13 @@ import { getProjectConfig, type ProjectConfig } from '../utils/getProjectConfig'
 import { clearError, clearProgress, markComplete, setError } from '../utils/progressTracking';
 import { prompt } from '../utils/prompts';
 
-type ViewState = 'status' | 'org-select' | 'region-select' | 'token-confirm' | 'token-id-input' | 'token-value-input';
+type ViewState =
+  | 'status'
+  | 'org-select'
+  | 'region-select'
+  | 'token-confirm'
+  | 'token-id-input'
+  | 'token-value-input';
 type SetupState = 'new' | 'stale' | 'incomplete' | 'complete';
 
 type PlanetScaleSetupViewProps = {
@@ -50,7 +56,10 @@ const detectSetupState = (config: ProjectConfig): SetupState => {
   return 'incomplete';
 };
 
-export const PlanetScaleSetupView: React.FC<PlanetScaleSetupViewProps> = ({ onComplete, onCancel }) => {
+export const PlanetScaleSetupView: React.FC<PlanetScaleSetupViewProps> = ({
+  onComplete,
+  onCancel,
+}) => {
   const { config, syncConfig } = useConfig();
   const [viewState, setViewState] = useState<ViewState>('status');
   const [running, setRunning] = useState(false);
@@ -90,7 +99,10 @@ export const PlanetScaleSetupView: React.FC<PlanetScaleSetupViewProps> = ({ onCo
 
   // Derive setup state from config (no delay)
   const setupState = useMemo(() => (config ? detectSetupState(config) : 'new'), [config]);
-  const progressItems = useMemo(() => (config ? getPlanetScaleProgressItems(config) : []), [config]);
+  const progressItems = useMemo(
+    () => (config ? getPlanetScaleProgressItems(config) : []),
+    [config],
+  );
   const error = config?.planetscale.error ?? '';
 
   // Load organizations
@@ -176,7 +188,10 @@ export const PlanetScaleSetupView: React.FC<PlanetScaleSetupViewProps> = ({ onCo
             setRegions(availableRegions);
             setViewState('region-select');
           } catch (err) {
-            await setError('planetscale', err instanceof Error ? err.message : 'Failed to load regions');
+            await setError(
+              'planetscale',
+              err instanceof Error ? err.message : 'Failed to load regions',
+            );
             await syncConfig();
             setViewState('status');
           } finally {
@@ -376,7 +391,13 @@ export const PlanetScaleSetupView: React.FC<PlanetScaleSetupViewProps> = ({ onCo
       value: region.slug,
     }));
 
-    const regionItemComponent = ({ isSelected = false, label }: { isSelected?: boolean; label: string }) => {
+    const regionItemComponent = ({
+      isSelected = false,
+      label,
+    }: {
+      isSelected?: boolean;
+      label: string;
+    }) => {
       const prefix = isSelected ? '❯ ' : '  ';
       return (
         <Text color={isSelected ? 'cyan' : undefined}>
@@ -393,7 +414,9 @@ export const PlanetScaleSetupView: React.FC<PlanetScaleSetupViewProps> = ({ onCo
         </Box>
 
         <Box marginBottom={1}>
-          <Text dimColor>Choose a region for your database. Closer regions provide lower latency.</Text>
+          <Text dimColor>
+            Choose a region for your database. Closer regions provide lower latency.
+          </Text>
         </Box>
 
         <SelectInput
@@ -447,7 +470,9 @@ export const PlanetScaleSetupView: React.FC<PlanetScaleSetupViewProps> = ({ onCo
 
         <Box flexDirection="column" marginBottom={1}>
           <Text dimColor>If you're missing any permissions, you'll get a 403 error.</Text>
-          <Text dimColor>Check your token at: https://app.planetscale.com/{orgName}/settings/service-tokens</Text>
+          <Text dimColor>
+            Check your token at: https://app.planetscale.com/{orgName}/settings/service-tokens
+          </Text>
         </Box>
 
         <Box marginTop={1}>
@@ -474,23 +499,38 @@ export const PlanetScaleSetupView: React.FC<PlanetScaleSetupViewProps> = ({ onCo
             Prerequisites:
           </Text>
           <Text dimColor>• Add payment info: https://app.planetscale.com/settings/billing</Text>
-          <Text dimColor> (Required for database creation - PS-10 starts at $5/month per database)</Text>
+          <Text dimColor>
+            {' '}
+            (Required for database creation - PS-10 starts at $5/month per database)
+          </Text>
         </Box>
 
         <Box flexDirection="column" marginBottom={1}>
           <Text>Create a service token with database permissions:</Text>
-          <Text dimColor>1. Go to: https://app.planetscale.com/{orgName}/settings/service-tokens</Text>
+          <Text dimColor>
+            1. Go to: https://app.planetscale.com/{orgName}/settings/service-tokens
+          </Text>
           <Text dimColor>2. Click "New service token"</Text>
           <Text dimColor>3. Enable org permissions: create_databases, read_databases</Text>
-          <Text dimColor> Enable DB permissions (all databases): read_database, write_database,</Text>
-          <Text dimColor> create_branch, read_branch, connect_branch, connect_production_branch</Text>
+          <Text dimColor>
+            {' '}
+            Enable DB permissions (all databases): read_database, write_database,
+          </Text>
+          <Text dimColor>
+            {' '}
+            create_branch, read_branch, connect_branch, connect_production_branch
+          </Text>
           <Text dimColor>4. Set expiration to "No expiration"</Text>
           <Text dimColor>5. Copy BOTH the token ID and token value</Text>
         </Box>
 
         <Box>
           <Text>Token ID: </Text>
-          <TextInput value={tokenIdInput} onChange={setTokenIdInput} onSubmit={handleTokenIdSubmit} />
+          <TextInput
+            value={tokenIdInput}
+            onChange={setTokenIdInput}
+            onSubmit={handleTokenIdSubmit}
+          />
         </Box>
 
         <Box marginTop={1}>
@@ -514,7 +554,11 @@ export const PlanetScaleSetupView: React.FC<PlanetScaleSetupViewProps> = ({ onCo
 
         <Box>
           <Text>Token Value: </Text>
-          <TextInput value={tokenInput} onChange={setTokenInput} onSubmit={handleTokenValueSubmit} />
+          <TextInput
+            value={tokenInput}
+            onChange={setTokenInput}
+            onSubmit={handleTokenValueSubmit}
+          />
         </Box>
 
         {tokenAction.running && <ActionSpinner label={tokenAction.actionLabel} />}

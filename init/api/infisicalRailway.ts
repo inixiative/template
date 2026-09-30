@@ -38,13 +38,16 @@ class InfisicalRailwayApi {
     service: 'infisical|railway',
     // Composite: either CLI bumping should invalidate cassettes since
     // both shape the Infisical-Railway connection payload.
-    version: async () => (await Promise.all([cliVersion('infisical'), cliVersion('railway')])).join('|'),
+    version: async () =>
+      (await Promise.all([cliVersion('infisical'), cliVersion('railway')])).join('|'),
     sanitizers: {
       createRailwayConnection: { fn: () => 'REDACTED' },
     },
   });
 
-  async listRailwayConnections(infisicalProjectId: string): Promise<Array<{ id: string; name: string }>> {
+  async listRailwayConnections(
+    infisicalProjectId: string,
+  ): Promise<Array<{ id: string; name: string }>> {
     return this.vcr.capture('listRailwayConnections', async () => {
       const infisicalToken = await getInfisicalToken();
       const response = await fetch(
@@ -52,9 +55,13 @@ class InfisicalRailwayApi {
         { method: 'GET', headers: { Authorization: `Bearer ${infisicalToken}` } },
       );
       if (!response.ok) {
-        throw new Error(`Failed to list Railway connections: ${response.statusText}\n${await response.text()}`);
+        throw new Error(
+          `Failed to list Railway connections: ${response.statusText}\n${await response.text()}`,
+        );
       }
-      const data = (await response.json()) as { appConnections?: Array<{ id: string; name: string }> };
+      const data = (await response.json()) as {
+        appConnections?: Array<{ id: string; name: string }>;
+      };
       return data.appConnections ?? [];
     });
   }
@@ -67,7 +74,9 @@ class InfisicalRailwayApi {
         { method: 'GET', headers: { Authorization: `Bearer ${infisicalToken}` } },
       );
       if (!response.ok) {
-        throw new Error(`Failed to list Railway syncs: ${response.statusText}\n${await response.text()}`);
+        throw new Error(
+          `Failed to list Railway syncs: ${response.statusText}\n${await response.text()}`,
+        );
       }
       const data = (await response.json()) as { secretSyncs?: RailwaySecretSync[] };
       return data.secretSyncs ?? [];
@@ -100,11 +109,14 @@ class InfisicalRailwayApi {
           );
           if (existing) return existing.id;
         }
-        throw new Error(`Failed to create Railway connection in Infisical: ${response.statusText}\n${errorText}`);
+        throw new Error(
+          `Failed to create Railway connection in Infisical: ${response.statusText}\n${errorText}`,
+        );
       }
 
       const data = (await response.json()) as { appConnection?: { id?: string } };
-      if (!data.appConnection?.id) throw new Error(`Unexpected Infisical API response: ${JSON.stringify(data)}`);
+      if (!data.appConnection?.id)
+        throw new Error(`Unexpected Infisical API response: ${JSON.stringify(data)}`);
       return data.appConnection.id;
     });
   }
@@ -143,7 +155,9 @@ class InfisicalRailwayApi {
 
   async ensureRailwaySync(input: EnsureRailwaySyncInput): Promise<void> {
     return this.vcr.capture('ensureRailwaySync', async () => {
-      const existing = (await this.listRailwaySyncs(input.infisicalProjectId)).find((s) => s.name === input.syncName);
+      const existing = (await this.listRailwaySyncs(input.infisicalProjectId)).find(
+        (s) => s.name === input.syncName,
+      );
       if (!existing) {
         await this.createRailwaySync(input);
         return;
@@ -156,12 +170,16 @@ class InfisicalRailwayApi {
         );
       }
       if ((existing.folder?.path || '') !== input.infisicalSecretPath) {
-        mismatches.push(`secretPath: expected "${input.infisicalSecretPath}", got "${existing.folder?.path || ''}"`);
+        mismatches.push(
+          `secretPath: expected "${input.infisicalSecretPath}", got "${existing.folder?.path || ''}"`,
+        );
       }
 
       const destinationConfig = existing.destinationConfig || {};
       if ((destinationConfig.projectId || '') !== input.railwayProjectId) {
-        mismatches.push(`projectId: expected "${input.railwayProjectId}", got "${destinationConfig.projectId || ''}"`);
+        mismatches.push(
+          `projectId: expected "${input.railwayProjectId}", got "${destinationConfig.projectId || ''}"`,
+        );
       }
       if ((destinationConfig.environmentId || '') !== input.railwayEnvironmentId) {
         mismatches.push(
@@ -169,7 +187,9 @@ class InfisicalRailwayApi {
         );
       }
       if ((destinationConfig.serviceId || '') !== input.railwayServiceId) {
-        mismatches.push(`serviceId: expected "${input.railwayServiceId}", got "${destinationConfig.serviceId || ''}"`);
+        mismatches.push(
+          `serviceId: expected "${input.railwayServiceId}", got "${destinationConfig.serviceId || ''}"`,
+        );
       }
 
       if (mismatches.length > 0) {

@@ -29,10 +29,15 @@ export type SerializedQueueOptions = {
 };
 
 const logError = (err: unknown): void => {
-  log.error(`serialized queue task failed: ${err instanceof Error ? err.message : String(err)}`, LogScope.api);
+  log.error(
+    `serialized queue task failed: ${err instanceof Error ? err.message : String(err)}`,
+    LogScope.api,
+  );
 };
 
-export const createSerializedQueue = ({ onError = logError }: SerializedQueueOptions = {}): SerializedQueue => {
+export const createSerializedQueue = ({
+  onError = logError,
+}: SerializedQueueOptions = {}): SerializedQueue => {
   let tail: Promise<unknown> = Promise.resolve();
   let pending = 0;
 

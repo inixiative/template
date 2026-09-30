@@ -60,7 +60,9 @@ describe('POST /me/tokens', () => {
   });
 
   it('stores token in database', async () => {
-    const response = await fetch(post('/api/v1/me/tokens', { name: 'Stored Token', role: 'owner' }));
+    const response = await fetch(
+      post('/api/v1/me/tokens', { name: 'Stored Token', role: 'owner' }),
+    );
     const { data } = await json<CreateTokenResponse>(response);
 
     const dbToken = await db.token.findUnique({ where: { id: data.id } });

@@ -29,7 +29,10 @@ export const inquiryUpdateController = makeController(inquiryUpdateRoute, async 
   const effectiveContent = handler.contentSchema.parse(content ?? inquiry.content);
   if (handler.validate) await handler.validate(db, inquiry, effectiveContent);
 
-  const partial = await hydrate('inquiry', { ...inquiry, content: effectiveContent } as HydratedRecord);
+  const partial = await hydrate('inquiry', {
+    ...inquiry,
+    content: effectiveContent,
+  } as HydratedRecord);
   if (!check(permix, rebacSchema, 'inquiry', partial, 'send'))
     throw makeError({ status: 403, message: 'Access denied' });
 

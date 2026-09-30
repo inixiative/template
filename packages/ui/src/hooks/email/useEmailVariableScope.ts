@@ -29,7 +29,10 @@ const bindingFor = (loop: LensLoopOption, taken: ReadonlySet<string>): string =>
 };
 
 const wrapInEaches = (frames: EmailScopeFrame[], inner: string): string =>
-  frames.reduceRight((body, frame) => `{{#each ${frame.eachPath} as=${frame.binding}}}${body}{{/each}}`, inner);
+  frames.reduceRight(
+    (body, frame) => `{{#each ${frame.eachPath} as=${frame.binding}}}${body}{{/each}}`,
+    inner,
+  );
 
 export const useEmailVariableScope = (
   source: RuleBuilderSource | undefined,
@@ -46,10 +49,17 @@ export const useEmailVariableScope = (
     if (!lens) return [];
     const frame = frames.at(-1);
     const scope = frame
-      ? lensScopeSurface(lens, { mapName: frame.loop.relation.mapName, model: frame.loop.relation.modelName })
+      ? lensScopeSurface(lens, {
+          mapName: frame.loop.relation.mapName,
+          model: frame.loop.relation.modelName,
+        })
       : lensScopeSurface(lens);
     const prefix = frame ? `${frame.binding}.` : '';
-    const loops = scope.loops.map<EmailVariableRow>((loop) => ({ type: 'loop', path: `${prefix}${loop.path}`, loop }));
+    const loops = scope.loops.map<EmailVariableRow>((loop) => ({
+      type: 'loop',
+      path: `${prefix}${loop.path}`,
+      loop,
+    }));
     const values = scope.values.map<EmailVariableRow>((value) => {
       const path = `${prefix}${value.path}`;
       return { type: 'value', path, snippet: wrapInEaches(frames, `{{${path}}}`), value };

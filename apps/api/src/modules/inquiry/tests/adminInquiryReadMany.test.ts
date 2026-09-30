@@ -1,7 +1,17 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import type { User } from '@template/db/generated/client/client';
-import { InquiryResourceModel, InquiryStatus, InquiryType, PlatformRole } from '@template/db/generated/client/enums';
-import { cleanupTouchedTables, createInquiry, createOrganization, createUser } from '@template/db/test';
+import {
+  InquiryResourceModel,
+  InquiryStatus,
+  InquiryType,
+  PlatformRole,
+} from '@template/db/generated/client/enums';
+import {
+  cleanupTouchedTables,
+  createInquiry,
+  createOrganization,
+  createUser,
+} from '@template/db/test';
 import { adminInquiryRouter } from '#/modules/inquiry';
 import { createTestApp } from '#tests/createTestApp';
 import { get, json } from '#tests/utils/request';
@@ -74,7 +84,9 @@ describe('GET /api/admin/inquiry', () => {
     });
 
     const response = await fetch(
-      get(`/api/admin/inquiry?searchFields[expiresAt][gte]=${encodeURIComponent(now.toISOString())}`),
+      get(
+        `/api/admin/inquiry?searchFields[expiresAt][gte]=${encodeURIComponent(now.toISOString())}`,
+      ),
     );
     const { data } = await json<ReadManyResponse['data']>(response);
 

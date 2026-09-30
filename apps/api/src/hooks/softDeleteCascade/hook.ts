@@ -25,13 +25,17 @@ export const registerSoftDeleteCascadeHook = () => {
     HookTiming.after,
     [DbAction.update, DbAction.updateManyAndReturn, DbAction.upsert],
     async ({ model, action, args, result, previous }: HookOptions) => {
-      const data = (action === DbAction.upsert ? (args as { update?: Row }).update : (args as { data?: Row }).data) as
-        | Row
-        | undefined;
+      const data = (
+        action === DbAction.upsert
+          ? (args as { update?: Row }).update
+          : (args as { data?: Row }).data
+      ) as Row | undefined;
       if (!data || !('deletedAt' in data)) return;
 
       const results = castArray(result) as Row[];
-      const previousById = new Map((castArray(previous ?? []) as Row[]).map((row) => [row.id, row]));
+      const previousById = new Map(
+        (castArray(previous ?? []) as Row[]).map((row) => [row.id, row]),
+      );
 
       for (const row of results) {
         const prior = previousById.get(row.id);

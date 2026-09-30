@@ -9,7 +9,11 @@ import { STREAM_DEFINITIONS } from '@template/shared/ws';
 import { useStream } from '@template/ui/hooks/useStream';
 import type { ListStreamState } from '@template/ui/lib/ws/listStream';
 
-export type OrganizationContactsStream = ListStreamState<OrganizationReadManyContactsResponse['data'][number]>;
+export type OrganizationContactsStream = ListStreamState<
+  OrganizationReadManyContactsResponse['data'][number]
+>;
 
 export const useOrganizationContactsStream = (organizationId: string) =>
-  useStream<OrganizationContactsStream>(STREAM_DEFINITIONS.organizationReadManyContacts.name({ id: organizationId }));
+  useStream<OrganizationContactsStream>(
+    STREAM_DEFINITIONS.organizationReadManyContacts.name({ id: organizationId }),
+  );

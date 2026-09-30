@@ -15,7 +15,11 @@ export type NavItem = {
   icon?: LucideIcon;
   title?: string | ((context: TenantContext, pageContext?: PageContext) => string);
   description?: string | ((context: TenantContext, pageContext?: PageContext) => string);
-  access?: (permissions: PermissionsCheck, context: TenantContext, pageContext?: PageContext) => boolean;
+  access?: (
+    permissions: PermissionsCheck,
+    context: TenantContext,
+    pageContext?: PageContext,
+  ) => boolean;
   alias?: boolean;
   breadcrumbLabel?: (record: Record<string, unknown>) => string;
   items?: NavItem[];

@@ -47,9 +47,9 @@ describe('managed transactions', () => {
     it('rejects a hooked mutation inside a batch $transaction', async () => {
       const email = nextEmail('batch');
 
-      await expect(db.raw.$transaction([db.raw.user.create({ data: { email, name: 'Batched' } })])).rejects.toThrow(
-        'transaction that db.txn() did not open',
-      );
+      await expect(
+        db.raw.$transaction([db.raw.user.create({ data: { email, name: 'Batched' } })]),
+      ).rejects.toThrow('transaction that db.txn() did not open');
 
       expect(await db.user.findUnique({ where: { email } })).toBeNull();
     });
@@ -60,10 +60,16 @@ describe('managed transactions', () => {
       const email = nextEmail('reissued');
       let hookSawTransaction = false;
 
-      registerDbHook('reissued-hook', 'User', HookTiming.after, [DbAction.create], async ({ result }) => {
-        hookSawTransaction = db.isInTxn();
-        await db.session.findMany({ where: { userId: (result as { id: string }).id } });
-      });
+      registerDbHook(
+        'reissued-hook',
+        'User',
+        HookTiming.after,
+        [DbAction.create],
+        async ({ result }) => {
+          hookSawTransaction = db.isInTxn();
+          await db.session.findMany({ where: { userId: (result as { id: string }).id } });
+        },
+      );
 
       const user = await db.user.create({ data: { email, name: 'Reissued' } });
 
@@ -75,13 +81,19 @@ describe('managed transactions', () => {
     it('rolls back the write when its after hook throws', async () => {
       const email = nextEmail('reissued-failing-hook');
 
-      registerDbHook('reissued-failing-hook', 'User', HookTiming.after, [DbAction.create], async () => {
-        throw new Error('hook rejected the write');
-      });
-
-      await expect((async () => db.user.create({ data: { email, name: 'Doomed' } }))()).rejects.toThrow(
-        'hook rejected the write',
+      registerDbHook(
+        'reissued-failing-hook',
+        'User',
+        HookTiming.after,
+        [DbAction.create],
+        async () => {
+          throw new Error('hook rejected the write');
+        },
       );
+
+      await expect(
+        (async () => db.user.create({ data: { email, name: 'Doomed' } }))(),
+      ).rejects.toThrow('hook rejected the write');
 
       expect(await db.user.findUnique({ where: { email } })).toBeNull();
     });
@@ -94,7 +106,9 @@ describe('managed transactions', () => {
           data: {
             email: nextEmail('hookless-nested'),
             name: 'Hookless Nested',
-            sessions: { create: [{ token: `hookless-${getNextSeq()}-${Date.now()}`, expiresAt: new Date() }] },
+            sessions: {
+              create: [{ token: `hookless-${getNextSeq()}-${Date.now()}`, expiresAt: new Date() }],
+            },
           },
         }),
       ).rejects.toThrow('skips Session hooks');
@@ -112,7 +126,9 @@ describe('managed transactions', () => {
         data: {
           email: nextEmail('raw-nested'),
           name: 'Raw Nested',
-          sessions: { create: [{ token: `raw-nested-${getNextSeq()}-${Date.now()}`, expiresAt: new Date() }] },
+          sessions: {
+            create: [{ token: `raw-nested-${getNextSeq()}-${Date.now()}`, expiresAt: new Date() }],
+          },
         },
       });
 
@@ -128,15 +144,21 @@ describe('managed transactions', () => {
       const firstEmail = nextEmail('atomic-first');
       const secondEmail = nextEmail('atomic-second');
 
-      registerDbHook('atomic-side-effect', 'User', HookTiming.after, [DbAction.create], async ({ result }) => {
-        await db.session.create({
-          data: {
-            userId: (result as { id: string }).id,
-            token: `atomic-${getNextSeq()}-${Date.now()}`,
-            expiresAt: new Date(Date.now() + 60_000),
-          },
-        });
-      });
+      registerDbHook(
+        'atomic-side-effect',
+        'User',
+        HookTiming.after,
+        [DbAction.create],
+        async ({ result }) => {
+          await db.session.create({
+            data: {
+              userId: (result as { id: string }).id,
+              token: `atomic-${getNextSeq()}-${Date.now()}`,
+              expiresAt: new Date(Date.now() + 60_000),
+            },
+          });
+        },
+      );
 
       await expect(
         db.txn(async () => {
@@ -154,15 +176,21 @@ describe('managed transactions', () => {
     it('writes the hook side effect on the same transaction as the mutation', async () => {
       const email = nextEmail('atomic-committed');
 
-      registerDbHook('atomic-visible', 'User', HookTiming.after, [DbAction.create], async ({ result }) => {
-        await db.session.create({
-          data: {
-            userId: (result as { id: string }).id,
-            token: `visible-${getNextSeq()}-${Date.now()}`,
-            expiresAt: new Date(Date.now() + 60_000),
-          },
-        });
-      });
+      registerDbHook(
+        'atomic-visible',
+        'User',
+        HookTiming.after,
+        [DbAction.create],
+        async ({ result }) => {
+          await db.session.create({
+            data: {
+              userId: (result as { id: string }).id,
+              token: `visible-${getNextSeq()}-${Date.now()}`,
+              expiresAt: new Date(Date.now() + 60_000),
+            },
+          });
+        },
+      );
 
       const user = await db.txn(() => db.user.create({ data: { email, name: 'Committed' } }));
 
@@ -191,13 +219,21 @@ describe('managed transactions', () => {
     it('does not fire when the transaction rolls back', async () => {
       const callback = mock(() => {});
 
-      registerDbHook('oncommit-rollback-hook', 'User', HookTiming.after, [DbAction.create], async () => {
-        db.onCommit(callback);
-      });
+      registerDbHook(
+        'oncommit-rollback-hook',
+        'User',
+        HookTiming.after,
+        [DbAction.create],
+        async () => {
+          db.onCommit(callback);
+        },
+      );
 
       await expect(
         db.txn(async () => {
-          await db.user.create({ data: { email: nextEmail('oncommit-rollback'), name: 'Rolled Back' } });
+          await db.user.create({
+            data: { email: nextEmail('oncommit-rollback'), name: 'Rolled Back' },
+          });
           throw new Error('Intentional error');
         }),
       ).rejects.toThrow('Intentional error');

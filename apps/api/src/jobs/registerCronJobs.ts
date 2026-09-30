@@ -26,7 +26,10 @@ export const registerCronJobs = async (queue: JobsQueue = defaultQueue): Promise
 
   for (const cronJob of cronJobs) {
     if (!isValidHandlerName(cronJob.handler)) {
-      log.warn(`Cron job "${cronJob.name}" has unknown handler: ${cronJob.handler} - skipping`, LogScope.job);
+      log.warn(
+        `Cron job "${cronJob.name}" has unknown handler: ${cronJob.handler} - skipping`,
+        LogScope.job,
+      );
       continue;
     }
 
@@ -45,7 +48,10 @@ export const registerCronJobs = async (queue: JobsQueue = defaultQueue): Promise
           backoff: { type: 'exponential', delay: cronJob.backoffMs },
         }),
       );
-      log.info(`Registered cron: ${cronJob.name} (${cronJob.handler}) - ${cronJob.pattern}`, LogScope.job);
+      log.info(
+        `Registered cron: ${cronJob.name} (${cronJob.handler}) - ${cronJob.pattern}`,
+        LogScope.job,
+      );
     } catch (error) {
       log.error(`Failed to register cron "${cronJob.name}": ${error}`, LogScope.job);
     }

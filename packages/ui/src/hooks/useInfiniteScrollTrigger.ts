@@ -13,7 +13,9 @@ export type UseInfiniteScrollTriggerOptions = {
   rootMargin?: string;
 };
 
-export function useInfiniteScrollTrigger(options: UseInfiniteScrollTriggerOptions): React.RefCallback<HTMLElement> {
+export function useInfiniteScrollTrigger(
+  options: UseInfiniteScrollTriggerOptions,
+): React.RefCallback<HTMLElement> {
   const { onLoadMore, hasMore, isLoading, rootMargin = '200px' } = options;
 
   // Use refs so the IntersectionObserver callback always sees current values

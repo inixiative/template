@@ -45,7 +45,11 @@ describe('getRedactFields', () => {
 
 describe('redactSensitiveFields', () => {
   it('masks Account password, keeps the rest', () => {
-    const result = redactSensitiveFields('Account', { id: '1', password: 'secret', providerId: 'google' });
+    const result = redactSensitiveFields('Account', {
+      id: '1',
+      password: 'secret',
+      providerId: 'google',
+    });
     expect(result.password).toBe('[REDACTED]');
     expect(result.providerId).toBe('google');
   });
@@ -72,7 +76,11 @@ describe('redactChangeDiff', () => {
 
 describe('redactPayload', () => {
   it('recursively masks sensitive keys anywhere in a payload', () => {
-    const payload = { userId: '1', account: { password: 'secret', email: 'a@b.c' }, items: [{ keyHash: 'h' }] };
+    const payload = {
+      userId: '1',
+      account: { password: 'secret', email: 'a@b.c' },
+      items: [{ keyHash: 'h' }],
+    };
     const result = redactPayload(payload);
     expect(result.account.password).toBe('[REDACTED]');
     expect(result.account.email).toBe('a@b.c');

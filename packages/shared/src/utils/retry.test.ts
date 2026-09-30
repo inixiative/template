@@ -69,7 +69,8 @@ describe('withRetry', () => {
       {
         attempts: 4,
         baseDelayMs: 2_000,
-        onRetry: (error, attempt, waitMs) => retries.push({ message: (error as Error).message, attempt, waitMs }),
+        onRetry: (error, attempt, waitMs) =>
+          retries.push({ message: (error as Error).message, attempt, waitMs }),
         sleep: async (ms) => {
           waits.push(ms);
         },
@@ -92,7 +93,11 @@ describe('withRetry', () => {
         async () => {
           throw new Error('always');
         },
-        { attempts: 2, onRetry: (_error, attempt) => attempts.push(attempt), sleep: async () => {} },
+        {
+          attempts: 2,
+          onRetry: (_error, attempt) => attempts.push(attempt),
+          sleep: async () => {},
+        },
       ),
     ).rejects.toThrow('always');
     expect(attempts).toEqual([1]);

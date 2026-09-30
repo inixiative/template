@@ -25,7 +25,8 @@ const resolveSearchForPolicy = (
     return Object.keys(search).length > 0 ? search : undefined;
   }
 
-  const preservedContext = policy === 'context' ? pickSearchParams(currentSearch, ['org', 'space']) : undefined;
+  const preservedContext =
+    policy === 'context' ? pickSearchParams(currentSearch, ['org', 'space']) : undefined;
   const spoof = spoofUserEmail ?? readSearchParam(currentSearch, 'spoof');
 
   if (!preservedContext && !spoof) return undefined;
@@ -54,7 +55,10 @@ const mergeSearch = (
   return Object.keys(merged).length > 0 ? merged : undefined;
 };
 
-export const createNavigationSlice: StateCreator<AppStore, [], [], NavigationSlice> = (set, get) => ({
+export const createNavigationSlice: StateCreator<AppStore, [], [], NavigationSlice> = (
+  set,
+  get,
+) => ({
   navigation: {
     navigate: null,
     navConfig: null,

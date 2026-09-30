@@ -14,11 +14,13 @@ export const expectStreamAudience = async <D extends StreamDefinition>(
   callers: AudienceCaller[],
 ): Promise<void> => {
   const route = await resolveOperationRoute(definition.name(params));
-  if (!route) throw new Error(`${definition.family}: no route resolves for ${definition.name(params)}`);
+  if (!route)
+    throw new Error(`${definition.family}: no route resolves for ${definition.name(params)}`);
   const reads: Array<{ label: string; payload: unknown }> = [];
   for (const { label, headers } of callers) {
     const res = await app.request(route.path, { headers });
-    if (routeAccessOf(res.status) !== 'granted') throw new Error(`${definition.family}: ${label} got ${res.status}`);
+    if (routeAccessOf(res.status) !== 'granted')
+      throw new Error(`${definition.family}: ${label} got ${res.status}`);
     reads.push({ label, payload: await res.json() });
   }
   if (definition.audience === 'perRecipient') return;

@@ -41,7 +41,9 @@ export const OrganizationProfilePage = () => {
   }, [profile?.name, profile?.slug]);
 
   const updateMutation = useOptimisticMutation({
-    mutationFn: apiMutation((payload: Omit<OrganizationUpdateData, 'url'>) => organizationUpdate(payload)),
+    mutationFn: apiMutation((payload: Omit<OrganizationUpdateData, 'url'>) =>
+      organizationUpdate(payload),
+    ),
     targets: [
       {
         queryKey: detailQueryKey,

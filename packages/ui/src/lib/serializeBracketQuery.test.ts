@@ -8,7 +8,9 @@ describe('serializeBracketQuery', () => {
   });
 
   it('serializes array values as repeated keys', () => {
-    const params = serializeBracketQuery({ searchFields: { status: { in: ['sent', 'approved'] } } });
+    const params = serializeBracketQuery({
+      searchFields: { status: { in: ['sent', 'approved'] } },
+    });
     expect(params.getAll('searchFields[status][in]')).toEqual(['sent', 'approved']);
   });
 
@@ -51,7 +53,9 @@ describe('serializeBracketQuery', () => {
   });
 
   it('serializes notIn operator', () => {
-    const params = serializeBracketQuery({ searchFields: { type: { notIn: ['draft', 'canceled'] } } });
+    const params = serializeBracketQuery({
+      searchFields: { type: { notIn: ['draft', 'canceled'] } },
+    });
     expect(params.getAll('searchFields[type][notIn]')).toEqual(['draft', 'canceled']);
   });
 
@@ -71,7 +75,9 @@ describe('serializeBracketQuery', () => {
 
 describe('serializeBracketQuery — symbol values ([:] marker)', () => {
   it('encodes null/boolean leaves via the [:] marker', () => {
-    const params = serializeBracketQuery({ searchFields: { a: { equals: null }, b: { equals: true } } });
+    const params = serializeBracketQuery({
+      searchFields: { a: { equals: null }, b: { equals: true } },
+    });
     expect(params.get('searchFields[a][equals][:]')).toBe('null');
     expect(params.get('searchFields[b][equals][:]')).toBe('true');
   });
@@ -91,7 +97,9 @@ describe('serializeBracketQuery — symbol values ([:] marker)', () => {
 
 describe('serializeBracketQuery — number values ([$] marker)', () => {
   it('marks nested numbers, including inside arrays', () => {
-    const params = serializeBracketQuery({ searchFields: { score: { in: [1, 2] }, age: { equals: 30 } } });
+    const params = serializeBracketQuery({
+      searchFields: { score: { in: [1, 2] }, age: { equals: 30 } },
+    });
     expect(params.getAll('searchFields[score][in][$]')).toEqual(['1', '2']);
     expect(params.get('searchFields[age][equals][$]')).toBe('30');
   });

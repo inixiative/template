@@ -5,12 +5,23 @@
  * @uses infrastructure:prisma
  */
 import { db } from '@template/db';
-import { refreshBatchContext, registerBatch, unregisterBatch } from '#/modules/batch/services/batchRegistry';
+import {
+  refreshBatchContext,
+  registerBatch,
+  unregisterBatch,
+} from '#/modules/batch/services/batchRegistry';
 import { interpolateRequest } from '#/modules/batch/services/interpolation';
 import { executeRequest } from '#/modules/batch/services/strategies/executeRequest';
 import type { RequestResult, StrategyExecutor } from '#/modules/batch/services/strategies/types';
 
-export const failOnRound: StrategyExecutor = async (app, rounds, sharedHeaders, baseRequest, baseContext, _timeout) => {
+export const failOnRound: StrategyExecutor = async (
+  app,
+  rounds,
+  sharedHeaders,
+  baseRequest,
+  baseContext,
+  _timeout,
+) => {
   const batchId = crypto.randomUUID();
   registerBatch(batchId, db, baseContext);
 
@@ -26,8 +37,17 @@ export const failOnRound: StrategyExecutor = async (app, rounds, sharedHeaders, 
 
       const roundPromises = round.map(async (request) => {
         try {
-          const interpolatedRequest = interpolateRequest(request, { results, currentRound: roundIndex });
-          const result = await executeRequest(app, interpolatedRequest, batchId, sharedHeaders, baseRequest);
+          const interpolatedRequest = interpolateRequest(request, {
+            results,
+            currentRound: roundIndex,
+          });
+          const result = await executeRequest(
+            app,
+            interpolatedRequest,
+            batchId,
+            sharedHeaders,
+            baseRequest,
+          );
           if (result.error) {
             failedRequests++;
           } else {
@@ -58,7 +78,12 @@ export const failOnRound: StrategyExecutor = async (app, rounds, sharedHeaders, 
       }
     }
 
-    const status = failedRequests === 0 ? 'success' : failedRequests === totalRequests ? 'failed' : 'partialSuccess';
+    const status =
+      failedRequests === 0
+        ? 'success'
+        : failedRequests === totalRequests
+          ? 'failed'
+          : 'partialSuccess';
 
     return {
       batch: results,

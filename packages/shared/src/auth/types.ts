@@ -61,7 +61,10 @@ export type AuthSpaceUser = {
 };
 
 export type AuthClient = {
-  signIn: (credentials: { email: string; password: string }) => Promise<{ user: AuthUser; session: AuthSession }>;
+  signIn: (credentials: {
+    email: string;
+    password: string;
+  }) => Promise<{ user: AuthUser; session: AuthSession }>;
   signUp: (credentials: {
     email: string;
     password: string;

@@ -13,7 +13,10 @@ describe('recomposeFromSnapshots', () => {
           mjml: '{{#component:card}}{{#slot:body}}OVERRIDE{{/slot:body}}{{/component:card}}',
           componentVersions: { card: 'card-v1' },
         },
-        'card-v1': { mjml: '<x>{{#slot:body:default}}DEFAULT{{/slot:body:default}}</x>', componentVersions: {} },
+        'card-v1': {
+          mjml: '<x>{{#slot:body:default}}DEFAULT{{/slot:body:default}}</x>',
+          componentVersions: {},
+        },
       }),
     );
     expect(result).toBe('<x>OVERRIDE</x>');
@@ -23,7 +26,10 @@ describe('recomposeFromSnapshots', () => {
     const result = await recomposeFromSnapshots(
       'root',
       loaderFrom({
-        root: { mjml: '{{#component:hero}}{{/component:hero}}', componentVersions: { hero: 'hero-v2' } },
+        root: {
+          mjml: '{{#component:hero}}{{/component:hero}}',
+          componentVersions: { hero: 'hero-v2' },
+        },
         'hero-v2': {
           mjml: '{{#slot:body:default}}{{#component:cta}}{{/component:cta}}{{/slot:body:default}}',
           componentVersions: { cta: 'cta-v7' },
@@ -38,7 +44,10 @@ describe('recomposeFromSnapshots', () => {
     const result = await recomposeFromSnapshots(
       'root',
       loaderFrom({
-        root: { mjml: 'a{{#component:gone}}{{/component:gone}}b', componentVersions: { gone: null } },
+        root: {
+          mjml: 'a{{#component:gone}}{{/component:gone}}b',
+          componentVersions: { gone: null },
+        },
       }),
     );
     expect(result).toBe('ab');
@@ -95,7 +104,9 @@ describe('recomposeCommunication (DB-backed)', () => {
       name: 'Recompose Sent',
       subject: 'Hi',
       kind: 'system',
-      mjml: documentMjml('{{#component:recompose-hero}}<mj-text>Saved</mj-text>{{/component:recompose-hero}}'),
+      mjml: documentMjml(
+        '{{#component:recompose-hero}}<mj-text>Saved</mj-text>{{/component:recompose-hero}}',
+      ),
       ownerModel: 'default',
     });
     const pin = await db.auditLog.findFirst({

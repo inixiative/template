@@ -8,7 +8,11 @@ type Listener = (payload: unknown) => void;
 
 const listenersByStream = new Map<string, Map<string, Set<Listener>>>();
 
-export const addStreamListener = (stream: string, type: string, listener: Listener): (() => void) => {
+export const addStreamListener = (
+  stream: string,
+  type: string,
+  listener: Listener,
+): (() => void) => {
   const byType = listenersByStream.get(stream) ?? new Map<string, Set<Listener>>();
   const listeners = byType.get(type) ?? new Set<Listener>();
   listeners.add(listener);

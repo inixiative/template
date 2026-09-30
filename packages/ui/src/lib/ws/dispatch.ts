@@ -11,7 +11,9 @@ import { refetchQuery } from '@template/ui/lib/ws/refetchQuery';
 
 type Handlers = {
   [C in WSEvent['category']]: {
-    [A in Extract<WSEvent, { category: C }>['action']]: (event: Extract<WSEvent, { category: C; action: A }>) => void;
+    [A in Extract<WSEvent, { category: C }>['action']]: (
+      event: Extract<WSEvent, { category: C; action: A }>,
+    ) => void;
   };
 };
 

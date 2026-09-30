@@ -18,9 +18,15 @@ export const customerRefCustomerId = (customerRef: CustomerRef): string =>
   polymorphicTarget(customerRef, 'CustomerRef', 'customerModel')!.id;
 
 const bySegment = async ({ segment, diff }: MembershipChange): Promise<void> => {
-  const subject = { segmentId: segment.id, ownerModel: segment.ownerModel, ownerId: segmentOwnerId(segment) };
-  if (diff.added.length) await emitAppEvent('segment.membersAdded', { ...subject, customerRefIds: diff.added });
-  if (diff.removed.length) await emitAppEvent('segment.membersRemoved', { ...subject, customerRefIds: diff.removed });
+  const subject = {
+    segmentId: segment.id,
+    ownerModel: segment.ownerModel,
+    ownerId: segmentOwnerId(segment),
+  };
+  if (diff.added.length)
+    await emitAppEvent('segment.membersAdded', { ...subject, customerRefIds: diff.added });
+  if (diff.removed.length)
+    await emitAppEvent('segment.membersRemoved', { ...subject, customerRefIds: diff.removed });
 };
 
 const byCustomerRef = (changes: MembershipChange[]): Map<string, PerCustomerRef> => {
@@ -48,7 +54,9 @@ export const publishMembershipChanges = async (changes: MembershipChange[]): Pro
       customerModel: customerRef.customerModel,
       customerId: customerRefCustomerId(customerRef),
     };
-    if (added.length) await emitAppEvent('customerRef.segmentsAdded', { ...subject, segmentIds: added });
-    if (removed.length) await emitAppEvent('customerRef.segmentsRemoved', { ...subject, segmentIds: removed });
+    if (added.length)
+      await emitAppEvent('customerRef.segmentsAdded', { ...subject, segmentIds: added });
+    if (removed.length)
+      await emitAppEvent('customerRef.segmentsRemoved', { ...subject, segmentIds: removed });
   }
 };

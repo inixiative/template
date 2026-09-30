@@ -71,7 +71,9 @@ describe('emailLens — four lenses, one per scope root', () => {
   });
 
   it('an opaque data bag is addressable at any depth, as beneath-Json rather than missing', () => {
-    expect(walkEmailLensPath('data.mission.reward.amount', emailLens()).outcome).toBe('beneathJson');
+    expect(walkEmailLensPath('data.mission.reward.amount', emailLens()).outcome).toBe(
+      'beneathJson',
+    );
     expect(
       emailRuleVocabularyIssues(emailLens(), {
         field: 'data.mission.reward.amount',
@@ -129,7 +131,11 @@ describe('emailLens — the rule vocabulary', () => {
   it('a relation the slot does not declare, a typo path and an unknown root are refused', () => {
     const issues = emailRuleVocabularyIssues(lens, {
       all: [
-        { field: 'recipient.tags', arrayOperator: 'any', condition: { field: 'id', operator: 'equals', value: 'x' } },
+        {
+          field: 'recipient.tags',
+          arrayOperator: 'any',
+          condition: { field: 'id', operator: 'equals', value: 'x' },
+        },
         { field: 'recipient.zzzNope', operator: 'equals', value: 'x' },
         { field: 'nope.field', operator: 'equals', value: 'x' },
       ],
@@ -164,7 +170,11 @@ describe('emailLens — the rows a rule names', () => {
       emailRuleReferences(lens, {
         any: [
           { field: 'recipient.spaceUsers.space.id', operator: 'equals', value: 'space-1' },
-          { field: 'recipient.organizationUsers.organization.id', operator: 'notEquals', value: 'org-1' },
+          {
+            field: 'recipient.organizationUsers.organization.id',
+            operator: 'notEquals',
+            value: 'org-1',
+          },
         ],
       }),
     ).toEqual([
@@ -174,9 +184,9 @@ describe('emailLens — the rows a rule names', () => {
   });
 
   it('the sender names its own row, as any slot reaching a referenceable id does', () => {
-    expect(emailRuleReferences(lens, { field: 'sender.id', operator: 'equals', value: 'org-1' })).toEqual([
-      { model: 'Organization', id: 'org-1' },
-    ]);
+    expect(
+      emailRuleReferences(lens, { field: 'sender.id', operator: 'equals', value: 'org-1' }),
+    ).toEqual([{ model: 'Organization', id: 'org-1' }]);
   });
 
   it('vocabulary values, plain fields, the data bag, path and bind leaves name nothing', () => {
@@ -201,7 +211,13 @@ describe('emailLens — evaluation goes through the lens', () => {
       id: 'u1',
       name: 'Ann',
       tagAttachments: [{ deletedAt: null, tag: { id: 'tag-a', name: 'vip', ...tagOwner } }],
-      providerRefs: [{ segmentMembers: [{ segment: { id: 'seg-a', name: 's', deletedAt: null, ...segmentOwner } }] }],
+      providerRefs: [
+        {
+          segmentMembers: [
+            { segment: { id: 'seg-a', name: 's', deletedAt: null, ...segmentOwner } },
+          ],
+        },
+      ],
     },
     sender: { id: 'org-1', name: 'Acme' },
     data: {},
@@ -233,7 +249,10 @@ describe('emailLens — evaluation goes through the lens', () => {
     const lens = scopeEmailLens(emailLens({ sender: lensFor('Organization') }), org);
     const bindings = new Map([['item', 'recipient.tagAttachments']]);
     const frames = loopFrames(bindings);
-    const scoped = scopedRule({ field: 'item.tag.name', operator: 'equals', value: 'vip' }, bindings).rule!;
+    const scoped = scopedRule(
+      { field: 'item.tag.name', operator: 'equals', value: 'vip' },
+      bindings,
+    ).rule!;
     expect(emailRuleVocabularyIssues(lens, scoped)).toEqual([]);
 
     const own = {
@@ -244,9 +263,17 @@ describe('emailLens — evaluation goes through the lens', () => {
       deletedAt: null,
       tag: { id: 'tag-b', name: 'vip', ownerModel: 'Organization', organizationId: 'org-2' },
     };
-    const gone = { deletedAt: '2026-01-01', tag: { id: 'tag-c', name: 'vip', ownerModel: 'platform' } };
-    const base = { recipient: { id: 'u1', name: 'Ann', tagAttachments: [own, foreign, gone] }, sender: {}, data: {} };
-    const passes = (item: unknown) => evaluateScopedRule(lens, scoped, narrowToElements({ ...base, item }, frames));
+    const gone = {
+      deletedAt: '2026-01-01',
+      tag: { id: 'tag-c', name: 'vip', ownerModel: 'platform' },
+    };
+    const base = {
+      recipient: { id: 'u1', name: 'Ann', tagAttachments: [own, foreign, gone] },
+      sender: {},
+      data: {},
+    };
+    const passes = (item: unknown) =>
+      evaluateScopedRule(lens, scoped, narrowToElements({ ...base, item }, frames));
     expect(passes(own)).toBe(true);
     expect(passes(foreign)).not.toBe(true);
     expect(passes(gone)).not.toBe(true);
@@ -261,16 +288,28 @@ describe('emailLens — evaluation goes through the lens', () => {
         scopedRule({ field: 'item.tag.id', operator: 'equals', value: 'tag-a' }, bindings).rule!,
       ),
     ).toEqual([{ model: 'Tag', id: 'tag-a' }]);
-    const bad = scopedRule({ field: 'item.tag.nope', operator: 'equals', value: 1 }, bindings).rule!;
+    const bad = scopedRule({ field: 'item.tag.nope', operator: 'equals', value: 1 }, bindings)
+      .rule!;
     expect(emailRuleVocabularyIssues(lens, bad).join(' ')).toContain('nope');
-    const toRoot = scopedRule({ field: 'item.tag.name', operator: 'equals', path: 'recipient.name' }, bindings).rule!;
+    const toRoot = scopedRule(
+      { field: 'item.tag.name', operator: 'equals', path: 'recipient.name' },
+      bindings,
+    ).rule!;
     expect(emailRuleVocabularyIssues(lens, toRoot)).toEqual([]);
     const data = {
-      recipient: { id: 'u1', name: 'vip', tagAttachments: [{ deletedAt: null, tag: { id: 't', name: 'vip' } }] },
+      recipient: {
+        id: 'u1',
+        name: 'vip',
+        tagAttachments: [{ deletedAt: null, tag: { id: 't', name: 'vip' } }],
+      },
     };
     const frames = loopFrames(bindings);
     expect(
-      evaluateScopedRule(lens, toRoot, narrowToElements({ ...data, item: data.recipient.tagAttachments[0] }, frames)),
+      evaluateScopedRule(
+        lens,
+        toRoot,
+        narrowToElements({ ...data, item: data.recipient.tagAttachments[0] }, frames),
+      ),
     ).toBe(true);
   });
 
@@ -287,7 +326,9 @@ describe('emailLens — evaluation goes through the lens', () => {
       condition: { field: 'organization.name', operator: 'equals', value: 'Acme' },
     } as Condition;
     expect(check(applyEmailLens(lens, byName), member({ id: 'org-1', name: 'Acme' }))).toBe(true);
-    expect(check(applyEmailLens(lens, byName), member({ id: 'org-2', name: 'Acme' }))).not.toBe(true);
+    expect(check(applyEmailLens(lens, byName), member({ id: 'org-2', name: 'Acme' }))).not.toBe(
+      true,
+    );
   });
 
   it('a platform owner sees platform tags and no segments', () => {
@@ -318,7 +359,10 @@ describe('emailLens — evaluation goes through the lens', () => {
     expect(JSON.stringify(applied)).toContain('"field":"item.price"');
     const data = {
       ...scope({}, {}),
-      recipient: { ...scope({}, {}).recipient, organizationUsers: [{ organization: { id: 'org-1' } }] },
+      recipient: {
+        ...scope({}, {}).recipient,
+        organizationUsers: [{ organization: { id: 'org-1' } }],
+      },
       item: { price: 2 },
     };
     expect(check(applied, data)).toBe(true);
@@ -329,13 +373,21 @@ describe('emailSurface — the four lenses composed for the builder', () => {
   it('roots the surface at Email with one field per slot and the union of what each slot exposes', () => {
     const surface = emailSurface(emailLens({ sender: lensFor('Organization') }));
     expect(surface.model).toBe(EMAIL_SURFACE_ROOT);
-    expect(fieldsOf(surface, EMAIL_SURFACE_ROOT)).toEqual(['data', 'recipient', 'sender', 'system']);
+    expect(fieldsOf(surface, EMAIL_SURFACE_ROOT)).toEqual([
+      'data',
+      'recipient',
+      'sender',
+      'system',
+    ]);
     expect(surface.maps[surface.mapName]?.models[EMAIL_SURFACE_ROOT]?.fields.data).toEqual({
       kind: 'scalar',
       type: 'Json',
     });
     expect(fieldsOf(surface, 'User')).toEqual(
-      [...DEFAULT_RECIPIENT_NARROWING.picks!, ...Object.keys(DEFAULT_RECIPIENT_NARROWING.relations!)].sort(),
+      [
+        ...DEFAULT_RECIPIENT_NARROWING.picks!,
+        ...Object.keys(DEFAULT_RECIPIENT_NARROWING.relations!),
+      ].sort(),
     );
     expect(fieldsOf(surface, 'Organization')).not.toContain('emailTemplates');
     expect(fieldsOf(surface, 'EmailSystem')).toEqual(['now', 'unsubscribeUrl', 'year']);
@@ -367,16 +419,24 @@ describe('emailSurface — the four lenses composed for the builder', () => {
       { path: 'data', label: 'Data' },
       { path: 'system', label: 'System' },
     ]);
-    expect(emailRuleDecoration(emailLens()).facets.map((facet) => facet.path)).toEqual(['recipient', 'data', 'system']);
+    expect(emailRuleDecoration(emailLens()).facets.map((facet) => facet.path)).toEqual([
+      'recipient',
+      'data',
+      'system',
+    ]);
   });
 });
 
 describe('parseSlotLenses', () => {
   it('keeps only object-shaped slots', () => {
-    expect(parseSlotLenses({ recipient: { picks: ['email'] }, sender: 'nope', data: null })).toEqual({
+    expect(
+      parseSlotLenses({ recipient: { picks: ['email'] }, sender: 'nope', data: null }),
+    ).toEqual({
       recipient: { picks: ['email'] },
     });
-    expect(parseSlotLenses({ data: { picks: ['content'] }, extra: 1 })).toEqual({ data: { picks: ['content'] } });
+    expect(parseSlotLenses({ data: { picks: ['content'] }, extra: 1 })).toEqual({
+      data: { picks: ['content'] },
+    });
     expect(parseSlotLenses(null)).toEqual({});
     expect(parseSlotLenses([1])).toEqual({});
   });

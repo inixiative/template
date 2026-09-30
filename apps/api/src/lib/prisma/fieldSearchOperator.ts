@@ -9,7 +9,10 @@ import type { FieldDef } from '#/lib/prisma/fieldMetadata';
 
 // Prisma has no universal substring op: String → contains, String[] → has,
 // Json → string_contains; anything else is not text-searchable → undefined.
-export const fieldSearchOperator = (field: FieldDef, term: string): Record<string, unknown> | undefined => {
+export const fieldSearchOperator = (
+  field: FieldDef,
+  term: string,
+): Record<string, unknown> | undefined => {
   if (field.kind !== 'scalar') return undefined;
   if (field.type === 'String') {
     if (field.isList) return dialect.supportsScalarListSearch ? { has: term } : undefined;

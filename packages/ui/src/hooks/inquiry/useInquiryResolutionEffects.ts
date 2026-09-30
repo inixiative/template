@@ -22,7 +22,10 @@ type EffectContext = {
 // by construction so a new type added to the enum is a TS error here until
 // its post-approval effect is declared (or explicitly no-op'd). No switch
 // fall-through, no silent gaps.
-const RESOLUTION_EFFECTS: Record<InquiryType, (inq: InquiryMeta, ctx: EffectContext) => Promise<void>> = {
+const RESOLUTION_EFFECTS: Record<
+  InquiryType,
+  (inq: InquiryMeta, ctx: EffectContext) => Promise<void>
+> = {
   inviteOrganizationUser: async (_inq, { refreshMe, queryClient }) => {
     await queryClient.invalidateQueries({ queryKey: meReadManyOrganizationsQueryKey() });
     await refreshMe();

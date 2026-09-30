@@ -23,9 +23,11 @@ const whereColumns = (condition: Condition, out: Set<string>): void => {
   if (condition == null || typeof condition === 'boolean') return;
   const node = condition as Record<string, unknown>;
   for (const key of ['all', 'any']) {
-    if (Array.isArray(node[key])) for (const child of node[key] as Condition[]) whereColumns(child, out);
+    if (Array.isArray(node[key]))
+      for (const child of node[key] as Condition[]) whereColumns(child, out);
   }
-  for (const key of ['if', 'then', 'else']) if (node[key] !== undefined) whereColumns(node[key] as Condition, out);
+  for (const key of ['if', 'then', 'else'])
+    if (node[key] !== undefined) whereColumns(node[key] as Condition, out);
   if (typeof node.field === 'string' && node.field) out.add(node.field.split('.')[0]!);
 };
 
@@ -41,7 +43,11 @@ type Visit = PathProjection extends Map<string, infer V> ? V : never;
 const admitted = (visit: Visit, row: Record<string, unknown>): boolean =>
   visit.whereClauses.every((clause) => check(clause, row) === true);
 
-const pruneRow = (byPath: PathProjection, row: Record<string, unknown>, path: string): Record<string, unknown> => {
+const pruneRow = (
+  byPath: PathProjection,
+  row: Record<string, unknown>,
+  path: string,
+): Record<string, unknown> => {
   const visit = byPath.get(path);
   if (!visit) return row;
 

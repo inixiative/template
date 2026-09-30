@@ -4,7 +4,10 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
-import { getSoftDeleteScoper, type SoftDeleteScoper } from '@template/db/extensions/softDeleteScopeRegistry';
+import {
+  getSoftDeleteScoper,
+  type SoftDeleteScoper,
+} from '@template/db/extensions/softDeleteScopeRegistry';
 import { Prisma } from '@template/db/generated/client/client';
 import { auditActorContext } from '@template/db/lib/auditActorContext';
 
@@ -29,12 +32,17 @@ const bypassed = (): boolean => {
   return !!scope && (scope.platformSuperadmin || scope.bypassSoftDeleteScope);
 };
 
-const scopeArgs = (scoper: SoftDeleteScoper, model: string, args: unknown): Record<string, unknown> => {
+const scopeArgs = (
+  scoper: SoftDeleteScoper,
+  model: string,
+  args: unknown,
+): Record<string, unknown> => {
   const next = { ...((args ?? {}) as Record<string, unknown>) };
   next.where = scoper.liveWhere(model, (next.where as Record<string, unknown>) ?? {});
   for (const key of ['include', 'select'] as const) {
     const tree = next[key];
-    if (tree && typeof tree === 'object') next[key] = scoper.liveIncludes(model, tree as Record<string, unknown>);
+    if (tree && typeof tree === 'object')
+      next[key] = scoper.liveIncludes(model, tree as Record<string, unknown>);
   }
   return next;
 };

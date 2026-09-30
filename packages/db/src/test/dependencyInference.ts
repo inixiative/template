@@ -8,7 +8,10 @@ import type { DependencyConfig, ModelName } from '@template/db/test/factoryTypes
 import { getModelRelations } from '@template/db/utils/prismaMapRelations';
 import type { ZodObject, ZodTypeAny } from 'zod';
 
-const zodSchemas = zodSchemasNs as unknown as Record<string, ZodObject<Record<string, ZodTypeAny>> | undefined>;
+const zodSchemas = zodSchemasNs as unknown as Record<
+  string,
+  ZodObject<Record<string, ZodTypeAny>> | undefined
+>;
 
 const getCreateInputSchema = (modelName: ModelName): ZodObject<Record<string, ZodTypeAny>> | null =>
   zodSchemas[`${modelName}CreateInputObjectSchema`] ?? null;
@@ -57,7 +60,9 @@ export const mergeDependencies = (
       };
     } else {
       if (!manualDep.modelName || !manualDep.foreignKey) {
-        throw new Error(`Manual dependency ${key} in ${modelName} must specify modelName and foreignKey`);
+        throw new Error(
+          `Manual dependency ${key} in ${modelName} must specify modelName and foreignKey`,
+        );
       }
       merged[key] = {
         modelName: manualDep.modelName,

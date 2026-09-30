@@ -1,5 +1,11 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db, RuleReferenceError, registerSoftDeleteScoper, ruleReferenceIssues } from '@template/db';
+import {
+  clearHookRegistry,
+  db,
+  RuleReferenceError,
+  registerSoftDeleteScoper,
+  ruleReferenceIssues,
+} from '@template/db';
 import {
   cleanupTouchedTables,
   createEmailComponent,
@@ -50,7 +56,8 @@ const save = (body: string, extra: { subject?: string; slug?: string } = {}) =>
     ...extra,
   });
 
-const edgesOf = (where: Record<string, unknown>) => db.ruleReference.findMany({ where, orderBy: { createdAt: 'asc' } });
+const edgesOf = (where: Record<string, unknown>) =>
+  db.ruleReference.findMany({ where, orderBy: { createdAt: 'asc' } });
 
 const refKey = (model: string, id: string) => `${model}|${id}`;
 
@@ -111,9 +118,9 @@ describe('ruleReference — the save path writes edges, the referenced side stam
       condition: { field: 'id', operator: 'equals', value: tag.id },
     };
 
-    await expect(save(mjml(`{{#if rule=${JSON.stringify(rule)}}}owner{{/if}}`))).rejects.toBeInstanceOf(
-      ConditionValidationError,
-    );
+    await expect(
+      save(mjml(`{{#if rule=${JSON.stringify(rule)}}}owner{{/if}}`)),
+    ).rejects.toBeInstanceOf(ConditionValidationError);
   });
 
   it('the FK-column spelling of a reference is refused at save — outside the lens vocabulary', async () => {
@@ -138,7 +145,11 @@ describe('ruleReference — the save path writes edges, the referenced side stam
   });
 
   it('re-saving the body set-diffs: survivors keep their row, removed edges go, added edges appear', async () => {
-    const [{ entity: a }, { entity: b }, { entity: c }] = await Promise.all([createTag(), createTag(), createTag()]);
+    const [{ entity: a }, { entity: b }, { entity: c }] = await Promise.all([
+      createTag(),
+      createTag(),
+      createTag(),
+    ]);
     const { template } = await save(mjml(taggedBlock(a.id, b.id)), { slug: 'diff' });
     const before = await edgesOf({ emailTemplateId: template.id });
     const survivor = before.find((edge) => edge.tagId === b.id);
@@ -166,13 +177,17 @@ describe('ruleReference — the save path writes edges, the referenced side stam
     expect(await edgesOf({ emailTemplateId: template.id })).toEqual([]);
     const edges = await edgesOf({ emailComponentId: components[0]!.id });
     expect(edges).toHaveLength(1);
-    expect(edges[0]).toMatchObject({ ownerModel: 'EmailComponent', emailTemplateId: null, tagId: tag.id });
+    expect(edges[0]).toMatchObject({
+      ownerModel: 'EmailComponent',
+      emailTemplateId: null,
+      tagId: tag.id,
+    });
   });
 
   it('naming a row that does not exist is refused at save', async () => {
-    await expect(save(mjml(taggedBlock('01900000-0000-7000-8000-000000000000')))).rejects.toBeInstanceOf(
-      RuleReferenceError,
-    );
+    await expect(
+      save(mjml(taggedBlock('01900000-0000-7000-8000-000000000000'))),
+    ).rejects.toBeInstanceOf(RuleReferenceError);
   });
 
   it('naming a soft-deleted row is refused at save', async () => {
@@ -240,7 +255,9 @@ describe('ruleReference — the save path writes edges, the referenced side stam
       });
     const published = (await staleEvents()).map((event) => event.data as Record<string, unknown>);
     expect(published.map((data) => [data.ownerModel, data.ownerId]).sort()).toEqual(
-      stamped.map((edge) => [edge.ownerModel, edge.emailTemplateId ?? edge.emailComponentId]).sort(),
+      stamped
+        .map((edge) => [edge.ownerModel, edge.emailTemplateId ?? edge.emailComponentId])
+        .sort(),
     );
     expect(published.every((data) => data.referencedModel === 'Tag')).toBe(true);
 
@@ -267,13 +284,16 @@ describe('ruleReference — the save path writes edges, the referenced side stam
     await save(mjml(taggedBlock(tag.id)), { slug: 'edit' });
     await db.tag.update({ where: { id: tag.id }, data: { deletedAt: new Date() } });
 
-    const { template: edited } = await save(mjml(taggedBlock(tag.id)), { slug: 'edit', subject: 'Typo fixed' });
+    const { template: edited } = await save(mjml(taggedBlock(tag.id)), {
+      slug: 'edit',
+      subject: 'Typo fixed',
+    });
     expect(edited.subject).toBe('Typo fixed');
 
     await db.tag.update({ where: { id: other.id }, data: { deletedAt: new Date() } });
-    await expect(save(mjml(taggedBlock(tag.id, other.id)), { slug: 'edit' })).rejects.toBeInstanceOf(
-      RuleReferenceError,
-    );
+    await expect(
+      save(mjml(taggedBlock(tag.id, other.id)), { slug: 'edit' }),
+    ).rejects.toBeInstanceOf(RuleReferenceError);
   });
 
   it('a save that removes the dead reference removes its edge', async () => {

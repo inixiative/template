@@ -15,7 +15,10 @@ const linkedinStored = z.object({
 });
 
 type LinkedinInput = LinkedinValue | { url: string };
-const linkedinInput: z.ZodType<LinkedinInput> = z.union([z.object({ url: z.string().url() }), linkedinStored]);
+const linkedinInput: z.ZodType<LinkedinInput> = z.union([
+  z.object({ url: z.string().url() }),
+  linkedinStored,
+]);
 
 export const linkedinDef: ContactTypeDef<LinkedinInput, LinkedinValue> = {
   inputSchema: linkedinInput,
@@ -23,7 +26,8 @@ export const linkedinDef: ContactTypeDef<LinkedinInput, LinkedinValue> = {
   valueSchema: linkedinStored,
   toValueKey: (v) => `${v.classifier}:${v.handle.toLowerCase()}`,
   redact: (id, v) => ({ classifier: v.classifier, handle: id }),
-  toUrl: (v) => `https://linkedin.com/${v.classifier === 'personal' ? 'in' : v.classifier}/${v.handle}`,
+  toUrl: (v) =>
+    `https://linkedin.com/${v.classifier === 'personal' ? 'in' : v.classifier}/${v.handle}`,
   subtype: { mode: 'forbidden' }, // classifier lives in `value`
   uniqueness: 'per-owner',
   display: { label: 'LinkedIn', icon: 'simple-icons:linkedin' },

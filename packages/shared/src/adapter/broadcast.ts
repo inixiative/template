@@ -43,8 +43,10 @@ export const makeBroadcastRegistry = <A>(): BroadcastRegistry<A> => {
         if (result.status === 'fulfilled') values.push(result.value);
         else errors.push(result.reason);
       }
-      if (errors.length === 1) throw errors[0] instanceof Error ? errors[0] : new Error(String(errors[0]));
-      if (errors.length > 1) throw new AggregateError(errors, `${errors.length} broadcast adapter failures`);
+      if (errors.length === 1)
+        throw errors[0] instanceof Error ? errors[0] : new Error(String(errors[0]));
+      if (errors.length > 1)
+        throw new AggregateError(errors, `${errors.length} broadcast adapter failures`);
       return values;
     },
     has: (name) => map.has(name),

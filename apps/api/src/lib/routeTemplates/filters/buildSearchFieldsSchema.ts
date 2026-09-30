@@ -11,7 +11,10 @@ import { leafFilterSchema } from '#/lib/routeTemplates/filters/filterComponents'
 
 type Visit = { fields: Record<string, FieldMapEntry> };
 
-const buildNodeShape = (byPath: Map<string, Visit>, nodePath: string): Record<string, z.ZodTypeAny> => {
+const buildNodeShape = (
+  byPath: Map<string, Visit>,
+  nodePath: string,
+): Record<string, z.ZodTypeAny> => {
   const shape: Record<string, z.ZodTypeAny> = {};
   const visit = byPath.get(nodePath);
   if (!visit) return shape;
@@ -24,7 +27,9 @@ const buildNodeShape = (byPath: Map<string, Visit>, nodePath: string): Record<st
       // to-many → Prisma relation operators; to-one → nest directly.
       shape[field] = (
         entry.isList
-          ? z.object({ some: child.optional(), every: child.optional(), none: child.optional() }).strict()
+          ? z
+              .object({ some: child.optional(), every: child.optional(), none: child.optional() })
+              .strict()
           : child
       ).optional();
       continue;

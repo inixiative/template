@@ -30,9 +30,14 @@ type SpecNode = SdkSchema & {
 
 type SpecParameter = { readonly name?: string; readonly schema?: SpecNode };
 
-type SpecOperation = { readonly operationId?: string; readonly parameters?: readonly SpecParameter[] };
+type SpecOperation = {
+  readonly operationId?: string;
+  readonly parameters?: readonly SpecParameter[];
+};
 
-type Spec = { readonly paths?: { readonly [path: string]: { readonly [method: string]: SpecOperation } } };
+type Spec = {
+  readonly paths?: { readonly [path: string]: { readonly [method: string]: SpecOperation } };
+};
 
 const spec = openApiSpec as Spec;
 
@@ -42,7 +47,14 @@ const stringValues = (values: SdkSchema['enum']): string[] | undefined =>
 const RELATION_KEYS = new Set(['some', 'every', 'none']);
 // A json leaf's keys are exactly the json operators — distinguishes it from a
 // to-one relation (whose keys are field names) without descending into it.
-const JSON_LEAF_KEYS = new Set(['path', 'equals', 'not', 'string_contains', 'string_starts_with', 'string_ends_with']);
+const JSON_LEAF_KEYS = new Set([
+  'path',
+  'equals',
+  'not',
+  'string_contains',
+  'string_starts_with',
+  'string_ends_with',
+]);
 
 // A scalar/enum leaf is a `bare value | <Type>Filter` union (anyOf). A json leaf is a
 // plain object keyed by json operators. A relation is an object keyed by field names.
@@ -136,4 +148,5 @@ export const getQueryMetadataByOperation = (operationId: string): QueryMetadata 
   return {};
 };
 
-export const useQueryMetadata = (operationId: string): QueryMetadata => getQueryMetadataByOperation(operationId);
+export const useQueryMetadata = (operationId: string): QueryMetadata =>
+  getQueryMetadataByOperation(operationId);

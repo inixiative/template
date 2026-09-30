@@ -37,7 +37,9 @@ export const validateEncryptionVersions = async (db: Db) => {
 
       // Validate keys are different (prevent accidental same-key rotation)
       if (previousKey && currentKey === previousKey) {
-        errors.push(`${modelName}.${fields.encryptedField}: Current and previous keys must be different`);
+        errors.push(
+          `${modelName}.${fields.encryptedField}: Current and previous keys must be different`,
+        );
       }
 
       const distinctVersions = await db.delegate(modelConfig.model).findMany({

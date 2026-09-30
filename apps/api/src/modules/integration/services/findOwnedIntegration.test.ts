@@ -1,7 +1,12 @@
 import { afterAll, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import { IntegrationOwnerModel } from '@template/db/generated/client/enums';
-import { cleanupTouchedTables, createIntegration, createOrganization, createUser } from '@template/db/test';
+import {
+  cleanupTouchedTables,
+  createIntegration,
+  createOrganization,
+  createUser,
+} from '@template/db/test';
 import { findOwnedIntegration } from '#/modules/integration/services/findOwnedIntegration';
 
 describe('findOwnedIntegration', () => {

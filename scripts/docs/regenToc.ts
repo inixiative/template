@@ -68,7 +68,9 @@ const extractHeadings = (md: string): Heading[] => {
 const renderToc = (headings: Heading[]): string => {
   if (headings.length === 0) return '';
   const minLevel = Math.min(...headings.map((h) => h.level));
-  return headings.map(({ level, text, slug }) => `${'  '.repeat(level - minLevel)}- [${text}](#${slug})`).join('\n');
+  return headings
+    .map(({ level, text, slug }) => `${'  '.repeat(level - minLevel)}- [${text}](#${slug})`)
+    .join('\n');
 };
 
 // Remove a legacy `## Contents` section that doesn't use the markers. The

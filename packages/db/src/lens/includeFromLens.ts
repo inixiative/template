@@ -4,12 +4,20 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
-import { type Condition, type Lens, type LensNarrowing, projectByPath } from '@inixiative/json-rules';
+import {
+  type Condition,
+  type Lens,
+  type LensNarrowing,
+  projectByPath,
+} from '@inixiative/json-rules';
 import { rootLens } from '@template/db/lens/rootLens';
 
 export type IncludeTree = { [relation: string]: true | { include: IncludeTree } };
 
-const modelFields = (root: Lens, model: string): Record<string, { kind: string; type: string }> | undefined => {
+const modelFields = (
+  root: Lens,
+  model: string,
+): Record<string, { kind: string; type: string }> | undefined => {
   for (const map of Object.values(root.maps)) {
     const entry = map.models[model];
     if (entry) return entry.fields as Record<string, { kind: string; type: string }>;
@@ -19,7 +27,11 @@ const modelFields = (root: Lens, model: string): Record<string, { kind: string; 
 
 // Leading run of `object` relation segments only — `bridge` resolves in memory
 // via the bridge dictionary, never a Prisma include.
-const relationRun = (root: Lens, model: string, fieldPath: string): { chain: string[]; model: string } => {
+const relationRun = (
+  root: Lens,
+  model: string,
+  fieldPath: string,
+): { chain: string[]; model: string } => {
   const chain: string[] = [];
   let current = model;
   for (const segment of fieldPath.split('.')) {
@@ -62,7 +74,8 @@ const collectRelationPaths = (
       if (run.chain.length) {
         const nested = [...prefix, ...run.chain];
         out.add(nested.join('.'));
-        if (c.condition) collectRelationPaths(c.condition as Condition, run.model, root, nested, out);
+        if (c.condition)
+          collectRelationPaths(c.condition as Condition, run.model, root, nested, out);
         return;
       }
     }
@@ -138,7 +151,8 @@ export const includeFromLens = (lens: Lens | LensNarrowing): IncludeTree | undef
 
   const wherePaths = new Set<string>();
   for (const visit of byPath.values()) {
-    for (const clause of visit.whereClauses) collectRelationPaths(clause, visit.modelName, root, [], wherePaths);
+    for (const clause of visit.whereClauses)
+      collectRelationPaths(clause, visit.modelName, root, [], wherePaths);
   }
 
   const merged = mergeInto(projection(rootKey) ?? {}, treeFromPaths(wherePaths));

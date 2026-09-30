@@ -54,15 +54,23 @@ export const resourceContextMiddleware = (): MiddlewareHandler => async (c, next
   return next();
 };
 
-const findResources = async (db: Db, accessor: AccessorName, where: Record<string, unknown>, scopeModel?: string) => {
-  const delegate = db[accessor] as { findMany: (...args: unknown[]) => Promise<unknown[]> } | undefined;
+const findResources = async (
+  db: Db,
+  accessor: AccessorName,
+  where: Record<string, unknown>,
+  scopeModel?: string,
+) => {
+  const delegate = db[accessor] as
+    | { findMany: (...args: unknown[]) => Promise<unknown[]> }
+    | undefined;
   if (!delegate?.findMany) return [];
 
   const args = { ...resourceContextArgs[accessor] } as Record<string, unknown>;
   if (scopeModel) {
     for (const key of ['include', 'select'] as const) {
       const tree = args[key];
-      if (tree && typeof tree === 'object') args[key] = liveIncludes(scopeModel, tree as Record<string, unknown>);
+      if (tree && typeof tree === 'object')
+        args[key] = liveIncludes(scopeModel, tree as Record<string, unknown>);
     }
   }
 

@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'bun:test';
-import { inquiryFiltersToSearchFields, mergeInquiryFilters } from '@template/ui/lib/inquiries/queryKeys';
+import {
+  inquiryFiltersToSearchFields,
+  mergeInquiryFilters,
+} from '@template/ui/lib/inquiries/queryKeys';
 
 describe('inquiryFiltersToSearchFields', () => {
   it('empty filters returns empty object', () => {
@@ -70,7 +73,10 @@ describe('inquiryFiltersToSearchFields', () => {
 
 describe('mergeInquiryFilters', () => {
   it('external types bound internal values and allow narrowing by overlap', () => {
-    const merged = mergeInquiryFilters({ types: ['createSpace', 'transferSpace'] }, { types: ['transferSpace'] });
+    const merged = mergeInquiryFilters(
+      { types: ['createSpace', 'transferSpace'] },
+      { types: ['transferSpace'] },
+    );
     expect(merged.types).toEqual(['transferSpace']);
   });
 
@@ -85,7 +91,10 @@ describe('mergeInquiryFilters', () => {
   });
 
   it('narrowing works for statuses too', () => {
-    const merged = mergeInquiryFilters({ statuses: ['sent', 'approved'] }, { statuses: ['approved'] });
+    const merged = mergeInquiryFilters(
+      { statuses: ['sent', 'approved'] },
+      { statuses: ['approved'] },
+    );
     expect(merged.statuses).toEqual(['approved']);
   });
 

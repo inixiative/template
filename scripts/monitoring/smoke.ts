@@ -5,12 +5,18 @@
  * @uses none
  */
 import { log, withLogContext } from '../../packages/shared/src/logger';
-import { captureTraceContext, recordDuration, withRemoteTrace, withSpan } from '../../packages/shared/src/telemetry';
+import {
+  captureTraceContext,
+  recordDuration,
+  withRemoteTrace,
+  withSpan,
+} from '../../packages/shared/src/telemetry';
 import { readTelemetryConfig } from '../../packages/shared/src/telemetry/config';
 import { initializeTelemetry } from '../../packages/shared/src/telemetry/initialize';
 
 const config = readTelemetryConfig('api');
-if (!config) throw new Error('Set OTEL_ENABLED=true and OTEL_EXPORTER_OTLP_ENDPOINT to your collector');
+if (!config)
+  throw new Error('Set OTEL_ENABLED=true and OTEL_EXPORTER_OTLP_ENDPOINT to your collector');
 const sdk = initializeTelemetry(config);
 log.level = 'info';
 let traceId = '';

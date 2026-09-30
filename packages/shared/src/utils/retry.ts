@@ -16,7 +16,13 @@ export type RetryOptions = {
 
 export const withRetry = async <T>(
   fn: () => Promise<T>,
-  { attempts = 3, baseDelayMs = 1000, isRetryable = () => true, onRetry, sleep: sleepFn = sleep }: RetryOptions = {},
+  {
+    attempts = 3,
+    baseDelayMs = 1000,
+    isRetryable = () => true,
+    onRetry,
+    sleep: sleepFn = sleep,
+  }: RetryOptions = {},
 ): Promise<T> => {
   let lastError: unknown;
   for (let attempt = 0; attempt < attempts; attempt++) {

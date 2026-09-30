@@ -18,7 +18,8 @@ import { JobType } from '#/jobs/types';
 // write isn't poisoned (per webhooks / cache hook convention).
 
 const syncToBullMQ = (prev: CronJob | null, curr: CronJob | null) => async () => {
-  if (prev) await queue.removeRepeatable(prev.handler, { pattern: prev.pattern, jobId: prev.jobId });
+  if (prev)
+    await queue.removeRepeatable(prev.handler, { pattern: prev.pattern, jobId: prev.jobId });
   if (curr?.enabled) {
     // Lazy: the handler registry imports handlers that emit through hooks — a static import cycles.
     const { isValidHandlerName, jobHandlers } = await import('#/jobs/handlers');
@@ -45,7 +46,8 @@ export const registerCronJobSyncHook = () => {
     [DbAction.create, DbAction.update, DbAction.delete],
     async (options: HookOptions) => {
       const prev = (options.previous ?? null) as CronJob | null;
-      const curr = options.action === DbAction.delete ? null : ((options.result ?? null) as CronJob | null);
+      const curr =
+        options.action === DbAction.delete ? null : ((options.result ?? null) as CronJob | null);
       db.onCommit([syncToBullMQ(prev, curr)], ConcurrencyType.queue);
     },
   );
