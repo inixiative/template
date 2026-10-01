@@ -15,18 +15,18 @@ import { RuleReferenceError } from '@template/db/utils/ruleReferenceError';
 import { type RuleReference, referenceKey } from '@template/shared/rules';
 import { groupBy } from 'lodash-es';
 
-export type RuleReferenceOwner = { model: ModelName; id: string };
+export type RuleReferenceSource = { model: ModelName; id: string };
 
 export type RuleReferenceGate = { sources: SourceQuery[] } | 'rebuild';
 
 type Edge = {
   id: string;
-  referencedModel: string;
-  referencedId: string;
-  referencedDeletedAt: Date | null;
+  targetModel: string;
+  targetId: string;
+  targetDeletedAt: Date | null;
 };
 
-const fkColumn = (axis: 'ownerModel' | 'referencedModel', model: string): string => {
+const fkColumn = (axis: 'sourceModel' | 'targetModel', model: string): string => {
   const column = resolveFalsePolymorphismRef({ model: 'RuleReference', axis, value: model });
   if (!column) {
     throw new Error(
@@ -37,15 +37,15 @@ const fkColumn = (axis: 'ownerModel' | 'referencedModel', model: string): string
 };
 
 const edgeKey = (edge: Edge): string =>
-  referenceKey({ model: edge.referencedModel, id: edge.referencedId });
+  referenceKey({ model: edge.targetModel, id: edge.targetId });
 
-const edgeData = (owner: RuleReferenceOwner, ref: RuleReference, target: TargetState) => ({
-  ownerModel: owner.model,
-  [fkColumn('ownerModel', owner.model)]: owner.id,
-  referencedModel: ref.model,
-  referencedId: ref.id,
-  [fkColumn('referencedModel', ref.model)]: ref.id,
-  referencedDeletedAt: target.deletedAt,
+const edgeData = (source: RuleReferenceSource, ref: RuleReference, state: TargetState) => ({
+  sourceModel: source.model,
+  [fkColumn('sourceModel', source.model)]: source.id,
+  targetModel: ref.model,
+  targetId: ref.id,
+  [fkColumn('targetModel', ref.model)]: ref.id,
+  targetDeletedAt: state.deletedAt,
 });
 
 const stampOf = (state: TargetState | undefined): number | null =>
@@ -67,29 +67,29 @@ const admit = async (
   const [outside] = (await admitRuleReferences(sources, added)).unadmitted;
   if (outside)
     throw new RuleReferenceError(
-      `rule names a ${outside.model} outside this owner's view: ${outside.id}`,
+      `rule names a ${outside.model} outside this source's view: ${outside.id}`,
     );
 };
 
 /**
- * Recompute one owner's edges from the rows its rule names, inside the caller's transaction:
+ * Recompute one source's edges from the rows its rule names, inside the caller's transaction:
  * set-diff against the edges it holds (a kept edge keeps its id), every kept edge restamped against
  * its target's current `deletedAt`, every new edge born with it. Targets are read under
  * `FOR UPDATE`, so an edge cannot be written live against a row whose delete is uncommitted.
  *
- * The gate is the save path's: a newly named row must be live and inside the owner's `sources`
+ * The gate is the save path's: a newly named row must be live and inside the lens's `sources`
  * (a reference already held is not re-admitted, so a dead one stays editable). A `'rebuild'` — the
- * owner coming back from a revive — skips it: a target that died while the owner was away gets an
- * edge carrying its stamp, so the owner returns degraded rather than refused. A purged target gets
+ * source coming back from a revive — skips it: a target that died while the source was away gets an
+ * edge carrying its stamp, so the source returns degraded rather than refused. A purged target gets
  * no new edge, and the rule fails closed on it.
  */
 export const syncRuleReferenceEdges = async (
-  owner: RuleReferenceOwner,
+  source: RuleReferenceSource,
   references: RuleReference[],
   gate: RuleReferenceGate,
 ): Promise<void> => {
   const existing = (await db.ruleReference.findMany({
-    where: { [fkColumn('ownerModel', owner.model)]: owner.id } as Prisma.RuleReferenceWhereInput,
+    where: { [fkColumn('sourceModel', source.model)]: source.id } as Prisma.RuleReferenceWhereInput,
   })) as Edge[];
 
   const named = new Map(references.map((ref) => [referenceKey(ref), ref]));
@@ -106,20 +106,20 @@ export const syncRuleReferenceEdges = async (
 
   const drifted = [...held.values()].filter((edge) => {
     const target = states.get(edgeKey(edge));
-    return target && (edge.referencedDeletedAt?.getTime() ?? null) !== stampOf(target);
+    return target && (edge.targetDeletedAt?.getTime() ?? null) !== stampOf(target);
   });
   for (const [stamp, group] of Object.entries(
     groupBy(drifted, (edge) => stampOf(states.get(edgeKey(edge))) ?? 0),
   )) {
     await db.ruleReference.updateManyAndReturn({
       where: { id: { in: group.map((edge) => edge.id) } },
-      data: { referencedDeletedAt: stamp === '0' ? null : new Date(Number(stamp)) },
+      data: { targetDeletedAt: stamp === '0' ? null : new Date(Number(stamp)) },
     });
   }
 
   const toCreate = added.flatMap((ref) => {
     const target = states.get(referenceKey(ref));
-    return target ? [edgeData(owner, ref, target)] : [];
+    return target ? [edgeData(source, ref, target)] : [];
   });
   if (toCreate.length)
     await db.ruleReference.createManyAndReturn({

@@ -5,16 +5,16 @@
  * @uses none
  */
 import {
-  RuleReferenceOwnerModel,
-  RuleReferenceReferencedModel,
+  RuleReferenceSourceModel,
+  RuleReferenceTargetModel,
 } from '@template/db/generated/client/enums';
 import { createFactory } from '@template/db/test/factory';
 
 const ruleReferenceFactory = createFactory('RuleReference', {
   defaults: () => ({
-    ownerModel: RuleReferenceOwnerModel.EmailTemplate,
-    referencedModel: RuleReferenceReferencedModel.Tag,
-    referencedId: '',
+    sourceModel: RuleReferenceSourceModel.EmailTemplate,
+    targetModel: RuleReferenceTargetModel.Tag,
+    targetId: '',
   }),
   dependencies: {
     emailTemplate: {
@@ -35,9 +35,9 @@ const ruleReferenceFactory = createFactory('RuleReference', {
       required: false,
     },
     space: { modelName: 'Space', foreignKey: { id: 'spaceId' }, required: false },
-    referencedSegment: {
+    targetSegment: {
       modelName: 'Segment',
-      foreignKey: { id: 'referencedSegmentId' },
+      foreignKey: { id: 'targetSegmentId' },
       required: false,
     },
   },

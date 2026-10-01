@@ -81,7 +81,7 @@ describe('saveEmailTemplate — a rule may only name what its owner can see', ()
     const edges = await db.ruleReference.findMany({
       where: { emailTemplateId: saved.template.id },
     });
-    expect(edges.map((edge) => edge.referencedId).sort()).toEqual(
+    expect(edges.map((edge) => edge.targetId).sort()).toEqual(
       [platformTag.id, myTag.id, mySegment.id].sort(),
     );
   });

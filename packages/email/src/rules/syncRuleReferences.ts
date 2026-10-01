@@ -5,7 +5,7 @@
  * @uses infrastructure:prisma
  */
 
-import { type RuleReferenceOwner, syncRuleReferenceEdges } from '@template/db';
+import { type RuleReferenceSource, syncRuleReferenceEdges } from '@template/db';
 import type { EmailComponent, EmailTemplate } from '@template/db/generated/client/client';
 import { stripComponentBodies } from '@template/email/render/stripComponentBodies';
 import {
@@ -16,21 +16,21 @@ import {
 import { contentRuleReferences } from '@template/email/rules/ruleReferences';
 
 export const syncRuleReferences = (
-  owner: RuleReferenceOwner,
+  source: RuleReferenceSource,
   contents: string[],
   lens: EmailLens | undefined,
   mode: 'save' | 'rebuild' = 'save',
 ) => {
   const judged = lens ?? defaultEmailLens;
   return syncRuleReferenceEdges(
-    owner,
+    source,
     contentRuleReferences(judged, ...contents),
     mode === 'rebuild' ? 'rebuild' : { sources: emailSourceQueries(judged) },
   );
 };
 
-// The contents an owner's rules live in — the one answer save and revive share, so a regenerated
-// owner holds exactly the edges its last save wrote.
+// The contents a source's rules live in — the one answer save and revive share, so a regenerated
+// source holds exactly the edges its last save wrote.
 export const templateRuleContents = (
   template: Pick<EmailTemplate, 'subject' | 'mjml'>,
 ): string[] => [template.subject ?? '', stripComponentBodies(template.mjml)];
