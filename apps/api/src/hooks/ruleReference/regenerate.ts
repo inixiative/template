@@ -17,7 +17,7 @@ import { customerRefLens } from '#/modules/customerRef/lib/customerRefLens';
 
 type Row = Record<string, unknown>;
 
-// Rebuild a revived owner's edges from the rule it holds now. Re-reads the owner rather than
+// Rebuild a revived source's edges from the rule it holds now. Re-reads the source rather than
 // trusting the revive's result row, whose columns are whatever the caller selected.
 export const regenerateRuleReferences = async (model: string, row: Row): Promise<void> => {
   const id = row.id;

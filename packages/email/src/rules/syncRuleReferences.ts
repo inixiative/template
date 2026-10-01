@@ -6,7 +6,7 @@
  */
 
 import {
-  type RuleReferenceOwner,
+  type RuleReferenceSource,
   regenerateRuleReferenceEdges,
   syncRuleReferenceEdges,
 } from '@template/db';
@@ -20,20 +20,20 @@ import {
 import { contentRuleReferences } from '@template/email/rules/ruleReferences';
 
 export const syncRuleReferences = (
-  owner: RuleReferenceOwner,
+  source: RuleReferenceSource,
   contents: string[],
   lens: EmailLens | undefined,
 ) => {
   const judged = lens ?? defaultEmailLens;
   return syncRuleReferenceEdges(
-    owner,
+    source,
     contentRuleReferences(judged, ...contents),
     emailSourceQueries(judged),
   );
 };
 
-// The contents an owner's rules live in — the one answer save and revive share, so a regenerated
-// owner holds exactly the edges its last save wrote.
+// The contents a source's rules live in — the one answer save and revive share, so a regenerated
+// source holds exactly the edges its last save wrote.
 export const templateRuleContents = (
   template: Pick<EmailTemplate, 'subject' | 'mjml'>,
 ): string[] => [template.subject ?? '', stripComponentBodies(template.mjml)];
@@ -43,8 +43,11 @@ export const componentRuleContents = (component: Pick<EmailComponent, 'mjml'>): 
 ];
 
 export const regenerateRuleReferences = (
-  owner: RuleReferenceOwner,
+  source: RuleReferenceSource,
   contents: string[],
   lens: EmailLens | undefined,
 ) =>
-  regenerateRuleReferenceEdges(owner, contentRuleReferences(lens ?? defaultEmailLens, ...contents));
+  regenerateRuleReferenceEdges(
+    source,
+    contentRuleReferences(lens ?? defaultEmailLens, ...contents),
+  );

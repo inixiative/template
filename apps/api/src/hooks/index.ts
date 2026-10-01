@@ -8,7 +8,7 @@ import { registerImmutableFieldsHook } from '#/hooks/immutableFields/hook';
 import { registerLastLoginAtHook } from '#/hooks/lastLoginAt/hook';
 import { registerOrderedListHook } from '#/hooks/orderedList/hook';
 import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
-import { registerRuleReferenceReferencedHook } from '#/hooks/ruleReference/referencedHook';
+import { registerRuleReferenceTargetHook } from '#/hooks/ruleReference/targetHook';
 import { registerRulesHook } from '#/hooks/rules/hook';
 import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
 import { registerSegmentMemberOwnerHook } from '#/hooks/segmentMemberOwner/hook';
@@ -33,7 +33,7 @@ export const registerHooks = () => {
   registerLastLoginAtHook();
   registerOrderedListHook();
   registerPreventHardDeleteHook();
-  registerRuleReferenceReferencedHook();
+  registerRuleReferenceTargetHook();
   registerSegmentConditionsHook();
   registerSegmentMemberOwnerHook();
   registerSegmentRuleReferencesHook();

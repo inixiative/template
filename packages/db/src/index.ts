@@ -138,7 +138,7 @@ export {
 } from './utils/ruleReferenceHealth';
 export { ruleReferences } from './utils/ruleReferences';
 export {
-  type RuleReferenceOwner,
+  type RuleReferenceSource,
   regenerateRuleReferenceEdges,
   syncRuleReferenceEdges,
 } from './utils/syncRuleReferenceEdges';

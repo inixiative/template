@@ -39,13 +39,13 @@ models, and a Json column's contents aren't indexable — so the edges become ro
 
 ### `RuleReference` — false polymorphism on both axes
 
-`packages/db/prisma/schema/ruleReference.prisma`. `ownerModel` + `emailTemplateId` /
-`emailComponentId`; `referencedModel` + `tagId` / `organizationId` / `spaceId`; both axes in
+`packages/db/prisma/schema/ruleReference.prisma`. `sourceModel` + `emailTemplateId` /
+`emailComponentId`; `targetModel` + `tagId` / `organizationId` / `spaceId`; both axes in
 `PolymorphismRegistry`, so the `rules` hook enforces exactly-one-FK and the type fields are
 immutable. Real relations on both ends, `onDelete: Cascade`. Edge identity is one partial unique per
-(owner, referenced) branch pair — the Contact / EmailTemplate convention. No `updatedAt` /
+(source, target) branch pair — the Contact / EmailTemplate convention. No `updatedAt` /
 `deletedAt`: append/delete only, a row is never mutated. Tenant scoping is derived through the
-owner, never denormalized onto the edge.
+source, never denormalized onto the edge.
 
 Not a bare `(model, id)` string pair (Zealot #2116's first cut). Typed relations are what the
 consumers need: `include` on either end, relation-scoped `deletedAt` joins, and a hard delete on
@@ -64,7 +64,7 @@ so it registers no edge — it is not a refusal (ruling 2026-09-10, below). This
 named first consumer that API was waiting for.
 
 Which models are referenceable is the registry's answer, not a surface's:
-`RULE_REFERENCEABLE_MODELS` (`packages/db/src/utils/ruleReferenceable.ts`) is the `referencedModel`
+`RULE_REFERENCEABLE_MODELS` (`packages/db/src/utils/ruleReferenceable.ts`) is the `targetModel`
 axis of `PolymorphismRegistry.RuleReference`. A rule-tracked lens never exposes an FK column:
 `omitForeignKeys(lens)` (`packages/db/src/lens`, the `redactLens` shape) omits every FK column
 `prismaMap` knows, on every model, wherever it appears. Sources are the surface's own:
@@ -76,40 +76,40 @@ gets its `exposedSurface` (sources stripped), save and settle keep the narrowing
 (`packages/db`) keeps the id-field sources (`prismaMap.isId`) as row references;
 `contentRuleReferences(lens, ...contents)` (email) folds every `{{#if}}` block, branch and nesting
 (`collectRules` in the condition parser). Adding a referenceable model = a `RuleReference` FK
-column + a registry entry (the referenced-side hook and email's id sources derive); adding a
+column + a registry entry (the target-side hook and email's id sources derive); adding a
 rule-bearing column = a `syncRuleReferenceEdges` call from its save path.
-Segment (FEAT-021) is the second owner and the fourth referenced model: `segmentId` /
-`referencedSegmentId`, edges written by the `segmentRuleReferences` after-write hook.
+Segment (FEAT-021) is the second source and the fourth target model: `segmentId` /
+`targetSegmentId`, edges written by the `segmentRuleReferences` after-write hook.
 
-### No owner-side hook
+### No source-side hook
 
-Edges are written by `syncRuleReferenceEdges(owner, references)` — a service in `packages/db`,
-fronted for email by `syncRuleReferences(owner, contents, lens)` in `packages/email/src/rules/`
+Edges are written by `syncRuleReferenceEdges(source, references)` — a service in `packages/db`,
+fronted for email by `syncRuleReferences(source, contents, lens)` in `packages/email/src/rules/`
 (vocabulary gate + `collectRules` over MJML and subject), called by `saveEmailTemplate` inside its
 transaction for the template and each component it saved. That is the only writer of `mjml`/`subject` in the repo, so there is
 nothing for a hook to catch that the call does not. The gate (vocabulary, delta against live rows
 under `findForUpdate`) throws `RuleReferenceError`, a sibling of
-`ConditionValidationError` on the same path. The one hook left is on the referenced side.
+`ConditionValidationError` on the same path. The one hook left is on the target side.
 
 ### Staleness — two clocks on the edge row
 
 An edge has to survive the row it names, and say so. Two ways a target leaves, two signals, both
 on the edge:
 
-* **Soft delete** — `ruleReference:referenced` copies the target's `deletedAt` onto every edge that
-  names it, matched on `(referencedModel, referencedId)`. One `updateManyAndReturn` per model, no
+* **Soft delete** — `ruleReference:target` copies the target's `deletedAt` onto every edge that
+  names it, matched on `(targetModel, targetId)`. One `updateManyAndReturn` per model, no
   walk and no closure. Re-resolve rather than set-once, so an undelete clears it.
-* **Purge** — the referenced FK carries no `onDelete`, so Postgres `SET NULL`s it and the edge
-  stands with `referencedId` still naming the row that went. No hook can see a purge (the client
+* **Purge** — the target FK carries no `onDelete`, so Postgres `SET NULL`s it and the edge
+  stands with `targetId` still naming the row that went. No hook can see a purge (the client
   path is refused by `preventHardDelete`; the redact path is raw), which is why this one is the
   database's job rather than a listener's.
 
 ### True polymorphism beside the false
 
-The referenced axis carries both: the typed FK **and** `referencedId`.
+The target axis carries both: the typed FK **and** `targetId`.
 
 They are two clocks on one fact. The FK is the *relation* — owned by referential integrity, and it
-goes null at exactly the moment the row ceases to exist. `referencedId` is the *name* — owned by
+goes null at exactly the moment the row ceases to exist. `targetId` is the *name* — owned by
 the rule content, written once and never updated. They agree for the whole time the target is
 alive and diverge precisely at the moment worth detecting, so the divergence is the signal.
 `syncRuleReferenceEdges` writes both from the same value, so they agree by construction.
@@ -151,17 +151,17 @@ state is never touched by a degraded rule.
 ### Open: a lens that lives in a row
 
 Extraction is a function of two inputs — the rule content and the lens — and a save-time sync only
-observes the first. A per-template lens is fine, because editing it *is* an owner write. A shared
-lens authored as data is not: change it and every owner's edges are wrong at once with no write to
-notice. Re-deriving on a base-lens change is a sweep over `syncRuleReferenceEdges(owner, refs)`, the
+observes the first. A per-template lens is fine, because editing it *is* a source write. A shared
+lens authored as data is not: change it and every source's edges are wrong at once with no write to
+notice. Re-deriving on a base-lens change is a sweep over `syncRuleReferenceEdges(source, refs)`, the
 same callable a backfill loops over, triggered by a job rather than by a save. Deliberately not
-built here — the constraint is written down so the owner set stays open rather than being
+built here — the constraint is written down so the source set stays open rather than being
 tightened around today's two models.
 
 ### Tests
 
 `apps/api/src/hooks/ruleReference/ruleReference.test.ts` (18, DB-backed — scoper,
-preventHardDelete, rules): typed edges per surface and per referenced model, subject as a surface,
+preventHardDelete, rules): typed edges per surface and per target model, subject as a surface,
 set-diff keeps survivors, clear, components, refused on missing /
 soft-deleted, a `path` or describing operator saves with no edge, a soft-delete stamps every edge
 naming the target and a restore clears them, a purge nulls the FK and leaves the edge naming the
@@ -191,13 +191,13 @@ Every confirmed finding was fixed in-branch and pinned by a test:
   The save path runs `checkRuleAgainstLens` on every rule, so an FK spelling or a typo path is
   refused at save, and any relation path to a referenceable id is a registered edge.
 - **The save race, fenced with `db.findForUpdate`** (extended to take `{ id: { in } }`, where an
-  empty list locks nothing rather than the whole table): the save gate locks the referenced rows
+  empty list locks nothing rather than the whole table): the save gate locks the target rows
   before reading liveness, so a save can no longer commit an edge to a row a concurrent
   transaction is deleting. This is the only lock left — with nothing materialised there is no
   second writer to lose an update against.
 - **The gate validates the delta, not the document**: a pre-existing dead reference no longer
-  freezes its owner — edits that keep it are allowed and the projection stays truthful; only a
-  *newly added* dead reference is a 422. Archived owners need no repair pass on restore, because
+  freezes its source — edits that keep it are allowed and the projection stays truthful; only a
+  *newly added* dead reference is a 422. Archived sources need no repair pass on restore, because
   there is no projection to have gone stale while they were away.
 - **Render**: rules evaluate over the **nested** `{ sender, recipient, data }` object (dotted
   to-one paths resolve; the one-level flattening could not); a rule that requires an unsupplied
@@ -205,7 +205,7 @@ Every confirmed finding was fixed in-branch and pinned by a test:
   reported and suppressed instead of shipping raw rule JSON in the email body; a malformed
   nested marker can no longer let a `{{/if}}` inside a JSON string bisect the outer block.
 - **Hard delete**: the client path is *prevented* (`preventHardDelete`); the purge/redact path
-  `SET NULL`s the referenced FK and needs no companion call — the edge stays, `referencedId` still
+  `SET NULL`s the target FK and needs no companion call — the edge stays, `targetId` still
   names the row, and the null FK is what the read calls `purged`.
 
 Known limitations, deliberately not papered over:
@@ -226,8 +226,8 @@ Known limitations, deliberately not papered over:
 
 ## Rulings (Aron, 2026-08-31, on Zealot #2116)
 
-1. False polymorphism, not a bare pair — typed FKs on both ends, cascade on the referenced side.
-2. `referencedModel` is per edge, from the extraction; a constant is the column being decorative.
+1. False polymorphism, not a bare pair — typed FKs on both ends, cascade on the target side.
+2. `targetModel` is per edge, from the extraction; a constant is the column being decorative.
 3. Edges hard-delete and have no lifecycle. deletedAt-awareness is on the joins and on the
    staleness trigger, never on the edge.
 4. Legacy rows outside the id'd rule system (Zealot's ~10.8k `workflowJSON.autoApproveConfig`)
@@ -239,8 +239,8 @@ Known limitations, deliberately not papered over:
 
 ## Rulings (Aron, 2026-09-04 → 2026-09-08)
 
-6. Edges are written by a service from the save path; the only hook is on the referenced side and
-   copies one scalar across one hop. No owner-side hook, no projection.
+6. Edges are written by a service from the save path; the only hook is on the target side and
+   copies one scalar across one hop. No source-side hook, no projection.
 7. Staleness is asked, not stored. Degraded is a function of the current lens and the rows the
    rule names; nothing is computed ahead of time and nothing thaws.
 8. Save is always valid: a rule that cannot be evaluated correctly cannot be saved. Leaving an
@@ -269,23 +269,23 @@ template keeps two:
 edge for that leaf and evaluation is not refused for it. A bound value is valid exactly when its
 binding is supplied, which the first path already decides.
 
-## Ruling (Aron, 2026-09-30) — the owner takes its edges with it
+## Ruling (Aron, 2026-09-30) — the source takes its edges with it
 
-A soft-deleted owner's rule is not evaluated, so its edges would only hold the referenced side and
-count as degraded. `RuleReference` is in `HARD_DELETE_ON_TOMBSTONE`: tombstoning an owner hard-deletes
-its edges. The referenced relations (`tag`, `organization`, `space`, `referencedSegment`) are
+A soft-deleted source's rule is not evaluated, so its edges would only hold the target side and
+count as degraded. `RuleReference` is in `HARD_DELETE_ON_TOMBSTONE`: tombstoning a source hard-deletes
+its edges. The target relations (`tag`, `organization`, `space`, `targetSegment`) are
 `CASCADE_EXEMPT` — tombstoning a *named* row keeps the edges that name it, and
-`ruleReference:referenced` stamps them. Segment is both, and gets both behaviours.
+`ruleReference:target` stamps them. Segment is both, and gets both behaviours.
 
-Reviving the owner regenerates its edges from the rule it holds now (`REGENERATE_ON_REVIVE` in the
+Reviving the source regenerates its edges from the rule it holds now (`REGENERATE_ON_REVIVE` in the
 cascade, `regenerateRuleReferenceEdges` in `@template/db`). Regeneration is not a save: there is no
-admission gate, because the owner is coming back rather than being authored. A target that was
-soft-deleted while the owner was away gets an edge already carrying `referencedDeletedAt`. A target
+admission gate, because the source is coming back rather than being authored. A target that was
+soft-deleted while the source was away gets an edge already carrying `targetDeletedAt`. A target
 that was purged gets no edge: the client cannot write the null-FK shape only `SET NULL` produces, and
 does not need to, since health reads references off the rule and the live set off the edges, so a
 named row with no edge is never live. A revocation (`Session`, `Token`) has no regenerator and stays
-gone. The contents an email owner's rules live in (`templateRuleContents` / `componentRuleContents`)
-are one answer shared by save and revive, so a revived owner holds exactly the edges its last save
+gone. The contents an email source's rules live in (`templateRuleContents` / `componentRuleContents`)
+are one answer shared by save and revive, so a revived source holds exactly the edges its last save
 wrote. Zealot has the same shape (ZLT-5163).
 
 ## Zealot follow-through
@@ -301,7 +301,7 @@ degraded" — which is the same question asked transitively over the segment gra
 ## Not in scope
 
 Tree composition (a rule evaluating another rule's tree — rejected on ZLT-4331). Depth caps. A
-`referencesX` boolean on the owner. Migrating component references onto the table (ruling 5).
+`referencesX` boolean on the source. Migrating component references onto the table (ruling 5).
 Transitive degradation — built on FEAT-021 (#105): `segmentRuleStates` closes over the owner's
 edges. Tenancy of a reference — built on #105 as well: the lens narrowing's `where` alone decides
 nothing at save (`checkRuleAgainstLens` is a vocabulary check), so `syncRuleReferenceEdges` takes

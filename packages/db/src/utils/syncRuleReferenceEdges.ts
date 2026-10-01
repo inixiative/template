@@ -16,11 +16,11 @@ import { RuleReferenceError } from '@template/db/utils/ruleReferenceError';
 import { type RuleReference, referenceKey } from '@template/shared/rules';
 import { groupBy } from 'lodash-es';
 
-export type RuleReferenceOwner = { model: ModelName; id: string };
+export type RuleReferenceSource = { model: ModelName; id: string };
 
-type Edge = { id: string; referencedModel: string; referencedId: string };
+type Edge = { id: string; targetModel: string; targetId: string };
 
-const fkColumn = (axis: 'ownerModel' | 'referencedModel', model: string): string => {
+const fkColumn = (axis: 'sourceModel' | 'targetModel', model: string): string => {
   const column = resolveFalsePolymorphismRef({ model: 'RuleReference', axis, value: model });
   if (!column) {
     throw new Error(
@@ -31,17 +31,17 @@ const fkColumn = (axis: 'ownerModel' | 'referencedModel', model: string): string
 };
 
 const edgeKey = (edge: Edge): string =>
-  referenceKey({ model: edge.referencedModel, id: edge.referencedId });
+  referenceKey({ model: edge.targetModel, id: edge.targetId });
 
 type TargetState = { deletedAt: Date | null };
 
-const edgeData = (owner: RuleReferenceOwner, ref: RuleReference, target: TargetState) => ({
-  ownerModel: owner.model,
-  [fkColumn('ownerModel', owner.model)]: owner.id,
-  referencedModel: ref.model,
-  referencedId: ref.id,
-  [fkColumn('referencedModel', ref.model)]: ref.id,
-  referencedDeletedAt: target.deletedAt,
+const edgeData = (source: RuleReferenceSource, ref: RuleReference, target: TargetState) => ({
+  sourceModel: source.model,
+  [fkColumn('sourceModel', source.model)]: source.id,
+  targetModel: ref.model,
+  targetId: ref.id,
+  [fkColumn('targetModel', ref.model)]: ref.id,
+  targetDeletedAt: target.deletedAt,
 });
 
 const targetStates = async (references: RuleReference[]): Promise<Map<string, TargetState>> => {
@@ -61,19 +61,19 @@ const targetStates = async (references: RuleReference[]): Promise<Map<string, Ta
 };
 
 /**
- * Recompute one owner's edges from the rows its rules name, inside the caller's transaction. The
+ * Recompute one source's edges from the rows its rules name, inside the caller's transaction. The
  * gate is delta-only and fenced: a reference already held is not re-admitted (a save may keep or drop it),
  * a newly named row must be live, and the lock stops a concurrent delete landing between the
  * check and the edge it admits.
  */
 export const syncRuleReferenceEdges = async (
-  owner: RuleReferenceOwner,
+  source: RuleReferenceSource,
   references: RuleReference[],
   sources?: SourceQuery[],
 ): Promise<void> => {
-  const ownerColumn = fkColumn('ownerModel', owner.model);
+  const sourceColumn = fkColumn('sourceModel', source.model);
   const existing = (await db.ruleReference.findMany({
-    where: { [ownerColumn]: owner.id } as Prisma.RuleReferenceWhereInput,
+    where: { [sourceColumn]: source.id } as Prisma.RuleReferenceWhereInput,
   })) as Edge[];
   const held = new Set(existing.map(edgeKey));
 
@@ -96,7 +96,7 @@ export const syncRuleReferenceEdges = async (
   const toDelete = existing.filter((edge) => !named.has(edgeKey(edge)));
   const toCreate = references
     .filter((ref) => !held.has(referenceKey(ref)))
-    .map((ref) => edgeData(owner, ref, { deletedAt: null }));
+    .map((ref) => edgeData(source, ref, { deletedAt: null }));
 
   if (toDelete.length)
     await db.ruleReference.deleteMany({ where: { id: { in: toDelete.map((edge) => edge.id) } } });
@@ -107,20 +107,20 @@ export const syncRuleReferenceEdges = async (
 };
 
 /**
- * Rebuild one owner's edges from the rows its rule names today, with no admission gate: the owner
+ * Rebuild one source's edges from the rows its rule names today, with no admission gate: the source
  * is coming back (a revive), not being authored. A soft-deleted target gets an edge carrying its
- * `referencedDeletedAt`, so an owner whose target died while it was away comes back degraded rather
+ * `targetDeletedAt`, so a source whose target died while it was away comes back degraded rather
  * than refused. A purged target gets no edge — the client cannot write the null-FK shape only
  * SET NULL produces, and does not need to: health reads the references off the rule and the live
  * set off the edges, so a named row with no edge is never live and the rule fails closed.
  */
 export const regenerateRuleReferenceEdges = async (
-  owner: RuleReferenceOwner,
+  source: RuleReferenceSource,
   references: RuleReference[],
 ): Promise<void> => {
-  const ownerColumn = fkColumn('ownerModel', owner.model);
+  const sourceColumn = fkColumn('sourceModel', source.model);
   await db.ruleReference.deleteMany({
-    where: { [ownerColumn]: owner.id } as Prisma.RuleReferenceWhereInput,
+    where: { [sourceColumn]: source.id } as Prisma.RuleReferenceWhereInput,
   });
 
   const unique = [...new Map(references.map((ref) => [referenceKey(ref), ref])).values()];
@@ -128,7 +128,7 @@ export const regenerateRuleReferenceEdges = async (
   const states = await targetStates(unique);
   const data = unique.flatMap((ref) => {
     const target = states.get(referenceKey(ref));
-    return target ? [edgeData(owner, ref, target)] : [];
+    return target ? [edgeData(source, ref, target)] : [];
   });
   if (data.length)
     await db.ruleReference.createManyAndReturn({

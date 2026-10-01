@@ -17,7 +17,7 @@ type Row = Record<string, unknown>;
 // the rows that died with the parent — a child deleted independently keeps
 // its own timestamp and stays dead. Hard-deleted relations are gone for good
 // unless they are derived from the parent (REGENERATE_ON_REVIVE): a revocation
-// stays revoked, a rule reference is rebuilt from the revived owner's rule.
+// stays revoked, a rule reference is rebuilt from the revived source's rule.
 export const registerSoftDeleteCascadeHook = () => {
   validateDeleteBehavior();
   registerDbHook(
