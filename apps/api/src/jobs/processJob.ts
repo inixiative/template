@@ -42,8 +42,15 @@ const runJob = async (
             log.info(`Processing job ${job.name} (${job.id})`);
 
             const payload = (job.data as { payload?: unknown }).payload;
+            const integrationId =
+              typeof payload === 'object' &&
+              payload !== null &&
+              'integrationId' in payload &&
+              typeof payload.integrationId === 'string'
+                ? payload.integrationId
+                : null;
             await auditActorContext.scope(
-              { ...nullAuditActor, actorJobName: job.name },
+              { ...nullAuditActor, actorJobName: job.name, integrationId },
               async () => {
                 if (payload === undefined) {
                   await (handler as (handlerCtx: WorkerContext) => Promise<void>)(ctx);

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'bun:test';
+import { type AuditActor, auditActorContext } from '@template/db/lib/auditActorContext';
 import { processJob } from '#/jobs/processJob';
 import { queue } from '#/jobs/queue';
 import { slowLastFinishedKey } from '#/jobs/slowLaneSignals';
@@ -58,6 +59,23 @@ describe('processJob', () => {
     await processJob(jobWith('fast-job', { lane: JobLane.fast }), { handlers: handlers as never });
 
     expect(await queue.redis.get(slowLastFinishedKey(queue.name))).toBeNull();
+  });
+
+  it('runs the handler as the job actor, carrying the payload integrationId', async () => {
+    const actors: (AuditActor | null)[] = [];
+    const handlers = {
+      sendWebhook: async () => {
+        actors.push(auditActorContext.getScope());
+      },
+    };
+
+    await processJob(jobWith('integration-job', { payload: { integrationId: 'integration-1' } }), {
+      handlers: handlers as never,
+    });
+    await processJob(jobWith('plain-job', {}), { handlers: handlers as never });
+
+    expect(actors.map((actor) => actor?.actorJobName)).toEqual(['sendWebhook', 'sendWebhook']);
+    expect(actors.map((actor) => actor?.integrationId)).toEqual(['integration-1', null]);
   });
 
   it('rejects an unknown handler', async () => {
