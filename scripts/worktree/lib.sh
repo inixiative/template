@@ -117,7 +117,10 @@ quote_env_value() {
 project_name() {
   local name=""
   [ -f "$1/.env" ] && name="$(env_value "$1/.env" PROJECT_NAME)"
-  echo "${name:-template}"
+  # No fallback. Guessing the project name sends slot databases and buckets to
+  # whichever project owns the default ports on this machine.
+  [ -n "$name" ] || die "Error: PROJECT_NAME is not set in $1/.env — run 'bun run setup' (or copy .env from another checkout of this repo) before creating worktrees."
+  printf '%s' "$name"
 }
 
 valid_slot() {
