@@ -47,9 +47,7 @@ describe('webhook hook', () => {
         name: 'sendWebhook',
       });
 
-      const user = await db.user.create({
-        data: { email: `webhook-test-create-${Date.now()}@example.com` },
-      });
+      const { entity: user } = await createUser();
 
       expect(enqueueSpy).toHaveBeenCalledWith(
         'sendWebhook',

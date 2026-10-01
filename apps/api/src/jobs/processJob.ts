@@ -5,12 +5,13 @@
  * @uses infrastructure:redis, infrastructure:prisma
  */
 import { db } from '@template/db';
-import { auditActorContext, nullAuditActor } from '@template/db/lib/auditActorContext';
+import { auditActorContext } from '@template/db/lib/auditActorContext';
 import { addLogBroadcast, LogScope, log, logScope } from '@template/shared/logger';
 import type { Job } from 'bullmq';
 import { admitToSlot } from '#/jobs/admitToSlot';
 import { isSlowJobData } from '#/jobs/buildJobData';
 import { isValidHandlerName, type JobHandlers, jobHandlers } from '#/jobs/handlers';
+import { jobAuditActor } from '#/jobs/jobAuditActor';
 import { queue } from '#/jobs/queue';
 import { recordSlowFinished } from '#/jobs/slowLaneSignals';
 import { createSlowSlotPool, type SlowSlotPool } from '#/jobs/slowSlotPool';
@@ -42,25 +43,15 @@ const runJob = async (
             log.info(`Processing job ${job.name} (${job.id})`);
 
             const payload = (job.data as { payload?: unknown }).payload;
-            const integrationId =
-              typeof payload === 'object' &&
-              payload !== null &&
-              'integrationId' in payload &&
-              typeof payload.integrationId === 'string'
-                ? payload.integrationId
-                : null;
-            await auditActorContext.scope(
-              { ...nullAuditActor, actorJobName: job.name, integrationId },
-              async () => {
-                if (payload === undefined) {
-                  await (handler as (handlerCtx: WorkerContext) => Promise<void>)(ctx);
-                } else {
-                  await (
-                    handler as (handlerCtx: WorkerContext, handlerPayload: unknown) => Promise<void>
-                  )(ctx, payload);
-                }
-              },
-            );
+            await auditActorContext.scope(jobAuditActor(job.name, payload), async () => {
+              if (payload === undefined) {
+                await (handler as (handlerCtx: WorkerContext) => Promise<void>)(ctx);
+              } else {
+                await (
+                  handler as (handlerCtx: WorkerContext, handlerPayload: unknown) => Promise<void>
+                )(ctx, payload);
+              }
+            });
 
             log.info(`Completed job ${job.name} (${job.id})`);
           },
