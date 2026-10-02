@@ -10,7 +10,6 @@ import type {
   EmailOwnerModel,
   EmailTemplate,
 } from '@template/db/generated/client/client';
-import { assertTemplateSlugAvailable } from '@template/email/render/assertTemplateSlugAvailable';
 import { EACH, IF, parseEachBlock, parseIfBlock } from '@template/email/render/conditionParser';
 import { decomposeNodes } from '@template/email/render/decompose';
 import { expand } from '@template/email/render/expand';
@@ -92,7 +91,6 @@ export const saveEmailTemplate = async (
 
   return db.txn(
     async () => {
-      await assertTemplateSlugAvailable(input.slug, ctx.ownerModel);
       const existing = await lookupCascade(slugs, ctx);
       const { mjml, refs, writes } = decomposeNodes(nodes, (slug) => existing[slug]?.mjml);
 
