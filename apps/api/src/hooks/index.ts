@@ -3,6 +3,7 @@ import { registerAuditLogHook } from '#/hooks/auditLog/hook';
 import { registerClearCacheHook } from '#/hooks/cache/hook';
 import { registerContactRulesHook } from '#/hooks/contactRules/hook';
 import { registerCronJobSyncHook } from '#/hooks/cronJobSync/hook';
+import { registerEmailTemplateSlugReservationHook } from '#/hooks/emailTemplateSlugReservation/hook';
 import { registerEmailVersioningHook } from '#/hooks/emailVersioning/hook';
 import { registerImmutableFieldsHook } from '#/hooks/immutableFields/hook';
 import { registerLastLoginAtHook } from '#/hooks/lastLoginAt/hook';
@@ -26,6 +27,7 @@ export const registerHooks = () => {
   registerRulesHook();
   registerAuditLogHook();
   registerEmailVersioningHook();
+  registerEmailTemplateSlugReservationHook();
   registerClearCacheHook();
   registerContactRulesHook();
   registerCronJobSyncHook();

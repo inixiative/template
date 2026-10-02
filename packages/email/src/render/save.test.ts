@@ -360,17 +360,50 @@ describe('saveEmailTemplate', () => {
     expect(outer?.componentRefs).toEqual(['inner']);
   });
 
-  it('admin template - no cascade', async () => {
+  it('an admin template inherits an unchanged default component instead of copying it', async () => {
+    await createEmailComponent({
+      slug: 'footer',
+      mjml: '<mj-text>Default Footer</mj-text>',
+      ownerModel: 'default',
+    });
+
     const result = await saveEmailTemplate({
-      slug: 'admin-only',
-      name: 'Admin Only',
+      slug: 'admin-uses-default',
+      name: 'Admin Uses Default',
       subject: 'Hello',
       kind: 'system',
-      mjml: mjml('<mj-text>Admin</mj-text>'),
+      mjml: mjml('{{#component:footer}}<mj-text>Default Footer</mj-text>{{/component:footer}}'),
       ownerModel: 'admin',
     });
 
     expect(result.template.ownerModel).toBe('admin');
+    expect(result.components).toEqual([]);
+    expect(result.template.componentRefs).toEqual(['footer']);
+  });
+
+  it('an admin template that changes a default component writes its own admin copy', async () => {
+    await createEmailComponent({
+      slug: 'footer',
+      mjml: '<mj-text>Default Footer</mj-text>',
+      ownerModel: 'default',
+    });
+
+    const result = await saveEmailTemplate({
+      slug: 'admin-own-footer',
+      name: 'Admin Own Footer',
+      subject: 'Hello',
+      kind: 'system',
+      mjml: mjml(
+        '{{#component:footer}}<mj-text>UserEvidence Footer</mj-text>{{/component:footer}}',
+      ),
+      ownerModel: 'admin',
+    });
+
+    expect(result.components.map((c) => [c.slug, c.ownerModel])).toEqual([['footer', 'admin']]);
+    const defaultFooter = await db.emailComponent.findFirst({
+      where: { slug: 'footer', ownerModel: 'default' },
+    });
+    expect(defaultFooter?.mjml).toBe('<mj-text>Default Footer</mj-text>');
   });
 
   it('a component outside the tier cascade is written at the current tier', async () => {
