@@ -133,7 +133,7 @@ describe('emailTemplateSlugReservation hook', () => {
     );
   });
 
-  it('a soft-deleted admin template no longer reserves its slug', async () => {
+  it('a soft-deleted admin template still reserves its slug, and re-saving revives it', async () => {
     const admin = await saveEmailTemplate({ ...templateInput('retired'), ownerModel: 'admin' });
     await db.txn(() =>
       db.emailTemplate.update({
@@ -142,9 +142,28 @@ describe('emailTemplateSlugReservation hook', () => {
       }),
     );
 
-    const result = await saveEmailTemplate({ ...templateInput('retired'), ownerModel: 'default' });
+    await expectConflict(saveEmailTemplate({ ...templateInput('retired'), ownerModel: 'default' }));
 
-    expect(result.template.ownerModel).toBe('default');
+    const revived = await saveEmailTemplate({ ...templateInput('retired'), ownerModel: 'admin' });
+    expect(revived.template.id).toBe(admin.template.id);
+    expect(revived.template.deletedAt).toBeNull();
+  });
+
+  it('a soft-deleted tenant template still holds its slug against a new admin template', async () => {
+    const { entity: org } = await createOrganization();
+    const tenant = await saveEmailTemplate({
+      ...templateInput('welcome'),
+      ownerModel: 'Organization',
+      organizationId: org.id,
+    });
+    await db.txn(() =>
+      db.emailTemplate.update({
+        where: { id: tenant.template.id },
+        data: { deletedAt: new Date() },
+      }),
+    );
+
+    await expectConflict(saveEmailTemplate({ ...templateInput('welcome'), ownerModel: 'admin' }));
   });
 
   it('lets exactly one of two concurrent saves claim a slug across tiers', async () => {

@@ -60,15 +60,16 @@ const assertSlugAvailable = async (slug: string, rows: TemplateWrite[]): Promise
 
   await db.findForUpdate('EmailTemplate', { slug }, { upserting: true });
   const ownIds = rows.map((row) => row.id).filter((id): id is string => typeof id === 'string');
-  const holder = await db.emailTemplate.findFirst({
-    where: {
-      slug,
-      deletedAt: null,
-      ownerModel: isAdmin ? { not: 'admin' } : 'admin',
-      ...(ownIds.length && { id: { notIn: ownIds } }),
-    },
-    select: { ownerModel: true },
-  });
+  const holder = await db.withDeleted(() =>
+    db.emailTemplate.findFirst({
+      where: {
+        slug,
+        ownerModel: isAdmin ? { not: 'admin' } : 'admin',
+        ...(ownIds.length && { id: { notIn: ownIds } }),
+      },
+      select: { ownerModel: true },
+    }),
+  );
   if (holder) throw reservedSlugError(slug, isAdmin ? 'admin' : tierOf(rows[0]), holder.ownerModel);
 };
 

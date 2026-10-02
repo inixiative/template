@@ -4,7 +4,7 @@
  * @partOf feature:email
  * @uses infrastructure:prisma
  */
-import { db } from '@template/db';
+import { db, revive } from '@template/db';
 import type { EmailComponent, EmailTemplate } from '@template/db/generated/client/client';
 import type { OwnerScope } from '@template/email/render/types';
 
@@ -14,15 +14,18 @@ type ScopedEmailRow = {
 };
 
 type ScopedDelegate<Row extends { id: string }> = {
-  findFirst: (args: { where: Partial<Row> }) => Promise<Row | null>;
+  findFirst: (args: {
+    where: Partial<Row> | Record<string, unknown>;
+    orderBy?: Record<string, 'asc' | 'desc'>;
+  }) => Promise<Row | null>;
   update: (args: { where: { id: string }; data: Partial<Row> }) => Promise<Row>;
   create: (args: { data: Partial<Row> }) => Promise<Row>;
 };
 
-// Resolve the row by its natural key within the owner scope, then update-or-create. Two-stage
-// (findFirst → update/create) rather than a Prisma `upsert`: the natural-key uniques are PARTIAL
-// (`WHERE deleted_at IS NULL`), which `upsert`/`ON CONFLICT` can't target — so the read-then-write is
-// the deliberate soft-delete adaptation, shared by both scoped email rows so the flow lives in one place.
+const reviveRow = (model: keyof ScopedEmailRow, id: string) =>
+  model === 'emailTemplate' ? revive(db.emailTemplate, { id }) : revive(db.emailComponent, { id });
+
+// The natural-key uniques are partial (`WHERE deleted_at IS NULL`), so `upsert` can't target them.
 export const saveScopedRow = async <Model extends keyof ScopedEmailRow>(
   model: Model,
   input: ScopedEmailRow[Model] & { slug: string; locale: string },
@@ -38,15 +41,21 @@ export const saveScopedRow = async <Model extends keyof ScopedEmailRow>(
     userId: ctx.userId ?? null,
   } as Partial<Row>;
 
-  const where = {
-    slug: input.slug,
-    locale: input.locale,
-    ...scope,
-    deletedAt: null,
-  } as Partial<Row>;
+  const naturalKey = { slug: input.slug, locale: input.locale, ...scope };
   const data = { ...input, ...scope } as Partial<Row>;
 
-  const existing = await delegate.findFirst({ where });
-  if (existing) return delegate.update({ where: { id: existing.id }, data });
-  return delegate.create({ data });
+  const live = await delegate.findFirst({ where: { ...naturalKey, deletedAt: null } });
+  if (live) return delegate.update({ where: { id: live.id }, data });
+
+  const tombstone = await db.withDeleted(() =>
+    delegate.findFirst({
+      where: { ...naturalKey, deletedAt: { not: null } },
+      orderBy: { deletedAt: 'desc' },
+    }),
+  );
+  if (!tombstone) return delegate.create({ data });
+
+  await reviveRow(model, tombstone.id);
+  const { id: _inputId, ...revivedData } = data as Partial<Row> & { id?: string };
+  return delegate.update({ where: { id: tombstone.id }, data: revivedData as Partial<Row> });
 };
