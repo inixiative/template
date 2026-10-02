@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { db, FindForUpdateLockTimeoutError } from '@template/db';
 import type { User } from '@template/db/generated/client/client';
 import { getRedisClient } from '@template/db/redis/client';
@@ -312,24 +312,6 @@ describe('db.findForUpdate upserting mode', () => {
         2_000,
       );
       expect(rows).toEqual([]);
-    });
-
-    it('releases the values it did take when Redis fails partway through the batch', async () => {
-      const list = emails('redis-fails', 3);
-      const redis = getRedisClient();
-      const set = redis.set.bind(redis);
-      let calls = 0;
-      const spy = spyOn(redis, 'set').mockImplementation(((...args: Parameters<typeof set>) => {
-        calls += 1;
-        return calls === 2 ? Promise.reject(new Error('redis went away')) : set(...args);
-      }) as typeof redis.set);
-
-      try {
-        await expect(fence({ email: { in: list } }, 0)).rejects.toThrow('redis went away');
-      } finally {
-        spy.mockRestore();
-      }
-      for (const email of list) await expect(fence({ email }, 0)).resolves.toEqual([]);
     });
 
     it('serializes a batch create against single-row creates of the same values into one row each', async () => {

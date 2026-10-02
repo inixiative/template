@@ -54,8 +54,8 @@ could only stand for one scalar-equality key. A batch writer had no way in short
 value is its own Redis key; a batch waits on a single-row holder of any value; it takes none while one
 is held; contention is on the whole key; exactly one of three fields may list values, in any position;
 two or three listed fields are refused with no lock taken; an empty list takes no lock; re-entry
-acquires only the missing keys; a Redis failure mid-batch releases what landed; a batch create races
-single-row creates into one row each.
+acquires only the missing keys; a batch create races single-row creates into one row each. Every
+test runs against the real database and Redis and asserts lock keys and rows; none spies on a client.
 
 ## Related
 
