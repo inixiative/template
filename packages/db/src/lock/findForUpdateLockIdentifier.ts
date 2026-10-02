@@ -20,8 +20,8 @@ const serializeValue = (value: UpsertingValue): string => {
   return `${typeof value}:${String(value)}`;
 };
 
-// The lock is only meaningful for the one row a scalar-equality key can name. A list, an operator
-// object or a null names a set the lock key cannot stand for, so upserting mode refuses them.
+// The lock stands for exactly what a scalar-equality key names: one row, or a claim on a value such
+// as a slug. A list, an operator object or a null names a set the lock key cannot stand for.
 // Entries are sorted by key so the same where locks the same key whatever its object order, and
 // hashed so the key stays bounded and carries no raw column values.
 export const findForUpdateLockIdentifier = (

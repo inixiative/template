@@ -6,4 +6,5 @@ export { type EmailErrorType, EmailRenderError } from './EmailRenderError';
 export { isEmailContentError } from './isEmailContentError';
 export { type MjmlIssue, MjmlValidationError } from './MjmlValidationError';
 export { ParseBlocksError, type ParseBlocksErrorReason } from './ParseBlocksError';
+export { ReservedSlugError } from './ReservedSlugError';
 export { type TokenIssue, TokenValidationError } from './TokenValidationError';

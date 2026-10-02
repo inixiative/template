@@ -13,7 +13,7 @@ export type AfterCommitFn = () => Promise<void> | void;
 
 export type FinallyFn = () => Promise<void> | void;
 
-// `upserting` fences a row that may not exist yet: a Redis lock on the where-key is taken before
+// `upserting` fences a where-key whose rows may not exist yet: a Redis lock on it is taken before
 // the SELECT ... FOR UPDATE and dropped when the transaction ends. `waitMs` bounds the wait for it.
 export type FindForUpdateOptions = { upserting?: boolean; waitMs?: number };
 

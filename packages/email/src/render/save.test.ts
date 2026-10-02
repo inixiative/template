@@ -11,6 +11,7 @@ import {
 import { DependentTemplateError } from '@template/email/errors/DependentTemplateError';
 import { DivergentDuplicateSlugError } from '@template/email/errors/DivergentDuplicateSlugError';
 import { MjmlValidationError } from '@template/email/errors/MjmlValidationError';
+import { ReservedSlugError } from '@template/email/errors/ReservedSlugError';
 import { TokenValidationError } from '@template/email/errors/TokenValidationError';
 import { guardedToken } from '@template/email/render/guardedToken';
 import { saveEmailTemplate } from '@template/email/render/save';
@@ -360,17 +361,50 @@ describe('saveEmailTemplate', () => {
     expect(outer?.componentRefs).toEqual(['inner']);
   });
 
-  it('admin template - no cascade', async () => {
+  it('an admin template inherits an unchanged default component instead of copying it', async () => {
+    await createEmailComponent({
+      slug: 'footer',
+      mjml: '<mj-text>Default Footer</mj-text>',
+      ownerModel: 'default',
+    });
+
     const result = await saveEmailTemplate({
-      slug: 'admin-only',
-      name: 'Admin Only',
+      slug: 'admin-uses-default',
+      name: 'Admin Uses Default',
       subject: 'Hello',
       kind: 'system',
-      mjml: mjml('<mj-text>Admin</mj-text>'),
+      mjml: mjml('{{#component:footer}}<mj-text>Default Footer</mj-text>{{/component:footer}}'),
       ownerModel: 'admin',
     });
 
     expect(result.template.ownerModel).toBe('admin');
+    expect(result.components).toEqual([]);
+    expect(result.template.componentRefs).toEqual(['footer']);
+  });
+
+  it('an admin template that changes a default component writes its own admin copy', async () => {
+    await createEmailComponent({
+      slug: 'footer',
+      mjml: '<mj-text>Default Footer</mj-text>',
+      ownerModel: 'default',
+    });
+
+    const result = await saveEmailTemplate({
+      slug: 'admin-own-footer',
+      name: 'Admin Own Footer',
+      subject: 'Hello',
+      kind: 'system',
+      mjml: mjml(
+        '{{#component:footer}}<mj-text>UserEvidence Footer</mj-text>{{/component:footer}}',
+      ),
+      ownerModel: 'admin',
+    });
+
+    expect(result.components.map((c) => [c.slug, c.ownerModel])).toEqual([['footer', 'admin']]);
+    const defaultFooter = await db.emailComponent.findFirst({
+      where: { slug: 'footer', ownerModel: 'default' },
+    });
+    expect(defaultFooter?.mjml).toBe('<mj-text>Default Footer</mj-text>');
   });
 
   it('a component outside the tier cascade is written at the current tier', async () => {
@@ -544,5 +578,114 @@ describe('saveEmailTemplate — the lens decides at save', () => {
 
     const untouched = await db.emailComponent.findFirst({ where: { slug: 'greeting' } });
     expect(untouched?.mjml).toContain('recipient.email');
+  });
+});
+
+describe('admin template slug reservation', () => {
+  afterAll(async () => {
+    await cleanupTouchedTables(db);
+  });
+
+  beforeEach(async () => {
+    await db.emailComponent.deleteMany({});
+    await db.emailTemplate.deleteMany({});
+  });
+
+  const templateInput = (slug: string) => ({
+    slug,
+    name: slug,
+    subject: 'Hello',
+    kind: 'system' as const,
+    mjml: mjml('<mj-text>Hello</mj-text>'),
+  });
+
+  it('refuses a default template on an admin slug', async () => {
+    await saveEmailTemplate({ ...templateInput('password-reset'), ownerModel: 'admin' });
+
+    await expect(
+      saveEmailTemplate({ ...templateInput('password-reset'), ownerModel: 'default' }),
+    ).rejects.toBeInstanceOf(ReservedSlugError);
+  });
+
+  it('refuses a tenant template on an admin slug', async () => {
+    const { entity: org } = await createOrganization();
+    await saveEmailTemplate({ ...templateInput('password-reset'), ownerModel: 'admin' });
+
+    await expect(
+      saveEmailTemplate({
+        ...templateInput('password-reset'),
+        ownerModel: 'Organization',
+        organizationId: org.id,
+      }),
+    ).rejects.toBeInstanceOf(ReservedSlugError);
+  });
+
+  it('refuses an admin template on a slug another tier already uses', async () => {
+    await saveEmailTemplate({ ...templateInput('welcome'), ownerModel: 'default' });
+
+    await expect(
+      saveEmailTemplate({ ...templateInput('welcome'), ownerModel: 'admin' }),
+    ).rejects.toBeInstanceOf(ReservedSlugError);
+  });
+
+  it('reserves the slug in every locale', async () => {
+    await saveEmailTemplate({
+      ...templateInput('password-reset'),
+      ownerModel: 'admin',
+      locale: 'en',
+    });
+
+    await expect(
+      saveEmailTemplate({
+        ...templateInput('password-reset'),
+        ownerModel: 'default',
+        locale: 'fr',
+      }),
+    ).rejects.toBeInstanceOf(ReservedSlugError);
+  });
+
+  it('lets the admin tier re-save its own slug and add locales', async () => {
+    const first = await saveEmailTemplate({
+      ...templateInput('password-reset'),
+      ownerModel: 'admin',
+    });
+    const resaved = await saveEmailTemplate({
+      ...templateInput('password-reset'),
+      mjml: mjml('<mj-text>v2</mj-text>'),
+      ownerModel: 'admin',
+    });
+    const french = await saveEmailTemplate({
+      ...templateInput('password-reset'),
+      ownerModel: 'admin',
+      locale: 'fr',
+    });
+
+    expect(resaved.template.id).toBe(first.template.id);
+    expect(french.template.ownerModel).toBe('admin');
+  });
+
+  it('a soft-deleted admin template no longer reserves its slug', async () => {
+    const admin = await saveEmailTemplate({ ...templateInput('retired'), ownerModel: 'admin' });
+    await db.emailTemplate.update({
+      where: { id: admin.template.id },
+      data: { deletedAt: new Date() },
+    });
+
+    const result = await saveEmailTemplate({ ...templateInput('retired'), ownerModel: 'default' });
+
+    expect(result.template.ownerModel).toBe('default');
+  });
+
+  it('lets exactly one of two concurrent saves claim a slug across tiers', async () => {
+    const results = await Promise.allSettled([
+      saveEmailTemplate({ ...templateInput('contested'), ownerModel: 'admin' }),
+      saveEmailTemplate({ ...templateInput('contested'), ownerModel: 'default' }),
+    ]);
+
+    const rejected = results.filter((result) => result.status === 'rejected');
+    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    expect(rejected).toHaveLength(1);
+    expect((rejected[0] as PromiseRejectedResult).reason).toBeInstanceOf(ReservedSlugError);
+    expect(await db.emailTemplate.count({ where: { slug: 'contested' } })).toBe(1);
   });
 });
