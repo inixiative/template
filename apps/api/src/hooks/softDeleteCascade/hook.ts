@@ -18,6 +18,11 @@ type Row = Record<string, unknown>;
 // its own timestamp and stays dead. Hard-deleted relations are gone for good
 // unless they are derived from the parent (REGENERATE_ON_REVIVE): a revocation
 // stays revoked, a rule reference is rebuilt from the revived owner's rule.
+//
+// The rows of one write are grouped by stamp and cascaded as a batch, so a bulk
+// tombstone of twenty parents walks each child table once, not twenty times. A
+// tombstone groups by the stamp being written (one group); a revive groups by
+// each row's prior stamp, which is what its children were buried with.
 export const registerSoftDeleteCascadeHook = () => {
   validateDeleteBehavior();
   registerDbHook(
@@ -33,18 +38,30 @@ export const registerSoftDeleteCascadeHook = () => {
       ) as Row | undefined;
       if (!data || !('deletedAt' in data)) return;
 
-      const results = castArray(result) as Row[];
       const previousById = new Map(
         (castArray(previous ?? []) as Row[]).map((row) => [row.id, row]),
       );
+      const priorStamp = (row: Row): unknown => previousById.get(row.id)?.deletedAt;
 
-      for (const row of results) {
-        const prior = previousById.get(row.id);
-        if (data.deletedAt === null) {
-          if (prior?.deletedAt != null) await reviveChildren(model, row, prior.deletedAt);
-        } else if (row.deletedAt != null && (!prior || prior.deletedAt == null)) {
-          await tombstoneChildren(model, row);
-        }
+      const groups = new Map<string, { stamp: unknown; rows: Row[] }>();
+      const addTo = (stamp: unknown, row: Row) => {
+        const key = String(stamp);
+        const group = groups.get(key) ?? { stamp, rows: [] };
+        group.rows.push(row);
+        groups.set(key, group);
+      };
+
+      const isReviving = data.deletedAt === null;
+      for (const row of castArray(result) as Row[]) {
+        if (isReviving && priorStamp(row) != null) addTo(priorStamp(row), row);
+        if (!isReviving && row.deletedAt != null && priorStamp(row) == null)
+          addTo(row.deletedAt, row);
+      }
+
+      for (const { stamp, rows } of groups.values()) {
+        await (isReviving
+          ? reviveChildren(model, rows, stamp)
+          : tombstoneChildren(model, rows, stamp));
       }
     },
   );

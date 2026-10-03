@@ -17,45 +17,52 @@ import { customerRefLens } from '#/modules/customerRef/lib/customerRefLens';
 
 type Row = Record<string, unknown>;
 
-// Rebuild a revived owner's edges from the rule it holds now. Re-reads the owner rather than
-// trusting the revive's result row, whose columns are whatever the caller selected.
-export const regenerateRuleReferences = async (model: string, row: Row): Promise<void> => {
-  const id = row.id;
-  if (typeof id !== 'string') return;
+const idsOf = (rows: Row[]): string[] =>
+  rows.map((row) => row.id).filter((id): id is string => typeof id === 'string');
+
+// Rebuild the revived owners' edges from the rules they hold now — every owner the revive brought
+// back in one read per model, not one per row. Re-reads the owners rather than trusting the
+// revive's result rows, whose columns are whatever the caller selected.
+export const regenerateRuleReferences = async (model: string, rows: Row[]): Promise<void> => {
+  const ids = idsOf(rows);
+  if (!ids.length) return;
 
   switch (model) {
     case 'Segment': {
-      const segment = await db.segment.findUnique({ where: { id } });
-      if (!segment) return;
-      await regenerateRuleReferenceEdges(
-        { model: 'Segment', id },
-        segment.conditions ? ruleReferences(customerRefLens, segment.conditions as Condition) : [],
-      );
+      const segments = await db.segment.findMany({ where: { id: { in: ids } } });
+      for (const segment of segments)
+        await regenerateRuleReferenceEdges(
+          { model: 'Segment', id: segment.id },
+          segment.conditions
+            ? ruleReferences(customerRefLens, segment.conditions as Condition)
+            : [],
+        );
       return;
     }
     case 'EmailTemplate': {
-      const template = await db.emailTemplate.findUnique({ where: { id } });
-      if (!template) return;
-      const lens = emailLensFor(
-        template.slug,
-        rowOwner(template),
-        await templateLens(template.slug, template),
-      );
-      await regenerateEmailRuleReferences(
-        { model: 'EmailTemplate', id },
-        templateRuleContents(template),
-        lens,
-      );
+      const templates = await db.emailTemplate.findMany({ where: { id: { in: ids } } });
+      for (const template of templates) {
+        const lens = emailLensFor(
+          template.slug,
+          rowOwner(template),
+          await templateLens(template.slug, template),
+        );
+        await regenerateEmailRuleReferences(
+          { model: 'EmailTemplate', id: template.id },
+          templateRuleContents(template),
+          lens,
+        );
+      }
       return;
     }
     case 'EmailComponent': {
-      const component = await db.emailComponent.findUnique({ where: { id } });
-      if (!component) return;
-      await regenerateEmailRuleReferences(
-        { model: 'EmailComponent', id },
-        componentRuleContents(component),
-        emailLensFor(undefined, rowOwner(component)),
-      );
+      const components = await db.emailComponent.findMany({ where: { id: { in: ids } } });
+      for (const component of components)
+        await regenerateEmailRuleReferences(
+          { model: 'EmailComponent', id: component.id },
+          componentRuleContents(component),
+          emailLensFor(undefined, rowOwner(component)),
+        );
       return;
     }
   }
