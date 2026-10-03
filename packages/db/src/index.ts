@@ -45,6 +45,7 @@ export {
 } from './lanes';
 // Distributed lock
 export {
+  type AcquireOptions,
   createLock,
   FindForUpdateLockTimeoutError,
   type Lock,

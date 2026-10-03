@@ -1,10 +1,10 @@
 # INFRA-031: Jobs — port the Gate 5 lane, the lock hardening, and the claim policy from Zealot
 
-**Status**: 👀 Review — §1 landed in template #104 (2026-09-13); §2 and §3 ported from merged Zealot #2248 on 2026-09-23 (branch `INFRA-031-slow-lane`)
+**Status**: ✅ Done — §1 landed in template #104 (2026-09-13); §2 and §3 ported from Zealot #2248 (2026-09-23), §2 then brought to the shape Zealot #2438 (ZLT-4980) shipped; all on main
 **Assignee**: Aron
 **Priority**: Medium (template's `createLock` carries the same refresh race Zealot fixes in #2271)
 **Created**: 2026-09-12
-**Updated**: 2026-09-23
+**Updated**: 2026-10-02
 
 The jobs rail converged with Zealot in June (INFRA-021 / INFRA-022: outbox, drain, `createLock`, `heartbeat`, lanes). Zealot has moved again. Bring each item below over once it lands there, in the shape Aron settled — not the shape of Zealot's first pass.
 
@@ -29,8 +29,9 @@ The pre-port `tick()` used `GET` then `PEXPIRE`, allowing a refresh to extend a 
 
 ### 2. Fast / slow lane — Zealot #2248 (ZLT-4633), the reworked shape — PORTED
 
-Landed in #118, then reshaped (Aron, 2026-09-23) — **priority and pressure, no slot cap**:
+Landed in #118, reshaped (Aron, 2026-09-23) to **priority and pressure**, then given a per-worker **slot share** to match Zealot #2438 (ZLT-4980, merged 2026-10-02):
 - **Slow jobs wait in the one shared BullMQ queue at the lowest priority** (`SLOW_LANE_PRIORITY = PRIORITY_LIMIT`, `jobs/lanePriority.ts`). BullMQ takes plain waiting jobs before prioritized ones, so fast work is always picked first while idle slots still run slow work — capacity stays fully shared. No slot cap, no worker presence, no Lua lease set, no self-feed, no refusal path. Measured against real Redis (2 workers × 10, 3000 × 60 ms slow jobs): FIFO fast-job wait p50 7.8 s; priority 41 ms. A cap enforced by re-queuing refused slow jobs cut fast wait to 2 ms but cost ~19 re-queues per slow job and 40% of slow throughput, so it was dropped. The trade: a fast job arriving while every slot is busy with slow work waits for one to finish — fine for short slow handlers.
+- **Slow work runs in at most a share of each worker's slots** (`JOBS_SLOW_SLOT_FRACTION`, default `0.5`, at least one; `jobs/slowSlotPool.ts`, `jobs/admitToSlot.ts`, called from `processJob`). The share caps slow work but reserves nothing for it. A slow job refused by a full share is parked in `delayed` for 2 s, widening by 20 ms per queued slow job up to `JOBS_SLOW_PARK_MAX_MS`, and returns at its lane priority; parked and delayed slow jobs count against the slow depth budget. `jobs/slowLaneSignals.ts` reports whether the slow lane is moving. This supersedes the "no slot cap / no refusal path" trade in the bullet above: the cap is per worker and in-process, so there is still no worker presence and no Lua lease set.
 - **Pressure is one depth budget divided by lane.** `JOBS_MAX_QUEUE_DEPTH` counts waiting + prioritized + active; slow (`prioritized`) may fill `JOBS_SLOW_QUEUE_DEPTH_FRACTION` of it. Each lane has its own overflow flag and spills to the outbox in batches; the drain refills each lane in batches (one read + one delete per lane per pass) at a 2s tick so a quickly-emptied slow share is refilled before slots idle.
 - **Outbox lane is a column** (`JobOutbox.lane`, enum `JobLane`, index `(lane, attempts, id)`), mirroring `data.lane`; Zealot filters by JSON path.
 - **No chunking.** The template keeps its per-recipient `deliverEmail` and puts fan-outs wider than `EMAIL_SLOW_LANE_MIN_RECIPIENTS` on the slow lane, enqueued concurrently. Send-time suppression is already per-recipient (`canDeliver` reads the contact at delivery).
@@ -64,7 +65,7 @@ Check `deliverEmail` against this: confirm its `sending` claim is row-state only
 
 ## Exit criteria
 
-Met on `INFRA-031-slow-lane`, pending review.
+Met on main.
 
 
 `createLock` refresh is one eval with the tri-state release and tests mirroring Zealot's; the lane tag + outbox lane + presence set exist with the drain ordering test; `deliverEmail` claim audited against §3; Redis scripts under `jobs/queries/`.

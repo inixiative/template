@@ -74,7 +74,7 @@ kanban
 - [INFRA-008: Disaster Recovery](./INFRA-008-disaster-recovery-and-restore-drills.md) - Backup/restore strategy and restore drills
 - [INFRA-009: Adapter Primitives](./INFRA-009-adapter-primitives.md) - Swappable external service pattern (in progress)
 - [INFRA-020: Audit Log Cold Storage](./INFRA-020-audit-logs-cold-storage.md) - Ship audit logs to cold storage before hot-deletion
-- [INFRA-031: Jobs lane + lock port from Zealot](./INFRA-031-jobs-lane-and-lock-port-from-zealot.md) - Gate 5 lane tag, outbox lane admission, presence set, createLock refresh fix, row-state claim policy
+- [INFRA-031: Jobs lane + lock port from Zealot](./archived/INFRA-031-jobs-lane-and-lock-port-from-zealot.md) ✅ - slow lane as lowest priority + per-worker slot share, createLock refresh fix, row-state claim policy
 - [INFRA-010: Cloudflare WAF & Asset Serving](./INFRA-010-cloudflare-waf-and-asset-serving.md) - WAF rules, DDoS protection, CDN, init script integration
 - [INFRA-033: Segment Reconcile Perf Budget](./INFRA-033-segment-reconcile-perf-budget.md) - Measure DB load of both reconcile rails; set the scale threshold for field-level trigger narrowing
 
