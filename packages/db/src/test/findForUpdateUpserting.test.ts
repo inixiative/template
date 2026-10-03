@@ -238,18 +238,42 @@ describe('db.findForUpdate upserting mode', () => {
       await single.done;
     });
 
-    it('takes none of its values while one is held, so the rest stay free for others', async () => {
-      const [taken, free] = emails('all-or-none', 2) as [string, string];
+    it('a batch that gives up waiting on one value releases every value it had taken', async () => {
+      const [taken, ...others] = emails('gives-up', 5) as [string, ...string[]];
       const single = holdWhile({ email: taken });
       await single.held;
 
-      const batch = fence({ email: { in: [free, taken] } }, 300);
-      await new Promise((resolve) => setTimeout(resolve, 50));
-      await expect(fence({ email: free }, 0)).resolves.toEqual([]);
-      await expect(batch).rejects.toBeInstanceOf(FindForUpdateLockTimeoutError);
+      await expect(fence({ email: { in: [...others, taken] } }, 200)).rejects.toBeInstanceOf(
+        FindForUpdateLockTimeoutError,
+      );
+      for (const email of others) await expect(fence({ email }, 0)).resolves.toEqual([]);
 
       single.release();
       await single.done;
+    });
+
+    it('lets overlapping batches that list the same values in opposite orders both finish', async () => {
+      const list = emails('opposite-orders', 6);
+      const holdBriefly = (order: string[]) =>
+        db.txn(async () => {
+          await db.findForUpdate(
+            'User',
+            { email: { in: order } },
+            { upserting: true, waitMs: 2_500 },
+          );
+          await new Promise((resolve) => setTimeout(resolve, 40));
+        });
+
+      const outcomes = await Promise.allSettled(
+        Array.from({ length: 4 }, (_, n) => holdBriefly(n % 2 ? [...list].reverse() : list)),
+      );
+
+      expect(outcomes.map((outcome) => outcome.status)).toEqual([
+        'fulfilled',
+        'fulfilled',
+        'fulfilled',
+        'fulfilled',
+      ]);
     });
 
     it('contends on the whole key: the same listed value beside another fixed field is another row', async () => {
