@@ -5,17 +5,17 @@
  * @uses none
  */
 import type {
-  RuleReferenceOwnerModel,
-  RuleReferenceReferencedModel,
+  RuleReferenceSourceModel,
+  RuleReferenceTargetModel,
 } from '@template/db/generated/client/enums';
 import { makeAppEvent } from '#/appEvents/makeAppEvent';
 
 export type RuleReferenceStalePayload = {
-  ownerModel: RuleReferenceOwnerModel;
-  ownerId: string;
-  referencedModel: RuleReferenceReferencedModel;
-  referencedId: string;
-  referencedDeletedAt: Date;
+  sourceModel: RuleReferenceSourceModel;
+  sourceId: string;
+  targetModel: RuleReferenceTargetModel;
+  targetId: string;
+  targetDeletedAt: Date;
 };
 
 export const ruleReferenceStale = makeAppEvent<RuleReferenceStalePayload>({});

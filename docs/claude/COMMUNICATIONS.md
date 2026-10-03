@@ -582,7 +582,7 @@ for the claim to reopen.
 
 1. Load the log; **skip unless `queued`**.
 2. **Resolve** the template via the cascade (`settleTemplate`) → subject/mjml + `kind` + `emailTemplateId`.
-   Rules evaluate through the lens of the row that won the cascade (`composed.owner`); a referenced
+   Rules evaluate through the lens of the row that won the cascade (`composed.owner`); a target
    segment whose own rule is degraded leaves the live set first (`withoutDegradedSegments`).
    A content error (`isEmailContentError`: render, parse, MJML, token, condition) → `failed` with
    `reasonCode: render_failed`, no retry. Any other error before the claim (database, verifier) throws with
@@ -672,13 +672,13 @@ edges are persisted so that "who references X" is an index and a stale rule is n
 (INFRA-030; Zealot ZLT-4441 is the same primitive on MySQL).
 
 - **`RuleReference`** (`packages/db/prisma/schema/ruleReference.prisma`): one row per
-  (owner row → referenced row), false-polymorphic on both ends — `ownerModel` + one typed FK per
-  rule-bearing model (`emailTemplateId` / `emailComponentId`), `referencedModel` + one typed FK per
+  (source row → target row), false-polymorphic on both ends — `sourceModel` + one typed FK per
+  rule-bearing model (`emailTemplateId` / `emailComponentId`), `targetModel` + one typed FK per
   referenceable model (`tagId` / `organizationId` / `spaceId`), both axes in `PolymorphismRegistry`.
   Real relations on both ends, `onDelete: Cascade`; append/delete only, no lifecycle of its own.
 - **Which models are referenceable is the registry's answer, not any surface's.**
-  `RULE_REFERENCEABLE_MODELS` (`packages/db`) is the `referencedModel` axis of
-  `PolymorphismRegistry.RuleReference`; the referenced-side hook registers on it.
+  `RULE_REFERENCEABLE_MODELS` (`packages/db`) is the `targetModel` axis of
+  `PolymorphismRegistry.RuleReference`; the target-side hook registers on it.
 - **A rule-tracked lens has one spelling per reference: the row's `id`, never an FK column.**
   `omitForeignKeys(lens)` (`packages/db/lens`, the same shape as `redactLens`) omits every FK
   column `prismaMap` knows from every model, wherever it appears; each rule-tracked lens wraps
@@ -703,24 +703,24 @@ edges are persisted so that "who references X" is an index and a stale rule is n
   asks the same question at render through `ruleVocabularyIssues`. With no lens there is nothing
   to decide and only extraction runs.
 - **Edges are written by the save path, not a hook.** The writer is
-  `syncRuleReferenceEdges(owner, references, sources?)` in `packages/db` — set-diff (survivors
+  `syncRuleReferenceEdges(source, references, sources?)` in `packages/db` — set-diff (survivors
   keep their row), a newly added missing or soft-deleted target refused as a delta (a pre-existing
-  dead reference stays editable), referenced rows locked with `db.findForUpdate` while the gate
+  dead reference stays editable), target rows locked with `db.findForUpdate` while the gate
   reads them. With the lens's `sourceQueries` passed as `sources`, a newly added reference the
   source's composed `where` does not admit is refused too (`unadmittedRuleReferences`): that is how
   an Organization template cannot name another organization's tag or segment. Throws
   `RuleReferenceError`. Adding a rule-bearing column = a `syncRuleReferenceEdges`
-  call from its save path. Email's `syncRuleReferences(owner, contents, lens)` is the
+  call from its save path. Email's `syncRuleReferences(source, contents, lens)` is the
   content-shaped front: it collects the rules out of MJML and subject (`contentRuleReferences`)
   and hands the references down. `saveEmailTemplate` calls it inside
   its transaction for the template and each saved component; it is the only writer of
   `mjml`/`subject`, so nothing bypasses it.
 - **Staleness lives on the edge, as two signals rather than a computed flag.** A soft delete of a
-  referenced row is copied onto every edge naming it by `ruleReference:referenced` (one
-  `updateManyAndReturn`, matched on `(referencedModel, referencedId)`, cleared on undelete); a
-  purge `SET NULL`s the typed FK and leaves `referencedId` naming the row that went. The referenced
+  target row is copied onto every edge naming it by `ruleReference:target` (one
+  `updateManyAndReturn`, matched on `(targetModel, targetId)`, cleared on undelete); a
+  purge `SET NULL`s the typed FK and leaves `targetId` naming the row that went. The target
   axis therefore carries true polymorphism beside the false — the FK is the relation and may go
-  null, `referencedId` is the name and never changes, and the sync writes both from one value.
+  null, `targetId` is the name and never changes, and the sync writes both from one value.
   `ruleReferenceIssues(edges)` reads both from the edge rows alone, so consumers
   write `include: { ruleReferences: true }` and never grow that include as models become
   referenceable. At render, `composeTemplate` reads the template's edges plus those of the

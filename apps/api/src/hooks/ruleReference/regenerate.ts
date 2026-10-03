@@ -20,8 +20,8 @@ type Row = Record<string, unknown>;
 const idsOf = (rows: Row[]): string[] =>
   rows.map((row) => row.id).filter((id): id is string => typeof id === 'string');
 
-// Rebuild the revived owners' edges from the rules they hold now — every owner the revive brought
-// back in one read per model, not one per row. Re-reads the owners rather than trusting the
+// Rebuild the revived sources' edges from the rules they hold now — every source the revive brought
+// back in one read per model, not one per row. Re-reads the sources rather than trusting the
 // revive's result rows, whose columns are whatever the caller selected.
 export const regenerateRuleReferences = async (model: string, rows: Row[]): Promise<void> => {
   const ids = idsOf(rows);
