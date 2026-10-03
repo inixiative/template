@@ -5,6 +5,7 @@
  * @uses infrastructure:redis
  */
 import { db } from '@template/db';
+import { auditActorContext } from '@template/db/lib/auditActorContext';
 import { log } from '@template/shared/logger';
 import { captureTraceContext } from '@template/shared/telemetry';
 import { isTest } from '@template/shared/utils';
@@ -12,6 +13,7 @@ import type { Job } from 'bullmq';
 import { admitEnvelope } from '#/jobs/admitEnvelope';
 import { buildJobData } from '#/jobs/buildJobData';
 import type { JobPayloads } from '#/jobs/handlers';
+import { jobAuditActor } from '#/jobs/jobAuditActor';
 import type { SupersedingJobHandler } from '#/jobs/makeSupersedingJob';
 import { queue } from '#/jobs/queue';
 import { type JobLane, type JobOptions, JobType, type WorkerContext } from '#/jobs/types';
@@ -65,7 +67,9 @@ export const enqueueJob = async <K extends keyof JobPayloads>(
       queue,
       job: { id: jobId, name: handlerName, data } as Job,
     };
-    await (handler as (workerCtx: WorkerContext, p?: unknown) => Promise<void>)(ctx, payload);
+    await auditActorContext.scope(jobAuditActor(handlerName, payload), () =>
+      (handler as (workerCtx: WorkerContext, p?: unknown) => Promise<void>)(ctx, payload),
+    );
     return { jobId, name: handlerName };
   }
 

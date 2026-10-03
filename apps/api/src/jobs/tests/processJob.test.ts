@@ -1,4 +1,9 @@
 import { afterEach, describe, expect, it } from 'bun:test';
+import {
+  type AuditActor,
+  auditActorContext,
+  nullAuditActor,
+} from '@template/db/lib/auditActorContext';
 import { processJob } from '#/jobs/processJob';
 import { queue } from '#/jobs/queue';
 import { slowLastFinishedKey } from '#/jobs/slowLaneSignals';
@@ -58,6 +63,62 @@ describe('processJob', () => {
     await processJob(jobWith('fast-job', { lane: JobLane.fast }), { handlers: handlers as never });
 
     expect(await queue.redis.get(slowLastFinishedKey(queue.name))).toBeNull();
+  });
+
+  it('runs the handler as the job actor, carrying the payload integrationId', async () => {
+    const actors: (AuditActor | null)[] = [];
+    const handlers = {
+      sendWebhook: async () => {
+        actors.push(auditActorContext.getScope());
+      },
+    };
+
+    await processJob(jobWith('integration-job', { payload: { integrationId: 'integration-1' } }), {
+      handlers: handlers as never,
+    });
+    await processJob(jobWith('plain-job', {}), { handlers: handlers as never });
+
+    expect(actors.map((actor) => actor?.actorJobName)).toEqual(['sendWebhook', 'sendWebhook']);
+    expect(actors.map((actor) => actor?.integrationId)).toEqual(['integration-1', null]);
+  });
+
+  it('runs a slow-lane job as the job actor too', async () => {
+    const actors: (AuditActor | null)[] = [];
+    const handlers = {
+      sendWebhook: async () => {
+        actors.push(auditActorContext.getScope());
+      },
+    };
+
+    await processJob(
+      jobWith('slow-integration-job', {
+        lane: JobLane.slow,
+        payload: { integrationId: 'integration-1' },
+      }),
+      { handlers: handlers as never },
+    );
+
+    expect(actors[0]?.actorJobName).toBe('sendWebhook');
+    expect(actors[0]?.integrationId).toBe('integration-1');
+  });
+
+  it('lets a scope opened inside the handler take over, then restores the job actor', async () => {
+    const observed: (string | null | undefined)[] = [];
+    const handlers = {
+      sendWebhook: async () => {
+        await auditActorContext.scope(
+          { ...nullAuditActor, actorUserId: 'inner-user' },
+          async () => {
+            observed.push(auditActorContext.getScope()?.actorUserId);
+          },
+        );
+        observed.push(auditActorContext.getScope()?.actorJobName);
+      },
+    };
+
+    await processJob(jobWith('nested-job', {}), { handlers: handlers as never });
+
+    expect(observed).toEqual(['inner-user', 'sendWebhook']);
   });
 
   it('rejects an unknown handler', async () => {

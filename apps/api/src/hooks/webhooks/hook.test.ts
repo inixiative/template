@@ -10,6 +10,9 @@ import {
 } from '@template/db/test';
 import { registerWebhookHook } from '#/hooks/webhooks/hook';
 import * as enqueueModule from '#/jobs/enqueue';
+import { processJob } from '#/jobs/processJob';
+import { JobType } from '#/jobs/types';
+import { createMockJob } from '#tests/createTestWorker';
 
 registerWebhookHook();
 
@@ -44,9 +47,7 @@ describe('webhook hook', () => {
         name: 'sendWebhook',
       });
 
-      const user = await db.user.create({
-        data: { email: `webhook-test-create-${Date.now()}@example.com` },
-      });
+      const { entity: user } = await createUser();
 
       expect(enqueueSpy).toHaveBeenCalledWith(
         'sendWebhook',
@@ -228,6 +229,29 @@ describe('webhook hook — origin suppression', () => {
       async () => {
         await db.user.update({ where: { id: writeUserId }, data: { name: 'Origin SF' } });
       },
+    );
+
+    const delivered = deliveredSubIds();
+    expect(delivered).toContain(hsSub.id);
+    expect(delivered).toContain(plainSub.id);
+    expect(delivered).not.toContain(sfSub.id);
+  });
+
+  it('skips the subscription of the integration a job writes for', async () => {
+    enqueueSpy.mockClear();
+
+    const handlers = {
+      sendWebhook: async () => {
+        await db.user.update({ where: { id: writeUserId }, data: { name: 'Job for SF' } });
+      },
+    };
+    await processJob(
+      createMockJob({
+        id: 'sync-sf',
+        name: 'sendWebhook',
+        data: { type: JobType.adhoc, payload: { integrationId: sfIntegrationId } },
+      }),
+      { handlers: handlers as never },
     );
 
     const delivered = deliveredSubIds();
