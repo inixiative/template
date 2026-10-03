@@ -4,7 +4,7 @@
 **Assignee**: Aron
 **Priority**: Medium
 **Created**: 2026-08-31
-**Updated**: 2026-08-31
+**Updated**: 2026-09-30
 
 > Zealot hit this as ZLT-4441 / #2116 (write-only edge table + DB hook, reviewed 2026-08-31 with the
 > rulings below) after the ZLT-4331 review proved per-surface tree scanning doesn't scale: a delete
@@ -269,6 +269,25 @@ template keeps two:
 edge for that leaf and evaluation is not refused for it. A bound value is valid exactly when its
 binding is supplied, which the first path already decides.
 
+## Ruling (Aron, 2026-09-30) — the owner takes its edges with it
+
+A soft-deleted owner's rule is not evaluated, so its edges would only hold the referenced side and
+count as degraded. `RuleReference` is in `HARD_DELETE_ON_TOMBSTONE`: tombstoning an owner hard-deletes
+its edges. The referenced relations (`tag`, `organization`, `space`, `referencedSegment`) are
+`CASCADE_EXEMPT` — tombstoning a *named* row keeps the edges that name it, and
+`ruleReference:referenced` stamps them. Segment is both, and gets both behaviours.
+
+Reviving the owner regenerates its edges from the rule it holds now (`REGENERATE_ON_REVIVE` in the
+cascade, `regenerateRuleReferenceEdges` in `@template/db`). Regeneration is not a save: there is no
+admission gate, because the owner is coming back rather than being authored. A target that was
+soft-deleted while the owner was away gets an edge already carrying `referencedDeletedAt`. A target
+that was purged gets no edge: the client cannot write the null-FK shape only `SET NULL` produces, and
+does not need to, since health reads references off the rule and the live set off the edges, so a
+named row with no edge is never live. A revocation (`Session`, `Token`) has no regenerator and stays
+gone. The contents an email owner's rules live in (`templateRuleContents` / `componentRuleContents`)
+are one answer shared by save and revive, so a revived owner holds exactly the edges its last save
+wrote. Zealot has the same shape (ZLT-5163).
+
 ## Zealot follow-through
 
 #2116 (registry) and #2142 (backfill) merged 2026-09-08 — the same primitive on MySQL. The
@@ -298,3 +317,33 @@ admit (`unadmittedRuleReferences`). Email passes its owner-scoped lens; the segm
 - `apps/api/src/hooks/emailVersioning/hook.ts`, `packages/email/src/render/validateNoCycle.ts` —
   the reverse-walk and cycle-check precedents this generalizes.
 - Zealot **ZLT-4441** / #2116, **ZLT-4444**, **ZLT-4331**; inixiative/json-rules#9 and 2.20.0.
+
+## Hardening from Zealot ZLT-5169 / #2531 (2026-10-02)
+
+Zealot's review of the same primitive found four holes the template shared; this branch closes them.
+
+- **Rebuild restamps in place.** `regenerateRuleReferenceEdges` was delete-all + recreate, so an edge
+  changed id on every revive. It is now the save path's set-diff plus a restamp of every kept edge
+  against its target's current `deletedAt`: ids are stable and a second rebuild is a no-op.
+- **Target stamps are read under `FOR UPDATE`.** A plain read races the target's own soft delete:
+  the save sees the target live, the delete's referenced-side hook finds no edge to stamp, and the
+  edge is written live against a dead row. `targetStates` and `lockedLiveReferences` both lock.
+- **Targets are locked in model-name order**, not the order the rule lists them, so two saves that
+  name a Segment and a Tag the other way round cannot deadlock on each other.
+- **Owner lock on rule saves.** The cycle check reads the owner's graph unlocked, so two saves that
+  name each other each see a graph without the other's edge and both commit. `withOwnerLock(owner,
+  'rules', save)` (`apps/api/src/lib/locks/withOwnerLock.ts`) serializes a segment's conditions
+  save per owner: a Redis `createLock` taken before the transaction, so it precedes every row lock;
+  3s wait then 409. It rides INFRA-035's `acquire({ waitMs, onTimeout })`.
+- **The soft-delete cascade is batched by stamp.** One write's rows are grouped by tombstone stamp
+  and each child table is walked once per group; `REGENERATE_ON_REVIVE` takes the revived rows and
+  rebuilds their edges with one owner read per model.
+
+Tests: `apps/api/src/hooks/ruleReference/edgeConcurrency.test.ts` — a save racing the delete of the
+row it names is refused and writes no edge; a drifted stamp is repaired with the id kept; a target
+tombstoned behind the hooks is stamped in place and a second rebuild changes nothing; the owner lock
+queues, lets other owners through, and 409s past the wait.
+
+Not ported: Zealot's `backfillRuleReferences --execute/--verify` script (mission delete, rotateGroupID
+and the admin hooks are Zealot-only). A template backfill would be a loop over
+`regenerateRuleReferenceEdges` per owner model; filed when a drift is observed.

@@ -13,10 +13,16 @@ import { lockedLiveReferences } from '@template/db/utils/lockedLiveReferences';
 import type { ModelName } from '@template/db/utils/modelNames';
 import { RuleReferenceError } from '@template/db/utils/ruleReferenceError';
 import { type RuleReference, referenceKey } from '@template/shared/rules';
+import { groupBy, sortBy } from 'lodash-es';
 
 export type RuleReferenceOwner = { model: ModelName; id: string };
 
-type Edge = { id: string; referencedModel: string; referencedId: string };
+type Edge = {
+  id: string;
+  referencedModel: string;
+  referencedId: string;
+  referencedDeletedAt: Date | null;
+};
 
 const fkColumn = (axis: 'ownerModel' | 'referencedModel', model: string): string => {
   const column = resolveFalsePolymorphismRef({ model: 'RuleReference', axis, value: model });
@@ -30,6 +36,41 @@ const fkColumn = (axis: 'ownerModel' | 'referencedModel', model: string): string
 
 const edgeKey = (edge: Edge): string =>
   referenceKey({ model: edge.referencedModel, id: edge.referencedId });
+
+type TargetState = { deletedAt: Date | null };
+
+const edgeData = (owner: RuleReferenceOwner, ref: RuleReference, target: TargetState) => ({
+  ownerModel: owner.model,
+  [fkColumn('ownerModel', owner.model)]: owner.id,
+  referencedModel: ref.model,
+  referencedId: ref.id,
+  [fkColumn('referencedModel', ref.model)]: ref.id,
+  referencedDeletedAt: target.deletedAt,
+});
+
+const stampOf = (state: TargetState | undefined): number | null =>
+  state?.deletedAt ? state.deletedAt.getTime() : null;
+
+// The stamp an edge is born with, or restamped to, read under FOR UPDATE so it cannot race the
+// target's own soft delete: a plain read sees the target live while its delete is uncommitted, the
+// delete's referenced-side hook then finds no edge to stamp, and the edge is written live against a
+// dead row. Under the lock whichever transaction reaches the target first wins and the other waits.
+// Models are locked in name order for the same reason `lockedLiveReferences` does it. A purged
+// target has no row and so no state; the caller leaves it alone.
+const targetStates = async (references: RuleReference[]): Promise<Map<string, TargetState>> => {
+  const states = new Map<string, TargetState>();
+  for (const [model, group] of sortBy(
+    Object.entries(groupBy(references, 'model')),
+    ([name]) => name,
+  )) {
+    const rows = await db.findForUpdate<{ id: string; deletedAt?: Date | null }>(model, {
+      id: { in: [...new Set(group.map((ref) => ref.id))] },
+    });
+    for (const row of rows)
+      states.set(referenceKey({ model, id: row.id }), { deletedAt: row.deletedAt ?? null });
+  }
+  return states;
+};
 
 /**
  * Recompute one owner's edges from the rows its rules name, inside the caller's transaction. The
@@ -67,13 +108,7 @@ export const syncRuleReferenceEdges = async (
   const toDelete = existing.filter((edge) => !named.has(edgeKey(edge)));
   const toCreate = references
     .filter((ref) => !held.has(referenceKey(ref)))
-    .map((ref) => ({
-      ownerModel: owner.model,
-      [ownerColumn]: owner.id,
-      referencedModel: ref.model,
-      referencedId: ref.id,
-      [fkColumn('referencedModel', ref.model)]: ref.id,
-    }));
+    .map((ref) => edgeData(owner, ref, { deletedAt: null }));
 
   if (toDelete.length)
     await db.ruleReference.deleteMany({ where: { id: { in: toDelete.map((edge) => edge.id) } } });
@@ -82,3 +117,61 @@ export const syncRuleReferenceEdges = async (
       data: toCreate as Prisma.RuleReferenceCreateManyInput[],
     });
 };
+
+/**
+ * Rebuild one owner's edges from the rows its rule names today, with no admission gate: the owner
+ * is coming back (a revive) or being repaired (a backfill), not authored. The same set-diff as the
+ * save path, plus every kept edge is restamped against its target's current state — in place, so
+ * an edge keeps its id and a second rebuild is a no-op. A soft-deleted target gets an edge carrying
+ * its `referencedDeletedAt`, so an owner whose target died while it was away comes back degraded
+ * rather than refused. A purged target gets no new edge, and an existing edge to one is left as the
+ * database recorded it (FK nulled by SET NULL): the client cannot write that shape, and does not
+ * need to — health reads the references off the rule and the live set off the edges, so a named
+ * row with no live edge is never live and the rule fails closed.
+ */
+export const regenerateRuleReferenceEdges = async (
+  owner: RuleReferenceOwner,
+  references: RuleReference[],
+): Promise<void> =>
+  db.txn(async () => {
+    const ownerColumn = fkColumn('ownerModel', owner.model);
+    const existing = (await db.ruleReference.findMany({
+      where: { [ownerColumn]: owner.id } as Prisma.RuleReferenceWhereInput,
+    })) as Edge[];
+
+    const named = new Map(references.map((ref) => [referenceKey(ref), ref]));
+    const toDelete = existing.filter((edge) => !named.has(edgeKey(edge)));
+    if (toDelete.length)
+      await db.ruleReference.deleteMany({
+        where: { id: { in: toDelete.map((edge) => edge.id) } },
+      });
+    if (!named.size) return;
+
+    const states = await targetStates([...named.values()]);
+    const held = new Map(
+      existing.filter((edge) => named.has(edgeKey(edge))).map((edge) => [edgeKey(edge), edge]),
+    );
+
+    const drifted = [...held.values()].filter((edge) => {
+      const target = states.get(edgeKey(edge));
+      return target && (edge.referencedDeletedAt?.getTime() ?? null) !== stampOf(target);
+    });
+    for (const [stamp, group] of Object.entries(
+      groupBy(drifted, (edge) => stampOf(states.get(edgeKey(edge))) ?? 0),
+    )) {
+      await db.ruleReference.updateManyAndReturn({
+        where: { id: { in: group.map((edge) => edge.id) } },
+        data: { referencedDeletedAt: stamp === '0' ? null : new Date(Number(stamp)) },
+      });
+    }
+
+    const toCreate = [...named.values()].flatMap((ref) => {
+      if (held.has(referenceKey(ref))) return [];
+      const target = states.get(referenceKey(ref));
+      return target ? [edgeData(owner, ref, target)] : [];
+    });
+    if (toCreate.length)
+      await db.ruleReference.createManyAndReturn({
+        data: toCreate as Prisma.RuleReferenceCreateManyInput[],
+      });
+  });
