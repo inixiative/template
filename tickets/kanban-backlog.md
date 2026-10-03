@@ -37,6 +37,7 @@ kanban
     INFRA-020-audit-logs-cold-storage
     INFRA-010-cloudflare-waf-and-asset-serving
     INFRA-033-segment-reconcile-perf-budget
+    INFRA-036-clock-sensitive-rule-tick
     DOC-001-scalar-api-docs-ui
     DOC-002-ai-discoverable-api-metadata
     FE-002-editor-slice-pattern
@@ -77,6 +78,7 @@ kanban
 - [INFRA-031: Jobs lane + lock port from Zealot](./archived/INFRA-031-jobs-lane-and-lock-port-from-zealot.md) ✅ - slow lane as lowest priority + per-worker slot share, createLock refresh fix, row-state claim policy
 - [INFRA-010: Cloudflare WAF & Asset Serving](./INFRA-010-cloudflare-waf-and-asset-serving.md) - WAF rules, DDoS protection, CDN, init script integration
 - [INFRA-033: Segment Reconcile Perf Budget](./INFRA-033-segment-reconcile-perf-budget.md) - Measure DB load of both reconcile rails; set the scale threshold for field-level trigger narrowing
+- [INFRA-036: Clock-Sensitive Rule Tick](./INFRA-036-clock-sensitive-rule-tick.md) - `Segment.clockUnit` (hour/day/week/month) derived at save by a json-rules fold; one sweep cron row per unit
 
 **Audit & Compliance:**
 - [FEAT-017: Audit Log Hardening, Inquiry Lineage, and Explorer](./FEAT-017-audit-log-hardening-lineage-and-explorer.md) - Durable audit writes, inquiry causality, and admin audit browsing
@@ -132,12 +134,12 @@ kanban
 
 ## Quick Stats
 
-- **Total Backlog Items**: 32
+- **Total Backlog Items**: 33
 - **Polish**: 3
 - **Enterprise**: 2
 - **Financial**: 2
 - **Communication**: 3
-- **Infrastructure**: 8
+- **Infrastructure**: 9
 - **Audit & Compliance**: 1
 - **Security & Encryption**: 3
 - **AI Developer Experience**: 2
@@ -161,4 +163,4 @@ These features are valuable but not critical for MVP or initial production launc
 
 ---
 
-_Last Updated: 2026-09-30_
+_Last Updated: 2026-10-03_
