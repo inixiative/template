@@ -247,7 +247,8 @@ const dbMethods = {
 
   // Raw SELECT * FOR UPDATE — scalar columns only, no relations/includes; load related data separately.
   // A row that does not exist yet locks nothing, so find-then-create races; `upserting: true` fences
-  // the where-key itself (see acquireFindForUpdateLock) and returns 0 or 1 rows.
+  // the where-key itself (see acquireFindForUpdateLock). One field may list values as `{ in: [...] }`
+  // to fence a batch of such rows, each under the key a single-row fence on it takes.
   findForUpdate: async <T = unknown>(
     model: string,
     where: Record<string, unknown>,
