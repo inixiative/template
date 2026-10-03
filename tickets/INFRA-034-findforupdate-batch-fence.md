@@ -29,10 +29,12 @@ could only stand for one scalar-equality key. A batch writer had no way in short
   lock is taken. An empty list names no row and takes no lock, as non-upserting `{ in: [] }` already
   selects nothing.
 - **A wrapper, not a second lock.** `acquireFindForUpdateLock` takes one ordinary `createLock` per key,
-  the same lock a single-row fence takes, acquired in parallel and held all or none. A round that wins
-  only some keys releases them and retries with fresh locks: holding the winners while waiting would
-  let two batches each hold half of what the other needs. Keys this transaction already holds are
-  skipped. Keys that landed before a Redis error are released before it propagates. Every lock rides
+  the same lock a single-row fence takes, one at a time in sorted order, holding each while it waits
+  on the next. Two batches that share keys meet on the lowest shared key first and the loser waits
+  behind the winner, so overlapping batches finish in turn. (A first cut took the keys in parallel
+  and released partial wins to retry; batches listing the same rows in opposite orders livelocked
+  until both timed out — Zealot measured 1 in 8.) Keys this transaction already holds are skipped. A
+  timeout or a Redis error releases every key already taken before it propagates. Every lock rides
   `finallyFns`, as before.
 
 ## Known costs
@@ -40,9 +42,10 @@ could only stand for one scalar-equality key. A batch writer had no way in short
 - **Heartbeats scale with the batch.** Each key keeps its own lease alive (3s heartbeat), so a
   1,000-row batch is ~333 refreshes/s while held. Fine for imports of hundreds; a large sync should
   fence in chunks.
-- **Batches can be starved.** All-or-none means a batch waits until every key is free at once; under
-  constant single-row traffic on its keys it times out (`FindForUpdateLockTimeoutError`) rather than
-  deadlocking.
+- **A waiting batch holds what it has.** Keys sort below the one it waits on stay locked while it
+  waits, so single-row writers on those rows wait too, for at most the batch's `waitMs`.
+- **Order across calls is the caller's job.** The sort orders keys within one call; a transaction
+  that fences several key shapes must fence them in the same order at every writer.
 - **A fence is a lock on a key, not on a row.** A writer that inserts the same row without taking the
   same key shape is not fenced. Pick the shape from the row's unique keys and use it at every writer;
   where a row has two unique keys (Zealot FanUsers: the primary key and `(email, brandUuid)`), take
@@ -51,8 +54,8 @@ could only stand for one scalar-equality key. A batch writer had no way in short
 ## Tests
 
 `packages/db/src/test/findForUpdateUpserting.test.ts` — "fencing a batch with one listed field": each
-value is its own Redis key; a batch waits on a single-row holder of any value; it takes none while one
-is held; contention is on the whole key; exactly one of three fields may list values, in any position;
+value is its own Redis key; a batch waits on a single-row holder of any value; one that gives up
+releases every key it had taken; overlapping batches in opposite orders both finish; contention is on the whole key; exactly one of three fields may list values, in any position;
 two or three listed fields are refused with no lock taken; an empty list takes no lock; re-entry
 acquires only the missing keys; a batch create races single-row creates into one row each. Every
 test runs against the real database and Redis and asserts lock keys and rows; none spies on a client.
