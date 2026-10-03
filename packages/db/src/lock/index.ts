@@ -3,6 +3,7 @@ export { createLock } from './createLock';
 export { FindForUpdateLockTimeoutError } from './findForUpdateLockTimeoutError';
 export { maxSafeHeartbeatMs } from './maxSafeHeartbeatMs';
 export type {
+  AcquireOptions,
   Claim,
   ClaimOptions,
   ClaimResult,

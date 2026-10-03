@@ -139,6 +139,79 @@ describe('createLock', () => {
       expect(calls.get[0]).toEqual(['lock:exact-custom-key']);
       expect(calls.eval[0]?.slice(1)).toEqual([1, 'lock:exact-custom-key', token]);
     });
+
+    it('with waitMs queues behind the holder and wins once it releases', async () => {
+      const id = newId();
+      const holder = createLock({
+        service: 's',
+        identifier: id,
+        ttlMs: 60_000,
+        heartbeatMs: 10_000,
+      });
+      const waiter = createLock({
+        service: 's',
+        identifier: id,
+        ttlMs: 60_000,
+        heartbeatMs: 10_000,
+      });
+      expect(await holder.acquire()).toBe(true);
+
+      const acquiring = waiter.acquire({ waitMs: 1_000, pollMs: 10 });
+      await sleep(60);
+      expect(await waiter.verify()).toBe(false);
+      await holder.release();
+
+      expect(await acquiring).toBe(true);
+      expect(await waiter.verify()).toBe(true);
+      await waiter.release();
+    });
+
+    it('with waitMs returns false once the wait runs out', async () => {
+      const id = newId();
+      const holder = createLock({
+        service: 's',
+        identifier: id,
+        ttlMs: 60_000,
+        heartbeatMs: 10_000,
+      });
+      const waiter = createLock({
+        service: 's',
+        identifier: id,
+        ttlMs: 60_000,
+        heartbeatMs: 10_000,
+      });
+      expect(await holder.acquire()).toBe(true);
+
+      const startedAt = Date.now();
+      expect(await waiter.acquire({ waitMs: 80, pollMs: 10 })).toBe(false);
+      expect(Date.now() - startedAt).toBeGreaterThanOrEqual(80);
+
+      expect(await holder.verify()).toBe(true);
+      await holder.release();
+    });
+
+    it('throws the onTimeout error instead of returning false', async () => {
+      const id = newId();
+      const holder = createLock({
+        service: 's',
+        identifier: id,
+        ttlMs: 60_000,
+        heartbeatMs: 10_000,
+      });
+      const waiter = createLock({
+        service: 's',
+        identifier: id,
+        ttlMs: 60_000,
+        heartbeatMs: 10_000,
+      });
+      expect(await holder.acquire()).toBe(true);
+
+      await expect(
+        waiter.acquire({ waitMs: 40, pollMs: 10, onTimeout: () => new Error('still held') }),
+      ).rejects.toThrow('still held');
+
+      await holder.release();
+    });
   });
 
   describe('verify', () => {

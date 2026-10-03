@@ -23,8 +23,6 @@ const FIND_FOR_UPDATE_LOCK_HEARTBEAT_MS = 3_000;
 export const FIND_FOR_UPDATE_LOCK_WAIT_MS = 3_000;
 const FIND_FOR_UPDATE_LOCK_POLL_MS = 25;
 
-const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
-
 // Lock first, then fence: querying first lets two callers both see no row before either locks.
 // The release rides the transaction's finally queue, so the key drops once the transaction has
 // settled, commit or rollback — never before the commit a waiter must read, and never behind the
@@ -47,11 +45,11 @@ export const acquireFindForUpdateLock = async (
     maxMissed: 1,
   });
 
-  const deadline = Date.now() + waitMs;
-  while (!(await lock.acquire())) {
-    if (Date.now() >= deadline) throw new FindForUpdateLockTimeoutError(key, waitMs);
-    await sleep(Math.min(FIND_FOR_UPDATE_LOCK_POLL_MS, Math.max(deadline - Date.now(), 0)));
-  }
+  await lock.acquire({
+    waitMs,
+    pollMs: FIND_FOR_UPDATE_LOCK_POLL_MS,
+    onTimeout: () => new FindForUpdateLockTimeoutError(key, waitMs),
+  });
 
   openTransaction.heldLockKeys.add(key);
   openTransaction.finallyFns.push(async () => {

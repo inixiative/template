@@ -14,6 +14,7 @@ import { createClaim } from '@template/db/lock/createClaim';
 import { fencedDelete } from '@template/db/lock/queries/fencedDelete';
 import { fencedRefresh } from '@template/db/lock/queries/fencedRefresh';
 import type {
+  AcquireOptions,
   Claim,
   ClaimOptions,
   Lock,
@@ -26,6 +27,9 @@ import { getRedisClient } from '@template/db/redis/client';
 import { redisNamespace } from '@template/db/redis/namespaces';
 import { log } from '@template/shared/logger';
 import { heartbeat } from '@template/shared/utils';
+
+const DEFAULT_POLL_MS = 50;
+const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 export function createLock(opts: ClaimOptions): Claim;
 export function createLock(opts: LockOptions): Lock;
@@ -117,12 +121,32 @@ const createRenewingLock = (opts: LockOptions, redis: LockRedis, key: string): L
     declareLost('token_mismatch');
   };
 
-  const acquire = async (): Promise<boolean> => {
+  const tryAcquire = async (): Promise<boolean> => {
     const result = await redis.set(key, processId, 'PX', ttlMs, 'NX');
     if (result !== 'OK') return false;
     stop = heartbeat(tick, heartbeatMs, {
       onError: (err) => log.error(`Lock heartbeat error: ${key}`, err),
     });
+    return true;
+  };
+
+  // The poll is a sleep, not a Redis blocking primitive: a waiter costs one SET per poll and
+  // nothing while asleep. A waiter polling inside an interactive transaction must keep `waitMs`
+  // under that transaction's own timeout, or it expires while still waiting.
+  const acquire = async ({
+    waitMs = 0,
+    pollMs = DEFAULT_POLL_MS,
+    onTimeout,
+  }: AcquireOptions = {}): Promise<boolean> => {
+    const deadline = Date.now() + waitMs;
+    while (!(await tryAcquire())) {
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) {
+        if (onTimeout) throw onTimeout();
+        return false;
+      }
+      await sleep(Math.min(pollMs, remaining));
+    }
     return true;
   };
 
