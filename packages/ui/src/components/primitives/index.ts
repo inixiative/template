@@ -9,6 +9,7 @@ export * from './Input';
 export * from './Label';
 export * from './Pagination';
 export * from './PasswordInput';
+export * from './SearchableSelect';
 export * from './Select';
 export * from './SlugInput';
 export * from './Table';

@@ -71,6 +71,7 @@
   - [Avatar](#avatar)
   - [EmptyState](#emptystate)
   - [DropdownMenu](#dropdownmenu)
+  - [SearchableSelect](#searchableselect)
   - [Auth Components](#auth-components)
   - [Layout Utilities](#layout-utilities)
 - [Hooks](#hooks)
@@ -1539,6 +1540,32 @@ const columns = [
     <DropdownMenuItem onSelect={() => handleDelete()}>Delete</DropdownMenuItem>
   </DropdownMenuContent>
 </DropdownMenu>
+```
+
+### SearchableSelect
+
+**Location:** `/packages/ui/src/components/primitives/SearchableSelect.tsx`
+
+A `Select` with a search box in its popover (Ariakit select + combobox). Same `options` / `value` / `onChange` contract as `Select`. Without `onSearch` it filters the given options by label in memory. With `onSearch` it skips local filtering and calls `onSearch(query)` debounced, so the caller can query the API and pass the results back as `options`. The selected label stays visible after the results change.
+
+**Usage:**
+
+```typescript
+const [search, setSearch] = useState('');
+const { data, isFetching } = useQuery({
+  queryKey: adminContactReadManyQueryKey({ query: { search } }),
+  queryFn: apiQuery(adminContactReadMany),
+});
+
+<SearchableSelect
+  aria-label="Recipient"
+  options={(data?.data ?? []).map((contact) => ({ value: contact.id, label: contact.valueKey ?? contact.id }))}
+  value={contactId}
+  onChange={setContactId}
+  onSearch={setSearch}
+  isLoading={isFetching}
+  placeholder="Choose a person"
+/>
 ```
 
 ### Auth Components
