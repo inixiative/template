@@ -9,6 +9,7 @@ config:
 kanban
   Backlog
     AUTH-006-webhook-tenant-isolation
+    AUTH-007-user-one-writer
     AUTH-005-websocket-permission-change-interruption
     FEAT-017-audit-log-hardening-lineage-and-explorer
     FEAT-019-extensible-actor-attribution
