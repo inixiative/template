@@ -54,7 +54,7 @@ that save, so the lens check never runs at save.
 | 9 | Component missing at render (deleted, or its shadow removed with no parent) | render | `component_missing` thrown, failed, retries, DLQ; policy does not apply | ops |
 | 10 | Component missing at read (`hydrate`) | read | bare ref kept, no error | editor |
 | 11 | Persisted component cycle | save, render and hydrate all throw `circular_ref` | | ops or editor |
-| 12 | `degradedComponentRefs` | versioning hook and guarded send-path recompute after `component_missing` | missing component slugs when rendering this row transitively, honoring slot overrides; not necessarily in `componentRefs`; compose never consults it | admin list |
+| 12 | `degradedComponentRefs` | the written row in its own transaction (versioning hook); its ancestors by the after-commit superseding job `recomputeEmailDependents`; guarded send-path recompute after `component_missing` | missing component slugs when rendering this row transitively, honoring slot overrides; not necessarily in `componentRefs`; compose never consults it | admin list |
 | 13 | No template anywhere in the cascade | render | `template_missing`, failed, retries, DLQ | ops |
 | 14 | Base owner with `degrade` or `fallback` | render | forced to `fail` | ops |
 | 15 | Rail-provided system token not supplied | never | literal token ships | the recipient |
@@ -135,9 +135,14 @@ the failing block, and it walks down to the base owner and then fails.
    it embeds through its own lens (the expanded body is what is validated). A component save
    walks every same-owner template that embeds it, transitively through components, and
    re-validates each against that template's lens (`validateDependents`); one failure refuses the
-   save with the list (`DependentTemplateError`). Other owners' templates are stamped by the
-   versioning hook (`degradedComponentRefs` stays as the at-rest projection) and never refused —
-   the same direction as a gone tag degrading a rule instead of blocking the delete.
+   save with the list (`DependentTemplateError`). Other owners' templates are never refused; they
+   carry the outcome in `degradedComponentRefs`, the at-rest projection — the same direction as a
+   gone tag degrading a rule instead of blocking the delete. The written row is stamped in its own
+   transaction by the versioning hook, and its ancestors are restamped after commit by the
+   superseding job `recomputeEmailDependents` (keyed by slug, 5 second delay). The split is audit
+   versus cache (Aron, 2026-10-06): an ancestor's version-bump snapshot is an audit event, an
+   insert per mutation that must ride the causing transaction, while its badge is a cache of
+   derivable state that sends never read, so it can lag a write by a few seconds.
 3. **No raw token ever ships.** `substituteToken` renders empty and records a typed issue for a
    nil value, an object, an unknown root, a prototype key, an unknown system token. The
    literal `{{…}}` never reaches a recipient.

@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
+import { afterAll, afterEach, beforeAll, describe, expect, it, type Mock, spyOn } from 'bun:test';
 import { clearHookRegistry, db } from '@template/db';
 import {
   buildEmailComponent,
@@ -9,7 +9,9 @@ import {
 import { expand, saveEmailTemplate } from '@template/email/render';
 import { registerAuditLogHook } from '#/hooks/auditLog/hook';
 import { registerEmailVersioningHook } from '#/hooks/emailVersioning/hook';
+import * as enqueueModule from '#/jobs/enqueue';
 import { recomposeSnapshot } from '#/lib/email/recompose';
+import { createTestWorker } from '#tests/createTestWorker';
 
 const mjml = (content: string) =>
   `<mjml><mj-body><mj-section><mj-column>${content}</mj-column></mj-section></mj-body></mjml>`;
@@ -25,6 +27,12 @@ const greetingTemplate = () => ({
 
 const latestSnapshot = (where: Record<string, unknown>) =>
   db.auditLog.findFirst({ where, orderBy: { createdAt: 'desc' } });
+
+const runRestamp = (slug: string) =>
+  createTestWorker({ name: 'recomputeEmailDependents', id: Bun.randomUUIDv7() }).run({ slug });
+
+const restampEnqueues = (spy: Mock<typeof enqueueModule.enqueueJob>) =>
+  spy.mock.calls.filter(([name]) => name === 'recomputeEmailDependents');
 
 describe('emailVersioning', () => {
   beforeAll(() => {
@@ -145,19 +153,83 @@ describe('emailVersioning', () => {
     expect(await recomposeSnapshot(snap2!.id)).toBe(live2);
   });
 
-  it('pins null and flags the live row when a referenced component is removed with no fallback', async () => {
+  it('pins null at once and flags the live row only when the restamp job runs', async () => {
     const { template, components } = await saveEmailTemplate(greetingTemplate());
+    const enqueue = spyOn(enqueueModule, 'enqueueJob');
 
-    await db.emailComponent.update({
-      where: { id: components[0].id },
-      data: { deletedAt: new Date() },
-    });
+    try {
+      await db.emailComponent.update({
+        where: { id: components[0].id },
+        data: { deletedAt: new Date() },
+      });
 
-    const templateSnapshot = await latestSnapshot({ subjectEmailTemplateId: template.id });
-    expect(templateSnapshot?.componentVersions).toEqual({ greeting: null });
+      const templateSnapshot = await latestSnapshot({ subjectEmailTemplateId: template.id });
+      expect(templateSnapshot?.componentVersions).toEqual({ greeting: null });
+      expect(
+        (await db.emailTemplate.findUniqueOrThrow({ where: { id: template.id } }))
+          .degradedComponentRefs,
+      ).toEqual([]);
+      expect(restampEnqueues(enqueue)).toEqual([
+        ['recomputeEmailDependents', { slug: 'greeting' }, { delay: 5000 }],
+      ]);
+    } finally {
+      enqueue.mockRestore();
+    }
 
+    await runRestamp('greeting');
     const liveTemplate = await db.emailTemplate.findUniqueOrThrow({ where: { id: template.id } });
     expect(liveTemplate.degradedComponentRefs).toEqual(['greeting']);
+  });
+
+  it('a component edit snapshots its ancestor in the transaction and defers the badge', async () => {
+    const { template, components } = await saveEmailTemplate(greetingTemplate());
+    const snapshotsBefore = await db.auditLog.count({
+      where: { subjectEmailTemplateId: template.id },
+    });
+    const enqueue = spyOn(enqueueModule, 'enqueueJob');
+
+    try {
+      await db.emailComponent.update({
+        where: { id: components[0].id },
+        data: { mjml: '<mj-text>Edited</mj-text>' },
+      });
+
+      expect(await db.auditLog.count({ where: { subjectEmailTemplateId: template.id } })).toBe(
+        snapshotsBefore + 1,
+      );
+      expect(restampEnqueues(enqueue)).toEqual([
+        ['recomputeEmailDependents', { slug: 'greeting' }, { delay: 5000 }],
+      ]);
+    } finally {
+      enqueue.mockRestore();
+    }
+  });
+
+  it('a rolled-back component write neither snapshots its ancestor nor enqueues a restamp', async () => {
+    const { template, components } = await saveEmailTemplate(greetingTemplate());
+    const snapshotsBefore = await db.auditLog.count({
+      where: { subjectEmailTemplateId: template.id },
+    });
+    const enqueue = spyOn(enqueueModule, 'enqueueJob');
+
+    try {
+      await expect(
+        db.txn(async () => {
+          await db.emailComponent.update({
+            where: { id: components[0].id },
+            data: { deletedAt: new Date() },
+          });
+          throw new Error('roll back');
+        }),
+      ).rejects.toThrow('roll back');
+
+      expect(restampEnqueues(enqueue)).toEqual([]);
+    } finally {
+      enqueue.mockRestore();
+    }
+    expect(await db.auditLog.count({ where: { subjectEmailTemplateId: template.id } })).toBe(
+      snapshotsBefore,
+    );
   });
 
   it('keeps a dependent healthy when deletion affects only an overridden default slot', async () => {
@@ -177,6 +249,7 @@ describe('emailVersioning', () => {
     });
     const before = await db.auditLog.count({ where: { subjectEmailTemplateId: template.id } });
     await db.emailComponent.update({ where: { id: child.id }, data: { deletedAt: new Date() } });
+    await runRestamp('x');
     const stored = await db.emailTemplate.findUniqueOrThrow({ where: { id: template.id } });
     expect(stored.degradedComponentRefs).toEqual([]);
     expect(

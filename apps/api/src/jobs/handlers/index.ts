@@ -1,6 +1,10 @@
 import { type CleanStaleDataPayload, cleanStaleData } from '#/jobs/handlers/cleanStaleData';
 import { type DeliverEmailPayload, deliverEmail } from '#/jobs/handlers/deliverEmail';
 import {
+  type RecomputeEmailDependentsPayload,
+  recomputeEmailDependents,
+} from '#/jobs/handlers/recomputeEmailDependents';
+import {
   type ReconcileCustomerRefSegmentsPayload,
   reconcileCustomerRefSegments,
 } from '#/jobs/handlers/reconcileCustomerRefSegments';
@@ -20,6 +24,7 @@ export const JobHandlerName = {
   reconcileSegment: 'reconcileSegment',
   reconcileCustomerRefSegments: 'reconcileCustomerRefSegments',
   sweepSegments: 'sweepSegments',
+  recomputeEmailDependents: 'recomputeEmailDependents',
 } as const;
 
 export type JobHandlerName = (typeof JobHandlerName)[keyof typeof JobHandlerName];
@@ -33,6 +38,7 @@ export type JobPayloads = {
   reconcileSegment: ReconcileSegmentPayload;
   reconcileCustomerRefSegments: ReconcileCustomerRefSegmentsPayload;
   sweepSegments: undefined;
+  recomputeEmailDependents: RecomputeEmailDependentsPayload;
 };
 
 export type JobHandlers = {
@@ -48,6 +54,7 @@ export const jobHandlers: JobHandlers = {
   reconcileSegment,
   reconcileCustomerRefSegments,
   sweepSegments,
+  recomputeEmailDependents,
 };
 
 export const isValidHandlerName = (name: string): name is JobHandlerName => name in jobHandlers;
