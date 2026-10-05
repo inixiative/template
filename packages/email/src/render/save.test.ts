@@ -44,7 +44,7 @@ describe('saveEmailTemplate', () => {
     expect(result.components).toEqual([]);
   });
 
-  it('re-saving a soft-deleted slug creates a live row instead of updating the tombstone', async () => {
+  it('re-saving a soft-deleted slug revives the same row with the new body', async () => {
     const input = {
       slug: 'revived',
       name: 'Revived',
@@ -61,11 +61,61 @@ describe('saveEmailTemplate', () => {
 
     const second = await saveEmailTemplate({ ...input, mjml: mjml('<mj-text>v2</mj-text>') });
 
-    expect(second.template.id).not.toBe(first.template.id);
+    expect(second.template.id).toBe(first.template.id);
     expect(second.template.deletedAt).toBeNull();
-    const tombstone = await db.emailTemplate.findUnique({ where: { id: first.template.id } });
-    expect(tombstone?.deletedAt).not.toBeNull();
-    expect(tombstone?.mjml).toContain('v1');
+    expect(second.template.mjml).toContain('v2');
+    expect(await db.emailTemplate.count({ where: { slug: 'revived' } })).toBe(1);
+  });
+
+  it('re-saving a template revives its soft-deleted same-tier component in place', async () => {
+    const input = {
+      slug: 'with-footer',
+      name: 'With Footer',
+      subject: 'Hello',
+      kind: 'system' as const,
+      mjml: mjml('{{#component:footer}}<mj-text>v1</mj-text>{{/component:footer}}'),
+      ownerModel: 'default' as const,
+    };
+    const first = await saveEmailTemplate(input);
+    const [footer] = first.components;
+    await db.emailComponent.update({ where: { id: footer.id }, data: { deletedAt: new Date() } });
+
+    const second = await saveEmailTemplate({
+      ...input,
+      mjml: mjml('{{#component:footer}}<mj-text>v2</mj-text>{{/component:footer}}'),
+    });
+
+    expect(second.components.map((c) => c.id)).toEqual([footer.id]);
+    expect(second.components[0].deletedAt).toBeNull();
+    expect(second.components[0].mjml).toBe('<mj-text>v2</mj-text>');
+    expect(await db.emailComponent.count({ where: { slug: 'footer' } })).toBe(1);
+  });
+
+  it('a soft-deleted parent-tier component is never inherited', async () => {
+    const { entity: org } = await createOrganization();
+    const parent = await createEmailComponent({
+      slug: 'shared',
+      mjml: '<mj-text>Shared</mj-text>',
+      ownerModel: 'default',
+    });
+    await db.emailComponent.update({
+      where: { id: parent.entity.id },
+      data: { deletedAt: new Date() },
+    });
+
+    const result = await saveEmailTemplate({
+      slug: 'org-uses-shared',
+      name: 'Org Uses Shared',
+      subject: 'Hello',
+      kind: 'system',
+      mjml: mjml('{{#component:shared}}<mj-text>Shared</mj-text>{{/component:shared}}'),
+      ownerModel: 'Organization',
+      organizationId: org.id,
+    });
+
+    expect(result.components.map((c) => [c.slug, c.ownerModel])).toEqual([
+      ['shared', 'Organization'],
+    ]);
   });
 
   it("a User-owned save lands on that user's row, never on another user's same-slug row", async () => {
@@ -360,17 +410,50 @@ describe('saveEmailTemplate', () => {
     expect(outer?.componentRefs).toEqual(['inner']);
   });
 
-  it('admin template - no cascade', async () => {
+  it('an admin template inherits an unchanged default component instead of copying it', async () => {
+    await createEmailComponent({
+      slug: 'footer',
+      mjml: '<mj-text>Default Footer</mj-text>',
+      ownerModel: 'default',
+    });
+
     const result = await saveEmailTemplate({
-      slug: 'admin-only',
-      name: 'Admin Only',
+      slug: 'admin-uses-default',
+      name: 'Admin Uses Default',
       subject: 'Hello',
       kind: 'system',
-      mjml: mjml('<mj-text>Admin</mj-text>'),
+      mjml: mjml('{{#component:footer}}<mj-text>Default Footer</mj-text>{{/component:footer}}'),
       ownerModel: 'admin',
     });
 
     expect(result.template.ownerModel).toBe('admin');
+    expect(result.components).toEqual([]);
+    expect(result.template.componentRefs).toEqual(['footer']);
+  });
+
+  it('an admin template that changes a default component writes its own admin copy', async () => {
+    await createEmailComponent({
+      slug: 'footer',
+      mjml: '<mj-text>Default Footer</mj-text>',
+      ownerModel: 'default',
+    });
+
+    const result = await saveEmailTemplate({
+      slug: 'admin-own-footer',
+      name: 'Admin Own Footer',
+      subject: 'Hello',
+      kind: 'system',
+      mjml: mjml(
+        '{{#component:footer}}<mj-text>UserEvidence Footer</mj-text>{{/component:footer}}',
+      ),
+      ownerModel: 'admin',
+    });
+
+    expect(result.components.map((c) => [c.slug, c.ownerModel])).toEqual([['footer', 'admin']]);
+    const defaultFooter = await db.emailComponent.findFirst({
+      where: { slug: 'footer', ownerModel: 'default' },
+    });
+    expect(defaultFooter?.mjml).toBe('<mj-text>Default Footer</mj-text>');
   });
 
   it('a component outside the tier cascade is written at the current tier', async () => {

@@ -268,11 +268,11 @@ describe('composeTemplate — the row that won the cascade names its owner', () 
 });
 
 describe('parentOwner', () => {
-  it('walks the cascade Space → Organization → default and stops at base owners', () => {
+  it('walks the cascade Space → Organization → default and admin → default, stopping at default', () => {
     expect(parentOwner('Space')).toBe('Organization');
     expect(parentOwner('Organization')).toBe('default');
+    expect(parentOwner('admin')).toBe('default');
     expect(parentOwner('default')).toBeNull();
-    expect(parentOwner('admin')).toBeNull();
   });
 });
 

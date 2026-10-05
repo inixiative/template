@@ -19,6 +19,7 @@ export const parentOwner = (owner: EmailOwnerModel): EmailOwnerModel | null => {
     case 'Space':
       return 'Organization';
     case 'Organization':
+    case 'admin':
       return 'default';
     default:
       return null;

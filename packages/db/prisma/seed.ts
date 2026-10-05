@@ -7,6 +7,7 @@
  */
 
 import { type AccessorName, db } from '@template/db';
+import { auditActorContext, nullAuditActor } from '@template/db/lib/auditActorContext';
 import { LogScope, log } from '@template/shared/logger';
 import { ConcurrencyType, getConcurrency, resolveAll } from '@template/shared/utils';
 import { isUuidV7 } from '@template/shared/utils/isUuidV7';
@@ -86,31 +87,37 @@ const seedTable = async (seedFile: SeedFile): Promise<void> => {
         ? {}
         : omit(data, ['id', ...(seedFile.updateOmitFields ?? [])]);
 
-      await delegate.upsert({ where: { id }, create: data, update: updateData });
+      await db.txn(async () => {
+        await db.findForUpdate(seedFile.model, { id }, { upserting: true });
+        await delegate.upsert({ where: { id }, create: data, update: updateData });
+      });
       log.success(`  - Upserted: ${id}`, LogScope.seed);
     }),
     concurrency,
   );
 };
 
-export const seed = async () => {
-  const isProduction = process.env.NODE_ENV === 'production';
+const SEED_ACTOR = { ...nullAuditActor, actorJobName: 'seed' };
 
-  log.info('Starting database seed...', LogScope.seed);
-  if (isProduction) log.warn('Running in PRODUCTION mode', LogScope.seed);
-  if (includePrime) log.info('Including PRIME development data', LogScope.seed);
-  if (targetTable) log.info(`Target table: ${targetTable}`, LogScope.seed);
+export const seed = () =>
+  auditActorContext.scope(SEED_ACTOR, async () => {
+    const isProduction = process.env.NODE_ENV === 'production';
 
-  checkUUIDUniqueness();
+    log.info('Starting database seed...', LogScope.seed);
+    if (isProduction) log.warn('Running in PRODUCTION mode', LogScope.seed);
+    if (includePrime) log.info('Including PRIME development data', LogScope.seed);
+    if (targetTable) log.info(`Target table: ${targetTable}`, LogScope.seed);
 
-  for (const seedFile of seeds) {
-    if (targetTable && seedFile.model !== targetTable) continue;
+    checkUUIDUniqueness();
 
-    await seedTable(seedFile);
-  }
+    for (const seedFile of seeds) {
+      if (targetTable && seedFile.model !== targetTable) continue;
 
-  log.success('Seed completed!', LogScope.seed);
-};
+      await seedTable(seedFile);
+    }
+
+    log.success('Seed completed!', LogScope.seed);
+  });
 
 if (import.meta.main) {
   seed()
