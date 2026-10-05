@@ -73,6 +73,33 @@ and the first vendor — as a proposal to discuss, not a schema.
   already does this in flat columns.
 - **History is the audit log**, not a table.
 
+## Geo (Aron, 2026-10-05: "we need geo also for sure — PostGIS")
+
+- **PostGIS is the store.** The template has no Postgres extension yet (no `CREATE EXTENSION`, no
+  `Unsupported` column), so this is the first: `previewFeatures += ["postgresqlExtensions"]`,
+  `extensions = [postgis]` on the datasource, and on `Address` a
+  `location Unsupported("geography(Point, 4326)")?` column with a GiST index written in the
+  migration SQL. `geography`, not `geometry`: distances come back in metres without a projection
+  choice, and every use here is "within N km of", not cartography.
+- **The geocoding adapter writes it.** `validate` returns the point with the verdict; the service
+  stores it beside the structured fields and clears it with the verification state on any edit.
+  Nothing user-entered reaches `location`.
+- **Reads are raw SQL on a seam, not Prisma.** Prisma cannot read or filter an `Unsupported`
+  column, so `db.raw` queries (`ST_DWithin`, `ST_Distance`, nearest-N by `<->`) live in one
+  `packages/db/src/geo/` module. The lens exposes `distanceKm`-style facts only through that seam.
+- **Radius rules are an engine question, left open.** json-rules has no geo operator. "Customers
+  within 50 km of a Space" would be a `within` distance operator compiling to `ST_DWithin` on the
+  SQL rail, haversine in `check()`, and *unsupported* on the Prisma rail — three rails must agree
+  before it ships, so it is a json-rules proposal, not something this ticket adds by hand.
+- **Timezone falls out of geo.** An owner's primary address point resolves to an IANA zone (Google
+  Time Zone API through the same adapter), which is what the app's calendar-period date policy
+  needs per owner (see INFRA-036). Worth a line in the survey table: which vendors return it.
+- **Cardi.** Aron recalls Cardi had geocoding and that the original idea was to backport it. Zealot
+  does have a geocoding client (`integrations/googleGeocode/api.ts`, embedded VCR) and the
+  component normaliser (`createShippingAddress`), but no stored geo and no PostGIS. Cardi is not
+  checked out locally and not in the inixiative or userevidence GitHub orgs — find it before the
+  survey so whatever it solved is a row in the table.
+
 ## Zealot lessons
 
 - Free-text `address VARCHAR(100)` + `zipCode VARCHAR(100)` on `FanUsers`, re-geocoded at every
@@ -92,5 +119,5 @@ vendor before a consumer asks. Localized display beyond what the provider return
 ## Related
 
 - **Blocks**: FIN-001 (billing address), physical fulfilment.
-- **Rides on**: false-polymorphism registry, INFRA-009, `reference/countries.ts`.
+- **Rides on**: false-polymorphism registry, INFRA-009, `reference/countries.ts`, PostGIS (first extension; `postgresqlExtensions`).
 - **Feeds**: FEAT-021 (country/region in the lens), FEAT-020 (anything finer).
