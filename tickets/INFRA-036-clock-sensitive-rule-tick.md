@@ -57,3 +57,17 @@ alone keeps it fresh.
 - Hook: saving a rolling rule writes `clockUnit`; editing it to an absolute date clears it;
   revive rebuilds it.
 - Sweep: the hourly row enqueues only `hour` segments, the weekly row only `week`; the backstop still enqueues all.
+
+## Refinements (2026-10-05)
+
+- The unit means "how fast the boundary moves" for rolling expressions and "when the boundary
+  jumps" for period ones; the mapping above is right for both. The app's date policy favours
+  calendar periods (`this month` over "last 30 days"), so most clock-sensitive rules are period
+  rules and land on `day`, `week` or `month`.
+- Period boundaries fall at local midnight, so across owners' timezones a week or month turns over
+  a window of about a day, never longer. Schedule each unit's cron row **after the last zone has
+  crossed** (around 12:00 UTC on the boundary day) so every owner is fresh before anyone looks;
+  early zones wait up to half a day. That is a cron time, not a design point. The hourly row is
+  zone-free: an hour boundary is the same instant everywhere.
+- Hourly is the floor on purpose. A two-hour rolling window can be an hour stale at its edge —
+  fine for targeting, not for gating a payout; that is a per-use product line, not a minute tier.
