@@ -14,7 +14,7 @@
 > correctly. We should probably do some sort of polling on the various solutions to the address
 > patterns we can consider for international."
 
-So: an `Address` model with its own owner, lifecycle and shape, **not** a `ContactType.address`
+So: an `Address` model with its own owner, lifecycle, shape, editor and query helpers, **not** a `ContactType.address`
 (that draft is withdrawn — Contact's one-JSON-value-plus-valueKey shape is right for a phone or a
 handle and too thin for the thing that has defeated every CRM). And no schema is designed until the
 survey below is done and discussed.
@@ -99,6 +99,51 @@ and the first vendor — as a proposal to discuss, not a schema.
   component normaliser (`createShippingAddress`), but no stored geo and no PostGIS. Cardi is not
   checked out locally and not in the inixiative or userevidence GitHub orgs — find it before the
   survey so whatever it solved is a row in the table.
+
+## Frontend (Aron, 2026-10-05: "we really need a good frontend to capture all this stuff")
+
+The capture UI is part of the feature, not a follow-up. Today `packages/ui` has no contact editor
+at all (one stream hook), so the address editor is the first owner-scoped editor in the template and
+sets the pattern.
+
+- **One `AddressBook` editor per owner** (User, Organization, Space), in `packages/ui`, fed by the
+  SDK: the owner's addresses grouped by role — primary, shipping, billing, business, home — with
+  "make primary" per role, add, edit, archive. Which roles an owner type shows is config, not
+  code: a User has home and shipping, an Organization has billing and business, a Space inherits
+  its Organization's billing unless it sets its own.
+- **One `AddressForm`**, driven by the per-country metadata the survey picks: country first, then
+  the fields that country has, in that country's order, with that country's labels (ZIP vs
+  Postcode, State vs Prefecture) and its postal pattern inline. No per-country components.
+- **Autocomplete through the adapter's `suggest`**, debounced, country-biased; picking a suggestion
+  fills the structured fields and runs `validate`. A `corrected` verdict shows the provider's
+  version beside what was typed and asks — never silently overwrites. `unconfirmed` saves with a
+  visible "unverified" state and a retry.
+- **Freeform paste** — a textarea that goes through `parse`, for the address a user copies from an
+  email. The structured form is the result, editable.
+- **Map confirmation**: when `location` is set, a small map pin the user can drag to correct the
+  point (drag writes `location` only, never the text fields, and marks the point user-corrected).
+- **Picker, not just editor**: a `AddressSelect` for consumers (checkout, fulfilment) that lists the
+  owner's addresses of a role and returns the **snapshot value**, since consumers store a copy.
+- **Rules builder**: `country` and `region` appear as ordinary lens fields in the segment builder
+  with the countries table as their option source. The distance operator (below) gets its own
+  control — a reference point (an address or a Space) plus a radius with units — once the engine
+  has it.
+
+## Query helpers (Aron: "it usually needs raw SQL so probably need helpers")
+
+PostGIS reads cannot go through Prisma, so the raw SQL is written once, typed, in
+`packages/db/src/geo/`, and nothing outside that module spells `ST_*`:
+
+- `withinRadius(point, km, { model, fk? })` → ids of Address rows (optionally joined to one owner
+  model) within the radius — `ST_DWithin` on `geography`, index-backed.
+- `distanceKm(fromAddressId | point, toAddressIds[])` → one query, a `Map<id, km>`; the only way a
+  read gets a distance onto a row.
+- `nearest(point, n, { model })` → `ORDER BY location <-> $1 LIMIT n`, KNN on the GiST index.
+- `pointFromLatLng(lat, lng)` / `latLngFromPoint(row)` → the one place the EWKB/`ST_MakePoint`
+  conversion lives; the API never sees PostGIS types, only `{ lat, lng }`.
+- All of them take the ambient `db` (txn-aware), apply the soft-delete scope by hand because raw
+  SQL is outside the scoper, and are the seam the lens's `distance` fact and the future json-rules
+  `within` operator compile against — the SQL rail of that operator *is* `withinRadius`.
 
 ## Zealot lessons
 
