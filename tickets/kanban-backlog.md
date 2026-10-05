@@ -53,7 +53,7 @@ kanban
 **User Experience:**
 - [FEAT-006: Localization](./FEAT-006-localization.md) - i18n support, multi-language
 - [FEAT-007: White Labeling](./FEAT-007-white-labeling.md) - Custom domains, DNS hooks, CORS, theming
-- [FEAT-010: Addresses](./FEAT-010-addresses.md) - `ContactType.address` with libaddressinput metadata, Google adapter (INFRA-009) porting Zealot`s geocode fallbacks, `Contact.country`/`region` for rules, snapshots at use
+- [FEAT-010: Addresses](./FEAT-010-addresses.md) - Own model (ruling 10-05); survey the international address standards, libraries and vendors first, then design
 - [FEAT-012: Notifications](./FEAT-012-notifications.md) - Novu integration, app-events completion, notification center
 - [COMM-002: Email Validation](./COMM-002-email-validation.md) - Email verification API (Bouncer/Emailable) for deliverability
 

@@ -1,168 +1,96 @@
-# FEAT-010: Addresses — a Contact type, not a model
+# FEAT-010: Addresses — its own model; survey the international patterns before designing
 
-**Status**: 🆕 Not Started
+**Status**: 🔍 Research
 **Assignee**: TBD
-**Priority**: Medium (FIN-001 billing and any physical fulfilment need it; Zealot paid for the lessons)
+**Priority**: Medium (FIN-001 billing and any physical fulfilment need it)
 **Created**: 2026-02-06
-**Updated**: 2026-10-05 (rewritten from the stub; shape decided against Contact, the false-polymorphism registry and INFRA-009)
+**Updated**: 2026-10-05 (ruling: Address is its own model, not a Contact type; design waits on a survey)
 
 ---
 
-## Overview
+## Ruling (Aron, 2026-10-05)
 
-A postal address is contact information: it belongs to a User, an Organization or a Space, there
-can be several per owner with roles (billing, shipping, home, business), one is primary, it has a
-canonical form for dedupe, it can be verified, and it must be redactable. `Contact` already models
-exactly that for phones, emails and handles — false-polymorphic owner, `type` + `subtype`, `label`,
-`position`, typed JSON `value` with a `valueKey` projection, `verifiedAt`, `source`, `redact`,
-per-owner uniqueness, audit through the lifecycle. Addresses are one more `ContactType`, not a new
-table with its own owner columns, its own uniqueness and its own CRUD.
+> "Address needs to be its own thing. I suspect it's so complicated. I've never seen it solved
+> correctly. We should probably do some sort of polling on the various solutions to the address
+> patterns we can consider for international."
 
-What is genuinely new is three things: a structured address value with country-aware validation,
-an adapter for the external validation / geocoding provider, and making the parts a rule can read.
+So: an `Address` model with its own owner, lifecycle and shape, **not** a `ContactType.address`
+(that draft is withdrawn — Contact's one-JSON-value-plus-valueKey shape is right for a phone or a
+handle and too thin for the thing that has defeated every CRM). And no schema is designed until the
+survey below is done and discussed.
 
-## Shape
+## Step 1 — the survey
 
-### 1. `ContactType.address`
+Collect, side by side, how each of these represents an international address, what it gets right,
+and where it breaks. One table, one row per candidate, same columns: field set, how it handles
+countries with no postal code / no street names / non-Latin scripts / sorting codes / dependent
+localities, whether it carries per-country format metadata, whether it carries a canonical form
+for dedupe, whether it is a standard, a library or a vendor API, and what it costs to adopt.
 
-- `type: address`; `subtype` **required** from `ADDRESS_SUBTYPES = ['billing', 'shipping', 'home', 'business']`
-  (the stub's "address types" are subtypes, the way phone has mobile/work). Primary = `position 0`
-  per subtype, which Contact already orders by.
-- `value` (`AddressValue`), the stored canonical shape, field names from Google's libaddressinput
-  so the per-country metadata (below) applies without a mapping layer:
+Standards and schemas:
+- **OASIS xAL / CIQ** — the maximalist XML standard; shows the full field space
+- **UPU S42** — the postal union's addressing standard; closest to what carriers accept
+- **ISO 19160** — addressing conceptual model
+- **Schema.org `PostalAddress`** — what the web has converged on
+- **HL7 FHIR `Address`** — a pragmatic, widely implemented shape with `use` and `type`
+- **vCard `ADR`** — the oldest shipped shape; what every phone exports
 
-  ```ts
-  type AddressValue = {
-    country: CountryCode;              // ISO-3166-1 alpha-2 — @template/shared/reference/countries
-    addressLines: string[];            // 1–3 lines, street number + route + unit
-    locality?: string;                 // city / town
-    dependentLocality?: string;        // neighbourhood / district, where the country uses one
-    administrativeArea?: string;       // state / province / region — code where the country has them (US-CA → 'CA')
-    postalCode?: string;
-    sortingCode?: string;              // CEDEX etc.
-    recipient?: string;                // name on the label — shipping only
-    organization?: string;             // company on the label
-    formatted?: string;                // provider's one-line rendering, display only
-    geo?: { lat: number; lng: number };// set by the validation adapter, never by input
-    validatedAt?: string;              // ISO; the adapter's verdict stamp. Absent = user-entered, unverified
-  };
-  ```
+Metadata and libraries:
+- **Google libaddressinput** — per-country required fields, labels, order, postal regex (open
+  dataset); the metadata layer most forms are built on
+- **OpenCage `address-formatter`** — the OSM community's per-country formatting templates
+- **i18n-postal-address**, **postal-address** (npm) — the formatting libraries built on the above
+- **libpostal** — statistical parser/normaliser for free text; the canonical-form candidate
 
-- `inputSchema` is loose: the structured object above, **or** `{ freeform: string, country?: CountryCode }`
-  for a pasted address; `parseInput` normalises either into `AddressValue` (freeform goes through
-  the adapter's `parse`, see §3). `valueSchema` is strict.
-- `toValueKey`: `country|postalCode|normalised lines|locality` — upper-cased, diacritics stripped,
-  whitespace and punctuation collapsed. Two spellings of one address dedupe; the per-owner unique
-  on `(ownerFk, type, valueKey)` already exists.
-- `uniqueness: 'per-owner'`. Two owners may share an address (a founder and their company).
-- `redact`: lines → `['[redacted]']`, locality/postal/geo/recipient dropped, `country` kept
-  (an aggregate fact, not PII on its own).
-- `display: { label: 'Address', icon: 'lucide:map-pin' }`. No `toUrl`, no `toStubEmail`.
+Vendors (validation / autocomplete / geocoding):
+- **Google** (Geocoding, Places, Address Validation API) — Zealot's existing client
+- **Loqate**, **Smarty**, **Melissa** — validation-first vendors
+- **HERE**, **Mapbox**, **Geoapify** — geocoding-first
 
-### 2. Country-aware validation — metadata, not hand-written rules
+Product shapes worth copying from, because they ship to every country:
+- **Stripe** `address` (billing), **Shopify** `MailingAddress`, **Salesforce** compound address
+  field, **HubSpot** address properties
 
-Which fields a country requires, what it calls them (ZIP vs Postcode, State vs Province vs
-Prefecture), how it orders them, and the postal-code pattern come from libaddressinput's open
-metadata (`i18napis.appspot.com/address` dataset, vendored as JSON into
-`packages/shared/src/reference/addressFormats.ts` the way `countries.ts` vendors ISO-3166).
-`valueSchema` is refined per `country` from that table: required fields present, postal code
-matches the pattern, `administrativeArea` in the country's list when it has one. The same table
-drives the FE form (labels, order, which fields show) — one source for validation and rendering,
-no per-country code.
+Output of the survey: the recommended field set, the metadata source, the canonical-form approach,
+and the first vendor — as a proposal to discuss, not a schema.
 
-### 3. The address adapter (INFRA-009)
+## What survives whatever the survey picks
 
-Validation and geocoding talk to a third party, so they are an adapter with an interface, a
-provider implementation and a console/mock implementation, picked at `init`:
+- **Owner is false-polymorphic** (User | Organization | Space) through the registry, like Contact
+  and Segment. Roles (billing, shipping, home, business) and a primary per role.
+- **Validation and geocoding are an adapter** (INFRA-009): interface, provider, console/mock,
+  chosen at `init`. Zealot's `integrations/googleGeocode/api.ts` (embedded VCR) is the first
+  provider's client, and `createShippingAddress`'s fallbacks port with it — `postal_town` for a
+  missing locality (UK, ZLT-2463), `administrative_area_level_3` with " City" stripped, non-Latin
+  components skipped for a Latin one, province and street recovered from the raw string. A
+  provider failure saves the address unverified; it never fails the write.
+- **Verification state lives on the row** and is cleared by any edit to an address field.
+- **Rules read scalar columns**, never the structured value: at least `country`, probably `region`,
+  exposed through the customer lens. Finer than that (postal prefix, radius) is a derived
+  enrichment (FEAT-020).
+- **Consumers snapshot, never reference.** A redemption, invoice or shipment keeps its own copy of
+  the address as used; the owner's row moves on without it. Zealot's `DirectRewardRedemption`
+  already does this in flat columns.
+- **History is the audit log**, not a table.
 
-```ts
-type AddressClient = {
-  parse(freeform: string, hint?: { country?: CountryCode }): Promise<AddressValue | null>;   // paste → structured
-  validate(value: AddressValue): Promise<{ value: AddressValue; verdict: 'confirmed' | 'corrected' | 'unconfirmed' }>;
-  suggest(prefix: string, hint?: { country?: CountryCode }): Promise<AddressSuggestion[]>;  // autocomplete
-};
-```
+## Zealot lessons
 
-- First provider: **Google** (Geocoding for `parse`/`validate`, Places Autocomplete for `suggest`).
-  Zealot's `integrations/googleGeocode/api.ts` is the client to port — embedded VCR, cassette per
-  test, never touches `globalThis.fetch`. Second provider when a consumer needs it (Loqate, Smarty);
-  the interface is the investment.
-- The component → field normaliser ports from Zealot's `createShippingAddress` **with its fallbacks
-  intact**, each one a bug that reached production: `postal_town` when `locality` is missing (UK,
-  ZLT-2463 — a carrier rejected the shipment for a missing city), `administrative_area_level_3` with
-  the trailing " City" stripped, non-Latin components skipped in favour of a Latin one, province
-  recovered from the raw string when the provider returns none, street recovered from the raw string
-  when the provider drops the route. `validate` returns `corrected` when it changed anything, and
-  the FE shows the correction rather than silently overwriting what the user typed.
-- `geo` and `validatedAt` are written only by `validate`. A user edit to any address field clears
-  both, so a stale verification can never outlive the address it verified.
-- Validation runs in the write path of the Contact service (`parseInput` for freeform, `validate`
-  on save when the adapter is configured), never in a hook — same ruling as segment reconcile:
-  external calls belong where the request can report them, and a provider outage must degrade to
-  "saved, unverified", not to a failed save.
-
-### 4. What a rule can read
-
-Segmenting by country or region is the first thing anyone wants and the JSON value is not a
-lens path. Two indexed scalar columns on `Contact`, written by the Contact service from the value
-on every save:
-
-- `country CountryCode?` — populated for `address` **and** `phone` (phone already carries it in
-  `value`), so "customers in Germany" is `contacts.country` whichever contact type says so.
-- `region String?` — `administrativeArea` for addresses; null otherwise.
-
-Both join the customer lens as filterable paths on `contacts` narrowed by `type`. Postal-code
-prefix and geo-radius rules are **not** in scope; if they are wanted they are derived enrichments
-(FEAT-020), not more columns.
-
-### 5. Consumers take a snapshot, not a reference
-
-A redemption, an invoice or a shipment keeps **its own copy** of the address value as it was at the
-moment of use (`Json` column, `AddressValue` shape), never an FK to the Contact row. The owner edits
-or deletes their address later; the record of what was billed or shipped must not move with it.
-Zealot's `DirectRewardRedemption` already does this, in flat columns; the template does it as one
-JSON column with the same schema, so the renderer is shared.
-
-### 6. History
-
-Nothing new. Contact writes go through the lifecycle and land in `AuditLog` with before/after; the
-"address change tracking" the stub asked for is a query on the audit log, not a table.
+- Free-text `address VARCHAR(100)` + `zipCode VARCHAR(100)` on `FanUsers`, re-geocoded at every
+  shipment. Parse once at save, store structured, verify, snapshot at use.
+- `IntegrationMap`'s "`02109` is a postal code, not the number 2109": postal codes are strings end
+  to end.
+- Carrier rejections for a missing city and non-Latin locality names made the geocode fallbacks
+  load-bearing; they are part of the normaliser, not polish.
+- `createShippingAddress` swallowing every error into `null` hid incomplete addresses until the
+  carrier bounced them.
 
 ## Not in scope
 
-- Tax and shipping-rate calculation (FIN-001 / a fulfilment ticket consume the billing and
-  shipping subtypes; they do not live here).
-- A second validation provider before a consumer asks for one.
-- Postal-code prefix or geo-radius segmentation (derived enrichments, FEAT-020).
-- Localized display of foreign scripts beyond what the provider returns (FEAT-006).
-
-## Zealot lessons folded in
-
-- Free-text `address VARCHAR(100)` + `zipCode VARCHAR(100)` on `FanUsers`, re-parsed by the geocoder
-  at every shipment: parse once at save, store structured, verify, snapshot at use.
-- `IntegrationMap`'s "`02109` is a postal code, not the number 2109": postal codes are strings
-  end to end; the value schema never coerces them.
-- Missing-city carrier rejections and non-Latin locality names: the fallbacks in §3 are the
-  normaliser, not optional polish.
-- `createShippingAddress` swallowing every error into `null`: here a provider failure is a logged
-  `unconfirmed` verdict and the address saves unverified.
-
-## Tests
-
-- `addressDef`: freeform US / UK / JP / DE parse into the canonical shape (cassettes); valueKey
-  dedupes "123 Main St." and "123 main street"; per-country required fields and postal patterns
-  refuse and accept as the metadata says; redaction keeps `country` only.
-- Adapter: each `createShippingAddress` fallback reproduced as a cassette-driven case; `corrected`
-  verdict when the provider changes a component; provider error → `unconfirmed`, save succeeds.
-- Contact service: `country`/`region` columns follow the value on create, update and the clear on
-  edit; `validatedAt`/`geo` cleared by an edit to any address field.
-- Lens: a segment rule on `contacts.country` with `type: address` compiles on both rails and
-  matches the expected customers.
-- Snapshot: a consumer's stored copy is unchanged after the owner edits the Contact.
+Tax and shipping-rate calculation (FIN-001 and a fulfilment ticket consume the roles). A second
+vendor before a consumer asks. Localized display beyond what the provider returns (FEAT-006).
 
 ## Related
 
-- **Blocks**: FIN-001 (billing address), any physical fulfilment.
-- **Rides on**: Contact registry (`packages/shared/src/contact/`), false-polymorphism registry,
-  INFRA-009 adapter primitive, `reference/countries.ts`.
-- **Feeds**: FEAT-021 segments (the two columns in the lens), FEAT-020 (anything finer than region).
+- **Blocks**: FIN-001 (billing address), physical fulfilment.
+- **Rides on**: false-polymorphism registry, INFRA-009, `reference/countries.ts`.
+- **Feeds**: FEAT-021 (country/region in the lens), FEAT-020 (anything finer).
