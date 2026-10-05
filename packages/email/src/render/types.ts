@@ -10,6 +10,12 @@ import type {
   EmailTemplate,
 } from '@template/db/generated/client/client';
 
+import type { EmailRenderError } from '@template/email/errors/EmailRenderError';
+
+export type RenderObserver = {
+  onRenderFailure?: (error: EmailRenderError) => void;
+};
+
 export type OwnerScope = {
   ownerModel: EmailOwnerModel;
   organizationId?: string | null;

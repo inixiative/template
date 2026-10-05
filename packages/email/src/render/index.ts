@@ -6,6 +6,7 @@ export {
   composeComponent,
   composeTemplate,
 } from './compose';
+export { computeDegradedComponentRefs } from './computeDegradedComponentRefs';
 export {
   type ComponentWrite,
   collectSlugs,
@@ -41,6 +42,7 @@ export {
   rowOwner,
 } from './owner';
 export { parseBlocks } from './parseBlocks';
+export { recomputeDegradedComponentRefs } from './recomputeDegradedComponentRefs';
 export { sanitizeSubject } from './sanitizeSubject';
 export {
   type LensForSlug,
@@ -52,4 +54,9 @@ export {
 } from './save';
 export type { RenderIssue, RenderIssueKind } from './settle';
 export { SYSTEM_TOKENS, type SystemToken, type SystemTokenName } from './systemTokens';
-export { type EmailModel, EmailModels, type EmailModelType, type OwnerScope } from './types';
+export {
+  type EmailModel,
+  EmailModels,
+  type EmailModelType,
+  type OwnerScope,
+} from './types';

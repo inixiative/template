@@ -3,6 +3,8 @@ import { clearHookRegistry, db, registerSoftDeleteScoper } from '@template/db';
 import type { Organization } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
+  createEmailComponent,
+  createEmailTemplate,
   createOrganization,
   createSegment,
   createTag,
@@ -143,6 +145,67 @@ describe('settleTemplate — the registry entry decides what an issue does', () 
         substitute: 'holey',
       }),
     ).rejects.toBeInstanceOf(EmailRenderError);
+  });
+
+  it('refreshes an unmarked template after a raw component deletion and preserves substitution', async () => {
+    const { entity: component } = await createEmailComponent({ slug: 'removed-child' });
+    const { entity: template } = await createEmailTemplate({
+      mjml: mjml('{{#component:removed-child}}{{/component:removed-child}}'),
+      subject: 'Hello',
+    });
+    const expected = await settleTemplate('clean', platform, variables);
+    await db.raw.emailComponent.delete({ where: { id: component.id } });
+    const before = await db.emailTemplate.findUniqueOrThrow({ where: { id: template.id } });
+    expect(before.degradedComponentRefs).toEqual([]);
+    const settled = await settleTemplate(template.slug, platform, variables, undefined, {
+      onIssue: 'fail',
+      substitute: 'clean',
+    });
+    expect(settled).toEqual(expected);
+    const stored = await db.emailTemplate.findUniqueOrThrow({ where: { id: template.id } });
+    expect(stored.degradedComponentRefs).toEqual(['removed-child']);
+    expect(stored.updatedAt).toEqual(before.updatedAt);
+  });
+
+  it('refreshes an unmarked template while preserving the failed send outcome', async () => {
+    const { entity: component } = await createEmailComponent({ slug: 'removed-fatal-child' });
+    const { entity: template } = await createEmailTemplate({
+      mjml: mjml('{{#component:removed-fatal-child}}{{/component:removed-fatal-child}}'),
+      subject: 'Hello',
+    });
+    await db.raw.emailComponent.delete({ where: { id: component.id } });
+    await expect(
+      settleTemplate(template.slug, platform, variables, undefined, { onIssue: 'fail' }),
+    ).rejects.toMatchObject({
+      type: 'render_failed',
+      path: ['Component not found: removed-fatal-child'],
+    });
+    expect(
+      (await db.emailTemplate.findUniqueOrThrow({ where: { id: template.id } }))
+        .degradedComponentRefs,
+    ).toEqual(['removed-fatal-child']);
+    await expect(
+      settleTemplate(template.slug, platform, variables, undefined, { onIssue: 'fail' }),
+    ).rejects.toMatchObject({
+      type: 'render_failed',
+      path: ['Component not found: removed-fatal-child'],
+    });
+  });
+
+  it('skips recomputation for an already marked template and preserves its value and timestamp', async () => {
+    const { entity: template } = await createEmailTemplate({
+      mjml: mjml('{{#component:already-missing}}{{/component:already-missing}}'),
+      subject: 'Hello',
+      degradedComponentRefs: ['already-missing', 'previously-missing'],
+    });
+    const settled = await settleTemplate(template.slug, platform, variables, undefined, {
+      onIssue: 'fail',
+      substitute: 'clean',
+    });
+    expect(settled.slug).toBe('clean');
+    const stored = await db.emailTemplate.findUniqueOrThrow({ where: { id: template.id } });
+    expect(stored.degradedComponentRefs).toEqual(template.degradedComponentRefs);
+    expect(stored.updatedAt).toEqual(template.updatedAt);
   });
 });
 

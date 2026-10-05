@@ -15,6 +15,7 @@ import {
 } from '@template/db';
 import type { AuditSubjectModel } from '@template/db/generated/client/enums';
 import { auditActorStore } from '@template/db/lib/auditActorContext';
+import { recomputeDegradedComponentRefs } from '@template/email/render';
 import { castArray, isEqual } from 'lodash-es';
 import { processAuditData } from '#/hooks/auditLog/utils';
 import {
@@ -61,32 +62,6 @@ const wroteSnapshot = (model: EmailModel, change: Change): boolean =>
 const isSoftDelete = (change: Change): boolean =>
   change.previous?.deletedAt == null && change.record.deletedAt != null;
 
-const degradedFrom = (versions: Record<string, string | null>): string[] =>
-  Object.entries(versions)
-    .filter(([, id]) => id === null)
-    .map(([slug]) => slug)
-    .sort();
-
-const syncDegradedRefs = async (
-  model: EmailModel,
-  record: VersionedRecord,
-  versions: Record<string, string | null>,
-): Promise<void> => {
-  const degraded = degradedFrom(versions);
-  if (isEqual([...record.degradedComponentRefs].sort(), degraded)) return;
-  if (model === 'EmailTemplate') {
-    await db.emailTemplate.update({
-      where: { id: record.id },
-      data: { degradedComponentRefs: degraded },
-    });
-  } else {
-    await db.emailComponent.update({
-      where: { id: record.id },
-      data: { degradedComponentRefs: degraded },
-    });
-  }
-};
-
 const snapshotChildVersions = async (model: EmailModel, record: VersionedRecord): Promise<void> => {
   const latest = await findLatestSnapshot(model, record.id);
   if (!latest) return;
@@ -96,7 +71,7 @@ const snapshotChildVersions = async (model: EmailModel, record: VersionedRecord)
     where: { id: latest.id },
     data: { componentVersions: versions as Prisma.InputJsonValue },
   });
-  await syncDegradedRefs(model, record, versions);
+  await recomputeDegradedComponentRefs(model, record.id);
 };
 
 const walkUp = async (slug: string, visited: Set<string>): Promise<void> => {
@@ -120,7 +95,7 @@ const walkUp = async (slug: string, visited: Set<string>): Promise<void> => {
     if (isEqual(latest?.componentVersions ?? {}, newVersions)) continue;
 
     await createVersionBumpSnapshot(model, record, newVersions);
-    await syncDegradedRefs(model, record, newVersions);
+    await recomputeDegradedComponentRefs(model, record.id);
     if (model === 'EmailComponent') await walkUp(record.slug, visited);
   }
 };
