@@ -24,9 +24,10 @@ rule, read by the sweep as a `where`.
   `ago`/`ahead` (rolling, units years → seconds), `this`/`last`/`next` (period), `start`/`end`
   (edge); `isDateExpr` is the gate and `requireNow` is where evaluation demands a clock. Add a
   fold beside `ruleSourceValues`: `ruleClockUnit(rule): ClockUnit | null` with
-  `ClockUnit = hour | day | week | month`, the smallest unit any date expression in the tree
-  depends on. Rolling: seconds, minutes and hours → `hour`; days → `day`; weeks → `week`; months,
-  quarters and years → `month`. Period and edge: the period unit, with quarter and year → `month`.
+  `ClockUnit = hour | day | week | month | quarter | year`, the smallest unit any date expression
+  in the tree depends on (Aron, 2026-10-05: six units, each its own tick). Rolling: seconds,
+  minutes and hours → `hour`; days → `day`; weeks → `week`; months → `month`; quarters →
+  `quarter`; years → `year`. Period and edge: the period unit.
   Absolute dates and column-to-column `path` compares → `null`. Walks `all`/`any`/relation/aggregate/window
   nodes like the other folds; a hand-rolled walk in the segment module is wrong under v3 bindings.
 - **`Segment.clockUnit`**, a nullable enum column, written by the `segmentRuleReferences`
@@ -35,8 +36,8 @@ rule, read by the sweep as a `where`.
   `conditions` does; a second materialized rule surface gets its own column. Email templates and
   components evaluate at render and materialize nothing, so they need no tick and no column.
 - **One job per unit.** `sweepSegments` takes `{ clockUnit?: ClockUnit }` in its cron payload and
-  `sweepableSegments(filter)` adds the `where`; dependency order is unchanged. Four cron rows pick
-  up their own unit — hourly, daily (keep 04:00), weekly, monthly — beside the existing nightly
+  `sweepableSegments(filter)` adds the `where`; dependency order is unchanged. Six cron rows pick
+  up their own unit — hourly, daily (keep 04:00), weekly, monthly, quarterly, yearly — beside the existing nightly
   backstop over every sound dynamic segment. Hourly is the floor; a finer tick is a product
   decision, not a default.
 - **Dependents need no column.** A segment that reads a clock-sensitive segment's membership is
@@ -51,7 +52,7 @@ alone keeps it fresh.
 
 ## Tests
 
-- Fold: rolling hours → `hour`; rolling minutes → `hour`; `thisWeek` → `week`; `lastQuarter` → `month`; absolute date → `null`; a date expression
+- Fold: rolling hours → `hour`; rolling minutes → `hour`; `thisWeek` → `week`; `lastQuarter` → `quarter`; `thisYear` → `year`; absolute date → `null`; a date expression
   nested under `any` → relation → aggregate is found; `path` compare → `null`.
 - Hook: saving a rolling rule writes `clockUnit`; editing it to an absolute date clears it;
   revive rebuilds it.
