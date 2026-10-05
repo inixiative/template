@@ -1,6 +1,11 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
 import { clearHookRegistry, db } from '@template/db';
-import { cleanupTouchedTables } from '@template/db/test';
+import {
+  buildEmailComponent,
+  cleanupTouchedTables,
+  createEmailComponent,
+  createEmailTemplate,
+} from '@template/db/test';
 import { expand, saveEmailTemplate } from '@template/email/render';
 import { registerAuditLogHook } from '#/hooks/auditLog/hook';
 import { registerEmailVersioningHook } from '#/hooks/emailVersioning/hook';
@@ -153,5 +158,49 @@ describe('emailVersioning', () => {
 
     const liveTemplate = await db.emailTemplate.findUniqueOrThrow({ where: { id: template.id } });
     expect(liveTemplate.degradedComponentRefs).toEqual(['greeting']);
+  });
+
+  it('keeps a dependent healthy when deletion affects only an overridden default slot', async () => {
+    const { entity: child } = await createEmailComponent({ slug: 'x' });
+    await createEmailComponent({
+      slug: 'card',
+      mjml: '{{#slot:inner:default}}{{#component:x}}{{/component:x}}{{/slot:inner:default}}',
+      componentRefs: ['x'],
+    });
+    const { entity: template } = await createEmailTemplate({
+      mjml: mjml('{{#component:card}}{{#slot:inner}}OVERRIDE{{/slot:inner}}{{/component:card}}'),
+      componentRefs: ['card'],
+    });
+    const { entity: inherited } = await createEmailTemplate({
+      mjml: mjml('{{#component:card}}{{/component:card}}'),
+      componentRefs: ['card'],
+    });
+    const before = await db.auditLog.count({ where: { subjectEmailTemplateId: template.id } });
+    await db.emailComponent.update({ where: { id: child.id }, data: { deletedAt: new Date() } });
+    const stored = await db.emailTemplate.findUniqueOrThrow({ where: { id: template.id } });
+    expect(stored.degradedComponentRefs).toEqual([]);
+    expect(
+      (await db.emailTemplate.findUniqueOrThrow({ where: { id: inherited.id } }))
+        .degradedComponentRefs,
+    ).toEqual(['x']);
+    expect(await db.auditLog.count({ where: { subjectEmailTemplateId: template.id } })).toBe(
+      before + 1,
+    );
+  });
+
+  it('keeps a template healthy when its resolved component has no audit snapshot', async () => {
+    const { entity } = await buildEmailComponent({ slug: 'raw-child' });
+    const component = await db.raw.emailComponent.create({ data: entity });
+    expect(await latestSnapshot({ subjectEmailComponentId: component.id })).toBeNull();
+    const { entity: template } = await createEmailTemplate({
+      mjml: mjml('{{#component:raw-child}}{{/component:raw-child}}'),
+      componentRefs: ['raw-child'],
+    });
+    const snapshot = await latestSnapshot({ subjectEmailTemplateId: template.id });
+    expect(snapshot?.componentVersions).toEqual({ 'raw-child': null });
+    expect(
+      (await db.emailTemplate.findUniqueOrThrow({ where: { id: template.id } }))
+        .degradedComponentRefs,
+    ).toEqual([]);
   });
 });

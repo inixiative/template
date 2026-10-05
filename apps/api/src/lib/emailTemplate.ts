@@ -10,9 +10,11 @@ import {
   type ComposeTemplateResult,
   composeTemplate,
   interpolate,
+  lookupTemplate,
   type OwnerScope,
   type RenderIssue,
   type RuleErrorSink,
+  recomputeDegradedComponentRefs,
   type Variables,
 } from '@template/email/render';
 import type { EmailLens } from '@template/email/rules';
@@ -175,8 +177,22 @@ export const settleTemplate = async (
     primaryKind = rendered.settled.kind;
     primaryOwner = rendered.ownerModel;
   } catch (error) {
-    if (error instanceof EmailRenderError && error.type !== 'render_failed')
+    if (error instanceof EmailRenderError && error.type !== 'render_failed') {
+      if (error.type === 'component_missing') {
+        try {
+          const row = await lookupTemplate(template, scope);
+          if (row && !row.degradedComponentRefs.length)
+            await recomputeDegradedComponentRefs('EmailTemplate', row.id);
+        } catch (refreshError) {
+          log.error(
+            { error: refreshError, template, ownerModel: scope.ownerModel },
+            'Email degradation recompute failed',
+            LogScope.email,
+          );
+        }
+      }
       return substituted(error.message);
+    }
     throw error;
   }
 

@@ -13,7 +13,6 @@ export type VersionedRecord = Pick<
   | 'id'
   | 'slug'
   | 'componentRefs'
-  | 'degradedComponentRefs'
   | 'ownerModel'
   | 'organizationId'
   | 'spaceId'

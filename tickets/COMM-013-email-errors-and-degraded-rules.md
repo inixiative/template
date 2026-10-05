@@ -54,7 +54,7 @@ that save, so the lens check never runs at save.
 | 9 | Component missing at render (deleted, or its shadow removed with no parent) | render | `component_missing` thrown, failed, retries, DLQ; policy does not apply | ops |
 | 10 | Component missing at read (`hydrate`) | read | bare ref kept, no error | editor |
 | 11 | Persisted component cycle | save, render and hydrate all throw `circular_ref` | | ops or editor |
-| 12 | `degradedComponentRefs` | versioning hook, on ref writes | index-list projection only; compose never consults it | admin list |
+| 12 | `degradedComponentRefs` | versioning hook and guarded send-path recompute after `component_missing` | missing component slugs when rendering this row transitively, honoring slot overrides; not necessarily in `componentRefs`; compose never consults it | admin list |
 | 13 | No template anywhere in the cascade | render | `template_missing`, failed, retries, DLQ | ops |
 | 14 | Base owner with `degrade` or `fallback` | render | forced to `fail` | ops |
 | 15 | Rail-provided system token not supplied | never | literal token ships | the recipient |

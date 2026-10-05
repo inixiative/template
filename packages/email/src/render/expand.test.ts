@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test';
+import { EmailRenderError } from '@template/email/errors/EmailRenderError';
 import { expandWith, type LookupComponents } from '@template/email/render/expand';
 
 const lookupFrom =
@@ -240,5 +241,36 @@ describe('expand', () => {
         type: 'component_missing',
       });
     });
+  });
+});
+
+describe('render observers', () => {
+  it('reports a missing component and continues rendering', async () => {
+    const failures: EmailRenderError[] = [];
+    const output = await expandWith(
+      'before{{#component:missing}}{{/component:missing}}{{#component:present}}{{/component:present}}after',
+      lookupFrom({ present: 'PRESENT' }),
+      { onRenderFailure: (error) => failures.push(error) },
+    );
+    expect(output).toBe('beforePRESENTafter');
+    expect(failures).toHaveLength(1);
+    expect(failures[0]).toBeInstanceOf(EmailRenderError);
+    expect(failures[0]).toMatchObject({ slug: 'missing', type: 'component_missing' });
+  });
+
+  it('reports a circular reference instead of throwing', async () => {
+    const failures: EmailRenderError[] = [];
+    const output = await expandWith(
+      '{{#component:a}}{{/component:a}}tail',
+      lookupFrom({
+        a: 'A{{#component:b}}{{/component:b}}',
+        b: 'B{{#component:a}}{{/component:a}}',
+      }),
+      { onRenderFailure: (error) => failures.push(error) },
+    );
+    expect(output).toBe('ABtail');
+    expect(failures).toHaveLength(1);
+    expect(failures[0]).toBeInstanceOf(EmailRenderError);
+    expect(failures[0]).toMatchObject({ slug: 'a', type: 'circular_ref', path: ['a', 'b', 'a'] });
   });
 });
