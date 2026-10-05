@@ -40,6 +40,9 @@ rule, read by the sweep as a `where`.
   up their own unit — hourly, daily (keep 04:00), weekly, monthly, quarterly, yearly — beside the existing nightly
   backstop over every sound dynamic segment. Hourly is the floor; a finer tick is a product
   decision, not a default.
+- **Same column on derived enrichment maps.** When FEAT-020 lands, a derived map folds `clockUnit`
+  from its own rules on the same hook and a synthetic map declares it, so one enum and one sweep
+  family cover every materialized rule surface (Zealot: `IntegrationMap`, ZLT-5215).
 - **Dependents need no column.** A segment that reads a clock-sensitive segment's membership is
   refreshed by the dependents fan-out `reconcileSegment` already runs after a diff.
 
