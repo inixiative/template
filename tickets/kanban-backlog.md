@@ -43,6 +43,7 @@ kanban
     FE-002-editor-slice-pattern
     FE-006-conditional-form-v2
     COMM-009-component-slots-passthrough-children
+    COMM-014-per-org-sending-domains
 ```
 
 ## Tickets
@@ -58,6 +59,7 @@ kanban
 
 **Communications:**
 - [COMM-009: Component Slots](./COMM-009-component-slots-passthrough-children.md) - `{{slot:name}}` passthrough children for wrapper components (not registered/cascading subcomponents); from ZLT-3139
+- [COMM-014: Per-org Sending Domains](./COMM-014-per-org-sending-domains.md) - Stub. Each org signs with its own verified domain; port of Zealot's "Per-brand email domains" once its shape settles
 
 **Enterprise:**
 - [AUTH-001: SSO](./AUTH-001-sso.md) - SAML/OIDC, JIT provisioning, SCIM
@@ -134,7 +136,7 @@ kanban
 
 ## Quick Stats
 
-- **Total Backlog Items**: 33
+- **Total Backlog Items**: 34
 - **Polish**: 3
 - **Enterprise**: 2
 - **Financial**: 2
