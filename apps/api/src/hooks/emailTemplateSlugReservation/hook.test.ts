@@ -149,6 +149,32 @@ describe('emailTemplateSlugReservation hook', () => {
     expect(revived.template.deletedAt).toBeNull();
   });
 
+  it('an admin slug deleted and revived twice stays one row with one id', async () => {
+    const admin = await saveEmailTemplate({ ...templateInput('cycled'), ownerModel: 'admin' });
+
+    for (let round = 0; round < 2; round++) {
+      await db.txn(() =>
+        db.emailTemplate.update({
+          where: { id: admin.template.id },
+          data: { deletedAt: new Date() },
+        }),
+      );
+      await expectConflict(
+        saveEmailTemplate({ ...templateInput('cycled'), ownerModel: 'default' }),
+      );
+
+      const revived = await saveEmailTemplate({ ...templateInput('cycled'), ownerModel: 'admin' });
+      expect(revived.template.id).toBe(admin.template.id);
+    }
+
+    const rows = await db.withDeleted(() =>
+      db.emailTemplate.findMany({ where: { slug: 'cycled' } }),
+    );
+    expect(rows.map((row) => [row.id, row.ownerModel, row.deletedAt])).toEqual([
+      [admin.template.id, 'admin', null],
+    ]);
+  });
+
   it('a soft-deleted tenant template still holds its slug against a new admin template', async () => {
     const { entity: org } = await createOrganization();
     const tenant = await saveEmailTemplate({

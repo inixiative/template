@@ -4,6 +4,7 @@ import { lensFor } from '@template/db/lens';
 import {
   cleanupTouchedTables,
   createEmailComponent,
+  createEmailTemplate,
   createOrganization,
   createSpace,
   createUser,
@@ -89,6 +90,73 @@ describe('saveEmailTemplate', () => {
     expect(second.components[0].deletedAt).toBeNull();
     expect(second.components[0].mjml).toBe('<mj-text>v2</mj-text>');
     expect(await db.emailComponent.count({ where: { slug: 'footer' } })).toBe(1);
+  });
+
+  it('delete, re-create, delete, re-create keeps one template row and one id throughout', async () => {
+    const input = {
+      slug: 'cycled',
+      name: 'Cycled',
+      subject: 'Hello',
+      kind: 'system' as const,
+      mjml: mjml('{{#component:badge}}<mj-text>v1</mj-text>{{/component:badge}}'),
+      ownerModel: 'default' as const,
+    };
+    const rowsFor = () =>
+      db.withDeleted(async () => ({
+        templates: await db.emailTemplate.findMany({ where: { slug: 'cycled' } }),
+        components: await db.emailComponent.findMany({ where: { slug: 'badge' } }),
+      }));
+    const softDelete = async (templateId: string, componentId: string) => {
+      const deletedAt = new Date();
+      await db.emailTemplate.update({ where: { id: templateId }, data: { deletedAt } });
+      await db.emailComponent.update({ where: { id: componentId }, data: { deletedAt } });
+    };
+
+    const first = await saveEmailTemplate(input);
+    const templateId = first.template.id;
+    const componentId = first.components[0].id;
+
+    for (const version of ['v2', 'v3']) {
+      await softDelete(templateId, componentId);
+      const deleted = await rowsFor();
+      expect(deleted.templates.map((t) => [t.id, t.deletedAt !== null])).toEqual([
+        [templateId, true],
+      ]);
+      expect(deleted.components.map((c) => [c.id, c.deletedAt !== null])).toEqual([
+        [componentId, true],
+      ]);
+
+      const saved = await saveEmailTemplate({
+        ...input,
+        mjml: mjml(`{{#component:badge}}<mj-text>${version}</mj-text>{{/component:badge}}`),
+      });
+      expect(saved.template.id).toBe(templateId);
+      expect(saved.components.map((c) => c.id)).toEqual([componentId]);
+
+      const revived = await rowsFor();
+      expect(revived.templates.map((t) => [t.id, t.deletedAt])).toEqual([[templateId, null]]);
+      expect(revived.components.map((c) => [c.id, c.deletedAt, c.mjml])).toEqual([
+        [componentId, null, `<mj-text>${version}</mj-text>`],
+      ]);
+    }
+  });
+
+  it('the natural-key unique covers tombstones, so a key can never hold a second row', async () => {
+    const { entity: tombstone } = await createEmailTemplate({
+      slug: 'one-row',
+      ownerModel: 'default',
+      deletedAt: new Date(),
+    });
+
+    await expect(
+      createEmailTemplate({ slug: 'one-row', ownerModel: 'default', deletedAt: new Date() }),
+    ).rejects.toThrow();
+    await expect(createEmailTemplate({ slug: 'one-row', ownerModel: 'default' })).rejects.toThrow();
+
+    const rows = await db.withDeleted(() =>
+      db.emailTemplate.findMany({ where: { slug: 'one-row' } }),
+    );
+    expect(rows.map((row) => row.id)).toEqual([tombstone.id]);
   });
 
   it('a soft-deleted parent-tier component is never inherited', async () => {
