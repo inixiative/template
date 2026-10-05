@@ -1,4 +1,4 @@
-# COMM-014: Per-org sending domains (bring-your-own sender)
+# COMM-016: Per-org sending domains (bring-your-own sender)
 
 **Status**: 📋 Stub — not started. Zealot ships this first (Linear project "Per-brand email domains", Steven, Oct 2026); port once the Zealot shape settles.
 **Assignee**: TBD
