@@ -10,10 +10,11 @@
 // Synchronous, inside the writing transaction: the written row's own snapshot (the audit hook
 // writes it; this hook stamps its componentVersions), the written row's own degradedComponentRefs,
 // and a version-bump snapshot for every ancestor whose resolved component versions moved. A
-// snapshot is an audit event. It is per mutation, it is an insert, it takes no lock on the
-// ancestor, and it has to ride the transaction that caused it: if it were deferred to a debounced
-// job, three quick edits to a component would collapse into one history entry, and the history
-// would no longer commit or roll back together with the change it records.
+// snapshot is an audit event. It is per mutation, it is an insert, and the only lock it takes on
+// the ancestor is the key-share lock its subject foreign key implies, which a plain update of the
+// ancestor does not conflict with. It has to ride the transaction that caused it: if it were
+// deferred to a debounced job, three quick edits to a component would collapse into one history
+// entry, and the history would no longer commit or roll back together with the change it records.
 //
 // Deferred, after commit: the ancestors' degradedComponentRefs. That column is a cache of state
 // that can always be derived again from the live rows. It is per state rather than per event, and
