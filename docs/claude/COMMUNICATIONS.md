@@ -675,7 +675,8 @@ edges are persisted so that "who references X" is an index and a stale rule is n
   (source row → target row), false-polymorphic on both ends — `sourceModel` + one typed FK per
   rule-bearing model (`sourceEmailTemplateId` / `sourceEmailComponentId` / `sourceSegmentId`), `targetModel` + one typed FK per
   referenceable model (`targetTagId` / `targetOrganizationId` / `targetSpaceId` / `targetSegmentId`), both axes in `PolymorphismRegistry`.
-  Real relations on both ends, `onDelete: Cascade`; append/delete only, no lifecycle of its own.
+  Real relations on both ends: the source side cascades, the target side is left to `SET NULL` on a
+  purge. Edges are written by the sync (create, delete, restamp) and stamped by `ruleReference:target`.
 - **Which models are referenceable is the registry's answer, not any surface's.**
   `RULE_REFERENCEABLE_MODELS` (`packages/db`) is the `targetModel` axis of
   `PolymorphismRegistry.RuleReference`; the referenced-side hook registers on it.
@@ -708,10 +709,10 @@ edges are persisted so that "who references X" is an index and a stale rule is n
   dead reference stays editable), referenced rows locked with `db.findForUpdate` while the gate
   reads them, and every kept edge restamped against its target. With `gate: { sources }` (the
   lens's `sourceQueries`), a newly added reference the
-  source's composed `where` does not admit is refused too (`unadmittedRuleReferences`): that is how
+  source's composed `where` does not admit is refused too (`admitRuleReferences`): that is how
   an Organization template cannot name another organization's tag or segment. Throws
   `RuleReferenceError`. Adding a rule-bearing column = a `syncRuleReferenceEdges`
-  call from its save path. Email's `syncRuleReferences(owner, contents, lens)` is the
+  call from its save path. Email's `syncRuleReferences(source, contents, lens, mode)` is the
   content-shaped front: it collects the rules out of MJML and subject (`contentRuleReferences`)
   and hands the references down. `saveEmailTemplate` calls it inside
   its transaction for the template and each saved component; it is the only writer of

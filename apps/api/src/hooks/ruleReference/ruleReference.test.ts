@@ -327,10 +327,13 @@ describe('ruleReference — the save path writes edges, the target side stamps t
     const { entity: comp } = await createEmailComponent();
 
     await expect(
-      createRuleReference(
-        { sourceModel: 'EmailTemplate', targetModel: 'Tag', targetId: tag.id },
-        { emailComponent: comp, tag },
-      ),
+      createRuleReference({
+        sourceModel: 'EmailTemplate',
+        sourceEmailComponentId: comp.id,
+        targetModel: 'Tag',
+        targetId: tag.id,
+        targetTagId: tag.id,
+      }),
     ).rejects.toMatchObject({ status: 422 });
   });
 });

@@ -17,24 +17,36 @@ const ruleReferenceFactory = createFactory('RuleReference', {
     targetId: '',
   }),
   dependencies: {
-    emailTemplate: {
+    sourceEmailTemplate: {
       modelName: 'EmailTemplate',
-      foreignKey: { id: 'emailTemplateId' },
+      foreignKey: { id: 'sourceEmailTemplateId' },
       required: false,
     },
-    emailComponent: {
+    sourceEmailComponent: {
       modelName: 'EmailComponent',
-      foreignKey: { id: 'emailComponentId' },
+      foreignKey: { id: 'sourceEmailComponentId' },
       required: false,
     },
-    segment: { modelName: 'Segment', foreignKey: { id: 'segmentId' }, required: false },
-    tag: { modelName: 'Tag', foreignKey: { id: 'tagId' }, required: false },
-    organization: {
+    sourceSegment: {
+      modelName: 'Segment',
+      foreignKey: { id: 'sourceSegmentId' },
+      required: false,
+    },
+    targetTag: {
+      modelName: 'Tag',
+      foreignKey: { id: 'targetTagId' },
+      required: false,
+    },
+    targetOrganization: {
       modelName: 'Organization',
-      foreignKey: { id: 'organizationId' },
+      foreignKey: { id: 'targetOrganizationId' },
       required: false,
     },
-    space: { modelName: 'Space', foreignKey: { id: 'spaceId' }, required: false },
+    targetSpace: {
+      modelName: 'Space',
+      foreignKey: { id: 'targetSpaceId' },
+      required: false,
+    },
     targetSegment: {
       modelName: 'Segment',
       foreignKey: { id: 'targetSegmentId' },

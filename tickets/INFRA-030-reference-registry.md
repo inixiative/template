@@ -273,7 +273,7 @@ binding is supplied, which the first path already decides.
 
 A soft-deleted owner's rule is not evaluated, so its edges would only hold the referenced side and
 count as degraded. `RuleReference` is in `HARD_DELETE_ON_TOMBSTONE`: tombstoning an owner hard-deletes
-its edges. The referenced relations (`tag`, `organization`, `space`, `targetSegment`) are
+its edges. The target relations (`targetTag`, `targetOrganization`, `targetSpace`, `targetSegment`) are
 `CASCADE_EXEMPT` — tombstoning a *named* row keeps the edges that name it, and
 `ruleReference:target` stamps them. Segment is both, and gets both behaviours.
 
@@ -307,7 +307,7 @@ Transitive degradation — built on FEAT-021 (#105): `segmentRuleStates` closes 
 edges. Tenancy of a reference — built on #105 as well: the lens narrowing's `where` alone decides
 nothing at save (`checkRuleAgainstLens` is a vocabulary check), so `syncRuleReferenceEdges` takes
 the lens's `sourceQueries` and refuses a newly named row the source's composed `where` does not
-admit (`unadmittedRuleReferences`). Email passes its owner-scoped lens; the segment gate
+admit (`admitRuleReferences`). Email passes its owner-scoped lens; the segment gate
 (`assertSegmentReferencesOwned`) still restates the same predicate by hand and should migrate.
 
 ## Related
