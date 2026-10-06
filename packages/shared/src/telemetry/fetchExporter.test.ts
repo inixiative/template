@@ -13,7 +13,7 @@ const exportOnce = (exporter: ReturnType<typeof createFetchExporter>) =>
   new Promise<ExportResult>((resolve) => exporter.export({}, resolve));
 
 describe('export failure diagnostics', () => {
-  it('reports HTTP status and category, suppresses secrets and throttles repeated failures', async () => {
+  it('reports signal and HTTP status, suppresses secrets and throttles repeated failures', async () => {
     const warnings: string[] = [];
     const warn = spyOn(console, 'warn').mockImplementation((value) => warnings.push(String(value)));
     const server = Bun.serve({
@@ -25,14 +25,7 @@ describe('export failure diagnostics', () => {
         }),
     });
     try {
-      for (const [httpStatus, category] of [
-        [401, 'authentication'],
-        [403, 'authentication'],
-        [402, 'billing_or_quota'],
-        [429, 'rate_limit'],
-        [503, 'collector'],
-        [415, 'http'],
-      ] as const) {
+      for (const httpStatus of [401, 402, 403, 415, 429, 503]) {
         const exporter = createFetchExporter({
           url: `${server.url}${httpStatus}?private=url-secret`,
           headers: { Authorization: 'Bearer header-secret' },
@@ -52,7 +45,6 @@ describe('export failure diagnostics', () => {
           level: 'warn',
           message: 'Telemetry export failed. Application continues.',
           signal: 'logs',
-          category,
           httpStatus,
         });
       }
@@ -64,15 +56,24 @@ describe('export failure diagnostics', () => {
     }
   });
 
-  it('distinguishes timeout, transport, serialization and stopped failures without raw errors', async () => {
+  it('reports failures before a response with the signal and no status or raw error', async () => {
     const warnings: string[] = [];
     const warn = spyOn(console, 'warn').mockImplementation((value) => warnings.push(String(value)));
     const server = Bun.serve({ port: 0, fetch: () => new Promise<Response>(() => {}) });
     try {
-      const timeout = createFetchExporter({ signal: 'traces', url: server.url.toString(), timeoutMs: 20, serialize });
+      const timeout = createFetchExporter({
+        signal: 'traces',
+        url: server.url.toString(),
+        timeoutMs: 20,
+        serialize,
+      });
       expect((await exportOnce(timeout)).code).toBe(ExportResultCode.FAILED);
       await timeout.shutdown();
-      const transport = createFetchExporter({ signal: 'metrics', url: 'not-a-url-secret', serialize });
+      const transport = createFetchExporter({
+        signal: 'metrics',
+        url: 'not-a-url-secret',
+        serialize,
+      });
       expect((await exportOnce(transport)).code).toBe(ExportResultCode.FAILED);
       await transport.shutdown();
       const serialization = createFetchExporter({
@@ -87,10 +88,10 @@ describe('export failure diagnostics', () => {
       await stopped.shutdown();
       expect((await exportOnce(stopped)).code).toBe(ExportResultCode.FAILED);
       expect(warnings.map((value) => JSON.parse(value))).toEqual([
-        expect.objectContaining({ signal: 'traces', category: 'timeout' }),
-        expect.objectContaining({ signal: 'metrics', category: 'transport' }),
-        expect.objectContaining({ signal: 'unknown', category: 'serialization' }),
-        expect.objectContaining({ signal: 'unknown', category: 'exporter_stopped' }),
+        expect.objectContaining({ signal: 'traces' }),
+        expect.objectContaining({ signal: 'metrics' }),
+        expect.objectContaining({ signal: 'unknown' }),
+        expect.objectContaining({ signal: 'unknown' }),
       ]);
       expect(warnings.join('\n')).not.toContain('secret');
       expect(warnings.join('\n')).not.toContain('httpStatus');
