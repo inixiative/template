@@ -39,8 +39,8 @@ models, and a Json column's contents aren't indexable — so the edges become ro
 
 ### `RuleReference` — false polymorphism on both axes
 
-`packages/db/prisma/schema/ruleReference.prisma`. `sourceModel` + `emailTemplateId` /
-`emailComponentId`; `targetModel` + `tagId` / `organizationId` / `spaceId`; both axes in
+`packages/db/prisma/schema/ruleReference.prisma`. `sourceModel` + `sourceEmailTemplateId` /
+`sourceEmailComponentId`; `targetModel` + `targetTagId` / `targetOrganizationId` / `targetSpaceId`; both axes in
 `PolymorphismRegistry`, so the `rules` hook enforces exactly-one-FK and the type fields are
 immutable. Real relations on both ends, `onDelete: Cascade`. Edge identity is one partial unique per
 (owner, referenced) branch pair — the Contact / EmailTemplate convention. No `updatedAt` /
@@ -78,7 +78,7 @@ gets its `exposedSurface` (sources stripped), save and settle keep the narrowing
 (`collectRules` in the condition parser). Adding a referenceable model = a `RuleReference` FK
 column + a registry entry (the referenced-side hook and email's id sources derive); adding a
 rule-bearing column = a `syncRuleReferenceEdges` call from its save path.
-Segment (FEAT-021) is the second owner and the fourth referenced model: `segmentId` /
+Segment (FEAT-021) is the second source and the fourth target model: `sourceSegmentId` /
 `targetSegmentId`, edges written by the `segmentRuleReferences` after-write hook.
 
 ### No owner-side hook

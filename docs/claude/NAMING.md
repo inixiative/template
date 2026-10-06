@@ -221,6 +221,10 @@ A polymorphic slot is named for the role the row plays, as `<side>Model` + typed
 
 Never `referenced*`.
 
+The typed FKs and relations carry the side too, so both ends read the same way: `sourceSegmentId` /
+`sourceSegment`, `targetTagId` / `targetTag` (as `Inquiry.sourceUserId` / `targetUserId`). The
+back-relation on a target model is `targetedBy<Records>` (`Tag.targetedByRules`).
+
 ### IDs
 
 TODO: Document ID format

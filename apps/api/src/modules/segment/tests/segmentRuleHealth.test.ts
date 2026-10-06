@@ -25,7 +25,8 @@ const membersOf = (segmentId: string) => ({
   condition: { field: 'segment.id', operator: Operator.equals, value: segmentId },
 });
 
-const edgesOf = (segmentId: string) => db.ruleReference.findMany({ where: { segmentId } });
+const edgesOf = (sourceSegmentId: string) =>
+  db.ruleReference.findMany({ where: { sourceSegmentId } });
 
 describe('segment rule health — the segments a rule names, as edges', () => {
   let space: Space;
@@ -56,7 +57,7 @@ describe('segment rule health — the segments a rule names, as edges', () => {
     expect(edges).toHaveLength(1);
     expect(edges[0]).toMatchObject({
       sourceModel: 'Segment',
-      segmentId: dependent.id,
+      sourceSegmentId: dependent.id,
       targetModel: 'Segment',
       targetId: target.id,
       targetSegmentId: target.id,

@@ -68,7 +68,10 @@ const settles = (promise: Promise<unknown>, withinMs: number) =>
   ]);
 
 const edgesOf = (segmentId: string) =>
-  db.ruleReference.findMany({ where: { segmentId }, orderBy: { createdAt: 'asc' } });
+  db.ruleReference.findMany({
+    where: { sourceSegmentId: segmentId },
+    orderBy: { createdAt: 'asc' },
+  });
 
 describe('ruleReference — edges under concurrency and repair', () => {
   let space: Space;

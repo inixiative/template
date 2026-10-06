@@ -204,17 +204,17 @@ export const PolymorphismRegistry = {
       {
         field: 'sourceModel',
         fkMap: {
-          EmailTemplate: ['emailTemplateId'],
-          EmailComponent: ['emailComponentId'],
-          Segment: ['segmentId'],
+          EmailTemplate: ['sourceEmailTemplateId'],
+          EmailComponent: ['sourceEmailComponentId'],
+          Segment: ['sourceSegmentId'],
         },
       },
       {
         field: 'targetModel',
         fkMap: {
-          Tag: ['tagId'],
-          Organization: ['organizationId'],
-          Space: ['spaceId'],
+          Tag: ['targetTagId'],
+          Organization: ['targetOrganizationId'],
+          Space: ['targetSpaceId'],
           Segment: ['targetSegmentId'],
         },
       },

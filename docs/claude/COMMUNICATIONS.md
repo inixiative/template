@@ -673,8 +673,8 @@ edges are persisted so that "who references X" is an index and a stale rule is n
 
 - **`RuleReference`** (`packages/db/prisma/schema/ruleReference.prisma`): one row per
   (source row → target row), false-polymorphic on both ends — `sourceModel` + one typed FK per
-  rule-bearing model (`emailTemplateId` / `emailComponentId`), `targetModel` + one typed FK per
-  referenceable model (`tagId` / `organizationId` / `spaceId`), both axes in `PolymorphismRegistry`.
+  rule-bearing model (`sourceEmailTemplateId` / `sourceEmailComponentId` / `sourceSegmentId`), `targetModel` + one typed FK per
+  referenceable model (`targetTagId` / `targetOrganizationId` / `targetSpaceId` / `targetSegmentId`), both axes in `PolymorphismRegistry`.
   Real relations on both ends, `onDelete: Cascade`; append/delete only, no lifecycle of its own.
 - **Which models are referenceable is the registry's answer, not any surface's.**
   `RULE_REFERENCEABLE_MODELS` (`packages/db`) is the `targetModel` axis of

@@ -104,21 +104,23 @@ describe('ruleReference — a source takes its edges with it and brings them bac
       const { entity: tag } = await createTag();
       const { template } = await saveTemplateNaming(tag.id);
       expect(
-        await db.ruleReference.findMany({ where: { emailTemplateId: template.id } }),
+        await db.ruleReference.findMany({ where: { sourceEmailTemplateId: template.id } }),
       ).toHaveLength(1);
 
       await tombstone('emailTemplate', template.id);
-      expect(await db.ruleReference.findMany({ where: { emailTemplateId: template.id } })).toEqual(
-        [],
-      );
+      expect(
+        await db.ruleReference.findMany({ where: { sourceEmailTemplateId: template.id } }),
+      ).toEqual([]);
 
       await revive('emailTemplate', template.id);
-      const edges = await db.ruleReference.findMany({ where: { emailTemplateId: template.id } });
+      const edges = await db.ruleReference.findMany({
+        where: { sourceEmailTemplateId: template.id },
+      });
       expect(edges).toHaveLength(1);
       expect(edges[0]).toMatchObject({
         targetModel: 'Tag',
         targetId: tag.id,
-        tagId: tag.id,
+        targetTagId: tag.id,
       });
       expect(ruleReferenceIssues(edges)).toEqual([]);
     });
@@ -131,7 +133,9 @@ describe('ruleReference — a source takes its edges with it and brings them bac
 
       await revive('emailTemplate', template.id);
 
-      const edges = await db.ruleReference.findMany({ where: { emailTemplateId: template.id } });
+      const edges = await db.ruleReference.findMany({
+        where: { sourceEmailTemplateId: template.id },
+      });
       expect(edges[0]?.targetDeletedAt?.toISOString()).toBe('2026-09-30T12:00:00.000Z');
       expect(ruleReferenceIssues(edges).map((issue) => issue.reason)).toEqual(['deleted']);
     });
@@ -144,7 +148,9 @@ describe('ruleReference — a source takes its edges with it and brings them bac
 
       await revive('emailTemplate', template.id);
 
-      const edges = await db.ruleReference.findMany({ where: { emailTemplateId: template.id } });
+      const edges = await db.ruleReference.findMany({
+        where: { sourceEmailTemplateId: template.id },
+      });
       expect(edges).toEqual([]);
       expect(liveRuleReferenceKeys(edges).has(referenceKey({ model: 'Tag', id: tag.id }))).toBe(
         false,
@@ -162,7 +168,7 @@ describe('ruleReference — a source takes its edges with it and brings them bac
 
       await tombstone('segment', target.id);
 
-      const edges = await db.ruleReference.findMany({ where: { segmentId: dependent.id } });
+      const edges = await db.ruleReference.findMany({ where: { sourceSegmentId: dependent.id } });
       expect(edges).toHaveLength(1);
       expect(ruleReferenceIssues(edges).map((issue) => issue.reason)).toEqual(['deleted']);
     });
@@ -175,10 +181,12 @@ describe('ruleReference — a source takes its edges with it and brings them bac
       );
 
       await tombstone('segment', dependent.id);
-      expect(await db.ruleReference.findMany({ where: { segmentId: dependent.id } })).toEqual([]);
+      expect(await db.ruleReference.findMany({ where: { sourceSegmentId: dependent.id } })).toEqual(
+        [],
+      );
 
       await revive('segment', dependent.id);
-      const edges = await db.ruleReference.findMany({ where: { segmentId: dependent.id } });
+      const edges = await db.ruleReference.findMany({ where: { sourceSegmentId: dependent.id } });
       expect(edges).toHaveLength(1);
       expect(edges[0]).toMatchObject({
         targetModel: 'Segment',
