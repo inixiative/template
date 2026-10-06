@@ -4,7 +4,11 @@
  * @partOf feature:email
  * @uses infrastructure:prisma, primitive:shared
  */
-import { type SourceQuery, type SourceValues, sourceValuesFromQueryRows } from '@inixiative/json-rules';
+import {
+  type SourceQuery,
+  type SourceValues,
+  sourceValuesFromQueryRows,
+} from '@inixiative/json-rules';
 import { db } from '@template/db';
 import { type EmailLens, emailSourceQueries } from '@template/email/rules';
 

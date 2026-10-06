@@ -20,12 +20,21 @@ export type EmptyStateProps = {
   show?: boolean | (() => boolean);
 };
 
-export const EmptyState = ({ icon, title, description, action, className, show = true }: EmptyStateProps) => {
+export const EmptyState = ({
+  icon,
+  title,
+  description,
+  action,
+  className,
+  show = true,
+}: EmptyStateProps) => {
   const shouldShow = typeof show === 'function' ? show() : show;
   if (!shouldShow) return null;
 
   return (
-    <div className={cn('flex flex-col items-center justify-center px-6 py-14 text-center', className)}>
+    <div
+      className={cn('flex flex-col items-center justify-center px-6 py-14 text-center', className)}
+    >
       {icon && (
         <div className="mb-4 rounded-xl bg-background p-3 shadow-sm ring-1 ring-border">
           <Icon icon={icon} className="h-6 w-6 text-primary" />

@@ -8,7 +8,11 @@ import type { PreflightFinding, SyncPreflightCheck } from '@template/email/prefl
 import { collectJsonOpacityWarnings } from '@template/email/rules/collectJsonOpacityWarnings';
 import { checkExpectations } from '@template/email/rules/componentExpectations';
 
-export const unresolvedLensPaths: SyncPreflightCheck = ({ fieldPaths, lens, tokenUnresolvedSeverity = 'error' }) => {
+export const unresolvedLensPaths: SyncPreflightCheck = ({
+  fieldPaths,
+  lens,
+  tokenUnresolvedSeverity = 'error',
+}) => {
   if (!lens) return [];
   const findings: PreflightFinding[] = checkExpectations([...fieldPaths], lens)
     .filter((check) => !check.ok)

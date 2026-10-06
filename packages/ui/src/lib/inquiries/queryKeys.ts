@@ -35,7 +35,10 @@ export const INQUIRY_STATUS_COLORS: Record<InquiryStatus | 'expired', string> = 
 
 export const INQUIRY_TERMINAL_STATUSES: InquiryStatus[] = ['approved', 'denied', 'canceled'];
 
-export const isTerminalInquiry = (inq: { status: InquiryStatus; expiresAt?: string | null }): boolean => {
+export const isTerminalInquiry = (inq: {
+  status: InquiryStatus;
+  expiresAt?: string | null;
+}): boolean => {
   if (INQUIRY_TERMINAL_STATUSES.includes(inq.status)) return true;
   if (inq.expiresAt && new Date(inq.expiresAt) < new Date()) return true;
   return false;
@@ -47,7 +50,10 @@ export type InquiryFilters = {
   includeExpired?: boolean;
 };
 
-const mergeBoundedArray = <T>(external: T[] | undefined, internal: T[] | undefined): T[] | undefined => {
+const mergeBoundedArray = <T>(
+  external: T[] | undefined,
+  internal: T[] | undefined,
+): T[] | undefined => {
   if (!external) return internal;
   if (!internal || internal.length === 0) return external;
 
@@ -55,7 +61,10 @@ const mergeBoundedArray = <T>(external: T[] | undefined, internal: T[] | undefin
   return narrowed.length > 0 ? narrowed : external;
 };
 
-const mergeIncludeExpired = (external: boolean | undefined, internal: boolean | undefined): boolean | undefined => {
+const mergeIncludeExpired = (
+  external: boolean | undefined,
+  internal: boolean | undefined,
+): boolean | undefined => {
   if (external === false || internal === false) return false;
   if (external === true) return true;
   return internal;
@@ -82,7 +91,10 @@ export const mergeInquiryFilters = (
 // The server handles the NULL case via orNullFields: when expiresAt[gte] is in
 // searchFields and 'expiresAt' is listed in orNullFields, the controller emits
 // WHERE (expiresAt >= now OR expiresAt IS NULL) — never-expiring inquiries are preserved.
-export const inquiryFiltersToSearchFields = (filters: InquiryFilters, now?: Date): Record<string, unknown> => {
+export const inquiryFiltersToSearchFields = (
+  filters: InquiryFilters,
+  now?: Date,
+): Record<string, unknown> => {
   const searchFields: Record<string, unknown> = {};
   if (filters.types?.length) searchFields.type = { in: filters.types };
   if (filters.statuses?.length) searchFields.status = { in: filters.statuses };
@@ -102,8 +114,12 @@ export type InquiryMeta = {
 
 // Query keys affected when the SOURCE side mutates (cancel/delete)
 export const sourceMutations: Record<InquiryType, (inq: InquiryMeta) => QueryKey[]> = {
-  inviteOrganizationUser: (inq) => [organizationSentManyInquiriesQueryKey({ path: { id: inq.sourceOrganizationId! } })],
-  createSpace: (inq) => [organizationSentManyInquiriesQueryKey({ path: { id: inq.sourceOrganizationId! } })],
+  inviteOrganizationUser: (inq) => [
+    organizationSentManyInquiriesQueryKey({ path: { id: inq.sourceOrganizationId! } }),
+  ],
+  createSpace: (inq) => [
+    organizationSentManyInquiriesQueryKey({ path: { id: inq.sourceOrganizationId! } }),
+  ],
   updateSpace: (inq) => [spaceSentManyInquiriesQueryKey({ path: { id: inq.sourceSpaceId! } })],
   transferSpace: (inq) => [spaceSentManyInquiriesQueryKey({ path: { id: inq.sourceSpaceId! } })],
 };
@@ -113,5 +129,7 @@ export const targetMutations: Record<InquiryType, (inq: InquiryMeta) => QueryKey
   inviteOrganizationUser: (_inq) => [meReceivedManyInquiriesQueryKey()],
   createSpace: (_inq) => [],
   updateSpace: (_inq) => [],
-  transferSpace: (inq) => [organizationReceivedManyInquiriesQueryKey({ path: { id: inq.targetOrganizationId! } })],
+  transferSpace: (inq) => [
+    organizationReceivedManyInquiriesQueryKey({ path: { id: inq.targetOrganizationId! } }),
+  ],
 };

@@ -12,7 +12,10 @@ type RetryOptions = {
 /**
  * Retry an async operation with configurable timeout
  */
-export const retryWithTimeout = async <T>(operation: () => Promise<T>, options: RetryOptions): Promise<T> => {
+export const retryWithTimeout = async <T>(
+  operation: () => Promise<T>,
+  options: RetryOptions,
+): Promise<T> => {
   const {
     maxRetries,
     delayMs,

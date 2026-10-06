@@ -6,7 +6,13 @@ import { z } from 'zod';
 import { resolveBullmqRedisUrl } from '#/jobs/bullmqRedisUrl';
 import { enqueueJob } from '#/jobs/enqueue';
 import { SLOW_LANE_PRIORITY } from '#/jobs/lanePriority';
-import { flushOutbox, maxQueueDepth, maxSlowQueueDepth, queueDepths, spillToOutbox } from '#/jobs/outbox';
+import {
+  flushOutbox,
+  maxQueueDepth,
+  maxSlowQueueDepth,
+  queueDepths,
+  spillToOutbox,
+} from '#/jobs/outbox';
 import { startOutboxDrainLoop, stopOutboxDrainLoop } from '#/jobs/outbox/drain';
 import { processJob } from '#/jobs/processJob';
 import { queue } from '#/jobs/queue';
@@ -51,7 +57,10 @@ const percentile = (values: number[], p: number) => {
   return sorted[Math.min(sorted.length - 1, Math.floor(p * sorted.length))] ?? Number.NaN;
 };
 
-const waitUntil = async (condition: () => boolean | Promise<boolean>, timeoutMs: number): Promise<boolean> => {
+const waitUntil = async (
+  condition: () => boolean | Promise<boolean>,
+  timeoutMs: number,
+): Promise<boolean> => {
   const deadline = Date.now() + timeoutMs;
   while (!(await condition())) {
     if (Date.now() > deadline) return false;
@@ -98,10 +107,14 @@ const assertDisposableTarget = (): void => {
 
 const startWorker = (concurrency: number, handlers: (job: Job) => Handlers): Worker => {
   const slowSlots = createSlowSlotPool(concurrency);
-  return new Worker('jobs', (job: Job) => processJob(job, { handlers: handlers(job) as never, slowSlots }), {
-    connection: createRedisConnection('check:worker', resolveBullmqRedisUrl()),
-    concurrency,
-  });
+  return new Worker(
+    'jobs',
+    (job: Job) => processJob(job, { handlers: handlers(job) as never, slowSlots }),
+    {
+      connection: createRedisConnection('check:worker', resolveBullmqRedisUrl()),
+      concurrency,
+    },
+  );
 };
 
 const checkLaneCapacity = async () => {
@@ -172,10 +185,13 @@ const checkLaneCapacity = async () => {
       fastWaitTargetMs: FAST_WAIT_TARGET_MS,
     },
     failures: failuresOf([
-      peakSlowRunning > slowSlots && `slow work held ${peakSlowRunning} slots, over its ${slowSlots}`,
-      peakSlowRunning < slowSlots && `slow work peaked at ${peakSlowRunning} of its ${slowSlots} slots`,
+      peakSlowRunning > slowSlots &&
+        `slow work held ${peakSlowRunning} slots, over its ${slowSlots}`,
+      peakSlowRunning < slowSlots &&
+        `slow work peaked at ${peakSlowRunning} of its ${slowSlots} slots`,
       fastWaits.length < FAST_JOBS && `${FAST_JOBS - fastWaits.length} fast jobs never started`,
-      fastP95Ms >= FAST_WAIT_TARGET_MS && `fast p95 start ${fastP95Ms} ms, over the ${FAST_WAIT_TARGET_MS} ms target`,
+      fastP95Ms >= FAST_WAIT_TARGET_MS &&
+        `fast p95 start ${fastP95Ms} ms, over the ${FAST_WAIT_TARGET_MS} ms target`,
       lost > 0 && `${lost} slow jobs lost`,
       duplicates > 0 && `${duplicates} slow jobs ran twice`,
     ]),
@@ -193,7 +209,8 @@ const checkSendLargerThanShare = async () => {
   const concurrency = process.env.JOBS_WORKER_CONCURRENCY;
   const workers = Array.from({ length: WORKERS }, () => startWorker(concurrency, () => handlers));
   const failedJobs: string[] = [];
-  for (const worker of workers) worker.on('failed', (job, err) => failedJobs.push(`${job?.id}: ${err.message}`));
+  for (const worker of workers)
+    worker.on('failed', (job, err) => failedJobs.push(`${job?.id}: ${err.message}`));
   const events = new QueueEvents('jobs', {
     connection: createRedisConnection('check:events', resolveBullmqRedisUrl()),
   });
@@ -220,7 +237,13 @@ const checkSendLargerThanShare = async () => {
   startOutboxDrainLoop();
 
   const loops = { isRunning: true };
-  const signal = { peakInRedis: 0, lowestRatio: Number.POSITIVE_INFINITY, highestRatio: 0, truthTotal: 0, samples: 0 };
+  const signal = {
+    peakInRedis: 0,
+    lowestRatio: Number.POSITIVE_INFINITY,
+    highestRatio: 0,
+    truthTotal: 0,
+    samples: 0,
+  };
   const sampleLoop = (async () => {
     while (loops.isRunning) {
       const [truth, depths] = await Promise.all([slowJobsInRedis(), queueDepths(true)]);
@@ -238,7 +261,9 @@ const checkSendLargerThanShare = async () => {
   await waitUntil(
     async () =>
       failedJobs.length > 0 ||
-      (completions.size === SEND_JOBS && (await db.jobOutbox.count()) === 0 && (await queueEmpty())),
+      (completions.size === SEND_JOBS &&
+        (await db.jobOutbox.count()) === 0 &&
+        (await queueEmpty())),
     600_000,
   );
   const sendSeconds = (Date.now() - startedAt) / 1000;
@@ -279,7 +304,8 @@ const checkSendLargerThanShare = async () => {
       SEND_JOBS <= share && `the send of ${SEND_JOBS} does not exceed the slow share of ${share}`,
       signal.peakInRedis > shareCeiling &&
         `the drain let ${signal.peakInRedis} slow jobs into Redis, over the ${shareCeiling} ceiling`,
-      lowestRatio < SIGNAL_MIN_RATIO && `the slow signal read ${lowestRatio.toFixed(2)} of the slow jobs queued`,
+      lowestRatio < SIGNAL_MIN_RATIO &&
+        `the slow signal read ${lowestRatio.toFixed(2)} of the slow jobs queued`,
       signal.highestRatio > SIGNAL_MAX_RATIO &&
         `the slow signal read ${signal.highestRatio.toFixed(2)} times the slow jobs queued`,
       parksPerQueuedJobSecond > parkRateCeiling &&
@@ -308,7 +334,8 @@ const checkHungSlowHandlers = async () => {
     },
   }));
   await worker.waitUntilReady();
-  for (let n = 0; n < HUNG_JOBS; n++) await enqueueJob('sendWebhook', { n } as never, { lane: JobLane.slow });
+  for (let n = 0; n < HUNG_JOBS; n++)
+    await enqueueJob('sendWebhook', { n } as never, { lane: JobLane.slow });
 
   await waitUntil(() => hung.running >= 1, 30_000);
   await readSlowLaneState();
@@ -322,13 +349,18 @@ const checkHungSlowHandlers = async () => {
   return {
     report: {
       idleBeforeMs: idleBefore,
-      whileHung: { queued: whileHung.queued, deferred: whileHung.deferred, idleMs: whileHung.idleMs },
+      whileHung: {
+        queued: whileHung.queued,
+        deferred: whileHung.deferred,
+        idleMs: whileHung.idleMs,
+      },
       afterDrainedIdleMs: afterDrained.idleMs,
     },
     failures: failuresOf([
       idleBefore !== 0 && `the idle signal read ${idleBefore} ms with no slow work queued`,
       whileHung.queued === 0 && 'hung slow work read as nothing queued',
-      whileHung.queued > HUNG_JOBS && `${HUNG_JOBS} hung slow jobs read as ${whileHung.queued} queued`,
+      whileHung.queued > HUNG_JOBS &&
+        `${HUNG_JOBS} hung slow jobs read as ${whileHung.queued} queued`,
       whileHung.idleMs < HUNG_FOR_MS * 0.8 &&
         `the idle signal read ${whileHung.idleMs} ms after ${HUNG_FOR_MS} ms of hung slow handlers`,
       afterDrained.idleMs !== 0 && 'the idle signal stayed up after the slow lane emptied',
@@ -343,9 +375,18 @@ const checkSlowPriorityOrder = async () => {
     await probe.obliterate({ force: true });
     await probe.pause();
     await probe.addBulk(
-      Array.from({ length: 200 }, (_, n) => ({ name: 'probe', data: {}, opts: { jobId: `j${n}`, priority } })),
+      Array.from({ length: 200 }, (_, n) => ({
+        name: 'probe',
+        data: {},
+        opts: { jobId: `j${n}`, priority },
+      })),
     );
-    const members = await connection.zrange(`${probe.qualifiedName}:prioritized`, 0, -1, 'WITHSCORES');
+    const members = await connection.zrange(
+      `${probe.qualifiedName}:prioritized`,
+      0,
+      -1,
+      'WITHSCORES',
+    );
     const ids = members.filter((_, i) => i % 2 === 0);
     return {
       distinctScores: new Set(members.filter((_, i) => i % 2 === 1)).size,
@@ -361,7 +402,8 @@ const checkSlowPriorityOrder = async () => {
   return {
     report: { slowLanePriority: slow, priorityLimit: limit },
     failures: failuresOf([
-      slow.distinctScores < 200 && `SLOW_LANE_PRIORITY gave ${slow.distinctScores}/200 distinct scores`,
+      slow.distinctScores < 200 &&
+        `SLOW_LANE_PRIORITY gave ${slow.distinctScores}/200 distinct scores`,
       !slow.inAddOrder && 'SLOW_LANE_PRIORITY jobs left add order',
     ]),
   };
@@ -373,7 +415,10 @@ const checkJumpedJobRepair = async () => {
       throw new Error('slowLaneCheck: first attempt fails');
     },
   }));
-  const { jobId } = await enqueueJob('sendWebhook', { n: -1 } as never, { lane: JobLane.slow, attempts: 1 });
+  const { jobId } = await enqueueJob('sendWebhook', { n: -1 } as never, {
+    lane: JobLane.slow,
+    attempts: 1,
+  });
   const slowJob = await queue.getJob(jobId);
   if (!slowJob) throw new Error('slowLaneCheck: repair probe job vanished');
   await waitUntil(async () => (await slowJob.getState()) === 'failed', 30_000);
@@ -386,14 +431,18 @@ const checkJumpedJobRepair = async () => {
   const recordRun = (job: Job) => async () => {
     ran.push({ name: job.name, priority: job.priority });
   };
-  const recorder = startWorker(1, (job) => ({ sendWebhook: recordRun(job), cleanStaleData: recordRun(job) }));
+  const recorder = startWorker(1, (job) => ({
+    sendWebhook: recordRun(job),
+    cleanStaleData: recordRun(job),
+  }));
   await waitUntil(() => ran.length === 2, 30_000);
   await recorder.close();
 
   return {
     report: { runOrder: ran },
     failures: failuresOf([
-      ran[0]?.name !== 'cleanStaleData' && `a retried slow job ran before waiting fast work: ${JSON.stringify(ran)}`,
+      ran[0]?.name !== 'cleanStaleData' &&
+        `a retried slow job ran before waiting fast work: ${JSON.stringify(ran)}`,
       ran.find((entry) => entry.name === 'sendWebhook')?.priority !== SLOW_LANE_PRIORITY &&
         'the retried slow job lost its priority',
     ]),

@@ -7,7 +7,11 @@ import type {
   SpaceUser,
   User,
 } from '@template/db/generated/client/client';
-import { InquiryResourceModel, InquiryStatus, InquiryType } from '@template/db/generated/client/enums';
+import {
+  InquiryResourceModel,
+  InquiryStatus,
+  InquiryType,
+} from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
   createInquiry,
@@ -97,7 +101,10 @@ describe('GET /api/v1/space/:id/inquiries/sent', () => {
       { role: 'member' },
       { user: viewer, organization: org },
     );
-    const { entity: viewerSu } = await createSpaceUser({ role: 'viewer' }, { ...viewerOuCtx, space });
+    const { entity: viewerSu } = await createSpaceUser(
+      { role: 'viewer' },
+      { ...viewerOuCtx, space },
+    );
 
     const viewerFetch = createTestApp({
       mockUser: viewer,
@@ -278,6 +285,8 @@ describe('GET /api/v1/space/:id/inquiries/received', () => {
     expect(response.status).toBe(200);
     expect(data.some((i) => i.id === mine.id)).toBe(true);
     expect(data.every((i) => i.targetSpaceId === space.id)).toBe(true);
-    expect(data.every((i) => i.status !== InquiryStatus.draft && i.status !== InquiryStatus.canceled)).toBe(true);
+    expect(
+      data.every((i) => i.status !== InquiryStatus.draft && i.status !== InquiryStatus.canceled),
+    ).toBe(true);
   });
 });

@@ -23,14 +23,23 @@ const tagged: Condition = {
   condition: { field: 'tag.id', operator: 'equals', value: 'tag-1' },
 };
 const tagRef = [{ model: 'Tag', id: 'tag-1' }];
-const arms = { degraded: (issues: ReturnType<typeof ruleIssues>) => issues.map((i) => i.kind), sound: () => ['sound'] };
+const arms = {
+  degraded: (issues: ReturnType<typeof ruleIssues>) => issues.map((i) => i.kind),
+  sound: () => ['sound'],
+};
 
 describe('withRule', () => {
   it('accepts a vocabulary provider in place of a lens', () => {
     const live = new Set([referenceKey({ model: 'Tag', id: 'tag-1' })]);
-    const provider = { vocabularyIssues: (rule: Condition) => ('field' in (rule as object) ? [] : ['not a leaf']) };
-    expect(withRule({ lens: provider, rule: tagged, references: tagRef, live }, arms)).toEqual(['sound']);
-    expect(withRule({ lens: provider, rule: { all: [] }, references: [], live }, arms)).toEqual(['vocabulary']);
+    const provider = {
+      vocabularyIssues: (rule: Condition) => ('field' in (rule as object) ? [] : ['not a leaf']),
+    };
+    expect(withRule({ lens: provider, rule: tagged, references: tagRef, live }, arms)).toEqual([
+      'sound',
+    ]);
+    expect(withRule({ lens: provider, rule: { all: [] }, references: [], live }, arms)).toEqual([
+      'vocabulary',
+    ]);
   });
 
   it('runs the sound arm when the lens admits the rule and every named row is live', () => {
@@ -39,7 +48,9 @@ describe('withRule', () => {
   });
 
   it('a named row outside the live set is a reference issue — absence is the answer', () => {
-    expect(withRule({ lens, rule: tagged, references: tagRef, live: new Set() }, arms)).toEqual(['reference']);
+    expect(withRule({ lens, rule: tagged, references: tagRef, live: new Set() }, arms)).toEqual([
+      'reference',
+    ]);
   });
 
   it('no live set means nothing was confirmed, so every named row is a reference issue', () => {
@@ -54,15 +65,21 @@ describe('withRule', () => {
   it('a required binding the caller did not supply is a binding issue', () => {
     const bound: Condition = { field: 'tier', operator: 'equals', bind: 'tier' };
     expect(withRule({ lens, rule: bound, references: [] }, arms)).toEqual(['binding']);
-    expect(withRule({ lens, rule: bound, references: [], bindings: {} }, arms)).toEqual(['binding']);
+    expect(withRule({ lens, rule: bound, references: [], bindings: {} }, arms)).toEqual([
+      'binding',
+    ]);
     const issues = ruleIssues({ lens, rule: bound, references: [] });
     expect(issues[0]).toMatchObject({ kind: 'binding', name: 'tier' });
   });
 
   it('a supplied binding is sound, null included — presence is the contract', () => {
     const bound: Condition = { field: 'tier', operator: 'equals', bind: 'tier' };
-    expect(withRule({ lens, rule: bound, references: [], bindings: { tier: 'gold' } }, arms)).toEqual(['sound']);
-    expect(withRule({ lens, rule: bound, references: [], bindings: { tier: null } }, arms)).toEqual(['sound']);
+    expect(
+      withRule({ lens, rule: bound, references: [], bindings: { tier: 'gold' } }, arms),
+    ).toEqual(['sound']);
+    expect(withRule({ lens, rule: bound, references: [], bindings: { tier: null } }, arms)).toEqual(
+      ['sound'],
+    );
   });
 
   it('a rule the lens no longer admits is degraded at evaluation, not only at save', () => {

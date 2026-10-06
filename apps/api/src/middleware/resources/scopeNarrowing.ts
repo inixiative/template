@@ -22,7 +22,10 @@ export const scopeNarrowing = makeMiddleware<Scope>((scope) =>
   Object.assign(
     async (c: Context<AppEnv>, next: () => Promise<void>) => {
       const current = c.get('filterLens');
-      if (!current) throw new Error('scopeNarrowing: no narrowing on context — declare a `narrowing` on the route');
+      if (!current)
+        throw new Error(
+          'scopeNarrowing: no narrowing on context — declare a `narrowing` on the route',
+        );
       const { root, mapDefaults } = await scope(c);
       c.set('filterLens', { parent: current, root, mapDefaults });
       await next();

@@ -39,17 +39,30 @@ export const getJobSupersededBy = async (jobId: string): Promise<string | null> 
 
 // Re-assert a lapsed baton at job start, never displacing a newer holder (see ageGatedReclaim).
 export const reclaimLane = (lane: string, jobId: string): Promise<unknown> =>
-  ageGatedReclaim(getRedisClient(), lane, jobId, LANE_TTL_SEC, SUPERSEDED_PREFIX, SUPERSEDED_TTL_SEC);
+  ageGatedReclaim(
+    getRedisClient(),
+    lane,
+    jobId,
+    LANE_TTL_SEC,
+    SUPERSEDED_PREFIX,
+    SUPERSEDED_TTL_SEC,
+  );
 
 // Roll back a claim when the subsequent queue.add/outbox spill fails. Best-effort, but never silent:
 // if this fenced cleanup fails (transient redis/script error) the phantom jobId lingers in the lane key
 // until TTL (≤5min), so an older in-flight job can be wrongly treated as superseded. Log it so that
 // window is diagnosable rather than invisible.
-export const releaseLane = (lane: string, jobId: string, previousHolder?: string | null): Promise<unknown> =>
-  fencedRelease(getRedisClient(), lane, jobId, previousHolder ?? '', SUPERSEDED_PREFIX).catch((err) => {
-    log.error(`releaseLane: fenced delete failed; lane key will linger until TTL: ${lane}`, err);
-    return null;
-  });
+export const releaseLane = (
+  lane: string,
+  jobId: string,
+  previousHolder?: string | null,
+): Promise<unknown> =>
+  fencedRelease(getRedisClient(), lane, jobId, previousHolder ?? '', SUPERSEDED_PREFIX).catch(
+    (err) => {
+      log.error(`releaseLane: fenced delete failed; lane key will linger until TTL: ${lane}`, err);
+      return null;
+    },
+  );
 
 // Hold the lane as jobId and fire onUsurped once a *different* job takes the baton; returns stop().
 // While we're still the holder we REFRESH the TTL each poll, so the lane never expires out from under

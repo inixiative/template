@@ -42,7 +42,8 @@ const walkCondition = (cond: Condition | undefined, prefix: string, out: Set<str
             : node.field
           : currentPrefix;
       const aggregate = node.aggregate as { field?: unknown } | undefined;
-      if (typeof aggregate === 'object' && aggregate !== null) addPath(out, childPrefix, aggregate.field);
+      if (typeof aggregate === 'object' && aggregate !== null)
+        addPath(out, childPrefix, aggregate.field);
       if (Array.isArray(node.orderBy)) {
         for (const entry of node.orderBy as { field?: unknown }[]) {
           if (typeof entry === 'object' && entry !== null) addPath(out, childPrefix, entry.field);
@@ -60,7 +61,11 @@ const walkCondition = (cond: Condition | undefined, prefix: string, out: Set<str
   });
 };
 
-const collectRuleFieldPaths = (rule: Condition, bindings: BindingChain, out: CollectedPaths): void => {
+const collectRuleFieldPaths = (
+  rule: Condition,
+  bindings: BindingChain,
+  out: CollectedPaths,
+): void => {
   const raw = new Set<string>();
   walkCondition(rule, '', raw);
   for (const path of raw) {
@@ -71,7 +76,11 @@ const collectRuleFieldPaths = (rule: Condition, bindings: BindingChain, out: Col
   }
 };
 
-type CollectedPaths = { fieldPaths: Set<string>; eachLoopPaths: Set<string>; rulePaths: Set<string> };
+type CollectedPaths = {
+  fieldPaths: Set<string>;
+  eachLoopPaths: Set<string>;
+  rulePaths: Set<string>;
+};
 
 const collectTokenPaths = (text: string, bindings: BindingChain, out: Set<string>): void => {
   for (const match of text.matchAll(TOKEN_PATTERN)) {
@@ -104,7 +113,8 @@ const collectFromContent = (content: string, bindings: BindingChain, out: Collec
         continue;
       }
       for (const branch of block.branches) {
-        if (branch.kind !== 'else' && branch.rule) collectRuleFieldPaths(branch.rule, bindings, out);
+        if (branch.kind !== 'else' && branch.rule)
+          collectRuleFieldPaths(branch.rule, bindings, out);
         collectFromContent(branch.body, bindings, out);
       }
       i = block.end;
@@ -138,9 +148,18 @@ const collectFromContent = (content: string, bindings: BindingChain, out: Collec
 export const collectHydrationPaths = (
   content: string,
 ): { fieldPaths: string[]; eachLoopPaths: string[]; rulePaths: string[] } => {
-  const out: CollectedPaths = { fieldPaths: new Set(), eachLoopPaths: new Set(), rulePaths: new Set() };
+  const out: CollectedPaths = {
+    fieldPaths: new Set(),
+    eachLoopPaths: new Set(),
+    rulePaths: new Set(),
+  };
   collectFromContent(content, new Map(), out);
-  return { fieldPaths: [...out.fieldPaths], eachLoopPaths: [...out.eachLoopPaths], rulePaths: [...out.rulePaths] };
+  return {
+    fieldPaths: [...out.fieldPaths],
+    eachLoopPaths: [...out.eachLoopPaths],
+    rulePaths: [...out.rulePaths],
+  };
 };
 
-export const collectConditionFieldPaths = (content: string): string[] => collectHydrationPaths(content).fieldPaths;
+export const collectConditionFieldPaths = (content: string): string[] =>
+  collectHydrationPaths(content).fieldPaths;

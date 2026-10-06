@@ -37,7 +37,11 @@ const loadSpec = async (): Promise<Spec> => {
 
 const operations = (spec: Spec) =>
   Object.entries(spec.paths ?? {}).flatMap(([path, item]) =>
-    METHODS.filter((method) => item[method]).map((method) => ({ path, method, op: item[method] as Operation })),
+    METHODS.filter((method) => item[method]).map((method) => ({
+      path,
+      method,
+      op: item[method] as Operation,
+    })),
   );
 
 describe('OpenAPI security', () => {
@@ -48,7 +52,11 @@ describe('OpenAPI security', () => {
     expect(Object.keys(schemes).sort()).toEqual(['apiToken', 'internalSecret', 'sessionToken']);
     expect(schemes.sessionToken).toMatchObject({ type: 'http', scheme: 'bearer' });
     expect(schemes.apiToken).toMatchObject({ type: 'http', scheme: 'bearer' });
-    expect(schemes.internalSecret).toMatchObject({ type: 'apiKey', in: 'header', name: 'x-internal-secret' });
+    expect(schemes.internalSecret).toMatchObject({
+      type: 'apiKey',
+      in: 'header',
+      name: 'x-internal-secret',
+    });
   });
 
   it('declares security on every operation, matching the middleware it mounts', async () => {
@@ -60,8 +68,12 @@ describe('OpenAPI security', () => {
 
     const wrong = all
       .map(({ path, method, op }) => {
-        const expectedSecurity = expectedSchemes(path, op.operationId).map((name) => ({ [name]: [] }));
-        const ok = Array.isArray(op.security) && JSON.stringify(op.security) === JSON.stringify(expectedSecurity);
+        const expectedSecurity = expectedSchemes(path, op.operationId).map((name) => ({
+          [name]: [],
+        }));
+        const ok =
+          Array.isArray(op.security) &&
+          JSON.stringify(op.security) === JSON.stringify(expectedSecurity);
         return ok
           ? null
           : `${method.toUpperCase()} ${path} (${op.operationId}): expected ${JSON.stringify(expectedSecurity)}, got ${JSON.stringify(op.security)}`;
@@ -72,7 +84,9 @@ describe('OpenAPI security', () => {
 
     const unregistered = all
       .flatMap(({ path, op }) =>
-        (op.security ?? []).flatMap((requirement) => Object.keys(requirement).map((name) => ({ path, name }))),
+        (op.security ?? []).flatMap((requirement) =>
+          Object.keys(requirement).map((name) => ({ path, name })),
+        ),
       )
       .filter(({ name }) => !registered.includes(name));
 
@@ -83,6 +97,9 @@ describe('OpenAPI security', () => {
     const spec = await loadSpec();
 
     expect(spec.paths?.['/api/v1/me/tokens']?.post?.security).toEqual([{ sessionToken: [] }]);
-    expect(spec.paths?.['/api/v1/me/contacts']?.post?.security).toEqual([{ sessionToken: [] }, { apiToken: [] }]);
+    expect(spec.paths?.['/api/v1/me/contacts']?.post?.security).toEqual([
+      { sessionToken: [] },
+      { apiToken: [] },
+    ]);
   });
 });

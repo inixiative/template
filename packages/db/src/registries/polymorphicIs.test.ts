@@ -10,8 +10,12 @@ describe('polymorphicIs', () => {
     const bound = resolveBindings(rule, polymorphicBindings('Organization', 'org-1'));
     expect(check(bound, { ownerModel: 'Organization', organizationId: 'org-1' })).toBe(true);
     expect(check(bound, { ownerModel: 'Organization', organizationId: 'org-2' })).not.toBe(true);
-    expect(check(bound, { ownerModel: 'User', userId: 'u-9', organizationId: null })).not.toBe(true);
-    expect(check(bound, { ownerModel: 'platform', userId: null, organizationId: null })).not.toBe(true);
+    expect(check(bound, { ownerModel: 'User', userId: 'u-9', organizationId: null })).not.toBe(
+      true,
+    );
+    expect(check(bound, { ownerModel: 'platform', userId: null, organizationId: null })).not.toBe(
+      true,
+    );
   });
 
   it('a composite value is reached through the column it shares with the single-key kind', () => {
@@ -19,11 +23,17 @@ describe('polymorphicIs', () => {
       polymorphicIs('CommunicationLog', 'senderType'),
       polymorphicBindings('Organization', 'org-1'),
     );
-    expect(check(bound, { senderType: 'OrganizationUser', senderOrganizationId: 'org-1', senderUserId: 'u-1' })).toBe(
-      true,
-    );
+    expect(
+      check(bound, {
+        senderType: 'OrganizationUser',
+        senderOrganizationId: 'org-1',
+        senderUserId: 'u-1',
+      }),
+    ).toBe(true);
     expect(check(bound, { senderType: 'Organization', senderOrganizationId: 'org-1' })).toBe(true);
-    expect(check(bound, { senderType: 'User', senderUserId: 'u-9', senderOrganizationId: null })).not.toBe(true);
+    expect(
+      check(bound, { senderType: 'User', senderUserId: 'u-9', senderOrganizationId: null }),
+    ).not.toBe(true);
   });
 
   it('refuses an axis the registry does not declare, and a kind no single key binds', () => {

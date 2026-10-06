@@ -29,7 +29,10 @@ describe('PATCH /api/v1/organization/:id', () => {
     const { entity: o } = await createOrganization();
     org = o;
 
-    const { entity: ou } = await createOrganizationUser({ role: 'admin' }, { user, organization: org });
+    const { entity: ou } = await createOrganizationUser(
+      { role: 'admin' },
+      { user, organization: org },
+    );
     orgUser = ou;
 
     const harness = createTestApp({
@@ -57,7 +60,9 @@ describe('PATCH /api/v1/organization/:id', () => {
     const seq = getNextSeq();
     await createOrganization({ slug: `taken-slug-${seq}` });
 
-    const response = await fetch(patch(`/api/v1/organization/${org.id}`, { slug: `taken-slug-${seq}` }));
+    const response = await fetch(
+      patch(`/api/v1/organization/${org.id}`, { slug: `taken-slug-${seq}` }),
+    );
     const body = await jsonError(response);
 
     expect(response.status).toBe(409);

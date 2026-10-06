@@ -1,4 +1,10 @@
-import { DbAction, type HookOptions, HookTiming, orderedListRegistry, registerDbHook } from '@template/db';
+import {
+  DbAction,
+  type HookOptions,
+  HookTiming,
+  orderedListRegistry,
+  registerDbHook,
+} from '@template/db';
 import { castArray } from 'lodash-es';
 import { queueOrderedListCacheInvalidation } from '#/hooks/orderedList/utils';
 import { applyOrderedListHardDelete } from '#/lib/prisma/orderedList';

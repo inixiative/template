@@ -21,7 +21,9 @@ export const segmentMembersRemoved = makeAppEvent<SegmentMembersRemovedPayload>(
     {
       kind: 'channels',
       target: { channels: [WS_CHANNELS.segmentReadManySegmentMembers.name(data.segmentId)] },
-      message: { data: refetch({ _id: 'segmentReadManySegmentMembers', path: { id: data.segmentId } }) },
+      message: {
+        data: refetch({ _id: 'segmentReadManySegmentMembers', path: { id: data.segmentId } }),
+      },
     },
   ],
 });

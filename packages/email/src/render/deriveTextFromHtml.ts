@@ -18,7 +18,11 @@ const OPTIONS: HtmlToTextOptions = {
     { selector: 'a', options: { hideLinkHrefIfSameAsText: true, linkBrackets: ['(', ')'] } },
     { selector: 'img', format: 'imageAlt' },
     // rendered MJML is built from layout tables; the 60-char default column would rewrap body copy
-    { selector: 'table', format: 'dataTable', options: { maxColumnWidth: Number.MAX_SAFE_INTEGER } },
+    {
+      selector: 'table',
+      format: 'dataTable',
+      options: { maxColumnWidth: Number.MAX_SAFE_INTEGER },
+    },
   ],
 };
 

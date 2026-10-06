@@ -14,9 +14,13 @@ let __main: Redis | null = null;
 let __subscriber: Redis | null = null;
 let __mock: Redis | null = null;
 
-export const resolveRedisUrl = (url?: string): string => url || process.env.REDIS_URL || 'redis://localhost:6379';
+export const resolveRedisUrl = (url?: string): string =>
+  url || process.env.REDIS_URL || 'redis://localhost:6379';
 
-export const createRedisConnection = (scope: LogScope | string = LogScope.db, url?: string): Redis => {
+export const createRedisConnection = (
+  scope: LogScope | string = LogScope.db,
+  url?: string,
+): Redis => {
   if (isTest) {
     if (!__mock) __mock = new RedisMock() as unknown as Redis;
     log.info('Using shared in-memory mock', scope);
@@ -44,7 +48,8 @@ export const getRedisPub = (): Redis => getRedisClient();
 export const getRedisSub = (): Redis => {
   // A subscribed connection can only run subscriber commands, so the subscriber is always
   // its own connection — in tests a duplicate() of the shared mock (same broker, separate mode).
-  if (!__subscriber) __subscriber = isTest ? getRedisClient().duplicate() : createRedisConnection(LogScope.ws);
+  if (!__subscriber)
+    __subscriber = isTest ? getRedisClient().duplicate() : createRedisConnection(LogScope.ws);
   return __subscriber;
 };
 

@@ -3,7 +3,11 @@ import { SLOW_LANE_PRIORITY } from '#/jobs/lanePriority';
 import { laneDepthsFrom } from '#/jobs/outbox/queueDepth';
 import { queue } from '#/jobs/queue';
 import { readSlowLaneState } from '#/jobs/readSlowLaneState';
-import { recordSlowDeferral, recordSlowFinished, SLOW_DEFERRED_GRACE_MS } from '#/jobs/slowLaneSignals';
+import {
+  recordSlowDeferral,
+  recordSlowFinished,
+  SLOW_DEFERRED_GRACE_MS,
+} from '#/jobs/slowLaneSignals';
 
 describe('laneDepthsFrom', () => {
   it('caps the deferral list at the delayed count, so a promoted job waiting to be fetched is not counted twice', () => {
@@ -15,7 +19,11 @@ describe('laneDepthsFrom', () => {
   });
 
   it('falls back to the list when delayed was not read', () => {
-    expect(laneDepthsFrom({ waiting: 2 }, 0, 4)).toEqual({ total: 2 + 4, slow: 4, slowDeferred: 4 });
+    expect(laneDepthsFrom({ waiting: 2 }, 0, 4)).toEqual({
+      total: 2 + 4,
+      slow: 4,
+      slowDeferred: 4,
+    });
   });
 });
 
@@ -24,10 +32,14 @@ describe('readSlowLaneState', () => {
   let restore = (): void => {};
 
   beforeAll(() => {
-    const getJobCounts = spyOn(queue, 'getJobCounts').mockImplementation((async () => ({ ...counts })) as never);
-    const getCountsPerPriority = spyOn(queue, 'getCountsPerPriority').mockImplementation((async () => ({
-      [SLOW_LANE_PRIORITY]: counts.prioritized,
+    const getJobCounts = spyOn(queue, 'getJobCounts').mockImplementation((async () => ({
+      ...counts,
     })) as never);
+    const getCountsPerPriority = spyOn(queue, 'getCountsPerPriority').mockImplementation(
+      (async () => ({
+        [SLOW_LANE_PRIORITY]: counts.prioritized,
+      })) as never,
+    );
     restore = () => {
       getJobCounts.mockRestore();
       getCountsPerPriority.mockRestore();
@@ -43,7 +55,8 @@ describe('readSlowLaneState', () => {
 
   it('counts slow jobs deferred into delayed as queued slow work, in the slow count and the whole budget', async () => {
     Object.assign(counts, { waiting: 1, prioritized: 2, delayed: 9 });
-    for (let i = 0; i < 6; i++) await recordSlowDeferral(queue.redis, queue.name, `parked-${i}`, Date.now() + 20_000);
+    for (let i = 0; i < 6; i++)
+      await recordSlowDeferral(queue.redis, queue.name, `parked-${i}`, Date.now() + 20_000);
 
     const state = await readSlowLaneState();
 

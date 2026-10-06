@@ -14,7 +14,11 @@ const NON_ORDERABLE_TYPES = new Set(['Json', 'Bytes']);
 const isOrderableLeaf = (entry: FieldMapEntry): boolean =>
   (entry.kind === 'scalar' || entry.kind === 'enum') && !NON_ORDERABLE_TYPES.has(entry.type);
 
-const crossesToMany = (dottedPath: string, rootKey: string, byPath: Map<string, Visit>): boolean => {
+const crossesToMany = (
+  dottedPath: string,
+  rootKey: string,
+  byPath: Map<string, Visit>,
+): boolean => {
   if (dottedPath === rootKey) return false;
   let parentKey = rootKey;
   for (const segment of dottedPath.slice(rootKey.length + 1).split('.')) {

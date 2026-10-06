@@ -60,4 +60,6 @@ type ContactDefs = typeof contactDefs;
 export type ContactInput<K extends ContactType> = Parameters<ContactDefs[K]['parseInput']>[0];
 export type ContactValue<K extends ContactType> = ReturnType<ContactDefs[K]['parseInput']>;
 
-export const ContactRegistry: { [K in ContactType]: ContactTypeDef<ContactInput<K>, ContactValue<K>> } = contactDefs;
+export const ContactRegistry: {
+  [K in ContactType]: ContactTypeDef<ContactInput<K>, ContactValue<K>>;
+} = contactDefs;

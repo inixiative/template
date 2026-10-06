@@ -16,7 +16,10 @@ const findOrCreateUser = (email: string, model = 'User') =>
   });
 
 const withTimeout = <T>(promise: Promise<T>, ms: number): Promise<T> =>
-  Promise.race([promise, new Promise<T>((_, reject) => setTimeout(() => reject(new Error('timed out')), ms))]);
+  Promise.race([
+    promise,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error('timed out')), ms)),
+  ]);
 
 describe('db.findForUpdate upserting mode', () => {
   beforeEach(() => {
@@ -29,7 +32,9 @@ describe('db.findForUpdate upserting mode', () => {
 
   it('serializes concurrent create-if-missing on one key into exactly one row', async () => {
     const email = `upserting-race-${getNextSeq()}@test.com`;
-    const results = await db.parallel(Array.from({ length: 5 }, () => () => findOrCreateUser(email)));
+    const results = await db.parallel(
+      Array.from({ length: 5 }, () => () => findOrCreateUser(email)),
+    );
 
     expect(results.filter((result) => result.created)).toHaveLength(1);
     expect(new Set(results.map((result) => result.user.id)).size).toBe(1);
@@ -38,7 +43,10 @@ describe('db.findForUpdate upserting mode', () => {
 
   it('serializes model and accessor aliases for the same missing row', async () => {
     const email = `upserting-alias-${getNextSeq()}@test.com`;
-    const results = await db.parallel([() => findOrCreateUser(email, 'User'), () => findOrCreateUser(email, 'user')]);
+    const results = await db.parallel([
+      () => findOrCreateUser(email, 'User'),
+      () => findOrCreateUser(email, 'user'),
+    ]);
     expect(results.filter((result) => result.created)).toHaveLength(1);
     expect(new Set(results.map((result) => result.user.id)).size).toBe(1);
     expect(await db.user.count({ where: { email } })).toBe(1);
@@ -64,7 +72,9 @@ describe('db.findForUpdate upserting mode', () => {
     ).rejects.toThrow('Intentional rollback');
 
     const started = Date.now();
-    const result = await db.txn(() => db.findForUpdate('User', { email }, { upserting: true, waitMs: 100 }));
+    const result = await db.txn(() =>
+      db.findForUpdate('User', { email }, { upserting: true, waitMs: 100 }),
+    );
     expect(result).toEqual([]);
     expect(Date.now() - started).toBeLessThan(1_000);
   });
@@ -91,7 +101,9 @@ describe('db.findForUpdate upserting mode', () => {
         async () => {
           await held;
           try {
-            return await db.txn(() => db.findForUpdate('User', { email }, { upserting: true, waitMs: 150 }));
+            return await db.txn(() =>
+              db.findForUpdate('User', { email }, { upserting: true, waitMs: 150 }),
+            );
           } finally {
             releaseHolder();
           }
@@ -121,7 +133,9 @@ describe('db.findForUpdate upserting mode', () => {
   it('keys the lock on sorted entries, so where-object order does not matter', async () => {
     const {
       entity: { id: userId, email },
-    } = await db.txn(() => createUser({ email: `upserting-order-${getNextSeq()}@test.com`, name: 'Order' }));
+    } = await db.txn(() =>
+      createUser({ email: `upserting-order-${getNextSeq()}@test.com`, name: 'Order' }),
+    );
     const other = await db.parallel<unknown>(
       [
         () =>
@@ -131,12 +145,16 @@ describe('db.findForUpdate upserting mode', () => {
           }),
         async () => {
           await new Promise((resolve) => setTimeout(resolve, 50));
-          return db.txn(() => db.findForUpdate('User', { email, id: userId }, { upserting: true, waitMs: 100 }));
+          return db.txn(() =>
+            db.findForUpdate('User', { email, id: userId }, { upserting: true, waitMs: 100 }),
+          );
         },
       ],
       { resolution: 'allSettled' },
     );
-    expect((other[1] as PromiseRejectedResult).reason).toBeInstanceOf(FindForUpdateLockTimeoutError);
+    expect((other[1] as PromiseRejectedResult).reason).toBeInstanceOf(
+      FindForUpdateLockTimeoutError,
+    );
   });
 
   it.each([

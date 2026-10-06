@@ -8,7 +8,10 @@ import { spawn } from 'node:child_process';
 import { watch } from 'node:fs';
 import { resolve } from 'node:path';
 
-const WATCH_PATHS = [resolve(__dirname, '../../apps/api'), resolve(__dirname, '../../packages/db/prisma')];
+const WATCH_PATHS = [
+  resolve(__dirname, '../../apps/api'),
+  resolve(__dirname, '../../packages/db/prisma'),
+];
 const WATCH_EXTENSIONS = ['.ts', '.tsx', '.prisma'];
 const DEBOUNCE_MS = 500;
 const API_URL = process.env.VITE_API_URL || 'http://localhost:8000';

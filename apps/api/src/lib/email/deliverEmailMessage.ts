@@ -43,7 +43,8 @@ export type DeliverEmailMessageOptions = {
   sleep?: (ms: number) => Promise<void>;
 };
 
-const errorMessageOf = (error: unknown): string => (error instanceof Error ? error.message : String(error));
+const errorMessageOf = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error);
 
 // Once shutdown starts, the next failure is recorded instead of retried: an in-claim backoff can run
 // past the shutdown timeout, and a force-exit mid-backoff would strand the row in `sending`.
@@ -95,8 +96,15 @@ export const deliverEmailMessage = async (
   try {
     settled = await settleTemplate(template, sender, variables, (kind) => {
       if (kind === 'system') return {};
-      if (!entry.recipientContactId) throw new EmailRenderError(template, 'unsubscribe_unavailable');
-      return { unsubscribeUrl: unsubscribeUrl({ userId: recipient.id, contactId: entry.recipientContactId, kind }) };
+      if (!entry.recipientContactId)
+        throw new EmailRenderError(template, 'unsubscribe_unavailable');
+      return {
+        unsubscribeUrl: unsubscribeUrl({
+          userId: recipient.id,
+          contactId: entry.recipientContactId,
+          kind,
+        }),
+      };
     });
   } catch (error) {
     if (!isEmailContentError(error)) throw error;
@@ -170,7 +178,9 @@ export const deliverEmailMessage = async (
         ...resolved,
         settledMjml: settled.mjml,
         variables: settled.variables as Prisma.InputJsonValue,
-        renderIssues: settled.issues.length ? (settled.issues as Prisma.InputJsonValue) : Prisma.JsonNull,
+        renderIssues: settled.issues.length
+          ? (settled.issues as Prisma.InputJsonValue)
+          : Prisma.JsonNull,
       },
     });
     if (rows.length === 0) return rows;
@@ -179,12 +189,16 @@ export const deliverEmailMessage = async (
     const resolutions = Object.entries(settled.componentResolutions);
     if (resolutions.length > 0) {
       const snapshots = await db.auditLog.findMany({
-        where: { subjectEmailComponentId: { in: resolutions.map(([, componentId]) => componentId) } },
+        where: {
+          subjectEmailComponentId: { in: resolutions.map(([, componentId]) => componentId) },
+        },
         orderBy: { id: 'desc' },
         distinct: ['subjectEmailComponentId'],
         select: { id: true, subjectEmailComponentId: true },
       });
-      const latestByComponent = new Map(snapshots.map((snapshot) => [snapshot.subjectEmailComponentId, snapshot.id]));
+      const latestByComponent = new Map(
+        snapshots.map((snapshot) => [snapshot.subjectEmailComponentId, snapshot.id]),
+      );
       await db.communicationComponentVersion.createManyAndReturn({
         data: resolutions.map(([slug, emailComponentId]) => ({
           communicationLogId,
@@ -232,7 +246,11 @@ export const deliverEmailMessage = async (
     // retries the job, which meets the `sending` row and stops.
     await settleCommunication(
       { id: communicationLogId, status: 'sending' },
-      { status: 'failed', reasonCode: communicationReasonCodeFor(error), error: errorMessageOf(error) },
+      {
+        status: 'failed',
+        reasonCode: communicationReasonCodeFor(error),
+        error: errorMessageOf(error),
+      },
     );
     log.error(`Email send for ${communicationLogId} failed`, error, LogScope.email);
     return;

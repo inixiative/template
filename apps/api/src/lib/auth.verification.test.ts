@@ -10,7 +10,10 @@ import { emailRegistry, emailVerifier } from '#/lib/email';
 const adapters = emailRegistry.names().map((name) => ({ name, client: emailRegistry.get(name) }));
 const sent: SendEmailOptions[] = [];
 const verificationEvent = spyOn(appEventHandlers, 'user.verificationRequested');
-const verifier = spyOn(emailVerifier, 'verify').mockImplementation(async (email) => ({ email, status: 'deliverable' }));
+const verifier = spyOn(emailVerifier, 'verify').mockImplementation(async (email) => ({
+  email,
+  status: 'deliverable',
+}));
 
 beforeAll(() => {
   registerTestTracker();

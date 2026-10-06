@@ -54,7 +54,9 @@ export const enqueueJob = async <K extends keyof JobPayloads>(
   if (isTest) {
     const jobId = id ?? Bun.randomUUIDv7();
     if (jobOptions.delay !== undefined) {
-      log.info(`Test enqueue: ${handlerName} (${jobId}) carries delay=${jobOptions.delay}ms — returned unrun`);
+      log.info(
+        `Test enqueue: ${handlerName} (${jobId}) carries delay=${jobOptions.delay}ms — returned unrun`,
+      );
       return { jobId, name: handlerName };
     }
     const data = buildJobData(handler, { type, id, payload, dedupeKey }, lane);
@@ -67,7 +69,11 @@ export const enqueueJob = async <K extends keyof JobPayloads>(
     return { jobId, name: handlerName };
   }
 
-  const data = buildJobData(handler, { type, id, payload, dedupeKey, traceContext: captureTraceContext() }, lane);
+  const data = buildJobData(
+    handler,
+    { type, id, payload, dedupeKey, traceContext: captureTraceContext() },
+    lane,
+  );
   const admission = await admitEnvelope({
     handlerName,
     jobId: jobOptions.jobId ?? Bun.randomUUIDv7(),

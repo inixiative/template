@@ -81,11 +81,18 @@ describe('lensFromSchema', () => {
 
   it('maps nested objects to child models, stripping nullability', () => {
     expect(fields.brand).toEqual({ kind: 'object', type: 'Reward.brand' });
-    expect(lens.maps.sdk.models['Reward.brand'].fields.name).toEqual({ kind: 'scalar', type: 'String' });
+    expect(lens.maps.sdk.models['Reward.brand'].fields.name).toEqual({
+      kind: 'scalar',
+      type: 'String',
+    });
   });
 
   it('maps object arrays to isList relations', () => {
-    expect(fields.redemptions).toEqual({ kind: 'object', type: 'Reward.redemptions', isList: true });
+    expect(fields.redemptions).toEqual({
+      kind: 'object',
+      type: 'Reward.redemptions',
+      isList: true,
+    });
     expect(lens.maps.sdk.models['Reward.redemptions'].fields.redeemedAt).toEqual({
       kind: 'scalar',
       type: 'DateTime',
@@ -97,8 +104,14 @@ describe('lensFromSchema', () => {
   });
 
   it('unwraps a root array schema to its items', () => {
-    const listLens = lensFromSchema({ type: 'array', items: RewardSchema } as const satisfies SdkSchema, 'Reward');
-    expect(listLens.maps.sdk.models.Reward.fields.itemTitle).toEqual({ kind: 'scalar', type: 'String' });
+    const listLens = lensFromSchema(
+      { type: 'array', items: RewardSchema } as const satisfies SdkSchema,
+      'Reward',
+    );
+    expect(listLens.maps.sdk.models.Reward.fields.itemTitle).toEqual({
+      kind: 'scalar',
+      type: 'String',
+    });
   });
 
   it('builds from a real generated SDK schema', () => {

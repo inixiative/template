@@ -65,7 +65,9 @@ describe('softDeleteScope extension', () => {
     const { entity: orgUser } = await createOrganizationUser();
     await tombstone('organizationUser', orgUser.id);
 
-    expect(await db.organizationUser.findMany({ where: { userId: orgUser.userId } })).toHaveLength(0);
+    expect(await db.organizationUser.findMany({ where: { userId: orgUser.userId } })).toHaveLength(
+      0,
+    );
 
     const loaded = await db.user.findUnique({
       where: { id: orgUser.userId },
@@ -76,11 +78,20 @@ describe('softDeleteScope extension', () => {
 
   it('scopes bare include trees automatically', async () => {
     const { entity: user } = await createUser();
-    const { entity: liveContact } = await createContact({ ownerModel: ContactOwnerModel.User }, { user });
-    const { entity: deadContact } = await createContact({ ownerModel: ContactOwnerModel.User }, { user });
+    const { entity: liveContact } = await createContact(
+      { ownerModel: ContactOwnerModel.User },
+      { user },
+    );
+    const { entity: deadContact } = await createContact(
+      { ownerModel: ContactOwnerModel.User },
+      { user },
+    );
     await tombstone('contact', deadContact.id);
 
-    const loaded = await db.user.findUnique({ where: { id: user.id }, include: { contacts: true } });
+    const loaded = await db.user.findUnique({
+      where: { id: user.id },
+      include: { contacts: true },
+    });
     const ids = loaded?.contacts.map((c) => c.id) ?? [];
     expect(ids).toContain(liveContact.id);
     expect(ids).not.toContain(deadContact.id);
@@ -102,14 +113,19 @@ describe('softDeleteScope extension', () => {
       (async () => db.user.update({ where: { id: user.id }, data: { name: 'blocked' } }))(),
     ).rejects.toThrow();
 
-    const updated = await db.withDeleted(() => db.user.update({ where: { id: user.id }, data: { name: 'allowed' } }));
+    const updated = await db.withDeleted(() =>
+      db.user.update({ where: { id: user.id }, data: { name: 'allowed' } }),
+    );
     expect(updated.name).toBe('allowed');
   });
 
   it('revives a parent and its cascaded subtree with the extension active', async () => {
     const { entity: org } = await createOrganization();
     const { entity: space } = await createSpace({}, { organization: org });
-    const { entity: contact } = await createContact({ ownerModel: ContactOwnerModel.Space }, { space });
+    const { entity: contact } = await createContact(
+      { ownerModel: ContactOwnerModel.Space },
+      { space },
+    );
 
     await tombstone('organization', org.id);
     expect(await db.organization.findUnique({ where: { id: org.id } })).toBeNull();

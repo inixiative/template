@@ -13,11 +13,18 @@ const isPlainObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
 export type NodeContext = { model: string; path: string };
-export type NodeScope = (ctx: NodeContext, node: Record<string, unknown>) => Record<string, unknown>[];
+export type NodeScope = (
+  ctx: NodeContext,
+  node: Record<string, unknown>,
+) => Record<string, unknown>[];
 
-const merge = (node: Record<string, unknown>, clauses: Record<string, unknown>[]): Record<string, unknown> => {
+const merge = (
+  node: Record<string, unknown>,
+  clauses: Record<string, unknown>[],
+): Record<string, unknown> => {
   if (!clauses.length) return node;
-  if (clauses.length === 1 && !Object.keys(clauses[0]).some((key) => key in node)) return { ...node, ...clauses[0] };
+  if (clauses.length === 1 && !Object.keys(clauses[0]).some((key) => key in node))
+    return { ...node, ...clauses[0] };
   return { AND: [node, ...clauses] };
 };
 
@@ -30,15 +37,26 @@ const asOne = (clauses: Record<string, unknown>[]): Record<string, unknown> =>
 // `every` gets scope by implication — an out-of-scope row must never fail the
 // predicate. Bare `isNot` gets scope as a fail-closed `is` sibling — folded
 // inside, an out-of-scope row would pass the negation.
-export const walkWhere = (model: string, where: Record<string, unknown>, scopeAt: NodeScope): Record<string, unknown> =>
-  scopeNode({ model, path: '' }, where, scopeAt);
+export const walkWhere = (
+  model: string,
+  where: Record<string, unknown>,
+  scopeAt: NodeScope,
+): Record<string, unknown> => scopeNode({ model, path: '' }, where, scopeAt);
 
-const scopeNode = (ctx: NodeContext, node: Record<string, unknown>, scopeAt: NodeScope): Record<string, unknown> => {
+const scopeNode = (
+  ctx: NodeContext,
+  node: Record<string, unknown>,
+  scopeAt: NodeScope,
+): Record<string, unknown> => {
   const walked = walkEntries(ctx, node, scopeAt);
   return merge(walked, scopeAt(ctx, walked));
 };
 
-const walkEntries = (ctx: NodeContext, node: Record<string, unknown>, scopeAt: NodeScope): Record<string, unknown> => {
+const walkEntries = (
+  ctx: NodeContext,
+  node: Record<string, unknown>,
+  scopeAt: NodeScope,
+): Record<string, unknown> => {
   const out: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(node)) {
     if (BOOLEAN_KEYS.has(key)) {
@@ -52,7 +70,12 @@ const walkEntries = (ctx: NodeContext, node: Record<string, unknown>, scopeAt: N
     const field = lookupField(ctx.model, key);
     out[key] =
       field?.kind === 'object' && isPlainObject(value)
-        ? hop({ model: field.type, path: ctx.path ? `${ctx.path}.${key}` : key }, field, value, scopeAt)
+        ? hop(
+            { model: field.type, path: ctx.path ? `${ctx.path}.${key}` : key },
+            field,
+            value,
+            scopeAt,
+          )
         : value;
   }
   return out;

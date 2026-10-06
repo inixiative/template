@@ -8,10 +8,18 @@ import { context, metrics, propagation, trace } from '@opentelemetry/api';
 import { logs, SeverityNumber } from '@opentelemetry/api-logs';
 import { AsyncLocalStorageContextManager } from '@opentelemetry/context-async-hooks';
 import { W3CTraceContextPropagator } from '@opentelemetry/core';
-import { JsonLogsSerializer, JsonMetricsSerializer, JsonTraceSerializer } from '@opentelemetry/otlp-transformer';
+import {
+  JsonLogsSerializer,
+  JsonMetricsSerializer,
+  JsonTraceSerializer,
+} from '@opentelemetry/otlp-transformer';
 import { resourceFromAttributes } from '@opentelemetry/resources';
 import { BatchLogRecordProcessor, LoggerProvider } from '@opentelemetry/sdk-logs';
-import { AggregationTemporality, MeterProvider, PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics';
+import {
+  AggregationTemporality,
+  MeterProvider,
+  PeriodicExportingMetricReader,
+} from '@opentelemetry/sdk-metrics';
 import {
   BasicTracerProvider,
   BatchSpanProcessor,
@@ -53,7 +61,10 @@ const startTelemetry = (config: TelemetryConfig) => {
     readers: [
       new PeriodicExportingMetricReader({
         exporter: {
-          ...createFetchExporter({ ...targets.metrics, serialize: JsonMetricsSerializer.serializeRequest }),
+          ...createFetchExporter({
+            ...targets.metrics,
+            serialize: JsonMetricsSerializer.serializeRequest,
+          }),
           selectAggregationTemporality: () => AggregationTemporality.DELTA,
         },
         exportIntervalMillis: 30_000,

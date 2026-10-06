@@ -15,7 +15,10 @@ export class DependentTemplateError extends Error {
   ) {
     super(
       `Component "${componentSlug}" would break ${dependents.length} template(s) that embed it:\n${dependents
-        .map((dependent) => `  ${dependent.slug}: ${dependent.issues.map((issue) => issue.message).join('; ')}`)
+        .map(
+          (dependent) =>
+            `  ${dependent.slug}: ${dependent.issues.map((issue) => issue.message).join('; ')}`,
+        )
         .join('\n')}`,
     );
     this.name = 'DependentTemplateError';

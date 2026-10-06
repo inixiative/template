@@ -32,7 +32,10 @@ describe('DELETE /api/v1/organizationUser/:id', () => {
   });
 
   it('deletes the organizationUser', async () => {
-    const { entity: toDelete } = await createOrganizationUser({ role: 'viewer' }, { organization: org });
+    const { entity: toDelete } = await createOrganizationUser(
+      { role: 'viewer' },
+      { organization: org },
+    );
 
     const response = await fetch(del(`/api/v1/organizationUser/${toDelete.id}`));
     expect(response.status).toBe(204);

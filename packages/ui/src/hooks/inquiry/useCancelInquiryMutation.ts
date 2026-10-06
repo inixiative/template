@@ -21,7 +21,9 @@ export const useCancelInquiryMutation = () => {
           if (!cached?.data) return cached;
           return {
             ...cached,
-            data: cached.data.map((inq) => (inq.id === inquiry.id ? { ...inq, status: 'canceled' } : inq)),
+            data: cached.data.map((inq) =>
+              inq.id === inquiry.id ? { ...inq, status: 'canceled' } : inq,
+            ),
           };
         },
       })),

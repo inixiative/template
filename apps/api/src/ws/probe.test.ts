@@ -3,8 +3,18 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import type { User } from '@template/db/generated/client/client';
-import { InquiryResourceModel, InquiryStatus, InquiryType, PlatformRole } from '@template/db/generated/client/enums';
-import { cleanupTouchedTables, createInquiry, createOrganization, createUser } from '@template/db/test';
+import {
+  InquiryResourceModel,
+  InquiryStatus,
+  InquiryType,
+  PlatformRole,
+} from '@template/db/generated/client/enums';
+import {
+  cleanupTouchedTables,
+  createInquiry,
+  createOrganization,
+  createUser,
+} from '@template/db/test';
 import { STREAM_DEFINITIONS, WS_CHANNELS } from '@template/shared/ws';
 import { canSubscribe, resolveIdentity } from '#/ws/probe';
 import { createBearerToken } from '#tests/utils/createBearerToken';
@@ -56,7 +66,10 @@ describe('ws subscribe probe (real app)', () => {
 
   it('rejects a data stream family — streams are opened, not subscribed', async () => {
     expect(
-      await canSubscribe(adminBearer, STREAM_DEFINITIONS.organizationReadManyContacts.name({ id: inquiryId })),
+      await canSubscribe(
+        adminBearer,
+        STREAM_DEFINITIONS.organizationReadManyContacts.name({ id: inquiryId }),
+      ),
     ).toBe(false);
   });
 
@@ -86,7 +99,11 @@ describe('ws subscribe probe (real app)', () => {
   it('a spoofed probe carries the TARGET authority, not the admin', async () => {
     const { entity: outsider } = await createUser();
     const channel = WS_CHANNELS.inquiryRead.name(inquiryId);
-    expect(await canSubscribe({ ...adminBearer, 'x-spoof-user-email': outsider.email }, channel)).toBe(false);
-    expect(await canSubscribe({ ...adminBearer, 'x-spoof-user-email': targetUser.email }, channel)).toBe(true);
+    expect(
+      await canSubscribe({ ...adminBearer, 'x-spoof-user-email': outsider.email }, channel),
+    ).toBe(false);
+    expect(
+      await canSubscribe({ ...adminBearer, 'x-spoof-user-email': targetUser.email }, channel),
+    ).toBe(true);
   });
 });

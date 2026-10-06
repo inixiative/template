@@ -1,5 +1,11 @@
 import { resolveMx, resolveTxt } from 'dns/promises';
-import { getDomain, type ResendDnsRecord, type ResendDomain, upsertDomain, verifyDomain } from '../api/resend';
+import {
+  getDomain,
+  type ResendDnsRecord,
+  type ResendDomain,
+  upsertDomain,
+  verifyDomain,
+} from '../api/resend';
 import { updateConfigField } from '../utils/configHelpers';
 import { getProjectConfig } from '../utils/getProjectConfig';
 import { markComplete } from '../utils/progressTracking';
@@ -40,7 +46,10 @@ export const storeResendApiKey = async (projectId: string, apiKey: string): Prom
  * Store from address in Infisical root environment.
  * Root secrets are inherited by prod and staging via Infisical imports.
  */
-export const storeResendFromAddress = async (projectId: string, fromAddress: string): Promise<void> => {
+export const storeResendFromAddress = async (
+  projectId: string,
+  fromAddress: string,
+): Promise<void> => {
   await updateConfigField('resend', 'fromAddress', fromAddress);
   await syncResendProjectName();
   await setSecretAsync(projectId, 'root', 'EMAIL_FROM', fromAddress, '/api');
@@ -55,7 +64,10 @@ export const ensureResendDomain = async (
   fromAddress: string,
   apiKey?: string,
 ): Promise<ResendDomain> => {
-  const result = await upsertDomain(apiKey ?? (await getStoredResendApiKey(projectId)), getDomainName(fromAddress));
+  const result = await upsertDomain(
+    apiKey ?? (await getStoredResendApiKey(projectId)),
+    getDomainName(fromAddress),
+  );
 
   await updateConfigField('resend', 'fromAddress', fromAddress);
   await updateConfigField('resend', 'domainId', result.id);
@@ -74,7 +86,10 @@ export type DnsCheckResult = {
  * Check DNS records locally via resolver before hitting Resend's API.
  * Returns which records are found vs missing.
  */
-const checkDnsLocally = async (records: ResendDnsRecord[], domain: string): Promise<DnsCheckResult[]> => {
+const checkDnsLocally = async (
+  records: ResendDnsRecord[],
+  domain: string,
+): Promise<DnsCheckResult[]> => {
   const results: DnsCheckResult[] = [];
 
   for (const record of records) {
@@ -89,7 +104,9 @@ const checkDnsLocally = async (records: ResendDnsRecord[], domain: string): Prom
         const mxRecords = await resolveMx(fqdn);
         results.push({
           record,
-          found: mxRecords.some((mx) => mx.exchange.replace(/\.$/, '') === record.value.replace(/\.$/, '')),
+          found: mxRecords.some(
+            (mx) => mx.exchange.replace(/\.$/, '') === record.value.replace(/\.$/, ''),
+          ),
         });
       } else {
         results.push({ record, found: true });
@@ -144,7 +161,11 @@ export const confirmResendDnsSetup = async (
     return {
       verified: false,
       domain: currentDomain,
-      failedRecords: missing.map((r) => ({ type: r.record.type, name: r.record.name, status: 'not_propagated' })),
+      failedRecords: missing.map((r) => ({
+        type: r.record.type,
+        name: r.record.name,
+        status: 'not_propagated',
+      })),
       dnsCheck,
     };
   }
@@ -152,7 +173,8 @@ export const confirmResendDnsSetup = async (
   // Step 2: Check if Resend already shows verified (avoid re-triggering)
   onProgress?.('DNS propagated. Checking Resend status...');
   const isAlreadyVerified =
-    currentDomain.status === 'verified' || (currentDomain.records ?? []).every((r) => r.status === 'verified');
+    currentDomain.status === 'verified' ||
+    (currentDomain.records ?? []).every((r) => r.status === 'verified');
 
   let domain: ResendDomain;
   if (isAlreadyVerified) {
@@ -170,7 +192,8 @@ export const confirmResendDnsSetup = async (
     .filter((r) => r.status !== 'verified' && r.status !== 'not_started')
     .map((r) => ({ type: r.type, name: r.name, status: r.status }));
 
-  const allVerified = domain.status === 'verified' || (domain.records ?? []).every((r) => r.status === 'verified');
+  const allVerified =
+    domain.status === 'verified' || (domain.records ?? []).every((r) => r.status === 'verified');
 
   if (allVerified) {
     await updateConfigField('resend', 'fromAddress', fromAddress);

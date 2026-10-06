@@ -6,7 +6,11 @@
  */
 import crypto from 'node:crypto';
 import type { Db, Prisma } from '@template/db';
-import type { WebhookEvent, WebhookEventAction, WebhookEventStatus } from '@template/db/generated/client/client';
+import type {
+  WebhookEvent,
+  WebhookEventAction,
+  WebhookEventStatus,
+} from '@template/db/generated/client/client';
 import { log } from '@template/shared/logger';
 import type { JobHandler } from '#/jobs/types';
 import { isIntegrationRecordPoisoned } from '#/modules/integration/services/isIntegrationRecordPoisoned';
@@ -38,7 +42,9 @@ export const sendWebhook: JobHandler<SendWebhookPayload> = async (ctx, payload) 
       resourceId,
     }))
   ) {
-    log.info(`Webhook record ${resourceId} is poisoned for integration ${subscription.integrationId} - skipping`);
+    log.info(
+      `Webhook record ${resourceId} is poisoned for integration ${subscription.integrationId} - skipping`,
+    );
     return;
   }
 
@@ -127,15 +133,23 @@ export const sendWebhook: JobHandler<SendWebhookPayload> = async (ctx, payload) 
     recentEvents.length >= FAILURE_THRESHOLD &&
     recentEvents.every((e: Pick<WebhookEvent, 'status'>) => e.status !== 'success');
   if (allFailed) {
-    await db.webhookSubscription.update({ where: { id: subscriptionId }, data: { isActive: false } });
-    log.info(`Webhook subscription ${subscriptionId} disabled after ${FAILURE_THRESHOLD} consecutive failures`);
+    await db.webhookSubscription.update({
+      where: { id: subscriptionId },
+      data: { isActive: false },
+    });
+    log.info(
+      `Webhook subscription ${subscriptionId} disabled after ${FAILURE_THRESHOLD} consecutive failures`,
+    );
   }
 };
 
 const RECORD_FAILURE_THRESHOLD = 3;
 
 // Only a refusal of the record's content counts; redirects, auth, conflicts and rate limits say nothing about the record.
-const RECORD_REJECTION = { status: 'error', httpStatus: { in: [400, 422] } } satisfies Prisma.WebhookEventWhereInput;
+const RECORD_REJECTION = {
+  status: 'error',
+  httpStatus: { in: [400, 422] },
+} satisfies Prisma.WebhookEventWhereInput;
 
 const isRecordRejection = (event: { status: WebhookEventStatus; httpStatus?: number }): boolean =>
   event.status === RECORD_REJECTION.status &&
@@ -143,7 +157,11 @@ const isRecordRejection = (event: { status: WebhookEventStatus; httpStatus?: num
   RECORD_REJECTION.httpStatus.in.includes(event.httpStatus);
 
 // Ordered by id, not createdAt: ids are uuidv7, so events in the same millisecond still order exactly.
-const isRecordRejected = async (db: Db, subscriptionId: string, resourceId: string): Promise<boolean> => {
+const isRecordRejected = async (
+  db: Db,
+  subscriptionId: string,
+  resourceId: string,
+): Promise<boolean> => {
   const lastSuccess = await db.webhookEvent.findFirst({
     where: { webhookSubscriptionId: subscriptionId, resourceId, status: 'success' },
     orderBy: { id: 'desc' },

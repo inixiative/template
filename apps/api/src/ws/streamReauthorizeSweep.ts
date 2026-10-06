@@ -19,7 +19,10 @@ const reauthorizeQueued = async (ws: WSSocket): Promise<void> => {
   try {
     await ws.data.queue.run(() => reauthorizeStreams(ws));
   } catch (err) {
-    log.error(`ws stream re-authorization failed: ${err instanceof Error ? err.message : String(err)}`, LogScope.ws);
+    log.error(
+      `ws stream re-authorization failed: ${err instanceof Error ? err.message : String(err)}`,
+      LogScope.ws,
+    );
   } finally {
     pending.delete(ws);
   }

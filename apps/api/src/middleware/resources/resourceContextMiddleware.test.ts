@@ -2,7 +2,12 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { CronJobScalarSchema, OrganizationScalarSchema } from '@template/db';
 import type { CronJob, Organization, User } from '@template/db/generated/client/client';
-import { cleanupTouchedTables, createCronJob, createOrganization, createUser } from '@template/db/test';
+import {
+  cleanupTouchedTables,
+  createCronJob,
+  createOrganization,
+  createUser,
+} from '@template/db/test';
 import { getResource } from '#/lib/context/getResource';
 import { readRoute } from '#/lib/routeTemplates';
 import { makeController } from '#/lib/utils/makeController';
@@ -81,7 +86,10 @@ describe('resourceContextMiddleware', () => {
     adminFetch = adminHarness.fetch;
 
     const { entity: d } = await createOrganization();
-    deletedOrg = await db.organization.update({ where: { id: d.id }, data: { deletedAt: new Date() } });
+    deletedOrg = await db.organization.update({
+      where: { id: d.id },
+      data: { deletedAt: new Date() },
+    });
   });
 
   afterAll(async () => {

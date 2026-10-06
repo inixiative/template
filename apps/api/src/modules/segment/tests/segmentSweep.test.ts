@@ -3,7 +3,12 @@ import { Operator } from '@inixiative/json-rules';
 import { clearHookRegistry, db, registerSoftDeleteScoper } from '@template/db';
 import type { Space } from '@template/db/generated/client/client';
 import { SegmentType } from '@template/db/generated/client/enums';
-import { cleanupTouchedTables, createOrganizationUser, createSegment, createSpace } from '@template/db/test';
+import {
+  cleanupTouchedTables,
+  createOrganizationUser,
+  createSegment,
+  createSpace,
+} from '@template/db/test';
 import { registerRuleReferenceReferencedHook } from '#/hooks/ruleReference/referencedHook';
 import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
 import { registerSegmentRuleReferencesHook } from '#/hooks/segmentRuleReferences/hook';
@@ -37,13 +42,22 @@ describe('sweepable segments — what the nightly sweep enqueues', () => {
   });
 
   it('enqueues sound dynamic segments only: a degraded one is skipped, not warned about by its job', async () => {
-    const { entity: target } = await createSegment({ type: SegmentType.dynamic, conditions: acmeRule }, { space });
-    const { entity: sound } = await createSegment({ type: SegmentType.dynamic, conditions: acmeRule }, { space });
+    const { entity: target } = await createSegment(
+      { type: SegmentType.dynamic, conditions: acmeRule },
+      { space },
+    );
+    const { entity: sound } = await createSegment(
+      { type: SegmentType.dynamic, conditions: acmeRule },
+      { space },
+    );
     const { entity: degraded } = await createSegment(
       { type: SegmentType.dynamic, conditions: membersOf(target.id) },
       { space },
     );
-    const { entity: pinned } = await createSegment({ type: SegmentType.static, conditions: acmeRule }, { space });
+    const { entity: pinned } = await createSegment(
+      { type: SegmentType.static, conditions: acmeRule },
+      { space },
+    );
     await db.segment.update({ where: { id: target.id }, data: { deletedAt: new Date() } });
 
     const ids = (await sweepableSegments()).map((segment) => segment.id);

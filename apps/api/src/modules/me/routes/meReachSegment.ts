@@ -6,7 +6,10 @@
  */
 import { actionRoute } from '#/lib/routeTemplates';
 import { Modules } from '#/modules/modules';
-import { segmentReachBodySchema, segmentReachResponseSchema } from '#/modules/segment/schemas/segmentSchemas';
+import {
+  segmentReachBodySchema,
+  segmentReachResponseSchema,
+} from '#/modules/segment/schemas/segmentSchemas';
 import { Tags } from '#/modules/tags';
 
 export const meReachSegmentRoute = actionRoute({

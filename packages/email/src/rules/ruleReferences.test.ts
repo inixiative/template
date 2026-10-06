@@ -22,7 +22,11 @@ describe('ruleReferences — the rows an email rule names', () => {
     const rule: Condition = {
       any: [
         { field: 'recipient.spaceUsers.space.id', operator: 'equals', value: 'space-1' },
-        { field: 'recipient.organizationUsers.organization.id', operator: 'notEquals', value: 'org-1' },
+        {
+          field: 'recipient.organizationUsers.organization.id',
+          operator: 'notEquals',
+          value: 'org-1',
+        },
       ],
     };
     expect(emailRuleReferences(defaultEmailLens, rule)).toEqual([
@@ -44,21 +48,45 @@ describe('ruleReferences — the rows an email rule names', () => {
   });
 
   it('a row read from path or bind names nothing — there is no edge to register', () => {
-    const fromPath: Condition = { field: 'recipient.tagAttachments.tag.id', operator: 'equals', path: 'data.tagId' };
-    const fromBind: Condition = { field: 'recipient.tagAttachments.tag.id', operator: 'equals', bind: 'tagId' };
+    const fromPath: Condition = {
+      field: 'recipient.tagAttachments.tag.id',
+      operator: 'equals',
+      path: 'data.tagId',
+    };
+    const fromBind: Condition = {
+      field: 'recipient.tagAttachments.tag.id',
+      operator: 'equals',
+      bind: 'tagId',
+    };
     expect(emailRuleReferences(defaultEmailLens, fromPath)).toEqual([]);
     expect(emailRuleReferences(defaultEmailLens, fromBind)).toEqual([]);
   });
 
   it('an operator that describes the row without naming it names nothing', () => {
-    const rule: Condition = { field: 'recipient.tagAttachments.tag.id', operator: 'contains', value: 'abc' };
+    const rule: Condition = {
+      field: 'recipient.tagAttachments.tag.id',
+      operator: 'contains',
+      value: 'abc',
+    };
     expect(emailRuleReferences(defaultEmailLens, rule)).toEqual([]);
   });
 
   it('contentRuleReferences folds every block, branch and nesting across contents, deduped', () => {
-    const tagA: Condition = { field: 'recipient.tagAttachments.tag.id', operator: 'equals', value: 'tag-a' };
-    const tagB: Condition = { field: 'recipient.tagAttachments.tag.id', operator: 'equals', value: 'tag-b' };
-    const space: Condition = { field: 'recipient.spaceUsers.space.id', operator: 'equals', value: 'space-1' };
+    const tagA: Condition = {
+      field: 'recipient.tagAttachments.tag.id',
+      operator: 'equals',
+      value: 'tag-a',
+    };
+    const tagB: Condition = {
+      field: 'recipient.tagAttachments.tag.id',
+      operator: 'equals',
+      value: 'tag-b',
+    };
+    const space: Condition = {
+      field: 'recipient.spaceUsers.space.id',
+      operator: 'equals',
+      value: 'space-1',
+    };
     const mjml = `<mj-text>${block(tagA, `inner ${block(space)}`)}{{#if rule=${JSON.stringify(tagB)}}}B{{else if rule=${JSON.stringify(tagA)}}}A{{else}}none{{/if}}</mj-text>`;
     const subject = `Hello ${block(space, 'there')}`;
     expect(contentRuleReferences(defaultEmailLens, subject, mjml)).toEqual([
@@ -69,6 +97,8 @@ describe('ruleReferences — the rows an email rule names', () => {
   });
 
   it('content without conditionals names nothing', () => {
-    expect(contentRuleReferences(defaultEmailLens, '<mj-text>Hi {{recipient.name}}</mj-text>')).toEqual([]);
+    expect(
+      contentRuleReferences(defaultEmailLens, '<mj-text>Hi {{recipient.name}}</mj-text>'),
+    ).toEqual([]);
   });
 });

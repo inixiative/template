@@ -7,7 +7,12 @@
 import { getRedisPub, getRedisSub } from '@template/db';
 import { LogScope, log } from '@template/shared/logger';
 import { streamAppendFrame } from '#/ws/dataFrame';
-import { broadcastLocal, sendToChannelLocal, sendToStreamLocal, sendToUserLocal } from '#/ws/delivery';
+import {
+  broadcastLocal,
+  sendToChannelLocal,
+  sendToStreamLocal,
+  sendToUserLocal,
+} from '#/ws/delivery';
 import { inStreamOrder } from '#/ws/streamPublishOrder';
 import type { WSOutbound } from '#/ws/types';
 
@@ -86,7 +91,11 @@ export const sendToChannel = (channel: string, event: WSOutbound): Promise<void>
   publish({ type: 'channel', target: channel, event });
 
 // Serialized per stream so this instance publishes a stream's appends in emission order, fallback included.
-export const appendToStream = (stream: string, append: StreamAppend, userIds?: string[]): Promise<void> =>
+export const appendToStream = (
+  stream: string,
+  append: StreamAppend,
+  userIds?: string[],
+): Promise<void> =>
   inStreamOrder(stream, () =>
     publish({
       type: 'stream',
@@ -96,7 +105,8 @@ export const appendToStream = (stream: string, append: StreamAppend, userIds?: s
     }),
   );
 
-export const broadcast = (event: WSOutbound): Promise<void> => publish({ type: 'broadcast', event });
+export const broadcast = (event: WSOutbound): Promise<void> =>
+  publish({ type: 'broadcast', event });
 
 export const isPubSubEnabled = (): boolean => {
   return pubsubEnabled;

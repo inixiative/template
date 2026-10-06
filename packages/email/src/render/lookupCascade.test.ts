@@ -16,7 +16,11 @@ describe('lookupCascade', () => {
   });
 
   it('resolves a present slug to its component', async () => {
-    await createEmailComponent({ slug: 'header', mjml: '<mj-text>H</mj-text>', ownerModel: 'default' });
+    await createEmailComponent({
+      slug: 'header',
+      mjml: '<mj-text>H</mj-text>',
+      ownerModel: 'default',
+    });
     const result = await lookupCascade(['header'], defaultCtx);
     expect(result.header?.mjml).toBe('<mj-text>H</mj-text>');
   });

@@ -6,7 +6,12 @@
  */
 import { afterEach, beforeEach, expect, mock, spyOn, test } from 'bun:test';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { createMemoryHistory, createRootRoute, createRouter, RouterProvider } from '@tanstack/react-router';
+import {
+  createMemoryHistory,
+  createRootRoute,
+  createRouter,
+  RouterProvider,
+} from '@tanstack/react-router';
 import { buildUser } from '@template/db/test';
 import { SignupForm } from '@template/ui/components/auth/SignupForm';
 import { UserMenu } from '@template/ui/components/layout/UserMenu';
@@ -41,12 +46,15 @@ beforeEach(() => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
     const path = new URL(url).pathname;
     const headers = new Headers(
-      init?.headers ?? (typeof input === 'object' && 'headers' in input ? input.headers : undefined),
+      init?.headers ??
+        (typeof input === 'object' && 'headers' in input ? input.headers : undefined),
     );
     requests.push({ path, authorization: headers.get('authorization') });
     return respond(path);
   };
-  fetchSpy = spyOn(globalThis, 'fetch').mockImplementation(Object.assign(intercept, { preconnect: fetch.preconnect }));
+  fetchSpy = spyOn(globalThis, 'fetch').mockImplementation(
+    Object.assign(intercept, { preconnect: fetch.preconnect }),
+  );
   authenticate = mock(() => {});
   socketLogout = mock(() => {});
   const websocket = {
@@ -74,7 +82,10 @@ afterEach(() => {
 
 test('verification-required signup succeeds without a token, hydration or websocket authentication', async () => {
   respond = () => Response.json({ token: null, user: { emailVerified: false } });
-  expect(await store.getState().auth.signUp(method)).toEqual({ status: 'verification-pending', email: method.email });
+  expect(await store.getState().auth.signUp(method)).toEqual({
+    status: 'verification-pending',
+    email: method.email,
+  });
   expect(requests.map((r) => r.path)).toEqual(['/api/auth/sign-up/email']);
   expect(getToken()).toBeNull();
   expect(store.getState().auth.isAuthenticated).toBe(false);
@@ -109,7 +120,9 @@ test.each([
   const user = entity.__serialize();
   respond = (path) =>
     path === '/api/v1/me'
-      ? Response.json({ data: { ...user, organizations: [], organizationUsers: [], spaces: [], spaceUsers: [] } })
+      ? Response.json({
+          data: { ...user, organizations: [], organizationUsers: [], spaces: [], spaceUsers: [] },
+        })
       : Response.json({ token, user });
   const result = await store.getState().auth[action](method);
   if (action === 'signUp') expect(result).toEqual({ status: 'authenticated' });
@@ -120,9 +133,14 @@ test.each([
   expect(authenticate).toHaveBeenCalledWith(token);
 });
 
-test.each(['signIn', 'signUp'] as const)('%s errors do not hydrate or authenticate', async (action) => {
+test.each([
+  'signIn',
+  'signUp',
+] as const)('%s errors do not hydrate or authenticate', async (action) => {
   respond = () => Response.json({ message: 'Email verification required' }, { status: 403 });
-  await expect(store.getState().auth[action](method)).rejects.toThrow('Email verification required');
+  await expect(store.getState().auth[action](method)).rejects.toThrow(
+    'Email verification required',
+  );
   expect(requests).toHaveLength(1);
   expect(getToken()).toBeNull();
   expect(store.getState().auth.isAuthenticated).toBe(false);
@@ -136,13 +154,18 @@ test('a malformed tokenless signup remains an error', async () => {
   expect(getToken()).toBeNull();
 });
 
-test.each([200, 403])('logout sends the bearer session and clears local access on HTTP %i', async (status) => {
+test.each([
+  200, 403,
+])('logout sends the bearer session and clears local access on HTTP %i', async (status) => {
   setToken(token, new Date(Date.now() + 60_000));
   store.setState((state) => ({
     auth: { ...state.auth, isAuthenticated: true, organizations: {}, spaces: {}, spaceUsers: {} },
   }));
   store.getState().tenant.setUser();
-  respond = () => Response.json(status === 200 ? { success: true } : { message: 'Revocation failed' }, { status });
+  respond = () =>
+    Response.json(status === 200 ? { success: true } : { message: 'Revocation failed' }, {
+      status,
+    });
   const pending = store.getState().auth.logout();
   if (status === 200) await pending;
   else await expect(pending).rejects.toThrow('Revocation failed');
@@ -167,7 +190,10 @@ test('signup form displays verification success without navigating to the dashbo
   });
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const route = createRootRoute({ component: () => <SignupForm onLoginClick={login} /> });
-  const router = createRouter({ routeTree: route, history: createMemoryHistory({ initialEntries: ['/'] }) });
+  const router = createRouter({
+    routeTree: route,
+    history: createMemoryHistory({ initialEntries: ['/'] }),
+  });
   const view = render(
     <QueryClientProvider client={client}>
       <RouterProvider router={router} />

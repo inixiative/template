@@ -12,7 +12,11 @@ const contentSchema = spaceContentSchema.partial();
 
 type UpdateSpaceContent = z.infer<typeof contentSchema>;
 
-const validate = async (db: Db, inquiry: Partial<Inquiry>, content: UpdateSpaceContent): Promise<void> => {
+const validate = async (
+  db: Db,
+  inquiry: Partial<Inquiry>,
+  content: UpdateSpaceContent,
+): Promise<void> => {
   const { slug } = content;
   if (!slug) return;
 
@@ -20,7 +24,9 @@ const validate = async (db: Db, inquiry: Partial<Inquiry>, content: UpdateSpaceC
   const space = await db.space.findUniqueOrThrow({ where: { id: spaceId } });
 
   const [existingSpace, existingInquiry] = await Promise.all([
-    db.space.findFirst({ where: { organizationId: space.organizationId, slug, id: { not: spaceId } } }),
+    db.space.findFirst({
+      where: { organizationId: space.organizationId, slug, id: { not: spaceId } },
+    }),
     db.inquiry.findFirst({
       where: {
         id: { not: inquiry.id },
@@ -32,9 +38,13 @@ const validate = async (db: Db, inquiry: Partial<Inquiry>, content: UpdateSpaceC
     }),
   ]);
 
-  if (existingSpace) throw makeError({ status: 409, message: 'A space with this slug already exists' });
+  if (existingSpace)
+    throw makeError({ status: 409, message: 'A space with this slug already exists' });
   if (existingInquiry)
-    throw makeError({ status: 409, message: 'An open request to update this space to this slug already exists' });
+    throw makeError({
+      status: 409,
+      message: 'An open request to update this space to this slug already exists',
+    });
 };
 
 export const updateSpaceHandler: InquiryHandler<UpdateSpaceContent> = {

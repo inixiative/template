@@ -18,13 +18,23 @@ describe('collectComponentRegions', () => {
   test('bare ref → one region, no body, no overrides', () => {
     const regions = collectComponentRegions('a{{#component:footer}}{{/component:footer}}b');
     expect(regions).toEqual([
-      { slug: 'footer', path: [1], depth: 0, hasBody: false, overrideSlots: [], occurrenceIndex: 0 },
+      {
+        slug: 'footer',
+        path: [1],
+        depth: 0,
+        hasBody: false,
+        overrideSlots: [],
+        occurrenceIndex: 0,
+      },
     ]);
   });
 
   test('ref with only an override slot → no body, override listed (per-instance overridden state)', () => {
-    const src = '{{#component:card}}{{#slot:header}}<mj-text>Hi</mj-text>{{/slot:header}}{{/component:card}}';
-    expect(collectComponentRegions(src)).toMatchObject([{ hasBody: false, overrideSlots: ['header'] }]);
+    const src =
+      '{{#component:card}}{{#slot:header}}<mj-text>Hi</mj-text>{{/slot:header}}{{/component:card}}';
+    expect(collectComponentRegions(src)).toMatchObject([
+      { hasBody: false, overrideSlots: ['header'] },
+    ]);
   });
 
   test('inlined body (chrome + :default slot) → hasBody, nested ref gets its own deeper region', () => {
@@ -33,7 +43,14 @@ describe('collectComponentRegions', () => {
     const regions = collectComponentRegions(src);
     expect(regions).toEqual([
       { slug: 'card', path: [0], depth: 0, hasBody: true, overrideSlots: [], occurrenceIndex: 0 },
-      { slug: 'cta', path: [0, 1, 0], depth: 1, hasBody: false, overrideSlots: [], occurrenceIndex: 0 },
+      {
+        slug: 'cta',
+        path: [0, 1, 0],
+        depth: 1,
+        hasBody: false,
+        overrideSlots: [],
+        occurrenceIndex: 0,
+      },
     ]);
   });
 
@@ -88,7 +105,8 @@ describe('collapseComponentBodies (revert local edits → bare refs, save-time n
   });
 
   test('nested occurrence collapses too; other slugs untouched', () => {
-    const src = '{{#component:outer}}<a>{{#component:inner}}<b>edited</b>{{/component:inner}}</a>{{/component:outer}}';
+    const src =
+      '{{#component:outer}}<a>{{#component:inner}}<b>edited</b>{{/component:inner}}</a>{{/component:outer}}';
     expect(collapseComponentBodies(src, 'inner')).toBe(
       '{{#component:outer}}<a>{{#component:inner}}{{/component:inner}}</a>{{/component:outer}}',
     );
@@ -101,7 +119,8 @@ describe('collapseComponentBodies (revert local edits → bare refs, save-time n
 
 describe('removeSlotOverride (revert override → default shows again)', () => {
   test('drops only the named fill; body and sibling overrides survive byte-for-byte', () => {
-    const src = '{{#component:card}}<x/>{{#slot:a}}fill-a{{/slot:a}}{{#slot:b}}fill-b{{/slot:b}}{{/component:card}}';
+    const src =
+      '{{#component:card}}<x/>{{#slot:a}}fill-a{{/slot:a}}{{#slot:b}}fill-b{{/slot:b}}{{/component:card}}';
     expect(removeSlotOverride(src, { slug: 'card', occurrenceIndex: 0 }, 'a')).toBe(
       '{{#component:card}}<x/>{{#slot:b}}fill-b{{/slot:b}}{{/component:card}}',
     );
@@ -117,16 +136,22 @@ describe('removeSlotOverride (revert override → default shows again)', () => {
   test('an occurrence that no longer exists throws instead of rewriting a different region', () => {
     const src =
       '{{#component:hero}}<y/>{{/component:hero}}{{#component:promo}}{{#slot:a}}x{{/slot:a}}{{/component:promo}}';
-    expect(() => removeSlotOverride(src, { slug: 'footer', occurrenceIndex: 0 }, 'a')).toThrow(/stale/);
+    expect(() => removeSlotOverride(src, { slug: 'footer', occurrenceIndex: 0 }, 'a')).toThrow(
+      /stale/,
+    );
   });
 
   test('an occurrence rank past the last match throws', () => {
     const src = '{{#component:card}}{{#slot:a}}x{{/slot:a}}{{/component:card}}';
-    expect(() => removeSlotOverride(src, { slug: 'card', occurrenceIndex: 1 }, 'a')).toThrow(/stale/);
+    expect(() => removeSlotOverride(src, { slug: 'card', occurrenceIndex: 1 }, 'a')).toThrow(
+      /stale/,
+    );
   });
 
   test('no matching component in the source throws', () => {
-    expect(() => removeSlotOverride('text only', { slug: 'card', occurrenceIndex: 0 }, 'a')).toThrow(/stale/);
+    expect(() =>
+      removeSlotOverride('text only', { slug: 'card', occurrenceIndex: 0 }, 'a'),
+    ).toThrow(/stale/);
   });
 
   test('addresses by slug-rank, surviving a sibling shift that would silently retarget a positional path', () => {

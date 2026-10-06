@@ -26,7 +26,10 @@ export const CONCEPTS: ConceptRegistry = {
   'primitive:authz': { package: ['permissions'], docs: ['PERMISSIONS.md'] },
   'primitive:batch': { module: ['batch'], docs: ['BATCH.md'] },
   'primitive:ui': { package: ['ui'], docs: ['FRONTEND.md', 'ZUSTAND.md'] }, // the component library
-  'primitive:shared': { package: ['shared'], docs: ['CONCURRENCY.md', 'LOGGING.md', 'ENCRYPTION.md'] }, // shared utils/types
+  'primitive:shared': {
+    package: ['shared'],
+    docs: ['CONCURRENCY.md', 'LOGGING.md', 'ENCRYPTION.md'],
+  }, // shared utils/types
   'primitive:sdk': { package: ['sdk'] }, // generated API client
   'primitive:appEvents': { module: ['appEvents'], docs: ['APP_EVENTS.md'] },
   'primitive:jobs': { module: ['jobs', 'job'], docs: ['JOBS.md'] }, // 'job' = admin/job enqueue surface

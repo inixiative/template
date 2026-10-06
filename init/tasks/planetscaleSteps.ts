@@ -13,7 +13,10 @@ type PlanetScaleProgressGroup = {
   getLabel: (config: ProjectConfig, completedCount: number, totalCount: number) => string;
 };
 
-const countCompletedActions = (progress: PlanetScaleProgress, actions: readonly PlanetScaleAction[]): number => {
+const countCompletedActions = (
+  progress: PlanetScaleProgress,
+  actions: readonly PlanetScaleAction[],
+): number => {
   return actions.filter((action) => progress[action]).length;
 };
 
@@ -34,12 +37,16 @@ const planetscaleProgressItems: readonly PlanetScaleProgressItem[] = [
   {
     action: 'selectRegion',
     getLabel: (config) =>
-      config.planetscale.region ? `Region selected: ${config.planetscale.region}` : 'Region selected',
+      config.planetscale.region
+        ? `Region selected: ${config.planetscale.region}`
+        : 'Region selected',
   },
   {
     action: 'recordTokenId',
     getLabel: (config) =>
-      config.planetscale.tokenId ? `Service token recorded: ${config.planetscale.tokenId}` : 'Service token recorded',
+      config.planetscale.tokenId
+        ? `Service token recorded: ${config.planetscale.tokenId}`
+        : 'Service token recorded',
   },
   {
     action: 'storeOrganizationSecret',
@@ -60,7 +67,9 @@ const planetscaleProgressItems: readonly PlanetScaleProgressItem[] = [
   {
     action: 'createDB',
     getLabel: (config) =>
-      config.planetscale.database ? `Database created: ${config.planetscale.database}` : 'Database created',
+      config.planetscale.database
+        ? `Database created: ${config.planetscale.database}`
+        : 'Database created',
   },
   {
     action: 'renameProductionBranch',
@@ -111,21 +120,32 @@ const planetscaleProgressGroups: readonly PlanetScaleProgressGroup[] = [
   {
     actions: ['selectRegion'],
     getLabel: (config) =>
-      config.planetscale.region ? `Region selected: ${config.planetscale.region}` : 'Region selected',
+      config.planetscale.region
+        ? `Region selected: ${config.planetscale.region}`
+        : 'Region selected',
   },
   {
     actions: ['recordTokenId'],
     getLabel: (config) =>
-      config.planetscale.tokenId ? `Service token recorded: ${config.planetscale.tokenId}` : 'Service token recorded',
+      config.planetscale.tokenId
+        ? `Service token recorded: ${config.planetscale.tokenId}`
+        : 'Service token recorded',
   },
   {
-    actions: ['storeOrganizationSecret', 'storeRegionSecret', 'storeTokenIdSecret', 'storeTokenSecret'],
+    actions: [
+      'storeOrganizationSecret',
+      'storeRegionSecret',
+      'storeTokenIdSecret',
+      'storeTokenSecret',
+    ],
     getLabel: countLabel('PlanetScale secrets stored in Infisical'),
   },
   {
     actions: ['createDB'],
     getLabel: (config) =>
-      config.planetscale.database ? `Database created: ${config.planetscale.database}` : 'Database created',
+      config.planetscale.database
+        ? `Database created: ${config.planetscale.database}`
+        : 'Database created',
   },
   {
     actions: ['renameProductionBranch'],
@@ -160,14 +180,18 @@ export type PlanetScaleProgressSummary = {
   totalCount: number;
 };
 
-export const getPlanetScaleProgressItems = (config: ProjectConfig): Array<{ label: string; completed: boolean }> => {
+export const getPlanetScaleProgressItems = (
+  config: ProjectConfig,
+): Array<{ label: string; completed: boolean }> => {
   return planetscaleProgressItems.map((item) => ({
     label: item.getLabel(config),
     completed: config.planetscale.progress[item.action],
   }));
 };
 
-export const getPlanetScaleProgressSummaries = (config: ProjectConfig): PlanetScaleProgressSummary[] => {
+export const getPlanetScaleProgressSummaries = (
+  config: ProjectConfig,
+): PlanetScaleProgressSummary[] => {
   return planetscaleProgressGroups.map((group) => {
     const completedCount = countCompletedActions(config.planetscale.progress, group.actions);
     const totalCount = group.actions.length;

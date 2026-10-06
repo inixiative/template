@@ -8,4 +8,6 @@ import { DbAction, type ManyAction } from '@template/db';
 export type HookRow = Record<string, unknown>;
 
 export const isManyAction = (action: DbAction): action is ManyAction =>
-  action === DbAction.createManyAndReturn || action === DbAction.updateManyAndReturn || action === DbAction.deleteMany;
+  action === DbAction.createManyAndReturn ||
+  action === DbAction.updateManyAndReturn ||
+  action === DbAction.deleteMany;

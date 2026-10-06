@@ -75,7 +75,9 @@ describe('GET /api/admin/organization', () => {
   });
 
   it('sorts by multiple fields', async () => {
-    const response = await fetch(get('/api/admin/organization?orderBy=name:asc&orderBy=createdAt:desc'));
+    const response = await fetch(
+      get('/api/admin/organization?orderBy=name:asc&orderBy=createdAt:desc'),
+    );
     const { data } = await json<ReadManyResponse>(response);
 
     expect(response.status).toBe(200);
@@ -101,7 +103,9 @@ describe('GET /api/admin/organization', () => {
   });
 
   it('combines searchFields with filters', async () => {
-    const response = await fetch(get('/api/admin/organization?searchFields[name]=cherry&deleted=false'));
+    const response = await fetch(
+      get('/api/admin/organization?searchFields[name]=cherry&deleted=false'),
+    );
     const { data } = await json<ReadManyResponse>(response);
 
     expect(response.status).toBe(200);
@@ -110,7 +114,9 @@ describe('GET /api/admin/organization', () => {
   });
 
   it('combines orderBy with searchFields', async () => {
-    const response = await fetch(get('/api/admin/organization?searchFields[name]=a&orderBy=name:asc'));
+    const response = await fetch(
+      get('/api/admin/organization?searchFields[name]=a&orderBy=name:asc'),
+    );
     const { data } = await json<ReadManyResponse>(response);
 
     expect(response.status).toBe(200);

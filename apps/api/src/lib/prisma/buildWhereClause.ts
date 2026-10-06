@@ -21,8 +21,16 @@ import { type FieldDef, lookupField } from '#/lib/prisma/fieldMetadata';
 import { fieldSearchOperator } from '#/lib/prisma/fieldSearchOperator';
 import { buildJsonWhere } from '#/lib/prisma/jsonFilter';
 import { validatePathNotation } from '#/lib/prisma/pathNotation';
-import { getDefaultOperator, getValidOperators, STRING_OPS_WITH_MODE } from '#/lib/prisma/scalarOperators';
-import type { BracketQueryPrimitive, BracketQueryRecord, BracketQueryValue } from '#/lib/utils/parseBracketNotation';
+import {
+  getDefaultOperator,
+  getValidOperators,
+  STRING_OPS_WITH_MODE,
+} from '#/lib/prisma/scalarOperators';
+import type {
+  BracketQueryPrimitive,
+  BracketQueryRecord,
+  BracketQueryValue,
+} from '#/lib/utils/parseBracketNotation';
 
 type BuildWhereOptions = {
   filterLens: LensNarrowing;
@@ -67,7 +75,10 @@ const MAX_COMBINATOR_CHILDREN = 25;
 // `{ '0': …, '1': … }` → ordered array. The wire carries combinator siblings under numeric
 // segments and the parse yields numeric-STRING keys, never a real array, so order comes from
 // the key rather than insertion.
-const indexedChildren = (combinator: string, value: BracketQueryValue | undefined): BracketQueryRecord[] => {
+const indexedChildren = (
+  combinator: string,
+  value: BracketQueryValue | undefined,
+): BracketQueryRecord[] => {
   const entries = isRecord(value) ? Object.entries(value) : [];
   if (!entries.length || entries.some(([key, child]) => !/^\d+$/.test(key) || !isRecord(child))) {
     throw makeError({
@@ -83,7 +94,9 @@ const indexedChildren = (combinator: string, value: BracketQueryValue | undefine
       message: `'${combinator}' accepts at most ${MAX_COMBINATOR_CHILDREN} groups, got ${entries.length}`,
     });
   }
-  return entries.sort(([a], [b]) => Number(a) - Number(b)).map(([, child]) => child as BracketQueryRecord);
+  return entries
+    .sort(([a], [b]) => Number(a) - Number(b))
+    .map(([, child]) => child as BracketQueryRecord);
 };
 
 const kindLabel = (field: FieldDef): string => (field.kind === 'enum' ? 'enum' : field.type);
@@ -99,7 +112,12 @@ const wrapBareValue = (field: FieldDef, value: BracketQueryPrimitive): Record<st
   }
   const op = getDefaultOperator(field);
   const coerced = coerceValueForField(field, value);
-  if (dialect.stringMode && field.kind === 'scalar' && field.type === 'String' && STRING_OPS_WITH_MODE.has(op)) {
+  if (
+    dialect.stringMode &&
+    field.kind === 'scalar' &&
+    field.type === 'String' &&
+    STRING_OPS_WITH_MODE.has(op)
+  ) {
     return { [op]: coerced, mode: dialect.stringMode };
   }
   return { [op]: coerced };
@@ -155,7 +173,8 @@ const validateAndTransformSearchFields = (
   prefix = '',
   depth = 0,
 ): BracketQueryRecord => {
-  if (depth > 10) throw makeError({ status: 400, message: 'Search query nesting too deep (max 10 levels)' });
+  if (depth > 10)
+    throw makeError({ status: 400, message: 'Search query nesting too deep (max 10 levels)' });
 
   const result: BracketQueryRecord = {};
 
@@ -166,7 +185,14 @@ const validateAndTransformSearchFields = (
     // resolve against the same prefix, and the per-leaf whitelist still applies inside each.
     if (isCombinator(key)) {
       result[key] = indexedChildren(key, value).map((child) =>
-        validateAndTransformSearchFields(child, searchableFields, skipFieldValidation, model, prefix, depth + 1),
+        validateAndTransformSearchFields(
+          child,
+          searchableFields,
+          skipFieldValidation,
+          model,
+          prefix,
+          depth + 1,
+        ),
       ) as unknown as BracketQueryValue;
       continue;
     }
@@ -230,7 +256,10 @@ const validateAndTransformSearchFields = (
     const hasFieldOp = keys.some((k) => (FIELD_OPERATORS as readonly string[]).includes(k));
 
     if (hasRelationOp) {
-      if (!skipFieldValidation && !searchableFields.some((f) => f === currentPath || f.startsWith(`${currentPath}.`))) {
+      if (
+        !skipFieldValidation &&
+        !searchableFields.some((f) => f === currentPath || f.startsWith(`${currentPath}.`))
+      ) {
         throw makeError({
           status: 400,
           message: `Relation '${currentPath}' is not searchable. Allowed fields: ${searchableFields.join(', ')}`,
@@ -269,7 +298,11 @@ const validateAndTransformSearchFields = (
         result[key] = value;
         continue;
       }
-      result[key] = transformOperatorValue(field, value, currentPath) as unknown as BracketQueryValue;
+      result[key] = transformOperatorValue(
+        field,
+        value,
+        currentPath,
+      ) as unknown as BracketQueryValue;
       continue;
     }
 
@@ -301,7 +334,10 @@ const allOf = (conditions: Record<string, unknown>[]): Record<string, unknown> =
 // group's own conditions AND'd together — flattening OR would turn a union into an
 // intersection, silently. The check names AND rather than OR so that a combinator added later
 // lands on the correct side by default.
-const toConditions = (record: BracketQueryRecord, orNullFields: string[]): Record<string, unknown>[] => {
+const toConditions = (
+  record: BracketQueryRecord,
+  orNullFields: string[],
+): Record<string, unknown>[] => {
   const out: Record<string, unknown>[] = [];
 
   for (const [key, value] of Object.entries(record)) {
@@ -368,7 +404,12 @@ export const buildWhereClause = (options: BuildWhereOptions): Record<string, unk
   }
 
   if (searchFields && (searchableFields.length || skipFieldValidation)) {
-    const transformed = validateAndTransformSearchFields(searchFields, searchableFields, skipFieldValidation, model);
+    const transformed = validateAndTransformSearchFields(
+      searchFields,
+      searchableFields,
+      skipFieldValidation,
+      model,
+    );
     conditions.push(...toConditions(transformed, orNullFields));
   }
 

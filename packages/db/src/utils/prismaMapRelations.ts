@@ -5,7 +5,12 @@
  */
 import { getRelations, type Identifier, type PrismaMap } from '@inixiative/prisma-map';
 import { prismaMap } from '@template/db/generated/prismaMap';
-import { type AccessorName, type ModelName, toAccessor, toModelName } from '@template/db/utils/modelNames';
+import {
+  type AccessorName,
+  type ModelName,
+  toAccessor,
+  toModelName,
+} from '@template/db/utils/modelNames';
 
 export type { Identifier } from '@inixiative/prisma-map';
 

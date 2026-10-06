@@ -13,7 +13,8 @@ const CLASSIFY_TAG = /^\{\{\s*[#/]\s*(?:component|slot)\s*:\s*([^}:]*?)\s*(?::[^
 
 export const assertNoStrayTagShapes = (input: string): void => {
   const shaped = new Map<number, string>();
-  for (const shapedMatch of input.matchAll(TAG_SHAPED)) shaped.set(shapedMatch.index ?? 0, shapedMatch[0]);
+  for (const shapedMatch of input.matchAll(TAG_SHAPED))
+    shaped.set(shapedMatch.index ?? 0, shapedMatch[0]);
   for (const cleanMatch of input.matchAll(BLOCK_TAG)) shaped.delete(cleanMatch.index ?? 0);
 
   if (shaped.size === 0) return;

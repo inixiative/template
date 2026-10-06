@@ -11,5 +11,8 @@ import { reconcileCustomerOf } from '#/modules/segment/lib/reconcileCustomer';
 export type TagAttachmentCreatedPayload = { tagAttachment: TagAttachment };
 
 export const tagAttachmentCreated = makeAppEvent<TagAttachmentCreatedPayload>({
-  cb: [({ tagAttachment }) => reconcileCustomerOf({ model: 'TagAttachment', axis: 'resourceModel' }, tagAttachment)],
+  cb: [
+    ({ tagAttachment }) =>
+      reconcileCustomerOf({ model: 'TagAttachment', axis: 'resourceModel' }, tagAttachment),
+  ],
 });

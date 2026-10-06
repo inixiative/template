@@ -33,7 +33,8 @@ const SYSTEM_TOKEN_RESOLVERS: Record<SystemTokenName, (now: Date, locale?: strin
   year: (now) => String(now.getUTCFullYear()),
 };
 
-const isSystemTokenName = (name: string): name is SystemTokenName => Object.hasOwn(SYSTEM_TOKEN_RESOLVERS, name);
+const isSystemTokenName = (name: string): name is SystemTokenName =>
+  Object.hasOwn(SYSTEM_TOKEN_RESOLVERS, name);
 
 const resolveSystemTokens = (template: string, options: InterpolateOptions): string => {
   const now = new Date();

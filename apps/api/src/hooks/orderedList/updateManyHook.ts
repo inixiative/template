@@ -50,7 +50,11 @@ export const registerOrderedListUpdateManyHook = () => {
       if (!data || !previous || !Array.isArray(previous)) return;
       if (data.deletedAt === undefined) return;
 
-      const affected = await applyOrderedListBulkDeletedAtChange(model, data, previous as Record<string, unknown>[]);
+      const affected = await applyOrderedListBulkDeletedAtChange(
+        model,
+        data,
+        previous as Record<string, unknown>[],
+      );
       queueOrderedListCacheInvalidation(model, affected);
     },
   );

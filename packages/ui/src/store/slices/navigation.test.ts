@@ -53,7 +53,12 @@ describe('navigation slice', () => {
 
   describe('setCurrentRouteMatch', () => {
     it('should set the current route match', () => {
-      const mockMatch = { fullPath: '/dashboard', params: {}, item: {} as NavItem, chain: [] } as RouteMatch;
+      const mockMatch = {
+        fullPath: '/dashboard',
+        params: {},
+        item: {} as NavItem,
+        chain: [],
+      } as RouteMatch;
 
       store.getState().navigation.setCurrentRouteMatch(mockMatch);
 
@@ -61,7 +66,12 @@ describe('navigation slice', () => {
     });
 
     it('should allow setting to null', () => {
-      const mockMatch = { fullPath: '/dashboard', params: {}, item: {} as NavItem, chain: [] } as RouteMatch;
+      const mockMatch = {
+        fullPath: '/dashboard',
+        params: {},
+        item: {} as NavItem,
+        chain: [],
+      } as RouteMatch;
 
       store.getState().navigation.setCurrentRouteMatch(mockMatch);
       expect(store.getState().navigation.currentRouteMatch).toBe(mockMatch);
@@ -94,7 +104,9 @@ describe('navigation slice', () => {
       store.getState().navigation.navigatePreserving('/dashboard', 'context');
 
       expect(mockNavigate).toHaveBeenCalled();
-      const [arg] = mockNavigate.mock.calls[0] as unknown as [{ to: string; search?: Record<string, string> }];
+      const [arg] = mockNavigate.mock.calls[0] as unknown as [
+        { to: string; search?: Record<string, string> },
+      ];
       expect(arg.to.startsWith('/dashboard')).toBe(true);
       expect(arg.to.includes('?')).toBe(false);
     });
@@ -106,7 +118,9 @@ describe('navigation slice', () => {
       store.getState().navigation.navigatePreserving('/dashboard#section', 'context');
 
       expect(mockNavigate).toHaveBeenCalled();
-      const [arg] = mockNavigate.mock.calls[0] as unknown as [{ to: string; search?: Record<string, string> }];
+      const [arg] = mockNavigate.mock.calls[0] as unknown as [
+        { to: string; search?: Record<string, string> },
+      ];
       expect(arg.to).toContain('/dashboard#section');
     });
 
@@ -124,7 +138,9 @@ describe('navigation slice', () => {
       store.getState().navigation.navigatePreserving('/dashboard', 'spoof');
 
       expect(mockNavigate).toHaveBeenCalled();
-      const [arg] = mockNavigate.mock.calls[0] as unknown as [{ to: string; search?: Record<string, string> }];
+      const [arg] = mockNavigate.mock.calls[0] as unknown as [
+        { to: string; search?: Record<string, string> },
+      ];
       expect(arg.to.startsWith('/dashboard')).toBe(true);
       expect(arg.search?.spoof).toBe('admin@example.com');
     });

@@ -26,7 +26,8 @@ export const redactUser = async (c: Context<AppEnv>, userId: string) => {
       where: { id: { in: singleMemberOrgs.map((o) => o.id) } },
       data: { deletedAt: now },
     });
-    for (const organization of organizations) await emitAppEvent('organization.deleted', { organization });
+    for (const organization of organizations)
+      await emitAppEvent('organization.deleted', { organization });
   }
 
   const singleMemberSpaces = await db.space.findMany({

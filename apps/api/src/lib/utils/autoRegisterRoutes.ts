@@ -18,7 +18,9 @@ export const autoRegisterRoutes = async (
   const routesDir = resolve(moduleDir, 'routes');
   const controllersDir = resolve(moduleDir, 'controllers');
 
-  const routeFiles = readdirSync(routesDir).filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'));
+  const routeFiles = readdirSync(routesDir).filter(
+    (f) => f.endsWith('.ts') && !f.endsWith('.test.ts'),
+  );
 
   const prefix = options?.admin ? 'admin' : options?.internal ? 'internal' : '';
 
@@ -45,10 +47,16 @@ export const autoRegisterRoutes = async (
   }
 };
 
-export const autoRegisterAdminRoutes = async (router: OpenAPIHono<AppEnv>, modulePath: string): Promise<void> => {
+export const autoRegisterAdminRoutes = async (
+  router: OpenAPIHono<AppEnv>,
+  modulePath: string,
+): Promise<void> => {
   return autoRegisterRoutes(router, modulePath, { admin: true });
 };
 
-export const autoRegisterInternalRoutes = async (router: OpenAPIHono<AppEnv>, modulePath: string): Promise<void> => {
+export const autoRegisterInternalRoutes = async (
+  router: OpenAPIHono<AppEnv>,
+  modulePath: string,
+): Promise<void> => {
   return autoRegisterRoutes(router, modulePath, { internal: true });
 };

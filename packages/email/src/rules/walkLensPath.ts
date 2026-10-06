@@ -20,7 +20,9 @@ export const lensPathFields = (path: string, lens: RuleLens): FieldMapEntry[] =>
 export const walkLensPath = (path: string, lens: RuleLens): LensPathWalk => {
   const walk = resolveLensPath(lens, path);
   if (walk.outcome === 'resolved') {
-    return walk.jsonSubPath.length ? { outcome: 'beneathJson', index: walk.hops.length - 1 } : { outcome: 'resolved' };
+    return walk.jsonSubPath.length
+      ? { outcome: 'beneathJson', index: walk.hops.length - 1 }
+      : { outcome: 'resolved' };
   }
   return walk.outcome === 'pastScalar'
     ? { outcome: 'pastScalar', index: walk.index }

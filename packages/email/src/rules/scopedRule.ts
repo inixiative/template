@@ -13,15 +13,19 @@ export type { BindingChain } from '@template/email/rules/resolveBindingPath';
 
 export type LoopFrame = { as: string; path: string };
 
-export type ScopedRule = { rule: Condition; issue?: undefined } | { rule?: undefined; issue: string };
+export type ScopedRule =
+  | { rule: Condition; issue?: undefined }
+  | { rule?: undefined; issue: string };
 
 class Unsupported extends Error {}
 
 type Node = Record<string, unknown>;
 
-const isNode = (value: unknown): value is Node => typeof value === 'object' && value !== null && !Array.isArray(value);
+const isNode = (value: unknown): value is Node =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
 
-const climb = (levels: number, rest: string): string => (levels === 0 ? rest : `${'$'.repeat(levels + 1)}.${rest}`);
+const climb = (levels: number, rest: string): string =>
+  levels === 0 ? rest : `${'$'.repeat(levels + 1)}.${rest}`;
 
 /** A bare `path` is the root context in json-rules, so the current element is `$.` and every climb is one `$` longer than a field's. */
 const climbPath = (levels: number, rest: string): string => `${'$'.repeat(levels + 1)}.${rest}`;
@@ -32,23 +36,37 @@ export const loopFrames = (bindings: BindingChain): LoopFrame[] =>
 /** The index counters in scope, read off the render scope for the bindings that carry no path. */
 export const loopIndices = (scope: Record<string, unknown>, bindings: BindingChain): Indices =>
   Object.fromEntries(
-    [...bindings].filter(([, path]) => !path).map(([name]) => [name, scope[name] as number | undefined]),
+    [...bindings]
+      .filter(([, path]) => !path)
+      .map(([name]) => [name, scope[name] as number | undefined]),
   );
 
 export type Indices = Record<string, number | undefined>;
 
 export type ScopedRuleOptions = { lens?: EmailLens; indices?: Indices };
 
-type Scope = { frames: LoopFrame[]; bindings: BindingChain; root: string | undefined; indices?: Indices };
+type Scope = {
+  frames: LoopFrame[];
+  bindings: BindingChain;
+  root: string | undefined;
+  indices?: Indices;
+};
 
 /** Where a ref lands, seen from a condition `depth` array scopes below the innermost loop element; null = as written. */
-const rewriteRef = (ref: string, depth: number, { frames, bindings, root }: Scope, up: typeof climb): string | null => {
+const rewriteRef = (
+  ref: string,
+  depth: number,
+  { frames, bindings, root }: Scope,
+  up: typeof climb,
+): string | null => {
   if (ref.startsWith('$')) return null;
   const { root: head, rest } = splitRoot(ref);
   if (bindings.has(head)) {
     const frame = frames.findIndex((candidate) => candidate.as === head);
     if (frame === -1)
-      throw new Unsupported(`"${ref}" reads a loop index as a path; an index can only be a rule's field`);
+      throw new Unsupported(
+        `"${ref}" reads a loop index as a path; an index can only be a rule's field`,
+      );
     if (!rest) throw new Unsupported(`"${ref}" names the loop element itself; name a field of it`);
     return up(frames.length - 1 - frame + depth, rest);
   }
@@ -80,7 +98,10 @@ const rewriteNode = (condition: Condition, depth: number, scope: Scope): Conditi
   const node = condition as Node;
   for (const key of ['all', 'any'] as const) {
     if (!Array.isArray(node[key])) continue;
-    return { ...node, [key]: (node[key] as Condition[]).map((child) => rewriteNode(child, depth, scope)) } as Condition;
+    return {
+      ...node,
+      [key]: (node[key] as Condition[]).map((child) => rewriteNode(child, depth, scope)),
+    } as Condition;
   }
   if ('if' in node) {
     const out: Node = { ...node };
@@ -90,12 +111,23 @@ const rewriteNode = (condition: Condition, depth: number, scope: Scope): Conditi
     return out as Condition;
   }
   const out: Node = { ...node };
-  if (typeof node.field === 'string' && indexLeaf(node.field, scope) === null && isIndex(node.field, scope)) {
-    return scope.indices ? check(node as Condition, { [node.field]: scope.indices[node.field] }) === true : true;
+  if (
+    typeof node.field === 'string' &&
+    indexLeaf(node.field, scope) === null &&
+    isIndex(node.field, scope)
+  ) {
+    return scope.indices
+      ? check(node as Condition, { [node.field]: scope.indices[node.field] }) === true
+      : true;
   }
   for (const key of ['field', 'path'] as const) {
     if (typeof node[key] !== 'string') continue;
-    const rewritten = rewriteRef(node[key] as string, depth, scope, key === 'path' ? climbPath : climb);
+    const rewritten = rewriteRef(
+      node[key] as string,
+      depth,
+      scope,
+      key === 'path' ? climbPath : climb,
+    );
     if (rewritten !== null) out[key] = rewritten;
   }
   for (const key of ['condition', 'filter'] as const) {
@@ -105,7 +137,9 @@ const rewriteNode = (condition: Condition, depth: number, scope: Scope): Conditi
 };
 
 const relativeTo = (path: string, enclosing: string | undefined): string | null =>
-  enclosing !== undefined && path.startsWith(`${enclosing}.`) ? path.slice(enclosing.length + 1) : null;
+  enclosing !== undefined && path.startsWith(`${enclosing}.`)
+    ? path.slice(enclosing.length + 1)
+    : null;
 
 /**
  * The array rule a loop-bound rule has always been: one `any` per enclosing `{{#each}}`, the
@@ -143,7 +177,8 @@ export const scopedRule = (
           `{{#each ${frame.path}}} iterates the ${splitRoot(frame.path).root} lens inside a loop over ${root}; nested loops must stay within one lens`,
         );
       }
-      const field = index === 0 ? frame.path : (relative ?? climb(index, splitRoot(frame.path).rest));
+      const field =
+        index === 0 ? frame.path : (relative ?? climb(index, splitRoot(frame.path).rest));
       out = { field, arrayOperator: 'any', condition: out } as Condition;
     }
     return { rule: out };
@@ -160,7 +195,10 @@ const setAt = (target: unknown, path: string, value: unknown): unknown => {
 };
 
 /** The scope with every iterated collection pinned to the element in scope, binding names dropped. */
-export const narrowToElements = (scope: Record<string, unknown>, frames: LoopFrame[]): Record<string, unknown> => {
+export const narrowToElements = (
+  scope: Record<string, unknown>,
+  frames: LoopFrame[],
+): Record<string, unknown> => {
   const out: Record<string, unknown> = Object.fromEntries(
     Object.entries(scope).filter(([key]) => !frames.some((frame) => frame.as === key)),
   );

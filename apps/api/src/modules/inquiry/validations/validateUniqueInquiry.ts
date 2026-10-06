@@ -20,7 +20,11 @@ type InquiryShape = Omit<Prisma.InquiryWhereInput, 'id'> & {
 
 type UniqueMode = 'targeted' | 'untargeted';
 
-export const validateUniqueInquiry = async (db: Db, inquiry: InquiryShape, mode: UniqueMode): Promise<void> => {
+export const validateUniqueInquiry = async (
+  db: Db,
+  inquiry: InquiryShape,
+  mode: UniqueMode,
+): Promise<void> => {
   const config = getPolymorphismConfig('Inquiry');
   if (!config) throw new Error('Inquiry polymorphism config missing from registry');
 
@@ -53,6 +57,9 @@ export const validateUniqueInquiry = async (db: Db, inquiry: InquiryShape, mode:
   const existing = await db.inquiry.findFirst({ where });
 
   if (existing) {
-    throw makeError({ status: 409, message: 'An open inquiry of this type already exists between these parties' });
+    throw makeError({
+      status: 409,
+      message: 'An open inquiry of this type already exists between these parties',
+    });
   }
 };

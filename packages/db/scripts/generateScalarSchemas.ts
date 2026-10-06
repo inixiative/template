@@ -68,7 +68,9 @@ for (const m of inputModelNames) {
     const createOpt = optionalFieldsIn(join(objectsDir, `${m}CreateInput.schema.ts`));
     const inputOpt = optionalFieldsIn(join(inputDir, `${m}.input.ts`));
     const relations = new Set(modelRelations[m]);
-    defaultedFieldsByModel[m] = [...createOpt].filter((f) => !inputOpt.has(f) && !relations.has(f)).sort();
+    defaultedFieldsByModel[m] = [...createOpt]
+      .filter((f) => !inputOpt.has(f) && !relations.has(f))
+      .sort();
   } catch {
     defaultedFieldsByModel[m] = [];
   }
@@ -82,9 +84,12 @@ const schemaBuilds = modelNames
     const defaulted = defaultedFieldsByModel[m] ?? [];
     const lines: string[] = [];
     if (inputModelSet.has(m)) {
-      lines.push(`export const ${m}ScalarInputSchema = ${m}InputSchema${omit(rel)}${partial(defaulted)};`);
+      lines.push(
+        `export const ${m}ScalarInputSchema = ${m}InputSchema${omit(rel)}${partial(defaulted)};`,
+      );
     }
-    if (pureModelSet.has(m)) lines.push(`export const ${m}ScalarSchema = ${m}ModelSchema${omit(rel)};`);
+    if (pureModelSet.has(m))
+      lines.push(`export const ${m}ScalarSchema = ${m}ModelSchema${omit(rel)};`);
     return lines.join('\n');
   })
   .join('\n');

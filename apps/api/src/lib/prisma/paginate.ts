@@ -4,7 +4,12 @@
  * @partOf infrastructure:prisma
  * @uses primitive:routeTemplates
  */
-import { type LensNarrowing, lensRequiredBindings, type RuleValue, resolveLensBindings } from '@inixiative/json-rules';
+import {
+  type LensNarrowing,
+  lensRequiredBindings,
+  type RuleValue,
+  resolveLensBindings,
+} from '@inixiative/json-rules';
 import type { AnyDelegate, Args, Result } from '@template/db';
 import { rootLens } from '@template/db/lens';
 import { stableHash } from '@template/shared/utils';
@@ -47,12 +52,17 @@ type PaginationQuery = {
 
 type FindManyArgs<T extends AnyDelegate> = Args<T, 'findMany'> & object;
 type FindManyWhere<T extends AnyDelegate> = FindManyArgs<T> extends { where?: infer W } ? W : never;
-type FindManyOrderBy<T extends AnyDelegate> = FindManyArgs<T> extends { orderBy?: infer O } ? O : never;
-type FindManyInclude<T extends AnyDelegate> = FindManyArgs<T> extends { include?: infer I } ? I : never;
+type FindManyOrderBy<T extends AnyDelegate> =
+  FindManyArgs<T> extends { orderBy?: infer O } ? O : never;
+type FindManyInclude<T extends AnyDelegate> =
+  FindManyArgs<T> extends { include?: infer I } ? I : never;
 type FindManyOmit<T extends AnyDelegate> = FindManyArgs<T> extends { omit?: infer O } ? O : never;
-type FindManySelect<T extends AnyDelegate> = FindManyArgs<T> extends { select?: infer S } ? S : never;
-type FindManyCursor<T extends AnyDelegate> = FindManyArgs<T> extends { cursor?: infer C } ? C : never;
-type FindManyDistinct<T extends AnyDelegate> = FindManyArgs<T> extends { distinct?: infer D } ? D : never;
+type FindManySelect<T extends AnyDelegate> =
+  FindManyArgs<T> extends { select?: infer S } ? S : never;
+type FindManyCursor<T extends AnyDelegate> =
+  FindManyArgs<T> extends { cursor?: infer C } ? C : never;
+type FindManyDistinct<T extends AnyDelegate> =
+  FindManyArgs<T> extends { distinct?: infer D } ? D : never;
 type PaginateOptions<T extends AnyDelegate> = {
   orNullFields?: string[];
   searchPaths?: string[];
@@ -98,7 +108,9 @@ const composeScopedFindMany = async <T extends AnyDelegate>(
   } = (options ?? {}) as PaginateOptions<T>;
 
   const bracketQuery = c.get('bracketQuery');
-  const searchFields = isBracketQueryRecord(bracketQuery.searchFields) ? bracketQuery.searchFields : query.searchFields;
+  const searchFields = isBracketQueryRecord(bracketQuery.searchFields)
+    ? bracketQuery.searchFields
+    : query.searchFields;
 
   const declaredLens = c.get('filterLens');
   if (!declaredLens) {
@@ -135,14 +147,17 @@ const composeScopedFindMany = async <T extends AnyDelegate>(
 
   // Lens relation wheres are authorization scope — they apply for superadmin
   // too, mirroring root wheres. Live scope remains superadmin-bypassable.
-  const composed = await lensWhere(filterLens, { AND: [baseWhere, searchWhere as Record<string, unknown>] });
+  const composed = await lensWhere(filterLens, {
+    AND: [baseWhere, searchWhere as Record<string, unknown>],
+  });
   const where = (superadmin ? composed : liveWhere(model, composed)) as FindManyWhere<T>;
 
   if (!superadmin) {
     const trees = findManyOptions as Record<string, unknown>;
     for (const key of ['include', 'select'] as const) {
       const tree = trees[key];
-      if (tree && typeof tree === 'object') trees[key] = liveIncludes(model, tree as Record<string, unknown>);
+      if (tree && typeof tree === 'object')
+        trees[key] = liveIncludes(model, tree as Record<string, unknown>);
     }
   }
 
@@ -220,7 +235,10 @@ export const withTotalOrder = (model: string, chain: SortKey[]): SortKey[] => {
 };
 
 const normalizeChain = (orderBy: unknown): SortKey[] => {
-  const entries = (Array.isArray(orderBy) ? orderBy : orderBy ? [orderBy] : []) as Record<string, unknown>[];
+  const entries = (Array.isArray(orderBy) ? orderBy : orderBy ? [orderBy] : []) as Record<
+    string,
+    unknown
+  >[];
   const chain: SortKey[] = [];
   for (const entry of entries) {
     const key = Object.keys(entry)[0];
@@ -242,7 +260,10 @@ type CursorPaginatedResult<T> = {
 export const cursorPaginate = async <
   T extends AnyDelegate,
   TItem = Result<T, FindManyArgs<T>, 'findMany'>[number],
-  C extends ValidatedContext<'query', CursorPaginationQuery> = ValidatedContext<'query', CursorPaginationQuery>,
+  C extends ValidatedContext<'query', CursorPaginationQuery> = ValidatedContext<
+    'query',
+    CursorPaginationQuery
+  >,
 >(
   c: C,
   delegate: T,
@@ -264,7 +285,9 @@ export const cursorPaginate = async <
     const decoded = decodeCursor(cursor);
     assertChainMatches(decoded.k, chain);
     assertFilterMatches(decoded.f, filterHash);
-    scopedWhere = { AND: [where, buildKeysetWhere(chain, hydrateCursorValues(model, chain, decoded.p))] };
+    scopedWhere = {
+      AND: [where, buildKeysetWhere(chain, hydrateCursorValues(model, chain, decoded.p))],
+    };
   }
 
   const rows = (await delegate.findMany({

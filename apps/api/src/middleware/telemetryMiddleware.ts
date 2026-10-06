@@ -21,7 +21,10 @@ export const telemetryMiddleware: MiddlewareHandler<AppEnv> = async (c, next) =>
     ? c.req.method
     : '_OTHER';
   return withRemoteTrace(
-    { traceparent: c.req.header('traceparent') ?? '', tracestate: c.req.header('tracestate') ?? '' },
+    {
+      traceparent: c.req.header('traceparent') ?? '',
+      tracestate: c.req.header('tracestate') ?? '',
+    },
     () =>
       withSpan(method, { kind: SpanKind.SERVER }, async (span) => {
         const start = performance.now();
@@ -40,7 +43,11 @@ export const telemetryMiddleware: MiddlewareHandler<AppEnv> = async (c, next) =>
           span.setAttributes(attributes);
           if (c.get('requestId')) span.setAttribute('request.id', c.get('requestId'));
           if (c.res.status >= 500 || c.error) span.setStatus({ code: SpanStatusCode.ERROR });
-          recordDuration('http.server.request.duration', (performance.now() - start) / 1000, attributes);
+          recordDuration(
+            'http.server.request.duration',
+            (performance.now() - start) / 1000,
+            attributes,
+          );
         }
       }),
   );

@@ -9,7 +9,10 @@ import { actionRoute } from '#/lib/routeTemplates/action';
 import { Modules } from '#/modules/modules';
 
 const cacheKeySchema = z.object({
-  model: z.string().optional().describe('Model name. Required with value, or omit both to clear all.'),
+  model: z
+    .string()
+    .optional()
+    .describe('Model name. Required with value, or omit both to clear all.'),
   value: z.string().optional().describe('The value to match (e.g., user ID, email)'),
   field: z.string().default('id').describe('Field name (default: "id")'),
   tags: z.array(z.string()).default([]).describe('Additional tags'),

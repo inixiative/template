@@ -19,6 +19,11 @@ export type TokenWithRelations = Token & {
   organizationUser: (OrganizationUser & { organization: Organization; user: User }) | null;
   space: Space | null;
   spaceUser:
-    | (SpaceUser & { organization: Organization; organizationUser: OrganizationUser; space: Space; user: User })
+    | (SpaceUser & {
+        organization: Organization;
+        organizationUser: OrganizationUser;
+        space: Space;
+        user: User;
+      })
     | null;
 };

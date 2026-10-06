@@ -64,7 +64,10 @@ describe('deliverEmail — send-time component version closure', () => {
   const createLog = async (data: Parameters<typeof createCommunicationLog>[0] = {}) =>
     (await createCommunicationLog({ address: 'fan@example.com', ...data })).entity;
 
-  const payloadFor = (logId: string, sender: DeliverEmailPayload['sender']): DeliverEmailPayload => ({
+  const payloadFor = (
+    logId: string,
+    sender: DeliverEmailPayload['sender'],
+  ): DeliverEmailPayload => ({
     template: 'closure-template',
     sender,
     recipient: { id: crypto.randomUUID(), name: 'Fan', email: 'fan@example.com' },
@@ -96,10 +99,15 @@ describe('deliverEmail — send-time component version closure', () => {
     });
     const log = await createLog({ senderType: 'Space', senderSpaceId: space.id });
 
-    await deliverEmail(ctx(), payloadFor(log.id, { type: 'Space', spaceId: space.id, organizationId: org.id }));
+    await deliverEmail(
+      ctx(),
+      payloadFor(log.id, { type: 'Space', spaceId: space.id, organizationId: org.id }),
+    );
 
     expect(sent).toHaveLength(1);
-    const rows = await db.communicationComponentVersion.findMany({ where: { communicationLogId: log.id } });
+    const rows = await db.communicationComponentVersion.findMany({
+      where: { communicationLogId: log.id },
+    });
     expect(rows).toHaveLength(1);
     expect(rows[0]?.slug).toBe('closure-footer');
     expect(rows[0]?.emailComponentId).toBe(spaceFooter.id);
@@ -114,7 +122,10 @@ describe('deliverEmail — send-time component version closure', () => {
   });
 
   it('captures the transitive closure — components resolved through other components', async () => {
-    const { entity: cta } = await createEmailComponent({ slug: 'closure-cta', mjml: '<mj-text>Go</mj-text>' });
+    const { entity: cta } = await createEmailComponent({
+      slug: 'closure-cta',
+      mjml: '<mj-text>Go</mj-text>',
+    });
     const { entity: hero } = await createEmailComponent({
       slug: 'closure-hero',
       mjml: '{{#component:closure-cta}}{{/component:closure-cta}}',
@@ -132,7 +143,9 @@ describe('deliverEmail — send-time component version closure', () => {
 
     await deliverEmail(ctx(), payloadFor(log.id, { type: 'platform' }));
 
-    const rows = await db.communicationComponentVersion.findMany({ where: { communicationLogId: log.id } });
+    const rows = await db.communicationComponentVersion.findMany({
+      where: { communicationLogId: log.id },
+    });
     expect(rows.map((row) => row.slug).sort()).toEqual(['closure-cta', 'closure-hero']);
     const byId = new Map(rows.map((row) => [row.slug, row.emailComponentId]));
     expect(byId.get('closure-cta')).toBe(cta.id);
@@ -161,7 +174,9 @@ describe('deliverEmail — send-time component version closure', () => {
     const refreshed = await db.communicationLog.findUnique({ where: { id: log.id } });
     expect(refreshed?.status).toBe('failed');
     expect(refreshed?.reasonCode).toBe(CommunicationReasonCode.send_error);
-    const rows = await db.communicationComponentVersion.findMany({ where: { communicationLogId: log.id } });
+    const rows = await db.communicationComponentVersion.findMany({
+      where: { communicationLogId: log.id },
+    });
     expect(rows).toHaveLength(1);
   });
 
@@ -178,7 +193,9 @@ describe('deliverEmail — send-time component version closure', () => {
 
     await deliverEmail(ctx(), payloadFor(log.id, { type: 'platform' }));
 
-    expect(await db.communicationComponentVersion.count({ where: { communicationLogId: log.id } })).toBe(0);
+    expect(
+      await db.communicationComponentVersion.count({ where: { communicationLogId: log.id } }),
+    ).toBe(0);
     expect(sent).toHaveLength(1);
   });
 });

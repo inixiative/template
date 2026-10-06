@@ -19,7 +19,9 @@ const groups: readonly Group[] = [
   {
     actions: ['selectAccount'],
     getLabel: (cfg) =>
-      cfg.cloudflarePages.accountName ? `Account selected: ${cfg.cloudflarePages.accountName}` : 'Account selected',
+      cfg.cloudflarePages.accountName
+        ? `Account selected: ${cfg.cloudflarePages.accountName}`
+        : 'Account selected',
   },
   {
     actions: ['storeApiToken'],
@@ -92,7 +94,9 @@ export type CloudflarePagesProgressSummary = {
   skipped: boolean;
 };
 
-export const getCloudflarePagesProgressSummaries = (config: ProjectConfig): CloudflarePagesProgressSummary[] => {
+export const getCloudflarePagesProgressSummaries = (
+  config: ProjectConfig,
+): CloudflarePagesProgressSummary[] => {
   const stagingEnabled = config.features.staging.enabled;
   return groups.map((g) => {
     const appDisabled = g.appKey ? !config.features.apps[g.appKey].enabled : false;
@@ -125,7 +129,9 @@ export const getCloudflarePagesProgressItems = (
  * Use this to derive a filtered progress map for completion %, so disabled
  * web/admin/staging steps don't drag the section to "incomplete".
  */
-export const getCloudflarePagesLiveActions = (config: ProjectConfig): readonly CloudflarePagesAction[] => {
+export const getCloudflarePagesLiveActions = (
+  config: ProjectConfig,
+): readonly CloudflarePagesAction[] => {
   const stagingEnabled = config.features.staging.enabled;
   const live: CloudflarePagesAction[] = [];
   for (const g of groups) {

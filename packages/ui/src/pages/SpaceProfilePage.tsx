@@ -4,7 +4,12 @@
  * @partOf primitive:ui
  * @uses primitive:sdk
  */
-import { type SpaceUpdateData, spaceProtected, spaceProtectedQueryKey, spaceUpdate } from '@template/sdk';
+import {
+  type SpaceUpdateData,
+  spaceProtected,
+  spaceProtectedQueryKey,
+  spaceUpdate,
+} from '@template/sdk';
 import { Page } from '@template/ui/components';
 import { ProfileFormCard } from '@template/ui/components/settings';
 import { useOptimisticMutation, useQuery } from '@template/ui/hooks';

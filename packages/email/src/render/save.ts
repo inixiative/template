@@ -5,7 +5,11 @@
  * @uses infrastructure:prisma
  */
 import { db } from '@template/db';
-import type { EmailComponent, EmailOwnerModel, EmailTemplate } from '@template/db/generated/client/client';
+import type {
+  EmailComponent,
+  EmailOwnerModel,
+  EmailTemplate,
+} from '@template/db/generated/client/client';
 import { EACH, IF, parseEachBlock, parseIfBlock } from '@template/email/render/conditionParser';
 import { decomposeNodes } from '@template/email/render/decompose';
 import { expand } from '@template/email/render/expand';
@@ -112,7 +116,11 @@ export const saveEmailTemplate = async (
       const template = await saveTemplate(finalTemplate, ctx);
 
       for (const component of components) {
-        await syncRuleReferences({ model: 'EmailComponent', id: component.id }, [component.mjml], options.lens);
+        await syncRuleReferences(
+          { model: 'EmailComponent', id: component.id },
+          [component.mjml],
+          options.lens,
+        );
       }
       await syncRuleReferences(
         { model: 'EmailTemplate', id: template.id },
@@ -122,7 +130,8 @@ export const saveEmailTemplate = async (
 
       const composed = await expand(template.mjml, ctx);
       assertValidTokens(composed, { lens: options.lens });
-      if (template.subject) assertValidTokens(template.subject, { lens: options.lens, isSubject: true });
+      if (template.subject)
+        assertValidTokens(template.subject, { lens: options.lens, isSubject: true });
 
       if (template.kind && template.kind !== 'system') {
         if (!withoutConditionals(composed).includes('{{system.unsubscribeUrl}}')) {

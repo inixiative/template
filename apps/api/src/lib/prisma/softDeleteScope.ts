@@ -37,7 +37,10 @@ const liveAt: NodeScope = ({ model }, node) => {
 export const liveWhere = (model: string, where: Record<string, unknown>): Record<string, unknown> =>
   walkWhere(model, where, liveAt);
 
-export const liveIncludes = (model: string, tree: Record<string, unknown>): Record<string, unknown> => {
+export const liveIncludes = (
+  model: string,
+  tree: Record<string, unknown>,
+): Record<string, unknown> => {
   const out: Record<string, unknown> = {};
   for (const [name, value] of Object.entries(tree)) {
     const field = lookupField(model, name);
@@ -45,7 +48,8 @@ export const liveIncludes = (model: string, tree: Record<string, unknown>): Reco
       out[name] = value;
       continue;
     }
-    const entry: Record<string, unknown> = value === true ? {} : { ...(value as Record<string, unknown>) };
+    const entry: Record<string, unknown> =
+      value === true ? {} : { ...(value as Record<string, unknown>) };
     for (const key of ['include', 'select'] as const) {
       if (isPlainObject(entry[key])) entry[key] = liveIncludes(field.type, entry[key]);
     }

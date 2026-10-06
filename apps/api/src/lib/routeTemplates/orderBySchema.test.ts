@@ -16,7 +16,10 @@ describe('orderBySchema', () => {
 
     it('parses multiple fields', () => {
       const result = parseOrderBy(['name:asc', 'createdAt:desc']);
-      expect(result).toEqual([{ name: Prisma.SortOrder.asc }, { createdAt: Prisma.SortOrder.desc }]);
+      expect(result).toEqual([
+        { name: Prisma.SortOrder.asc },
+        { createdAt: Prisma.SortOrder.desc },
+      ]);
     });
 
     it('parses nested field paths', () => {

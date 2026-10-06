@@ -63,7 +63,8 @@ export const tokenAuthMiddleware = async (c: Context<AppEnv>, next: Next) => {
         });
         // Touch lastUsedAt on cache-miss only (≈ TTL granularity): keeps it off the request
         // hot path and avoids a fire-and-forget write racing the later batch reads (P2028).
-        if (found) await db.token.update({ where: { id: found.id }, data: { lastUsedAt: new Date() } });
+        if (found)
+          await db.token.update({ where: { id: found.id }, data: { lastUsedAt: new Date() } });
         return found;
       },
       TOKEN_CACHE_TTL, // 10-minute TTL to balance performance with security (revoked tokens re-checked)
@@ -71,9 +72,12 @@ export const tokenAuthMiddleware = async (c: Context<AppEnv>, next: Next) => {
 
     if (!token) return next();
 
-    if (token.user) upsertCache(cacheKey('user', token.user.id), token.user, { ttl: TOKEN_CACHE_TTL });
+    if (token.user)
+      upsertCache(cacheKey('user', token.user.id), token.user, { ttl: TOKEN_CACHE_TTL });
     if (token.organization)
-      upsertCache(cacheKey('organization', token.organization.id), token.organization, { ttl: TOKEN_CACHE_TTL });
+      upsertCache(cacheKey('organization', token.organization.id), token.organization, {
+        ttl: TOKEN_CACHE_TTL,
+      });
     if (token.organizationUser)
       upsertCache(
         cacheKey('organizationUser', {
@@ -83,7 +87,8 @@ export const tokenAuthMiddleware = async (c: Context<AppEnv>, next: Next) => {
         token.organizationUser,
         { ttl: TOKEN_CACHE_TTL },
       );
-    if (token.space) upsertCache(cacheKey('space', token.space.id), token.space, { ttl: TOKEN_CACHE_TTL });
+    if (token.space)
+      upsertCache(cacheKey('space', token.space.id), token.space, { ttl: TOKEN_CACHE_TTL });
     if (token.spaceUser)
       upsertCache(
         cacheKey('spaceUser', {
@@ -113,7 +118,13 @@ export const tokenAuthMiddleware = async (c: Context<AppEnv>, next: Next) => {
       });
     } else if (token.ownerModel === 'SpaceUser' && token.spaceUser) {
       // SpaceUser token → use token data directly (scoped to single space)
-      const { user: spaceUserUser, organization, organizationUser, space, ...spaceUserFields } = token.spaceUser;
+      const {
+        user: spaceUserUser,
+        organization,
+        organizationUser,
+        space,
+        ...spaceUserFields
+      } = token.spaceUser;
       await setUserContext(c, {
         ...spaceUserUser,
         organizationUsers: organizationUser ? [organizationUser] : [],

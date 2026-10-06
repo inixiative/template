@@ -8,7 +8,12 @@ import { log, withLogContext } from '@template/shared/logger';
 import { recordDuration, SpanKind, withRemoteTrace, withSpan } from '@template/shared/telemetry';
 
 export const traceJob = <T>(
-  job: { name: string; id?: string; attemptsMade: number; data: { traceContext?: Record<string, string> } },
+  job: {
+    name: string;
+    id?: string;
+    attemptsMade: number;
+    data: { traceContext?: Record<string, string> };
+  },
   run: () => Promise<T>,
 ): Promise<T> =>
   withRemoteTrace(job.data.traceContext, () =>

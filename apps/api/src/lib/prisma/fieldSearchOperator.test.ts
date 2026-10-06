@@ -10,11 +10,15 @@ describe('fieldSearchOperator', () => {
   });
 
   it('String[] → has (exact element)', () => {
-    expect(fieldSearchOperator({ kind: 'scalar', type: 'String', isList: true }, 'foo')).toEqual({ has: 'foo' });
+    expect(fieldSearchOperator({ kind: 'scalar', type: 'String', isList: true }, 'foo')).toEqual({
+      has: 'foo',
+    });
   });
 
   it('Json → string_contains', () => {
-    expect(fieldSearchOperator({ kind: 'scalar', type: 'Json' }, 'foo')).toEqual({ string_contains: 'foo' });
+    expect(fieldSearchOperator({ kind: 'scalar', type: 'Json' }, 'foo')).toEqual({
+      string_contains: 'foo',
+    });
   });
 
   it('non-text scalars and relations → undefined (skipped)', () => {

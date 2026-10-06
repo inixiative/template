@@ -15,7 +15,13 @@ export const segmentDeleteController = makeController(segmentDeleteRoute, async 
   const db = c.get('db');
   const segment = getResource<'segment'>(c);
   const members = await db.segmentMember.findMany({ where: { segmentId: segment.id } });
-  const deleted = await db.segment.update({ where: { id: segment.id }, data: { deletedAt: new Date() } });
-  await emitAppEvent('segment.deleted', { segment: deleted, customerRefIds: map(members, 'customerRefId') });
+  const deleted = await db.segment.update({
+    where: { id: segment.id },
+    data: { deletedAt: new Date() },
+  });
+  await emitAppEvent('segment.deleted', {
+    segment: deleted,
+    customerRefIds: map(members, 'customerRefId'),
+  });
   return respond.noContent();
 });

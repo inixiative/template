@@ -12,7 +12,9 @@ import { keyBy } from 'lodash-es';
 type _MeData = MeReadResponses[200]['data'];
 
 export const fetchAndHydrateMe = async (
-  set: (partial: AppStore | Partial<AppStore> | ((state: AppStore) => AppStore | Partial<AppStore>)) => void,
+  set: (
+    partial: AppStore | Partial<AppStore> | ((state: AppStore) => AppStore | Partial<AppStore>),
+  ) => void,
   get: () => AppStore,
 ) => {
   const spoofUserEmail = get().auth.spoofUserEmail;

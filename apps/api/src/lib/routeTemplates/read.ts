@@ -37,7 +37,13 @@ export const readRoute = <const T extends RouteArgs>(args: T) => {
 
   if (!responseSchema) throw new Error('responseSchema is required for read routes');
 
-  const resourceName = submodel ? (many ? pluralize(submodel) : submodel) : many ? pluralize(model) : model;
+  const resourceName = submodel
+    ? many
+      ? pluralize(submodel)
+      : submodel
+    : many
+      ? pluralize(model)
+      : model;
   const parentContext = submodel ? ` for a ${model}` : '';
   const routePath = buildRoutePath({ submodel, action, skipId, many });
   const routeTags = buildTags({ model, submodel, tags, admin, internal });
@@ -45,7 +51,14 @@ export const readRoute = <const T extends RouteArgs>(args: T) => {
 
   return createRoute({
     ...args,
-    operationId: buildOperationId({ action: action || 'read', model, submodel, many, admin, internal }),
+    operationId: buildOperationId({
+      action: action || 'read',
+      model,
+      submodel,
+      many,
+      admin,
+      internal,
+    }),
     method: 'get',
     path: routePath,
     tags: routeTags,

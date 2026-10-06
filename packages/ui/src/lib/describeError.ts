@@ -25,7 +25,10 @@ export const describeError = (error: unknown, friendly?: string): DescribedError
   }
   if (error instanceof Error) return { message: error.message, detail: error.stack };
   if (error && typeof error === 'object') {
-    return { message: rawMessage(error) || 'Request failed', detail: JSON.stringify(error, null, 2) };
+    return {
+      message: rawMessage(error) || 'Request failed',
+      detail: JSON.stringify(error, null, 2),
+    };
   }
   return { message: String(error) };
 };

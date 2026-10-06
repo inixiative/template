@@ -6,13 +6,22 @@
  */
 import type { Context, MiddlewareHandler, Next } from 'hono';
 import { isSystemProbe } from '#/lib/utils/authProbe';
-import { organizationIdentity, principalIdentity, spaceIdentity } from '#/middleware/rateLimit/identities';
+import {
+  organizationIdentity,
+  principalIdentity,
+  spaceIdentity,
+} from '#/middleware/rateLimit/identities';
 import { rateLimitMax } from '#/middleware/rateLimit/limits';
 import { rateLimit } from '#/middleware/rateLimit/rateLimit';
 import type { AppEnv } from '#/types/appEnv';
 
 const limiter = rateLimit([
-  { scope: 'api:principal', windowMs: 1_000, max: (c) => rateLimitMax('user', c), key: principalIdentity },
+  {
+    scope: 'api:principal',
+    windowMs: 1_000,
+    max: (c) => rateLimitMax('user', c),
+    key: principalIdentity,
+  },
   { scope: 'api:space', windowMs: 1_000, max: (c) => rateLimitMax('space', c), key: spaceIdentity },
   {
     scope: 'api:organization',

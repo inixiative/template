@@ -31,6 +31,11 @@ const oauthCallbackToken = (): BetterAuthPlugin => ({
 export const oauthHandoffPlugins = () =>
   [
     // Order is load-bearing: plugin after-hooks run in sequence and the redirect rewrite reads `set-ott`.
-    oneTimeToken({ expiresIn: 1, storeToken: 'hashed', disableClientRequest: true, setOttHeaderOnNewSession: true }),
+    oneTimeToken({
+      expiresIn: 1,
+      storeToken: 'hashed',
+      disableClientRequest: true,
+      setOttHeaderOnNewSession: true,
+    }),
     oauthCallbackToken(),
   ] as const;

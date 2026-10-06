@@ -16,10 +16,17 @@ export const contactCreated = makeAppEvent<ContactCreatedPayload>({
   websocket: ({ contact }) => organizationContactUpsert(contact),
   cb: [
     async ({ contact }) => {
-      const fk = resolveFalsePolymorphismRef({ model: 'Contact', axis: 'ownerModel', value: contact.ownerModel })!;
+      const fk = resolveFalsePolymorphismRef({
+        model: 'Contact',
+        axis: 'ownerModel',
+        value: contact.ownerModel,
+      })!;
       const customerId = (contact as unknown as Record<string, string | null>)[fk];
       if (!customerId) return;
-      await enqueueJob('reconcileCustomerRefSegments', { customerModel: contact.ownerModel, customerId });
+      await enqueueJob('reconcileCustomerRefSegments', {
+        customerModel: contact.ownerModel,
+        customerId,
+      });
     },
   ],
 });

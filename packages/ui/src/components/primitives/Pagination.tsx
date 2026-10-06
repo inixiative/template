@@ -21,7 +21,11 @@ export type PaginationProps = {
 
 const DEFAULT_PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 
-export function buildPageRange(currentPage: number, totalPages: number, siblings = 1): (number | '...')[] {
+export function buildPageRange(
+  currentPage: number,
+  totalPages: number,
+  siblings = 1,
+): (number | '...')[] {
   if (totalPages <= 1) return [];
 
   const pages: (number | '...')[] = [];
@@ -68,7 +72,8 @@ export const Pagination = ({
   onPageSizeChange,
   className,
 }: PaginationProps) => {
-  const showPageSizeSelector = pageSizeOptions && pageSizeOptions.length > 0 && onPageSizeChange && pageSize;
+  const showPageSizeSelector =
+    pageSizeOptions && pageSizeOptions.length > 0 && onPageSizeChange && pageSize;
 
   if (totalPages <= 1 && !totalRecords && !showPageSizeSelector) return null;
 

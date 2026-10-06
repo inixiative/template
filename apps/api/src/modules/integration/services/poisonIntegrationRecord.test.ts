@@ -33,7 +33,11 @@ describe('poisonIntegrationRecord', () => {
 
   it('keeps the first poison when the record is poisoned again', async () => {
     const { customerRef, integration } = await setup();
-    const input = { integrationId: integration.id, model: WebhookModel.CustomerRef, resourceId: customerRef.id };
+    const input = {
+      integrationId: integration.id,
+      model: WebhookModel.CustomerRef,
+      resourceId: customerRef.id,
+    };
 
     const first = await poisonIntegrationRecord({ ...input, reason: 'HTTP 400: first' });
     const second = await poisonIntegrationRecord({ ...input, reason: 'HTTP 422: second' });

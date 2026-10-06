@@ -56,7 +56,9 @@ export type RailwayPostgresProgressSummary = {
   skipped: boolean;
 };
 
-export const getRailwayPostgresProgressSummaries = (config: ProjectConfig): RailwayPostgresProgressSummary[] => {
+export const getRailwayPostgresProgressSummaries = (
+  config: ProjectConfig,
+): RailwayPostgresProgressSummary[] => {
   const stagingEnabled = config.features.staging.enabled;
   return railwayPostgresProgressGroups.map((group) => {
     const skipped = !!group.requiresStaging && !stagingEnabled;

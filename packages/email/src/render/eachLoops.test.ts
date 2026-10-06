@@ -79,7 +79,10 @@ describe('{{#each}} loops', () => {
       id: 'u1',
       name: 'vip',
       email: 'ann@example.com',
-      providerRefs: [{ segmentMembers: [member('s1'), member('s2')] }, { segmentMembers: [member('s3')] }],
+      providerRefs: [
+        { segmentMembers: [member('s1'), member('s2')] },
+        { segmentMembers: [member('s3')] },
+      ],
       tagAttachments: [
         { deletedAt: null, tag: { id: 'match', name: 'vip' } },
         { deletedAt: null, tag: { id: 'other', name: 'plain' } },
@@ -143,14 +146,27 @@ describe('{{#each}} loops', () => {
         root: { where: { field: 'id', operator: 'equals', value: 'u1' } },
       } as unknown as EmailLens['recipient'],
     };
-    const attachment = (deletedAt: string | null, tag: Record<string, unknown>) => ({ deletedAt, tag });
+    const attachment = (deletedAt: string | null, tag: Record<string, unknown>) => ({
+      deletedAt,
+      tag,
+    });
     const recipient = (id: string) => ({
       id,
       name: 'Ann',
       email: 'ann@example.com',
       tagAttachments: [
-        attachment(null, { id: 'own', name: 'vip', ownerModel: 'Organization', organizationId: 'org-1' }),
-        attachment(null, { id: 'theirs', name: 'vip', ownerModel: 'Organization', organizationId: 'org-2' }),
+        attachment(null, {
+          id: 'own',
+          name: 'vip',
+          ownerModel: 'Organization',
+          organizationId: 'org-1',
+        }),
+        attachment(null, {
+          id: 'theirs',
+          name: 'vip',
+          ownerModel: 'Organization',
+          organizationId: 'org-2',
+        }),
         attachment('2026-01-01', { id: 'gone', name: 'vip', ownerModel: 'platform' }),
       ],
     });
@@ -158,9 +174,14 @@ describe('{{#each}} loops', () => {
       '{"field":"recipient.tagAttachments","arrayOperator":"any","condition":{"field":"tag.name","operator":"equals","value":"vip"}}';
     const template = `{{#if rule=${rule}}}VIP{{else}}BASE{{/if}}|{{#each recipient.tagAttachments as=item}}[{{item.tag.id}}]{{/each}}`;
     const render = (id: string) =>
-      interpolate(template, { recipient: recipient(id), sender: { id: 'org-1', name: 'Acme' }, data: {} }, undefined, {
-        lens,
-      });
+      interpolate(
+        template,
+        { recipient: recipient(id), sender: { id: 'org-1', name: 'Acme' }, data: {} },
+        undefined,
+        {
+          lens,
+        },
+      );
     expect(render('u1')).toBe('VIP|[own][]');
     expect(render('u2')).toBe('BASE|');
   });
@@ -171,7 +192,12 @@ describe('{{#each}} loops', () => {
       ownerId: 'org-1',
     });
     const render = (sender: Record<string, unknown>) =>
-      interpolate('[{{sender.name}}]', { recipient: { id: 'u1', name: 'Ann' }, sender, data: {} }, undefined, { lens });
+      interpolate(
+        '[{{sender.name}}]',
+        { recipient: { id: 'u1', name: 'Ann' }, sender, data: {} },
+        undefined,
+        { lens },
+      );
     expect(render({ id: 'org-1', name: 'Acme' })).toBe('[Acme]');
     expect(render({ id: 'org-2', name: 'FOREIGN' })).toBe('[]');
   });
@@ -227,9 +253,11 @@ describe('{{#each}} loops', () => {
       { lens },
     );
     expect(out).toBe('|');
-    expect(issues.some((detail) => detail.includes('reads the sender lens from inside a loop over recipient'))).toBe(
-      true,
-    );
+    expect(
+      issues.some((detail) =>
+        detail.includes('reads the sender lens from inside a loop over recipient'),
+      ),
+    ).toBe(true);
   });
 
   it('renders {{#if}} inside a loop against the element scope', () => {
@@ -246,20 +274,26 @@ describe('{{#each}} loops', () => {
   });
 
   it('renders nothing for an empty array', () => {
-    expect(render('before{{#each data.items as=item}}{{item.name}}{{/each}}after', { items: [] })).toBe('beforeafter');
+    expect(
+      render('before{{#each data.items as=item}}{{item.name}}{{/each}}after', { items: [] }),
+    ).toBe('beforeafter');
   });
 
   it('sinks and renders nothing when the path is not an array', () => {
     const errors: string[] = [];
-    const out = render('{{#each data.missing as=item}}{{item.name}}{{/each}}', {}, (m) => errors.push(m.detail));
+    const out = render('{{#each data.missing as=item}}{{item.name}}{{/each}}', {}, (m) =>
+      errors.push(m.detail),
+    );
     expect(out).toBe('');
     expect(errors).toContain('{{#each data.missing}} did not resolve to an array');
   });
 
   it('renders a bare binding token empty (and sinks) when it resolves to an object', () => {
     const errors: string[] = [];
-    const out = render('{{#each data.items as=item}}{{item}}{{/each}}', { items: [{ name: 'A' }] }, (m) =>
-      errors.push(m.detail),
+    const out = render(
+      '{{#each data.items as=item}}{{item}}{{/each}}',
+      { items: [{ name: 'A' }] },
+      (m) => errors.push(m.detail),
     );
     expect(out).toBe('');
     expect(errors.some((m) => m.includes('non-primitive'))).toBe(true);
@@ -276,7 +310,9 @@ describe('{{#each}} loops', () => {
 
   it('rejects a missing as= attribute', () => {
     const errors: string[] = [];
-    const out = render('{{#each data.items}}x{{/each}}', { items: [{ name: 'A' }] }, (m) => errors.push(m.detail));
+    const out = render('{{#each data.items}}x{{/each}}', { items: [{ name: 'A' }] }, (m) =>
+      errors.push(m.detail),
+    );
     expect(out).toBe('');
     expect(errors.some((m) => m.includes('as='))).toBe(true);
   });

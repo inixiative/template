@@ -8,7 +8,10 @@
 import type { RouteConfig, RouteHandler } from '@hono/zod-openapi';
 import type { Env, TypedResponse } from 'hono';
 import { ZodError, type ZodSchema } from 'zod';
-import { type ResponseMetadata, ResponseMetadataSchema } from '#/lib/routeTemplates/responseMetadata';
+import {
+  type ResponseMetadata,
+  ResponseMetadataSchema,
+} from '#/lib/routeTemplates/responseMetadata';
 import { isAuthProbe } from '#/lib/utils/authProbe';
 import type { AppEnv } from '#/types/appEnv';
 
@@ -55,7 +58,10 @@ type RouteContext<R extends RouteConfig, E extends Env> = Parameters<RouteHandle
 
 export const makeController = <R extends RouteConfig, T>(
   route: R,
-  handler: (c: RouteContext<R, AppEnv>, respond: TypedResponders<R, T>) => TypedResponse | Promise<TypedResponse>,
+  handler: (
+    c: RouteContext<R, AppEnv>,
+    respond: TypedResponders<R, T>,
+  ) => TypedResponse | Promise<TypedResponse>,
 ): RouteHandler<R, AppEnv> => {
   const impl = (c: RouteContext<R, AppEnv>) => {
     c.set('routeConfig', route);

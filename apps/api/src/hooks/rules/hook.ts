@@ -15,7 +15,10 @@ import { makeError } from '#/lib/errors';
 const validateData = (data: Record<string, unknown>, model: ModelName): void => {
   const result = check(getRule(model), data);
   if (result !== true)
-    throw makeError({ status: 422, message: typeof result === 'string' ? result : `Validation failed on ${model}` });
+    throw makeError({
+      status: 422,
+      message: typeof result === 'string' ? result : `Validation failed on ${model}`,
+    });
 };
 
 const processCreateArgs = (args: unknown, model: ModelName): void => {
@@ -25,11 +28,15 @@ const processCreateArgs = (args: unknown, model: ModelName): void => {
   else validateData(data as Record<string, unknown>, model);
 };
 
-const processUpdateArgs = (args: unknown, model: ModelName, previous?: Record<string, unknown>): void => {
-  const data = ((args as Record<string, unknown>)?.data ?? (args as Record<string, unknown>)?.update) as
-    | Record<string, unknown>
-    | undefined;
-  if (data && typeof data === 'object' && !Array.isArray(data)) validateData(shadowMerge(previous, data), model);
+const processUpdateArgs = (
+  args: unknown,
+  model: ModelName,
+  previous?: Record<string, unknown>,
+): void => {
+  const data = ((args as Record<string, unknown>)?.data ??
+    (args as Record<string, unknown>)?.update) as Record<string, unknown> | undefined;
+  if (data && typeof data === 'object' && !Array.isArray(data))
+    validateData(shadowMerge(previous, data), model);
 };
 
 export const registerRulesHook = () => {

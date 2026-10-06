@@ -1,7 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { clearHookRegistry, db, RuleReferenceError, registerSoftDeleteScoper } from '@template/db';
 import type { Organization, Segment, Tag } from '@template/db/generated/client/client';
-import { cleanupTouchedTables, createOrganization, createSegment, createTag } from '@template/db/test';
+import {
+  cleanupTouchedTables,
+  createOrganization,
+  createSegment,
+  createTag,
+} from '@template/db/test';
 import { registerRulesHook } from '#/hooks/rules/hook';
 import { saveEmailTemplate } from '#/lib/email/saveEmailTemplate';
 import { liveIncludes, liveWhere } from '#/lib/prisma/softDeleteScope';
@@ -56,8 +61,10 @@ describe('saveEmailTemplate — a rule may only name what its owner can see', ()
     platformTag = (await createTag()).entity;
     myTag = (await createTag({ ownerModel: 'Organization' }, { organization: mine })).entity;
     theirTag = (await createTag({ ownerModel: 'Organization' }, { organization: theirs })).entity;
-    mySegment = (await createSegment({ ownerModel: 'Organization' }, { organization: mine })).entity;
-    theirSegment = (await createSegment({ ownerModel: 'Organization' }, { organization: theirs })).entity;
+    mySegment = (await createSegment({ ownerModel: 'Organization' }, { organization: mine }))
+      .entity;
+    theirSegment = (await createSegment({ ownerModel: 'Organization' }, { organization: theirs }))
+      .entity;
   });
 
   afterAll(async () => {
@@ -71,16 +78,24 @@ describe('saveEmailTemplate — a rule may only name what its owner can see', ()
       mine.id,
       `${taggedBlock(platformTag.id)}${taggedBlock(myTag.id)}${inSegmentBlock(mySegment.id)}`,
     );
-    const edges = await db.ruleReference.findMany({ where: { emailTemplateId: saved.template.id } });
-    expect(edges.map((edge) => edge.referencedId).sort()).toEqual([platformTag.id, myTag.id, mySegment.id].sort());
+    const edges = await db.ruleReference.findMany({
+      where: { emailTemplateId: saved.template.id },
+    });
+    expect(edges.map((edge) => edge.referencedId).sort()).toEqual(
+      [platformTag.id, myTag.id, mySegment.id].sort(),
+    );
   });
 
   it("another owner's tag is refused", async () => {
-    await expect(saveFor(mine.id, taggedBlock(theirTag.id))).rejects.toBeInstanceOf(RuleReferenceError);
+    await expect(saveFor(mine.id, taggedBlock(theirTag.id))).rejects.toBeInstanceOf(
+      RuleReferenceError,
+    );
   });
 
   it("another owner's segment is refused", async () => {
-    await expect(saveFor(mine.id, inSegmentBlock(theirSegment.id))).rejects.toBeInstanceOf(RuleReferenceError);
+    await expect(saveFor(mine.id, inSegmentBlock(theirSegment.id))).rejects.toBeInstanceOf(
+      RuleReferenceError,
+    );
   });
 
   it('a platform template sees platform tags only', async () => {

@@ -2,8 +2,18 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { db } from '@template/db';
-import { cleanupTouchedTables, createContact, createOrganizationUser, createUser } from '@template/db/test';
-import { defineStream, STREAM_DEFINITIONS, type StreamFamily, type StreamParams } from '@template/shared/ws';
+import {
+  cleanupTouchedTables,
+  createContact,
+  createOrganizationUser,
+  createUser,
+} from '@template/db/test';
+import {
+  defineStream,
+  STREAM_DEFINITIONS,
+  type StreamFamily,
+  type StreamParams,
+} from '@template/shared/ws';
 import { z } from 'zod';
 import { isPerCallerScope, scopeNarrowing } from '#/middleware/resources/scopeNarrowing';
 import { type AudienceCaller, expectStreamAudience } from '#tests/expectStreamAudience';
@@ -28,7 +38,10 @@ const STREAM_AUDIENCE_FIXTURES: { [F in StreamFamily]: AudienceFixture<F> } = {
       callers.push({ label: role, headers: await bearer(context.user) });
     }
     for (let i = 0; i < 3; i++) {
-      await createContact({ ownerModel: 'Organization', organizationId: organization.id }, { organization });
+      await createContact(
+        { ownerModel: 'Organization', organizationId: organization.id },
+        { organization },
+      );
     }
     return { params: { id: organization.id }, callers };
   },

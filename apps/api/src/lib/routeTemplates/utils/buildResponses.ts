@@ -6,7 +6,10 @@
  */
 import { z } from '@hono/zod-openapi';
 import { errorResponses } from '#/lib/routeTemplates/errorResponses';
-import { cursorPaginateResponseSchema, paginateResponseSchema } from '#/lib/routeTemplates/paginationSchemas';
+import {
+  cursorPaginateResponseSchema,
+  paginateResponseSchema,
+} from '#/lib/routeTemplates/paginationSchemas';
 import type { RouteArgs, ZodResponseSchema } from '#/lib/routeTemplates/types';
 
 type SuccessResponse<T extends ZodResponseSchema> = {
@@ -23,7 +26,8 @@ export const buildResponses = <const T extends RouteArgs>(args: T, statusCode: 2
       many && paginate
         ? z.object({
             data: dataSchema,
-            pagination: paginate === 'cursor' ? cursorPaginateResponseSchema : paginateResponseSchema,
+            pagination:
+              paginate === 'cursor' ? cursorPaginateResponseSchema : paginateResponseSchema,
           })
         : z.object({ data: dataSchema });
 
@@ -33,7 +37,9 @@ export const buildResponses = <const T extends RouteArgs>(args: T, statusCode: 2
         description: 'Success',
       },
       ...errorResponses,
-    } as { [K in typeof statusCode]: SuccessResponse<NonNullable<T['responseSchema']>> } & typeof errorResponses;
+    } as {
+      [K in typeof statusCode]: SuccessResponse<NonNullable<T['responseSchema']>>;
+    } & typeof errorResponses;
   }
 
   return {

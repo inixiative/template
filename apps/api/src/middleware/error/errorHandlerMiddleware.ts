@@ -39,7 +39,8 @@ export const errorHandlerMiddleware = async (err: unknown, c: Context<AppEnv>) =
     return makeError({ status: 409, message: `Resource already exists: ${target}` }).getResponse();
   }
 
-  if (isWriteConflictError(err)) return makeError({ status: 409, message: 'Write conflict' }).getResponse();
+  if (isWriteConflictError(err))
+    return makeError({ status: 409, message: 'Write conflict' }).getResponse();
 
   if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
     return makeError({ status: 404, message: 'Resource not found' }).getResponse();

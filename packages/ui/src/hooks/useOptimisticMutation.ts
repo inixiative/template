@@ -86,7 +86,10 @@ export const useOptimisticMutation = <TData, TError = Error, TVariables = void>(
   });
 };
 
-export const createOptimisticListTarget = <TItem extends { id: string }, TVariables = unknown>(options: {
+export const createOptimisticListTarget = <
+  TItem extends { id: string },
+  TVariables = unknown,
+>(options: {
   queryKey: QueryKey;
   operation: OptimisticListOperation;
   optimisticExtras?: Partial<TItem>;
@@ -96,9 +99,14 @@ export const createOptimisticListTarget = <TItem extends { id: string }, TVariab
   return {
     queryKey,
     optimisticUpdate: (currentData, variables) => {
-      const isWrapped = currentData !== undefined && !Array.isArray(currentData) && 'data' in (currentData as object);
+      const isWrapped =
+        currentData !== undefined &&
+        !Array.isArray(currentData) &&
+        'data' in (currentData as object);
       const list: TItem[] =
-        (isWrapped ? (currentData as { data: TItem[] }).data : (currentData as TItem[] | undefined)) ?? [];
+        (isWrapped
+          ? (currentData as { data: TItem[] }).data
+          : (currentData as TItem[] | undefined)) ?? [];
 
       const vars = variables as Record<string, unknown>;
       const path = vars.path as Record<string, string> | undefined;

@@ -26,7 +26,9 @@ export const buildRoutePath = (args: BuildRoutePathArgs): string => {
   }
 
   if (submodel) {
-    parts.push(many || operation === 'create' || operation === 'action' ? pluralize(submodel) : submodel);
+    parts.push(
+      many || operation === 'create' || operation === 'action' ? pluralize(submodel) : submodel,
+    );
   }
 
   if (action) {

@@ -14,7 +14,11 @@ const MASS_EVICTION_MIN_MEMBERS = 50;
 
 type DiffScope = { segmentId: string; matching: Iterable<string>; within?: string[] };
 
-export const applyMembershipDiff = async ({ segmentId, matching, within }: DiffScope): Promise<MembershipDiff> => {
+export const applyMembershipDiff = async ({
+  segmentId,
+  matching,
+  within,
+}: DiffScope): Promise<MembershipDiff> => {
   const matchingSet = new Set(matching);
   const current = await db.segmentMember.findMany({
     where: { segmentId, ...(within && { customerRefId: { in: within } }) },
@@ -29,7 +33,9 @@ export const applyMembershipDiff = async ({ segmentId, matching, within }: DiffS
     currentIds.size >= MASS_EVICTION_MIN_MEMBERS &&
     toRemove.length / currentIds.size > MASS_EVICTION_RATIO
   ) {
-    log.warn(`reconcile evicting ${toRemove.length} of ${currentIds.size} members from segment ${segmentId}`);
+    log.warn(
+      `reconcile evicting ${toRemove.length} of ${currentIds.size} members from segment ${segmentId}`,
+    );
   }
 
   let added: string[] = [];
@@ -42,7 +48,8 @@ export const applyMembershipDiff = async ({ segmentId, matching, within }: DiffS
       });
       added = written.map((member) => member.customerRefId);
     }
-    if (toRemove.length) await db.segmentMember.deleteMany({ where: { segmentId, customerRefId: { in: toRemove } } });
+    if (toRemove.length)
+      await db.segmentMember.deleteMany({ where: { segmentId, customerRefId: { in: toRemove } } });
   });
 
   return { added, removed: toRemove };

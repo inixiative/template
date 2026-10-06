@@ -20,7 +20,10 @@ describe('many operations with hooks', () => {
       );
 
       const result = await db.user.createManyAndReturn({
-        data: [{ email: `test-cmar-1-${Date.now()}@example.com` }, { email: `test-cmar-2-${Date.now()}@example.com` }],
+        data: [
+          { email: `test-cmar-1-${Date.now()}@example.com` },
+          { email: `test-cmar-2-${Date.now()}@example.com` },
+        ],
       });
 
       expect(result.length).toBe(2);
@@ -31,7 +34,9 @@ describe('many operations with hooks', () => {
 
   describe('updateManyAndReturn', () => {
     it('triggers after hooks with previous[] and result[]', async () => {
-      const user = await db.user.create({ data: { email: `test-umar-${Date.now()}@example.com`, name: 'Before' } });
+      const user = await db.user.create({
+        data: { email: `test-umar-${Date.now()}@example.com`, name: 'Before' },
+      });
 
       let hookPrevious: unknown;
       let hookResult: unknown;

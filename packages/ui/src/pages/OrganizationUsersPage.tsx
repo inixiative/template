@@ -76,7 +76,9 @@ export const OrganizationUsersPage = ({ organizationId }: OrganizationUsersPageP
   });
 
   const inviteMutation = useMutation({
-    mutationFn: apiMutation((vars: Parameters<typeof organizationCreateInquiry>[0]) => organizationCreateInquiry(vars)),
+    mutationFn: apiMutation((vars: Parameters<typeof organizationCreateInquiry>[0]) =>
+      organizationCreateInquiry(vars),
+    ),
     onSuccess: () => setIsInviteModalOpen(false),
   });
 
@@ -84,7 +86,9 @@ export const OrganizationUsersPage = ({ organizationId }: OrganizationUsersPageP
     {
       key: 'user.name',
       label: 'Name',
-      render: (orgUser: OrganizationUser) => <span className="font-medium">{orgUser.name || 'N/A'}</span>,
+      render: (orgUser: OrganizationUser) => (
+        <span className="font-medium">{orgUser.name || 'N/A'}</span>
+      ),
     },
     {
       key: 'user.email',
@@ -94,7 +98,9 @@ export const OrganizationUsersPage = ({ organizationId }: OrganizationUsersPageP
     {
       key: 'role',
       label: 'Role',
-      render: (orgUser: OrganizationUser) => <span className="capitalize">{orgUser.organizationUser.role}</span>,
+      render: (orgUser: OrganizationUser) => (
+        <span className="capitalize">{orgUser.organizationUser.role}</span>
+      ),
     },
     {
       key: 'createdAt',

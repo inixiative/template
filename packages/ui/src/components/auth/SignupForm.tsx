@@ -7,7 +7,13 @@
 import { Icon } from '@iconify/react';
 import { useSearch } from '@tanstack/react-router';
 import { Button } from '@template/ui/components/primitives/Button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@template/ui/components/primitives/Card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@template/ui/components/primitives/Card';
 import { Input } from '@template/ui/components/primitives/Input';
 import { Label } from '@template/ui/components/primitives/Label';
 import { useAuthProviders } from '@template/ui/hooks';
@@ -48,7 +54,8 @@ export const SignupForm = ({ onLoginClick }: SignupFormProps) => {
       const result = await signUp({ type: 'email', email, password, name });
       setPassword('');
       if (result.status === 'verification-pending') setVerificationEmail(result.email);
-      else if (result.status === 'authenticated') navigatePreserving(search.redirectTo || '/dashboard', 'context');
+      else if (result.status === 'authenticated')
+        navigatePreserving(search.redirectTo || '/dashboard', 'context');
     } catch (err) {
       const described = describeError(err, 'Sign up failed. Please try again.');
       setError(described);
@@ -120,7 +127,9 @@ export const SignupForm = ({ onLoginClick }: SignupFormProps) => {
           {displayError && (
             <div className="bg-error/10 border border-error text-error-foreground rounded-md p-3 text-sm">
               {displayError.message}
-              {displayError.detail && <div className="mt-1 text-xs opacity-80 break-all">{displayError.detail}</div>}
+              {displayError.detail && (
+                <div className="mt-1 text-xs opacity-80 break-all">{displayError.detail}</div>
+              )}
             </div>
           )}
 
@@ -150,7 +159,9 @@ export const SignupForm = ({ onLoginClick }: SignupFormProps) => {
                   <span className="w-full border-t" />
                 </div>
                 <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-background px-2 text-muted-foreground">Or continue with email</span>
+                  <span className="bg-background px-2 text-muted-foreground">
+                    Or continue with email
+                  </span>
                 </div>
               </div>
             </>
@@ -204,7 +215,11 @@ export const SignupForm = ({ onLoginClick }: SignupFormProps) => {
             {onLoginClick && (
               <div className="text-center text-sm text-muted-foreground">
                 Already have an account?{' '}
-                <button type="button" onClick={onLoginClick} className="text-primary hover:underline">
+                <button
+                  type="button"
+                  onClick={onLoginClick}
+                  className="text-primary hover:underline"
+                >
                   Log In
                 </button>
               </div>

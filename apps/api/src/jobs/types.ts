@@ -48,9 +48,14 @@ export type JobData<TPayload = unknown> = {
   traceContext?: Record<string, string>;
 };
 
-export type JobHandlerArgs<TPayload = void> = [TPayload] extends [undefined] ? [] : [payload: TPayload];
+export type JobHandlerArgs<TPayload = void> = [TPayload] extends [undefined]
+  ? []
+  : [payload: TPayload];
 
-export type JobHandler<TPayload = void> = ((ctx: WorkerContext, ...args: JobHandlerArgs<TPayload>) => Promise<void>) & {
+export type JobHandler<TPayload = void> = ((
+  ctx: WorkerContext,
+  ...args: JobHandlerArgs<TPayload>
+) => Promise<void>) & {
   lane?: JobLane;
 };
 

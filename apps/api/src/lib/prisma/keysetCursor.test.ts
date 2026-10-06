@@ -46,7 +46,9 @@ describe('encodeCursor / decodeCursor', () => {
       ['updatedAt', 'desc'],
       ['id', 'asc'],
     ];
-    const decoded = decodeCursor(encodeCursor(chain, [new Date('2026-07-22T10:00:00.000Z'), 'u-1'], FILTER));
+    const decoded = decodeCursor(
+      encodeCursor(chain, [new Date('2026-07-22T10:00:00.000Z'), 'u-1'], FILTER),
+    );
     expect(decoded.p).toEqual(['2026-07-22T10:00:00.000Z', 'u-1']);
   });
 
@@ -65,8 +67,12 @@ describe('encodeCursor / decodeCursor', () => {
       ['name', 'desc'],
       ['id', 'asc'],
     ];
-    expect(() => decodeCursor(encode({ v: 2, k: chain, p: ['active'], f: FILTER }))).toThrow(AppError);
-    expect(() => decodeCursor(encode({ v: 2, k: ID_ASC, p: ['a', 'b'], f: FILTER }))).toThrow(AppError);
+    expect(() => decodeCursor(encode({ v: 2, k: chain, p: ['active'], f: FILTER }))).toThrow(
+      AppError,
+    );
+    expect(() => decodeCursor(encode({ v: 2, k: ID_ASC, p: ['a', 'b'], f: FILTER }))).toThrow(
+      AppError,
+    );
   });
 
   it('rejects a null value (would reach Prisma as `{ gt: null }`)', () => {
@@ -84,7 +90,9 @@ describe('encodeCursor / decodeCursor', () => {
       ['id', 'asc'],
       ['id', 'asc'],
     ];
-    expect(() => decodeCursor(encode({ v: 2, k: dup, p: ['a', 'b'], f: FILTER }))).toThrow(AppError);
+    expect(() => decodeCursor(encode({ v: 2, k: dup, p: ['a', 'b'], f: FILTER }))).toThrow(
+      AppError,
+    );
   });
 });
 

@@ -11,7 +11,11 @@ export const byUser = new Map<string, Set<string>>();
 export const byChannel = new Map<string, Set<string>>();
 export const byStream = new Map<string, Set<string>>();
 
-export const indexInto = (map: Map<string, Set<string>>, key: string, connectionId: string): void => {
+export const indexInto = (
+  map: Map<string, Set<string>>,
+  key: string,
+  connectionId: string,
+): void => {
   let set = map.get(key);
   if (!set) {
     set = new Set();
@@ -20,7 +24,11 @@ export const indexInto = (map: Map<string, Set<string>>, key: string, connection
   set.add(connectionId);
 };
 
-export const deindexFrom = (map: Map<string, Set<string>>, key: string, connectionId: string): void => {
+export const deindexFrom = (
+  map: Map<string, Set<string>>,
+  key: string,
+  connectionId: string,
+): void => {
   const set = map.get(key);
   if (!set) return;
   set.delete(connectionId);
