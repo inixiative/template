@@ -9,13 +9,15 @@ import { db } from '@template/db/client';
 import type { Prisma } from '@template/db/generated/client/client';
 import { resolveFalsePolymorphismRef } from '@template/db/registries/falsePolymorphism';
 import { admitRuleReferences } from '@template/db/utils/admitRuleReferences';
-import { lockedLiveReferences } from '@template/db/utils/lockedLiveReferences';
+import { lockedTargetStates, type TargetState } from '@template/db/utils/lockedTargetStates';
 import type { ModelName } from '@template/db/utils/modelNames';
 import { RuleReferenceError } from '@template/db/utils/ruleReferenceError';
 import { type RuleReference, referenceKey } from '@template/shared/rules';
-import { groupBy, sortBy } from 'lodash-es';
+import { groupBy } from 'lodash-es';
 
 export type RuleReferenceOwner = { model: ModelName; id: string };
+
+export type RuleReferenceGate = { sources: SourceQuery[] } | 'rebuild';
 
 type Edge = {
   id: string;
@@ -37,8 +39,6 @@ const fkColumn = (axis: 'ownerModel' | 'referencedModel', model: string): string
 const edgeKey = (edge: Edge): string =>
   referenceKey({ model: edge.referencedModel, id: edge.referencedId });
 
-type TargetState = { deletedAt: Date | null };
-
 const edgeData = (owner: RuleReferenceOwner, ref: RuleReference, target: TargetState) => ({
   ownerModel: owner.model,
   [fkColumn('ownerModel', owner.model)]: owner.id,
@@ -51,127 +51,78 @@ const edgeData = (owner: RuleReferenceOwner, ref: RuleReference, target: TargetS
 const stampOf = (state: TargetState | undefined): number | null =>
   state?.deletedAt ? state.deletedAt.getTime() : null;
 
-// The stamp an edge is born with, or restamped to, read under FOR UPDATE so it cannot race the
-// target's own soft delete: a plain read sees the target live while its delete is uncommitted, the
-// delete's referenced-side hook then finds no edge to stamp, and the edge is written live against a
-// dead row. Under the lock whichever transaction reaches the target first wins and the other waits.
-// Models are locked in name order for the same reason `lockedLiveReferences` does it. A purged
-// target has no row and so no state; the caller leaves it alone.
-const targetStates = async (references: RuleReference[]): Promise<Map<string, TargetState>> => {
-  const states = new Map<string, TargetState>();
-  for (const [model, group] of sortBy(
-    Object.entries(groupBy(references, 'model')),
-    ([name]) => name,
-  )) {
-    const rows = await db.findForUpdate<{ id: string; deletedAt?: Date | null }>(model, {
-      id: { in: [...new Set(group.map((ref) => ref.id))] },
-    });
-    for (const row of rows)
-      states.set(referenceKey({ model, id: row.id }), { deletedAt: row.deletedAt ?? null });
-  }
-  return states;
+const admit = async (
+  added: RuleReference[],
+  states: Map<string, TargetState>,
+  sources: SourceQuery[],
+): Promise<void> => {
+  const dead = added.find((ref) => {
+    const target = states.get(referenceKey(ref));
+    return !target || target.deletedAt;
+  });
+  if (dead)
+    throw new RuleReferenceError(
+      `rule names a ${dead.model} that does not exist or is deleted: ${dead.id}`,
+    );
+  const [outside] = (await admitRuleReferences(sources, added)).unadmitted;
+  if (outside)
+    throw new RuleReferenceError(
+      `rule names a ${outside.model} outside this owner's view: ${outside.id}`,
+    );
 };
 
 /**
- * Recompute one owner's edges from the rows its rules name, inside the caller's transaction. The
- * gate is delta-only and fenced: a reference already held is not re-admitted (a save may keep or drop it),
- * a newly named row must be live, and the lock stops a concurrent delete landing between the
- * check and the edge it admits.
+ * Recompute one owner's edges from the rows its rule names, inside the caller's transaction:
+ * set-diff against the edges it holds (a kept edge keeps its id), every kept edge restamped against
+ * its target's current `deletedAt`, every new edge born with it. Targets are read under
+ * `FOR UPDATE`, so an edge cannot be written live against a row whose delete is uncommitted.
+ *
+ * The gate is the save path's: a newly named row must be live and inside the owner's `sources`
+ * (a reference already held is not re-admitted, so a dead one stays editable). A `'rebuild'` — the
+ * owner coming back from a revive — skips it: a target that died while the owner was away gets an
+ * edge carrying its stamp, so the owner returns degraded rather than refused. A purged target gets
+ * no new edge, and the rule fails closed on it.
  */
 export const syncRuleReferenceEdges = async (
   owner: RuleReferenceOwner,
   references: RuleReference[],
-  sources?: SourceQuery[],
+  gate: RuleReferenceGate,
 ): Promise<void> => {
-  const ownerColumn = fkColumn('ownerModel', owner.model);
   const existing = (await db.ruleReference.findMany({
-    where: { [ownerColumn]: owner.id } as Prisma.RuleReferenceWhereInput,
+    where: { [fkColumn('ownerModel', owner.model)]: owner.id } as Prisma.RuleReferenceWhereInput,
   })) as Edge[];
-  const held = new Set(existing.map(edgeKey));
 
-  const live = await lockedLiveReferences(references);
-  const added = references.filter((ref) => !held.has(referenceKey(ref)));
-  const fresh = added.find((ref) => !live.has(referenceKey(ref)));
-  if (fresh)
-    throw new RuleReferenceError(
-      `rule names a ${fresh.model} that does not exist or is deleted: ${fresh.id}`,
-    );
-  if (sources) {
-    const [outside] = (await admitRuleReferences(sources, added)).unadmitted;
-    if (outside)
-      throw new RuleReferenceError(
-        `rule names a ${outside.model} outside this owner's view: ${outside.id}`,
-      );
-  }
+  const named = new Map(references.map((ref) => [referenceKey(ref), ref]));
+  const held = new Map(
+    existing.filter((edge) => named.has(edgeKey(edge))).map((edge) => [edgeKey(edge), edge]),
+  );
+  const added = [...named.values()].filter((ref) => !held.has(referenceKey(ref)));
+  const states = named.size ? await lockedTargetStates([...named.values()]) : new Map();
+  if (gate !== 'rebuild') await admit(added, states, gate.sources);
 
-  const named = new Set(references.map(referenceKey));
   const toDelete = existing.filter((edge) => !named.has(edgeKey(edge)));
-  const toCreate = references
-    .filter((ref) => !held.has(referenceKey(ref)))
-    .map((ref) => edgeData(owner, ref, { deletedAt: null }));
-
   if (toDelete.length)
     await db.ruleReference.deleteMany({ where: { id: { in: toDelete.map((edge) => edge.id) } } });
+
+  const drifted = [...held.values()].filter((edge) => {
+    const target = states.get(edgeKey(edge));
+    return target && (edge.referencedDeletedAt?.getTime() ?? null) !== stampOf(target);
+  });
+  for (const [stamp, group] of Object.entries(
+    groupBy(drifted, (edge) => stampOf(states.get(edgeKey(edge))) ?? 0),
+  )) {
+    await db.ruleReference.updateManyAndReturn({
+      where: { id: { in: group.map((edge) => edge.id) } },
+      data: { referencedDeletedAt: stamp === '0' ? null : new Date(Number(stamp)) },
+    });
+  }
+
+  const toCreate = added.flatMap((ref) => {
+    const target = states.get(referenceKey(ref));
+    return target ? [edgeData(owner, ref, target)] : [];
+  });
   if (toCreate.length)
     await db.ruleReference.createManyAndReturn({
       data: toCreate as Prisma.RuleReferenceCreateManyInput[],
     });
 };
-
-/**
- * Rebuild one owner's edges from the rows its rule names today, with no admission gate: the owner
- * is coming back (a revive) or being repaired (a backfill), not authored. The same set-diff as the
- * save path, plus every kept edge is restamped against its target's current state — in place, so
- * an edge keeps its id and a second rebuild is a no-op. A soft-deleted target gets an edge carrying
- * its `referencedDeletedAt`, so an owner whose target died while it was away comes back degraded
- * rather than refused. A purged target gets no new edge, and an existing edge to one is left as the
- * database recorded it (FK nulled by SET NULL): the client cannot write that shape, and does not
- * need to — health reads the references off the rule and the live set off the edges, so a named
- * row with no live edge is never live and the rule fails closed.
- */
-export const regenerateRuleReferenceEdges = async (
-  owner: RuleReferenceOwner,
-  references: RuleReference[],
-): Promise<void> =>
-  db.txn(async () => {
-    const ownerColumn = fkColumn('ownerModel', owner.model);
-    const existing = (await db.ruleReference.findMany({
-      where: { [ownerColumn]: owner.id } as Prisma.RuleReferenceWhereInput,
-    })) as Edge[];
-
-    const named = new Map(references.map((ref) => [referenceKey(ref), ref]));
-    const toDelete = existing.filter((edge) => !named.has(edgeKey(edge)));
-    if (toDelete.length)
-      await db.ruleReference.deleteMany({
-        where: { id: { in: toDelete.map((edge) => edge.id) } },
-      });
-    if (!named.size) return;
-
-    const states = await targetStates([...named.values()]);
-    const held = new Map(
-      existing.filter((edge) => named.has(edgeKey(edge))).map((edge) => [edgeKey(edge), edge]),
-    );
-
-    const drifted = [...held.values()].filter((edge) => {
-      const target = states.get(edgeKey(edge));
-      return target && (edge.referencedDeletedAt?.getTime() ?? null) !== stampOf(target);
-    });
-    for (const [stamp, group] of Object.entries(
-      groupBy(drifted, (edge) => stampOf(states.get(edgeKey(edge))) ?? 0),
-    )) {
-      await db.ruleReference.updateManyAndReturn({
-        where: { id: { in: group.map((edge) => edge.id) } },
-        data: { referencedDeletedAt: stamp === '0' ? null : new Date(Number(stamp)) },
-      });
-    }
-
-    const toCreate = [...named.values()].flatMap((ref) => {
-      if (held.has(referenceKey(ref))) return [];
-      const target = states.get(referenceKey(ref));
-      return target ? [edgeData(owner, ref, target)] : [];
-    });
-    if (toCreate.length)
-      await db.ruleReference.createManyAndReturn({
-        data: toCreate as Prisma.RuleReferenceCreateManyInput[],
-      });
-  });

@@ -3,9 +3,9 @@ import { type Condition, Operator } from '@inixiative/json-rules';
 import {
   clearHookRegistry,
   db,
-  regenerateRuleReferenceEdges,
   registerSoftDeleteScoper,
   ruleReferences,
+  syncRuleReferenceEdges,
 } from '@template/db';
 import type { Space } from '@template/db/generated/client/client';
 import {
@@ -142,9 +142,10 @@ describe('ruleReference — edges under concurrency and repair', () => {
   describe('rebuild restamps in place', () => {
     const rebuild = (segment: { id: string; conditions: unknown }) =>
       db.txn(() =>
-        regenerateRuleReferenceEdges(
+        syncRuleReferenceEdges(
           { model: 'Segment', id: segment.id },
           ruleReferences(customerRefLens, segment.conditions as Condition),
+          'rebuild',
         ),
       );
 

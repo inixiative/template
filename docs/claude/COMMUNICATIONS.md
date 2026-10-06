@@ -703,10 +703,11 @@ edges are persisted so that "who references X" is an index and a stale rule is n
   asks the same question at render through `ruleVocabularyIssues`. With no lens there is nothing
   to decide and only extraction runs.
 - **Edges are written by the save path, not a hook.** The writer is
-  `syncRuleReferenceEdges(owner, references, sources?)` in `packages/db` — set-diff (survivors
+  `syncRuleReferenceEdges(owner, references, gate)` in `packages/db` — set-diff (survivors
   keep their row), a newly added missing or soft-deleted target refused as a delta (a pre-existing
   dead reference stays editable), referenced rows locked with `db.findForUpdate` while the gate
-  reads them. With the lens's `sourceQueries` passed as `sources`, a newly added reference the
+  reads them, and every kept edge restamped against its target. With `gate: { sources }` (the
+  lens's `sourceQueries`), a newly added reference the
   source's composed `where` does not admit is refused too (`unadmittedRuleReferences`): that is how
   an Organization template cannot name another organization's tag or segment. Throws
   `RuleReferenceError`. Adding a rule-bearing column = a `syncRuleReferenceEdges`

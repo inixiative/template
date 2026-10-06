@@ -278,8 +278,9 @@ its edges. The referenced relations (`tag`, `organization`, `space`, `referenced
 `ruleReference:referenced` stamps them. Segment is both, and gets both behaviours.
 
 Reviving the owner regenerates its edges from the rule it holds now (`REGENERATE_ON_REVIVE` in the
-cascade, `regenerateRuleReferenceEdges` in `@template/db`). Regeneration is not a save: there is no
-admission gate, because the owner is coming back rather than being authored. A target that was
+cascade). It calls the owner's own generator — the one its save path calls (`syncSegmentEdges`,
+email's `syncRuleReferences`) — with `'rebuild'`, which skips the admission gate, because the owner
+is coming back rather than being authored. A target that was
 soft-deleted while the owner was away gets an edge already carrying `referencedDeletedAt`. A target
 that was purged gets no edge: the client cannot write the null-FK shape only `SET NULL` produces, and
 does not need to, since health reads references off the rule and the live set off the edges, so a
@@ -318,6 +319,15 @@ admit (`unadmittedRuleReferences`). Email passes its owner-scoped lens; the segm
   the reverse-walk and cycle-check precedents this generalizes.
 - Zealot **ZLT-4441** / #2116, **ZLT-4444**, **ZLT-4331**; inixiative/json-rules#9 and 2.20.0.
 
+## One generator for save and revive (2026-10-06, Aron's #141 review)
+
+Revive had its own copy of the edge writer (`regenerateRuleReferenceEdges`, plus email's
+`regenerateRuleReferences`). There is now one: `syncRuleReferenceEdges(owner, references, gate)`.
+`gate` is `{ sources }` on a save (newly named rows must be live and in view) or `'rebuild'` on a
+revive (no gate; dead targets are stamped, not refused). Both paths restamp kept edges and read
+targets once, through `lockedTargetStates` (which replaced `lockedLiveReferences` and the private
+`targetStates`, the same locked query written twice).
+
 ## Hardening from Zealot ZLT-5169 / #2531 (2026-10-02)
 
 Zealot's review of the same primitive found four holes the template shared; this branch closes them.
@@ -327,7 +337,7 @@ Zealot's review of the same primitive found four holes the template shared; this
   against its target's current `deletedAt`: ids are stable and a second rebuild is a no-op.
 - **Target stamps are read under `FOR UPDATE`.** A plain read races the target's own soft delete:
   the save sees the target live, the delete's referenced-side hook finds no edge to stamp, and the
-  edge is written live against a dead row. `targetStates` and `lockedLiveReferences` both lock.
+  edge is written live against a dead row. `lockedTargetStates` locks them.
 - **Targets are locked in model-name order**, not the order the rule lists them, so two saves that
   name a Segment and a Tag the other way round cannot deadlock on each other.
 - **Owner lock on rule saves.** The cycle check reads the owner's graph unlocked, so two saves that
@@ -346,4 +356,4 @@ queues, lets other owners through, and 409s past the wait.
 
 Not ported: Zealot's `backfillRuleReferences --execute/--verify` script (mission delete, rotateGroupID
 and the admin hooks are Zealot-only). A template backfill would be a loop over
-`regenerateRuleReferenceEdges` per owner model; filed when a drift is observed.
+each owner's generator in `'rebuild'` mode; filed when a drift is observed.

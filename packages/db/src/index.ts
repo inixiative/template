@@ -109,7 +109,7 @@ export {
 export { isUniqueConstraintError } from './utils/isUniqueConstraintError';
 export { isWriteConflictError } from './utils/isWriteConflictError';
 // Rule references: the rows a stored rule names, as edges
-export { lockedLiveReferences } from './utils/lockedLiveReferences';
+export { lockedTargetStates, type TargetState } from './utils/lockedTargetStates';
 // Model name utilities
 export {
   type AccessorName,
@@ -139,8 +139,8 @@ export {
 } from './utils/ruleReferenceHealth';
 export { ruleReferences } from './utils/ruleReferences';
 export {
+  type RuleReferenceGate,
   type RuleReferenceOwner,
-  regenerateRuleReferenceEdges,
   syncRuleReferenceEdges,
 } from './utils/syncRuleReferenceEdges';
 export {

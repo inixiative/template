@@ -54,7 +54,6 @@ export { type LoopFrame, loopFrames, narrowToElements, scopedRule } from './scop
 export { type EmailLensOwner, scopeEmailLens } from './scopeEmailLens';
 export {
   componentRuleContents,
-  regenerateRuleReferences,
   syncRuleReferences,
   templateRuleContents,
 } from './syncRuleReferences';
