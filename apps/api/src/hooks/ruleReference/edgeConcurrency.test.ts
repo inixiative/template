@@ -15,7 +15,7 @@ import {
   createSpace,
 } from '@template/db/test';
 import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
-import { registerRuleReferenceReferencedHook } from '#/hooks/ruleReference/referencedHook';
+import { registerRuleReferenceTargetHook } from '#/hooks/ruleReference/targetHook';
 import { registerRulesHook } from '#/hooks/rules/hook';
 import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
 import { registerSegmentRuleReferencesHook } from '#/hooks/segmentRuleReferences/hook';
@@ -68,7 +68,10 @@ const settles = (promise: Promise<unknown>, withinMs: number) =>
   ]);
 
 const edgesOf = (segmentId: string) =>
-  db.ruleReference.findMany({ where: { segmentId }, orderBy: { createdAt: 'asc' } });
+  db.ruleReference.findMany({
+    where: { sourceSegmentId: segmentId },
+    orderBy: { createdAt: 'asc' },
+  });
 
 describe('ruleReference — edges under concurrency and repair', () => {
   let space: Space;
@@ -80,7 +83,7 @@ describe('ruleReference — edges under concurrency and repair', () => {
     registerRulesHook();
     registerSegmentConditionsHook();
     registerSegmentRuleReferencesHook();
-    registerRuleReferenceReferencedHook();
+    registerRuleReferenceTargetHook();
     registerSoftDeleteCascadeHook();
     const { context } = await createOrganizationUser({ role: 'admin' });
     space = (await createSpace({}, { organization: context.organization })).entity;
@@ -156,13 +159,13 @@ describe('ruleReference — edges under concurrency and repair', () => {
         { space },
       );
       const [edge] = await edgesOf(dependent.id);
-      await db.$executeRaw`UPDATE "RuleReference" SET "referencedDeletedAt" = '2026-01-01T00:00:00Z' WHERE "id" = ${edge?.id}`;
+      await db.$executeRaw`UPDATE "RuleReference" SET "targetDeletedAt" = '2026-01-01T00:00:00Z' WHERE "id" = ${edge?.id}`;
 
       await rebuild(dependent);
 
       const [after] = await edgesOf(dependent.id);
       expect(after?.id).toBe(edge?.id);
-      expect(after?.referencedDeletedAt).toBeNull();
+      expect(after?.targetDeletedAt).toBeNull();
     });
 
     it('stamps an edge whose target died behind the hooks, keeps the id, and a second rebuild changes nothing', async () => {
@@ -177,7 +180,7 @@ describe('ruleReference — edges under concurrency and repair', () => {
       await rebuild(dependent);
       const [stamped] = await edgesOf(dependent.id);
       expect(stamped?.id).toBe(edge?.id);
-      expect(stamped?.referencedDeletedAt?.toISOString()).toBe('2026-09-30T12:00:00.000Z');
+      expect(stamped?.targetDeletedAt?.toISOString()).toBe('2026-09-30T12:00:00.000Z');
 
       await rebuild(dependent);
       expect(await edgesOf(dependent.id)).toEqual([stamped]);

@@ -18,25 +18,25 @@ import {
 
 /** The shape a rule-reference edge has to arrive in for its health to be readable. No relations. */
 export type RuleReferenceRow = {
-  referencedModel: string;
-  referencedId: string;
-  referencedDeletedAt?: Date | null;
+  targetModel: string;
+  targetId: string;
+  targetDeletedAt?: Date | null;
 } & Record<string, unknown>;
 
 export type RuleReferenceIssue = {
   key: string;
-  referencedModel: string;
-  referencedId: string;
+  targetModel: string;
+  targetId: string;
   reason: 'deleted' | 'purged';
 };
 
 const purged = (edge: RuleReferenceRow): boolean => {
   const column = resolveFalsePolymorphismRef({
     model: 'RuleReference',
-    axis: 'referencedModel',
-    value: edge.referencedModel as ModelName,
+    axis: 'targetModel',
+    value: edge.targetModel as ModelName,
   });
-  // why: an unregistered referencedModel cannot be checked, and reading it as healthy is the
+  // why: an unregistered targetModel cannot be checked, and reading it as healthy is the
   // why: vacuous-`none` outcome this table exists to prevent - so it counts as gone.
   return !column || edge[column] == null;
 };
@@ -45,18 +45,18 @@ const purged = (edge: RuleReferenceRow): boolean => {
  * Which of these edges no longer resolve, read from the edge rows alone.
  *
  * Two signals, because a target leaves in two ways: soft delete is copied onto the edge as
- * `referencedDeletedAt`, and a purge nulls the typed FK while `referencedId` keeps the name.
+ * `targetDeletedAt`, and a purge nulls the typed FK while `targetId` keeps the name.
  */
 export const ruleReferenceIssues = (edges: RuleReferenceRow[]): RuleReferenceIssue[] =>
   edges.flatMap((edge) => {
-    const reason = edge.referencedDeletedAt != null ? 'deleted' : purged(edge) ? 'purged' : null;
+    const reason = edge.targetDeletedAt != null ? 'deleted' : purged(edge) ? 'purged' : null;
     if (!reason) return [];
-    const { referencedModel, referencedId } = edge;
+    const { targetModel, targetId } = edge;
     return [
       {
-        key: referenceKey({ model: referencedModel, id: referencedId }),
-        referencedModel,
-        referencedId,
+        key: referenceKey({ model: targetModel, id: targetId }),
+        targetModel,
+        targetId,
         reason,
       },
     ];
@@ -68,7 +68,7 @@ export const liveRuleReferences = (edges: RuleReferenceRow[]): RuleReference[] =
   const seen = new Set<string>();
   const live: RuleReference[] = [];
   for (const edge of edges) {
-    const reference = { model: edge.referencedModel, id: edge.referencedId };
+    const reference = { model: edge.targetModel, id: edge.targetId };
     const key = referenceKey(reference);
     if (broken.has(key) || seen.has(key)) continue;
     seen.add(key);

@@ -17,7 +17,7 @@ import {
 } from '@template/db/test';
 import { referenceKey } from '@template/shared/rules';
 import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
-import { registerRuleReferenceReferencedHook } from '#/hooks/ruleReference/referencedHook';
+import { registerRuleReferenceTargetHook } from '#/hooks/ruleReference/targetHook';
 import { registerRulesHook } from '#/hooks/rules/hook';
 import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
 import { registerSegmentRuleReferencesHook } from '#/hooks/segmentRuleReferences/hook';
@@ -70,7 +70,7 @@ const revive = (model: 'emailTemplate' | 'segment' | 'tag', id: string) =>
     }),
   );
 
-describe('ruleReference — an owner takes its edges with it and brings them back', () => {
+describe('ruleReference — a source takes its edges with it and brings them back', () => {
   let space: Space;
 
   beforeAll(async () => {
@@ -79,7 +79,7 @@ describe('ruleReference — an owner takes its edges with it and brings them bac
     registerRulesHook();
     registerSegmentConditionsHook();
     registerSegmentRuleReferencesHook();
-    registerRuleReferenceReferencedHook();
+    registerRuleReferenceTargetHook();
     registerSoftDeleteCascadeHook();
     const { context } = await createOrganizationUser({ role: 'admin' });
     space = (await createSpace({}, { organization: context.organization })).entity;
@@ -99,26 +99,28 @@ describe('ruleReference — an owner takes its edges with it and brings them bac
     });
   });
 
-  describe('email template owner', () => {
+  describe('email template source', () => {
     it('drops its edges when soft-deleted and regenerates them on revive', async () => {
       const { entity: tag } = await createTag();
       const { template } = await saveTemplateNaming(tag.id);
       expect(
-        await db.ruleReference.findMany({ where: { emailTemplateId: template.id } }),
+        await db.ruleReference.findMany({ where: { sourceEmailTemplateId: template.id } }),
       ).toHaveLength(1);
 
       await tombstone('emailTemplate', template.id);
-      expect(await db.ruleReference.findMany({ where: { emailTemplateId: template.id } })).toEqual(
-        [],
-      );
+      expect(
+        await db.ruleReference.findMany({ where: { sourceEmailTemplateId: template.id } }),
+      ).toEqual([]);
 
       await revive('emailTemplate', template.id);
-      const edges = await db.ruleReference.findMany({ where: { emailTemplateId: template.id } });
+      const edges = await db.ruleReference.findMany({
+        where: { sourceEmailTemplateId: template.id },
+      });
       expect(edges).toHaveLength(1);
       expect(edges[0]).toMatchObject({
-        referencedModel: 'Tag',
-        referencedId: tag.id,
-        tagId: tag.id,
+        targetModel: 'Tag',
+        targetId: tag.id,
+        targetTagId: tag.id,
       });
       expect(ruleReferenceIssues(edges)).toEqual([]);
     });
@@ -131,8 +133,10 @@ describe('ruleReference — an owner takes its edges with it and brings them bac
 
       await revive('emailTemplate', template.id);
 
-      const edges = await db.ruleReference.findMany({ where: { emailTemplateId: template.id } });
-      expect(edges[0]?.referencedDeletedAt?.toISOString()).toBe('2026-09-30T12:00:00.000Z');
+      const edges = await db.ruleReference.findMany({
+        where: { sourceEmailTemplateId: template.id },
+      });
+      expect(edges[0]?.targetDeletedAt?.toISOString()).toBe('2026-09-30T12:00:00.000Z');
       expect(ruleReferenceIssues(edges).map((issue) => issue.reason)).toEqual(['deleted']);
     });
 
@@ -144,7 +148,9 @@ describe('ruleReference — an owner takes its edges with it and brings them bac
 
       await revive('emailTemplate', template.id);
 
-      const edges = await db.ruleReference.findMany({ where: { emailTemplateId: template.id } });
+      const edges = await db.ruleReference.findMany({
+        where: { sourceEmailTemplateId: template.id },
+      });
       expect(edges).toEqual([]);
       expect(liveRuleReferenceKeys(edges).has(referenceKey({ model: 'Tag', id: tag.id }))).toBe(
         false,
@@ -152,8 +158,8 @@ describe('ruleReference — an owner takes its edges with it and brings them bac
     });
   });
 
-  describe('segment, which is both an owner and a referenced row', () => {
-    it('tombstoning a referenced segment keeps the edges that name it, and stamps them', async () => {
+  describe('segment, which is both a source and a target row', () => {
+    it('tombstoning a target segment keeps the edges that name it, and stamps them', async () => {
       const { entity: target } = await createSegment({ conditions: acmeRule }, { space });
       const { entity: dependent } = await createSegment(
         { conditions: membersOf(target.id) },
@@ -162,7 +168,7 @@ describe('ruleReference — an owner takes its edges with it and brings them bac
 
       await tombstone('segment', target.id);
 
-      const edges = await db.ruleReference.findMany({ where: { segmentId: dependent.id } });
+      const edges = await db.ruleReference.findMany({ where: { sourceSegmentId: dependent.id } });
       expect(edges).toHaveLength(1);
       expect(ruleReferenceIssues(edges).map((issue) => issue.reason)).toEqual(['deleted']);
     });
@@ -175,14 +181,16 @@ describe('ruleReference — an owner takes its edges with it and brings them bac
       );
 
       await tombstone('segment', dependent.id);
-      expect(await db.ruleReference.findMany({ where: { segmentId: dependent.id } })).toEqual([]);
+      expect(await db.ruleReference.findMany({ where: { sourceSegmentId: dependent.id } })).toEqual(
+        [],
+      );
 
       await revive('segment', dependent.id);
-      const edges = await db.ruleReference.findMany({ where: { segmentId: dependent.id } });
+      const edges = await db.ruleReference.findMany({ where: { sourceSegmentId: dependent.id } });
       expect(edges).toHaveLength(1);
       expect(edges[0]).toMatchObject({
-        referencedModel: 'Segment',
-        referencedSegmentId: target.id,
+        targetModel: 'Segment',
+        targetSegmentId: target.id,
       });
     });
   });

@@ -18,6 +18,7 @@
   - [Styles](#styles)
 - [Database](#database)
   - [Prisma Schema](#prisma-schema)
+  - [Polymorphic Sides](#polymorphic-sides)
   - [IDs](#ids)
 - [Files & Directories](#files--directories)
   - [Backend Structure](#backend-structure)
@@ -205,6 +206,24 @@ TODO: Tailwind conventions
 | Field | camelCase | `firstName`, `organizationId` |
 | Enum | PascalCase | `Role`, `PlatformRole` |
 | Relation | camelCase, descriptive | `organization`, `members`, `createdBy` |
+
+### Polymorphic Sides
+
+A polymorphic slot is named for the role the row plays, as `<side>Model` + typed FKs.
+
+| Side | Meaning | Example |
+|------|---------|---------|
+| `owner` | Tenancy only — who the row belongs to | `Contact.ownerModel` |
+| `source` / `target` | The two ends of a directed edge | `Inquiry`, `RuleReference` `sourceModel` / `targetModel` |
+| `resource` | A one-sided slot | `TagAttachment.resourceModel` |
+| `subject` | The row a record is about | `AuditLog.subjectModel` |
+| `actor` | Who acted | `AuditLog.actorUserId` |
+
+Never `referenced*`.
+
+The typed FKs and relations carry the side too, so both ends read the same way: `sourceSegmentId` /
+`sourceSegment`, `targetTagId` / `targetTag` (as `Inquiry.sourceUserId` / `targetUserId`). The
+back-relation on a target model is `targetedBy<Records>` (`Tag.targetedByRules`).
 
 ### IDs
 

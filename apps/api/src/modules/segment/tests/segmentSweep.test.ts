@@ -9,7 +9,7 @@ import {
   createSegment,
   createSpace,
 } from '@template/db/test';
-import { registerRuleReferenceReferencedHook } from '#/hooks/ruleReference/referencedHook';
+import { registerRuleReferenceTargetHook } from '#/hooks/ruleReference/targetHook';
 import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
 import { registerSegmentRuleReferencesHook } from '#/hooks/segmentRuleReferences/hook';
 import { liveIncludes, liveWhere } from '#/lib/prisma/softDeleteScope';
@@ -30,7 +30,7 @@ describe('sweepable segments — what the nightly sweep enqueues', () => {
     registerSoftDeleteScoper({ liveWhere, liveIncludes });
     registerSegmentConditionsHook();
     registerSegmentRuleReferencesHook();
-    registerRuleReferenceReferencedHook();
+    registerRuleReferenceTargetHook();
     const { context } = await createOrganizationUser({ role: 'admin' });
     space = (await createSpace({}, { organization: context.organization })).entity;
   });

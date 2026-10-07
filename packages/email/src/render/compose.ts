@@ -42,8 +42,8 @@ const liveRuleReferencesOf = async (
   const edges = (await db.ruleReference.findMany({
     where: {
       OR: [
-        { emailTemplateId: templateId },
-        ...(componentIds.length ? [{ emailComponentId: { in: componentIds } }] : []),
+        { sourceEmailTemplateId: templateId },
+        ...(componentIds.length ? [{ sourceEmailComponentId: { in: componentIds } }] : []),
       ],
     },
   })) as RuleReferenceRow[];

@@ -19,7 +19,7 @@ type Row = Record<string, unknown>;
 const idsOf = (rows: Row[]): string[] =>
   rows.map((row) => row.id).filter((id): id is string => typeof id === 'string');
 
-// Re-reads the owners rather than trusting the revive's result rows, whose columns are whatever the
+// Re-reads the sources rather than trusting the revive's result rows, whose columns are whatever the
 // caller selected.
 export const regenerateRuleReferences = async (model: string, rows: Row[]): Promise<void> => {
   const ids = idsOf(rows);

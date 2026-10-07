@@ -10,7 +10,7 @@ import {
   createSpace,
 } from '@template/db/test';
 import { RuleDegradedError } from '@template/shared/rules';
-import { registerRuleReferenceReferencedHook } from '#/hooks/ruleReference/referencedHook';
+import { registerRuleReferenceTargetHook } from '#/hooks/ruleReference/targetHook';
 import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
 import { registerSegmentRuleReferencesHook } from '#/hooks/segmentRuleReferences/hook';
 import { liveIncludes, liveWhere } from '#/lib/prisma/softDeleteScope';
@@ -25,7 +25,8 @@ const membersOf = (segmentId: string) => ({
   condition: { field: 'segment.id', operator: Operator.equals, value: segmentId },
 });
 
-const edgesOf = (segmentId: string) => db.ruleReference.findMany({ where: { segmentId } });
+const edgesOf = (sourceSegmentId: string) =>
+  db.ruleReference.findMany({ where: { sourceSegmentId } });
 
 describe('segment rule health — the segments a rule names, as edges', () => {
   let space: Space;
@@ -34,7 +35,7 @@ describe('segment rule health — the segments a rule names, as edges', () => {
     registerSoftDeleteScoper({ liveWhere, liveIncludes });
     registerSegmentConditionsHook();
     registerSegmentRuleReferencesHook();
-    registerRuleReferenceReferencedHook();
+    registerRuleReferenceTargetHook();
     const { context } = await createOrganizationUser({ role: 'admin' });
     space = (await createSpace({}, { organization: context.organization })).entity;
   });
@@ -55,11 +56,11 @@ describe('segment rule health — the segments a rule names, as edges', () => {
     const edges = await edgesOf(dependent.id);
     expect(edges).toHaveLength(1);
     expect(edges[0]).toMatchObject({
-      ownerModel: 'Segment',
-      segmentId: dependent.id,
-      referencedModel: 'Segment',
-      referencedId: target.id,
-      referencedSegmentId: target.id,
+      sourceModel: 'Segment',
+      sourceSegmentId: dependent.id,
+      targetModel: 'Segment',
+      targetId: target.id,
+      targetSegmentId: target.id,
     });
 
     await db.segment.update({ where: { id: dependent.id }, data: { conditions: acmeRule } });
@@ -155,7 +156,7 @@ describe('segment rule health — edge upkeep', () => {
     registerSoftDeleteScoper({ liveWhere, liveIncludes });
     registerSegmentConditionsHook();
     registerSegmentRuleReferencesHook();
-    registerRuleReferenceReferencedHook();
+    registerRuleReferenceTargetHook();
     const { context } = await createOrganizationUser({ role: 'admin' });
     space = (await createSpace({}, { organization: context.organization })).entity;
   });

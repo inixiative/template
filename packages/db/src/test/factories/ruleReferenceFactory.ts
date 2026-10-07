@@ -5,39 +5,51 @@
  * @uses none
  */
 import {
-  RuleReferenceOwnerModel,
-  RuleReferenceReferencedModel,
+  RuleReferenceSourceModel,
+  RuleReferenceTargetModel,
 } from '@template/db/generated/client/enums';
 import { createFactory } from '@template/db/test/factory';
 
 const ruleReferenceFactory = createFactory('RuleReference', {
   defaults: () => ({
-    ownerModel: RuleReferenceOwnerModel.EmailTemplate,
-    referencedModel: RuleReferenceReferencedModel.Tag,
-    referencedId: '',
+    sourceModel: RuleReferenceSourceModel.EmailTemplate,
+    targetModel: RuleReferenceTargetModel.Tag,
+    targetId: '',
   }),
   dependencies: {
-    emailTemplate: {
+    sourceEmailTemplate: {
       modelName: 'EmailTemplate',
-      foreignKey: { id: 'emailTemplateId' },
+      foreignKey: { id: 'sourceEmailTemplateId' },
       required: false,
     },
-    emailComponent: {
+    sourceEmailComponent: {
       modelName: 'EmailComponent',
-      foreignKey: { id: 'emailComponentId' },
+      foreignKey: { id: 'sourceEmailComponentId' },
       required: false,
     },
-    segment: { modelName: 'Segment', foreignKey: { id: 'segmentId' }, required: false },
-    tag: { modelName: 'Tag', foreignKey: { id: 'tagId' }, required: false },
-    organization: {
-      modelName: 'Organization',
-      foreignKey: { id: 'organizationId' },
-      required: false,
-    },
-    space: { modelName: 'Space', foreignKey: { id: 'spaceId' }, required: false },
-    referencedSegment: {
+    sourceSegment: {
       modelName: 'Segment',
-      foreignKey: { id: 'referencedSegmentId' },
+      foreignKey: { id: 'sourceSegmentId' },
+      required: false,
+    },
+    targetTag: {
+      modelName: 'Tag',
+      foreignKey: { id: 'targetTagId' },
+      required: false,
+    },
+    targetOrganization: {
+      modelName: 'Organization',
+      foreignKey: { id: 'targetOrganizationId' },
+      required: false,
+    },
+    targetSpace: {
+      modelName: 'Space',
+      foreignKey: { id: 'targetSpaceId' },
+      required: false,
+    },
+    targetSegment: {
+      modelName: 'Segment',
+      foreignKey: { id: 'targetSegmentId' },
       required: false,
     },
   },

@@ -140,7 +140,7 @@ export {
 export { ruleReferences } from './utils/ruleReferences';
 export {
   type RuleReferenceGate,
-  type RuleReferenceOwner,
+  type RuleReferenceSource,
   syncRuleReferenceEdges,
 } from './utils/syncRuleReferenceEdges';
 export {

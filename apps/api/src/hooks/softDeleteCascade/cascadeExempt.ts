@@ -12,6 +12,6 @@ export const CASCADE_EXEMPT: Record<string, readonly string[]> = {
   CustomerRef: ['customerOrganization', 'customerSpace', 'customerUser'],
   Inquiry: ['sourceOrganization', 'sourceSpace', 'sourceUser'],
   // A rule names these rows; it does not own them. Tombstoning one stamps the edges that name it
-  // (ruleReference:referenced) — deleting them would erase the record that a rule is degraded.
-  RuleReference: ['tag', 'organization', 'space', 'referencedSegment'],
+  // (ruleReference:target) — deleting them would erase the record that a rule is degraded.
+  RuleReference: ['targetTag', 'targetOrganization', 'targetSpace', 'targetSegment'],
 };
