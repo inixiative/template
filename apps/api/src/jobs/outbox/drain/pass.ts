@@ -42,7 +42,7 @@ const admitLaneRows = async (lane: JobLane, room: number): Promise<number> => {
       const opts = withLanePriority({ lane }, (row.options ?? {}) as JobsOptions);
       const baton = data.dedupeKey ? laneKey(row.handlerName, data.dedupeKey) : undefined;
       // Rows buffered before enqueue validated custom ids would otherwise fail every re-add and
-      // quarantine deliverable work; admission mints a replacement instead.
+      // quarantine deliverable work; the re-add mints a replacement instead.
       const jobId = isValidJobId(row.jobId) ? row.jobId : Bun.randomUUIDv7();
       let previousHolder: string | null = null;
       try {

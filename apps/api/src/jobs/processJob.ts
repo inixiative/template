@@ -8,8 +8,8 @@ import { db } from '@template/db';
 import { auditActorContext } from '@template/db/lib/auditActorContext';
 import { addLogBroadcast, LogScope, log, logScope } from '@template/shared/logger';
 import type { Job } from 'bullmq';
-import { admitToSlot } from '#/jobs/admitToSlot';
 import { isSlowJobData } from '#/jobs/buildJobData';
+import { claimSlotOrRequeue } from '#/jobs/claimSlotOrRequeue';
 import { isValidHandlerName, type JobHandlers, jobHandlers } from '#/jobs/handlers';
 import { jobAuditActor } from '#/jobs/jobAuditActor';
 import { queue } from '#/jobs/queue';
@@ -72,7 +72,7 @@ export const processJob = async (
     throw new Error(`Unknown job handler: ${job.name}`);
   }
 
-  const releaseSlot = await admitToSlot(job, queue, slowSlots);
+  const releaseSlot = await claimSlotOrRequeue(job, queue, slowSlots);
   try {
     await runJob(job, handler);
   } finally {

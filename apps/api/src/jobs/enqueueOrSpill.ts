@@ -19,7 +19,7 @@ import { queue } from '#/jobs/queue';
 import { recordDelayedSlowAdd } from '#/jobs/slowLaneSignals';
 import { type JobData, type JobOptions, JobType } from '#/jobs/types';
 
-export type EnvelopeAdmission = {
+export type EnqueueOrSpillArgs = {
   handlerName: string;
   jobId: string;
   data: JobData;
@@ -27,15 +27,15 @@ export type EnvelopeAdmission = {
   bypass: boolean;
 };
 
-export type EnvelopeAdmissionResult = { jobId: string; outboxed?: true };
+export type EnqueueOrSpillResult = { jobId: string; outboxed?: true };
 
-export const admitEnvelope = async ({
+export const enqueueOrSpill = async ({
   handlerName,
   jobId,
   data,
   options,
   bypass,
-}: EnvelopeAdmission): Promise<EnvelopeAdmissionResult> => {
+}: EnqueueOrSpillArgs): Promise<EnqueueOrSpillResult> => {
   const baton = data.dedupeKey ? laneKey(handlerName, data.dedupeKey) : undefined;
   const lane = outboxLaneOf({ data });
   const jobOptions = withLanePriority(data, options);

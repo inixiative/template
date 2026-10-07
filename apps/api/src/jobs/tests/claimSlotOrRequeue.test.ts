@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
 import { resetEnvOverrides, setEnvOverride } from '@template/shared/utils';
 import { DelayedError, type Job, WaitingError } from 'bullmq';
-import { admitToSlot } from '#/jobs/admitToSlot';
+import { claimSlotOrRequeue } from '#/jobs/claimSlotOrRequeue';
 import { SLOW_LANE_PRIORITY } from '#/jobs/lanePriority';
 import { queue } from '#/jobs/queue';
 import {
@@ -29,7 +29,7 @@ const jobIn = (
     moveToDelayed: mock(async () => undefined),
   } as Partial<Job>);
 
-describe('admitToSlot', () => {
+describe('claimSlotOrRequeue', () => {
   let waiting = 0;
   let restore = (): void => {};
 
@@ -56,9 +56,9 @@ describe('admitToSlot', () => {
     await queue.redis.flushdb();
   });
 
-  it('admits a fast job without touching the slow slots or the queue', async () => {
+  it('runs a fast job without touching the slow slots or the queue', async () => {
     const slots = createSlowSlotPool(4);
-    const release = await admitToSlot(jobIn(JobLane.fast), queue, slots);
+    const release = await claimSlotOrRequeue(jobIn(JobLane.fast), queue, slots);
     release();
     expect(slots.held()).toBe(0);
     expect(queue.getWaitingCount).not.toHaveBeenCalled();
@@ -66,7 +66,7 @@ describe('admitToSlot', () => {
 
   it('holds a slow slot for the run and frees it on release', async () => {
     const slots = createSlowSlotPool(4);
-    const release = await admitToSlot(jobIn(JobLane.slow), queue, slots);
+    const release = await claimSlotOrRequeue(jobIn(JobLane.slow), queue, slots);
     expect(slots.held()).toBe(1);
     release();
     expect(slots.held()).toBe(0);
@@ -74,12 +74,12 @@ describe('admitToSlot', () => {
 
   it('parks a slow job in delayed when the slow half is full, and counts it as deferred slow work', async () => {
     const slots = createSlowSlotPool(4);
-    await admitToSlot(jobIn(JobLane.slow, SLOW_LANE_PRIORITY, 'first'), queue, slots);
-    await admitToSlot(jobIn(JobLane.slow, SLOW_LANE_PRIORITY, 'second'), queue, slots);
+    await claimSlotOrRequeue(jobIn(JobLane.slow, SLOW_LANE_PRIORITY, 'first'), queue, slots);
+    await claimSlotOrRequeue(jobIn(JobLane.slow, SLOW_LANE_PRIORITY, 'second'), queue, slots);
     const third = jobIn(JobLane.slow, SLOW_LANE_PRIORITY, 'third');
     const before = Date.now();
 
-    await expect(admitToSlot(third, queue, slots)).rejects.toBeInstanceOf(DelayedError);
+    await expect(claimSlotOrRequeue(third, queue, slots)).rejects.toBeInstanceOf(DelayedError);
 
     expect(slots.held()).toBe(2);
     const [timestamp, token] = (third.moveToDelayed as ReturnType<typeof mock>).mock.calls[0] as [
@@ -92,19 +92,19 @@ describe('admitToSlot', () => {
     expect(await readSlowDeferred(queue.redis, queue.name)).toBe(1);
   });
 
-  it('a parked slow job leaves the deferred count when a worker picks it back up and admits it', async () => {
+  it('a parked slow job leaves the deferred count when a worker picks it back up and gives it a slot', async () => {
     const slots = createSlowSlotPool(2);
     const parked = jobIn(JobLane.slow, SLOW_LANE_PRIORITY, 'parked');
-    const releaseFirst = await admitToSlot(
+    const releaseFirst = await claimSlotOrRequeue(
       jobIn(JobLane.slow, SLOW_LANE_PRIORITY, 'first'),
       queue,
       slots,
     );
-    await expect(admitToSlot(parked, queue, slots)).rejects.toBeInstanceOf(DelayedError);
+    await expect(claimSlotOrRequeue(parked, queue, slots)).rejects.toBeInstanceOf(DelayedError);
     expect(await readSlowDeferred(queue.redis, queue.name)).toBe(1);
 
     releaseFirst();
-    const release = await admitToSlot(parked, queue, slots);
+    const release = await claimSlotOrRequeue(parked, queue, slots);
 
     expect(await readSlowDeferred(queue.redis, queue.name)).toBe(0);
     release();
@@ -115,7 +115,11 @@ describe('admitToSlot', () => {
     waiting = 1;
 
     await expect(
-      admitToSlot(jobIn(JobLane.slow, SLOW_LANE_PRIORITY, 'jumper'), queue, createSlowSlotPool(4)),
+      claimSlotOrRequeue(
+        jobIn(JobLane.slow, SLOW_LANE_PRIORITY, 'jumper'),
+        queue,
+        createSlowSlotPool(4),
+      ),
     ).rejects.toBeInstanceOf(WaitingError);
 
     expect(await readSlowDeferred(queue.redis, queue.name)).toBe(0);
@@ -126,11 +130,11 @@ describe('admitToSlot', () => {
       throw new Error('redis down');
     }) as never);
     const slots = createSlowSlotPool(2);
-    await admitToSlot(jobIn(JobLane.slow, SLOW_LANE_PRIORITY, 'first'), queue, slots);
+    await claimSlotOrRequeue(jobIn(JobLane.slow, SLOW_LANE_PRIORITY, 'first'), queue, slots);
     const refused = jobIn(JobLane.slow, SLOW_LANE_PRIORITY, 'refused');
 
     try {
-      await expect(admitToSlot(refused, queue, slots)).rejects.toBeInstanceOf(DelayedError);
+      await expect(claimSlotOrRequeue(refused, queue, slots)).rejects.toBeInstanceOf(DelayedError);
       expect(refused.moveToDelayed).toHaveBeenCalledTimes(1);
     } finally {
       zadd.mockRestore();
@@ -142,7 +146,7 @@ describe('admitToSlot', () => {
     const slots = createSlowSlotPool(4);
     const jumped = jobIn(JobLane.slow);
 
-    await expect(admitToSlot(jumped, queue, slots)).rejects.toBeInstanceOf(WaitingError);
+    await expect(claimSlotOrRequeue(jumped, queue, slots)).rejects.toBeInstanceOf(WaitingError);
 
     expect(jumped.moveToWait).toHaveBeenCalledWith('worker-token');
     expect(slots.held()).toBe(0);
@@ -150,7 +154,7 @@ describe('admitToSlot', () => {
 
   it('runs a prioritized job that started with no fast work waiting', async () => {
     const between = jobIn(JobLane.fast, 5);
-    const release = await admitToSlot(between, queue, createSlowSlotPool(4));
+    const release = await claimSlotOrRequeue(between, queue, createSlowSlotPool(4));
     release();
     expect(between.moveToWait).not.toHaveBeenCalled();
   });

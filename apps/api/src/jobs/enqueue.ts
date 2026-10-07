@@ -9,8 +9,8 @@ import { log } from '@template/shared/logger';
 import { captureTraceContext } from '@template/shared/telemetry';
 import { isTest } from '@template/shared/utils';
 import type { Job } from 'bullmq';
-import { admitEnvelope } from '#/jobs/admitEnvelope';
 import { buildJobData } from '#/jobs/buildJobData';
+import { enqueueOrSpill } from '#/jobs/enqueueOrSpill';
 import type { JobPayloads } from '#/jobs/handlers';
 import type { SupersedingJobHandler } from '#/jobs/makeSupersedingJob';
 import { queue } from '#/jobs/queue';
@@ -74,12 +74,12 @@ export const enqueueJob = async <K extends keyof JobPayloads>(
     { type, id, payload, dedupeKey, traceContext: captureTraceContext() },
     lane,
   );
-  const admission = await admitEnvelope({
+  const placed = await enqueueOrSpill({
     handlerName,
     jobId: jobOptions.jobId ?? Bun.randomUUIDv7(),
     data,
     options: jobOptions,
     bypass,
   });
-  return { ...admission, name: handlerName };
+  return { ...placed, name: handlerName };
 };
