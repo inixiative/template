@@ -10,7 +10,13 @@ import type { Context } from 'hono';
 import { getResource, getResourceType } from '#/lib/context/getResource';
 import type { AppEnv } from '#/types/appEnv';
 
-const nullSourceFields = { sourceUserId: null, sourceOrganizationId: null, sourceSpaceId: null };
+const nullSourceFields = {
+  sourceUserId: null,
+  sourceOrganizationId: null,
+  sourceSpaceId: null,
+  sourceIntegrationId: null,
+  sourceTokenId: null,
+};
 
 export type InquirySourceFields =
   | { sourceModel: (typeof InquiryResourceModel)['User']; sourceUserId: UserId }

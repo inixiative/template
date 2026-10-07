@@ -25,4 +25,6 @@ export const inquiryCreateSanitizeKeys = [
   'sourceUserId',
   'sourceOrganizationId',
   'sourceSpaceId',
+  'sourceIntegrationId',
+  'sourceTokenId',
 ] as const;

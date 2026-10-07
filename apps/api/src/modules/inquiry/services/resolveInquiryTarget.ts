@@ -17,7 +17,7 @@ const nullTargetFields = {
   targetIntegrationId: null,
   targetTokenId: null,
 };
-type InquiryTargetBody = {
+export type InquiryTargetBody = {
   targetModel: InquiryResourceModel;
   targetUserId?: string;
   targetOrganizationId?: string;
@@ -34,6 +34,17 @@ export type InquiryTargetFields =
       targetOrganizationId: OrganizationId;
     }
   | { targetModel: (typeof InquiryResourceModel)['Space']; targetSpaceId: SpaceId }
+  | {
+      targetModel: (typeof InquiryResourceModel)['OrganizationUser'];
+      targetOrganizationId: OrganizationId;
+      targetUserId: UserId;
+    }
+  | {
+      targetModel: (typeof InquiryResourceModel)['SpaceUser'];
+      targetOrganizationId: OrganizationId;
+      targetSpaceId: SpaceId;
+      targetUserId: UserId;
+    }
   | { targetModel: (typeof InquiryResourceModel)['admin'] };
 
 export const resolveInquiryTarget = async <C extends ValidatedContext<'json', InquiryTargetBody>>(
@@ -99,8 +110,48 @@ export const resolveInquiryTarget = async <C extends ValidatedContext<'json', In
     });
   }
 
-  // The remaining party kinds name a row no request body can resolve: they are set by
-  // the service that already holds the party, never from a slug or an email.
+  if (targetModel === InquiryResourceModel.OrganizationUser) {
+    if (!body.targetOrganizationId || !body.targetUserId)
+      throw makeError({
+        status: 422,
+        message: 'targetOrganizationId and targetUserId are required',
+      });
+    const membership = await db.organizationUser.findUnique({
+      where: {
+        organizationId_userId: {
+          organizationId: body.targetOrganizationId as OrganizationId,
+          userId: body.targetUserId as UserId,
+        },
+      },
+    });
+    if (!membership)
+      throw makeError({ status: 404, message: 'Target organization user not found' });
+    return {
+      ...nullTargetFields,
+      targetModel,
+      targetOrganizationId: membership.organizationId as OrganizationId,
+      targetUserId: membership.userId as UserId,
+    };
+  }
+
+  if (targetModel === InquiryResourceModel.SpaceUser) {
+    if (!body.targetSpaceId || !body.targetUserId)
+      throw makeError({ status: 422, message: 'targetSpaceId and targetUserId are required' });
+    const membership = await db.spaceUser.findFirst({
+      where: { spaceId: body.targetSpaceId as SpaceId, userId: body.targetUserId as UserId },
+    });
+    if (!membership) throw makeError({ status: 404, message: 'Target space user not found' });
+    return {
+      ...nullTargetFields,
+      targetModel,
+      targetOrganizationId: membership.organizationId as OrganizationId,
+      targetSpaceId: membership.spaceId as SpaceId,
+      targetUserId: membership.userId as UserId,
+    };
+  }
+
+  // Integration and Token name a row no request body can resolve: they are set by the
+  // service that already holds the party, never from a slug or an email.
   if (targetModel !== InquiryResourceModel.admin)
     throw makeError({
       status: 422,
