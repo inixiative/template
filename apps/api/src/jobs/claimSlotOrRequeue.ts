@@ -29,7 +29,7 @@ const trackDeferral = async (
   }
 };
 
-export const admitToSlot = async (
+export const claimSlotOrRequeue = async (
   job: Job,
   queue: JobsQueue,
   slowSlots: SlowSlotPool,

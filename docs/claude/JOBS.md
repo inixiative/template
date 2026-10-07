@@ -65,13 +65,13 @@ jobs/
 │   ├── mutex.ts        # Serialized queue shared by flush + drain
 │   ├── queueDepth.ts   # Cached waiting+active depth probe
 │   └── types.ts        # OutboxRow + shouldSpill
-├── admitEnvelope.ts    # Routes a built envelope: BullMQ (at its lane's priority) or the outbox
-├── admitToSlot.ts      # Job-start check: slow slot cap, and returning a line-jumper to its priority
+├── enqueueOrSpill.ts   # Routes a built envelope: BullMQ (at its lane's priority) or the outbox
+├── claimSlotOrRequeue.ts # Job-start check: slow slot cap, and returning a line-jumper to its priority
 ├── buildJobData.ts     # The one job-data envelope every producer builds (lane resolved here)
 ├── enqueue.ts          # enqueueJob function
 ├── lanePriority.ts     # Slow lane → lowest BullMQ priority
 ├── makeJob.ts          # Job wrapper constructors
-├── processJob.ts       # Per-job processor: slot admission, scopes, tracing
+├── processJob.ts       # Per-job processor: slot claim, scopes, tracing
 ├── queue.ts            # BullMQ queue setup
 ├── registerCronJobs.ts # Cron registration on worker startup
 ├── slowSlotPool.ts     # Per-worker count of slots running slow jobs
@@ -296,7 +296,7 @@ A custom `jobId` must satisfy BullMQ's rules (`validateJobId`): not `'0'`, no `'
 
 When overflow is active, an `adhoc` enqueue returns `{ jobId, name, outboxed: true }` (spilled to the buffer) instead of adding to BullMQ directly. See [Overflow Buffer](#overflow-buffer).
 
-In test (`isTest`), `enqueueJob` skips BullMQ entirely and runs the handler inline — cascading effects happen for real, errors propagate, no queue/overflow machinery involved. The inline job still receives the resolved envelope (lane included). To test routing, call `admitEnvelope` directly (see `jobs/tests/`).
+In test (`isTest`), `enqueueJob` skips BullMQ entirely and runs the handler inline — cascading effects happen for real, errors propagate, no queue/overflow machinery involved. The inline job still receives the resolved envelope (lane included). To test routing, call `enqueueOrSpill` directly (see `jobs/tests/`).
 
 ---
 
@@ -322,9 +322,9 @@ BullMQ moves a job to active from the plain wait list first and from the priorit
 
 ### Slots: Slow Work Uses at Most Its Share
 
-Priority decides which job starts next, but BullMQ never preempts a running job, so ordering alone would let slow work fill every slot and make a fast job wait for a slow one to finish. Each worker therefore runs slow jobs in at most `JOBS_SLOW_SLOT_FRACTION` of its `JOBS_WORKER_CONCURRENCY` slots (at least one), counted by the worker's own `SlowSlotPool` (`jobs/slowSlotPool.ts`). When a slow job starts on a worker whose slow share is full, `admitToSlot` (`jobs/admitToSlot.ts`) parks it: it moves to delayed and returns to the slow band at its stored priority when it comes due. `moveToDelayed` skips the attempt count, so parking never uses up retries. The park is uniform between `SLOW_PARK_MIN_MS` (2 s) and a window that widens by 20 ms for each queued slow job, capped at `JOBS_SLOW_PARK_MAX_MS` (60 s), so refused jobs do not come due together and a large send is not refetched and refused every second. Each park counts `jobs.slow.parked`. The other slots stay free for fast work. Fast work is not capped: it may use every slot, including the slow share when no slow work is running.
+Priority decides which job starts next, but BullMQ never preempts a running job, so ordering alone would let slow work fill every slot and make a fast job wait for a slow one to finish. Each worker therefore runs slow jobs in at most `JOBS_SLOW_SLOT_FRACTION` of its `JOBS_WORKER_CONCURRENCY` slots (at least one), counted by the worker's own `SlowSlotPool` (`jobs/slowSlotPool.ts`). When a slow job starts on a worker whose slow share is full, `claimSlotOrRequeue` (`jobs/claimSlotOrRequeue.ts`) parks it: it moves to delayed and returns to the slow band at its stored priority when it comes due. `moveToDelayed` skips the attempt count, so parking never uses up retries. The park is uniform between `SLOW_PARK_MIN_MS` (2 s) and a window that widens by 20 ms for each queued slow job, capped at `JOBS_SLOW_PARK_MAX_MS` (60 s), so refused jobs do not come due together and a large send is not refetched and refused every second. Each park counts `jobs.slow.parked`. The other slots stay free for fast work. Fast work is not capped: it may use every slot, including the slow share when no slow work is running.
 
-`admitToSlot` also keeps a job at its priority when BullMQ does not. Stalled-job recovery and a manual retry (`job.retry()`, `queue.retryJobs()`, the Bull Board retry button) put a job on the plain wait list whatever its priority, ahead of all fast work. A job with a priority can legitimately start only when the plain wait list is empty, so a prioritized job that starts while fast work is waiting is moved back with `job.moveToWait`, which returns it to its priority band. Automatic retries and delayed promotion already keep the priority.
+`claimSlotOrRequeue` also keeps a job at its priority when BullMQ does not. Stalled-job recovery and a manual retry (`job.retry()`, `queue.retryJobs()`, the Bull Board retry button) put a job on the plain wait list whatever its priority, ahead of all fast work. A job with a priority can legitimately start only when the plain wait list is empty, so a prioritized job that starts while fast work is waiting is moved back with `job.moveToWait`, which returns it to its priority band. Automatic retries and delayed promotion already keep the priority.
 
 The slot share needs no shared state: every worker applies the same fraction to its own concurrency, so the fleet-wide share follows.
 
@@ -343,7 +343,7 @@ The drain refills fast rows up to the budget's free room, then slow rows up to w
 
 While the slot share has a send parked, nearly all of it sits in BullMQ's `delayed` set at any moment. A count that skipped `delayed` read a queued send as an empty lane: the drain admitted past the slow share and every signal read zero. But `delayed` cannot simply be counted — it also holds scheduled cron repeats, backoff retries and deliberately delayed fast jobs, and BullMQ keeps it as one set ordered by due time with no priority to count by.
 
-So the slow lane keeps its own list of the slow jobs it put there (`jobs/slowLaneSignals.ts`): a Redis sorted set per queue, `job:<queue>:slow:deferred`, of job ids scored by due time. A job goes on it when `admitToSlot` parks it (recorded before `moveToDelayed`, so a parked job is never outside the count) or when a slow job is added with a delay (`admitEnvelope`, or the drain re-adding a delayed slow row), and comes off when a worker picks it back up — when `admitToSlot` admits it to a slow slot or sends it back as a line-jumper. Keyed by job id, so parking the same job again moves its score instead of counting it twice. The list is a signal, not part of delivery: a Redis error while writing it is logged and never fails or blocks the job.
+So the slow lane keeps its own list of the slow jobs it put there (`jobs/slowLaneSignals.ts`): a Redis sorted set per queue, `job:<queue>:slow:deferred`, of job ids scored by due time. A job goes on it when `claimSlotOrRequeue` parks it (recorded before `moveToDelayed`, so a parked job is never outside the count) or when a slow job is added with a delay (`enqueueOrSpill`, or the drain re-adding a delayed slow row), and comes off when a worker picks it back up — when `claimSlotOrRequeue` gives it a slow slot or sends it back as a line-jumper. Keyed by job id, so parking the same job again moves its score instead of counting it twice. The list is a signal, not part of delivery: a Redis error while writing it is logged and never fails or blocks the job.
 
 It cannot go by due time: BullMQ promotes delayed jobs only when a worker fetches, and parked jobs were measured sitting in `delayed` 2–21 s past due, so a count by due-time band undercounts. An entry stays counted until a worker picks the job up; only one nobody picks up within `SLOW_DEFERRED_GRACE_MS` (five minutes) of its due time — a delayed job deleted by hand, say — stops counting, and the drain pass prunes it. The depth probe caps the list at BullMQ's own `delayed` count, because a listed job that was promoted and is waiting to be fetched is in the slow band too.
 
