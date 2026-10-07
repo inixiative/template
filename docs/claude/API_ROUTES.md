@@ -145,7 +145,7 @@ A lens narrowing can declare a `where` in three places, and they assert three di
 
 **mapDefaults model where** (`mapDefaults.prisma.models.<Model>.where`) — the broadest: wherever this model appears anywhere in the lens's projection, apply this condition. Placement-independent; this is the mechanism `redactLens` rides.
 
-`projectByPath` merges all three before consumption: each visit's `whereClauses` is the union of node-declared wheres and mapDefaults wheres for that visit's model, keyed by path.
+`projectLens` merges all three before consumption: each visit's `whereClauses` is the union of node-declared wheres and mapDefaults wheres for that visit's model, keyed by path.
 
 ### How pagination applies them
 
@@ -580,7 +580,7 @@ GET /api/v1/users?searchFields[emailVerified][:]=true
 
 ### Route declaration (lens narrowing)
 
-The `filterLens` field on `readRoute` is a `LensNarrowing` from `@inixiative/json-rules` (2.2.0+). Shape:
+The `filterLens` field on `readRoute` is a `LensNarrowing` from `@inixiative/json-rules` (3.0+). Shape:
 
 ```typescript
 import { lensFor } from '@template/db/lens';

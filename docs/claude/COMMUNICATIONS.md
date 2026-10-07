@@ -342,7 +342,7 @@ is decided per site: save takes it from the input, the rule surface and prefligh
 (default: platform), and settle from `composeTemplate`'s `owner` — the row that won the cascade,
 so an Organization row rendered for a Space sender sees the organization's tags. No inheritance up
 the tree for now. The picker gets real options for Tag and Segment (`emailSourceValues`, the lens's
-`sourceQueries` run through Prisma). Organization and Space are scoped on both the model and
+`toSourceQueries` run through Prisma). Organization and Space are scoped on both the model and
 its ID source: an Organization owner sees itself and its spaces; a Space owner sees itself
 and its organization; a User owner sees neither; platform rows leave these two models unrestricted.
 The picker uses those same source queries.
@@ -351,7 +351,7 @@ The picker uses those same source queries.
 token or rule reads a slot. `prune` applies both picks and each visit's `where`: hidden list
 elements are dropped, hidden to-one relations become null, and a hidden root becomes null.
 An unfiltered loop cannot expose a foreign tag through a token while the corresponding rule
-would refuse it. Token/path traversal delegates to json-rules' `resolveLensPath`.
+would refuse it. Token/path traversal delegates to json-rules' `walkLensPath`.
 
 A route's `filterLens` is a different role: it controls accepted filters and sorting, while
 `responseSchema` controls the response. Do not use this projection step to reshape an already
@@ -694,8 +694,8 @@ edges are persisted so that "who references X" is an index and a stale rule is n
   itself (`defaultEmailLens` when none is threaded) — extraction never runs on the exposed
   surface. Adding a referenceable model = a registry entry + an FK column (the hook and email's
   sources derive); a surface that reaches it declares its own labeled id source.
-- **Extraction is the lens's** (`ruleReferences(lens, rule)`, `packages/db`): `ruleSourceValues`
-  (json-rules ≥ 2.20) reports the values a rule names at each source, and a source on a model's
+- **Extraction is the lens's** (`ruleReferences(lens, rule)`, `packages/db`): `describeRuleSources`
+  (json-rules ≥ 3.0) reports the values a rule names at each source, and a source on a model's
   id field is a row reference. Nested and dotted spellings are one path; a `path`/`bind` leaf at a
   source — or an operator that describes the row without naming it (`contains`, `between`) — is
   `dynamic`: it names no row and registers no edge. When save is handed a lens (the api
@@ -708,7 +708,7 @@ edges are persisted so that "who references X" is an index and a stale rule is n
   keep their row), a newly added missing or soft-deleted target refused as a delta (a pre-existing
   dead reference stays editable), referenced rows locked with `db.findForUpdate` while the gate
   reads them, and every kept edge restamped against its target. With `gate: { sources }` (the
-  lens's `sourceQueries`), a newly added reference the
+  lens's `toSourceQueries`), a newly added reference the
   source's composed `where` does not admit is refused too (`admitRuleReferences`): that is how
   an Organization template cannot name another organization's tag or segment. Throws
   `RuleReferenceError`. Adding a rule-bearing column = a `syncRuleReferenceEdges`
@@ -731,7 +731,7 @@ edges are persisted so that "who references X" is an index and a stale rule is n
 - **`withRule(health, { degraded, sound })`** asks, at evaluation and against the current lens,
   whether the rule can be evaluated correctly — two questions: every binding it requires is
   supplied (`bindOptional` marks the ones that may be left out and resolve to null), and it is
-  still valid — the lens admits it (`checkRuleAgainstLens`, so a lens change after save degrades
+  still valid — the lens admits it (`validateRuleInLens`, so a lens change after save degrades
   the rule instead of silently narrowing it) and every row it names is in the live set the caller
   confirmed (absent set = nothing confirmed = every reference missing). Degraded means "do nothing
   new, say why": in email that is a rule issue, never a match, and the registry entry's `render`

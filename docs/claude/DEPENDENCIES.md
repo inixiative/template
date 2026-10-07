@@ -73,7 +73,7 @@
 | Package | Purpose | Notes |
 |---------|---------|-------|
 | `zod` | Schema validation | Runtime type checking, OpenAPI integration |
-| `@inixiative/json-rules` (`^2.8.0`) | Rules engine | Declarative validation in hooks |
+| `@inixiative/json-rules` (`^3.0.0`) | Rules engine | Declarative validation in hooks |
 
 ---
 
