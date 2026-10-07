@@ -34,11 +34,11 @@ const ownerSegments = (sample: Segment): Promise<Segment[]> =>
 const edgesFor = async (segmentIds: string[]): Promise<Record<string, RuleReferenceRow[]>> =>
   groupBy(
     (await db.ruleReference.findMany({
-      where: { segmentId: { in: segmentIds } },
+      where: { sourceSegmentId: { in: segmentIds } },
     })) as (RuleReferenceRow & {
-      segmentId: string;
+      sourceSegmentId: string;
     })[],
-    'segmentId',
+    'sourceSegmentId',
   );
 
 const closeOverOwner = (

@@ -25,7 +25,7 @@ model Organization {
   inquiriesReceived    Inquiry[]             @relation("InquiryTarget")
   emailComponents      EmailComponent[]
   emailTemplates       EmailTemplate[]
-  ruleReferences       RuleReference[]
+  targetedByRules      RuleReference[] @relation("RuleReferenceTarget")
   spaces               Space[]
   customerRefs         CustomerRef[]         @relation("customerRefs")
   providerRefs         CustomerRef[]         @relation("providerRefs")

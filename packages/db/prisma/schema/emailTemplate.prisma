@@ -42,7 +42,7 @@ model EmailTemplate {
   user              User?              @relation(fields: [userId], references: [id], onDelete: Cascade)
   auditLogs         AuditLog[]
   communicationLogs CommunicationLog[]
-  ruleReferences    RuleReference[]
+  ruleReferences    RuleReference[] @relation("RuleReferenceSource")
 
   // Per-owner uniqueness — one partial unique per ownerModel branch (see EmailComponent for the
   // tier rationale). The uniques are partial on tier only, never on deletedAt: a natural key holds

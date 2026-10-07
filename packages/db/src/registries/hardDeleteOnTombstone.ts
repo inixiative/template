@@ -13,6 +13,7 @@ export const HARD_DELETE_ON_TOMBSTONE = [
   'Token',
   'WebhookSubscription',
   'WebhookEvent',
+  'RuleReference',
 ] as const;
 
 export type HardDeletedOnTombstone = (typeof HARD_DELETE_ON_TOMBSTONE)[number];

@@ -42,3 +42,35 @@ export const findForUpdateLockIdentifier = (
   const digest = createHash('sha256').update(JSON.stringify(serialized)).digest('hex');
   return `${model}:${digest}`;
 };
+
+const isInList = (value: unknown): value is { in: unknown } =>
+  value !== null &&
+  typeof value === 'object' &&
+  !Array.isArray(value) &&
+  Object.keys(value).length === 1 &&
+  'in' in value;
+
+// A batch fences many rows at once by listing values in one field as `{ in: [...] }`; every other
+// field stays a scalar, so `{ email: { in: [a, b] }, tenantId }` names the rows (a, tenantId) and
+// (b, tenantId). Each value becomes the identifier a single-row fence on it computes, so a batch and
+// a single-row writer contend on the same keys. Only one field may list values: two lists name a
+// cross product nobody asked for. An empty list names no row and takes no lock.
+export const findForUpdateLockIdentifiers = (
+  model: string,
+  where: Record<string, unknown>,
+): string[] => {
+  const listed = Object.entries(where).filter(([, value]) => isInList(value));
+  if (!listed.length) return [findForUpdateLockIdentifier(model, where)];
+  if (listed.length > 1)
+    throw new Error(
+      `db.findForUpdate() upserting mode: only one field may list values on model '${model}', got ${listed.map(([key]) => `'${key}'`).join(', ')}`,
+    );
+  const [[field, { in: values }]] = listed as [[string, { in: unknown }]];
+  if (!Array.isArray(values))
+    throw new Error(`db.findForUpdate(): the 'in' for '${field}' must be an array`);
+  return [
+    ...new Set(
+      values.map((value) => findForUpdateLockIdentifier(model, { ...where, [field]: value })),
+    ),
+  ];
+};

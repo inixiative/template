@@ -10,7 +10,11 @@ import {
   organizationReadManySpacesQueryKey,
   spaceProtectedQueryKey,
 } from '@template/sdk';
-import type { InquiryMeta, InquiryType } from '@template/ui/lib/inquiries/queryKeys';
+import type {
+  InquiryMeta,
+  InquiryResolutionStatus,
+  InquiryType,
+} from '@template/ui/lib/inquiries/queryKeys';
 import { useAppStore } from '@template/ui/store';
 
 type EffectContext = {
@@ -51,7 +55,7 @@ export const useInquiryResolutionEffects = () => {
   const refreshMe = useAppStore((state) => state.auth.refreshMe);
   const queryClient = useQueryClient();
 
-  return async (inquiry: InquiryMeta, status: 'approved' | 'denied' | 'changesRequested') => {
+  return async (inquiry: InquiryMeta, status: InquiryResolutionStatus) => {
     if (status !== 'approved') return;
     await RESOLUTION_EFFECTS[inquiry.type](inquiry, { refreshMe, queryClient });
   };

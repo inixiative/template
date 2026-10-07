@@ -15,7 +15,7 @@ import {
 } from '@template/db/test';
 import { ConditionValidationError } from '@template/email/errors';
 import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
-import { registerRuleReferenceReferencedHook } from '#/hooks/ruleReference/referencedHook';
+import { registerRuleReferenceTargetHook } from '#/hooks/ruleReference/targetHook';
 import { registerRulesHook } from '#/hooks/rules/hook';
 import { saveEmailTemplate } from '#/lib/email/saveEmailTemplate';
 import { liveIncludes, liveWhere } from '#/lib/prisma/softDeleteScope';
@@ -61,12 +61,12 @@ const edgesOf = (where: Record<string, unknown>) =>
 
 const refKey = (model: string, id: string) => `${model}|${id}`;
 
-describe('ruleReference — the save path writes edges, the referenced side stamps them', () => {
+describe('ruleReference — the save path writes edges, the target side stamps them', () => {
   beforeAll(() => {
     registerSoftDeleteScoper({ liveWhere, liveIncludes });
     registerPreventHardDeleteHook();
     registerRulesHook();
-    registerRuleReferenceReferencedHook();
+    registerRuleReferenceTargetHook();
   });
 
   afterAll(async () => {
@@ -87,17 +87,17 @@ describe('ruleReference — the save path writes edges, the referenced side stam
     const { entity: tag } = await createTag();
     const { template } = await save(mjml(taggedBlock(tag.id)));
 
-    const edges = await edgesOf({ emailTemplateId: template.id });
+    const edges = await edgesOf({ sourceEmailTemplateId: template.id });
     expect(edges).toHaveLength(1);
     expect(edges[0]).toMatchObject({
-      ownerModel: 'EmailTemplate',
-      emailTemplateId: template.id,
-      emailComponentId: null,
-      referencedModel: 'Tag',
-      referencedId: tag.id,
-      tagId: tag.id,
-      organizationId: null,
-      spaceId: null,
+      sourceModel: 'EmailTemplate',
+      sourceEmailTemplateId: template.id,
+      sourceEmailComponentId: null,
+      targetModel: 'Tag',
+      targetId: tag.id,
+      targetTagId: tag.id,
+      targetOrganizationId: null,
+      targetSpaceId: null,
     });
   });
 
@@ -105,9 +105,13 @@ describe('ruleReference — the save path writes edges, the referenced side stam
     const { entity: space } = await createSpace();
     const { template } = await save(mjml('hi'), { subject: `Welcome ${inSpaceBlock(space.id)}` });
 
-    const edges = await edgesOf({ emailTemplateId: template.id });
+    const edges = await edgesOf({ sourceEmailTemplateId: template.id });
     expect(edges).toHaveLength(1);
-    expect(edges[0]).toMatchObject({ referencedModel: 'Space', spaceId: space.id, tagId: null });
+    expect(edges[0]).toMatchObject({
+      targetModel: 'Space',
+      targetSpaceId: space.id,
+      targetTagId: null,
+    });
   });
 
   it('a relation the lens does not declare is refused at save, even when it reaches a referenceable id', async () => {
@@ -151,14 +155,14 @@ describe('ruleReference — the save path writes edges, the referenced side stam
       createTag(),
     ]);
     const { template } = await save(mjml(taggedBlock(a.id, b.id)), { slug: 'diff' });
-    const before = await edgesOf({ emailTemplateId: template.id });
-    const survivor = before.find((edge) => edge.tagId === b.id);
+    const before = await edgesOf({ sourceEmailTemplateId: template.id });
+    const survivor = before.find((edge) => edge.targetTagId === b.id);
 
     await save(mjml(taggedBlock(b.id, c.id)), { slug: 'diff' });
 
-    const after = await edgesOf({ emailTemplateId: template.id });
-    expect(after.map((edge) => edge.tagId).sort()).toEqual([b.id, c.id].sort());
-    expect(after.find((edge) => edge.tagId === b.id)).toEqual(survivor);
+    const after = await edgesOf({ sourceEmailTemplateId: template.id });
+    expect(after.map((edge) => edge.targetTagId).sort()).toEqual([b.id, c.id].sort());
+    expect(after.find((edge) => edge.targetTagId === b.id)).toEqual(survivor);
   });
 
   it('a body with no rules clears the edges', async () => {
@@ -167,20 +171,20 @@ describe('ruleReference — the save path writes edges, the referenced side stam
 
     await save(mjml('plain'), { slug: 'clear' });
 
-    expect(await edgesOf({ emailTemplateId: template.id })).toEqual([]);
+    expect(await edgesOf({ sourceEmailTemplateId: template.id })).toEqual([]);
   });
 
   it('components are a surface: an edge from the component, not the template that embeds it', async () => {
     const { entity: tag } = await createTag();
     const { template, components } = await save(mjml(component('vip', taggedBlock(tag.id))));
 
-    expect(await edgesOf({ emailTemplateId: template.id })).toEqual([]);
-    const edges = await edgesOf({ emailComponentId: components[0]!.id });
+    expect(await edgesOf({ sourceEmailTemplateId: template.id })).toEqual([]);
+    const edges = await edgesOf({ sourceEmailComponentId: components[0]!.id });
     expect(edges).toHaveLength(1);
     expect(edges[0]).toMatchObject({
-      ownerModel: 'EmailComponent',
-      emailTemplateId: null,
-      tagId: tag.id,
+      sourceModel: 'EmailComponent',
+      sourceEmailTemplateId: null,
+      targetTagId: tag.id,
     });
   });
 
@@ -205,10 +209,10 @@ describe('ruleReference — the save path writes edges, the referenced side stam
     };
 
     const { template } = await save(mjml(`{{#if rule=${JSON.stringify(rule)}}}x{{/if}}`));
-    expect(await edgesOf({ emailTemplateId: template.id })).toHaveLength(0);
+    expect(await edgesOf({ sourceEmailTemplateId: template.id })).toHaveLength(0);
   });
 
-  it('an operator that describes the referenced row without naming it saves and registers no edge', async () => {
+  it('an operator that describes the target row without naming it saves and registers no edge', async () => {
     const rule = {
       field: 'recipient.tagAttachments',
       arrayOperator: 'any',
@@ -216,66 +220,69 @@ describe('ruleReference — the save path writes edges, the referenced side stam
     };
 
     const { template } = await save(mjml(`{{#if rule=${JSON.stringify(rule)}}}x{{/if}}`));
-    expect(await edgesOf({ emailTemplateId: template.id })).toHaveLength(0);
+    expect(await edgesOf({ sourceEmailTemplateId: template.id })).toHaveLength(0);
   });
 
-  it('soft-deleting a referenced tag stamps every edge that names it; restoring clears them', async () => {
+  it('soft-deleting a target tag stamps every edge that names it; restoring clears them', async () => {
     const { entity: tag } = await createTag();
     await save(mjml(taggedBlock(tag.id)));
     await save(mjml(component('vip', taggedBlock(tag.id))));
 
-    expect(ruleReferenceIssues(await edgesOf({ referencedId: tag.id }))).toEqual([]);
+    expect(ruleReferenceIssues(await edgesOf({ targetId: tag.id }))).toEqual([]);
 
     await db.tag.update({ where: { id: tag.id }, data: { deletedAt: new Date() } });
-    const stamped = await edgesOf({ referencedId: tag.id });
+    const stamped = await edgesOf({ targetId: tag.id });
     expect(stamped).toHaveLength(2);
-    expect(stamped.every((edge) => edge.referencedDeletedAt != null)).toBe(true);
+    expect(stamped.every((edge) => edge.targetDeletedAt != null)).toBe(true);
     expect(ruleReferenceIssues(stamped).map((issue) => [issue.key, issue.reason])).toEqual([
       [refKey('Tag', tag.id), 'deleted'],
       [refKey('Tag', tag.id), 'deleted'],
     ]);
 
     await db.withDeleted(() => db.tag.update({ where: { id: tag.id }, data: { deletedAt: null } }));
-    const cleared = await edgesOf({ referencedId: tag.id });
-    expect(cleared.every((edge) => edge.referencedDeletedAt == null)).toBe(true);
+    const cleared = await edgesOf({ targetId: tag.id });
+    expect(cleared.every((edge) => edge.targetDeletedAt == null)).toBe(true);
     expect(ruleReferenceIssues(cleared)).toEqual([]);
   });
 
-  it('soft-deleting a referenced row publishes one stale event per edge, naming the owner; restoring publishes none', async () => {
+  it('soft-deleting a target row publishes one stale event per edge, naming the source; restoring publishes none', async () => {
     const { entity: tag } = await createTag();
     await save(mjml(taggedBlock(tag.id)));
     await save(mjml(component('vip', taggedBlock(tag.id))));
 
     await db.tag.update({ where: { id: tag.id }, data: { deletedAt: new Date() } });
 
-    const stamped = await edgesOf({ referencedId: tag.id });
+    const stamped = await edgesOf({ targetId: tag.id });
     const staleEvents = () =>
       db.appEvent.findMany({
-        where: { name: 'ruleReference.stale', data: { path: ['referencedId'], equals: tag.id } },
+        where: { name: 'ruleReference.stale', data: { path: ['targetId'], equals: tag.id } },
       });
     const published = (await staleEvents()).map((event) => event.data as Record<string, unknown>);
-    expect(published.map((data) => [data.ownerModel, data.ownerId]).sort()).toEqual(
+    expect(published.map((data) => [data.sourceModel, data.sourceId]).sort()).toEqual(
       stamped
-        .map((edge) => [edge.ownerModel, edge.emailTemplateId ?? edge.emailComponentId])
+        .map((edge) => [
+          edge.sourceModel,
+          edge.sourceEmailTemplateId ?? edge.sourceEmailComponentId,
+        ])
         .sort(),
     );
-    expect(published.every((data) => data.referencedModel === 'Tag')).toBe(true);
+    expect(published.every((data) => data.targetModel === 'Tag')).toBe(true);
 
     await db.withDeleted(() => db.tag.update({ where: { id: tag.id }, data: { deletedAt: null } }));
     expect(await staleEvents()).toHaveLength(published.length);
   });
 
-  it('purging a referenced row nulls the FK and leaves the edge naming it', async () => {
+  it('purging a target row nulls the FK and leaves the edge naming it', async () => {
     const { entity: tag } = await createTag();
     await save(mjml(taggedBlock(tag.id)));
 
     await db.$executeRaw`DELETE FROM "TagAttachment" WHERE "tagId" = ${tag.id}`;
     await db.$executeRaw`DELETE FROM "Tag" WHERE "id" = ${tag.id}`;
 
-    const edges = await edgesOf({ referencedId: tag.id });
+    const edges = await edgesOf({ targetId: tag.id });
     expect(edges).toHaveLength(1);
-    expect(edges[0]!.tagId).toBeNull();
-    expect(edges[0]!.referencedId).toBe(tag.id);
+    expect(edges[0]!.targetTagId).toBeNull();
+    expect(edges[0]!.targetId).toBe(tag.id);
     expect(ruleReferenceIssues(edges).map((issue) => issue.reason)).toEqual(['purged']);
   });
 
@@ -300,30 +307,33 @@ describe('ruleReference — the save path writes edges, the referenced side stam
     const [{ entity: dead }, { entity: alive }] = await Promise.all([createTag(), createTag()]);
     await save(mjml(taggedBlock(dead.id)), { slug: 'rm' });
     await db.tag.update({ where: { id: dead.id }, data: { deletedAt: new Date() } });
-    expect(await edgesOf({ tagId: dead.id })).toHaveLength(1);
+    expect(await edgesOf({ targetTagId: dead.id })).toHaveLength(1);
 
     await save(mjml(taggedBlock(alive.id)), { slug: 'rm' });
 
-    expect(await edgesOf({ tagId: dead.id })).toEqual([]);
-    expect(await edgesOf({ tagId: alive.id })).toHaveLength(1);
+    expect(await edgesOf({ targetTagId: dead.id })).toEqual([]);
+    expect(await edgesOf({ targetTagId: alive.id })).toHaveLength(1);
   });
 
-  it('the client refuses a hard delete of a referenced model', async () => {
+  it('the client refuses a hard delete of a target model', async () => {
     const { entity: tag } = await createTag();
     await save(mjml(taggedBlock(tag.id)));
 
     await expect(db.tag.delete({ where: { id: tag.id } })).rejects.toThrow(/preventHardDelete/);
   });
 
-  it('the registry governs the edge: an owner FK that contradicts ownerModel is refused', async () => {
+  it('the registry governs the edge: a source FK that contradicts sourceModel is refused', async () => {
     const { entity: tag } = await createTag();
     const { entity: comp } = await createEmailComponent();
 
     await expect(
-      createRuleReference(
-        { ownerModel: 'EmailTemplate', referencedModel: 'Tag', referencedId: tag.id },
-        { emailComponent: comp, tag },
-      ),
+      createRuleReference({
+        sourceModel: 'EmailTemplate',
+        sourceEmailComponentId: comp.id,
+        targetModel: 'Tag',
+        targetId: tag.id,
+        targetTagId: tag.id,
+      }),
     ).rejects.toMatchObject({ status: 422 });
   });
 });

@@ -99,6 +99,8 @@ Trace sampling uses a parent-based ratio; metrics and logs remain independent. C
 
 Export is bounded and best-effort: batches use finite queues/timeouts and drop on collector rejection/outage rather than blocking business operations. Failures produce a rate-limited console warning without credentials or collector response bodies. Graceful API/worker shutdown drains work then flushes providers. Abrupt process termination can lose buffered data. Use a nearby Collector with a persistent sending queue if loss-resistant delivery is required. Do not also scrape stdout into the same log backend without filtering, or every log will be ingested twice.
 
+The warning is a JSON record with `event=telemetry.export.failed`, the affected `signal` (`logs`, `traces`, or `metrics`), and `httpStatus` when a collector responded (e.g. `402` points at the provider account, `401`/`403` at credentials, `429` at rate limits). A failure before any response (timeout, transport, serialization, stopped exporter) has no `httpStatus`. Warnings bypass the application log pipeline to avoid recursive export and are limited to one per minute per signal exporter. No destination URL, credentials, payload, response body, or raw error is logged. A running app or healthy HTTP endpoint does not establish successful telemetry ingestion.
+
 ## Following an incident across two services
 
 1. Open the failed/slow operation in New Relic and copy its trace ID.

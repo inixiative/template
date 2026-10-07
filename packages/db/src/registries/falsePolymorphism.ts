@@ -202,20 +202,20 @@ export const PolymorphismRegistry = {
   RuleReference: {
     axes: [
       {
-        field: 'ownerModel',
+        field: 'sourceModel',
         fkMap: {
-          EmailTemplate: ['emailTemplateId'],
-          EmailComponent: ['emailComponentId'],
-          Segment: ['segmentId'],
+          EmailTemplate: ['sourceEmailTemplateId'],
+          EmailComponent: ['sourceEmailComponentId'],
+          Segment: ['sourceSegmentId'],
         },
       },
       {
-        field: 'referencedModel',
+        field: 'targetModel',
         fkMap: {
-          Tag: ['tagId'],
-          Organization: ['organizationId'],
-          Space: ['spaceId'],
-          Segment: ['referencedSegmentId'],
+          Tag: ['targetTagId'],
+          Organization: ['targetOrganizationId'],
+          Space: ['targetSpaceId'],
+          Segment: ['targetSegmentId'],
         },
       },
     ],
