@@ -5,7 +5,7 @@
  * @uses primitive:sdk
  */
 import type { QueryKey } from '@tanstack/react-query';
-import type { InquiryItem } from '@template/sdk';
+import type { InquiryItem, InquiryResolveData } from '@template/sdk';
 import {
   meReceivedManyInquiriesQueryKey,
   organizationReceivedManyInquiriesQueryKey,
@@ -15,6 +15,7 @@ import {
 
 export type InquiryType = InquiryItem['type'];
 export type InquiryStatus = InquiryItem['status'];
+export type InquiryResolutionStatus = InquiryResolveData['body']['status'];
 
 export const INQUIRY_TYPE_LABELS: Record<InquiryType, string> = {
   inviteOrganizationUser: 'Organization Invitation',

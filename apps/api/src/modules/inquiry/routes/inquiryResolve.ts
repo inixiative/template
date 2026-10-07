@@ -5,9 +5,9 @@
  * @uses primitive:routeTemplates
  */
 import { z } from '@hono/zod-openapi';
-import { InquiryStatus } from '@template/db/generated/client/enums';
 import { actionRoute } from '#/lib/routeTemplates';
 import { validatePermission } from '#/middleware/validations/validatePermission';
+import { inquiryResolutionStatusSchema } from '#/modules/inquiry/schemas/inquiryResolutionStatusSchema';
 import { inquiryReceivedResponseSchema } from '#/modules/inquiry/schemas/inquiryResponseSchemas';
 import { Modules } from '#/modules/modules';
 
@@ -16,7 +16,7 @@ import { Modules } from '#/modules/modules';
 // through here instead of stripping them.
 const bodySchema = z
   .object({
-    status: z.enum([InquiryStatus.approved, InquiryStatus.denied, InquiryStatus.changesRequested]),
+    status: inquiryResolutionStatusSchema,
     explanation: z.string().optional(),
   })
   .passthrough();
