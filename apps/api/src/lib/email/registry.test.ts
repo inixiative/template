@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { projectByPath, requiredBindings } from '@inixiative/json-rules';
+import { listBindings, projectLens } from '@inixiative/json-rules';
 import { lensFor } from '@template/db/lens';
 import { emailLens } from '@template/email/rules';
 import { addressLens, recipientLens, registry } from '#/lib/email/registry';
@@ -8,10 +8,10 @@ describe('recipientLens', () => {
   it("targets the template's recipient lens with a bound where — the shape is the lens's, not the entry's", () => {
     const where = { field: 'id', operator: 'equals', value: 'u1' } as const;
     const lens = recipientLens(emailLens().recipient, where);
-    const paths = [...projectByPath(lens).keys()];
+    const paths = Object.keys(projectLens(lens));
     expect(paths).toContain('User.tagAttachments.tag');
     expect(paths).toContain('User.providerRefs.segmentMembers.segment');
-    expect(projectByPath(lens).get('User')?.whereClauses).toEqual([where]);
+    expect(projectLens(lens).User?.whereClauses).toEqual([where]);
   });
 
   it('an address lens reaches only the email', () => {
@@ -27,7 +27,7 @@ describe('registry — declarative invariants', () => {
 
   it('every recipient bind names a field the entity picks', () => {
     for (const entry of Object.values(registry)) {
-      for (const name of requiredBindings(entry.recipients.where))
+      for (const name of listBindings(entry.recipients.where, { required: true }))
         expect(entityPicks(entry)).toContain(name);
     }
   });

@@ -5,13 +5,13 @@
  * @uses primitive:shared
  */
 import {
-  applyLens,
   type Condition,
-  checkRuleAgainstLens,
   type LensNarrowing,
+  narrowRule,
   RuleTarget,
   toPrisma,
   validateRule,
+  validateRuleInLens,
 } from '@inixiative/json-rules';
 import { rootLens } from '@template/db/lens/rootLens';
 import type { RuleLens } from '@template/shared/rules';
@@ -94,11 +94,9 @@ export const validateRuleForLens = (
     return invalid(structural.errors.map((error) => `${error.path}: ${error.message}`));
 
   const rule = normalized as Condition;
-  const vocabulary = checkRuleAgainstLens(rule, lens);
+  const vocabulary = validateRuleInLens(rule, lens);
   if (!vocabulary.ok)
-    return invalid(
-      vocabulary.violations.map((violation) => `${violation.path}: ${violation.reason}`),
-    );
+    return invalid(vocabulary.errors.map((error) => `${error.path}: ${error.message}`));
 
   const openArm = emptyArmInsideAny(rule);
   if (openArm) return invalid([openArm]);
@@ -106,7 +104,7 @@ export const validateRuleForLens = (
   if (compileWith) {
     try {
       const root = rootLens(compileWith);
-      toPrisma(applyLens(rule, compileWith), {
+      toPrisma(narrowRule(rule, compileWith), {
         map: root,
         mapName: root.mapName,
         model: root.model,

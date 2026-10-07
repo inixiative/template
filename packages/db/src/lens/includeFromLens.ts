@@ -4,12 +4,7 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
-import {
-  type Condition,
-  type Lens,
-  type LensNarrowing,
-  projectByPath,
-} from '@inixiative/json-rules';
+import { type Condition, type Lens, type LensNarrowing, projectLens } from '@inixiative/json-rules';
 import { rootLens } from '@template/db/lens/rootLens';
 
 export type IncludeTree = { [relation: string]: true | { include: IncludeTree } };
@@ -131,30 +126,29 @@ const mergeInto = (target: IncludeTree, source: IncludeTree): IncludeTree => {
 };
 
 export const includeFromLens = (lens: Lens | LensNarrowing): IncludeTree | undefined => {
-  const byPath = projectByPath(lens);
+  const byPath = projectLens(lens);
   const root = 'parent' in lens ? rootLens(lens) : lens;
 
   const projection = (path: string): IncludeTree | undefined => {
-    const visit = byPath.get(path);
+    const visit = byPath[path];
     if (!visit) return undefined;
     const include: IncludeTree = {};
     for (const [name, entry] of Object.entries(visit.fields)) {
       if (entry.kind !== 'object') continue;
-      const nested = byPath.has(`${path}.${name}`) ? projection(`${path}.${name}`) : undefined;
+      const nested = Object.hasOwn(byPath, `${path}.${name}`)
+        ? projection(`${path}.${name}`)
+        : undefined;
       include[name] = nested ? { include: nested } : true;
     }
     return Object.keys(include).length > 0 ? include : undefined;
   };
 
-  const [rootKey] = byPath.keys();
-  if (!rootKey) return undefined;
-
   const wherePaths = new Set<string>();
-  for (const visit of byPath.values()) {
+  for (const visit of Object.values(byPath)) {
     for (const clause of visit.whereClauses)
-      collectRelationPaths(clause, visit.modelName, root, [], wherePaths);
+      collectRelationPaths(clause, visit.model, root, [], wherePaths);
   }
 
-  const merged = mergeInto(projection(rootKey) ?? {}, treeFromPaths(wherePaths));
+  const merged = mergeInto(projection(root.model) ?? {}, treeFromPaths(wherePaths));
   return Object.keys(merged).length > 0 ? merged : undefined;
 };

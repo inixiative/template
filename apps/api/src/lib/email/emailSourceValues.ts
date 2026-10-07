@@ -5,9 +5,9 @@
  * @uses infrastructure:prisma, primitive:shared
  */
 import {
+  materializeSourceQuery,
   type SourceQuery,
   type SourceValues,
-  sourceValuesFromQueryRows,
 } from '@inixiative/json-rules';
 import { db } from '@template/db';
 import { type EmailLens, emailSourceQueries } from '@template/email/rules';
@@ -19,7 +19,7 @@ const sourceValuesOf = async (query: SourceQuery): Promise<SourceValues> => {
     select: query.prisma.select,
     ...(query.prisma.distinct ? { distinct: query.prisma.distinct } : {}),
   })) as Record<string, unknown>[];
-  return sourceValuesFromQueryRows(query, rows);
+  return materializeSourceQuery(query, rows);
 };
 
 export const emailSourceValues = (lens: EmailLens): Promise<SourceValues[]> =>

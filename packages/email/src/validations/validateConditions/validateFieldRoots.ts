@@ -53,6 +53,6 @@ export const validateFieldRoots = (
   }
   if (!lens) return;
   for (const violation of emailRuleViolations(lens, scoped.rule)) {
-    issues.push({ path: `${path}:${violation.path}`, message: violation.reason });
+    issues.push({ path: `${path}:${violation.path}`, message: violation.message });
   }
 };

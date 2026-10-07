@@ -4,12 +4,7 @@
  * @partOf feature:segment
  * @uses infrastructure:prisma, primitive:shared
  */
-import {
-  applyLens,
-  type Condition,
-  executePrismaQueryPlan,
-  toPrisma,
-} from '@inixiative/json-rules';
+import { type Condition, executePrismaPlan, narrowRule, toPrisma } from '@inixiative/json-rules';
 import { db, Prisma } from '@template/db';
 import type { Segment } from '@template/db/generated/client/client';
 import type { ProviderModel } from '@template/db/generated/client/enums';
@@ -30,13 +25,13 @@ export const compileSegmentWhere = async (
 ): Promise<Record<string, unknown>> => {
   const lens = resolvedCustomerRefLens(ownerModel, ownerId);
   const root = rootLens(lens);
-  const plan = toPrisma(applyLens(rule, lens), {
+  const plan = toPrisma(narrowRule(rule, lens), {
     map: root,
     mapName: root.mapName,
     model: root.model,
     now: new Date(),
   });
-  const where = await executePrismaQueryPlan(plan, db as never);
+  const where = await executePrismaPlan(plan, db as never);
   return { AND: [where, { [customerRefProviderFk(ownerModel)]: ownerId }] };
 };
 

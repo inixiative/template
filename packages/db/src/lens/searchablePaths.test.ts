@@ -136,7 +136,7 @@ describe('searchablePaths', () => {
 
     it('multiple relations targeting SAME model — picks stay PATH-SCOPED (no sibling leak)', () => {
       // sourceUser:User picks ['name'] and targetUser:User picks ['email'] both target User.
-      // projectByPath keeps each visit's picks isolated to its own path, so the
+      // projectLens keeps each visit's picks isolated to its own path, so the
       // sibling field never leaks across paths.
       const paths = searchablePaths({
         parent: inquiryLens,

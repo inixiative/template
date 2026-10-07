@@ -5,14 +5,14 @@
  * @uses infrastructure:prisma
  */
 import {
+  bindLens,
   type Condition,
+  describeRuleSources,
   type LensNarrowing,
   type ModelNarrowing,
   Operator,
-  projectByPath,
-  resolveLensBindings,
-  ruleSourceValues,
-  sourceQueries,
+  projectLens,
+  toSourceQueries,
 } from '@inixiative/json-rules';
 import { db, polymorphicBindings, polymorphicIs } from '@template/db';
 import type { Prisma, Segment } from '@template/db/generated/client/client';
@@ -95,7 +95,7 @@ export const resolvedCustomerRefLens = (
   ownerModel: ProviderModel,
   ownerId: string,
 ): LensNarrowing =>
-  resolveLensBindings(customerRefLens, polymorphicBindings(ownerModel, ownerId)) as LensNarrowing;
+  bindLens(customerRefLens, polymorphicBindings(ownerModel, ownerId)) as LensNarrowing;
 
 /** The segments the lens lets this owner name — its own live ones — read through the Segment source it declares. */
 export const ownedSegments = async (
@@ -103,7 +103,7 @@ export const ownedSegments = async (
   ownerId: string,
   where: Prisma.SegmentWhereInput = {},
 ): Promise<Segment[]> => {
-  const source = sourceQueries(resolvedCustomerRefLens(ownerModel, ownerId)).find(
+  const source = toSourceQueries(resolvedCustomerRefLens(ownerModel, ownerId)).find(
     (query) => query.model === 'Segment' && query.field === 'id',
   )!;
   return db.segment.findMany({
@@ -112,7 +112,7 @@ export const ownedSegments = async (
 };
 
 export const customerRefReachedModels = (): Set<string> =>
-  new Set([...projectByPath(customerRefLens).values()].map((visit) => visit.modelName));
+  new Set(Object.values(projectLens(customerRefLens)).map((visit) => visit.model));
 
 const membershipProbe = {
   field: 'segmentMembers',
@@ -125,7 +125,7 @@ const membershipProbe = {
 } as Condition;
 
 if (
-  !ruleSourceValues(customerRefLens, membershipProbe).some(
+  !describeRuleSources(membershipProbe, customerRefLens).some(
     (source) => source.model === 'Segment' && source.field === 'id' && !source.dynamic,
   )
 ) {

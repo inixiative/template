@@ -7,10 +7,10 @@
 import {
   type Condition,
   check,
-  executePrismaQueryPlan,
+  executePrismaPlan,
   type Lens,
   type LensNarrowing,
-  projectByPath,
+  projectLens,
   toPrisma,
 } from '@inixiative/json-rules';
 import { db } from '@template/db/client';
@@ -22,9 +22,7 @@ export const fetchLens = async <T extends Record<string, unknown> = Record<strin
   lens: Lens | LensNarrowing,
 ): Promise<T[]> => {
   const root = 'parent' in lens ? rootLens(lens) : lens;
-  const byPath = projectByPath(lens);
-  const [rootKey] = byPath.keys();
-  const visit = rootKey ? byPath.get(rootKey) : undefined;
+  const visit = projectLens(lens)[root.model];
   if (!visit) return [];
 
   const model = toModelName(root.model);
@@ -32,7 +30,7 @@ export const fetchLens = async <T extends Record<string, unknown> = Record<strin
   const condition: Condition = clauses.length === 1 ? clauses[0] : { all: clauses };
 
   const plan = toPrisma(condition, { map: root, mapName: root.mapName, model });
-  const where = plan.steps.length ? await executePrismaQueryPlan(plan, db as never) : {};
+  const where = plan.steps.length ? await executePrismaPlan(plan, db as never) : {};
   requireWhere(where);
 
   const include = includeFromLens(lens);

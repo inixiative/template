@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'bun:test';
-import { projectByPath } from '@inixiative/json-rules';
+import { projectLens } from '@inixiative/json-rules';
 import { lensFor } from '@template/db/lens/lensFor';
 import { omitForeignKeys } from '@template/db/lens/omitForeignKeys';
 
 const fieldsAt = (lens: ReturnType<typeof omitForeignKeys>, path: string): string[] => {
-  const byPath = projectByPath(lens);
-  const [rootKey] = byPath.keys();
-  const visit = byPath.get(path ? `${rootKey}.${path}` : (rootKey as string));
+  const byPath = projectLens(lens);
+  const [rootKey] = Object.keys(byPath);
+  const visit = byPath[path ? `${rootKey}.${path}` : (rootKey as string)];
   return Object.keys(visit?.fields ?? {});
 };
 

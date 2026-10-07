@@ -4,7 +4,7 @@
  * @partOf feature:segment
  * @uses infrastructure:prisma
  */
-import { applyLens, check } from '@inixiative/json-rules';
+import { check, narrowRule } from '@inixiative/json-rules';
 import { db, polymorphicTarget } from '@template/db';
 import type { CustomerRef, Segment } from '@template/db/generated/client/client';
 import type { ProviderModel } from '@template/db/generated/client/enums';
@@ -65,7 +65,7 @@ export const reconcileCustomerRef = async (
   for (const segment of ordered) {
     const matches = withRule(states.get(segment.id)!.health, {
       degraded: () => null,
-      sound: (rule) => (row ? check(applyLens(rule, lens), row) === true : false),
+      sound: (rule) => (row ? check(narrowRule(rule, lens), row) === true : false),
     });
     if (matches === null) continue;
     if (row) recordDecision(row, segment, matches);

@@ -4,7 +4,7 @@
  * @partOf infrastructure:prisma
  * @uses primitive:shared
  */
-import { type Condition, ruleSourceValues } from '@inixiative/json-rules';
+import { type Condition, describeRuleSources } from '@inixiative/json-rules';
 import { prismaMap } from '@template/db/generated/prismaMap';
 import type { RuleLens, RuleReference } from '@template/shared/rules';
 
@@ -17,7 +17,7 @@ const memo = new WeakMap<RuleLens, Map<string, RuleReference[]>>();
 
 const computeRuleReferences = (lens: RuleLens, rule: Condition): RuleReference[] => {
   const references: RuleReference[] = [];
-  for (const source of ruleSourceValues(lens, rule)) {
+  for (const source of describeRuleSources(rule, lens)) {
     if (!isRowIdSource(source.model, source.field)) continue;
     for (const value of source.values) {
       if (typeof value === 'string' && value) references.push({ model: source.model, id: value });

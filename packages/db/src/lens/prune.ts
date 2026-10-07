@@ -10,7 +10,8 @@ import {
   type Lens,
   type LensNarrowing,
   type PathProjection,
-  projectByPath,
+  type ProjectedVisit,
+  projectLens,
 } from '@inixiative/json-rules';
 
 type Pruned<T> = T extends readonly (infer E)[]
@@ -31,16 +32,14 @@ const whereColumns = (condition: Condition, out: Set<string>): void => {
   if (typeof node.field === 'string' && node.field) out.add(node.field.split('.')[0]!);
 };
 
-const readColumns = (visit: PathProjection extends Map<string, infer V> ? V : never): string[] => {
+const readColumns = (visit: ProjectedVisit): string[] => {
   const columns = new Set(Object.keys(visit.fields));
   for (const clause of visit.whereClauses) whereColumns(clause, columns);
   return [...columns];
 };
 
-type Visit = PathProjection extends Map<string, infer V> ? V : never;
-
 /** A related row the visit's `where` admits — the lens's data narrowing, applied to a row already in hand. */
-const admitted = (visit: Visit, row: Record<string, unknown>): boolean =>
+const admitted = (visit: ProjectedVisit, row: Record<string, unknown>): boolean =>
   visit.whereClauses.every((clause) => check(clause, row) === true);
 
 const pruneRow = (
@@ -48,7 +47,7 @@ const pruneRow = (
   row: Record<string, unknown>,
   path: string,
 ): Record<string, unknown> => {
-  const visit = byPath.get(path);
+  const visit = byPath[path];
   if (!visit) return row;
 
   const out: Record<string, unknown> = {};
@@ -56,7 +55,7 @@ const pruneRow = (
     if (!(name in row)) continue;
     const value = row[name];
     const childPath = `${path}.${name}`;
-    const child = byPath.get(childPath);
+    const child = byPath[childPath];
     if (value != null && child) {
       out[name] = Array.isArray(value)
         ? (value as Record<string, unknown>[])
@@ -76,9 +75,9 @@ export const prune = <D extends Record<string, unknown> | readonly Record<string
   data: D,
   lens: Lens | LensNarrowing,
 ): Pruned<D> => {
-  const byPath = projectByPath(lens);
-  const [rootKey] = byPath.keys();
-  const root = rootKey ? byPath.get(rootKey) : undefined;
+  const byPath = projectLens(lens);
+  const [rootKey] = Object.keys(byPath);
+  const root = rootKey ? byPath[rootKey] : undefined;
   if (!rootKey || !root) return data as unknown as Pruned<D>;
 
   if (Array.isArray(data)) {

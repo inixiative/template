@@ -5,10 +5,10 @@
  * @uses primitive:routeTemplates
  */
 import {
+  bindLens,
   type LensNarrowing,
-  lensRequiredBindings,
+  listLensBindings,
   type RuleValue,
-  resolveLensBindings,
 } from '@inixiative/json-rules';
 import type { AnyDelegate, Args, Result } from '@template/db';
 import { rootLens } from '@template/db/lens';
@@ -119,16 +119,16 @@ const composeScopedFindMany = async <T extends AnyDelegate>(
       message: 'paginate: route must declare a filterLens (readRoute({ filterLens: … })).',
     });
   }
-  const required = lensRequiredBindings(declaredLens);
-  const missing = [...required].filter((name) => bindings?.[name] === undefined);
+  const required = listLensBindings(declaredLens);
+  const missing = required.filter((name) => bindings?.[name] === undefined);
   if (missing.length) {
     throw makeError({
       status: 500,
       message: `paginate: lens requires bindings not provided: ${missing.join(', ')}`,
     });
   }
-  const filterLens = required.size
-    ? (resolveLensBindings(declaredLens, bindings ?? {}) as LensNarrowing)
+  const filterLens = required.length
+    ? (bindLens(declaredLens, bindings ?? {}) as LensNarrowing)
     : declaredLens;
   // Superadmin bypasses both the searchable-fields whitelist and the injected
   // `deletedAt: null` live scope.
