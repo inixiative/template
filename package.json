@@ -59,7 +59,7 @@
     "lint:fix": "biome check --write . && bun run lint:postBiome",
     "format": "biome format --write .",
     "docs:toc": "bun run scripts/docs/regenToc.ts",
-    "prepare": "lefthook install"
+    "prepare": "if git rev-parse --git-dir >/dev/null 2>&1; then lefthook install; fi"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.2",
