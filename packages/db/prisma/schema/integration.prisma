@@ -3,6 +3,8 @@
 // ============================================================================
 
 model Integration {
+  inquiriesSent          Inquiry[]             @relation("InquirySource")
+  inquiriesReceived      Inquiry[]             @relation("InquiryTarget")
   id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt

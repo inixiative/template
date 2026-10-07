@@ -228,8 +228,12 @@ export const PolymorphismRegistry = {
         fkMap: {
           admin: [],
           User: ['sourceUserId'],
+          OrganizationUser: ['sourceOrganizationId', 'sourceUserId'],
           Organization: ['sourceOrganizationId'],
           Space: ['sourceSpaceId'],
+          SpaceUser: ['sourceOrganizationId', 'sourceSpaceId', 'sourceUserId'],
+          Integration: ['sourceIntegrationId'],
+          Token: ['sourceTokenId'],
         },
       },
       {
@@ -237,8 +241,12 @@ export const PolymorphismRegistry = {
         fkMap: {
           admin: [],
           User: ['targetUserId'],
+          OrganizationUser: ['targetOrganizationId', 'targetUserId'],
           Organization: ['targetOrganizationId'],
           Space: ['targetSpaceId'],
+          SpaceUser: ['targetOrganizationId', 'targetSpaceId', 'targetUserId'],
+          Integration: ['targetIntegrationId'],
+          Token: ['targetTokenId'],
         },
       },
     ],

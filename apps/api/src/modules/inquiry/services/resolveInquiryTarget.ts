@@ -10,7 +10,13 @@ import { getValidatedBody, type ValidatedContext } from '#/lib/context/getValida
 import { makeError } from '#/lib/errors';
 import { findUserOrCreateGuest } from '#/modules/user/services/findOrCreateGuest';
 
-const nullTargetFields = { targetUserId: null, targetOrganizationId: null, targetSpaceId: null };
+const nullTargetFields = {
+  targetUserId: null,
+  targetOrganizationId: null,
+  targetSpaceId: null,
+  targetIntegrationId: null,
+  targetTokenId: null,
+};
 type InquiryTargetBody = {
   targetModel: InquiryResourceModel;
   targetUserId?: string;
@@ -93,5 +99,12 @@ export const resolveInquiryTarget = async <C extends ValidatedContext<'json', In
     });
   }
 
+  // The remaining party kinds name a row no request body can resolve: they are set by
+  // the service that already holds the party, never from a slug or an email.
+  if (targetModel !== InquiryResourceModel.admin)
+    throw makeError({
+      status: 422,
+      message: `Inquiry target ${targetModel} cannot be resolved from a request`,
+    });
   return { ...nullTargetFields, targetModel };
 };
