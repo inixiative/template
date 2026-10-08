@@ -602,7 +602,7 @@ chain (user or org) down to the `default` floor, carrying the user id for interp
    delivery job carries the recipient's id, the bound targeting `where` and the cc / bcc rules — no
    addresses: `deliverEmail` re-reads the recipient through the lens at send time with the
    targeting re-checked (`not_found` once it no longer matches), resolves cc / bcc through the same
-   sender-clamped recipient lens, and sends to — and records on the log — the recipient's current
+   recipient lens (owner- and sender-scoped relations; the registry `where` picks the people), and sends to — and records on the log — the recipient's current
    email, so nothing hidden rides the queue and the email shows the recipient as they are when it
    goes out. Then resolve each recipient's email `Contact` (settings + deliverability
    live there).

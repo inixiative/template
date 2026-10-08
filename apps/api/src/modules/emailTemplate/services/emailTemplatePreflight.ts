@@ -78,10 +78,9 @@ export const emailTemplatePreflight = async (
     locale,
   };
 
-  assertValidConditions(input.mjml);
-  if (input.subject) assertValidConditions(input.subject, { isSubject: true });
-
   const lens = input.slug ? await emailLensAt(input.slug, ctx) : emailLensFor(undefined, ctx);
+  assertValidConditions(input.mjml, { lens });
+  if (input.subject) assertValidConditions(input.subject, { isSubject: true, lens });
   const variables = sampleVariables(lens);
 
   const renderWarnings: string[] = [];

@@ -29,16 +29,20 @@ export const boundAndLive = (model: ModelName, axis: string): Condition => ({
 export const through = (relation: string, condition: Condition): Condition => {
   if (typeof condition !== 'object' || condition === null) return condition;
   const node = condition as Record<string, unknown>;
-  if (Array.isArray(node.all))
-    return { all: (node.all as Condition[]).map((c) => through(relation, c)) };
-  if (Array.isArray(node.any))
-    return { any: (node.any as Condition[]).map((c) => through(relation, c)) };
+  for (const key of ['all', 'any'])
+    if (Array.isArray(node[key]))
+      return {
+        ...node,
+        [key]: (node[key] as Condition[]).map((child) => through(relation, child)),
+      } as Condition;
   if ('if' in node) {
     const out: Record<string, unknown> = { ...node };
     for (const key of ['if', 'then', 'else'])
       if (node[key] !== undefined) out[key] = through(relation, node[key] as Condition);
     return out as Condition;
   }
+  if (node.path !== undefined)
+    throw new Error(`through('${relation}'): a clamp comparing against a path cannot be re-rooted`);
   return typeof node.field === 'string'
     ? ({ ...node, field: `${relation}.${node.field}` } as Condition)
     : condition;

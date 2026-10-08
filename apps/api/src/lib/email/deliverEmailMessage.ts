@@ -145,7 +145,7 @@ export const deliverEmailMessage = async (
     ? canDeliver(settled.kind, entry.recipientContact)
     : settled.kind === 'system';
   if (!deliverable) {
-    await settleCommunication(open, { status: 'suppressed', ...resolved });
+    await settleCommunication(open, { status: 'suppressed', address, ...resolved });
     return;
   }
 
@@ -172,6 +172,7 @@ export const deliverEmailMessage = async (
   if (deliverability === 'undeliverable') {
     await settleCommunication(open, {
       status: 'undeliverable',
+      address,
       error: undeliverableReason ?? 'undeliverable',
       ...resolved,
     });

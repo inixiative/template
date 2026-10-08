@@ -285,15 +285,20 @@ const sliceOf = (lens: EmailLens, leaf: Leaf): Slice | undefined => {
   return slot ? { root, rest, slot, leaf } : undefined;
 };
 
+export const rootRelativePath = (path: string, top: boolean): string =>
+  top && path.startsWith('$.') ? path.slice(2) : path;
+
 const absolutePathsIn = (leaf: Leaf): Set<string> => {
   const out = new Set<string>();
-  walkConditionTree(leaf as Condition, undefined, (node) => {
+  walkConditionTree(leaf as Condition, true, (node, top) => {
     const record = node as Record<string, unknown>;
-    if (typeof record.path === 'string' && isScopeRoot(splitRoot(record.path).root))
-      out.add(record.path);
+    if (typeof record.path === 'string') {
+      const path = rootRelativePath(record.path, top);
+      if (isScopeRoot(splitRoot(path).root)) out.add(path);
+    }
     return [
-      { condition: record.condition as Condition | undefined, context: undefined },
-      { condition: record.filter as Condition | undefined, context: undefined },
+      { condition: record.condition as Condition | undefined, context: false },
+      { condition: record.filter as Condition | undefined, context: false },
     ];
   });
   return out;
@@ -333,15 +338,6 @@ export const emailRuleViolations = (lens: EmailLens, rule: Condition): Validatio
       });
       continue;
     }
-    if (slot === OPAQUE_SLOT) continue;
-    if (!rest) {
-      violations.push({
-        path: leaf.field,
-        code: 'not_in_lens',
-        message: 'names a lens, not a field',
-      });
-      continue;
-    }
     const crossings = absolutePathsIn(leaf);
     for (const crossing of crossings) {
       const walk = walkEmailLensPath(crossing, lens);
@@ -352,6 +348,15 @@ export const emailRuleViolations = (lens: EmailLens, rule: Condition): Validatio
           message: 'path (comparison ref) does not resolve through the narrowed lens',
         });
       }
+    }
+    if (slot === OPAQUE_SLOT) continue;
+    if (!rest) {
+      violations.push({
+        path: leaf.field,
+        code: 'not_in_lens',
+        message: 'names a lens, not a field',
+      });
+      continue;
     }
     const chain = arrayChain({ ...leaf, field: rest } as Condition);
     for (const violation of validateRuleInLens({ ...leaf, field: rest } as Condition, slot)

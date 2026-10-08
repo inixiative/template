@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { createLens, type FieldMap } from '@inixiative/json-rules';
 import { ConditionValidationError } from '@template/email/errors/ConditionValidationError';
 import { EACH_MAX_DEPTH } from '@template/email/render/limits';
-import type { EmailLens } from '@template/email/rules/emailLens';
+import { type EmailLens, emailLens } from '@template/email/rules/emailLens';
 import {
   assertValidConditions,
   validateConditions,
@@ -473,4 +473,26 @@ describe('validateConditions — per-entity straddle check', () => {
     const content = '{{#if rule=true}}{{#component:card}}{{/if}}stray{{/component:card}}';
     expect(validateConditions(content).some((x) => x.message.includes('straddle'))).toBe(true);
   });
+});
+
+describe('validateConditions — a path value is judged through the lens wherever it sits', () => {
+  const lens = emailLens();
+  const probe = (path: string) => JSON.stringify({ field: 'data.org', operator: 'equals', path });
+
+  for (const path of [
+    'recipient.tagAttachments.0.tag.organizationId',
+    '$.recipient.tagAttachments.0.tag.organizationId',
+  ]) {
+    it(`refuses ${path}, at the top and inside a loop over data`, () => {
+      expect(
+        validateConditions(`{{#if rule=${probe(path)}}}A{{/if}}`, { lens }).length,
+      ).toBeGreaterThan(0);
+      expect(
+        validateConditions(
+          `{{#each data.items as=i}}{{#if rule=${probe(path)}}}A{{/if}}{{/each}}`,
+          { lens },
+        ).length,
+      ).toBeGreaterThan(0);
+    });
+  }
 });

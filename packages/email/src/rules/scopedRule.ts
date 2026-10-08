@@ -6,7 +6,13 @@
  */
 import { type Condition, check } from '@inixiative/json-rules';
 import { RESERVED_SCOPE_ROOTS } from '@template/email/render/conditionParser';
-import { type EmailLens, OPAQUE_SLOT, slotOf, splitRoot } from '@template/email/rules/emailLens';
+import {
+  type EmailLens,
+  OPAQUE_SLOT,
+  rootRelativePath,
+  slotOf,
+  splitRoot,
+} from '@template/email/rules/emailLens';
 import type { BindingChain } from '@template/email/rules/resolveBindingPath';
 import { walkConditionTree } from '@template/email/rules/walkConditionTree';
 
@@ -153,8 +159,10 @@ const rootsRead = (rule: Condition): Set<string> => {
   walkConditionTree(rule, true, (leaf, top) => {
     const node = leaf as Node;
     if (top && typeof node.field === 'string') roots.add(splitRoot(node.field).root);
-    if (typeof node.path === 'string' && !node.path.startsWith('$'))
-      roots.add(splitRoot(node.path).root);
+    if (typeof node.path === 'string') {
+      const path = rootRelativePath(node.path, top);
+      if (!path.startsWith('$')) roots.add(splitRoot(path).root);
+    }
     return [
       { condition: node.condition as Condition | undefined, context: false },
       { condition: node.filter as Condition | undefined, context: false },
@@ -171,7 +179,8 @@ export const opaqueLoopIssue = (
 ): string | undefined => {
   if (!bindings || !loopFrames(bindings).length || iteratesLens(bindings, lens)) return undefined;
   const backed = [...rootsRead(rule)].filter((root) => {
-    const slot = slotOf(lens, root);
+    const bound = bindings.get(root);
+    const slot = slotOf(lens, bound ? splitRoot(bound).root : root);
     return slot !== undefined && slot !== OPAQUE_SLOT;
   });
   return backed.length

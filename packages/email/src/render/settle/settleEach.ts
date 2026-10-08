@@ -84,7 +84,7 @@ export const settleEach = (
   }
 
   const filter = block.filter;
-  const lens = options.lens ?? defaultEmailLens;
+  const { lens } = options;
   const lensed = iteratesLens(bodyOptions.bindings, lens);
   const opaque =
     filter === undefined ? undefined : opaqueLoopIssue(filter, bodyOptions.bindings, lens);
@@ -123,11 +123,14 @@ export const settleEach = (
       continue;
     }
     try {
-      const elementScope = { ...ruleScope, [as]: element };
       const passes =
         judged && judgeable
-          ? evaluateScopedRule(lens, judged, toRuleData(narrowToElements(elementScope, frames)))
-          : check(filter as Condition, toRuleData(elementScope));
+          ? evaluateScopedRule(
+              lens,
+              judged,
+              toRuleData(narrowToElements({ ...ruleScope, [as]: element }, frames)),
+            )
+          : check(filter as Condition, toRuleData({ ...scope, [as]: arrayValue[position] }));
       if (passes === true) emitted.push(pair);
     } catch (err) {
       return issue(err instanceof Error ? err.message : 'Unknown error');

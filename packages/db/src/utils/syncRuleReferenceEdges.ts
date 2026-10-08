@@ -64,15 +64,15 @@ const admit = async (
       `rule names a ${dead.model} that does not exist or is deleted: ${dead.id}`,
     );
   const keys = new Set(added.map(referenceKey));
-  const [outside] = (
-    await admitRuleReferences({
-      ...gate,
-      scopes: gate.scopes.map(({ lens, references }) => ({
-        lens,
-        references: references.filter((ref) => keys.has(referenceKey(ref))),
-      })),
-    })
-  ).unadmitted;
+  const scopes = gate.scopes.map(({ lens, references }) => ({
+    lens,
+    references: references.filter((ref) => keys.has(referenceKey(ref))),
+  }));
+  const scoped = new Set(scopes.flatMap(({ references }) => references.map(referenceKey)));
+  const [outside] = [
+    ...added.filter((ref) => !scoped.has(referenceKey(ref))),
+    ...(await admitRuleReferences({ ...gate, scopes })).unadmitted,
+  ];
   if (outside)
     throw new RuleReferenceError(
       `rule names a ${outside.model} outside this source's view: ${outside.id}`,

@@ -41,7 +41,7 @@ export const settleBranches = (
     }
 
     const rule = branch.rule!;
-    const lens = options.lens ?? defaultEmailLens;
+    const { lens } = options;
     const opaque = opaqueLoopIssue(rule, options.bindings, lens);
     if (opaque !== undefined) {
       onError?.({ kind: 'rule', detail: opaque });
@@ -63,7 +63,9 @@ export const settleBranches = (
       try {
         const passes = lensed
           ? evaluateScopedRule(lens, judged, toRuleData(narrowToElements(ruleScope, frames)))
-          : check(frames.length ? rule : applyEmailLens(lens, rule), toRuleData(ruleScope));
+          : frames.length
+            ? check(rule, toRuleData(scope))
+            : check(applyEmailLens(lens, rule), toRuleData(ruleScope));
         return passes === true ? settle(branch.body, scope, options, onError) : null;
       } catch (err) {
         onError?.({ kind: 'rule', detail: err instanceof Error ? err.message : 'Unknown error' });

@@ -458,4 +458,63 @@ describe('{{#each}} loops', () => {
     expect(out).not.toContain('LEAK');
     expect(issues.join(' ')).toContain('opaque slot');
   });
+
+  describe('a rule never reads a clamp column the lens hides', () => {
+    const lens = scopeEmailLens(emailLens({ sender: lensFor('Organization') }), {
+      ownerModel: 'Organization',
+      ownerId: 'org-1',
+    });
+    const variables = {
+      recipient: {
+        id: 'u1',
+        name: 'Ann',
+        tagAttachments: [
+          {
+            deletedAt: null,
+            tag: { id: 't1', name: 'vip', ownerModel: 'Organization', organizationId: 'org-1' },
+          },
+        ],
+      },
+      data: { org: 'org-1', items: [1] },
+    };
+    const probe = (path: string) => JSON.stringify({ field: 'data.org', operator: 'equals', path });
+    const renderIssues = (template: string) => {
+      const issues: string[] = [];
+      const out = interpolate(template, variables, (issue) => issues.push(issue.detail), { lens });
+      return { out, issues };
+    };
+
+    for (const path of [
+      'recipient.tagAttachments.0.tag.organizationId',
+      '$.recipient.tagAttachments.0.tag.organizationId',
+    ]) {
+      it(`a path value into a hidden column is refused: ${path}`, () => {
+        const top = renderIssues(`{{#if rule=${probe(path)}}}LEAK{{/if}}`);
+        expect(top.out).not.toContain('LEAK');
+        const looped = renderIssues(
+          `{{#each data.items as=i}}{{#if rule=${probe(path)}}}LEAK{{/if}}{{/each}}`,
+        );
+        expect(looped.out).not.toContain('LEAK');
+        expect(looped.issues.length).toBeGreaterThan(0);
+      });
+    }
+
+    it('a binding over a lens-backed collection inside an opaque loop is refused, rule and filter alike', () => {
+      const hidden = JSON.stringify({
+        field: 't.tag.organizationId',
+        operator: 'equals',
+        value: 'org-1',
+      });
+      const branch = renderIssues(
+        `{{#each data.items as=i}}{{#each recipient.tagAttachments as=t}}{{#if rule=${hidden}}}LEAK{{/if}}{{/each}}{{/each}}`,
+      );
+      expect(branch.out).not.toContain('LEAK');
+      expect(branch.issues.join(' ')).toContain('opaque slot');
+      const filtered = renderIssues(
+        `{{#each data.items as=i}}{{#each recipient.tagAttachments as=t filter=${hidden}}}LEAK{{/each}}{{/each}}`,
+      );
+      expect(filtered.out).not.toContain('LEAK');
+      expect(filtered.issues.join(' ')).toContain('opaque slot');
+    });
+  });
 });
