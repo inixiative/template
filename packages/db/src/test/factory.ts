@@ -11,6 +11,7 @@ import { mergeDependencies } from '@template/db/test/dependencyInference';
 import {
   assertDiscriminatorsChosen,
   assertNoDiscriminatorDefaults,
+  assertParentFollowsAxes,
   assertSelectedForeignKeys,
 } from '@template/db/test/factoryPolymorphism';
 import type {
@@ -165,6 +166,7 @@ export const createFactory = <K extends ModelName>(
             : depFactory.build(relationValue as never, ctx));
         }
       } else if (!ctx[depAccessor] && dep.required && !foreignKeyGiven(dep, scalarFields)) {
+        assertParentFollowsAxes(modelName, merged, dep.modelName);
         const depFactory = createFactory(dep.modelName, {
           defaults: registered.defaults as () => Partial<CreateInputOf<typeof dep.modelName>>,
         });

@@ -28,6 +28,7 @@ export const withDiscriminatorDefaults = <T extends Record<string, unknown>>(
 ): T & Record<string, unknown> => {
   const filled: Record<string, unknown> = { ...fields };
   for (const axis of getPolymorphismConfig(modelName)?.axes ?? [])
-    filled[axis.field] ??= discriminatorDefault(modelName, axis.field);
+    if (filled[axis.field] === undefined)
+      filled[axis.field] = discriminatorDefault(modelName, axis.field);
   return filled as T & Record<string, unknown>;
 };

@@ -4,7 +4,9 @@ import { cleanupTouchedTables } from '@template/db/test';
 import {
   createInquiry,
   createIntegration,
+  createOrganization,
   createTag,
+  createTagCategory,
   createUser,
 } from '@template/db/test/factories';
 import { createFactory } from '@template/db/test/factory';
@@ -46,5 +48,23 @@ describe('polymorphic factories', () => {
     const { entity, context } = await createTag();
     expect(entity.ownerModel).toBe('platform');
     expect(context.tagCategory?.ownerModel).toBe('platform');
+  });
+
+  it('refuses to build a parent that would not follow the child', async () => {
+    const { entity: user } = await createUser();
+    await expect(createTag({ ownerModel: 'User' }, { user })).rejects.toThrow(
+      'Tag ownerModel=User needs a TagCategory with the same ownerModel',
+    );
+    const { entity: tagCategory } = await createTagCategory({ ownerModel: 'User' }, { user });
+    const { entity } = await createTag({ ownerModel: 'User' }, { user, tagCategory });
+    expect(entity.tagCategoryId).toBe(tagCategory.id);
+  });
+
+  it('refuses a foreign key the chosen discriminator does not select', async () => {
+    const { entity: user } = await createUser();
+    const { entity: organization } = await createOrganization();
+    await expect(
+      createIntegration({ ownerModel: 'User', userId: user.id, organizationId: organization.id }),
+    ).rejects.toThrow('Integration ownerModel=User cannot have organizationId');
   });
 });
