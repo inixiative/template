@@ -382,19 +382,19 @@ export const emailSlotLenses = (lens: EmailLens): [ScopeRoot, RuleLens][] =>
 export const emailSourceQueries = (lens: EmailLens): SourceQuery[] =>
   emailSlotLenses(lens).flatMap(([, slot]) => toSourceQueries(slot));
 
-/** The variables a template renders with, projected through each slot: rows a `where` hides are gone before any token or rule reads them. */
+/** Each slot's variables as the lens shows them; `keepGrantColumns` is the re-check projection rules evaluate on, never one to render. */
 export const narrowVariables = <V extends Record<string, unknown>>(
   lens: EmailLens,
   variables: V,
+  { keepGrantColumns = false }: { keepGrantColumns?: boolean } = {},
 ): V => {
   const out: Record<string, unknown> = { ...variables };
   for (const [root, slot] of emailSlotLenses(lens)) {
     const value = variables[root];
     if (value && typeof value === 'object')
       out[root] = Array.isArray(value)
-        ? projectRows(slot, value, { keepGrantColumns: true })
-        : (projectRows(slot, [value as Record<string, unknown>], { keepGrantColumns: true })[0] ??
-          null);
+        ? projectRows(slot, value, { keepGrantColumns })
+        : (projectRows(slot, [value as Record<string, unknown>], { keepGrantColumns })[0] ?? null);
   }
   return out as V;
 };

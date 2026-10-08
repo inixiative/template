@@ -5,6 +5,8 @@ import { lensFor } from '@template/db/lens';
 import {
   cleanupTouchedTables,
   createEmailTemplate,
+  createOrganization,
+  createOrganizationUser,
   createTag,
   createTagAttachment,
   createUser,
@@ -155,6 +157,60 @@ describe('sendEmail handler', () => {
     expect(byAddress.get(vip.email)).toContain('VIP');
     expect(byAddress.get(vip.email)).not.toContain('BASE');
     expect(byAddress.get(plain.email)).toContain('BASE');
+  });
+
+  it("an organization's email shows nothing of the recipient's other organizations, in the send or at rest, while its rules judge them as the database does", async () => {
+    const { entity: own } = await createOrganization({ name: 'Own Org' });
+    const { entity: other } = await createOrganization({ name: 'Other Org' });
+    const { entity: member } = await createUser({ name: 'Member' });
+    await createOrganizationUser({}, { user: member, organization: own });
+    await createOrganizationUser({}, { user: member, organization: other });
+    const anyNotOwn = JSON.stringify({
+      field: 'recipient.organizationUsers',
+      arrayOperator: 'any',
+      condition: { field: 'organization.name', operator: 'notEquals', value: own.name },
+    });
+    await saveEmailTemplate({
+      slug: 'test-foreign-membership',
+      name: 'foreign membership',
+      subject: 'Hi',
+      kind: 'system',
+      mjml: plainMjml(
+        `{{#each recipient.organizationUsers as=m}}[{{m.organization.id}}]{{/each}}|{{#if rule=${anyNotOwn}}}OTHER{{else}}ONLY{{/if}}`,
+      ),
+      ownerModel: 'Organization',
+      organizationId: own.id,
+    });
+    const organization: EmailEntry['entity'] = {
+      parent: lensFor('Organization'),
+      root: {
+        where: { field: 'id', operator: Operator.equals, bind: 'organizationId' },
+        picks: ['id', 'name'],
+      },
+    };
+    addEntry('test-foreign-membership', {
+      entity: organization,
+      data: { parent: lensFor('Organization'), root: { picks: ['id', 'name'] } },
+      sender: { type: 'Organization', organizationId: 'id' },
+      recipients: recipientById(member.id),
+      render: { onIssue: 'degrade' },
+    });
+
+    await sendEmail(ctx(), {
+      eventName: 'test',
+      template: 'test-foreign-membership',
+      data: { organizationId: own.id },
+    });
+
+    expect(sent).toHaveLength(1);
+    expect(sent[0].html).toContain(`[${own.id}]`);
+    expect(sent[0].html).toContain('ONLY');
+    expect(sent[0].html).not.toContain(other.id);
+    const [entry] = await testDb.communicationLog.findMany({
+      where: { recipientUserId: member.id },
+    });
+    expect(JSON.stringify(entry?.variables)).toContain(own.id);
+    expect(JSON.stringify(entry?.variables)).not.toContain(other.id);
   });
 
   it('resolves cc per recipient and attaches it to that recipient’s email', async () => {

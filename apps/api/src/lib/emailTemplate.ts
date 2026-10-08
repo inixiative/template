@@ -17,7 +17,7 @@ import {
   recomputeDegradedComponentRefs,
   type Variables,
 } from '@template/email/render';
-import type { EmailLens } from '@template/email/rules';
+import { type EmailLens, narrowVariables } from '@template/email/rules';
 import { LogScope, log } from '@template/shared/logger';
 import { emailLensFor } from '#/lib/email/emailLensFor';
 import { type RenderIssuePolicy, renderPolicyFor } from '#/lib/email/registry';
@@ -102,7 +102,7 @@ const renderComposed = (
       kind: composed.kind,
       emailTemplateId: composed.id,
       emailTemplateAuditLogId: composed.emailTemplateAuditLogId,
-      variables: vars,
+      variables: narrowVariables(lens, vars),
       componentResolutions: composed.componentResolutions,
       issues,
     },

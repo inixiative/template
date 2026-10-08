@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { lensFor } from '@template/db/lens';
+import { lensFor, live } from '@template/db/lens';
 import { interpolate } from '@template/email/render/interpolate';
 import type { RuleErrorSink } from '@template/email/render/settle';
 import { type EmailLens, emailLens } from '@template/email/rules/emailLens';
@@ -226,6 +226,85 @@ describe('{{#each}} loops', () => {
       { lens },
     );
     expect(out).toBe('[name-own][]');
+  });
+
+  describe('a row the owner cannot see renders nothing, yet rules judge it as the database does', () => {
+    const lens = scopeEmailLens(emailLens({ sender: lensFor('Organization') }), {
+      ownerModel: 'Organization',
+      ownerId: 'org-1',
+    });
+    const variables = {
+      recipient: {
+        id: 'u1',
+        name: 'Ann',
+        email: 'ann@example.com',
+        organizationUsers: [
+          { role: 'admin', organization: { id: 'org-1', name: 'Acme' } },
+          { role: 'member', organization: { id: 'org-2', name: 'Rival' } },
+        ],
+      },
+      sender: { id: 'org-1', name: 'Acme' },
+      data: {},
+    };
+    const renderWith = (template: string) => interpolate(template, variables, undefined, { lens });
+
+    it('a foreign organization a loop element reaches prints nothing', () => {
+      expect(
+        renderWith('{{#each recipient.organizationUsers as=m}}[{{m.organization.id}}]{{/each}}'),
+      ).toBe('[org-1][]');
+    });
+
+    it('a negation through the hidden organization holds as the database would, outside and inside a loop', () => {
+      const notAcme = { field: 'organization.name', operator: 'notEquals', value: 'Acme' };
+      const anyNotAcme = JSON.stringify({
+        field: 'recipient.organizationUsers',
+        arrayOperator: 'any',
+        condition: notAcme,
+      });
+      const elementNotAcme = JSON.stringify({ ...notAcme, field: 'm.organization.name' });
+      expect(
+        renderWith(
+          `{{#if rule=${anyNotAcme}}}OTHER{{else}}ONLY{{/if}}|{{#each recipient.organizationUsers as=m}}{{#if rule=${elementNotAcme}}}X{{else}}{{m.role}}{{/if}} {{/each}}|{{#each recipient.organizationUsers as=m filter=${elementNotAcme}}}{{m.role}}{{/each}}`,
+        ),
+      ).toBe('ONLY|admin member |');
+    });
+
+    it('a loop over rows a grant reads whole, hidden ones among them, fails closed with an issue', () => {
+      const wholeList = emailLens({
+        narrowing: {
+          recipient: {
+            picks: ['id', 'name'],
+            where: {
+              field: 'tagAttachments',
+              arrayOperator: 'any',
+              condition: { field: 'deletedAt', operator: 'exists' },
+            },
+            relations: {
+              tagAttachments: { picks: [], where: live, relations: { tag: { picks: ['id'] } } },
+            },
+          },
+        },
+      });
+      const issues: string[] = [];
+      const out = interpolate(
+        '{{#each recipient.tagAttachments as=item}}[{{item.tag.id}}]{{/each}}',
+        {
+          recipient: {
+            id: 'u1',
+            name: 'Ann',
+            tagAttachments: [
+              { deletedAt: null, tag: { id: 'live' } },
+              { deletedAt: '2026-01-01', tag: { id: 'gone' } },
+            ],
+          },
+          data: {},
+        },
+        (issue) => issues.push(issue.detail),
+        { lens: wholeList },
+      );
+      expect(out).toBe('');
+      expect(issues.join(' ')).toContain('cannot be judged one by one');
+    });
   });
 
   it('an unsupported loop rule fails closed with an issue: nothing renders, no raw check', () => {
