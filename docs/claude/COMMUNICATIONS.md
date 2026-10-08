@@ -329,7 +329,11 @@ other lens. Everything a template does with a path or a rule goes through it:
   and evaluation all read that one form, and evaluation runs slot-relative against the iterated
   collection pinned to the element in scope (`narrowToElements`, `evaluateScopedRule`).
 - **The builder** — `emailSurface` composes the four exposed surfaces under a presentation root
-  `Email` for the rule surface route; `emailRuleDecoration` derives one facet per lens present.
+  `Email` for the rule surface route: the maps each slot's projection shows, plus a narrowing whose
+  `root.relations` turns each slot on and, beneath it, the slot's own shown tree (columns kept per
+  path), so the builder gates against the narrowed lens (`composeNarrowed(source)`) and walks loops
+  with `lensScopeSurface(lens, { at })`. Fetched options are keyed at the slot's path under `Email`
+  (`emailSurfaceSourceValues`). `emailRuleDecoration` derives one facet per lens present.
 
 **The lens is the row owner's.** `emailLensFor(slug, owner)` (`apps/api/src/lib/email/emailLensFor.ts`)
 builds the slug's declared lens (the registry entry's sender and data lenses, the User recipient,
@@ -337,7 +341,14 @@ narrowed by the slots stored on the row — or on the slug's default-tier row wh
 none) and scopes it to the owner of the row being saved, edited or rendered
 (`scopeEmailLens`): tags are platform-owned or the owner's, segments are the owner's (via
 `recipient.providerRefs.segmentMembers.segment`), platform tiers see platform tags and no segments.
-`OrganizationUser`/`SpaceUser` rows scope to the person, like the cascade they sit on. The owner
+`OrganizationUser`/`SpaceUser` rows scope to the person, like the cascade they sit on. The scope
+is merged into each slot's **first** narrowing (`intoFirstLayer`): json-rules 3.4 lets a later layer's
+grant read only what its parent shows, and these grants read columns the slot hides.
+**Memberships are the sender's.** At send, `emailLensFor(slug, owner, stored, sender)` also grants
+`OrganizationUser` / `SpaceUser` rows to the sending owner (`senderLensOwner`): an Organization or
+OrganizationUser sender sees that organization's memberships and its spaces'; a Space or SpaceUser
+sender sees that space's membership only; a User sender sees none; a platform or admin send is
+unrestricted. Without a sender (save, preview, rule surface) the template owner stands in. The owner
 is decided per site: save takes it from the input, the rule surface and preflight from the body
 (default: platform), and settle from `composeTemplate`'s `owner` — the row that won the cascade,
 so an Organization row rendered for a Space sender sees the organization's tags. No inheritance up
@@ -569,9 +580,10 @@ chain (user or org) down to the `default` floor, carrying the user id for interp
 2. Resolve the template row for the sender's scope and build the owner-scoped email lens from that
    row; fetch recipients in one batch through its **recipient lens** with the entry's targeting
    `where` (`recipientLens`), pruned to what the lens picks plus what its `where`s read. The
-   recipient that reaches delivery carries its tags, memberships and segments, so a
-   `{{#if rule=…}}` over them decides at send. Then resolve each recipient's email `Contact`
-   (settings + deliverability live there).
+   delivery job carries only the recipient's id: `deliverEmail` re-reads the recipient through the
+   lens at send time, so nothing hidden rides the queue and the email shows the recipient as they
+   are when it goes out. Then resolve each recipient's email `Contact` (settings + deliverability
+   live there).
 3. **Find-or-create** a `queued` `CommunicationLog` row keyed on the per-recipient `idempotencyKey`
    — the at-most-once fence, durable beyond BullMQ's retention window (P2002 race → re-read).
 4. Enqueue `deliverEmail` with the log id. A fan-out wider than `EMAIL_SLOW_LANE_MIN_RECIPIENTS` runs on
@@ -588,7 +600,10 @@ for the claim to reopen.
 
 1. Load the log; **skip unless `queued`**.
 2. **Resolve** the template via the cascade (`settleTemplate`) → subject/mjml + `kind` + `emailTemplateId`.
-   Rules evaluate through the lens of the row that won the cascade (`composed.owner`); a referenced
+   The recipient is loaded through the lens of the row that won the cascade (`composed.owner`) and
+   the sender (`recipientVariables`); a recipient that no longer resolves → `failed` with
+   `reasonCode: not_found`, no send. Rendering is `renderForRecipient` (see
+   [Messaging](#messaging-non-email-channels)). Rules evaluate through that lens; a referenced
    segment whose own rule is degraded leaves the live set first (`withoutDegradedSegments`).
    A content error (`isEmailContentError`: render, parse, MJML, token, condition) → `failed` with
    `reasonCode: render_failed`, no retry. Any other error before the claim (database, verifier) throws with
@@ -696,7 +711,7 @@ edges are persisted so that "who references X" is an index and a stale rule is n
   recipient lens reaches `tagAttachments.tag`, `spaceUsers.space`, `organizationUsers.organization`
   and `providerRefs.segmentMembers.segment` (`id`, `name`); a relation the lens does not declare
   is refused at save. The api's `emailLensFor(slug, owner)` builds the owner-scoped lens; the
-  builder gets `emailSurface` of it (which strips sources), while save and settle keep the lens
+  builder gets `emailSurface` of it (which strips grants and sources), while save and settle keep the lens
   itself (`defaultEmailLens` when none is threaded) — extraction never runs on the exposed
   surface. Adding a referenceable model = a registry entry + an FK column (the hook and email's
   sources derive); a surface that reaches it declares its own labeled id source.
@@ -782,14 +797,23 @@ type MessageDispatchOptions = { replyTo?: { chatMessageId: string } };
 Two BullMQ handlers (`messageUser`, `messageContact`), shaped like the email jobs but with no template
 cascade, no `CommunicationLog`, and no fan-out planner:
 
-- **`messageUser`** — `{ rule, kind, content }`. `resolveUsers(rule, lens?)` compiles the
-  `@inixiative/json-rules` `Condition` through a recipient lens (default: the platform-scoped
-  recipient lens of the email lens, so an organization's tag is outside its view) to a Prisma
-  query, then for each resolved user interpolates `content` and dispatches to
-  every `canDeliver(kind, contact)` contact via that contact's registered adapter. A missing adapter for
-  a `ContactType` throws.
+- **`messageUser`** — `{ rule, kind, content, sender? }` (sender defaults to platform). It builds the
+  sender's email lens (`emailLensFor(undefined, ownerScope(sender), undefined, sender)`), and
+  `resolveUsers(rule, lens.recipient)` compiles the `@inixiative/json-rules` `Condition` through its
+  recipient lens to a Prisma query at job time. Each resolved user is rendered through the same
+  primitive email uses, then dispatched to every `canDeliver(kind, contact)` contact via that
+  contact's registered adapter. A missing adapter for a `ContactType` throws. Not registered in
+  `jobHandlers` until an adapter exists.
 - **`messageContact`** — `{ contactId, kind, content, replyTo? }`. Loads one `Contact`, gates on
   `canDeliver`, and dispatches (no interpolation — `content` is pre-rendered).
+
+**Both lanes render with one primitive** (`apps/api/src/lib/email/renderForRecipient.ts`):
+`recipientVariables(lens, { recipientId, sender, data })` loads the recipient through the recipient
+lens when the send runs (the fetched rows a re-check needs, with the sender-scoped memberships),
+and `renderForRecipient(text, variables, lens)` interpolates: tokens and loops read the viewer
+projection (scope-root tokens through json-rules `readLensValue`), rules judge the re-check rows.
+`deliverEmail` and `messageUser` both call it, so the same recipient and content render the same in
+either lane.
 
 `canDeliver(kind, contact, customerRef?)` (`apps/api/src/lib/messaging/canDeliver.ts`) is the shared
 gate for both lanes: `system` always delivers; otherwise the kind must be in `contact.acceptedKinds`

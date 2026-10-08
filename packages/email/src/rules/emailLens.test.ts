@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'bun:test';
-import { type Condition, check, projectLens } from '@inixiative/json-rules';
+import {
+  type Condition,
+  check,
+  lensVisit,
+  projectLens,
+  validateNarrowing,
+  validateRuleInLens,
+} from '@inixiative/json-rules';
 import { lensFor } from '@template/db/lens';
 import {
   applyEmailLens,
@@ -317,7 +324,11 @@ describe('emailLens — evaluation goes through the lens', () => {
   it('an organization owner reaches only its own organization through the recipient, by name as well as id', () => {
     const lens = scopeEmailLens(emailLens(), org);
     const member = (organization: Record<string, unknown>) => ({
-      recipient: { id: 'u1', name: 'Ann', organizationUsers: [{ role: 'member', organization }] },
+      recipient: {
+        id: 'u1',
+        name: 'Ann',
+        organizationUsers: [{ role: 'member', organizationId: organization.id, organization }],
+      },
       sender: {},
       data: {},
     });
@@ -419,7 +430,7 @@ describe('emailSurface — the four lenses composed for the builder', () => {
     expect(surface.maps[surface.mapName]?.models.Space).toBeUndefined();
   });
 
-  it('attaches fetched options to the surface the builder resolves', () => {
+  it('attaches fetched options at the slot path the builder resolves', () => {
     const surface = emailSurface(emailLens());
     const fetched = [
       {
@@ -429,14 +440,27 @@ describe('emailSurface — the four lenses composed for the builder', () => {
         field: 'id',
         options: [{ value: 'tag-1', label: 'VIP' }],
       },
-    ];
-    const resolved = projectLens(surface, {
-      sourceValues: emailSurfaceSourceValues(fetched),
-      by: 'model',
-    });
-    expect(resolved.maps[surface.mapName]?.models.Tag?.fields.id?.options).toEqual([
-      { value: 'tag-1', label: 'VIP' },
-    ]);
+    ] as const;
+    const visit = lensVisit(
+      { parent: surface, root: surface.narrowing.root },
+      'recipient.tagAttachments.tag',
+      { sourceValues: emailSurfaceSourceValues([['recipient', fetched[0]]]) },
+    );
+    expect(visit?.fields.id?.options).toEqual([{ value: 'tag-1', label: 'VIP' }]);
+  });
+
+  it('turns each slot and its own tree on beneath the Email root, so relation rules gate', () => {
+    const surface = emailSurface(emailLens({ sender: lensFor('Organization') }));
+    const gate = { parent: surface, root: surface.narrowing.root };
+    expect(validateNarrowing(gate).ok).toBe(true);
+    const ok = (field: string) =>
+      validateRuleInLens({ field, operator: 'exists' } as Condition, gate).ok;
+    expect(ok('recipient.organizationUsers.organization.name')).toBe(true);
+    expect(ok('recipient.tagAttachments.tag.name')).toBe(true);
+    expect(ok('recipient.providerRefs.segmentMembers.segment.name')).toBe(true);
+    expect(ok('sender.name')).toBe(true);
+    expect(ok('recipient.organizationUsers.organization.organizationUsers.role')).toBe(false);
+    expect(ok('recipient.organizationUsers.organization.emailTemplates')).toBe(false);
   });
 
   it('derives one facet per slot present', () => {

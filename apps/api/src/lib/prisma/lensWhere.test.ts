@@ -96,7 +96,7 @@ describe('lensWhere — root wheres (path "")', () => {
       parent: {
         parent: lensFor('User'),
         root: {
-          picks: [],
+          picks: ['emailVerified'],
           where: { field: 'platformRole', operator: 'equals', value: 'superadmin' },
         },
       },

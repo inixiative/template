@@ -117,7 +117,7 @@ export const sendEmail = makeJob<SendEmailPayload>(async (_ctx, payload) => {
   const row = await lookupTemplate(template, ownerScope(sender));
   if (!row) throw new EmailRenderError(template, 'template_missing');
   const lens = recipientLens(
-    emailLensFor(template, rowOwner(row), await templateLens(template, row)).recipient,
+    emailLensFor(template, rowOwner(row), await templateLens(template, row), sender).recipient,
     bindWhere(entry.recipients.where, entityRow),
   );
   const sendKey = plannerJobId(eventName, template, data);
@@ -185,7 +185,15 @@ export const sendEmail = makeJob<SendEmailPayload>(async (_ctx, payload) => {
           : undefined;
         await enqueueJob(
           'deliverEmail',
-          { template, sender, recipient, cc, bcc, data: dataVars, communicationLogId },
+          {
+            template,
+            sender,
+            recipientId: recipient.id,
+            cc,
+            bcc,
+            data: dataVars,
+            communicationLogId,
+          },
           { id: idempotencyKey, lane },
         );
       },

@@ -9,7 +9,6 @@ import { EmailRenderError } from '@template/email/errors/EmailRenderError';
 import {
   type ComposeTemplateResult,
   composeTemplate,
-  interpolate,
   lookupTemplate,
   type OwnerScope,
   type RenderIssue,
@@ -21,6 +20,7 @@ import { type EmailLens, narrowVariables } from '@template/email/rules';
 import { LogScope, log } from '@template/shared/logger';
 import { emailLensFor } from '#/lib/email/emailLensFor';
 import { type RenderIssuePolicy, renderPolicyFor } from '#/lib/email/registry';
+import { renderForRecipient } from '#/lib/email/renderForRecipient';
 import type { Sender } from '#/lib/email/sender';
 import { withoutDegradedSegments } from '#/lib/email/withoutDegradedSegments';
 
@@ -91,9 +91,12 @@ const renderComposed = (
   const subjectIssues: RenderIssue[] = [];
   const bodySink: RuleErrorSink = (issue) => issues.push(issue);
   const subjectSink: RuleErrorSink = (issue) => subjectIssues.push(issue);
-  const options = { locale: scope.locale, liveRefs, lens };
-  const mjml = interpolate(composed.mjml, vars, bodySink, options);
-  const subject = interpolate(composed.subject, vars, subjectSink, options);
+  const options = { locale: scope.locale, liveRefs };
+  const mjml = renderForRecipient(composed.mjml, vars, lens, { ...options, onError: bodySink });
+  const subject = renderForRecipient(composed.subject, vars, lens, {
+    ...options,
+    onError: subjectSink,
+  });
   return {
     settled: {
       slug,
@@ -119,7 +122,7 @@ export type RenderPolicy = { onIssue: RenderIssuePolicy; substitute?: string };
 export const settleTemplate = async (
   template: string,
   sender: Sender,
-  variables: Variables,
+  variablesFor: (lens: EmailLens) => Promise<Variables>,
   systemVarsForKind?: (kind: CommunicationKind) => Record<string, unknown>,
   policy: RenderPolicy = renderPolicyFor(template),
 ): Promise<SettledTemplate> => {
@@ -127,10 +130,11 @@ export const settleTemplate = async (
 
   const render = async (slug: string, at: OwnerScope = scope): Promise<Rendered> => {
     const composed = await composeTemplate(slug, at);
+    const lens = emailLensFor(slug, composed.owner, composed.lens, sender);
+    const variables = await variablesFor(lens);
     const vars: Variables = systemVarsForKind
       ? { ...variables, system: { ...variables.system, ...systemVarsForKind(composed.kind) } }
       : variables;
-    const lens = emailLensFor(slug, composed.owner, composed.lens);
     const liveRefs = await withoutDegradedSegments(composed.liveRuleRefs);
     return renderComposed(slug, composed, vars, at, lens, liveRefs);
   };
@@ -177,7 +181,11 @@ export const settleTemplate = async (
     primaryKind = rendered.settled.kind;
     primaryOwner = rendered.ownerModel;
   } catch (error) {
-    if (error instanceof EmailRenderError && error.type !== 'render_failed') {
+    if (
+      error instanceof EmailRenderError &&
+      error.type !== 'render_failed' &&
+      error.type !== 'recipient_missing'
+    ) {
       if (error.type === 'component_missing') {
         try {
           const row = await lookupTemplate(template, scope);

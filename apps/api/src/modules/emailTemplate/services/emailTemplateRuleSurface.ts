@@ -4,10 +4,11 @@
  * @partOf feature:email
  * @uses infrastructure:prisma, primitive:shared
  */
-import type { Lens, SourceValues } from '@inixiative/json-rules';
+import type { SourceValues } from '@inixiative/json-rules';
 import type { OwnerScope } from '@template/email/render';
 import {
   type EmailRuleDecoration,
+  type EmailSurface,
   emailRuleDecoration,
   emailSurface,
   emailSurfaceSourceValues,
@@ -16,7 +17,7 @@ import { emailLensAt } from '#/lib/email/emailLensFor';
 import { emailSourceValues } from '#/lib/email/emailSourceValues';
 
 export type EmailTemplateRuleSurface = {
-  source: Lens;
+  source: EmailSurface;
   sourceValues: SourceValues[];
   decoration: EmailRuleDecoration;
 };

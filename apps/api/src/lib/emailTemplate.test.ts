@@ -40,7 +40,14 @@ const saveForOrganization = (organizationId: string, slug: string, content: stri
   });
 
 const platform = { type: 'platform' } as const;
-const variables = { recipient: { id: 'u1', name: 'Ada', email: 'ada@example.com' }, data: {} };
+const given =
+  <V>(vars: V) =>
+  async () =>
+    vars;
+const variables = given({
+  recipient: { id: 'u1', name: 'Ada', email: 'ada@example.com' },
+  data: {},
+});
 
 describe('settleTemplate — the registry entry decides what an issue does', () => {
   let organization: Organization;
@@ -237,20 +244,17 @@ describe("settleTemplate — rules evaluate through the owner's lens", () => {
 
   const sender = () => ({ type: 'Organization', organizationId: organization.id }) as const;
 
-  const recipientWith = (tag: {
-    id: string;
-    ownerModel: string;
-    organizationId: string | null;
-  }) => ({
-    recipient: {
-      id: 'u1',
-      name: 'Ada',
-      email: 'ada@example.com',
-      tagAttachments: [{ deletedAt: null, tag: { ...tag, name: 't' } }],
-      providerRefs: [],
-    },
-    data: {},
-  });
+  const recipientWith = (tag: { id: string; ownerModel: string; organizationId: string | null }) =>
+    given({
+      recipient: {
+        id: 'u1',
+        name: 'Ada',
+        email: 'ada@example.com',
+        tagAttachments: [{ deletedAt: null, tag: { ...tag, name: 't' } }],
+        providerRefs: [],
+      },
+      data: {},
+    });
 
   beforeAll(async () => {
     registerSoftDeleteScoper({ liveWhere, liveIncludes });

@@ -59,15 +59,7 @@ export const reconcileCustomerRef = async (
   const lens = resolvedCustomerRefLens(provider.ownerModel, provider.ownerId);
   const ordered = sortByDependency(segments, buildReferenceMap(segments));
   const states = await segmentRuleStates(ordered);
-  const soundRules = ordered.flatMap((segment) =>
-    withRule(states.get(segment.id)!.health, { degraded: () => [], sound: (rule) => [rule] }),
-  );
-  const [row] = await hydrateCustomerRefs(
-    provider.ownerModel,
-    provider.ownerId,
-    [customerRefId],
-    soundRules,
-  );
+  const [row] = await hydrateCustomerRefs(provider.ownerModel, provider.ownerId, [customerRefId]);
 
   const results: CustomerRefReconciliation = [];
   for (const segment of ordered) {

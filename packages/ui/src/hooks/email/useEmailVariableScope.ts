@@ -4,13 +4,13 @@
  * @partOf feature:email
  * @uses none
  */
-import type { Lens, SourceValues } from '@inixiative/json-rules';
+import type { Lens, LensNarrowing } from '@inixiative/json-rules';
 import {
+  composeNarrowed,
   type LensLoopOption,
   type LensValueOption,
   lensScopeSurface,
   type RuleBuilderSource,
-  resolve,
 } from '@inixiative/rules-builder';
 import { kebabCase } from 'lodash-es';
 import { useCallback, useMemo, useState } from 'react';
@@ -36,24 +36,18 @@ const wrapInEaches = (frames: EmailScopeFrame[], inner: string): string =>
 
 export const useEmailVariableScope = (
   source: RuleBuilderSource | undefined,
-  sourceValues: SourceValues[] = [],
   enclosingBindings: readonly string[] = [],
 ) => {
-  const lens = useMemo<Lens | undefined>(
-    () => (source ? resolve(source, { sourceValues }) : undefined),
-    [source, sourceValues],
+  const lens = useMemo<Lens | LensNarrowing | undefined>(
+    () => (source ? composeNarrowed(source) : undefined),
+    [source],
   );
   const [frames, setFrames] = useState<EmailScopeFrame[]>([]);
 
   const rows = useMemo<EmailVariableRow[]>(() => {
     if (!lens) return [];
     const frame = frames.at(-1);
-    const scope = frame
-      ? lensScopeSurface(lens, {
-          mapName: frame.loop.relation.mapName,
-          model: frame.loop.relation.modelName,
-        })
-      : lensScopeSurface(lens);
+    const scope = lensScopeSurface(lens, { at: frame?.loop.at });
     const prefix = frame ? `${frame.binding}.` : '';
     const loops = scope.loops.map<EmailVariableRow>((loop) => ({
       type: 'loop',

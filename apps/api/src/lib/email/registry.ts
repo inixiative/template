@@ -51,7 +51,7 @@ const userEntity = (bind: string): LensNarrowing => ({
 const userData: LensNarrowing = { parent: lensFor('User'), root: user };
 
 const inquiryInvite: ModelNarrowing = {
-  picks: ['id', 'content', 'sourceOrganizationId', 'targetUserId', 'sourceOrganization'],
+  picks: ['id', 'content', 'sourceOrganizationId', 'targetUserId'],
   relations: { sourceOrganization: { picks: ['name'] } },
 };
 

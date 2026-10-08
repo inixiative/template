@@ -7,11 +7,12 @@ import type { AppEnv } from '#/types/appEnv';
 
 const inquiryNarrowing = (): LensNarrowing => ({
   parent: lensFor('Inquiry'),
-  root: { picks: ['type'] },
+  root: { picks: ['type', 'status'], relations: { sourceUser: {} } },
 });
 
-const ruleA: Condition = { field: 'a', operator: 'equals', value: 1 };
-const ruleB: Condition = { field: 'b', operator: 'equals', value: 2 };
+const ruleA: Condition = { field: 'status', operator: 'equals', value: 'sent' };
+const ruleB: Condition = { field: 'type', operator: 'equals', value: 'inviteOrganizationUser' };
+const userRule: Condition = { field: 'email', operator: 'equals', value: 'a@example.com' };
 
 // The composed root-model wheres along the full narrowing chain — exactly what
 // buildWhereClause reads off the stacked layers.
@@ -72,15 +73,16 @@ describe('scopeNarrowing', () => {
     expect(capturedPath).toBe('/inquiry/abc');
   });
 
-  it('stacks root.relations and mapDefaults onto the layer', async () => {
+  it('stacks root.relations and mapDefaults onto the layer, narrowing a relation the route turned on', async () => {
     const lens = await runMiddlewares([
       scopeNarrowing(() => ({
-        root: { relations: { sourceUser: { where: ruleA } } },
-        mapDefaults: { prisma: { models: { User: { where: ruleB } } } },
+        root: { relations: { sourceUser: { where: userRule } } },
+        mapDefaults: { prisma: { models: { User: { where: userRule } } } },
       })),
     ]);
-    expect(lens?.root?.relations?.sourceUser.where).toEqual(ruleA);
-    expect(lens?.mapDefaults?.prisma?.models?.User.where).toEqual(ruleB);
+    expect(lens?.root?.relations?.sourceUser.where).toEqual(userRule);
+    expect(lens?.mapDefaults?.prisma?.models?.User.where).toEqual(userRule);
+    expect(projectLens(lens!)['Inquiry.sourceUser']?.whereClauses).toEqual([userRule, userRule]);
   });
 
   it('awaits async scope callbacks (for integration-source lookups)', async () => {

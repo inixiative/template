@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'bun:test';
-import { type Condition, createLens, type FieldMap } from '@inixiative/json-rules';
+import {
+  type Condition,
+  createLens,
+  type FieldMap,
+  type LensNarrowing,
+} from '@inixiative/json-rules';
 import { referenceKey, ruleIssues, withRule } from '@template/shared/rules/withRule';
 
 const map: FieldMap = {
@@ -15,7 +20,10 @@ const map: FieldMap = {
     Tag: { fields: { id: { kind: 'scalar', type: 'String', isRequired: true } } },
   },
 };
-const lens = createLens({ maps: { prisma: map }, mapName: 'prisma', model: 'User' });
+const lens: LensNarrowing = {
+  parent: createLens({ maps: { prisma: map }, mapName: 'prisma', model: 'User' }),
+  root: { relations: { tagAttachments: { relations: { tag: {} } } } },
+};
 
 const tagged: Condition = {
   field: 'tagAttachments',

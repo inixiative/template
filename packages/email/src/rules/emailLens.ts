@@ -16,6 +16,7 @@ import {
   type LensNarrowing,
   type ModelNarrowing,
   narrowRule,
+  type PathProjection,
   projectLens,
   projectRows,
   type SourceQuery,
@@ -407,10 +408,35 @@ export const narrowEmailLens = (
   ...Object.fromEntries(emailSlotLenses(lens).map(([root, slot]) => [root, narrow(root, slot)])),
 });
 
-export const emailSurface = (lens: EmailLens): Lens => {
+export type EmailSurface = Lens & { narrowing: Omit<LensNarrowing, 'parent'> };
+
+const surfaceNode = (projection: PathProjection, path: string): ModelNarrowing => {
+  const picks: string[] = [];
+  const enumPicks: Record<string, readonly string[]> = {};
+  const relations: Record<string, ModelNarrowing> = {};
+  for (const [name, entry] of Object.entries(projection[path]?.fields ?? {})) {
+    if (entry.kind === 'object') {
+      const child = `${path}.${name}`;
+      if (projection[child]) relations[name] = surfaceNode(projection, child);
+      continue;
+    }
+    if (entry.kind === 'bridge') continue;
+    picks.push(name);
+    if (entry.kind === 'enum' && entry.values) enumPicks[name] = entry.values;
+  }
+  return {
+    picks,
+    ...(Object.keys(enumPicks).length ? { enumPicks } : {}),
+    ...(Object.keys(relations).length ? { relations } : {}),
+  };
+};
+
+/** The builder's source: every slot under one Email root, each slot's own tree turned on beneath its relation. */
+export const emailSurface = (lens: EmailLens): EmailSurface => {
   const models: FieldMap['models'] = {};
   const enums: NonNullable<FieldMap['enums']> = {};
   const rootFields: Record<string, FieldMapEntry> = {};
+  const relations: Record<string, ModelNarrowing> = {};
   for (const root of SCOPE_ROOTS) {
     const slot = lens[root];
     if (!slot) continue;
@@ -427,8 +453,9 @@ export const emailSurface = (lens: EmailLens): Lens => {
       Object.assign(enums, map.enums ?? {});
     }
     rootFields[root] = relation(surface.model, `Email_${root}`, false);
+    relations[root] = surfaceNode(projectLens(slot), getLensRoot(slot).model);
   }
-  return createLens({
+  const base = createLens({
     maps: {
       [EMAIL_MAP_NAME]: {
         models: { ...models, [EMAIL_SURFACE_ROOT]: { fields: rootFields } },
@@ -438,11 +465,26 @@ export const emailSurface = (lens: EmailLens): Lens => {
     mapName: EMAIL_MAP_NAME,
     model: EMAIL_SURFACE_ROOT,
   });
+  return {
+    maps: base.maps,
+    mapName: base.mapName,
+    model: base.model,
+    narrowing: { root: { relations } },
+  };
 };
 
-/** The surface re-homes every slot under the email map, so its options must be keyed there too. */
-export const emailSurfaceSourceValues = (values: readonly SourceValues[]): SourceValues[] =>
-  values.map((value) => ({ ...value, mapName: EMAIL_MAP_NAME }));
+/** The surface re-homes every slot under the Email root of the email map, so its options must be keyed there too. */
+export const emailSurfaceSourceValues = (
+  values: readonly (readonly [ScopeRoot, SourceValues])[],
+): SourceValues[] =>
+  values.map(([root, value]) => {
+    const dot = value.path.indexOf('.');
+    return {
+      ...value,
+      mapName: EMAIL_MAP_NAME,
+      path: `${EMAIL_SURFACE_ROOT}.${root}${dot === -1 ? '' : value.path.slice(dot)}`,
+    };
+  });
 
 export type EmailRuleFacet = { path: string; label: string };
 export type EmailRuleDecoration = { facets: EmailRuleFacet[] };

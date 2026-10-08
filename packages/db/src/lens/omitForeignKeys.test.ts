@@ -12,7 +12,10 @@ const fieldsAt = (lens: ReturnType<typeof omitForeignKeys>, path: string): strin
 
 describe('omitForeignKeys', () => {
   it('drops the FK columns of the root model and keeps the relation', () => {
-    const fields = fieldsAt(omitForeignKeys({ parent: lensFor('Space') }), '');
+    const fields = fieldsAt(
+      omitForeignKeys({ parent: lensFor('Space'), root: { relations: { organization: {} } } }),
+      '',
+    );
     expect(fields).not.toContain('organizationId');
     expect(fields).toContain('organization');
     expect(fields).toContain('id');
@@ -21,7 +24,7 @@ describe('omitForeignKeys', () => {
   it('drops FK columns wherever a model appears via relations', () => {
     const lens = omitForeignKeys({
       parent: lensFor('User'),
-      root: { relations: { tagAttachments: {} } },
+      root: { relations: { tagAttachments: { relations: { tag: {} } } } },
     });
     const fields = fieldsAt(lens, 'tagAttachments');
     expect(fields).not.toContain('tagId');

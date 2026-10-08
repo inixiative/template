@@ -593,20 +593,21 @@ readRoute({
   filterLens: {
     parent: lensFor('Organization'),         // anchors the lens
     root: {
-      picks: ['name', 'slug', 'description'],  // filterable fields (dot-paths for relations)
+      picks: ['name', 'slug', 'description'],  // filterable columns (columns only — never a relation)
       // omits: [...],                       // alternatively: exclude specific fields
       // enumOmits: { Status: ['draft'] },   // hide enum values from the SDK type surface
       // where: { ... },                     // server-enforced row filter (Condition AST)
-      // relations: { author: { picks: [...], where: ... } },  // descent scoping
+      // relations: { author: { picks: [...], where: ... } },  // turns a relation on, and scopes it
     },
   },
 });
 ```
 
-**Picks dot-paths** for relations:
+**Relations** are off until the route's `filterLens` turns them on, through `relations` (never `picks`):
 ```typescript
 root: {
-  picks: ['name', 'slug', 'organizationUsers.role', 'organizationUsers.user.name'],
+  picks: ['name', 'slug'],
+  relations: { organizationUsers: { picks: ['role'], relations: { user: { picks: ['name'] } } } },
 }
 ```
 
@@ -715,15 +716,15 @@ const { data, pagination } = await paginate(c, db.organization, {
 2. `prepareMiddleware` injects an inline middleware that sets `filterLens` on context from the route's static `filterLens`
 3. `scopeNarrowing` middleware(s) merge ctx-aware wheres into the narrowing
 4. `paginate()` reads the final narrowing + bracket-query searchFields, calls `buildWhereClause`
-5. `buildWhereClause` validates fields against `filterLens.root.picks`, translates `filterLens.root.where` via `toPrisma`, AND-merges everything
+5. `buildWhereClause` validates fields against `searchablePaths(filterLens)` (the columns each shown path keeps), translates the lens's wheres via `toPrisma`, AND-merges everything
 
 ### Security
 
-- Only fields in `filterLens.root.picks` can be searched (whitelist with full dot-paths)
+- Only paths the lens shows can be searched: columns kept by `picks` / `omits`, through relations the route's `filterLens` turns on
 - **Superadmin bypass:** users with `platformRole: 'superadmin'` skip the whitelist (`skipFieldValidation: true`). Path notation validation still applies.
 - Path notation: camelCase enforced, rejects snake_case, prevents injection
 - Supports Prisma meta-fields (`_count`, `_max`, `_min`, `_avg`, `_sum`)
-- Relation fields must be explicitly whitelisted (non-superadmin)
+- Relations must be turned on by the route's `filterLens` (non-superadmin); a `scopeNarrowing` layer can only narrow them
 - Max 10 levels of nesting in the bracket query
 - Routes without a `filterLens` skip search entirely (`paginate` no-ops the search path)
 - `root.where` is AND-merged into the prisma where — server enforces even when the SDK type would allow a value through
@@ -778,55 +779,42 @@ export function parseBracketNotation(url: string): Record<string, any> {
 
 ### Relation Field Security
 
-When using relation filters, explicitly whitelist nested fields in `filterLens.root.picks` as dot-paths:
+A relation is off until the route's `filterLens` (the first narrowing over `lensFor(...)`) turns it on through `relations`. `picks` names columns only; a relation name in `picks` is a `wrong_kind` error. Each relation object keeps its own columns and may turn on further relations:
 
 ```typescript
 filterLens: {
   parent: lensFor('Organization'),
   root: {
-    picks: [
-      'name',
-      'slug',
-      'organizationUsers.role',
-      'organizationUsers.user.name',
-    ],
-  },
-}
-
-// Allowed queries:
-?searchFields[organizationUsers][some][role]=admin              // ✓ organizationUsers.role whitelisted
-?searchFields[organizationUsers][some][user][name]=John         // ✓ organizationUsers.user.name whitelisted
-
-// Rejected queries (non-superadmin):
-?searchFields[organizationUsers][some][secretField]=hack        // ✗ not in picks
-?searchFields[organizationUsers][some][user][email]=test        // ✗ not in picks
-
-// Superadmin: all valid fields allowed regardless of picks (skipFieldValidation bypass)
-```
-
-For deeper structural narrowing of related models, use `root.relations`:
-
-```typescript
-filterLens: {
-  parent: lensFor('Organization'),
-  root: {
-    picks: ['name'],
+    picks: ['name', 'slug'],
     relations: {
       organizationUsers: {
         picks: ['role'],
         where: { field: 'role', operator: 'notEquals', value: 'pending' },  // descent scope
         relations: {
-          user: { picks: ['name', 'email'] },
+          user: { picks: ['name'] },
         },
       },
     },
   },
 }
+
+// Allowed queries:
+?searchFields[organizationUsers][some][role]=admin              // ✓ organizationUsers is on, role kept
+?searchFields[organizationUsers][some][user][name]=John         // ✓ organizationUsers.user is on, name kept
+
+// Rejected queries (non-superadmin):
+?searchFields[organizationUsers][some][secretField]=hack        // ✗ not kept on organizationUsers
+?searchFields[organizationUsers][some][user][email]=test        // ✗ not kept on organizationUsers.user
+?searchFields[spaces][some][name]=x                             // ✗ spaces is not turned on
+
+// Superadmin: all valid fields allowed regardless of the lens (skipFieldValidation bypass)
 ```
 
+A `scopeNarrowing` layer stacked on top can only narrow: it may hide a relation (`omits`) or restate one the route turned on to add a `where`, and its wheres may read only what the route's lens shows. Turn on everything a route crosses in its `filterLens`.
+
 **Validation:**
-- Full dot-path must be in `picks` (non-superadmin users)
-- Superadmin (`platformRole: 'superadmin'`) bypasses picks validation entirely
+- The full path must be shown by the lens (non-superadmin users)
+- Superadmin (`platformRole: 'superadmin'`) bypasses the whitelist entirely
 - Relation operators (`some`, `every`, `none`) automatically supported
 - Error thrown for non-whitelisted fields (not silently ignored)
 

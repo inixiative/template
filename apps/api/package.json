@@ -24,7 +24,7 @@
     "@bull-board/api": "^6.20.3",
     "@bull-board/hono": "^6.20.3",
     "@hono/zod-openapi": "^1.2.2",
-    "@inixiative/json-rules": "^3.2.0",
+    "@inixiative/json-rules": "^3.4.0",
     "@sentry/bun": "^10.42.0",
     "@template/db": "workspace:*",
     "@template/permissions": "workspace:*",

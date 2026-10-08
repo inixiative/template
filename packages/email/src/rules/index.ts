@@ -21,6 +21,7 @@ export {
   type EmailRuleDecoration,
   type EmailRuleFacet,
   type EmailSlotLenses,
+  type EmailSurface,
   emailDynamicRuleReferences,
   emailLens,
   emailRuleDecoration,
