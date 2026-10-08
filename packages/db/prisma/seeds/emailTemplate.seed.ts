@@ -80,7 +80,7 @@ export const emailTemplateSeeds: SeedFile<EmailTemplate> = {
         '    </mj-section>',
         '    <mj-section padding="10px 0">',
         '      <mj-column>',
-        '        <mj-button href="{{sender.webUrl}}/invitations/{{data.id}}" background-color="#2563eb" color="#ffffff" font-size="16px" border-radius="6px" inner-padding="12px 24px">',
+        '        <mj-button href="{{system.webUrl}}/invitations/{{data.id}}" background-color="#2563eb" color="#ffffff" font-size="16px" border-radius="6px" inner-padding="12px 24px">',
         '          Accept Invitation',
         '        </mj-button>',
         '      </mj-column>',
@@ -106,7 +106,7 @@ export const emailTemplateSeeds: SeedFile<EmailTemplate> = {
       kind: 'system',
       inheritToSpaces: true,
       componentRefs: ['system-header', 'system-footer'],
-      subject: 'Welcome to {{sender.platformName}}',
+      subject: 'Welcome to {{system.platformName}}',
       mjml: [
         '<mjml>',
         '  <mj-body background-color="#f9fafb">',

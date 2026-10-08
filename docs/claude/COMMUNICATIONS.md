@@ -555,7 +555,10 @@ type EmailEntry = {
 The identity an email is sent *as* — a discriminated union keyed on `SenderType`
 (`platform | admin | User | Organization | Space | OrganizationUser | SpaceUser`).
 Identity (from-address/display, via `resolveSender`/`resolveFromAddress`) is separate
-from branding (which template), which the cascade resolves. `ownerScope(sender)` maps a sender to
+from branding (which template), which the cascade resolves. `resolveSender` loads the sending row
+through its lens (`lensFor(type)`, scalar columns) as the `sender` variable, so `{{sender.*}}`
+reads what the sender slot's lens declares; a platform or admin send has no `sender`. The
+platform's own name and URL are system tokens: `{{system.platformName}}`, `{{system.webUrl}}`. `ownerScope(sender)` maps a sender to
 its own owner tier — user-actors keep their tier (`SpaceUser`/`OrganizationUser`/`User`), and
 `platform → default` (the one bridge between the two enums) — then the cascade walks that tier's
 chain (user or org) down to the `default` floor, carrying the user id for interpolation.

@@ -229,6 +229,15 @@ describe('interpolate', () => {
       }
     });
 
+    it('resolves the platform name and web URL, which belong to the platform, not the sender', () => {
+      const result = interpolate('{{system.platformName}} {{system.webUrl}}', {
+        sender: { platformName: 'NOT_THIS' },
+      });
+      expect(result).toBe(
+        `${process.env.PROJECT_NAME ?? 'Template'} ${process.env.WEB_URL ?? ''}`.trim(),
+      );
+    });
+
     it('is not overridable by a caller-supplied system bucket', () => {
       const result = interpolate('{{system.year}}', { system: { year: 'HACKED' } } as never);
       expect(result).toBe(utcYear);

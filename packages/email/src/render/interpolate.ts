@@ -31,6 +31,8 @@ const SYSTEM_TOKEN_RESOLVERS: Record<SystemTokenName, (now: Date, locale?: strin
     }
   },
   year: (now) => String(now.getUTCFullYear()),
+  platformName: () => process.env.PROJECT_NAME ?? 'Template',
+  webUrl: () => process.env.WEB_URL ?? '',
 };
 
 const isSystemTokenName = (name: string): name is SystemTokenName =>
