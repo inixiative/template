@@ -50,6 +50,7 @@ export {
   type SaveTemplateInput,
   type SaveTemplateOptions,
   type SaveTemplateResult,
+  saveEmailComponents,
   saveEmailTemplate,
 } from './save';
 export type { RenderIssue, RenderIssueKind } from './settle';

@@ -184,7 +184,8 @@ export const settleTemplate = async (
     if (
       error instanceof EmailRenderError &&
       error.type !== 'render_failed' &&
-      error.type !== 'recipient_missing'
+      error.type !== 'recipient_missing' &&
+      error.type !== 'data_missing'
     ) {
       if (error.type === 'component_missing') {
         try {

@@ -11,7 +11,7 @@ import { stripComponentBodies } from '@template/email/render/stripComponentBodie
 import {
   defaultEmailLens,
   type EmailLens,
-  emailSourceQueries,
+  emailSourceLenses,
 } from '@template/email/rules/emailLens';
 import {
   contentDynamicRuleReferences,
@@ -35,7 +35,7 @@ export const syncRuleReferences = (
   return syncRuleReferenceEdges(
     source,
     contentRuleReferences(judged, ...contents),
-    mode === 'rebuild' ? 'rebuild' : { sources: emailSourceQueries(judged) },
+    mode === 'rebuild' ? 'rebuild' : emailSourceLenses(judged),
   );
 };
 

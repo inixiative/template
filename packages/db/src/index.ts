@@ -86,7 +86,11 @@ export {
 // User with relations type and schema
 export type { UserWithRelations } from './types/userWithRelations';
 export { UserWithRelationsSchema } from './types/userWithRelations';
-export { admitRuleReferences, type RuleReferenceAdmission } from './utils/admitRuleReferences';
+export {
+  admitRuleReferences,
+  type RuleReferenceAdmission,
+  type SourceLenses,
+} from './utils/admitRuleReferences';
 // SQL utilities
 export { aliasColumns } from './utils/aliasColumns';
 // Type-safe delegate helpers (pass-the-delegate pattern)
@@ -142,7 +146,11 @@ export {
   dynamicRuleReferences,
   ruleReferences,
 } from './utils/ruleReferences';
-export { sourcePrismaQuery } from './utils/sourcePrismaQuery';
+export {
+  compiledSourceWhere,
+  type SourceQueryScope,
+  sourceQueryValues,
+} from './utils/sourceQueryValues';
 export { sourceQueryWhere } from './utils/sourceQueryWhere';
 export {
   type RuleReferenceGate,

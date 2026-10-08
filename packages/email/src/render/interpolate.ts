@@ -57,7 +57,7 @@ export const interpolate = (
   const { lens } = options;
   const scope = toScope(lens ? narrowVariables(lens, variables) : variables);
   const ruleScope = lens
-    ? toScope(narrowVariables(lens, variables, { keepGrantColumns: true }))
+    ? toScope(narrowVariables(lens, variables, { keepClampColumns: true }))
     : scope;
   return settle(
     resolveSystemTokens(template, options),

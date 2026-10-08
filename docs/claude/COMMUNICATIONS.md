@@ -353,8 +353,10 @@ is decided per site: save takes it from the input, the rule surface and prefligh
 (default: platform), and settle from `composeTemplate`'s `owner` — the row that won the cascade,
 so an Organization row rendered for a Space sender sees the organization's tags. No inheritance up
 the tree for now. The picker gets real options for Tag and Segment (`emailSourceValues`, the lens's
-`toSourceQueries` run through Prisma, keyed onto the `email` surface map by
-`emailSurfaceSourceValues`). A referenced model's path source points at its own model source
+`toSourceQueries` run through Prisma by `sourceQueryValues`, keyed onto the `email` surface map by
+`emailSurfaceSourceValues`). A source across a bridge returns candidates (`recheck`):
+`sourceQueryValues` / `sourceQueryWhere` re-check them with the far side the caller's `farSide`
+loads, and refuse them without it. A referenced model's path source points at its own model source
 (`sources: { id: { from: 'mapDefaults' } }`), so it offers every row the owner may name, not only
 rows already linked down the path. Organization and Space are scoped on both the model and
 its ID source: an Organization owner sees itself and its spaces; a Space owner sees itself
@@ -579,7 +581,7 @@ chain (user or org) down to the `default` floor, carrying the user id for interp
 1. Resolve the entity lens; bail if missing or no email adapter is registered.
 2. Resolve the template row for the sender's scope and build the owner-scoped email lens from that
    row; fetch recipients in one batch through its **recipient lens** with the entry's targeting
-   `where` (`recipientLens`), pruned to what the lens picks plus what its `where`s read. The
+   `where` (`slotRowsLens`), pruned to what the lens picks plus what its `where`s read. The
    delivery job carries only the recipient's id: `deliverEmail` re-reads the recipient through the
    lens at send time, so nothing hidden rides the queue and the email shows the recipient as they
    are when it goes out. Then resolve each recipient's email `Contact` (settings + deliverability
@@ -601,7 +603,8 @@ for the claim to reopen.
 1. Load the log; **skip unless `queued`**.
 2. **Resolve** the template via the cascade (`settleTemplate`) → subject/mjml + `kind` + `emailTemplateId`.
    The recipient is loaded through the lens of the row that won the cascade (`composed.owner`) and
-   the sender (`recipientVariables`); a recipient that no longer resolves → `failed` with
+   the sender (`recipientVariables`), and a model-lens data slot is re-read the same way from the
+   payload's `data.id`; a recipient or data entity that no longer resolves → `failed` with
    `reasonCode: not_found`, no send. Rendering is `renderForRecipient` (see
    [Messaging](#messaging-non-email-channels)). Rules evaluate through that lens; a referenced
    segment whose own rule is degraded leaves the live set first (`withoutDegradedSegments`).
@@ -684,7 +687,10 @@ lives in the audit log**:
   placeholders intact — not the per-recipient interpolated bytes.
 - **Seeds**: the `packages/db` seed can't import `registerHooks`, so the canonical seed runs through
   `apps/api/scripts/seed.ts`, which registers all hooks first — seeded system templates get their
-  initial snapshots.
+  initial snapshots. Email seed files are `savedByApp`: the api seed persists them through
+  `emailSeedSavers` (`saveEmailComponents`, the api `saveEmailTemplate`), so a seeded row meets
+  every save guard — MJML, conditions, lens tokens — and one that would not validate fails the run.
+  The `packages/db` seed alone refuses them.
 
 ### Rule References (the rows a rule names)
 
@@ -729,7 +735,7 @@ edges are persisted so that "who references X" is an index and a stale rule is n
   `syncRuleReferenceEdges(owner, references, gate)` in `packages/db` — set-diff (survivors
   keep their row), a newly added missing or soft-deleted target refused as a delta (a pre-existing
   dead reference stays editable), referenced rows locked with `db.findForUpdate` while the gate
-  reads them, and every kept edge restamped against its target. With `gate: { sources }` (the
+  reads them, and every kept edge restamped against its target. With `gate: { lenses }` (each
   lens's `toSourceQueries`), a newly added reference the
   source's composed `where` does not admit is refused too (`admitRuleReferences`): that is how
   an Organization template cannot name another organization's tag or segment. Throws
@@ -810,6 +816,8 @@ cascade, no `CommunicationLog`, and no fan-out planner:
 **Both lanes render with one primitive** (`apps/api/src/lib/email/renderForRecipient.ts`):
 `recipientVariables(lens, { recipientId, sender, data })` loads the recipient through the recipient
 lens when the send runs (the fetched rows a re-check needs, with the sender-scoped memberships),
+and a data slot that is a model lens through the data lens by `data.id` (the queued payload is
+never rendered, so an owner's clamp on the data entity re-checks against the row as it is),
 and `renderForRecipient(text, variables, lens)` interpolates: tokens and loops read the viewer
 projection (scope-root tokens through json-rules `readLensValue`), rules judge the re-check rows.
 `deliverEmail` and `messageUser` both call it, so the same recipient and content render the same in

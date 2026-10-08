@@ -14,7 +14,7 @@ import type { EmailOwnerRef } from '@template/email/render/owner';
 import type { RuleErrorSink } from '@template/email/render/settle';
 import type { OwnerScope } from '@template/email/render/types';
 import { collectConditionFieldPaths } from '@template/email/rules/collectHydrationPaths';
-import { type EmailLens, emailSourceQueries } from '@template/email/rules/emailLens';
+import { type EmailLens, emailSourceLenses } from '@template/email/rules/emailLens';
 import { emptyRowFor } from '@template/email/rules/emptyRowFor';
 import { contentRuleReferences } from '@template/email/rules/ruleReferences';
 import { assertValidConditions } from '@template/email/validations/validateConditions';
@@ -58,7 +58,7 @@ const admittedReferences = async (
   lens: EmailLens,
   ...contents: string[]
 ): Promise<RuleReference[]> =>
-  (await admitRuleReferences(emailSourceQueries(lens), contentRuleReferences(lens, ...contents)))
+  (await admitRuleReferences(emailSourceLenses(lens), contentRuleReferences(lens, ...contents)))
     .admitted;
 
 const sampleVariables = (lens: EmailLens): Variables => ({

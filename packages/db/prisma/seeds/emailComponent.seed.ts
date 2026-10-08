@@ -9,7 +9,7 @@ import type { SeedFile } from '../seed';
 
 export const emailComponentSeeds: SeedFile<EmailComponent> = {
   model: 'emailComponent',
-  updateOmitFields: ['createdAt'],
+  savedByApp: true,
   records: [
     {
       id: '01936d42-ec00-7000-8000-000000000001',

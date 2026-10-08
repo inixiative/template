@@ -104,7 +104,7 @@ export const settleEach = (
   const ruleArray = resolvePath(block.path, ruleScope);
   if (!Array.isArray(ruleArray) || ruleArray.length !== arrayValue.length)
     return issue(
-      `{{#each ${block.path}}} iterates rows a grant reads whole, so its rows cannot be judged one by one`,
+      `{{#each ${block.path}}} iterates rows a clamp reads whole, so its rows cannot be judged one by one`,
     );
 
   const emitted: { shown: unknown; judged: unknown }[] = [];

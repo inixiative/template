@@ -3,12 +3,12 @@ import { listBindings, projectLens, toLensSelect } from '@inixiative/json-rules'
 import { lensFor } from '@template/db/lens';
 import { emailLens } from '@template/email/rules';
 import { emailLensFor } from '#/lib/email/emailLensFor';
-import { addressLens, recipientLens, registry } from '#/lib/email/registry';
+import { addressLens, registry, slotRowsLens } from '#/lib/email/registry';
 
-describe('recipientLens', () => {
+describe('slotRowsLens', () => {
   it("targets the template's recipient lens with a bound where — the shape is the lens's, not the entry's", () => {
     const where = { field: 'id', operator: 'equals', value: 'u1' } as const;
-    const lens = recipientLens(emailLens().recipient, where);
+    const lens = slotRowsLens(emailLens().recipient, where);
     const paths = Object.keys(projectLens(lens));
     expect(paths).toContain('User.tagAttachments.tag');
     expect(paths).toContain('User.providerRefs.segmentMembers.segment');
@@ -17,7 +17,7 @@ describe('recipientLens', () => {
 
   it('targets a recipient lens that keeps no id: the targeting where sits in its first layer', () => {
     const where = { field: 'id', operator: 'equals', value: 'u1' } as const;
-    const lens = recipientLens(
+    const lens = slotRowsLens(
       emailLens({ narrowing: { recipient: { picks: ['email'] } } }).recipient,
       where,
     );
