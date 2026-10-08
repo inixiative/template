@@ -31,7 +31,6 @@ export {
   emailRuleVocabulary,
   emailRuleVocabularyIssues,
   emailSlotLenses,
-  emailSourceLenses,
   emailSurface,
   emailSurfaceSourceValues,
   evaluateScopedRule,
@@ -54,7 +53,7 @@ export {
   type RailProvidedSystemField,
 } from './railProvidedSystemFields';
 export { type BindingChain, resolveBindingPath } from './resolveBindingPath';
-export { contentRuleReferences } from './ruleReferences';
+export { contentReferenceScopes, contentRuleReferences } from './ruleReferences';
 export { type LoopFrame, loopFrames, narrowToElements, scopedRule } from './scopedRule';
 export { type EmailLensOwner, scopeEmailLens } from './scopeEmailLens';
 export {

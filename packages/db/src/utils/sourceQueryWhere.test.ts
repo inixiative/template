@@ -50,10 +50,17 @@ describe('a stepped source — a count the where resolves to an id set first', (
       await createTagAttachment({ tagId: busy.id, userId: user.id });
     }
 
-    const { admitted, unadmitted } = await admitRuleReferences({ lenses: [busyTags] }, [
-      { model: 'Tag', id: busy.id },
-      { model: 'Tag', id: idle.id },
-    ]);
+    const { admitted, unadmitted } = await admitRuleReferences({
+      scopes: [
+        {
+          lens: busyTags,
+          references: [
+            { model: 'Tag', id: busy.id },
+            { model: 'Tag', id: idle.id },
+          ],
+        },
+      ],
+    });
     expect(admitted).toEqual([{ model: 'Tag', id: busy.id }]);
     expect(unadmitted).toEqual([{ model: 'Tag', id: idle.id }]);
   });
@@ -128,10 +135,18 @@ describe('a source across a bridge — its rows are candidates, re-checked with 
 
   it('admits a reference only when the far side holds', async () => {
     const { gold, silver, farSide } = await fixture();
-    const { admitted, unadmitted } = await admitRuleReferences({ lenses: [goldTags], farSide }, [
-      { model: 'Tag', id: gold.id },
-      { model: 'Tag', id: silver.id },
-    ]);
+    const { admitted, unadmitted } = await admitRuleReferences({
+      scopes: [
+        {
+          lens: goldTags,
+          references: [
+            { model: 'Tag', id: gold.id },
+            { model: 'Tag', id: silver.id },
+          ],
+        },
+      ],
+      farSide,
+    });
     expect(admitted).toEqual([{ model: 'Tag', id: gold.id }]);
     expect(unadmitted).toEqual([{ model: 'Tag', id: silver.id }]);
   });
@@ -141,5 +156,33 @@ describe('a source across a bridge — its rows are candidates, re-checked with 
     await expect(sourceQueryValues(query, { lens: goldTags }, ours)).rejects.toBeInstanceOf(
       UsageError,
     );
+  });
+});
+
+describe('a reference is admitted by the lens it was named through, not the first one that has the model', () => {
+  const named = (value: string): LensNarrowing => ({
+    parent: lensFor('Tag'),
+    root: { sources: { id: { where: { field: 'name', operator: 'equals', value } } } },
+  });
+
+  it("a row one slot's source admits is still refused when another slot named it", async () => {
+    const a = (await createTag({ name: 'slot-a' })).entity;
+    const b = (await createTag({ name: 'slot-b' })).entity;
+
+    const { admitted, unadmitted } = await admitRuleReferences({
+      scopes: [
+        { lens: named('slot-a'), references: [{ model: 'Tag', id: a.id }] },
+        {
+          lens: named('slot-b'),
+          references: [
+            { model: 'Tag', id: a.id },
+            { model: 'Tag', id: b.id },
+          ],
+        },
+      ],
+    });
+
+    expect(admitted).toEqual([{ model: 'Tag', id: b.id }]);
+    expect(unadmitted).toEqual([{ model: 'Tag', id: a.id }]);
   });
 });

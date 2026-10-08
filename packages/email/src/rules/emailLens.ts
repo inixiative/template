@@ -30,7 +30,6 @@ import {
   dynamicRuleReferences,
   RULE_REFERENCEABLE_MODELS,
   ruleReferences,
-  type SourceLenses,
 } from '@template/db';
 import { lensFor, live, omitForeignKeys } from '@template/db/lens';
 import { redactLens } from '@template/db/lens/redactLens';
@@ -380,10 +379,15 @@ export const emailRuleVocabulary = (lens: EmailLens): RuleVocabulary => ({
   vocabularyIssues: (rule) => emailRuleVocabularyIssues(lens, rule),
 });
 
-export const emailRuleReferences = (lens: EmailLens, rule: Condition): RuleReference[] =>
+export const emailRuleReferences = (
+  lens: EmailLens,
+  rule: Condition,
+  root?: ScopeRoot,
+): RuleReference[] =>
   leaves(rule).flatMap((leaf) => {
     const slice = sliceOf(lens, leaf);
     if (!slice || slice.slot === OPAQUE_SLOT || !slice.rest) return [];
+    if (root && slice.root !== root) return [];
     return ruleReferences(slice.slot, { ...leaf, field: slice.rest } as Condition);
   });
 
@@ -454,10 +458,6 @@ export const emailSlotLenses = (lens: EmailLens): [ScopeRoot, RuleLens][] =>
     const slot = lens[root];
     return slot && slot !== OPAQUE_SLOT ? [[root, slot] as [ScopeRoot, RuleLens]] : [];
   });
-
-export const emailSourceLenses = (lens: EmailLens): SourceLenses => ({
-  lenses: emailSlotLenses(lens).map(([, slot]) => slot),
-});
 
 /** Each slot's variables as the lens shows them; `keepClampColumns` is the re-check projection rules evaluate on, never one to render. */
 export const narrowVariables = <V extends Record<string, unknown>>(
