@@ -17,11 +17,17 @@ import {
   narrowRule,
   projectLens,
   type SourceQuery,
+  type SourceValues,
   toSourceQueries,
   type ValidationIssue,
   validateRuleInLens,
 } from '@inixiative/json-rules';
-import { RULE_REFERENCEABLE_MODELS, ruleReferences } from '@template/db';
+import {
+  type DynamicRuleReference,
+  dynamicRuleReferences,
+  RULE_REFERENCEABLE_MODELS,
+  ruleReferences,
+} from '@template/db';
 import { lensFor, live, omitForeignKeys, prune, rootLens } from '@template/db/lens';
 import {
   RESERVED_SCOPE_ROOTS,
@@ -57,7 +63,10 @@ export type EmailLensInput = {
   narrowing?: EmailSlotLenses;
 };
 
-const referenced: ModelNarrowing = { picks: ['id', 'name'] };
+const referenced: ModelNarrowing = {
+  picks: ['id', 'name'],
+  sources: { id: { from: 'mapDefaults' } },
+};
 
 export const DEFAULT_RECIPIENT_NARROWING: ModelNarrowing = {
   picks: ['id', 'name', 'email'],
@@ -302,6 +311,18 @@ export const emailRuleReferences = (lens: EmailLens, rule: Condition): RuleRefer
     return ruleReferences(slice.slot, { ...leaf, field: slice.rest } as Condition);
   });
 
+export const emailDynamicRuleReferences = (
+  lens: EmailLens,
+  rule: Condition,
+): DynamicRuleReference[] =>
+  leaves(rule).flatMap((leaf) => {
+    const slice = sliceOf(lens, leaf);
+    if (!slice || slice.slot === OPAQUE_SLOT || !slice.rest) return [];
+    return dynamicRuleReferences(slice.slot, { ...leaf, field: slice.rest } as Condition).map(
+      (reference) => ({ ...reference, path: `${slice.root}.${reference.path}` }),
+    );
+  });
+
 const mapRuleTree = (condition: Condition, map: (leaf: Condition) => Condition): Condition => {
   if (condition == null || typeof condition === 'boolean') return condition;
   const node = condition as Record<string, unknown>;
@@ -415,6 +436,10 @@ export const emailSurface = (lens: EmailLens): Lens => {
     model: EMAIL_SURFACE_ROOT,
   });
 };
+
+/** The surface re-homes every slot under the email map, so its options must be keyed there too. */
+export const emailSurfaceSourceValues = (values: readonly SourceValues[]): SourceValues[] =>
+  values.map((value) => ({ ...value, mapName: EMAIL_MAP_NAME }));
 
 export type EmailRuleFacet = { path: string; label: string };
 export type EmailRuleDecoration = { facets: EmailRuleFacet[] };

@@ -14,7 +14,7 @@ import {
   projectLens,
   toSourceQueries,
 } from '@inixiative/json-rules';
-import { db, polymorphicBindings, polymorphicIs } from '@template/db';
+import { db, polymorphicBindings, polymorphicIs, sourceQueryWhere } from '@template/db';
 import type { Prisma, Segment } from '@template/db/generated/client/client';
 import type { ProviderModel } from '@template/db/generated/client/enums';
 import { boundAndLive, lensFor, live, omitForeignKeys, platformOrBound } from '@template/db/lens';
@@ -40,11 +40,7 @@ const tagAttachments: ModelNarrowing = {
   picks: [],
   where: live,
   relations: {
-    tag: {
-      picks: ['id', 'name'],
-      where: live,
-      sources: { id: { label: 'name', where: tagOwned } },
-    },
+    tag: { picks: ['id', 'name'], sources: { id: { from: 'mapDefaults' } } },
   },
 };
 
@@ -72,7 +68,7 @@ export const customerRefLens: LensNarrowing = omitForeignKeys({
   mapDefaults: {
     prisma: {
       models: {
-        Tag: { where: tagOwned },
+        Tag: { where: tagOwned, sources: { id: { label: 'name', where: tagOwned } } },
         Segment: { where: segmentOwned, sources: { id: { label: 'name', where: segmentOwned } } },
       },
     },
@@ -86,7 +82,10 @@ export const customerRefLens: LensNarrowing = omitForeignKeys({
       }),
       customerOrganization: customer(['id', 'name', 'createdAt']),
       customerSpace: customer(['id', 'name', 'createdAt']),
-      segmentMembers: { picks: [], relations: { segment: { picks: ['id'], where: segmentOwned } } },
+      segmentMembers: {
+        picks: [],
+        relations: { segment: { picks: ['id'], sources: { id: { from: 'mapDefaults' } } } },
+      },
     },
   },
 });
@@ -107,7 +106,7 @@ export const ownedSegments = async (
     (query) => query.model === 'Segment' && query.field === 'id',
   )!;
   return db.segment.findMany({
-    where: { AND: [source.prisma.where as Prisma.SegmentWhereInput, where] },
+    where: { AND: [(await sourceQueryWhere(source)) as Prisma.SegmentWhereInput, where] },
   });
 };
 
