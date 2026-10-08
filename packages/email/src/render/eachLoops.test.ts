@@ -228,11 +228,42 @@ describe('{{#each}} loops', () => {
     expect(out).toBe('[name-own][]');
   });
 
-  describe('a row the owner cannot see renders nothing, yet rules judge it as the database does', () => {
+  it("memberships are the sender's: another organization's membership is not a row of the loop", () => {
     const lens = scopeEmailLens(emailLens({ sender: lensFor('Organization') }), {
       ownerModel: 'Organization',
       ownerId: 'org-1',
     });
+    const out = interpolate(
+      '{{#each recipient.organizationUsers as=m}}[{{m.organization.name}}:{{m.role}}]{{/each}}',
+      {
+        recipient: {
+          id: 'u1',
+          name: 'Ann',
+          email: 'ann@example.com',
+          organizationUsers: [
+            { role: 'admin', organizationId: 'org-1', organization: { id: 'org-1', name: 'Acme' } },
+            {
+              role: 'member',
+              organizationId: 'org-2',
+              organization: { id: 'org-2', name: 'Rival' },
+            },
+          ],
+        },
+        sender: { id: 'org-1', name: 'Acme' },
+        data: {},
+      },
+      undefined,
+      { lens },
+    );
+    expect(out).toBe('[Acme:admin]');
+  });
+
+  describe('a row the owner cannot see renders nothing, yet rules judge it as the database does', () => {
+    const lens = scopeEmailLens(
+      emailLens({ sender: lensFor('Organization') }),
+      { ownerModel: 'Organization', ownerId: 'org-1' },
+      null,
+    );
     const variables = {
       recipient: {
         id: 'u1',

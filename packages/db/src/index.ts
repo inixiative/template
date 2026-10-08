@@ -142,6 +142,7 @@ export {
   dynamicRuleReferences,
   ruleReferences,
 } from './utils/ruleReferences';
+export { sourcePrismaQuery } from './utils/sourcePrismaQuery';
 export { sourceQueryWhere } from './utils/sourceQueryWhere';
 export {
   type RuleReferenceGate,

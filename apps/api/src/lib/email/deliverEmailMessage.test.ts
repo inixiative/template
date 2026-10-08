@@ -1,7 +1,15 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 import { db } from '@template/db';
 import { CommunicationReasonCode, CommunicationStatus } from '@template/db/generated/client/enums';
-import { cleanupTouchedTables, createCommunicationLog } from '@template/db/test';
+import {
+  cleanupTouchedTables,
+  createCommunicationLog,
+  createOrganization,
+  createOrganizationUser,
+  createSpace,
+  createSpaceUser,
+  createUser,
+} from '@template/db/test';
 import type { EmailClient, SendEmailOptions, SendEmailResult } from '@template/email/client/types';
 import { EmailProviderError } from '@template/email/errors/EmailProviderError';
 import { saveEmailTemplate } from '@template/email/render';
@@ -34,7 +42,10 @@ describe('deliverEmailMessage — claim policy', () => {
     waits.push(ms);
   };
 
-  beforeAll(() => {
+  let fan: { id: string };
+
+  beforeAll(async () => {
+    fan = (await createUser({ email: 'fan@example.com' })).entity;
     const recorder: EmailClient = {
       send: async (options) => {
         attempts.push(options);
@@ -78,7 +89,7 @@ describe('deliverEmailMessage — claim policy', () => {
   const payloadFor = (logId: string, template = TEMPLATE): DeliverEmailPayload => ({
     template,
     sender: { type: 'platform' },
-    recipient: { id: crypto.randomUUID(), name: 'Fan', email: 'fan@example.com' },
+    recipientId: fan.id,
     data: {},
     communicationLogId: logId,
   });
@@ -184,5 +195,134 @@ describe('deliverEmailMessage — claim policy', () => {
     const row = await rowOf(log.id);
     expect(row.status).toBe(CommunicationStatus.queued);
     expect(row.reasonCode).toBeNull();
+  });
+});
+
+describe('deliverEmailMessage — the recipient is read through the lens at send time', () => {
+  const sent: SendEmailOptions[] = [];
+  const sleep = async (): Promise<void> => {};
+  const RENDER_ADAPTER = 'send-time-recipient';
+
+  beforeAll(() => {
+    emailRegistry.register(RENDER_ADAPTER, {
+      send: async (options) => {
+        sent.push(options);
+        return { id: `sent-${sent.length}`, success: true };
+      },
+      sendBatch: async (batch) => batch.map((_, i) => ({ id: `batch-${i}`, success: true })),
+    });
+  });
+
+  afterEach(async () => {
+    sent.length = 0;
+    await db.communicationLog.deleteMany({});
+    await db.emailTemplate.deleteMany({});
+  });
+
+  afterAll(async () => {
+    emailRegistry.unregister(RENDER_ADAPTER);
+    await cleanupTouchedTables(db);
+  });
+
+  const saveTemplate = (slug: string, content: string, owner: Record<string, unknown> = {}) =>
+    saveEmailTemplate({
+      slug,
+      name: slug,
+      subject: 'Hi',
+      kind: 'system',
+      mjml: documentMjml(`<mj-text>${content}</mj-text>`),
+      ownerModel: 'default',
+      ...owner,
+    });
+
+  const deliver = async (
+    template: string,
+    recipientId: string,
+    sender: DeliverEmailPayload['sender'] = { type: 'platform' },
+  ) => {
+    const log = (await createCommunicationLog({ address: `${recipientId}@example.com` })).entity;
+    await deliverEmailMessage(
+      { template, sender, recipientId, data: {}, communicationLogId: log.id },
+      { sleep },
+    );
+    return db.communicationLog.findUniqueOrThrow({ where: { id: log.id } });
+  };
+
+  it('renders the recipient as the database holds them when the job runs, not when it was queued', async () => {
+    await saveTemplate('send-time-name', 'Hello {{recipient.name}}');
+    const { entity: user } = await createUser({ name: 'Queued Name' });
+    await db.user.update({ where: { id: user.id }, data: { name: 'Current Name' } });
+
+    const row = await deliver('send-time-name', user.id);
+
+    expect(row.status).toBe(CommunicationStatus.sent);
+    expect(sent[0]?.html).toContain('Hello Current Name');
+    expect(sent[0]?.html).not.toContain('Queued Name');
+    expect(sent[0]?.to).toBe(`${user.id}@example.com`);
+  });
+
+  it('closes a send whose recipient no longer resolves as not_found, without sending', async () => {
+    await saveTemplate('send-time-gone', 'Hello {{recipient.name}}');
+
+    const row = await deliver('send-time-gone', crypto.randomUUID());
+
+    expect(sent).toHaveLength(0);
+    expect(row.status).toBe(CommunicationStatus.failed);
+    expect(row.reasonCode).toBe(CommunicationReasonCode.not_found);
+  });
+
+  it("an organization's send shows only its own membership of a recipient who belongs to two", async () => {
+    const { entity: mine } = await createOrganization({ name: 'Sending Org' });
+    const { entity: theirs } = await createOrganization({ name: 'Other Org' });
+    const { entity: user } = await createUser();
+    await createOrganizationUser({ role: 'admin' }, { user, organization: mine });
+    await createOrganizationUser({ role: 'member' }, { user, organization: theirs });
+    await saveTemplate(
+      'org-memberships',
+      '{{#each recipient.organizationUsers as=m}}[{{m.organization.name}}:{{m.role}}]{{/each}}',
+    );
+
+    const row = await deliver('org-memberships', user.id, {
+      type: 'Organization',
+      organizationId: mine.id,
+    });
+
+    expect(row.status).toBe(CommunicationStatus.sent);
+    expect(sent[0]?.html).toContain('[Sending Org:admin]');
+    expect(sent[0]?.html).not.toContain('Other Org');
+    expect(sent[0]?.html).not.toContain(':member]');
+  });
+
+  it("a space sending with its organization's template shows that space's membership only", async () => {
+    const { entity: organization } = await createOrganization({ name: 'Parent Org' });
+    const { entity: space } = await createSpace({ name: 'Sending Space' }, { organization });
+    const { entity: sibling } = await createSpace({ name: 'Sibling Space' }, { organization });
+    const { entity: user } = await createUser();
+    const { entity: organizationUser } = await createOrganizationUser(
+      { role: 'member' },
+      { user, organization },
+    );
+    await createSpaceUser({ role: 'owner' }, { user, organization, space, organizationUser });
+    await createSpaceUser(
+      { role: 'viewer' },
+      { user, organization, space: sibling, organizationUser },
+    );
+    await saveTemplate(
+      'space-memberships',
+      '{{#each recipient.spaceUsers as=m}}[{{m.space.name}}:{{m.role}}]{{/each}}|{{#each recipient.organizationUsers as=o}}[{{o.organization.name}}]{{/each}}',
+      { ownerModel: 'Organization', organizationId: organization.id, inheritToSpaces: true },
+    );
+
+    const row = await deliver('space-memberships', user.id, {
+      type: 'Space',
+      spaceId: space.id,
+      organizationId: organization.id,
+    });
+
+    expect(row.status).toBe(CommunicationStatus.sent);
+    expect(row.emailTemplateId).not.toBeNull();
+    expect(sent[0]?.html).toContain('[Sending Space:owner]');
+    expect(sent[0]?.html).not.toContain('Sibling Space');
+    expect(sent[0]?.html).not.toContain('[Parent Org]');
   });
 });

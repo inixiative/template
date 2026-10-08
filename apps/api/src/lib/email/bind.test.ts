@@ -21,13 +21,7 @@ describe('bindLens', () => {
       picks: string[];
       relations: unknown;
     };
-    expect(root.picks).toEqual([
-      'id',
-      'content',
-      'sourceOrganizationId',
-      'targetUserId',
-      'sourceOrganization',
-    ]);
+    expect(root.picks).toEqual(['id', 'content', 'sourceOrganizationId', 'targetUserId']);
     expect(root.relations).toEqual({ sourceOrganization: { picks: ['name'] } });
   });
 

@@ -28,7 +28,7 @@ describe('a stepped source — a count the where resolves to an id set first', (
 
   it('compiles to steps, and admits exactly the rows its count holds for', async () => {
     const sources = toSourceQueries(busyTags);
-    expect(sources[0]?.prisma.steps?.length).toBeGreaterThan(0);
+    expect(sources[0]?.prisma?.steps?.length).toBeGreaterThan(0);
 
     const busy = (await createTag()).entity;
     const idle = (await createTag()).entity;

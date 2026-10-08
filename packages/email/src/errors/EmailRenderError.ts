@@ -9,7 +9,8 @@ export type EmailErrorType =
   | 'template_missing'
   | 'circular_ref'
   | 'render_failed'
-  | 'unsubscribe_unavailable';
+  | 'unsubscribe_unavailable'
+  | 'recipient_missing';
 
 const message = (slug: string, type: EmailErrorType, path?: string[]): string => {
   switch (type) {
@@ -27,6 +28,8 @@ const message = (slug: string, type: EmailErrorType, path?: string[]): string =>
         : `Template render failed: ${slug}`;
     case 'unsubscribe_unavailable':
       return `Template ${slug} is not a system email and the recipient has no contact to unsubscribe`;
+    case 'recipient_missing':
+      return `The recipient of ${slug} no longer resolves through its lens`;
   }
 };
 

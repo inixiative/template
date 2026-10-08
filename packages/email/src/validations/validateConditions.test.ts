@@ -182,7 +182,10 @@ const testMap: FieldMap = {
 const slot = (model: string) => createLens({ mapName: 'test', model, maps: { test: testMap } });
 
 const testLens: EmailLens = {
-  recipient: slot('Recipient'),
+  recipient: {
+    parent: slot('Recipient'),
+    root: { relations: { memberships: { relations: { perks: {} } } } },
+  },
   sender: slot('Sender'),
   system: slot('System'),
 };

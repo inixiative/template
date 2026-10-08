@@ -29,7 +29,10 @@ describe('deriveComponentExpectations', () => {
 });
 
 describe('checkExpectations (the "can this belong to this template" walk)', () => {
-  const lens: EmailLens = { recipient: lensFor('User'), system: systemSlot() };
+  const lens: EmailLens = {
+    recipient: { parent: lensFor('User'), root: { relations: { contacts: {} } } },
+    system: systemSlot(),
+  };
 
   it('accepts paths that resolve against the lens, across scalars and through relations', () => {
     const checks = checkExpectations(

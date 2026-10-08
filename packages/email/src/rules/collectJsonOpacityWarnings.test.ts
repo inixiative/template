@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'bun:test';
-import { createLens, validateRuleInLens } from '@inixiative/json-rules';
+import { createLens, type LensNarrowing, validateRuleInLens } from '@inixiative/json-rules';
 import { collectJsonOpacityWarnings } from '@template/email/rules/collectJsonOpacityWarnings';
 import type { EmailLens } from '@template/email/rules/emailLens';
 
-const recipient = createLens({
+const recipientBase = createLens({
   mapName: 'test',
   model: 'Recipient',
   maps: {
@@ -26,6 +26,11 @@ const recipient = createLens({
     },
   },
 });
+
+const recipient: LensNarrowing = {
+  parent: recipientBase,
+  root: { relations: { enrichments: {}, partners: {} } },
+};
 
 const testLens: EmailLens = { recipient };
 

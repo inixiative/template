@@ -8,19 +8,29 @@ import {
   materializeSourceQuery,
   type SourceQuery,
   type SourceValues,
+  toSourceQueries,
 } from '@inixiative/json-rules';
-import { db, sourceQueryWhere } from '@template/db';
-import { type EmailLens, emailSourceQueries } from '@template/email/rules';
+import { db, sourcePrismaQuery, sourceQueryWhere } from '@template/db';
+import type { ScopeRoot } from '@template/email/render/conditionParser';
+import { type EmailLens, emailSlotLenses } from '@template/email/rules';
 
 const sourceValuesOf = async (query: SourceQuery): Promise<SourceValues> => {
-  const delegate = db.delegate(query.model);
-  const rows = (await delegate.findMany({
+  const { select, distinct } = sourcePrismaQuery(query);
+  const rows = (await db.delegate(query.model).findMany({
     where: await sourceQueryWhere(query),
-    select: query.prisma.select,
-    ...(query.prisma.distinct ? { distinct: query.prisma.distinct } : {}),
+    select,
+    ...(distinct ? { distinct } : {}),
   })) as Record<string, unknown>[];
   return materializeSourceQuery(query, rows);
 };
 
-export const emailSourceValues = (lens: EmailLens): Promise<SourceValues[]> =>
-  Promise.all(emailSourceQueries(lens).map(sourceValuesOf));
+export const emailSourceValues = (lens: EmailLens): Promise<[ScopeRoot, SourceValues][]> =>
+  Promise.all(
+    emailSlotLenses(lens).flatMap(([root, slot]) =>
+      toSourceQueries(slot)
+        .filter((query) => query.prisma)
+        .map(
+          async (query): Promise<[ScopeRoot, SourceValues]> => [root, await sourceValuesOf(query)],
+        ),
+    ),
+  );

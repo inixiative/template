@@ -22,7 +22,10 @@ const map: FieldMap = {
   },
 };
 const lens: EmailLens = {
-  recipient: createLens({ maps: { prisma: map }, mapName: 'prisma', model: 'User' }),
+  recipient: {
+    parent: createLens({ maps: { prisma: map }, mapName: 'prisma', model: 'User' }),
+    root: { relations: { account: {}, contacts: {} } },
+  },
   sender: createLens({ maps: { prisma: map }, mapName: 'prisma', model: 'Organization' }),
   data: OPAQUE_SLOT,
   system: systemSlot(),

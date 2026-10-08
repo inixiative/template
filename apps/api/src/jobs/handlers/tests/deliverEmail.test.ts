@@ -7,6 +7,7 @@ import {
   createEmailComponent,
   createOrganization,
   createSpace,
+  createUser,
 } from '@template/db/test';
 import type { EmailClient, SendEmailOptions } from '@template/email/client/types';
 import { saveEmailTemplate } from '@template/email/render';
@@ -25,7 +26,10 @@ describe('deliverEmail — send-time component version closure', () => {
   const attempts: SendEmailOptions[] = [];
   const outcomes: Array<Error | { id: string; success: false }> = [];
 
-  beforeAll(() => {
+  let fan: { id: string };
+
+  beforeAll(async () => {
+    fan = (await createUser({ email: 'fan@example.com' })).entity;
     registerAuditLogHook();
     registerEmailVersioningHook();
     const recorder: EmailClient = {
@@ -70,7 +74,7 @@ describe('deliverEmail — send-time component version closure', () => {
   ): DeliverEmailPayload => ({
     template: 'closure-template',
     sender,
-    recipient: { id: crypto.randomUUID(), name: 'Fan', email: 'fan@example.com' },
+    recipientId: fan.id,
     data: {},
     communicationLogId: logId,
   });

@@ -5,7 +5,6 @@
  * @uses none
  */
 import {
-  type Condition,
   executePrismaPlan,
   getLensRoot,
   type Lens,
@@ -20,12 +19,11 @@ import { toModelName } from '@template/db/utils/modelNames';
 
 export const fetchLens = async <T extends Record<string, unknown> = Record<string, unknown>>(
   lens: Lens | LensNarrowing,
-  { rules }: { rules?: readonly Condition[] } = {},
 ): Promise<T[]> => {
   const where = await executePrismaPlan(toPrisma(true, { lens }), db as never);
   requireWhere(where);
   const delegate = db.delegate(toModelName(getLensRoot(lens).model));
-  const { select } = toLensSelect(lens, { rules });
+  const { select } = toLensSelect(lens);
   const rows = (await delegate.findMany({ where, select })) as T[];
-  return projectRows(lens, rows, { keepGrantColumns: true, rules }) as T[];
+  return projectRows(lens, rows, { keepGrantColumns: true }) as T[];
 };

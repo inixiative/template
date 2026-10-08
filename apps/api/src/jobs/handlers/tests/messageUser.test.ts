@@ -1,8 +1,17 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
 import { Operator } from '@inixiative/json-rules';
 import { ContactType } from '@template/db/generated/client/enums';
-import { cleanupTouchedTables, createContact, createUser } from '@template/db/test';
+import {
+  cleanupTouchedTables,
+  createContact,
+  createOrganization,
+  createOrganizationUser,
+  createUser,
+} from '@template/db/test';
+import { saveEmailTemplate } from '@template/email/render';
 import { messageUser } from '#/jobs/handlers/messageUser';
+import { recipientVariables } from '#/lib/email/renderForRecipient';
+import { settleTemplate } from '#/lib/emailTemplate';
 import { type MessageContent, messageProviderRegistry } from '#/lib/messaging/providers';
 import { createTestApp } from '#tests/createTestApp';
 import { createTestWorker } from '#tests/createTestWorker';
@@ -225,5 +234,76 @@ describe('messageUser handler', () => {
     });
 
     expect(dispatched).toHaveLength(0);
+  });
+
+  describe('renders through the recipient lens, as email does', () => {
+    const memberships =
+      '{{#each recipient.organizationUsers as=m}}[{{m.organization.name}}:{{m.role}}]{{/each}}';
+    const isAdmin = JSON.stringify({
+      field: 'recipient.organizationUsers',
+      arrayOperator: 'any',
+      condition: { field: 'role', operator: 'equals', value: 'admin' },
+    });
+
+    const member = async () => {
+      const { entity: mine } = await createOrganization({ name: 'Mine' });
+      const { entity: theirs } = await createOrganization({ name: 'Theirs' });
+      const { entity: user } = await createUser({ name: 'Ada' });
+      await createOrganizationUser({ role: 'admin' }, { user, organization: mine });
+      await createOrganizationUser({ role: 'member' }, { user, organization: theirs });
+      await createContact(
+        { ownerModel: 'User', type: ContactType.whatsapp, value: { jid: user.id } },
+        { user },
+      );
+      return { user, mine, theirs };
+    };
+
+    const send = async (userId: string, organizationId: string, text: string) => {
+      await messageUser(worker, {
+        rule: { field: 'id', operator: Operator.equals, value: userId },
+        kind: 'system',
+        content: { text },
+        sender: { type: 'Organization', organizationId },
+      });
+      return dispatched.at(-1)?.content.text;
+    };
+
+    it("renders only the viewer projection: a hidden column and another organization's membership never print", async () => {
+      const { user, mine } = await member();
+      expect(
+        await send(
+          user.id,
+          mine.id,
+          `{{recipient.name}}|{{recipient.platformRole}}|${memberships}`,
+        ),
+      ).toBe('Ada||[Mine:admin]');
+    });
+
+    it("judges rules on the re-check rows the sender's lens keeps", async () => {
+      const { user, mine, theirs } = await member();
+      const text = `{{#if rule=${isAdmin}}}ADMIN{{else}}NOT{{/if}}`;
+      expect(await send(user.id, mine.id, text)).toBe('ADMIN');
+      expect(await send(user.id, theirs.id, text)).toBe('NOT');
+    });
+
+    it('renders the same content exactly as the email lane does for the same recipient', async () => {
+      const { user, mine } = await member();
+      const text = `Hi {{recipient.name}} ${memberships} {{#if rule=${isAdmin}}}ADMIN{{/if}}`;
+      await saveEmailTemplate({
+        slug: 'same-render',
+        name: 'same-render',
+        subject: 'Hi',
+        kind: 'system',
+        mjml: `<mjml><mj-body><mj-section><mj-column><mj-text>${text}</mj-text></mj-column></mj-section></mj-body></mjml>`,
+        ownerModel: 'default',
+      });
+      const sender = { type: 'Organization', organizationId: mine.id } as const;
+      const messaged = await send(user.id, mine.id, text);
+      const emailed = await settleTemplate('same-render', sender, (lens) =>
+        recipientVariables(lens, { recipientId: user.id, sender }),
+      );
+      expect(messaged).toBe('Hi Ada [Mine:admin] ADMIN');
+      expect(emailed.mjml).toContain(`<mj-text>${messaged}</mj-text>`);
+    });
   });
 });

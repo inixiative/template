@@ -16,8 +16,7 @@ import mjml2html from 'mjml';
 import { emitAppEvent } from '#/appEvents/emit';
 import { defaultEmailClient, emailVerifier, resolveFromAddress } from '#/lib/email';
 import { communicationReasonCodeFor } from '#/lib/email/communicationReasonCode';
-import type { Recipient } from '#/lib/email/recipient';
-import { resolveSender } from '#/lib/email/resolveSender';
+import { recipientVariables } from '#/lib/email/renderForRecipient';
 import type { Sender } from '#/lib/email/sender';
 import { unsubscribeUrl } from '#/lib/email/unsubscribe';
 import { type SettledTemplate, settleTemplate } from '#/lib/emailTemplate';
@@ -32,7 +31,7 @@ const SEND_RETRY_BASE_DELAY_MS = 2_000;
 export type DeliverEmailPayload = {
   template: string;
   sender: Sender;
-  recipient: Recipient;
+  recipientId: string;
   cc?: string[];
   bcc?: string[];
   data: Record<string, unknown>;
@@ -60,7 +59,7 @@ export const deliverEmailMessage = async (
   payload: DeliverEmailPayload,
   { sleep = sleepUnlessShuttingDown }: DeliverEmailMessageOptions = {},
 ): Promise<void> => {
-  const { template, sender, recipient, cc, bcc, data, communicationLogId } = payload;
+  const { template, sender, recipientId, cc, bcc, data, communicationLogId } = payload;
   const open = { id: communicationLogId, status: 'queued' as const };
 
   const entry = await db.communicationLog.findUnique({
@@ -68,6 +67,7 @@ export const deliverEmailMessage = async (
     select: {
       status: true,
       reasonCode: true,
+      address: true,
       recipientContactId: true,
       recipientContact: {
         select: { acceptedKinds: true, deliverability: true, deliverabilityCheckedAt: true },
@@ -83,29 +83,35 @@ export const deliverEmailMessage = async (
     return;
   }
 
-  const variables: Variables = { sender: await resolveSender(sender), recipient, data };
-
   const settleRenderFailure = (error: unknown) =>
     settleCommunication(open, {
       status: 'failed',
-      reasonCode: CommunicationReasonCode.render_failed,
+      reasonCode:
+        error instanceof EmailRenderError && error.type === 'recipient_missing'
+          ? CommunicationReasonCode.not_found
+          : CommunicationReasonCode.render_failed,
       error: errorMessageOf(error),
     });
 
   let settled: SettledTemplate;
   try {
-    settled = await settleTemplate(template, sender, variables, (kind) => {
-      if (kind === 'system') return {};
-      if (!entry.recipientContactId)
-        throw new EmailRenderError(template, 'unsubscribe_unavailable');
-      return {
-        unsubscribeUrl: unsubscribeUrl({
-          userId: recipient.id,
-          contactId: entry.recipientContactId,
-          kind,
-        }),
-      };
-    });
+    settled = await settleTemplate(
+      template,
+      sender,
+      (lens) => recipientVariables(lens, { recipientId, sender, data, label: template }),
+      (kind) => {
+        if (kind === 'system') return {};
+        if (!entry.recipientContactId)
+          throw new EmailRenderError(template, 'unsubscribe_unavailable');
+        return {
+          unsubscribeUrl: unsubscribeUrl({
+            userId: recipientId,
+            contactId: entry.recipientContactId,
+            kind,
+          }),
+        };
+      },
+    );
   } catch (error) {
     if (!isEmailContentError(error)) throw error;
     await settleRenderFailure(error);
@@ -134,7 +140,7 @@ export const deliverEmailMessage = async (
   let deliverability: string | null = cacheFresh ? cached.deliverability : null;
   let undeliverableReason: string | null = null;
   if (deliverability === null) {
-    const verdict = await emailVerifier.verify(recipient.email);
+    const verdict = await emailVerifier.verify(entry.address);
     deliverability = verdict.status;
     undeliverableReason = verdict.reason ?? null;
     if (entry.recipientContactId) {
@@ -165,7 +171,7 @@ export const deliverEmailMessage = async (
   const headers =
     settled.kind !== 'system' && entry.recipientContactId
       ? {
-          'List-Unsubscribe': `<${unsubscribeUrl({ userId: recipient.id, contactId: entry.recipientContactId, kind: settled.kind })}>`,
+          'List-Unsubscribe': `<${unsubscribeUrl({ userId: recipientId, contactId: entry.recipientContactId, kind: settled.kind })}>`,
           'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
         }
       : undefined;
@@ -217,7 +223,7 @@ export const deliverEmailMessage = async (
     const result = await withRetry(
       () =>
         defaultEmailClient().send({
-          to: recipient.email,
+          to: entry.address,
           cc,
           bcc,
           from,

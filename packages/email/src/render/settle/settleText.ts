@@ -16,6 +16,6 @@ export const settleText = (
 ): string => {
   if (!options.substitute) return text;
   return text.replace(TOKEN_PATTERN, (_match, root: string, segments: string) =>
-    substituteToken(root, segments, scope, onError),
+    substituteToken(root, segments, scope, onError, options),
   );
 };
