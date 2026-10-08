@@ -217,7 +217,7 @@ describe('evaluateConditions — unterminated block', () => {
 describe('evaluateConditions — undefined variable stripping', () => {
   it('drops undefined top-level variable groups from the rule data', () => {
     const output = evaluateConditions(
-      '{{#if rule={"field":"recipient.name","operator":"isDefined","value":true}}}has{{else}}none{{/if}}',
+      '{{#if rule={"field":"recipient.name","operator":"exists"}}}has{{else}}none{{/if}}',
       { recipient: undefined, data: { x: 1 } },
     );
 
