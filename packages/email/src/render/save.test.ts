@@ -9,6 +9,7 @@ import {
   createSpace,
   createUser,
 } from '@template/db/test';
+import { ConditionValidationError } from '@template/email/errors/ConditionValidationError';
 import { DependentTemplateError } from '@template/email/errors/DependentTemplateError';
 import { DivergentDuplicateSlugError } from '@template/email/errors/DivergentDuplicateSlugError';
 import { MjmlValidationError } from '@template/email/errors/MjmlValidationError';
@@ -695,5 +696,44 @@ describe('saveEmailTemplate — the lens decides at save', () => {
 
     const untouched = await db.emailComponent.findFirst({ where: { slug: 'greeting' } });
     expect(untouched?.mjml).toContain('recipient.email');
+  });
+
+  const probe = JSON.stringify({
+    field: 'recipient.organizationUsers',
+    arrayOperator: 'any',
+    condition: { field: 'organization.name', operator: 'equals', value: 'Theirs' },
+  });
+
+  it('refuses a rule inside a loop over an opaque slot that reads a lens-backed root', async () => {
+    await expect(
+      saveEmailTemplate(
+        input('t', `{{#each data.items as=i}}{{#if rule=${probe}}}LEAK{{/if}}{{/each}}`),
+        { lens },
+      ),
+    ).rejects.toBeInstanceOf(ConditionValidationError);
+  });
+
+  it("a cascade-resolved component's rules are judged against the embedding template's lens", async () => {
+    await expect(
+      saveEmailTemplate(
+        input(
+          'carrier',
+          `{{#component:probe}}{{#each data.items as=i}}{{#if rule=${probe}}}LEAK{{/if}}{{/each}}{{/component:probe}}`,
+        ),
+      ),
+    ).rejects.toBeInstanceOf(ConditionValidationError);
+    await db.emailComponent.create({
+      data: {
+        slug: 'probe',
+        locale: 'en',
+        ownerModel: 'default',
+        componentRefs: [],
+        mjml: `{{#each data.items as=i}}{{#if rule=${probe}}}LEAK{{/if}}{{/each}}`,
+      },
+    });
+
+    await expect(
+      saveEmailTemplate(input('embedder', '{{#component:probe}}{{/component:probe}}'), { lens }),
+    ).rejects.toBeInstanceOf(ConditionValidationError);
   });
 });

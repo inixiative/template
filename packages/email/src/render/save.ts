@@ -145,6 +145,7 @@ export const saveEmailTemplate = async (
       );
 
       const composed = await expand(template.mjml, ctx);
+      assertValidConditions(composed, { lens: options.lens });
       assertValidTokens(composed, { lens: options.lens });
       if (template.subject)
         assertValidTokens(template.subject, { lens: options.lens, isSubject: true });

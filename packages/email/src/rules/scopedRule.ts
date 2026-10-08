@@ -8,6 +8,7 @@ import { type Condition, check } from '@inixiative/json-rules';
 import { RESERVED_SCOPE_ROOTS } from '@template/email/render/conditionParser';
 import { type EmailLens, OPAQUE_SLOT, slotOf, splitRoot } from '@template/email/rules/emailLens';
 import type { BindingChain } from '@template/email/rules/resolveBindingPath';
+import { walkConditionTree } from '@template/email/rules/walkConditionTree';
 
 export type { BindingChain } from '@template/email/rules/resolveBindingPath';
 
@@ -156,6 +157,37 @@ export const iteratesLens = (bindings: BindingChain | undefined, lens?: EmailLen
   if (!lens) return root !== 'data';
   const slot = slotOf(lens, root);
   return slot !== undefined && slot !== OPAQUE_SLOT;
+};
+
+const rootsRead = (rule: Condition): Set<string> => {
+  const roots = new Set<string>();
+  walkConditionTree(rule, true, (leaf, top) => {
+    const node = leaf as Node;
+    if (top && typeof node.field === 'string') roots.add(splitRoot(node.field).root);
+    if (typeof node.path === 'string' && !node.path.startsWith('$'))
+      roots.add(splitRoot(node.path).root);
+    return [
+      { condition: node.condition as Condition | undefined, context: false },
+      { condition: node.filter as Condition | undefined, context: false },
+    ];
+  });
+  return roots;
+};
+
+/** Inside a loop over an opaque slot a rule is checked against raw elements, so it may not read a lens-backed root at all. */
+export const opaqueLoopIssue = (
+  rule: Condition,
+  bindings: BindingChain | undefined,
+  lens: EmailLens,
+): string | undefined => {
+  if (!bindings || !loopFrames(bindings).length || iteratesLens(bindings, lens)) return undefined;
+  const backed = [...rootsRead(rule)].filter((root) => {
+    const slot = slotOf(lens, root);
+    return slot !== undefined && slot !== OPAQUE_SLOT;
+  });
+  return backed.length
+    ? `a rule inside a loop over an opaque slot may not read ${backed.join(', ')}`
+    : undefined;
 };
 
 export const scopedRule = (

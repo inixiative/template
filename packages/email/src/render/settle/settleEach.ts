@@ -26,6 +26,7 @@ import {
   iteratesLens,
   loopFrames,
   narrowToElements,
+  opaqueLoopIssue,
   scopedRule,
 } from '@template/email/rules/scopedRule';
 import { withRule } from '@template/shared/rules';
@@ -85,6 +86,9 @@ export const settleEach = (
   const filter = block.filter;
   const lens = options.lens ?? defaultEmailLens;
   const lensed = iteratesLens(bodyOptions.bindings, lens);
+  const opaque =
+    filter === undefined ? undefined : opaqueLoopIssue(filter, bodyOptions.bindings, lens);
+  if (opaque !== undefined) return issue(opaque);
   if (filter !== undefined && lensed) {
     const scoped = scopedRule(filter, bodyOptions.bindings, { lens });
     if (scoped.issue !== undefined) return issue(scoped.issue);

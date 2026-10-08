@@ -21,6 +21,7 @@ import {
   loopFrames,
   loopIndices,
   narrowToElements,
+  opaqueLoopIssue,
   scopedRule,
 } from '@template/email/rules/scopedRule';
 import { withRule } from '@template/shared/rules';
@@ -41,6 +42,11 @@ export const settleBranches = (
 
     const rule = branch.rule!;
     const lens = options.lens ?? defaultEmailLens;
+    const opaque = opaqueLoopIssue(rule, options.bindings, lens);
+    if (opaque !== undefined) {
+      onError?.({ kind: 'rule', detail: opaque });
+      continue;
+    }
     const scoped = scopedRule(rule, options.bindings, {
       lens,
       indices: options.bindings && loopIndices(scope, options.bindings),

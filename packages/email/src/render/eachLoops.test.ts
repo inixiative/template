@@ -428,4 +428,32 @@ describe('{{#each}} loops', () => {
   it('renders an unknown root empty outside any loop, never the literal token', () => {
     expect(render('hello {{unknown.thing}} world', {})).toBe('hello  world');
   });
+
+  it('a rule inside a loop over an opaque slot that probes a lens-backed root renders nothing and reports it', () => {
+    const lens = scopeEmailLens(emailLens({ sender: lensFor('Organization') }), {
+      ownerModel: 'Organization',
+      ownerId: 'org-1',
+    });
+    const probe = JSON.stringify({
+      field: 'recipient.organizationUsers',
+      arrayOperator: 'any',
+      condition: { field: 'organization.name', operator: 'equals', value: 'Theirs' },
+    });
+    const issues: string[] = [];
+    const out = interpolate(
+      `{{#each data.items as=i}}{{#if rule=${probe}}}LEAK{{else}}-{{/if}}{{/each}}`,
+      {
+        recipient: {
+          id: 'u1',
+          name: 'Ann',
+          organizationUsers: [{ role: 'member', organization: { id: 'org-2', name: 'Theirs' } }],
+        },
+        data: { items: [1] },
+      },
+      (issue) => issues.push(issue.detail),
+      { lens },
+    );
+    expect(out).not.toContain('LEAK');
+    expect(issues.join(' ')).toContain('opaque slot');
+  });
 });

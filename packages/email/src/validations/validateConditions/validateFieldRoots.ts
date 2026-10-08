@@ -7,9 +7,13 @@
 import type { Condition } from '@inixiative/json-rules';
 import type { ConditionIssue } from '@template/email/errors/ConditionValidationError';
 import { RESERVED_SCOPE_ROOTS } from '@template/email/render/conditionParser';
-import { type EmailLens, emailRuleViolations } from '@template/email/rules/emailLens';
+import {
+  defaultEmailLens,
+  type EmailLens,
+  emailRuleViolations,
+} from '@template/email/rules/emailLens';
 import type { BindingChain } from '@template/email/rules/resolveBindingPath';
-import { scopedRule } from '@template/email/rules/scopedRule';
+import { opaqueLoopIssue, scopedRule } from '@template/email/rules/scopedRule';
 import { walkConditionTree } from '@template/email/rules/walkConditionTree';
 import { collectContextPathRoots } from '@template/email/validations/validateConditions/collectContextPathRoots';
 import type { ConditionNode } from '@template/email/validations/validateConditions/types';
@@ -46,6 +50,11 @@ export const validateFieldRoots = (
   }
   if (unknown.length) return;
 
+  const opaque = opaqueLoopIssue(rule, bindingScope, lens ?? defaultEmailLens);
+  if (opaque !== undefined) {
+    issues.push({ path, message: opaque });
+    return;
+  }
   const scoped = scopedRule(rule, bindingScope, { lens });
   if (scoped.issue !== undefined) {
     issues.push({ path, message: scoped.issue });
