@@ -608,9 +608,10 @@ const users = await db.user.findMany({ where });
 
 **What it does:**
 1. Applies `search` across all `searchableFields` (case-insensitive `contains`, OR logic)
-2. Applies `searchFields` to individual fields (case-insensitive `contains`, AND logic with search)
-3. Merges with `filters` object
-4. Returns combined `where` clause
+2. Applies `searchFields` to individual fields (case-sensitive; a bare String value is `contains`; pass `mode: 'insensitive'` to opt in), AND logic with search
+3. Escapes LIKE metacharacters (`%`, `_`, `\`) in `contains` / `startsWith` / `endsWith`, an insensitive `equals` / `not`, Json `string_*`, and the `search` term, so a value matches only itself
+4. Merges with `filters` object
+5. Returns combined `where` clause
 
 **Security:** Uses `validatePathNotation()` to prevent injection attacks on nested field paths.
 

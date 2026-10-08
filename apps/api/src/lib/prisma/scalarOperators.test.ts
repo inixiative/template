@@ -4,7 +4,6 @@ import {
   getDefaultOperator,
   getValidOperators,
   isValidOperatorForField,
-  STRING_OPS_WITH_MODE,
 } from '#/lib/prisma/scalarOperators';
 
 const scalar = (type: string): FieldDef => ({ kind: 'scalar', type });
@@ -95,20 +94,5 @@ describe('isValidOperatorForField', () => {
 
   it('rejects any operator on Json', () => {
     expect(isValidOperatorForField(scalar('Json'), 'equals')).toBe(false);
-  });
-});
-
-describe('STRING_OPS_WITH_MODE', () => {
-  it('contains every string op that supports Prisma mode insensitive', () => {
-    expect(STRING_OPS_WITH_MODE.has('contains')).toBe(true);
-    expect(STRING_OPS_WITH_MODE.has('startsWith')).toBe(true);
-    expect(STRING_OPS_WITH_MODE.has('endsWith')).toBe(true);
-    expect(STRING_OPS_WITH_MODE.has('equals')).toBe(true);
-    expect(STRING_OPS_WITH_MODE.has('not')).toBe(true);
-  });
-
-  it("excludes 'in' / 'notIn' (Prisma doesn't support mode on array ops)", () => {
-    expect(STRING_OPS_WITH_MODE.has('in')).toBe(false);
-    expect(STRING_OPS_WITH_MODE.has('notIn')).toBe(false);
   });
 });

@@ -17,15 +17,12 @@ import {
 import { makeError } from '#/lib/errors';
 import { buildSearchPath } from '#/lib/prisma/buildSearchPath';
 import { coerceValueForField } from '#/lib/prisma/coerceValue';
+import { escapeLikePattern } from '#/lib/prisma/escapeLikePattern';
 import { type FieldDef, lookupField } from '#/lib/prisma/fieldMetadata';
 import { fieldSearchOperator } from '#/lib/prisma/fieldSearchOperator';
 import { buildJsonWhere } from '#/lib/prisma/jsonFilter';
 import { validatePathNotation } from '#/lib/prisma/pathNotation';
-import {
-  getDefaultOperator,
-  getValidOperators,
-  STRING_OPS_WITH_MODE,
-} from '#/lib/prisma/scalarOperators';
+import { getDefaultOperator, getValidOperators } from '#/lib/prisma/scalarOperators';
 import type {
   BracketQueryPrimitive,
   BracketQueryRecord,
@@ -101,6 +98,24 @@ const indexedChildren = (
 
 const kindLabel = (field: FieldDef): string => (field.kind === 'enum' ? 'enum' : field.type);
 
+const PATTERN_OPS = new Set(['contains', 'startsWith', 'endsWith']);
+const EQUALITY_OPS = new Set(['equals', 'not']);
+
+const isTextField = (field: FieldDef): boolean =>
+  field.kind === 'scalar' && field.type === 'String' && !field.isList;
+
+const matchesLiterally = (
+  field: FieldDef,
+  op: string,
+  value: unknown,
+  insensitive: boolean,
+): unknown =>
+  typeof value === 'string' &&
+  isTextField(field) &&
+  (PATTERN_OPS.has(op) || (insensitive && EQUALITY_OPS.has(op)))
+    ? escapeLikePattern(value)
+    : value;
+
 const wrapBareValue = (field: FieldDef, value: BracketQueryPrimitive): Record<string, unknown> => {
   // Bare symbols (null/true/false) on a json column → equals that json scalar (null
   // is the provider json-null). Non-symbol bare values never reach here for json.
@@ -111,16 +126,7 @@ const wrapBareValue = (field: FieldDef, value: BracketQueryPrimitive): Record<st
     return { equals: null };
   }
   const op = getDefaultOperator(field);
-  const coerced = coerceValueForField(field, value);
-  if (
-    dialect.stringMode &&
-    field.kind === 'scalar' &&
-    field.type === 'String' &&
-    STRING_OPS_WITH_MODE.has(op)
-  ) {
-    return { [op]: coerced, mode: dialect.stringMode };
-  }
-  return { [op]: coerced };
+  return { [op]: matchesLiterally(field, op, coerceValueForField(field, value), false) };
 };
 
 const transformOperatorValue = (
@@ -151,16 +157,9 @@ const transformOperatorValue = (
     }
   }
 
-  // String ops support `mode` on Postgres. Auto-add it when any mode-capable op is
-  // present and the caller didn't override `mode`. No-op where dialect omits mode.
-  if (
-    dialect.stringMode &&
-    field.kind === 'scalar' &&
-    field.type === 'String' &&
-    out.mode === undefined &&
-    Object.keys(out).some((k) => STRING_OPS_WITH_MODE.has(k))
-  ) {
-    out.mode = dialect.stringMode;
+  const insensitive = out.mode === 'insensitive';
+  for (const [op, opValue] of Object.entries(out)) {
+    out[op] = matchesLiterally(field, op, opValue, insensitive);
   }
   return out;
 };

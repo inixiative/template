@@ -118,6 +118,16 @@ describe('buildWhereClause', () => {
       });
     });
 
+    it('escapes LIKE metacharacters in the free-text term', () => {
+      const result = buildWhereClause({
+        filterLens: { parent: lensFor('User'), root: { picks: ['name'] } },
+        search: '50%_',
+      });
+      expect(result).toEqual({
+        AND: [{ OR: [{ name: { contains: '50\\%\\_', mode: 'insensitive' } }] }],
+      });
+    });
+
     it('emits no OR when every searchable field is non-String', () => {
       const result = buildWhereClause({
         filterLens: { parent: lensFor('User'), root: { picks: ['platformRole', 'createdAt'] } },
@@ -135,13 +145,13 @@ describe('buildWhereClause', () => {
   });
 
   describe('searchFields — bare value applies the kind default operator', () => {
-    it('String → contains + insensitive mode', () => {
+    it('String → contains, case-sensitive', () => {
       const result = buildWhereClause({
         filterLens: { parent: lensFor('User'), root: { picks: ['name'] } },
         searchFields: { name: 'aron' },
       });
       expect(result).toEqual({
-        AND: [{ name: { contains: 'aron', mode: 'insensitive' } }],
+        AND: [{ name: { contains: 'aron' } }],
       });
     });
 
@@ -242,14 +252,61 @@ describe('buildWhereClause', () => {
   });
 
   describe('searchFields — explicit operators', () => {
-    it("auto-adds mode: 'insensitive' for String + mode-capable ops", () => {
+    it('String operators are case-sensitive unless the caller opts in', () => {
       const result = buildWhereClause({
         filterLens: { parent: lensFor('User'), root: { picks: ['name'] } },
         searchFields: { name: { startsWith: 'A' } },
       });
       expect(result).toEqual({
+        AND: [{ name: { startsWith: 'A' } }],
+      });
+    });
+
+    it("keeps an explicit mode: 'insensitive' opt-in", () => {
+      const result = buildWhereClause({
+        filterLens: { parent: lensFor('User'), root: { picks: ['name'] } },
+        searchFields: { name: { startsWith: 'A', mode: 'insensitive' } },
+      });
+      expect(result).toEqual({
         AND: [{ name: { startsWith: 'A', mode: 'insensitive' } }],
       });
+    });
+
+    it('escapes LIKE metacharacters so a pattern operator matches its value literally', () => {
+      const result = buildWhereClause({
+        filterLens: { parent: lensFor('User'), root: { picks: ['name', 'email'] } },
+        searchFields: {
+          name: { contains: '50%_off', endsWith: 'a\\b' },
+          email: { startsWith: 'x_y' },
+        },
+      });
+      expect(result).toEqual({
+        AND: [
+          { name: { contains: '50\\%\\_off', endsWith: 'a\\\\b' } },
+          { email: { startsWith: 'x\\_y' } },
+        ],
+      });
+    });
+
+    it('escapes an insensitive equality (Prisma compiles it to ILIKE) but not a sensitive one', () => {
+      const lens = { parent: lensFor('User'), root: { picks: ['name'] } };
+      expect(
+        buildWhereClause({
+          filterLens: lens,
+          searchFields: { name: { equals: '50%', mode: 'insensitive' } },
+        }),
+      ).toEqual({ AND: [{ name: { equals: '50\\%', mode: 'insensitive' } }] });
+      expect(
+        buildWhereClause({ filterLens: lens, searchFields: { name: { equals: '50%' } } }),
+      ).toEqual({ AND: [{ name: { equals: '50%' } }] });
+    });
+
+    it('escapes a bare String value, which defaults to contains', () => {
+      const result = buildWhereClause({
+        filterLens: { parent: lensFor('User'), root: { picks: ['name'] } },
+        searchFields: { name: '50%' },
+      });
+      expect(result).toEqual({ AND: [{ name: { contains: '50\\%' } }] });
     });
 
     it("doesn't add mode when caller explicitly passes mode", () => {
@@ -420,7 +477,7 @@ describe('buildWhereClause', () => {
         searchFields: { tokens: { some: { name: 'tok-prod' } } },
       });
       expect(result).toEqual({
-        AND: [{ tokens: { some: { name: { contains: 'tok-prod', mode: 'insensitive' } } } }],
+        AND: [{ tokens: { some: { name: { contains: 'tok-prod' } } } }],
       });
     });
 
@@ -455,10 +512,7 @@ describe('buildWhereClause', () => {
         skipFieldValidation: true,
       });
       expect(result).toEqual({
-        AND: [
-          { name: { contains: 'aron', mode: 'insensitive' } },
-          { platformRole: { equals: 'user' } },
-        ],
+        AND: [{ name: { contains: 'aron' } }, { platformRole: { equals: 'user' } }],
       });
     });
 
@@ -502,7 +556,7 @@ describe('buildWhereClause', () => {
         orNullFields: ['name'],
       });
       expect(result).toEqual({
-        AND: [{ OR: [{ name: { contains: 'aron', mode: 'insensitive' } }, { name: null }] }],
+        AND: [{ OR: [{ name: { contains: 'aron' } }, { name: null }] }],
       });
     });
   });
@@ -611,7 +665,7 @@ describe('buildWhereClause', () => {
       expect(result).toEqual({
         AND: [
           { OR: [{ name: { contains: 'greg', mode: 'insensitive' } }] },
-          { tokens: { some: { name: { contains: 'tok-a', mode: 'insensitive' } } } },
+          { tokens: { some: { name: { contains: 'tok-a' } } } },
         ],
       });
     });
@@ -660,8 +714,8 @@ describe('buildWhereClause', () => {
       // form matches nothing where the grouped form matches a user holding two tokens.
       expect(result).toEqual({
         AND: [
-          { tokens: { some: { name: { contains: 'tok-a', mode: 'insensitive' } } } },
-          { tokens: { some: { name: { contains: 'tok-b', mode: 'insensitive' } } } },
+          { tokens: { some: { name: { contains: 'tok-a' } } } },
+          { tokens: { some: { name: { contains: 'tok-b' } } } },
         ],
       });
     });
@@ -672,10 +726,7 @@ describe('buildWhereClause', () => {
         searchFields: { AND: { 10: { name: 'ten' }, 2: { name: 'two' } } },
       });
       expect(result).toEqual({
-        AND: [
-          { name: { contains: 'two', mode: 'insensitive' } },
-          { name: { contains: 'ten', mode: 'insensitive' } },
-        ],
+        AND: [{ name: { contains: 'two' } }, { name: { contains: 'ten' } }],
       });
     });
 
@@ -689,10 +740,7 @@ describe('buildWhereClause', () => {
           {
             tokens: {
               some: {
-                AND: [
-                  { name: { contains: 'tok-a', mode: 'insensitive' } },
-                  { name: { contains: 'tok-b', mode: 'insensitive' } },
-                ],
+                AND: [{ name: { contains: 'tok-a' } }, { name: { contains: 'tok-b' } }],
               },
             },
           },
@@ -705,7 +753,7 @@ describe('buildWhereClause', () => {
         filterLens: { parent: lensFor('User'), root: { picks: ['name'] } },
         searchFields: { AND: { 0: { AND: { 0: { name: 'aron' } } } } },
       });
-      expect(result).toEqual({ AND: [{ name: { contains: 'aron', mode: 'insensitive' } }] });
+      expect(result).toEqual({ AND: [{ name: { contains: 'aron' } }] });
     });
 
     it('still enforces the whitelist inside a child', () => {
@@ -744,7 +792,7 @@ describe('buildWhereClause', () => {
         searchFields: { tokens: { some: { name: 'tok-prod' } } },
       });
       expect(result).toEqual({
-        AND: [{ tokens: { some: { name: { contains: 'tok-prod', mode: 'insensitive' } } } }],
+        AND: [{ tokens: { some: { name: { contains: 'tok-prod' } } } }],
       });
     });
 
@@ -758,10 +806,7 @@ describe('buildWhereClause', () => {
       expect(result).toEqual({
         AND: [
           {
-            OR: [
-              { name: { contains: 'aron', mode: 'insensitive' } },
-              { email: { contains: 'phil@x.com', mode: 'insensitive' } },
-            ],
+            OR: [{ name: { contains: 'aron' } }, { email: { contains: 'phil@x.com' } }],
           },
         ],
       });
@@ -777,12 +822,9 @@ describe('buildWhereClause', () => {
           {
             OR: [
               {
-                AND: [
-                  { name: { contains: 'aron', mode: 'insensitive' } },
-                  { email: { contains: 'aron@x.com', mode: 'insensitive' } },
-                ],
+                AND: [{ name: { contains: 'aron' } }, { email: { contains: 'aron@x.com' } }],
               },
-              { name: { contains: 'phil', mode: 'insensitive' } },
+              { name: { contains: 'phil' } },
             ],
           },
         ],
@@ -798,12 +840,9 @@ describe('buildWhereClause', () => {
       });
       expect(result).toEqual({
         AND: [
-          { email: { contains: 'x@y.com', mode: 'insensitive' } },
+          { email: { contains: 'x@y.com' } },
           {
-            OR: [
-              { name: { contains: 'aron', mode: 'insensitive' } },
-              { name: { contains: 'phil', mode: 'insensitive' } },
-            ],
+            OR: [{ name: { contains: 'aron' } }, { name: { contains: 'phil' } }],
           },
         ],
       });
@@ -824,12 +863,9 @@ describe('buildWhereClause', () => {
           {
             OR: [
               {
-                AND: [
-                  { name: { contains: 'aron', mode: 'insensitive' } },
-                  { email: { contains: 'aron@x.com', mode: 'insensitive' } },
-                ],
+                AND: [{ name: { contains: 'aron' } }, { email: { contains: 'aron@x.com' } }],
               },
-              { name: { contains: 'phil', mode: 'insensitive' } },
+              { name: { contains: 'phil' } },
             ],
           },
         ],
@@ -876,10 +912,7 @@ describe('buildWhereClause', () => {
           {
             tokens: {
               some: {
-                OR: [
-                  { name: { contains: 'tok-a', mode: 'insensitive' } },
-                  { name: { contains: 'tok-b', mode: 'insensitive' } },
-                ],
+                OR: [{ name: { contains: 'tok-a' } }, { name: { contains: 'tok-b' } }],
               },
             },
           },
@@ -904,7 +937,7 @@ describe('buildWhereClause', () => {
         orNullFields: ['name'],
       });
       expect(result).toEqual({
-        AND: [{ OR: [{ name: { contains: 'aron', mode: 'insensitive' } }, { name: null }] }],
+        AND: [{ OR: [{ name: { contains: 'aron' } }, { name: null }] }],
       });
     });
 
@@ -923,10 +956,7 @@ describe('buildWhereClause', () => {
         searchFields: { AND: { 0: { name: 'aron' }, 5: { email: 'aron@x.com' } } },
       });
       expect(result).toEqual({
-        AND: [
-          { name: { contains: 'aron', mode: 'insensitive' } },
-          { email: { contains: 'aron@x.com', mode: 'insensitive' } },
-        ],
+        AND: [{ name: { contains: 'aron' } }, { email: { contains: 'aron@x.com' } }],
       });
     });
   });
