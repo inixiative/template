@@ -6,38 +6,26 @@
  */
 import {
   type Condition,
-  check,
-  executePrismaQueryPlan,
+  executePrismaPlan,
+  getLensRoot,
   type Lens,
   type LensNarrowing,
-  projectByPath,
+  projectRows,
+  toLensSelect,
   toPrisma,
 } from '@inixiative/json-rules';
 import { db } from '@template/db/client';
 import { requireWhere } from '@template/db/hydrate/requireWhere';
-import { includeFromLens, rootLens } from '@template/db/lens';
 import { toModelName } from '@template/db/utils/modelNames';
 
 export const fetchLens = async <T extends Record<string, unknown> = Record<string, unknown>>(
   lens: Lens | LensNarrowing,
+  { rules }: { rules?: readonly Condition[] } = {},
 ): Promise<T[]> => {
-  const root = 'parent' in lens ? rootLens(lens) : lens;
-  const byPath = projectByPath(lens);
-  const [rootKey] = byPath.keys();
-  const visit = rootKey ? byPath.get(rootKey) : undefined;
-  if (!visit) return [];
-
-  const model = toModelName(root.model);
-  const clauses = visit.whereClauses;
-  const condition: Condition = clauses.length === 1 ? clauses[0] : { all: clauses };
-
-  const plan = toPrisma(condition, { map: root, mapName: root.mapName, model });
-  const where = plan.steps.length ? await executePrismaQueryPlan(plan, db as never) : {};
+  const where = await executePrismaPlan(toPrisma(true, { lens }), db as never);
   requireWhere(where);
-
-  const include = includeFromLens(lens);
-  const delegate = db.delegate(model);
-  const rows = (await delegate.findMany(include ? { where, include } : { where })) as T[];
-
-  return rows.filter((row) => check(condition, row) === true);
+  const delegate = db.delegate(toModelName(getLensRoot(lens).model));
+  const { select } = toLensSelect(lens, { rules });
+  const rows = (await delegate.findMany({ where, select })) as T[];
+  return projectRows(lens, rows, { keepGrantColumns: true, rules }) as T[];
 };

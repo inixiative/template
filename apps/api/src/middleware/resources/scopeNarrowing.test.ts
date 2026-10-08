@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { OpenAPIHono } from '@hono/zod-openapi';
-import { type Condition, type LensNarrowing, projectByPath } from '@inixiative/json-rules';
+import { type Condition, type LensNarrowing, projectLens } from '@inixiative/json-rules';
 import { lensFor } from '@template/db/lens';
 import { scopeNarrowing } from '#/middleware/resources/scopeNarrowing';
 import type { AppEnv } from '#/types/appEnv';
@@ -15,11 +15,8 @@ const ruleB: Condition = { field: 'b', operator: 'equals', value: 2 };
 
 // The composed root-model wheres along the full narrowing chain — exactly what
 // buildWhereClause reads off the stacked layers.
-const composedWheres = (n: LensNarrowing): Condition[] => {
-  const byPath = projectByPath(n) as Map<string, { whereClauses: Condition[] }>;
-  const rootKey = byPath.keys().next().value;
-  return rootKey ? (byPath.get(rootKey)?.whereClauses ?? []) : [];
-};
+const composedWheres = (n: LensNarrowing): Condition[] =>
+  projectLens(n).Inquiry?.whereClauses ?? [];
 
 // Run middlewares against a fresh app with inquiryNarrowing seeded on ctx; return the
 // resulting filterLens captured after they ran.

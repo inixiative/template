@@ -137,7 +137,12 @@ export {
   ruleHealthFromEdges,
   ruleReferenceIssues,
 } from './utils/ruleReferenceHealth';
-export { ruleReferences } from './utils/ruleReferences';
+export {
+  type DynamicRuleReference,
+  dynamicRuleReferences,
+  ruleReferences,
+} from './utils/ruleReferences';
+export { sourceQueryWhere } from './utils/sourceQueryWhere';
 export {
   type RuleReferenceGate,
   type RuleReferenceSource,

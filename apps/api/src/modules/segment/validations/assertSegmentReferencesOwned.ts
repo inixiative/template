@@ -4,7 +4,7 @@
  * @partOf feature:segment
  * @uses infrastructure:prisma
  */
-import { type Condition, sourceQueries } from '@inixiative/json-rules';
+import { type Condition, toSourceQueries } from '@inixiative/json-rules';
 import { admitRuleReferences, ruleReferences } from '@template/db';
 import type { Segment } from '@template/db/generated/client/client';
 import type { ProviderModel } from '@template/db/generated/client/enums';
@@ -35,7 +35,7 @@ export const assertSegmentReferencesOwned = async ({
   );
   if (added.length) {
     const { unadmitted } = await admitRuleReferences(
-      sourceQueries(resolvedCustomerRefLens(ownerModel, ownerId)),
+      toSourceQueries(resolvedCustomerRefLens(ownerModel, ownerId)),
       added,
     );
     if (unadmitted.length) {

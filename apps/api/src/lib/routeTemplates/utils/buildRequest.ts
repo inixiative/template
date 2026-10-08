@@ -5,7 +5,7 @@
  * @uses infrastructure:prisma
  */
 import { z } from '@hono/zod-openapi';
-import { validateNarrowing } from '@inixiative/json-rules';
+import { assertValidNarrowing } from '@inixiative/json-rules';
 import type { Prisma } from '@template/db';
 import { searchablePaths } from '@template/db/lens';
 import { buildOrderBySchema } from '#/lib/routeTemplates/filters/buildOrderBySchema';
@@ -116,8 +116,8 @@ export const buildRequest = <const T extends RouteArgs>(
     filterLens,
   } = args;
 
-  // projectByPath silently drops unresolved paths, so validate the authored narrowing up front.
-  if (filterLens) validateNarrowing(filterLens);
+  // projectLens silently drops unresolved paths, so validate the authored narrowing up front.
+  if (filterLens) assertValidNarrowing(filterLens);
 
   const searchableFields = filterLens ? searchablePaths(filterLens) : undefined;
 

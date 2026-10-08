@@ -5,21 +5,19 @@
  * @uses none
  */
 import {
-  type Condition,
   describeRule,
-  executePrismaQueryPlan,
+  executePrismaPlan,
+  getLensRoot,
   type LensNarrowing,
-  projectByPath,
+  projectLens,
   toPrisma,
 } from '@inixiative/json-rules';
 import { db } from '@template/db';
-import { rootLens } from '@template/db/lens';
 import { makeError } from '#/lib/errors';
 import { modelFields } from '#/lib/prisma/fieldMetadata';
 import { liveWhere } from '#/lib/prisma/softDeleteScope';
 import { walkWhere } from '#/lib/prisma/whereWalker';
 
-type Visit = { modelName: string; mapName: string; whereClauses: Condition[] };
 type PlanStep = {
   operation: string;
   model?: string;
@@ -59,7 +57,7 @@ const liveScopePlan = (plan: { steps: unknown[] }) => {
 
 // Bridge conditions cross into another source and can never run inside the
 // query — 'throw' (paginate: a paginated where must be complete) or 'defer'
-// (non-paginated consumers over-fetch and post-filter via applyLens).
+// (non-paginated consumers over-fetch and post-filter via narrowRule).
 export type LensWhereOptions = { bridges?: 'throw' | 'defer' };
 
 // Every narrowing where — the root visit keys to '' — compiled per visit.
@@ -71,11 +69,10 @@ const visitWheres = async (
   bridges: 'throw' | 'defer',
   rootScope: Record<string, unknown>,
 ): Promise<Map<string, Record<string, unknown>[]>> => {
-  const lens = rootLens(filterLens);
-  const byPath = projectByPath(filterLens) as Map<string, Visit>;
-  const rootKey = byPath.keys().next().value;
+  const lens = getLensRoot(filterLens);
+  const rootKey = lens.model;
   const wheres = new Map<string, Record<string, unknown>[]>();
-  for (const [key, visit] of byPath) {
+  for (const [key, visit] of Object.entries(projectLens(filterLens))) {
     if (!visit.whereClauses.length) continue;
     const clauses: Record<string, unknown>[] = [];
     for (const clause of visit.whereClauses) {
@@ -88,20 +85,19 @@ const visitWheres = async (
         }
         continue;
       }
-      const plan = toPrisma(clause, { map: lens, mapName: visit.mapName, model: visit.modelName });
+      const plan = toPrisma(clause, { map: lens, mapName: visit.mapName, model: visit.model });
       const step = plan.steps[0];
       let where: Record<string, unknown>;
       if (plan.steps.length === 1 && step && 'where' in step) {
         where = step.where;
       } else {
-        if (key === rootKey) scopePlan(plan, visit.modelName, rootScope);
+        if (key === rootKey) scopePlan(plan, visit.model, rootScope);
         liveScopePlan(plan);
-        where = await executePrismaQueryPlan(plan, db as never);
+        where = await executePrismaPlan(plan, db as never);
       }
       if (Object.keys(where).length > 0) clauses.push(where);
     }
-    if (clauses.length)
-      wheres.set(key === rootKey ? '' : key.slice((rootKey as string).length + 1), clauses);
+    if (clauses.length) wheres.set(key === rootKey ? '' : key.slice(rootKey.length + 1), clauses);
   }
   return wheres;
 };
@@ -117,5 +113,5 @@ export const lensWhere = async (
 ): Promise<Record<string, unknown>> => {
   const wheres = await visitWheres(filterLens, options?.bridges ?? 'throw', where);
   if (!wheres.size) return where;
-  return walkWhere(rootLens(filterLens).model, where, ({ path }) => wheres.get(path) ?? []);
+  return walkWhere(getLensRoot(filterLens).model, where, ({ path }) => wheres.get(path) ?? []);
 };

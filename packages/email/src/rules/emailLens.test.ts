@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { type Condition, check } from '@inixiative/json-rules';
+import { type Condition, check, projectLens } from '@inixiative/json-rules';
 import { lensFor } from '@template/db/lens';
 import {
   applyEmailLens,
@@ -10,6 +10,7 @@ import {
   emailRuleReferences,
   emailRuleVocabularyIssues,
   emailSurface,
+  emailSurfaceSourceValues,
   evaluateScopedRule,
   fieldsLens,
   OPAQUE_SLOT,
@@ -390,7 +391,13 @@ describe('emailSurface — the four lenses composed for the builder', () => {
       ].sort(),
     );
     expect(fieldsOf(surface, 'Organization')).not.toContain('emailTemplates');
-    expect(fieldsOf(surface, 'EmailSystem')).toEqual(['now', 'unsubscribeUrl', 'year']);
+    expect(fieldsOf(surface, 'EmailSystem')).toEqual([
+      'now',
+      'platformName',
+      'unsubscribeUrl',
+      'webUrl',
+      'year',
+    ]);
   });
 
   it('exposes exactly what the slots reach, and nothing beyond it', () => {
@@ -410,6 +417,26 @@ describe('emailSurface — the four lenses composed for the builder', () => {
     expect(fieldsOf(surface, 'Organization')).toEqual(['name']);
     expect(fieldsOf(surface, 'Inquiry')).toEqual(['content']);
     expect(surface.maps[surface.mapName]?.models.Space).toBeUndefined();
+  });
+
+  it('attaches fetched options to the surface the builder resolves', () => {
+    const surface = emailSurface(emailLens());
+    const fetched = [
+      {
+        path: 'User.tagAttachments.tag',
+        mapName: 'prisma',
+        model: 'Tag',
+        field: 'id',
+        options: [{ value: 'tag-1', label: 'VIP' }],
+      },
+    ];
+    const resolved = projectLens(surface, {
+      sourceValues: emailSurfaceSourceValues(fetched),
+      by: 'model',
+    });
+    expect(resolved.maps[surface.mapName]?.models.Tag?.fields.id?.options).toEqual([
+      { value: 'tag-1', label: 'VIP' },
+    ]);
   });
 
   it('derives one facet per slot present', () => {

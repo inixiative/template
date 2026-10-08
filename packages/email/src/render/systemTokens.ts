@@ -23,6 +23,10 @@ export const SYSTEM_TOKENS = [
   { name: 'now', kind: 'DateTime' },
   /** The current year — a copyright line, mostly. */
   { name: 'year', kind: 'Int' },
+  /** The platform's name (`PROJECT_NAME`). */
+  { name: 'platformName', kind: 'String' },
+  /** The web app's base URL (`WEB_URL`), for links. */
+  { name: 'webUrl', kind: 'String' },
 ] as const satisfies readonly SystemToken[];
 
 /** Literal union of the names, so the resolver map is typed exhaustively over this list: a token added

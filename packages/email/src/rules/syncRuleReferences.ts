@@ -5,7 +5,7 @@
  * @uses infrastructure:prisma
  */
 
-import { type RuleReferenceSource, syncRuleReferenceEdges } from '@template/db';
+import { RuleReferenceError, type RuleReferenceSource, syncRuleReferenceEdges } from '@template/db';
 import type { EmailComponent, EmailTemplate } from '@template/db/generated/client/client';
 import { stripComponentBodies } from '@template/email/render/stripComponentBodies';
 import {
@@ -13,7 +13,10 @@ import {
   type EmailLens,
   emailSourceQueries,
 } from '@template/email/rules/emailLens';
-import { contentRuleReferences } from '@template/email/rules/ruleReferences';
+import {
+  contentDynamicRuleReferences,
+  contentRuleReferences,
+} from '@template/email/rules/ruleReferences';
 
 export const syncRuleReferences = (
   source: RuleReferenceSource,
@@ -22,6 +25,13 @@ export const syncRuleReferences = (
   mode: 'save' | 'rebuild' = 'save',
 ) => {
   const judged = lens ?? defaultEmailLens;
+  if (mode === 'save') {
+    const [dynamic] = contentDynamicRuleReferences(judged, ...contents);
+    if (dynamic)
+      throw new RuleReferenceError(
+        `rule names a ${dynamic.model} by a value read at evaluation (${dynamic.path}); name it by id`,
+      );
+  }
   return syncRuleReferenceEdges(
     source,
     contentRuleReferences(judged, ...contents),

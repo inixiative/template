@@ -6,6 +6,7 @@
  */
 import type { SourceQuery } from '@inixiative/json-rules';
 import { db } from '@template/db/client';
+import { sourceQueryWhere } from '@template/db/utils/sourceQueryWhere';
 import type { RuleReference } from '@template/shared/rules';
 import { groupBy, partition } from 'lodash-es';
 
@@ -26,7 +27,7 @@ export const admitRuleReferences = async (
     }
     const delegate = db.delegate(model);
     const rows = (await delegate.findMany({
-      where: { AND: [source.prisma.where, { id: { in: refs.map((ref) => ref.id) } }] },
+      where: { AND: [await sourceQueryWhere(source), { id: { in: refs.map((ref) => ref.id) } }] },
     })) as { id: string }[];
     const ids = new Set(rows.map((row) => row.id));
     const [inside, outside] = partition(refs, (ref) => ids.has(ref.id));

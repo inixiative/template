@@ -4,8 +4,14 @@
  * @partOf feature:email
  * @uses infrastructure:prisma
  */
+
+import type { DynamicRuleReference } from '@template/db';
 import { collectRules } from '@template/email/render/conditionParser';
-import { type EmailLens, emailRuleReferences } from '@template/email/rules/emailLens';
+import {
+  type EmailLens,
+  emailDynamicRuleReferences,
+  emailRuleReferences,
+} from '@template/email/rules/emailLens';
 import { type RuleReference, referenceKey } from '@template/shared/rules';
 
 /** The rows the rules in these contents name, folded across every block and branch, deduped. */
@@ -24,3 +30,13 @@ export const contentRuleReferences = (lens: EmailLens, ...contents: string[]): R
   }
   return references;
 };
+
+export const contentDynamicRuleReferences = (
+  lens: EmailLens,
+  ...contents: string[]
+): DynamicRuleReference[] =>
+  contents.flatMap((content) =>
+    collectRules(content, new Map(), lens).flatMap((rule) =>
+      emailDynamicRuleReferences(lens, rule),
+    ),
+  );

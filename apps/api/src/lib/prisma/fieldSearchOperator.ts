@@ -5,6 +5,7 @@
  * @uses none
  */
 import { dialect } from '@template/db/lens';
+import { escapeLikePattern } from '#/lib/prisma/escapeLikePattern';
 import type { FieldDef } from '#/lib/prisma/fieldMetadata';
 
 // Prisma has no universal substring op: String → contains, String[] → has,
@@ -16,8 +17,9 @@ export const fieldSearchOperator = (
   if (field.kind !== 'scalar') return undefined;
   if (field.type === 'String') {
     if (field.isList) return dialect.supportsScalarListSearch ? { has: term } : undefined;
-    return dialect.stringMode ? { contains: term, mode: dialect.stringMode } : { contains: term };
+    const contains = escapeLikePattern(term);
+    return dialect.stringMode ? { contains, mode: dialect.stringMode } : { contains };
   }
-  if (field.type === 'Json') return { string_contains: term };
+  if (field.type === 'Json') return { string_contains: escapeLikePattern(term) };
   return undefined;
 };

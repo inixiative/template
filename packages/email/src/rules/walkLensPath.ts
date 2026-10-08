@@ -4,7 +4,7 @@
  * @partOf feature:email
  * @uses primitive:shared
  */
-import { type FieldMapEntry, resolveLensPath } from '@inixiative/json-rules';
+import { type FieldMapEntry, walkLensPath as walkThroughLens } from '@inixiative/json-rules';
 import type { RuleLens } from '@template/shared/rules';
 
 export type LensPathWalk =
@@ -15,10 +15,10 @@ export type LensPathWalk =
 
 /** The field each segment of a dotted path lands on, as the lens resolves it; stops at the first miss or scalar. */
 export const lensPathFields = (path: string, lens: RuleLens): FieldMapEntry[] =>
-  resolveLensPath(lens, path).hops.map((hop) => hop.entry);
+  walkThroughLens(lens, path).hops.map((hop) => hop.entry);
 
 export const walkLensPath = (path: string, lens: RuleLens): LensPathWalk => {
-  const walk = resolveLensPath(lens, path);
+  const walk = walkThroughLens(lens, path);
   if (walk.outcome === 'resolved') {
     return walk.jsonSubPath.length
       ? { outcome: 'beneathJson', index: walk.hops.length - 1 }

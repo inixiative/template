@@ -5,7 +5,12 @@
  * @uses infrastructure:prisma
  */
 import type { Condition } from '@inixiative/json-rules';
-import { type RuleValidation, ruleReferences, validateRuleForLens } from '@template/db';
+import {
+  dynamicRuleReferences,
+  type RuleValidation,
+  ruleReferences,
+  validateRuleForLens,
+} from '@template/db';
 import type { ProviderModel } from '@template/db/generated/client/enums';
 import {
   customerRefLens,
@@ -25,6 +30,16 @@ export const validateSegmentConditions = (
     compileWith: resolvedCustomerRefLens(ownerModel, PROBE_OWNER_ID),
   });
   if (!validation.valid) return validation;
+  const dynamic = dynamicRuleReferences(customerRefLens, validation.normalized as Condition);
+  if (dynamic.length)
+    return {
+      valid: false,
+      errors: dynamic.map(
+        (reference) =>
+          `${reference.path}: names a ${reference.model} by a value read at evaluation; name it by id`,
+      ),
+      normalized: validation.normalized,
+    };
   const self = ruleReferences(customerRefLens, validation.normalized as Condition).some(
     (reference) => reference.model === 'Segment' && reference.id === options.selfId,
   );

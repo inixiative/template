@@ -4,16 +4,10 @@
  * @partOf feature:segment
  * @uses infrastructure:prisma, primitive:shared
  */
-import {
-  applyLens,
-  type Condition,
-  executePrismaQueryPlan,
-  toPrisma,
-} from '@inixiative/json-rules';
+import { type Condition, executePrismaPlan, toPrisma } from '@inixiative/json-rules';
 import { db, Prisma } from '@template/db';
 import type { Segment } from '@template/db/generated/client/client';
 import type { ProviderModel } from '@template/db/generated/client/enums';
-import { rootLens } from '@template/db/lens';
 import { RuleDegradedError, RuleEvaluationError, withRule } from '@template/shared/rules';
 import { resolvedCustomerRefLens } from '#/modules/customerRef/lib/customerRefLens';
 import { customerRefProviderFk, segmentOwnerId } from '#/modules/segment/lib/segmentOwner';
@@ -28,15 +22,11 @@ export const compileSegmentWhere = async (
   ownerId: string,
   rule: Condition,
 ): Promise<Record<string, unknown>> => {
-  const lens = resolvedCustomerRefLens(ownerModel, ownerId);
-  const root = rootLens(lens);
-  const plan = toPrisma(applyLens(rule, lens), {
-    map: root,
-    mapName: root.mapName,
-    model: root.model,
+  const plan = toPrisma(rule, {
+    lens: resolvedCustomerRefLens(ownerModel, ownerId),
     now: new Date(),
   });
-  const where = await executePrismaQueryPlan(plan, db as never);
+  const where = await executePrismaPlan(plan, db as never);
   return { AND: [where, { [customerRefProviderFk(ownerModel)]: ownerId }] };
 };
 

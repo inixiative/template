@@ -6,11 +6,11 @@
  */
 import {
   type Condition,
-  checkRuleAgainstLens,
   type Lens,
   type LensNarrowing,
+  listBindings,
   type RuleValue,
-  requiredBindings,
+  validateRuleInLens,
 } from '@inixiative/json-rules';
 
 export type RuleLens = Lens | LensNarrowing;
@@ -52,13 +52,11 @@ export type RuleArms<T> = {
 export const ruleVocabularyIssues = (lens: RuleLens | RuleVocabulary, rule: Condition): string[] =>
   'vocabularyIssues' in lens
     ? lens.vocabularyIssues(rule)
-    : checkRuleAgainstLens(rule, lens).violations.map(
-        (violation) => `${violation.path}: ${violation.reason}`,
-      );
+    : validateRuleInLens(rule, lens).errors.map((error) => `${error.path}: ${error.message}`);
 
 export const ruleIssues = ({ lens, rule, references, live, bindings }: RuleHealth): RuleIssue[] => {
   const issues: RuleIssue[] = [];
-  for (const name of requiredBindings(rule)) {
+  for (const name of listBindings(rule, { required: true })) {
     if (bindings && Object.hasOwn(bindings, name)) continue;
     issues.push({
       kind: 'binding',

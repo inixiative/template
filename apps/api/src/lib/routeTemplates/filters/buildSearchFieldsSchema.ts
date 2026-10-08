@@ -5,18 +5,18 @@
  * @uses infrastructure:prisma
  */
 import { z } from '@hono/zod-openapi';
-import { type FieldMapEntry, type LensNarrowing, projectByPath } from '@inixiative/json-rules';
+import {
+  getLensRoot,
+  type LensNarrowing,
+  type PathProjection,
+  projectLens,
+} from '@inixiative/json-rules';
 import { redactLens } from '@template/db/lens/redactLens';
 import { leafFilterSchema } from '#/lib/routeTemplates/filters/filterComponents';
 
-type Visit = { fields: Record<string, FieldMapEntry> };
-
-const buildNodeShape = (
-  byPath: Map<string, Visit>,
-  nodePath: string,
-): Record<string, z.ZodTypeAny> => {
+const buildNodeShape = (byPath: PathProjection, nodePath: string): Record<string, z.ZodTypeAny> => {
   const shape: Record<string, z.ZodTypeAny> = {};
-  const visit = byPath.get(nodePath);
+  const visit = byPath[nodePath];
   if (!visit) return shape;
 
   for (const [field, entry] of Object.entries(visit.fields)) {
@@ -45,10 +45,8 @@ const buildNodeShape = (
 // of per-kind filter leaves (to-one nested directly, to-many under some/every/none),
 // scoped to the lens's redacted+narrowed searchable fields.
 export const buildSearchFieldsSchema = (filterLens: LensNarrowing): z.ZodTypeAny | undefined => {
-  const byPath = projectByPath(redactLens(filterLens)) as Map<string, Visit>;
-  const rootKey = byPath.keys().next().value;
-  if (!rootKey) return undefined;
-  const shape = buildNodeShape(byPath, rootKey);
+  const byPath = projectLens(redactLens(filterLens));
+  const shape = buildNodeShape(byPath, getLensRoot(filterLens).model);
   if (Object.keys(shape).length === 0) return undefined;
   // Combinators are advertised exactly one level deep: their children are plain nodes carrying
   // no combinator of their own. The wire accepts a combinator at any node, but a recursive

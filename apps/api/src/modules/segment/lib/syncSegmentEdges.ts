@@ -4,8 +4,7 @@
  * @partOf feature:segment
  * @uses infrastructure:prisma
  */
-import type { Condition } from '@inixiative/json-rules';
-import { sourceQueries } from '@inixiative/json-rules';
+import { type Condition, toSourceQueries } from '@inixiative/json-rules';
 import { ruleReferences, syncRuleReferenceEdges } from '@template/db';
 import type { Segment } from '@template/db/generated/client/client';
 import {
@@ -21,7 +20,7 @@ export const syncSegmentEdges = (segment: Segment, mode: 'save' | 'rebuild' = 's
     mode === 'rebuild'
       ? 'rebuild'
       : {
-          sources: sourceQueries(
+          sources: toSourceQueries(
             resolvedCustomerRefLens(segment.ownerModel, segmentOwnerId(segment)),
           ),
         },

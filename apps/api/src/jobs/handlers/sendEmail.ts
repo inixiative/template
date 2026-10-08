@@ -7,7 +7,6 @@
 import type { LensNarrowing } from '@inixiative/json-rules';
 import { db } from '@template/db';
 import { fetchLens } from '@template/db/hydrate';
-import { prune } from '@template/db/lens';
 import { EmailRenderError } from '@template/email/errors/EmailRenderError';
 import { lookupTemplate, rowOwner, templateLens } from '@template/email/render';
 import { declaredFields } from '@template/email/rules';
@@ -106,14 +105,12 @@ export const sendEmail = makeJob<SendEmailPayload>(async (_ctx, payload) => {
   }
 
   const entityRow = entity as Record<string, unknown>;
-  const dataVars = fields
-    ? pick(data, fields)
-    : (prune(entity, entityLens) as Record<string, unknown>);
+  const dataVars = fields ? pick(data, fields) : entityRow;
 
   const emailsOf = async (lens: LensNarrowing): Promise<string[] | undefined> => {
     const rows = await fetchLens(lens);
     if (!rows.length) return undefined;
-    return (prune(rows, lens) as Array<{ email: string }>).map((r) => r.email);
+    return (rows as Array<{ email: string }>).map((r) => r.email);
   };
 
   const sender = pickSender(entry.sender, entityRow);
@@ -127,7 +124,7 @@ export const sendEmail = makeJob<SendEmailPayload>(async (_ctx, payload) => {
 
   const users = await fetchLens(lens);
   const plan = users.map((user) => {
-    const recipient = prune(user, lens) as Recipient;
+    const recipient = user as Recipient;
     return {
       user,
       recipient,
