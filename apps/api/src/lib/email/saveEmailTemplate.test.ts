@@ -98,6 +98,17 @@ describe('saveEmailTemplate — a rule may only name what its owner can see', ()
     );
   });
 
+  it('a tag named by a value read at evaluation is refused: no save can check which rows it names', async () => {
+    const byPrefix = `{{#if rule=${JSON.stringify({
+      field: 'recipient.tagAttachments',
+      arrayOperator: 'any',
+      condition: { field: 'tag.id', operator: 'startsWith', value: myTag.id.slice(0, 8) },
+    })}}}VIP{{/if}}`;
+    await expect(saveFor(mine.id, byPrefix)).rejects.toThrow(
+      'rule names a Tag by a value read at evaluation (recipient.User.tagAttachments.tag.id); name it by id',
+    );
+  });
+
   it('a platform template sees platform tags only', async () => {
     await expect(
       saveEmailTemplate({

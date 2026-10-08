@@ -104,6 +104,21 @@ describe('segmentConditions hook', () => {
     ).rejects.toThrow('Invalid segment conditions');
   });
 
+  it('refuses a rule naming a segment by a value read at evaluation: no save can check which rows it names', async () => {
+    await expect(
+      createSegment(
+        {
+          conditions: {
+            field: 'segmentMembers',
+            arrayOperator: 'any',
+            condition: { field: 'segment.id', operator: Operator.startsWith, value: '0' },
+          },
+        },
+        { space },
+      ),
+    ).rejects.toThrow('names a Segment by a value read at evaluation');
+  });
+
   it('refuses a rule naming a segment that does not exist or belongs to another owner', async () => {
     const membersOf = (id: string) => ({
       field: 'segmentMembers',

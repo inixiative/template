@@ -201,26 +201,28 @@ describe('ruleReference — the save path writes edges, the target side stamps t
     await expect(save(mjml(taggedBlock(tag.id)))).rejects.toBeInstanceOf(RuleReferenceError);
   });
 
-  it('a rule that reads the row from path names no row: it saves and registers no edge', async () => {
+  it('a rule that reads the row from path names no checkable row: save refuses it', async () => {
     const rule = {
       field: 'recipient.tagAttachments',
       arrayOperator: 'any',
       condition: { field: 'tag.id', operator: 'equals', path: 'recipient.id' },
     };
 
-    const { template } = await save(mjml(`{{#if rule=${JSON.stringify(rule)}}}x{{/if}}`));
-    expect(await edgesOf({ sourceEmailTemplateId: template.id })).toHaveLength(0);
+    await expect(save(mjml(`{{#if rule=${JSON.stringify(rule)}}}x{{/if}}`))).rejects.toThrow(
+      'rule names a Tag by a value read at evaluation',
+    );
   });
 
-  it('an operator that describes the target row without naming it saves and registers no edge', async () => {
+  it('an operator that describes the target row without naming it is refused at save', async () => {
     const rule = {
       field: 'recipient.tagAttachments',
       arrayOperator: 'any',
       condition: { field: 'tag.id', operator: 'contains', value: 'abc' },
     };
 
-    const { template } = await save(mjml(`{{#if rule=${JSON.stringify(rule)}}}x{{/if}}`));
-    expect(await edgesOf({ sourceEmailTemplateId: template.id })).toHaveLength(0);
+    await expect(save(mjml(`{{#if rule=${JSON.stringify(rule)}}}x{{/if}}`))).rejects.toThrow(
+      'rule names a Tag by a value read at evaluation',
+    );
   });
 
   it('soft-deleting a target tag stamps every edge that names it; restoring clears them', async () => {
