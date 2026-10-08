@@ -11,11 +11,13 @@ import {
   createLens,
   type FieldMap,
   type FieldMapEntry,
+  getLensRoot,
   type Lens,
   type LensNarrowing,
   type ModelNarrowing,
   narrowRule,
   projectLens,
+  projectRows,
   type SourceQuery,
   type SourceValues,
   toSourceQueries,
@@ -28,7 +30,7 @@ import {
   RULE_REFERENCEABLE_MODELS,
   ruleReferences,
 } from '@template/db';
-import { lensFor, live, omitForeignKeys, prune, rootLens } from '@template/db/lens';
+import { lensFor, live, omitForeignKeys } from '@template/db/lens';
 import {
   RESERVED_SCOPE_ROOTS,
   SCOPE_ROOTS,
@@ -85,16 +87,14 @@ const referenceableSources = Object.fromEntries(
   RULE_REFERENCEABLE_MODELS.map((model) => [model, { sources: { id: { label: 'name' } } }]),
 );
 
-const baseOf = (lens: RuleLens): Lens => ('parent' in lens ? rootLens(lens) : lens);
-
-const scalarPicks = (fields: Record<string, { kind: string }>): ModelNarrowing => ({
+export const scalarPicks = (fields: Record<string, { kind: string }>): ModelNarrowing => ({
   picks: Object.entries(fields)
     .filter(([, field]) => field.kind !== 'object' && field.kind !== 'bridge')
     .map(([name]) => name),
 });
 
 const slot = (lens: RuleLens, narrowing?: ModelNarrowing): RuleLens => {
-  const base = baseOf(lens);
+  const base = getLensRoot(lens);
   const prisma = base.mapName === 'prisma';
   const root =
     narrowing ??
@@ -128,7 +128,7 @@ export const fieldsLens = (fields: Record<string, string>, model = EMAIL_DATA_MO
   });
 
 export const declaredFields = (lens: RuleLens): string[] | null => {
-  const base = baseOf(lens);
+  const base = getLensRoot(lens);
   return base.mapName === EMAIL_MAP_NAME
     ? Object.keys(base.maps[EMAIL_MAP_NAME]?.models[base.model]?.fields ?? {})
     : null;
@@ -151,7 +151,7 @@ const SYSTEM_FIELDS: Record<string, string> = {
 export const systemSlot = (): Lens => fieldsLens(SYSTEM_FIELDS, EMAIL_SYSTEM_MODEL);
 
 const isUserLens = (lens: RuleLens): boolean => {
-  const base = baseOf(lens);
+  const base = getLensRoot(lens);
   return base.mapName === 'prisma' && base.model === 'User';
 };
 
@@ -391,7 +391,10 @@ export const narrowVariables = <V extends Record<string, unknown>>(
   for (const [root, slot] of emailSlotLenses(lens)) {
     const value = variables[root];
     if (value && typeof value === 'object')
-      out[root] = prune(value as Record<string, unknown>, slot);
+      out[root] = Array.isArray(value)
+        ? projectRows(slot, value, { keepGrantColumns: true })
+        : (projectRows(slot, [value as Record<string, unknown>], { keepGrantColumns: true })[0] ??
+          null);
   }
   return out as V;
 };

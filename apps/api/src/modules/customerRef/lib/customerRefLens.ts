@@ -93,8 +93,7 @@ export const customerRefLens: LensNarrowing = omitForeignKeys({
 export const resolvedCustomerRefLens = (
   ownerModel: ProviderModel,
   ownerId: string,
-): LensNarrowing =>
-  bindLens(customerRefLens, polymorphicBindings(ownerModel, ownerId)) as LensNarrowing;
+): LensNarrowing => bindLens(customerRefLens, polymorphicBindings(ownerModel, ownerId));
 
 /** The segments the lens lets this owner name — its own live ones — read through the Segment source it declares. */
 export const ownedSegments = async (

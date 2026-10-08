@@ -7,12 +7,12 @@
 import {
   describeRule,
   executePrismaPlan,
+  getLensRoot,
   type LensNarrowing,
   projectLens,
   toPrisma,
 } from '@inixiative/json-rules';
 import { db } from '@template/db';
-import { rootLens } from '@template/db/lens';
 import { makeError } from '#/lib/errors';
 import { modelFields } from '#/lib/prisma/fieldMetadata';
 import { liveWhere } from '#/lib/prisma/softDeleteScope';
@@ -69,7 +69,7 @@ const visitWheres = async (
   bridges: 'throw' | 'defer',
   rootScope: Record<string, unknown>,
 ): Promise<Map<string, Record<string, unknown>[]>> => {
-  const lens = rootLens(filterLens);
+  const lens = getLensRoot(filterLens);
   const rootKey = lens.model;
   const wheres = new Map<string, Record<string, unknown>[]>();
   for (const [key, visit] of Object.entries(projectLens(filterLens))) {
@@ -113,5 +113,5 @@ export const lensWhere = async (
 ): Promise<Record<string, unknown>> => {
   const wheres = await visitWheres(filterLens, options?.bridges ?? 'throw', where);
   if (!wheres.size) return where;
-  return walkWhere(rootLens(filterLens).model, where, ({ path }) => wheres.get(path) ?? []);
+  return walkWhere(getLensRoot(filterLens).model, where, ({ path }) => wheres.get(path) ?? []);
 };

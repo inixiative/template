@@ -5,9 +5,13 @@
  * @uses infrastructure:prisma
  */
 import { z } from '@hono/zod-openapi';
-import { type LensNarrowing, type PathProjection, projectLens } from '@inixiative/json-rules';
+import {
+  getLensRoot,
+  type LensNarrowing,
+  type PathProjection,
+  projectLens,
+} from '@inixiative/json-rules';
 import { redactLens } from '@template/db/lens/redactLens';
-import { rootLens } from '@template/db/lens/rootLens';
 import { leafFilterSchema } from '#/lib/routeTemplates/filters/filterComponents';
 
 const buildNodeShape = (byPath: PathProjection, nodePath: string): Record<string, z.ZodTypeAny> => {
@@ -42,7 +46,7 @@ const buildNodeShape = (byPath: PathProjection, nodePath: string): Record<string
 // scoped to the lens's redacted+narrowed searchable fields.
 export const buildSearchFieldsSchema = (filterLens: LensNarrowing): z.ZodTypeAny | undefined => {
   const byPath = projectLens(redactLens(filterLens));
-  const shape = buildNodeShape(byPath, rootLens(filterLens).model);
+  const shape = buildNodeShape(byPath, getLensRoot(filterLens).model);
   if (Object.keys(shape).length === 0) return undefined;
   // Combinators are advertised exactly one level deep: their children are plain nodes carrying
   // no combinator of their own. The wire accepts a combinator at any node, but a recursive

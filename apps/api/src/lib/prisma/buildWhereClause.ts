@@ -4,9 +4,9 @@
  * @partOf infrastructure:prisma
  * @uses primitive:shared
  */
-import type { LensNarrowing } from '@inixiative/json-rules';
+import { getLensRoot, type LensNarrowing } from '@inixiative/json-rules';
 import { type ModelName, toModelName } from '@template/db';
-import { dialect, rootLens, searchablePaths } from '@template/db/lens';
+import { dialect, searchablePaths } from '@template/db/lens';
 import {
   FIELD_OPERATORS,
   isArrayFieldOperator,
@@ -370,7 +370,7 @@ export const buildWhereClause = (options: BuildWhereOptions): Record<string, unk
     filters = {},
     orNullFields = [],
   } = options;
-  const lens = rootLens(filterLens);
+  const lens = getLensRoot(filterLens);
   const model = toModelName(lens.model);
   const searchableFields = searchablePaths(filterLens);
   const conditions: Record<string, unknown>[] = [];

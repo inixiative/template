@@ -6,12 +6,12 @@
  */
 import {
   bindLens,
+  getLensRoot,
   type LensNarrowing,
   listLensBindings,
   type RuleValue,
 } from '@inixiative/json-rules';
 import type { AnyDelegate, Args, Result } from '@template/db';
-import { rootLens } from '@template/db/lens';
 import { stableHash } from '@template/shared/utils';
 import { getValidatedQuery, type ValidatedContext } from '#/lib/context/getValidatedData';
 import { isSuperadmin } from '#/lib/context/isSuperadmin';
@@ -127,14 +127,12 @@ const composeScopedFindMany = async <T extends AnyDelegate>(
       message: `paginate: lens requires bindings not provided: ${missing.join(', ')}`,
     });
   }
-  const filterLens = required.length
-    ? (bindLens(declaredLens, bindings ?? {}) as LensNarrowing)
-    : declaredLens;
+  const filterLens = required.length ? bindLens(declaredLens, bindings ?? {}) : declaredLens;
   // Superadmin bypasses both the searchable-fields whitelist and the injected
   // `deletedAt: null` live scope.
   const superadmin = isSuperadmin(c);
 
-  const model = rootLens(filterLens).model;
+  const model = getLensRoot(filterLens).model;
   const baseWhere = (findManyOptions.where ?? {}) as Record<string, unknown>;
   const searchWhere = buildWhereClause({
     filterLens,

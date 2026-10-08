@@ -6,12 +6,12 @@
  */
 import {
   type FieldMapEntry,
+  getLensRoot,
   type LensNarrowing,
   type PathProjection,
   projectLens,
 } from '@inixiative/json-rules';
 import { redactLens } from '@template/db/lens/redactLens';
-import { rootLens } from '@template/db/lens/rootLens';
 
 const NON_ORDERABLE_TYPES = new Set(['Json', 'Bytes']);
 
@@ -30,7 +30,7 @@ const crossesToMany = (dottedPath: string, rootKey: string, byPath: PathProjecti
 
 export const orderablePaths = (filterLens: LensNarrowing): string[] => {
   const byPath = projectLens(redactLens(filterLens));
-  const rootKey = rootLens(filterLens).model;
+  const rootKey = getLensRoot(filterLens).model;
 
   const paths: string[] = [];
   for (const [dottedPath, visit] of Object.entries(byPath)) {

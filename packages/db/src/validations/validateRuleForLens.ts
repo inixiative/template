@@ -7,13 +7,11 @@
 import {
   type Condition,
   type LensNarrowing,
-  narrowRule,
   RuleTarget,
   toPrisma,
   validateRule,
   validateRuleInLens,
 } from '@inixiative/json-rules';
-import { rootLens } from '@template/db/lens/rootLens';
 import type { RuleLens } from '@template/shared/rules';
 
 export type RuleValidation = { valid: boolean; errors: string[]; normalized: unknown };
@@ -103,12 +101,7 @@ export const validateRuleForLens = (
 
   if (compileWith) {
     try {
-      const root = rootLens(compileWith);
-      toPrisma(narrowRule(rule, compileWith), {
-        map: root,
-        mapName: root.mapName,
-        model: root.model,
-      });
+      toPrisma(rule, { lens: compileWith });
     } catch (error) {
       return invalid([
         error instanceof Error ? error.message : 'rule is not evaluable under the lens',

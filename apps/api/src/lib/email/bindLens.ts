@@ -14,5 +14,4 @@ import { bindValues } from '#/lib/email/bindValues';
 export const bindLens = (
   narrowing: LensNarrowing,
   values: Record<string, unknown>,
-): LensNarrowing =>
-  bindLensValues(narrowing, bindValues(listLensBindings(narrowing), values)) as LensNarrowing;
+): LensNarrowing => bindLensValues(narrowing, bindValues(listLensBindings(narrowing), values));

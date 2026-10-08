@@ -391,7 +391,13 @@ describe('emailSurface — the four lenses composed for the builder', () => {
       ].sort(),
     );
     expect(fieldsOf(surface, 'Organization')).not.toContain('emailTemplates');
-    expect(fieldsOf(surface, 'EmailSystem')).toEqual(['now', 'unsubscribeUrl', 'year']);
+    expect(fieldsOf(surface, 'EmailSystem')).toEqual([
+      'now',
+      'platformName',
+      'unsubscribeUrl',
+      'webUrl',
+      'year',
+    ]);
   });
 
   it('exposes exactly what the slots reach, and nothing beyond it', () => {
