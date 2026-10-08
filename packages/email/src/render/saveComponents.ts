@@ -10,6 +10,7 @@ import { parseBlocks } from '@template/email/render/parseBlocks';
 import { saveScopedRow } from '@template/email/render/saveScopedRow';
 import type { OwnerScope } from '@template/email/render/types';
 import { deriveComponentExpectations } from '@template/email/rules/componentExpectations';
+import type { EmailLens } from '@template/email/rules/emailLens';
 import { assertNoDuplicateExposedSlots } from '@template/email/validations/assertNoDuplicateExposedSlots';
 import { assertValidConditions } from '@template/email/validations/validateConditions';
 import { validateMjml } from '@template/email/validations/validateMjml';
@@ -70,18 +71,23 @@ const depthFirstOrder = (inputs: EmailComponent[]): EmailComponent[] => {
 export const saveComponents = async (
   inputs: EmailComponent[],
   ctx: OwnerScope,
+  lens?: EmailLens,
 ): Promise<EmailComponent[]> => {
   const saved: EmailComponent[] = [];
   for (const input of depthFirstOrder(inputs)) {
-    saved.push(await saveComponent(input, ctx));
+    saved.push(await saveComponent(input, ctx, lens));
   }
   return saved;
 };
 
-const saveComponent = async (input: EmailComponent, ctx: OwnerScope): Promise<EmailComponent> => {
+const saveComponent = async (
+  input: EmailComponent,
+  ctx: OwnerScope,
+  lens: EmailLens | undefined,
+): Promise<EmailComponent> => {
   await validateComponentMjml(input.mjml);
   assertNoDuplicateExposedSlots(parseBlocks(input.mjml), input.slug);
-  assertValidConditions(input.mjml);
+  assertValidConditions(input.mjml, { lens });
 
   return saveScopedRow(
     'emailComponent',
