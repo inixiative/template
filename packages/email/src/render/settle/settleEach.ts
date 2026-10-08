@@ -100,33 +100,50 @@ export const settleEach = (
     if (degraded !== null) return issue(degraded);
   }
 
-  const emitted: unknown[] = [];
+  const ruleScope = options.ruleScope ?? scope;
+  const ruleArray = resolvePath(block.path, ruleScope);
+  if (!Array.isArray(ruleArray) || ruleArray.length !== arrayValue.length)
+    return issue(
+      `{{#each ${block.path}}} iterates rows a grant reads whole, so its rows cannot be judged one by one`,
+    );
+
+  const emitted: { shown: unknown; judged: unknown }[] = [];
   const frames = loopFrames(bodyOptions.bindings);
   const judged =
     filter === undefined ? undefined : scopedRule(filter, bodyOptions.bindings, { lens }).rule;
-  for (const element of arrayValue) {
+  for (const [position, element] of ruleArray.entries()) {
+    const pair = { shown: arrayValue[position], judged: element };
     const judgeable = lensed && typeof element === 'object' && element !== null;
     if (filter === undefined) {
-      emitted.push(element);
+      emitted.push(pair);
       continue;
     }
     try {
-      const elementScope = { ...scope, [as]: element };
+      const elementScope = { ...ruleScope, [as]: element };
       const passes =
         judged && judgeable
           ? evaluateScopedRule(lens, judged, toRuleData(narrowToElements(elementScope, frames)))
           : check(filter as Condition, toRuleData(elementScope));
-      if (passes === true) emitted.push(element);
+      if (passes === true) emitted.push(pair);
     } catch (err) {
       return issue(err instanceof Error ? err.message : 'Unknown error');
     }
   }
 
   let out = '';
-  emitted.forEach((element, position) => {
-    const elementScope: Scope = { ...scope, [as]: element };
-    if (index) elementScope[index] = position;
-    out += settle(block.body, elementScope, bodyOptions, onError);
+  emitted.forEach(({ shown, judged: element }, position) => {
+    const elementScope: Scope = { ...scope, [as]: shown };
+    const elementRuleScope: Scope = { ...ruleScope, [as]: element };
+    if (index) {
+      elementScope[index] = position;
+      elementRuleScope[index] = position;
+    }
+    out += settle(
+      block.body,
+      elementScope,
+      { ...bodyOptions, ruleScope: elementRuleScope },
+      onError,
+    );
   });
   return out;
 };

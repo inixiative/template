@@ -4,7 +4,7 @@
  * @partOf primitive:jobs
  * @uses feature:email
  */
-import type { LensNarrowing } from '@inixiative/json-rules';
+import { type LensNarrowing, projectRows } from '@inixiative/json-rules';
 import { db } from '@template/db';
 import { fetchLens } from '@template/db/hydrate';
 import { EmailRenderError } from '@template/email/errors/EmailRenderError';
@@ -105,7 +105,7 @@ export const sendEmail = makeJob<SendEmailPayload>(async (_ctx, payload) => {
   }
 
   const entityRow = entity as Record<string, unknown>;
-  const dataVars = fields ? pick(data, fields) : entityRow;
+  const dataVars = fields ? pick(data, fields) : (projectRows(entityLens, [entityRow])[0] ?? {});
 
   const emailsOf = async (lens: LensNarrowing): Promise<string[] | undefined> => {
     const rows = await fetchLens(lens);

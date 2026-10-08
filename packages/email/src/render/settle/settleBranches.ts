@@ -52,11 +52,12 @@ export const settleBranches = (
     const judged = scoped.rule;
     const frames = loopFrames(options.bindings ?? new Map());
     const lensed = iteratesLens(options.bindings, lens);
+    const ruleScope = options.ruleScope ?? scope;
     const evaluate = (): string | null => {
       try {
         const passes = lensed
-          ? evaluateScopedRule(lens, judged, toRuleData(narrowToElements(scope, frames)))
-          : check(frames.length ? rule : applyEmailLens(lens, rule), toRuleData(scope));
+          ? evaluateScopedRule(lens, judged, toRuleData(narrowToElements(ruleScope, frames)))
+          : check(frames.length ? rule : applyEmailLens(lens, rule), toRuleData(ruleScope));
         return passes === true ? settle(branch.body, scope, options, onError) : null;
       } catch (err) {
         onError?.({ kind: 'rule', detail: err instanceof Error ? err.message : 'Unknown error' });

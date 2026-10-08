@@ -53,10 +53,16 @@ export const interpolate = (
   variables: Variables,
   onError?: RuleErrorSink,
   options: InterpolateOptions = {},
-): string =>
-  settle(
+): string => {
+  const { lens } = options;
+  const scope = toScope(lens ? narrowVariables(lens, variables) : variables);
+  const ruleScope = lens
+    ? toScope(narrowVariables(lens, variables, { keepGrantColumns: true }))
+    : scope;
+  return settle(
     resolveSystemTokens(template, options),
-    toScope(options.lens ? narrowVariables(options.lens, variables) : variables),
-    { substitute: true, liveRefs: options.liveRefs, lens: options.lens },
+    scope,
+    { substitute: true, liveRefs: options.liveRefs, lens, ruleScope },
     onError,
   );
+};

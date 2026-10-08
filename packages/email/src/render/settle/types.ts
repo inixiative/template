@@ -21,4 +21,5 @@ export type SettleOptions = {
   liveRefs?: ReadonlySet<string>;
   bindings?: BindingChain;
   lens?: EmailLens;
+  ruleScope?: Scope;
 };
