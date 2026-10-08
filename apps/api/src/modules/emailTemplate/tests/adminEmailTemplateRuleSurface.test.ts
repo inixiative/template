@@ -5,8 +5,10 @@ import {
   cleanupTouchedTables,
   createEmailTemplate,
   createOrganization,
+  createOrganizationUser,
   createSegment,
   createSpace,
+  createSpaceUser,
   createTag,
   createUser,
 } from '@template/db/test';
@@ -198,6 +200,12 @@ describe('POST /api/admin/emailTemplate/ruleSurface — the picker offers what t
     const { entity: space } = await createSpace({}, { organization: mine });
     const { entity: sibling } = await createSpace({}, { organization: mine });
     await createSpace({}, { organization: theirs });
+    const { entity: member } = await createUser();
+    const { entity: organizationUser } = await createOrganizationUser(
+      {},
+      { user: member, organization: mine },
+    );
+    await createSpaceUser({}, { user: member, organization: mine, space, organizationUser });
 
     const { data } = await json<Surface>(
       await fetch(

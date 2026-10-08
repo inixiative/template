@@ -122,3 +122,21 @@ describe('saveEmailTemplate — a rule may only name what its owner can see', ()
     ).rejects.toBeInstanceOf(RuleReferenceError);
   });
 });
+
+describe('saveEmailTemplate — a stored lens only narrows the declared surface', () => {
+  it('refuses a template whose stored recipient lens turns on sessions', async () => {
+    await expect(
+      saveEmailTemplate({
+        slug: `stored-sessions-${++seq}`,
+        name: 'stored',
+        subject: 's',
+        kind: 'system',
+        mjml: mjml('{{#each recipient.sessions as=s}}{{s.token}}{{/each}}'),
+        ownerModel: 'default',
+        lens: {
+          recipient: { picks: ['id', 'email'], relations: { sessions: { picks: ['token'] } } },
+        },
+      }),
+    ).rejects.toThrow(/sessions/);
+  });
+});

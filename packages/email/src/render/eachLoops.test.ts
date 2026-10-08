@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test';
+import type { LensNarrowing } from '@inixiative/json-rules';
 import { lensFor, live } from '@template/db/lens';
 import { interpolate } from '@template/email/render/interpolate';
 import type { RuleErrorSink } from '@template/email/render/settle';
@@ -105,11 +106,7 @@ describe('{{#each}} loops', () => {
         recipient: {
           picks: ['id', 'name'],
           relations: {
-            tagAttachments: {
-              picks: [],
-              where: { field: 'deletedAt', operator: 'notExists' },
-              relations: { tag: { picks: ['id', 'name'] } },
-            },
+            tagAttachments: { picks: [], relations: { tag: { picks: ['id', 'name'] } } },
           },
         },
       },
@@ -301,9 +298,11 @@ describe('{{#each}} loops', () => {
     });
 
     it('a loop over rows a clamp reads whole, hidden ones among them, fails closed with an issue', () => {
-      const wholeList = emailLens({
-        narrowing: {
-          recipient: {
+      const wholeList = {
+        ...emailLens(),
+        recipient: {
+          parent: lensFor('User'),
+          root: {
             picks: ['id', 'name'],
             where: {
               field: 'tagAttachments',
@@ -314,8 +313,8 @@ describe('{{#each}} loops', () => {
               tagAttachments: { picks: [], where: live, relations: { tag: { picks: ['id'] } } },
             },
           },
-        },
-      });
+        } as LensNarrowing,
+      };
       const issues: string[] = [];
       const out = interpolate(
         '{{#each recipient.tagAttachments as=item}}[{{item.tag.id}}]{{/each}}',

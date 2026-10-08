@@ -14,6 +14,7 @@ import {
   getLensRoot,
   type Lens,
   type LensNarrowing,
+  lensVisit,
   type ModelNarrowing,
   narrowRule,
   Operator,
@@ -32,6 +33,7 @@ import {
   type SourceLenses,
 } from '@template/db';
 import { lensFor, live, omitForeignKeys } from '@template/db/lens';
+import { redactLens } from '@template/db/lens/redactLens';
 import {
   RESERVED_SCOPE_ROOTS,
   SCOPE_ROOTS,
@@ -86,21 +88,30 @@ export const DEFAULT_RECIPIENT_NARROWING: ModelNarrowing = {
   },
 };
 
+const viewOf = ({ picks, relations }: ModelNarrowing): ModelNarrowing => ({
+  ...(picks ? { picks } : {}),
+  ...(relations
+    ? {
+        relations: Object.fromEntries(
+          Object.entries(relations).map(([name, child]) => [name, viewOf(child)]),
+        ),
+      }
+    : {}),
+});
+
+const DEFAULT_RECIPIENT_VIEW = viewOf(DEFAULT_RECIPIENT_NARROWING);
+
 const withMemberships = (memberships: {
   organizationUsers?: ModelNarrowing;
   spaceUsers?: ModelNarrowing;
 }): ModelNarrowing => {
-  const {
-    organizationUsers: _o,
-    spaceUsers: _s,
-    ...relations
-  } = DEFAULT_RECIPIENT_NARROWING.relations!;
-  return { ...DEFAULT_RECIPIENT_NARROWING, relations: { ...relations, ...memberships } };
+  const { organizationUsers: _o, spaceUsers: _s, ...relations } = DEFAULT_RECIPIENT_VIEW.relations!;
+  return { ...DEFAULT_RECIPIENT_VIEW, relations: { ...relations, ...memberships } };
 };
 
-/** The recipient a sender sees by default: its own level only; a stored lens widens it within the sender's tree. */
-export const defaultRecipientNarrowing = (sender: EmailLensOwner): ModelNarrowing => {
-  const { organizationUsers, spaceUsers } = DEFAULT_RECIPIENT_NARROWING.relations!;
+/** The recipient a sender sees by default: its own level only; a stored lens chooses more of the sender's tree. */
+export const defaultRecipientNarrowing = (sender: EmailLensOwner): ModelNarrowing | undefined => {
+  const { organizationUsers, spaceUsers } = DEFAULT_RECIPIENT_VIEW.relations!;
   switch (sender?.ownerModel) {
     case 'Organization':
       return withMemberships({ organizationUsers });
@@ -108,11 +119,11 @@ export const defaultRecipientNarrowing = (sender: EmailLensOwner): ModelNarrowin
       return withMemberships({
         spaceUsers: {
           ...spaceUsers,
-          where: { field: 'spaceId', operator: Operator.equals, value: sender.ownerId },
+          where: { field: 'space.id', operator: Operator.equals, value: sender.ownerId },
         },
       });
     case undefined:
-      return DEFAULT_RECIPIENT_NARROWING;
+      return undefined;
     default:
       return withMemberships({});
   }
@@ -128,11 +139,35 @@ export const scalarPicks = (fields: Record<string, { kind: string }>): ModelNarr
     .map(([name]) => name),
 });
 
-const slot = (lens: RuleLens, narrowing?: ModelNarrowing): RuleLens => {
+const shownRelations = (shown: RuleLens, path: string): string[] =>
+  Object.entries(lensVisit(shown, path)?.fields ?? {})
+    .filter(([, field]) => field.kind === 'object')
+    .map(([name]) => name);
+
+const exactly = (shown: RuleLens, node: ModelNarrowing, path = ''): ModelNarrowing => {
+  const relations = node.relations ?? {};
+  const hidden = shownRelations(shown, path).filter((name) => !(name in relations));
+  return {
+    ...node,
+    ...(hidden.length ? { omits: [...(node.omits ?? []), ...hidden] } : {}),
+    ...(node.relations
+      ? {
+          relations: Object.fromEntries(
+            Object.entries(node.relations).map(([name, child]) => [
+              name,
+              exactly(shown, child, path ? `${path}.${name}` : name),
+            ]),
+          ),
+        }
+      : {}),
+  };
+};
+
+const slot = (lens: RuleLens, view?: ModelNarrowing, surface?: ModelNarrowing): RuleLens => {
   const base = getLensRoot(lens);
   const prisma = base.mapName === 'prisma';
   const root =
-    narrowing ??
+    surface ??
     ('parent' in lens
       ? undefined
       : scalarPicks(base.maps[base.mapName]?.models[base.model]?.fields ?? {}));
@@ -142,7 +177,11 @@ const slot = (lens: RuleLens, narrowing?: ModelNarrowing): RuleLens => {
     ...(root ? { root } : {}),
   };
   if (root) assertValidNarrowing(declared);
-  return prisma ? omitForeignKeys(declared) : declared;
+  const shown = prisma ? redactLens(omitForeignKeys(declared)) : declared;
+  if (!view) return shown;
+  const viewed: LensNarrowing = { parent: shown, root: exactly(shown, view) };
+  assertValidNarrowing(viewed);
+  return viewed;
 };
 
 export const fieldsLens = (fields: Record<string, string>, model = EMAIL_DATA_MODEL): Lens =>
@@ -195,12 +234,13 @@ export const emailLens = ({
   recipient = lensFor('User'),
   data,
   narrowing = {},
-  recipientDefault = DEFAULT_RECIPIENT_NARROWING,
+  recipientDefault,
 }: EmailLensInput = {}): EmailLens => ({
   ...(sender ? { sender: slot(sender, narrowing.sender) } : {}),
   recipient: slot(
     recipient,
-    narrowing.recipient ?? (isUserLens(recipient) ? recipientDefault : undefined),
+    narrowing.recipient ?? recipientDefault,
+    isUserLens(recipient) ? DEFAULT_RECIPIENT_NARROWING : undefined,
   ),
   data: data ? slot(data, narrowing.data) : OPAQUE_SLOT,
   system: systemSlot(),

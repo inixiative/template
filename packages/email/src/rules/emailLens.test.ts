@@ -26,6 +26,7 @@ import {
 } from '@template/email/rules/emailLens';
 import { loopFrames, narrowToElements, scopedRule } from '@template/email/rules/scopedRule';
 import { scopeEmailLens } from '@template/email/rules/scopeEmailLens';
+import type { RuleLens } from '@template/shared/rules';
 
 const fieldsOf = (surface: ReturnType<typeof emailSurface>, model: string): string[] =>
   Object.keys(surface.maps[surface.mapName]?.models[model]?.fields ?? {}).sort();
@@ -490,5 +491,65 @@ describe('parseSlotLenses', () => {
     });
     expect(parseSlotLenses(null)).toEqual({});
     expect(parseSlotLenses([1])).toEqual({});
+  });
+});
+
+describe('a stored slot lens is a later layer: it only narrows what the template declares', () => {
+  const refusal = (build: () => unknown): string => {
+    try {
+      build();
+    } catch (error) {
+      return error instanceof Error ? error.message : String(error);
+    }
+    return '';
+  };
+
+  it('refuses a recipient lens that turns on sessions or accounts', () => {
+    expect(
+      refusal(() =>
+        emailLens({
+          narrowing: {
+            recipient: { picks: ['id', 'email'], relations: { sessions: { picks: ['token'] } } },
+          },
+        }),
+      ),
+    ).toContain('sessions');
+    expect(
+      refusal(() =>
+        emailLens({
+          narrowing: {
+            recipient: { picks: ['id', 'email'], relations: { accounts: { picks: ['password'] } } },
+          },
+        }),
+      ),
+    ).toContain('accounts');
+  });
+
+  it('refuses a sender lens that turns on a relation the sender slot does not show', () => {
+    expect(
+      refusal(() =>
+        emailLens({
+          sender: lensFor('Organization'),
+          narrowing: { sender: { picks: ['id'], relations: { tokens: { picks: ['name'] } } } },
+        }),
+      ),
+    ).toContain('tokens');
+  });
+
+  it('a stored recipient lens shows only what it names, inside the declared surface', () => {
+    const lens = emailLens({
+      narrowing: {
+        recipient: {
+          picks: ['id', 'email'],
+          relations: { tagAttachments: { picks: [], relations: { tag: { picks: ['id'] } } } },
+        },
+      },
+    });
+    const shown = Object.keys(projectLens(lens.recipient as RuleLens));
+    expect(shown).toContain('User.tagAttachments.tag');
+    expect(shown).not.toContain('User.organizationUsers');
+    expect(shown.some((path) => path.includes('sessions') || path.includes('accounts'))).toBe(
+      false,
+    );
   });
 });
