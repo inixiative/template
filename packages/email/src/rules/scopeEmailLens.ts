@@ -55,7 +55,11 @@ const ownerDefaults = (owner: Owner): NarrowingDefaults['models'] => ({
 });
 
 const organizationMemberships = (sender: Owner): Condition =>
-  sender.ownerModel === 'Organization' ? is('organizationId', sender.ownerId) : false;
+  sender.ownerModel === 'Organization'
+    ? is('organizationId', sender.ownerId)
+    : sender.ownerModel === 'Space' && sender.organizationId
+      ? is('organizationId', sender.organizationId)
+      : false;
 
 const spaceMemberships = (sender: Owner): Condition =>
   sender.ownerModel === 'Space'

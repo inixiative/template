@@ -295,6 +295,33 @@ describe('deliverEmailMessage — the recipient is read through the lens at send
     expect(sent[0]?.html).not.toContain(':member]');
   });
 
+  it("an organization's default lens shows its memberships, and its spaces' only when the lens turns them on", async () => {
+    const { entity: organization } = await createOrganization({ name: 'Org Default' });
+    const { entity: space } = await createSpace({ name: 'Org Space' }, { organization });
+    const { entity: user } = await createUser();
+    const { entity: organizationUser } = await createOrganizationUser(
+      { role: 'admin' },
+      { user, organization },
+    );
+    await createSpaceUser({ role: 'owner' }, { user, organization, space, organizationUser });
+    await saveTemplate(
+      'org-default-spaces',
+      '{{#each recipient.spaceUsers as=m}}[{{m.space.name}}]{{/each}}',
+      { ownerModel: 'Organization', organizationId: organization.id },
+    );
+
+    await saveTemplate('org-default-spaces', 'PLATFORM');
+
+    const row = await deliver('org-default-spaces', user.id, {
+      type: 'Organization',
+      organizationId: organization.id,
+    });
+
+    expect(row.status).toBe(CommunicationStatus.sent);
+    expect(sent[0]?.html).toContain('PLATFORM');
+    expect(sent[0]?.html).not.toContain('[Org Space]');
+  });
+
   it("a space sending with its organization's template shows that space's membership only", async () => {
     const { entity: organization } = await createOrganization({ name: 'Parent Org' });
     const { entity: space } = await createSpace({ name: 'Sending Space' }, { organization });
@@ -311,7 +338,7 @@ describe('deliverEmailMessage — the recipient is read through the lens at send
     );
     await saveTemplate(
       'space-memberships',
-      '{{#each recipient.spaceUsers as=m}}[{{m.space.name}}:{{m.role}}]{{/each}}|{{#each recipient.organizationUsers as=o}}[{{o.organization.name}}]{{/each}}',
+      '{{#each recipient.spaceUsers as=m}}[{{m.space.name}}:{{m.role}}]{{/each}}',
       { ownerModel: 'Organization', organizationId: organization.id, inheritToSpaces: true },
     );
 
@@ -325,7 +352,69 @@ describe('deliverEmailMessage — the recipient is read through the lens at send
     expect(row.emailTemplateId).not.toBeNull();
     expect(sent[0]?.html).toContain('[Sending Space:owner]');
     expect(sent[0]?.html).not.toContain('Sibling Space');
-    expect(sent[0]?.html).not.toContain('[Parent Org]');
+  });
+
+  it("a space's default lens leaves organization memberships off, so a template reading them falls back to the platform's", async () => {
+    const { entity: organization } = await createOrganization({ name: 'Default Org' });
+    const { entity: space } = await createSpace({ name: 'Default Space' }, { organization });
+    const { entity: user } = await createUser();
+    await createOrganizationUser({ role: 'member' }, { user, organization });
+    await saveTemplate(
+      'space-default-org',
+      '{{#each recipient.organizationUsers as=o}}[{{o.organization.name}}]{{/each}}',
+      { ownerModel: 'Organization', organizationId: organization.id, inheritToSpaces: true },
+    );
+
+    await saveTemplate('space-default-org', 'PLATFORM');
+
+    const row = await deliver('space-default-org', user.id, {
+      type: 'Space',
+      spaceId: space.id,
+      organizationId: organization.id,
+    });
+
+    expect(row.status).toBe(CommunicationStatus.sent);
+    expect(sent[0]?.html).toContain('PLATFORM');
+    expect(sent[0]?.html).not.toContain('[Default Org]');
+  });
+
+  it("a space whose lens turns on organization memberships sees its parent organization's, never another's", async () => {
+    const { entity: organization } = await createOrganization({ name: 'Parent Org' });
+    const { entity: other } = await createOrganization({ name: 'Other Org' });
+    const { entity: space } = await createSpace({ name: 'Lens Space' }, { organization });
+    const { entity: user } = await createUser();
+    await createOrganizationUser({ role: 'admin' }, { user, organization });
+    await createOrganizationUser({ role: 'member' }, { user, organization: other });
+    await saveTemplate(
+      'space-lens-org',
+      '{{#each recipient.organizationUsers as=o}}[{{o.organization.name}}:{{o.role}}]{{/each}}',
+      {
+        ownerModel: 'Organization',
+        organizationId: organization.id,
+        inheritToSpaces: true,
+        lens: {
+          recipient: {
+            picks: ['id', 'name', 'email'],
+            relations: {
+              organizationUsers: {
+                picks: ['role'],
+                relations: { organization: { picks: ['id', 'name'] } },
+              },
+            },
+          },
+        },
+      },
+    );
+
+    const row = await deliver('space-lens-org', user.id, {
+      type: 'Space',
+      spaceId: space.id,
+      organizationId: organization.id,
+    });
+
+    expect(row.status).toBe(CommunicationStatus.sent);
+    expect(sent[0]?.html).toContain('[Parent Org:admin]');
+    expect(sent[0]?.html).not.toContain('Other Org');
   });
 
   describe('the data entity is read through the data lens at send time', () => {

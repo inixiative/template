@@ -345,10 +345,14 @@ none) and scopes it to the owner of the row being saved, edited or rendered
 is merged into each slot's **first** narrowing (`intoFirstLayer`): json-rules 3.4 lets a later layer's
 clamp read only what its parent shows, and these clamps read columns the slot hides.
 **Memberships are the sender's.** At send, `emailLensFor(slug, owner, stored, sender)` also clamps
-`OrganizationUser` / `SpaceUser` rows to the sending owner (`senderLensOwner`): an Organization or
-OrganizationUser sender sees that organization's memberships and its spaces'; a Space or SpaceUser
-sender sees that space's membership only; a User sender sees none; a platform or admin send is
-unrestricted. Without a sender (save, preview, rule surface) the template owner stands in. The owner
+`OrganizationUser` / `SpaceUser` rows to the sending owner's tree (`senderLensOwner`): an
+Organization or OrganizationUser sender to that organization and its spaces; a Space or SpaceUser
+sender to that space and its parent organization; a User sender to none; a platform or admin send
+is unrestricted. The clamp bounds; the lens chooses what shows inside it. By default
+(`defaultRecipientNarrowing`) a sender sees its own level only: an Organization its organization
+memberships, a Space its space memberships, a User none, a platform or admin both. A stored
+recipient lens that turns on `organizationUsers` (from a space) or `spaceUsers` (from an
+organization) shows them, still within the sender's tree. Without a sender (save, preview, rule surface) the template owner stands in. The owner
 is decided per site: save takes it from the input, the rule surface and preflight from the body
 (default: platform), and settle from `composeTemplate`'s `owner` — the row that won the cascade,
 so an Organization row rendered for a Space sender sees the organization's tags. No inheritance up
