@@ -16,6 +16,7 @@ import {
   type LensNarrowing,
   type ModelNarrowing,
   narrowRule,
+  Operator,
   type PathProjection,
   projectLens,
   projectRows,
@@ -38,6 +39,7 @@ import {
 } from '@template/email/render/conditionParser';
 import { SYSTEM_TOKENS } from '@template/email/render/systemTokens';
 import { RAIL_PROVIDED_SYSTEM_FIELDS } from '@template/email/rules/railProvidedSystemFields';
+import type { EmailLensOwner } from '@template/email/rules/scopeEmailLens';
 import { walkConditionTree } from '@template/email/rules/walkConditionTree';
 import { type LensPathWalk, walkLensPath } from '@template/email/rules/walkLensPath';
 import type { RuleLens, RuleReference, RuleVocabulary } from '@template/shared/rules';
@@ -63,6 +65,7 @@ export type EmailLensInput = {
   recipient?: RuleLens;
   data?: RuleLens | null;
   narrowing?: EmailSlotLenses;
+  recipientDefault?: ModelNarrowing;
 };
 
 const referenced: ModelNarrowing = {
@@ -81,6 +84,38 @@ export const DEFAULT_RECIPIENT_NARROWING: ModelNarrowing = {
       relations: { segmentMembers: { picks: [], relations: { segment: referenced } } },
     },
   },
+};
+
+const withMemberships = (memberships: {
+  organizationUsers?: ModelNarrowing;
+  spaceUsers?: ModelNarrowing;
+}): ModelNarrowing => {
+  const {
+    organizationUsers: _o,
+    spaceUsers: _s,
+    ...relations
+  } = DEFAULT_RECIPIENT_NARROWING.relations!;
+  return { ...DEFAULT_RECIPIENT_NARROWING, relations: { ...relations, ...memberships } };
+};
+
+/** The recipient a sender sees by default: its own level only; a stored lens widens it within the sender's tree. */
+export const defaultRecipientNarrowing = (sender: EmailLensOwner): ModelNarrowing => {
+  const { organizationUsers, spaceUsers } = DEFAULT_RECIPIENT_NARROWING.relations!;
+  switch (sender?.ownerModel) {
+    case 'Organization':
+      return withMemberships({ organizationUsers });
+    case 'Space':
+      return withMemberships({
+        spaceUsers: {
+          ...spaceUsers,
+          where: { field: 'spaceId', operator: Operator.equals, value: sender.ownerId },
+        },
+      });
+    case undefined:
+      return DEFAULT_RECIPIENT_NARROWING;
+    default:
+      return withMemberships({});
+  }
 };
 
 const referenceableSources = Object.fromEntries(
@@ -160,11 +195,12 @@ export const emailLens = ({
   recipient = lensFor('User'),
   data,
   narrowing = {},
+  recipientDefault = DEFAULT_RECIPIENT_NARROWING,
 }: EmailLensInput = {}): EmailLens => ({
   ...(sender ? { sender: slot(sender, narrowing.sender) } : {}),
   recipient: slot(
     recipient,
-    narrowing.recipient ?? (isUserLens(recipient) ? DEFAULT_RECIPIENT_NARROWING : undefined),
+    narrowing.recipient ?? (isUserLens(recipient) ? recipientDefault : undefined),
   ),
   data: data ? slot(data, narrowing.data) : OPAQUE_SLOT,
   system: systemSlot(),

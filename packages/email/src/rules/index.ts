@@ -12,6 +12,7 @@ export {
   DEFAULT_RECIPIENT_NARROWING,
   declaredFields,
   defaultEmailLens,
+  defaultRecipientNarrowing,
   EMAIL_DATA_MODEL,
   EMAIL_MAP_NAME,
   EMAIL_SURFACE_ROOT,

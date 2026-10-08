@@ -345,10 +345,18 @@ none) and scopes it to the owner of the row being saved, edited or rendered
 is merged into each slot's **first** narrowing (`intoFirstLayer`): json-rules 3.4 lets a later layer's
 clamp read only what its parent shows, and these clamps read columns the slot hides.
 **Memberships are the sender's.** At send, `emailLensFor(slug, owner, stored, sender)` also clamps
-`OrganizationUser` / `SpaceUser` rows to the sending owner (`senderLensOwner`): an Organization or
-OrganizationUser sender sees that organization's memberships and its spaces'; a Space or SpaceUser
-sender sees that space's membership only; a User sender sees none; a platform or admin send is
-unrestricted. Without a sender (save, preview, rule surface) the template owner stands in. The owner
+`OrganizationUser` / `SpaceUser` rows to the sending owner's tree (`senderLensOwner`): an
+Organization, OrganizationUser, Space or SpaceUser sender to its organization (the organization and
+all its spaces, a space's parent included); a User sender to none; a platform or admin send is
+unrestricted. Nothing outside that organization ever shows. The clamp bounds; the lens chooses what
+shows inside it. By default (`defaultRecipientNarrowing`) a sender sees its own level only: an
+Organization its organization memberships, a Space its own space's memberships, a User none, a
+platform or admin both. A stored recipient lens that turns on `organizationUsers` or `spaceUsers`
+widens it, still within the organization. Targeting follows the same bound: a `messageUser` rule
+from an Organization- or Space-level sender reaches only people holding a membership the recipient
+lens shows (`targetedBySender`), so a space reaches its own members by default and its organization's
+when its lens widens. Registry sends target the entity's own recipient (an invite's target need not
+be a member yet). Without a sender (save, preview, rule surface) the template owner stands in. The owner
 is decided per site: save takes it from the input, the rule surface and preflight from the body
 (default: platform), and settle from `composeTemplate`'s `owner` — the row that won the cascade,
 so an Organization row rendered for a Space sender sees the organization's tags. No inheritance up
