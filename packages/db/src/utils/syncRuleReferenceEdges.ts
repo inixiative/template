@@ -7,7 +7,7 @@
 import { db } from '@template/db/client';
 import type { Prisma } from '@template/db/generated/client/client';
 import { resolveFalsePolymorphismRef } from '@template/db/registries/falsePolymorphism';
-import { admitRuleReferences, type SourceLenses } from '@template/db/utils/admitRuleReferences';
+import { admitRuleReferences, type ReferenceScopes } from '@template/db/utils/admitRuleReferences';
 import { lockedTargetStates, type TargetState } from '@template/db/utils/lockedTargetStates';
 import type { ModelName } from '@template/db/utils/modelNames';
 import { RuleReferenceError } from '@template/db/utils/ruleReferenceError';
@@ -16,7 +16,7 @@ import { groupBy } from 'lodash-es';
 
 export type RuleReferenceSource = { model: ModelName; id: string };
 
-export type RuleReferenceGate = SourceLenses | 'rebuild';
+export type RuleReferenceGate = ReferenceScopes | 'rebuild';
 
 type Edge = {
   id: string;
@@ -53,7 +53,7 @@ const stampOf = (state: TargetState | undefined): number | null =>
 const admit = async (
   added: RuleReference[],
   states: Map<string, TargetState>,
-  sources: SourceLenses,
+  gate: ReferenceScopes,
 ): Promise<void> => {
   const dead = added.find((ref) => {
     const target = states.get(referenceKey(ref));
@@ -63,25 +63,23 @@ const admit = async (
     throw new RuleReferenceError(
       `rule names a ${dead.model} that does not exist or is deleted: ${dead.id}`,
     );
-  const [outside] = (await admitRuleReferences(sources, added)).unadmitted;
+  const keys = new Set(added.map(referenceKey));
+  const scopes = gate.scopes.map(({ lens, references }) => ({
+    lens,
+    references: references.filter((ref) => keys.has(referenceKey(ref))),
+  }));
+  const scoped = new Set(scopes.flatMap(({ references }) => references.map(referenceKey)));
+  const [outside] = [
+    ...added.filter((ref) => !scoped.has(referenceKey(ref))),
+    ...(await admitRuleReferences({ ...gate, scopes })).unadmitted,
+  ];
   if (outside)
     throw new RuleReferenceError(
       `rule names a ${outside.model} outside this source's view: ${outside.id}`,
     );
 };
 
-/**
- * Recompute one source's edges from the rows its rule names, inside the caller's transaction:
- * set-diff against the edges it holds (a kept edge keeps its id), every kept edge restamped against
- * its target's current `deletedAt`, every new edge born with it. Targets are read under
- * `FOR UPDATE`, so an edge cannot be written live against a row whose delete is uncommitted.
- *
- * The gate is the save path's: a newly named row must be live and inside the lenses' `sources`
- * (a reference already held is not re-admitted, so a dead one stays editable). A `'rebuild'` — the
- * source coming back from a revive — skips it: a target that died while the source was away gets an
- * edge carrying its stamp, so the source returns degraded rather than refused. A purged target gets
- * no new edge, and the rule fails closed on it.
- */
+// Targets are read FOR UPDATE so an edge is never written live against an uncommitted delete.
 export const syncRuleReferenceEdges = async (
   source: RuleReferenceSource,
   references: RuleReference[],

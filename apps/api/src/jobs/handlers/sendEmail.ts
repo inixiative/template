@@ -4,7 +4,7 @@
  * @partOf primitive:jobs
  * @uses feature:email
  */
-import { type LensNarrowing, projectRows } from '@inixiative/json-rules';
+import { projectRows } from '@inixiative/json-rules';
 import { db } from '@template/db';
 import { fetchLens } from '@template/db/hydrate';
 import { EmailRenderError } from '@template/email/errors/EmailRenderError';
@@ -24,7 +24,7 @@ import { fanOutLane } from '#/lib/email/fanOutLane';
 import { deliverJobId, plannerJobId } from '#/lib/email/idempotency';
 import { pickSender } from '#/lib/email/pickSender';
 import type { Recipient } from '#/lib/email/recipient';
-import { addressLens, registry, slotRowsLens } from '#/lib/email/registry';
+import { registry, slotRowsLens } from '#/lib/email/registry';
 import type { Sender } from '#/lib/email/sender';
 import { ownerScope } from '#/lib/emailTemplate';
 
@@ -107,18 +107,13 @@ export const sendEmail = makeJob<SendEmailPayload>(async (_ctx, payload) => {
   const entityRow = entity as Record<string, unknown>;
   const dataVars = fields ? pick(data, fields) : (projectRows(entityLens, [entityRow])[0] ?? {});
 
-  const emailsOf = async (lens: LensNarrowing): Promise<string[] | undefined> => {
-    const rows = await fetchLens(lens);
-    if (!rows.length) return undefined;
-    return (rows as Array<{ email: string }>).map((r) => r.email);
-  };
-
   const sender = pickSender(entry.sender, entityRow);
   const row = await lookupTemplate(template, ownerScope(sender));
   if (!row) throw new EmailRenderError(template, 'template_missing');
+  const targeting = bindWhere(entry.recipients.where, entityRow);
   const lens = slotRowsLens(
     emailLensFor(template, rowOwner(row), await templateLens(template, row), sender).recipient,
-    bindWhere(entry.recipients.where, entityRow),
+    targeting,
   );
   const sendKey = plannerJobId(eventName, template, data);
 
@@ -177,20 +172,15 @@ export const sendEmail = makeJob<SendEmailPayload>(async (_ctx, payload) => {
     return [
       async () => {
         const userRow = user as Record<string, unknown>;
-        const cc = entry.cc
-          ? await emailsOf(addressLens(bindWhere(entry.cc.where, userRow)))
-          : undefined;
-        const bcc = entry.bcc
-          ? await emailsOf(addressLens(bindWhere(entry.bcc.where, userRow)))
-          : undefined;
         await enqueueJob(
           'deliverEmail',
           {
             template,
             sender,
             recipientId: recipient.id,
-            cc,
-            bcc,
+            targeting,
+            cc: entry.cc ? bindWhere(entry.cc.where, userRow) : undefined,
+            bcc: entry.bcc ? bindWhere(entry.bcc.where, userRow) : undefined,
             data: dataVars,
             communicationLogId,
           },

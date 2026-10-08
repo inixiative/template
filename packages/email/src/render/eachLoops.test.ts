@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'bun:test';
+import type { LensNarrowing } from '@inixiative/json-rules';
 import { lensFor, live } from '@template/db/lens';
 import { interpolate } from '@template/email/render/interpolate';
 import type { RuleErrorSink } from '@template/email/render/settle';
-import { type EmailLens, emailLens } from '@template/email/rules/emailLens';
+import { defaultEmailLens, type EmailLens, emailLens } from '@template/email/rules/emailLens';
 import { scopeEmailLens } from '@template/email/rules/scopeEmailLens';
 
 const render = (template: string, data: Record<string, unknown>, onError?: RuleErrorSink) =>
-  interpolate(template, { data }, onError);
+  interpolate(template, { data }, onError, { lens: defaultEmailLens });
 
 describe('{{#each}} loops', () => {
   it('renders the body once per element bound to as=', () => {
@@ -105,11 +106,7 @@ describe('{{#each}} loops', () => {
         recipient: {
           picks: ['id', 'name'],
           relations: {
-            tagAttachments: {
-              picks: [],
-              where: { field: 'deletedAt', operator: 'notExists' },
-              relations: { tag: { picks: ['id', 'name'] } },
-            },
+            tagAttachments: { picks: [], relations: { tag: { picks: ['id', 'name'] } } },
           },
         },
       },
@@ -181,7 +178,7 @@ describe('{{#each}} loops', () => {
           lens,
         },
       );
-    expect(render('u1')).toBe('VIP|[own][]');
+    expect(render('u1')).toBe('VIP|[own]');
     expect(render('u2')).toBe('BASE|');
   });
 
@@ -225,7 +222,7 @@ describe('{{#each}} loops', () => {
       undefined,
       { lens },
     );
-    expect(out).toBe('[name-own][]');
+    expect(out).toBe('[name-own]');
   });
 
   it("memberships are the sender's: another organization's membership is not a row of the loop", () => {
@@ -301,9 +298,13 @@ describe('{{#each}} loops', () => {
     });
 
     it('a loop over rows a clamp reads whole, hidden ones among them, fails closed with an issue', () => {
-      const wholeList = emailLens({
-        narrowing: {
-          recipient: {
+      const { data, system } = emailLens();
+      const wholeList = {
+        data,
+        system,
+        recipient: {
+          parent: lensFor('User'),
+          root: {
             picks: ['id', 'name'],
             where: {
               field: 'tagAttachments',
@@ -314,8 +315,8 @@ describe('{{#each}} loops', () => {
               tagAttachments: { picks: [], where: live, relations: { tag: { picks: ['id'] } } },
             },
           },
-        },
-      });
+        } as LensNarrowing,
+      };
       const issues: string[] = [];
       const out = interpolate(
         '{{#each recipient.tagAttachments as=item}}[{{item.tag.id}}]{{/each}}',
@@ -428,5 +429,92 @@ describe('{{#each}} loops', () => {
 
   it('renders an unknown root empty outside any loop, never the literal token', () => {
     expect(render('hello {{unknown.thing}} world', {})).toBe('hello  world');
+  });
+
+  it('a rule inside a loop over an opaque slot that probes a lens-backed root renders nothing and reports it', () => {
+    const lens = scopeEmailLens(emailLens({ sender: lensFor('Organization') }), {
+      ownerModel: 'Organization',
+      ownerId: 'org-1',
+    });
+    const probe = JSON.stringify({
+      field: 'recipient.organizationUsers',
+      arrayOperator: 'any',
+      condition: { field: 'organization.name', operator: 'equals', value: 'Theirs' },
+    });
+    const issues: string[] = [];
+    const out = interpolate(
+      `{{#each data.items as=i}}{{#if rule=${probe}}}LEAK{{else}}-{{/if}}{{/each}}`,
+      {
+        recipient: {
+          id: 'u1',
+          name: 'Ann',
+          organizationUsers: [{ role: 'member', organization: { id: 'org-2', name: 'Theirs' } }],
+        },
+        data: { items: [1] },
+      },
+      (issue) => issues.push(issue.detail),
+      { lens },
+    );
+    expect(out).not.toContain('LEAK');
+    expect(issues.join(' ')).toContain('opaque slot');
+  });
+
+  describe('a rule never reads a clamp column the lens hides', () => {
+    const lens = scopeEmailLens(emailLens({ sender: lensFor('Organization') }), {
+      ownerModel: 'Organization',
+      ownerId: 'org-1',
+    });
+    const variables = {
+      recipient: {
+        id: 'u1',
+        name: 'Ann',
+        tagAttachments: [
+          {
+            deletedAt: null,
+            tag: { id: 't1', name: 'vip', ownerModel: 'Organization', organizationId: 'org-1' },
+          },
+        ],
+      },
+      data: { org: 'org-1', items: [1] },
+    };
+    const probe = (path: string) => JSON.stringify({ field: 'data.org', operator: 'equals', path });
+    const renderIssues = (template: string) => {
+      const issues: string[] = [];
+      const out = interpolate(template, variables, (issue) => issues.push(issue.detail), { lens });
+      return { out, issues };
+    };
+
+    for (const path of [
+      'recipient.tagAttachments.0.tag.organizationId',
+      '$.recipient.tagAttachments.0.tag.organizationId',
+    ]) {
+      it(`a path value into a hidden column is refused: ${path}`, () => {
+        const top = renderIssues(`{{#if rule=${probe(path)}}}LEAK{{/if}}`);
+        expect(top.out).not.toContain('LEAK');
+        const looped = renderIssues(
+          `{{#each data.items as=i}}{{#if rule=${probe(path)}}}LEAK{{/if}}{{/each}}`,
+        );
+        expect(looped.out).not.toContain('LEAK');
+        expect(looped.issues.length).toBeGreaterThan(0);
+      });
+    }
+
+    it('a binding over a lens-backed collection inside an opaque loop is refused, rule and filter alike', () => {
+      const hidden = JSON.stringify({
+        field: 't.tag.organizationId',
+        operator: 'equals',
+        value: 'org-1',
+      });
+      const branch = renderIssues(
+        `{{#each data.items as=i}}{{#each recipient.tagAttachments as=t}}{{#if rule=${hidden}}}LEAK{{/if}}{{/each}}{{/each}}`,
+      );
+      expect(branch.out).not.toContain('LEAK');
+      expect(branch.issues.join(' ')).toContain('opaque slot');
+      const filtered = renderIssues(
+        `{{#each data.items as=i}}{{#each recipient.tagAttachments as=t filter=${hidden}}}LEAK{{/each}}{{/each}}`,
+      );
+      expect(filtered.out).not.toContain('LEAK');
+      expect(filtered.issues.join(' ')).toContain('opaque slot');
+    });
   });
 });

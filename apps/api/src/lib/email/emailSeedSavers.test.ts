@@ -2,7 +2,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import { type SeedFile, seedTable } from '@template/db/prisma/seed';
 import { seeds } from '@template/db/prisma/seeds';
-import { cleanupTouchedTables } from '@template/db/test';
+import { cleanupTouchedTables, createOrganization, createTag } from '@template/db/test';
 import { TokenValidationError } from '@template/email/errors/TokenValidationError';
 import { emailSeedSavers } from '#/lib/email/emailSeedSavers';
 
@@ -57,5 +57,37 @@ describe('email seeds persist through the app save', () => {
 
   it('refuses to write email seeds directly, without the app save', async () => {
     await expect(seedTable(invalidTemplate)).rejects.toThrow(/app's save path/);
+  });
+
+  it('refuses a seeded component whose rule names a row the platform lens does not admit', async () => {
+    const { entity: organization } = await createOrganization();
+    const { entity: tag } = await createTag({
+      ownerModel: 'Organization',
+      organizationId: organization.id,
+    });
+    const rule = JSON.stringify({
+      field: 'recipient.tagAttachments',
+      arrayOperator: 'any',
+      condition: { field: 'tag.id', operator: 'equals', value: tag.id },
+    });
+    const component: SeedFile = {
+      model: 'emailComponent',
+      savedByApp: true,
+      records: [
+        {
+          id: '01936d42-ec00-7000-8000-0000000000f1',
+          slug: 'seed-org-tag',
+          locale: 'en',
+          ownerModel: 'default',
+          componentRefs: [],
+          mjml: `<mj-text>{{#if rule=${rule}}}VIP{{/if}}</mj-text>`,
+        },
+      ],
+    };
+
+    await expect(seedTable(component, emailSeedSavers)).rejects.toThrow(
+      /outside this source's view/,
+    );
+    expect(await db.emailComponent.findFirst({ where: { slug: 'seed-org-tag' } })).toBeNull();
   });
 });

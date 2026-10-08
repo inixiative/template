@@ -88,8 +88,9 @@ export type { UserWithRelations } from './types/userWithRelations';
 export { UserWithRelationsSchema } from './types/userWithRelations';
 export {
   admitRuleReferences,
+  type ReferenceScope,
+  type ReferenceScopes,
   type RuleReferenceAdmission,
-  type SourceLenses,
 } from './utils/admitRuleReferences';
 // SQL utilities
 export { aliasColumns } from './utils/aliasColumns';

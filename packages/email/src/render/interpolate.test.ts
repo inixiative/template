@@ -2,93 +2,139 @@ import { describe, expect, it, spyOn } from 'bun:test';
 import { interpolate } from '@template/email/render/interpolate';
 import { EACH_MAX_DEPTH, EACH_MAX_ELEMENTS } from '@template/email/render/limits';
 import { SYSTEM_TOKENS } from '@template/email/render/systemTokens';
+import { defaultEmailLens } from '@template/email/rules/emailLens';
 
 describe('interpolate', () => {
   describe('variable substitution', () => {
     it('substitutes sender variables', () => {
-      const result = interpolate('Hello from {{sender.name}}', {
-        sender: { name: 'Acme Corp' },
-      });
+      const result = interpolate(
+        'Hello from {{sender.name}}',
+        {
+          sender: { name: 'Acme Corp' },
+        },
+        undefined,
+        { lens: defaultEmailLens },
+      );
       expect(result).toBe('Hello from Acme Corp');
     });
 
     it('substitutes recipient variables', () => {
-      const result = interpolate('Hi {{recipient.name}}, your email is {{recipient.email}}', {
-        recipient: { name: 'John', email: 'john@example.com' },
-      });
+      const result = interpolate(
+        'Hi {{recipient.name}}, your email is {{recipient.email}}',
+        {
+          recipient: { name: 'John', email: 'john@example.com' },
+        },
+        undefined,
+        { lens: defaultEmailLens },
+      );
       expect(result).toBe('Hi John, your email is john@example.com');
     });
 
     it('substitutes data values', () => {
-      const result = interpolate('Your code is {{data.code}}', {
-        data: { code: '123456' },
-      });
+      const result = interpolate(
+        'Your code is {{data.code}}',
+        {
+          data: { code: '123456' },
+        },
+        undefined,
+        { lens: defaultEmailLens },
+      );
       expect(result).toBe('Your code is 123456');
     });
 
     it('substitutes system lens values', () => {
-      const result = interpolate('Manage your prefs: {{system.preferencesUrl}}', {
-        system: { preferencesUrl: 'https://app.example.com/prefs' },
-      });
+      const result = interpolate(
+        'Manage your prefs: {{system.unsubscribeUrl}}',
+        {
+          system: { unsubscribeUrl: 'https://app.example.com/prefs' },
+        },
+        undefined,
+        { lens: defaultEmailLens },
+      );
       expect(result).toBe('Manage your prefs: https://app.example.com/prefs');
     });
 
     it('resolves all four lenses together', () => {
       const result = interpolate(
-        '{{sender.name}}→{{recipient.name}}:{{data.code}} [{{system.appName}}]',
+        '{{sender.name}}→{{recipient.name}}:{{data.code}} [{{system.unsubscribeUrl}}]',
         {
           sender: { name: 'Acme' },
           recipient: { name: 'Jo' },
           data: { code: '42' },
-          system: { appName: 'Tmpl' },
+          system: { unsubscribeUrl: 'Tmpl' },
         },
+        undefined,
+        { lens: defaultEmailLens },
       );
       expect(result).toBe('Acme→Jo:42 [Tmpl]');
     });
 
     it('renders empty and sinks a token issue when the value is missing — never the literal token', () => {
       const issues: string[] = [];
-      const result = interpolate('Hello {{recipient.name}}', {}, (issue) =>
-        issues.push(`${issue.kind}:${issue.path}`),
+      const result = interpolate(
+        'Hello {{recipient.name}}',
+        {},
+        (issue) => issues.push(`${issue.kind}:${issue.path}`),
+        { lens: defaultEmailLens },
       );
       expect(result).toBe('Hello ');
       expect(issues).toEqual(['token:recipient.name']);
     });
 
     it('escapes HTML in values', () => {
-      const result = interpolate('Hello {{recipient.name}}', {
-        recipient: { name: '<script>alert("xss")</script>' },
-      });
+      const result = interpolate(
+        'Hello {{recipient.name}}',
+        {
+          recipient: { name: '<script>alert("xss")</script>' },
+        },
+        undefined,
+        { lens: defaultEmailLens },
+      );
       expect(result).toBe('Hello &lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;');
     });
 
     it('handles multiple prefixes', () => {
-      const result = interpolate('{{sender.name}} sent {{recipient.name}} code {{data.code}}', {
-        sender: { name: 'Acme' },
-        recipient: { name: 'John' },
-        data: { code: '999' },
-      });
+      const result = interpolate(
+        '{{sender.name}} sent {{recipient.name}} code {{data.code}}',
+        {
+          sender: { name: 'Acme' },
+          recipient: { name: 'John' },
+          data: { code: '999' },
+        },
+        undefined,
+        { lens: defaultEmailLens },
+      );
       expect(result).toBe('Acme sent John code 999');
     });
 
     it('handles hyphenated keys', () => {
-      const result = interpolate('Hi {{recipient.first-name}} {{recipient.last-name}}', {
-        recipient: { 'first-name': 'John', 'last-name': 'Doe' },
-      });
+      const result = interpolate(
+        'Hi {{data.first-name}} {{data.last-name}}',
+        {
+          data: { 'first-name': 'John', 'last-name': 'Doe' },
+        },
+        undefined,
+        { lens: defaultEmailLens },
+      );
       expect(result).toBe('Hi John Doe');
     });
 
     it('resolves nested paths', () => {
-      const result = interpolate('Org: {{data.org.name}}, role: {{data.member.role}}', {
-        data: { org: { name: 'Acme' }, member: { role: 'admin' } },
-      });
+      const result = interpolate(
+        'Org: {{data.org.name}}, role: {{data.member.role}}',
+        {
+          data: { org: { name: 'Acme' }, member: { role: 'admin' } },
+        },
+        undefined,
+        { lens: defaultEmailLens },
+      );
       expect(result).toBe('Org: Acme, role: admin');
     });
 
     it('does not resolve prototype-chain or inherited-function paths', () => {
       const template =
         '{{data.constructor.name}}|{{data.__proto__.x}}|{{data.prototype}}|{{data.toString}}';
-      const result = interpolate(template, { data: {} });
+      const result = interpolate(template, { data: {} }, undefined, { lens: defaultEmailLens });
       expect(result).toBe('|||');
     });
   });
@@ -100,6 +146,8 @@ describe('interpolate', () => {
       const result = interpolate(
         'Hello{{#if rule={"field":"data.role","operator":"equals","value":"admin"}}} Admin{{/if}}!',
         { data: { role: 'admin' } },
+        undefined,
+        { lens: defaultEmailLens },
       );
       expect(result).toBe('Hello Admin!');
     });
@@ -108,6 +156,8 @@ describe('interpolate', () => {
       const result = interpolate(
         'Hello{{#if rule={"field":"data.role","operator":"equals","value":"admin"}}} Admin{{/if}}!',
         { data: { role: 'user' } },
+        undefined,
+        { lens: defaultEmailLens },
       );
       expect(result).toBe('Hello!');
     });
@@ -119,9 +169,14 @@ describe('interpolate', () => {
           { field: 'data.verified', operator: 'equals', value: true },
         ],
       });
-      const result = interpolate(`Show{{#if rule=${rule}}} secret{{/if}} content`, {
-        data: { role: 'admin', verified: true },
-      });
+      const result = interpolate(
+        `Show{{#if rule=${rule}}} secret{{/if}} content`,
+        {
+          data: { role: 'admin', verified: true },
+        },
+        undefined,
+        { lens: defaultEmailLens },
+      );
       expect(result).toBe('Show secret content');
     });
 
@@ -132,9 +187,14 @@ describe('interpolate', () => {
           { field: 'data.role', operator: 'equals', value: 'owner' },
         ],
       });
-      const result = interpolate(`{{#if rule=${rule}}}Privileged{{/if}}`, {
-        data: { role: 'owner' },
-      });
+      const result = interpolate(
+        `{{#if rule=${rule}}}Privileged{{/if}}`,
+        {
+          data: { role: 'owner' },
+        },
+        undefined,
+        { lens: defaultEmailLens },
+      );
       expect(result).toBe('Privileged');
     });
 
@@ -146,6 +206,8 @@ describe('interpolate', () => {
           recipient: { name: 'John' },
           data: { premium: true },
         },
+        undefined,
+        { lens: defaultEmailLens },
       );
       expect(result).toBe('Hi John, thanks for being premium!');
     });
@@ -161,6 +223,8 @@ describe('interpolate', () => {
       const result = interpolate(
         `{{#if rule=${adminRule}}}[Admin]{{/if}}{{#if rule=${premiumRule}}}[Premium]{{/if}} User`,
         { data: { role: 'admin', premium: false } },
+        undefined,
+        { lens: defaultEmailLens },
       );
       expect(result).toBe('[Admin] User');
     });
@@ -171,9 +235,14 @@ describe('interpolate', () => {
         operator: 'in',
         value: ['admin', 'owner', 'manager'],
       });
-      const result = interpolate(`{{#if rule=${rule}}}Manager View{{/if}}`, {
-        data: { role: 'manager' },
-      });
+      const result = interpolate(
+        `{{#if rule=${rule}}}Manager View{{/if}}`,
+        {
+          data: { role: 'manager' },
+        },
+        undefined,
+        { lens: defaultEmailLens },
+      );
       expect(result).toBe('Manager View');
     });
 
@@ -183,9 +252,14 @@ describe('interpolate', () => {
         operator: 'notEquals',
         value: 'banned',
       });
-      const result = interpolate(`{{#if rule=${rule}}}Welcome{{/if}}`, {
-        data: { status: 'active' },
-      });
+      const result = interpolate(
+        `{{#if rule=${rule}}}Welcome{{/if}}`,
+        {
+          data: { status: 'active' },
+        },
+        undefined,
+        { lens: defaultEmailLens },
+      );
       expect(result).toBe('Welcome');
     });
 
@@ -195,9 +269,14 @@ describe('interpolate', () => {
         operator: 'equals',
         value: 'use {braces} here',
       });
-      const result = interpolate(`{{#if rule=${rule}}}Matched{{/if}}`, {
-        data: { msg: 'use {braces} here' },
-      });
+      const result = interpolate(
+        `{{#if rule=${rule}}}Matched{{/if}}`,
+        {
+          data: { msg: 'use {braces} here' },
+        },
+        undefined,
+        { lens: defaultEmailLens },
+      );
       expect(result).toBe('Matched');
     });
 
@@ -207,6 +286,7 @@ describe('interpolate', () => {
         '{{#if rule={invalid json}}}Content{{else}}Fallback{{/if}}',
         { recipient: {} },
         (m) => errors.push(m.detail),
+        { lens: defaultEmailLens },
       );
       expect(result).toBe('Fallback');
       expect(errors).toHaveLength(1);
@@ -217,7 +297,9 @@ describe('interpolate', () => {
     const utcYear = String(new Date().getUTCFullYear());
 
     it('resolves reserved system tokens from the engine clock at send time', () => {
-      const result = interpolate('© {{system.year}} — sent {{system.now}}', {});
+      const result = interpolate('© {{system.year}} — sent {{system.now}}', {}, undefined, {
+        lens: defaultEmailLens,
+      });
       expect(result).toContain(`© ${utcYear} —`);
       expect(result).not.toContain('{{system.now}}');
     });
@@ -225,29 +307,42 @@ describe('interpolate', () => {
     it('resolves every token the shared list offers', () => {
       for (const { name } of SYSTEM_TOKENS) {
         const token = `{{system.${name}}}`;
-        expect(interpolate(token, {})).not.toContain(token);
+        expect(interpolate(token, {}, undefined, { lens: defaultEmailLens })).not.toContain(token);
       }
     });
 
     it('resolves the platform name and web URL, which belong to the platform, not the sender', () => {
-      const result = interpolate('{{system.platformName}} {{system.webUrl}}', {
-        sender: { platformName: 'NOT_THIS' },
-      });
+      const result = interpolate(
+        '{{system.platformName}} {{system.webUrl}}',
+        {
+          sender: { platformName: 'NOT_THIS' },
+        },
+        undefined,
+        { lens: defaultEmailLens },
+      );
       expect(result).toBe(
         `${process.env.PROJECT_NAME ?? 'Template'} ${process.env.WEB_URL ?? ''}`.trim(),
       );
     });
 
     it('is not overridable by a caller-supplied system bucket', () => {
-      const result = interpolate('{{system.year}}', { system: { year: 'HACKED' } } as never);
+      const result = interpolate(
+        '{{system.year}}',
+        { system: { year: 'HACKED' } } as never,
+        undefined,
+        { lens: defaultEmailLens },
+      );
       expect(result).toBe(utcYear);
     });
 
     it('renders unknown and nested system tokens empty and sinks them', () => {
       const issues: string[] = [];
       expect(
-        interpolate('{{system.unknown}} {{system.now.iso}}', {}, (issue) =>
-          issues.push(issue.path ?? ''),
+        interpolate(
+          '{{system.unknown}} {{system.now.iso}}',
+          {},
+          (issue) => issues.push(issue.path ?? ''),
+          { lens: defaultEmailLens },
         ),
       ).toBe(' ');
       expect(issues).toEqual(['system.unknown', 'system.now.iso']);
@@ -255,12 +350,18 @@ describe('interpolate', () => {
 
     it('does not resolve inherited Object.prototype members as system tokens', () => {
       const template = '{{system.__proto__}}|{{system.toString}}|{{system.constructor}}';
-      expect(interpolate(template, {})).toBe('||');
+      expect(interpolate(template, {}, undefined, { lens: defaultEmailLens })).toBe('||');
     });
 
     it('formats system.now in the caller-provided locale', () => {
-      const enUS = interpolate('{{system.now}}', {}, undefined, { locale: 'en-US' });
-      const enGB = interpolate('{{system.now}}', {}, undefined, { locale: 'en-GB' });
+      const enUS = interpolate('{{system.now}}', {}, undefined, {
+        lens: defaultEmailLens,
+        locale: 'en-US',
+      });
+      const enGB = interpolate('{{system.now}}', {}, undefined, {
+        lens: defaultEmailLens,
+        locale: 'en-GB',
+      });
       // Same instant, both English: en-US is month-first with a comma, en-GB day-first without one.
       expect(enUS).toMatch(/^[A-Z][a-z]+ \d{1,2}, \d{4}$/);
       expect(enGB).toMatch(/^\d{1,2} [A-Z][a-z]+ \d{4}$/);
@@ -273,25 +374,40 @@ describe('interpolate', () => {
         day: 'numeric',
         timeZone: 'UTC',
       });
-      expect(interpolate('{{system.now}}', {}, undefined, { locale: 'en-US' })).toBe(utcToday);
+      expect(
+        interpolate('{{system.now}}', {}, undefined, { lens: defaultEmailLens, locale: 'en-US' }),
+      ).toBe(utcToday);
     });
 
     it('degrades a malformed locale to the runtime default instead of failing the send', () => {
-      const result = interpolate('{{system.now}}', {}, undefined, { locale: 'not_a_locale' });
+      const result = interpolate('{{system.now}}', {}, undefined, {
+        lens: defaultEmailLens,
+        locale: 'not_a_locale',
+      });
       expect(result).not.toContain('{{system.now}}');
       expect(result).toMatch(/\d{4}/);
     });
 
     it('resolves inside a conditional body', () => {
       const rule = JSON.stringify({ field: 'data.plan', operator: 'equals', value: 'pro' });
-      const result = interpolate(`{{#if rule=${rule}}}{{system.year}}{{/if}}`, {
-        data: { plan: 'pro' },
-      });
+      const result = interpolate(
+        `{{#if rule=${rule}}}{{system.year}}{{/if}}`,
+        {
+          data: { plan: 'pro' },
+        },
+        undefined,
+        { lens: defaultEmailLens },
+      );
       expect(result).toBe(utcYear);
     });
 
     it('does not resolve a system token carried in a caller value', () => {
-      const result = interpolate('{{data.note}}', { data: { note: '{{system.year}}' } });
+      const result = interpolate(
+        '{{data.note}}',
+        { data: { note: '{{system.year}}' } },
+        undefined,
+        { lens: defaultEmailLens },
+      );
       expect(result).toBe('{{system.year}}');
     });
 
@@ -305,6 +421,8 @@ describe('interpolate', () => {
         const [first, second, year] = interpolate(
           '{{system.now}} / {{system.now}} / {{system.year}}',
           {},
+          undefined,
+          { lens: defaultEmailLens },
         ).split(' / ');
         expect(second).toBe(first as string);
         expect(year).toBe('2026');
@@ -318,9 +436,14 @@ describe('interpolate', () => {
 describe('interpolate — {{#each}} grammar', () => {
   it('substitutes a bare binding token per element when the element is a primitive', () => {
     expect(
-      interpolate('{{#each data.items as=item}}[{{item}}]{{/each}}', {
-        data: { items: ['a', 'b', 'c'] },
-      }),
+      interpolate(
+        '{{#each data.items as=item}}[{{item}}]{{/each}}',
+        {
+          data: { items: ['a', 'b', 'c'] },
+        },
+        undefined,
+        { lens: defaultEmailLens },
+      ),
     ).toBe('[a][b][c]');
   });
 
@@ -336,6 +459,8 @@ describe('interpolate — {{#each}} grammar', () => {
           ],
         },
       },
+      undefined,
+      { lens: defaultEmailLens },
     );
     expect(result).toBe('0:1 ');
   });
@@ -344,6 +469,8 @@ describe('interpolate — {{#each}} grammar', () => {
     const result = interpolate(
       '{{#each data.items as=item}}{{#if rule= {"field":"item.ok","operator":"equals","value":true} }}Y{{/if}}{{/each}}',
       { data: { items: [{ ok: true }, { ok: false }] } },
+      undefined,
+      { lens: defaultEmailLens },
     );
     expect(result).toBe('Y');
   });
@@ -352,14 +479,19 @@ describe('interpolate — {{#each}} grammar', () => {
 describe('interpolate — {{#each}} scope', () => {
   it('an unresolved identifier (not a binding, not a reserved root) renders empty and sinks', () => {
     const errors: string[] = [];
-    expect(interpolate('{{notabinding}}', {}, (m) => errors.push(m.detail))).toBe('');
+    expect(
+      interpolate('{{notabinding}}', {}, (m) => errors.push(m.detail), { lens: defaultEmailLens }),
+    ).toBe('');
     expect(errors).toEqual(['{{notabinding}} names no scope root or loop binding']);
   });
 
   it('an inherited Object.prototype property is not mistaken for an in-scope binding', () => {
     const errors: string[] = [];
-    const result = interpolate('{{constructor}} {{constructor.name}}', {}, (m) =>
-      errors.push(m.detail),
+    const result = interpolate(
+      '{{constructor}} {{constructor.name}}',
+      {},
+      (m) => errors.push(m.detail),
+      { lens: defaultEmailLens },
     );
     expect(result).toBe(' ');
     expect(errors).toHaveLength(2);
@@ -371,6 +503,7 @@ describe('interpolate — {{#each}} scope', () => {
       '{{#each data.items as=system}}{{system.now}}|{{system.label}}{{/each}}',
       { data: { items: [{ label: 'shadowed', now: 'shadowed' }] } },
       (m) => errors.push(m.detail),
+      { lens: defaultEmailLens },
     );
     expect(result).toBe('');
     expect(errors).toEqual(['as= "system" collides with a reserved or enclosing binding']);
@@ -382,6 +515,7 @@ describe('interpolate — {{#each}} scope', () => {
       '{{#each data.items as=first typo=value as=second}}{{second}}{{/each}}',
       { data: { items: ['unsafe'] } },
       (m) => errors.push(m.detail),
+      { lens: defaultEmailLens },
     );
     expect(result).toBe('');
     expect(errors).toEqual([
@@ -396,6 +530,7 @@ describe('interpolate — {{#each}} scope', () => {
       '{{#each data.items as item}}X{{/each}}',
       { data: { items: ['unsafe'] } },
       (m) => errors.push(m.detail),
+      { lens: defaultEmailLens },
     );
     expect(result).toBe('');
     expect(errors).toEqual([
@@ -410,6 +545,7 @@ describe('interpolate — {{#each}} scope', () => {
       '{{#each data.items as=item}}{{item.meta}}{{/each}}',
       { data: { items: [{ meta: { a: 1 } }] } },
       (m) => errors.push(m.detail),
+      { lens: defaultEmailLens },
     );
     expect(result).toBe('');
     expect(errors).toEqual(['{{item.meta}} resolved to a non-primitive value']);
@@ -419,17 +555,27 @@ describe('interpolate — {{#each}} scope', () => {
 describe('interpolate — prototype-chain token safety on bindings', () => {
   it('renders a constructor token on an each binding empty', () => {
     expect(
-      interpolate('{{#each data.items as=item}}{{item.constructor}}{{/each}}', {
-        data: { items: [{}] },
-      }),
+      interpolate(
+        '{{#each data.items as=item}}{{item.constructor}}{{/each}}',
+        {
+          data: { items: [{}] },
+        },
+        undefined,
+        { lens: defaultEmailLens },
+      ),
     ).toBe('');
   });
 
   it('renders function-valued each-binding properties empty', () => {
     expect(
-      interpolate('{{#each data.items as=item}}{{item.fn}}{{/each}}', {
-        data: { items: [{ fn: () => 'should not render' }] },
-      }),
+      interpolate(
+        '{{#each data.items as=item}}{{item.fn}}{{/each}}',
+        {
+          data: { items: [{ fn: () => 'should not render' }] },
+        },
+        undefined,
+        { lens: defaultEmailLens },
+      ),
     ).toBe('');
   });
 });
@@ -438,8 +584,11 @@ describe('interpolate — {{#each}} semantics', () => {
   it('an empty array renders empty with no sink', () => {
     const errors: string[] = [];
     expect(
-      interpolate('{{#each data.items as=item}}X{{/each}}', { data: { items: [] } }, (m) =>
-        errors.push(m.detail),
+      interpolate(
+        '{{#each data.items as=item}}X{{/each}}',
+        { data: { items: [] } },
+        (m) => errors.push(m.detail),
+        { lens: defaultEmailLens },
       ),
     ).toBe('');
     expect(errors).toEqual([]);
@@ -452,6 +601,7 @@ describe('interpolate — {{#each}} semantics', () => {
         '{{#each data.items as=item filter={bad json}}}X{{/each}}',
         variables,
         (m) => errors.push(m.detail),
+        { lens: defaultEmailLens },
       );
       expect(result).toBe('');
       expect(errors).toHaveLength(1);
@@ -473,6 +623,8 @@ describe('interpolate — {{#each}} semantics', () => {
           ],
         },
       },
+      undefined,
+      { lens: defaultEmailLens },
     );
     expect(result).toBe('0:B 1:D ');
   });
@@ -484,9 +636,14 @@ describe('interpolate — {{#each}} semantics', () => {
       '{{r.tier}} ' +
       '{{/each}}' +
       '{{/each}}';
-    const result = interpolate(template, {
-      data: { missions: [{ minTier: 2, rewards: [{ tier: 1 }, { tier: 2 }, { tier: 3 }] }] },
-    });
+    const result = interpolate(
+      template,
+      {
+        data: { missions: [{ minTier: 2, rewards: [{ tier: 1 }, { tier: 2 }, { tier: 3 }] }] },
+      },
+      undefined,
+      { lens: defaultEmailLens },
+    );
     expect(result).toBe('2 3 ');
   });
 
@@ -496,6 +653,7 @@ describe('interpolate — {{#each}} semantics', () => {
       '{{#each data.items as=item filter={"field":"item.missingField","operator":"equals","value":"x"}}}{{item.n}}{{/each}}',
       { data: { items: [{ n: 1 }, { n: 2 }] } },
       (m) => errors.push(m.detail),
+      { lens: defaultEmailLens },
     );
     expect(result).toBe('');
     expect(errors).toEqual([]);
@@ -514,6 +672,7 @@ describe('interpolate — {{#each}} semantics', () => {
         },
       },
       (m) => errors.push(m.detail),
+      { lens: defaultEmailLens },
     );
     expect(result).toBe('');
     expect(errors).toHaveLength(1);
@@ -527,6 +686,7 @@ describe('interpolate — {{#each}} structural-error posture', () => {
       'before {{data.x}} {{#each data.items as=item}}tail',
       { data: { x: 'V', items: [1] } },
       (m) => errors.push(m.detail),
+      { lens: defaultEmailLens },
     );
     expect(result).toBe('before V {{#each data.items as=item}}tail');
     expect(errors).toEqual(['unterminated {{#each}} block - missing {{/each}}']);
@@ -538,6 +698,7 @@ describe('interpolate — {{#each}} structural-error posture', () => {
       '{{#each data.items as=item}}X{{/if}}',
       { data: { items: [1] } },
       (m) => errors.push(m.detail),
+      { lens: defaultEmailLens },
     );
     expect(result).toBe('{{#each data.items as=item}}X{{/if}}');
     expect(errors.length).toBeGreaterThan(0);
@@ -545,30 +706,44 @@ describe('interpolate — {{#each}} structural-error posture', () => {
 
   it('an orphan close at depth 0 stays inert and silent for {{/each}} and {{/if}} alike', () => {
     const errors: string[] = [];
-    expect(interpolate('hello {{/each}} world', {}, (m) => errors.push(m.detail))).toBe(
-      'hello {{/each}} world',
-    );
-    expect(interpolate('hello {{/if}} world', {}, (m) => errors.push(m.detail))).toBe(
-      'hello {{/if}} world',
-    );
+    expect(
+      interpolate('hello {{/each}} world', {}, (m) => errors.push(m.detail), {
+        lens: defaultEmailLens,
+      }),
+    ).toBe('hello {{/each}} world');
+    expect(
+      interpolate('hello {{/if}} world', {}, (m) => errors.push(m.detail), {
+        lens: defaultEmailLens,
+      }),
+    ).toBe('hello {{/if}} world');
     expect(errors).toEqual([]);
   });
 });
 
 describe('interpolate — substitution exactly-once (injection)', () => {
   it('a data value containing literal {{recipient.x}} text is NOT resolved (no trailing re-scan)', () => {
-    const result = interpolate('{{data.evil}}', {
-      data: { evil: '{{recipient.email}}' },
-      recipient: { email: 'real@example.com' },
-    });
+    const result = interpolate(
+      '{{data.evil}}',
+      {
+        data: { evil: '{{recipient.email}}' },
+        recipient: { email: 'real@example.com' },
+      },
+      undefined,
+      { lens: defaultEmailLens },
+    );
     expect(result).toBe('{{recipient.email}}');
   });
 
   it('the same injection guard holds for a value substituted from inside a loop body', () => {
-    const result = interpolate('{{#each data.items as=item}}{{item}}{{/each}}', {
-      data: { items: ['{{recipient.email}}'] },
-      recipient: { email: 'real@example.com' },
-    });
+    const result = interpolate(
+      '{{#each data.items as=item}}{{item}}{{/each}}',
+      {
+        data: { items: ['{{recipient.email}}'] },
+        recipient: { email: 'real@example.com' },
+      },
+      undefined,
+      { lens: defaultEmailLens },
+    );
     expect(result).toBe('{{recipient.email}}');
   });
 });
@@ -577,26 +752,44 @@ describe('interpolate — reserved-root carve-out characterization', () => {
   it('an array value is non-primitive: empty, with a token issue', () => {
     const issues: string[] = [];
     expect(
-      interpolate('{{data.tags}}', { data: { tags: ['a', 'b'] } }, (issue) =>
-        issues.push(issue.detail),
+      interpolate(
+        '{{data.tags}}',
+        { data: { tags: ['a', 'b'] } },
+        (issue) => issues.push(issue.detail),
+        { lens: defaultEmailLens },
       ),
     ).toBe('');
     expect(issues).toEqual(['{{data.tags}} resolved to a non-primitive value']);
   });
 
   it('an object value is non-primitive: empty, with a token issue', () => {
-    expect(interpolate('{{data.obj}}', { data: { obj: { x: 1 } } })).toBe('');
+    expect(
+      interpolate('{{data.obj}}', { data: { obj: { x: 1 } } }, undefined, {
+        lens: defaultEmailLens,
+      }),
+    ).toBe('');
   });
 
   it('the number 0 and the boolean false substitute, not treated as missing values', () => {
-    expect(interpolate('{{data.n}}', { data: { n: 0 } })).toBe('0');
-    expect(interpolate('{{data.flag}}', { data: { flag: false } })).toBe('false');
+    expect(
+      interpolate('{{data.n}}', { data: { n: 0 } }, undefined, { lens: defaultEmailLens }),
+    ).toBe('0');
+    expect(
+      interpolate('{{data.flag}}', { data: { flag: false } }, undefined, {
+        lens: defaultEmailLens,
+      }),
+    ).toBe('false');
   });
 
   it('a reserved token span crossing an if marker boundary is reassembled, never substituted', () => {
-    const result = interpolate('{{data.{{#if rule=true}}x{{/if}}}}', {
-      data: { x: 'SHOULD_NOT_APPEAR' },
-    });
+    const result = interpolate(
+      '{{data.{{#if rule=true}}x{{/if}}}}',
+      {
+        data: { x: 'SHOULD_NOT_APPEAR' },
+      },
+      undefined,
+      { lens: defaultEmailLens },
+    );
     expect(result).toBe('{{data.x}}');
   });
 });
@@ -610,6 +803,7 @@ describe('interpolate — {{#each}} expansion bounds', () => {
       '{{#each data.items as=item}}X{{/each}}',
       { data: { items: items(EACH_MAX_ELEMENTS) } },
       (m) => errors.push(m.detail),
+      { lens: defaultEmailLens },
     );
     expect(result).toBe('X'.repeat(EACH_MAX_ELEMENTS));
     expect(errors).toEqual([]);
@@ -621,6 +815,7 @@ describe('interpolate — {{#each}} expansion bounds', () => {
       '{{#each data.items as=item}}X{{/each}}',
       { data: { items: items(EACH_MAX_ELEMENTS + 1) } },
       (m) => errors.push(m.detail),
+      { lens: defaultEmailLens },
     );
     expect(result).toBe('');
     expect(errors).toEqual([
@@ -634,6 +829,7 @@ describe('interpolate — {{#each}} expansion bounds', () => {
       '{{#each data.items as=item filter={"field":"item.n","operator":"equals","value":0}}}X{{/each}}',
       { data: { items: items(EACH_MAX_ELEMENTS + 1) } },
       (m) => errors.push(m.detail),
+      { lens: defaultEmailLens },
     );
     expect(result).toBe('');
     expect(errors).toHaveLength(1);
@@ -646,6 +842,7 @@ describe('interpolate — {{#each}} expansion bounds', () => {
       '{{#each data.items as=a}}{{#each a.kids as=b}}{{b.v}}{{/each}}{{/each}}',
       { data: { items: [{ kids: [{ v: 'x' }, { v: 'y' }] }] } },
       (m) => errors.push(m.detail),
+      { lens: defaultEmailLens },
     );
     expect(result).toBe('xy');
     expect(errors).toEqual([]);
@@ -657,6 +854,7 @@ describe('interpolate — {{#each}} expansion bounds', () => {
       '{{#each data.items as=a}}{{#each a.kids as=b}}{{#each b.grandkids as=c}}{{c.v}}{{/each}}{{/each}}{{/each}}',
       { data: { items: [{ kids: [{ grandkids: [{ v: 'x' }] }] }] } },
       (m) => errors.push(m.detail),
+      { lens: defaultEmailLens },
     );
     expect(result).toBe('');
     expect(errors).toEqual([
@@ -670,6 +868,7 @@ describe('interpolate — {{#each}} expansion bounds', () => {
       '{{#each data.a as=x}}{{#each x.k as=y}}{{y}}{{/each}}{{/each}}|{{#each data.a as=x}}{{#each x.k as=y}}{{y}}{{/each}}{{/each}}',
       { data: { a: [{ k: [1] }] } },
       (m) => errors.push(m.detail),
+      { lens: defaultEmailLens },
     );
     expect(result).toBe('1|1');
     expect(errors).toEqual([]);

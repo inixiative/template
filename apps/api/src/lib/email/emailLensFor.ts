@@ -22,11 +22,11 @@ import {
   scopeEmailLens,
 } from '@template/email/rules';
 import type { RuleLens } from '@template/shared/rules';
-import { registry, type SenderSpec } from '#/lib/email/registry';
+import { registry } from '#/lib/email/registry';
 import type { Sender } from '#/lib/email/sender';
 import { senderLensOwner } from '#/lib/email/senderLensOwner';
 
-const senderLens = (sender: SenderSpec): RuleLens | null =>
+const senderLens = (sender: Sender): RuleLens | null =>
   sender.type === 'platform' || sender.type === 'admin' ? null : lensFor(sender.type);
 
 export const emailLensFor = (
@@ -39,7 +39,7 @@ export const emailLensFor = (
   const scope = emailOwnerProvider(owner);
   const memberships = (sender && senderLensOwner(sender)) ?? scope;
   const lens = emailLens({
-    sender: entry ? senderLens(entry.sender) : undefined,
+    sender: entry ? senderLens(entry.sender) : sender ? senderLens(sender) : undefined,
     data: entry?.data,
     narrowing: parseSlotLenses(stored),
     recipientDefault: defaultRecipientNarrowing(memberships),

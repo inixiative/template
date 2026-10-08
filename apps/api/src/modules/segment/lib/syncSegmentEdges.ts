@@ -13,11 +13,22 @@ import {
 } from '#/modules/customerRef/lib/customerRefLens';
 import { segmentOwnerId } from '#/modules/segment/lib/segmentOwner';
 
-export const syncSegmentEdges = (segment: Segment, mode: 'save' | 'rebuild' = 'save') =>
-  syncRuleReferenceEdges(
+export const syncSegmentEdges = (segment: Segment, mode: 'save' | 'rebuild' = 'save') => {
+  const references = segment.conditions
+    ? ruleReferences(customerRefLens, segment.conditions as Condition)
+    : [];
+  return syncRuleReferenceEdges(
     { model: 'Segment', id: segment.id },
-    segment.conditions ? ruleReferences(customerRefLens, segment.conditions as Condition) : [],
+    references,
     mode === 'rebuild'
       ? 'rebuild'
-      : { lenses: [resolvedCustomerRefLens(segment.ownerModel, segmentOwnerId(segment))] },
+      : {
+          scopes: [
+            {
+              lens: resolvedCustomerRefLens(segment.ownerModel, segmentOwnerId(segment)),
+              references,
+            },
+          ],
+        },
   );
+};

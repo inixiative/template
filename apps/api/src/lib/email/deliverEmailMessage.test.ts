@@ -9,6 +9,8 @@ import {
   createOrganizationUser,
   createSpace,
   createSpaceUser,
+  createTag,
+  createTagAttachment,
   createUser,
 } from '@template/db/test';
 import type { EmailClient, SendEmailOptions, SendEmailResult } from '@template/email/client/types';
@@ -241,10 +243,11 @@ describe('deliverEmailMessage — the recipient is read through the lens at send
     recipientId: string,
     sender: DeliverEmailPayload['sender'] = { type: 'platform' },
     data: Record<string, unknown> = {},
+    extra: Pick<DeliverEmailPayload, 'targeting' | 'cc' | 'bcc'> = {},
   ) => {
     const log = (await createCommunicationLog({ address: `${recipientId}@example.com` })).entity;
     await deliverEmailMessage(
-      { template, sender, recipientId, data, communicationLogId: log.id },
+      { template, sender, recipientId, data, communicationLogId: log.id, ...extra },
       { sleep },
     );
     return db.communicationLog.findUniqueOrThrow({ where: { id: log.id } });
@@ -260,7 +263,7 @@ describe('deliverEmailMessage — the recipient is read through the lens at send
     expect(row.status).toBe(CommunicationStatus.sent);
     expect(sent[0]?.html).toContain('Hello Current Name');
     expect(sent[0]?.html).not.toContain('Queued Name');
-    expect(sent[0]?.to).toBe(`${user.id}@example.com`);
+    expect(sent[0]?.to).toBe(user.email);
   });
 
   it('closes a send whose recipient no longer resolves as not_found, without sending', async () => {
@@ -522,6 +525,113 @@ describe('deliverEmailMessage — the recipient is read through the lens at send
       expect(sent).toHaveLength(0);
       expect(row.status).toBe(CommunicationStatus.failed);
       expect(row.reasonCode).toBe(CommunicationReasonCode.not_found);
+    });
+  });
+
+  describe("a fallback keeps the primary template's bound", () => {
+    it('a recipient outside the primary lens is not sent the platform fallback either', async () => {
+      const { entity: organization } = await createOrganization({ name: 'Bound Org' });
+      const { entity: outsider } = await createUser({ name: 'Outsider' });
+      await saveTemplate('bound-fallback', 'PLATFORM');
+      await saveTemplate(
+        'bound-fallback',
+        '{{#component:bound-promo}}<mj-text>promo</mj-text>{{/component:bound-promo}}',
+        {
+          ownerModel: 'Organization',
+          organizationId: organization.id,
+          lens: {
+            recipient: {
+              picks: ['id', 'name', 'email'],
+              where: { field: 'name', operator: 'equals', value: 'Insider' },
+            },
+          },
+        },
+      );
+      await db.emailComponent.deleteMany({
+        where: { slug: 'bound-promo', organizationId: organization.id },
+      });
+
+      const row = await deliver('bound-fallback', outsider.id, {
+        type: 'Organization',
+        organizationId: organization.id,
+      });
+
+      expect(sent).toHaveLength(0);
+      expect(row.status).toBe(CommunicationStatus.failed);
+      expect(row.reasonCode).toBe(CommunicationReasonCode.not_found);
+    });
+
+    it("the platform fallback renders through the primary owner's clamps", async () => {
+      const { entity: organization } = await createOrganization({ name: 'Clamp Org' });
+      const { entity: user } = await createUser({ name: 'Insider' });
+      const { entity: mine } = await createTag({
+        name: 'clamp-mine',
+        ownerModel: 'Organization',
+        organizationId: organization.id,
+      });
+      await createTagAttachment({ tagId: mine.id, userId: user.id });
+      await saveTemplate(
+        'clamp-fallback',
+        '{{#each recipient.tagAttachments as=t}}[{{t.tag.name}}]{{/each}}',
+      );
+      await saveTemplate(
+        'clamp-fallback',
+        '{{#component:clamp-promo}}<mj-text>promo</mj-text>{{/component:clamp-promo}}',
+        { ownerModel: 'Organization', organizationId: organization.id },
+      );
+      await db.emailComponent.deleteMany({
+        where: { slug: 'clamp-promo', organizationId: organization.id },
+      });
+
+      const row = await deliver('clamp-fallback', user.id, {
+        type: 'Organization',
+        organizationId: organization.id,
+      });
+
+      expect(row.status).toBe(CommunicationStatus.sent);
+      expect(sent[0]?.html).toContain('[clamp-mine]');
+    });
+  });
+
+  describe('targeting, copies and the address are read when the send runs', () => {
+    it('closes a send whose recipient no longer matches the registry targeting as not_found', async () => {
+      await saveTemplate('send-time-targeting', 'Hello');
+      const { entity: user } = await createUser({ name: 'Was Targeted' });
+      await db.user.update({ where: { id: user.id }, data: { name: 'Moved On' } });
+
+      const row = await deliver('send-time-targeting', user.id, undefined, undefined, {
+        targeting: { field: 'name', operator: 'equals', value: 'Was Targeted' },
+      });
+
+      expect(sent).toHaveLength(0);
+      expect(row.status).toBe(CommunicationStatus.failed);
+      expect(row.reasonCode).toBe(CommunicationReasonCode.not_found);
+    });
+
+    it('resolves cc at send through the lens, to the address the copy holds now', async () => {
+      await saveTemplate('send-time-cc', 'Hello');
+      const { entity: user } = await createUser();
+      const { entity: manager } = await createUser();
+      const current = `current-${manager.id}@example.com`;
+      await db.user.update({ where: { id: manager.id }, data: { email: current } });
+
+      await deliver('send-time-cc', user.id, undefined, undefined, {
+        cc: { field: 'id', operator: 'equals', value: manager.id },
+      });
+
+      expect(sent[0]?.cc).toEqual([current]);
+    });
+
+    it("sends to the recipient's current address and records it on the log", async () => {
+      await saveTemplate('send-time-address', 'Hello');
+      const { entity: user } = await createUser();
+      const current = `moved-${user.id}@example.com`;
+      await db.user.update({ where: { id: user.id }, data: { email: current } });
+
+      const row = await deliver('send-time-address', user.id);
+
+      expect(sent[0]?.to).toBe(current);
+      expect(row.address).toBe(current);
     });
   });
 });

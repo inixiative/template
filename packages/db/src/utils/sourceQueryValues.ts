@@ -21,13 +21,11 @@ export type SourceQueryScope = {
   farSide?: (query: SourceQuery, candidates: SourceRow[]) => Promise<SourceRow[]>;
 };
 
-/** A source query's compiled where, its count / aggregate steps resolved to the id sets they stand for. */
 export const compiledSourceWhere = async (query: SourceQuery): Promise<Record<string, unknown>> =>
   query.prisma.steps
     ? executePrismaPlan({ steps: query.prisma.steps }, db as never)
     : query.prisma.where;
 
-/** The options a source offers among the rows `where` admits; a bridged query's rows are candidates, re-checked with the far side `farSide` loads. */
 export const sourceQueryValues = async (
   query: SourceQuery,
   { lens, farSide }: SourceQueryScope,

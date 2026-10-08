@@ -8,13 +8,10 @@
 import { RuleReferenceError, type RuleReferenceSource, syncRuleReferenceEdges } from '@template/db';
 import type { EmailComponent, EmailTemplate } from '@template/db/generated/client/client';
 import { stripComponentBodies } from '@template/email/render/stripComponentBodies';
-import {
-  defaultEmailLens,
-  type EmailLens,
-  emailSourceLenses,
-} from '@template/email/rules/emailLens';
+import { defaultEmailLens, type EmailLens } from '@template/email/rules/emailLens';
 import {
   contentDynamicRuleReferences,
+  contentReferenceScopes,
   contentRuleReferences,
 } from '@template/email/rules/ruleReferences';
 
@@ -35,12 +32,10 @@ export const syncRuleReferences = (
   return syncRuleReferenceEdges(
     source,
     contentRuleReferences(judged, ...contents),
-    mode === 'rebuild' ? 'rebuild' : emailSourceLenses(judged),
+    mode === 'rebuild' ? 'rebuild' : { scopes: contentReferenceScopes(judged, ...contents) },
   );
 };
 
-// The contents a source's rules live in — the one answer save and revive share, so a regenerated
-// source holds exactly the edges its last save wrote.
 export const templateRuleContents = (
   template: Pick<EmailTemplate, 'subject' | 'mjml'>,
 ): string[] => [template.subject ?? '', stripComponentBodies(template.mjml)];

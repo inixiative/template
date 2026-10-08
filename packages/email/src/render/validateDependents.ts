@@ -13,6 +13,7 @@ import { expand } from '@template/email/render/expand';
 import { ownerCascade, ownerWhere } from '@template/email/render/owner';
 import type { LensForSlug } from '@template/email/render/save';
 import type { OwnerScope } from '@template/email/render/types';
+import { validateConditions } from '@template/email/validations/validateConditions';
 import { validateTokens } from '@template/email/validations/validateTokens';
 
 const embeddingTemplates = async (
@@ -61,6 +62,7 @@ export const validateDependents = async (
     if (!lens) continue;
     const composed = await expand(template.mjml, ctx);
     const issues = [
+      ...validateConditions(composed, { lens }),
       ...validateTokens(composed, { lens }),
       ...validateTokens(template.subject, { lens, isSubject: true }),
     ];

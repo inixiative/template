@@ -3,7 +3,7 @@ import { listBindings, projectLens, toLensSelect } from '@inixiative/json-rules'
 import { lensFor } from '@template/db/lens';
 import { emailLens } from '@template/email/rules';
 import { emailLensFor } from '#/lib/email/emailLensFor';
-import { addressLens, registry, slotRowsLens } from '#/lib/email/registry';
+import { registry, slotRowsLens } from '#/lib/email/registry';
 
 describe('slotRowsLens', () => {
   it("targets the template's recipient lens with a bound where — the shape is the lens's, not the entry's", () => {
@@ -29,12 +29,6 @@ describe('slotRowsLens', () => {
     expect(() =>
       emailLensFor('welcome', { ownerModel: 'default' }, { recipient: { picks: ['id', 'name'] } }),
     ).toThrow(/must keep `email`/);
-  });
-
-  it('an address lens reaches only the email', () => {
-    const lens = addressLens({ field: 'id', operator: 'equals', value: 'u1' });
-    expect(lens.parent).toEqual(lensFor('User'));
-    expect(lens.root?.picks).toEqual(['email']);
   });
 });
 

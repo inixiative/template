@@ -6,39 +6,54 @@
  */
 import { type Lens, type LensNarrowing, toSourceQueries } from '@inixiative/json-rules';
 import { type SourceQueryScope, sourceQueryValues } from '@template/db/utils/sourceQueryValues';
-import type { RuleReference } from '@template/shared/rules';
-import { groupBy, partition } from 'lodash-es';
+import { type RuleReference, referenceKey } from '@template/shared/rules';
+import { groupBy } from 'lodash-es';
 
 export type RuleReferenceAdmission = { admitted: RuleReference[]; unadmitted: RuleReference[] };
 
-export type SourceLenses = {
-  lenses: (Lens | LensNarrowing)[];
+export type ReferenceScope = { lens: Lens | LensNarrowing; references: RuleReference[] };
+
+export type ReferenceScopes = {
+  scopes: ReferenceScope[];
   farSide?: SourceQueryScope['farSide'];
 };
 
-/** Which references the lenses' own sources admit right now — the one predicate save and preflight share. */
-export const admitRuleReferences = async (
-  { lenses, farSide }: SourceLenses,
-  references: RuleReference[],
-): Promise<RuleReferenceAdmission> => {
-  const sources = lenses.flatMap((lens) => toSourceQueries(lens).map((query) => ({ query, lens })));
-  const admitted: RuleReference[] = [];
-  const unadmitted: RuleReference[] = [];
+const refusedIn = async (
+  { lens, references }: ReferenceScope,
+  farSide: SourceQueryScope['farSide'],
+): Promise<RuleReference[]> => {
+  const sources = toSourceQueries(lens);
+  const refused: RuleReference[] = [];
   for (const [model, refs] of Object.entries(groupBy(references, 'model'))) {
-    const source = sources.find(({ query }) => query.model === model && query.field === 'id');
+    const source = sources.find((query) => query.model === model && query.field === 'id');
     if (!source) {
-      unadmitted.push(...refs);
+      refused.push(...refs);
       continue;
     }
     const { options } = await sourceQueryValues(
-      source.query,
-      { lens: source.lens, farSide },
+      source,
+      { lens, farSide },
       { id: { in: refs.map((ref) => ref.id) } },
     );
     const ids = new Set(options.map((option) => option.value));
-    const [inside, outside] = partition(refs, (ref) => ids.has(ref.id));
-    admitted.push(...inside);
-    unadmitted.push(...outside);
+    refused.push(...refs.filter((ref) => !ids.has(ref.id)));
   }
-  return { admitted, unadmitted };
+  return refused;
+};
+
+export const admitRuleReferences = async ({
+  scopes,
+  farSide,
+}: ReferenceScopes): Promise<RuleReferenceAdmission> => {
+  const refused = new Set<string>();
+  for (const scope of scopes)
+    for (const ref of await refusedIn(scope, farSide)) refused.add(referenceKey(ref));
+  const named = new Map(
+    scopes.flatMap(({ references }) => references).map((ref) => [referenceKey(ref), ref]),
+  );
+  const all = [...named.values()];
+  return {
+    admitted: all.filter((ref) => !refused.has(referenceKey(ref))),
+    unadmitted: all.filter((ref) => refused.has(referenceKey(ref))),
+  };
 };

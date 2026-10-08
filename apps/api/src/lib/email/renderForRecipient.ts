@@ -21,6 +21,7 @@ import type { Sender } from '#/lib/email/sender';
 export type RecipientRef = {
   recipientId: string;
   sender: Sender;
+  targeting?: Condition;
   data?: Record<string, unknown>;
   label?: string;
 };
@@ -43,18 +44,27 @@ const dataVariables = async (
   return row;
 };
 
-/** The recipient and the data entity as the lens shows them when the send runs: the fetched re-check rows, never a queued copy. */
 export const recipientVariables = async (
   lens: EmailLens,
-  { recipientId, sender, data = {}, label = 'message' }: RecipientRef,
+  { recipientId, sender, targeting, data = {}, label = 'message' }: RecipientRef,
 ): Promise<Variables> => {
-  const [recipient] = await fetchLens(slotRowsLens(lens.recipient, byId(recipientId)));
+  const where = targeting ? { all: [byId(recipientId), targeting] } : byId(recipientId);
+  const [recipient] = await fetchLens(slotRowsLens(lens.recipient, where));
   if (!recipient) throw new EmailRenderError(label, 'recipient_missing');
   return {
     sender: await resolveSender(sender),
     recipient,
     data: await dataVariables(lens, data, label),
   };
+};
+
+export const addressesThrough = async (
+  lens: EmailLens,
+  where: Condition | undefined,
+): Promise<string[] | undefined> => {
+  if (!where) return undefined;
+  const rows = await fetchLens<{ email: string }>(slotRowsLens(lens.recipient, where));
+  return rows.length ? rows.map((row) => row.email) : undefined;
 };
 
 export const renderForRecipient = (

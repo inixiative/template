@@ -15,7 +15,7 @@ export type Variables = Partial<Record<ScopeRoot, Record<string, unknown>>>;
 export type InterpolateOptions = {
   locale?: string;
   liveRefs?: ReadonlySet<string>;
-  lens?: EmailLens;
+  lens: EmailLens;
 };
 
 const SYSTEM_TOKEN_PATTERN = /\{\{system\.([a-zA-Z0-9_-]+)\}\}/g;
@@ -51,14 +51,12 @@ export const toScope = (variables: Variables): Scope => ({ ...variables });
 export const interpolate = (
   template: string,
   variables: Variables,
-  onError?: RuleErrorSink,
-  options: InterpolateOptions = {},
+  onError: RuleErrorSink | undefined,
+  options: InterpolateOptions,
 ): string => {
   const { lens } = options;
-  const scope = toScope(lens ? narrowVariables(lens, variables) : variables);
-  const ruleScope = lens
-    ? toScope(narrowVariables(lens, variables, { keepClampColumns: true }))
-    : scope;
+  const scope = toScope(narrowVariables(lens, variables));
+  const ruleScope = toScope(narrowVariables(lens, variables, { keepClampColumns: true }));
   return settle(
     resolveSystemTokens(template, options),
     scope,

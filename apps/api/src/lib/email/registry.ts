@@ -10,8 +10,6 @@ import { fieldsLens, OPAQUE_SLOT, type SlotLens } from '@template/email/rules';
 import type { RuleLens } from '@template/shared/rules';
 import type { Sender } from '#/lib/email/sender';
 
-export type SenderSpec = Sender;
-
 export type RecipientTarget = { where: Condition };
 
 export type RenderIssuePolicy = 'platform' | 'fail' | 'degrade';
@@ -23,7 +21,7 @@ export type RenderSpec = {
 
 export type EmailEntry = {
   entity: LensNarrowing;
-  sender: SenderSpec;
+  sender: Sender;
   recipients: RecipientTarget;
   cc?: RecipientTarget;
   bcc?: RecipientTarget;
@@ -35,11 +33,6 @@ export const slotRowsLens = (slot: SlotLens | undefined, where: Condition): Lens
   if (!slot || slot === OPAQUE_SLOT) throw new Error('Email slot lens is not a model lens');
   return intoFirstLayer(slot, { root: { where } });
 };
-
-export const addressLens = (where: Condition): LensNarrowing => ({
-  parent: lensFor('User'),
-  root: { where, picks: ['email'] },
-});
 
 const user: ModelNarrowing = { picks: ['id', 'name', 'email'] };
 

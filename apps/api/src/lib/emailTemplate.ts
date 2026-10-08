@@ -14,6 +14,8 @@ import {
   type RenderIssue,
   type RuleErrorSink,
   recomputeDegradedComponentRefs,
+  rowOwner,
+  templateLens,
   type Variables,
 } from '@template/email/render';
 import { type EmailLens, narrowVariables } from '@template/email/rules';
@@ -127,10 +129,24 @@ export const settleTemplate = async (
   policy: RenderPolicy = renderPolicyFor(template),
 ): Promise<SettledTemplate> => {
   const scope = ownerScope(sender);
+  let primaryLens: EmailLens | undefined;
 
-  const render = async (slug: string, at: OwnerScope = scope): Promise<Rendered> => {
+  const primaryBound = async (): Promise<EmailLens> => {
+    if (primaryLens) return primaryLens;
+    const row = await lookupTemplate(template, scope);
+    return row
+      ? emailLensFor(template, rowOwner(row), await templateLens(template, row), sender)
+      : emailLensFor(template, scope, undefined, sender);
+  };
+
+  const render = async (
+    slug: string,
+    at: OwnerScope = scope,
+    bound?: EmailLens,
+  ): Promise<Rendered> => {
     const composed = await composeTemplate(slug, at);
-    const lens = emailLensFor(slug, composed.owner, composed.lens, sender);
+    const lens = bound ?? emailLensFor(slug, composed.owner, composed.lens, sender);
+    if (!bound) primaryLens = lens;
     const variables = await variablesFor(lens);
     const vars: Variables = systemVarsForKind
       ? { ...variables, system: { ...variables.system, ...systemVarsForKind(composed.kind) } }
@@ -157,7 +173,7 @@ export const settleTemplate = async (
       `Email ${label}: template=${template} → ${slug}@${at.ownerModel} — ${reason}`,
       LogScope.email,
     );
-    const rendered = await render(slug, at);
+    const rendered = await render(slug, at, await primaryBound());
     if (!clean(rendered)) {
       throw new EmailRenderError(slug, 'render_failed', [
         describe([...rendered.subjectIssues, ...rendered.settled.issues]),

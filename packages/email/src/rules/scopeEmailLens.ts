@@ -5,9 +5,9 @@
  * @uses primitive:shared
  */
 import { bindLens, type Condition, type NarrowingDefaults, Operator } from '@inixiative/json-rules';
-import { polymorphicBindings } from '@template/db';
+import { polymorphicBindings, polymorphicIs } from '@template/db';
 import type { ProviderModel } from '@template/db/generated/client/enums';
-import { boundAndLive, intoFirstLayer, platformOrBound } from '@template/db/lens';
+import { boundAndLive, intoFirstLayer, platformOrBound, through } from '@template/db/lens';
 import { type EmailLens, narrowEmailLens } from '@template/email/rules/emailLens';
 import type { RuleLens } from '@template/shared/rules';
 
@@ -19,9 +19,13 @@ export type EmailLensOwner = {
 
 const tag = platformOrBound('Tag', 'ownerModel');
 const segment = boundAndLive('Segment', 'ownerModel');
+const customerRef = polymorphicIs('CustomerRef', 'providerModel');
 const platformDefaults: NarrowingDefaults['models'] = {
   Tag: { where: tag, sources: { id: { where: tag } } },
   Segment: { where: segment, sources: { id: { where: segment } } },
+  TagAttachment: { where: through('tag', tag) },
+  SegmentMember: { where: through('segment', segment) },
+  CustomerRef: { where: customerRef },
 };
 
 const is = (field: string, value: string): Condition => ({

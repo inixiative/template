@@ -11,7 +11,6 @@ import { senderLensOwner } from '#/lib/email/senderLensOwner';
 
 const MEMBERSHIPS = ['organizationUsers', 'spaceUsers'] as const;
 
-/** A rule targets only people holding a membership the sender's lens shows — its own tree, as wide as the lens turns it on. */
 export const targetedBySender = (
   rule: Condition,
   recipient: RuleLens,

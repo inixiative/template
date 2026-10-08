@@ -86,7 +86,7 @@ export const saveEmailComponents = async (
   ctx: OwnerScope,
   lens?: EmailLens,
 ): Promise<EmailComponent[]> => {
-  const components = await saveComponents(inputs, ctx);
+  const components = await saveComponents(inputs, ctx, lens);
   for (const component of components) {
     await syncRuleReferences(
       { model: 'EmailComponent', id: component.id },
@@ -145,6 +145,7 @@ export const saveEmailTemplate = async (
       );
 
       const composed = await expand(template.mjml, ctx);
+      assertValidConditions(composed, { lens: options.lens });
       assertValidTokens(composed, { lens: options.lens });
       if (template.subject)
         assertValidTokens(template.subject, { lens: options.lens, isSubject: true });

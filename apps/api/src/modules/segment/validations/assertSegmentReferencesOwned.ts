@@ -34,10 +34,9 @@ export const assertSegmentReferencesOwned = async ({
     (reference) => !held.includes(referenceKey(reference)),
   );
   if (added.length) {
-    const { unadmitted } = await admitRuleReferences(
-      { lenses: [resolvedCustomerRefLens(ownerModel, ownerId)] },
-      added,
-    );
+    const { unadmitted } = await admitRuleReferences({
+      scopes: [{ lens: resolvedCustomerRefLens(ownerModel, ownerId), references: added }],
+    });
     if (unadmitted.length) {
       throw invalidSegmentConditions(
         unadmitted.map(

@@ -20,6 +20,6 @@ export type SettleOptions = {
   eachDepth?: number;
   liveRefs?: ReadonlySet<string>;
   bindings?: BindingChain;
-  lens?: EmailLens;
+  lens: EmailLens;
   ruleScope?: Scope;
 };
