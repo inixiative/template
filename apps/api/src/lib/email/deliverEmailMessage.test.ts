@@ -370,14 +370,31 @@ describe('deliverEmailMessage — the recipient is read through the lens at send
       const { entity: sending } = await createOrganization({ name: 'Sending Org' });
       await saveOverride(sending.id);
 
-      await deliver(
+      const row = await deliver(
         INVITE,
         user.id,
         { type: 'Organization', organizationId: sending.id },
         { id: inquiry.id, sourceOrganization: { name: 'Hidden Org' } },
       );
 
-      expect(sent[0]?.html ?? '').not.toContain('Hidden Org');
+      expect(sent).toHaveLength(0);
+      expect(row.status).toBe(CommunicationStatus.failed);
+      expect(row.reasonCode).toBe(CommunicationReasonCode.render_failed);
+      expect(row.error).toContain('Template not found');
+    });
+
+    it('fails a send whose payload carries no data id, without sending or retrying', async () => {
+      const { organization, user } = await inviteFrom('No Id Org');
+      await saveOverride(organization.id);
+
+      const row = await deliver(INVITE, user.id, {
+        type: 'Organization',
+        organizationId: organization.id,
+      });
+
+      expect(sent).toHaveLength(0);
+      expect(row.status).toBe(CommunicationStatus.failed);
+      expect(row.reasonCode).toBe(CommunicationReasonCode.render_failed);
     });
 
     it('closes a send whose data entity no longer resolves as not_found, without sending', async () => {

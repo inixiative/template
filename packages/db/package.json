@@ -32,7 +32,7 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:studio": "prisma studio",
-    "db:seed": "bun run prisma/seed.ts",
+    "db:seed": "bun run --cwd ../../apps/api db:seed",
     "db:truncate:webhooks": "bun run scripts/truncateWebhookSubscriptions.ts",
     "typecheck": "tsc --noEmit"
   },

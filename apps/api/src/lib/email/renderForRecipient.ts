@@ -35,7 +35,9 @@ const dataVariables = async (
   const slot = lens.data;
   if (!slot || slot === OPAQUE_SLOT || declaredFields(slot)) return data;
   if (typeof data.id !== 'string')
-    throw new Error(`Email ${label}: the data slot is a model lens and its payload carries no id`);
+    throw new EmailRenderError(label, 'render_failed', [
+      'the data slot is a model lens and its payload carries no id',
+    ]);
   const [row] = await fetchLens(slotRowsLens(slot, byId(data.id)));
   if (!row) throw new EmailRenderError(label, 'data_missing');
   return row;

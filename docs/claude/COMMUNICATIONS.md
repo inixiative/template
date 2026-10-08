@@ -689,8 +689,9 @@ lives in the audit log**:
   `apps/api/scripts/seed.ts`, which registers all hooks first — seeded system templates get their
   initial snapshots. Email seed files are `savedByApp`: the api seed persists them through
   `emailSeedSavers` (`saveEmailComponents`, the api `saveEmailTemplate`), so a seeded row meets
-  every save guard — MJML, conditions, lens tokens — and one that would not validate fails the run.
-  The `packages/db` seed alone refuses them.
+  the guards its save runs (a template: MJML, conditions, lens tokens, rule references; a component:
+  MJML, conditions, rule references) and one that would not validate fails the run. They seed last,
+  after the cron jobs. The `packages/db` seed alone refuses them.
 
 ### Rule References (the rows a rule names)
 

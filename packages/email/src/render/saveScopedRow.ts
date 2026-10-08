@@ -46,9 +46,10 @@ export const saveScopedRow = async <Model extends keyof ScopedEmailRow>(
 
   const naturalKey = { slug: input.slug, locale: input.locale, ...scope };
   const data = { ...input, ...scope } as Partial<Row>;
+  const { id: _inputId, ...keptData } = data as Partial<Row> & { id?: string };
 
   const live = await delegate.findFirst({ where: { ...naturalKey, deletedAt: null } });
-  if (live) return delegate.update({ where: { id: live.id }, data });
+  if (live) return delegate.update({ where: { id: live.id }, data: keptData as Partial<Row> });
 
   const tombstone = await db.withDeleted(() =>
     delegate.findFirst({ where: { ...naturalKey, deletedAt: { not: null } } }),
@@ -56,6 +57,5 @@ export const saveScopedRow = async <Model extends keyof ScopedEmailRow>(
   if (!tombstone) return delegate.create({ data });
 
   await reviveRow(model, tombstone.id);
-  const { id: _inputId, ...revivedData } = data as Partial<Row> & { id?: string };
-  return delegate.update({ where: { id: tombstone.id }, data: revivedData as Partial<Row> });
+  return delegate.update({ where: { id: tombstone.id }, data: keptData as Partial<Row> });
 };
