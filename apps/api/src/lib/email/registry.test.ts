@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { listBindings, projectLens } from '@inixiative/json-rules';
+import { listBindings, projectLens, toLensSelect } from '@inixiative/json-rules';
 import { lensFor } from '@template/db/lens';
 import { emailLens } from '@template/email/rules';
 import { addressLens, recipientLens, registry } from '#/lib/email/registry';
@@ -12,6 +12,22 @@ describe('recipientLens', () => {
     expect(paths).toContain('User.tagAttachments.tag');
     expect(paths).toContain('User.providerRefs.segmentMembers.segment');
     expect(projectLens(lens).User?.whereClauses).toEqual([where]);
+  });
+
+  it('targets a recipient lens that keeps no id: the targeting where sits in its first layer', () => {
+    const where = { field: 'id', operator: 'equals', value: 'u1' } as const;
+    const lens = recipientLens(
+      emailLens({ narrowing: { recipient: { picks: ['email'] } } }).recipient,
+      where,
+    );
+    expect(() => toLensSelect(lens)).not.toThrow();
+    expect(projectLens(lens).User?.whereClauses).toEqual([where]);
+  });
+
+  it('refuses a recipient lens that hides the email delivery addresses', () => {
+    expect(() => emailLens({ narrowing: { recipient: { picks: ['id', 'name'] } } })).toThrow(
+      /must keep `email`/,
+    );
   });
 
   it('an address lens reaches only the email', () => {

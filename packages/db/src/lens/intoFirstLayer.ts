@@ -14,7 +14,13 @@ import type {
 } from '@inixiative/json-rules';
 
 type MapDefaults = NonNullable<LensNarrowing['mapDefaults']>;
+type Grants = Pick<ModelDefaultNarrowing, 'where' | 'sources'>;
 type SourceSpecShape = { where?: Condition; label?: string; groupBy?: string | string[] };
+
+export type FirstLayerGrants = {
+  root?: Pick<ModelDefaultNarrowing, 'where'>;
+  mapDefaults?: Record<string, { models: Record<string, Grants> }>;
+};
 
 const SPEC_KEYS = ['where', 'label', 'groupBy', 'from'];
 
@@ -49,51 +55,53 @@ const mergeSources = (
   return out;
 };
 
-const mergeModel = (
-  a: ModelDefaultNarrowing | undefined,
-  b: ModelDefaultNarrowing,
-): ModelDefaultNarrowing => {
-  if (!a) return b;
-  const where = both(a.where, b.where);
-  const sources = mergeSources(a.sources, b.sources);
+const withGrants = <N extends ModelDefaultNarrowing>(
+  narrowing: N | undefined,
+  grants: Grants,
+): N => {
+  const where = both(narrowing?.where, grants.where);
+  const sources = mergeSources(narrowing?.sources, grants.sources);
   return {
-    ...a,
-    ...b,
+    ...narrowing,
     ...(where === undefined ? {} : { where }),
     ...(sources ? { sources } : {}),
-    ...(a.relations || b.relations ? { relations: { ...a.relations, ...b.relations } } : {}),
-  };
+  } as N;
 };
 
 const mergeDefaults = (
-  a: NarrowingDefaults | undefined,
-  b: NarrowingDefaults,
+  defaults: NarrowingDefaults | undefined,
+  grants: Record<string, Grants>,
 ): NarrowingDefaults => {
-  const models: Record<string, ModelDefaultNarrowing> = { ...a?.models };
-  for (const [model, narrowing] of Object.entries(b.models ?? {}))
-    models[model] = mergeModel(models[model], narrowing);
-  return {
-    ...a,
-    ...b,
-    models,
-    ...(a?.enums || b.enums ? { enums: { ...a?.enums, ...b.enums } } : {}),
-  };
+  const models: Record<string, ModelDefaultNarrowing> = { ...defaults?.models };
+  for (const [model, modelGrants] of Object.entries(grants))
+    models[model] = withGrants(models[model], modelGrants);
+  return { ...defaults, models };
 };
 
-const mergeMapDefaults = (a: MapDefaults | undefined, b: MapDefaults): MapDefaults => {
-  const out: MapDefaults = { ...a };
-  for (const [mapName, defaults] of Object.entries(b))
-    out[mapName] = mergeDefaults(out[mapName], defaults);
+const mergeMapDefaults = (
+  mapDefaults: MapDefaults | undefined,
+  grants: NonNullable<FirstLayerGrants['mapDefaults']>,
+): MapDefaults => {
+  const out: MapDefaults = { ...mapDefaults };
+  for (const [mapName, { models }] of Object.entries(grants))
+    out[mapName] = mergeDefaults(out[mapName], models);
   return out;
 };
 
-/** Grants that read what a narrowing hides belong in its first layer: later layers may only read what their parent shows. */
+const withFirstLayerGrants = (layer: LensNarrowing, grants: FirstLayerGrants): LensNarrowing => ({
+  ...layer,
+  ...(grants.root ? { root: withGrants(layer.root, grants.root) } : {}),
+  ...(grants.mapDefaults
+    ? { mapDefaults: mergeMapDefaults(layer.mapDefaults, grants.mapDefaults) }
+    : {}),
+});
+
+/** Grants that read what a narrowing hides belong in its first layer: later layers may only read what their parent shows. Only grants merge, so nothing here widens a layer. */
 export const intoFirstLayer = (
   lens: Lens | LensNarrowing,
-  mapDefaults: MapDefaults,
+  grants: FirstLayerGrants,
 ): LensNarrowing => {
-  if (!('parent' in lens)) return { parent: lens, mapDefaults };
-  if (!('parent' in lens.parent))
-    return { ...lens, mapDefaults: mergeMapDefaults(lens.mapDefaults, mapDefaults) };
-  return { ...lens, parent: intoFirstLayer(lens.parent, mapDefaults) };
+  if (!('parent' in lens)) return withFirstLayerGrants({ parent: lens }, grants);
+  if (!('parent' in lens.parent)) return withFirstLayerGrants(lens, grants);
+  return { ...lens, parent: intoFirstLayer(lens.parent, grants) };
 };

@@ -33,7 +33,7 @@ export const emailLensFor = (
     narrowing: parseSlotLenses(stored),
   });
   const scope = emailOwnerProvider(owner);
-  return scopeEmailLens(lens, scope, sender ? senderLensOwner(sender) : scope);
+  return scopeEmailLens(lens, scope, (sender && senderLensOwner(sender)) ?? scope);
 };
 
 export const emailLensAt = async (slug: string, owner: OwnerScope): Promise<EmailLens> =>

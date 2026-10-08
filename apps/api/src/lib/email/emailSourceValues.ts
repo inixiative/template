@@ -27,8 +27,10 @@ const sourceValuesOf = async (query: SourceQuery): Promise<SourceValues> => {
 export const emailSourceValues = (lens: EmailLens): Promise<[ScopeRoot, SourceValues][]> =>
   Promise.all(
     emailSlotLenses(lens).flatMap(([root, slot]) =>
-      toSourceQueries(slot).map(
-        async (query): Promise<[ScopeRoot, SourceValues]> => [root, await sourceValuesOf(query)],
-      ),
+      toSourceQueries(slot)
+        .filter((query) => query.prisma)
+        .map(
+          async (query): Promise<[ScopeRoot, SourceValues]> => [root, await sourceValuesOf(query)],
+        ),
     ),
   );

@@ -80,7 +80,7 @@ export const scopeEmailLens = (
       ...(owner ? ownerDefaults(owner) : {}),
       ...(sender ? membershipDefaults(sender) : {}),
     };
-    const scoped: RuleLens = intoFirstLayer(slot, { prisma: { models } });
+    const scoped: RuleLens = intoFirstLayer(slot, { mapDefaults: { prisma: { models } } });
     return owner
       ? (bindLens(scoped, polymorphicBindings(owner.ownerModel, owner.ownerId)) as RuleLens)
       : scoped;
