@@ -9,7 +9,7 @@ import type { SeedFile } from '../seed';
 
 export const emailTemplateSeeds: SeedFile<EmailTemplate> = {
   model: 'emailTemplate',
-  updateOmitFields: ['createdAt'],
+  savedByApp: true,
   records: [
     {
       id: '01936d42-ec00-7000-8000-000000000010',
@@ -28,7 +28,7 @@ export const emailTemplateSeeds: SeedFile<EmailTemplate> = {
         '    <mj-section padding="20px 0">',
         '      <mj-column>',
         '        <mj-text font-size="16px" color="#111827" line-height="1.5">',
-        '          Hi {{recipient.name}},',
+        '          Hi {{#if rule={"field":"recipient.name","operator":"exists"}}}{{recipient.name}}{{else}}there{{/if}},',
         '        </mj-text>',
         '        <mj-text font-size="16px" color="#374151" line-height="1.5">',
         '          Please verify your email address to complete your account setup.',
@@ -63,7 +63,8 @@ export const emailTemplateSeeds: SeedFile<EmailTemplate> = {
       kind: 'system',
       inheritToSpaces: true,
       componentRefs: ['system-header', 'system-footer'],
-      subject: "You've been invited to {{data.sourceOrganization.name}}",
+      subject:
+        'You\'ve been invited to {{#if rule={"field":"data.sourceOrganization.name","operator":"exists"}}}{{data.sourceOrganization.name}}{{else}}an organization{{/if}}',
       mjml: [
         '<mjml>',
         '  <mj-body background-color="#f9fafb">',
@@ -71,10 +72,10 @@ export const emailTemplateSeeds: SeedFile<EmailTemplate> = {
         '    <mj-section padding="20px 0">',
         '      <mj-column>',
         '        <mj-text font-size="16px" color="#111827" line-height="1.5">',
-        '          Hi {{recipient.name}},',
+        '          Hi {{#if rule={"field":"recipient.name","operator":"exists"}}}{{recipient.name}}{{else}}there{{/if}},',
         '        </mj-text>',
         '        <mj-text font-size="16px" color="#374151" line-height="1.5">',
-        "          You've been invited to join <strong>{{data.sourceOrganization.name}}</strong> as a {{data.content.role}}.",
+        '          You\'ve been invited to join {{#if rule={"field":"data.sourceOrganization.name","operator":"exists"}}}<strong>{{data.sourceOrganization.name}}</strong>{{else}}an organization{{/if}}{{#if rule={"field":"data.content.role","operator":"exists"}}} as a {{data.content.role}}{{/if}}.',
         '        </mj-text>',
         '      </mj-column>',
         '    </mj-section>',
@@ -114,7 +115,7 @@ export const emailTemplateSeeds: SeedFile<EmailTemplate> = {
         '    <mj-section padding="20px 0">',
         '      <mj-column>',
         '        <mj-text font-size="16px" color="#111827" line-height="1.5">',
-        '          Hi {{recipient.name}},',
+        '          Hi {{#if rule={"field":"recipient.name","operator":"exists"}}}{{recipient.name}}{{else}}there{{/if}},',
         '        </mj-text>',
         '        <mj-text font-size="16px" color="#374151" line-height="1.5">',
         '          Welcome! Your account has been created. You can sign in at any time to get started.',

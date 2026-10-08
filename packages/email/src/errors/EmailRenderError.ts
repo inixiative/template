@@ -10,7 +10,8 @@ export type EmailErrorType =
   | 'circular_ref'
   | 'render_failed'
   | 'unsubscribe_unavailable'
-  | 'recipient_missing';
+  | 'recipient_missing'
+  | 'data_missing';
 
 const message = (slug: string, type: EmailErrorType, path?: string[]): string => {
   switch (type) {
@@ -30,6 +31,8 @@ const message = (slug: string, type: EmailErrorType, path?: string[]): string =>
       return `Template ${slug} is not a system email and the recipient has no contact to unsubscribe`;
     case 'recipient_missing':
       return `The recipient of ${slug} no longer resolves through its lens`;
+    case 'data_missing':
+      return `The data entity of ${slug} no longer resolves through its lens`;
   }
 };
 

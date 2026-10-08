@@ -25,5 +25,5 @@ export const fetchLens = async <T extends Record<string, unknown> = Record<strin
   const delegate = db.delegate(toModelName(getLensRoot(lens).model));
   const { select } = toLensSelect(lens);
   const rows = (await delegate.findMany({ where, select })) as T[];
-  return projectRows(lens, rows, { keepGrantColumns: true }) as T[];
+  return projectRows(lens, rows, { keepClampColumns: true }) as T[];
 };

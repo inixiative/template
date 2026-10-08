@@ -32,12 +32,12 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:studio": "prisma studio",
-    "db:seed": "bun run prisma/seed.ts",
+    "db:seed": "bun run --cwd ../../apps/api db:seed",
     "db:truncate:webhooks": "bun run scripts/truncateWebhookSubscriptions.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@inixiative/json-rules": "^3.4.0",
+    "@inixiative/json-rules": "^3.5.0",
     "@prisma/adapter-pg": "^7.4.2",
     "@prisma/client": "^7.4.2",
     "@supercharge/promise-pool": "^3.3.0",

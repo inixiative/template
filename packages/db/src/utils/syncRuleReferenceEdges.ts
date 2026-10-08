@@ -4,11 +4,10 @@
  * @partOf infrastructure:prisma
  * @uses primitive:shared
  */
-import type { SourceQuery } from '@inixiative/json-rules';
 import { db } from '@template/db/client';
 import type { Prisma } from '@template/db/generated/client/client';
 import { resolveFalsePolymorphismRef } from '@template/db/registries/falsePolymorphism';
-import { admitRuleReferences } from '@template/db/utils/admitRuleReferences';
+import { admitRuleReferences, type SourceLenses } from '@template/db/utils/admitRuleReferences';
 import { lockedTargetStates, type TargetState } from '@template/db/utils/lockedTargetStates';
 import type { ModelName } from '@template/db/utils/modelNames';
 import { RuleReferenceError } from '@template/db/utils/ruleReferenceError';
@@ -17,7 +16,7 @@ import { groupBy } from 'lodash-es';
 
 export type RuleReferenceSource = { model: ModelName; id: string };
 
-export type RuleReferenceGate = { sources: SourceQuery[] } | 'rebuild';
+export type RuleReferenceGate = SourceLenses | 'rebuild';
 
 type Edge = {
   id: string;
@@ -54,7 +53,7 @@ const stampOf = (state: TargetState | undefined): number | null =>
 const admit = async (
   added: RuleReference[],
   states: Map<string, TargetState>,
-  sources: SourceQuery[],
+  sources: SourceLenses,
 ): Promise<void> => {
   const dead = added.find((ref) => {
     const target = states.get(referenceKey(ref));
@@ -77,7 +76,7 @@ const admit = async (
  * its target's current `deletedAt`, every new edge born with it. Targets are read under
  * `FOR UPDATE`, so an edge cannot be written live against a row whose delete is uncommitted.
  *
- * The gate is the save path's: a newly named row must be live and inside the lens's `sources`
+ * The gate is the save path's: a newly named row must be live and inside the lenses' `sources`
  * (a reference already held is not re-admitted, so a dead one stays editable). A `'rebuild'` — the
  * source coming back from a revive — skips it: a target that died while the source was away gets an
  * edge carrying its stamp, so the source returns degraded rather than refused. A purged target gets
@@ -98,7 +97,7 @@ export const syncRuleReferenceEdges = async (
   );
   const added = [...named.values()].filter((ref) => !held.has(referenceKey(ref)));
   const states = named.size ? await lockedTargetStates([...named.values()]) : new Map();
-  if (gate !== 'rebuild') await admit(added, states, gate.sources);
+  if (gate !== 'rebuild') await admit(added, states, gate);
 
   const toDelete = existing.filter((edge) => !named.has(edgeKey(edge)));
   if (toDelete.length)

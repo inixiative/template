@@ -19,7 +19,12 @@ export type SeedFile<T = Record<string, unknown>> = {
   records: (Partial<T> & { id: string; prime?: boolean })[];
   createOnly?: boolean;
   updateOmitFields?: string[];
+  savedByApp?: true;
 };
+
+export type SeedRecord = Record<string, unknown> & { id: string };
+
+export type SeedSavers = Partial<Record<AccessorName, (record: SeedRecord) => Promise<unknown>>>;
 
 const args = process.argv.slice(2);
 const targetTable = args.find((arg) => !arg.startsWith('--'));
@@ -56,8 +61,13 @@ const checkUUIDUniqueness = () => {
   }
 };
 
-const seedTable = async (seedFile: SeedFile): Promise<void> => {
+export const seedTable = async (seedFile: SeedFile, savers: SeedSavers = {}): Promise<void> => {
   const delegate = db.delegate(seedFile.model);
+  const save = savers[seedFile.model];
+  if (seedFile.savedByApp && !save)
+    throw new Error(
+      `${seedFile.model} seeds persist through the app's save path and its guards; run the api seed (apps/api/scripts/seed.ts)`,
+    );
 
   const eligibleRecords = seedFile.records.filter((record) => {
     // Skip prime data in production
@@ -75,6 +85,14 @@ const seedTable = async (seedFile: SeedFile): Promise<void> => {
   }
 
   log.info(`Seeding ${seedFile.model} (${eligibleRecords.length} records)...`, LogScope.seed);
+
+  if (seedFile.savedByApp && save) {
+    for (const { prime: _prime, ...record } of eligibleRecords) {
+      await save(record as SeedRecord);
+      log.success(`  - Saved: ${record.id}`, LogScope.seed);
+    }
+    return;
+  }
 
   const concurrency = getConcurrency([ConcurrencyType.db]) || 10;
 
@@ -99,7 +117,7 @@ const seedTable = async (seedFile: SeedFile): Promise<void> => {
 
 const SEED_ACTOR = { ...nullAuditActor, actorJobName: 'seed' };
 
-export const seed = () =>
+export const seed = (savers: SeedSavers = {}) =>
   auditActorContext.scope(SEED_ACTOR, async () => {
     const isProduction = process.env.NODE_ENV === 'production';
 
@@ -113,7 +131,7 @@ export const seed = () =>
     for (const seedFile of seeds) {
       if (targetTable && seedFile.model !== targetTable) continue;
 
-      await seedTable(seedFile);
+      await seedTable(seedFile, savers);
     }
 
     log.success('Seed completed!', LogScope.seed);

@@ -87,7 +87,8 @@ export const deliverEmailMessage = async (
     settleCommunication(open, {
       status: 'failed',
       reasonCode:
-        error instanceof EmailRenderError && error.type === 'recipient_missing'
+        error instanceof EmailRenderError &&
+        (error.type === 'recipient_missing' || error.type === 'data_missing')
           ? CommunicationReasonCode.not_found
           : CommunicationReasonCode.render_failed,
       error: errorMessageOf(error),

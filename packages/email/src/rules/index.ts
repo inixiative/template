@@ -30,7 +30,7 @@ export {
   emailRuleVocabulary,
   emailRuleVocabularyIssues,
   emailSlotLenses,
-  emailSourceQueries,
+  emailSourceLenses,
   emailSurface,
   emailSurfaceSourceValues,
   evaluateScopedRule,

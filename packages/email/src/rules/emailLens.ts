@@ -19,9 +19,7 @@ import {
   type PathProjection,
   projectLens,
   projectRows,
-  type SourceQuery,
   type SourceValues,
-  toSourceQueries,
   type ValidationIssue,
   validateRuleInLens,
 } from '@inixiative/json-rules';
@@ -30,6 +28,7 @@ import {
   dynamicRuleReferences,
   RULE_REFERENCEABLE_MODELS,
   ruleReferences,
+  type SourceLenses,
 } from '@template/db';
 import { lensFor, live, omitForeignKeys } from '@template/db/lens';
 import {
@@ -380,22 +379,23 @@ export const emailSlotLenses = (lens: EmailLens): [ScopeRoot, RuleLens][] =>
     return slot && slot !== OPAQUE_SLOT ? [[root, slot] as [ScopeRoot, RuleLens]] : [];
   });
 
-export const emailSourceQueries = (lens: EmailLens): SourceQuery[] =>
-  emailSlotLenses(lens).flatMap(([, slot]) => toSourceQueries(slot));
+export const emailSourceLenses = (lens: EmailLens): SourceLenses => ({
+  lenses: emailSlotLenses(lens).map(([, slot]) => slot),
+});
 
-/** Each slot's variables as the lens shows them; `keepGrantColumns` is the re-check projection rules evaluate on, never one to render. */
+/** Each slot's variables as the lens shows them; `keepClampColumns` is the re-check projection rules evaluate on, never one to render. */
 export const narrowVariables = <V extends Record<string, unknown>>(
   lens: EmailLens,
   variables: V,
-  { keepGrantColumns = false }: { keepGrantColumns?: boolean } = {},
+  { keepClampColumns = false }: { keepClampColumns?: boolean } = {},
 ): V => {
   const out: Record<string, unknown> = { ...variables };
   for (const [root, slot] of emailSlotLenses(lens)) {
     const value = variables[root];
     if (value && typeof value === 'object')
       out[root] = Array.isArray(value)
-        ? projectRows(slot, value, { keepGrantColumns })
-        : (projectRows(slot, [value as Record<string, unknown>], { keepGrantColumns })[0] ?? null);
+        ? projectRows(slot, value, { keepClampColumns })
+        : (projectRows(slot, [value as Record<string, unknown>], { keepClampColumns })[0] ?? null);
   }
   return out as V;
 };

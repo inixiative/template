@@ -300,7 +300,7 @@ describe('{{#each}} loops', () => {
       ).toBe('ONLY|admin member |');
     });
 
-    it('a loop over rows a grant reads whole, hidden ones among them, fails closed with an issue', () => {
+    it('a loop over rows a clamp reads whole, hidden ones among them, fails closed with an issue', () => {
       const wholeList = emailLens({
         narrowing: {
           recipient: {

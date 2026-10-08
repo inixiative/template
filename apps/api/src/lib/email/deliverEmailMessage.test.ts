@@ -4,6 +4,7 @@ import { CommunicationReasonCode, CommunicationStatus } from '@template/db/gener
 import {
   cleanupTouchedTables,
   createCommunicationLog,
+  createInquiry,
   createOrganization,
   createOrganizationUser,
   createSpace,
@@ -239,10 +240,11 @@ describe('deliverEmailMessage — the recipient is read through the lens at send
     template: string,
     recipientId: string,
     sender: DeliverEmailPayload['sender'] = { type: 'platform' },
+    data: Record<string, unknown> = {},
   ) => {
     const log = (await createCommunicationLog({ address: `${recipientId}@example.com` })).entity;
     await deliverEmailMessage(
-      { template, sender, recipientId, data: {}, communicationLogId: log.id },
+      { template, sender, recipientId, data, communicationLogId: log.id },
       { sleep },
     );
     return db.communicationLog.findUniqueOrThrow({ where: { id: log.id } });
@@ -324,5 +326,91 @@ describe('deliverEmailMessage — the recipient is read through the lens at send
     expect(sent[0]?.html).toContain('[Sending Space:owner]');
     expect(sent[0]?.html).not.toContain('Sibling Space');
     expect(sent[0]?.html).not.toContain('[Parent Org]');
+  });
+
+  describe('the data entity is read through the data lens at send time', () => {
+    const INVITE = 'inquiry-invite-organization-user';
+
+    const inviteFrom = async (organizationName: string) => {
+      const { entity: organization } = await createOrganization({ name: organizationName });
+      const { entity: user } = await createUser();
+      const { entity: inquiry } = await createInquiry({
+        content: { role: 'member' },
+        sourceOrganizationId: organization.id,
+        targetUserId: user.id,
+      });
+      return { organization, user, inquiry };
+    };
+
+    const saveOverride = (organizationId: string) =>
+      saveTemplate(INVITE, 'Join [{{data.sourceOrganization.name}}] as {{data.content.role}}', {
+        ownerModel: 'Organization',
+        organizationId,
+      });
+
+    it("an organization's override renders its own organization's name, read when the send runs", async () => {
+      const { organization, user, inquiry } = await inviteFrom('Inviting Org');
+      await saveOverride(organization.id);
+
+      const row = await deliver(
+        INVITE,
+        user.id,
+        { type: 'Organization', organizationId: organization.id },
+        { id: inquiry.id, sourceOrganization: { name: 'Queued Name' } },
+      );
+
+      expect(row.status).toBe(CommunicationStatus.sent);
+      expect(row.emailTemplateId).not.toBeNull();
+      expect(sent[0]?.html).toContain('Join [Inviting Org] as member');
+      expect(sent[0]?.html).not.toContain('Queued Name');
+    });
+
+    it("never renders another organization's name the override's clamp hides", async () => {
+      const { inquiry, user } = await inviteFrom('Hidden Org');
+      const { entity: sending } = await createOrganization({ name: 'Sending Org' });
+      await saveOverride(sending.id);
+
+      const row = await deliver(
+        INVITE,
+        user.id,
+        { type: 'Organization', organizationId: sending.id },
+        { id: inquiry.id, sourceOrganization: { name: 'Hidden Org' } },
+      );
+
+      expect(sent).toHaveLength(0);
+      expect(row.status).toBe(CommunicationStatus.failed);
+      expect(row.reasonCode).toBe(CommunicationReasonCode.render_failed);
+      expect(row.error).toContain('Template not found');
+    });
+
+    it('fails a send whose payload carries no data id, without sending or retrying', async () => {
+      const { organization, user } = await inviteFrom('No Id Org');
+      await saveOverride(organization.id);
+
+      const row = await deliver(INVITE, user.id, {
+        type: 'Organization',
+        organizationId: organization.id,
+      });
+
+      expect(sent).toHaveLength(0);
+      expect(row.status).toBe(CommunicationStatus.failed);
+      expect(row.reasonCode).toBe(CommunicationReasonCode.render_failed);
+    });
+
+    it('closes a send whose data entity no longer resolves as not_found, without sending', async () => {
+      const { organization, user } = await inviteFrom('Gone Org');
+      await saveOverride(organization.id);
+
+      const row = await deliver(
+        INVITE,
+        user.id,
+        { type: 'Organization', organizationId: organization.id },
+        { id: crypto.randomUUID() },
+      );
+
+      expect(sent).toHaveLength(0);
+      expect(row.status).toBe(CommunicationStatus.failed);
+      expect(row.reasonCode).toBe(CommunicationReasonCode.not_found);
+    });
   });
 });

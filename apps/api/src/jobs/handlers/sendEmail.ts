@@ -24,7 +24,7 @@ import { fanOutLane } from '#/lib/email/fanOutLane';
 import { deliverJobId, plannerJobId } from '#/lib/email/idempotency';
 import { pickSender } from '#/lib/email/pickSender';
 import type { Recipient } from '#/lib/email/recipient';
-import { addressLens, recipientLens, registry } from '#/lib/email/registry';
+import { addressLens, registry, slotRowsLens } from '#/lib/email/registry';
 import type { Sender } from '#/lib/email/sender';
 import { ownerScope } from '#/lib/emailTemplate';
 
@@ -116,7 +116,7 @@ export const sendEmail = makeJob<SendEmailPayload>(async (_ctx, payload) => {
   const sender = pickSender(entry.sender, entityRow);
   const row = await lookupTemplate(template, ownerScope(sender));
   if (!row) throw new EmailRenderError(template, 'template_missing');
-  const lens = recipientLens(
+  const lens = slotRowsLens(
     emailLensFor(template, rowOwner(row), await templateLens(template, row), sender).recipient,
     bindWhere(entry.recipients.where, entityRow),
   );

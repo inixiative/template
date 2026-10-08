@@ -80,6 +80,23 @@ export const ownerScopeOf = (input: SaveTemplateInput): OwnerScope => ({
   locale: input.locale ?? 'en',
 });
 
+/** Components saved and their rule references synced, inside the caller's transaction. */
+export const saveEmailComponents = async (
+  inputs: EmailComponent[],
+  ctx: OwnerScope,
+  lens?: EmailLens,
+): Promise<EmailComponent[]> => {
+  const components = await saveComponents(inputs, ctx);
+  for (const component of components) {
+    await syncRuleReferences(
+      { model: 'EmailComponent', id: component.id },
+      componentRuleContents(component),
+      lens,
+    );
+  }
+  return components;
+};
+
 export const saveEmailTemplate = async (
   input: SaveTemplateInput,
   options: SaveTemplateOptions = {},
@@ -116,16 +133,11 @@ export const saveEmailTemplate = async (
         await validateNoCycle(component.slug, component.componentRefs ?? [], ctx);
       }
 
-      const components = finalComponents.length ? await saveComponents(finalComponents, ctx) : [];
+      const components = finalComponents.length
+        ? await saveEmailComponents(finalComponents, ctx, options.lens)
+        : [];
       const template = await saveTemplate(finalTemplate, ctx);
 
-      for (const component of components) {
-        await syncRuleReferences(
-          { model: 'EmailComponent', id: component.id },
-          componentRuleContents(component),
-          options.lens,
-        );
-      }
       await syncRuleReferences(
         { model: 'EmailTemplate', id: template.id },
         templateRuleContents(template),

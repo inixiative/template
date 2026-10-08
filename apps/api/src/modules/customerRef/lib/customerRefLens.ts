@@ -101,11 +101,12 @@ export const ownedSegments = async (
   ownerId: string,
   where: Prisma.SegmentWhereInput = {},
 ): Promise<Segment[]> => {
-  const source = toSourceQueries(resolvedCustomerRefLens(ownerModel, ownerId)).find(
+  const lens = resolvedCustomerRefLens(ownerModel, ownerId);
+  const source = toSourceQueries(lens).find(
     (query) => query.model === 'Segment' && query.field === 'id',
   )!;
   return db.segment.findMany({
-    where: { AND: [(await sourceQueryWhere(source)) as Prisma.SegmentWhereInput, where] },
+    where: { AND: [(await sourceQueryWhere(source, { lens })) as Prisma.SegmentWhereInput, where] },
   });
 };
 

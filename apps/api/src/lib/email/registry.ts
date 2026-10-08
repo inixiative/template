@@ -31,8 +31,8 @@ export type EmailEntry = {
   render?: RenderSpec;
 };
 
-export const recipientLens = (slot: SlotLens | undefined, where: Condition): LensNarrowing => {
-  if (!slot || slot === OPAQUE_SLOT) throw new Error('Email recipient lens is not a model lens');
+export const slotRowsLens = (slot: SlotLens | undefined, where: Condition): LensNarrowing => {
+  if (!slot || slot === OPAQUE_SLOT) throw new Error('Email slot lens is not a model lens');
   return intoFirstLayer(slot, { root: { where } });
 };
 
