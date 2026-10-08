@@ -6,6 +6,8 @@ import {
   createContact,
   createOrganization,
   createOrganizationUser,
+  createSpace,
+  createSpaceUser,
   createUser,
 } from '@template/db/test';
 import { saveEmailTemplate } from '@template/email/render';
@@ -305,5 +307,29 @@ describe('messageUser handler', () => {
       expect(messaged).toBe('Hi Ada [Mine:admin] ADMIN');
       expect(emailed.mjml).toContain(`<mj-text>${messaged}</mj-text>`);
     });
+  });
+
+  it("reads {{sender.*}} through the sender's slot: a foreign key never prints", async () => {
+    const { entity: organization } = await createOrganization({ name: 'Slot Org' });
+    const { entity: space } = await createSpace({ name: 'Slot Space' }, { organization });
+    const { entity: user } = await createUser();
+    const { entity: organizationUser } = await createOrganizationUser(
+      { role: 'member' },
+      { user, organization },
+    );
+    await createSpaceUser({ role: 'viewer' }, { user, organization, space, organizationUser });
+    await createContact(
+      { ownerModel: 'User', type: ContactType.whatsapp, value: { jid: user.id } },
+      { user },
+    );
+
+    await messageUser(worker, {
+      rule: { field: 'id', operator: Operator.equals, value: user.id },
+      kind: 'system',
+      content: { text: '{{sender.name}}|{{sender.organizationId}}' },
+      sender: { type: 'Space', spaceId: space.id, organizationId: organization.id },
+    });
+
+    expect(dispatched.at(-1)?.content.text).toBe('Slot Space|');
   });
 });

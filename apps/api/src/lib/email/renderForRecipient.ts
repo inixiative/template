@@ -44,7 +44,6 @@ const dataVariables = async (
   return row;
 };
 
-/** The recipient and the data entity as the lens shows them when the send runs: the fetched re-check rows, never a queued copy. */
 export const recipientVariables = async (
   lens: EmailLens,
   { recipientId, sender, targeting, data = {}, label = 'message' }: RecipientRef,

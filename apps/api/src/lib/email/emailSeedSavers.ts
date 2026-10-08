@@ -11,7 +11,6 @@ import { ownerScopeOf, type SaveTemplateInput, saveEmailComponents } from '@temp
 import { emailLensFor } from '#/lib/email/emailLensFor';
 import { saveEmailTemplate } from '#/lib/email/saveEmailTemplate';
 
-/** Seeded email rows persist through the save the app uses, so a seed that would not validate fails the run. */
 export const emailSeedSavers: SeedSavers = {
   emailComponent: (record) => {
     const owner = ownerScopeOf(record as unknown as SaveTemplateInput);

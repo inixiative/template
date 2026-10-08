@@ -10,8 +10,6 @@ import { fieldsLens, OPAQUE_SLOT, type SlotLens } from '@template/email/rules';
 import type { RuleLens } from '@template/shared/rules';
 import type { Sender } from '#/lib/email/sender';
 
-export type SenderSpec = Sender;
-
 export type RecipientTarget = { where: Condition };
 
 export type RenderIssuePolicy = 'platform' | 'fail' | 'degrade';
@@ -23,7 +21,7 @@ export type RenderSpec = {
 
 export type EmailEntry = {
   entity: LensNarrowing;
-  sender: SenderSpec;
+  sender: Sender;
   recipients: RecipientTarget;
   cc?: RecipientTarget;
   bcc?: RecipientTarget;

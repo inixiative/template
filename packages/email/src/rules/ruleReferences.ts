@@ -35,11 +35,9 @@ const namedThrough = (
   return references;
 };
 
-/** The rows the rules in these contents name, folded across every block and branch, deduped. */
 export const contentRuleReferences = (lens: EmailLens, ...contents: string[]): RuleReference[] =>
   namedThrough(lens, undefined, contents);
 
-/** Each slot with the rows named through it, so each is admitted by its own slot's sources. */
 export const contentReferenceScopes = (lens: EmailLens, ...contents: string[]): ReferenceScope[] =>
   emailSlotLenses(lens).map(([root, slot]) => ({
     lens: slot,

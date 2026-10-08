@@ -34,7 +34,6 @@ const climbPath = (levels: number, rest: string): string => `${'$'.repeat(levels
 export const loopFrames = (bindings: BindingChain): LoopFrame[] =>
   [...bindings].flatMap(([as, path]) => (path ? [{ as, path }] : []));
 
-/** The index counters in scope, read off the render scope for the bindings that carry no path. */
 export const loopIndices = (scope: Record<string, unknown>, bindings: BindingChain): Indices =>
   Object.fromEntries(
     [...bindings]
@@ -53,7 +52,6 @@ type Scope = {
   indices?: Indices;
 };
 
-/** Where a ref lands, seen from a condition `depth` array scopes below the innermost loop element; null = as written. */
 const rewriteRef = (
   ref: string,
   depth: number,
@@ -83,7 +81,6 @@ const rewriteRef = (
   return null;
 };
 
-/** A leaf on a loop index is a counter, not a lens path: true while nothing is iterating, its verdict once something is. */
 const isIndex = (field: string, { bindings, frames }: Scope): boolean =>
   bindings.has(field) && !frames.some((frame) => frame.as === field);
 
@@ -142,14 +139,6 @@ const relativeTo = (path: string, enclosing: string | undefined): string | null 
     ? path.slice(enclosing.length + 1)
     : null;
 
-/**
- * The array rule a loop-bound rule has always been: one `any` per enclosing `{{#each}}`, the
- * innermost body as its condition, binding leaves element-relative and root leaves climbing with
- * `$$`. A leaf that reads a loop index, the element itself, or another lens's root has no shape the
- * lens can judge, and comes back as an issue — never as a rule to evaluate raw. A loop over the
- * opaque `data` bag has no lens to fold and comes back as written.
- */
-/** Whether the collection a loop iterates sits in a lens: `data` is opaque by construction, and a lens says so for its slots. */
 export const iteratesLens = (bindings: BindingChain | undefined, lens?: EmailLens): boolean => {
   const first = bindings && loopFrames(bindings)[0];
   if (!first) return false;
@@ -226,7 +215,6 @@ const setAt = (target: unknown, path: string, value: unknown): unknown => {
   return { ...base, [head]: rest ? setAt(base[head], rest, value) : value };
 };
 
-/** The scope with every iterated collection pinned to the element in scope, binding names dropped. */
 export const narrowToElements = (
   scope: Record<string, unknown>,
   frames: LoopFrame[],

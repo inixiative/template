@@ -8,10 +8,8 @@ import { type Condition, Operator } from '@inixiative/json-rules';
 import { polymorphicIs } from '@template/db/registries/polymorphicIs';
 import type { ModelName } from '@template/db/utils/modelNames';
 
-/** Not soft-deleted. */
 export const live: Condition = { field: 'deletedAt', operator: Operator.notExists };
 
-/** A platform row, or one whose axis points at the bound owner — live either way. */
 export const platformOrBound = (model: ModelName, axis: string): Condition => ({
   all: [
     live,
@@ -24,12 +22,10 @@ export const platformOrBound = (model: ModelName, axis: string): Condition => ({
   ],
 });
 
-/** A live row whose axis points at the bound owner. */
 export const boundAndLive = (model: ModelName, axis: string): Condition => ({
   all: [polymorphicIs(model, axis), live],
 });
 
-/** The same condition read from a row that reaches the constrained one through a to-one relation. */
 export const through = (relation: string, condition: Condition): Condition => {
   if (typeof condition !== 'object' || condition === null) return condition;
   const node = condition as Record<string, unknown>;

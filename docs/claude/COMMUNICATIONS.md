@@ -327,7 +327,11 @@ other lens. Everything a template does with a path or a rule goes through it:
   rule inside `{{#each}}` is the array rule it always was (`scopedRule`): one `any` per enclosing
   loop, binding leaves element-relative, root leaves climbing with `$$`; vocabulary, references
   and evaluation all read that one form, and evaluation runs slot-relative against the iterated
-  collection pinned to the element in scope (`narrowToElements`, `evaluateScopedRule`).
+  collection pinned to the element in scope (`narrowToElements`, `evaluateScopedRule`). A loop over
+  the opaque `data` bag has no lens to fold, so a rule inside it may not read a lens-backed root at
+  all (`opaqueLoopIssue`): refused at save (`validateConditions`) and at render. Template save and
+  dependent re-validation check the *composed* template, so a cascade-resolved component is judged
+  against the embedding template's lens.
 - **The builder** — `emailSurface` composes the four exposed surfaces under a presentation root
   `Email` for the rule surface route: the maps each slot's projection shows, plus a narrowing whose
   `root.relations` turns each slot on and, beneath it, the slot's own shown tree (columns kept per
@@ -336,11 +340,16 @@ other lens. Everything a template does with a path or a rule goes through it:
   (`emailSurfaceSourceValues`). `emailRuleDecoration` derives one facet per lens present.
 
 **The lens is the row owner's.** `emailLensFor(slug, owner)` (`apps/api/src/lib/email/emailLensFor.ts`)
-builds the slug's declared lens (the registry entry's sender and data lenses, the User recipient,
-narrowed by the slots stored on the row — or on the slug's default-tier row when the row carries
-none) and scopes it to the owner of the row being saved, edited or rendered
-(`scopeEmailLens`): tags are platform-owned or the owner's, segments are the owner's (via
-`recipient.providerRefs.segmentMembers.segment`), platform tiers see platform tags and no segments.
+builds the slug's declared lens (the registry entry's sender and data lenses, the User recipient
+over `DEFAULT_RECIPIENT_NARROWING`, a sender slot from the actual sender when no entry declares
+one; every prisma slot foreign-key-free and redacted) and narrows it by the slots stored on the
+row — or on the slug's default-tier row when the row carries none. A stored slot is a **later
+layer**: it shows exactly what it names and can never turn on what the declared surface does not
+(a stored recipient lens naming `sessions` or `accounts` is refused). The lens is scoped to the
+owner of the row being saved, edited or rendered (`scopeEmailLens`): tags are platform-owned or the
+owner's, segments are the owner's (via `recipient.providerRefs.segmentMembers.segment`), platform
+tiers see platform tags and no segments; the link rows are bound the same way — a tag attachment or
+segment membership by its far side, a customer ref by its provider.
 `OrganizationUser`/`SpaceUser` rows scope to the person, like the cascade they sit on. The scope
 is merged into each slot's **first** narrowing (`intoFirstLayer`): json-rules 3.4 lets a later layer's
 clamp read only what its parent shows, and these clamps read columns the slot hides.
@@ -590,9 +599,12 @@ chain (user or org) down to the `default` floor, carrying the user id for interp
 2. Resolve the template row for the sender's scope and build the owner-scoped email lens from that
    row; fetch recipients in one batch through its **recipient lens** with the entry's targeting
    `where` (`slotRowsLens`), pruned to what the lens picks plus what its `where`s read. The
-   delivery job carries only the recipient's id: `deliverEmail` re-reads the recipient through the
-   lens at send time, so nothing hidden rides the queue and the email shows the recipient as they
-   are when it goes out. Then resolve each recipient's email `Contact` (settings + deliverability
+   delivery job carries the recipient's id, the bound targeting `where` and the cc / bcc rules — no
+   addresses: `deliverEmail` re-reads the recipient through the lens at send time with the
+   targeting re-checked (`not_found` once it no longer matches), resolves cc / bcc through the same
+   sender-clamped recipient lens, and sends to — and records on the log — the recipient's current
+   email, so nothing hidden rides the queue and the email shows the recipient as they are when it
+   goes out. Then resolve each recipient's email `Contact` (settings + deliverability
    live there).
 3. **Find-or-create** a `queued` `CommunicationLog` row keyed on the per-recipient `idempotencyKey`
    — the at-most-once fence, durable beyond BullMQ's retention window (P2002 race → re-read).
@@ -665,6 +677,10 @@ declared on the template's code registry entry (`apps/api/src/lib/email/registry
 - **`substitute: '<slug>'`** — a different template rendered instead of the platform fallback,
   with the primary's sender, recipient and variables. Same clean-or-fail rule. A substitute may
   not itself name a substitute.
+
+A fallback or substitute renders its own content through the **primary** template's lens — its
+owner clamps and stored recipient targeting — so it never sends what the primary would refuse: a
+recipient outside the primary lens is `not_found`.
 
 A non-system template rendered for a recipient with no contact row fails
 (`unsubscribe_unavailable`) before anything is sent: the unsubscribe link is not optional.

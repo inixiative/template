@@ -108,7 +108,6 @@ const withMemberships = (memberships: {
   return { ...DEFAULT_RECIPIENT_VIEW, relations: { ...relations, ...memberships } };
 };
 
-/** The recipient a sender sees by default: its own level only; a stored lens chooses more of the sender's tree. */
 export const defaultRecipientNarrowing = (sender: EmailLensOwner): ModelNarrowing | undefined => {
   const { organizationUsers, spaceUsers } = DEFAULT_RECIPIENT_VIEW.relations!;
   switch (sender?.ownerModel) {
@@ -309,7 +308,6 @@ const leaves = (rule: Condition): Leaf[] => {
   return out;
 };
 
-/** The dotted field chain a nested array rule descends — what a violation inside its condition is relative to. */
 const arrayChain = (rule: Condition): string[] => {
   const chain: string[] = [];
   let node = rule as Record<string, unknown>;
@@ -440,7 +438,6 @@ export const applyEmailLens = (lens: EmailLens, rule: Condition): Condition =>
     );
   });
 
-/** A loop-bound rule (see `scopedRule`) evaluates slot-relative, so its `$$` refs climb to the lens root. */
 export const evaluateScopedRule = (
   lens: EmailLens,
   scoped: Condition,
@@ -459,7 +456,6 @@ export const emailSlotLenses = (lens: EmailLens): [ScopeRoot, RuleLens][] =>
     return slot && slot !== OPAQUE_SLOT ? [[root, slot] as [ScopeRoot, RuleLens]] : [];
   });
 
-/** Each slot's variables as the lens shows them; `keepClampColumns` is the re-check projection rules evaluate on, never one to render. */
 export const narrowVariables = <V extends Record<string, unknown>>(
   lens: EmailLens,
   variables: V,
@@ -507,7 +503,6 @@ const surfaceNode = (projection: PathProjection, path: string): ModelNarrowing =
   };
 };
 
-/** The builder's source: every slot under one Email root, each slot's own tree turned on beneath its relation. */
 export const emailSurface = (lens: EmailLens): EmailSurface => {
   const models: FieldMap['models'] = {};
   const enums: NonNullable<FieldMap['enums']> = {};
@@ -549,7 +544,6 @@ export const emailSurface = (lens: EmailLens): EmailSurface => {
   };
 };
 
-/** The surface re-homes every slot under the Email root of the email map, so its options must be keyed there too. */
 export const emailSurfaceSourceValues = (
   values: readonly (readonly [ScopeRoot, SourceValues])[],
 ): SourceValues[] =>

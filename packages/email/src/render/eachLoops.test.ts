@@ -3,11 +3,11 @@ import type { LensNarrowing } from '@inixiative/json-rules';
 import { lensFor, live } from '@template/db/lens';
 import { interpolate } from '@template/email/render/interpolate';
 import type { RuleErrorSink } from '@template/email/render/settle';
-import { type EmailLens, emailLens } from '@template/email/rules/emailLens';
+import { defaultEmailLens, type EmailLens, emailLens } from '@template/email/rules/emailLens';
 import { scopeEmailLens } from '@template/email/rules/scopeEmailLens';
 
 const render = (template: string, data: Record<string, unknown>, onError?: RuleErrorSink) =>
-  interpolate(template, { data }, onError);
+  interpolate(template, { data }, onError, { lens: defaultEmailLens });
 
 describe('{{#each}} loops', () => {
   it('renders the body once per element bound to as=', () => {

@@ -11,7 +11,6 @@ import {
   sourceQueryValues,
 } from '@template/db/utils/sourceQueryValues';
 
-/** The rows a source admits as a where; a bridged query's candidates are re-checked first and pinned by value. */
 export const sourceQueryWhere = async (
   query: SourceQuery,
   scope: SourceQueryScope,

@@ -36,8 +36,6 @@ export const syncRuleReferences = (
   );
 };
 
-// The contents a source's rules live in — the one answer save and revive share, so a regenerated
-// source holds exactly the edges its last save wrote.
 export const templateRuleContents = (
   template: Pick<EmailTemplate, 'subject' | 'mjml'>,
 ): string[] => [template.subject ?? '', stripComponentBodies(template.mjml)];

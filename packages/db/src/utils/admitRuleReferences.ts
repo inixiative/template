@@ -41,7 +41,6 @@ const refusedIn = async (
   return refused;
 };
 
-/** Which references each lens's own sources admit — a reference is admitted only by the lens it was named through. */
 export const admitRuleReferences = async ({
   scopes,
   farSide,
