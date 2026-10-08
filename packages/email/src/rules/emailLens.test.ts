@@ -222,6 +222,10 @@ describe('emailLens — evaluation goes through the lens', () => {
       tagAttachments: [{ deletedAt: null, tag: { id: 'tag-a', name: 'vip', ...tagOwner } }],
       providerRefs: [
         {
+          providerModel: 'Organization',
+          providerUserId: null,
+          providerOrganizationId: segmentOwner.organizationId ?? null,
+          providerSpaceId: null,
           segmentMembers: [
             { segment: { id: 'seg-a', name: 's', deletedAt: null, ...segmentOwner } },
           ],

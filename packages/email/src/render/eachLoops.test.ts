@@ -178,7 +178,7 @@ describe('{{#each}} loops', () => {
           lens,
         },
       );
-    expect(render('u1')).toBe('VIP|[own][]');
+    expect(render('u1')).toBe('VIP|[own]');
     expect(render('u2')).toBe('BASE|');
   });
 
@@ -222,7 +222,7 @@ describe('{{#each}} loops', () => {
       undefined,
       { lens },
     );
-    expect(out).toBe('[name-own][]');
+    expect(out).toBe('[name-own]');
   });
 
   it("memberships are the sender's: another organization's membership is not a row of the loop", () => {
