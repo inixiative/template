@@ -722,14 +722,12 @@ describe('saveEmailTemplate — the lens decides at save', () => {
         ),
       ),
     ).rejects.toBeInstanceOf(ConditionValidationError);
-    await db.emailComponent.create({
-      data: {
-        slug: 'probe',
-        locale: 'en',
-        ownerModel: 'default',
-        componentRefs: [],
-        mjml: `{{#each data.items as=i}}{{#if rule=${probe}}}LEAK{{/if}}{{/each}}`,
-      },
+    await createEmailComponent({
+      slug: 'probe',
+      locale: 'en',
+      ownerModel: 'default',
+      componentRefs: [],
+      mjml: `{{#each data.items as=i}}{{#if rule=${probe}}}LEAK{{/if}}{{/each}}`,
     });
 
     await expect(

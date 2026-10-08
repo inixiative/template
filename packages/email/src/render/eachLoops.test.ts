@@ -298,8 +298,10 @@ describe('{{#each}} loops', () => {
     });
 
     it('a loop over rows a clamp reads whole, hidden ones among them, fails closed with an issue', () => {
+      const { data, system } = emailLens();
       const wholeList = {
-        ...emailLens(),
+        data,
+        system,
         recipient: {
           parent: lensFor('User'),
           root: {
