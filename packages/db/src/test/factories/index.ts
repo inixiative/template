@@ -1,3 +1,4 @@
+export * from './accountFactory';
 export * from './auditLogFactory';
 export * from './authProviderFactory';
 export * from './communicationLogFactory';
@@ -23,5 +24,6 @@ export * from './tagCategoryFactory';
 export * from './tagFactory';
 export * from './tokenFactory';
 export * from './userFactory';
+export * from './verificationFactory';
 export * from './webhookEventFactory';
 export * from './webhookSubscriptionFactory';
