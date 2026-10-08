@@ -54,23 +54,16 @@ const ownerDefaults = (owner: Owner): NarrowingDefaults['models'] => ({
   Space: { where: spaceScope(owner), sources: { id: { where: spaceScope(owner) } } },
 });
 
-const organizationMemberships = (sender: Owner): Condition =>
+const senderOrganization = (sender: Owner): Condition =>
   sender.ownerModel === 'Organization'
     ? is('organizationId', sender.ownerId)
     : sender.ownerModel === 'Space' && sender.organizationId
       ? is('organizationId', sender.organizationId)
       : false;
 
-const spaceMemberships = (sender: Owner): Condition =>
-  sender.ownerModel === 'Space'
-    ? is('spaceId', sender.ownerId)
-    : sender.ownerModel === 'Organization'
-      ? is('organizationId', sender.ownerId)
-      : false;
-
 const membershipDefaults = (sender: Owner): NarrowingDefaults['models'] => ({
-  OrganizationUser: { where: organizationMemberships(sender) },
-  SpaceUser: { where: spaceMemberships(sender) },
+  OrganizationUser: { where: senderOrganization(sender) },
+  SpaceUser: { where: senderOrganization(sender) },
 });
 
 export const scopeEmailLens = (

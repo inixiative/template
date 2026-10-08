@@ -192,7 +192,7 @@ describe('POST /api/admin/emailTemplate/ruleSurface — the picker offers what t
     expect(optionsOf(data, 'Space')).toEqual([]);
   });
 
-  it("a space template offers its own space and its organization, never another's", async () => {
+  it("a space template offers its own space by default, never its siblings or another organization's", async () => {
     const { entity: mine } = await createOrganization();
     const { entity: theirs } = await createOrganization();
     const { entity: space } = await createSpace({}, { organization: mine });
@@ -210,7 +210,7 @@ describe('POST /api/admin/emailTemplate/ruleSurface — the picker offers what t
       ),
     );
 
-    expect(optionsOf(data, 'Organization')).toEqual([mine.id]);
+    expect(optionsOf(data, 'Organization')).toEqual([]);
     expect(optionsOf(data, 'Space')).toEqual([space.id]);
     expect(optionsOf(data, 'Space')).not.toContain(sibling.id);
   });

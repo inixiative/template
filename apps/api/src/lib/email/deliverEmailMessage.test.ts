@@ -378,16 +378,35 @@ describe('deliverEmailMessage — the recipient is read through the lens at send
     expect(sent[0]?.html).not.toContain('[Default Org]');
   });
 
-  it("a space whose lens turns on organization memberships sees its parent organization's, never another's", async () => {
+  it("a space whose lens widens to its organization renders the organization's and sibling spaces' memberships, never another organization's", async () => {
     const { entity: organization } = await createOrganization({ name: 'Parent Org' });
     const { entity: other } = await createOrganization({ name: 'Other Org' });
     const { entity: space } = await createSpace({ name: 'Lens Space' }, { organization });
+    const { entity: sibling } = await createSpace({ name: 'Sibling Space' }, { organization });
+    const { entity: foreign } = await createSpace(
+      { name: 'Foreign Space' },
+      { organization: other },
+    );
     const { entity: user } = await createUser();
-    await createOrganizationUser({ role: 'admin' }, { user, organization });
-    await createOrganizationUser({ role: 'member' }, { user, organization: other });
+    const { entity: organizationUser } = await createOrganizationUser(
+      { role: 'admin' },
+      { user, organization },
+    );
+    const { entity: otherUser } = await createOrganizationUser(
+      { role: 'member' },
+      { user, organization: other },
+    );
+    await createSpaceUser(
+      { role: 'viewer' },
+      { user, organization, space: sibling, organizationUser },
+    );
+    await createSpaceUser(
+      { role: 'owner' },
+      { user, organization: other, space: foreign, organizationUser: otherUser },
+    );
     await saveTemplate(
       'space-lens-org',
-      '{{#each recipient.organizationUsers as=o}}[{{o.organization.name}}:{{o.role}}]{{/each}}',
+      '{{#each recipient.organizationUsers as=o}}[{{o.organization.name}}:{{o.role}}]{{/each}}|{{#each recipient.spaceUsers as=m}}[{{m.space.name}}:{{m.role}}]{{/each}}',
       {
         ownerModel: 'Organization',
         organizationId: organization.id,
@@ -400,6 +419,7 @@ describe('deliverEmailMessage — the recipient is read through the lens at send
                 picks: ['role'],
                 relations: { organization: { picks: ['id', 'name'] } },
               },
+              spaceUsers: { picks: ['role'], relations: { space: { picks: ['id', 'name'] } } },
             },
           },
         },
@@ -414,7 +434,9 @@ describe('deliverEmailMessage — the recipient is read through the lens at send
 
     expect(row.status).toBe(CommunicationStatus.sent);
     expect(sent[0]?.html).toContain('[Parent Org:admin]');
+    expect(sent[0]?.html).toContain('[Sibling Space:viewer]');
     expect(sent[0]?.html).not.toContain('Other Org');
+    expect(sent[0]?.html).not.toContain('Foreign Space');
   });
 
   describe('the data entity is read through the data lens at send time', () => {

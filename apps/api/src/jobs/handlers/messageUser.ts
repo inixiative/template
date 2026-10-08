@@ -16,6 +16,7 @@ import { ownerScope } from '#/lib/emailTemplate';
 import { canDeliver } from '#/lib/messaging/canDeliver';
 import { getMessageProviderAdapter, type MessageContent } from '#/lib/messaging/providers';
 import { resolveUsers } from '#/lib/messaging/resolveUsers';
+import { targetedBySender } from '#/lib/messaging/senderTargeting';
 
 export type MessageUserPayload = {
   rule: Condition;
@@ -32,7 +33,7 @@ export const messageUser = makeJob<MessageUserPayload>(async (_ctx, payload) => 
   const lens = emailLensFor(undefined, ownerScope(sender), undefined, sender);
   if (!lens.recipient || lens.recipient === OPAQUE_SLOT)
     throw new Error('messageUser: the recipient lens is not a model lens');
-  const users = await resolveUsers(rule, lens.recipient);
+  const users = await resolveUsers(targetedBySender(rule, lens.recipient, sender), lens.recipient);
 
   for (const user of users) {
     const variables = await recipientVariables(lens, {

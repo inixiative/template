@@ -16,6 +16,7 @@ import {
   type LensNarrowing,
   type ModelNarrowing,
   narrowRule,
+  Operator,
   type PathProjection,
   projectLens,
   projectRows,
@@ -85,29 +86,35 @@ export const DEFAULT_RECIPIENT_NARROWING: ModelNarrowing = {
   },
 };
 
-const withMemberships = (keep: ('organizationUsers' | 'spaceUsers')[]): ModelNarrowing => {
-  const { organizationUsers, spaceUsers, ...relations } = DEFAULT_RECIPIENT_NARROWING.relations!;
-  const memberships = { organizationUsers, spaceUsers };
-  return {
-    ...DEFAULT_RECIPIENT_NARROWING,
-    relations: {
-      ...relations,
-      ...Object.fromEntries(keep.map((name) => [name, memberships[name]])),
-    },
-  };
+const withMemberships = (memberships: {
+  organizationUsers?: ModelNarrowing;
+  spaceUsers?: ModelNarrowing;
+}): ModelNarrowing => {
+  const {
+    organizationUsers: _o,
+    spaceUsers: _s,
+    ...relations
+  } = DEFAULT_RECIPIENT_NARROWING.relations!;
+  return { ...DEFAULT_RECIPIENT_NARROWING, relations: { ...relations, ...memberships } };
 };
 
-/** The recipient a sender sees by default: its own level's memberships only; a stored lens turns on the rest of its tree. */
+/** The recipient a sender sees by default: its own level only; a stored lens widens it within the sender's tree. */
 export const defaultRecipientNarrowing = (sender: EmailLensOwner): ModelNarrowing => {
+  const { organizationUsers, spaceUsers } = DEFAULT_RECIPIENT_NARROWING.relations!;
   switch (sender?.ownerModel) {
     case 'Organization':
-      return withMemberships(['organizationUsers']);
+      return withMemberships({ organizationUsers });
     case 'Space':
-      return withMemberships(['spaceUsers']);
+      return withMemberships({
+        spaceUsers: {
+          ...spaceUsers,
+          where: { field: 'spaceId', operator: Operator.equals, value: sender.ownerId },
+        },
+      });
     case undefined:
       return DEFAULT_RECIPIENT_NARROWING;
     default:
-      return withMemberships([]);
+      return withMemberships({});
   }
 };
 
