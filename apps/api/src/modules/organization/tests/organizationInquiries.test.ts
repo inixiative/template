@@ -183,6 +183,37 @@ describe('POST /api/v1/organization/:id/inquiries — create and send with autoA
     expect(data.sentAt).toBeNull();
     expect(data.expiresAt).toBeNull();
   });
+
+  it('refuses a source named by the request body', async () => {
+    const { entity: invitee } = await createUser();
+    const body = {
+      type: InquiryType.inviteOrganizationUser,
+      targetModel: InquiryResourceModel.User,
+      content: { organizationId: org.id, role: 'member' },
+      targetUserId: invitee.id,
+    };
+
+    for (const spoofed of [
+      { sourceIntegrationId: '01a00000-0000-7000-8000-000000000000' },
+      { sourceTokenId: '01a00000-0000-7000-8000-000000000001' },
+    ]) {
+      const rejected = await fetch(
+        post(`/api/v1/organization/${org.id}/inquiries`, { ...body, ...spoofed }),
+      );
+      expect(rejected.status).toBe(400);
+    }
+
+    const response = await fetch(post(`/api/v1/organization/${org.id}/inquiries`, body));
+    const { data } = await json<Inquiry>(response);
+
+    expect(response.status).toBe(201);
+
+    const record = await db.inquiry.findUniqueOrThrow({ where: { id: data.id } });
+    expect(record.sourceModel).toBe(InquiryResourceModel.Organization);
+    expect(record.sourceOrganizationId).toBe(org.id);
+    expect(record.sourceIntegrationId).toBeNull();
+    expect(record.sourceTokenId).toBeNull();
+  });
 });
 
 describe('POST /api/v1/organization/:id/inquiries — inviteOrganizationUser (low roles)', () => {
