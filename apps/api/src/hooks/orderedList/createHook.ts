@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind hook
+ * @partOf infrastructure:prisma
+ */
 import { DbAction, HookTiming, registerDbHook } from '@template/db';
 import { extractRows, queueOrderedListCacheInvalidation } from '#/hooks/orderedList/utils';
 import { applyOrderedListBatchCreate, applyOrderedListCreate } from '#/lib/prisma/orderedList';
