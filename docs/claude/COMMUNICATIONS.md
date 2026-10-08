@@ -343,8 +343,8 @@ none) and scopes it to the owner of the row being saved, edited or rendered
 `recipient.providerRefs.segmentMembers.segment`), platform tiers see platform tags and no segments.
 `OrganizationUser`/`SpaceUser` rows scope to the person, like the cascade they sit on. The scope
 is merged into each slot's **first** narrowing (`intoFirstLayer`): json-rules 3.4 lets a later layer's
-grant read only what its parent shows, and these grants read columns the slot hides.
-**Memberships are the sender's.** At send, `emailLensFor(slug, owner, stored, sender)` also grants
+clamp read only what its parent shows, and these clamps read columns the slot hides.
+**Memberships are the sender's.** At send, `emailLensFor(slug, owner, stored, sender)` also clamps
 `OrganizationUser` / `SpaceUser` rows to the sending owner (`senderLensOwner`): an Organization or
 OrganizationUser sender sees that organization's memberships and its spaces'; a Space or SpaceUser
 sender sees that space's membership only; a User sender sees none; a platform or admin send is
@@ -711,7 +711,7 @@ edges are persisted so that "who references X" is an index and a stale rule is n
   recipient lens reaches `tagAttachments.tag`, `spaceUsers.space`, `organizationUsers.organization`
   and `providerRefs.segmentMembers.segment` (`id`, `name`); a relation the lens does not declare
   is refused at save. The api's `emailLensFor(slug, owner)` builds the owner-scoped lens; the
-  builder gets `emailSurface` of it (which strips grants and sources), while save and settle keep the lens
+  builder gets `emailSurface` of it (which strips clamps and sources), while save and settle keep the lens
   itself (`defaultEmailLens` when none is threaded) — extraction never runs on the exposed
   surface. Adding a referenceable model = a registry entry + an FK column (the hook and email's
   sources derive); a surface that reaches it declares its own labeled id source.
