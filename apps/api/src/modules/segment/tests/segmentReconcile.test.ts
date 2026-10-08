@@ -26,6 +26,7 @@ import {
   createSpace,
   createTag,
   createTagAttachment,
+  createTagCategory,
   createUser,
   getNextSeq,
 } from '@template/db/test';
@@ -126,8 +127,17 @@ describe('segment reconcile', () => {
 
   it('a tag rule sees platform tags and the owner’s own, never another owner’s, even by name', async () => {
     const elsewhere = (await createSpace({}, { organization })).entity;
-    const theirs = (await createTag({ name: 'vip', ownerModel: 'Space' }, { space: elsewhere }))
-      .entity;
+    const theirs = (
+      await createTag(
+        { name: 'vip', ownerModel: 'Space' },
+        {
+          space: elsewhere,
+          tagCategory: (
+            await createTagCategory({ ownerModel: 'Space' }, { space: elsewhere })
+          ).entity,
+        },
+      )
+    ).entity;
     await createTagAttachment({ resourceModel: 'User' }, { user: acme, tag: theirs });
     const byName = {
       field: 'customerUser.tagAttachments',
@@ -141,7 +151,15 @@ describe('segment reconcile', () => {
     expect(await memberIds(segment.id)).toEqual([]);
     expect(await reconcileCustomerRef(acmeRef.id)).toEqual([]);
 
-    const mine = (await createTag({ name: 'vip', ownerModel: 'Space' }, { space })).entity;
+    const mine = (
+      await createTag(
+        { name: 'vip', ownerModel: 'Space' },
+        {
+          space,
+          tagCategory: (await createTagCategory({ ownerModel: 'Space' }, { space })).entity,
+        },
+      )
+    ).entity;
     const { entity: attachment } = await createTagAttachment(
       { resourceModel: 'User' },
       { user: acme, tag: mine },

@@ -8,6 +8,7 @@ import {
   createSegment,
   createSpace,
   createTag,
+  createTagCategory,
   createUser,
 } from '@template/db/test';
 import { adminEmailTemplateRouter } from '#/modules/emailTemplate';
@@ -162,9 +163,28 @@ describe('POST /api/admin/emailTemplate/ruleSurface — the picker offers what t
     const { entity: mine } = await createOrganization();
     const { entity: theirs } = await createOrganization();
     const platformTag = (await createTag()).entity;
-    const myTag = (await createTag({ ownerModel: 'Organization' }, { organization: mine })).entity;
-    const theirTag = (await createTag({ ownerModel: 'Organization' }, { organization: theirs }))
-      .entity;
+    const myTag = (
+      await createTag(
+        { ownerModel: 'Organization' },
+        {
+          organization: mine,
+          tagCategory: (
+            await createTagCategory({ ownerModel: 'Organization' }, { organization: mine })
+          ).entity,
+        },
+      )
+    ).entity;
+    const theirTag = (
+      await createTag(
+        { ownerModel: 'Organization' },
+        {
+          organization: theirs,
+          tagCategory: (
+            await createTagCategory({ ownerModel: 'Organization' }, { organization: theirs })
+          ).entity,
+        },
+      )
+    ).entity;
     const mySegment = (await createSegment({ ownerModel: 'Organization' }, { organization: mine }))
       .entity;
     const theirSegment = (
@@ -218,7 +238,17 @@ describe('POST /api/admin/emailTemplate/ruleSurface — the picker offers what t
   it('a platform template offers platform tags and no segments', async () => {
     const { entity: org } = await createOrganization();
     const platformTag = (await createTag()).entity;
-    const orgTag = (await createTag({ ownerModel: 'Organization' }, { organization: org })).entity;
+    const orgTag = (
+      await createTag(
+        { ownerModel: 'Organization' },
+        {
+          organization: org,
+          tagCategory: (
+            await createTagCategory({ ownerModel: 'Organization' }, { organization: org })
+          ).entity,
+        },
+      )
+    ).entity;
     await createSegment({ ownerModel: 'Organization' }, { organization: org });
 
     const { data } = await json<Surface>(
