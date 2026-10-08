@@ -59,7 +59,10 @@ describe('reconcile triggers — membership follows the events', () => {
     ).entity;
 
   const liveSegment = async (conditions: object): Promise<Segment> => {
-    const { entity } = await createSegment({ type: SegmentType.dynamic, conditions }, { space });
+    const { entity } = await createSegment(
+      { ownerModel: 'Space', type: SegmentType.dynamic, conditions },
+      { space },
+    );
     await emitAppEvent('segment.created', { segment: entity });
     return entity;
   };

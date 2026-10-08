@@ -1,16 +1,7 @@
-/**
- * @atlas
- * @kind factory
- * @partOf infrastructure:prisma
- * @uses none
- */
-import { TagResource } from '@template/db/generated/client/enums';
 import { createFactory } from '@template/db/test/factory';
 
 const tagAttachmentFactory = createFactory('TagAttachment', {
-  defaults: () => ({
-    resourceModel: TagResource.User,
-  }),
+  defaults: () => ({}),
   dependencies: {
     user: {
       modelName: 'User',

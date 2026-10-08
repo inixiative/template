@@ -13,7 +13,9 @@ const zodSchemas = zodSchemasNs as unknown as Record<
   ZodObject<Record<string, ZodTypeAny>> | undefined
 >;
 
-const getCreateInputSchema = (modelName: ModelName): ZodObject<Record<string, ZodTypeAny>> | null =>
+export const getCreateInputSchema = (
+  modelName: ModelName,
+): ZodObject<Record<string, ZodTypeAny>> | null =>
   zodSchemas[`${modelName}CreateInputObjectSchema`] ?? null;
 
 export const inferDependencies = (modelName: ModelName): Record<string, DependencyConfig> => {

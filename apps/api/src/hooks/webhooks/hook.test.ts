@@ -32,7 +32,7 @@ describe('webhook hook', () => {
 
       // Subscribe to CustomerRef - User changes route here via relatedModels
       await createWebhookSubscription(
-        { model: WebhookModel.CustomerRef, url: 'https://example.com/webhook' },
+        { ownerModel: 'User', model: WebhookModel.CustomerRef, url: 'https://example.com/webhook' },
         context,
       );
     });
@@ -189,6 +189,7 @@ describe('webhook hook — origin suppression', () => {
 
     const { entity: sf } = await createWebhookSubscription(
       {
+        ownerModel: 'User',
         model: WebhookModel.CustomerRef,
         url: 'https://example.com/webhook-sf',
         integrationId: sfIntegration.id,
@@ -197,6 +198,7 @@ describe('webhook hook — origin suppression', () => {
     );
     const { entity: hs } = await createWebhookSubscription(
       {
+        ownerModel: 'User',
         model: WebhookModel.CustomerRef,
         url: 'https://example.com/webhook-hs',
         integrationId: hsIntegration.id,
@@ -204,7 +206,11 @@ describe('webhook hook — origin suppression', () => {
       context,
     );
     const { entity: plain } = await createWebhookSubscription(
-      { model: WebhookModel.CustomerRef, url: 'https://example.com/webhook-plain' },
+      {
+        ownerModel: 'User',
+        model: WebhookModel.CustomerRef,
+        url: 'https://example.com/webhook-plain',
+      },
       context,
     );
     sfSub = sf;

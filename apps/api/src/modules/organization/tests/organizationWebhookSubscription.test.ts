@@ -111,6 +111,7 @@ describe('organization/webhookSubscriptions', () => {
     it('returns org webhooks', async () => {
       const seq = getNextSeq();
       await createWebhookSubscription({
+        model: 'CustomerRef',
         ownerModel: 'Organization',
         organizationId: org.id,
         url: `https://example.com/org-list-${seq}`,
@@ -129,6 +130,7 @@ describe('organization/webhookSubscriptions', () => {
       const otherOrg = otherContext.organization;
       const seq = getNextSeq();
       await createWebhookSubscription({
+        model: 'CustomerRef',
         ownerModel: 'Organization',
         organizationId: otherOrg.id,
         url: `https://example.com/other-org-${seq}`,

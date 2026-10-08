@@ -66,7 +66,8 @@ describe('deliverEmail — send-time component version closure', () => {
   const ctx = () => ({ db, log: () => {} }) as never;
 
   const createLog = async (data: Parameters<typeof createCommunicationLog>[0] = {}) =>
-    (await createCommunicationLog({ address: 'fan@example.com', ...data })).entity;
+    (await createCommunicationLog({ senderType: 'platform', address: 'fan@example.com', ...data }))
+      .entity;
 
   const payloadFor = (
     logId: string,

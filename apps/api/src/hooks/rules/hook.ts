@@ -6,8 +6,9 @@ import {
   type ModelName,
   registerDbHook,
   type SingleAction,
+  withDiscriminatorDefaults,
 } from '@template/db';
-import { without } from 'lodash-es';
+import { castArray, without } from 'lodash-es';
 import { getRule, RulesRegistry } from '#/hooks/rules/registry';
 import { shadowMerge } from '#/hooks/rules/shadowMerge';
 import { makeError } from '#/lib/errors';
@@ -24,8 +25,8 @@ const validateData = (data: Record<string, unknown>, model: ModelName): void => 
 const processCreateArgs = (args: unknown, model: ModelName): void => {
   const data = (args as Record<string, unknown>)?.data ?? (args as Record<string, unknown>)?.create;
   if (!data || typeof data !== 'object') return;
-  if (Array.isArray(data)) for (const d of data) validateData(d as Record<string, unknown>, model);
-  else validateData(data as Record<string, unknown>, model);
+  for (const row of castArray(data) as Record<string, unknown>[])
+    validateData(withDiscriminatorDefaults(model, row), model);
 };
 
 const processUpdateArgs = (

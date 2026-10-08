@@ -102,7 +102,7 @@ describe('segment reconcile', () => {
 
   it('a saved segment is not reconciled until its created event fires', async () => {
     const { entity: segment } = await createSegment(
-      { type: SegmentType.dynamic, conditions: acmeRule },
+      { ownerModel: 'Space', type: SegmentType.dynamic, conditions: acmeRule },
       { space },
     );
     expect(await memberIds(segment.id)).toEqual([]);
@@ -118,7 +118,7 @@ describe('segment reconcile', () => {
     await customerOf(stranger, elsewhere);
 
     const segment = await saveSegment(
-      { type: SegmentType.dynamic, conditions: acmeRule },
+      { ownerModel: ProviderModel.Space, type: SegmentType.dynamic, conditions: acmeRule },
       { space },
     );
     expect(await memberIds(segment.id)).toEqual([acmeRef.id]);
@@ -134,7 +134,10 @@ describe('segment reconcile', () => {
       arrayOperator: 'any',
       condition: { field: 'tag.name', operator: Operator.equals, value: 'vip' },
     };
-    const segment = await saveSegment({ type: SegmentType.dynamic, conditions: byName }, { space });
+    const segment = await saveSegment(
+      { ownerModel: ProviderModel.Space, type: SegmentType.dynamic, conditions: byName },
+      { space },
+    );
     expect(await memberIds(segment.id)).toEqual([]);
     expect(await reconcileCustomerRef(acmeRef.id)).toEqual([]);
 
@@ -151,7 +154,11 @@ describe('segment reconcile', () => {
     const picked = (await createUser({ email: `picked-${getNextSeq()}@example.test` })).entity;
     const pickedRef = await customerOf(picked);
     const segment = await saveSegment(
-      { type: SegmentType.static, conditions: { all: [acmeRule, idsRule([pickedRef.id])] } },
+      {
+        ownerModel: ProviderModel.Space,
+        type: SegmentType.static,
+        conditions: { all: [acmeRule, idsRule([pickedRef.id])] },
+      },
       { space },
     );
     expect(await memberIds(segment.id)).toEqual([]);
@@ -174,7 +181,11 @@ describe('segment reconcile', () => {
     const elsewhere = (await createSpace({}, { organization })).entity;
     const foreignRef = await customerOf(other, elsewhere);
     const segment = await saveSegment(
-      { type: SegmentType.static, conditions: idsRule([otherRef.id, foreignRef.id]) },
+      {
+        ownerModel: ProviderModel.Space,
+        type: SegmentType.static,
+        conditions: idsRule([otherRef.id, foreignRef.id]),
+      },
       { space },
     );
     expect(await memberIds(segment.id)).toEqual([otherRef.id]);
@@ -218,7 +229,7 @@ describe('segment reconcile', () => {
 
   it('a customer-side reconcile re-evaluates every reference of that customer, and only those', async () => {
     const segment = await saveSegment(
-      { type: SegmentType.dynamic, conditions: acmeRule },
+      { ownerModel: ProviderModel.Space, type: SegmentType.dynamic, conditions: acmeRule },
       { space },
     );
     const newcomer = (await createUser({ email: `late-${getNextSeq()}@example.test` })).entity;
@@ -235,6 +246,7 @@ describe('segment reconcile', () => {
   it('a contact event reaches the customer reference through the contact owner', async () => {
     const segment = await saveSegment(
       {
+        ownerModel: ProviderModel.Space,
         type: SegmentType.dynamic,
         conditions: {
           field: 'customerUser.contacts',
@@ -248,6 +260,7 @@ describe('segment reconcile', () => {
 
     const { entity: contact } = await createContact(
       {
+        ownerModel: 'User',
         type: ContactType.phone,
         value: { e164: `+1555${String(getNextSeq()).padStart(7, '0').slice(-7)}`, country: 'US' },
       },
@@ -263,9 +276,13 @@ describe('segment reconcile', () => {
   });
 
   it('a segment can be built from the membership of another, evaluated in dependency order', async () => {
-    const base = await saveSegment({ type: SegmentType.dynamic, conditions: acmeRule }, { space });
+    const base = await saveSegment(
+      { ownerModel: ProviderModel.Space, type: SegmentType.dynamic, conditions: acmeRule },
+      { space },
+    );
     const derived = await saveSegment(
       {
+        ownerModel: ProviderModel.Space,
         type: SegmentType.dynamic,
         conditions: {
           all: [
@@ -299,6 +316,7 @@ describe('segment reconcile', () => {
   it("a communication from another provider does not satisfy this provider's rule", async () => {
     const segment = await saveSegment(
       {
+        ownerModel: ProviderModel.Space,
         type: SegmentType.dynamic,
         conditions: {
           field: 'customerUser.communicationsReceived',
@@ -333,9 +351,13 @@ describe('segment reconcile', () => {
   });
 
   it('a single customer write resolves a segment-of-segment in one pass', async () => {
-    const base = await saveSegment({ type: SegmentType.dynamic, conditions: acmeRule }, { space });
+    const base = await saveSegment(
+      { ownerModel: ProviderModel.Space, type: SegmentType.dynamic, conditions: acmeRule },
+      { space },
+    );
     const derived = await saveSegment(
       {
+        ownerModel: ProviderModel.Space,
         type: SegmentType.dynamic,
         conditions: {
           field: 'segmentMembers',
@@ -359,7 +381,7 @@ describe('segment reconcile', () => {
 
   it('flipping to static keeps the members and stops reacting; flipping back catches up', async () => {
     const segment = await saveSegment(
-      { type: SegmentType.dynamic, conditions: acmeRule },
+      { ownerModel: ProviderModel.Space, type: SegmentType.dynamic, conditions: acmeRule },
       { space },
     );
     expect(await memberIds(segment.id)).toEqual([acmeRef.id]);

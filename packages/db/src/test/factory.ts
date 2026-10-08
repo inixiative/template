@@ -5,8 +5,14 @@
  */
 import { db } from '@template/db/client';
 import { prismaMap } from '@template/db/generated/prismaMap';
+import { withDiscriminatorDefaults } from '@template/db/registries/discriminatorDefaults';
 import { getPolymorphismConfig } from '@template/db/registries/falsePolymorphism';
 import { mergeDependencies } from '@template/db/test/dependencyInference';
+import {
+  assertDiscriminatorsChosen,
+  assertNoDiscriminatorDefaults,
+  assertSelectedForeignKeys,
+} from '@template/db/test/factoryPolymorphism';
 import type {
   BuildContext,
   BuildResult,
@@ -82,11 +88,20 @@ type RegisteredFactory = {
 
 const factoryRegistry = new Map<ModelName, RegisteredFactory>();
 
+const foreignKeyGiven = (dep: DependencyConfig, scalarFields: Record<string, unknown>) =>
+  (typeof dep.foreignKey === 'string' ? [dep.foreignKey] : Object.values(dep.foreignKey)).every(
+    (field) => scalarFields[field] != null,
+  );
+
+export const registeredDependencies = (modelName: ModelName) =>
+  factoryRegistry.get(modelName)?.dependencies ?? {};
+
 export const createFactory = <K extends ModelName>(
   modelName: K,
   config: FactoryConfig<K>,
 ): Factory<K> => {
   const dependencies = mergeDependencies(modelName, config.dependencies);
+  assertNoDiscriminatorDefaults(modelName, config.defaults() as Record<string, unknown>);
 
   factoryRegistry.set(modelName, {
     defaults: config.defaults as () => Partial<unknown>,
@@ -122,6 +137,9 @@ export const createFactory = <K extends ModelName>(
       ...scalarFields,
     };
 
+    Object.assign(merged, withDiscriminatorDefaults(modelName, merged));
+    assertDiscriminatorsChosen(modelName, merged);
+
     for (const [fieldName, dep] of Object.entries(dependencies)) {
       const relationValue = relationFields[fieldName];
       const registered = factoryRegistry.get(dep.modelName);
@@ -146,7 +164,7 @@ export const createFactory = <K extends ModelName>(
             ? depFactory.create(relationValue as never, ctx)
             : depFactory.build(relationValue as never, ctx));
         }
-      } else if (!ctx[depAccessor] && dep.required) {
+      } else if (!ctx[depAccessor] && dep.required && !foreignKeyGiven(dep, scalarFields)) {
         const depFactory = createFactory(dep.modelName, {
           defaults: registered.defaults as () => Partial<CreateInputOf<typeof dep.modelName>>,
         });
@@ -189,6 +207,8 @@ export const createFactory = <K extends ModelName>(
         }
       }
     }
+
+    assertSelectedForeignKeys(modelName, merged);
 
     const delegate = db.delegate(modelName);
     const entity: ModelOf<K> = persist

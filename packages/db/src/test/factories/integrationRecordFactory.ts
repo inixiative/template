@@ -1,16 +1,7 @@
-/**
- * @atlas
- * @kind factory
- * @partOf infrastructure:prisma
- * @uses none
- */
-import { WebhookModel } from '@template/db/generated/client/enums';
 import { createFactory } from '@template/db/test/factory';
 
 const integrationRecordFactory = createFactory('IntegrationRecord', {
-  defaults: () => ({
-    model: WebhookModel.CustomerRef,
-  }),
+  defaults: () => ({}),
   dependencies: {
     integration: {
       modelName: 'Integration',

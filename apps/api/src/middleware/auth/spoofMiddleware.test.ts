@@ -37,7 +37,7 @@ describe('spoofMiddleware via token auth', () => {
   it('superadmin authenticated via token can spoof another user', async () => {
     const { entity: admin } = await createUser({ platformRole: 'superadmin' });
     const { entity: target } = await createUser();
-    const { entity: token } = await createToken({}, { user: admin });
+    const { entity: token } = await createToken({ ownerModel: 'User' }, { user: admin });
 
     const res = await buildApp({ user: admin, token }).fetch(
       new Request('http://test/echo', { headers: { 'x-spoof-user-email': target.email } }),
@@ -53,7 +53,7 @@ describe('spoofMiddleware via token auth', () => {
   it('non-superadmin with token cannot spoof — header is ignored', async () => {
     const { entity: caller } = await createUser();
     const { entity: target } = await createUser();
-    const { entity: token } = await createToken({}, { user: caller });
+    const { entity: token } = await createToken({ ownerModel: 'User' }, { user: caller });
 
     const res = await buildApp({ user: caller, token }).fetch(
       new Request('http://test/echo', { headers: { 'x-spoof-user-email': target.email } }),

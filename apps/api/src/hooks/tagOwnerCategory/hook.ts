@@ -7,6 +7,7 @@ import {
   type Prisma,
   registerDbHook,
   type SingleAction,
+  withDiscriminatorDefaults,
 } from '@template/db';
 import { castArray } from 'lodash-es';
 import { makeError } from '#/lib/errors';
@@ -31,9 +32,7 @@ const validateRowAgainstCategory = (row: TagRow, category: CategoryOwner | undef
     throw makeError({ status: 422, message: `TagCategory ${row.tagCategoryId} not found` });
   }
 
-  // ownerModel has a DB default of 'platform' — apply it during validation so
-  // creates that omit it match Prisma's post-default semantics.
-  const ownerModel = (row.ownerModel as string | undefined) ?? 'platform';
+  const { ownerModel } = withDiscriminatorDefaults('Tag', row);
 
   if (ownerModel !== category.ownerModel) {
     throw makeError({

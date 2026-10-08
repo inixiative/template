@@ -4,13 +4,12 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
-import { AuditAction, AuditSubjectModel } from '@template/db/generated/client/enums';
+import { AuditAction } from '@template/db/generated/client/enums';
 import { createFactory } from '@template/db/test/factory';
 
 const auditLogFactory = createFactory('AuditLog', {
   defaults: () => ({
     action: AuditAction.create,
-    subjectModel: AuditSubjectModel.User,
   }),
   dependencies: {
     actorUser: {

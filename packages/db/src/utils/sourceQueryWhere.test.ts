@@ -47,7 +47,7 @@ describe('a stepped source — a count the where resolves to an id set first', (
     const idle = (await createTag()).entity;
     for (let i = 0; i < 2; i++) {
       const { entity: user } = await createUser();
-      await createTagAttachment({ tagId: busy.id, userId: user.id });
+      await createTagAttachment({ resourceModel: 'User', tagId: busy.id, userId: user.id });
     }
 
     const { admitted, unadmitted } = await admitRuleReferences({ lenses: [busyTags] }, [

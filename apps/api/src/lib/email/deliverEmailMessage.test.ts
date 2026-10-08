@@ -85,7 +85,8 @@ describe('deliverEmailMessage — claim policy', () => {
   });
 
   const createLog = async (data: Parameters<typeof createCommunicationLog>[0] = {}) =>
-    (await createCommunicationLog({ address: 'fan@example.com', ...data })).entity;
+    (await createCommunicationLog({ senderType: 'platform', address: 'fan@example.com', ...data }))
+      .entity;
 
   const payloadFor = (logId: string, template = TEMPLATE): DeliverEmailPayload => ({
     template,
@@ -242,7 +243,12 @@ describe('deliverEmailMessage — the recipient is read through the lens at send
     sender: DeliverEmailPayload['sender'] = { type: 'platform' },
     data: Record<string, unknown> = {},
   ) => {
-    const log = (await createCommunicationLog({ address: `${recipientId}@example.com` })).entity;
+    const log = (
+      await createCommunicationLog({
+        senderType: 'platform',
+        address: `${recipientId}@example.com`,
+      })
+    ).entity;
     await deliverEmailMessage(
       { template, sender, recipientId, data, communicationLogId: log.id },
       { sleep },
@@ -446,6 +452,8 @@ describe('deliverEmailMessage — the recipient is read through the lens at send
       const { entity: organization } = await createOrganization({ name: organizationName });
       const { entity: user } = await createUser();
       const { entity: inquiry } = await createInquiry({
+        sourceModel: 'Organization',
+        targetModel: 'User',
         content: { role: 'member' },
         sourceOrganizationId: organization.id,
         targetUserId: user.id,
