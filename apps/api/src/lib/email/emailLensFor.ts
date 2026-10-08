@@ -4,6 +4,8 @@
  * @partOf feature:email
  * @uses infrastructure:prisma, primitive:shared
  */
+
+import { lensVisit } from '@inixiative/json-rules';
 import { lensFor } from '@template/db/lens';
 import {
   type EmailOwnerRef,
@@ -11,7 +13,13 @@ import {
   lookupLens,
   type OwnerScope,
 } from '@template/email/render';
-import { type EmailLens, emailLens, parseSlotLenses, scopeEmailLens } from '@template/email/rules';
+import {
+  type EmailLens,
+  emailLens,
+  OPAQUE_SLOT,
+  parseSlotLenses,
+  scopeEmailLens,
+} from '@template/email/rules';
 import type { RuleLens } from '@template/shared/rules';
 import { registry, type SenderSpec } from '#/lib/email/registry';
 import type { Sender } from '#/lib/email/sender';
@@ -32,6 +40,12 @@ export const emailLensFor = (
     data: entry?.data,
     narrowing: parseSlotLenses(stored),
   });
+  if (
+    lens.recipient &&
+    lens.recipient !== OPAQUE_SLOT &&
+    !lensVisit(lens.recipient, '')?.fields.email
+  )
+    throw new Error('The recipient lens must keep `email`: delivery addresses the recipient by it');
   const scope = emailOwnerProvider(owner);
   return scopeEmailLens(lens, scope, (sender && senderLensOwner(sender)) ?? scope);
 };

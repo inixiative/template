@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { listBindings, projectLens, toLensSelect } from '@inixiative/json-rules';
 import { lensFor } from '@template/db/lens';
 import { emailLens } from '@template/email/rules';
+import { emailLensFor } from '#/lib/email/emailLensFor';
 import { addressLens, recipientLens, registry } from '#/lib/email/registry';
 
 describe('recipientLens', () => {
@@ -25,9 +26,9 @@ describe('recipientLens', () => {
   });
 
   it('refuses a recipient lens that hides the email delivery addresses', () => {
-    expect(() => emailLens({ narrowing: { recipient: { picks: ['id', 'name'] } } })).toThrow(
-      /must keep `email`/,
-    );
+    expect(() =>
+      emailLensFor('welcome', { ownerModel: 'default' }, { recipient: { picks: ['id', 'name'] } }),
+    ).toThrow(/must keep `email`/);
   });
 
   it('an address lens reaches only the email', () => {

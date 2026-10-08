@@ -14,7 +14,6 @@ import {
   getLensRoot,
   type Lens,
   type LensNarrowing,
-  lensVisit,
   type ModelNarrowing,
   narrowRule,
   type PathProjection,
@@ -157,12 +156,6 @@ const isUserLens = (lens: RuleLens): boolean => {
   return base.mapName === 'prisma' && base.model === 'User';
 };
 
-const addressable = (recipient: RuleLens): RuleLens => {
-  if (isUserLens(recipient) && !lensVisit(recipient, '')?.fields.email)
-    throw new Error('The recipient lens must keep `email`: delivery addresses the recipient by it');
-  return recipient;
-};
-
 export const emailLens = ({
   sender,
   recipient = lensFor('User'),
@@ -170,11 +163,9 @@ export const emailLens = ({
   narrowing = {},
 }: EmailLensInput = {}): EmailLens => ({
   ...(sender ? { sender: slot(sender, narrowing.sender) } : {}),
-  recipient: addressable(
-    slot(
-      recipient,
-      narrowing.recipient ?? (isUserLens(recipient) ? DEFAULT_RECIPIENT_NARROWING : undefined),
-    ),
+  recipient: slot(
+    recipient,
+    narrowing.recipient ?? (isUserLens(recipient) ? DEFAULT_RECIPIENT_NARROWING : undefined),
   ),
   data: data ? slot(data, narrowing.data) : OPAQUE_SLOT,
   system: systemSlot(),
