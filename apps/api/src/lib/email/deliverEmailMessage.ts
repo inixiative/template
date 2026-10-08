@@ -4,6 +4,7 @@
  * @partOf feature:email
  * @uses infrastructure:prisma, primitive:appEvents
  */
+import type { Condition } from '@inixiative/json-rules';
 import { db, Prisma } from '@template/db';
 import { CommunicationReasonCode } from '@template/db/generated/client/enums';
 import { EmailProviderError } from '@template/email/errors/EmailProviderError';
@@ -16,7 +17,7 @@ import mjml2html from 'mjml';
 import { emitAppEvent } from '#/appEvents/emit';
 import { defaultEmailClient, emailVerifier, resolveFromAddress } from '#/lib/email';
 import { communicationReasonCodeFor } from '#/lib/email/communicationReasonCode';
-import { recipientVariables } from '#/lib/email/renderForRecipient';
+import { addressesThrough, recipientVariables } from '#/lib/email/renderForRecipient';
 import type { Sender } from '#/lib/email/sender';
 import { unsubscribeUrl } from '#/lib/email/unsubscribe';
 import { type SettledTemplate, settleTemplate } from '#/lib/emailTemplate';
@@ -32,8 +33,9 @@ export type DeliverEmailPayload = {
   template: string;
   sender: Sender;
   recipientId: string;
-  cc?: string[];
-  bcc?: string[];
+  targeting?: Condition;
+  cc?: Condition;
+  bcc?: Condition;
   data: Record<string, unknown>;
   communicationLogId: string;
 };
@@ -59,7 +61,7 @@ export const deliverEmailMessage = async (
   payload: DeliverEmailPayload,
   { sleep = sleepUnlessShuttingDown }: DeliverEmailMessageOptions = {},
 ): Promise<void> => {
-  const { template, sender, recipientId, cc, bcc, data, communicationLogId } = payload;
+  const { template, sender, recipientId, targeting, data, communicationLogId } = payload;
   const open = { id: communicationLogId, status: 'queued' as const };
 
   const entry = await db.communicationLog.findUnique({
@@ -95,11 +97,26 @@ export const deliverEmailMessage = async (
     });
 
   let settled: SettledTemplate;
+  let address = entry.address;
+  let cc: string[] | undefined;
+  let bcc: string[] | undefined;
   try {
     settled = await settleTemplate(
       template,
       sender,
-      (lens) => recipientVariables(lens, { recipientId, sender, data, label: template }),
+      async (lens) => {
+        const variables = await recipientVariables(lens, {
+          recipientId,
+          sender,
+          targeting,
+          data,
+          label: template,
+        });
+        address = String(variables.recipient?.email ?? entry.address);
+        cc = await addressesThrough(lens, payload.cc);
+        bcc = await addressesThrough(lens, payload.bcc);
+        return variables;
+      },
       (kind) => {
         if (kind === 'system') return {};
         if (!entry.recipientContactId)
@@ -141,7 +158,7 @@ export const deliverEmailMessage = async (
   let deliverability: string | null = cacheFresh ? cached.deliverability : null;
   let undeliverableReason: string | null = null;
   if (deliverability === null) {
-    const verdict = await emailVerifier.verify(entry.address);
+    const verdict = await emailVerifier.verify(address);
     deliverability = verdict.status;
     undeliverableReason = verdict.reason ?? null;
     if (entry.recipientContactId) {
@@ -182,6 +199,7 @@ export const deliverEmailMessage = async (
       where: open,
       data: {
         status: 'sending',
+        address,
         ...resolved,
         settledMjml: settled.mjml,
         variables: settled.variables as Prisma.InputJsonValue,
@@ -224,7 +242,7 @@ export const deliverEmailMessage = async (
     const result = await withRetry(
       () =>
         defaultEmailClient().send({
-          to: entry.address,
+          to: address,
           cc,
           bcc,
           from,

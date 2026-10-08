@@ -36,11 +36,6 @@ export const slotRowsLens = (slot: SlotLens | undefined, where: Condition): Lens
   return intoFirstLayer(slot, { root: { where } });
 };
 
-export const addressLens = (where: Condition): LensNarrowing => ({
-  parent: lensFor('User'),
-  root: { where, picks: ['email'] },
-});
-
 const user: ModelNarrowing = { picks: ['id', 'name', 'email'] };
 
 const userEntity = (bind: string): LensNarrowing => ({
