@@ -342,7 +342,10 @@ is decided per site: save takes it from the input, the rule surface and prefligh
 (default: platform), and settle from `composeTemplate`'s `owner` — the row that won the cascade,
 so an Organization row rendered for a Space sender sees the organization's tags. No inheritance up
 the tree for now. The picker gets real options for Tag and Segment (`emailSourceValues`, the lens's
-`toSourceQueries` run through Prisma). Organization and Space are scoped on both the model and
+`toSourceQueries` run through Prisma, keyed onto the `email` surface map by
+`emailSurfaceSourceValues`). A referenced model's path source points at its own model source
+(`sources: { id: { from: 'mapDefaults' } }`), so it offers every row the owner may name, not only
+rows already linked down the path. Organization and Space are scoped on both the model and
 its ID source: an Organization owner sees itself and its spaces; a Space owner sees itself
 and its organization; a User owner sees neither; platform rows leave these two models unrestricted.
 The picker uses those same source queries.
@@ -698,7 +701,8 @@ edges are persisted so that "who references X" is an index and a stale rule is n
   (json-rules ≥ 3.0) reports the values a rule names at each source, and a source on a model's
   id field is a row reference. Nested and dotted spellings are one path; a `path`/`bind` leaf at a
   source — or an operator that describes the row without naming it (`contains`, `between`) — is
-  `dynamic`: it names no row and registers no edge. When save is handed a lens (the api
+  `dynamic`: no save can check which rows it names, so save refuses it (`dynamicRuleReferences`;
+  email throws `RuleReferenceError`, a segment's conditions fail validation). When save is handed a lens (the api
   always is), its condition gate (`assertValidConditions`) refuses any rule path the lens does not
   resolve — an FK spelling or typo path is a 422, never a silently unregistered rule; `withRule`
   asks the same question at render through `ruleVocabularyIssues`. With no lens there is nothing
