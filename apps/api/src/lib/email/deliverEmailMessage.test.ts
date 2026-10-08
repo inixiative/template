@@ -9,6 +9,8 @@ import {
   createOrganizationUser,
   createSpace,
   createSpaceUser,
+  createTag,
+  createTagAttachment,
   createUser,
 } from '@template/db/test';
 import type { EmailClient, SendEmailOptions, SendEmailResult } from '@template/email/client/types';
@@ -522,6 +524,71 @@ describe('deliverEmailMessage — the recipient is read through the lens at send
       expect(sent).toHaveLength(0);
       expect(row.status).toBe(CommunicationStatus.failed);
       expect(row.reasonCode).toBe(CommunicationReasonCode.not_found);
+    });
+  });
+
+  describe("a fallback keeps the primary template's bound", () => {
+    it('a recipient outside the primary lens is not sent the platform fallback either', async () => {
+      const { entity: organization } = await createOrganization({ name: 'Bound Org' });
+      const { entity: outsider } = await createUser({ name: 'Outsider' });
+      await saveTemplate('bound-fallback', 'PLATFORM');
+      await saveTemplate(
+        'bound-fallback',
+        '{{#component:bound-promo}}<mj-text>promo</mj-text>{{/component:bound-promo}}',
+        {
+          ownerModel: 'Organization',
+          organizationId: organization.id,
+          lens: {
+            recipient: {
+              picks: ['id', 'name', 'email'],
+              where: { field: 'name', operator: 'equals', value: 'Insider' },
+            },
+          },
+        },
+      );
+      await db.emailComponent.deleteMany({
+        where: { slug: 'bound-promo', organizationId: organization.id },
+      });
+
+      const row = await deliver('bound-fallback', outsider.id, {
+        type: 'Organization',
+        organizationId: organization.id,
+      });
+
+      expect(sent).toHaveLength(0);
+      expect(row.status).toBe(CommunicationStatus.failed);
+      expect(row.reasonCode).toBe(CommunicationReasonCode.not_found);
+    });
+
+    it("the platform fallback renders through the primary owner's clamps", async () => {
+      const { entity: organization } = await createOrganization({ name: 'Clamp Org' });
+      const { entity: user } = await createUser({ name: 'Insider' });
+      const { entity: mine } = await createTag({
+        name: 'clamp-mine',
+        ownerModel: 'Organization',
+        organizationId: organization.id,
+      });
+      await createTagAttachment({ tagId: mine.id, userId: user.id });
+      await saveTemplate(
+        'clamp-fallback',
+        '{{#each recipient.tagAttachments as=t}}[{{t.tag.name}}]{{/each}}',
+      );
+      await saveTemplate(
+        'clamp-fallback',
+        '{{#component:clamp-promo}}<mj-text>promo</mj-text>{{/component:clamp-promo}}',
+        { ownerModel: 'Organization', organizationId: organization.id },
+      );
+      await db.emailComponent.deleteMany({
+        where: { slug: 'clamp-promo', organizationId: organization.id },
+      });
+
+      const row = await deliver('clamp-fallback', user.id, {
+        type: 'Organization',
+        organizationId: organization.id,
+      });
+
+      expect(row.status).toBe(CommunicationStatus.sent);
+      expect(sent[0]?.html).toContain('[clamp-mine]');
     });
   });
 });
