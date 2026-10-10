@@ -4,16 +4,10 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
-import {
-  RuleReferenceSourceModel,
-  RuleReferenceTargetModel,
-} from '@template/db/generated/client/enums';
 import { createFactory } from '@template/db/test/factory';
 
 const ruleReferenceFactory = createFactory('RuleReference', {
   defaults: () => ({
-    sourceModel: RuleReferenceSourceModel.EmailTemplate,
-    targetModel: RuleReferenceTargetModel.Tag,
     targetId: '',
   }),
   dependencies: {

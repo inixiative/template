@@ -69,6 +69,7 @@ describe('WebhookSubscription CRUD', () => {
   describe('GET /webhookSubscription/:id', () => {
     it('reads own user webhook', async () => {
       const { entity: sub } = await createWebhookSubscription({
+        model: 'CustomerRef',
         ownerModel: 'User',
         userId: user.id,
       });
@@ -82,6 +83,7 @@ describe('WebhookSubscription CRUD', () => {
 
     it('reads org webhook as member', async () => {
       const { entity: sub } = await createWebhookSubscription({
+        model: 'CustomerRef',
         ownerModel: 'Organization',
         organizationId: org.id,
       });
@@ -93,6 +95,7 @@ describe('WebhookSubscription CRUD', () => {
     it('rejects reading other user webhook', async () => {
       const { entity: otherUser } = await createUser();
       const { entity: sub } = await createWebhookSubscription({
+        model: 'CustomerRef',
         ownerModel: 'User',
         userId: otherUser.id,
       });
@@ -105,6 +108,7 @@ describe('WebhookSubscription CRUD', () => {
   describe('PATCH /webhookSubscription/:id', () => {
     it('updates own user webhook', async () => {
       const { entity: sub } = await createWebhookSubscription({
+        model: 'CustomerRef',
         ownerModel: 'User',
         userId: user.id,
         isActive: true,
@@ -121,6 +125,7 @@ describe('WebhookSubscription CRUD', () => {
 
     it('reactivates webhook by default on update', async () => {
       const { entity: sub } = await createWebhookSubscription({
+        model: 'CustomerRef',
         ownerModel: 'User',
         userId: user.id,
         isActive: false,
@@ -138,6 +143,7 @@ describe('WebhookSubscription CRUD', () => {
 
     it('rejects a private/internal URL (SSRF guard)', async () => {
       const { entity: sub } = await createWebhookSubscription({
+        model: 'CustomerRef',
         ownerModel: 'User',
         userId: user.id,
         isActive: true,
@@ -152,6 +158,7 @@ describe('WebhookSubscription CRUD', () => {
 
     it('keeps inactive when explicitly set', async () => {
       const { entity: sub } = await createWebhookSubscription({
+        model: 'CustomerRef',
         ownerModel: 'User',
         userId: user.id,
         isActive: false,
@@ -169,6 +176,7 @@ describe('WebhookSubscription CRUD', () => {
     it('rejects updating other user webhook', async () => {
       const { entity: otherUser } = await createUser();
       const { entity: sub } = await createWebhookSubscription({
+        model: 'CustomerRef',
         ownerModel: 'User',
         userId: otherUser.id,
       });
@@ -183,6 +191,7 @@ describe('WebhookSubscription CRUD', () => {
   describe('DELETE /webhookSubscription/:id', () => {
     it('deletes own user webhook', async () => {
       const { entity: sub } = await createWebhookSubscription({
+        model: 'CustomerRef',
         ownerModel: 'User',
         userId: user.id,
       });
@@ -196,6 +205,7 @@ describe('WebhookSubscription CRUD', () => {
 
     it('deletes org webhook as admin', async () => {
       const { entity: sub } = await createWebhookSubscription({
+        model: 'CustomerRef',
         ownerModel: 'Organization',
         organizationId: org.id,
       });
@@ -207,6 +217,7 @@ describe('WebhookSubscription CRUD', () => {
     it('rejects deleting other user webhook', async () => {
       const { entity: otherUser } = await createUser();
       const { entity: sub } = await createWebhookSubscription({
+        model: 'CustomerRef',
         ownerModel: 'User',
         userId: otherUser.id,
       });

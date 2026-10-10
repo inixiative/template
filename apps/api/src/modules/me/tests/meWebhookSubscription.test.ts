@@ -90,6 +90,7 @@ describe('me/webhookSubscriptions', () => {
     it('returns user webhooks', async () => {
       const seq = getNextSeq();
       await createWebhookSubscription({
+        model: 'CustomerRef',
         ownerModel: 'User',
         userId: user.id,
         url: `https://example.com/list-${seq}`,
@@ -107,6 +108,7 @@ describe('me/webhookSubscriptions', () => {
       const { entity: otherUser } = await createUser();
       const seq = getNextSeq();
       await createWebhookSubscription({
+        model: 'CustomerRef',
         ownerModel: 'User',
         userId: otherUser.id,
         url: `https://example.com/other-${seq}`,

@@ -34,7 +34,7 @@ describe('segmentConditions hook', () => {
   it('refuses a segment without conditions, whatever its type', async () => {
     for (const type of [SegmentType.static, SegmentType.dynamic]) {
       await expect(
-        createSegment({ type, conditions: Prisma.DbNull as never }, { space }),
+        createSegment({ ownerModel: 'Space', type, conditions: Prisma.DbNull as never }, { space }),
       ).rejects.toThrow('requires conditions');
     }
   });
@@ -43,6 +43,7 @@ describe('segmentConditions hook', () => {
     await expect(
       createSegment(
         {
+          ownerModel: 'Space',
           conditions: {
             field: 'customerUser.platformRole',
             operator: Operator.equals,
@@ -56,7 +57,10 @@ describe('segmentConditions hook', () => {
 
   it('accepts a valid rule and writes the normalized tree back', async () => {
     const { entity } = await createSegment(
-      { conditions: { all: [acmeRule, { field: 'customerUser.contacts', arrayOperator: 'any' }] } },
+      {
+        ownerModel: 'Space',
+        conditions: { all: [acmeRule, { field: 'customerUser.contacts', arrayOperator: 'any' }] },
+      },
       { space },
     );
     expect(entity.conditions).toEqual({
@@ -69,12 +73,18 @@ describe('segmentConditions hook', () => {
 
   it('refuses an empty arm inside any', async () => {
     await expect(
-      createSegment({ conditions: { any: [acmeRule, { all: [] }] } }, { space }),
+      createSegment(
+        { ownerModel: 'Space', conditions: { any: [acmeRule, { all: [] }] } },
+        { space },
+      ),
     ).rejects.toThrow('matches every row');
   });
 
   it('refuses a segment that references its own membership', async () => {
-    const { entity } = await createSegment({ conditions: acmeRule }, { space });
+    const { entity } = await createSegment(
+      { ownerModel: 'Space', conditions: acmeRule },
+      { space },
+    );
     await expect(
       db.segment.update({
         where: { id: entity.id },
@@ -93,6 +103,7 @@ describe('segmentConditions hook', () => {
     await expect(
       createSegment(
         {
+          ownerModel: 'Space',
           conditions: {
             field: 'segmentMembers',
             arrayOperator: 'any',
@@ -108,6 +119,7 @@ describe('segmentConditions hook', () => {
     await expect(
       createSegment(
         {
+          ownerModel: 'Space',
           conditions: {
             field: 'segmentMembers',
             arrayOperator: 'any',
@@ -126,18 +138,30 @@ describe('segmentConditions hook', () => {
       condition: { field: 'segment.id', operator: Operator.equals, value: id },
     });
     await expect(
-      createSegment({ conditions: membersOf('00000000-0000-7000-8000-00000000dead') }, { space }),
+      createSegment(
+        { ownerModel: 'Space', conditions: membersOf('00000000-0000-7000-8000-00000000dead') },
+        { space },
+      ),
     ).rejects.toThrow('does not own');
 
     const { context } = await createOrganizationUser();
     const elsewhere = (await createSpace({}, { organization: context.organization })).entity;
-    const { entity: foreign } = await createSegment({ conditions: acmeRule }, { space: elsewhere });
-    await expect(createSegment({ conditions: membersOf(foreign.id) }, { space })).rejects.toThrow(
-      'does not own',
+    const { entity: foreign } = await createSegment(
+      { ownerModel: 'Space', conditions: acmeRule },
+      { space: elsewhere },
     );
+    await expect(
+      createSegment({ ownerModel: 'Space', conditions: membersOf(foreign.id) }, { space }),
+    ).rejects.toThrow('does not own');
 
-    const { entity: own } = await createSegment({ conditions: acmeRule }, { space });
-    const { entity } = await createSegment({ conditions: membersOf(own.id) }, { space });
+    const { entity: own } = await createSegment(
+      { ownerModel: 'Space', conditions: acmeRule },
+      { space },
+    );
+    const { entity } = await createSegment(
+      { ownerModel: 'Space', conditions: membersOf(own.id) },
+      { space },
+    );
     expect(entity.id).toBeTruthy();
   });
 
@@ -155,7 +179,10 @@ describe('segmentConditions hook', () => {
   });
 
   it('refuses clearing conditions on update and leaves an untouched rule alone', async () => {
-    const { entity } = await createSegment({ conditions: acmeRule }, { space });
+    const { entity } = await createSegment(
+      { ownerModel: 'Space', conditions: acmeRule },
+      { space },
+    );
     await expect(
       db.segment.update({ where: { id: entity.id }, data: { conditions: Prisma.DbNull as never } }),
     ).rejects.toThrow('requires conditions');

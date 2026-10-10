@@ -135,9 +135,9 @@ describe('lensWhere — query-plan execution (count operators)', () => {
   it('executes the groupBy plan and returns a runnable where scoping rows by relation count', async () => {
     const { entity: qualified } = await createUser();
     const { entity: unqualified } = await createUser();
-    await createToken({ isActive: true }, { user: qualified });
-    await createToken({ isActive: true }, { user: qualified });
-    await createToken({ isActive: false }, { user: unqualified });
+    await createToken({ ownerModel: 'User', isActive: true }, { user: qualified });
+    await createToken({ ownerModel: 'User', isActive: true }, { user: qualified });
+    await createToken({ ownerModel: 'User', isActive: false }, { user: unqualified });
 
     const lens: LensNarrowing = {
       parent: lensFor('User'),

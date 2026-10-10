@@ -58,7 +58,7 @@ describe('POST /api/admin/user/:id/redact', () => {
 
   it('deletes user tokens', async () => {
     const { entity: targetUser, context } = await createUser();
-    await createToken({}, context);
+    await createToken({ ownerModel: 'User' }, context);
 
     await fetch(post(`/api/admin/user/${targetUser.id}/redact`, {}));
 

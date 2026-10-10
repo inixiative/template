@@ -14,7 +14,6 @@ const emailTemplateFactory = createFactory('EmailTemplate', {
     kind: 'system' as const,
     subject: 'Test Subject',
     mjml: '<mjml><mj-body><mj-text>Default</mj-text></mj-body></mjml>',
-    ownerModel: 'default' as const,
     componentRefs: [],
     inheritToSpaces: true,
   }),

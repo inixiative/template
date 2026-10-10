@@ -8,6 +8,7 @@ import {
   createOrganization,
   createSegment,
   createTag,
+  createTagCategory,
 } from '@template/db/test';
 import { EmailRenderError } from '@template/email/errors/EmailRenderError';
 import { saveEmailTemplate } from '@template/email/render';
@@ -257,9 +258,39 @@ describe("settleTemplate — rules evaluate through the owner's lens", () => {
     registerRulesHook();
     organization = (await createOrganization()).entity;
     other = (await createOrganization()).entity;
-    myTag = (await createTag({ ownerModel: 'Organization' }, { organization })).entity;
-    theirTag = (await createTag({ ownerModel: 'Organization' }, { organization: other })).entity;
-    goneTag = (await createTag({ ownerModel: 'Organization' }, { organization })).entity;
+    myTag = (
+      await createTag(
+        { ownerModel: 'Organization' },
+        {
+          organization,
+          tagCategory: (
+            await createTagCategory({ ownerModel: 'Organization' }, { organization })
+          ).entity,
+        },
+      )
+    ).entity;
+    theirTag = (
+      await createTag(
+        { ownerModel: 'Organization' },
+        {
+          organization: other,
+          tagCategory: (
+            await createTagCategory({ ownerModel: 'Organization' }, { organization: other })
+          ).entity,
+        },
+      )
+    ).entity;
+    goneTag = (
+      await createTag(
+        { ownerModel: 'Organization' },
+        {
+          organization,
+          tagCategory: (
+            await createTagCategory({ ownerModel: 'Organization' }, { organization })
+          ).entity,
+        },
+      )
+    ).entity;
     segment = (
       await createSegment(
         {

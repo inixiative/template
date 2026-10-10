@@ -93,8 +93,14 @@ describe('ruleReference — edges under concurrency and repair', () => {
 
   describe('a save racing the delete of the row it names', () => {
     it('waits for the delete to commit and is then refused, never written live against a dead row', async () => {
-      const { entity: target } = await createSegment({ conditions: acmeRule }, { space });
-      const { entity: other } = await createSegment({ conditions: acmeRule }, { space });
+      const { entity: target } = await createSegment(
+        { ownerModel: 'Space', conditions: acmeRule },
+        { space },
+      );
+      const { entity: other } = await createSegment(
+        { ownerModel: 'Space', conditions: acmeRule },
+        { space },
+      );
       const held = gate();
       const release = gate();
 
@@ -144,9 +150,12 @@ describe('ruleReference — edges under concurrency and repair', () => {
       );
 
     it('repairs a drifted stamp and keeps the edge id', async () => {
-      const { entity: target } = await createSegment({ conditions: acmeRule }, { space });
+      const { entity: target } = await createSegment(
+        { ownerModel: 'Space', conditions: acmeRule },
+        { space },
+      );
       const { entity: dependent } = await createSegment(
-        { conditions: membersOf(target.id) },
+        { ownerModel: 'Space', conditions: membersOf(target.id) },
         { space },
       );
       const [edge] = await edgesOf(dependent.id);
@@ -160,9 +169,12 @@ describe('ruleReference — edges under concurrency and repair', () => {
     });
 
     it('stamps an edge whose target died behind the hooks, keeps the id, and a second rebuild changes nothing', async () => {
-      const { entity: target } = await createSegment({ conditions: acmeRule }, { space });
+      const { entity: target } = await createSegment(
+        { ownerModel: 'Space', conditions: acmeRule },
+        { space },
+      );
       const { entity: dependent } = await createSegment(
-        { conditions: membersOf(target.id) },
+        { ownerModel: 'Space', conditions: membersOf(target.id) },
         { space },
       );
       const [edge] = await edgesOf(dependent.id);

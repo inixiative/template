@@ -231,7 +231,10 @@ describe('segment routes', () => {
 
   it('reach refuses a rule naming a segment the owner does not have', async () => {
     const elsewhere = (await createSpace({}, { organization: org })).entity;
-    const { entity: foreign } = await createSegment({ conditions: acmeRule }, { space: elsewhere });
+    const { entity: foreign } = await createSegment(
+      { ownerModel: 'Space', conditions: acmeRule },
+      { space: elsewhere },
+    );
     const response = await ownerFetch(
       post(`/api/v1/space/${space.id}/segments/reach`, { conditions: membersOf(foreign.id) }),
     );

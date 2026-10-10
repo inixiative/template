@@ -151,9 +151,12 @@ describe('ruleReference — a source takes its edges with it and brings them bac
 
   describe('segment, which is both a source and a target row', () => {
     it('tombstoning a target segment keeps the edges that name it, and stamps them', async () => {
-      const { entity: target } = await createSegment({ conditions: acmeRule }, { space });
+      const { entity: target } = await createSegment(
+        { ownerModel: 'Space', conditions: acmeRule },
+        { space },
+      );
       const { entity: dependent } = await createSegment(
-        { conditions: membersOf(target.id) },
+        { ownerModel: 'Space', conditions: membersOf(target.id) },
         { space },
       );
 
@@ -165,9 +168,12 @@ describe('ruleReference — a source takes its edges with it and brings them bac
     });
 
     it('drops its own edges when it is tombstoned and regenerates them on revive', async () => {
-      const { entity: target } = await createSegment({ conditions: acmeRule }, { space });
+      const { entity: target } = await createSegment(
+        { ownerModel: 'Space', conditions: acmeRule },
+        { space },
+      );
       const { entity: dependent } = await createSegment(
-        { conditions: membersOf(target.id) },
+        { ownerModel: 'Space', conditions: membersOf(target.id) },
         { space },
       );
 

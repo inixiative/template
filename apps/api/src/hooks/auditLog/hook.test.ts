@@ -46,7 +46,7 @@ describe('auditLog hook', () => {
       mount: [
         (app) => {
           app.post('/test/user', async (c) => {
-            const user = await db.user.create({ data: { email } });
+            const user = (await createUser({ email })).entity;
             return c.json({ id: user.id });
           });
         },
@@ -129,7 +129,7 @@ describe('auditLog hook', () => {
         (app) => {
           app.use('*', auditActorMiddleware);
           app.post('/test/user', async (c) => {
-            const user = await db.user.create({ data: { email: `audit-actor-${ts}@example.com` } });
+            const user = (await createUser({ email: `audit-actor-${ts}@example.com` })).entity;
             return c.json({ id: user.id });
           });
         },
@@ -164,7 +164,7 @@ describe('auditLog hook', () => {
           });
           app.use('*', auditActorMiddleware);
           app.post('/test/user', async (c) => {
-            const user = await db.user.create({ data: { email: `audit-spoof-${ts}@example.com` } });
+            const user = (await createUser({ email: `audit-spoof-${ts}@example.com` })).entity;
             return c.json({ id: user.id });
           });
         },
@@ -185,7 +185,7 @@ describe('auditLog hook', () => {
 
   it('records actorTokenId when authenticated via token', async () => {
     const { entity: tokenOwner } = await createUser();
-    const { entity: token } = await createToken({ userId: tokenOwner.id });
+    const { entity: token } = await createToken({ ownerModel: 'User', userId: tokenOwner.id });
     const mockToken: TokenWithRelations = {
       ...token,
       user: tokenOwner,
@@ -203,7 +203,7 @@ describe('auditLog hook', () => {
         (app) => {
           app.use('*', auditActorMiddleware);
           app.post('/test/user', async (c) => {
-            const user = await db.user.create({ data: { email: `audit-token-${ts}@example.com` } });
+            const user = (await createUser({ email: `audit-token-${ts}@example.com` })).entity;
             return c.json({ id: user.id });
           });
         },
@@ -226,7 +226,7 @@ describe('auditLog hook', () => {
 
   it('keeps the token snapshot after the acting token is deleted', async () => {
     const { entity: tokenOwner } = await createUser();
-    const { entity: token } = await createToken({ userId: tokenOwner.id });
+    const { entity: token } = await createToken({ ownerModel: 'User', userId: tokenOwner.id });
     const mockToken: TokenWithRelations = {
       ...token,
       user: tokenOwner,
@@ -244,9 +244,8 @@ describe('auditLog hook', () => {
         (app) => {
           app.use('*', auditActorMiddleware);
           app.post('/test/user', async (c) => {
-            const user = await db.user.create({
-              data: { email: `audit-token-deleted-${ts}@example.com` },
-            });
+            const user = (await createUser({ email: `audit-token-deleted-${ts}@example.com` }))
+              .entity;
             return c.json({ id: user.id });
           });
         },
@@ -278,7 +277,7 @@ describe('auditLog hook', () => {
         auditActorContext.scope(
           { ...nullAuditActor, actorJobName: 'cleanStaleAuditLogs' },
           async () => {
-            const user = await db.user.create({ data: { email: `audit-job-${ts}@example.com` } });
+            const user = (await createUser({ email: `audit-job-${ts}@example.com` })).entity;
             userId = user.id;
           },
         ),
@@ -297,6 +296,8 @@ describe('auditLog hook', () => {
     const { entity: organization } = await createOrganization();
     const { entity: targetUser } = await createUser();
     const { entity: inquiry } = await createInquiry({
+      sourceModel: 'Organization',
+      targetModel: 'User',
       sourceOrganizationId: organization.id,
       targetUserId: targetUser.id,
     });
@@ -308,9 +309,7 @@ describe('auditLog hook', () => {
           app.use('*', auditActorMiddleware);
           app.post('/test/resolve', async (c) => {
             auditActorContext.extend({ sourceInquiryId: inquiry.id });
-            const user = await db.user.create({
-              data: { email: `audit-inquiry-${ts}@example.com` },
-            });
+            const user = (await createUser({ email: `audit-inquiry-${ts}@example.com` })).entity;
             return c.json({ id: user.id });
           });
         },
@@ -335,9 +334,9 @@ describe('auditLog hook', () => {
       mount: [
         (app) => {
           app.post('/test/org', async (c) => {
-            const org = await db.organization.create({
-              data: { name: `audit-softdel-${ts}`, slug: `softdel-${ts}` },
-            });
+            const org = (
+              await createOrganization({ name: `audit-softdel-${ts}`, slug: `softdel-${ts}` })
+            ).entity;
             await db.organization.update({
               where: { id: org.id },
               data: { deletedAt: new Date() },
@@ -370,9 +369,7 @@ describe('auditLog hook', () => {
       mount: [
         (app) => {
           app.post('/test/org/hard-delete', async (c) => {
-            const org = await db.organization.create({
-              data: { name: `audit-harddel-${ts}`, slug },
-            });
+            const org = (await createOrganization({ name: `audit-harddel-${ts}`, slug })).entity;
             await db.organization.delete({ where: { id: org.id } });
             return c.json({ id: org.id });
           });
@@ -516,9 +513,8 @@ describe('auditLog hook', () => {
       await auditActorContext.scope(
         { ...nullAuditActor, actorJobName: 'reissuedActor' },
         async () => {
-          const user = await db.user.create({
-            data: { email: `actor-reissue-${Date.now()}@example.com` },
-          });
+          const user = (await createUser({ email: `actor-reissue-${Date.now()}@example.com` }))
+            .entity;
           userId = user.id;
         },
       );
@@ -529,7 +525,7 @@ describe('auditLog hook', () => {
     it('records the actor when the scope callback returns the write un-awaited', async () => {
       const user = await auditActorContext.scope(
         { ...nullAuditActor, actorJobName: 'lazyActor' },
-        () => db.user.create({ data: { email: `actor-lazy-${Date.now()}@example.com` } }),
+        async () => (await createUser({ email: `actor-lazy-${Date.now()}@example.com` })).entity,
       );
 
       expect((await actorLogFor(user.id))?.actorJobName).toBe('lazyActor');
@@ -539,9 +535,7 @@ describe('auditLog hook', () => {
       let userId = '';
       await auditActorContext.scope({ ...nullAuditActor, actorJobName: 'lostActor' }, () =>
         auditActorStore.exit(async () => {
-          const user = await db.user.create({
-            data: { email: `actor-lost-${Date.now()}@example.com` },
-          });
+          const user = (await createUser({ email: `actor-lost-${Date.now()}@example.com` })).entity;
           userId = user.id;
         }),
       );
@@ -554,9 +548,8 @@ describe('auditLog hook', () => {
       await auditActorContext.scope({ ...nullAuditActor, actorJobName: 'rescuedActor' }, () =>
         db.txn(() =>
           auditActorStore.exit(async () => {
-            const user = await db.user.create({
-              data: { email: `actor-rescued-${Date.now()}@example.com` },
-            });
+            const user = (await createUser({ email: `actor-rescued-${Date.now()}@example.com` }))
+              .entity;
             userId = user.id;
           }),
         ),
