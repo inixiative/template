@@ -29,7 +29,6 @@ import {
   type SortKey,
 } from '#/lib/prisma/keysetCursor';
 import { lensWhere } from '#/lib/prisma/lensWhere';
-import { liveIncludes, liveWhere } from '#/lib/prisma/softDeleteScope';
 import type { BracketQueryRecord, BracketQueryValue } from '#/lib/utils/parseBracketNotation';
 
 const DEFAULT_CURSOR_PAGE_SIZE = 100;
@@ -128,8 +127,6 @@ const composeScopedFindMany = async <T extends AnyDelegate>(
     });
   }
   const filterLens = required.length ? bindLens(declaredLens, bindings ?? {}) : declaredLens;
-  // Superadmin bypasses both the searchable-fields whitelist and the injected
-  // `deletedAt: null` live scope.
   const superadmin = isSuperadmin(c);
 
   const model = getLensRoot(filterLens).model;
@@ -143,21 +140,11 @@ const composeScopedFindMany = async <T extends AnyDelegate>(
     orNullFields,
   });
 
-  // Lens relation wheres are authorization scope — they apply for superadmin
-  // too, mirroring root wheres. Live scope remains superadmin-bypassable.
+  // Lens relation wheres are authorization scope — they apply on superadmin endpoints too.
   const composed = await lensWhere(filterLens, {
     AND: [baseWhere, searchWhere as Record<string, unknown>],
   });
-  const where = (superadmin ? composed : liveWhere(model, composed)) as FindManyWhere<T>;
-
-  if (!superadmin) {
-    const trees = findManyOptions as Record<string, unknown>;
-    for (const key of ['include', 'select'] as const) {
-      const tree = trees[key];
-      if (tree && typeof tree === 'object')
-        trees[key] = liveIncludes(model, tree as Record<string, unknown>);
-    }
-  }
+  const where = composed as FindManyWhere<T>;
 
   return { where, model, findManyOptions, callerOrderByOption };
 };

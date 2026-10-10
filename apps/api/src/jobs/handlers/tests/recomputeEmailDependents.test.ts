@@ -58,8 +58,10 @@ describe('recomputeEmailDependents handler', () => {
   });
 
   afterEach(async () => {
-    await db.emailTemplate.deleteMany({});
-    await db.emailComponent.deleteMany({});
+    await db.withDeleted(async () => {
+      await db.emailTemplate.deleteMany({});
+      await db.emailComponent.deleteMany({});
+    });
   });
 
   it('degrades every consumer of a deleted component, including one reached only through a component', async () => {

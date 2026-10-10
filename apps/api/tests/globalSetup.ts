@@ -1,11 +1,14 @@
 import '#/config/env';
 import { afterEach } from 'bun:test';
-import { db } from '@template/db';
+import { db, registerSoftDeleteScoper } from '@template/db';
 import { resetEnvOverrides } from '@template/shared/utils';
+import { liveIncludes, liveWhere } from '#/lib/prisma/softDeleteScope';
 
 // Global backstop: clear any env overrides a test registered (setEnvOverride / withEnv)
 // so nothing leaks into the next file in the single-process worker.
 afterEach(resetEnvOverrides);
+
+registerSoftDeleteScoper({ liveWhere, liveIncludes });
 
 const truncateAll = async () => {
   if (process.env.NODE_ENV !== 'test' && process.env.ENVIRONMENT !== 'test') return;

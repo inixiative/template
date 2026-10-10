@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db, registerSoftDeleteScoper } from '@template/db';
+import { clearHookRegistry, db } from '@template/db';
 import type { Organization } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
@@ -13,7 +13,6 @@ import { EmailRenderError } from '@template/email/errors/EmailRenderError';
 import { saveEmailTemplate } from '@template/email/render';
 import { registerRulesHook } from '#/hooks/rules/hook';
 import { settleTemplate } from '#/lib/emailTemplate';
-import { liveIncludes, liveWhere } from '#/lib/prisma/softDeleteScope';
 
 const mjml = (content: string) =>
   `<mjml><mj-body><mj-section><mj-column><mj-text>${content}</mj-text></mj-column></mj-section></mj-body></mjml>`;
@@ -53,7 +52,6 @@ describe('settleTemplate — the registry entry decides what an issue does', () 
   let organization: Organization;
 
   beforeAll(async () => {
-    registerSoftDeleteScoper({ liveWhere, liveIncludes });
     registerRulesHook();
     organization = (await createOrganization()).entity;
     await save('clean', 'Hi {{recipient.name}}');
@@ -70,7 +68,6 @@ describe('settleTemplate — the registry entry decides what an issue does', () 
   afterAll(async () => {
     await cleanupTouchedTables(db);
     clearHookRegistry();
-    registerSoftDeleteScoper(null);
   });
 
   it('a clean render carries no issues', async () => {
@@ -257,7 +254,6 @@ describe("settleTemplate — rules evaluate through the owner's lens", () => {
     });
 
   beforeAll(async () => {
-    registerSoftDeleteScoper({ liveWhere, liveIncludes });
     registerRulesHook();
     organization = (await createOrganization()).entity;
     other = (await createOrganization()).entity;
@@ -286,7 +282,6 @@ describe("settleTemplate — rules evaluate through the owner's lens", () => {
   afterAll(async () => {
     await cleanupTouchedTables(db);
     clearHookRegistry();
-    registerSoftDeleteScoper(null);
   });
 
   it("a tag the owner can see matches; the same rule over another owner's tag does not", async () => {

@@ -1,11 +1,5 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
-import {
-  clearHookRegistry,
-  db,
-  RuleReferenceError,
-  registerSoftDeleteScoper,
-  ruleReferenceIssues,
-} from '@template/db';
+import { clearHookRegistry, db, RuleReferenceError, ruleReferenceIssues } from '@template/db';
 import {
   cleanupTouchedTables,
   createEmailComponent,
@@ -18,7 +12,6 @@ import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
 import { registerRuleReferenceTargetHook } from '#/hooks/ruleReference/targetHook';
 import { registerRulesHook } from '#/hooks/rules/hook';
 import { saveEmailTemplate } from '#/lib/email/saveEmailTemplate';
-import { liveIncludes, liveWhere } from '#/lib/prisma/softDeleteScope';
 
 const mjml = (content: string) =>
   `<mjml><mj-body><mj-section><mj-column><mj-text>${content}</mj-text></mj-column></mj-section></mj-body></mjml>`;
@@ -63,7 +56,6 @@ const refKey = (model: string, id: string) => `${model}|${id}`;
 
 describe('ruleReference — the save path writes edges, the target side stamps them', () => {
   beforeAll(() => {
-    registerSoftDeleteScoper({ liveWhere, liveIncludes });
     registerPreventHardDeleteHook();
     registerRulesHook();
     registerRuleReferenceTargetHook();
@@ -71,7 +63,6 @@ describe('ruleReference — the save path writes edges, the target side stamps t
 
   afterAll(async () => {
     clearHookRegistry();
-    registerSoftDeleteScoper(null);
     await cleanupTouchedTables(db);
   });
 

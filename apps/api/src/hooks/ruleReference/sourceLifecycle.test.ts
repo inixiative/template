@@ -1,12 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
 import { Operator } from '@inixiative/json-rules';
-import {
-  clearHookRegistry,
-  db,
-  liveRuleReferenceKeys,
-  registerSoftDeleteScoper,
-  ruleReferenceIssues,
-} from '@template/db';
+import { clearHookRegistry, db, liveRuleReferenceKeys, ruleReferenceIssues } from '@template/db';
 import type { Space } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
@@ -23,7 +17,6 @@ import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
 import { registerSegmentRuleReferencesHook } from '#/hooks/segmentRuleReferences/hook';
 import { registerSoftDeleteCascadeHook } from '#/hooks/softDeleteCascade/hook';
 import { saveEmailTemplate } from '#/lib/email/saveEmailTemplate';
-import { liveIncludes, liveWhere } from '#/lib/prisma/softDeleteScope';
 
 const mjml = (content: string) =>
   `<mjml><mj-body><mj-section><mj-column><mj-text>${content}</mj-text></mj-column></mj-section></mj-body></mjml>`;
@@ -74,7 +67,6 @@ describe('ruleReference — a source takes its edges with it and brings them bac
   let space: Space;
 
   beforeAll(async () => {
-    registerSoftDeleteScoper({ liveWhere, liveIncludes });
     registerPreventHardDeleteHook();
     registerRulesHook();
     registerSegmentConditionsHook();
@@ -87,7 +79,6 @@ describe('ruleReference — a source takes its edges with it and brings them bac
 
   afterAll(async () => {
     clearHookRegistry();
-    registerSoftDeleteScoper(null);
     await cleanupTouchedTables(db);
   });
 

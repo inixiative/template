@@ -103,11 +103,13 @@ describe('upsert', () => {
     const b = await phone(u.id); // 2
     await softDelete(b.id);
 
-    await db.contact.upsert({
-      where: { id: b.id },
-      create: { ...phoneRow(u.id) },
-      update: { deletedAt: null },
-    });
+    await db.withDeleted(() =>
+      db.contact.upsert({
+        where: { id: b.id },
+        create: { ...phoneRow(u.id) },
+        update: { deletedAt: null },
+      }),
+    );
 
     const rows = await liveOrders(u.id);
     expect(posOf(rows, b.id)).toBe(2);

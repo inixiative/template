@@ -89,7 +89,7 @@ enum PlatformRole {
 
 Superadmins:
 - Skip all `permix.check()` calls (always return true)
-- Can access admin routes
+- Can access admin routes — and only there see soft-deleted rows (the admin router runs inside `db.withDeleted`); on ordinary routes tombstones stay invisible to them too
 - Can spoof other users
 
 ### Role

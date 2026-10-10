@@ -25,7 +25,7 @@ describe('soft delete', () => {
     expect(posOf(rows, a.id)).toBe(1);
     expect(posOf(rows, c.id)).toBe(2);
 
-    const deleted = await db.contact.findUnique({ where: { id: b.id } });
+    const deleted = await db.withDeleted(() => db.contact.findUnique({ where: { id: b.id } }));
     expect(deleted!.position).toBeLessThan(0);
   });
 
@@ -53,7 +53,9 @@ describe('bulk soft delete', () => {
     const b = await phone(u.id); // 2 — already soft-deleted before the bulk op
     const c = await phone(u.id); // 3
     await softDelete(b.id); // live: a=1, c=2; b: negative
-    const bAfterFirstDelete = await db.contact.findUnique({ where: { id: b.id } });
+    const bAfterFirstDelete = await db.withDeleted(() =>
+      db.contact.findUnique({ where: { id: b.id } }),
+    );
     const bOldNeg = bAfterFirstDelete!.position;
     // Bulk-set deletedAt over a where-clause that matches BOTH live and the already-deleted row.
     // Only a and c should transition; b must keep its existing negative.

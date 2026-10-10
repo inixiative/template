@@ -27,11 +27,6 @@ const SCOPED_OPS = new Set([
   'upsert',
 ]);
 
-const bypassed = (): boolean => {
-  const scope = auditActorContext.getScope();
-  return !!scope && (scope.platformSuperadmin || scope.bypassSoftDeleteScope);
-};
-
 const scopeArgs = (
   scoper: SoftDeleteScoper,
   model: string,
@@ -54,7 +49,8 @@ export const softDeleteScopeExtension = () =>
       $allModels: {
         async $allOperations({ model, operation, args, query }) {
           const scoper = getSoftDeleteScoper();
-          if (!scoper || bypassed() || !SCOPED_OPS.has(operation)) return query(args);
+          if (!scoper || auditActorContext.isSoftDeleteBypassed() || !SCOPED_OPS.has(operation))
+            return query(args);
           return query(scopeArgs(scoper, model, args) as typeof args);
         },
       },

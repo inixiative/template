@@ -18,8 +18,8 @@ registerSoftDeleteCascadeHook();
 registerRulesHook();
 registerContactRulesHook();
 
-const spaceById = (id: string) => db.space.findUnique({ where: { id } });
-const contactById = (id: string) => db.contact.findUnique({ where: { id } });
+const spaceById = (id: string) => db.withDeleted(() => db.space.findUnique({ where: { id } }));
+const contactById = (id: string) => db.withDeleted(() => db.contact.findUnique({ where: { id } }));
 
 const makeTree = async () => {
   const { entity: org } = await createOrganization();
@@ -86,10 +86,12 @@ describe('softDeleteCascade hook', () => {
     await tombstoneOrg(org.id);
     const spaceDeletedAt = (await spaceById(space.id))?.deletedAt;
 
-    await db.organization.update({
-      where: { id: org.id },
-      data: { deletedAt: new Date('2027-01-01T00:00:00Z') },
-    });
+    await db.withDeleted(() =>
+      db.organization.update({
+        where: { id: org.id },
+        data: { deletedAt: new Date('2027-01-01T00:00:00Z') },
+      }),
+    );
 
     expect((await spaceById(space.id))?.deletedAt).toEqual(spaceDeletedAt);
   });
@@ -124,7 +126,9 @@ describe('softDeleteCascade hook', () => {
     await db.user.update({ where: { id: user.id }, data: { deletedAt: new Date() } });
     expect(await db.session.findUnique({ where: { id: session.id } })).toBeNull();
 
-    await db.user.update({ where: { id: user.id }, data: { deletedAt: null } });
+    await db.withDeleted(() =>
+      db.user.update({ where: { id: user.id }, data: { deletedAt: null } }),
+    );
     expect(await db.session.findUnique({ where: { id: session.id } })).toBeNull();
   });
 });

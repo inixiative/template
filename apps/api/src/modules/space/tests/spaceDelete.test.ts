@@ -74,7 +74,7 @@ describe('DELETE /api/v1/space/:id', () => {
     const response = await harness.fetch(del(`/api/v1/space/${toDelete.id}`));
     expect(response.status).toBe(204);
 
-    const deleted = await db.space.findUnique({ where: { id: toDelete.id } });
+    const deleted = await db.withDeleted(() => db.space.findUnique({ where: { id: toDelete.id } }));
     expect(deleted).not.toBeNull();
     expect(deleted?.deletedAt).not.toBeNull();
   });

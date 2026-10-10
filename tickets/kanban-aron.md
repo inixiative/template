@@ -30,7 +30,6 @@ kanban
     FEAT-008-permissions-builder
     API-004-route-exposure-tags
   In Progress
-    DB-003-endpoint-decides-soft-delete-visibility
     INFRA-027-rate-limiter-atomicity-fail-open-scopes
     INFRA-029-preset-facet-knobs
     AUTH-002-unified-auth-system
@@ -39,6 +38,7 @@ kanban
     INFRA-001-init-script
     INFRA-011-railway-buckets
   Review
+    DB-003-endpoint-decides-soft-delete-visibility
     INFRA-030-reference-registry
     FEAT-021-segments
   Done
@@ -93,7 +93,6 @@ kanban
 See [Backlog Board](./kanban-backlog.md) for future enhancements (localization, white labeling, SSO, notifications, financial systems, CI/CD, etc.)
 
 ### 🚧 In Progress
-- [DB-003: The endpoint decides soft-delete visibility](./DB-003-endpoint-decides-soft-delete-visibility.md) - Declared superadmin endpoints (the admin router) run unscoped; every other endpoint is live-scoped for every actor, superadmin included (ZLT-5486)
 - [INFRA-029: Preset Facets with Variables](./INFRA-029-preset-facet-knobs.md) - rules-builder 0.26.1 shipped (`variable` slots on preset facets, builder-shape identity, `FacetCondition`); Zealot pin bump + `presets` side-channel (#1710) retirement pending
 - [AUTH-002: Unified Auth System](./AUTH-002-unified-auth-system.md) - Multi-method auth (email/password, OAuth, SSO/SAML)
 - [INFRA-004: WebSockets](./INFRA-004-websockets.md) - Infrastructure complete, wiring up event handlers
@@ -102,6 +101,7 @@ See [Backlog Board](./kanban-backlog.md) for future enhancements (localization, 
 - [INFRA-011: Railway Buckets](./INFRA-011-railway-buckets.md) - MinIO local + s3 adapter + bucket provisioning built
 
 ### 👀 Review
+- [DB-003: The endpoint decides soft-delete visibility](./DB-003-endpoint-decides-soft-delete-visibility.md) - Declared superadmin endpoints (the admin router) run unscoped; every other endpoint is live-scoped for every actor, superadmin included (ZLT-5486)
 - [INFRA-030: Reference Registry](./INFRA-030-reference-registry.md) - The rows a rule names, as edges: false-polymorphic `RuleReference` both ends + save-path edge writer in `packages/db` + staleness re-resolve; `withRule` asks two questions (bindings supplied, rule still valid: lens admits it, named rows live) — ruling 2026-09-10 retired the dynamic arm; email conditionals are the first surface, segments the second; json-rules 2.22.0 `bindOptional`
 - [FEAT-021: Segments](./FEAT-021-segments.md) - Zealot's Groups ported onto CustomerRef, stacked on INFRA-030: owner = `ProviderModel`, every segment is a rule (static = computed at save, dynamic = continuous, hand-picked = `id in [...]`), lens-driven validation + set/entity reconcile jobs through `withRule` (degraded, not paused; `ruleIssues` on the owner's reads), Segment → Segment edges, business-event triggers handled by jobs, four membership events (owner + member side), read-many pair on me/user/organization/space, nested Owned/Memberships pages in all three contexts
 
@@ -117,8 +117,8 @@ See [Backlog Board](./kanban-backlog.md) for future enhancements (localization, 
 
 - **Total Tickets**: 21
 - **Todo**: 14
-- **In Progress**: 7
-- **Review**: 1
+- **In Progress**: 6
+- **Review**: 2
 - **Blocked**: 2 (waiting on rules builder)
 - **Done**: 3
 

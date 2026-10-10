@@ -81,7 +81,9 @@ describe('DELETE /api/v1/inquiry/:id/cancel', () => {
     const response = await fetch(del(`/api/v1/inquiry/${inquiry.id}/cancel`));
     expect(response.status).toBe(204);
 
-    const updated = await db.inquiry.findUnique({ where: { id: inquiry.id } });
+    const updated = await db.withDeleted(() =>
+      db.inquiry.findUnique({ where: { id: inquiry.id } }),
+    );
     expect(updated?.expiresAt).toBeNull();
   });
 

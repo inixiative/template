@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { Operator } from '@inixiative/json-rules';
-import { clearHookRegistry, db, registerSoftDeleteScoper } from '@template/db';
+import { clearHookRegistry, db } from '@template/db';
 import type { Space } from '@template/db/generated/client/client';
 import { SegmentType } from '@template/db/generated/client/enums';
 import {
@@ -12,7 +12,6 @@ import {
 import { registerRuleReferenceTargetHook } from '#/hooks/ruleReference/targetHook';
 import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
 import { registerSegmentRuleReferencesHook } from '#/hooks/segmentRuleReferences/hook';
-import { liveIncludes, liveWhere } from '#/lib/prisma/softDeleteScope';
 import { sweepableSegments } from '#/modules/segment/services/sweepableSegments';
 
 const acmeRule = { field: 'customerUser.email', operator: Operator.endsWith, value: '@acme.test' };
@@ -27,7 +26,6 @@ describe('sweepable segments — what the nightly sweep enqueues', () => {
   let space: Space;
 
   beforeAll(async () => {
-    registerSoftDeleteScoper({ liveWhere, liveIncludes });
     registerSegmentConditionsHook();
     registerSegmentRuleReferencesHook();
     registerRuleReferenceTargetHook();
@@ -38,7 +36,6 @@ describe('sweepable segments — what the nightly sweep enqueues', () => {
   afterAll(async () => {
     await cleanupTouchedTables(db);
     clearHookRegistry();
-    registerSoftDeleteScoper(null);
   });
 
   it('enqueues sound dynamic segments only: a degraded one is skipped, not warned about by its job', async () => {

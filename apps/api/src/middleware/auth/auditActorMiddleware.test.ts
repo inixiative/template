@@ -10,7 +10,7 @@ import { spoofMiddleware } from '#/middleware/auth/spoofMiddleware';
 import { prepareRequest } from '#/middleware/prepareRequest';
 import type { AppEnv } from '#/types/appEnv';
 
-type Echo = { integrationId: string | null; platformSuperadmin: boolean | null };
+type Echo = { integrationId: string | null; actorUserId: string | null };
 
 const buildApp = (user: User) => {
   const app = new OpenAPIHono<AppEnv>();
@@ -25,7 +25,7 @@ const buildApp = (user: User) => {
     const actor = auditActorContext.getScope();
     return c.json({
       integrationId: actor?.integrationId ?? null,
-      platformSuperadmin: actor?.platformSuperadmin ?? null,
+      actorUserId: actor?.actorUserId ?? null,
     });
   });
   return app;
@@ -64,7 +64,7 @@ describe('auditActorMiddleware x-integration-id', () => {
 
     const body = await echo(admin, { 'x-integration-id': integration.id });
 
-    expect(body.platformSuperadmin).toBe(true);
+    expect(body.actorUserId).toBe(admin.id);
     expect(body.integrationId).toBeNull();
   });
 

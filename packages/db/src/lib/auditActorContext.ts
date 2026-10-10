@@ -17,7 +17,6 @@ export type AuditActor = {
   userAgent: string | null;
   sourceInquiryId: string | null;
   integrationId: string | null;
-  platformSuperadmin: boolean;
   bypassSoftDeleteScope: boolean;
 };
 
@@ -32,7 +31,6 @@ export const nullAuditActor: AuditActor = {
   userAgent: null,
   sourceInquiryId: null,
   integrationId: null,
-  platformSuperadmin: false,
   bypassSoftDeleteScope: false,
 };
 
@@ -47,6 +45,7 @@ export const auditActorContext = {
     const current = auditActorStore.getStore();
     if (current) Object.assign(current, partial);
   },
+  isSoftDeleteBypassed: (): boolean => auditActorStore.getStore()?.bypassSoftDeleteScope ?? false,
   withSoftDeleteBypass: <T>(fn: () => T | Promise<T>): Promise<Awaited<T>> => {
     const current = auditActorStore.getStore() ?? nullAuditActor;
     return auditActorStore.run(

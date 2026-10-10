@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { Operator } from '@inixiative/json-rules';
-import { clearHookRegistry, db, registerSoftDeleteScoper } from '@template/db';
+import { clearHookRegistry, db } from '@template/db';
 import type { Space } from '@template/db/generated/client/client';
 import { SegmentType } from '@template/db/generated/client/enums';
 import {
@@ -13,7 +13,6 @@ import { RuleDegradedError } from '@template/shared/rules';
 import { registerRuleReferenceTargetHook } from '#/hooks/ruleReference/targetHook';
 import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
 import { registerSegmentRuleReferencesHook } from '#/hooks/segmentRuleReferences/hook';
-import { liveIncludes, liveWhere } from '#/lib/prisma/softDeleteScope';
 import { evaluateSegment } from '#/modules/segment/services/evaluateSegment';
 import { withSegmentRuleIssues } from '#/modules/segment/services/withSegmentRuleIssues';
 
@@ -32,7 +31,6 @@ describe('segment rule health — the segments a rule names, as edges', () => {
   let space: Space;
 
   beforeAll(async () => {
-    registerSoftDeleteScoper({ liveWhere, liveIncludes });
     registerSegmentConditionsHook();
     registerSegmentRuleReferencesHook();
     registerRuleReferenceTargetHook();
@@ -43,7 +41,6 @@ describe('segment rule health — the segments a rule names, as edges', () => {
   afterAll(async () => {
     await cleanupTouchedTables(db);
     clearHookRegistry();
-    registerSoftDeleteScoper(null);
   });
 
   it('saving a membership rule writes one Segment → Segment edge, and re-saving set-diffs it', async () => {
@@ -153,7 +150,6 @@ describe('segment rule health — edge upkeep', () => {
   let space: Space;
 
   beforeAll(async () => {
-    registerSoftDeleteScoper({ liveWhere, liveIncludes });
     registerSegmentConditionsHook();
     registerSegmentRuleReferencesHook();
     registerRuleReferenceTargetHook();
@@ -164,7 +160,6 @@ describe('segment rule health — edge upkeep', () => {
   afterAll(async () => {
     await cleanupTouchedTables(db);
     clearHookRegistry();
-    registerSoftDeleteScoper(null);
   });
 
   it('a narrowed update still resyncs the edges', async () => {
