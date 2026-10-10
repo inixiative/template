@@ -9,7 +9,7 @@
  * a Boolean-kind field; on any other field it is rejected with an error (so e.g.
  * `searchFields[createdAt][:]=true` no longer builds an invalid Prisma filter).
  */
-import type { FieldDef } from '@template/db';
+import type { ModelField } from '@template/db';
 import { makeError } from '#/lib/errors';
 
 type Coercer = (value: unknown) => unknown;
@@ -76,9 +76,9 @@ const COERCERS: Record<string, Coercer> = {
   // handled by buildJsonWhere, not coercion — pass through unchanged.
 };
 
-const kindLabel = (field: FieldDef): string => (field.kind === 'enum' ? 'enum' : field.type);
+const kindLabel = (field: ModelField): string => (field.kind === 'enum' ? 'enum' : field.type);
 
-export const coerceValueForField = (field: FieldDef, value: unknown): unknown => {
+export const coerceValueForField = (field: ModelField, value: unknown): unknown => {
   // null is the `[:]` is-null wire symbol — valid on any field, pass through.
   if (value === null) return value;
   if (Array.isArray(value)) return value.map((item) => coerceValueForField(field, item));

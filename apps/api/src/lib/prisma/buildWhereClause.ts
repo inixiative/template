@@ -5,7 +5,7 @@
  * @uses primitive:shared
  */
 import { getLensRoot, type LensNarrowing } from '@inixiative/json-rules';
-import { type FieldDef, lookupField, type ModelName, toModelName } from '@template/db';
+import { lookupField, type ModelField, type ModelName, toModelName } from '@template/db';
 import { dialect, searchablePaths } from '@template/db/lens';
 import {
   FIELD_OPERATORS,
@@ -95,16 +95,16 @@ const indexedChildren = (
     .map(([, child]) => child as BracketQueryRecord);
 };
 
-const kindLabel = (field: FieldDef): string => (field.kind === 'enum' ? 'enum' : field.type);
+const kindLabel = (field: ModelField): string => (field.kind === 'enum' ? 'enum' : field.type);
 
 const PATTERN_OPS = new Set(['contains', 'startsWith', 'endsWith']);
 const EQUALITY_OPS = new Set(['equals', 'not']);
 
-const isTextField = (field: FieldDef): boolean =>
+const isTextField = (field: ModelField): boolean =>
   field.kind === 'scalar' && field.type === 'String' && !field.isList;
 
 const matchesLiterally = (
-  field: FieldDef,
+  field: ModelField,
   op: string,
   value: unknown,
   insensitive: boolean,
@@ -115,7 +115,10 @@ const matchesLiterally = (
     ? escapeLikePattern(value)
     : value;
 
-const wrapBareValue = (field: FieldDef, value: BracketQueryPrimitive): Record<string, unknown> => {
+const wrapBareValue = (
+  field: ModelField,
+  value: BracketQueryPrimitive,
+): Record<string, unknown> => {
   // Bare symbols (null/true/false) on a json column → equals that json scalar (null
   // is the provider json-null). Non-symbol bare values never reach here for json.
   if (field.kind === 'scalar' && field.type === 'Json' && isBracketSymbol(value)) {
@@ -129,7 +132,7 @@ const wrapBareValue = (field: FieldDef, value: BracketQueryPrimitive): Record<st
 };
 
 const transformOperatorValue = (
-  field: FieldDef,
+  field: ModelField,
   value: BracketQueryRecord,
   fieldPath: string,
 ): Record<string, unknown> => {

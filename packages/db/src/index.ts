@@ -77,6 +77,13 @@ export * from './typedModelIds';
 // biome-ignore lint/complexity/noBannedTypes: Prisma GetPayload generics require {}
 export type PrismaBaseArgs = {};
 export {
+  type EnumField,
+  isScalarField,
+  type ModelField,
+  type RelationField,
+  type ScalarField,
+} from '@inixiative/prisma-map';
+export {
   POLYMORPHIC_BINDS,
   type PolymorphicKind,
   polymorphicBindings,
@@ -111,7 +118,7 @@ export {
   type RuntimeDelegate,
   update,
 } from './utils/delegates';
-export { type FieldDef, hasDeletedAt, lookupField, modelFields } from './utils/fieldMetadata';
+export { hasDeletedAt, lookupField, modelFields } from './utils/fieldMetadata';
 // Prisma error narrowing
 export { isUniqueConstraintError } from './utils/isUniqueConstraintError';
 export { isWriteConflictError } from './utils/isWriteConflictError';

@@ -1,30 +1,31 @@
 import { describe, expect, it } from 'bun:test';
 import { fieldSearchOperator } from '#/lib/prisma/fieldSearchOperator';
+import { enumField, relationField, scalarField } from '#tests/utils/modelFields';
 
 describe('fieldSearchOperator', () => {
   it('String scalar → case-insensitive contains', () => {
-    expect(fieldSearchOperator({ kind: 'scalar', type: 'String' }, 'foo')).toEqual({
+    expect(fieldSearchOperator(scalarField('String'), 'foo')).toEqual({
       contains: 'foo',
       mode: 'insensitive',
     });
   });
 
   it('String[] → has (exact element)', () => {
-    expect(fieldSearchOperator({ kind: 'scalar', type: 'String', isList: true }, 'foo')).toEqual({
+    expect(fieldSearchOperator(scalarField('String', true), 'foo')).toEqual({
       has: 'foo',
     });
   });
 
   it('Json → string_contains', () => {
-    expect(fieldSearchOperator({ kind: 'scalar', type: 'Json' }, 'foo')).toEqual({
+    expect(fieldSearchOperator(scalarField('Json'), 'foo')).toEqual({
       string_contains: 'foo',
     });
   });
 
   it('non-text scalars and relations → undefined (skipped)', () => {
-    expect(fieldSearchOperator({ kind: 'scalar', type: 'Int' }, 'foo')).toBeUndefined();
-    expect(fieldSearchOperator({ kind: 'scalar', type: 'DateTime' }, 'foo')).toBeUndefined();
-    expect(fieldSearchOperator({ kind: 'enum', type: 'Role' }, 'foo')).toBeUndefined();
-    expect(fieldSearchOperator({ kind: 'object', type: 'User' }, 'foo')).toBeUndefined();
+    expect(fieldSearchOperator(scalarField('Int'), 'foo')).toBeUndefined();
+    expect(fieldSearchOperator(scalarField('DateTime'), 'foo')).toBeUndefined();
+    expect(fieldSearchOperator(enumField('Role', []), 'foo')).toBeUndefined();
+    expect(fieldSearchOperator(relationField('User'), 'foo')).toBeUndefined();
   });
 });

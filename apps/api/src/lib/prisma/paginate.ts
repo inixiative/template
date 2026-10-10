@@ -12,7 +12,7 @@ import {
   type RuleValue,
 } from '@inixiative/json-rules';
 import type { AnyDelegate, Args, Result } from '@template/db';
-import { lookupField, modelFields } from '@template/db';
+import { isScalarField, lookupField, modelFields } from '@template/db';
 import { stableHash } from '@template/shared/utils';
 import { getValidatedQuery, type ValidatedContext } from '#/lib/context/getValidatedData';
 import { isSuperadmin } from '#/lib/context/isSuperadmin';
@@ -190,23 +190,18 @@ export const paginate = async <
   };
 };
 
-// why: a keyset chain must end in a non-null unique column — a nullable tiebreaker either voids
-// why: the boundary comparison or silently skips rows on ties. Every model here carries a
-// why: required uuidv7 `id`, so that is the anchor; prismaMap exposes no isId/isRequired, so a
-// why: model with a differently-named primary key cannot be detected and must pin it itself
-// why: via options.orderBy.
 // why: a keyset chain must end in a non-null unique column - a nullable or non-unique tiebreaker
 // why: either voids the boundary comparison or silently skips rows on ties. That column is the
 // why: model's own @id, read off prismaMap rather than assumed by name.
 const primaryKeysOf = (model: string): string[] =>
   Object.entries(modelFields(model) ?? {})
-    .filter(([, field]) => field.isId && field.isRequired)
+    .filter(([, field]) => isScalarField(field) && field.isId && field.isRequired)
     .map(([name]) => name);
 
 export const withTotalOrder = (model: string, chain: SortKey[]): SortKey[] => {
   const lastKey = chain[chain.length - 1]?.[0];
   const lastField = lastKey ? lookupField(model, lastKey) : undefined;
-  if (lastField?.isId && lastField.isRequired) return chain;
+  if (lastField && isScalarField(lastField) && lastField.isId && lastField.isRequired) return chain;
 
   const [primaryKey, ...rest] = primaryKeysOf(model);
   if (!primaryKey || rest.length > 0) {

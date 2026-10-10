@@ -4,7 +4,8 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
-import { type FieldDef, lookupField } from '@template/db/utils/fieldMetadata';
+import type { ModelField } from '@inixiative/prisma-map';
+import { lookupField } from '@template/db/utils/fieldMetadata';
 import { isRelationOperator } from '@template/shared/bracketQuery';
 
 const BOOLEAN_KEYS = new Set(['AND', 'OR', 'NOT']);
@@ -83,7 +84,7 @@ const walkEntries = (
 
 const hop = (
   ctx: NodeContext,
-  field: FieldDef,
+  field: ModelField,
   value: Record<string, unknown>,
   scopeAt: NodeScope,
 ): Record<string, unknown> => {

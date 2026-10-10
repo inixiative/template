@@ -4,35 +4,23 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
+import type { ModelField, PrismaMap } from '@inixiative/prisma-map';
 import { prismaMap } from '@template/db/generated/prismaMap';
 
-export type FieldDef = {
-  kind: 'scalar' | 'enum' | 'object';
-  type: string; // 'String' | 'Int' | 'Boolean' | 'DateTime' | 'Json' | <ModelName> | <EnumName>
-  isList?: boolean;
-  isRequired?: boolean;
-  isId?: boolean;
-  values?: readonly string[];
-  relationName?: string;
-  fromFields?: readonly string[];
-  toFields?: readonly string[];
-};
+// The generated map is declared `as const` (readonly literal arrays); cast once to the lib's
+// structural PrismaMap shape, as prismaMapRelations does.
+const MAP = prismaMap.models as unknown as PrismaMap;
 
-// `prismaMap` is exported `as const`, so its type is the full literal shape.
-// For string-keyed runtime lookups we reshape it once at module boundary —
-// one cast, no `unknown` laundering.
-const MAP = prismaMap.models as Record<string, { fields: Record<string, FieldDef> }>;
-
-const getField = (modelName: string, fieldName: string): FieldDef | undefined =>
+const getField = (modelName: string, fieldName: string): ModelField | undefined =>
   MAP[modelName]?.fields?.[fieldName];
 
-export const modelFields = (modelName: string): Record<string, FieldDef> | undefined =>
+export const modelFields = (modelName: string): Record<string, ModelField> | undefined =>
   MAP[modelName]?.fields;
 
 export const hasDeletedAt = (modelName: string): boolean =>
   getField(modelName, 'deletedAt') !== undefined;
 
-export const lookupField = (modelName: string, path: string): FieldDef | undefined => {
+export const lookupField = (modelName: string, path: string): ModelField | undefined => {
   const segments = path.split('.');
   let currentModel: string | undefined = modelName;
   for (let i = 0; i < segments.length; i += 1) {
