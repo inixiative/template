@@ -30,6 +30,7 @@ kanban
     FEAT-008-permissions-builder
     API-004-route-exposure-tags
   In Progress
+    DB-003-endpoint-decides-soft-delete-visibility
     INFRA-027-rate-limiter-atomicity-fail-open-scopes
     INFRA-029-preset-facet-knobs
     AUTH-002-unified-auth-system
@@ -92,6 +93,7 @@ kanban
 See [Backlog Board](./kanban-backlog.md) for future enhancements (localization, white labeling, SSO, notifications, financial systems, CI/CD, etc.)
 
 ### 🚧 In Progress
+- [DB-003: The endpoint decides soft-delete visibility](./DB-003-endpoint-decides-soft-delete-visibility.md) - Declared superadmin endpoints (the admin router) run unscoped; every other endpoint is live-scoped for every actor, superadmin included (ZLT-5486)
 - [INFRA-029: Preset Facets with Variables](./INFRA-029-preset-facet-knobs.md) - rules-builder 0.26.1 shipped (`variable` slots on preset facets, builder-shape identity, `FacetCondition`); Zealot pin bump + `presets` side-channel (#1710) retirement pending
 - [AUTH-002: Unified Auth System](./AUTH-002-unified-auth-system.md) - Multi-method auth (email/password, OAuth, SSO/SAML)
 - [INFRA-004: WebSockets](./INFRA-004-websockets.md) - Infrastructure complete, wiring up event handlers
@@ -113,9 +115,9 @@ See [Backlog Board](./kanban-backlog.md) for future enhancements (localization, 
 
 ## Quick Stats
 
-- **Total Tickets**: 20
+- **Total Tickets**: 21
 - **Todo**: 14
-- **In Progress**: 6
+- **In Progress**: 7
 - **Review**: 1
 - **Blocked**: 2 (waiting on rules builder)
 - **Done**: 3
@@ -140,4 +142,4 @@ FEAT-021 (Segments, PR #105)
 
 ---
 
-_Last Updated: 2026-09-27_
+_Last Updated: 2026-10-10_
