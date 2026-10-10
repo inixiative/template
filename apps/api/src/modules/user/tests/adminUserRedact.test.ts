@@ -10,7 +10,7 @@ import {
   createUser,
 } from '@template/db/test';
 import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
-import { adminUserRouter } from '#/modules/user';
+import { adminRouter } from '#/routes/admin';
 import { createTestApp } from '#tests/createTestApp';
 import { post } from '#tests/utils/request';
 
@@ -31,7 +31,7 @@ describe('POST /api/admin/user/:id/redact', () => {
 
     const harness = createTestApp({
       mockUser: superadmin,
-      mount: [(app) => app.route('/api/admin/user', adminUserRouter)],
+      mount: [(app) => app.route('/api/admin', adminRouter)],
     });
     fetch = harness.fetch;
     db = harness.db;
