@@ -1,4 +1,3 @@
-import { registerSoftDeleteScope } from '@template/db';
 import { registerAuditLogHook } from '#/hooks/auditLog/hook';
 import { registerClearCacheHook } from '#/hooks/cache/hook';
 import { registerContactRulesHook } from '#/hooks/contactRules/hook';
@@ -22,7 +21,6 @@ import { registerWebhookSubscriptionUrlHook } from '#/hooks/webhookSubscriptionU
 import { registerWebhookHook } from '#/hooks/webhooks/hook';
 
 export const registerHooks = () => {
-  registerSoftDeleteScope();
   registerRulesHook();
   registerAuditLogHook();
   registerEmailVersioningHook();

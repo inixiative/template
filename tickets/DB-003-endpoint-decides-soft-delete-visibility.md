@@ -62,11 +62,11 @@ the extension's implementation and stay as that — they lose every other caller
   `_count: true`.
 - **The engine moves into `packages/db`.** `softDeleteScope.ts` sits beside the extension, which
   imports it directly; `whereWalker` and `fieldMetadata` move to `packages/db/src/utils` and export
-  from `@template/db`. The IoC scoper registry becomes a registration flag:
-  `registerSoftDeleteScope()` (called by `registerHooks()` and the test preload), fail-open until
-  called. `fieldMetadata`'s own `modelNames()` goes; callers use the existing `modelNames` /
-  `isModelName`.
-- **Tests run what production runs.** The API test preload registers the scope; the per-file
+  from `@template/db`. The IoC scoper registry goes: the extension is not a hook, the client composes
+  it (`.$extends(softDeleteScopeExtension())`), and it is always on — nothing to register.
+  `fieldMetadata` returns prisma-map's `ModelField`; its own `modelNames()` goes for the existing
+  `modelNames` / `isModelName`.
+- **Tests run what production runs.** The extension is always on; the per-file
   register/unregister pairs go, and tests that inspect tombstones read through `db.withDeleted`.
 - **Drop `platformSuperadmin` from `AuditActor`.** Its sole reader was the extension's bypass.
 - **Docs**: `docs/claude/CONTEXT.md`, `DATABASE.md`, `HOOKS.md`, `API_ROUTES.md`, `PERMISSIONS.md`.
@@ -88,7 +88,7 @@ the extension's implementation and stay as that — they lose every other caller
   malformed id and a real id — the superadmin check runs before `resourceContextMiddleware` and the
   param validator; a superadmin resolves the id. The list route's `deleted` switch decides tombstone
   visibility. Mutation-checked: registering the guard after the routes fails all three 403 cases.
-- Extension in `packages/db`, with no API wiring: fails open until registered, then scopes.
+- Extension in `packages/db`, with no API wiring: scopes every read and write.
 - Superadmin on a normal route → 404 on a soft-deleted resource.
 - Superadmin on a `validateSuperadmin` router → resolves it.
 - Non-superadmin on that router → 403.

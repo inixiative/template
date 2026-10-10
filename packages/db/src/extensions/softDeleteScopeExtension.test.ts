@@ -6,10 +6,6 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { db } from '@template/db/client';
-import {
-  registerSoftDeleteScope,
-  unregisterSoftDeleteScope,
-} from '@template/db/extensions/softDeleteScopeRegistry';
 import { ContactOwnerModel } from '@template/db/generated/client/enums';
 import { auditActorContext, nullAuditActor } from '@template/db/lib/auditActorContext';
 import {
@@ -27,25 +23,10 @@ const tombstone = (model: 'user' | 'organization' | 'contact' | 'organizationUse
 describe('softDeleteScope extension', () => {
   beforeAll(() => {
     registerTestTracker();
-    registerSoftDeleteScope();
   });
 
   afterAll(async () => {
-    unregisterSoftDeleteScope();
     await cleanupTouchedTables(db);
-  });
-
-  it('fails open until registered', async () => {
-    const { entity: user } = await createUser();
-    await tombstone('user', user.id);
-
-    unregisterSoftDeleteScope();
-    try {
-      expect((await db.user.findUnique({ where: { id: user.id } }))?.id).toBe(user.id);
-    } finally {
-      registerSoftDeleteScope();
-    }
-    expect(await db.user.findUnique({ where: { id: user.id } })).toBeNull();
   });
 
   it('hides a soft-deleted row from an ordinary read with no hand-scoping', async () => {

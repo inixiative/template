@@ -5,7 +5,6 @@
  * @uses none
  */
 import { liveIncludes, liveWhere } from '@template/db/extensions/softDeleteScope';
-import { isSoftDeleteScopeRegistered } from '@template/db/extensions/softDeleteScopeRegistry';
 import { Prisma } from '@template/db/generated/client/client';
 import { auditActorContext } from '@template/db/lib/auditActorContext';
 
@@ -42,11 +41,7 @@ export const softDeleteScopeExtension = () =>
     query: {
       $allModels: {
         async $allOperations({ model, operation, args, query }) {
-          if (
-            !isSoftDeleteScopeRegistered() ||
-            auditActorContext.isSoftDeleteBypassed() ||
-            !SCOPED_OPS.has(operation)
-          )
+          if (auditActorContext.isSoftDeleteBypassed() || !SCOPED_OPS.has(operation))
             return query(args);
           return query(scopeArgs(model, args) as typeof args);
         },
