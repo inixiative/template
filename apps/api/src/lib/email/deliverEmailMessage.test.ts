@@ -11,6 +11,7 @@ import {
   createSpaceUser,
   createTag,
   createTagAttachment,
+  createTagCategory,
   createUser,
 } from '@template/db/test';
 import type { EmailClient, SendEmailOptions, SendEmailResult } from '@template/email/client/types';
@@ -572,12 +573,15 @@ describe('deliverEmailMessage — the recipient is read through the lens at send
     it("the platform fallback renders through the primary owner's clamps", async () => {
       const { entity: organization } = await createOrganization({ name: 'Clamp Org' });
       const { entity: user } = await createUser({ name: 'Insider' });
-      const { entity: mine } = await createTag({
-        name: 'clamp-mine',
-        ownerModel: 'Organization',
-        organizationId: organization.id,
-      });
-      await createTagAttachment({ tagId: mine.id, userId: user.id });
+      const { entity: tagCategory } = await createTagCategory(
+        { ownerModel: 'Organization' },
+        { organization },
+      );
+      const { entity: mine } = await createTag(
+        { name: 'clamp-mine', ownerModel: 'Organization' },
+        { organization, tagCategory },
+      );
+      await createTagAttachment({ resourceModel: 'User' }, { user, tag: mine });
       await saveTemplate(
         'clamp-fallback',
         '{{#each recipient.tagAttachments as=t}}[{{t.tag.name}}]{{/each}}',
