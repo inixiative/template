@@ -10,6 +10,7 @@ import {
   createSegmentMember,
   createTag,
   createTagAttachment,
+  createTagCategory,
   createUser,
 } from '@template/db/test';
 import type { SendEmailOptions } from '@template/email/client/types';
@@ -28,12 +29,15 @@ const fixture = async () => {
   const { entity: theirs } = await createOrganization({ name: 'Theirs' });
   const { entity: user } = await createUser();
   for (const organization of [mine, theirs]) {
-    const { entity: tag } = await createTag({
-      name: `${organization.name} tag`,
-      ownerModel: 'Organization',
-      organizationId: organization.id,
-    });
-    await createTagAttachment({ tagId: tag.id, userId: user.id });
+    const { entity: tagCategory } = await createTagCategory(
+      { ownerModel: 'Organization' },
+      { organization },
+    );
+    const { entity: tag } = await createTag(
+      { name: `${organization.name} tag`, ownerModel: 'Organization' },
+      { organization, tagCategory },
+    );
+    await createTagAttachment({ resourceModel: 'User' }, { user, tag });
     const { entity: ref } = await createCustomerRef({
       customerModel: 'User',
       providerModel: 'Organization',
@@ -89,7 +93,13 @@ describe("an organization's email sees only its own link rows", () => {
       ownerModel: 'Organization',
       organizationId: mine.id,
     });
-    const log = (await createCommunicationLog({ address: `${user.id}@example.com` })).entity;
+    const log = (
+      await createCommunicationLog({
+        senderType: 'Organization',
+        senderOrganizationId: mine.id,
+        address: `${user.id}@example.com`,
+      })
+    ).entity;
 
     await deliverEmailMessage(
       {
