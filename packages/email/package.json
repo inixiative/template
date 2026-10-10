@@ -22,7 +22,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@inixiative/json-rules": "^3.5.0",
+    "@inixiative/json-rules": "^3.5.1",
+    "@inixiative/rules-builder": "0.31.0",
     "@template/db": "workspace:*",
     "@template/shared": "workspace:*",
     "html-to-text": "^10.0.1",

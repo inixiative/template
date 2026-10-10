@@ -5,7 +5,7 @@
     "": {
       "name": "template",
       "dependencies": {
-        "@inixiative/json-rules": "^3.5.0",
+        "@inixiative/json-rules": "^3.5.1",
         "ink": "^6.8.0",
         "ink-select-input": "^6.2.0",
         "ink-spinner": "^5.0.0",
@@ -16,8 +16,8 @@
       },
       "devDependencies": {
         "@biomejs/biome": "2.5.2",
-        "@inixiative/atlas": "^0.1.1",
-        "@inixiative/config": "^0.5.57",
+        "@inixiative/atlas": "^0.2.0",
+        "@inixiative/config": "^0.5.65",
         "@lightpanda/browser": "^1.2.0",
         "@mendable/firecrawl-js": "^4.18.1",
         "@tanstack/react-router": "^1.166.2",
@@ -78,7 +78,7 @@
         "@bull-board/api": "^6.20.3",
         "@bull-board/hono": "^6.20.3",
         "@hono/zod-openapi": "^1.2.2",
-        "@inixiative/json-rules": "^3.5.0",
+        "@inixiative/json-rules": "^3.5.1",
         "@sentry/bun": "^10.42.0",
         "@template/db": "workspace:*",
         "@template/permissions": "workspace:*",
@@ -178,7 +178,7 @@
       },
       "devDependencies": {
         "@faker-js/faker": "^10.3.0",
-        "@inixiative/prisma-map": "^0.3.0",
+        "@inixiative/prisma-map": "^0.3.1",
         "@types/bcryptjs": "^3.0.0",
         "@types/ioredis-mock": "^8.2.7",
         "@types/lodash-es": "^4.17.12",
@@ -192,7 +192,8 @@
       "name": "@template/email",
       "version": "0.0.1",
       "dependencies": {
-        "@inixiative/json-rules": "^3.5.0",
+        "@inixiative/json-rules": "^3.5.1",
+        "@inixiative/rules-builder": "0.31.0",
         "@template/db": "workspace:*",
         "@template/shared": "workspace:*",
         "html-to-text": "^10.0.1",
@@ -276,7 +277,7 @@
       "dependencies": {
         "@ariakit/react": "^0.4.22",
         "@iconify/react": "^6.0.2",
-        "@inixiative/rules-builder": "0.30.0",
+        "@inixiative/rules-builder": "0.31.0",
         "@opentelemetry/api": "^1.9.0",
         "@opentelemetry/core": "^2.6.0",
         "@opentelemetry/sdk-trace-base": "^2.6.0",
@@ -620,17 +621,17 @@
 
     "@img/sharp-win32-x64": ["@img/sharp-win32-x64@0.33.5", "", { "os": "win32", "cpu": "x64" }, "sha512-MpY/o8/8kj+EcnxwvrP4aTJSWw/aZ7JIGR4aBeZkZw5B7/Jn+tY9/VNwtcoGmdT7GfggGIU4kygOMSbYnOrAbg=="],
 
-    "@inixiative/atlas": ["@inixiative/atlas@0.1.1", "", { "dependencies": { "@inixiative/json-rules": "^2.13.0" }, "bin": { "atlas": "bin/atlas.ts" } }, "sha512-vEXZ3mFKAoEW8lk9NjumMcgLpG57qX813Z0X+xXXBPYZXrEUgRXdqJiLZTEEmntZddo4J28UfUGU7BERmOFyBQ=="],
+    "@inixiative/atlas": ["@inixiative/atlas@0.2.0", "", { "dependencies": { "@inixiative/json-rules": "^3.3.1" }, "bin": { "atlas": "bin/atlas.ts" } }, "sha512-Lko2EMwJu64I+6minHob8+vsjZVLHX84nrR3lVZqAAw1jn/gAfrenVMpHkPzLAjyAgPk5LQ4o+5cvrdY1uXpAw=="],
 
-    "@inixiative/config": ["@inixiative/config@0.5.57", "", { "peerDependencies": { "@biomejs/biome": ">=2.5.0", "tsup": ">=8.5.0", "typescript": ">=6.0.0" }, "optionalPeers": ["@biomejs/biome", "tsup", "typescript"], "bin": { "inixiative-config": "dist/cli.js" } }, "sha512-Jia4wMSYeQGir0hGbJYr/h6KeKOaO8iZsPSwLMpVIaYO1ua5q8kEldGA4x8zTIj9bhhHACX6OsfjJnj6ZGt5Jg=="],
+    "@inixiative/config": ["@inixiative/config@0.5.65", "", { "peerDependencies": { "@biomejs/biome": ">=2.5.0", "tsup": ">=8.5.0", "typescript": ">=6.0.0" }, "optionalPeers": ["@biomejs/biome", "tsup", "typescript"], "bin": { "inixiative-config": "dist/cli.js" } }, "sha512-ifdhDC2rZ/PB9Z7CmwqczlIPrl+tSFmXQlbbFRqy1f14wAD4rOQAxQAIf08KvuiTPoKchp2QXrxSxHcNtY+/Vg=="],
 
-    "@inixiative/json-rules": ["@inixiative/json-rules@3.5.0", "", { "dependencies": { "dayjs": "^1.11.13", "fastest-levenshtein": "^1.0.16", "re2js": "^2.8.6" }, "peerDependencies": { "@prisma/client": ">=6.0.0", "typescript": ">=6.0.0" }, "optionalPeers": ["@prisma/client", "typescript"] }, "sha512-F107QsddJDZmI96o307aiOv1QWVXuGcA/DzrUlWHTYev31jf/ihBIm3IhlhArvH5TQDnOMCo5W9GbunuG4W6bg=="],
+    "@inixiative/json-rules": ["@inixiative/json-rules@3.5.1", "", { "dependencies": { "dayjs": "^1.11.13", "fastest-levenshtein": "^1.0.16", "re2js": "^2.8.6" }, "peerDependencies": { "@prisma/client": ">=6.0.0", "typescript": ">=6.0.0" }, "optionalPeers": ["@prisma/client", "typescript"] }, "sha512-vaWgBhzKd5GglNTCPIvr+GBUigEgx0l1blL/4P52Cwy2c8fzNn5WcfVI1in7eeN1PHiI22dav/U3FbI+qmubNg=="],
 
     "@inixiative/permissions": ["@inixiative/permissions@0.4.0", "", { "dependencies": { "@inixiative/json-rules": "^3.0.0", "lodash-es": "^4.17.21" }, "peerDependencies": { "typescript": ">=6.0.0", "zod": "^4.0.0" }, "optionalPeers": ["typescript", "zod"] }, "sha512-nb29WoajWjWm79qdAL110YxQJO0qB1Ji82Z1im3TnPKdm8YpY3YwIeeU6Joruonunfpi2aHhFx5oabGDRzlirA=="],
 
-    "@inixiative/prisma-map": ["@inixiative/prisma-map@0.3.0", "", {}, "sha512-H/rRPs8ILiorRlqM/WmLgS1oYKL1lNPHitrEiJOa2agyxmJqp6gOKuW4dJ0hdJgHmykLfKpBORXgY3+Cbc8t9g=="],
+    "@inixiative/prisma-map": ["@inixiative/prisma-map@0.3.1", "", {}, "sha512-gFUaG7rL15/He2sYVdLvbMoNiTlWIdq4Ocyw5qD+7zSZce/khVTVQcc3aDigkapSCAmKQsfOoUvr1vhn2jdo4Q=="],
 
-    "@inixiative/rules-builder": ["@inixiative/rules-builder@0.30.0", "", { "peerDependencies": { "@inixiative/json-rules": "^3.4.0", "react": "^18.0.0 || ^19.0.0" } }, "sha512-EqOcXj+ZaZZQa02r+l9ln6gtGe2fyy/3QN2aIH7Xc8v8DK5Z8HpU5ADAl1C+3x2GSMYt+Zh+gz3zoDtPAypaJA=="],
+    "@inixiative/rules-builder": ["@inixiative/rules-builder@0.31.0", "", { "peerDependencies": { "@inixiative/json-rules": "^3.5.0", "react": "^18.0.0 || ^19.0.0" } }, "sha512-mUxaeBIbEjZcihWC3//1QM8nHnfXsRR6zovPdv01/UvbAXbwPZZ6BwnCz4eBpj2uQyZuZfj/HwfXVU4UvEIsLg=="],
 
     "@inquirer/ansi": ["@inquirer/ansi@2.0.7", "", {}, "sha512-3eTuUO1vH2cZm2ZKHeQxnOqlTi9EfZDGgIe3BL3I4u+rJHocr9Fz86M4fjYABPvFnQG/gGK551HqDiIcETwU6Q=="],
 
@@ -2427,8 +2428,6 @@
     "@hey-api/json-schema-ref-parser/js-yaml": ["js-yaml@4.1.1", "", { "dependencies": { "argparse": "^2.0.1" }, "bin": { "js-yaml": "bin/js-yaml.js" } }, "sha512-qQKT4zQxXl8lLwBtHMWwaTcGfFOZviOJet3Oy/xmGk2gZH677CJM9EvtfdSkgWcATZhj/55JZ0rmy3myCT5lsA=="],
 
     "@hey-api/shared/semver": ["semver@7.7.4", "", { "bin": { "semver": "bin/semver.js" } }, "sha512-vFKC2IEtQnVhpT78h1Yp8wzwrf8CM+MzKMHGJZfBtzhZNycRFnXsHk6E5TxIkkMsgNS7mdX3AGB7x2QM2di4lA=="],
-
-    "@inixiative/atlas/@inixiative/json-rules": ["@inixiative/json-rules@2.27.0", "", { "dependencies": { "dayjs": "^1.11.13", "fastest-levenshtein": "^1.0.16" }, "peerDependencies": { "typescript": ">=6.0.0" }, "optionalPeers": ["typescript"] }, "sha512-62F0EPYVH3BZNhEAtuF+fXOSNJl8PCvCaUoGtjqJtovng2bscYYLU18U7Sk4Y7Y7e6qpdTAhvQdecUa9PznQjw=="],
 
     "@inquirer/core/signal-exit": ["signal-exit@4.1.0", "", {}, "sha512-bzyZ1e88w9O1iNJbKnOlvYTrWPDl46O1bG0D3XInv+9tkPrxrN8jUUTiFlDkkmKWgn1M6CfIA13SuGqOa9Korw=="],
 

@@ -18,13 +18,12 @@ import {
   type ModelNarrowing,
   narrowRule,
   Operator,
-  type PathProjection,
-  projectLens,
   projectRows,
   type SourceValues,
   type ValidationIssue,
   validateRuleInLens,
 } from '@inixiative/json-rules';
+import { builderSource } from '@inixiative/rules-builder';
 import {
   type DynamicRuleReference,
   dynamicRuleReferences,
@@ -487,27 +486,6 @@ export const narrowEmailLens = (
 
 export type EmailSurface = Lens & { narrowing: Omit<LensNarrowing, 'parent'> };
 
-const surfaceNode = (projection: PathProjection, path: string): ModelNarrowing => {
-  const picks: string[] = [];
-  const enumPicks: Record<string, readonly string[]> = {};
-  const relations: Record<string, ModelNarrowing> = {};
-  for (const [name, entry] of Object.entries(projection[path]?.fields ?? {})) {
-    if (entry.kind === 'object') {
-      const child = `${path}.${name}`;
-      if (projection[child]) relations[name] = surfaceNode(projection, child);
-      continue;
-    }
-    if (entry.kind === 'bridge') continue;
-    picks.push(name);
-    if (entry.kind === 'enum' && entry.values) enumPicks[name] = entry.values;
-  }
-  return {
-    picks,
-    ...(Object.keys(enumPicks).length ? { enumPicks } : {}),
-    ...(Object.keys(relations).length ? { relations } : {}),
-  };
-};
-
 export const emailSurface = (lens: EmailLens): EmailSurface => {
   const models: FieldMap['models'] = {};
   const enums: NonNullable<FieldMap['enums']> = {};
@@ -520,7 +498,7 @@ export const emailSurface = (lens: EmailLens): EmailSurface => {
       rootFields[root] = { kind: 'scalar', type: 'Json' };
       continue;
     }
-    const surface = projectLens(slot, { by: 'model' });
+    const surface = builderSource(slot);
     for (const map of Object.values(surface.maps)) {
       for (const [model, entry] of Object.entries(map.models)) {
         const fields = { ...(models[model]?.fields ?? {}), ...entry.fields };
@@ -529,7 +507,7 @@ export const emailSurface = (lens: EmailLens): EmailSurface => {
       Object.assign(enums, map.enums ?? {});
     }
     rootFields[root] = relation(surface.model, `Email_${root}`, false);
-    relations[root] = surfaceNode(projectLens(slot), getLensRoot(slot).model);
+    relations[root] = surface.narrowing.root;
   }
   const base = createLens({
     maps: {

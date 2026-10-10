@@ -2,7 +2,12 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import { type SeedFile, seedTable } from '@template/db/prisma/seed';
 import { seeds } from '@template/db/prisma/seeds';
-import { cleanupTouchedTables, createOrganization, createTag } from '@template/db/test';
+import {
+  cleanupTouchedTables,
+  createOrganization,
+  createTag,
+  createTagCategory,
+} from '@template/db/test';
 import { TokenValidationError } from '@template/email/errors/TokenValidationError';
 import { emailSeedSavers } from '#/lib/email/emailSeedSavers';
 
@@ -61,10 +66,14 @@ describe('email seeds persist through the app save', () => {
 
   it('refuses a seeded component whose rule names a row the platform lens does not admit', async () => {
     const { entity: organization } = await createOrganization();
-    const { entity: tag } = await createTag({
-      ownerModel: 'Organization',
-      organizationId: organization.id,
-    });
+    const { entity: tagCategory } = await createTagCategory(
+      { ownerModel: 'Organization' },
+      { organization },
+    );
+    const { entity: tag } = await createTag(
+      { ownerModel: 'Organization' },
+      { organization, tagCategory },
+    );
     const rule = JSON.stringify({
       field: 'recipient.tagAttachments',
       arrayOperator: 'any',

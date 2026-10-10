@@ -4,8 +4,13 @@
  * @partOf feature:email
  * @uses infrastructure:prisma
  */
-import type { Condition, LensNarrowing, ModelNarrowing } from '@inixiative/json-rules';
-import { intoFirstLayer, lensFor } from '@template/db/lens';
+import {
+  type Condition,
+  clampLens,
+  type LensNarrowing,
+  type ModelNarrowing,
+} from '@inixiative/json-rules';
+import { lensFor } from '@template/db/lens';
 import { fieldsLens, OPAQUE_SLOT, type SlotLens } from '@template/email/rules';
 import type { RuleLens } from '@template/shared/rules';
 import type { Sender } from '#/lib/email/sender';
@@ -31,7 +36,7 @@ export type EmailEntry = {
 
 export const slotRowsLens = (slot: SlotLens | undefined, where: Condition): LensNarrowing => {
   if (!slot || slot === OPAQUE_SLOT) throw new Error('Email slot lens is not a model lens');
-  return intoFirstLayer(slot, { root: { where } });
+  return clampLens(slot, { root: { where } });
 };
 
 const user: ModelNarrowing = { picks: ['id', 'name', 'email'] };
