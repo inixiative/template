@@ -4,10 +4,16 @@
  * @partOf feature:email
  * @uses primitive:shared
  */
-import { bindLens, type Condition, type NarrowingDefaults, Operator } from '@inixiative/json-rules';
+import {
+  bindLens,
+  type Condition,
+  clampLens,
+  type NarrowingDefaults,
+  Operator,
+} from '@inixiative/json-rules';
 import { polymorphicBindings, polymorphicIs } from '@template/db';
 import type { ProviderModel } from '@template/db/generated/client/enums';
-import { boundAndLive, intoFirstLayer, platformOrBound, through } from '@template/db/lens';
+import { boundAndLive, platformOrBound, through } from '@template/db/lens';
 import { type EmailLens, narrowEmailLens } from '@template/email/rules/emailLens';
 import type { RuleLens } from '@template/shared/rules';
 
@@ -81,7 +87,7 @@ export const scopeEmailLens = (
       ...(owner ? ownerDefaults(owner) : {}),
       ...(sender ? membershipDefaults(sender) : {}),
     };
-    const scoped: RuleLens = intoFirstLayer(slot, { mapDefaults: { prisma: { models } } });
+    const scoped: RuleLens = clampLens(slot, { mapDefaults: { prisma: { models } } });
     return owner
       ? (bindLens(scoped, polymorphicBindings(owner.ownerModel, owner.ownerId)) as RuleLens)
       : scoped;
