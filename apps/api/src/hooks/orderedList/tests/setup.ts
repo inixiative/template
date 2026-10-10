@@ -69,11 +69,13 @@ export const liveOrders = (userId: string, type: ContactType = ContactType.phone
   });
 
 export const allOrders = (userId: string, type = ContactType.phone) =>
-  db.contact.findMany({
-    where: { userId, type },
-    orderBy: { position: 'asc' },
-    select: { id: true, position: true, deletedAt: true },
-  });
+  db.withDeleted(() =>
+    db.contact.findMany({
+      where: { userId, type },
+      orderBy: { position: 'asc' },
+      select: { id: true, position: true, deletedAt: true },
+    }),
+  );
 
 export const positions = (rows: { position: number }[]) => rows.map((r) => r.position);
 
@@ -84,4 +86,4 @@ export const softDelete = (id: string) =>
   db.contact.update({ where: { id }, data: { deletedAt: new Date() } });
 
 export const restore = (id: string) =>
-  db.contact.update({ where: { id }, data: { deletedAt: null } });
+  db.withDeleted(() => db.contact.update({ where: { id }, data: { deletedAt: null } }));

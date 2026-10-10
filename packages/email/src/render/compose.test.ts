@@ -6,10 +6,13 @@ import {
   createEmailTemplate,
   createOrganization,
   createSpace,
+  registerTestTracker,
 } from '@template/db/test';
 import { EmailRenderError } from '@template/email/errors/EmailRenderError';
 import { composeComponent, composeTemplate } from '@template/email/render/compose';
 import { parentOwner } from '@template/email/render/owner';
+
+registerTestTracker();
 
 describe('composeTemplate', () => {
   afterAll(async () => {
@@ -17,8 +20,7 @@ describe('composeTemplate', () => {
   });
 
   beforeEach(async () => {
-    await db.emailComponent.deleteMany({});
-    await db.emailTemplate.deleteMany({});
+    await cleanupTouchedTables(db);
   });
 
   it('composes template with no components', async () => {
@@ -282,7 +284,7 @@ describe('composeComponent', () => {
   });
 
   beforeEach(async () => {
-    await db.emailComponent.deleteMany({});
+    await cleanupTouchedTables(db);
   });
 
   it('composes standalone component', async () => {

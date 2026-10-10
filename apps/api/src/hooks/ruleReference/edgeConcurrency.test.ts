@@ -1,12 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
 import { type Condition, Operator } from '@inixiative/json-rules';
-import {
-  clearHookRegistry,
-  db,
-  registerSoftDeleteScoper,
-  ruleReferences,
-  syncRuleReferenceEdges,
-} from '@template/db';
+import { clearHookRegistry, db, ruleReferences, syncRuleReferenceEdges } from '@template/db';
 import type { Space } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
@@ -21,7 +15,6 @@ import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
 import { registerSegmentRuleReferencesHook } from '#/hooks/segmentRuleReferences/hook';
 import { registerSoftDeleteCascadeHook } from '#/hooks/softDeleteCascade/hook';
 import { withOwnerLock } from '#/lib/locks/withOwnerLock';
-import { liveIncludes, liveWhere } from '#/lib/prisma/softDeleteScope';
 import { customerRefLens } from '#/modules/customerRef/lib/customerRefLens';
 
 const acmeRule = { field: 'customerUser.email', operator: Operator.endsWith, value: '@acme.test' };
@@ -78,7 +71,6 @@ describe('ruleReference — edges under concurrency and repair', () => {
   let owner: { ownerModel: string; ownerId: string };
 
   beforeAll(async () => {
-    registerSoftDeleteScoper({ liveWhere, liveIncludes });
     registerPreventHardDeleteHook();
     registerRulesHook();
     registerSegmentConditionsHook();
@@ -92,7 +84,6 @@ describe('ruleReference — edges under concurrency and repair', () => {
 
   afterAll(async () => {
     clearHookRegistry();
-    registerSoftDeleteScoper(null);
     await cleanupTouchedTables(db);
   });
 

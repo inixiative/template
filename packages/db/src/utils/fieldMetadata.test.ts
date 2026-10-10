@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { lookupField } from '#/lib/prisma/fieldMetadata';
+import { lookupField } from '@template/db/utils/fieldMetadata';
 
 describe('lookupField', () => {
   it('resolves a top-level scalar field', () => {

@@ -482,11 +482,10 @@ const accessor = pathParts[3] as AccessorName;
 // Supports alternate lookups: ?lookup=slug
 const lookup = c.req.query('lookup') || 'id';
 
-// Finds resources via the db delegate for that accessor.
-// Models with a deletedAt column get `deletedAt: null` appended unless the
-// caller is a superadmin — soft-deleted rows 404 for everyone else.
+// Finds resources via the db delegate for that accessor. The soft-delete
+// extension scopes the lookup and its include tree — no filter here.
 const resources = await db[accessor].findMany({
-  where: { [lookup]: id, ...softDeleteFilter },
+  where: { [lookup]: id },
   ...resourceContextArgs[accessor],  // Custom inclusions
 });
 
@@ -508,12 +507,13 @@ c.set('resourceType', accessor);
 
 ### Soft-Delete Invisibility
 
-If the resolved model has a `deletedAt` column (detected via the generated prismaMap through
-`lookupField`), the middleware appends `deletedAt: null` to the lookup unless the caller is a
-superadmin. Deleted means deleted for everyone except superadmins — soft-deleted resources 404
-uniformly, with no per-controller `deletedAt` checks. Revival flows go through create-path
-upserts on unique keys, never load-the-deleted-row-by-id. Models without `deletedAt` are
-unaffected.
+The middleware adds no soft-delete filter of its own: the lookup runs through the db client, whose
+soft-delete extension scopes it (see DATABASE.md → Soft-delete read scoping). **The endpoint
+decides visibility, not the actor.** On every ordinary route a soft-deleted resource 404s for
+everyone — a superadmin calling `/api/v1/organization/:id` included. Superadmin endpoints (mounted
+on `adminRouter`, behind `validateSuperadmin`) run inside `db.withDeleted`, so there the lookup
+resolves tombstones too. Revival flows go through create-path upserts on unique keys, never
+load-the-deleted-row-by-id. Models without `deletedAt` are unaffected.
 
 ### Lookup Parameter
 

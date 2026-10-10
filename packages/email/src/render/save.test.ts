@@ -8,6 +8,7 @@ import {
   createOrganization,
   createSpace,
   createUser,
+  registerTestTracker,
 } from '@template/db/test';
 import { ConditionValidationError } from '@template/email/errors/ConditionValidationError';
 import { DependentTemplateError } from '@template/email/errors/DependentTemplateError';
@@ -18,6 +19,8 @@ import { guardedToken } from '@template/email/render/guardedToken';
 import { saveEmailTemplate } from '@template/email/render/save';
 import { emailLens } from '@template/email/rules/emailLens';
 
+registerTestTracker();
+
 const mjml = (content: string) =>
   `<mjml><mj-body><mj-section><mj-column>${content}</mj-column></mj-section></mj-body></mjml>`;
 
@@ -27,8 +30,7 @@ describe('saveEmailTemplate', () => {
   });
 
   beforeEach(async () => {
-    await db.emailComponent.deleteMany({});
-    await db.emailTemplate.deleteMany({});
+    await cleanupTouchedTables(db);
   });
 
   it('saves template with no components', async () => {
@@ -624,8 +626,7 @@ describe('saveEmailTemplate — the lens decides at save', () => {
   });
 
   beforeEach(async () => {
-    await db.emailComponent.deleteMany({});
-    await db.emailTemplate.deleteMany({});
+    await cleanupTouchedTables(db);
   });
 
   const input = (slug: string, content: string, subject = 'Hi {{recipient.email}}') => ({

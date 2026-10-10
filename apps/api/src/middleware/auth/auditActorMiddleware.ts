@@ -9,7 +9,6 @@ import { auditActorContext } from '@template/db/lib/auditActorContext';
 import { log } from '@template/shared/logger';
 import type { Context, Next } from 'hono';
 import { clientAddress } from '#/lib/clientIp';
-import { isSuperadmin } from '#/lib/context/isSuperadmin';
 import { findOwnedIntegration } from '#/modules/integration/services/findOwnedIntegration';
 import type { AppEnv } from '#/types/appEnv';
 
@@ -49,7 +48,6 @@ export const auditActorMiddleware = async (c: Context<AppEnv>, next: Next) => {
     userAgent: c.req.header('user-agent') ?? null,
     sourceInquiryId: null,
     integrationId: await resolveOriginIntegrationId(c),
-    platformSuperadmin: isSuperadmin(c),
     bypassSoftDeleteScope: false,
   };
 

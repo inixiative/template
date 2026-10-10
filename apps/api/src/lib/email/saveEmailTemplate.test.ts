@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db, RuleReferenceError, registerSoftDeleteScoper } from '@template/db';
+import { clearHookRegistry, db, RuleReferenceError } from '@template/db';
 import type { Organization, Segment, Tag } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
@@ -10,7 +10,6 @@ import {
 } from '@template/db/test';
 import { registerRulesHook } from '#/hooks/rules/hook';
 import { saveEmailTemplate } from '#/lib/email/saveEmailTemplate';
-import { liveIncludes, liveWhere } from '#/lib/prisma/softDeleteScope';
 
 const mjml = (content: string) =>
   `<mjml><mj-body><mj-section><mj-column><mj-text>${content}</mj-text></mj-column></mj-section></mj-body></mjml>`;
@@ -55,7 +54,6 @@ describe('saveEmailTemplate — a rule may only name what its owner can see', ()
   let theirSegment: Segment;
 
   beforeAll(async () => {
-    registerSoftDeleteScoper({ liveWhere, liveIncludes });
     registerRulesHook();
     mine = (await createOrganization()).entity;
     theirs = (await createOrganization()).entity;
@@ -91,7 +89,6 @@ describe('saveEmailTemplate — a rule may only name what its owner can see', ()
   afterAll(async () => {
     await cleanupTouchedTables(db);
     clearHookRegistry();
-    registerSoftDeleteScoper(null);
   });
 
   it("platform tags and the owner's own tags and segments are admitted", async () => {

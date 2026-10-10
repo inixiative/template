@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { liveIncludes, liveWhere } from '#/lib/prisma/softDeleteScope';
+import { liveIncludes, liveWhere } from '@template/db/extensions/softDeleteScope';
 
 const LIVE = { deletedAt: null };
 
@@ -130,9 +130,24 @@ describe('liveIncludes', () => {
     });
   });
 
-  it('non-relation entries pass through', () => {
-    expect(liveIncludes('User', { _count: { select: { contacts: true } } })).toEqual({
-      _count: { select: { contacts: true } },
+  it('scopes _count relation counts; column-less targets stay bare', () => {
+    expect(
+      liveIncludes('User', { _count: { select: { contacts: true, sessions: true } } }),
+    ).toEqual({
+      _count: { select: { contacts: { where: LIVE }, sessions: true } },
     });
+  });
+
+  it('an explicit deletedAt in a _count where wins', () => {
+    const tree = { _count: { select: { contacts: { where: { deletedAt: { not: null } } } } } };
+    expect(liveIncludes('User', tree)).toEqual(tree);
+  });
+
+  it('expands `_count: true` so every scoped relation count is live', () => {
+    const scoped = liveIncludes('User', { _count: true })._count as {
+      select: Record<string, unknown>;
+    };
+    expect(scoped.select.contacts).toEqual({ where: LIVE });
+    expect(scoped.select.sessions).toBe(true);
   });
 });

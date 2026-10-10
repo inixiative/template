@@ -640,10 +640,9 @@ buildWhereClause({
 
 A Prisma client extension (`packages/db/src/extensions/softDeleteScopeExtension.ts`) auto-injects `deletedAt: null` into every read (`findMany`/`findFirst`/`findUnique`/`count`/`aggregate`/`groupBy`) and every write `where` (`update`/`delete`/`upsert`), plus nested `include`/`select` trees, for any model that has a `deletedAt` column. You do **not** hand-write `deletedAt: null` — forgetting it can no longer leak soft-deleted rows.
 
-Two bypasses, both off the audit-actor ALS:
+One bypass, `db.withDeleted(fn)`: it runs `fn` with scoping off (revive, redaction/GDPR, inspecting tombstones). Must be `await`ed inside the callback. Who the caller is never unscopes anything — **the endpoint decides**. `validateSuperadmin`, mounted on `adminRouter`, runs the rest of the request inside `db.withDeleted`, so superadmin endpoints read and write tombstones; every other route is scoped for every caller, superadmin included.
 
-- **Superadmin** — a `platformSuperadmin` caller sees soft-deleted rows.
-- **`db.withDeleted(fn)`** — runs `fn` with scoping off (revive, redaction/GDPR, admin "show deleted" reads). Must be `await`ed inside the callback.
+The extension is the only soft-delete scoping layer — no middleware, `paginate` or lens code adds `deletedAt: null` by hand. It covers the root `where` (including relation filters like `some`/`every`/`is`), nested `include`/`select` trees, `_count` relation counts, `count`/`aggregate`/`groupBy` (the lens count plans). Its engine (`liveWhere` / `liveIncludes`, `packages/db/src/extensions/softDeleteScope.ts`) lives beside it in `packages/db`. It is not a mutation-lifecycle hook and needs no registration: the client composes it (`client.ts`, `.$extends(softDeleteScopeExtension())`), so every process and every test sees what production sees. A test that inspects a tombstone wraps the read in `db.withDeleted`.
 
 Write `where`s are scoped too, so a soft-deleted row can't be mutated without a bypass. Cascade revive is exempt automatically: it matches on an explicit `deletedAt` value, and an explicit `deletedAt` mention in a `where` opts that query out of injection.
 

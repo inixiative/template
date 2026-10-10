@@ -151,7 +151,7 @@ A lens narrowing can declare a `where` in three places, and they assert three di
 
 - **Root clauses**: compiled in `buildWhereClause` and ANDed into the query unconditionally — superadmin included. Lens narrowing is authorization shape, not a visibility preference.
 - **Non-root clauses**: `lensWhere` compiles each once, keyed by dotted path, then walks the fully composed where (caller base where + client filters + global search). Wherever the query traverses a relation, the clause folds in with operator-aware semantics: ANDed inside `some`/`none`/`is` and bare to-one nesting; into `every` by implication (an out-of-scope row must never fail it); as a fail-closed `is` sibling on bare `isNot`. A relation the query never touches contributes nothing — the lens where doesn't add joins, it colors the joins the query already makes.
-- **Soft-delete live scope** rides the identical walk afterward as a separate concern with different authority: superadmin bypasses it, because it is visibility, not authorization.
+- **Soft-delete live scope** is not paginate's job: the db client's soft-delete extension scopes the final query, its include/select trees and the lens count plans. It is visibility, not authorization, and the endpoint decides it — superadmin endpoints (the admin router) run unscoped; every other route is live-scoped for every caller, superadmin included.
 
 One line: **root where = who's in the list; relation where = what you see when you look sideways from a row; model where = the same, declared once per model instead of once per edge.**
 

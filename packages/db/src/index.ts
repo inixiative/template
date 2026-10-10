@@ -19,11 +19,6 @@ export {
   unregisterDbHook,
   unregisterDbInvariant,
 } from './extensions/hookRegistry';
-// Automatic soft-delete read/write scoping (app registers the scoper at bootstrap)
-export {
-  registerSoftDeleteScoper,
-  type SoftDeleteScoper,
-} from './extensions/softDeleteScopeRegistry';
 // Prisma namespace for advanced types (Prisma.UserWhereInput, etc.)
 export { Prisma } from './generated/client/client';
 // Scalar schemas (model schemas without relations)
@@ -76,6 +71,13 @@ export * from './typedModelIds';
 // biome-ignore lint/complexity/noBannedTypes: Prisma GetPayload generics require {}
 export type PrismaBaseArgs = {};
 export {
+  type EnumField,
+  isScalarField,
+  type ModelField,
+  type RelationField,
+  type ScalarField,
+} from '@inixiative/prisma-map';
+export {
   POLYMORPHIC_BINDS,
   type PolymorphicKind,
   polymorphicBindings,
@@ -110,6 +112,7 @@ export {
   type RuntimeDelegate,
   update,
 } from './utils/delegates';
+export { hasDeletedAt, lookupField, modelFields } from './utils/fieldMetadata';
 // Prisma error narrowing
 export { isUniqueConstraintError } from './utils/isUniqueConstraintError';
 export { isWriteConflictError } from './utils/isWriteConflictError';
@@ -158,6 +161,7 @@ export {
   type RuleReferenceSource,
   syncRuleReferenceEdges,
 } from './utils/syncRuleReferenceEdges';
+export { type NodeContext, type NodeScope, walkWhere } from './utils/whereWalker';
 export {
   type RuleValidation,
   type ValidateRuleForLensOptions,

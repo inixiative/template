@@ -4,11 +4,17 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
-import { DbAction, type HookOptions, HookTiming, registerDbHook } from '@template/db';
+import {
+  DbAction,
+  type HookOptions,
+  HookTiming,
+  hasDeletedAt,
+  modelNames,
+  registerDbHook,
+} from '@template/db';
 import { castArray } from 'lodash-es';
 import { reviveChildren, tombstoneChildren } from '#/hooks/softDeleteCascade/cascade';
 import { validateDeleteBehavior } from '#/hooks/softDeleteCascade/validateDeleteBehavior';
-import { hasDeletedAt, modelNames } from '#/lib/prisma/fieldMetadata';
 
 type Row = Record<string, unknown>;
 
@@ -27,7 +33,7 @@ export const registerSoftDeleteCascadeHook = () => {
   validateDeleteBehavior();
   registerDbHook(
     'softDeleteCascade',
-    modelNames().filter(hasDeletedAt),
+    modelNames.filter(hasDeletedAt),
     HookTiming.after,
     [DbAction.update, DbAction.updateManyAndReturn, DbAction.upsert],
     async ({ model, action, args, result, previous }: HookOptions) => {

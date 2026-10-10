@@ -4,14 +4,14 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
+import type { ModelField } from '@template/db';
 import { dialect } from '@template/db/lens';
 import { escapeLikePattern } from '#/lib/prisma/escapeLikePattern';
-import type { FieldDef } from '#/lib/prisma/fieldMetadata';
 
 // Prisma has no universal substring op: String → contains, String[] → has,
 // Json → string_contains; anything else is not text-searchable → undefined.
 export const fieldSearchOperator = (
-  field: FieldDef,
+  field: ModelField,
   term: string,
 ): Record<string, unknown> | undefined => {
   if (field.kind !== 'scalar') return undefined;

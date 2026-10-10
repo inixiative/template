@@ -1,8 +1,10 @@
 import { afterAll, beforeEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
-import { cleanupTouchedTables, createEmailComponent } from '@template/db/test';
+import { cleanupTouchedTables, createEmailComponent, registerTestTracker } from '@template/db/test';
 import { lookupCascade } from '@template/email/render/lookupCascade';
 import type { OwnerScope } from '@template/email/render/types';
+
+registerTestTracker();
 
 const defaultCtx: OwnerScope = { ownerModel: 'default', locale: 'en' };
 
@@ -12,7 +14,7 @@ describe('lookupCascade', () => {
   });
 
   beforeEach(async () => {
-    await db.emailComponent.deleteMany({});
+    await cleanupTouchedTables(db);
   });
 
   it('resolves a present slug to its component', async () => {

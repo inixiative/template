@@ -11,6 +11,7 @@ import {
 import { getResource } from '#/lib/context/getResource';
 import { readRoute } from '#/lib/routeTemplates';
 import { makeController } from '#/lib/utils/makeController';
+import { validateSuperadmin } from '#/middleware/validations/validateSuperadmin';
 import { Modules } from '#/modules/modules';
 import type { AppEnv } from '#/types/appEnv';
 import { createTestApp, type MountFn } from '#tests/createTestApp';
@@ -49,6 +50,13 @@ const mountRoutes: MountFn = (app) => {
   const cronJobRouter = new OpenAPIHono<AppEnv>();
   cronJobRouter.openapi(cronJobReadRoute, cronJobReadController);
   app.route('/api/v1/cronJob', cronJobRouter);
+
+  const adminOrgRouter = new OpenAPIHono<AppEnv>();
+  adminOrgRouter.openapi(orgReadRoute, orgReadController);
+  const adminRouter = new OpenAPIHono<AppEnv>();
+  adminRouter.use('*', validateSuperadmin);
+  adminRouter.route('/organization', adminOrgRouter);
+  app.route('/api/admin', adminRouter);
 };
 
 describe('resourceContextMiddleware', () => {
@@ -126,11 +134,21 @@ describe('resourceContextMiddleware', () => {
     expect(response.status).toBe(404);
   });
 
-  it('loads a soft-deleted resource when the caller is a superadmin', async () => {
+  it('returns 404 for a soft-deleted resource to a superadmin on a normal route', async () => {
     const response = await adminFetch(get(`/api/v1/organization/${deletedOrg.id}`));
+    expect(response.status).toBe(404);
+  });
+
+  it('loads a soft-deleted resource for a superadmin on a superadmin endpoint', async () => {
+    const response = await adminFetch(get(`/api/admin/organization/${deletedOrg.id}`));
     expect(response.status).toBe(200);
     const { data } = await json<Organization>(response);
     expect(data.id).toBe(deletedOrg.id);
+  });
+
+  it('refuses a superadmin endpoint to a non-superadmin', async () => {
+    const response = await fetch(get(`/api/admin/organization/${deletedOrg.id}`));
+    expect(response.status).toBe(403);
   });
 
   it('leaves models without a deletedAt column unaffected', async () => {

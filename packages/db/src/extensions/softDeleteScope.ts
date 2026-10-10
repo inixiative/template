@@ -4,9 +4,9 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
+import { hasDeletedAt, lookupField, modelFields } from '@template/db/utils/fieldMetadata';
+import { type NodeScope, walkWhere } from '@template/db/utils/whereWalker';
 import { castArray } from 'lodash-es';
-import { hasDeletedAt, lookupField } from '#/lib/prisma/fieldMetadata';
-import { type NodeScope, walkWhere } from '#/lib/prisma/whereWalker';
 
 const BOOLEAN_KEYS = new Set(['AND', 'OR', 'NOT']);
 
@@ -37,12 +37,47 @@ const liveAt: NodeScope = ({ model }, node) => {
 export const liveWhere = (model: string, where: Record<string, unknown>): Record<string, unknown> =>
   walkWhere(model, where, liveAt);
 
+const listRelationNames = (model: string): Record<string, true> =>
+  Object.fromEntries(
+    Object.entries(modelFields(model) ?? {})
+      .filter(([, field]) => field.kind === 'object' && field.isList)
+      .map(([name]) => [name, true as const]),
+  );
+
+const liveCount = (model: string, count: unknown): unknown => {
+  const select =
+    count === true
+      ? listRelationNames(model)
+      : isPlainObject(count) && isPlainObject(count.select)
+        ? count.select
+        : undefined;
+  if (!select) return count;
+  const scoped: Record<string, unknown> = {};
+  for (const [name, value] of Object.entries(select)) {
+    const field = lookupField(model, name);
+    const live = field ? liveScope(field.type) : undefined;
+    if (!value || !field || !live) {
+      scoped[name] = value;
+      continue;
+    }
+    const entry: Record<string, unknown> =
+      value === true ? {} : { ...(value as Record<string, unknown>) };
+    entry.where = isPlainObject(entry.where) ? liveWhere(field.type, entry.where) : live;
+    scoped[name] = entry;
+  }
+  return { ...(isPlainObject(count) ? count : {}), select: scoped };
+};
+
 export const liveIncludes = (
   model: string,
   tree: Record<string, unknown>,
 ): Record<string, unknown> => {
   const out: Record<string, unknown> = {};
   for (const [name, value] of Object.entries(tree)) {
+    if (name === '_count') {
+      out[name] = liveCount(model, value);
+      continue;
+    }
     const field = lookupField(model, name);
     if (!value || field?.kind !== 'object') {
       out[name] = value;

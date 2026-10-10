@@ -192,14 +192,13 @@ auditActorContext.scope(
     ipAddress: c.req.header('x-forwarded-for'),
     userAgent: c.req.header('user-agent'),
     sourceInquiryId: inquiry?.id,
-    platformSuperadmin: isSuperadmin(c), // bypasses soft-delete read scoping
-    bypassSoftDeleteScope: false,        // flipped by db.withDeleted()
+    bypassSoftDeleteScope: false, // flipped by db.withDeleted()
   },
   () => next(),
 );
 ```
 
-The same store carries the soft-delete read-scope flags, so anything that bridges this context across a boundary (e.g. into a transaction) carries them too.
+The same store carries the soft-delete bypass flag, so anything that bridges this context across a boundary (e.g. into a transaction) carries them too.
 
 ---
 

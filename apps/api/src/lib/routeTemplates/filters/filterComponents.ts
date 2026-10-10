@@ -6,8 +6,8 @@
  */
 import { z } from '@hono/zod-openapi';
 import type { FieldMapEntry } from '@inixiative/json-rules';
+import type { ModelField } from '@template/db';
 import { JSON_FIELD_OPERATORS } from '@template/shared/bracketQuery';
-import type { FieldDef } from '#/lib/prisma/fieldMetadata';
 import { getValidOperators } from '#/lib/prisma/scalarOperators';
 
 const ARRAY_OPS = new Set(['in', 'notIn']);
@@ -61,7 +61,7 @@ export const jsonFilterSchema = z
 const SCALAR_TYPES = ['String', 'Int', 'DateTime', 'Boolean'] as const;
 const SCALAR_FILTERS = new Map<string, z.ZodObject<z.ZodRawShape>>(
   SCALAR_TYPES.flatMap((type) => {
-    const operators = getValidOperators({ kind: 'scalar', type } as FieldDef);
+    const operators = getValidOperators({ kind: 'scalar', type } as ModelField);
     if (!operators.length) return [];
     const value = type === 'Boolean' ? z.boolean() : z.string();
     return [[type, operatorObject(operators, value).openapi(`${type}Filter`)]];
@@ -72,7 +72,7 @@ const SCALAR_FILTERS = new Map<string, z.ZodObject<z.ZodRawShape>>(
 // which varies per route, so a single named component can't represent them.
 const enumFilterSchema = (values: readonly string[]): z.ZodType => {
   const value = values.length ? z.enum(values as [string, ...string[]]) : z.string();
-  return operatorObject(getValidOperators({ kind: 'enum', type: 'Enum' } as FieldDef), value);
+  return operatorObject(getValidOperators({ kind: 'enum', type: 'Enum' } as ModelField), value);
 };
 
 // A bare value (no operator) defaults to the field's operator at runtime

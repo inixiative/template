@@ -1,12 +1,14 @@
 import { afterAll, beforeEach, describe, expect, test } from 'bun:test';
 import { db } from '@template/db';
-import { cleanupTouchedTables } from '@template/db/test';
+import { cleanupTouchedTables, registerTestTracker } from '@template/db/test';
 import { EmailRenderError } from '@template/email/errors/EmailRenderError';
 import { decompose } from '@template/email/render/decompose';
 import { hydrate, hydrateCascade, type ResolveHydrateBodies } from '@template/email/render/hydrate';
 import { lookupCascade } from '@template/email/render/lookupCascade';
 import { saveEmailTemplate } from '@template/email/render/save';
 import type { OwnerScope } from '@template/email/render/types';
+
+registerTestTracker();
 
 const resolverFrom =
   (bodies: Record<string, string>): ResolveHydrateBodies =>
@@ -268,8 +270,7 @@ describe('hydrateCascade (DB-backed)', () => {
   });
 
   beforeEach(async () => {
-    await db.emailComponent.deleteMany({});
-    await db.emailTemplate.deleteMany({});
+    await cleanupTouchedTables(db);
   });
 
   test("inlines a saved component's body through the real cascade lookup", async () => {

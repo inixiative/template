@@ -28,8 +28,6 @@ const makeContext = (
   } as unknown as Parameters<typeof paginate>[0];
 };
 
-const superadmin = { platformRole: 'superadmin' };
-
 describe('paginate — lens bindings', () => {
   it('resolves `{ bind }` tokens into the lens before building the where', async () => {
     const captured: Captured = {};
@@ -43,7 +41,6 @@ describe('paginate — lens bindings', () => {
     expect(captured.findManyArgs?.where).toEqual({
       AND: [{}, {}],
       name: { equals: 'aron' },
-      deletedAt: null,
     });
   });
 
@@ -64,73 +61,8 @@ describe('paginate — lens bindings', () => {
 
     const result = await paginate(makeContext(lens), makeDelegate(captured));
 
-    expect(captured.findManyArgs?.where).toEqual({ AND: [{}, {}], deletedAt: null });
+    expect(captured.findManyArgs?.where).toEqual({ AND: [{}, {}] });
     expect(result.pagination).toEqual({ page: 1, pageSize: 20, total: 0, totalPages: 0 });
-  });
-});
-
-describe('paginate — soft-delete scope', () => {
-  const userLens: LensNarrowing = { parent: lensFor('User'), root: { picks: ['name'] } };
-
-  it('folds live scope onto to-many include levels; column-less targets stay bare', async () => {
-    const captured: Captured = {};
-
-    await paginate(makeContext(userLens), makeDelegate(captured), {
-      include: {
-        contacts: { where: { isActive: true }, include: { user: true } },
-        sessions: true,
-      },
-    });
-
-    expect(captured.findManyArgs?.include).toEqual({
-      contacts: { where: { isActive: true, deletedAt: null }, include: { user: true } },
-      sessions: true,
-    });
-  });
-
-  it('an explicit deletedAt on an include level wins', async () => {
-    const captured: Captured = {};
-
-    await paginate(makeContext(userLens), makeDelegate(captured), {
-      include: { tokens: { where: { deletedAt: { not: null } } } },
-    });
-
-    expect(captured.findManyArgs?.include).toEqual({
-      tokens: { where: { deletedAt: { not: null } } },
-    });
-  });
-
-  it('an explicit root deletedAt in the caller where skips the root injection', async () => {
-    const captured: Captured = {};
-
-    await paginate(makeContext(userLens), makeDelegate(captured), {
-      where: { deletedAt: { not: null } },
-    });
-
-    expect(captured.findManyArgs?.where).toEqual({ AND: [{ deletedAt: { not: null } }, {}] });
-  });
-
-  it('superadmin sees soft-deleted rows: no injection in the where or the include', async () => {
-    const captured: Captured = {};
-
-    await paginate(makeContext(userLens, {}, superadmin), makeDelegate(captured), {
-      include: { tokens: true },
-    });
-
-    expect(captured.findManyArgs?.where).toEqual({ AND: [{}, {}] });
-    expect(captured.findManyArgs?.include).toEqual({ tokens: true });
-  });
-
-  it('a model without its own column gets no injection (the cascade hook owns consistency)', async () => {
-    const captured: Captured = {};
-    const lens: LensNarrowing = {
-      parent: lensFor('WebhookSubscription'),
-      root: { picks: ['url'] },
-    };
-
-    await paginate(makeContext(lens), makeDelegate(captured));
-
-    expect(captured.findManyArgs?.where).toEqual({ AND: [{}, {}] });
   });
 });
 

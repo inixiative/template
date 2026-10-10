@@ -47,7 +47,10 @@ describe('DELETE /api/v1/organization/:id', () => {
     const response = await fetch(del(`/api/v1/organization/${org.id}`));
     expect(response.status).toBe(204);
 
-    const deleted = await db.organization.findUnique({ where: { id: org.id } });
+    const deleted = await db.withDeleted(() =>
+      db.organization.findUnique({ where: { id: org.id } }),
+    );
+    expect(deleted).not.toBeNull();
     expect(deleted?.deletedAt).not.toBeNull();
   });
 });

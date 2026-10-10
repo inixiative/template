@@ -12,13 +12,13 @@ import {
   type RuleValue,
 } from '@inixiative/json-rules';
 import type { AnyDelegate, Args, Result } from '@template/db';
+import { isScalarField, lookupField, modelFields } from '@template/db';
 import { stableHash } from '@template/shared/utils';
 import { getValidatedQuery, type ValidatedContext } from '#/lib/context/getValidatedData';
 import { isSuperadmin } from '#/lib/context/isSuperadmin';
 import { makeError } from '#/lib/errors';
 import { buildOrderBy } from '#/lib/prisma/buildOrderBy';
 import { buildWhereClause } from '#/lib/prisma/buildWhereClause';
-import { lookupField, modelFields } from '#/lib/prisma/fieldMetadata';
 import {
   assertChainMatches,
   assertFilterMatches,
@@ -29,7 +29,6 @@ import {
   type SortKey,
 } from '#/lib/prisma/keysetCursor';
 import { lensWhere } from '#/lib/prisma/lensWhere';
-import { liveIncludes, liveWhere } from '#/lib/prisma/softDeleteScope';
 import type { BracketQueryRecord, BracketQueryValue } from '#/lib/utils/parseBracketNotation';
 
 const DEFAULT_CURSOR_PAGE_SIZE = 100;
@@ -128,8 +127,6 @@ const composeScopedFindMany = async <T extends AnyDelegate>(
     });
   }
   const filterLens = required.length ? bindLens(declaredLens, bindings ?? {}) : declaredLens;
-  // Superadmin bypasses both the searchable-fields whitelist and the injected
-  // `deletedAt: null` live scope.
   const superadmin = isSuperadmin(c);
 
   const model = getLensRoot(filterLens).model;
@@ -143,21 +140,11 @@ const composeScopedFindMany = async <T extends AnyDelegate>(
     orNullFields,
   });
 
-  // Lens relation wheres are authorization scope — they apply for superadmin
-  // too, mirroring root wheres. Live scope remains superadmin-bypassable.
+  // Lens relation wheres are authorization scope — they apply on superadmin endpoints too.
   const composed = await lensWhere(filterLens, {
     AND: [baseWhere, searchWhere as Record<string, unknown>],
   });
-  const where = (superadmin ? composed : liveWhere(model, composed)) as FindManyWhere<T>;
-
-  if (!superadmin) {
-    const trees = findManyOptions as Record<string, unknown>;
-    for (const key of ['include', 'select'] as const) {
-      const tree = trees[key];
-      if (tree && typeof tree === 'object')
-        trees[key] = liveIncludes(model, tree as Record<string, unknown>);
-    }
-  }
+  const where = composed as FindManyWhere<T>;
 
   return { where, model, findManyOptions, callerOrderByOption };
 };
@@ -203,23 +190,18 @@ export const paginate = async <
   };
 };
 
-// why: a keyset chain must end in a non-null unique column — a nullable tiebreaker either voids
-// why: the boundary comparison or silently skips rows on ties. Every model here carries a
-// why: required uuidv7 `id`, so that is the anchor; prismaMap exposes no isId/isRequired, so a
-// why: model with a differently-named primary key cannot be detected and must pin it itself
-// why: via options.orderBy.
 // why: a keyset chain must end in a non-null unique column - a nullable or non-unique tiebreaker
 // why: either voids the boundary comparison or silently skips rows on ties. That column is the
 // why: model's own @id, read off prismaMap rather than assumed by name.
 const primaryKeysOf = (model: string): string[] =>
   Object.entries(modelFields(model) ?? {})
-    .filter(([, field]) => field.isId && field.isRequired)
+    .filter(([, field]) => isScalarField(field) && field.isId && field.isRequired)
     .map(([name]) => name);
 
 export const withTotalOrder = (model: string, chain: SortKey[]): SortKey[] => {
   const lastKey = chain[chain.length - 1]?.[0];
   const lastField = lastKey ? lookupField(model, lastKey) : undefined;
-  if (lastField?.isId && lastField.isRequired) return chain;
+  if (lastField && isScalarField(lastField) && lastField.isId && lastField.isRequired) return chain;
 
   const [primaryKey, ...rest] = primaryKeysOf(model);
   if (!primaryKey || rest.length > 0) {
