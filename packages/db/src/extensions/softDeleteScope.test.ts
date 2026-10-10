@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { liveIncludes, liveWhere } from '#/lib/prisma/softDeleteScope';
+import { liveIncludes, liveWhere } from '@template/db/extensions/softDeleteScope';
 
 const LIVE = { deletedAt: null };
 

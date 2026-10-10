@@ -6,8 +6,8 @@
  */
 import { z } from '@hono/zod-openapi';
 import type { FieldMapEntry } from '@inixiative/json-rules';
+import type { FieldDef } from '@template/db';
 import { JSON_FIELD_OPERATORS } from '@template/shared/bracketQuery';
-import type { FieldDef } from '#/lib/prisma/fieldMetadata';
 import { getValidOperators } from '#/lib/prisma/scalarOperators';
 
 const ARRAY_OPS = new Set(['in', 'notIn']);

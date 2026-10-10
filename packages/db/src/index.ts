@@ -19,10 +19,11 @@ export {
   unregisterDbHook,
   unregisterDbInvariant,
 } from './extensions/hookRegistry';
-// Automatic soft-delete read/write scoping (app registers the scoper at bootstrap)
+// Automatic soft-delete read/write scoping (the app and test setup register it at bootstrap)
 export {
-  registerSoftDeleteScoper,
-  type SoftDeleteScoper,
+  isSoftDeleteScopeRegistered,
+  registerSoftDeleteScope,
+  unregisterSoftDeleteScope,
 } from './extensions/softDeleteScopeRegistry';
 // Prisma namespace for advanced types (Prisma.UserWhereInput, etc.)
 export { Prisma } from './generated/client/client';
@@ -110,6 +111,7 @@ export {
   type RuntimeDelegate,
   update,
 } from './utils/delegates';
+export { type FieldDef, hasDeletedAt, lookupField, modelFields } from './utils/fieldMetadata';
 // Prisma error narrowing
 export { isUniqueConstraintError } from './utils/isUniqueConstraintError';
 export { isWriteConflictError } from './utils/isWriteConflictError';
@@ -158,6 +160,7 @@ export {
   type RuleReferenceSource,
   syncRuleReferenceEdges,
 } from './utils/syncRuleReferenceEdges';
+export { type NodeContext, type NodeScope, walkWhere } from './utils/whereWalker';
 export {
   type RuleValidation,
   type ValidateRuleForLensOptions,

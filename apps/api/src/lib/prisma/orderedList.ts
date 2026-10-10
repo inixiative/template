@@ -4,9 +4,8 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
-import { db, orderedListRegistry, Prisma } from '@template/db';
+import { db, hasDeletedAt, orderedListRegistry, Prisma } from '@template/db';
 import { prismaMap } from '@template/db/generated/prismaMap';
-import { hasDeletedAt } from '#/lib/prisma/fieldMetadata';
 
 type Where = Record<string, unknown>;
 type Row = Record<string, unknown>;

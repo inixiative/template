@@ -4,7 +4,7 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
-import type { FieldDef } from '#/lib/prisma/fieldMetadata';
+import type { FieldDef } from '@template/db';
 
 const ENUM_OPS = ['equals', 'in', 'notIn', 'not'] as const;
 

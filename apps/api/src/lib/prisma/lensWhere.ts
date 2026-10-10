@@ -12,10 +12,8 @@ import {
   projectLens,
   toPrisma,
 } from '@inixiative/json-rules';
-import { db } from '@template/db';
+import { db, modelFields, walkWhere } from '@template/db';
 import { makeError } from '#/lib/errors';
-import { modelFields } from '#/lib/prisma/fieldMetadata';
-import { walkWhere } from '#/lib/prisma/whereWalker';
 
 type PlanStep = {
   operation: string;

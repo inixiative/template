@@ -5,7 +5,7 @@
  * @uses primitive:shared
  */
 import { getLensRoot, type LensNarrowing } from '@inixiative/json-rules';
-import { type ModelName, toModelName } from '@template/db';
+import { type FieldDef, lookupField, type ModelName, toModelName } from '@template/db';
 import { dialect, searchablePaths } from '@template/db/lens';
 import {
   FIELD_OPERATORS,
@@ -18,7 +18,6 @@ import { makeError } from '#/lib/errors';
 import { buildSearchPath } from '#/lib/prisma/buildSearchPath';
 import { coerceValueForField } from '#/lib/prisma/coerceValue';
 import { escapeLikePattern } from '#/lib/prisma/escapeLikePattern';
-import { type FieldDef, lookupField } from '#/lib/prisma/fieldMetadata';
 import { fieldSearchOperator } from '#/lib/prisma/fieldSearchOperator';
 import { buildJsonWhere } from '#/lib/prisma/jsonFilter';
 import { validatePathNotation } from '#/lib/prisma/pathNotation';

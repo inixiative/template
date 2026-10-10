@@ -12,13 +12,13 @@ import {
   type RuleValue,
 } from '@inixiative/json-rules';
 import type { AnyDelegate, Args, Result } from '@template/db';
+import { lookupField, modelFields } from '@template/db';
 import { stableHash } from '@template/shared/utils';
 import { getValidatedQuery, type ValidatedContext } from '#/lib/context/getValidatedData';
 import { isSuperadmin } from '#/lib/context/isSuperadmin';
 import { makeError } from '#/lib/errors';
 import { buildOrderBy } from '#/lib/prisma/buildOrderBy';
 import { buildWhereClause } from '#/lib/prisma/buildWhereClause';
-import { lookupField, modelFields } from '#/lib/prisma/fieldMetadata';
 import {
   assertChainMatches,
   assertFilterMatches,

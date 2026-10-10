@@ -29,8 +29,6 @@ const getField = (modelName: string, fieldName: string): FieldDef | undefined =>
 export const modelFields = (modelName: string): Record<string, FieldDef> | undefined =>
   MAP[modelName]?.fields;
 
-export const modelNames = (): string[] => Object.keys(MAP);
-
 export const hasDeletedAt = (modelName: string): boolean =>
   getField(modelName, 'deletedAt') !== undefined;
 

@@ -4,9 +4,9 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
+import { hasDeletedAt, lookupField, modelFields } from '@template/db/utils/fieldMetadata';
+import { type NodeScope, walkWhere } from '@template/db/utils/whereWalker';
 import { castArray } from 'lodash-es';
-import { hasDeletedAt, lookupField, modelFields } from '#/lib/prisma/fieldMetadata';
-import { type NodeScope, walkWhere } from '#/lib/prisma/whereWalker';
 
 const BOOLEAN_KEYS = new Set(['AND', 'OR', 'NOT']);
 

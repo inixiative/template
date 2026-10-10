@@ -1,18 +1,25 @@
+/**
+ * @atlas
+ * @kind test
+ * @partOf infrastructure:prisma
+ * @uses none
+ */
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db, revive } from '@template/db';
+import { db } from '@template/db/client';
+import {
+  registerSoftDeleteScope,
+  unregisterSoftDeleteScope,
+} from '@template/db/extensions/softDeleteScopeRegistry';
 import { ContactOwnerModel } from '@template/db/generated/client/enums';
 import { auditActorContext, nullAuditActor } from '@template/db/lib/auditActorContext';
 import {
   cleanupTouchedTables,
   createContact,
-  createOrganization,
   createOrganizationUser,
   createSession,
-  createSpace,
   createUser,
   registerTestTracker,
 } from '@template/db/test';
-import { registerSoftDeleteCascadeHook } from '#/hooks/softDeleteCascade/hook';
 
 const tombstone = (model: 'user' | 'organization' | 'contact' | 'organizationUser', id: string) =>
   db.delegate(model).update({ where: { id }, data: { deletedAt: new Date() } });
@@ -20,12 +27,25 @@ const tombstone = (model: 'user' | 'organization' | 'contact' | 'organizationUse
 describe('softDeleteScope extension', () => {
   beforeAll(() => {
     registerTestTracker();
-    registerSoftDeleteCascadeHook();
+    registerSoftDeleteScope();
   });
 
   afterAll(async () => {
+    unregisterSoftDeleteScope();
     await cleanupTouchedTables(db);
-    clearHookRegistry();
+  });
+
+  it('fails open until registered', async () => {
+    const { entity: user } = await createUser();
+    await tombstone('user', user.id);
+
+    unregisterSoftDeleteScope();
+    try {
+      expect((await db.user.findUnique({ where: { id: user.id } }))?.id).toBe(user.id);
+    } finally {
+      registerSoftDeleteScope();
+    }
+    expect(await db.user.findUnique({ where: { id: user.id } })).toBeNull();
   });
 
   it('hides a soft-deleted row from an ordinary read with no hand-scoping', async () => {
@@ -189,23 +209,5 @@ describe('softDeleteScope extension', () => {
       db.user.update({ where: { id: user.id }, data: { name: 'allowed' } }),
     );
     expect(updated.name).toBe('allowed');
-  });
-
-  it('revives a parent and its cascaded subtree with the extension active', async () => {
-    const { entity: org } = await createOrganization();
-    const { entity: space } = await createSpace({}, { organization: org });
-    const { entity: contact } = await createContact(
-      { ownerModel: ContactOwnerModel.Space },
-      { space },
-    );
-
-    await tombstone('organization', org.id);
-    expect(await db.organization.findUnique({ where: { id: org.id } })).toBeNull();
-
-    await revive(db.organization, { id: org.id });
-
-    expect((await db.organization.findUnique({ where: { id: org.id } }))?.id).toBe(org.id);
-    expect((await db.space.findUnique({ where: { id: space.id } }))?.id).toBe(space.id);
-    expect((await db.contact.findUnique({ where: { id: contact.id } }))?.id).toBe(contact.id);
   });
 });

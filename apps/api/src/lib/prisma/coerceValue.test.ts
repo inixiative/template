@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
+import type { FieldDef } from '@template/db';
 import { coerceValueForField } from '#/lib/prisma/coerceValue';
-import type { FieldDef } from '#/lib/prisma/fieldMetadata';
 
 const scalar = (type: string): FieldDef => ({ kind: 'scalar', type });
 const enumField: FieldDef = { kind: 'enum', type: 'PlatformRole', values: ['user', 'superadmin'] };

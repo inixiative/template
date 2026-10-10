@@ -4,8 +4,8 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
+import { type FieldDef, lookupField } from '@template/db/utils/fieldMetadata';
 import { isRelationOperator } from '@template/shared/bracketQuery';
-import { type FieldDef, lookupField } from '#/lib/prisma/fieldMetadata';
 
 const BOOLEAN_KEYS = new Set(['AND', 'OR', 'NOT']);
 

@@ -4,9 +4,14 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
-import { HARD_DELETE_ON_TOMBSTONE, SOFT_DELETE_MODEL_SET } from '@template/db';
+import {
+  HARD_DELETE_ON_TOMBSTONE,
+  hasDeletedAt,
+  isModelName,
+  modelFields,
+  SOFT_DELETE_MODEL_SET,
+} from '@template/db';
 import { childRelations } from '#/hooks/softDeleteCascade/childRelations';
-import { hasDeletedAt, modelFields, modelNames } from '#/lib/prisma/fieldMetadata';
 
 const optionalForeignKey = (model: string, fromFields: readonly string[]): boolean => {
   const fields = modelFields(model);
@@ -16,12 +21,11 @@ const optionalForeignKey = (model: string, fromFields: readonly string[]): boole
 export const deleteBehaviorViolations = (
   models: readonly string[] = HARD_DELETE_ON_TOMBSTONE,
 ): string[] => {
-  const known = new Set(modelNames());
   const listed = new Set(models);
   const violations: string[] = [];
 
   for (const model of models) {
-    if (!known.has(model)) {
+    if (!isModelName(model)) {
       violations.push(
         `${model} is listed in HARD_DELETE_ON_TOMBSTONE but is not a model in the schema.`,
       );

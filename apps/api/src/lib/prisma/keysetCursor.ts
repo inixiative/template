@@ -4,8 +4,8 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
+import { lookupField } from '@template/db';
 import { makeError } from '#/lib/errors';
-import { lookupField } from '#/lib/prisma/fieldMetadata';
 
 export type SortDirection = 'asc' | 'desc';
 export type SortKey = readonly [string, SortDirection];

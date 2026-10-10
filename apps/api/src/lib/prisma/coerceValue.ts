@@ -9,8 +9,8 @@
  * a Boolean-kind field; on any other field it is rejected with an error (so e.g.
  * `searchFields[createdAt][:]=true` no longer builds an invalid Prisma filter).
  */
+import type { FieldDef } from '@template/db';
 import { makeError } from '#/lib/errors';
-import type { FieldDef } from '#/lib/prisma/fieldMetadata';
 
 type Coercer = (value: unknown) => unknown;
 

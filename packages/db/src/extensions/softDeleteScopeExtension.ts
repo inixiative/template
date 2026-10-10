@@ -4,10 +4,8 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
-import {
-  getSoftDeleteScoper,
-  type SoftDeleteScoper,
-} from '@template/db/extensions/softDeleteScopeRegistry';
+import { liveIncludes, liveWhere } from '@template/db/extensions/softDeleteScope';
+import { isSoftDeleteScopeRegistered } from '@template/db/extensions/softDeleteScopeRegistry';
 import { Prisma } from '@template/db/generated/client/client';
 import { auditActorContext } from '@template/db/lib/auditActorContext';
 
@@ -27,17 +25,13 @@ const SCOPED_OPS = new Set([
   'upsert',
 ]);
 
-const scopeArgs = (
-  scoper: SoftDeleteScoper,
-  model: string,
-  args: unknown,
-): Record<string, unknown> => {
+const scopeArgs = (model: string, args: unknown): Record<string, unknown> => {
   const next = { ...((args ?? {}) as Record<string, unknown>) };
-  next.where = scoper.liveWhere(model, (next.where as Record<string, unknown>) ?? {});
+  next.where = liveWhere(model, (next.where as Record<string, unknown>) ?? {});
   for (const key of ['include', 'select'] as const) {
     const tree = next[key];
     if (tree && typeof tree === 'object')
-      next[key] = scoper.liveIncludes(model, tree as Record<string, unknown>);
+      next[key] = liveIncludes(model, tree as Record<string, unknown>);
   }
   return next;
 };
@@ -48,10 +42,13 @@ export const softDeleteScopeExtension = () =>
     query: {
       $allModels: {
         async $allOperations({ model, operation, args, query }) {
-          const scoper = getSoftDeleteScoper();
-          if (!scoper || auditActorContext.isSoftDeleteBypassed() || !SCOPED_OPS.has(operation))
+          if (
+            !isSoftDeleteScopeRegistered() ||
+            auditActorContext.isSoftDeleteBypassed() ||
+            !SCOPED_OPS.has(operation)
+          )
             return query(args);
-          return query(scopeArgs(scoper, model, args) as typeof args);
+          return query(scopeArgs(model, args) as typeof args);
         },
       },
     },

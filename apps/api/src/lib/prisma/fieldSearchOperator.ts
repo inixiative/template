@@ -4,9 +4,9 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
+import type { FieldDef } from '@template/db';
 import { dialect } from '@template/db/lens';
 import { escapeLikePattern } from '#/lib/prisma/escapeLikePattern';
-import type { FieldDef } from '#/lib/prisma/fieldMetadata';
 
 // Prisma has no universal substring op: String → contains, String[] → has,
 // Json → string_contains; anything else is not text-searchable → undefined.

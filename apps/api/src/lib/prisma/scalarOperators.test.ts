@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import type { FieldDef } from '#/lib/prisma/fieldMetadata';
+import type { FieldDef } from '@template/db';
 import {
   getDefaultOperator,
   getValidOperators,
