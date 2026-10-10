@@ -6,8 +6,15 @@
  */
 import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 import { DbAction, db, HookTiming, registerDbHook, unregisterDbHook } from '@template/db';
-import { cleanupTouchedTables, createEmailComponent, createEmailTemplate } from '@template/db/test';
+import {
+  cleanupTouchedTables,
+  createEmailComponent,
+  createEmailTemplate,
+  registerTestTracker,
+} from '@template/db/test';
 import { recomputeDegradedComponentRefs } from '@template/email/render/recomputeDegradedComponentRefs';
+
+registerTestTracker();
 
 const cardBody = '{{#slot:inner:default}}{{#component:x}}{{/component:x}}{{/slot:inner:default}}';
 
@@ -18,8 +25,7 @@ describe('recomputeDegradedComponentRefs', () => {
 
   afterEach(async () => {
     unregisterDbHook('move-email-version');
-    await db.emailTemplate.deleteMany({});
-    await db.emailComponent.deleteMany({});
+    await cleanupTouchedTables(db);
   });
 
   it('ignores a missing default-slot child only when the template overrides that slot', async () => {
