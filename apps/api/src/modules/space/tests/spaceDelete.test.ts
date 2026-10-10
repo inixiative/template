@@ -7,7 +7,12 @@ import type {
   SpaceUser,
   User,
 } from '@template/db/generated/client/client';
-import { cleanupTouchedTables, createOrganizationUser, createSpace } from '@template/db/test';
+import {
+  cleanupTouchedTables,
+  createOrganizationUser,
+  createSpace,
+  createSpaceUser,
+} from '@template/db/test';
 import { spaceRouter } from '#/modules/space';
 import { createTestApp } from '#tests/createTestApp';
 import { del } from '#tests/utils/request';
@@ -30,14 +35,10 @@ describe('DELETE /api/v1/space/:id', () => {
     const { entity: s } = await createSpace({}, { organization: org });
     space = s;
 
-    spaceUser = await db.spaceUser.create({
-      data: {
-        role: 'owner',
-        organizationId: org.id,
-        spaceId: space.id,
-        userId: user.id,
-      },
-    });
+    ({ entity: spaceUser } = await createSpaceUser(
+      { role: 'owner' },
+      { user, organization: org, space, organizationUser: orgUser },
+    ));
 
     const harness = createTestApp({
       mockUser: user,
@@ -55,14 +56,10 @@ describe('DELETE /api/v1/space/:id', () => {
 
   it('soft deletes the space', async () => {
     const { entity: toDelete } = await createSpace({}, { organization: org });
-    const toDeleteSpaceUser = await db.spaceUser.create({
-      data: {
-        role: 'owner',
-        organizationId: org.id,
-        spaceId: toDelete.id,
-        userId: user.id,
-      },
-    });
+    const { entity: toDeleteSpaceUser } = await createSpaceUser(
+      { role: 'owner' },
+      { user, organization: org, space: toDelete, organizationUser: orgUser },
+    );
 
     const harness = createTestApp({
       mockUser: user,
