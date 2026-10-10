@@ -32,14 +32,14 @@ describe('validateNotToken', () => {
 
   it('rejects non-superadmin token with 403', async () => {
     const { entity: user } = await createUser();
-    const { entity: token } = await createToken({}, { user });
+    const { entity: token } = await createToken({ ownerModel: 'User' }, { user });
     const res = await buildApp({ user, token }).fetch(new Request('http://test/protected'));
     expect(res.status).toBe(403);
   });
 
   it('allows superadmin token through', async () => {
     const { entity: admin } = await createUser({ platformRole: 'superadmin' });
-    const { entity: token } = await createToken({}, { user: admin });
+    const { entity: token } = await createToken({ ownerModel: 'User' }, { user: admin });
     const res = await buildApp({ user: admin, token }).fetch(new Request('http://test/protected'));
     expect(res.status).toBe(200);
   });

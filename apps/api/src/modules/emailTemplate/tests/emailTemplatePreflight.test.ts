@@ -6,6 +6,7 @@ import {
   createEmailTemplate,
   createOrganization,
   createTag,
+  createTagCategory,
   createUser,
 } from '@template/db/test';
 import { adminEmailTemplateRouter } from '#/modules/emailTemplate';
@@ -177,7 +178,12 @@ describe("emailTemplatePreflight — rules are judged through the owner's lens",
     const { entity: mine } = await createOrganization();
     const { entity: theirTag } = await createTag(
       { ownerModel: 'Organization' },
-      { organization: theirs },
+      {
+        organization: theirs,
+        tagCategory: (
+          await createTagCategory({ ownerModel: 'Organization' }, { organization: theirs })
+        ).entity,
+      },
     );
     const result = await emailTemplatePreflight({
       mjml: taggedDraft(theirTag.id),

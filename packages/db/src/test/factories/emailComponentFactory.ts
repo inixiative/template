@@ -11,7 +11,6 @@ const emailComponentFactory = createFactory('EmailComponent', {
     slug: `component-${getNextSeq()}`,
     locale: 'en',
     mjml: '<mj-text>Default content</mj-text>',
-    ownerModel: 'default' as const,
     componentRefs: [],
     inheritToSpaces: true,
   }),

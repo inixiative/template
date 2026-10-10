@@ -6,6 +6,7 @@ import {
   createOrganization,
   createSegment,
   createTag,
+  createTagCategory,
 } from '@template/db/test';
 import { registerRulesHook } from '#/hooks/rules/hook';
 import { saveEmailTemplate } from '#/lib/email/saveEmailTemplate';
@@ -59,8 +60,28 @@ describe('saveEmailTemplate — a rule may only name what its owner can see', ()
     mine = (await createOrganization()).entity;
     theirs = (await createOrganization()).entity;
     platformTag = (await createTag()).entity;
-    myTag = (await createTag({ ownerModel: 'Organization' }, { organization: mine })).entity;
-    theirTag = (await createTag({ ownerModel: 'Organization' }, { organization: theirs })).entity;
+    myTag = (
+      await createTag(
+        { ownerModel: 'Organization' },
+        {
+          organization: mine,
+          tagCategory: (
+            await createTagCategory({ ownerModel: 'Organization' }, { organization: mine })
+          ).entity,
+        },
+      )
+    ).entity;
+    theirTag = (
+      await createTag(
+        { ownerModel: 'Organization' },
+        {
+          organization: theirs,
+          tagCategory: (
+            await createTagCategory({ ownerModel: 'Organization' }, { organization: theirs })
+          ).entity,
+        },
+      )
+    ).entity;
     mySegment = (await createSegment({ ownerModel: 'Organization' }, { organization: mine }))
       .entity;
     theirSegment = (await createSegment({ ownerModel: 'Organization' }, { organization: theirs }))

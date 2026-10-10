@@ -43,19 +43,19 @@ describe('sweepable segments — what the nightly sweep enqueues', () => {
 
   it('enqueues sound dynamic segments only: a degraded one is skipped, not warned about by its job', async () => {
     const { entity: target } = await createSegment(
-      { type: SegmentType.dynamic, conditions: acmeRule },
+      { ownerModel: 'Space', type: SegmentType.dynamic, conditions: acmeRule },
       { space },
     );
     const { entity: sound } = await createSegment(
-      { type: SegmentType.dynamic, conditions: acmeRule },
+      { ownerModel: 'Space', type: SegmentType.dynamic, conditions: acmeRule },
       { space },
     );
     const { entity: degraded } = await createSegment(
-      { type: SegmentType.dynamic, conditions: membersOf(target.id) },
+      { ownerModel: 'Space', type: SegmentType.dynamic, conditions: membersOf(target.id) },
       { space },
     );
     const { entity: pinned } = await createSegment(
-      { type: SegmentType.static, conditions: acmeRule },
+      { ownerModel: 'Space', type: SegmentType.static, conditions: acmeRule },
       { space },
     );
     await db.segment.update({ where: { id: target.id }, data: { deletedAt: new Date() } });

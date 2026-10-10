@@ -47,9 +47,12 @@ describe('segment rule health — the segments a rule names, as edges', () => {
   });
 
   it('saving a membership rule writes one Segment → Segment edge, and re-saving set-diffs it', async () => {
-    const { entity: target } = await createSegment({ conditions: acmeRule }, { space });
+    const { entity: target } = await createSegment(
+      { ownerModel: 'Space', conditions: acmeRule },
+      { space },
+    );
     const { entity: dependent } = await createSegment(
-      { conditions: membersOf(target.id) },
+      { ownerModel: 'Space', conditions: membersOf(target.id) },
       { space },
     );
 
@@ -68,9 +71,12 @@ describe('segment rule health — the segments a rule names, as edges', () => {
   });
 
   it('a sound rule reports no issues and evaluates', async () => {
-    const { entity: target } = await createSegment({ conditions: acmeRule }, { space });
+    const { entity: target } = await createSegment(
+      { ownerModel: 'Space', conditions: acmeRule },
+      { space },
+    );
     const { entity: dependent } = await createSegment(
-      { conditions: membersOf(target.id) },
+      { ownerModel: 'Space', conditions: membersOf(target.id) },
       { space },
     );
 
@@ -80,11 +86,11 @@ describe('segment rule health — the segments a rule names, as edges', () => {
 
   it('a rule naming a segment that is gone is degraded: it evaluates nothing, and the read says why', async () => {
     const { entity: target } = await createSegment(
-      { type: SegmentType.dynamic, conditions: acmeRule },
+      { ownerModel: 'Space', type: SegmentType.dynamic, conditions: acmeRule },
       { space },
     );
     const { entity: dependent } = await createSegment(
-      { type: SegmentType.dynamic, conditions: membersOf(target.id) },
+      { ownerModel: 'Space', type: SegmentType.dynamic, conditions: membersOf(target.id) },
       { space },
     );
 
@@ -109,15 +115,15 @@ describe('segment rule health — the segments a rule names, as edges', () => {
 
   it('degradation propagates up the graph: naming a degraded segment degrades the namer, and clears with it', async () => {
     const { entity: target } = await createSegment(
-      { type: SegmentType.dynamic, conditions: acmeRule },
+      { ownerModel: 'Space', type: SegmentType.dynamic, conditions: acmeRule },
       { space },
     );
     const { entity: middle } = await createSegment(
-      { type: SegmentType.dynamic, conditions: membersOf(target.id) },
+      { ownerModel: 'Space', type: SegmentType.dynamic, conditions: membersOf(target.id) },
       { space },
     );
     const { entity: top } = await createSegment(
-      { type: SegmentType.dynamic, conditions: membersOf(middle.id) },
+      { ownerModel: 'Space', type: SegmentType.dynamic, conditions: membersOf(middle.id) },
       { space },
     );
 
@@ -140,8 +146,14 @@ describe('segment rule health — the segments a rule names, as edges', () => {
   });
 
   it('a membership loop is refused at save', async () => {
-    const { entity: a } = await createSegment({ conditions: acmeRule }, { space });
-    const { entity: b } = await createSegment({ conditions: membersOf(a.id) }, { space });
+    const { entity: a } = await createSegment(
+      { ownerModel: 'Space', conditions: acmeRule },
+      { space },
+    );
+    const { entity: b } = await createSegment(
+      { ownerModel: 'Space', conditions: membersOf(a.id) },
+      { space },
+    );
 
     await expect(
       db.segment.update({ where: { id: a.id }, data: { conditions: membersOf(b.id) } }),
@@ -168,8 +180,14 @@ describe('segment rule health — edge upkeep', () => {
   });
 
   it('a narrowed update still resyncs the edges', async () => {
-    const { entity: target } = await createSegment({ conditions: acmeRule }, { space });
-    const { entity: dependent } = await createSegment({ conditions: acmeRule }, { space });
+    const { entity: target } = await createSegment(
+      { ownerModel: 'Space', conditions: acmeRule },
+      { space },
+    );
+    const { entity: dependent } = await createSegment(
+      { ownerModel: 'Space', conditions: acmeRule },
+      { space },
+    );
 
     await db.segment.update({
       where: { id: dependent.id },
@@ -180,9 +198,12 @@ describe('segment rule health — edge upkeep', () => {
   });
 
   it('a save that keeps a reference that has since died is allowed; a new dead reference is not', async () => {
-    const { entity: target } = await createSegment({ conditions: acmeRule }, { space });
+    const { entity: target } = await createSegment(
+      { ownerModel: 'Space', conditions: acmeRule },
+      { space },
+    );
     const { entity: dependent } = await createSegment(
-      { conditions: membersOf(target.id) },
+      { ownerModel: 'Space', conditions: membersOf(target.id) },
       { space },
     );
     await db.segment.update({ where: { id: target.id }, data: { deletedAt: new Date() } });
@@ -193,7 +214,10 @@ describe('segment rule health — edge upkeep', () => {
     });
     expect(renamed.name).toBe('renamed');
 
-    const { entity: other } = await createSegment({ conditions: acmeRule }, { space });
+    const { entity: other } = await createSegment(
+      { ownerModel: 'Space', conditions: acmeRule },
+      { space },
+    );
     await db.segment.update({ where: { id: other.id }, data: { deletedAt: new Date() } });
     await expect(
       db.segment.update({ where: { id: dependent.id }, data: { conditions: membersOf(other.id) } }),

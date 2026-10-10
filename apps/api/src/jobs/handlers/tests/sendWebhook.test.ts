@@ -604,7 +604,7 @@ describe('sendWebhook handler', () => {
     it('skips a poisoned record: no event, no request, while other records still deliver', async () => {
       const { sub, integration, customerRef } = await createRecordSubscription();
       await createIntegrationRecord(
-        { poisonedAt: new Date(), poisonedReason: 'HTTP 400: Bad Request' },
+        { model: 'CustomerRef', poisonedAt: new Date(), poisonedReason: 'HTTP 400: Bad Request' },
         { integration, customerRef },
       );
 

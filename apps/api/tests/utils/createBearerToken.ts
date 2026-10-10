@@ -7,7 +7,11 @@ import { createToken } from '@template/db/test';
 export const createBearerToken = async (user: User) => {
   const rawKey = randomBytes(24).toString('hex');
   const { entity: token } = await createToken(
-    { keyHash: createHash('sha256').update(rawKey).digest('hex'), keyPrefix: rawKey.slice(0, 16) },
+    {
+      ownerModel: 'User',
+      keyHash: createHash('sha256').update(rawKey).digest('hex'),
+      keyPrefix: rawKey.slice(0, 16),
+    },
     { user },
   );
   return { token, rawKey, authorization: `Bearer ${rawKey}` };

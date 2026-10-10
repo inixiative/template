@@ -64,7 +64,7 @@ describe('rate limit identities', () => {
 
   it('a session and a user-owned token share the user bucket', async () => {
     const { entity: user } = await createUser();
-    const { entity: token } = await createToken({}, { user });
+    const { entity: token } = await createToken({ ownerModel: 'User' }, { user });
 
     const viaSession = await who(createTestApp({ mockUser: user, mount: [echo] }).fetch);
     const viaToken = await who(

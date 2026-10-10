@@ -1,4 +1,5 @@
 export * from './auditEnabledModels';
+export * from './discriminatorDefaults';
 export {
   type FalsePolymorphismRef,
   type FlexibleRef,

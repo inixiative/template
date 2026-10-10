@@ -336,6 +336,6 @@ describe('ruleReference — the save path writes edges, the target side stamps t
         targetId: tag.id,
         targetTagId: tag.id,
       }),
-    ).rejects.toMatchObject({ status: 422 });
+    ).rejects.toThrow('RuleReference sourceModel=EmailTemplate needs sourceEmailTemplateId');
   });
 });

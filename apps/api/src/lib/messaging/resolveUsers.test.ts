@@ -8,6 +8,7 @@ import {
   createOrganization,
   createTag,
   createTagAttachment,
+  createTagCategory,
   createUser,
 } from '@template/db/test';
 import { resolveUsers } from '#/lib/messaging/resolveUsers';
@@ -104,7 +105,14 @@ describe('resolveUsers', () => {
 
   it("targets through the platform recipient lens: an organization's tag is outside its view", async () => {
     const { entity: organization } = await createOrganization();
-    const { entity: orgTag } = await createTag({ ownerModel: 'Organization' }, { organization });
+    const { entity: orgTag } = await createTag(
+      { ownerModel: 'Organization' },
+      {
+        organization,
+        tagCategory: (await createTagCategory({ ownerModel: 'Organization' }, { organization }))
+          .entity,
+      },
+    );
     await createTagAttachment({ resourceModel: TagResource.User }, { user: carol, tag: orgTag });
     const users = await resolveUsers({
       field: 'tagAttachments',

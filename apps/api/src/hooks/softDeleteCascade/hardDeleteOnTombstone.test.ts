@@ -29,7 +29,7 @@ describe('hardDeleteOnTombstone — rows that cannot outlive their parent', () =
 
   it('hard-deletes a tombstoned user’s tokens', async () => {
     const { entity: user } = await createUser();
-    const { entity: token } = await createToken({}, { user });
+    const { entity: token } = await createToken({ ownerModel: 'User' }, { user });
 
     await tombstoneUser(user.id);
 
@@ -38,7 +38,10 @@ describe('hardDeleteOnTombstone — rows that cannot outlive their parent', () =
 
   it('hard-deletes a tombstoned user’s webhook subscriptions', async () => {
     const { entity: user, context } = await createUser();
-    const { entity: subscription } = await createWebhookSubscription({}, context);
+    const { entity: subscription } = await createWebhookSubscription(
+      { model: 'CustomerRef', ownerModel: 'User' },
+      context,
+    );
 
     await tombstoneUser(user.id);
 
@@ -59,10 +62,16 @@ describe('hardDeleteOnTombstone — rows that cannot outlive their parent', () =
 
   it('hard-deletes a tombstoned integration’s tokens and webhook subscriptions', async () => {
     const { entity: user, context } = await createUser();
-    const { entity: integration } = await createIntegration({ userId: user.id });
-    const { entity: token } = await createToken({ integrationId: integration.id }, { user });
+    const { entity: integration } = await createIntegration({
+      ownerModel: 'User',
+      userId: user.id,
+    });
+    const { entity: token } = await createToken(
+      { ownerModel: 'User', integrationId: integration.id },
+      { user },
+    );
     const { entity: subscription } = await createWebhookSubscription(
-      { integrationId: integration.id },
+      { model: 'CustomerRef', ownerModel: 'User', integrationId: integration.id },
       context,
     );
 

@@ -4,19 +4,13 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
-import {
-  InquiryResourceModel,
-  InquiryStatus,
-  InquiryType,
-} from '@template/db/generated/client/enums';
+import { InquiryStatus, InquiryType } from '@template/db/generated/client/enums';
 import { createFactory } from '@template/db/test/factory';
 
 const inquiryFactory = createFactory('Inquiry', {
   defaults: () => ({
     type: InquiryType.inviteOrganizationUser,
     status: InquiryStatus.sent,
-    sourceModel: InquiryResourceModel.Organization,
-    targetModel: InquiryResourceModel.User,
     content: {},
     resolution: {},
   }),
