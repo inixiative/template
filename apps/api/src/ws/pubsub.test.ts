@@ -125,33 +125,49 @@ describe('ws pubsub (redis round trip)', () => {
     expect(pendingStreamQueues()).toBe(0);
   });
 
-  it('an append Redis cannot sequence resyncs holders on every instance once Redis is back', async () => {
-    const remote = createTestSocket({ connectionId: 'pubsub-remote' });
+  it('an append Redis cannot sequence is re-published as a resync until Redis takes it', async () => {
     const redis = getRedisPub();
     const evalSpy = spyOn(redis, 'eval').mockImplementation((() =>
       Promise.reject(new Error('redis down'))) as never);
     const realPublish = redis.publish.bind(redis);
-    let publishes = 0;
+    const published: string[] = [];
+    let attempts = 0;
     const publishSpy = spyOn(redis, 'publish').mockImplementation(((
       channel: string,
       message: string,
-    ) =>
-      ++publishes === 1
-        ? Promise.reject(new Error('redis down'))
-        : realPublish(channel, message)) as never);
+    ) => {
+      if (++attempts === 1) return Promise.reject(new Error('redis down'));
+      published.push(message);
+      return realPublish(channel, message);
+    }) as never);
     try {
       await appendToStream('pubsub:remote', { type: 'upsert', payload: { id: 'x' } });
-      addConnection(remote.socket);
-      subscribeToStream(remote.socket, 'pubsub:remote');
-      await waitFor(() => remote.sent.length > 0);
+      await appendToStream('pubsub:remote', { type: 'upsert', payload: { id: 'y' } });
+      await waitFor(() => published.length > 0);
+      await new Promise((resolve) => setTimeout(resolve, 50));
     } finally {
       evalSpy.mockRestore();
       publishSpy.mockRestore();
     }
 
-    expect(publishes).toBeGreaterThanOrEqual(2);
-    expect(remote.sent.map((message) => JSON.parse(message))).toEqual([
-      { type: 'error', action: 'open', stream: 'pubsub:remote', retryable: true },
+    expect(published.map((message) => JSON.parse(message))).toEqual([
+      { type: 'streamResync', target: 'pubsub:remote', origin: expect.any(String) },
+    ]);
+  });
+
+  it('a resync from another instance closes the stream on local holders as retryable', async () => {
+    const handle = createTestSocket({ connectionId: 'pubsub-foreign-resync' });
+    addConnection(handle.socket);
+    subscribeToStream(handle.socket, 'pubsub:foreign');
+
+    await getRedisPub().publish(
+      'ws:broadcast',
+      JSON.stringify({ type: 'streamResync', target: 'pubsub:foreign', origin: 'other-instance' }),
+    );
+    await waitFor(() => handle.sent.length > 0);
+
+    expect(handle.sent.map((message) => JSON.parse(message))).toEqual([
+      { type: 'error', action: 'open', stream: 'pubsub:foreign', retryable: true },
     ]);
   });
 

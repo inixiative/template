@@ -26,7 +26,7 @@ type PubSubMessage =
   | { type: 'user' | 'channel'; target: string; event: WSOutbound }
   | { type: 'broadcast'; event: WSOutbound }
   | { type: 'stream'; target: string; userIds?: string[]; seqs: number[]; append: StreamAppend }
-  | { type: 'streamResync'; target: string };
+  | { type: 'streamResync'; target: string; origin: string };
 
 const RESYNC_RETRY_MS = 1_000;
 
@@ -74,7 +74,7 @@ const deliverLocal = (message: PubSubMessage): void => {
       deliverStreamAppend(message);
       break;
     case 'streamResync':
-      resyncLocalHolders(message.target);
+      if (message.origin !== INSTANCE_ID) resyncLocalHolders(message.target);
       break;
     case 'broadcast':
       broadcastLocal(message.event);
@@ -127,31 +127,35 @@ export const sendToUser = (userId: string, event: WSOutbound): Promise<void> =>
 export const sendToChannel = (channel: string, event: WSOutbound): Promise<void> =>
   publish({ type: 'channel', target: channel, event });
 
+const INSTANCE_ID = crypto.randomUUID();
 const pendingResyncs = new Set<string>();
-let resyncRetry: ReturnType<typeof setTimeout> | undefined;
+let publishingResyncs = false;
+
+const retryPendingResyncs = (): void => {
+  setTimeout(() => void publishPendingResyncs(), RESYNC_RETRY_MS).unref?.();
+};
 
 // Holders on other instances missed the append too, so every instance hears a resync once Redis is back.
 const publishPendingResyncs = async (): Promise<void> => {
-  resyncRetry = undefined;
-  for (const stream of [...pendingResyncs]) {
-    try {
-      await getRedisPub().publish(
-        WS_CHANNEL,
-        JSON.stringify({ type: 'streamResync', target: stream }),
-      );
+  if (publishingResyncs) return;
+  publishingResyncs = true;
+  try {
+    for (const stream of [...pendingResyncs]) {
+      const message = { type: 'streamResync', target: stream, origin: INSTANCE_ID };
+      await getRedisPub().publish(WS_CHANNEL, JSON.stringify(message));
       pendingResyncs.delete(stream);
-    } catch {
-      resyncRetry = setTimeout(() => void publishPendingResyncs(), RESYNC_RETRY_MS);
-      resyncRetry.unref?.();
-      return;
     }
+  } catch {
+    retryPendingResyncs();
+  } finally {
+    publishingResyncs = false;
   }
 };
 
 const resyncEverywhere = (stream: string): void => {
   resyncLocalHolders(stream);
   pendingResyncs.add(stream);
-  if (!resyncRetry) void publishPendingResyncs();
+  void publishPendingResyncs();
 };
 
 // Serialized per stream so this instance publishes a stream's appends in emission order.

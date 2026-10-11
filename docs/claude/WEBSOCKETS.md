@@ -257,8 +257,8 @@ held row (by `updatedAt`) is ignored, so the folded state only moves forward. Ac
 
 ### Sequence numbers
 
-Every stream has a counter in Redis, shared by every instance and the worker: `ws:seq:<stream>`
-for a `'shared'` stream, and one per user (`ws:seq:<stream>:user:<userId>`) for a `'perRecipient'`
+Every stream has a counter in Redis, shared by every instance and the worker: `ws:seq:{<stream>}`
+for a `'shared'` stream, and one per user (`ws:seq:{<stream>}:user:<userId>`) for a `'perRecipient'`
 stream, so an append addressed to one user is never a gap for another. `appendToStream` runs one
 Lua script (`apps/api/src/ws/queries/publishStreamAppend.ts`) that `INCR`s the counter (each
 recipient's, for a per-recipient append) and `PUBLISH`es the append with those seqs, so publish
