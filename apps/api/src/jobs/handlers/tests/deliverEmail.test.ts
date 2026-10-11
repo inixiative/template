@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
 import { clearHookRegistry, db } from '@template/db';
 import { CommunicationReasonCode } from '@template/db/generated/client/enums';
 import {
@@ -8,6 +8,7 @@ import {
   createOrganization,
   createSpace,
   createUser,
+  registerTestTracker,
 } from '@template/db/test';
 import type { EmailClient, SendEmailOptions } from '@template/email/client/types';
 import { saveEmailTemplate } from '@template/email/render';
@@ -15,6 +16,8 @@ import { registerAuditLogHook } from '#/hooks/auditLog/hook';
 import { registerEmailVersioningHook } from '#/hooks/emailVersioning/hook';
 import { type DeliverEmailPayload, deliverEmail } from '#/jobs/handlers/deliverEmail';
 import { emailRegistry } from '#/lib/email';
+
+registerTestTracker();
 
 const ADAPTER = 'closure-recorder';
 
@@ -28,8 +31,7 @@ describe('deliverEmail — send-time component version closure', () => {
 
   let fan: { id: string };
 
-  beforeAll(async () => {
-    fan = (await createUser({ email: 'fan@example.com' })).entity;
+  beforeAll(() => {
     registerAuditLogHook();
     registerEmailVersioningHook();
     const recorder: EmailClient = {
@@ -46,6 +48,10 @@ describe('deliverEmail — send-time component version closure', () => {
     emailRegistry.register(ADAPTER, recorder);
   });
 
+  beforeEach(async () => {
+    fan = (await createUser({ email: 'fan@example.com' })).entity;
+  });
+
   afterAll(async () => {
     emailRegistry.unregister(ADAPTER);
     clearHookRegistry();
@@ -56,11 +62,7 @@ describe('deliverEmail — send-time component version closure', () => {
     sent.length = 0;
     attempts.length = 0;
     outcomes.length = 0;
-    await db.communicationComponentVersion.deleteMany({});
-    await db.communicationLog.deleteMany({});
-    await db.auditLog.deleteMany({});
-    await db.emailTemplate.deleteMany({});
-    await db.emailComponent.deleteMany({});
+    await cleanupTouchedTables(db);
   });
 
   const ctx = () => ({ db, log: () => {} }) as never;

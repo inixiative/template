@@ -71,11 +71,13 @@ describe('recomposeFromSnapshots', () => {
 
 import { afterAll, afterEach, beforeAll } from 'bun:test';
 import { clearHookRegistry, db } from '@template/db';
-import { cleanupTouchedTables } from '@template/db/test';
+import { cleanupTouchedTables, registerTestTracker } from '@template/db/test';
 import { saveEmailTemplate } from '@template/email/render';
 import { registerAuditLogHook } from '#/hooks/auditLog/hook';
 import { registerEmailVersioningHook } from '#/hooks/emailVersioning/hook';
 import { recomposeCommunication } from '#/lib/email/recompose';
+
+registerTestTracker();
 
 const documentMjml = (content: string) =>
   `<mjml><mj-body><mj-section><mj-column>${content}</mj-column></mj-section></mj-body></mjml>`;
@@ -92,10 +94,7 @@ describe('recomposeCommunication (DB-backed)', () => {
   });
 
   afterEach(async () => {
-    await db.communicationLog.deleteMany({});
-    await db.auditLog.deleteMany({});
-    await db.emailTemplate.deleteMany({});
-    await db.emailComponent.deleteMany({});
+    await cleanupTouchedTables(db);
   });
 
   const savedPin = async () => {

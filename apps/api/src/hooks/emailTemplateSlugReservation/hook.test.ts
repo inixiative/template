@@ -1,10 +1,16 @@
 import { afterAll, beforeEach, describe, expect, it } from 'bun:test';
 import { clearHookRegistry, db } from '@template/db';
-import { cleanupTouchedTables, createEmailTemplate, createOrganization } from '@template/db/test';
+import {
+  cleanupTouchedTables,
+  createEmailTemplate,
+  createOrganization,
+  registerTestTracker,
+} from '@template/db/test';
 import { saveEmailTemplate } from '@template/email/render/save';
 import { registerEmailTemplateSlugReservationHook } from '#/hooks/emailTemplateSlugReservation/hook';
 import { registerRulesHook } from '#/hooks/rules/hook';
 
+registerTestTracker();
 registerRulesHook();
 registerEmailTemplateSlugReservationHook();
 
@@ -30,7 +36,7 @@ const expectConflict = async (write: Promise<unknown>) => {
 
 describe('emailTemplateSlugReservation hook', () => {
   beforeEach(async () => {
-    await db.emailTemplate.deleteMany({});
+    await cleanupTouchedTables(db);
   });
 
   it('refuses a default template on an admin slug', async () => {

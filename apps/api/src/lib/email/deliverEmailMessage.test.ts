@@ -13,12 +13,15 @@ import {
   createTagAttachment,
   createTagCategory,
   createUser,
+  registerTestTracker,
 } from '@template/db/test';
 import type { EmailClient, SendEmailOptions, SendEmailResult } from '@template/email/client/types';
 import { EmailProviderError } from '@template/email/errors/EmailProviderError';
 import { saveEmailTemplate } from '@template/email/render';
 import { emailRegistry, emailVerifier } from '#/lib/email';
 import { type DeliverEmailPayload, deliverEmailMessage } from '#/lib/email/deliverEmailMessage';
+
+registerTestTracker();
 
 const ADAPTER = 'claim-policy-recorder';
 const TEMPLATE = 'claim-policy-template';
@@ -48,8 +51,7 @@ describe('deliverEmailMessage — claim policy', () => {
 
   let fan: { id: string };
 
-  beforeAll(async () => {
-    fan = (await createUser({ email: 'fan@example.com' })).entity;
+  beforeAll(() => {
     const recorder: EmailClient = {
       send: async (options) => {
         attempts.push(options);
@@ -63,6 +65,7 @@ describe('deliverEmailMessage — claim policy', () => {
   });
 
   beforeEach(async () => {
+    fan = (await createUser({ email: 'fan@example.com' })).entity;
     await saveEmailTemplate({
       slug: TEMPLATE,
       name: 'Claim policy',
@@ -77,9 +80,7 @@ describe('deliverEmailMessage — claim policy', () => {
     attempts.length = 0;
     outcomes.length = 0;
     waits.length = 0;
-    await db.communicationComponentVersion.deleteMany({});
-    await db.communicationLog.deleteMany({});
-    await db.emailTemplate.deleteMany({});
+    await cleanupTouchedTables(db);
   });
 
   afterAll(async () => {
@@ -220,8 +221,7 @@ describe('deliverEmailMessage — the recipient is read through the lens at send
 
   afterEach(async () => {
     sent.length = 0;
-    await db.communicationLog.deleteMany({});
-    await db.emailTemplate.deleteMany({});
+    await cleanupTouchedTables(db);
   });
 
   afterAll(async () => {
