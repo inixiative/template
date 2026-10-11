@@ -48,7 +48,11 @@ export { useInfiniteScrollTrigger } from './useInfiniteScrollTrigger';
 export { useInquiryPermission } from './useInquiryPermission';
 export { useLanguage } from './useLanguage';
 export { useMediaQuery } from './useMediaQuery';
-export { createOptimisticListTarget, useOptimisticMutation } from './useOptimisticMutation';
+export {
+  createOptimisticListTarget,
+  OPTIMISTIC_ID,
+  useOptimisticMutation,
+} from './useOptimisticMutation';
 export {
   type OrganizationContactsStream,
   useOrganizationContactsStream,

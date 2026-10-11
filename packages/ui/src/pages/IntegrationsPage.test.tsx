@@ -23,6 +23,7 @@ type StoredIntegration = Record<string, unknown> & {
 
 let stored: Record<string, StoredIntegration[]>;
 let requests: Array<{ method: string; path: string; body?: unknown }>;
+let permissionChecks: Array<{ model: string; id: unknown; action: unknown }>;
 let fetchSpy: ReturnType<typeof spyOn<typeof globalThis, 'fetch'>>;
 let client: QueryClient;
 let owner: Awaited<ReturnType<typeof buildUser>>['entity'];
@@ -43,7 +44,13 @@ const serverIntegration = async (
 const setContext = (context: TenantContext, canManage: boolean) =>
   useAppStore.setState((state) => ({
     tenant: { ...state.tenant, context },
-    permissions: { ...state.permissions, check: () => canManage },
+    permissions: {
+      ...state.permissions,
+      check: (model, record, action) => {
+        permissionChecks.push({ model, id: record.id, action });
+        return canManage && action === 'manage';
+      },
+    },
   }));
 
 const renderPage = () =>
@@ -59,6 +66,7 @@ beforeEach(async () => {
   owner = (await buildUser()).entity;
   stored = {};
   requests = [];
+  permissionChecks = [];
   client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const intercept = async (input: RequestInfo | URL) => {
     const request = input as Request;
@@ -73,6 +81,14 @@ beforeEach(async () => {
       const integration = await serverIntegration(body.name, body.provider);
       stored[path] = [...(stored[path] ?? []), integration];
       return Response.json({ data: integration }, { status: 201 });
+    }
+    if (request.method === 'DELETE' && path.startsWith('/api/v1/integration/')) {
+      requests.push({ method: 'DELETE', path });
+      const id = path.split('/').pop();
+      for (const key of Object.keys(stored)) {
+        stored[key] = (stored[key] ?? []).filter((integration) => integration.id !== id);
+      }
+      return new Response(null, { status: 204 });
     }
     return Response.json({ message: 'Unexpected request' }, { status: 400 });
   };
@@ -175,6 +191,14 @@ describe('IntegrationsPage', () => {
       `/api/v1/organization/${organization.id}/integrations`,
       `/api/v1/space/${space.id}/integrations`,
     ]);
+    expect(permissionChecks).toContainEqual({ model: 'user', id: owner.id, action: 'manage' });
+    expect(permissionChecks).toContainEqual({
+      model: 'organization',
+      id: organization.id,
+      action: 'manage',
+    });
+    expect(permissionChecks).toContainEqual({ model: 'space', id: space.id, action: 'manage' });
+    expect(permissionChecks.every((check) => check.action === 'manage')).toBe(true);
   });
 
   it("connect opens the provider's create flow and lists the new integration under it", async () => {
@@ -222,5 +246,39 @@ describe('IntegrationsPage', () => {
 
     await waitFor(() => expect(within(providerCard('github')).getByText('Platform')).toBeTruthy());
     expect(screen.queryByRole('button', { name: 'Finish GitHub' })).toBeNull();
+  });
+
+  it('connects through the organization when the context is an organization', async () => {
+    const organization = (await buildOrganization()).entity.__serialize();
+    setContext({ type: 'organization', organization } as unknown as TenantContext, true);
+    renderPage();
+    await waitFor(() => expect(requests).toHaveLength(1));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Connect Linear' }));
+    fireEvent.change(screen.getByLabelText('Integration name'), {
+      target: { value: 'Product' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Connect' }));
+
+    await waitFor(() => expect(within(providerCard('linear')).getByText('Product')).toBeTruthy());
+    expect(requests.find((request) => request.method === 'POST')?.path).toBe(
+      `/api/v1/organization/${organization.id}/integrations`,
+    );
+  });
+
+  it('deletes an integration from under its provider', async () => {
+    stored['/api/v1/me/integrations'] = [await serverIntegration('Old chat', 'slack')];
+    renderPage();
+    await screen.findByText('Old chat');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete Old chat' }));
+
+    await waitFor(() => expect(screen.queryByText('Old chat')).toBeNull());
+    await waitFor(() =>
+      expect(within(providerCard('slack')).getByText('Not connected')).toBeTruthy(),
+    );
+    const deleted = requests.filter((request) => request.method === 'DELETE');
+    expect(deleted).toHaveLength(1);
+    expect(deleted[0]?.path).toMatch(/^\/api\/v1\/integration\//);
   });
 });

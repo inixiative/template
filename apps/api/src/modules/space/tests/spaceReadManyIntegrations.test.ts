@@ -64,6 +64,13 @@ describe('GET /api/v1/space/:id/integrations', () => {
       ownerModel: 'Organization',
       organizationId: org.id,
     });
+    await createIntegration({
+      name: `Space membership ${seq}`,
+      ownerModel: 'SpaceUser',
+      organizationId: org.id,
+      spaceId: space.id,
+      userId: user.id,
+    });
     const { entity: removed } = await createIntegration({
       name: `Removed ${seq}`,
       ownerModel: 'Space',

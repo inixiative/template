@@ -14,7 +14,12 @@ import type {
 } from '@template/sdk';
 import { Badge, Button, Card, Page } from '@template/ui/components';
 import { CreateIntegrationModal } from '@template/ui/components/settings/CreateIntegrationModal';
-import { createOptimisticListTarget, useOptimisticMutation, useQuery } from '@template/ui/hooks';
+import {
+  createOptimisticListTarget,
+  OPTIMISTIC_ID,
+  useOptimisticMutation,
+  useQuery,
+} from '@template/ui/hooks';
 import { getContextParams } from '@template/ui/lib/getContextParams';
 import { integrationContextQueries } from '@template/ui/lib/integrationContextQueries';
 import {
@@ -72,7 +77,7 @@ const IntegrationRows = ({ integrations, canManage, onDelete }: IntegrationRowsP
             Connected {new Date(integration.createdAt).toLocaleDateString()}
           </p>
         </div>
-        {canManage && (
+        {canManage && integration.id !== OPTIMISTIC_ID && (
           <Button
             variant="ghost"
             size="sm"
@@ -95,7 +100,7 @@ export const IntegrationsPage = ({ connectFlows = {} }: IntegrationsPageProps) =
   const integrationQueries = integrationContextQueries(context);
   const canManage = permissions.check(...getContextParams(context), 'manage');
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: integrationQueries.readMany.queryKey,
     queryFn: integrationQueries.readMany.queryFn,
   });
@@ -134,7 +139,9 @@ export const IntegrationsPage = ({ connectFlows = {} }: IntegrationsPageProps) =
     deleteMutation.mutate({ path: { id: integration.id } });
 
   const canConnect = (provider: IntegrationProvider) =>
-    canManage && (Boolean(connectFlows[provider]) || integrationProviders[provider].directConnect);
+    canManage &&
+    !isError &&
+    (Boolean(connectFlows[provider]) || integrationProviders[provider].directConnect);
 
   const statusOf = (provider: IntegrationProvider): ProviderStatus => {
     if (integrationsOf(provider).length > 0) return 'connected';
@@ -142,11 +149,16 @@ export const IntegrationsPage = ({ connectFlows = {} }: IntegrationsPageProps) =
   };
 
   const closeConnect = () => setConnectingProvider(null);
-  const ConnectFlow = connectingProvider ? connectFlows[connectingProvider] : undefined;
+  const connectFlow = connectingProvider ? connectFlows[connectingProvider] : undefined;
 
   return (
     <>
       <Page title="Integrations" description="Connect the services this workspace works with">
+        {isError && (
+          <p role="alert" className="mb-3 text-sm text-destructive">
+            Integrations could not be loaded.
+          </p>
+        )}
         {isLoading ? (
           <div className="h-40 animate-pulse rounded-xl bg-muted/50" />
         ) : (
@@ -201,15 +213,15 @@ export const IntegrationsPage = ({ connectFlows = {} }: IntegrationsPageProps) =
         )}
       </Page>
 
-      {ConnectFlow ? (
-        <ConnectFlow
-          context={context}
-          onClose={closeConnect}
-          onConnected={() => {
+      {connectFlow ? (
+        connectFlow({
+          context,
+          onClose: closeConnect,
+          onConnected: () => {
             closeConnect();
             void queryClient.invalidateQueries({ queryKey: integrationQueries.readMany.queryKey });
-          }}
-        />
+          },
+        })
       ) : (
         <CreateIntegrationModal
           provider={connectingProvider}

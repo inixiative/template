@@ -4,6 +4,8 @@ import {
   cleanupTouchedTables,
   createIntegration,
   createOrganizationUser,
+  createSpace,
+  createSpaceUser,
   createUser,
   getNextSeq,
 } from '@template/db/test';
@@ -31,11 +33,29 @@ describe('GET /api/v1/me/integrations', () => {
       await createIntegration({ name, provider: 'github', ownerModel: 'User', userId: user.id });
     }
     await createIntegration({ name: `Theirs ${seq}`, ownerModel: 'User', userId: otherUser.id });
-    const { entity: orgUser } = await createOrganizationUser({ role: 'owner' }, { user });
+    const { entity: orgUser, context: orgUserContext } = await createOrganizationUser(
+      { role: 'owner' },
+      { user },
+    );
     await createIntegration({
       name: `Org ${seq}`,
       ownerModel: 'Organization',
       organizationId: orgUser.organizationId,
+    });
+    await createIntegration({
+      name: `Membership ${seq}`,
+      ownerModel: 'OrganizationUser',
+      organizationId: orgUser.organizationId,
+      userId: user.id,
+    });
+    const { entity: space } = await createSpace({}, { organization: orgUserContext.organization });
+    await createSpaceUser({ role: 'owner' }, { ...orgUserContext, space });
+    await createIntegration({
+      name: `Space membership ${seq}`,
+      ownerModel: 'SpaceUser',
+      organizationId: orgUser.organizationId,
+      spaceId: space.id,
+      userId: user.id,
     });
     const { entity: removed } = await createIntegration({
       name: `Removed ${seq}`,
