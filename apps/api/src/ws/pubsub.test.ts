@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 import { getRedisPub } from '@template/db';
 
 import { appendToStream, initWebSocketPubSub, isPubSubEnabled, sendToChannel } from '#/ws/pubsub';
+import { publishStreamAppend } from '#/ws/queries/publishStreamAppend';
 import { addConnection, clearRegistry } from '#/ws/registry';
 import { pendingStreamQueues } from '#/ws/streamPublishOrder';
 import { subscribeToStream } from '#/ws/streamSubscriptions';
@@ -59,32 +60,67 @@ describe('ws pubsub (redis round trip)', () => {
       category: 'data',
       action: 'append',
       stream: 'pubsub:stream',
+      seq: expect.any(Number),
       type: 'upsert',
       payload: { id: 'x' },
     });
   });
 
-  it('publishes one stream in emission order even when an earlier publish falls back to local delivery', async () => {
+  it('publishes one stream in emission order, each append one seq past the last', async () => {
     const handle = createTestSocket({ connectionId: 'pubsub-order' });
     addConnection(handle.socket);
     subscribeToStream(handle.socket, 'pubsub:ordered');
+
+    await Promise.all(
+      [1, 2, 3].map((n) => appendToStream('pubsub:ordered', { type: 'upsert', payload: { n } })),
+    );
+    await waitFor(() => handle.sent.length === 3);
+
+    const frames = handle.sent.map((message) => JSON.parse(message));
+    expect(frames.map((frame) => frame.payload.n)).toEqual([1, 2, 3]);
+    expect(frames.map((frame) => frame.seq - frames[0].seq)).toEqual([0, 1, 2]);
+    expect(pendingStreamQueues()).toBe(0);
+  });
+
+  it('two instances publishing one stream share its counter, so arrival order is seq order with no gaps', async () => {
+    const handle = createTestSocket({ connectionId: 'pubsub-instances' });
+    addConnection(handle.socket);
+    subscribeToStream(handle.socket, 'pubsub:shared');
+    // Each instance has its own per-stream queue, so their publishes interleave freely at Redis.
+    const instance = (name: string) => (n: number) =>
+      publishStreamAppend(getRedisPub(), 'ws:broadcast', 'pubsub:shared', {
+        type: 'stream',
+        target: 'pubsub:shared',
+        append: { type: 'upsert', payload: { name, n } },
+      });
+    const a = instance('a');
+    const b = instance('b');
+
+    await Promise.all([1, 2, 3, 4, 5].flatMap((n) => [a(n), b(n)]));
+    await waitFor(() => handle.sent.length === 10);
+
+    const seqs = handle.sent.map((message) => JSON.parse(message).seq as number);
+    expect(seqs.map((seq) => seq - (seqs[0] as number))).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+  });
+
+  it('an append Redis cannot sequence closes the stream on local holders as retryable', async () => {
+    const handle = createTestSocket({ connectionId: 'pubsub-down' });
+    addConnection(handle.socket);
+    subscribeToStream(handle.socket, 'pubsub:down');
     const redis = getRedisPub();
-    const realPublish = redis.publish.bind(redis);
-    let calls = 0;
-    const spy = spyOn(redis, 'publish').mockImplementation(((channel: string, message: string) =>
-      ++calls === 1
-        ? new Promise((_, reject) => setTimeout(() => reject(new Error('redis down')), 50))
-        : realPublish(channel, message)) as never);
+    const spy = spyOn(redis, 'eval').mockImplementation((() =>
+      Promise.reject(new Error('redis down'))) as never);
     try {
-      const first = appendToStream('pubsub:ordered', { type: 'upsert', payload: { n: 1 } });
-      const second = appendToStream('pubsub:ordered', { type: 'upsert', payload: { n: 2 } });
-      await Promise.all([first, second]);
-      await waitFor(() => handle.sent.length === 2);
+      await appendToStream('pubsub:down', { type: 'upsert', payload: { id: 'x' } });
+      await waitFor(() => handle.sent.length > 0);
     } finally {
       spy.mockRestore();
     }
 
-    expect(handle.sent.map((message) => JSON.parse(message).payload.n)).toEqual([1, 2]);
+    expect(handle.sent.map((message) => JSON.parse(message))).toEqual([
+      { type: 'error', action: 'open', stream: 'pubsub:down', retryable: true },
+    ]);
+    expect(handle.socket.data.streams.has('pubsub:down')).toBe(false);
     expect(pendingStreamQueues()).toBe(0);
   });
 

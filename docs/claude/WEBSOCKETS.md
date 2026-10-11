@@ -14,6 +14,7 @@
   - [Audience](#audience)
   - [Authorization and re-authorization](#authorization-and-re-authorization)
   - [Ordering](#ordering)
+  - [Sequence numbers](#sequence-numbers)
   - [Producing appends](#producing-appends)
   - [Frontend](#frontend)
 - [Frontend and horizontal scaling](#frontend-and-horizontal-scaling)
@@ -28,13 +29,15 @@ The frontend consumes two event classes (`WSEvent`, dispatched as `handlers[cate
 - **Query-refetch hints** — `{ category: 'query', action: 'refetch', key: { _id, path? } }`. The
   client invalidates that TanStack Query key and fetches data through the normal authorized HTTP
   route. Reconnect recovery refetches registered live queries.
-- **Data streams** — `{ category: 'data', action: 'snapshot', stream, payload }` once per open,
-  then `{ category: 'data', action: 'append', stream, type, payload }` for each change. The socket
+- **Data streams** — `{ category: 'data', action: 'snapshot', stream, seq, payload }` once per
+  open, then `{ category: 'data', action: 'append', stream, seq, type, payload }` for each change. The socket
   carries the data itself: the snapshot is the route's response and each append is a row shaped by
   the route's `responseSchema`, folded by the stream's kind. See [Data streams](#data-streams).
 
 Neither class is persisted or replayed. Every consumer owns a recovery path that does not depend
 on the push: query channels refetch on reconnect, and data streams re-open for a fresh snapshot.
+Data streams carry a per-stream `seq` so the client can *detect* a lost append and resync; nothing
+is ever re-sent (see [Sequence numbers](#sequence-numbers)).
 
 An app-event handler returns `WSHandoff[]`: a message handoff (`{ channels }` or `{ userIds }`
 target plus `message.data`) or a stream handoff built by `streamAppend`. Any further payload type
@@ -139,15 +142,15 @@ that route (`STREAM_DEFINITIONS.organizationReadManyContacts.name({ id })` →
 
 ```
 client → { action: 'open', stream }        server → { type: 'opened', stream }
-server → { category: 'data', action: 'snapshot', stream, payload }
-server → { category: 'data', action: 'append', stream, type, payload } …
+server → { category: 'data', action: 'snapshot', stream, seq, payload }
+server → { category: 'data', action: 'append', stream, seq, type, payload } …
 client → { action: 'close', stream }       server → { type: 'closed', stream }
 unauthorized (401/403/404/400…) → { type: 'openRejected', stream }
 transient (429/5xx), full queue, exception → { type: 'error', action: 'open', stream, retryable: true }
 ```
 
 Closing the socket or changing the user or credential closes every stream on it. There is no
-replay.
+replay: a lost append is detected by its `seq` and repaired by a fresh snapshot.
 
 **The contacts stream is scaffolding.** `organizationReadManyContacts` exists to exercise the
 primitive end to end and is the only registered stream. Remove it (definition, producers in the
@@ -233,14 +236,14 @@ on membership, role or token removal through an app event is a planned follow-up
 
 The connection subscribes to the stream before the snapshot request. Appends that arrive during
 the request are held (`heldAppends`) and sent after the snapshot, so a client never sees an append
-before its snapshot. An append can repeat a change the snapshot already contains, so every fold
-must be idempotent.
+before its snapshot. Held appends the snapshot already contains are dropped by their `seq` (below);
+one published during the read can still repeat a change the read saw, so every fold must be
+idempotent.
 
 Within one API instance, `appendToStream` publishes through a `createSerializedQueue` per stream
 key (`apps/api/src/ws/streamPublishOrder.ts`): a stream's appends go out in the order the instance
-emitted them, including when a publish fails and falls back to local delivery. Across instances,
-Redis pub/sub is the ordering boundary: two instances publishing to the same stream are delivered
-in the order Redis received the publishes, which need not be the order their writes committed.
+emitted them. Across instances, Redis is the ordering boundary: two instances publishing to the
+same stream are delivered in seq order, which need not be the order their writes committed.
 
 A removal is final. The list fold keeps a bounded set of tombstones (`__removed`, last 500 ids)
 and ignores any later `upsert` for a removed id, so a late update from another instance cannot
@@ -251,6 +254,35 @@ reconnect) keeps the tombstones, dropping only those whose row the snapshot show
 upserts of a live row, the definition's `ordering` decides: by default an update older than the
 held row (by `updatedAt`) is ignored, so the folded state only moves forward. Action listeners
 (`useStreamAction`) still hear every append, stale ones included.
+
+### Sequence numbers
+
+Every stream has a counter in Redis (`ws:seq:<stream>`), shared by every instance and the worker.
+`appendToStream` runs one Lua script (`apps/api/src/ws/queries/publishStreamAppend.ts`) that
+`INCR`s the counter and `PUBLISH`es the append with that `seq`, so publish order is seq order and
+two instances publishing one stream never produce a false gap. `openDataStream` reads the counter
+(`queries/readStreamSeq.ts`) **before** the snapshot read starts and stamps the snapshot with it:
+appends are published after their transaction commits, so every append at or below the stamp is
+already in the snapshot.
+
+The client (`createApiWebsocket`) keeps the last seq per open stream:
+
+- a snapshot sets it, replacing the stream's state;
+- an append at or below it is dropped (a held append the snapshot already holds, or a stale one
+  after a resync);
+- an append exactly one past it is applied;
+- an append further past it is a gap: the client forgets the last seq, drops appends until the
+  next snapshot, and re-sends `open` (`websocket.resync`) for a fresh one.
+
+The counter's TTL (one day) is refreshed by every append and every open, so only an idle stream's
+counter expires. A counter is seeded from the clock, so one re-created after expiry starts above any
+seq it gave out before and holders resync instead of ignoring every append.
+
+The server never drifts silently. Bun's `ws.send` returns `0` when it drops a frame (closed, or over
+its backpressure limit); `sendFrame` (`apps/api/src/ws/delivery.ts`), behind every send, then closes
+the connection (`1013 frame dropped`), and the client reconnects and re-opens its streams. If Redis
+cannot sequence an append, its local holders get a retryable `error` for the stream and re-open
+with backoff. There is no replay buffer, no queue and no acknowledgement.
 
 ### Producing appends
 
@@ -272,8 +304,8 @@ streamAppend(STREAM_DEFINITIONS.organizationReadManyContacts, { id: contact.orga
   routeRow(organizationReadManyContactsRoute, contact));
 ```
 
-`deliverWSHandoffs` calls `appendToStream`, which wraps the action in the append frame and
-publishes through Redis.
+`deliverWSHandoffs` calls `appendToStream`, which sequences the action and publishes it through
+Redis; each instance wraps it in the append frame on delivery.
 
 ### Frontend
 
@@ -320,7 +352,8 @@ mounted stream queries; `setClient` wires the QueryClient and reconnect recovery
 `sendToChannel`, `sendToUser`, `appendToStream` and `broadcast` publish through Redis
 `ws:broadcast`. Each API instance delivers to its local registry. Stream snapshots are served by
 whichever instance holds the socket; appends reach streams open on any instance. Redis failure
-falls back to local delivery, so cross-instance delivery is unavailable during the outage.
+falls back to local delivery for channel, user and broadcast messages, so cross-instance delivery
+is unavailable during the outage; stream appends cannot be sequenced, so local holders resync.
 
 ## Source and verification
 
@@ -333,14 +366,17 @@ falls back to local delivery, so cross-instance delivery is unavailable during t
   registries, delivery, ordering and Redis pub/sub.
 - `apps/api/src/ws/probe.test.ts`: real-route authorization, unknown channels, dot segments,
   missing credentials and spoof authority.
-- `apps/api/src/ws/dataStreams.test.ts`: open/snapshot/held appends, transient vs rejected
-  statuses, the pending-frame cap, credential swaps and re-authorization after revocation.
+- `apps/api/src/ws/dataStreams.test.ts`: open/snapshot/held appends, snapshot seq stamps, a
+  dropped frame closing the socket, transient vs rejected statuses, the pending-frame cap, credential swaps and re-authorization after revocation.
 - `apps/api/src/ws/streamAudience.test.ts`: the audience enforcement.
-- `apps/api/src/ws/pubsub.test.ts`: per-stream publish order and per-recipient delivery.
+- `apps/api/src/ws/pubsub.test.ts`: per-stream publish order, a shared counter across instances,
+  an unsequenced append, and per-recipient delivery.
+- `apps/api/src/ws/queries/streamSeq.test.ts`: snapshot stamp vs next seq, TTL refresh, re-seed
+  after expiry.
 - `apps/api/src/appEvents/handlers/contact/organizationContactsStream.test.ts`: app event →
   Redis → open socket, with append rows matching the route snapshot.
 - `packages/ui/src/lib/ws/createApiWebsocket.test.ts`,
   `listStream.test.ts`, `dispatch.test.ts`, `packages/ui/src/hooks/useStream.test.tsx`:
-  client protocol, retries, settling, folds and hooks.
+  client protocol, retries, settling, seq gaps and resync, folds and hooks.
 
 See [APP_EVENTS.md](APP_EVENTS.md) and [Segments](SEGMENTS.md#events-and-email-integration).

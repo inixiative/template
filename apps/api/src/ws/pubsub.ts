@@ -6,43 +6,46 @@
  */
 import { getRedisPub, getRedisSub } from '@template/db';
 import { LogScope, log } from '@template/shared/logger';
-import { streamAppendFrame } from '#/ws/dataFrame';
+import { type StreamAppend, streamAppendFrame } from '#/ws/dataFrame';
 import {
   broadcastLocal,
   sendToChannelLocal,
   sendToStreamLocal,
   sendToUserLocal,
 } from '#/ws/delivery';
+import { publishStreamAppend } from '#/ws/queries/publishStreamAppend';
+import { byId, byStream } from '#/ws/registry';
+import { rejectDataStream } from '#/ws/rejectDataStream';
 import { inStreamOrder } from '#/ws/streamPublishOrder';
 import type { WSOutbound } from '#/ws/types';
 
 const WS_CHANNEL = 'ws:broadcast';
 
-type PubSubMessage = {
-  type: 'user' | 'channel' | 'stream' | 'broadcast';
-  target?: string;
-  userIds?: string[];
-  event: WSOutbound;
-};
-
-export type StreamAppend = { type: string; payload: unknown; revive?: true };
+type PubSubMessage =
+  | { type: 'user' | 'channel'; target: string; event: WSOutbound }
+  | { type: 'broadcast'; event: WSOutbound }
+  | { type: 'stream'; target: string; userIds?: string[]; seq: number; append: StreamAppend };
 
 let initialized = false;
 let pubsubEnabled = false;
 
-const deliverLocal = ({ type, target, userIds, event }: PubSubMessage): void => {
-  switch (type) {
+const deliverLocal = (message: PubSubMessage): void => {
+  switch (message.type) {
     case 'user':
-      if (target) sendToUserLocal(target, event);
+      sendToUserLocal(message.target, message.event);
       break;
     case 'channel':
-      if (target) sendToChannelLocal(target, event);
+      sendToChannelLocal(message.target, message.event);
       break;
     case 'stream':
-      if (target) sendToStreamLocal(target, event, userIds);
+      sendToStreamLocal(
+        message.target,
+        streamAppendFrame(message.target, message.seq, message.append),
+        message.userIds,
+      );
       break;
     case 'broadcast':
-      broadcastLocal(event);
+      broadcastLocal(message.event);
       break;
   }
 };
@@ -75,7 +78,7 @@ export const initWebSocketPubSub = async (): Promise<void> => {
   }
 };
 
-const publish = async (message: PubSubMessage): Promise<void> => {
+const publish = async (message: Exclude<PubSubMessage, { type: 'stream' }>): Promise<void> => {
   try {
     await getRedisPub().publish(WS_CHANNEL, JSON.stringify(message));
   } catch (err) {
@@ -90,20 +93,36 @@ export const sendToUser = (userId: string, event: WSOutbound): Promise<void> =>
 export const sendToChannel = (channel: string, event: WSOutbound): Promise<void> =>
   publish({ type: 'channel', target: channel, event });
 
-// Serialized per stream so this instance publishes a stream's appends in emission order, fallback included.
+// An unsequenced append would drift its holders, so they re-open for a snapshot instead.
+const resyncLocalHolders = (stream: string): void => {
+  for (const id of [...(byStream.get(stream) ?? [])]) {
+    const ws = byId.get(id);
+    if (!ws) continue;
+    void ws.data.queue.run(async () => {
+      if (byId.has(id) && ws.data.streams.has(stream)) rejectDataStream(ws, stream, 'retryable');
+    });
+  }
+};
+
+// Serialized per stream so this instance publishes a stream's appends in emission order.
 export const appendToStream = (
   stream: string,
   append: StreamAppend,
   userIds?: string[],
 ): Promise<void> =>
-  inStreamOrder(stream, () =>
-    publish({
-      type: 'stream',
-      target: stream,
-      userIds,
-      event: streamAppendFrame(stream, append.type, append.payload, append.revive),
-    }),
-  );
+  inStreamOrder(stream, async () => {
+    try {
+      await publishStreamAppend(getRedisPub(), WS_CHANNEL, stream, {
+        type: 'stream',
+        target: stream,
+        ...(userIds ? { userIds } : {}),
+        append,
+      });
+    } catch (err) {
+      log.error(`Failed to publish a stream append (${stream}); resyncing local holders:`, err);
+      resyncLocalHolders(stream);
+    }
+  });
 
 export const broadcast = (event: WSOutbound): Promise<void> =>
   publish({ type: 'broadcast', event });

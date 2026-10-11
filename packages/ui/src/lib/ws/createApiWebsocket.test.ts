@@ -198,7 +198,13 @@ describe('createApiWebsocket', () => {
         queryFn: skipToken,
       }).subscribe(() => {});
 
-    const snapshotFrame = { category: 'data', action: 'snapshot', stream, payload: { data: [] } };
+    const snapshotFrame = {
+      category: 'data',
+      action: 'snapshot',
+      stream,
+      seq: 1,
+      payload: { data: [] },
+    };
 
     it('opens once per stream across holders and closes when the last holder releases it', async () => {
       const { api, ws } = connected();
@@ -562,7 +568,138 @@ describe('createApiWebsocket', () => {
       api.resync(stream);
       expect(opensOf(ws)).toEqual([]);
     });
+
+    describe('sequence numbers', () => {
+      const row = (id: string, version = 1) => ({
+        id,
+        updatedAt: new Date(Date.UTC(2026, 0, 1, 0, 0, version)).toISOString(),
+      });
+      const snapshot = (seq: number, ids: string[]) => ({
+        category: 'data',
+        action: 'snapshot',
+        stream,
+        seq,
+        payload: { data: ids.map((id) => row(id)) },
+      });
+      const upsert = (seq: number, id: string) => ({
+        category: 'data',
+        action: 'append',
+        stream,
+        seq,
+        type: 'upsert',
+        payload: row(id),
+      });
+      const remove = (seq: number, id: string) => ({
+        category: 'data',
+        action: 'append',
+        stream,
+        seq,
+        type: 'remove',
+        payload: { id },
+      });
+      const ids = () =>
+        client
+          .getQueryData<{ data: Array<{ id: string }> }>(dataStreamQueryKey(stream))
+          ?.data.map(({ id }) => id);
+
+      let consoleError: ReturnType<typeof spyOn>;
+      beforeEach(() => {
+        consoleError = spyOn(console, 'error').mockImplementation(() => {});
+      });
+      afterEach(() => consoleError.mockRestore());
+
+      const opened = async () => {
+        const { api, ws } = connected();
+        api.open(stream);
+        await settled();
+        receive(ws, { type: 'opened', stream });
+        ws.sent.length = 0;
+        return { api, ws };
+      };
+
+      it('applies the next seq and ignores an append the snapshot already holds', async () => {
+        const { ws } = await opened();
+        receive(ws, snapshot(10, ['a']));
+
+        receive(ws, upsert(9, 'held-before-snapshot'));
+        receive(ws, upsert(10, 'held-at-snapshot'));
+        receive(ws, upsert(11, 'b'));
+        receive(ws, upsert(11, 'b-duplicate'));
+
+        expect(ids()).toEqual(['b', 'a']);
+        expect(opensOf(ws)).toEqual([]);
+      });
+
+      it('a dropped append makes the client resync, and the new snapshot converges', async () => {
+        const { ws } = await opened();
+        receive(ws, snapshot(10, ['a']));
+        receive(ws, upsert(11, 'b'));
+
+        receive(ws, remove(13, 'a')); // 12 (upsert c) was lost
+
+        expect(opensOf(ws)).toEqual([{ action: 'open', stream }]);
+        expect(ids()).toEqual(['b', 'a']);
+
+        receive(ws, { type: 'opened', stream });
+        receive(ws, snapshot(13, ['c', 'b']));
+        receive(ws, upsert(14, 'd'));
+
+        expect(ids()).toEqual(['d', 'c', 'b']);
+      });
+
+      it('ignores appends between a gap and the resync snapshot, and stale ones after it', async () => {
+        const { ws } = await opened();
+        receive(ws, snapshot(10, ['a']));
+        receive(ws, upsert(12, 'gap'));
+
+        receive(ws, upsert(13, 'before-resync-snapshot'));
+        receive(ws, { type: 'opened', stream });
+        receive(ws, snapshot(14, ['x', 'a']));
+        receive(ws, upsert(14, 'stale-after-resync'));
+        receive(ws, upsert(13, 'older-still'));
+
+        expect(ids()).toEqual(['x', 'a']);
+        expect(opensOf(ws)).toEqual([{ action: 'open', stream }]);
+
+        receive(ws, upsert(15, 'y'));
+        expect(ids()).toEqual(['y', 'x', 'a']);
+      });
+
+      it('a gap while an open is already in flight waits for that open instead of sending another', async () => {
+        const { api, ws } = await opened();
+        receive(ws, snapshot(10, ['a']));
+        api.resync(stream);
+        expect(opensOf(ws)).toHaveLength(1);
+
+        receive(ws, upsert(12, 'gap'));
+        expect(opensOf(ws)).toHaveLength(1);
+        receive(ws, { type: 'opened', stream });
+        receive(ws, snapshot(12, ['gap', 'a']));
+        expect(ids()).toEqual(['gap', 'a']);
+      });
+
+      it('after a server-side close (dropped frame), the reconnect snapshot restores state', async () => {
+        const { api, ws } = await opened();
+        receive(ws, snapshot(10, ['a']));
+        receive(ws, upsert(11, 'b'));
+
+        ws.close(); // the server closed the socket after a dropped frame
+        api.connect(); // reconnect now rather than after the transport's delay
+        const reconnected = instances.at(-1) as FakeWebSocket;
+        expect(reconnected).not.toBe(ws);
+        open(reconnected);
+        expect(opensOf(reconnected)).toEqual([{ action: 'open', stream }]);
+
+        receive(reconnected, upsert(12, 'before-snapshot'));
+        receive(reconnected, { type: 'opened', stream });
+        receive(reconnected, snapshot(12, ['c', 'b', 'a']));
+        receive(reconnected, remove(13, 'a'));
+
+        expect(ids()).toEqual(['c', 'b']);
+      });
+    });
   });
+
   describe('adversarial review', () => {
     const stream = 'organizationReadManyContacts:id:org-1';
     beforeEach(() => useAppStore.setState({ client: new QueryClient() }));

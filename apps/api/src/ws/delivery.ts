@@ -7,8 +7,15 @@
 import { byChannel, byId, byStream, byUser, removeConnection } from '#/ws/registry';
 import type { WSOutbound, WSSocket } from '#/ws/types';
 
+// Bun returns 0 for a dropped frame; closing makes the client reconnect and resync instead of drift.
+export const sendFrame = (ws: WSSocket, message: string): void => {
+  if (ws.send(message) !== 0) return;
+  if (ws.readyState === WebSocket.OPEN) ws.close(1013, 'frame dropped');
+  removeConnection(ws);
+};
+
 const sendOrEvict = (ws: WSSocket, message: string): void => {
-  if (ws.readyState === WebSocket.OPEN) ws.send(message);
+  if (ws.readyState === WebSocket.OPEN) sendFrame(ws, message);
   else removeConnection(ws);
 };
 
@@ -25,7 +32,7 @@ const deliver = (connectionIds: Set<string>, message: string, send = sendOrEvict
 };
 
 export const sendTo = (ws: WSSocket, event: WSOutbound): void => {
-  ws.send(JSON.stringify(event));
+  sendFrame(ws, JSON.stringify(event));
 };
 
 export const sendToChannelLocal = (channel: string, event: WSOutbound): void => {

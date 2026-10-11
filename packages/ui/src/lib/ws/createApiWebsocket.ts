@@ -4,7 +4,7 @@
  * @partOf primitive:ui, primitive:websockets
  * @uses primitive:shared
  */
-import { createWebSocketClient, type WSEvent } from '@template/shared/ws';
+import { createWebSocketClient, type WSDataEvent, type WSEvent } from '@template/shared/ws';
 import { dispatchMessage } from '@template/ui/lib/ws/dispatch';
 import { failDataStream } from '@template/ui/lib/ws/failDataStream';
 import { type DebouncedFunc, debounce } from 'lodash-es';
@@ -67,6 +67,7 @@ export const createApiWebsocket = (
   const settlers = new Map<string, DebouncedFunc<() => void>>();
   const sentOpens = new Set<string>();
   const sentSubscribes = new Set<string>();
+  const lastSeqs = new Map<string, number>();
   let identityAttempts = 0;
   let identityFrame: Record<string, unknown> | null = null;
   let everOpened = false;
@@ -103,6 +104,7 @@ export const createApiWebsocket = (
     openAckTimers.delete(stream);
     if (!pendingOpens.delete(stream)) return;
     sentOpens.delete(stream);
+    lastSeqs.delete(stream);
     if (!isLive(stream)) return;
     failDataStream(stream, 'failed');
     scheduleRetry(stream);
@@ -143,6 +145,7 @@ export const createApiWebsocket = (
     if (streams.has(stream)) return;
     clearTimers(retryTimers, stream);
     retryAttempts.delete(stream);
+    lastSeqs.delete(stream);
     if (sentOpens.delete(stream)) sendRelease({ action: 'close', stream });
   };
 
@@ -172,6 +175,7 @@ export const createApiWebsocket = (
 
   const failOpen = (stream: string, retryable: boolean): void => {
     sentOpens.delete(stream);
+    lastSeqs.delete(stream);
     if (!streams.has(stream)) return;
     if (retryable) {
       failDataStream(stream, 'failed');
@@ -182,6 +186,30 @@ export const createApiWebsocket = (
     rejectedStreams.add(stream);
     clearTimers(retryTimers, stream);
     failDataStream(stream, 'rejected');
+  };
+
+  // Until the next snapshot, appends on the wire are already in it.
+  const resyncStream = (stream: string): void => {
+    lastSeqs.delete(stream);
+    if (isLive(stream) && !pendingOpens.has(stream)) sendOpen(stream);
+  };
+
+  const admitDataFrame = (event: WSDataEvent): boolean => {
+    if (event.action === 'snapshot') {
+      lastSeqs.set(event.stream, event.seq);
+      return true;
+    }
+    const lastSeq = lastSeqs.get(event.stream);
+    if (lastSeq === undefined || event.seq <= lastSeq) return false;
+    if (event.seq > lastSeq + 1) {
+      console.error(
+        `ws stream ${event.stream}: seq ${event.seq} after ${lastSeq}; requesting a fresh snapshot`,
+      );
+      resyncStream(event.stream);
+      return false;
+    }
+    lastSeqs.set(event.stream, event.seq);
+    return true;
   };
 
   const replaySubscriptions = (): void => {
@@ -269,7 +297,8 @@ export const createApiWebsocket = (
     onMessage: (data) => {
       const frame = data as InboundFrame;
       if (frame.category === 'data') {
-        if (sentOpens.has(frame.stream as string)) dispatchMessage(data as WSEvent);
+        const event = data as WSDataEvent;
+        if (sentOpens.has(event.stream) && admitDataFrame(event)) dispatchMessage(event);
         return;
       }
       if (frame.category) dispatchMessage(data as WSEvent);
@@ -291,6 +320,7 @@ export const createApiWebsocket = (
       pendingOpens.clear();
       sentOpens.clear();
       sentSubscribes.clear();
+      lastSeqs.clear();
       clearTimers(openAckTimers);
       clearTimers(retryTimers);
     },
@@ -359,8 +389,6 @@ export const createApiWebsocket = (
       rejectedStreams.delete(stream);
       settle(stream);
     },
-    resync: (stream) => {
-      if (isLive(stream) && !pendingOpens.has(stream)) sendOpen(stream);
-    },
+    resync: resyncStream,
   };
 };
