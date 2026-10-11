@@ -71,7 +71,11 @@ describe('recomposeFromSnapshots', () => {
 
 import { afterAll, afterEach, beforeAll } from 'bun:test';
 import { clearHookRegistry, db } from '@template/db';
-import { cleanupTouchedTables, registerTestTracker } from '@template/db/test';
+import {
+  cleanupTouchedTables,
+  createCommunicationLog,
+  registerTestTracker,
+} from '@template/db/test';
 import { saveEmailTemplate } from '@template/email/render';
 import { registerAuditLogHook } from '#/hooks/auditLog/hook';
 import { registerEmailVersioningHook } from '#/hooks/emailVersioning/hook';
@@ -116,17 +120,9 @@ describe('recomposeCommunication (DB-backed)', () => {
     return { template, pin };
   };
 
-  const createLog = (data: Record<string, unknown>) =>
-    db.communicationLog.create({
-      data: {
-        sendKey: 'recompose-test',
-        channel: 'email',
-        address: 'fan@example.com',
-        idempotencyKey: crypto.randomUUID(),
-        senderType: 'platform',
-        ...data,
-      },
-    });
+  const createLog = async (data: Parameters<typeof createCommunicationLog>[0] = {}) =>
+    (await createCommunicationLog({ senderType: 'platform', address: 'fan@example.com', ...data }))
+      .entity;
 
   it('returns the recorded settledMjml — the sent truth — not a recompose of the save-time pin', async () => {
     const { template, pin } = await savedPin();
