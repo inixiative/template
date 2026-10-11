@@ -1,4 +1,5 @@
 export * from './AuthProviderModal';
+export * from './CreateIntegrationModal';
 export * from './CreateTokenModal';
 export * from './CreateWebhookModal';
 export * from './ProfileFormCard';
