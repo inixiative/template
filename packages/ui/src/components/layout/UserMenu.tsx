@@ -109,7 +109,7 @@ export const UserMenu = ({ className, showSpoofControls = true }: UserMenuProps)
                 className="h-8"
               />
               <div className="flex gap-2">
-                <Button onClick={handleSpoofSubmit} size="sm" className="flex-1" flow={false}>
+                <Button onClick={handleSpoofSubmit} size="sm" className="flex-1">
                   Spoof
                 </Button>
                 {isSpoofing && (

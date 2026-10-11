@@ -1,40 +1,56 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import type { Flow, FlowStep, User } from '@template/db/generated/client/client';
+import type { Organization, User } from '@template/db/generated/client/client';
+import {
+  InquiryResourceModel,
+  InquiryStatus,
+  InquiryType,
+  TokenOwnerModel,
+} from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
   createFlow as createFlowRow,
-  createFlowStep,
+  createInquiry,
+  createOrganization,
+  createOrganizationUser,
   createToken,
   createUser,
 } from '@template/db/test';
-import { registerImmutableFieldsHook } from '#/hooks/immutableFields/hook';
 import { flowRouter } from '#/modules/flow';
+import type { FlowResponse } from '#/modules/flow/schemas/flowSchemas';
 import { meRouter } from '#/modules/me';
+import { organizationRouter } from '#/modules/organization';
 import { createTestApp } from '#tests/createTestApp';
 import { get, json, jsonError, post } from '#tests/utils/request';
-
-registerImmutableFieldsHook();
-
-type FlowResponse = Flow & { flowSteps: FlowStep[] };
-
-const flowSteps = [
-  { label: 'Connect Railway', url: '/settings/integrations?connect=railway' },
-  { label: 'Pick a workspace', url: '/settings/integrations/workspaces' },
-  { label: 'Provision', url: '/archives?provision=1', data: { provider: 'railway' } },
-];
 
 describe('flows', () => {
   let fetch: ReturnType<typeof createTestApp>['fetch'];
   let db: ReturnType<typeof createTestApp>['db'];
-  let user: User;
+  let owner: User;
+  let org: Organization;
+  let memberOnlyOrg: Organization;
+  let foreignOrg: Organization;
 
   beforeAll(async () => {
-    user = (await createUser()).entity;
+    owner = (await createUser()).entity;
+    org = (await createOrganization()).entity;
+    memberOnlyOrg = (await createOrganization()).entity;
+    foreignOrg = (await createOrganization()).entity;
+    const { entity: ownerSeat } = await createOrganizationUser(
+      { role: 'owner' },
+      { user: owner, organization: org },
+    );
+    const { entity: memberSeat } = await createOrganizationUser(
+      { role: 'member' },
+      { user: owner, organization: memberOnlyOrg },
+    );
+
     const harness = createTestApp({
-      mockUser: user,
+      mockUser: owner,
+      mockOrganizationUsers: [ownerSeat, memberSeat],
       mount: [
         (app) => app.route('/api/v1/me', meRouter),
         (app) => app.route('/api/v1/flow', flowRouter),
+        (app) => app.route('/api/v1/organization', organizationRouter),
       ],
     });
     fetch = harness.fetch;
@@ -45,182 +61,228 @@ describe('flows', () => {
     await cleanupTouchedTables(db);
   });
 
-  const startFlow = async (body: unknown = { returnUrl: '/archives', flowSteps }) => {
-    const response = await fetch(post('/api/v1/me/flows', body));
+  const start = async (organizationId: string) =>
+    fetch(
+      post('/api/v1/me/flows', {
+        flowKey: 'setUpOrganization',
+        params: { organizationId },
+        returnUrl: '/dashboard',
+      }),
+    );
+
+  const startFor = async (organization: Organization) => {
+    const response = await start(organization.id);
     expect(response.status).toBe(201);
     return (await json<FlowResponse>(response)).data;
   };
 
-  const advance = (flowId: string, currentStep: number) =>
-    fetch(post(`/api/v1/flow/${flowId}/advance`, { currentStep }));
-
-  const createOtherUsersFlow = async () => {
-    const { entity: flow, context } = await createFlowRow();
-    await createFlowStep({ order: 0 }, context);
-    return flow;
+  const check = async (flowId: string) => {
+    const response = await fetch(post(`/api/v1/flow/${flowId}/check`));
+    expect(response.status).toBe(200);
+    return (await json<FlowResponse>(response)).data;
   };
 
-  it('creates, reads, advances through every step, and completes', async () => {
-    const created = await startFlow();
-    expect(created.userId).toBe(user.id);
-    expect(created.currentStep).toBe(0);
-    expect(created.flowSteps.map((step) => [step.order, step.label, step.url])).toEqual(
-      flowSteps.map((step, order) => [order, step.label, step.url]),
+  const sendInvite = async (
+    organization: Organization,
+    status: InquiryStatus = InquiryStatus.sent,
+  ) => {
+    const { entity: invitee } = await createUser();
+    await createInquiry({
+      type: InquiryType.inviteOrganizationUser,
+      status,
+      sourceModel: InquiryResourceModel.Organization,
+      sourceOrganizationId: organization.id,
+      targetModel: InquiryResourceModel.User,
+      targetUserId: invitee.id,
+      content: { role: 'member' },
+    });
+  };
+
+  const createOrganizationToken = (organization: Organization) =>
+    createToken({ ownerModel: TokenOwnerModel.Organization }, { organization });
+
+  it('advances only when the bound route shows enough rows, through every step to completion', async () => {
+    const { entity: freshOrg } = await createOrganization();
+    const { entity: seat } = await createOrganizationUser(
+      { role: 'owner' },
+      { user: owner, organization: freshOrg },
     );
-    expect(created.flowSteps[2]!.data).toEqual({ provider: 'railway' });
+    const harness = createTestApp({
+      mockUser: owner,
+      mockOrganizationUsers: [seat],
+      mount: [
+        (app) => app.route('/api/v1/me', meRouter),
+        (app) => app.route('/api/v1/flow', flowRouter),
+        (app) => app.route('/api/v1/organization', organizationRouter),
+      ],
+    });
+    const startResponse = await harness.fetch(
+      post('/api/v1/me/flows', {
+        flowKey: 'setUpOrganization',
+        params: { organizationId: freshOrg.id },
+        returnUrl: '/dashboard',
+      }),
+    );
+    const started = (await json<FlowResponse>(startResponse)).data;
+    const checkFresh = async () =>
+      (await json<FlowResponse>(await harness.fetch(post(`/api/v1/flow/${started.id}/check`))))
+        .data;
 
-    const read = await fetch(get(`/api/v1/flow/${created.id}`));
-    expect(read.status).toBe(200);
-    expect((await json<FlowResponse>(read)).data.flowSteps).toHaveLength(3);
+    expect(startResponse.status).toBe(201);
+    expect(started.currentStep).toBe(0);
+    expect(started.progress).toEqual({ count: 0, required: 1 });
+    expect(started.flowSteps.map((step) => [step.key, step.mode, step.url])).toEqual([
+      ['inviteTeammate', 'navigate', `/users/members?org=${freshOrg.id}`],
+      ['inviteAnother', 'anchor', `/users/members?org=${freshOrg.id}#invite`],
+      ['createApiTokens', 'navigate', `/settings/tokens?org=${freshOrg.id}#create-token`],
+    ]);
 
-    for (const step of [0, 1]) {
-      const response = await advance(created.id, step);
-      const { data } = await json<FlowResponse>(response);
-      expect(response.status).toBe(200);
-      expect(data.currentStep).toBe(step + 1);
-      expect(data.completedAt).toBeNull();
-      expect(data.flowSteps[step]!.completedAt).not.toBeNull();
-    }
+    expect((await checkFresh()).currentStep).toBe(0);
 
-    const last = await advance(created.id, 2);
-    const { data: completed } = await json<FlowResponse>(last);
-    expect(last.status).toBe(200);
+    await sendInvite(freshOrg, InquiryStatus.draft);
+    const afterDraft = await checkFresh();
+    expect(afterDraft.currentStep).toBe(0);
+    expect(afterDraft.progress).toEqual({ count: 0, required: 1 });
+
+    await sendInvite(freshOrg);
+    const afterFirstInvite = await checkFresh();
+    expect(afterFirstInvite.currentStep).toBe(1);
+    expect(afterFirstInvite.progress).toEqual({ count: 1, required: 2 });
+    expect(afterFirstInvite.flowSteps[0]!.completedAt).not.toBeNull();
+
+    await sendInvite(freshOrg);
+    const afterSecondInvite = await checkFresh();
+    expect(afterSecondInvite.currentStep).toBe(2);
+    expect(afterSecondInvite.progress).toEqual({ count: 0, required: 2 });
+
+    await createOrganizationToken(freshOrg);
+    const afterOneToken = await checkFresh();
+    expect(afterOneToken.currentStep).toBe(2);
+    expect(afterOneToken.progress).toEqual({ count: 1, required: 2 });
+
+    await createOrganizationToken(freshOrg);
+    const completed = await checkFresh();
     expect(completed.currentStep).toBe(3);
     expect(completed.completedAt).not.toBeNull();
+    expect(completed.progress).toBeNull();
+    expect(completed.returnUrl).toBe('/dashboard');
     expect(completed.flowSteps.every((step) => step.completedAt !== null)).toBe(true);
   });
 
-  it('refuses to advance past the end', async () => {
-    const created = await startFlow({
-      returnUrl: '/archives',
-      flowSteps: [{ label: 'Only', url: '/only' }],
-    });
-    expect((await advance(created.id, 0)).status).toBe(200);
-
-    const pastEnd = await advance(created.id, 1);
-    expect(pastEnd.status).toBe(409);
-    expect((await jsonError(pastEnd)).message).toBe('Flow is already complete');
-  });
-
-  it('refuses to skip a step', async () => {
-    const created = await startFlow();
-    const skipped = await advance(created.id, 1);
-    expect(skipped.status).toBe(409);
-
-    const reread = await db.flow.findUniqueOrThrow({ where: { id: created.id } });
-    expect(reread.currentStep).toBe(0);
-  });
-
-  it('a repeated advance of a completed step returns the flow unchanged', async () => {
-    const created = await startFlow();
-    await advance(created.id, 0);
-
-    const repeated = await advance(created.id, 0);
-    const { data } = await json<FlowResponse>(repeated);
-    expect(repeated.status).toBe(200);
-    expect(data.currentStep).toBe(1);
-  });
-
-  it('advances once when the same step is advanced concurrently', async () => {
-    const created = await startFlow();
-
-    const responses = await Promise.all([advance(created.id, 0), advance(created.id, 0)]);
-
-    expect(responses.map((response) => response.status)).toEqual([200, 200]);
-    const bodies = await Promise.all(responses.map((response) => json<FlowResponse>(response)));
-    expect(bodies.map(({ data }) => data.currentStep)).toEqual([1, 1]);
-    const reread = await db.flow.findUniqueOrThrow({
-      where: { id: created.id },
-      include: { flowSteps: true },
-    });
-    expect(reread.currentStep).toBe(1);
-    expect(reread.flowSteps.filter((step) => step.completedAt !== null)).toHaveLength(1);
-  });
-
-  it("does not let a user read or advance another user's flow", async () => {
-    const othersFlow = await createOtherUsersFlow();
-
-    expect((await fetch(get(`/api/v1/flow/${othersFlow.id}`))).status).toBe(403);
-    expect((await advance(othersFlow.id, 0)).status).toBe(403);
-    expect((await fetch(post(`/api/v1/flow/${othersFlow.id}/cancel`))).status).toBe(403);
-
-    const reread = await db.flow.findUniqueOrThrow({ where: { id: othersFlow.id } });
-    expect(reread.currentStep).toBe(0);
-  });
-
-  it('cancels and returns the returnUrl; a canceled flow does not advance', async () => {
-    const created = await startFlow();
-
-    const canceled = await fetch(post(`/api/v1/flow/${created.id}/cancel`));
-    const { data } = await json<FlowResponse>(canceled);
-    expect(canceled.status).toBe(200);
-    expect(data.returnUrl).toBe('/archives');
-    expect(data.canceledAt).not.toBeNull();
-
-    const again = await fetch(post(`/api/v1/flow/${created.id}/cancel`));
-    expect(again.status).toBe(200);
-    expect((await json<FlowResponse>(again)).data.canceledAt).toBe(data.canceledAt);
-
-    const advanced = await advance(created.id, 0);
-    expect(advanced.status).toBe(409);
-    expect((await jsonError(advanced)).message).toBe('Flow was canceled');
-  });
-
-  it('advancing the last step and canceling concurrently leave exactly one terminal state', async () => {
-    const created = await startFlow({
-      returnUrl: '/archives',
-      flowSteps: [{ label: 'Only', url: '/only' }],
-    });
-
-    const [advanced, canceled] = await Promise.all([
-      advance(created.id, 0),
-      fetch(post(`/api/v1/flow/${created.id}/cancel`)),
-    ]);
-
-    expect([advanced.status, canceled.status].sort()).toEqual([200, 409]);
-    const reread = await db.flow.findUniqueOrThrow({ where: { id: created.id } });
-    expect([reread.completedAt, reread.canceledAt].filter((stamp) => stamp !== null)).toHaveLength(
-      1,
+  it('completes steps that already hold at start, in one pass', async () => {
+    const { entity: busyOrg } = await createOrganization();
+    const { entity: seat } = await createOrganizationUser(
+      { role: 'owner' },
+      { user: owner, organization: busyOrg },
     );
-  });
-
-  it("a read-only token can read its user's flow but not move it", async () => {
-    const created = await startFlow();
-    const { entity: token } = await createToken({ ownerModel: 'User', role: 'viewer' }, { user });
-    const viewer = createTestApp({
-      mockUser: user,
-      mockToken: {
-        ...token,
-        user,
-        organization: null,
-        organizationUser: null,
-        space: null,
-        spaceUser: null,
-      },
-      mount: [(app) => app.route('/api/v1/flow', flowRouter)],
+    await sendInvite(busyOrg);
+    await sendInvite(busyOrg);
+    const harness = createTestApp({
+      mockUser: owner,
+      mockOrganizationUsers: [seat],
+      mount: [
+        (app) => app.route('/api/v1/me', meRouter),
+        (app) => app.route('/api/v1/flow', flowRouter),
+        (app) => app.route('/api/v1/organization', organizationRouter),
+      ],
     });
 
-    expect((await viewer.fetch(get(`/api/v1/flow/${created.id}`))).status).toBe(200);
-    const advanced = await viewer.fetch(
-      post(`/api/v1/flow/${created.id}/advance`, { currentStep: 0 }),
+    const response = await harness.fetch(
+      post('/api/v1/me/flows', {
+        flowKey: 'setUpOrganization',
+        params: { organizationId: busyOrg.id },
+        returnUrl: '/dashboard',
+      }),
     );
-    expect(advanced.status).toBe(403);
-    expect((await viewer.fetch(post(`/api/v1/flow/${created.id}/cancel`))).status).toBe(403);
+
+    expect((await json<FlowResponse>(response)).data.currentStep).toBe(2);
   });
 
-  it('does not cancel a completed flow', async () => {
-    const created = await startFlow({
-      returnUrl: '/archives',
-      flowSteps: [{ label: 'Only', url: '/only' }],
+  it('reading a flow never advances it, even when the rule now holds', async () => {
+    const { entity: quietOrg } = await createOrganization();
+    const { entity: seat } = await createOrganizationUser(
+      { role: 'owner' },
+      { user: owner, organization: quietOrg },
+    );
+    const harness = createTestApp({
+      mockUser: owner,
+      mockOrganizationUsers: [seat],
+      mount: [
+        (app) => app.route('/api/v1/me', meRouter),
+        (app) => app.route('/api/v1/flow', flowRouter),
+        (app) => app.route('/api/v1/organization', organizationRouter),
+      ],
     });
-    await advance(created.id, 0);
+    const started = (
+      await json<FlowResponse>(
+        await harness.fetch(
+          post('/api/v1/me/flows', {
+            flowKey: 'setUpOrganization',
+            params: { organizationId: quietOrg.id },
+            returnUrl: '/dashboard',
+          }),
+        ),
+      )
+    ).data;
+    await sendInvite(quietOrg);
 
-    const canceled = await fetch(post(`/api/v1/flow/${created.id}/cancel`));
-    expect(canceled.status).toBe(409);
+    const read = (await json<FlowResponse>(await harness.fetch(get(`/api/v1/flow/${started.id}`))))
+      .data;
+
+    expect(read.currentStep).toBe(0);
+    expect(read.progress).toEqual({ count: 1, required: 1 });
+    const stored = await db.flow.findUniqueOrThrow({ where: { id: started.id } });
+    expect(stored.currentStep).toBe(0);
   });
 
-  it('accepts only paths inside the app for step urls and the returnUrl', async () => {
-    const outside = [
+  it('never counts rows the bound route would not return to this user', async () => {
+    const flow = await startFor(org);
+    await sendInvite(foreignOrg);
+    await sendInvite(foreignOrg);
+    await createOrganizationToken(foreignOrg);
+    await createOrganizationToken(foreignOrg);
+
+    const checked = await check(flow.id);
+
+    expect(checked.currentStep).toBe(flow.currentStep);
+    expect(checked.progress?.count).toBe(flow.progress?.count);
+  });
+
+  it('refuses to start a flow over data the user cannot read', async () => {
+    const foreign = await start(foreignOrg.id);
+    expect(foreign.status).toBe(403);
+
+    const memberOnly = await start(memberOnlyOrg.id);
+    expect(memberOnly.status).toBe(403);
+    expect((await jsonError(memberOnly)).message).toBe('You cannot see the data this flow checks');
+  });
+
+  it('refuses invalid params and unknown flows at start', async () => {
+    const badParams = await fetch(
+      post('/api/v1/me/flows', {
+        flowKey: 'setUpOrganization',
+        params: { organizationId: 'not-a-uuid' },
+        returnUrl: '/dashboard',
+      }),
+    );
+    expect(badParams.status).toBe(400);
+    expect((await jsonError(badParams)).message).toBe(
+      'Invalid params for flow "setUpOrganization"',
+    );
+
+    const missingParams = await fetch(
+      post('/api/v1/me/flows', { flowKey: 'setUpOrganization', returnUrl: '/dashboard' }),
+    );
+    expect(missingParams.status).toBe(400);
+
+    const unknownFlow = await fetch(
+      post('/api/v1/me/flows', { flowKey: 'nope', params: {}, returnUrl: '/dashboard' }),
+    );
+    expect(unknownFlow.status).toBe(400);
+  });
+
+  it('accepts only paths inside the app for the returnUrl', async () => {
+    for (const returnUrl of [
       'https://evil.example/x',
       '//evil.example/x',
       '/\\evil.example',
@@ -228,43 +290,84 @@ describe('flows', () => {
       '/\t/evil.example',
       'javascript:alert(1)',
       'relative',
-    ];
-
-    for (const url of outside) {
-      const stepResponse = await fetch(
-        post('/api/v1/me/flows', { returnUrl: '/archives', flowSteps: [{ label: 'X', url }] }),
+    ]) {
+      const response = await fetch(
+        post('/api/v1/me/flows', {
+          flowKey: 'setUpOrganization',
+          params: { organizationId: org.id },
+          returnUrl,
+        }),
       );
-      expect(stepResponse.status).toBe(400);
-
-      const returnResponse = await fetch(
-        post('/api/v1/me/flows', { returnUrl: url, flowSteps: [{ label: 'X', url: '/x' }] }),
-      );
-      expect(returnResponse.status).toBe(400);
+      expect(response.status).toBe(400);
     }
   });
 
-  it('refuses a flow with no steps', async () => {
-    const response = await fetch(
-      post('/api/v1/me/flows', { returnUrl: '/archives', flowSteps: [] }),
-    );
-    expect(response.status).toBe(400);
+  it('cancels and returns the returnUrl; a canceled flow never advances', async () => {
+    const flow = await startFor(org);
+
+    const canceled = await fetch(post(`/api/v1/flow/${flow.id}/cancel`));
+    const { data } = await json<FlowResponse>(canceled);
+    expect(canceled.status).toBe(200);
+    expect(data.returnUrl).toBe('/dashboard');
+    expect(data.canceledAt).not.toBeNull();
+
+    const again = await fetch(post(`/api/v1/flow/${flow.id}/cancel`));
+    expect((await json<FlowResponse>(again)).data.canceledAt).toBe(data.canceledAt);
+
+    await sendInvite(org);
+    await sendInvite(org);
+    const checked = await check(flow.id);
+    expect(checked.currentStep).toBe(flow.currentStep);
+    expect(checked.completedAt).toBeNull();
   });
 
-  it("keeps a step's label, url and data immutable once created", async () => {
-    const created = await startFlow();
-    const step = created.flowSteps[0]!;
-
-    await db.flowStep.update({
-      where: { id: step.id },
-      data: { label: 'Changed', url: '/changed', order: 9, data: { changed: true } },
+  it('two concurrent checks record each completed step once', async () => {
+    const { entity: raceOrg } = await createOrganization();
+    const { entity: seat } = await createOrganizationUser(
+      { role: 'owner' },
+      { user: owner, organization: raceOrg },
+    );
+    const harness = createTestApp({
+      mockUser: owner,
+      mockOrganizationUsers: [seat],
+      mount: [
+        (app) => app.route('/api/v1/me', meRouter),
+        (app) => app.route('/api/v1/flow', flowRouter),
+        (app) => app.route('/api/v1/organization', organizationRouter),
+      ],
     });
+    const started = (
+      await json<FlowResponse>(
+        await harness.fetch(
+          post('/api/v1/me/flows', {
+            flowKey: 'setUpOrganization',
+            params: { organizationId: raceOrg.id },
+            returnUrl: '/dashboard',
+          }),
+        ),
+      )
+    ).data;
+    await sendInvite(raceOrg);
 
-    const reread = await db.flowStep.findUniqueOrThrow({ where: { id: step.id } });
-    expect([reread.label, reread.url, reread.order, reread.data]).toEqual([
-      step.label,
-      step.url,
-      step.order,
-      step.data,
+    const responses = await Promise.all([
+      harness.fetch(post(`/api/v1/flow/${started.id}/check`)),
+      harness.fetch(post(`/api/v1/flow/${started.id}/check`)),
     ]);
+
+    expect(responses.map((response) => response.status)).toEqual([200, 200]);
+    const stored = await db.flow.findUniqueOrThrow({ where: { id: started.id } });
+    expect(stored.currentStep).toBe(1);
+    expect(stored.completedSteps).toHaveLength(1);
+  });
+
+  it("a stale or foreign flow id is not found or not the user's", async () => {
+    const { entity: othersFlow } = await createFlowRow({ params: { organizationId: org.id } });
+
+    expect((await fetch(get(`/api/v1/flow/${othersFlow.id}`))).status).toBe(403);
+    expect((await fetch(post(`/api/v1/flow/${othersFlow.id}/check`))).status).toBe(403);
+    expect((await fetch(post(`/api/v1/flow/${othersFlow.id}/cancel`))).status).toBe(403);
+    expect((await fetch(get('/api/v1/flow/01a12b8e-0000-7000-8000-000000000000'))).status).toBe(
+      404,
+    );
   });
 });

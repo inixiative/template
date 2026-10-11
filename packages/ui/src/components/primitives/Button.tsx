@@ -2,11 +2,8 @@
  * @atlas
  * @kind component
  * @partOf primitive:ui
- * @uses primitive:flows
+ * @uses none
  */
-import { isThenable } from '@template/shared/utils/isThenable';
-import { FlowContext } from '@template/ui/lib/flows/flowContext';
-import { type FlowParticipation, isFlowCompleting } from '@template/ui/lib/flows/isFlowCompleting';
 import { cn } from '@template/ui/lib/utils';
 import { cva, type VariantProps } from 'class-variance-authority';
 import * as React from 'react';
@@ -42,53 +39,21 @@ export interface ButtonProps
     VariantProps<typeof buttonVariants> {
   show?: boolean | (() => boolean);
   disabledText?: string;
-  flow?: FlowParticipation;
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  (
-    {
-      className,
-      variant,
-      size,
-      show = true,
-      disabledText,
-      disabled,
-      children,
-      flow,
-      onClick,
-      ...props
-    },
-    ref,
-  ) => {
-    const flowController = React.useContext(FlowContext);
+  ({ className, variant, size, show = true, disabledText, disabled, children, ...props }, ref) => {
     const shouldShow = typeof show === 'function' ? show() : show;
     if (!shouldShow) return null;
 
     const isDisabled = disabled || !!disabledText;
     const displayText = isDisabled && disabledText ? disabledText : children;
-    const completesFlow = isFlowCompleting({ flow, type: props.type, variant });
-    const advancesOnClick = flowController?.isActive && completesFlow && props.type !== 'submit';
-
-    const handleClick: React.MouseEventHandler<HTMLButtonElement> | undefined =
-      advancesOnClick && onClick
-        ? (event) => {
-            const result: unknown = onClick(event);
-            if (isThenable(result))
-              void result.then(
-                () => flowController.advance().catch(() => undefined),
-                () => undefined,
-              );
-          }
-        : onClick;
 
     return (
       <button
         className={cn(buttonVariants({ variant, size, className }))}
         ref={ref}
         disabled={isDisabled}
-        data-flow={completesFlow ? 'complete' : 'neutral'}
-        onClick={handleClick}
         {...props}
       >
         {displayText}

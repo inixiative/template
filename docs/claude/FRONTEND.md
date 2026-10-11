@@ -1346,7 +1346,6 @@ interface ConditionalProps {
 - Six variants: default, destructive, outline, secondary, ghost, link
 - Four sizes: sm, default, lg, icon
 - Standard conditional props (`show`, `disabled`, `disabledText`)
-- Flow-aware by default: inside an active flow, a primary or `type="submit"` button whose `onClick` returns a promise advances the flow when it resolves ([FLOWS.md](FLOWS.md#flow-aware-buttons))
 
 **Props:**
 
@@ -1354,12 +1353,11 @@ interface ConditionalProps {
 interface ButtonProps extends ConditionalProps {
   variant?: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link';
   size?: 'sm' | 'default' | 'lg' | 'icon';
-  flow?: false | 'complete';  // false exempts a completing button; 'complete' opts a neutral one in
 }
 ```
 
-`Form` and `Link` (`components/primitives/`) are the flow-aware `<form>` and `<a>`: `Form` advances
-the flow when an async `onSubmit` resolves, and `Link` keeps the `flow` param (plus `org` / `space`).
+`Link` (`components/primitives/Link.tsx`) is the in-app `<a>`: its `href` and its navigation keep
+`org` / `space`, and the `flow` param while a flow is active ([FLOWS.md](FLOWS.md#client)).
 
 **Usage:**
 

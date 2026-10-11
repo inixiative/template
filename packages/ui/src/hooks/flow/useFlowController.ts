@@ -5,11 +5,12 @@
  * @uses primitive:sdk
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { flowAdvance, flowCancel, flowRead, flowReadQueryKey } from '@template/sdk';
+import { flowCancel, flowCheck, flowRead, flowReadQueryKey } from '@template/sdk';
 import { apiMutation } from '@template/ui/lib/apiMutation';
 import { apiQuery } from '@template/ui/lib/apiQuery';
+import { FLOW_MUTATION_META, isFlowMutation } from '@template/ui/lib/flows/flowMutationMeta';
+import { flowStepTarget } from '@template/ui/lib/flows/flowStepTarget';
 import type { Flow, FlowController } from '@template/ui/lib/flows/flowTypes';
-import { withFlowParam } from '@template/ui/lib/flows/withFlowParam';
 import { useAppStore } from '@template/ui/store';
 import { useEffect, useMemo, useRef } from 'react';
 
@@ -17,11 +18,8 @@ export const useFlowController = (flowId: string | null): FlowController | null 
   const queryClient = useQueryClient();
   const navigatePreserving = useAppStore((state) => state.navigation.navigatePreserving);
   const queryKey = useMemo(() => flowReadQueryKey({ path: { id: flowId ?? '' } }), [flowId]);
-  const pendingAdvance = useRef<Promise<void> | null>(null);
-
-  useEffect(() => {
-    pendingAdvance.current = null;
-  }, [flowId]);
+  const pendingCheck = useRef<Promise<void> | null>(null);
+  const recheck = useRef(false);
 
   const { data } = useQuery({
     queryKey,
@@ -34,11 +32,10 @@ export const useFlowController = (flowId: string | null): FlowController | null 
     meta: { skipErrorToast: true },
   });
 
-  const { mutateAsync: advanceFlow } = useMutation({
-    mutationFn: apiMutation((opts: Parameters<typeof flowAdvance<true>>[0]) =>
-      flowAdvance<true>(opts),
-    ),
+  const { mutateAsync: checkFlow } = useMutation({
+    mutationFn: apiMutation((opts: Parameters<typeof flowCheck<true>>[0]) => flowCheck<true>(opts)),
     throwOnError: false,
+    meta: FLOW_MUTATION_META,
   });
 
   const { mutateAsync: cancelFlow } = useMutation({
@@ -46,33 +43,48 @@ export const useFlowController = (flowId: string | null): FlowController | null 
       flowCancel<true>(opts),
     ),
     throwOnError: false,
+    meta: { flowMutation: true },
   });
 
   const flow = flowId ? data?.data : undefined;
 
-  return useMemo(() => {
+  const controller = useMemo(() => {
     if (!flow) return null;
+    const isActive = !flow.completedAt && !flow.canceledAt;
 
     const settle = (next: Flow) => {
       queryClient.setQueryData<{ data: Flow }>(queryKey, (old) =>
         old ? { ...old, data: next } : { data: next },
       );
-      const nextStep = next.flowSteps[next.currentStep];
-      if (next.completedAt || next.canceledAt || !nextStep)
+      if (next.completedAt || next.canceledAt) {
         navigatePreserving(next.returnUrl, 'context');
-      else navigatePreserving(withFlowParam(nextStep.url, next.id), 'context');
+        return;
+      }
+      if (next.currentStep === flow.currentStep) return;
+      const step = next.flowSteps[next.currentStep];
+      const target = step && flowStepTarget(step, next.id);
+      if (target) navigatePreserving(target, 'context');
     };
 
-    const advance = () => {
-      pendingAdvance.current ??= advanceFlow({
-        path: { id: flow.id },
-        body: { currentStep: flow.currentStep },
-      })
-        .then(({ data: next }) => settle(next))
-        .finally(() => {
-          pendingAdvance.current = null;
-        });
-      return pendingAdvance.current;
+    const runCheck = async (): Promise<void> => {
+      const { data: next } = await checkFlow({ path: { id: flow.id } });
+      settle(next);
+      if (recheck.current) {
+        recheck.current = false;
+        await runCheck();
+      }
+    };
+
+    const check = () => {
+      if (!isActive) return Promise.resolve();
+      if (pendingCheck.current) {
+        recheck.current = true;
+        return pendingCheck.current;
+      }
+      pendingCheck.current = runCheck().finally(() => {
+        pendingCheck.current = null;
+      });
+      return pendingCheck.current;
     };
 
     const cancel = async () => {
@@ -83,9 +95,25 @@ export const useFlowController = (flowId: string | null): FlowController | null 
     return {
       flow,
       currentFlowStep: flow.flowSteps[flow.currentStep] ?? null,
-      isActive: !flow.completedAt && !flow.canceledAt,
-      advance,
+      isActive,
+      check,
       cancel,
     };
-  }, [flow, queryClient, queryKey, navigatePreserving, advanceFlow, cancelFlow]);
+  }, [flow, queryClient, queryKey, navigatePreserving, checkFlow, cancelFlow]);
+
+  useEffect(() => {
+    pendingCheck.current = null;
+    recheck.current = false;
+  }, [flowId]);
+
+  useEffect(() => {
+    if (!controller?.isActive) return;
+    return queryClient.getMutationCache().subscribe((event) => {
+      if (event.type !== 'updated' || event.action.type !== 'success') return;
+      if (isFlowMutation(event.mutation.meta)) return;
+      void controller.check().catch(() => undefined);
+    });
+  }, [controller, queryClient]);
+
+  return controller;
 };

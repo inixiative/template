@@ -6,15 +6,14 @@
  */
 import { actionRoute } from '#/lib/routeTemplates';
 import { validatePermission } from '#/middleware/validations/validatePermission';
-import { flowAdvanceBodySchema, flowResponseSchema } from '#/modules/flow/schemas/flowSchemas';
+import { flowResponseSchema } from '#/modules/flow/schemas/flowSchemas';
 import { Modules } from '#/modules/modules';
 
-export const flowAdvanceRoute = actionRoute({
+export const flowCheckRoute = actionRoute({
   model: Modules.flow,
-  action: 'advance',
+  action: 'check',
   description:
-    'Completes the step named by currentStep and moves the flow to the next one; completing the last step completes the flow. Repeating an advance of a step already completed returns the flow unchanged.',
+    'Re-evaluates the current step against its bound read route, as the caller, and advances through every step whose rule now holds. Completing the last step completes the flow.',
   middleware: [validatePermission('operate')],
-  bodySchema: flowAdvanceBodySchema,
   responseSchema: flowResponseSchema,
 });

@@ -15,7 +15,6 @@ export const HARD_DELETE_ON_TOMBSTONE = [
   'WebhookEvent',
   'RuleReference',
   'Flow',
-  'FlowStep',
 ] as const;
 
 export type HardDeletedOnTombstone = (typeof HARD_DELETE_ON_TOMBSTONE)[number];

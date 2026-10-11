@@ -418,12 +418,12 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 ## Flows
 
-**A user consumes an ordered set of in-app URLs, then returns where they started.** Lets one page send the user through others (Archives → Integrations → Connect Railway → back to Archives) without either page knowing about the other. Lineage: the Carde.io organized-play MVP; the template adds the owner, cancel, an end-of-flow guard, concurrency safety, the client and flow-aware buttons.
+**A user is taken through registered steps across pages, and the server decides when each step is done.** Lineage: the Carde.io organized-play MVP (`Flow` + `FlowStep`, and an onboarding config with `include` / `accomplished` per step); here `accomplished` is data.
 
-- ✅ **Model** - `Flow` (owner `userId`, `returnUrl`, `currentStep`, `completedAt`, `canceledAt`) + `FlowStep` (`order`, `label`, `url`, `data`, `completedAt`, `@@unique([flowId, order])`). Steps are immutable (no update/delete routes; `ImmutableFieldsOverrides` strips them). URLs must be app paths. Hard-deleted with their user
-- ✅ **API** - `POST /me/flows`, `GET /flow/:id`, `POST /flow/:id/advance`, `POST /flow/:id/cancel`. Owner-only via `ownerActions(['user'])`. Advance names the step it completes and runs under a `findForUpdate` row lock: repeating it is a no-op, skipping or passing the end is a 409
-- ✅ **Client** - `?flow=` carries the flow across refreshes and tabs. `FlowProvider` + `FlowBanner` are mounted by `AppShell` and `FullscreenLayout`; `useFlow()` and `useStartFlow()`; a `'flow'` navigation policy
-- ✅ **Flow-aware buttons** - Primary and submit `Button`s advance the flow when their async action resolves; neutral variants, sync handlers and failures never do; `flow={false}` / `flow="complete"`. `Form` and `Link` primitives carry the same awareness
+- ✅ **Registry** - `FlowKey` enum + `Record<FlowKey, FlowDefinition>` in `modules/flow/definitions`, like inquiry handlers. Each step: `key`, `label`, `url`, `mode` (`navigate` / `anchor` / `action`) and `completedWhen { read, path, where, count }` bound to a real readMany route by operationId. Validated at boot and in tests
+- ✅ **Server-checked completion** - `POST /flow/:id/check` runs the bound route as the caller through the batch sub-request machinery, with the step's `where` stacked on the route's `filterLens` as one more narrowing, and counts `pagination.total`. Permissions and tenancy are the route's own. Advances through every satisfied step under a row lock
+- ✅ **Instance** - `Flow` (`flowKey`, `params` validated by the flow's zod schema, `returnUrl`, `currentStep`, `completedSteps`, `completedAt`, `canceledAt`); hard-deleted with its user
+- ✅ **Client** - `?flow=`, `FlowProvider` + `FlowBanner` in both layouts, `useFlow()` / `useStartFlow()`, a check after every successful mutation via React Query's mutation cache, step entry by mode, `useHashSection` for anchors, a flow-preserving `Link`
 
 [Learn more: FLOWS.md](docs/claude/FLOWS.md)
 

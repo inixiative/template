@@ -16,20 +16,18 @@ import * as React from 'react';
 
 export interface LinkProps extends Omit<React.AnchorHTMLAttributes<HTMLAnchorElement>, 'href'> {
   to: string;
-  flow?: false;
 }
 
 const isPlainLeftClick = (event: React.MouseEvent<HTMLAnchorElement>) =>
   event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;
 
 const Link = React.forwardRef<HTMLAnchorElement, LinkProps>(
-  ({ to, flow, onClick, target, ...props }, ref) => {
+  ({ to, onClick, target, ...props }, ref) => {
     const location = useLocation();
     const spoofUserEmail = useAppStore((state) => state.auth.spoofUserEmail);
     const navigatePreserving = useAppStore((state) => state.navigation.navigatePreserving);
     const flowController = React.useContext(FlowContext);
-    const policy: NavigationPolicy =
-      flow !== false && flowController?.isActive ? 'flow' : 'context';
+    const policy: NavigationPolicy = flowController?.isActive ? 'flow' : 'context';
 
     const href = navigationTargetHref(
       resolveNavigationTarget(to, policy, {

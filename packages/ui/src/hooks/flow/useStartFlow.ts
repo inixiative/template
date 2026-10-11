@@ -7,15 +7,14 @@
 import { useMutation } from '@tanstack/react-query';
 import { type MeCreateFlowData, meCreateFlow } from '@template/sdk';
 import { apiMutation } from '@template/ui/lib/apiMutation';
+import { FLOW_MUTATION_META } from '@template/ui/lib/flows/flowMutationMeta';
+import { flowStepTarget } from '@template/ui/lib/flows/flowStepTarget';
 import type { Flow } from '@template/ui/lib/flows/flowTypes';
 import { withFlowParam } from '@template/ui/lib/flows/withFlowParam';
 import { useAppStore } from '@template/ui/store';
 import { useCallback } from 'react';
 
-export type StartFlowInput = {
-  flowSteps: MeCreateFlowData['body']['flowSteps'];
-  returnUrl?: string;
-};
+export type StartFlowInput = Omit<MeCreateFlowData['body'], 'returnUrl'> & { returnUrl?: string };
 
 const currentPathWithoutFlow = (): string =>
   withFlowParam(
@@ -30,13 +29,15 @@ export const useStartFlow = () => {
       meCreateFlow<true>(opts),
     ),
     throwOnError: false,
+    meta: { flowMutation: true },
   });
 
   const startFlow = useCallback(
-    async ({ flowSteps, returnUrl = currentPathWithoutFlow() }: StartFlowInput): Promise<Flow> => {
-      const { data: flow } = await createFlow({ body: { flowSteps, returnUrl } });
-      const [firstStep] = flow.flowSteps;
-      if (firstStep) navigatePreserving(withFlowParam(firstStep.url, flow.id), 'context');
+    async ({ returnUrl = currentPathWithoutFlow(), ...body }: StartFlowInput): Promise<Flow> => {
+      const { data: flow } = await createFlow({ body: { ...body, returnUrl } });
+      const step = flow.flowSteps[flow.currentStep];
+      const target = flow.completedAt ? flow.returnUrl : step && flowStepTarget(step, flow.id);
+      if (target) navigatePreserving(target, 'context');
       return flow;
     },
     [createFlow, navigatePreserving],

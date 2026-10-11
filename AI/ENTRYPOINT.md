@@ -288,7 +288,7 @@ Read docs based on task type:
 - DB/schema/hooks: `docs/claude/DATABASE.md`, `docs/claude/HOOKS.md`
 - Permissions/auth: `docs/claude/PERMISSIONS.md`, `docs/claude/AUTH.md`
 - Frontend/state/tables: `docs/claude/FRONTEND.md`, `docs/claude/ZUSTAND.md`
-- Flows (multi-page step sequences, flow-aware buttons): `docs/claude/FLOWS.md`
+- Flows (registered multi-page step sequences, server-checked completion): `docs/claude/FLOWS.md`
 - Jobs/Redis/logging: `docs/claude/JOBS.md`, `docs/claude/REDIS.md`, `docs/claude/LOGGING.md`
 - Concurrency (serialized queue, locks, parallel caps): `docs/claude/CONCURRENCY.md`
 - App events/email/notifications: `docs/claude/APP_EVENTS.md`

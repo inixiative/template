@@ -6,6 +6,12 @@
  */
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import {
+  createMemoryHistory,
+  createRootRoute,
+  createRouter,
+  RouterProvider,
+} from '@tanstack/react-router';
 import { buildToken, buildUser } from '@template/db/test';
 import { meReadManyTokensQueryKey } from '@template/sdk';
 import { TokensPage } from '@template/ui/pages/TokensPage';
@@ -32,7 +38,12 @@ const serverToken = async (name: string): Promise<StoredToken> => {
 const renderPage = () =>
   render(
     <QueryClientProvider client={client}>
-      <TokensPage />
+      <RouterProvider
+        router={createRouter({
+          routeTree: createRootRoute({ component: TokensPage }),
+          history: createMemoryHistory({ initialEntries: ['/settings/tokens'] }),
+        })}
+      />
     </QueryClientProvider>,
   );
 

@@ -76,6 +76,7 @@ export const prepareRequest = async (c: Context<AppEnv>, next: Next) => {
   c.set('resource', null);
   c.set('resourceType', null);
   c.set('filterLens', null);
+  c.set('subRequestNarrowing', batchContext?.narrowing ?? null);
 
   const bracketQuery = parseBracketNotation(c.req.url);
   c.set('bracketQuery', bracketQuery);

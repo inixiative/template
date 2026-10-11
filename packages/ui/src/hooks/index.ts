@@ -6,7 +6,7 @@ export {
   useEmailRuleSurface,
   useEmailVariableScope,
 } from './email';
-export { type StartFlowInput, useFlow, useFlowController, useStartFlow } from './flow';
+export { type StartFlowInput, useFlow, useStartFlow } from './flow';
 export {
   useCancelInquiryMutation,
   useCreateInquiryMutation,
@@ -33,6 +33,7 @@ export { useBreadcrumbs } from './useBreadcrumbs';
 export { useDarkMode } from './useDarkMode';
 export { type DataFilters, useDataFilters } from './useDataFilters';
 export { type DebouncedCallback, useDebounce, useDebouncedCallback } from './useDebounce';
+export { useHashSection } from './useHashSection';
 export {
   type InfiniteDataResult,
   type UseInfiniteDataOptions,

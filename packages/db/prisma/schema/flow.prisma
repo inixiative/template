@@ -1,5 +1,5 @@
 // ============================================================================
-// FLOW - A user consumes an ordered, immutable set of steps (each a URL), then returns
+// FLOW - One user's run through a flow definition (apps/api/src/modules/flow/definitions)
 // ============================================================================
 
 model Flow {
@@ -10,12 +10,13 @@ model Flow {
   userId String @db.VarChar(36)
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  returnUrl   String
-  currentStep Int       @default(0)
-  completedAt DateTime?
-  canceledAt  DateTime?
-
-  flowSteps FlowStep[]
+  flowKey        FlowKey
+  params         Json      @default("{}")
+  returnUrl      String
+  currentStep    Int       @default(0)
+  completedSteps Json      @default("[]")
+  completedAt    DateTime?
+  canceledAt     DateTime?
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
@@ -24,23 +25,6 @@ model Flow {
   @@index([userId])
 }
 
-model FlowStep {
-  id        String   @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  flowId String @db.VarChar(36)
-  flow   Flow   @relation(fields: [flowId], references: [id], onDelete: Cascade)
-
-  order       Int
-  label       String
-  url         String
-  data        Json      @default("{}")
-  completedAt DateTime?
-
-  // ==========================================================================
-  // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
-  // ==========================================================================
-
-  @@unique([flowId, order])
+enum FlowKey {
+  setUpOrganization
 }

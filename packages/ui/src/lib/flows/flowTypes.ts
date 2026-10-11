@@ -14,6 +14,6 @@ export type FlowController = {
   flow: Flow;
   currentFlowStep: FlowStep | null;
   isActive: boolean;
-  advance: () => Promise<void>;
+  check: () => Promise<void>;
   cancel: () => Promise<void>;
 };

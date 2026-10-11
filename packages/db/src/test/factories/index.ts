@@ -8,7 +8,6 @@ export * from './customerRefFactory';
 export * from './emailComponentFactory';
 export * from './emailTemplateFactory';
 export * from './flowFactory';
-export * from './flowStepFactory';
 export * from './inquiryFactory';
 export * from './integrationFactory';
 export * from './integrationRecordFactory';

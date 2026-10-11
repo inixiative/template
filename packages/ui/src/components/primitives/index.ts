@@ -6,7 +6,6 @@ export * from './Card';
 export * from './CopyButton';
 export * from './DropdownMenu';
 export * from './EmptyState';
-export * from './Form';
 export * from './Input';
 export * from './Label';
 export * from './Link';

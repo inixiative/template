@@ -14,7 +14,12 @@ import type {
 import { Button, Page, Table } from '@template/ui/components';
 import { CreateTokenModal } from '@template/ui/components/settings/CreateTokenModal';
 import { SecretRevealModal } from '@template/ui/components/utility/SecretRevealModal';
-import { createOptimisticListTarget, useOptimisticMutation, useQuery } from '@template/ui/hooks';
+import {
+  createOptimisticListTarget,
+  useHashSection,
+  useOptimisticMutation,
+  useQuery,
+} from '@template/ui/hooks';
 import { tokenContextQueries } from '@template/ui/lib/tokenContextQueries';
 import { useAppStore } from '@template/ui/store';
 import type { AuthenticatedContext } from '@template/ui/store/types/tenant';
@@ -28,7 +33,7 @@ type Token =
 type CreatedToken = Token & { key: string };
 
 export const TokensPage = () => {
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useHashSection('create-token');
   const [revealedKey, setRevealedKey] = useState<string | null>(null);
   const context = useAppStore((state) => state.tenant.context) as AuthenticatedContext;
   const tokenQueries = tokenContextQueries(context);

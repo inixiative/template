@@ -10,5 +10,5 @@ import { meCreateFlowRoute } from '#/modules/me/routes/meCreateFlow';
 
 export const meCreateFlowController = makeController(meCreateFlowRoute, async (c, respond) => {
   const user = c.get('user')!;
-  return respond.created(await createFlow(user.id, c.req.valid('json')));
+  return respond.created(await createFlow(c, user.id, c.req.valid('json')));
 });

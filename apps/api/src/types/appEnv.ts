@@ -18,6 +18,7 @@ import type { Permix } from '@template/permissions';
 import type { Hono } from 'hono';
 import type { TokenWithRelations } from '#/lib/context/types';
 import type { BracketQueryRecord } from '#/lib/utils/parseBracketNotation';
+import type { WhereScope } from '#/middleware/resources/scopeNarrowing';
 
 export type AppVars = {
   app: Hono<AppEnv>;
@@ -37,6 +38,7 @@ export type AppVars = {
   resourceType: AccessorName | null;
   routeConfig: RouteConfig | null;
   filterLens: LensNarrowing | null;
+  subRequestNarrowing: WhereScope | null;
   bracketQuery: BracketQueryRecord;
 };
 

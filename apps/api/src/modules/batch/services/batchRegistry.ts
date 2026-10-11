@@ -7,23 +7,30 @@
 import type { Db } from '@template/db';
 import type { Context } from 'hono';
 import { refreshUserContext } from '#/lib/context/refreshUserContext';
+import type { WhereScope } from '#/middleware/resources/scopeNarrowing';
 import type { AppEnv } from '#/types/appEnv';
 
 type BatchContext = {
   txn: Db;
   baseContext: Context<AppEnv>;
   baseHeaders: Record<string, string>;
+  narrowing?: WhereScope;
 };
 
 const registry = new Map<string, BatchContext>();
 
-export const registerBatch = (batchId: string, txn: Db, baseContext: Context<AppEnv>): void => {
+export const registerBatch = (
+  batchId: string,
+  txn: Db,
+  baseContext: Context<AppEnv>,
+  narrowing?: WhereScope,
+): void => {
   const baseHeaders: Record<string, string> = {};
   baseContext.req.raw.headers.forEach((value, key) => {
     baseHeaders[key] = value;
   });
 
-  registry.set(batchId, { txn, baseContext, baseHeaders });
+  registry.set(batchId, { txn, baseContext, baseHeaders, narrowing });
 };
 
 export const getBatchContext = (batchId: string): BatchContext | undefined => {

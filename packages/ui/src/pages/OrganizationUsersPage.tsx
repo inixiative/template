@@ -18,12 +18,16 @@ import {
 } from '@template/sdk';
 import { Button, Page, Table } from '@template/ui/components';
 import { InviteUserModal } from '@template/ui/components/users/InviteUserModal';
-import { createOptimisticListTarget, useOptimisticMutation, useQuery } from '@template/ui/hooks';
+import {
+  createOptimisticListTarget,
+  useHashSection,
+  useOptimisticMutation,
+  useQuery,
+} from '@template/ui/hooks';
 import { checkPermission } from '@template/ui/hooks/usePermission';
 import { apiMutation } from '@template/ui/lib/apiMutation';
 import { apiQuery } from '@template/ui/lib/apiQuery';
 import { useAppStore } from '@template/ui/store';
-import { useState } from 'react';
 
 type OrganizationUser = OrganizationReadManyUsersResponse['data'][number];
 
@@ -32,7 +36,7 @@ type OrganizationUsersPageProps = {
 };
 
 export const OrganizationUsersPage = ({ organizationId }: OrganizationUsersPageProps) => {
-  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+  const [isInviteModalOpen, setIsInviteModalOpen] = useHashSection('invite');
   const permissions = useAppStore((state) => state.permissions);
   const tenant = useAppStore((state) => state.tenant);
 

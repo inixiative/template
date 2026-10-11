@@ -4,8 +4,10 @@
  * @partOf primitive:flows
  * @uses none
  */
-import { FlowScalarSchema, FlowStepScalarSchema } from '@template/db';
+import { FlowScalarSchema } from '@template/db';
+import { FlowKey } from '@template/db/generated/client/enums';
 import { z } from 'zod';
+import { FlowStepMode } from '#/modules/flow/definitions/types';
 import { isAppPath } from '#/modules/flow/validations/isAppPath';
 
 export const flowUrlSchema = z
@@ -13,21 +15,29 @@ export const flowUrlSchema = z
   .max(2048)
   .refine(isAppPath, { message: 'Must be a path inside this app, starting with a single /' });
 
-export const flowStepCreateSchema = z.object({
-  label: z.string().trim().min(1).max(200),
-  url: flowUrlSchema,
-  data: z.record(z.string(), z.unknown()).optional(),
-});
-
 export const flowCreateBodySchema = z.object({
+  flowKey: z.enum(FlowKey),
+  params: z.record(z.string(), z.string()).default({}),
   returnUrl: flowUrlSchema,
-  flowSteps: z.array(flowStepCreateSchema).min(1).max(50),
 });
 
-export const flowAdvanceBodySchema = z.object({
-  currentStep: z.number().int().min(0),
+export const completedStepsSchema = z.array(
+  z.object({ stepKey: z.string(), completedAt: z.string() }),
+);
+
+export type CompletedSteps = z.infer<typeof completedStepsSchema>;
+
+export const flowResponseSchema = FlowScalarSchema.omit({ completedSteps: true }).extend({
+  flowSteps: z.array(
+    z.object({
+      key: z.string(),
+      label: z.string(),
+      url: z.string(),
+      mode: z.enum(FlowStepMode),
+      completedAt: z.string().nullable(),
+    }),
+  ),
+  progress: z.object({ count: z.number().int(), required: z.number().int() }).nullable(),
 });
 
-export const flowResponseSchema = FlowScalarSchema.extend({
-  flowSteps: FlowStepScalarSchema.array(),
-});
+export type FlowResponse = z.infer<typeof flowResponseSchema>;

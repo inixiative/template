@@ -1,13 +1,16 @@
 /**
  * @atlas
  * @kind entrypoint
- * @uses primitive:routeTemplates
+ * @uses primitive:routeTemplates, primitive:flows
  */
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { registerSecuritySchemes } from '#/lib/auth/securitySchemes';
+import { routeByOperationId } from '#/lib/routeTemplates/routeIndex';
 import { errorHandlerMiddleware } from '#/middleware/error/errorHandlerMiddleware';
 import { notFoundHandlerMiddleware } from '#/middleware/error/notFoundHandlerMiddleware';
 import { telemetryMiddleware } from '#/middleware/telemetryMiddleware';
+import { flowDefinitions } from '#/modules/flow/definitions';
+import { assertValidFlowDefinitions } from '#/modules/flow/validations/flowDefinitionIssues';
 import { Tags } from '#/modules/tags';
 import { routes } from '#/routes';
 import type { AppEnv } from '#/types/appEnv';
@@ -27,6 +30,7 @@ app.onError(errorHandlerMiddleware);
 
 // Mount all routes
 app.route('/', routes);
+assertValidFlowDefinitions(flowDefinitions, routeByOperationId);
 
 // OpenAPI
 registerSecuritySchemes(app);

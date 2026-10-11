@@ -5,12 +5,14 @@
 ## Contents
 
 - [Purpose](#purpose)
-- [Model](#model)
+- [Lineage](#lineage)
+- [Definitions](#definitions)
+  - [Validation](#validation)
+- [Evaluation](#evaluation)
+- [Instance](#instance)
 - [API](#api)
-  - [Advance](#advance)
 - [Client](#client)
-  - [Navigation policies](#navigation-policies)
-- [Flow-aware buttons](#flow-aware-buttons)
+- [Example: `setUpOrganization`](#example-setuporganization)
 - [What flows are not](#what-flows-are-not)
 - [Source map](#source-map)
 
@@ -18,161 +20,211 @@
 
 ## Purpose
 
-A flow takes one user through an ordered set of pages and brings them back to where they started.
-Each step is a URL. The user consumes the flow: a button that completes the work on a step moves
-them to the next step, and finishing or canceling returns them to the page that started the flow.
+A flow takes one user through an ordered set of steps across pages and brings them back to where
+they started. Flows are predefined in code. The server decides when a step is done, from the same
+data the user's own API calls would return. Pages and buttons need no flow-specific code.
 
 The canonical use: from Archives → Provision, the user needs a hosting integration first. The page
-starts a flow whose first step is Integrations → Connect Railway and whose last step is back on
-Archives with Railway preselected. Nothing on the Integrations page knows it is inside a flow; its
-primary "Connect" button is flow-aware by default.
+starts a flow whose first step is Integrations `#connect-railway`. The step completes when the
+user's integrations include Railway, and then the user is sent back to Archives with Railway
+preselected.
 
-Flows come from the Carde.io organized-play MVP (`Flow` + `FlowStep`, `PUT /flows/:id/advance`).
-The template adds the owner, cancel, an end-of-flow guard, safe concurrent advance, the client and
-flow-aware buttons.
+## Lineage
 
-## Model
+The Carde.io organized-play MVP had two pieces of this:
+
+- **The flow table.** `Flow { currentStep, complete }` and `FlowStep { order, label, url, data }`,
+  advanced by `PUT /flows/:id/advance`.
+- **Onboarding steps.** The Phoenix app's `OnboardingStep` had `include(user, game)` and
+  `accomplished(user, game)` functions, evaluated on the client.
+
+Template keeps the per-user instance and its `currentStep`. The steps move into a code registry,
+and `accomplished` becomes data: a json-rules condition over a readMany route. The server
+evaluates it as the user, so no client can advance a flow by claiming a step is done.
+
+## Definitions
+
+`apps/api/src/modules/flow/definitions/`. This follows the inquiry handler pattern: a Prisma enum
+(`FlowKey`) and a `Record<FlowKey, FlowDefinition>`, with one folder per flow holding its definition
+and its `paramsSchema`.
+
+```ts
+type FlowDefinition = {
+  key: FlowKey;
+  paramsSchema: z.ZodObject<…>;
+  steps: FlowStepDefinition[];
+};
+
+type FlowStepDefinition = {
+  key: string;
+  label: string;
+  url: string;
+  mode: 'navigate' | 'anchor' | 'action';
+  completedWhen: {
+    read: string;
+    path?: Record<string, string>;
+    where?: Condition;
+    count?: { atLeast: number };
+  };
+};
+```
+
+The fields:
+
+- **`read`**: the SDK operationId of a paginated readMany route that has a `filterLens`.
+- **`path`**: fills that route's path params. `{{param}}` takes a value from the flow's params.
+- **`where`**: a json-rules condition over that route's `filterLens`. A leaf can `bind` a flow param,
+  `flowStartedAt` or `userId`.
+- **`count`**: how many rows must match. The default is `{ atLeast: 1 }`.
+- **`url`**: where the step lives. It also takes `{{param}}`.
+- **`mode`**: what the client does when the step becomes current:
+  - `navigate` goes to `url`.
+  - `anchor` goes to `url`. When that is the current page, only the hash changes, and the page
+    opens or scrolls to that section.
+  - `action` stays put; the work happens on the current page.
+
+### Validation
+
+Definitions are checked at boot (`app.ts`) and in `flowDefinitionIssues.test.ts`. A bad definition
+fails boot and the test suite; it never reaches a user. For each step:
+
+- `read` names a registered route (the route index is filled by `autoRegisterRoutes`), and that
+  route is a paginated `GET` readMany with a `filterLens`.
+- `path` fills exactly the route's path params.
+- Every `{{param}}` in `url` and `path` is a key of `paramsSchema`, and every `bind` in `where` is a
+  param, `flowStartedAt` or `userId`.
+- `where` passes `validateRuleInLens` against the route's `filterLens`, so it reads only fields that
+  route lets a caller filter on.
+- `count.atLeast` is a positive integer.
+
+## Evaluation
+
+`POST /flow/:id/check` locks the flow (`db.findForUpdate`) and evaluates the current step. It
+advances while each next step's rule holds, possibly through several steps, and sets `completedAt`
+after the last one.
+
+A step's rule is evaluated by running its bound route as the caller. `countFlowStepRows` resolves
+the operationId and path with `resolveOperation`, the same helper the WebSocket layer uses. It then
+calls the route through the batch sub-request machinery (`registerBatch` + `x-batch-id`), the way
+`/batch` runs its sub-requests:
+
+- **Identity.** The sub-request inherits the caller's identity: user, token and spoof. Its
+  permissions are rebuilt from them, exactly as for a batch sub-request.
+- **Middleware.** Every middleware the route declares runs, for example
+  `validatePermission('manage')` on `organizationSentManyInquiries`.
+- **Scoping.** The controller's parent scoping, `paginate`, the route's `filterLens` and
+  `lensWhere` all run unchanged.
+- **The flow's condition.** `where` is the one addition. It rides on the batch context as a
+  narrowing, and `filterLensSetter` stacks it on the route's lens as one more layer, the same
+  mechanism `scopeNarrowing` uses. A narrowing layer only narrows.
+- **The count.** It is the route's own `pagination.total` (`pageSize=1`).
+
+If the route refuses (403, 404), the step does not hold. If it refuses the first step at start,
+`POST /me/flows` answers 403.
+
+Completion therefore sees exactly what the SDK call would return. Permissions and tenancy cannot
+drift, because there is no second implementation of them.
+
+**Why not a lens over the owner's data, or a refactored query builder?** A hand-built lens
+re-derives scoping that each route already encodes, and the two drift. The base `where` lives in
+each controller, so factoring readMany would mean changing every controller. Calling the route
+reuses all of it unchanged, and the batch registry already exists to call a route as its caller.
+
+## Instance
 
 `packages/db/prisma/schema/flow.prisma`
 
-| Model | Field | Meaning |
-|---|---|---|
-| `Flow` | `userId` | The person consuming the flow. Only they can read, advance or cancel it. |
-| | `returnUrl` | The page that started the flow. Cancel and finish go here. Immutable. |
-| | `currentStep` | `order` of the step the user is on. Equals the step count once complete. |
-| | `completedAt` / `canceledAt` | Terminal states. At most one is set. |
-| `FlowStep` | `order` | Position, from 0. `@@unique([flowId, order])`. |
-| | `label`, `url`, `data` | What the banner shows, where the step lives, and anything the step's page needs (`{ provider: 'railway' }`). Immutable. |
-| | `completedAt` | Set when the user advances past the step. |
+| Field | Meaning |
+|---|---|
+| `userId` | The person on the flow. Only they can read, check or cancel it. |
+| `flowKey` | The registry entry. Immutable. |
+| `params` | Bound at start and validated against the flow's `paramsSchema` (`{ organizationId }`). Immutable. |
+| `returnUrl` | The page that started the flow. Cancel and finish go here. App paths only. Immutable. |
+| `currentStep` | Index of the step the user is on. Equals the step count once complete. |
+| `completedSteps` | `[{ stepKey, completedAt }]`, appended when a step completes. |
+| `completedAt` / `canceledAt` | Terminal states. |
 
-Steps never change after creation: there is no step update or delete route, and
-`ImmutableFieldsOverrides` strips `order`, `label`, `url` and `data` from any update (and
-`returnUrl` on the flow). Step URLs and `returnUrl` must be paths inside the app (`/…`, not
-`//host` or an absolute URL), so a flow can never send a user off-site.
+**Per-step completion is stored as `completedSteps` on the instance, not as an event table.**
+Completion is written once, in order, under the flow's row lock, together with `currentStep`. One
+row keeps that atomic and makes reads a single row with no join. The history a table would give is
+already available: actions taken on a step are audit-logged by their own models, and app events
+carry the rest.
 
-Flows are not audit-enabled and not soft-deleted. They are ephemeral navigation state, like
-`Session` and `Token`: progress is not a change worth an audit row, and canceling is a state
-(`canceledAt`), not a delete. They are in `HARD_DELETE_ON_TOMBSTONE`, so a flow and its steps die
-with their user.
+**Not audit-enabled and not soft-deleted.** A flow is ephemeral navigation state, like `Session`
+and `Token`. It is in `HARD_DELETE_ON_TOMBSTONE`, so it is deleted with its user.
 
 ## API
 
-| Method | Path | Permission | Body | Notes |
-|---|---|---|---|---|
-| POST | `/me/flows` | the user | `{ returnUrl, flowSteps: [{ label, url, data? }] }` | 1–50 steps; `order` is the array index |
-| GET | `/flow/:id` | `read` | | Steps ordered by `order` |
-| POST | `/flow/:id/advance` | `operate` | `{ currentStep }` | Completes that step; see below |
-| POST | `/flow/:id/cancel` | `operate` | | Returns the flow, carrying `returnUrl` |
+| Method | Path | Permission | Notes |
+|---|---|---|---|
+| POST | `/me/flows` | the user | `{ flowKey, params, returnUrl }`. `params` failing `paramsSchema` is a 400. Steps that already hold complete at once. |
+| GET | `/flow/:id` | `read` | Never advances. Includes `progress` for the current step. |
+| POST | `/flow/:id/check` | `operate` | Evaluates and advances. |
+| POST | `/flow/:id/cancel` | `operate` | Returns the flow, carrying `returnUrl`. A completed flow is a 409. |
 
-Permissions are `ownerActions(['user'])` in the rebac schema: another user's flow is a 403. A
-read-only token can read a flow but not move it.
+Responses carry:
 
-### Advance
+- `flowSteps`: `[{ key, label, url, mode, completedAt }]`, with urls filled from params;
+- `progress`: `{ count, required }` for the current step.
 
-The body names the step being completed. Under a `db.findForUpdate` row lock:
-
-- `currentStep` below the flow's current step: already done. The flow is returned unchanged
-  (200), even if it has since completed or been canceled. This makes a double click, a retry or
-  two tabs safe: the step is completed once, and the caller follows the flow to wherever it is.
-- the flow is canceled or complete: 409.
-- `currentStep` ahead of the flow's current step: 409. Steps are not skipped.
-- otherwise the step gets `completedAt`, `currentStep` moves on, and completing the last step sets
-  the flow's `completedAt`.
-
-Cancel takes the same lock. Canceling twice returns the canceled flow; canceling a completed flow
-is a 409.
+There is no client-driven advance. The server decides.
 
 ## Client
 
-The flow id rides in the URL as the `flow` search param, so a flow survives a refresh and opens in a
-new tab.
+The flow id rides in the URL as `?flow=`. `FlowProvider` and `FlowBanner` are mounted by `AppShell`
+and `FullscreenLayout`.
 
-| Piece | Location | Role |
-|---|---|---|
-| `FlowProvider` | `components/flows/FlowProvider.tsx` | Reads `?flow=`, loads the flow, provides its controller. Mounted by `AppShell` and `FullscreenLayout`. |
-| `FlowBanner` | `components/flows/FlowBanner.tsx` | "Step 2 of 3 · label", a progress bar and Cancel. Mounted by both layouts; renders nothing outside an active flow. |
-| `useFlow()` | `hooks/flow/useFlow.ts` | `{ flow, currentFlowStep, isActive, advance(), cancel() }`, or `null` outside a flow. |
-| `useStartFlow()` | `hooks/flow/useStartFlow.ts` | `startFlow({ flowSteps, returnUrl? })` creates the flow and opens step 1 with `?flow=`. `returnUrl` defaults to the current page. |
+- `useFlow()` returns `{ flow, currentFlowStep, isActive, check(), cancel() }`, or `null`.
+- `useStartFlow()` provides `startFlow({ flowKey, params, returnUrl? })`. It creates the flow and
+  enters its current step. `returnUrl` defaults to the current page.
+- **After any successful mutation**, while a flow is active, the provider calls `check()`. It
+  subscribes to React Query's mutation cache, so every `useMutation` and `useOptimisticMutation`
+  takes part without page code. The flow's own requests are tagged `meta.flowMutation` and never
+  trigger a check. Concurrent triggers share one request and re-run once if more work landed
+  meanwhile.
+- **When a check advances**, the client enters the new current step by its `mode`. On the last step
+  it goes to `returnUrl`. A check that doesn't advance changes nothing on screen except the banner's
+  "1 of 2".
+- **Navigation never advances.** Back, forward, links and reloads don't check anything; only a
+  successful mutation does.
+- **Anchors.** Pages read the hash with `useHashSection(id)`, which returns `[open, setOpen]` tied
+  to `#id`. `OrganizationUsersPage` opens its invite modal on `#invite`, and `TokensPage` opens its
+  create modal on `#create-token`.
+- **`Link`** keeps `?flow=` (plus `org` / `space`) while a flow is active. The `'flow'` navigation
+  policy does the same for `navigatePreserving`. The sidebar and breadcrumbs use `'context'`, so
+  leaving a flow's pages through them drops it.
 
-`advance()` sends the step it is on and navigates to the next step's url with the flow's own id
-set as `?flow=` (not whatever the current URL holds). On the last step it goes to `returnUrl` with
-`'context'`, which drops the flow param. Concurrent calls share one request. `cancel()` goes to
-`returnUrl` the same way. A `?flow=` the user cannot read (stale, foreign, deleted) loads nothing:
-no banner, no toast, neutral buttons, and `Link` drops it.
+Buttons are plain buttons. They no longer decide completion.
 
-Finishing goes to `returnUrl`, not the last step's url. When the starting page needs something back
-(preselect Railway), make that page the last step and put it in the step's `data`:
+## Example: `setUpOrganization`
 
-```tsx
-const { startFlow } = useStartFlow();
+`apps/api/src/modules/flow/definitions/setUpOrganization/`, params `{ organizationId }`:
 
-startFlow({
-  returnUrl: '/archives',
-  flowSteps: [
-    { label: 'Connect Railway', url: '/settings/integrations?connect=railway' },
-    { label: 'Provision an archive', url: '/archives?provision=1', data: { provider: 'railway' } },
-  ],
-});
+| Step | Mode | Bound read | Completes when |
+|---|---|---|---|
+| Invite a teammate | navigate `/users/members?org=…` | `organizationSentManyInquiries` | ≥ 1 sent `inviteOrganizationUser` |
+| Invite one more | anchor `#invite` | same | ≥ 2 |
+| Create two API tokens | navigate `/settings/tokens?org=…#create-token` | `organizationReadManyTokens` | ≥ 2 |
 
-// on /archives
-const flow = useFlow();
-const provider = flow?.currentFlowStep?.data.provider;
-```
-
-### Navigation policies
-
-`navigatePreserving(to, policy)` takes a `'flow'` policy beside `'context'`, `'spoof'` and `'all'`:
-`'flow'` keeps `org`, `space` and `flow`; `'context'` keeps `org` and `space` and drops `flow`.
-The sidebar and breadcrumbs use `'context'`, so leaving a flow's pages through them leaves the flow
-(no banner, no flow-aware buttons). The flow itself stays open and can be resumed by its URL.
-
-## Flow-aware buttons
-
-Buttons are flow-aware by default, so a page does nothing to take part in a flow.
-
-A `Button` **completes** a step when it is `type="submit"` or the primary (`default`) variant.
-`secondary`, `ghost`, `outline`, `link` and `destructive` are neutral. `flow={false}` exempts a
-completing button; `flow="complete"` opts a neutral one in.
-
-Inside an active flow, a completing button's `onClick` runs as before. If it returns a promise and
-the promise resolves, the flow advances and navigates. Two rules keep this safe:
-
-- **Only a resolved promise advances.** A synchronous handler (opening a modal, toggling state)
-  never advances, and neither does a rejected one. Return the mutation's promise
-  (`mutateAsync`) to make an action complete a step.
-- **Outside an active flow nothing changes.** No `FlowProvider`, no `?flow=`, or a finished flow:
-  the button is the same button.
-
-When "resolved" does not mean "done" (a handler that catches its own errors and resolves, or a
-two-phase modal where the first submit only checks a token), exempt the button with `flow={false}`
-and call `useFlow()?.advance()` yourself when the step's work is really done.
-
-Shell controls that are not step work opt out: the UserMenu spoof button is `flow={false}`.
-
-Submits go through `Form` (`components/primitives/Form.tsx`), a `<form>` whose `onSubmit` may
-return a promise. When it resolves inside an active flow, the flow advances unless the submitting
-button is exempt (`flow={false}`, rendered as `data-flow="neutral"`). A plain `<form>` is not
-flow-aware.
-
-`Link` (`components/primitives/Link.tsx`) keeps the `flow` param (and `org` / `space`) in both its
-`href` and its navigation while a flow is active; `flow={false}` drops it.
+`organizationSentManyInquiries`' `filterLens` does not show `createdAt`, so this flow counts
+invitations sent before it started too. That is the lens doing its job: a rule can't read what the
+route doesn't expose.
 
 ## What flows are not
 
-- **Not login.** Auth keeps its own `redirectTo`: login happens before there is a user to own a
-  flow.
-- **Not a wizard engine.** Steps hold no form state and no branching; a step's page does its own
-  work. A different path is a different flow.
-- **Not server-side side effects.** Advancing records progress only. The step's own action (the
-  connect, the provision) does the work.
+- **Not login.** Auth keeps its own `redirectTo`.
+- **Not a write path.** Checking only reads; the step's own page does the work.
+- **Not a wizard engine.** There is no branching and no form state.
 
 ## Source map
 
-- Schema: `packages/db/prisma/schema/flow.prisma`; factories `flowFactory.ts`, `flowStepFactory.ts`
-- API: `apps/api/src/modules/flow/` and `apps/api/src/modules/me/*/meCreateFlow.ts`
-- Permissions: `'db:flow'` in `packages/permissions/src/rebac/schema.ts`
+- Schema: `packages/db/prisma/schema/flow.prisma`; factory `flowFactory.ts`
+- Registry: `apps/api/src/modules/flow/definitions/`
+- Validation: `apps/api/src/modules/flow/validations/flowDefinitionIssues.ts`; route index
+  `apps/api/src/lib/routeTemplates/routeIndex.ts`
+- Evaluation: `services/countFlowStepRows.ts`, `services/advanceSatisfiedSteps.ts`; batch narrowing in
+  `modules/batch/services/batchRegistry.ts`, `middleware/prepareRequest.ts`,
+  `lib/routeTemplates/utils/prepareMiddleware.ts`
 - Client: `packages/ui/src/components/flows/`, `packages/ui/src/hooks/flow/`,
-  `packages/ui/src/lib/flows/`, `packages/ui/src/lib/resolveNavigationTarget.ts`
-- Primitives: `Button.tsx`, `Form.tsx`, `Link.tsx` in `packages/ui/src/components/primitives/`
-- Tests: `apps/api/src/modules/flow/tests/flow.test.ts`,
-  `packages/ui/src/components/flows/flowAwareness.test.tsx`
+  `packages/ui/src/hooks/useHashSection.ts`, `packages/ui/src/lib/flows/`
+- Tests: `apps/api/src/modules/flow/tests/`, `packages/ui/src/components/flows/flowClient.test.tsx`
