@@ -3,6 +3,7 @@ export * from './Badge';
 export * from './Breadcrumb';
 export * from './Button';
 export * from './Card';
+export * from './CopyButton';
 export * from './DropdownMenu';
 export * from './EmptyState';
 export * from './Input';

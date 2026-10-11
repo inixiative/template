@@ -13,6 +13,7 @@ import type {
 } from '@template/sdk';
 import { Button, Page, Table } from '@template/ui/components';
 import { CreateTokenModal } from '@template/ui/components/settings/CreateTokenModal';
+import { SecretRevealModal } from '@template/ui/components/utility/SecretRevealModal';
 import { createOptimisticListTarget, useOptimisticMutation, useQuery } from '@template/ui/hooks';
 import { tokenContextQueries } from '@template/ui/lib/tokenContextQueries';
 import { useAppStore } from '@template/ui/store';
@@ -24,8 +25,11 @@ type Token =
   | OrganizationReadManyTokensResponse['data'][number]
   | SpaceReadManyTokensResponse['data'][number];
 
+type CreatedToken = Token & { key: string };
+
 export const TokensPage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [revealedKey, setRevealedKey] = useState<string | null>(null);
   const context = useAppStore((state) => state.tenant.context) as AuthenticatedContext;
   const tokenQueries = tokenContextQueries(context);
 
@@ -49,9 +53,11 @@ export const TokensPage = () => {
   const createMutation = useOptimisticMutation({
     mutationFn: tokenQueries.create.mutationFn,
     targets: [
-      createOptimisticListTarget<Token>({
+      createOptimisticListTarget<Token, unknown, { data: CreatedToken }>({
         queryKey: tokenQueries.readMany.queryKey,
         operation: 'create',
+        optimisticExtras: { createdAt: new Date().toISOString(), lastUsedAt: null },
+        itemFromResponse: ({ data: { key: _key, ...token } }) => token,
       }),
     ],
   });
@@ -88,6 +94,7 @@ export const TokensPage = () => {
           <Button
             variant="ghost"
             size="sm"
+            aria-label={`Delete ${item.name}`}
             onClick={() => deleteMutation.mutate({ path: { id: item.id } })}
           >
             <Icon icon="lucide:trash-2" className="h-4 w-4 text-destructive" />
@@ -98,7 +105,10 @@ export const TokensPage = () => {
   ];
 
   const handleCreate = (data: Pick<MeCreateTokenData['body'], 'name' | 'role'>) => {
-    createMutation.mutate({ body: data });
+    createMutation.mutate(
+      { body: data },
+      { onSuccess: (response) => setRevealedKey(response.data?.key ?? null) },
+    );
     setIsModalOpen(false);
   };
 
@@ -135,6 +145,13 @@ export const TokensPage = () => {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSubmit={handleCreate}
+      />
+
+      <SecretRevealModal
+        secret={revealedKey}
+        title="Your new API token"
+        label="API token"
+        onDismiss={() => setRevealedKey(null)}
       />
     </>
   );

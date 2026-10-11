@@ -1145,13 +1145,10 @@ export const ProfilePage = () => {
 - `UserProfileTab` - User profile editor
 - `OrganizationProfileTab` - Organization profile editor
 - `SpaceProfileTab` - Space profile editor
-- `UserTokensTab` - User API token management
-- `OrganizationTokensTab` - Organization token management
-- `SpaceTokensTab` - Space token management
 - `UserWebhooksTab` - User webhook subscriptions
 - `OrganizationWebhooksTab` - Org webhook subscriptions
 - `SpaceWebhooksTab` - Space webhook subscriptions
-- `CreateTokenModal` - Token creation modal
+- `CreateTokenModal` - Token creation modal (API tokens are managed by `TokensPage` in `packages/ui/src/pages/`, which shows a new key once in `SecretRevealModal`)
 - `AuthProviderModal` - Auth provider configuration modal
 
 #### Example: Settings Layout

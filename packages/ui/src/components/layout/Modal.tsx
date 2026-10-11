@@ -13,6 +13,7 @@ export type ModalProps = {
   open?: boolean;
   isOpen?: boolean;
   onClose: () => void;
+  dismissOnBackdrop?: boolean;
   size?: ModalSize;
   title?: string;
   children: React.ReactNode;
@@ -23,6 +24,7 @@ export const Modal = ({
   open,
   isOpen,
   onClose,
+  dismissOnBackdrop = true,
   size = 'small',
   title,
   children,
@@ -38,7 +40,7 @@ export const Modal = ({
         type="button"
         aria-label="Close modal"
         className="absolute inset-0 bg-black/50"
-        onClick={onClose}
+        onClick={dismissOnBackdrop ? onClose : undefined}
       />
       <div
         role="dialog"
