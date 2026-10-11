@@ -14,7 +14,7 @@ export const meCreateFlowRoute = createRoute({
   submodel: Modules.flow,
   skipId: true,
   description:
-    'Starts a registered flow for the current user. params are validated against the flow; steps already satisfied complete at once.',
+    "Starts a registered flow for the current user. bindings are validated against the flow's bindings schema; steps already satisfied complete at once.",
   bodySchema: flowCreateBodySchema,
   responseSchema: flowResponseSchema,
   tags: [Tags.me, Tags.flow],

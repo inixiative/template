@@ -22,7 +22,7 @@ export const flowStepNavigation = (step: FlowStep, flowId: string): FlowStepNavi
         to: step.to,
         params: step.params,
         search: (previous) => ({
-          ...pickSearchParams(previous, ['org', 'space', 'spoof']),
+          ...pickSearchParams(previous, ['spoof']),
           ...step.search,
           [FLOW_SEARCH_PARAM]: flowId,
         }),

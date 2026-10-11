@@ -147,7 +147,7 @@ export const TokensPage = () => {
       </Page>
 
       <CreateTokenModal
-        isOpen={isModalOpen}
+        isOpen={isModalOpen && !revealedKey}
         onClose={() => setIsModalOpen(false)}
         onSubmit={handleCreate}
       />

@@ -94,7 +94,7 @@ const buildServerFlow = async (): Promise<Flow> => {
   const { entity } = await buildFlow(
     {
       flowKey: 'setUpOrganization',
-      params: { organizationId: ORG },
+      bindings: { organizationId: ORG },
       returnUrl: '/dashboard',
       currentStep: 0,
       completedSteps: [],
@@ -106,7 +106,7 @@ const buildServerFlow = async (): Promise<Flow> => {
   const { completedSteps: _completedSteps, ...row } = entity.__serialize();
   const started = {
     ...row,
-    params: { organizationId: ORG },
+    bindings: { organizationId: ORG },
     flowSteps: STEPS.map(({ key, label, mode, to, hash }) => ({
       key,
       label,
@@ -287,8 +287,22 @@ describe('flow client', () => {
 
     await doWork();
     await doWork();
-    await waitFor(() => expect(navigatePreserving).toHaveBeenCalledWith('/dashboard', 'context'));
+    await waitFor(() => expect(locationOf(router).pathname).toBe('/dashboard'));
+    expect(locationOf(router)).toEqual({ pathname: '/dashboard', search: {}, hash: '' });
     await waitFor(() => expect(screen.queryByRole('region', { name: 'Flow progress' })).toBeNull());
+  });
+
+  it('mutations landing during a check re-check without re-entering the step', async () => {
+    const router = await renderInFlow();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Do work' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Do work' }));
+    await screen.findByText('Step 2 of 4');
+    await waitFor(() => expect(flowRequests('/check').length).toBeGreaterThanOrEqual(2));
+    await settle();
+
+    expect(router.history.length).toBe(2);
+    expect(locationOf(router).hash).toBe('invite');
   });
 
   it('a two-action step advances only after both actions', async () => {
@@ -356,12 +370,15 @@ describe('flow client', () => {
     expect(flowRequests('/check')).toHaveLength(1);
   });
 
-  it('Cancel returns to the returnUrl', async () => {
-    await renderInFlow();
+  it('Cancel returns to the returnUrl, without the flow, its context or its hash', async () => {
+    flow = { ...flow, returnUrl: '/archives' };
+    const router = renderAt(`/users/members?org=${ORG}&flow=${flow.id}#invite`, <Work />);
+    await screen.findByText('Step 1 of 4');
 
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
 
-    await waitFor(() => expect(navigatePreserving).toHaveBeenCalledWith('/dashboard', 'context'));
+    await waitFor(() => expect(locationOf(router).pathname).toBe('/archives'));
+    expect(locationOf(router)).toEqual({ pathname: '/archives', search: {}, hash: '' });
     expect(flowRequests('/cancel')).toHaveLength(1);
     await waitFor(() => expect(screen.queryByRole('region', { name: 'Flow progress' })).toBeNull());
   });

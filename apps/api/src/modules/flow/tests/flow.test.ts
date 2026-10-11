@@ -190,6 +190,42 @@ describe('flows', () => {
     expect(await evaluate()).toBe('holds');
   });
 
+  it("a caller-scoped read never matches another user's rows, even with a rule that is always true", async () => {
+    const { entity: loner } = await createUser();
+    const { entity: neighbour } = await createUser();
+    await createToken(
+      { name: 'shared-name', ownerModel: TokenOwnerModel.User },
+      { user: neighbour },
+    );
+    const evaluate = async (rule: Condition) => {
+      const response = await harnessFor(loner, []).fetch(
+        post('/test/evaluate', { read: 'meReadManyTokens', rule }),
+      );
+      return ((await response.json()) as { state: string }).state;
+    };
+
+    expect(await evaluate({ field: 'name', operator: Operator.equals, value: 'shared-name' })).toBe(
+      'pending',
+    );
+    expect(await evaluate(true)).toBe('pending');
+
+    await createToken({ name: 'shared-name', ownerModel: TokenOwnerModel.User }, { user: loner });
+    expect(await evaluate({ field: 'name', operator: Operator.equals, value: 'shared-name' })).toBe(
+      'holds',
+    );
+  });
+
+  it('a check after the user loses access answers 200 and advances nothing', async () => {
+    const { organization, app } = await freshOrganization();
+    const flow = await started(app, organization.id);
+    await sendInvite(organization);
+
+    const revoked = harnessFor(owner, []);
+    const checked = await checkIn(revoked, flow.id);
+
+    expect(checked.currentStep).toBe(0);
+  });
+
   it('never counts rows the bound route would not return to this user', async () => {
     const flow = await started(harness, org.id);
     await sendInvite(foreignOrg);

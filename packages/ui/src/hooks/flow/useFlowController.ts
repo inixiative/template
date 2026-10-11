@@ -12,16 +12,15 @@ import { apiQuery } from '@template/ui/lib/apiQuery';
 import { FLOW_MUTATION_META, isFlowMutation } from '@template/ui/lib/flows/flowMutationMeta';
 import { flowStepNavigation } from '@template/ui/lib/flows/flowStepNavigation';
 import type { Flow, FlowController } from '@template/ui/lib/flows/flowTypes';
-import { useAppStore } from '@template/ui/store';
 import { useEffect, useMemo, useRef } from 'react';
 
 export const useFlowController = (flowId: string | null): FlowController | null => {
   const queryClient = useQueryClient();
-  const navigatePreserving = useAppStore((state) => state.navigation.navigatePreserving);
   const navigate = useNavigate();
   const queryKey = useMemo(() => flowReadQueryKey({ path: { id: flowId ?? '' } }), [flowId]);
   const pendingCheck = useRef<Promise<void> | null>(null);
   const recheck = useRef(false);
+  const activeFlowId = useRef(flowId);
 
   const { data } = useQuery({
     queryKey,
@@ -37,7 +36,7 @@ export const useFlowController = (flowId: string | null): FlowController | null 
   const { mutateAsync: checkFlow } = useMutation({
     mutationFn: apiMutation((opts: Parameters<typeof flowCheck<true>>[0]) => flowCheck<true>(opts)),
     throwOnError: false,
-    meta: FLOW_MUTATION_META,
+    meta: { ...FLOW_MUTATION_META, skipErrorToast: true },
   });
 
   const { mutateAsync: cancelFlow } = useMutation({
@@ -45,7 +44,7 @@ export const useFlowController = (flowId: string | null): FlowController | null 
       flowCancel<true>(opts),
     ),
     throwOnError: false,
-    meta: { flowMutation: true },
+    meta: FLOW_MUTATION_META,
   });
 
   const flow = flowId ? data?.data : undefined;
@@ -55,14 +54,16 @@ export const useFlowController = (flowId: string | null): FlowController | null 
     const isActive = !flow.completedAt && !flow.canceledAt;
 
     const settle = (next: Flow) => {
+      const previous = queryClient.getQueryData<{ data: Flow }>(queryKey)?.data;
       queryClient.setQueryData<{ data: Flow }>(queryKey, (old) =>
         old ? { ...old, data: next } : { data: next },
       );
+      if (activeFlowId.current !== next.id) return;
       if (next.completedAt || next.canceledAt) {
-        navigatePreserving(next.returnUrl, 'context');
+        void navigate({ href: next.returnUrl });
         return;
       }
-      if (next.currentStep === flow.currentStep) return;
+      if (next.currentStep === previous?.currentStep) return;
       const step = next.flowSteps[next.currentStep];
       const target = step && flowStepNavigation(step, next.id);
       if (target) void navigate(target);
@@ -101,11 +102,15 @@ export const useFlowController = (flowId: string | null): FlowController | null 
       check,
       cancel,
     };
-  }, [flow, queryClient, queryKey, navigatePreserving, navigate, checkFlow, cancelFlow]);
+  }, [flow, queryClient, queryKey, navigate, checkFlow, cancelFlow]);
 
   useEffect(() => {
+    activeFlowId.current = flowId;
     pendingCheck.current = null;
     recheck.current = false;
+    return () => {
+      activeFlowId.current = null;
+    };
   }, [flowId]);
 
   useEffect(() => {

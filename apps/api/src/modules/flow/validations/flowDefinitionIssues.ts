@@ -45,6 +45,11 @@ const stepIssues = (
   const route = lookup(read);
   if (!route || route.method !== 'get')
     return [...issues, `read "${read}" is not a registered read route`];
+  if (route.many && !readsRows(route))
+    return [
+      ...issues,
+      `read "${read}" lists rows but is not a paginated readMany with a filterLens`,
+    ];
 
   const expected = routePathParams(route.path);
   const given = Object.keys(path).sort();

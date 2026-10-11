@@ -70,6 +70,11 @@ describe('flow definition validation', () => {
     ]);
   });
 
+  it('refuses a list route that is not a paginated readMany with a filterLens', () => {
+    const [issue] = issuesFor({ completedWhen: { read: 'authProviderReadMany', rule: true } });
+    expect(issue).toContain('lists rows but is not a paginated readMany with a filterLens');
+  });
+
   it('refuses a path that does not bind the route params', () => {
     const [issue] = issuesFor({
       completedWhen: { read: 'organizationSentManyInquiries', path: {}, rule: true },

@@ -20,7 +20,11 @@ export type IndexedRoute = RouteConfig & {
 const routes = new Map<string, IndexedRoute>();
 
 export const indexRoute = (route: IndexedRoute): void => {
-  if (route.operationId) routes.set(route.operationId, route);
+  if (!route.operationId) return;
+  const indexed = routes.get(route.operationId);
+  if (indexed && indexed !== route)
+    throw new Error(`routeIndex: operationId "${route.operationId}" is registered twice`);
+  routes.set(route.operationId, route);
 };
 
 export const routeByOperationId = (operationId: string): IndexedRoute | undefined =>
@@ -29,4 +33,4 @@ export const routeByOperationId = (operationId: string): IndexedRoute | undefine
 export const readsRows = (
   route: IndexedRoute,
 ): route is IndexedRoute & { filterLens: LensNarrowing } =>
-  route.method === 'get' && !!route.many && !!route.paginate && !!route.filterLens;
+  route.method === 'get' && route.many === true && route.paginate === true && !!route.filterLens;

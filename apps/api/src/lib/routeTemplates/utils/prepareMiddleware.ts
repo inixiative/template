@@ -12,7 +12,7 @@ const filterLensSetter =
   (filterLens: LensNarrowing): MiddlewareHandler =>
   async (c, next) => {
     const narrowing = c.get('subRequestNarrowing');
-    c.set('filterLens', narrowing ? { parent: filterLens, ...narrowing } : filterLens);
+    c.set('filterLens', narrowing ? { ...narrowing, parent: filterLens } : filterLens);
     await next();
   };
 

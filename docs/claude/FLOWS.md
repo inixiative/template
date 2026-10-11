@@ -138,12 +138,13 @@ the request through the batch sub-request machinery (`registerBatch` + `x-batch-
 - **Identity.** The sub-request inherits the caller's user, token and spoof. Its permissions are
   rebuilt from them, and the route's middleware (`validatePermission`, …) runs.
 - **Scoping.** The controller's own scoping and the route's `filterLens` run unchanged.
-- **readMany.** The rule rides the batch context as a narrowing, and `filterLensSetter` stacks it on
+- **readMany** (`many` and `paginate: true` with a `filterLens`; any other list route fails
+  validation). The rule, coerced by that lens, rides the batch context as a narrowing, and `filterLensSetter` stacks it on
   the route's lens as one more layer, the mechanism `scopeNarrowing` uses. A narrowing only
   narrows. The step holds when the route's `pagination.total` is greater than 0 (`pageSize=1`).
 - **Single read.** The route returns its record, and `check(rule, data)` evaluates it in memory.
-- **Refusal.** If the route refuses (403, 404), the step does not hold. If it refuses the first step
-  at start, `POST /me/flows` is a 403.
+- **Refusal.** If the route refuses (403, 404), the step does not hold; any other status is also logged.
+  If the route refuses at start, on the step creation stops on, `POST /me/flows` is a 403.
 
 **Why this path.** Completion sees exactly what the SDK call returns to this user, so permissions
 and tenancy cannot drift: there is no second implementation of them. For a readMany, the rule runs
@@ -197,11 +198,14 @@ and `FullscreenLayout`.
   takes part. The flow's own requests are tagged `meta.flowMutation` and never trigger a check.
   Concurrent triggers share one request and re-run once.
 - **When a check advances**, the client enters the new step by its `mode`, calling
-  `navigate({ to, params, search, hash })`. Search keeps `org`, `space`, `spoof` and `flow`. On the
-  last step it goes to `returnUrl`.
+  `navigate({ to, params, search, hash })`. Search is the step's own `search` plus `spoof` and
+  `flow`; the step names its own context (`org`), so none leaks over from the current page. A check
+  that settles after the user has left the flow navigates nowhere. Finishing or canceling goes to
+  `returnUrl` exactly as captured: no current context, no current hash.
 - **Navigation never advances.** Back, forward, links and reloads check nothing.
 - **Anchors.** Pages open sections from the hash with `useHashSection(id)`. `OrganizationUsersPage`
-  opens its invite modal on `#invite`, and `TokensPage` opens its create modal on `#create-token`.
+  opens its invite modal on `#invite`, and `TokensPage` opens its create modal on `#create-token`,
+  unless a new key is still being shown.
 - **`Link`** keeps `?flow=` while a flow is active.
 
 Buttons are plain buttons. They don't decide completion.

@@ -5,6 +5,7 @@
  * @uses primitive:routeTemplates
  */
 import { bindRule, check, coerceRule } from '@inixiative/json-rules';
+import { log } from '@template/shared/logger';
 import type { Context } from 'hono';
 import { readsRows, routeByOperationId } from '#/lib/routeTemplates/routeIndex';
 import type { FlowCompletion } from '#/modules/flow/definitions/types';
@@ -27,13 +28,18 @@ export const evaluateFlowStep = async (
 
   const boundRule = bindRule(rule, bindings);
   const search = new URLSearchParams(resolveBinds(query, bindings));
+  const refused = (response: Response): FlowStepState => {
+    if (response.status !== 403 && response.status !== 404)
+      log.warn(`flow step read "${read}" answered ${response.status}`);
+    return 'refused';
+  };
 
   if (readsRows(route)) {
     search.set('pageSize', '1');
     const response = await readAsCaller(c, `${operation.path}?${search}`, {
-      root: { where: boundRule },
+      root: { where: coerceRule(boundRule, route.filterLens) },
     });
-    if (!response.ok) return 'refused';
+    if (!response.ok) return refused(response);
     const { pagination } = (await response.json()) as { pagination: { total: number } };
     return pagination.total > 0 ? 'holds' : 'pending';
   }
@@ -42,7 +48,7 @@ export const evaluateFlowStep = async (
     c,
     search.size ? `${operation.path}?${search}` : operation.path,
   );
-  if (!response.ok || !route.responseSchema) return 'refused';
+  if (!response.ok || !route.responseSchema) return refused(response);
   const { data } = (await response.json()) as { data: Record<string, unknown> };
   const typedRule = coerceRule(boundRule, responseLens(route.responseSchema, read));
   return check(typedRule, data) === true ? 'holds' : 'pending';
