@@ -1346,6 +1346,7 @@ interface ConditionalProps {
 - Six variants: default, destructive, outline, secondary, ghost, link
 - Four sizes: sm, default, lg, icon
 - Standard conditional props (`show`, `disabled`, `disabledText`)
+- Flow-aware by default: inside an active flow, a primary or `type="submit"` button whose `onClick` returns a promise advances the flow when it resolves ([FLOWS.md](FLOWS.md#flow-aware-buttons))
 
 **Props:**
 
@@ -1353,8 +1354,12 @@ interface ConditionalProps {
 interface ButtonProps extends ConditionalProps {
   variant?: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link';
   size?: 'sm' | 'default' | 'lg' | 'icon';
+  flow?: false | 'complete';  // false exempts a completing button; 'complete' opts a neutral one in
 }
 ```
+
+`Form` and `Link` (`components/primitives/`) are the flow-aware `<form>` and `<a>`: `Form` advances
+the flow when an async `onSubmit` resolves, and `Link` keeps the `flow` param (plus `org` / `space`).
 
 **Usage:**
 
@@ -1725,6 +1730,10 @@ navigatePreservingContext('/settings');
 // Preserve spoof param only
 navigatePreservingSpoof('/users?org=xyz');
 ```
+
+`navigatePreserving(to, policy)` is the current form of the helpers above. Policies: `'context'` keeps
+`org` / `space` / `spoof`; `'flow'` also keeps the `flow` param ([FLOWS.md](FLOWS.md)); `'spoof'`
+keeps only `spoof`; `'all'` keeps every param.
 
 **When to use:**
 - `navigate` - Basic navigation, explicit search params

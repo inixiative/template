@@ -1,0 +1,46 @@
+// ============================================================================
+// FLOW - A user consumes an ordered, immutable set of steps (each a URL), then returns
+// ============================================================================
+
+model Flow {
+  id        String   @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId String @db.VarChar(36)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  returnUrl   String
+  currentStep Int       @default(0)
+  completedAt DateTime?
+  canceledAt  DateTime?
+
+  flowSteps FlowStep[]
+
+  // ==========================================================================
+  // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
+  // ==========================================================================
+
+  @@index([userId])
+}
+
+model FlowStep {
+  id        String   @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  flowId String @db.VarChar(36)
+  flow   Flow   @relation(fields: [flowId], references: [id], onDelete: Cascade)
+
+  order       Int
+  label       String
+  url         String
+  data        Json      @default("{}")
+  completedAt DateTime?
+
+  // ==========================================================================
+  // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
+  // ==========================================================================
+
+  @@unique([flowId, order])
+}

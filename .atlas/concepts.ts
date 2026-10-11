@@ -25,6 +25,7 @@ export const CONCEPTS: ConceptRegistry = {
 
   'primitive:authz': { package: ['permissions'], docs: ['PERMISSIONS.md'] },
   'primitive:batch': { module: ['batch'], docs: ['BATCH.md'] },
+  'primitive:flows': { module: ['flow'], docs: ['FLOWS.md'] },
   'primitive:ui': { package: ['ui'], docs: ['FRONTEND.md', 'ZUSTAND.md'] }, // the component library
   'primitive:shared': {
     package: ['shared'],

@@ -11,6 +11,7 @@ export {
   wrapEnvWithOverrides,
 } from './envOverrides';
 export { heartbeat } from './heartbeat';
+export { isThenable } from './isThenable';
 export { isUuidV7, uuidV7Schema } from './isUuidV7';
 export { resolveAll } from './resolveAll';
 export { type RetryOptions, withRetry } from './retry';

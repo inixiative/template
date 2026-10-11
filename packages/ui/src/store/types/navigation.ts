@@ -7,6 +7,7 @@
 import type { UseNavigateResult } from '@tanstack/react-router';
 import type { NavConfig } from '@template/ui/components/layout/navigationTypes';
 import type { RouteMatch } from '@template/ui/lib/findRoute';
+import type { NavigationPolicy } from '@template/ui/lib/resolveNavigationTarget';
 
 export type NavigationSlice = {
   navigation: {
@@ -16,6 +17,6 @@ export type NavigationSlice = {
     setNavigate: (fn: UseNavigateResult<string>) => void;
     setNavConfig: (config: NavConfig) => void;
     setCurrentRouteMatch: (match: RouteMatch | null) => void;
-    navigatePreserving: (to: string, policy: 'context' | 'spoof' | 'all') => void;
+    navigatePreserving: (to: string, policy: NavigationPolicy) => void;
   };
 };

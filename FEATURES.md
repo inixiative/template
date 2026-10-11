@@ -26,6 +26,7 @@
   - [General Security](#general-security)
 - [User Management](#user-management)
 - [Inquiry System](#inquiry-system)
+- [Flows](#flows)
 - [Contact System](#contact-system)
 - [Customer Management](#customer-management)
 - [Segments](#segments)
@@ -412,6 +413,19 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 - ✅ **Status Tracking** - Full state machine. `sentAt` set once on first send (historical). `expiresAt` set on send via `computeExpiresAt(type)`, cleared when moved back to draft
 - ✅ **Audit Lineage** - `sourceInquiryId` set in actor context during resolution so all side-effect mutations link back to the causal inquiry
 - 🟡 **UI and flow completion** (ticket FEAT-001) - Invitation flow, approval UI, and onboarding integrations in progress
+
+---
+
+## Flows
+
+**A user consumes an ordered set of in-app URLs, then returns where they started.** Lets one page send the user through others (Archives → Integrations → Connect Railway → back to Archives) without either page knowing about the other. Lineage: the Carde.io organized-play MVP; the template adds the owner, cancel, an end-of-flow guard, concurrency safety, the client and flow-aware buttons.
+
+- ✅ **Model** - `Flow` (owner `userId`, `returnUrl`, `currentStep`, `completedAt`, `canceledAt`) + `FlowStep` (`order`, `label`, `url`, `data`, `completedAt`, `@@unique([flowId, order])`). Steps are immutable (no update/delete routes; `ImmutableFieldsOverrides` strips them). URLs must be app paths. Hard-deleted with their user
+- ✅ **API** - `POST /me/flows`, `GET /flow/:id`, `POST /flow/:id/advance`, `POST /flow/:id/cancel`. Owner-only via `ownerActions(['user'])`. Advance names the step it completes and runs under a `findForUpdate` row lock: repeating it is a no-op, skipping or passing the end is a 409
+- ✅ **Client** - `?flow=` carries the flow across refreshes and tabs. `FlowProvider` + `FlowBanner` are mounted by `AppShell` and `FullscreenLayout`; `useFlow()` and `useStartFlow()`; a `'flow'` navigation policy
+- ✅ **Flow-aware buttons** - Primary and submit `Button`s advance the flow when their async action resolves; neutral variants, sync handlers and failures never do; `flow={false}` / `flow="complete"`. `Form` and `Link` primitives carry the same awareness
+
+[Learn more: FLOWS.md](docs/claude/FLOWS.md)
 
 ---
 
