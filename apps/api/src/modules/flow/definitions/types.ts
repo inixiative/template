@@ -16,25 +16,32 @@ export const FlowStepMode = {
 
 export type FlowStepMode = keyof typeof FlowStepMode;
 
+export type FlowBind = { bind: string };
+
+export type FlowBound = Record<string, FlowBind>;
+
 export type FlowCompletion = {
   read: string;
-  path?: Record<string, string>;
-  where?: Condition;
-  count?: { atLeast: number };
+  path?: FlowBound;
+  query?: FlowBound;
+  rule: Condition;
 };
 
 export type FlowStepDefinition = {
   key: string;
   label: string;
-  url: string;
   mode: FlowStepMode;
+  to: string;
+  params?: FlowBound;
+  search?: FlowBound;
+  hash?: string;
   completedWhen: FlowCompletion;
 };
 
-export type FlowParamsSchema = z.ZodObject<Record<string, z.ZodType<string>>>;
+export type FlowBindingsSchema = z.ZodObject<Record<string, z.ZodType<string>>>;
 
 export type FlowDefinition = {
   key: FlowKey;
-  paramsSchema: FlowParamsSchema;
+  bindingsSchema: FlowBindingsSchema;
   steps: FlowStepDefinition[];
 };

@@ -5,53 +5,61 @@
  * @uses primitive:routeTemplates
  */
 import { listBindings, validateRuleInLens } from '@inixiative/json-rules';
-import type { IndexedRoute } from '#/lib/routeTemplates/routeIndex';
+import { type IndexedRoute, readsRows } from '#/lib/routeTemplates/routeIndex';
 import type { FlowDefinition, FlowStepDefinition } from '#/modules/flow/definitions/types';
-import { flowTemplateParams } from '#/modules/flow/services/fillFlowTemplate';
-import { FLOW_BINDINGS } from '#/modules/flow/services/flowBindings';
+import { SYSTEM_BINDINGS } from '#/modules/flow/services/flowBindings';
+import { boundNames } from '#/modules/flow/services/resolveBinds';
+import { responseLens } from '#/modules/flow/services/responseLens';
 
 type RouteLookup = (operationId: string) => IndexedRoute | undefined;
 
 const routePathParams = (path: string): string[] =>
   [...path.matchAll(/[:{](\w+)\}?/g)].map(([, name]) => name!).sort();
 
+const readLens = (route: IndexedRoute, read: string) => {
+  if (readsRows(route)) return route.filterLens;
+  return route.responseSchema ? responseLens(route.responseSchema, read) : null;
+};
+
 const stepIssues = (
   step: FlowStepDefinition,
-  paramNames: Set<string>,
+  bindingNames: Set<string>,
   lookup: RouteLookup,
 ): string[] => {
   const issues: string[] = [];
-  const { read, path = {}, where, count } = step.completedWhen;
+  const { read, path = {}, query, rule } = step.completedWhen;
 
-  const templates = [step.url, ...Object.values(path)];
-  for (const name of templates.flatMap(flowTemplateParams))
-    if (!paramNames.has(name)) issues.push(`{{${name}}} is not a param of this flow`);
-  if (count && (!Number.isInteger(count.atLeast) || count.atLeast < 1))
-    issues.push('count.atLeast must be a positive integer');
+  if (step.mode === 'anchor' && !step.hash) issues.push('an anchor step needs a hash');
+
+  const binds = [
+    ...listBindings(rule, { required: true }),
+    ...boundNames(path),
+    ...boundNames(query),
+    ...boundNames(step.params),
+    ...boundNames(step.search),
+  ];
+  for (const name of new Set(binds))
+    if (!bindingNames.has(name))
+      issues.push(`binds "${name}", which the flow's bindings schema does not cover`);
 
   const route = lookup(read);
-  if (!route) return [...issues, `read "${read}" is not a registered route`];
-  if (route.method !== 'get' || !route.many || !route.paginate || !route.filterLens)
-    return [...issues, `read "${read}" is not a paginated readMany route with a filterLens`];
+  if (!route || route.method !== 'get')
+    return [...issues, `read "${read}" is not a registered read route`];
 
   const expected = routePathParams(route.path);
   const given = Object.keys(path).sort();
   if (expected.join() !== given.join())
     issues.push(
-      `path must fill exactly [${expected.join(', ')}] for "${read}", got [${given.join(', ')}]`,
+      `path must bind exactly [${expected.join(', ')}] for "${read}", got [${given.join(', ')}]`,
     );
 
-  if (where) {
-    const allowed = new Set<string>([...paramNames, ...FLOW_BINDINGS]);
-    for (const name of listBindings(where))
-      if (!allowed.has(name))
-        issues.push(`where binds "${name}", which is not a param of this flow`);
-    const { ok, errors } = validateRuleInLens(where, route.filterLens);
-    if (!ok)
-      issues.push(
-        `where reads outside the filterLens of "${read}": ${errors.map((e) => e.message).join('; ')}`,
-      );
-  }
+  const lens = readLens(route, read);
+  if (!lens) return [...issues, `read "${read}" declares no response schema to evaluate against`];
+  const { ok, errors } = validateRuleInLens(rule, lens);
+  if (!ok)
+    issues.push(
+      `rule reads outside the lens of "${read}": ${errors.map((error) => error.message).join('; ')}`,
+    );
   return issues;
 };
 
@@ -65,9 +73,14 @@ export const flowDefinitionIssues = (
     if (!definition.steps.length) issues.push('has no steps');
     if (new Set(definition.steps.map((step) => step.key)).size !== definition.steps.length)
       issues.push('repeats a step key');
-    const paramNames = new Set(Object.keys(definition.paramsSchema.shape));
+    const bindingNames = new Set<string>([
+      ...Object.keys(definition.bindingsSchema.shape),
+      ...SYSTEM_BINDINGS,
+    ]);
     for (const step of definition.steps)
-      issues.push(...stepIssues(step, paramNames, lookup).map((issue) => `${step.key}: ${issue}`));
+      issues.push(
+        ...stepIssues(step, bindingNames, lookup).map((issue) => `${step.key}: ${issue}`),
+      );
     return issues.map((issue) => `flow "${key}" ${issue}`);
   });
 

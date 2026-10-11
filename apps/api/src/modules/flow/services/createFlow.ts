@@ -19,23 +19,23 @@ export const createFlow = (
   userId: string,
   body: z.infer<typeof flowCreateBodySchema>,
 ) => {
-  const parsed = flowDefinitions[body.flowKey].paramsSchema.safeParse(body.params);
+  const parsed = flowDefinitions[body.flowKey].bindingsSchema.safeParse(body.bindings);
   if (!parsed.success)
     throw makeError({
       status: 400,
-      message: `Invalid params for flow "${body.flowKey}"`,
+      message: `Invalid bindings for flow "${body.flowKey}"`,
       fieldErrors: Object.fromEntries(
-        parsed.error.issues.map((issue) => [`params.${issue.path.join('.')}`, [issue.message]]),
+        parsed.error.issues.map((issue) => [`bindings.${issue.path.join('.')}`, [issue.message]]),
       ),
     });
 
   return db.txn(async () => {
     const created = await db.flow.create({
-      data: { userId, flowKey: body.flowKey, params: parsed.data, returnUrl: body.returnUrl },
+      data: { userId, flowKey: body.flowKey, bindings: parsed.data, returnUrl: body.returnUrl },
     });
-    const { flow, progress, visibility } = await advanceSatisfiedSteps(c, created);
-    if (visibility === 'refused')
+    const { flow, currentStepState } = await advanceSatisfiedSteps(c, created);
+    if (currentStepState === 'refused')
       throw makeError({ status: 403, message: 'You cannot see the data this flow checks' });
-    return presentFlow(flow, progress);
+    return presentFlow(flow);
   });
 };

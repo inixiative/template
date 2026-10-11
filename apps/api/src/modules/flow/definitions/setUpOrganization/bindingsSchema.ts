@@ -7,8 +7,6 @@
 import { uuidV7Schema } from '@template/shared/utils';
 import { z } from 'zod';
 
-export const paramsSchema = z.object({
+export const bindingsSchema = z.object({
   organizationId: uuidV7Schema,
 });
-
-export type SetUpOrganizationParams = z.infer<typeof paramsSchema>;

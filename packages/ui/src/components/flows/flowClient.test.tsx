@@ -25,17 +25,39 @@ import type { ReactNode } from 'react';
 
 const ORG = '01a12b8e-1111-7000-8000-000000000001';
 const STEPS = [
-  { key: 'inviteTeammate', label: 'Invite a teammate', mode: 'navigate', required: 1 },
-  { key: 'inviteAnother', label: 'Invite one more', mode: 'anchor', required: 2 },
-  { key: 'confirmHere', label: 'Confirm on this page', mode: 'action', required: 1 },
-  { key: 'createApiTokens', label: 'Create two API tokens', mode: 'navigate', required: 2 },
+  {
+    key: 'inviteTeammate',
+    label: 'Invite a teammate',
+    mode: 'navigate',
+    required: 1,
+    to: '/users/members',
+    hash: null,
+  },
+  {
+    key: 'inviteAnother',
+    label: 'Invite one more',
+    mode: 'anchor',
+    required: 2,
+    to: '/users/members',
+    hash: 'invite',
+  },
+  {
+    key: 'confirmHere',
+    label: 'Confirm on this page',
+    mode: 'action',
+    required: 1,
+    to: '/users/members',
+    hash: null,
+  },
+  {
+    key: 'createApiTokens',
+    label: 'Create two API tokens',
+    mode: 'navigate',
+    required: 2,
+    to: '/settings/tokens',
+    hash: 'create-token',
+  },
 ] as const;
-const STEP_URLS = [
-  `/users/members?org=${ORG}`,
-  `/users/members?org=${ORG}#invite`,
-  `/users/members?org=${ORG}`,
-  `/settings/tokens?org=${ORG}#create-token`,
-];
 
 const initialState = useAppStore.getState();
 const initialLocation = window.location.href;
@@ -46,13 +68,6 @@ let requests: Array<{ method: string; path: string }>;
 let fetchSpy: ReturnType<typeof spyOn<typeof globalThis, 'fetch'>>;
 let client: QueryClient;
 let navigatePreserving: ReturnType<typeof mock>;
-
-const progressOf = (current: Flow) => {
-  const step = STEPS[current.currentStep];
-  return step && !current.completedAt && !current.canceledAt
-    ? { count: rows, required: step.required }
-    : null;
-};
 
 const serverCheck = (current: Flow): Flow => {
   let next = current;
@@ -71,7 +86,7 @@ const serverCheck = (current: Flow): Flow => {
       ),
     };
   }
-  return { ...next, progress: progressOf(next) };
+  return next;
 };
 
 const buildServerFlow = async (): Promise<Flow> => {
@@ -92,16 +107,18 @@ const buildServerFlow = async (): Promise<Flow> => {
   const started = {
     ...row,
     params: { organizationId: ORG },
-    flowSteps: STEPS.map(({ key, label, mode }, index) => ({
+    flowSteps: STEPS.map(({ key, label, mode, to, hash }) => ({
       key,
       label,
       mode,
-      url: STEP_URLS[index]!,
+      to,
+      params: {},
+      search: { org: ORG },
+      hash,
       completedAt: null,
     })),
-    progress: null,
   };
-  return { ...started, progress: { count: 0, required: 1 } };
+  return started;
 };
 
 const flowRequests = (suffix: string) =>
@@ -155,6 +172,11 @@ const doWork = async (label = 'Do work') => {
   await waitFor(() => expect(flowRequests('/check').length).toBe(before + 1));
 };
 
+const locationOf = (router: ReturnType<typeof renderAt>) => {
+  const { pathname, search, hash } = router.state.location;
+  return { pathname, search, hash };
+};
+
 const settle = () => new Promise((resolve) => setTimeout(resolve, 30));
 
 beforeEach(async () => {
@@ -182,7 +204,7 @@ beforeEach(async () => {
       return Response.json({ data: flow });
     }
     if (request.method === 'POST' && path === `/api/v1/flow/${flow.id}/cancel`) {
-      flow = { ...flow, canceledAt: new Date().toISOString(), progress: null };
+      flow = { ...flow, canceledAt: new Date().toISOString() };
       return Response.json({ data: flow });
     }
     return Response.json({ message: 'Unexpected request' }, { status: 404 });
@@ -213,7 +235,7 @@ describe('flow client', () => {
           onClick={() =>
             void startFlow({
               flowKey: 'setUpOrganization',
-              params: { organizationId: ORG },
+              bindings: { organizationId: ORG },
               returnUrl: '/dashboard',
             })
           }
@@ -222,18 +244,13 @@ describe('flow client', () => {
         </Button>
       );
     };
-    renderAt('/organizations', <Starter />);
+    const starter = renderAt('/organizations', <Starter />);
     fireEvent.click(await screen.findByRole('button', { name: 'Set up' }));
-    await waitFor(() =>
-      expect(navigatePreserving).toHaveBeenCalledWith(
-        `/users/members?org=${ORG}&flow=${flow.id}`,
-        'context',
-      ),
-    );
+    await waitFor(() => expect(locationOf(starter).pathname).toBe('/users/members'));
+    expect(locationOf(starter).search).toEqual({ org: ORG, flow: flow.id });
     cleanup();
-    navigatePreserving.mockClear();
 
-    await renderInFlow(
+    const router = await renderInFlow(
       <>
         <Work />
         <Work path="/api/v1/fail" label="Fail" />
@@ -245,29 +262,28 @@ describe('flow client', () => {
     expect(flowRequests('/check')).toHaveLength(0);
 
     await doWork();
-    await waitFor(() =>
-      expect(navigatePreserving).toHaveBeenCalledWith(
-        `/users/members?org=${ORG}&flow=${flow.id}#invite`,
-        'context',
-      ),
-    );
     await screen.findByText('Step 2 of 4');
+    expect(locationOf(router)).toEqual({
+      pathname: '/users/members',
+      search: { org: ORG, flow: flow.id },
+      hash: 'invite',
+    });
 
     await doWork();
-    await screen.findByText('1 of 2');
+    await settle();
     expect(screen.getByText('Step 2 of 4')).toBeTruthy();
 
-    navigatePreserving.mockClear();
     await doWork();
     await screen.findByText('Step 3 of 4');
-    expect(navigatePreserving).not.toHaveBeenCalled();
+    expect(locationOf(router).hash).toBe('invite');
 
     await doWork();
     await screen.findByText('Step 4 of 4');
-    expect(navigatePreserving).toHaveBeenCalledWith(
-      `/settings/tokens?org=${ORG}&flow=${flow.id}#create-token`,
-      'context',
-    );
+    expect(locationOf(router)).toEqual({
+      pathname: '/settings/tokens',
+      search: { org: ORG, flow: flow.id },
+      hash: 'create-token',
+    });
 
     await doWork();
     await doWork();
@@ -276,28 +292,39 @@ describe('flow client', () => {
   });
 
   it('a two-action step advances only after both actions', async () => {
-    flow = { ...flow, currentStep: 1, progress: { count: 0, required: 2 } };
+    flow = { ...flow, currentStep: 1 };
     await renderInFlow();
 
     await doWork();
-    await screen.findByText('1 of 2');
-    expect(navigatePreserving).not.toHaveBeenCalled();
+    await settle();
+    expect(screen.getByText('Step 2 of 4')).toBeTruthy();
 
     await doWork();
     await screen.findByText('Step 3 of 4');
   });
 
   it('an anchor step keeps the page and sets the hash', async () => {
-    await renderInFlow();
+    const router = await renderInFlow();
+    const page = screen.getByRole('button', { name: 'Do work' });
 
     await doWork();
+    await screen.findByText('Step 2 of 4');
 
-    await waitFor(() => expect(navigatePreserving).toHaveBeenCalledTimes(1));
-    const [target] = navigatePreserving.mock.calls[0] as unknown as [string];
-    const url = new URL(target, 'http://localhost');
-    expect(url.pathname).toBe('/users/members');
-    expect(url.hash).toBe('#invite');
-    expect(url.searchParams.get('flow')).toBe(flow.id);
+    expect(locationOf(router).pathname).toBe('/users/members');
+    expect(locationOf(router).hash).toBe('invite');
+    expect(screen.getByRole('button', { name: 'Do work' })).toBe(page);
+  });
+
+  it('an action step does not navigate', async () => {
+    flow = { ...flow, currentStep: 1 };
+    rows = 1;
+    const router = await renderInFlow();
+    const before = locationOf(router);
+
+    await doWork();
+    await screen.findByText('Step 3 of 4');
+
+    expect(locationOf(router)).toEqual(before);
   });
 
   it('Back, forward and clicking around never check or advance', async () => {

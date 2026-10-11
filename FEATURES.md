@@ -418,12 +418,12 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 ## Flows
 
-**A user is taken through registered steps across pages, and the server decides when each step is done.** Lineage: the Carde.io organized-play MVP (`Flow` + `FlowStep`, and an onboarding config with `include` / `accomplished` per step); here `accomplished` is data.
+**A user is taken through registered steps across pages, and the server decides when each step is done.** Flows add no expression language: definitions are json-rules rules with `{ bind }` tokens, SDK operationIds with `{ path, query }`, and TanStack `{ to, params, search, hash }`. Lineage: the Carde.io organized-play MVP (`Flow` + `FlowStep`, and onboarding steps with `include` / `accomplished` functions); here `accomplished` is data.
 
-- ✅ **Registry** - `FlowKey` enum + `Record<FlowKey, FlowDefinition>` in `modules/flow/definitions`, like inquiry handlers. Each step: `key`, `label`, `url`, `mode` (`navigate` / `anchor` / `action`) and `completedWhen { read, path, where, count }` bound to a real readMany route by operationId. Validated at boot and in tests
-- ✅ **Server-checked completion** - `POST /flow/:id/check` runs the bound route as the caller through the batch sub-request machinery, with the step's `where` stacked on the route's `filterLens` as one more narrowing, and counts `pagination.total`. Permissions and tenancy are the route's own. Advances through every satisfied step under a row lock
-- ✅ **Instance** - `Flow` (`flowKey`, `params` validated by the flow's zod schema, `returnUrl`, `currentStep`, `completedSteps`, `completedAt`, `canceledAt`); hard-deleted with its user
-- ✅ **Client** - `?flow=`, `FlowProvider` + `FlowBanner` in both layouts, `useFlow()` / `useStartFlow()`, a check after every successful mutation via React Query's mutation cache, step entry by mode, `useHashSection` for anchors, a flow-preserving `Link`
+- ✅ **Registry** - `FlowKey` enum + `Record<FlowKey, FlowDefinition>` in `modules/flow/definitions`, like inquiry handlers. Each step: `key`, `label`, `mode` (`navigate` / `anchor` / `action`), router target, and `completedWhen { read, path, query, rule }`. Validated at boot and in tests: the read exists, its path params are bound, the rule stays inside the read's lens, every bind is covered by the flow's bindings schema
+- ✅ **Server-checked completion** - `POST /flow/:id/check` calls the bound read as the caller through the batch sub-request machinery. Against a readMany the rule is stacked on the route's `filterLens` and matched per row (one matching row completes the step); against a single read it is `check()`ed over the response, with `ArrayOperator.atLeast` for counts. Permissions and tenancy are the route's own
+- ✅ **Instance** - `Flow` (`flowKey`, `bindings`, `returnUrl`, `currentStep`, `completedSteps`, `completedAt`, `canceledAt`); hard-deleted with its user
+- ✅ **Client** - `?flow=`, `FlowProvider` + `FlowBanner` in both layouts, `useFlow()` / `useStartFlow()`, a check after every successful mutation via React Query's mutation cache, step entry through TanStack `navigate`, `useHashSection` for anchors, a flow-preserving `Link`
 
 [Learn more: FLOWS.md](docs/claude/FLOWS.md)
 

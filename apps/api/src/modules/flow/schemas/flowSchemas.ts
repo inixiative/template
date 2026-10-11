@@ -17,7 +17,7 @@ export const flowUrlSchema = z
 
 export const flowCreateBodySchema = z.object({
   flowKey: z.enum(FlowKey),
-  params: z.record(z.string(), z.string()).default({}),
+  bindings: z.record(z.string(), z.string()).default({}),
   returnUrl: flowUrlSchema,
 });
 
@@ -32,12 +32,14 @@ export const flowResponseSchema = FlowScalarSchema.omit({ completedSteps: true }
     z.object({
       key: z.string(),
       label: z.string(),
-      url: z.string(),
       mode: z.enum(FlowStepMode),
+      to: z.string(),
+      params: z.record(z.string(), z.string()),
+      search: z.record(z.string(), z.string()),
+      hash: z.string().nullable(),
       completedAt: z.string().nullable(),
     }),
   ),
-  progress: z.object({ count: z.number().int(), required: z.number().int() }).nullable(),
 });
 
 export type FlowResponse = z.infer<typeof flowResponseSchema>;

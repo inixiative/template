@@ -25,11 +25,6 @@ export const FlowBanner = () => {
           Step {stepNumber} of {stepCount}
         </span>
         <span className="truncate font-medium">{currentFlowStep.label}</span>
-        {flow.progress && flow.progress.required > 1 && (
-          <span className="shrink-0 text-muted-foreground">
-            {Math.min(flow.progress.count, flow.progress.required)} of {flow.progress.required}
-          </span>
-        )}
         <div
           role="progressbar"
           aria-valuemin={0}

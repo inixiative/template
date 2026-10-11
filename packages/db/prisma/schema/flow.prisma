@@ -11,7 +11,7 @@ model Flow {
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   flowKey        FlowKey
-  params         Json      @default("{}")
+  bindings       Json      @default("{}")
   returnUrl      String
   currentStep    Int       @default(0)
   completedSteps Json      @default("[]")

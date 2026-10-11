@@ -4,53 +4,68 @@
  * @partOf primitive:flows
  * @uses none
  */
-import { type Condition, Operator } from '@inixiative/json-rules';
-import { paramsSchema } from '#/modules/flow/definitions/setUpOrganization/schema';
+import { DateOperator, Operator } from '@inixiative/json-rules';
+import { bindingsSchema } from '#/modules/flow/definitions/setUpOrganization/bindingsSchema';
 import type { FlowDefinition } from '#/modules/flow/definitions/types';
 
-const sentInvites: Condition = {
-  all: [
-    { field: 'type', operator: Operator.equals, value: 'inviteOrganizationUser' },
-    { field: 'status', operator: Operator.equals, value: 'sent' },
-  ],
+const organization = { id: { bind: 'organizationId' } };
+const inOrganization = { org: { bind: 'organizationId' } };
+const sinceFlowStarted = {
+  field: 'createdAt',
+  dateOperator: DateOperator.onOrAfter,
+  bind: 'flowStartedAt',
 };
 
 export const setUpOrganizationFlow: FlowDefinition = {
   key: 'setUpOrganization',
-  paramsSchema,
+  bindingsSchema,
   steps: [
     {
       key: 'inviteTeammate',
       label: 'Invite a teammate',
-      url: '/users/members?org={{organizationId}}',
       mode: 'navigate',
+      to: '/users/members',
+      search: inOrganization,
+      hash: 'invite',
       completedWhen: {
         read: 'organizationSentManyInquiries',
-        path: { id: '{{organizationId}}' },
-        where: sentInvites,
+        path: organization,
+        rule: {
+          all: [
+            { field: 'type', operator: Operator.equals, value: 'inviteOrganizationUser' },
+            { field: 'status', operator: Operator.equals, value: 'sent' },
+          ],
+        },
       },
     },
     {
-      key: 'inviteAnother',
-      label: 'Invite one more',
-      url: '/users/members?org={{organizationId}}#invite',
-      mode: 'anchor',
-      completedWhen: {
-        read: 'organizationSentManyInquiries',
-        path: { id: '{{organizationId}}' },
-        where: sentInvites,
-        count: { atLeast: 2 },
-      },
-    },
-    {
-      key: 'createApiTokens',
-      label: 'Create two API tokens: one for CI, one for local development',
-      url: '/settings/tokens?org={{organizationId}}#create-token',
+      key: 'createCiToken',
+      label: 'Create an API token for CI',
       mode: 'navigate',
+      to: '/settings/tokens',
+      search: inOrganization,
+      hash: 'create-token',
       completedWhen: {
         read: 'organizationReadManyTokens',
-        path: { id: '{{organizationId}}' },
-        count: { atLeast: 2 },
+        path: organization,
+        rule: {
+          all: [sinceFlowStarted, { field: 'name', operator: Operator.contains, value: 'ci' }],
+        },
+      },
+    },
+    {
+      key: 'createLocalToken',
+      label: 'Create one for local development',
+      mode: 'anchor',
+      to: '/settings/tokens',
+      search: inOrganization,
+      hash: 'create-token',
+      completedWhen: {
+        read: 'organizationReadManyTokens',
+        path: organization,
+        rule: {
+          all: [sinceFlowStarted, { field: 'name', operator: Operator.contains, value: 'local' }],
+        },
       },
     },
   ],

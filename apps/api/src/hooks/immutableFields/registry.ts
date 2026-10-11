@@ -17,7 +17,7 @@ type ImmutableFieldsOverride = {
 export const ImmutableFieldsOverrides: Partial<Record<ModelName, ImmutableFieldsOverride>> = {
   ...polymorphismImmutableFields,
   Space: { exclude: ['organizationId'] },
-  Flow: { include: ['flowKey', 'params', 'returnUrl'] },
+  Flow: { include: ['flowKey', 'bindings', 'returnUrl'] },
 };
 
 const inferForeignKeyFields = (modelName: ModelName): string[] => {

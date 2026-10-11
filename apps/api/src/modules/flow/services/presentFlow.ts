@@ -7,22 +7,24 @@
 import type { Flow } from '@template/db/generated/client/client';
 import { flowDefinitions } from '#/modules/flow/definitions';
 import { completedStepsSchema, type FlowResponse } from '#/modules/flow/schemas/flowSchemas';
-import type { FlowProgress } from '#/modules/flow/services/advanceSatisfiedSteps';
-import { fillFlowTemplate } from '#/modules/flow/services/fillFlowTemplate';
+import { flowBindings } from '#/modules/flow/services/flowBindings';
+import { resolveBinds } from '#/modules/flow/services/resolveBinds';
 
-export const presentFlow = (flow: Flow, progress: FlowProgress): FlowResponse => {
+export const presentFlow = (flow: Flow): FlowResponse => {
   const { completedSteps: stored, ...row } = flow;
   const completedSteps = completedStepsSchema.parse(stored);
-  const params = flow.params as Record<string, string>;
+  const bindings = flowBindings(flow);
   return {
     ...row,
     flowSteps: flowDefinitions[flow.flowKey].steps.map((step) => ({
       key: step.key,
       label: step.label,
-      url: fillFlowTemplate(step.url, params),
       mode: step.mode,
+      to: step.to,
+      params: resolveBinds(step.params, bindings),
+      search: resolveBinds(step.search, bindings),
+      hash: step.hash ?? null,
       completedAt: completedSteps.find(({ stepKey }) => stepKey === step.key)?.completedAt ?? null,
     })),
-    progress,
   };
 };

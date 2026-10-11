@@ -14,6 +14,6 @@ import type { AppEnv } from '#/types/appEnv';
 export const checkFlow = (c: Context<AppEnv>, flowId: string) =>
   db.txn(async () => {
     const locked = await lockFlow(flowId);
-    const { flow, progress } = await advanceSatisfiedSteps(c, locked);
-    return presentFlow(flow, progress);
+    const { flow } = await advanceSatisfiedSteps(c, locked);
+    return presentFlow(flow);
   });

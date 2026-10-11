@@ -5,11 +5,12 @@
  * @uses primitive:sdk
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from '@tanstack/react-router';
 import { flowCancel, flowCheck, flowRead, flowReadQueryKey } from '@template/sdk';
 import { apiMutation } from '@template/ui/lib/apiMutation';
 import { apiQuery } from '@template/ui/lib/apiQuery';
 import { FLOW_MUTATION_META, isFlowMutation } from '@template/ui/lib/flows/flowMutationMeta';
-import { flowStepTarget } from '@template/ui/lib/flows/flowStepTarget';
+import { flowStepNavigation } from '@template/ui/lib/flows/flowStepNavigation';
 import type { Flow, FlowController } from '@template/ui/lib/flows/flowTypes';
 import { useAppStore } from '@template/ui/store';
 import { useEffect, useMemo, useRef } from 'react';
@@ -17,6 +18,7 @@ import { useEffect, useMemo, useRef } from 'react';
 export const useFlowController = (flowId: string | null): FlowController | null => {
   const queryClient = useQueryClient();
   const navigatePreserving = useAppStore((state) => state.navigation.navigatePreserving);
+  const navigate = useNavigate();
   const queryKey = useMemo(() => flowReadQueryKey({ path: { id: flowId ?? '' } }), [flowId]);
   const pendingCheck = useRef<Promise<void> | null>(null);
   const recheck = useRef(false);
@@ -62,8 +64,8 @@ export const useFlowController = (flowId: string | null): FlowController | null 
       }
       if (next.currentStep === flow.currentStep) return;
       const step = next.flowSteps[next.currentStep];
-      const target = step && flowStepTarget(step, next.id);
-      if (target) navigatePreserving(target, 'context');
+      const target = step && flowStepNavigation(step, next.id);
+      if (target) void navigate(target);
     };
 
     const runCheck = async (): Promise<void> => {
@@ -99,7 +101,7 @@ export const useFlowController = (flowId: string | null): FlowController | null 
       check,
       cancel,
     };
-  }, [flow, queryClient, queryKey, navigatePreserving, checkFlow, cancelFlow]);
+  }, [flow, queryClient, queryKey, navigatePreserving, navigate, checkFlow, cancelFlow]);
 
   useEffect(() => {
     pendingCheck.current = null;
