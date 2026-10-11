@@ -20,6 +20,7 @@ import { appendToStream, initWebSocketPubSub } from '#/ws/pubsub';
 import { readStreamSeq } from '#/ws/queries/readStreamSeq';
 import { byId, byStream, clearRegistry } from '#/ws/registry';
 import { reauthorizeOpenStreams } from '#/ws/streamReauthorizeSweep';
+import { streamSeqKey } from '#/ws/streamSeq';
 import { createTestSocket } from '#tests/createTestSocket';
 import { createBearerToken } from '#tests/utils/createBearerToken';
 
@@ -207,7 +208,7 @@ describe('data streams (real app)', () => {
     await until(() => byStream.has(stream));
 
     const append = streamAppendFrame(stream, 1, { type: 'remove', payload: { id: 'in-flight' } });
-    sendToStreamLocal(stream, append);
+    sendToStreamLocal(stream, () => JSON.stringify(append));
     expect(sent).toEqual([]);
     await pending;
 
@@ -223,7 +224,7 @@ describe('data streams (real app)', () => {
     sent.length = 0;
 
     const append = streamAppendFrame(stream, 1, { type: 'remove', payload: { id: 'x' } });
-    sendToStreamLocal(stream, append);
+    sendToStreamLocal(stream, () => JSON.stringify(append));
 
     expect(frames(sent)).toEqual([append]);
   });
@@ -325,7 +326,7 @@ describe('data streams (real app)', () => {
 
     it('stamps the snapshot with the seq of the last append before its read', async () => {
       await appendToStream(stream, { type: 'remove', payload: { id: 'before' } });
-      const counter = await readStreamSeq(getRedisClient(), stream);
+      const counter = await readStreamSeq(getRedisClient(), streamSeqKey(stream));
       const { socket, sent } = connect(bearer);
       await websocketHandler.message(socket, openFrame(stream));
 
@@ -386,7 +387,7 @@ describe('data streams (real app)', () => {
       const reconnected = connect(bearer);
       await websocketHandler.message(reconnected.socket, openFrame(stream));
       const snapshot = frames(reconnected.sent)[1];
-      expect(snapshot.seq).toBe(await readStreamSeq(getRedisClient(), stream));
+      expect(snapshot.seq).toBe(await readStreamSeq(getRedisClient(), streamSeqKey(stream)));
       expect(snapshot.payload.data.map((row: { id: string }) => row.id)).toContain(created.id);
 
       await appendToStream(stream, { type: 'remove', payload: { id: created.id } });
@@ -436,10 +437,8 @@ describe('data streams (real app)', () => {
         unregisterDbHook('clearCache');
       }
       await reauthorizeOpenStreams();
-      sendToStreamLocal(
-        stream,
-        streamAppendFrame(stream, 1, { type: 'remove', payload: { id: 'x' } }),
-      );
+      const append = streamAppendFrame(stream, 1, { type: 'remove', payload: { id: 'x' } });
+      sendToStreamLocal(stream, () => JSON.stringify(append));
 
       expect(frames(revocable.sent)).toEqual([{ type: 'openRejected', stream }]);
       expect(revocable.socket.data.streams.has(stream)).toBe(false);

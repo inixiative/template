@@ -12,25 +12,25 @@ describe('stream seq counter', () => {
   });
 
   const publish = () =>
-    publishStreamAppend(getRedisClient(), 'seqtest:channel', stream, {
+    publishStreamAppend(getRedisClient(), 'seqtest:channel', [streamSeqKey(stream)], {
       type: 'stream',
       target: stream,
-    });
+    }).then(([seq]) => seq as number);
 
   it('a snapshot stamp is the seq of the last append, and the next append is one past it', async () => {
-    const stamp = await readStreamSeq(getRedisClient(), stream);
-    expect(await readStreamSeq(getRedisClient(), stream)).toBe(stamp);
+    const stamp = await readStreamSeq(getRedisClient(), streamSeqKey(stream));
+    expect(await readStreamSeq(getRedisClient(), streamSeqKey(stream))).toBe(stamp);
 
     expect(await publish()).toBe(stamp + 1);
     expect(await publish()).toBe(stamp + 2);
-    expect(await readStreamSeq(getRedisClient(), stream)).toBe(stamp + 2);
+    expect(await readStreamSeq(getRedisClient(), streamSeqKey(stream))).toBe(stamp + 2);
   });
 
   it('every append and every read refreshes the counter ttl', async () => {
     const redis = getRedisClient();
     await publish();
     await redis.pexpire(streamSeqKey(stream), 1_000);
-    await readStreamSeq(redis, stream);
+    await readStreamSeq(redis, streamSeqKey(stream));
     expect(await redis.pttl(streamSeqKey(stream))).toBeGreaterThan(STREAM_SEQ_TTL_MS - 5_000);
 
     await redis.pexpire(streamSeqKey(stream), 1_000);

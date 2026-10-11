@@ -5,6 +5,7 @@ import { appendToStream, initWebSocketPubSub, isPubSubEnabled, sendToChannel } f
 import { publishStreamAppend } from '#/ws/queries/publishStreamAppend';
 import { addConnection, clearRegistry } from '#/ws/registry';
 import { pendingStreamQueues } from '#/ws/streamPublishOrder';
+import { streamSeqKey } from '#/ws/streamSeq';
 import { subscribeToStream } from '#/ws/streamSubscriptions';
 import { subscribeToChannel } from '#/ws/subscriptions';
 import { createTestSocket } from '#tests/createTestSocket';
@@ -88,7 +89,7 @@ describe('ws pubsub (redis round trip)', () => {
     subscribeToStream(handle.socket, 'pubsub:shared');
     // Each instance has its own per-stream queue, so their publishes interleave freely at Redis.
     const instance = (name: string) => (n: number) =>
-      publishStreamAppend(getRedisPub(), 'ws:broadcast', 'pubsub:shared', {
+      publishStreamAppend(getRedisPub(), 'ws:broadcast', [streamSeqKey('pubsub:shared')], {
         type: 'stream',
         target: 'pubsub:shared',
         append: { type: 'upsert', payload: { name, n } },
@@ -122,6 +123,61 @@ describe('ws pubsub (redis round trip)', () => {
     ]);
     expect(handle.socket.data.streams.has('pubsub:down')).toBe(false);
     expect(pendingStreamQueues()).toBe(0);
+  });
+
+  it('an append Redis cannot sequence resyncs holders on every instance once Redis is back', async () => {
+    const remote = createTestSocket({ connectionId: 'pubsub-remote' });
+    const redis = getRedisPub();
+    const evalSpy = spyOn(redis, 'eval').mockImplementation((() =>
+      Promise.reject(new Error('redis down'))) as never);
+    const realPublish = redis.publish.bind(redis);
+    let publishes = 0;
+    const publishSpy = spyOn(redis, 'publish').mockImplementation(((
+      channel: string,
+      message: string,
+    ) =>
+      ++publishes === 1
+        ? Promise.reject(new Error('redis down'))
+        : realPublish(channel, message)) as never);
+    try {
+      await appendToStream('pubsub:remote', { type: 'upsert', payload: { id: 'x' } });
+      addConnection(remote.socket);
+      subscribeToStream(remote.socket, 'pubsub:remote');
+      await waitFor(() => remote.sent.length > 0);
+    } finally {
+      evalSpy.mockRestore();
+      publishSpy.mockRestore();
+    }
+
+    expect(publishes).toBeGreaterThanOrEqual(2);
+    expect(remote.sent.map((message) => JSON.parse(message))).toEqual([
+      { type: 'error', action: 'open', stream: 'pubsub:remote', retryable: true },
+    ]);
+  });
+
+  it('counts a per-recipient stream per user, so an append for one user is no gap for another', async () => {
+    const alice = createTestSocket({ connectionId: 'pubsub-seq-alice', userId: 'alice' });
+    const bob = createTestSocket({ connectionId: 'pubsub-seq-bob', userId: 'bob' });
+    for (const { socket } of [alice, bob]) {
+      addConnection(socket);
+      subscribeToStream(socket, 'pubsub:per-user');
+    }
+
+    await appendToStream('pubsub:per-user', { type: 'upsert', payload: { n: 1 } }, [
+      'alice',
+      'bob',
+    ]);
+    await appendToStream('pubsub:per-user', { type: 'upsert', payload: { n: 2 } }, ['alice']);
+    await appendToStream('pubsub:per-user', { type: 'upsert', payload: { n: 3 } }, [
+      'alice',
+      'bob',
+    ]);
+    await waitFor(() => alice.sent.length === 3 && bob.sent.length === 2);
+
+    const seqs = (sent: string[]) => sent.map((message) => JSON.parse(message).seq as number);
+    const consecutive = (numbers: number[]) => numbers.map((seq) => seq - (numbers[0] as number));
+    expect(consecutive(seqs(alice.sent))).toEqual([0, 1, 2]);
+    expect(consecutive(seqs(bob.sent))).toEqual([0, 1]);
   });
 
   it('delivers a per-recipient append only to the targeted users', async () => {

@@ -257,13 +257,16 @@ held row (by `updatedAt`) is ignored, so the folded state only moves forward. Ac
 
 ### Sequence numbers
 
-Every stream has a counter in Redis (`ws:seq:<stream>`), shared by every instance and the worker.
-`appendToStream` runs one Lua script (`apps/api/src/ws/queries/publishStreamAppend.ts`) that
-`INCR`s the counter and `PUBLISH`es the append with that `seq`, so publish order is seq order and
-two instances publishing one stream never produce a false gap. `openDataStream` reads the counter
-(`queries/readStreamSeq.ts`) **before** the snapshot read starts and stamps the snapshot with it:
-appends are published after their transaction commits, so every append at or below the stamp is
-already in the snapshot.
+Every stream has a counter in Redis, shared by every instance and the worker: `ws:seq:<stream>`
+for a `'shared'` stream, and one per user (`ws:seq:<stream>:user:<userId>`) for a `'perRecipient'`
+stream, so an append addressed to one user is never a gap for another. `appendToStream` runs one
+Lua script (`apps/api/src/ws/queries/publishStreamAppend.ts`) that `INCR`s the counter (each
+recipient's, for a per-recipient append) and `PUBLISH`es the append with those seqs, so publish
+order is seq order and two instances publishing one stream never produce a false gap. Each
+instance hands every holder the seq of its own counter. `openDataStream` reads the caller's counter
+(`queries/readStreamSeq.ts`, key from `streamSeqKeyFor`) **before** the snapshot read starts and
+stamps the snapshot with it: appends are published after their transaction commits, so every
+append at or below the stamp is already in the snapshot.
 
 The client (`createApiWebsocket`) keeps the last seq per open stream:
 
@@ -282,7 +285,14 @@ The server never drifts silently. Bun's `ws.send` returns `0` when it drops a fr
 its backpressure limit); `sendFrame` (`apps/api/src/ws/delivery.ts`), behind every send, then closes
 the connection (`1013 frame dropped`), and the client reconnects and re-opens its streams. If Redis
 cannot sequence an append, its local holders get a retryable `error` for the stream and re-open
-with backoff. There is no replay buffer, no queue and no acknowledgement.
+with backoff, and the instance keeps re-publishing a `streamResync` for that stream (once a second,
+one per stream) until Redis takes it, so holders on every other instance re-open too. Opens need
+the counter, so while Redis is down every open answers a retryable `error` and the client backs
+off. There is no replay buffer, no queue and no acknowledgement.
+
+The seq cannot deduplicate a change that lands both in a snapshot read and in an append published
+after its stamp; list folds absorb that (upserts are idempotent), but a `log` fold appends the entry
+twice.
 
 ### Producing appends
 

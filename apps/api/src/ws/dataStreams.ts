@@ -10,13 +10,14 @@ import { sendFrame, sendTo } from '#/ws/delivery';
 import { readStreamSeq } from '#/ws/queries/readStreamSeq';
 import { byId } from '#/ws/registry';
 import { rejectDataStream } from '#/ws/rejectDataStream';
+import { streamSeqKeyFor } from '#/ws/streamSeq';
 import { fetchStreamSnapshot } from '#/ws/streamSnapshot';
 import { subscribeToStream, unsubscribeFromStream } from '#/ws/streamSubscriptions';
 import type { WSSocket } from '#/ws/types';
 
 // Seq first: every append at or below it is already in the snapshot that follows.
 const readSnapshot = async (ws: WSSocket, stream: string) => {
-  const seq = await readStreamSeq(getRedisClient(), stream);
+  const seq = await readStreamSeq(getRedisClient(), streamSeqKeyFor(stream, ws.data.userId));
   return { seq, read: await fetchStreamSnapshot(ws.data.headers, stream) };
 };
 

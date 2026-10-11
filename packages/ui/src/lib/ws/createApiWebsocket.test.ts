@@ -635,7 +635,7 @@ describe('createApiWebsocket', () => {
         receive(ws, snapshot(10, ['a']));
         receive(ws, upsert(11, 'b'));
 
-        receive(ws, remove(13, 'a')); // 12 (upsert c) was lost
+        receive(ws, remove(13, 'a'));
 
         expect(opensOf(ws)).toEqual([{ action: 'open', stream }]);
         expect(ids()).toEqual(['b', 'a']);
@@ -668,7 +668,7 @@ describe('createApiWebsocket', () => {
       it('a gap while an open is already in flight waits for that open instead of sending another', async () => {
         const { api, ws } = await opened();
         receive(ws, snapshot(10, ['a']));
-        api.resync(stream);
+        api.authenticate('tok');
         expect(opensOf(ws)).toHaveLength(1);
 
         receive(ws, upsert(12, 'gap'));
@@ -678,13 +678,28 @@ describe('createApiWebsocket', () => {
         expect(ids()).toEqual(['gap', 'a']);
       });
 
+      it('a gap that lands while the stream is released and re-held still resyncs', async () => {
+        const { api, ws } = await opened();
+        receive(ws, snapshot(10, ['a']));
+        api.close(stream);
+        receive(ws, upsert(12, 'gap'));
+        api.open(stream);
+        await settled();
+
+        expect(opensOf(ws)).toEqual([{ action: 'open', stream }]);
+        receive(ws, { type: 'opened', stream });
+        receive(ws, snapshot(12, ['gap', 'a']));
+        receive(ws, upsert(13, 'b'));
+        expect(ids()).toEqual(['gap', 'b', 'a']);
+      });
+
       it('after a server-side close (dropped frame), the reconnect snapshot restores state', async () => {
         const { api, ws } = await opened();
         receive(ws, snapshot(10, ['a']));
         receive(ws, upsert(11, 'b'));
 
-        ws.close(); // the server closed the socket after a dropped frame
-        api.connect(); // reconnect now rather than after the transport's delay
+        ws.close();
+        api.connect();
         const reconnected = instances.at(-1) as FakeWebSocket;
         expect(reconnected).not.toBe(ws);
         open(reconnected);

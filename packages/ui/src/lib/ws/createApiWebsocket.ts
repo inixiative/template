@@ -139,7 +139,8 @@ export const createApiWebsocket = (
 
   const reconcileStream = (stream: string): void => {
     if (isLive(stream)) {
-      if (!sentOpens.has(stream)) sendOpen(stream);
+      const awaitingResync = !lastSeqs.has(stream) && !pendingOpens.has(stream);
+      if (!sentOpens.has(stream) || awaitingResync) sendOpen(stream);
       return;
     }
     if (streams.has(stream)) return;

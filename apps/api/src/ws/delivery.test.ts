@@ -78,13 +78,15 @@ describe('delivery', () => {
     subscribeToStream(a.socket, 'st1');
     subscribeToChannel(b.socket, 'st1');
 
-    sendToStreamLocal('st1', {
-      category: 'data',
-      action: 'append',
-      stream: 'st1',
-      type: 'upsert',
-      payload: 1,
-    });
+    sendToStreamLocal('st1', () =>
+      JSON.stringify({
+        category: 'data',
+        action: 'append',
+        stream: 'st1',
+        type: 'upsert',
+        payload: 1,
+      }),
+    );
 
     expect(parse(a.sent)).toEqual([
       { category: 'data', action: 'append', stream: 'st1', type: 'upsert', payload: 1 },
@@ -92,7 +94,7 @@ describe('delivery', () => {
     expect(b.sent).toEqual([]);
   });
 
-  it('sendToStreamLocal with recipients skips holders outside them, including anonymous ones', () => {
+  it('sendToStreamLocal skips holders the append is not addressed to', () => {
     const alice = createTestSocket({ connectionId: 'alice', userId: 'u-alice' });
     const bob = createTestSocket({ connectionId: 'bob', userId: 'u-bob' });
     const anonymous = createTestSocket({ connectionId: 'anon', userId: null });
@@ -101,7 +103,9 @@ describe('delivery', () => {
       subscribeToStream(socket, 'st1');
     }
 
-    sendToStreamLocal('st1', { n: 1 }, ['u-alice']);
+    sendToStreamLocal('st1', (ws) =>
+      ws.data.userId === 'u-alice' ? JSON.stringify({ n: 1 }) : null,
+    );
 
     expect(parse(alice.sent)).toEqual([{ n: 1 }]);
     expect(bob.sent).toEqual([]);
@@ -117,7 +121,7 @@ describe('delivery', () => {
     subscribeToStream(open.socket, 'st1');
     priming.socket.data.heldAppends.set('st1', []);
 
-    sendToStreamLocal('st1', { n: 1 });
+    sendToStreamLocal('st1', () => JSON.stringify({ n: 1 }));
 
     expect(priming.sent).toEqual([]);
     expect(priming.socket.data.heldAppends.get('st1')).toEqual([JSON.stringify({ n: 1 })]);
