@@ -38,7 +38,7 @@ export const FlowBanner = () => {
           />
         </div>
       </div>
-      <Button variant="ghost" size="sm" onClick={cancel}>
+      <Button variant="ghost" size="sm" onClick={() => cancel().catch(() => undefined)}>
         Cancel
       </Button>
     </section>

@@ -72,7 +72,8 @@ read-only token can read a flow but not move it.
 The body names the step being completed. Under a `db.findForUpdate` row lock:
 
 - `currentStep` below the flow's current step: already done. The flow is returned unchanged
-  (200). This makes a double click, a retry or two tabs safe: the step is completed once.
+  (200), even if it has since completed or been canceled. This makes a double click, a retry or
+  two tabs safe: the step is completed once, and the caller follows the flow to wherever it is.
 - the flow is canceled or complete: 409.
 - `currentStep` ahead of the flow's current step: 409. Steps are not skipped.
 - otherwise the step gets `completedAt`, `currentStep` moves on, and completing the last step sets
@@ -93,9 +94,11 @@ new tab.
 | `useFlow()` | `hooks/flow/useFlow.ts` | `{ flow, currentFlowStep, isActive, advance(), cancel() }`, or `null` outside a flow. |
 | `useStartFlow()` | `hooks/flow/useStartFlow.ts` | `startFlow({ flowSteps, returnUrl? })` creates the flow and opens step 1 with `?flow=`. `returnUrl` defaults to the current page. |
 
-`advance()` sends the step it is on, navigates to the next step's url with `navigatePreserving(url,
-'flow')`, and on the last step goes to `returnUrl` with `'context'`, which drops the flow param.
-Concurrent calls share one request. `cancel()` goes to `returnUrl` the same way.
+`advance()` sends the step it is on and navigates to the next step's url with the flow's own id
+set as `?flow=` (not whatever the current URL holds). On the last step it goes to `returnUrl` with
+`'context'`, which drops the flow param. Concurrent calls share one request. `cancel()` goes to
+`returnUrl` the same way. A `?flow=` the user cannot read (stale, foreign, deleted) loads nothing:
+no banner, no toast, neutral buttons, and `Link` drops it.
 
 Finishing goes to `returnUrl`, not the last step's url. When the starting page needs something back
 (preselect Railway), make that page the last step and put it in the step's `data`:
@@ -140,13 +143,19 @@ the promise resolves, the flow advances and navigates. Two rules keep this safe:
 - **Outside an active flow nothing changes.** No `FlowProvider`, no `?flow=`, or a finished flow:
   the button is the same button.
 
+When "resolved" does not mean "done" (a handler that catches its own errors and resolves, or a
+two-phase modal where the first submit only checks a token), exempt the button with `flow={false}`
+and call `useFlow()?.advance()` yourself when the step's work is really done.
+
+Shell controls that are not step work opt out: the UserMenu spoof button is `flow={false}`.
+
 Submits go through `Form` (`components/primitives/Form.tsx`), a `<form>` whose `onSubmit` may
 return a promise. When it resolves inside an active flow, the flow advances unless the submitting
 button is exempt (`flow={false}`, rendered as `data-flow="neutral"`). A plain `<form>` is not
 flow-aware.
 
 `Link` (`components/primitives/Link.tsx`) keeps the `flow` param (and `org` / `space`) in both its
-`href` and its navigation; `flow={false}` drops it.
+`href` and its navigation while a flow is active; `flow={false}` drops it.
 
 ## What flows are not
 

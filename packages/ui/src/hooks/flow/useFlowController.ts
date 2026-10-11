@@ -9,21 +9,29 @@ import { flowAdvance, flowCancel, flowRead, flowReadQueryKey } from '@template/s
 import { apiMutation } from '@template/ui/lib/apiMutation';
 import { apiQuery } from '@template/ui/lib/apiQuery';
 import type { Flow, FlowController } from '@template/ui/lib/flows/flowTypes';
+import { withFlowParam } from '@template/ui/lib/flows/withFlowParam';
 import { useAppStore } from '@template/ui/store';
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 
-export const useFlowController = (flowId: string): FlowController | null => {
+export const useFlowController = (flowId: string | null): FlowController | null => {
   const queryClient = useQueryClient();
   const navigatePreserving = useAppStore((state) => state.navigation.navigatePreserving);
-  const queryKey = useMemo(() => flowReadQueryKey({ path: { id: flowId } }), [flowId]);
+  const queryKey = useMemo(() => flowReadQueryKey({ path: { id: flowId ?? '' } }), [flowId]);
   const pendingAdvance = useRef<Promise<void> | null>(null);
+
+  useEffect(() => {
+    pendingAdvance.current = null;
+  }, [flowId]);
 
   const { data } = useQuery({
     queryKey,
     queryFn: apiQuery((opts: Parameters<typeof flowRead>[0]) =>
-      flowRead({ ...opts, path: { id: flowId } }),
+      flowRead({ ...opts, path: { id: flowId ?? '' } }),
     ),
+    enabled: flowId !== null,
     throwOnError: false,
+    retry: false,
+    meta: { skipErrorToast: true },
   });
 
   const { mutateAsync: advanceFlow } = useMutation({
@@ -40,7 +48,7 @@ export const useFlowController = (flowId: string): FlowController | null => {
     throwOnError: false,
   });
 
-  const flow = data?.data;
+  const flow = flowId ? data?.data : undefined;
 
   return useMemo(() => {
     if (!flow) return null;
@@ -52,7 +60,7 @@ export const useFlowController = (flowId: string): FlowController | null => {
       const nextStep = next.flowSteps[next.currentStep];
       if (next.completedAt || next.canceledAt || !nextStep)
         navigatePreserving(next.returnUrl, 'context');
-      else navigatePreserving(nextStep.url, 'flow');
+      else navigatePreserving(withFlowParam(nextStep.url, next.id), 'context');
     };
 
     const advance = () => {

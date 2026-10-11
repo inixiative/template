@@ -5,6 +5,7 @@
  * @uses primitive:flows
  */
 import { useLocation } from '@tanstack/react-router';
+import { FlowContext } from '@template/ui/lib/flows/flowContext';
 import {
   type NavigationPolicy,
   navigationTargetHref,
@@ -26,7 +27,9 @@ const Link = React.forwardRef<HTMLAnchorElement, LinkProps>(
     const location = useLocation();
     const spoofUserEmail = useAppStore((state) => state.auth.spoofUserEmail);
     const navigatePreserving = useAppStore((state) => state.navigation.navigatePreserving);
-    const policy: NavigationPolicy = flow === false ? 'context' : 'flow';
+    const flowController = React.useContext(FlowContext);
+    const policy: NavigationPolicy =
+      flow !== false && flowController?.isActive ? 'flow' : 'context';
 
     const href = navigationTargetHref(
       resolveNavigationTarget(to, policy, {

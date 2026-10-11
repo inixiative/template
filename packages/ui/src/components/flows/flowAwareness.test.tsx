@@ -144,7 +144,10 @@ describe('flow-aware Button', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Connect' }));
 
     await waitFor(() =>
-      expect(navigatePreserving).toHaveBeenCalledWith('/archives?provision=1', 'flow'),
+      expect(navigatePreserving).toHaveBeenCalledWith(
+        `/archives?provision=1&flow=${flow.id}`,
+        'context',
+      ),
     );
     expect(action).toHaveBeenCalledTimes(1);
     expect(advanceRequests().map((request) => request.body)).toEqual([{ currentStep: 0 }]);
@@ -287,7 +290,10 @@ describe('flow-aware Form', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Connect' }));
 
     await waitFor(() =>
-      expect(navigatePreserving).toHaveBeenCalledWith('/archives?provision=1', 'flow'),
+      expect(navigatePreserving).toHaveBeenCalledWith(
+        `/archives?provision=1&flow=${flow.id}`,
+        'context',
+      ),
     );
     expect(advanceRequests()).toHaveLength(1);
   });
@@ -337,6 +343,27 @@ describe('FlowBanner', () => {
       `/api/v1/flow/${flow.id}/cancel`,
     );
     await waitFor(() => expect(screen.queryByRole('region', { name: 'Flow progress' })).toBeNull());
+  });
+});
+
+describe('a stale or foreign flow id', () => {
+  it('shows no banner, makes buttons neutral, and Links drop the param', async () => {
+    const action = mock(async () => {});
+    renderAt(
+      '/?flow=01a12b8e-0000-7000-8000-000000000000',
+      <>
+        <Button onClick={action}>Connect</Button>
+        <Link to="/settings">Settings</Link>
+      </>,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Connect' }));
+    await settle();
+
+    expect(action).toHaveBeenCalledTimes(1);
+    expect(advanceRequests()).toEqual([]);
+    expect(screen.queryByRole('region', { name: 'Flow progress' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Settings' }).getAttribute('href')).toBe('/settings');
   });
 });
 

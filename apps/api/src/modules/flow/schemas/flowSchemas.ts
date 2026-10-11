@@ -6,17 +6,7 @@
  */
 import { FlowScalarSchema, FlowStepScalarSchema } from '@template/db';
 import { z } from 'zod';
-
-const APP_ORIGIN = 'https://app.invalid';
-
-export const isAppPath = (value: string): boolean => {
-  if (!value.startsWith('/')) return false;
-  try {
-    return new URL(value, APP_ORIGIN).origin === APP_ORIGIN;
-  } catch {
-    return false;
-  }
-};
+import { isAppPath } from '#/modules/flow/validations/isAppPath';
 
 export const flowUrlSchema = z
   .string()

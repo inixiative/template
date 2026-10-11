@@ -4,6 +4,7 @@ import {
   cleanupTouchedTables,
   createFlow as createFlowRow,
   createFlowStep,
+  createToken,
   createUser,
 } from '@template/db/test';
 import { registerImmutableFieldsHook } from '#/hooks/immutableFields/hook';
@@ -165,6 +166,48 @@ describe('flows', () => {
     expect((await jsonError(advanced)).message).toBe('Flow was canceled');
   });
 
+  it('advancing the last step and canceling concurrently leave exactly one terminal state', async () => {
+    const created = await startFlow({
+      returnUrl: '/archives',
+      flowSteps: [{ label: 'Only', url: '/only' }],
+    });
+
+    const [advanced, canceled] = await Promise.all([
+      advance(created.id, 0),
+      fetch(post(`/api/v1/flow/${created.id}/cancel`)),
+    ]);
+
+    expect([advanced.status, canceled.status].sort()).toEqual([200, 409]);
+    const reread = await db.flow.findUniqueOrThrow({ where: { id: created.id } });
+    expect([reread.completedAt, reread.canceledAt].filter((stamp) => stamp !== null)).toHaveLength(
+      1,
+    );
+  });
+
+  it("a read-only token can read its user's flow but not move it", async () => {
+    const created = await startFlow();
+    const { entity: token } = await createToken({ ownerModel: 'User', role: 'viewer' }, { user });
+    const viewer = createTestApp({
+      mockUser: user,
+      mockToken: {
+        ...token,
+        user,
+        organization: null,
+        organizationUser: null,
+        space: null,
+        spaceUser: null,
+      },
+      mount: [(app) => app.route('/api/v1/flow', flowRouter)],
+    });
+
+    expect((await viewer.fetch(get(`/api/v1/flow/${created.id}`))).status).toBe(200);
+    const advanced = await viewer.fetch(
+      post(`/api/v1/flow/${created.id}/advance`, { currentStep: 0 }),
+    );
+    expect(advanced.status).toBe(403);
+    expect((await viewer.fetch(post(`/api/v1/flow/${created.id}/cancel`))).status).toBe(403);
+  });
+
   it('does not cancel a completed flow', async () => {
     const created = await startFlow({
       returnUrl: '/archives',
@@ -177,7 +220,15 @@ describe('flows', () => {
   });
 
   it('accepts only paths inside the app for step urls and the returnUrl', async () => {
-    const outside = ['https://evil.example/x', '//evil.example/x', '/\\evil.example', 'relative'];
+    const outside = [
+      'https://evil.example/x',
+      '//evil.example/x',
+      '/\\evil.example',
+      '/.//evil.example',
+      '/\t/evil.example',
+      'javascript:alert(1)',
+      'relative',
+    ];
 
     for (const url of outside) {
       const stepResponse = await fetch(
