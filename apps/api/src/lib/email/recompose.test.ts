@@ -71,11 +71,17 @@ describe('recomposeFromSnapshots', () => {
 
 import { afterAll, afterEach, beforeAll } from 'bun:test';
 import { clearHookRegistry, db } from '@template/db';
-import { cleanupTouchedTables } from '@template/db/test';
+import {
+  cleanupTouchedTables,
+  createCommunicationLog,
+  registerTestTracker,
+} from '@template/db/test';
 import { saveEmailTemplate } from '@template/email/render';
 import { registerAuditLogHook } from '#/hooks/auditLog/hook';
 import { registerEmailVersioningHook } from '#/hooks/emailVersioning/hook';
 import { recomposeCommunication } from '#/lib/email/recompose';
+
+registerTestTracker();
 
 const documentMjml = (content: string) =>
   `<mjml><mj-body><mj-section><mj-column>${content}</mj-column></mj-section></mj-body></mjml>`;
@@ -92,10 +98,7 @@ describe('recomposeCommunication (DB-backed)', () => {
   });
 
   afterEach(async () => {
-    await db.communicationLog.deleteMany({});
-    await db.auditLog.deleteMany({});
-    await db.emailTemplate.deleteMany({});
-    await db.emailComponent.deleteMany({});
+    await cleanupTouchedTables(db);
   });
 
   const savedPin = async () => {
@@ -117,17 +120,9 @@ describe('recomposeCommunication (DB-backed)', () => {
     return { template, pin };
   };
 
-  const createLog = (data: Record<string, unknown>) =>
-    db.communicationLog.create({
-      data: {
-        sendKey: 'recompose-test',
-        channel: 'email',
-        address: 'fan@example.com',
-        idempotencyKey: crypto.randomUUID(),
-        senderType: 'platform',
-        ...data,
-      },
-    });
+  const createLog = async (data: Parameters<typeof createCommunicationLog>[0] = {}) =>
+    (await createCommunicationLog({ senderType: 'platform', address: 'fan@example.com', ...data }))
+      .entity;
 
   it('returns the recorded settledMjml — the sent truth — not a recompose of the save-time pin', async () => {
     const { template, pin } = await savedPin();

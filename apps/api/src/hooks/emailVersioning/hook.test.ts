@@ -5,6 +5,7 @@ import {
   cleanupTouchedTables,
   createEmailComponent,
   createEmailTemplate,
+  registerTestTracker,
 } from '@template/db/test';
 import { expand, saveEmailTemplate } from '@template/email/render';
 import { registerAuditLogHook } from '#/hooks/auditLog/hook';
@@ -12,6 +13,8 @@ import { registerEmailVersioningHook } from '#/hooks/emailVersioning/hook';
 import * as enqueueModule from '#/jobs/enqueue';
 import { recomposeSnapshot } from '#/lib/email/recompose';
 import { createTestWorker } from '#tests/createTestWorker';
+
+registerTestTracker();
 
 const mjml = (content: string) =>
   `<mjml><mj-body><mj-section><mj-column>${content}</mj-column></mj-section></mj-body></mjml>`;
@@ -46,9 +49,7 @@ describe('emailVersioning', () => {
   });
 
   afterEach(async () => {
-    await db.auditLog.deleteMany({});
-    await db.emailTemplate.deleteMany({});
-    await db.emailComponent.deleteMany({});
+    await cleanupTouchedTables(db);
   });
 
   it('stamps a template snapshot with its child component audit-log ids', async () => {

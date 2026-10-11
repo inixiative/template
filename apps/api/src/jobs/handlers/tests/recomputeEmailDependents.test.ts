@@ -1,7 +1,14 @@
 import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 import { db, revive } from '@template/db';
-import { cleanupTouchedTables, createEmailComponent, createEmailTemplate } from '@template/db/test';
+import {
+  cleanupTouchedTables,
+  createEmailComponent,
+  createEmailTemplate,
+  registerTestTracker,
+} from '@template/db/test';
 import { createTestWorker } from '#tests/createTestWorker';
+
+registerTestTracker();
 
 const mjml = (content: string) =>
   `<mjml><mj-body><mj-section><mj-column>${content}</mj-column></mj-section></mj-body></mjml>`;
@@ -58,10 +65,7 @@ describe('recomputeEmailDependents handler', () => {
   });
 
   afterEach(async () => {
-    await db.withDeleted(async () => {
-      await db.emailTemplate.deleteMany({});
-      await db.emailComponent.deleteMany({});
-    });
+    await cleanupTouchedTables(db);
   });
 
   it('degrades every consumer of a deleted component, including one reached only through a component', async () => {
