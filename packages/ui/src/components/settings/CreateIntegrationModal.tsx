@@ -15,16 +15,30 @@ import { memo, useState } from 'react';
 type CreateIntegrationFormData = Pick<MeCreateIntegrationData['body'], 'name' | 'provider'>;
 
 type CreateIntegrationModalProps = {
-  provider: IntegrationProvider | null;
+  provider: IntegrationProvider | null | undefined;
   onClose: () => void;
   onSubmit: (data: CreateIntegrationFormData) => void;
+};
+
+const providerCopy = (label: string) => ({
+  title: `Connect ${label}`,
+  placeholder: `My ${label}`,
+  hint: `Names are unique per owner, so you can connect several ${label} accounts.`,
+  submit: 'Connect',
+});
+
+const customCopy = {
+  title: 'Add custom integration',
+  placeholder: 'My integration',
+  hint: 'A custom integration has no provider. Names are unique per owner.',
+  submit: 'Add',
 };
 
 export const CreateIntegrationModal = memo(
   ({ provider, onClose, onSubmit }: CreateIntegrationModalProps) => {
     const [name, setName] = useState('');
     const trimmedName = name.trim();
-    const label = provider ? integrationProviders[provider].label : '';
+    const copy = provider ? providerCopy(integrationProviders[provider].label) : customCopy;
 
     const close = () => {
       setName('');
@@ -33,13 +47,13 @@ export const CreateIntegrationModal = memo(
 
     const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault();
-      if (!provider || !trimmedName) return;
-      onSubmit({ name: trimmedName, provider });
+      if (!trimmedName) return;
+      onSubmit({ name: trimmedName, provider: provider ?? null });
       close();
     };
 
     return (
-      <Modal isOpen={provider !== null} onClose={close} title={`Connect ${label}`}>
+      <Modal isOpen={provider !== undefined} onClose={close} title={copy.title}>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="integration-name">Integration name</Label>
@@ -47,12 +61,10 @@ export const CreateIntegrationModal = memo(
               id="integration-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder={`My ${label}`}
+              placeholder={copy.placeholder}
               autoFocus
             />
-            <p className="text-xs text-muted-foreground">
-              Names are unique per owner, so you can connect several {label} accounts.
-            </p>
+            <p className="text-xs text-muted-foreground">{copy.hint}</p>
           </div>
 
           <div className="flex justify-end gap-2 pt-4">
@@ -60,7 +72,7 @@ export const CreateIntegrationModal = memo(
               Cancel
             </Button>
             <Button type="submit" disabled={!trimmedName}>
-              Connect
+              {copy.submit}
             </Button>
           </div>
         </form>

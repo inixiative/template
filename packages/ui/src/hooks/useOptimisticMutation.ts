@@ -99,7 +99,7 @@ export const useOptimisticMutation = <TData, TError = Error, TVariables = void>(
   });
 };
 
-export const OPTIMISTIC_ID = '__optimistic__';
+const OPTIMISTIC_ID = '__optimistic__';
 
 const isWrappedList = (currentData: unknown): currentData is { data: unknown[] } =>
   currentData !== undefined && !Array.isArray(currentData) && 'data' in (currentData as object);

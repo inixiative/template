@@ -29,3 +29,5 @@ export const integrationProviders: Record<IntegrationProvider, IntegrationProvid
 };
 
 export const integrationProviderValues = Object.keys(integrationProviders) as IntegrationProvider[];
+
+export const customIntegration = { label: 'Custom', icon: 'lucide:puzzle' };

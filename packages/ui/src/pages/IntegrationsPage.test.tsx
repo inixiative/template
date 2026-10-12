@@ -7,13 +7,17 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { buildIntegration, buildOrganization, buildSpace, buildUser } from '@template/db/test';
-import type { IntegrationProvider } from '@template/ui/lib/integrationProviders';
+import {
+  type IntegrationProvider,
+  integrationProviderValues,
+} from '@template/ui/lib/integrationProviders';
 import { IntegrationsPage } from '@template/ui/pages/IntegrationsPage';
 import { useAppStore } from '@template/ui/store';
 import type { TenantContext } from '@template/ui/store/types/tenant';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 const initialState = useAppStore.getState();
+const bucketCount = integrationProviderValues.length + 1;
 
 type StoredIntegration = Record<string, unknown> & {
   id: string;
@@ -21,12 +25,40 @@ type StoredIntegration = Record<string, unknown> & {
   provider: IntegrationProvider | null;
 };
 
+type ListRequest = { method: 'GET'; path: string; provider: string | null; page: number };
+type ApiRequest = ListRequest | { method: 'POST' | 'DELETE'; path: string; body?: unknown };
+
 let stored: Record<string, StoredIntegration[]>;
-let requests: Array<{ method: string; path: string; body?: unknown }>;
+let requests: ApiRequest[];
 let permissionChecks: Array<{ model: string; id: unknown; action: unknown }>;
 let fetchSpy: ReturnType<typeof spyOn<typeof globalThis, 'fetch'>>;
 let client: QueryClient;
 let owner: Awaited<ReturnType<typeof buildUser>>['entity'];
+let observers: Array<{ callback: IntersectionObserverCallback; targets: Set<Element> }>;
+let intersectionObserverSpy: ReturnType<typeof spyOn>;
+
+function RecordingIntersectionObserver(callback: IntersectionObserverCallback) {
+  const entry = { callback, targets: new Set<Element>() };
+  observers.push(entry);
+  return {
+    observe: (target: Element) => entry.targets.add(target),
+    unobserve: (target: Element) => entry.targets.delete(target),
+    disconnect: () => entry.targets.clear(),
+  };
+}
+
+const scrollToEnd = (container: HTMLElement) => {
+  const sentinel = container.querySelector('[aria-hidden="true"]:last-of-type');
+  for (const { callback, targets } of observers) {
+    if (!sentinel || !targets.has(sentinel)) continue;
+    act(() =>
+      callback(
+        [{ isIntersecting: true, target: sentinel } as IntersectionObserverEntry],
+        {} as IntersectionObserver,
+      ),
+    );
+  }
+};
 
 const serverIntegration = async (
   name: string,
@@ -62,21 +94,54 @@ const renderPage = () =>
 
 const providerCard = (provider: string) => screen.getByTestId(`provider-${provider}`);
 
+const listRequests = () =>
+  requests.filter((request): request is ListRequest => request.method === 'GET');
+
+const waitForBuckets = () =>
+  waitFor(() => expect(listRequests().length).toBeGreaterThanOrEqual(bucketCount));
+
+const readProviderFilter = (url: URL) =>
+  url.searchParams.get('searchFields[provider][equals][:]') === 'null'
+    ? null
+    : url.searchParams.get('searchFields[provider][equals]');
+
 beforeEach(async () => {
   owner = (await buildUser()).entity;
   stored = {};
   requests = [];
   permissionChecks = [];
+  observers = [];
+  intersectionObserverSpy = spyOn(globalThis, 'IntersectionObserver').mockImplementation(
+    RecordingIntersectionObserver as never,
+  );
   client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const intercept = async (input: RequestInfo | URL) => {
     const request = input as Request;
-    const path = new URL(request.url).pathname;
+    const url = new URL(request.url);
+    const path = url.pathname;
     if (request.method === 'GET' && path.endsWith('/integrations')) {
-      requests.push({ method: 'GET', path });
-      return Response.json({ data: stored[path] ?? [] });
+      const provider = readProviderFilter(url);
+      const page = Number(url.searchParams.get('page') ?? 1);
+      const pageSize = Number(url.searchParams.get('pageSize') ?? 100);
+      requests.push({ method: 'GET', path, provider, page });
+      const matching = (stored[path] ?? []).filter(
+        (integration) => integration.provider === provider,
+      );
+      return Response.json({
+        data: matching.slice((page - 1) * pageSize, page * pageSize),
+        pagination: {
+          page,
+          pageSize,
+          total: matching.length,
+          totalPages: Math.ceil(matching.length / pageSize),
+        },
+      });
     }
     if (request.method === 'POST' && path.endsWith('/integrations')) {
-      const body = (await request.json()) as { name: string; provider: IntegrationProvider };
+      const body = (await request.json()) as {
+        name: string;
+        provider: IntegrationProvider | null;
+      };
       requests.push({ method: 'POST', path, body });
       const integration = await serverIntegration(body.name, body.provider);
       stored[path] = [...(stored[path] ?? []), integration];
@@ -104,12 +169,13 @@ beforeEach(async () => {
 afterEach(() => {
   cleanup();
   fetchSpy.mockRestore();
+  intersectionObserverSpy.mockRestore();
   useAppStore.setState(initialState);
   client.clear();
 });
 
 describe('IntegrationsPage', () => {
-  it('renders every catalog provider with its status for the owner', async () => {
+  it('renders every catalog provider with the status of its own bucket', async () => {
     stored['/api/v1/me/integrations'] = [await serverIntegration('Engineering', 'github')];
     renderPage();
     await screen.findByText('Engineering');
@@ -118,7 +184,18 @@ describe('IntegrationsPage', () => {
       expect(screen.getByText(label)).toBeTruthy();
     }
     expect(within(providerCard('github')).getByText('Connected')).toBeTruthy();
-    expect(within(providerCard('slack')).getByText('Not connected')).toBeTruthy();
+    expect(await within(providerCard('slack')).findByText('Not connected')).toBeTruthy();
+  });
+
+  it('queries one bucket per provider plus a null-provider bucket for custom integrations', async () => {
+    renderPage();
+    await waitForBuckets();
+
+    expect(
+      listRequests()
+        .map((request) => request.provider)
+        .sort(),
+    ).toEqual([...integrationProviderValues, null].sort());
   });
 
   it('marks providers disabled when the actor cannot manage the owner', async () => {
@@ -128,10 +205,13 @@ describe('IntegrationsPage', () => {
     await screen.findByText('Engineering');
 
     expect(within(providerCard('github')).getByText('Connected')).toBeTruthy();
-    expect(within(providerCard('slack')).getByText('Disabled')).toBeTruthy();
+    expect(await within(providerCard('slack')).findByText('Disabled')).toBeTruthy();
     expect(
       (screen.getByRole('button', { name: 'Connect Slack' }) as HTMLButtonElement).disabled,
     ).toBe(true);
+    expect((screen.getByRole('button', { name: 'Add custom' }) as HTMLButtonElement).disabled).toBe(
+      true,
+    );
     expect(screen.queryByRole('button', { name: 'Delete Engineering' })).toBeNull();
   });
 
@@ -144,14 +224,40 @@ describe('IntegrationsPage', () => {
     ];
     renderPage();
     await screen.findByText('Team chat');
+    await screen.findByText('Legacy');
 
     const github = within(providerCard('github'));
     expect(github.getByText('Frontend repo')).toBeTruthy();
     expect(github.getByText('Backend repo')).toBeTruthy();
     expect(github.queryByText('Team chat')).toBeNull();
     expect(within(providerCard('slack')).getByText('Team chat')).toBeTruthy();
-    expect(within(providerCard('none')).getByText('Legacy')).toBeTruthy();
+    expect(within(providerCard('custom')).getByText('Legacy')).toBeTruthy();
     expect(within(providerCard('linear')).queryByRole('listitem')).toBeNull();
+  });
+
+  it('shows a hundred integrations per bucket and scrolls inside the bucket for more', async () => {
+    const repos: StoredIntegration[] = [];
+    for (let index = 1; index <= 102; index++) {
+      repos.push(await serverIntegration(`Repo ${String(index).padStart(3, '0')}`, 'github'));
+    }
+    stored['/api/v1/me/integrations'] = [...repos, await serverIntegration('Team chat', 'slack')];
+    renderPage();
+    await screen.findByText('Repo 100');
+
+    const github = within(providerCard('github'));
+    expect(github.getAllByRole('listitem')).toHaveLength(100);
+    expect(github.queryByText('Repo 101')).toBeNull();
+    expect(github.getByText('Connected')).toBeTruthy();
+
+    scrollToEnd(screen.getByTestId('integrations-github'));
+
+    await waitFor(() => expect(github.getAllByRole('listitem')).toHaveLength(102));
+    expect(
+      listRequests()
+        .filter((request) => request.provider === 'github')
+        .map((request) => request.page),
+    ).toEqual([1, 2]);
+    expect(listRequests().filter((request) => request.provider === 'slack')).toHaveLength(1);
   });
 
   it('lists the integrations of the current context: me, organization or space', async () => {
@@ -186,7 +292,7 @@ describe('IntegrationsPage', () => {
     await screen.findByText('Workspace');
     expect(screen.queryByText('Company')).toBeNull();
 
-    expect(requests.map((request) => request.path)).toEqual([
+    expect([...new Set(listRequests().map((request) => request.path))]).toEqual([
       '/api/v1/me/integrations',
       `/api/v1/organization/${organization.id}/integrations`,
       `/api/v1/space/${space.id}/integrations`,
@@ -203,7 +309,7 @@ describe('IntegrationsPage', () => {
 
   it("connect opens the provider's create flow and lists the new integration under it", async () => {
     renderPage();
-    await waitFor(() => expect(requests).toHaveLength(1));
+    await waitForBuckets();
 
     fireEvent.click(screen.getByRole('button', { name: 'Connect Slack' }));
     await screen.findByText('Connect Slack');
@@ -223,6 +329,31 @@ describe('IntegrationsPage', () => {
     await waitFor(() => expect(within(providerCard('slack')).getByText('Connected')).toBeTruthy());
   });
 
+  it('always shows the Custom card, and Add custom creates an integration without a provider', async () => {
+    renderPage();
+    await waitForBuckets();
+
+    const custom = within(providerCard('custom'));
+    expect(custom.getByText('Custom')).toBeTruthy();
+    expect(custom.queryByRole('listitem')).toBeNull();
+
+    fireEvent.click(custom.getByRole('button', { name: 'Add custom' }));
+    await screen.findByText('Add custom integration');
+    fireEvent.change(screen.getByLabelText('Integration name'), {
+      target: { value: 'Internal webhook' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+
+    await waitFor(() =>
+      expect(within(providerCard('custom')).getByText('Internal webhook')).toBeTruthy(),
+    );
+    expect(requests.find((request) => request.method === 'POST')).toEqual({
+      method: 'POST',
+      path: '/api/v1/me/integrations',
+      body: { name: 'Internal webhook', provider: null },
+    });
+  });
+
   it("a provider's own connect flow replaces the generic one and refreshes the list", async () => {
     render(
       <QueryClientProvider client={client}>
@@ -237,7 +368,7 @@ describe('IntegrationsPage', () => {
         />
       </QueryClientProvider>,
     );
-    await waitFor(() => expect(requests).toHaveLength(1));
+    await waitForBuckets();
 
     fireEvent.click(screen.getByRole('button', { name: 'Connect GitHub' }));
     expect(screen.queryByLabelText('Integration name')).toBeNull();
@@ -252,7 +383,7 @@ describe('IntegrationsPage', () => {
     const organization = (await buildOrganization()).entity.__serialize();
     setContext({ type: 'organization', organization } as unknown as TenantContext, true);
     renderPage();
-    await waitFor(() => expect(requests).toHaveLength(1));
+    await waitForBuckets();
 
     fireEvent.click(screen.getByRole('button', { name: 'Connect Linear' }));
     fireEvent.change(screen.getByLabelText('Integration name'), {

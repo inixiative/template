@@ -4,32 +4,32 @@
  * @partOf primitive:ui
  * @uses primitive:sdk
  */
+import type { QueryKey } from '@tanstack/react-query';
 import {
   integrationDelete,
+  type MeReadManyIntegrationsData,
   meCreateIntegration,
   meReadManyIntegrations,
-  meReadManyIntegrationsQueryKey,
+  meReadManyIntegrationsInfiniteQueryKey,
   organizationCreateIntegration,
   organizationReadManyIntegrations,
-  organizationReadManyIntegrationsQueryKey,
+  organizationReadManyIntegrationsInfiniteQueryKey,
   spaceCreateIntegration,
   spaceReadManyIntegrations,
-  spaceReadManyIntegrationsQueryKey,
+  spaceReadManyIntegrationsInfiniteQueryKey,
 } from '@template/sdk';
 import { apiMutation } from '@template/ui/lib/apiMutation';
-import { apiQuery } from '@template/ui/lib/apiQuery';
-import { makeContextQueries, mutation, query } from '@template/ui/lib/makeContextQueries';
+import { makeContextQueries, mutation } from '@template/ui/lib/makeContextQueries';
 
-const listQuery = { pageSize: 100 };
+export type IntegrationListQuery = NonNullable<MeReadManyIntegrationsData['query']>;
 
 export const integrationContextQueries = makeContextQueries()({
   user: () => ({
-    readMany: query({
-      queryKey: meReadManyIntegrationsQueryKey({ query: listQuery }),
-      queryFn: apiQuery((opts: Parameters<typeof meReadManyIntegrations>[0]) =>
-        meReadManyIntegrations({ ...opts, query: listQuery }),
-      ),
-    }),
+    readManyQueryKey: (query?: IntegrationListQuery): QueryKey =>
+      meReadManyIntegrationsInfiniteQueryKey({ query }),
+    readMany: apiMutation((opts: Parameters<typeof meReadManyIntegrations>[0]) =>
+      meReadManyIntegrations({ ...opts, throwOnError: true }),
+    ),
     create: mutation({
       mutationFn: apiMutation((opts: Parameters<typeof meCreateIntegration>[0]) =>
         meCreateIntegration(opts),
@@ -42,19 +42,15 @@ export const integrationContextQueries = makeContextQueries()({
     }),
   }),
   organization: ({ organization }) => ({
-    readMany: query({
-      queryKey: organizationReadManyIntegrationsQueryKey({
+    readManyQueryKey: (query?: IntegrationListQuery): QueryKey =>
+      organizationReadManyIntegrationsInfiniteQueryKey({ path: { id: organization.id }, query }),
+    readMany: apiMutation((opts: Parameters<typeof meReadManyIntegrations>[0]) =>
+      organizationReadManyIntegrations({
+        ...opts,
         path: { id: organization.id },
-        query: listQuery,
+        throwOnError: true,
       }),
-      queryFn: apiQuery((opts: Parameters<typeof organizationReadManyIntegrations>[0]) =>
-        organizationReadManyIntegrations({
-          ...opts,
-          path: { id: organization.id },
-          query: listQuery,
-        }),
-      ),
-    }),
+    ),
     create: mutation({
       mutationFn: apiMutation((opts: Parameters<typeof meCreateIntegration>[0]) =>
         organizationCreateIntegration({ ...opts, path: { id: organization.id } }),
@@ -67,12 +63,11 @@ export const integrationContextQueries = makeContextQueries()({
     }),
   }),
   space: ({ space }) => ({
-    readMany: query({
-      queryKey: spaceReadManyIntegrationsQueryKey({ path: { id: space.id }, query: listQuery }),
-      queryFn: apiQuery((opts: Parameters<typeof spaceReadManyIntegrations>[0]) =>
-        spaceReadManyIntegrations({ ...opts, path: { id: space.id }, query: listQuery }),
-      ),
-    }),
+    readManyQueryKey: (query?: IntegrationListQuery): QueryKey =>
+      spaceReadManyIntegrationsInfiniteQueryKey({ path: { id: space.id }, query }),
+    readMany: apiMutation((opts: Parameters<typeof meReadManyIntegrations>[0]) =>
+      spaceReadManyIntegrations({ ...opts, path: { id: space.id }, throwOnError: true }),
+    ),
     create: mutation({
       mutationFn: apiMutation((opts: Parameters<typeof meCreateIntegration>[0]) =>
         spaceCreateIntegration({ ...opts, path: { id: space.id } }),

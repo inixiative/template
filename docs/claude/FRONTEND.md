@@ -1149,7 +1149,7 @@ export const ProfilePage = () => {
 - `OrganizationWebhooksTab` - Org webhook subscriptions
 - `SpaceWebhooksTab` - Space webhook subscriptions
 - `CreateTokenModal` - Token creation modal (API tokens are managed by `TokensPage` in `packages/ui/src/pages/`, which shows a new key once in `SecretRevealModal`)
-- `CreateIntegrationModal` - Connect flow for one provider (Integrations are managed by `IntegrationsPage`, which lists the provider catalog in `lib/integrationProviders.ts`, each provider's status for the current owner, and the owner's integrations under their provider via `integrationContextQueries`)
+- `CreateIntegrationModal` - Connect flow for one provider, or a custom integration when `provider` is `null` (`undefined` = closed). Integrations are managed by `IntegrationsPage`: one bucket per provider in `lib/integrationProviders.ts` plus a Custom bucket (provider `null`), each its own `searchFields[provider]` query of 100 that infinite-scrolls on overflow (`useInfiniteDataQuery` + `useInfiniteScrollTrigger`); a provider's status comes from its bucket's total
 - `AuthProviderModal` - Auth provider configuration modal
 
 #### Example: Settings Layout

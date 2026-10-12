@@ -20,6 +20,7 @@ describe('GET /api/v1/me/integrations', () => {
   let user: User;
   let otherUser: User;
   let names: [string, string, string];
+  let customName: string;
 
   beforeAll(async () => {
     const { entity: u } = await createUser();
@@ -32,6 +33,13 @@ describe('GET /api/v1/me/integrations', () => {
     for (const name of names) {
       await createIntegration({ name, provider: 'github', ownerModel: 'User', userId: user.id });
     }
+    customName = `Custom ${seq}`;
+    await createIntegration({
+      name: customName,
+      provider: null,
+      ownerModel: 'User',
+      userId: user.id,
+    });
     await createIntegration({ name: `Theirs ${seq}`, ownerModel: 'User', userId: otherUser.id });
     const { entity: orgUser, context: orgUserContext } = await createOrganizationUser(
       { role: 'owner' },
@@ -81,7 +89,9 @@ describe('GET /api/v1/me/integrations', () => {
     const { data } = await json<Integration[]>(response);
 
     expect(response.status).toBe(200);
-    expect(data.map((integration) => integration.name).sort()).toEqual([...names].sort());
+    expect(data.map((integration) => integration.name).sort()).toEqual(
+      [...names, customName].sort(),
+    );
     expect(
       data.every(
         (integration) => integration.ownerModel === 'User' && integration.userId === user.id,
@@ -95,8 +105,33 @@ describe('GET /api/v1/me/integrations', () => {
 
     expect(response.status).toBe(200);
     expect(data).toHaveLength(2);
-    expect(pagination?.total).toBe(3);
+    expect(pagination?.total).toBe(4);
     expect(pagination?.pageSize).toBe(2);
+  });
+
+  it('returns custom integrations, which have no provider, under a null provider filter', async () => {
+    const response = await fetch(
+      get('/api/v1/me/integrations?searchFields[provider][equals][:]=null'),
+    );
+    const { data, pagination } = await json<Integration[]>(response);
+
+    expect(response.status).toBe(200);
+    expect(data.map((integration) => [integration.name, integration.provider])).toEqual([
+      [customName, null],
+    ]);
+    expect(pagination?.total).toBe(1);
+  });
+
+  it('filters by provider', async () => {
+    const response = await fetch(
+      get('/api/v1/me/integrations?searchFields[provider][equals]=github&pageSize=2'),
+    );
+    const { data, pagination } = await json<Integration[]>(response);
+
+    expect(response.status).toBe(200);
+    expect(data).toHaveLength(2);
+    expect(data.every((integration) => integration.provider === 'github')).toBe(true);
+    expect(pagination?.total).toBe(3);
   });
 
   it('filters through the lens', async () => {
