@@ -13,10 +13,12 @@ import {
   RouterProvider,
 } from '@tanstack/react-router';
 import type { Flow } from '@template/sdk';
+import { FlowStepAdvance, FlowStepState } from '@template/shared/flows';
 import { FlowBanner } from '@template/ui/components/flows/FlowBanner';
 import { Modal } from '@template/ui/components/layout/Modal';
 import type { NavConfig } from '@template/ui/components/layout/navigationTypes';
 import { Button } from '@template/ui/components/primitives/Button';
+import { type StartedFlow, useStartFlow } from '@template/ui/hooks/flow/useStartFlow';
 import { useAuthenticatedRouting } from '@template/ui/hooks/useAuthenticatedRouting';
 import { useRegisterNavigation } from '@template/ui/hooks/useRegisterNavigation';
 import { createAppQueryClient } from '@template/ui/lib/createAppQueryClient';
@@ -27,28 +29,25 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 const ORG = '01a12b8e-1111-7000-8000-000000000001';
 const FLOW_ID = '01a12b8e-2222-7000-8000-000000000002';
 
-const steps: Flow['steps'] = [
-  ['inviteTeammate', 'Invite a teammate', `/users/members?org=${ORG}#invite`, 'auto'],
-  [
-    'createCiToken',
-    'Create an API token for CI',
-    `/settings/tokens?org=${ORG}#create-token`,
-    'confirm',
-  ],
-  [
-    'createLocalToken',
-    'Create one for local development',
-    `/settings/tokens?org=${ORG}#create-token`,
-    'confirm',
-  ],
-].map(([key, label, to, advance]) => ({
-  key: key!,
-  label: label!,
-  to: to!,
-  advance: advance as 'auto' | 'confirm',
+const tokensPage = `/settings/tokens?org=${ORG}#create-token`;
+const step = (key: string, label: string, to: string, advance: FlowStepAdvance) => ({
+  key,
+  label,
+  to,
+  advance,
   readPath: '/api/v1/organization/x/tokens',
   rule: {},
-}));
+});
+const steps: Flow['steps'] = [
+  step(
+    'inviteTeammate',
+    'Invite a teammate',
+    `/users/members?org=${ORG}#invite`,
+    FlowStepAdvance.auto,
+  ),
+  step('createCiToken', 'Create an API token for CI', tokensPage, FlowStepAdvance.confirm),
+  step('createLocalToken', 'Create one for local development', tokensPage, FlowStepAdvance.confirm),
+];
 
 const navConfig: NavConfig = {
   user: [],
@@ -64,6 +63,7 @@ const initialState = useAppStore.getState();
 let holding: number;
 let gone: boolean;
 let requests: Array<{ method: string; path: string }>;
+let started: StartedFlow | undefined;
 let fetchSpy: ReturnType<typeof spyOn<typeof globalThis, 'fetch'>>;
 
 const serverFlow = (): Flow => {
@@ -77,7 +77,9 @@ const serverFlow = (): Flow => {
     steps,
     returnUrl: '/settings',
     currentStep,
-    stepStates: steps.map((_, index) => (index < currentStep ? 'done' : 'pending')),
+    stepStates: steps.map((_, index) =>
+      index < currentStep ? FlowStepState.done : FlowStepState.pending,
+    ),
   };
 };
 
@@ -98,6 +100,25 @@ const Work = () => {
   );
 };
 
+let withModal: boolean;
+
+const Starter = () => {
+  const { mutateAsync } = useStartFlow();
+  return (
+    <Button
+      variant="ghost"
+      onClick={async () => {
+        started = await mutateAsync({
+          flowKey: 'setUpOrganization',
+          bindings: { organizationId: ORG },
+        });
+      }}
+    >
+      Start
+    </Button>
+  );
+};
+
 const Root = () => {
   useRegisterNavigation(navConfig);
   useAuthenticatedRouting();
@@ -105,6 +126,12 @@ const Root = () => {
     <>
       <FlowBanner />
       <Work />
+      <Starter />
+      {withModal && (
+        <Modal isOpen onClose={() => undefined} title="Your key">
+          key
+        </Modal>
+      )}
     </>
   );
 };
@@ -122,8 +149,8 @@ const renderAt = (entry: string) => {
   return router;
 };
 
-const renderInFlow = async () => {
-  const router = renderAt(`/users/members?org=${ORG}&flow=${FLOW_ID}`);
+const renderInFlow = async (pathname = '/users/members') => {
+  const router = renderAt(`${pathname}?org=${ORG}&flow=${FLOW_ID}`);
   await screen.findByText(`Step ${Math.min(holding, steps.length) + 1} of ${steps.length}`);
   return router;
 };
@@ -136,6 +163,8 @@ const doWork = async () => {
 
 beforeEach(() => {
   holding = 0;
+  withModal = false;
+  started = undefined;
   gone = false;
   requests = [];
   const intercept = async (input: RequestInfo | URL) => {
@@ -143,6 +172,7 @@ beforeEach(() => {
     const path = new URL(request.url).pathname;
     requests.push({ method: request.method, path });
     if (path === '/api/v1/work') return Response.json({ data: {} });
+    if (path === '/api/v1/me/flows') return Response.json({ data: serverFlow() }, { status: 201 });
     if (path === `/api/v1/flow/${FLOW_ID}` && request.method === 'DELETE') {
       gone = true;
       return new Response(null, { status: 204 });
@@ -188,40 +218,67 @@ describe('flow client', () => {
     expect(router.state.location.search).toMatchObject({ org: ORG, flow: FLOW_ID });
   });
 
-  it('waits on a confirm step: the open modal becomes the Continue button', async () => {
+  it('stays put after a confirm step whose next step lives on the same page', async () => {
     holding = 1;
-    const router = await renderInFlow();
-    render(
-      <Modal isOpen onClose={() => undefined} title="Your key">
-        key
-      </Modal>,
-    );
+    const router = await renderInFlow('/settings/tokens');
 
     holding = 2;
     await doWork();
 
+    await screen.findByText('Step 3 of 3');
+    expect(router.state.location.pathname).toBe('/settings/tokens');
+    expect(screen.queryByRole('button', { name: /^Continue/ })).toBeNull();
+  });
+
+  it('turns an open modal close into Continue while the current step lives elsewhere', async () => {
+    holding = 1;
+    withModal = true;
+    const router = await renderInFlow();
+
     const next = await screen.findAllByRole('button', {
-      name: 'Continue: Create one for local development',
+      name: 'Continue: Create an API token for CI',
     });
-    expect(router.state.location.pathname).toBe('/users/members');
-    fireEvent.click(next[0]!);
+    expect(next).toHaveLength(2);
+    fireEvent.click(next[1]!);
 
     await waitFor(() => expect(router.state.location.pathname).toBe('/settings/tokens'));
-    expect(useAppStore.getState().navigation.flowContinue).toBeNull();
+    expect(router.state.location.hash).toBe('create-token');
   });
 
   it('finishes on returnUrl once the last step is confirmed', async () => {
     holding = 2;
-    const router = await renderInFlow();
+    const router = await renderInFlow('/settings/tokens');
 
     holding = 3;
     await doWork();
-    expect(useAppStore.getState().navigation.flowId).toBeNull();
     fireEvent.click(await screen.findByRole('button', { name: 'Finish' }));
 
     await waitFor(() => expect(router.state.location.pathname).toBe('/settings'));
+    expect(useAppStore.getState().navigation.flowId).toBeNull();
     expect(router.state.location.search).not.toHaveProperty('flow');
     expect(screen.queryByLabelText('Setup guide')).toBeNull();
+  });
+
+  it('starting a flow goes to its first pending step', async () => {
+    holding = 1;
+    const router = renderAt('/dashboard');
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Start' }));
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/settings/tokens'));
+    expect(started?.started).toBe(true);
+    expect(useAppStore.getState().navigation.flowId).toBe(FLOW_ID);
+  });
+
+  it('starting a flow that already holds leaves the caller where it is', async () => {
+    holding = 3;
+    const router = renderAt('/dashboard');
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Start' }));
+
+    await waitFor(() => expect(started?.started).toBe(false));
+    expect(router.state.location.pathname).toBe('/dashboard');
+    expect(useAppStore.getState().navigation.flowId).toBeNull();
   });
 
   it('drops the flow when the user leaves its pages', async () => {

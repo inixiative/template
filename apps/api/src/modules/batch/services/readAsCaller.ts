@@ -1,8 +1,8 @@
 /**
  * @atlas
  * @kind service
- * @partOf primitive:flows
- * @uses primitive:batch
+ * @partOf primitive:batch
+ * @uses none
  */
 import type { Context } from 'hono';
 import { registerBatch, unregisterBatch } from '#/modules/batch/services/batchRegistry';

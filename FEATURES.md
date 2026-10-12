@@ -420,11 +420,11 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 **A short-lived walk through a few in-app pages, checked by the server.** A convenience, not a contract: on any failure, or when the user leaves the flow's pages, the flow is deleted and the user is back on the normal site.
 
-- ✅ **Registry** - `FlowKey` enum + plain-TS definitions in `modules/flow/definitions`: a bindings schema and `steps(bindings)`, each step a `to`, an `advance` (`auto` / `confirm`), a GET read by operationId and a json-rules rule over the response
-- ✅ **Resolved at create** - steps are resolved and stored on the row; editing a definition never affects a running flow. Create checks too, so callers just create a flow instead of pre-checking whether it is needed
-- ✅ **Rechecked on every read** - from step 0, as the caller, through the batch sub-request machinery; list reads walk every page with `fetchAllPages`. Steps can move backward. A failed read deletes the flow (404); a finished one is returned once and deleted
+- ✅ **Registry** - `FlowKey` enum + `flowRegistry` in `modules/flow/registry`, one file per flow: a bindings schema and `steps(bindings)`, each step a `to`, an `advance` (`auto` / `confirm`), a `readPath` built with `apiPath(operationId, …)` and a json-rules rule over the response
+- ✅ **Resolved at create** - steps are resolved and stored on the row; editing the registry never affects a running flow. Create checks too, so callers just create a flow instead of pre-checking whether it is needed
+- ✅ **Rechecked on every read** - from step 0, as the caller, with `readAllAsCaller` (batch sub-requests, every page via `fetchAllPages`). Steps can move backward. A failed read deletes the flow (404); a finished one is returned once and deleted
 - ✅ **Transient** - `cleanStaleData` deletes flows idle for 15 minutes
-- ✅ **Client** - `?flow=` mirrors the store like `spoof`, one `FlowBanner` per app, every mutation rechecks via the `MutationCache`, `Modal` close becomes "Continue" on `confirm` steps, leaving the flow's pages drops it
+- ✅ **Client** - only `flowId` in the store (`?flow=` mirrors it like `spoof`), the flow read from the query cache, one `FlowBanner` per app, every mutation rechecks via the `MutationCache`, one `flowNext` rule drives the banner and `Modal` close ("Continue" / "Finish"), leaving the flow's pages drops it
 
 [Learn more: FLOWS.md](docs/claude/FLOWS.md)
 

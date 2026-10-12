@@ -9,6 +9,6 @@ import { makeController } from '#/lib/utils/makeController';
 import { flowDeleteRoute } from '#/modules/flow/routes/flowDelete';
 
 export const flowDeleteController = makeController(flowDeleteRoute, async (c, respond) => {
-  await c.get('db').flow.deleteMany({ where: { id: getResource<'flow'>(c).id } });
+  await c.get('db').flow.delete({ where: { id: getResource<'flow'>(c).id } });
   return respond.noContent();
 });

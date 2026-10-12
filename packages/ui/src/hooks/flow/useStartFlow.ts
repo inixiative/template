@@ -4,25 +4,31 @@
  * @partOf primitive:flows
  * @uses primitive:sdk
  */
-import { useMutation } from '@tanstack/react-query';
-import { type MeCreateFlowData, meCreateFlow } from '@template/sdk';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { type Flow, type MeCreateFlowData, meCreateFlow } from '@template/sdk';
 import { apiMutation } from '@template/ui/lib/apiMutation';
-import { currentPath } from '@template/ui/lib/routeRedirect';
+import { flowReadQueryKeyFor } from '@template/ui/lib/flows/flowReadQuery';
 import { useAppStore } from '@template/ui/store';
 
-export const useStartFlow = () =>
-  useMutation({
-    mutationFn: ({ flowKey, bindings }: MeCreateFlowData['body']) =>
-      apiMutation((opts: Parameters<typeof meCreateFlow<true>>[0]) => meCreateFlow<true>(opts))({
-        body: { flowKey, bindings: { returnUrl: currentPath(), ...bindings } },
-      }),
-    meta: { skipFlowInvalidate: true },
-    onSuccess: ({ data: flow }) => {
-      const { navigation } = useAppStore.getState();
+export type StartedFlow = { started: boolean; flow: Flow };
+
+export const useStartFlow = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (body: MeCreateFlowData['body']): Promise<StartedFlow> => {
+      const create = apiMutation((opts: Parameters<typeof meCreateFlow<true>>[0]) =>
+        meCreateFlow<true>(opts),
+      );
+      const { data: flow } = await create({ body });
       const step = flow.steps[flow.currentStep];
-      if (!step) return navigation.navigatePreserving(flow.returnUrl ?? '/dashboard', 'context');
+      if (!step) return { started: false, flow };
+
+      queryClient.setQueryData(flowReadQueryKeyFor(flow.id), flow);
+      const { navigation } = useAppStore.getState();
       navigation.setFlowId(flow.id);
-      navigation.receiveFlow(flow);
       if (step.to) navigation.navigatePreserving(step.to, 'context');
+      return { started: true, flow };
     },
+    meta: { skipFlowInvalidate: true },
   });
+};

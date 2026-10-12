@@ -5,8 +5,11 @@
  * @uses none
  */
 import { Icon } from '@iconify/react';
+import { useActiveFlow } from '@template/ui/hooks/flow/useActiveFlow';
+import { currentLocation } from '@template/ui/lib/currentLocation';
+import { flowNext } from '@template/ui/lib/flows/flowNext';
+import { followFlow } from '@template/ui/lib/flows/followFlow';
 import { cn } from '@template/ui/lib/utils';
-import { useAppStore } from '@template/ui/store';
 
 export type ModalSize = 'small' | 'large';
 
@@ -32,11 +35,12 @@ export const Modal = ({
   className,
 }: ModalProps) => {
   const isModalOpen = open ?? isOpen ?? false;
-  const flowContinue = useAppStore((state) => state.navigation.flowContinue);
-  const continueLabel = flowContinue?.label ?? null;
+  const flow = useActiveFlow();
+  const next = flow && flowNext(flow, currentLocation().pathname);
+  const continueLabel = next?.label ?? null;
   const close = () => {
     onClose();
-    if (flowContinue) useAppStore.getState().navigation.continueFlow();
+    if (next) followFlow(next);
   };
 
   if (!isModalOpen) return null;

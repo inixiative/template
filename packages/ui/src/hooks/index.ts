@@ -6,7 +6,7 @@ export {
   useEmailRuleSurface,
   useEmailVariableScope,
 } from './email';
-export { useStartFlow } from './flow';
+export { type StartedFlow, useActiveFlow, useStartFlow } from './flow';
 export {
   useCancelInquiryMutation,
   useCreateInquiryMutation,

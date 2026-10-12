@@ -4,10 +4,10 @@
  * @partOf primitive:ui
  * @uses none
  */
-import type { Flow } from '@template/sdk';
+import { currentLocation } from '@template/ui/lib/currentLocation';
 import { pickSearchParams, readSearchParam } from '@template/ui/lib/searchParams';
 import type { AppStore } from '@template/ui/store/types';
-import type { FlowContinue, NavigationSlice } from '@template/ui/store/types/navigation';
+import type { NavigationSlice } from '@template/ui/store/types/navigation';
 import type { StateCreator } from 'zustand';
 
 type Policy = 'context' | 'spoof' | 'all';
@@ -52,13 +52,6 @@ const parseNavigateTarget = (
   return Object.keys(search).length > 0 ? { ...target, search } : target;
 };
 
-const flowContinueAfter = (flow: Flow): FlowContinue => {
-  const next = flow.steps[flow.currentStep];
-  return next
-    ? { label: `Continue: ${next.label}`, to: next.to }
-    : { label: 'Finish', to: flow.returnUrl ?? '/dashboard' };
-};
-
 const mergeSearch = (
   left?: Record<string, string>,
   right?: Record<string, string>,
@@ -76,8 +69,6 @@ export const createNavigationSlice: StateCreator<AppStore, [], [], NavigationSli
     navConfig: null,
     currentRouteMatch: null,
     flowId: null,
-    flow: null,
-    flowContinue: null,
 
     setNavigate: (fn) =>
       set((state) => ({
@@ -103,9 +94,8 @@ export const createNavigationSlice: StateCreator<AppStore, [], [], NavigationSli
       const navigate = get().navigation.navigate;
       if (!navigate) return;
       const spoofUserEmail = get().auth.spoofUserEmail;
-      const currentSearch = typeof window === 'undefined' ? '' : (window.location?.search ?? '');
-      const currentHash =
-        typeof window === 'undefined' ? '' : (window.location?.hash ?? '').slice(1);
+      const { search: currentSearch, hash } = currentLocation();
+      const currentHash = hash.slice(1);
       const preservedSearch = resolveSearchForPolicy(
         currentSearch,
         policy,
@@ -120,49 +110,6 @@ export const createNavigationSlice: StateCreator<AppStore, [], [], NavigationSli
       });
     },
 
-    setFlowId: (flowId) =>
-      set((state) => ({
-        navigation: { ...state.navigation, flowId, flow: null, flowContinue: null },
-      })),
-
-    receiveFlow: (flow) => {
-      const { navigation } = get();
-      const previous = navigation.flow?.id === flow.id ? navigation.flow : null;
-      const finished = flow.currentStep >= flow.steps.length;
-      const advanced = previous !== null && flow.currentStep > previous.currentStep;
-      const completedStep = flow.steps[flow.currentStep - 1];
-      const flowContinue = advanced
-        ? flowContinueAfter(flow)
-        : flow.currentStep < (previous?.currentStep ?? 0)
-          ? null
-          : navigation.flowContinue;
-
-      set((state) => ({
-        navigation: {
-          ...state.navigation,
-          flowId: finished ? null : flow.id,
-          flow,
-          flowContinue,
-        },
-      }));
-      if (advanced && completedStep?.advance === 'auto') get().navigation.continueFlow();
-    },
-
-    continueFlow: () => {
-      const { flowContinue, flowId, navigatePreserving } = get().navigation;
-      set((state) => ({
-        navigation: {
-          ...state.navigation,
-          flowContinue: null,
-          flow: flowId ? state.navigation.flow : null,
-        },
-      }));
-      if (flowContinue?.to) navigatePreserving(flowContinue.to, 'context');
-    },
-
-    clearFlow: () =>
-      set((state) => ({
-        navigation: { ...state.navigation, flowId: null, flow: null, flowContinue: null },
-      })),
+    setFlowId: (flowId) => set((state) => ({ navigation: { ...state.navigation, flowId } })),
   },
 });

@@ -16,14 +16,12 @@ export const flowReadQuery = (id: string) => {
   return {
     queryKey: flowReadQueryKeyFor(id),
     queryFn: async (context: Parameters<typeof read>[0]) => {
-      const { navigation } = useAppStore.getState();
       try {
-        const { data: flow } = await read(context);
-        if (useAppStore.getState().navigation.flowId === id) navigation.receiveFlow(flow);
-        return flow;
+        return (await read(context)).data;
       } catch (error) {
-        if (useAppStore.getState().navigation.flowId === id) {
-          navigation.clearFlow();
+        const { navigation } = useAppStore.getState();
+        if (navigation.flowId === id) {
+          navigation.setFlowId(null);
           toast.message('Setup guide ended');
         }
         throw error;

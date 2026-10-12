@@ -2,51 +2,32 @@
  * @atlas
  * @kind service
  * @partOf primitive:flows
- * @uses infrastructure:prisma, primitive:errors
+ * @uses infrastructure:prisma
  */
 import type { Prisma } from '@template/db';
-import { log } from '@template/shared/logger';
 import type { Context } from 'hono';
-import type { z } from 'zod';
-import { makeError } from '#/lib/errors';
-import { flowDefinitions } from '#/modules/flow/definitions';
+import { z } from 'zod';
+import { flowRegistry } from '#/modules/flow/registry/flowRegistry';
 import type { flowCreateBodySchema } from '#/modules/flow/schemas/flowSchemas';
-import { checkSteps } from '#/modules/flow/services/checkSteps';
-import { resolveSteps } from '#/modules/flow/services/resolveSteps';
+import { checkFlow } from '#/modules/flow/services/checkFlow';
 import type { AppEnv } from '#/types/appEnv';
 
 export const createFlow = async (
   c: Context<AppEnv>,
   userId: string,
-  { flowKey, bindings }: z.infer<typeof flowCreateBodySchema>,
+  body: z.infer<typeof flowCreateBodySchema>,
 ) => {
-  const definition = flowDefinitions[flowKey];
-  const parsed = definition.bindingsSchema.safeParse(bindings);
-  if (!parsed.success)
-    throw makeError({
-      status: 400,
-      message: `Invalid bindings for flow "${flowKey}"`,
-      fieldErrors: Object.fromEntries(
-        parsed.error.issues.map((issue) => [`bindings.${issue.path.join('.')}`, [issue.message]]),
-      ),
-    });
+  const definition = flowRegistry[body.flowKey];
+  const { bindings } = z.object({ bindings: definition.bindingsSchema }).parse(body);
+  const steps = await definition.steps(bindings, new Date());
 
-  const steps = await resolveSteps(definition.steps(parsed.data, new Date()));
-  const checked = await checkSteps(c, steps).catch((error: unknown) => {
-    log.warn(`flow "${flowKey}" could not check its steps: ${String(error)}`);
-    throw makeError({ status: 400, message: `Flow "${flowKey}" cannot check its steps for you` });
-  });
-
-  const { returnUrl } = parsed.data;
-  const db = c.get('db');
-  const flow = await db.flow.create({
+  const flow = await c.get('db').flow.create({
     data: {
       userId,
-      flowKey,
+      flowKey: body.flowKey,
       steps: steps as Prisma.InputJsonValue,
-      returnUrl: typeof returnUrl === 'string' ? returnUrl : null,
+      returnUrl: typeof bindings.returnUrl === 'string' ? bindings.returnUrl : null,
     },
   });
-  if (checked.currentStep === steps.length) await db.flow.deleteMany({ where: { id: flow.id } });
-  return { ...flow, steps, ...checked };
+  return checkFlow(c, flow);
 };

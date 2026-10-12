@@ -91,23 +91,23 @@ describe('flows', () => {
     return (await json<FlowResponse>(response)).data;
   };
 
-  it('validates bindings against the definition schema', async () => {
+  it('validates bindings against the registered schema', async () => {
     const response = await startIn(harness, { organizationId: 'nope' });
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(422);
     expect(Object.keys((await jsonError(response)).fieldErrors ?? {})).toEqual([
       'bindings.organizationId',
     ]);
     expect(
       (await startIn(harness, { organizationId: owner.id, returnUrl: 'https://evil.test' })).status,
-    ).toBe(400);
+    ).toBe(422);
   });
 
-  it('refuses a flow over an organization the caller cannot read, and stores nothing', async () => {
+  it('drops a flow over an organization the caller cannot read, and stores nothing', async () => {
     const { entity: foreign } = await createOrganization();
     const response = await startIn(harness, { organizationId: foreign.id });
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(404);
     expect(await harness.db.flow.count({ where: { userId: owner.id } })).toBe(0);
   });
 
@@ -207,6 +207,20 @@ describe('flows', () => {
     expect(response.status).toBe(404);
     expect(await harness.db.flow.findUnique({ where: { id: flow.id } })).toBeNull();
     expect((await app.fetch(get(`/api/v1/flow/${flow.id}`))).status).toBe(404);
+  });
+
+  it('answers 404 to the losing tab when two reads finish the flow at once', async () => {
+    const { organization, app } = await ownedOrganization();
+    const flow = await started(app, organization.id);
+    await sendInvite(organization, InquiryStatus.sent);
+    await createOrganizationToken(organization, 'ci');
+    await createOrganizationToken(organization, 'local');
+
+    const statuses = await Promise.all(
+      [1, 2].map(async () => (await app.fetch(get(`/api/v1/flow/${flow.id}`))).status),
+    );
+
+    expect(statuses.sort()).toEqual([200, 404]);
   });
 
   it("refuses another user's flow", async () => {

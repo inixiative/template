@@ -4,26 +4,35 @@
  * @partOf primitive:flows
  * @uses primitive:ui
  */
-import { useQuery } from '@tanstack/react-query';
+import { useLocation } from '@tanstack/react-router';
+import { FlowStepAdvance } from '@template/shared/flows';
 import { Button } from '@template/ui/components/primitives/Button';
+import { useActiveFlow } from '@template/ui/hooks/flow/useActiveFlow';
 import { dropFlow } from '@template/ui/lib/flows/dropFlow';
-import { flowReadQuery } from '@template/ui/lib/flows/flowReadQuery';
-import { useAppStore } from '@template/ui/store';
+import { flowNext } from '@template/ui/lib/flows/flowNext';
+import { followFlow } from '@template/ui/lib/flows/followFlow';
+import { useEffect, useRef } from 'react';
 
 export const FlowBanner = () => {
-  const flowId = useAppStore((state) => state.navigation.flowId);
-  const flow = useAppStore((state) => state.navigation.flow);
-  const flowContinue = useAppStore((state) => state.navigation.flowContinue);
-  const continueFlow = useAppStore((state) => state.navigation.continueFlow);
-  const isAuthenticated = useAppStore((state) => state.auth.isAuthenticated);
+  const flow = useActiveFlow();
+  const { pathname } = useLocation();
+  const seen = useRef<{ id: string; currentStep: number } | null>(null);
 
-  useQuery({ ...flowReadQuery(flowId ?? ''), enabled: !!flowId && isAuthenticated });
+  useEffect(() => {
+    if (!flow) return;
+    const previous = seen.current?.id === flow.id ? seen.current.currentStep : null;
+    seen.current = { id: flow.id, currentStep: flow.currentStep };
+    if (previous === null || flow.currentStep <= previous) return;
+    if (flow.steps[flow.currentStep - 1]?.advance !== FlowStepAdvance.auto) return;
+    const next = flowNext(flow, pathname);
+    if (next) followFlow(next);
+  }, [flow, pathname]);
 
   if (!flow) return null;
 
   const stepCount = flow.steps.length;
   const finished = flow.currentStep >= stepCount;
-  const step = flow.steps[flow.currentStep];
+  const next = flowNext(flow, pathname);
 
   return (
     <section
@@ -36,7 +45,7 @@ export const FlowBanner = () => {
             {finished ? 'All set' : `Step ${flow.currentStep + 1} of ${stepCount}`}
           </p>
           <p className="truncate font-medium">
-            {finished ? 'Done — back to where you were' : step?.label}
+            {finished ? 'Done — back to where you were' : flow.steps[flow.currentStep]?.label}
           </p>
         </div>
         <Button variant="ghost" size="sm" onClick={dropFlow}>
@@ -55,9 +64,9 @@ export const FlowBanner = () => {
           style={{ width: `${(flow.currentStep / stepCount) * 100}%` }}
         />
       </div>
-      {flowContinue && (
-        <Button size="sm" className="w-full" onClick={continueFlow}>
-          {flowContinue.label}
+      {next && (
+        <Button size="sm" className="w-full" onClick={() => followFlow(next)}>
+          {next.label}
         </Button>
       )}
     </section>

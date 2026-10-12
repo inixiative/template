@@ -5,6 +5,7 @@
  * @uses none
  */
 import { useLocation } from '@tanstack/react-router';
+import { useActiveFlow } from '@template/ui/hooks/flow/useActiveFlow';
 import {
   applyAuthorizedContext,
   hasContextChanged,
@@ -34,7 +35,7 @@ export const useAuthenticatedRouting = (): { isAuthorized: boolean } => {
   const permissions = useAppStore((state) => state.permissions);
   const auth = useAppStore((state) => state.auth);
   const flowId = useAppStore((state) => state.navigation.flowId);
-  const flow = useAppStore((state) => state.navigation.flow);
+  const flow = useActiveFlow();
   const urlFlowId = parseRoutingSearchParams(search).flowId;
 
   // Handle context from query params (async for spoof)
@@ -44,7 +45,7 @@ export const useAuthenticatedRouting = (): { isAuthorized: boolean } => {
       syncStoreFromSearchParams({ searchParams, tenant, auth });
 
       if (searchParams.spoofEmail !== auth.spoofUserEmail) {
-        useAppStore.getState().navigation.clearFlow();
+        useAppStore.getState().navigation.setFlowId(null);
         await auth.setSpoof(searchParams.spoofEmail);
       }
     })();
@@ -77,8 +78,8 @@ export const useAuthenticatedRouting = (): { isAuthorized: boolean } => {
   ]);
 
   useEffect(() => {
-    if (isAuthorized && flowId && flow?.id === flowId && !isOnFlowPath(pathname, flow)) dropFlow();
-  }, [isAuthorized, flowId, flow, pathname]);
+    if (isAuthorized && flow && !isOnFlowPath(pathname, flow)) dropFlow();
+  }, [isAuthorized, flow, pathname]);
 
   // Check permissions and fallback to valid context
   useEffect(() => {

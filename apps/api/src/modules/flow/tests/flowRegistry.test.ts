@@ -9,7 +9,7 @@ import {
 } from '@template/db/test';
 import type { z } from 'zod';
 import { flowRouter } from '#/modules/flow';
-import { flowDefinitions } from '#/modules/flow/definitions';
+import { flowRegistry } from '#/modules/flow/registry/flowRegistry';
 import type { flowResponseSchema } from '#/modules/flow/schemas/flowSchemas';
 import { meRouter } from '#/modules/me';
 import { organizationRouter } from '#/modules/organization';
@@ -43,14 +43,14 @@ const callerFor: Record<
   },
 };
 
-describe('flow definitions', () => {
+describe('flow registry', () => {
   let db: Harness['db'] | undefined;
 
   afterAll(async () => {
     if (db) await cleanupTouchedTables(db);
   });
 
-  for (const definition of Object.values(flowDefinitions)) {
+  for (const definition of Object.values(flowRegistry)) {
     it(`${definition.key}: every step reads a real route that answers 200`, async () => {
       const { app, bindings } = await callerFor[definition.key]();
       db = app.db;
