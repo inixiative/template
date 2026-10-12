@@ -10,6 +10,7 @@ export {
   withEnv,
   wrapEnvWithOverrides,
 } from './envOverrides';
+export { type FetchAllPagesCap, fetchAllPages, type PageRequest } from './fetchAllPages';
 export { heartbeat } from './heartbeat';
 export { isUuidV7, uuidV7Schema } from './isUuidV7';
 export { resolveAll } from './resolveAll';

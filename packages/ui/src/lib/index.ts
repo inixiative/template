@@ -14,6 +14,5 @@ export * from './makeDataConfig';
 export * from './resolveSectionTarget';
 export * from './routeRedirect';
 export * from './searchParams';
-export * from './serializeBracketQuery';
 export * from './toast';
 export * from './utils';

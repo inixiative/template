@@ -6,9 +6,9 @@
  */
 import type { QueryFunctionContext } from '@tanstack/react-query';
 import { type Client, createClient } from '@template/sdk/generated/client';
+import { serializeBracketQuery } from '@template/shared/bracketQuery';
 import { getToken } from '@template/ui/lib/auth/token';
 import { telemetryFetch } from '@template/ui/lib/browserTelemetry';
-import { serializeBracketQuery } from '@template/ui/lib/serializeBracketQuery';
 
 export type ExtractSuccess<T> = T extends { data: infer _D; error?: never }
   ? T

@@ -20,9 +20,9 @@ import { Button, Page, Table } from '@template/ui/components';
 import { InviteUserModal } from '@template/ui/components/users/InviteUserModal';
 import {
   createOptimisticListTarget,
-  useHashSection,
   useOptimisticMutation,
   useQuery,
+  useSectionOpen,
 } from '@template/ui/hooks';
 import { checkPermission } from '@template/ui/hooks/usePermission';
 import { apiMutation } from '@template/ui/lib/apiMutation';
@@ -36,7 +36,7 @@ type OrganizationUsersPageProps = {
 };
 
 export const OrganizationUsersPage = ({ organizationId }: OrganizationUsersPageProps) => {
-  const [isInviteModalOpen, setIsInviteModalOpen] = useHashSection('invite');
+  const [isInviteModalOpen, setIsInviteModalOpen] = useSectionOpen('invite');
   const permissions = useAppStore((state) => state.permissions);
   const tenant = useAppStore((state) => state.tenant);
 

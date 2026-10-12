@@ -1,2 +1,1 @@
-export { useFlow } from './useFlow';
-export { type StartFlowInput, useStartFlow } from './useStartFlow';
+export { useStartFlow } from './useStartFlow';

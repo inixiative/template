@@ -4,38 +4,49 @@
  * @partOf primitive:flows
  * @uses infrastructure:prisma, primitive:errors
  */
-import { db } from '@template/db';
+import type { Prisma } from '@template/db';
+import { log } from '@template/shared/logger';
 import type { Context } from 'hono';
 import type { z } from 'zod';
 import { makeError } from '#/lib/errors';
 import { flowDefinitions } from '#/modules/flow/definitions';
 import type { flowCreateBodySchema } from '#/modules/flow/schemas/flowSchemas';
-import { advanceSatisfiedSteps } from '#/modules/flow/services/advanceSatisfiedSteps';
-import { presentFlow } from '#/modules/flow/services/presentFlow';
+import { checkSteps } from '#/modules/flow/services/checkSteps';
+import { resolveSteps } from '#/modules/flow/services/resolveSteps';
 import type { AppEnv } from '#/types/appEnv';
 
-export const createFlow = (
+export const createFlow = async (
   c: Context<AppEnv>,
   userId: string,
-  body: z.infer<typeof flowCreateBodySchema>,
+  { flowKey, bindings }: z.infer<typeof flowCreateBodySchema>,
 ) => {
-  const parsed = flowDefinitions[body.flowKey].bindingsSchema.safeParse(body.bindings);
+  const definition = flowDefinitions[flowKey];
+  const parsed = definition.bindingsSchema.safeParse(bindings);
   if (!parsed.success)
     throw makeError({
       status: 400,
-      message: `Invalid bindings for flow "${body.flowKey}"`,
+      message: `Invalid bindings for flow "${flowKey}"`,
       fieldErrors: Object.fromEntries(
         parsed.error.issues.map((issue) => [`bindings.${issue.path.join('.')}`, [issue.message]]),
       ),
     });
 
-  return db.txn(async () => {
-    const created = await db.flow.create({
-      data: { userId, flowKey: body.flowKey, bindings: parsed.data, returnUrl: body.returnUrl },
-    });
-    const { flow, currentStepState } = await advanceSatisfiedSteps(c, created);
-    if (currentStepState === 'refused')
-      throw makeError({ status: 403, message: 'You cannot see the data this flow checks' });
-    return presentFlow(flow);
+  const steps = await resolveSteps(definition.steps(parsed.data, new Date()));
+  const checked = await checkSteps(c, steps).catch((error: unknown) => {
+    log.warn(`flow "${flowKey}" could not check its steps: ${String(error)}`);
+    throw makeError({ status: 400, message: `Flow "${flowKey}" cannot check its steps for you` });
   });
+
+  const { returnUrl } = parsed.data;
+  const db = c.get('db');
+  const flow = await db.flow.create({
+    data: {
+      userId,
+      flowKey,
+      steps: steps as Prisma.InputJsonValue,
+      returnUrl: typeof returnUrl === 'string' ? returnUrl : null,
+    },
+  });
+  if (checked.currentStep === steps.length) await db.flow.deleteMany({ where: { id: flow.id } });
+  return { ...flow, steps, ...checked };
 };

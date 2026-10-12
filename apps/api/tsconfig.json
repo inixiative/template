@@ -8,7 +8,6 @@
       "@template/db/*": ["../../packages/db/src/*"],
       "@template/permissions": ["../../packages/permissions/src/index.ts"],
       "@template/permissions/*": ["../../packages/permissions/src/*"],
-      "@template/sdk/lenses/*": ["../../packages/sdk/src/lenses/*"],
       "@template/shared": ["../../packages/shared/src/index.ts"],
       "@template/shared/*": ["../../packages/shared/src/*"],
       "@template/email": ["../../packages/email/src/index.ts"],

@@ -6,6 +6,7 @@
  */
 import { Icon } from '@iconify/react';
 import { cn } from '@template/ui/lib/utils';
+import { useAppStore } from '@template/ui/store';
 
 export type ModalSize = 'small' | 'large';
 
@@ -31,6 +32,12 @@ export const Modal = ({
   className,
 }: ModalProps) => {
   const isModalOpen = open ?? isOpen ?? false;
+  const flowContinue = useAppStore((state) => state.navigation.flowContinue);
+  const continueLabel = flowContinue?.label ?? null;
+  const close = () => {
+    onClose();
+    if (flowContinue) useAppStore.getState().navigation.continueFlow();
+  };
 
   if (!isModalOpen) return null;
 
@@ -40,7 +47,7 @@ export const Modal = ({
         type="button"
         aria-label="Close modal"
         className="absolute inset-0 bg-black/50"
-        onClick={dismissOnBackdrop ? onClose : undefined}
+        onClick={dismissOnBackdrop ? close : undefined}
       />
       <div
         role="dialog"
@@ -53,7 +60,7 @@ export const Modal = ({
         )}
         onKeyDown={(e) => {
           if (e.key === 'Escape') {
-            onClose();
+            close();
           }
         }}
       >
@@ -61,11 +68,15 @@ export const Modal = ({
           {title && <h2 className="text-lg font-semibold">{title}</h2>}
           <button
             type="button"
-            onClick={onClose}
-            className={cn('p-2 hover:bg-accent rounded-md transition-colors', !title && 'ml-auto')}
-            aria-label="Close modal"
+            onClick={close}
+            className={cn(
+              'p-2 hover:bg-accent rounded-md transition-colors',
+              continueLabel && 'text-sm font-medium',
+              !title && 'ml-auto',
+            )}
+            aria-label={continueLabel ?? 'Close modal'}
           >
-            <Icon icon="lucide:x" className="h-5 w-5" />
+            {continueLabel ?? <Icon icon="lucide:x" className="h-5 w-5" />}
           </button>
         </div>
         <div className="flex-1 overflow-y-auto p-6">{children}</div>

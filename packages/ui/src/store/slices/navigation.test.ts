@@ -119,9 +119,9 @@ describe('navigation slice', () => {
 
       expect(mockNavigate).toHaveBeenCalled();
       const [arg] = mockNavigate.mock.calls[0] as unknown as [
-        { to: string; search?: Record<string, string> },
+        { to: string; hash?: string; search?: Record<string, string> },
       ];
-      expect(arg.to).toContain('/dashboard#section');
+      expect(arg).toMatchObject({ to: '/dashboard', hash: 'section' });
     });
 
     it('should preserve spoof from auth state under spoof policy', () => {

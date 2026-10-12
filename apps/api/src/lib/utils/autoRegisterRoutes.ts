@@ -7,7 +7,6 @@ import { readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { OpenAPIHono, RouteConfig } from '@hono/zod-openapi';
 import { log } from '@template/shared/logger';
-import { indexRoute } from '#/lib/routeTemplates/routeIndex';
 import { toOpenApi } from '#/lib/routeTemplates/utils';
 import type { AppEnv } from '#/types/appEnv';
 
@@ -65,7 +64,6 @@ export const autoRegisterRoutes = async (
   });
 
   for (const { route, controller } of registrations) {
-    indexRoute(route);
     router.openapi(toOpenApi(route), controller);
   }
 };

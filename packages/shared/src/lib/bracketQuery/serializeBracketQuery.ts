@@ -1,8 +1,8 @@
 /**
  * @atlas
  * @kind helper
- * @partOf primitive:ui
- * @uses primitive:shared
+ * @partOf primitive:shared
+ * @uses none
  */
 import {
   BRACKET_NUMBER_SEGMENT,
@@ -11,7 +11,7 @@ import {
   bracketSymbolToken,
   isBracketNumber,
   isBracketSymbol,
-} from '@template/shared/bracketQuery';
+} from '@template/shared/bracketQuery/symbols';
 
 export const serializeBracketQuery = (
   obj: Record<string, unknown>,

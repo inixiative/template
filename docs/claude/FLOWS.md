@@ -1,245 +1,86 @@
 # Flows
 
-<!-- toc:start -->
+A flow walks a user through a few in-app pages, like a tax-filing wizard: invite a teammate, then create a CI token, then a local one. It is a convenience, not a contract. If anything goes wrong — a step's check fails, the user leaves the flow's pages, nobody touches it for 15 minutes — the flow is deleted and the user is simply back on the normal site.
 
 ## Contents
 
-- [Purpose](#purpose)
-- [Lineage](#lineage)
 - [Definitions](#definitions)
-  - [Validation](#validation)
-- [Evaluation](#evaluation)
-- [Instance](#instance)
-- [API](#api)
+- [Lifecycle](#lifecycle)
+- [Routes](#routes)
 - [Client](#client)
-- [Example: `setUpOrganization`](#example-setuporganization)
-- [What flows are not](#what-flows-are-not)
-- [Source map](#source-map)
-
-<!-- toc:end -->
-
-## Purpose
-
-A flow takes one user through an ordered set of steps across pages and brings them back to where
-they started. Flows are predefined in code. The server decides when a step is done, from the same
-data the user's own API reads return. Pages and buttons need no flow-specific code.
-
-The canonical use is Kingdom's Archives → Provision. The user needs a hosting integration first, so
-the page starts a flow:
-
-1. The first step sends the user to Integrations.
-2. That step completes once one of the owner's enabled integrations is Railway or Render.
-3. The user returns to Archives.
-
-**Flows add no expression language.** Everything in a definition is an existing piece:
-
-- json-rules conditions and their `{ bind }` tokens (`bindRule`, `listBindings`), including
-  `ArrayOperator.atLeast` for counts;
-- SDK operationIds and the SDK's `{ path, query }` call shape;
-- TanStack Router's own `{ to, params, search, hash }`.
-
-## Lineage
-
-The Carde.io organized-play MVP had two pieces of this:
-
-- **The flow table.** `Flow { currentStep, complete }` and `FlowStep { order, label, url, data }`,
-  advanced by `PUT /flows/:id/advance`.
-- **Onboarding steps.** The Phoenix app's `OnboardingStep` had `include(user, game)` and
-  `accomplished(user, game)` functions, evaluated on the client.
-
-Template keeps the per-user instance and `currentStep`. The steps move into a code registry, and
-`accomplished` becomes data: a json-rules rule over what an API read returns to the user. The
-server evaluates it, so no client can advance a flow by claiming a step is done.
+- [Adding a flow](#adding-a-flow)
 
 ## Definitions
 
-`apps/api/src/modules/flow/definitions/`. This follows the inquiry handler pattern: a Prisma enum
-(`FlowKey`) and a `Record<FlowKey, FlowDefinition>`, with one folder per flow holding its
-definition and its `bindingsSchema`.
+Definitions live in code, in `apps/api/src/modules/flow/definitions`, keyed by the `FlowKey` enum (`Record<FlowKey, FlowDefinition>`, like the inquiry handlers).
 
 ```ts
-type FlowBind = { bind: string };
-
 type FlowDefinition = {
   key: FlowKey;
-  bindingsSchema: z.ZodObject<…>;
-  steps: FlowStepDefinition[];
+  bindingsSchema: z.ZodObject;                 // what the caller must send, e.g. { organizationId }
+  steps(bindings, now: Date): FlowStepInput[]; // plain TS; interpolate bindings directly
 };
 
-type FlowStepDefinition = {
+type FlowStepInput = {
   key: string;
   label: string;
-  mode: 'navigate' | 'anchor' | 'action';
-  to: string;
-  params?: Record<string, FlowBind>;
-  search?: Record<string, FlowBind>;
-  hash?: string;
-  completedWhen: {
-    read: string;
-    path?: Record<string, FlowBind>;
-    query?: Record<string, FlowBind>;
-    rule: Condition;
-  };
+  to?: string;                   // in-app URL incl. search + #hash; omit for a step done in place
+  advance: 'auto' | 'confirm';
+  read: { operationId: string; path?: Record<string, string>; query?: Record<string, unknown> };
+  rule: Condition;               // json-rules, checked over { data }
 };
 ```
 
-**Bindings.** A flow is started with `bindings` (for example `{ organizationId }`), validated
-against its `bindingsSchema`. Two bindings are always present: `flowStartedAt` and `userId`. Every
-`{ bind }`, in a rule, a `path`, a `query`, `params` or `search`, resolves from them; in rules
-through `bindRule`.
+- **`read`** names a GET route by its SDK operationId. Put every predicate the route's own `searchFields` can express in `query`; the rule only judges what comes back.
+- **`rule`** runs with json-rules `check` over `{ data }`. For a list read, `data` is every matching row (pages walked with `fetchAllPages`, capped); use `ArrayOperator.notEmpty` / `atLeast` / `any`. For a single read, `data` is the record.
+- **`advance`**: `auto` moves the user to the next step as soon as the step holds. `confirm` waits for the user (see [Client](#client)). Use `confirm` when the page shows something the user must see before leaving, like a token's one-time secret.
+- **`returnUrl`**: a definition may accept an optional `returnUrl` binding (`flowUrlSchema`, in-app paths only). Without it the flow ends on `/dashboard`.
 
-**Navigation.** `to`, `params`, `search` and `hash` are handed to TanStack Router's `navigate` once
-their binds are resolved. `mode` says what the client does when the step becomes current:
+## Lifecycle
 
-- `navigate` goes there.
-- `anchor` also goes there, but when that is the current page only the hash changes, and the page
-  opens or scrolls to that section.
-- `action` stays put; the work happens on the current page.
+```
+POST me/flows {flowKey, bindings}
+  → bindings parsed by bindingsSchema (400 + fieldErrors)
+  → steps(bindings) resolved: operationId → path, query → bracket query string
+  → stored on Flow.steps (immutable: editing a definition never touches a running flow)
+  → checked (below), returned
 
-**Completion.** `completedWhen` names a read by its SDK operationId, fills it the way the SDK call
-would (`{ path: { id } }`, plus `query`), and gives a plain json-rules `rule`. How the rule is read
-depends on the route:
+GET flow/:id   (on mount, and after every successful mutation)
+  → recheck from step 0, in order, as the caller; stop at the first step that does not hold
+  → currentStep = that step; stepStates = done / pending per step (computed, not stored)
+  → touches updatedAt
+```
 
-- **A paginated readMany with a `filterLens`:** the rule is matched per returned row, and the step
-  completes when at least one row matches. One row must satisfy the whole rule; two rows each
-  satisfying half of it do not complete the step.
-- **A single read:** the rule is evaluated against the returned record. Counting is the rule's own
-  job: `{ field: 'organizationUsers', arrayOperator: ArrayOperator.atLeast, count: 2, condition }`
-  on a read whose response carries that relation (`meRead` does).
+- **Backward moves are normal.** Delete the CI token and the next read puts you back on that step.
+- **Reads run as the caller** through the batch sub-request machinery (`registerBatch` + `executeRequest`): same session, permissions, tenancy and rate-limit exemption as the caller's own request.
+- **Any read error drops the flow**: non-2xx, a thrown rule, or a `fetchAllPages` cap. The row is deleted and the GET answers 404.
+- **Finished**: when every step holds, the response carries `currentStep === steps.length` and the row is hard-deleted.
+- **Don't pre-check; create and see.** Create runs the same checks. A flow whose steps all hold already comes back complete and is never stored, so a caller never has to ask "does this user need the flow?" first.
+- **Cleanup**: `Flow` rows hold only `id, userId, flowKey, steps, returnUrl, createdAt, updatedAt`. The `cleanStaleFlows` cron row runs `cleanStaleData` every 5 minutes on `updatedAt` with a 15-minute retention. Flows are hard-deleted with their user.
 
-### Validation
+## Routes
 
-Definitions are checked at boot (`app.ts`) and in `flowDefinitionIssues.test.ts`, so a bad
-definition never reaches a user. For each step:
+| Route | operationId | |
+|---|---|---|
+| `POST /api/v1/me/flows` | `meCreateFlow` | body `{ flowKey, bindings }` → 201 flow |
+| `GET /api/v1/flow/:id` | `flowRead` | recheck; 404 once dropped or finished |
+| `DELETE /api/v1/flow/:id` | `flowDelete` | 204 |
 
-1. **`read` exists.** It names a registered `GET` route. The route index is filled by
-   `autoRegisterRoutes`.
-2. **Its route params are covered by binds.** `path` binds exactly the route's path params.
-3. **The rule's fields are inside the read's lens** (`validateRuleInLens`). For a readMany that is
-   the route's `filterLens`. For a single read it is the lens of its `responseSchema` (built by the
-   SDK's `lensFromSchema`, with every relation in the response turned on). A rule over a relation
-   the response doesn't carry fails here.
-4. **Every bind is covered.** Each bind in the rule (`listBindings(rule, { required: true })`) and
-   in `path` / `query` / `params` / `search` is in the bindings schema or is a system binding.
-
-An `anchor` step must also have a `hash`.
-
-## Evaluation
-
-`POST /flow/:id/check` locks the flow (`db.findForUpdate`) and evaluates the current step. It
-advances while each next step holds, possibly through several steps, and sets `completedAt` after
-the last one.
-
-A step is evaluated by calling its read route as the caller. `evaluateFlowStep` resolves the
-operationId and path with `resolveOperation`, the helper the WebSocket layer uses. It then makes
-the request through the batch sub-request machinery (`registerBatch` + `x-batch-id`), the same way
-`/batch` runs sub-requests:
-
-- **Identity.** The sub-request inherits the caller's user, token and spoof. Its permissions are
-  rebuilt from them, and the route's middleware (`validatePermission`, …) runs.
-- **Scoping.** The controller's own scoping and the route's `filterLens` run unchanged.
-- **readMany** (`many` and `paginate: true` with a `filterLens`; any other list route fails
-  validation). The rule, coerced by that lens, rides the batch context as a narrowing, and `filterLensSetter` stacks it on
-  the route's lens as one more layer, the mechanism `scopeNarrowing` uses. A narrowing only
-  narrows. The step holds when the route's `pagination.total` is greater than 0 (`pageSize=1`).
-- **Single read.** The route returns its record, and `check(rule, data)` evaluates it in memory.
-- **Refusal.** If the route refuses (403, 404), the step does not hold; any other status is also logged.
-  If the route refuses at start, on the step creation stops on, `POST /me/flows` is a 403.
-
-**Why this path.** Completion sees exactly what the SDK call returns to this user, so permissions
-and tenancy cannot drift: there is no second implementation of them. For a readMany, the rule runs
-in the database through the route's own `lensWhere`, so a read-many check never loads every row. A
-single read is one record, so `check()` over the response is exact and cheap.
-
-## Instance
-
-`packages/db/prisma/schema/flow.prisma`
-
-| Field | Meaning |
-|---|---|
-| `userId` | The person on the flow. Only they can read, check or cancel it. |
-| `flowKey` | The registry entry. Immutable. |
-| `bindings` | Bound at start, validated by `bindingsSchema`. Immutable. |
-| `returnUrl` | The page that started the flow. Cancel and finish go here. App paths only. Immutable. |
-| `currentStep` | Index of the step the user is on. Equals the step count once complete. |
-| `completedSteps` | `[{ stepKey, completedAt }]`, appended when a step completes. |
-| `completedAt` / `canceledAt` | Terminal states. |
-
-**Per-step completion is stored as `completedSteps` on the instance, not as an event table.** It is
-written once per step, in order, under the flow's row lock, together with `currentStep`. One row
-keeps that atomic and makes reads a single row. The actions that completed a step are already
-audit-logged by their own models.
-
-**Not audit-enabled and not soft-deleted.** A flow is ephemeral navigation state, like `Session`
-and `Token`. It is in `HARD_DELETE_ON_TOMBSTONE`, so it is deleted with its user.
-
-## API
-
-| Method | Path | Permission | Notes |
-|---|---|---|---|
-| POST | `/me/flows` | the user | `{ flowKey, bindings, returnUrl }`. Bindings failing the schema are a 400. Steps that already hold complete at once. |
-| GET | `/flow/:id` | `read` | Never advances. |
-| POST | `/flow/:id/check` | `operate` | Evaluates and advances. |
-| POST | `/flow/:id/cancel` | `operate` | Returns the flow, carrying `returnUrl`. A completed flow is a 409. |
-
-`flowSteps` in each response is `[{ key, label, mode, to, params, search, hash, completedAt }]`,
-with binds resolved.
+The response is the `Flow` row with `steps` parsed, plus the computed `stepStates` and `currentStep`.
 
 ## Client
 
-The flow id rides in the URL as `?flow=`. `FlowProvider` and `FlowBanner` are mounted by `AppShell`
-and `FullscreenLayout`.
+All of it is in `packages/ui`; pages need no flow code.
 
-- `useFlow()` returns `{ flow, currentFlowStep, isActive, check(), cancel() }`, or `null`.
-- `useStartFlow()` provides `startFlow({ flowKey, bindings, returnUrl? })`. It creates the flow and
-  enters its current step. `returnUrl` defaults to the current page.
-- **After any successful mutation**, while a flow is active, the provider calls `check()`. It
-  subscribes to React Query's mutation cache, so every `useMutation` and `useOptimisticMutation`
-  takes part. The flow's own requests are tagged `meta.flowMutation` and never trigger a check.
-  Concurrent triggers share one request and re-run once.
-- **When a check advances**, the client enters the new step by its `mode`, calling
-  `navigate({ to, params, search, hash })`. Search is the step's own `search` plus `spoof` and
-  `flow`; the step names its own context (`org`), so none leaks over from the current page. A check
-  that settles after the user has left the flow navigates nowhere. Finishing or canceling goes to
-  `returnUrl` exactly as captured: no current context, no current hash.
-- **Navigation never advances.** Back, forward, links and reloads check nothing.
-- **Anchors.** Pages open sections from the hash with `useHashSection(id)`. `OrganizationUsersPage`
-  opens its invite modal on `#invite`, and `TokensPage` opens its create modal on `#create-token`,
-  unless a new key is still being shown.
-- **`Link`** keeps `?flow=` while a flow is active.
+- **State**: `navigation.flowId`, `navigation.flow` (last response) and `navigation.flowContinue` in the store. The store is the truth; the `flow` search param mirrors it like `spoof` (`useAuthenticatedRouting`), is seeded from `?flow=` on load, and is kept by `navigatePreserving`.
+- **Reads**: `FlowBanner`, mounted once in each app's `__root.tsx`, runs the flow read (`lib/flows/flowReadQuery.ts`, `staleTime: 0`). The app `MutationCache` invalidates it after every successful mutation unless the mutation has `meta: { skipFlowInvalidate: true }`.
+- **Advancing**: when a read moves `currentStep` forward past an `auto` step, the user is sent to the next step's `to` (or `returnUrl` at the end). Past a `confirm` step, `flowContinue` is set: the banner shows a `Continue: <next step>` (or `Finish`) button, and any open `Modal` turns its close button into the same button, so closing the token-reveal modal continues the flow.
+- **Dropping off**: landing on a pathname that is not one of the steps' `to`, the `returnUrl`, `/dashboard`, `/login` or `/auth/callback` clears the flow and fires `DELETE`. Search and hash are ignored. A 404 on the read clears it with a quiet "Setup guide ended" toast. Changing spoof clears it. The banner's Dismiss does the same as leaving.
+- **Starting**: `useStartFlow().mutate({ flowKey, bindings })` sends the current path as `returnUrl` and navigates to the first pending step.
+- **Deep links into modals**: `useSectionOpen('create-token')` keeps a modal's open state in the URL hash, so a step's `to` of `/settings/tokens#create-token` opens the dialog.
 
-Buttons are plain buttons. They don't decide completion.
+## Adding a flow
 
-## Example: `setUpOrganization`
-
-`apps/api/src/modules/flow/definitions/setUpOrganization/`, with bindings `{ organizationId }`:
-
-| Step | Mode | Read | Rule (per row) |
-|---|---|---|---|
-| Invite a teammate | navigate `/users/members` `#invite` | `organizationSentManyInquiries` | `type = inviteOrganizationUser` and `status = sent` |
-| Create an API token for CI | navigate `/settings/tokens` `#create-token` | `organizationReadManyTokens` | created since the flow started, and `name` contains `ci` |
-| Create one for local development | anchor `#create-token` (same page) | same | created since the flow started, and `name` contains `local` |
-
-`organizationSentManyInquiries`' `filterLens` does not expose `createdAt`, so the invite step
-counts invitations sent before the flow too. That is the lens doing its job: a rule can't read what
-the route doesn't expose.
-
-## What flows are not
-
-- **Not login.** Auth keeps its own `redirectTo`.
-- **Not a write path.** Checking only reads; the step's own page does the work.
-- **Not a wizard engine.** There is no branching and no form state.
-
-## Source map
-
-- Schema: `packages/db/prisma/schema/flow.prisma`; factory `flowFactory.ts`
-- Registry: `apps/api/src/modules/flow/definitions/`
-- Validation: `validations/flowDefinitionIssues.ts`; route index
-  `apps/api/src/lib/routeTemplates/routeIndex.ts`
-- Evaluation: `services/evaluateFlowStep.ts`, `services/readAsCaller.ts`,
-  `services/responseLens.ts`, `services/advanceSatisfiedSteps.ts`. The batch narrowing lives in
-  `modules/batch/services/batchRegistry.ts`, `middleware/prepareRequest.ts` and
-  `lib/routeTemplates/utils/prepareMiddleware.ts`.
-- Client: `packages/ui/src/components/flows/`, `packages/ui/src/hooks/flow/`,
-  `packages/ui/src/hooks/useHashSection.ts`, `packages/ui/src/lib/flows/`
-- Tests: `apps/api/src/modules/flow/tests/`, `packages/ui/src/components/flows/flowClient.test.tsx`
+1. Add the key to `enum FlowKey` (`packages/db/prisma/schema/flow.prisma`).
+2. Write the definition under `definitions/<key>/` and register it in `definitions/index.ts`.
+3. Add a caller to `callerFor` in `modules/flow/tests/flowDefinitions.test.ts`. That test creates the flow with factory data and asserts every step's read is a real route that answers 200, which catches unknown operationIds and filters the route rejects.

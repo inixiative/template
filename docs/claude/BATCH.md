@@ -485,11 +485,6 @@ const internalRequest = new Request(url, {
 // Middleware loads batch context and skips re-authentication
 ```
 
-`registerBatch` takes an optional fourth argument, a `WhereScope` narrowing. A sub-request carrying it
-stacks that narrowing on its route's `filterLens` (`filterLensSetter`), the way `scopeNarrowing`
-does: it can only narrow what the route returns. Flows use it to count a step's rows through the
-route itself ([FLOWS.md](FLOWS.md#evaluation)); `/batch` passes none.
-
 **State isolation:**
 
 Each batch sub-request gets **deep clones** of mutable context to prevent state leakage:

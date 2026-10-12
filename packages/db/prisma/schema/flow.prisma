@@ -1,5 +1,5 @@
 // ============================================================================
-// FLOW - One user's run through a flow definition (apps/api/src/modules/flow/definitions)
+// FLOW - A short-lived walk through a registered definition (apps/api/src/modules/flow/definitions)
 // ============================================================================
 
 model Flow {
@@ -10,19 +10,16 @@ model Flow {
   userId String @db.VarChar(36)
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  flowKey        FlowKey
-  bindings       Json      @default("{}")
-  returnUrl      String
-  currentStep    Int       @default(0)
-  completedSteps Json      @default("[]")
-  completedAt    DateTime?
-  canceledAt     DateTime?
+  flowKey   FlowKey
+  steps     Json
+  returnUrl String?
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
   // ==========================================================================
 
   @@index([userId])
+  @@index([updatedAt])
 }
 
 enum FlowKey {

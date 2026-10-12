@@ -20,6 +20,7 @@ export const parseRoutingSearchParams = (search: SearchInput): RoutingSearchPara
     organizationId: readSearchParam(search, 'org'),
     spaceId: readSearchParam(search, 'space'),
     spoofEmail: readSearchParam(search, 'spoof'),
+    flowId: readSearchParam(search, 'flow'),
   };
 };
 

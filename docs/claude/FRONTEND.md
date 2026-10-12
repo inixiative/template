@@ -1356,9 +1356,6 @@ interface ButtonProps extends ConditionalProps {
 }
 ```
 
-`Link` (`components/primitives/Link.tsx`) is the in-app `<a>`: its `href` and its navigation keep
-`org` / `space`, and the `flow` param while a flow is active ([FLOWS.md](FLOWS.md#client)).
-
 **Usage:**
 
 ```typescript
@@ -1728,10 +1725,6 @@ navigatePreservingContext('/settings');
 // Preserve spoof param only
 navigatePreservingSpoof('/users?org=xyz');
 ```
-
-`navigatePreserving(to, policy)` is the current form of the helpers above. Policies: `'context'` keeps
-`org` / `space` / `spoof`; `'flow'` also keeps the `flow` param ([FLOWS.md](FLOWS.md)); `'spoof'`
-keeps only `spoof`; `'all'` keeps every param.
 
 **When to use:**
 - `navigate` - Basic navigation, explicit search params
@@ -2408,7 +2401,7 @@ Test coverage:
 - `useInfiniteDataQuery.test.ts` — 8 tests (page location)
 - `useInfiniteScrollTrigger.test.ts` — 4 tests (callback guards)
 - `Pagination.test.ts` — 17 tests (page range, record count)
-- `serializeBracketQuery.test.ts` — 20 tests (bracket notation)
+- `serializeBracketQuery.test.ts` (in `@template/shared/bracketQuery`) — 20 tests (bracket notation)
 
 ---
 

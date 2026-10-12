@@ -1,5 +1,4 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { ArrayOperator, type Condition, Operator } from '@inixiative/json-rules';
 import type { Organization, OrganizationUser, User } from '@template/db/generated/client/client';
 import {
   InquiryResourceModel,
@@ -16,19 +15,15 @@ import {
   createToken,
   createUser,
 } from '@template/db/test';
+import type { z } from 'zod';
 import { flowRouter } from '#/modules/flow';
-import type { FlowCompletion } from '#/modules/flow/definitions/types';
-import type { FlowResponse } from '#/modules/flow/schemas/flowSchemas';
-import { evaluateFlowStep } from '#/modules/flow/services/evaluateFlowStep';
+import type { flowResponseSchema } from '#/modules/flow/schemas/flowSchemas';
 import { meRouter } from '#/modules/me';
 import { organizationRouter } from '#/modules/organization';
 import { createTestApp } from '#tests/createTestApp';
-import { get, json, jsonError, post } from '#tests/utils/request';
+import { del, get, json, jsonError, post } from '#tests/utils/request';
 
-const asOwnerOf = async (user: User, organization: Organization) => {
-  const { entity: seat } = await createOrganizationUser({ role: 'owner' }, { user, organization });
-  return seat;
-};
+type FlowResponse = z.infer<typeof flowResponseSchema>;
 
 const harnessFor = (user: User, seats: OrganizationUser[]) =>
   createTestApp({
@@ -38,20 +33,12 @@ const harnessFor = (user: User, seats: OrganizationUser[]) =>
       (app) => app.route('/api/v1/me', meRouter),
       (app) => app.route('/api/v1/flow', flowRouter),
       (app) => app.route('/api/v1/organization', organizationRouter),
-      (app) =>
-        app.post('/test/evaluate', async (c) => {
-          const completion = (await c.req.json()) as FlowCompletion;
-          return c.json({ state: await evaluateFlowStep(c, completion, { userId: user.id }) });
-        }),
     ],
   });
 
 type Harness = ReturnType<typeof harnessFor>;
 
-const sendInvite = async (
-  organization: Organization,
-  status: InquiryStatus = InquiryStatus.sent,
-) => {
+const sendInvite = async (organization: Organization, status: InquiryStatus) => {
   const { entity: invitee } = await createUser();
   await createInquiry({
     type: InquiryType.inviteOrganizationUser,
@@ -64,285 +51,177 @@ const sendInvite = async (
   });
 };
 
-const createOrganizationToken = (organization: Organization, name: string) =>
-  createToken({ name, ownerModel: TokenOwnerModel.Organization }, { organization });
+const createOrganizationToken = async (organization: Organization, name: string) =>
+  (await createToken({ name, ownerModel: TokenOwnerModel.Organization }, { organization })).entity;
 
 describe('flows', () => {
   let owner: User;
-  let org: Organization;
-  let memberOnlyOrg: Organization;
-  let foreignOrg: Organization;
   let harness: Harness;
 
   beforeAll(async () => {
     owner = (await createUser()).entity;
-    org = (await createOrganization()).entity;
-    memberOnlyOrg = (await createOrganization()).entity;
-    foreignOrg = (await createOrganization()).entity;
-    const ownerSeat = await asOwnerOf(owner, org);
-    const { entity: memberSeat } = await createOrganizationUser(
-      { role: 'member' },
-      { user: owner, organization: memberOnlyOrg },
-    );
-    harness = harnessFor(owner, [ownerSeat, memberSeat]);
+    harness = harnessFor(owner, []);
   });
 
   afterAll(async () => {
     await cleanupTouchedTables(harness.db);
   });
 
-  const startIn = (app: Harness, organizationId: string) =>
-    app.fetch(
-      post('/api/v1/me/flows', {
-        flowKey: 'setUpOrganization',
-        bindings: { organizationId },
-        returnUrl: '/dashboard',
-      }),
+  const ownedOrganization = async () => {
+    const { entity: organization } = await createOrganization();
+    const { entity: seat } = await createOrganizationUser(
+      { role: 'owner' },
+      { user: owner, organization },
     );
+    return { organization, seat, app: harnessFor(owner, [seat]) };
+  };
+
+  const startIn = (app: Harness, bindings: Record<string, unknown>) =>
+    app.fetch(post('/api/v1/me/flows', { flowKey: 'setUpOrganization', bindings }));
 
   const started = async (app: Harness, organizationId: string) => {
-    const response = await startIn(app, organizationId);
+    const response = await startIn(app, { organizationId, returnUrl: '/settings' });
     expect(response.status).toBe(201);
     return (await json<FlowResponse>(response)).data;
   };
 
-  const checkIn = async (app: Harness, flowId: string) => {
-    const response = await app.fetch(post(`/api/v1/flow/${flowId}/check`));
+  const readIn = async (app: Harness, flowId: string) => {
+    const response = await app.fetch(get(`/api/v1/flow/${flowId}`));
     expect(response.status).toBe(200);
     return (await json<FlowResponse>(response)).data;
   };
 
-  const freshOrganization = async () => {
-    const { entity: organization } = await createOrganization();
-    const seat = await asOwnerOf(owner, organization);
-    return { organization, app: harnessFor(owner, [seat]) };
-  };
+  it('validates bindings against the definition schema', async () => {
+    const response = await startIn(harness, { organizationId: 'nope' });
 
-  it('start → rule false, no advance → mutation → check → advance → … → complete', async () => {
-    const { organization, app } = await freshOrganization();
+    expect(response.status).toBe(400);
+    expect(Object.keys((await jsonError(response)).fieldErrors ?? {})).toEqual([
+      'bindings.organizationId',
+    ]);
+    expect(
+      (await startIn(harness, { organizationId: owner.id, returnUrl: 'https://evil.test' })).status,
+    ).toBe(400);
+  });
+
+  it('refuses a flow over an organization the caller cannot read, and stores nothing', async () => {
+    const { entity: foreign } = await createOrganization();
+    const response = await startIn(harness, { organizationId: foreign.id });
+
+    expect(response.status).toBe(400);
+    expect(await harness.db.flow.count({ where: { userId: owner.id } })).toBe(0);
+  });
+
+  it('resolves and stores every step at create', async () => {
+    const { organization, app } = await ownedOrganization();
     const flow = await started(app, organization.id);
 
+    expect(flow.returnUrl).toBe('/settings');
     expect(flow.currentStep).toBe(0);
-    expect(
-      flow.flowSteps.map(({ key, mode, to, search, hash }) => [key, mode, to, search, hash]),
-    ).toEqual([
-      ['inviteTeammate', 'navigate', '/users/members', { org: organization.id }, 'invite'],
-      ['createCiToken', 'navigate', '/settings/tokens', { org: organization.id }, 'create-token'],
-      ['createLocalToken', 'anchor', '/settings/tokens', { org: organization.id }, 'create-token'],
+    expect(flow.stepStates).toEqual(['pending', 'pending', 'pending']);
+    expect(flow.steps.map(({ key, to, advance }) => [key, to, advance])).toEqual([
+      ['inviteTeammate', `/users/members?org=${organization.id}#invite`, 'auto'],
+      ['createCiToken', `/settings/tokens?org=${organization.id}#create-token`, 'confirm'],
+      ['createLocalToken', `/settings/tokens?org=${organization.id}#create-token`, 'confirm'],
     ]);
-    expect((await checkIn(app, flow.id)).currentStep).toBe(0);
+    expect(flow.steps[0]?.readPath).toStartWith(
+      `/api/v1/organization/${organization.id}/inquiries/sent?`,
+    );
+    expect(await harness.db.flow.findUnique({ where: { id: flow.id } })).not.toBeNull();
+  });
+
+  it('completes the invite step at create when any invite was already sent', async () => {
+    const { organization, app } = await ownedOrganization();
+    await sendInvite(organization, InquiryStatus.sent);
+
+    const flow = await started(app, organization.id);
+
+    expect(flow.currentStep).toBe(1);
+    expect(flow.stepStates).toEqual(['done', 'pending', 'pending']);
+  });
+
+  it('rechecks from the first step: advances in order and goes back when a step stops holding', async () => {
+    const { organization, app } = await ownedOrganization();
+    const flow = await started(app, organization.id);
 
     await sendInvite(organization, InquiryStatus.draft);
-    expect((await checkIn(app, flow.id)).currentStep).toBe(0);
+    expect((await readIn(app, flow.id)).currentStep).toBe(0);
 
-    await sendInvite(organization);
-    const invited = await checkIn(app, flow.id);
-    expect(invited.currentStep).toBe(1);
-    expect(invited.flowSteps[0]!.completedAt).not.toBeNull();
+    await createOrganizationToken(organization, 'personal');
+    expect((await readIn(app, flow.id)).currentStep).toBe(0);
 
-    await createOrganizationToken(organization, 'ci deploy');
-    expect((await checkIn(app, flow.id)).currentStep).toBe(2);
+    await sendInvite(organization, InquiryStatus.sent);
+    const ciToken = await createOrganizationToken(organization, 'ci runner');
+    const advanced = await readIn(app, flow.id);
+    expect(advanced.currentStep).toBe(2);
+    expect(advanced.stepStates).toEqual(['done', 'done', 'pending']);
 
-    await createOrganizationToken(organization, 'local dev');
-    const completed = await checkIn(app, flow.id);
-    expect(completed.currentStep).toBe(3);
-    expect(completed.completedAt).not.toBeNull();
-    expect(completed.returnUrl).toBe('/dashboard');
-    expect(completed.flowSteps.every((step) => step.completedAt !== null)).toBe(true);
+    await harness.db.token.delete({ where: { id: ciToken.id } });
+    const back = await readIn(app, flow.id);
+    expect(back.currentStep).toBe(1);
+    expect(back.stepStates).toEqual(['done', 'pending', 'pending']);
   });
 
-  it('against a read-many route, one returned row must match the whole rule', async () => {
-    const { organization, app } = await freshOrganization();
-    await sendInvite(organization);
-    await createOrganizationToken(organization, 'old ci token');
-    await Bun.sleep(5);
-    const flow = await started(app, organization.id);
-    expect(flow.currentStep).toBe(1);
+  it('ends on the app home when no returnUrl is bound', async () => {
+    const { organization, app } = await ownedOrganization();
+    const response = await startIn(app, { organizationId: organization.id });
 
-    await createOrganizationToken(organization, 'deploy');
-    expect((await checkIn(app, flow.id)).currentStep).toBe(1);
+    expect((await json<FlowResponse>(response)).data.returnUrl).toBeNull();
+  });
 
+  it('returns a flow whose steps all hold at create as complete, and stores nothing', async () => {
+    const { organization, app } = await ownedOrganization();
+    await sendInvite(organization, InquiryStatus.sent);
     await createOrganizationToken(organization, 'ci');
-    expect((await checkIn(app, flow.id)).currentStep).toBe(2);
+    await createOrganizationToken(organization, 'local');
+
+    const response = await startIn(app, { organizationId: organization.id });
+    const flow = (await json<FlowResponse>(response)).data;
+
+    expect(response.status).toBe(201);
+    expect(flow.currentStep).toBe(3);
+    expect(flow.stepStates).toEqual(['done', 'done', 'done']);
+    expect(await harness.db.flow.findUnique({ where: { id: flow.id } })).toBeNull();
   });
 
-  it('a single read with a relation array counts with atLeast, so it takes two actions', async () => {
-    const { entity: founder } = await createUser();
-    const { entity: first } = await createOrganization();
-    const seats = [await asOwnerOf(founder, first)];
-    const twoOwnedOrganizations: Condition = {
-      field: 'organizationUsers',
-      arrayOperator: ArrayOperator.atLeast,
-      count: 2,
-      condition: { field: 'role', operator: Operator.equals, value: 'owner' },
-    };
-    const evaluate = async () => {
-      const response = await harnessFor(founder, seats).fetch(
-        post('/test/evaluate', { read: 'meRead', rule: twoOwnedOrganizations }),
-      );
-      return ((await response.json()) as { state: string }).state;
-    };
-
-    expect(await evaluate()).toBe('pending');
-
-    const { entity: second } = await createOrganization();
-    seats.push(await asOwnerOf(founder, second));
-    expect(await evaluate()).toBe('holds');
-  });
-
-  it("a caller-scoped read never matches another user's rows, even with a rule that is always true", async () => {
-    const { entity: loner } = await createUser();
-    const { entity: neighbour } = await createUser();
-    await createToken(
-      { name: 'shared-name', ownerModel: TokenOwnerModel.User },
-      { user: neighbour },
-    );
-    const evaluate = async (rule: Condition) => {
-      const response = await harnessFor(loner, []).fetch(
-        post('/test/evaluate', { read: 'meReadManyTokens', rule }),
-      );
-      return ((await response.json()) as { state: string }).state;
-    };
-
-    expect(await evaluate({ field: 'name', operator: Operator.equals, value: 'shared-name' })).toBe(
-      'pending',
-    );
-    expect(await evaluate(true)).toBe('pending');
-
-    await createToken({ name: 'shared-name', ownerModel: TokenOwnerModel.User }, { user: loner });
-    expect(await evaluate({ field: 'name', operator: Operator.equals, value: 'shared-name' })).toBe(
-      'holds',
-    );
-  });
-
-  it('a check after the user loses access answers 200 and advances nothing', async () => {
-    const { organization, app } = await freshOrganization();
+  it('returns the finished flow once, then deletes it', async () => {
+    const { organization, app } = await ownedOrganization();
     const flow = await started(app, organization.id);
-    await sendInvite(organization);
+    await sendInvite(organization, InquiryStatus.sent);
+    await createOrganizationToken(organization, 'ci');
+    await createOrganizationToken(organization, 'local');
 
-    const revoked = harnessFor(owner, []);
-    const checked = await checkIn(revoked, flow.id);
+    const finished = await readIn(app, flow.id);
 
-    expect(checked.currentStep).toBe(0);
+    expect(finished.currentStep).toBe(3);
+    expect(finished.stepStates).toEqual(['done', 'done', 'done']);
+    expect(await harness.db.flow.findUnique({ where: { id: flow.id } })).toBeNull();
+    expect((await app.fetch(get(`/api/v1/flow/${flow.id}`))).status).toBe(404);
   });
 
-  it('never counts rows the bound route would not return to this user', async () => {
-    const flow = await started(harness, org.id);
-    await sendInvite(foreignOrg);
-    await createOrganizationToken(foreignOrg, 'ci');
-
-    const checked = await checkIn(harness, flow.id);
-
-    expect(checked.currentStep).toBe(flow.currentStep);
-  });
-
-  it('refuses to start a flow over data the user cannot read', async () => {
-    expect((await startIn(harness, foreignOrg.id)).status).toBe(403);
-
-    const memberOnly = await startIn(harness, memberOnlyOrg.id);
-    expect(memberOnly.status).toBe(403);
-    expect((await jsonError(memberOnly)).message).toBe('You cannot see the data this flow checks');
-  });
-
-  it('refuses invalid bindings and unknown flows at start', async () => {
-    const invalid = await harness.fetch(
-      post('/api/v1/me/flows', {
-        flowKey: 'setUpOrganization',
-        bindings: { organizationId: 'not-a-uuid' },
-        returnUrl: '/dashboard',
-      }),
-    );
-    expect(invalid.status).toBe(400);
-    expect((await jsonError(invalid)).message).toBe(
-      'Invalid bindings for flow "setUpOrganization"',
-    );
-
-    const missing = await harness.fetch(
-      post('/api/v1/me/flows', { flowKey: 'setUpOrganization', returnUrl: '/dashboard' }),
-    );
-    expect(missing.status).toBe(400);
-
-    const unknown = await harness.fetch(
-      post('/api/v1/me/flows', { flowKey: 'nope', bindings: {}, returnUrl: '/dashboard' }),
-    );
-    expect(unknown.status).toBe(400);
-  });
-
-  it('accepts only paths inside the app for the returnUrl', async () => {
-    for (const returnUrl of [
-      'https://evil.example/x',
-      '//evil.example/x',
-      '/\\evil.example',
-      '/.//evil.example',
-      '/\t/evil.example',
-      'javascript:alert(1)',
-      'relative',
-    ]) {
-      const response = await harness.fetch(
-        post('/api/v1/me/flows', {
-          flowKey: 'setUpOrganization',
-          bindings: { organizationId: org.id },
-          returnUrl,
-        }),
-      );
-      expect(response.status).toBe(400);
-    }
-  });
-
-  it('reading a flow never advances it, even when the rule now holds', async () => {
-    const { organization, app } = await freshOrganization();
-    const flow = await started(app, organization.id);
-    await sendInvite(organization);
-
-    const response = await app.fetch(get(`/api/v1/flow/${flow.id}`));
-
-    expect((await json<FlowResponse>(response)).data.currentStep).toBe(0);
-    expect((await app.db.flow.findUniqueOrThrow({ where: { id: flow.id } })).currentStep).toBe(0);
-  });
-
-  it('cancels and returns the returnUrl; a canceled flow never advances', async () => {
-    const { organization, app } = await freshOrganization();
+  it('drops the user off the flow when a step read fails', async () => {
+    const { organization, app } = await ownedOrganization();
     const flow = await started(app, organization.id);
 
-    const canceled = await app.fetch(post(`/api/v1/flow/${flow.id}/cancel`));
-    const { data } = await json<FlowResponse>(canceled);
-    expect(canceled.status).toBe(200);
-    expect(data.returnUrl).toBe('/dashboard');
-    expect(data.canceledAt).not.toBeNull();
+    const response = await harnessFor(owner, []).fetch(get(`/api/v1/flow/${flow.id}`));
 
-    const again = await app.fetch(post(`/api/v1/flow/${flow.id}/cancel`));
-    expect((await json<FlowResponse>(again)).data.canceledAt).toBe(data.canceledAt);
-
-    await sendInvite(organization);
-    const checked = await checkIn(app, flow.id);
-    expect(checked.currentStep).toBe(0);
-    expect(checked.completedAt).toBeNull();
+    expect(response.status).toBe(404);
+    expect(await harness.db.flow.findUnique({ where: { id: flow.id } })).toBeNull();
+    expect((await app.fetch(get(`/api/v1/flow/${flow.id}`))).status).toBe(404);
   });
 
-  it('two concurrent checks record each completed step once', async () => {
-    const { organization, app } = await freshOrganization();
-    const flow = await started(app, organization.id);
-    await sendInvite(organization);
-
-    const responses = await Promise.all([
-      app.fetch(post(`/api/v1/flow/${flow.id}/check`)),
-      app.fetch(post(`/api/v1/flow/${flow.id}/check`)),
-    ]);
-
-    expect(responses.map((response) => response.status)).toEqual([200, 200]);
-    const stored = await app.db.flow.findUniqueOrThrow({ where: { id: flow.id } });
-    expect(stored.currentStep).toBe(1);
-    expect(stored.completedSteps).toHaveLength(1);
-  });
-
-  it("a stale or foreign flow id is not found or not the user's", async () => {
-    const { entity: othersFlow } = await createFlowRow({ bindings: { organizationId: org.id } });
+  it("refuses another user's flow", async () => {
+    const { entity: stranger } = await createUser();
+    const { entity: othersFlow } = await createFlowRow({}, { user: stranger });
 
     expect((await harness.fetch(get(`/api/v1/flow/${othersFlow.id}`))).status).toBe(403);
-    expect((await harness.fetch(post(`/api/v1/flow/${othersFlow.id}/check`))).status).toBe(403);
-    expect((await harness.fetch(post(`/api/v1/flow/${othersFlow.id}/cancel`))).status).toBe(403);
-    expect(
-      (await harness.fetch(get('/api/v1/flow/01a12b8e-0000-7000-8000-000000000000'))).status,
-    ).toBe(404);
+    expect((await harness.fetch(del(`/api/v1/flow/${othersFlow.id}`))).status).toBe(403);
+    expect(await harness.db.flow.findUnique({ where: { id: othersFlow.id } })).not.toBeNull();
+  });
+
+  it('deletes a flow', async () => {
+    const { entity: flow } = await createFlowRow({}, { user: owner });
+
+    expect((await harness.fetch(del(`/api/v1/flow/${flow.id}`))).status).toBe(204);
+    expect(await harness.db.flow.findUnique({ where: { id: flow.id } })).toBeNull();
   });
 });

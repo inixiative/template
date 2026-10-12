@@ -4,419 +4,249 @@
  * @partOf primitive:flows
  * @uses none
  */
-import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
-import { QueryClient, QueryClientProvider, useMutation } from '@tanstack/react-query';
+import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
+import { QueryClientProvider, useMutation } from '@tanstack/react-query';
 import {
   createMemoryHistory,
   createRootRoute,
   createRouter,
   RouterProvider,
 } from '@tanstack/react-router';
-import { buildFlow, buildUser } from '@template/db/test';
+import type { Flow } from '@template/sdk';
 import { FlowBanner } from '@template/ui/components/flows/FlowBanner';
-import { FlowProvider } from '@template/ui/components/flows/FlowProvider';
+import { Modal } from '@template/ui/components/layout/Modal';
+import type { NavConfig } from '@template/ui/components/layout/navigationTypes';
 import { Button } from '@template/ui/components/primitives/Button';
-import { Link } from '@template/ui/components/primitives/Link';
-import { useStartFlow } from '@template/ui/hooks/flow/useStartFlow';
-import type { Flow } from '@template/ui/lib/flows/flowTypes';
+import { useAuthenticatedRouting } from '@template/ui/hooks/useAuthenticatedRouting';
+import { useRegisterNavigation } from '@template/ui/hooks/useRegisterNavigation';
+import { createAppQueryClient } from '@template/ui/lib/createAppQueryClient';
+import { toast } from '@template/ui/lib/toast';
 import { useAppStore } from '@template/ui/store';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import type { ReactNode } from 'react';
 
 const ORG = '01a12b8e-1111-7000-8000-000000000001';
-const STEPS = [
-  {
-    key: 'inviteTeammate',
-    label: 'Invite a teammate',
-    mode: 'navigate',
-    required: 1,
-    to: '/users/members',
-    hash: null,
-  },
-  {
-    key: 'inviteAnother',
-    label: 'Invite one more',
-    mode: 'anchor',
-    required: 2,
-    to: '/users/members',
-    hash: 'invite',
-  },
-  {
-    key: 'confirmHere',
-    label: 'Confirm on this page',
-    mode: 'action',
-    required: 1,
-    to: '/users/members',
-    hash: null,
-  },
-  {
-    key: 'createApiTokens',
-    label: 'Create two API tokens',
-    mode: 'navigate',
-    required: 2,
-    to: '/settings/tokens',
-    hash: 'create-token',
-  },
-] as const;
+const FLOW_ID = '01a12b8e-2222-7000-8000-000000000002';
+
+const steps: Flow['steps'] = [
+  ['inviteTeammate', 'Invite a teammate', `/users/members?org=${ORG}#invite`, 'auto'],
+  [
+    'createCiToken',
+    'Create an API token for CI',
+    `/settings/tokens?org=${ORG}#create-token`,
+    'confirm',
+  ],
+  [
+    'createLocalToken',
+    'Create one for local development',
+    `/settings/tokens?org=${ORG}#create-token`,
+    'confirm',
+  ],
+].map(([key, label, to, advance]) => ({
+  key: key!,
+  label: label!,
+  to: to!,
+  advance: advance as 'auto' | 'confirm',
+  readPath: '/api/v1/organization/x/tokens',
+  rule: {},
+}));
+
+const navConfig: NavConfig = {
+  user: [],
+  organization: [],
+  space: [],
+  public: ['/users/members', '/settings/tokens', '/settings', '/elsewhere', '/dashboard'].map(
+    (path) => ({ label: path, path }),
+  ),
+};
 
 const initialState = useAppStore.getState();
-const initialLocation = window.location.href;
 
-let flow: Flow;
-let rows: number;
+let holding: number;
+let gone: boolean;
 let requests: Array<{ method: string; path: string }>;
 let fetchSpy: ReturnType<typeof spyOn<typeof globalThis, 'fetch'>>;
-let client: QueryClient;
-let navigatePreserving: ReturnType<typeof mock>;
 
-const serverCheck = (current: Flow): Flow => {
-  let next = current;
-  for (;;) {
-    const step = STEPS[next.currentStep];
-    if (!step || next.completedAt || next.canceledAt || rows < step.required) break;
-    rows -= step.required;
-    const completedAt = new Date().toISOString();
-    const currentStep = next.currentStep + 1;
-    next = {
-      ...next,
-      currentStep,
-      completedAt: currentStep === STEPS.length ? completedAt : null,
-      flowSteps: next.flowSteps.map((flowStep) =>
-        flowStep.key === step.key ? { ...flowStep, completedAt } : flowStep,
-      ),
-    };
-  }
-  return next;
-};
-
-const buildServerFlow = async (): Promise<Flow> => {
-  const { entity: user } = await buildUser();
-  const { entity } = await buildFlow(
-    {
-      flowKey: 'setUpOrganization',
-      bindings: { organizationId: ORG },
-      returnUrl: '/dashboard',
-      currentStep: 0,
-      completedSteps: [],
-      completedAt: null,
-      canceledAt: null,
-    },
-    { user },
-  );
-  const { completedSteps: _completedSteps, ...row } = entity.__serialize();
-  const started = {
-    ...row,
-    bindings: { organizationId: ORG },
-    flowSteps: STEPS.map(({ key, label, mode, to, hash }) => ({
-      key,
-      label,
-      mode,
-      to,
-      params: {},
-      search: { org: ORG },
-      hash,
-      completedAt: null,
-    })),
+const serverFlow = (): Flow => {
+  const currentStep = Math.min(holding, steps.length);
+  return {
+    id: FLOW_ID,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    userId: '01a12b8e-3333-7000-8000-000000000003',
+    flowKey: 'setUpOrganization',
+    steps,
+    returnUrl: '/settings',
+    currentStep,
+    stepStates: steps.map((_, index) => (index < currentStep ? 'done' : 'pending')),
   };
-  return started;
 };
 
-const flowRequests = (suffix: string) =>
-  requests.filter((request) => request.path === `/api/v1/flow/${flow.id}${suffix}`);
+const flowReads = () =>
+  requests.filter(({ method, path }) => method === 'GET' && path === `/api/v1/flow/${FLOW_ID}`);
 
-const Work = ({ path = '/api/v1/work', label = 'Do work' }: { path?: string; label?: string }) => {
+const Work = () => {
   const { mutate } = useMutation({
     mutationFn: async () => {
-      const response = await fetch(new Request(`http://localhost:8000${path}`, { method: 'POST' }));
-      if (!response.ok) throw new Error('work failed');
+      await fetch(new Request('http://localhost:8000/api/v1/work', { method: 'POST' }));
     },
     throwOnError: false,
-    meta: { skipErrorToast: true },
   });
   return (
     <Button variant="ghost" onClick={() => mutate()}>
-      {label}
+      Do work
     </Button>
   );
 };
 
-const renderAt = (entry: string, ui: ReactNode) => {
+const Root = () => {
+  useRegisterNavigation(navConfig);
+  useAuthenticatedRouting();
+  return (
+    <>
+      <FlowBanner />
+      <Work />
+    </>
+  );
+};
+
+const renderAt = (entry: string) => {
   const router = createRouter({
-    routeTree: createRootRoute({
-      component: () => (
-        <FlowProvider>
-          <FlowBanner />
-          {ui}
-        </FlowProvider>
-      ),
-    }),
+    routeTree: createRootRoute({ component: Root }),
     history: createMemoryHistory({ initialEntries: [entry] }),
   });
   render(
-    <QueryClientProvider client={client}>
+    <QueryClientProvider client={createAppQueryClient()}>
       <RouterProvider router={router} />
     </QueryClientProvider>,
   );
   return router;
 };
 
-const renderInFlow = async (ui: ReactNode = <Work />) => {
-  const router = renderAt(`/users/members?org=${ORG}&flow=${flow.id}`, ui);
-  await screen.findByText(`Step ${flow.currentStep + 1} of ${STEPS.length}`);
+const renderInFlow = async () => {
+  const router = renderAt(`/users/members?org=${ORG}&flow=${FLOW_ID}`);
+  await screen.findByText(`Step ${Math.min(holding, steps.length) + 1} of ${steps.length}`);
   return router;
 };
 
-const doWork = async (label = 'Do work') => {
-  const before = flowRequests('/check').length;
-  fireEvent.click(screen.getByRole('button', { name: label }));
-  await waitFor(() => expect(flowRequests('/check').length).toBe(before + 1));
+const doWork = async () => {
+  const before = flowReads().length;
+  fireEvent.click(screen.getByRole('button', { name: 'Do work' }));
+  await waitFor(() => expect(flowReads().length).toBe(before + 1));
 };
 
-const locationOf = (router: ReturnType<typeof renderAt>) => {
-  const { pathname, search, hash } = router.state.location;
-  return { pathname, search, hash };
-};
-
-const settle = () => new Promise((resolve) => setTimeout(resolve, 30));
-
-beforeEach(async () => {
-  flow = await buildServerFlow();
-  rows = 0;
+beforeEach(() => {
+  holding = 0;
+  gone = false;
   requests = [];
-  client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  navigatePreserving = mock(() => {});
   const intercept = async (input: RequestInfo | URL) => {
     const request = input as Request;
     const path = new URL(request.url).pathname;
     requests.push({ method: request.method, path });
-    if (request.method === 'POST' && path === '/api/v1/work') {
-      rows += 1;
-      return Response.json({ data: {} });
+    if (path === '/api/v1/work') return Response.json({ data: {} });
+    if (path === `/api/v1/flow/${FLOW_ID}` && request.method === 'DELETE') {
+      gone = true;
+      return new Response(null, { status: 204 });
     }
-    if (request.method === 'POST' && path === '/api/v1/fail')
-      return Response.json({ message: 'nope' }, { status: 400 });
-    if (request.method === 'POST' && path === '/api/v1/me/flows')
-      return Response.json({ data: flow }, { status: 201 });
-    if (request.method === 'GET' && path === `/api/v1/flow/${flow.id}`)
-      return Response.json({ data: flow });
-    if (request.method === 'POST' && path === `/api/v1/flow/${flow.id}/check`) {
-      flow = serverCheck(flow);
+    if (path === `/api/v1/flow/${FLOW_ID}` && !gone) {
+      const flow = serverFlow();
+      if (flow.currentStep === steps.length) gone = true;
       return Response.json({ data: flow });
     }
-    if (request.method === 'POST' && path === `/api/v1/flow/${flow.id}/cancel`) {
-      flow = { ...flow, canceledAt: new Date().toISOString() };
-      return Response.json({ data: flow });
-    }
-    return Response.json({ message: 'Unexpected request' }, { status: 404 });
+    return Response.json({ message: 'Flow ended' }, { status: 404 });
   };
   fetchSpy = spyOn(globalThis, 'fetch').mockImplementation(
     Object.assign(intercept, { preconnect: fetch.preconnect }),
   );
-  useAppStore.setState((state) => ({
-    navigation: { ...state.navigation, navigatePreserving },
-  }));
+  useAppStore.setState((state) => ({ auth: { ...state.auth, isAuthenticated: true } }));
 });
 
 afterEach(() => {
   cleanup();
   fetchSpy.mockRestore();
   useAppStore.setState(initialState);
-  client.clear();
-  window.history.replaceState(null, '', initialLocation);
 });
 
 describe('flow client', () => {
-  it('start → rule false, no advance → work → check → advance → … → complete → returnUrl', async () => {
-    const Starter = () => {
-      const { startFlow } = useStartFlow();
-      return (
-        <Button
-          variant="ghost"
-          onClick={() =>
-            void startFlow({
-              flowKey: 'setUpOrganization',
-              bindings: { organizationId: ORG },
-              returnUrl: '/dashboard',
-            })
-          }
-        >
-          Set up
-        </Button>
-      );
-    };
-    const starter = renderAt('/organizations', <Starter />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Set up' }));
-    await waitFor(() => expect(locationOf(starter).pathname).toBe('/users/members'));
-    expect(locationOf(starter).search).toEqual({ org: ORG, flow: flow.id });
-    cleanup();
+  it('is seeded from ?flow= and kept across navigatePreserving', async () => {
+    const router = await renderInFlow();
+    expect(useAppStore.getState().navigation.flowId).toBe(FLOW_ID);
 
-    const router = await renderInFlow(
-      <>
-        <Work />
-        <Work path="/api/v1/fail" label="Fail" />
-      </>,
-    );
+    act(() => useAppStore.getState().navigation.navigatePreserving('/settings/tokens', 'context'));
 
-    fireEvent.click(screen.getByRole('button', { name: 'Fail' }));
-    await settle();
-    expect(flowRequests('/check')).toHaveLength(0);
-
-    await doWork();
-    await screen.findByText('Step 2 of 4');
-    expect(locationOf(router)).toEqual({
-      pathname: '/users/members',
-      search: { org: ORG, flow: flow.id },
-      hash: 'invite',
-    });
-
-    await doWork();
-    await settle();
-    expect(screen.getByText('Step 2 of 4')).toBeTruthy();
-
-    await doWork();
-    await screen.findByText('Step 3 of 4');
-    expect(locationOf(router).hash).toBe('invite');
-
-    await doWork();
-    await screen.findByText('Step 4 of 4');
-    expect(locationOf(router)).toEqual({
-      pathname: '/settings/tokens',
-      search: { org: ORG, flow: flow.id },
-      hash: 'create-token',
-    });
-
-    await doWork();
-    await doWork();
-    await waitFor(() => expect(locationOf(router).pathname).toBe('/dashboard'));
-    expect(locationOf(router)).toEqual({ pathname: '/dashboard', search: {}, hash: '' });
-    await waitFor(() => expect(screen.queryByRole('region', { name: 'Flow progress' })).toBeNull());
+    await waitFor(() => expect(router.state.location.pathname).toBe('/settings/tokens'));
+    expect(router.state.location.search).toMatchObject({ flow: FLOW_ID });
   });
 
-  it('mutations landing during a check re-check without re-entering the step', async () => {
+  it('rechecks after any mutation and moves on by itself after an auto step', async () => {
     const router = await renderInFlow();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Do work' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Do work' }));
-    await screen.findByText('Step 2 of 4');
-    await waitFor(() => expect(flowRequests('/check').length).toBeGreaterThanOrEqual(2));
-    await settle();
+    holding = 1;
+    await doWork();
 
-    expect(router.history.length).toBe(2);
-    expect(locationOf(router).hash).toBe('invite');
+    await waitFor(() => expect(router.state.location.pathname).toBe('/settings/tokens'));
+    expect(router.state.location.hash).toBe('create-token');
+    expect(router.state.location.search).toMatchObject({ org: ORG, flow: FLOW_ID });
   });
 
-  it('a two-action step advances only after both actions', async () => {
-    flow = { ...flow, currentStep: 1 };
+  it('waits on a confirm step: the open modal becomes the Continue button', async () => {
+    holding = 1;
+    const router = await renderInFlow();
+    render(
+      <Modal isOpen onClose={() => undefined} title="Your key">
+        key
+      </Modal>,
+    );
+
+    holding = 2;
+    await doWork();
+
+    const next = await screen.findAllByRole('button', {
+      name: 'Continue: Create one for local development',
+    });
+    expect(router.state.location.pathname).toBe('/users/members');
+    fireEvent.click(next[0]!);
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/settings/tokens'));
+    expect(useAppStore.getState().navigation.flowContinue).toBeNull();
+  });
+
+  it('finishes on returnUrl once the last step is confirmed', async () => {
+    holding = 2;
+    const router = await renderInFlow();
+
+    holding = 3;
+    await doWork();
+    expect(useAppStore.getState().navigation.flowId).toBeNull();
+    fireEvent.click(await screen.findByRole('button', { name: 'Finish' }));
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/settings'));
+    expect(router.state.location.search).not.toHaveProperty('flow');
+    expect(screen.queryByLabelText('Setup guide')).toBeNull();
+  });
+
+  it('drops the flow when the user leaves its pages', async () => {
     await renderInFlow();
 
-    await doWork();
-    await settle();
-    expect(screen.getByText('Step 2 of 4')).toBeTruthy();
+    act(() => useAppStore.getState().navigation.navigatePreserving('/elsewhere', 'context'));
 
-    await doWork();
-    await screen.findByText('Step 3 of 4');
+    await waitFor(() => expect(useAppStore.getState().navigation.flowId).toBeNull());
+    await waitFor(() =>
+      expect(requests).toContainEqual({ method: 'DELETE', path: `/api/v1/flow/${FLOW_ID}` }),
+    );
   });
 
-  it('an anchor step keeps the page and sets the hash', async () => {
-    const router = await renderInFlow();
-    const page = screen.getByRole('button', { name: 'Do work' });
-
-    await doWork();
-    await screen.findByText('Step 2 of 4');
-
-    expect(locationOf(router).pathname).toBe('/users/members');
-    expect(locationOf(router).hash).toBe('invite');
-    expect(screen.getByRole('button', { name: 'Do work' })).toBe(page);
-  });
-
-  it('an action step does not navigate', async () => {
-    flow = { ...flow, currentStep: 1 };
-    rows = 1;
-    const router = await renderInFlow();
-    const before = locationOf(router);
-
-    await doWork();
-    await screen.findByText('Step 3 of 4');
-
-    expect(locationOf(router)).toEqual(before);
-  });
-
-  it('Back, forward and clicking around never check or advance', async () => {
-    rows = 5;
-    const router = await renderInFlow(<Link to="/settings/tokens">Tokens</Link>);
-
-    await act(async () => {
-      await router.navigate({ to: '/settings/tokens', search: { flow: flow.id } as never });
-    });
-    await act(async () => {
-      router.history.back();
-    });
-    await act(async () => {
-      router.history.forward();
-    });
-    fireEvent.click(screen.getByRole('link', { name: 'Tokens' }));
-    await settle();
-
-    expect(flowRequests('/check')).toHaveLength(0);
-    expect(screen.getByText('Step 1 of 4')).toBeTruthy();
-  });
-
-  it("the flow's own requests never trigger a check", async () => {
+  it('clears quietly when the flow read answers 404', async () => {
+    const message = spyOn(toast, 'message');
+    const error = spyOn(toast, 'error');
     await renderInFlow();
 
+    gone = true;
     await doWork();
-    await settle();
 
-    expect(flowRequests('/check')).toHaveLength(1);
-  });
-
-  it('Cancel returns to the returnUrl, without the flow, its context or its hash', async () => {
-    flow = { ...flow, returnUrl: '/archives' };
-    const router = renderAt(`/users/members?org=${ORG}&flow=${flow.id}#invite`, <Work />);
-    await screen.findByText('Step 1 of 4');
-
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-
-    await waitFor(() => expect(locationOf(router).pathname).toBe('/archives'));
-    expect(locationOf(router)).toEqual({ pathname: '/archives', search: {}, hash: '' });
-    expect(flowRequests('/cancel')).toHaveLength(1);
-    await waitFor(() => expect(screen.queryByRole('region', { name: 'Flow progress' })).toBeNull());
-  });
-
-  it('a stale or foreign flow id is inert: no banner, no checks, Links drop it', async () => {
-    renderAt(
-      '/users/members?flow=01a12b8e-0000-7000-8000-000000000000',
-      <>
-        <Work />
-        <Link to="/settings">Settings</Link>
-      </>,
-    );
-
-    fireEvent.click(await screen.findByRole('button', { name: 'Do work' }));
-    await settle();
-
-    expect(requests.filter((request) => request.path.endsWith('/check'))).toHaveLength(0);
-    expect(screen.queryByRole('region', { name: 'Flow progress' })).toBeNull();
-    expect(screen.getByRole('link', { name: 'Settings' }).getAttribute('href')).toBe('/settings');
-  });
-
-  it('outside any flow, a mutation never checks', async () => {
-    renderAt('/users/members', <Work />);
-
-    fireEvent.click(await screen.findByRole('button', { name: 'Do work' }));
-    await settle();
-
-    expect(requests.map((request) => request.path)).toEqual(['/api/v1/work']);
-  });
-
-  it('Link keeps the flow param and context while a flow is active', async () => {
-    await renderInFlow(<Link to="/settings/tokens">Tokens</Link>);
-
-    const href = new URL(
-      screen.getByRole('link', { name: 'Tokens' }).getAttribute('href')!,
-      'http://localhost',
-    );
-    expect(href.searchParams.get('flow')).toBe(flow.id);
-    expect(href.searchParams.get('org')).toBe(ORG);
+    await waitFor(() => expect(useAppStore.getState().navigation.flowId).toBeNull());
+    expect(message).toHaveBeenCalledWith('Setup guide ended');
+    expect(error).not.toHaveBeenCalled();
+    message.mockRestore();
+    error.mockRestore();
   });
 });

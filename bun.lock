@@ -82,7 +82,6 @@
         "@sentry/bun": "^10.42.0",
         "@template/db": "workspace:*",
         "@template/permissions": "workspace:*",
-        "@template/sdk": "workspace:*",
         "@template/shared": "workspace:*",
         "better-auth": "^1.6.9",
         "bullmq": "^5.70.4",

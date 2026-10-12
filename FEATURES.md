@@ -418,12 +418,13 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 ## Flows
 
-**A user is taken through registered steps across pages, and the server decides when each step is done.** Flows add no expression language: definitions are json-rules rules with `{ bind }` tokens, SDK operationIds with `{ path, query }`, and TanStack `{ to, params, search, hash }`. Lineage: the Carde.io organized-play MVP (`Flow` + `FlowStep`, and onboarding steps with `include` / `accomplished` functions); here `accomplished` is data.
+**A short-lived walk through a few in-app pages, checked by the server.** A convenience, not a contract: on any failure, or when the user leaves the flow's pages, the flow is deleted and the user is back on the normal site.
 
-- ✅ **Registry** - `FlowKey` enum + `Record<FlowKey, FlowDefinition>` in `modules/flow/definitions`, like inquiry handlers. Each step: `key`, `label`, `mode` (`navigate` / `anchor` / `action`), router target, and `completedWhen { read, path, query, rule }`. Validated at boot and in tests: the read exists, its path params are bound, the rule stays inside the read's lens, every bind is covered by the flow's bindings schema
-- ✅ **Server-checked completion** - `POST /flow/:id/check` calls the bound read as the caller through the batch sub-request machinery. Against a readMany the rule is stacked on the route's `filterLens` and matched per row (one matching row completes the step); against a single read it is `check()`ed over the response, with `ArrayOperator.atLeast` for counts. Permissions and tenancy are the route's own
-- ✅ **Instance** - `Flow` (`flowKey`, `bindings`, `returnUrl`, `currentStep`, `completedSteps`, `completedAt`, `canceledAt`); hard-deleted with its user
-- ✅ **Client** - `?flow=`, `FlowProvider` + `FlowBanner` in both layouts, `useFlow()` / `useStartFlow()`, a check after every successful mutation via React Query's mutation cache, step entry through TanStack `navigate`, `useHashSection` for anchors, a flow-preserving `Link`
+- ✅ **Registry** - `FlowKey` enum + plain-TS definitions in `modules/flow/definitions`: a bindings schema and `steps(bindings)`, each step a `to`, an `advance` (`auto` / `confirm`), a GET read by operationId and a json-rules rule over the response
+- ✅ **Resolved at create** - steps are resolved and stored on the row; editing a definition never affects a running flow. Create checks too, so callers just create a flow instead of pre-checking whether it is needed
+- ✅ **Rechecked on every read** - from step 0, as the caller, through the batch sub-request machinery; list reads walk every page with `fetchAllPages`. Steps can move backward. A failed read deletes the flow (404); a finished one is returned once and deleted
+- ✅ **Transient** - `cleanStaleData` deletes flows idle for 15 minutes
+- ✅ **Client** - `?flow=` mirrors the store like `spoof`, one `FlowBanner` per app, every mutation rechecks via the `MutationCache`, `Modal` close becomes "Continue" on `confirm` steps, leaving the flow's pages drops it
 
 [Learn more: FLOWS.md](docs/claude/FLOWS.md)
 

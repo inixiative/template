@@ -4,69 +4,57 @@
  * @partOf primitive:flows
  * @uses none
  */
-import { DateOperator, Operator } from '@inixiative/json-rules';
+import { ArrayOperator } from '@inixiative/json-rules';
+import { InquiryStatus, InquiryType } from '@template/db/generated/client/enums';
 import { bindingsSchema } from '#/modules/flow/definitions/setUpOrganization/bindingsSchema';
 import type { FlowDefinition } from '#/modules/flow/definitions/types';
 
-const organization = { id: { bind: 'organizationId' } };
-const inOrganization = { org: { bind: 'organizationId' } };
-const sinceFlowStarted = {
-  field: 'createdAt',
-  dateOperator: DateOperator.onOrAfter,
-  bind: 'flowStartedAt',
-};
+const anyRow = { field: 'data', arrayOperator: ArrayOperator.notEmpty } as const;
 
-export const setUpOrganizationFlow: FlowDefinition = {
+export const setUpOrganizationFlow: FlowDefinition<typeof bindingsSchema> = {
   key: 'setUpOrganization',
   bindingsSchema,
-  steps: [
-    {
-      key: 'inviteTeammate',
-      label: 'Invite a teammate',
-      mode: 'navigate',
-      to: '/users/members',
-      search: inOrganization,
-      hash: 'invite',
-      completedWhen: {
-        read: 'organizationSentManyInquiries',
-        path: organization,
-        rule: {
-          all: [
-            { field: 'type', operator: Operator.equals, value: 'inviteOrganizationUser' },
-            { field: 'status', operator: Operator.equals, value: 'sent' },
-          ],
+  steps: ({ organizationId }) => {
+    const tokensNamed = (name: string) => ({
+      operationId: 'organizationReadManyTokens',
+      path: { id: organizationId },
+      query: { searchFields: { name: { contains: name } } },
+    });
+
+    return [
+      {
+        key: 'inviteTeammate',
+        label: 'Invite a teammate',
+        to: `/users/members?org=${organizationId}#invite`,
+        advance: 'auto',
+        read: {
+          operationId: 'organizationSentManyInquiries',
+          path: { id: organizationId },
+          query: {
+            searchFields: {
+              type: InquiryType.inviteOrganizationUser,
+              status: InquiryStatus.sent,
+            },
+          },
         },
+        rule: anyRow,
       },
-    },
-    {
-      key: 'createCiToken',
-      label: 'Create an API token for CI',
-      mode: 'navigate',
-      to: '/settings/tokens',
-      search: inOrganization,
-      hash: 'create-token',
-      completedWhen: {
-        read: 'organizationReadManyTokens',
-        path: organization,
-        rule: {
-          all: [sinceFlowStarted, { field: 'name', operator: Operator.contains, value: 'ci' }],
-        },
+      {
+        key: 'createCiToken',
+        label: 'Create an API token for CI',
+        to: `/settings/tokens?org=${organizationId}#create-token`,
+        advance: 'confirm',
+        read: tokensNamed('ci'),
+        rule: anyRow,
       },
-    },
-    {
-      key: 'createLocalToken',
-      label: 'Create one for local development',
-      mode: 'anchor',
-      to: '/settings/tokens',
-      search: inOrganization,
-      hash: 'create-token',
-      completedWhen: {
-        read: 'organizationReadManyTokens',
-        path: organization,
-        rule: {
-          all: [sinceFlowStarted, { field: 'name', operator: Operator.contains, value: 'local' }],
-        },
+      {
+        key: 'createLocalToken',
+        label: 'Create one for local development',
+        to: `/settings/tokens?org=${organizationId}#create-token`,
+        advance: 'confirm',
+        read: tokensNamed('local'),
+        rule: anyRow,
       },
-    },
-  ],
+    ];
+  },
 };

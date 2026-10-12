@@ -11,8 +11,7 @@ import { resourceContextMiddleware } from '#/middleware/resources/resourceContex
 const filterLensSetter =
   (filterLens: LensNarrowing): MiddlewareHandler =>
   async (c, next) => {
-    const narrowing = c.get('subRequestNarrowing');
-    c.set('filterLens', narrowing ? { ...narrowing, parent: filterLens } : filterLens);
+    c.set('filterLens', filterLens);
     await next();
   };
 

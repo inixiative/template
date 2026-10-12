@@ -4,21 +4,17 @@
  * @partOf primitive:flows
  * @uses primitive:batch
  */
-import { db } from '@template/db';
 import type { Context } from 'hono';
-import type { WhereScope } from '#/middleware/resources/scopeNarrowing';
 import { registerBatch, unregisterBatch } from '#/modules/batch/services/batchRegistry';
+import { executeRequest } from '#/modules/batch/services/strategies/executeRequest';
+import type { RequestResult } from '#/modules/batch/services/strategies/types';
 import type { AppEnv } from '#/types/appEnv';
 
-export const readAsCaller = async (
-  c: Context<AppEnv>,
-  path: string,
-  narrowing?: WhereScope,
-): Promise<Response> => {
+export const readAsCaller = async (c: Context<AppEnv>, path: string): Promise<RequestResult> => {
   const batchId = crypto.randomUUID();
-  registerBatch(batchId, db, c, narrowing);
+  registerBatch(batchId, c.get('db'), c);
   try {
-    return await c.get('app').request(path, { headers: { 'x-batch-id': batchId } });
+    return await executeRequest(c.get('app'), { method: 'GET', path }, batchId, {}, c.req.raw);
   } finally {
     unregisterBatch(batchId);
   }
