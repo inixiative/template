@@ -446,7 +446,11 @@ Defined in the env schema (`apps/api/src/config/env.ts`), read lazily through `o
 
 ## Cron Jobs
 
-Stored in DB, registered on worker startup; `registerCronJobs` then removes any BullMQ repeatable no enabled row registered (a renamed or disabled job left behind), unless a row failed to register. The `cronJobSync` hook moves the BullMQ repeatable when a row is created, updated or deleted inside `db.txn`. BullMQ's `removeRepeatable(name, repeat, jobId)` takes the job id as its third argument: a `jobId` inside `repeat` is overwritten, so the key never matches.
+Stored in DB, registered on worker startup; `registerCronJobs` then removes any BullMQ repeatable no enabled row registered (a renamed or disabled job left behind), unless a row failed to register. The `cronJobSync` hook moves the BullMQ repeatable whenever a row's handler, jobId, pattern, enabled, payload or retry policy changes (create, update, upsert, delete inside `db.txn`). BullMQ's `removeRepeatable(name, repeat, jobId)` takes the job id as its third argument: a `jobId` inside `repeat` is overwritten, so the key never matches.
+
+### System Cron Jobs (seeded)
+
+The system's own jobs are rows in `packages/db/prisma/seeds/cronJob.seed.ts` with stable ids. The seed runner writes each record inside `db.txn`, so with the api seed (`bun run db:seed`, hooks registered) every deploy's seed brings `name`, `jobId`, `handler` and `description` back in line with the code and the hook swaps the repeatable: renaming a handler is a code change plus a seed. `pattern`, `enabled`, `payload`, `maxAttempts` and `backoffMs` are admin-tunable in superadmin, so the seed sets them on insert only (`updateOmitFields`).
 
 ### Cron Patterns (UTC)
 
