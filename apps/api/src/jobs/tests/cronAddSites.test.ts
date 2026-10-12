@@ -48,6 +48,7 @@ describe('cron add sites stamp the resolved lane', () => {
       add: async (name: string, data: JobData) => {
         recorded.push({ name, data });
       },
+      getRepeatableJobs: async () => [],
     } as unknown as JobsQueue;
 
     await registerCronJobs(recordingQueue);
