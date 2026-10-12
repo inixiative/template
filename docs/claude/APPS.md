@@ -138,6 +138,6 @@ branding data; see `tickets/FEAT-007-white-labeling.md`.
 **Component Organization:**
 - `@template/ui` - components, hooks, pages, store and guards shared by all apps
 - `@template/sdk` - generated API client
-- Apps hold routes, nav config and `main.tsx`; they have no component folders of their own
+- Apps hold routes, nav config, `main.tsx` and `app/lib/logger.ts`; they have no component folders of their own
 
 **For comprehensive frontend details**, see [FRONTEND.md](FRONTEND.md).

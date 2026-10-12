@@ -1018,7 +1018,7 @@ const handleAction = async () => {
 
 ### 17. Bun-Native Resume Tests with VCR Fixtures
 
-**Pattern:** Provider task tests use `bun:test`, `mock.module(...)`, and the shared `VCR` (`@template/shared/vcr`, see [TESTING.md](TESTING.md#vcr-external-services)). Each `init/api/*` client owns a `vcr`; tests queue cassettes with `api.vcr.queue(method, fixture)`.
+**Pattern:** Provider task tests use `bun:test`, `mock.module(...)`, and the shared `VCR` (`@template/shared/vcr`, see [TESTING.md](TESTING.md#vcr-external-services)). The `init/api/*` clients (all but `cloudflare` and `resend`) own a `vcr`; tests queue cassettes with `api.vcr.queue(method, fixture)`.
 
 **Why:**
 - ✅ Fast, deterministic task coverage without live provider calls
@@ -1049,16 +1049,19 @@ init/
 
 ## Resource Naming
 
-Every provisioned resource is named **`{project}-{env}-{app}`**: project name from `project.config.ts`, then `prod` / `staging`, then the app. Always project → environment → app, so a dashboard filters by `{project}-*` and several projects share one workspace without collisions.
+Railway resources are named **`{project}-{env}-{app}`**: project name from `project.config.ts`, then `prod` / `staging`, then the app. Always project → environment → app, so a dashboard filters by `{project}-*` and several projects share one workspace without collisions.
 
-| Resource | Names |
-|----------|-------|
-| Railway services | `{project}-prod-api`, `{project}-prod-worker`, `{project}-prod-redis` (and `-staging-`) |
-| Redis volumes | `{project}-prod-redis-data`, `{project}-staging-redis-data` |
-| Infisical → Railway syncs | `{project}-prod-api-service-sync`, `{project}-prod-worker-service-sync` (and `-staging-`) |
-| Railway buckets | `{project}-prod-system`, `{project}-prod-user` (and `-staging-`) |
+| Resource | Names | Source |
+|----------|-------|--------|
+| Railway services | `{project}-prod-api`, `{project}-prod-worker`, `{project}-prod-redis` (and `-staging-`) | `railwaySetup.ts` |
+| Redis volumes | `{project}-prod-redis-data`, `{project}-staging-redis-data` | `railwaySetup.ts` |
+| Railway Postgres | `{project}-prod-postgres`, volume `{project}-prod-postgres-data` (and `-staging-`) | `railwayPostgresSetup.ts` |
+| Infisical → Railway syncs | `{project}-prod-api-service-sync`, `{project}-prod-worker-service-sync` (and `-staging-`) | `railwaySetup.ts` |
+| Railway buckets | `{project}-prod-system`, `{project}-prod-user` (and `-staging-`) | `railwayBucketsSetup.ts` |
+| Vercel projects | `{project}-web`, `{project}-admin` (no environment) | `vercelSetup.ts` |
+| PlanetScale branches | `{project}-production-init`, `{project}-staging-init` | `planetscaleSetup.ts` |
 
-Names are template literals over the config's project name in `init/tasks/railwaySetup.ts` and `railwayBucketsSetup.ts`; never hardcode one.
+Names are template literals over the config's project name in `init/tasks/*Setup.ts`; never hardcode one.
 
 ## File Structure
 

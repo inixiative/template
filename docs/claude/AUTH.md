@@ -39,10 +39,6 @@
   - [validateNotToken](#validatenottoken)
   - [validateSuperadmin](#validatesuperadmin)
 - [Choosing Between validateUser and validateActor](#choosing-between-validateuser-and-validateactor)
-  - [validateUser - Requires User Context](#validateuser---requires-user-context)
-  - [validateActor - More Permissive](#validateactor---more-permissive)
-  - [When to Use Each](#when-to-use-each)
-  - [Example](#example)
 
 <!-- toc:end -->
 
@@ -241,7 +237,7 @@ Provider credentials are encrypted, never hashed: the server must decrypt them t
 | Operation | Who | Notes |
 |-----------|-----|-------|
 | `authProviderReadMany` | public | Platform providers, for login/signup pages |
-| `organizationReadAuthProvider` | org members | `{ platform, organization }` (secrets omitted) |
+| `organizationReadAuthProvider` | public (no auth middleware; login page calls it) | `{ platform, organization }`; secrets omitted, non-owners see enabled providers only |
 | `organizationCreateAuthProvider` | org owner | Encrypts `secrets` |
 | `authProviderUpdate` | `own` on the provider | `organizationId`, `type`, `provider` and encrypted columns are sanitized; new `secrets` re-encrypt |
 | `authProviderDelete` | `own` on the provider | |
@@ -427,11 +423,16 @@ Order matters. Applied in `apps/api/src/routes/api.ts`:
 
 ```typescript
 apiRouter.use('*', corsMiddleware);
-apiRouter.use('*', prepareRequest);      // 1. Initialize context
-apiRouter.use('*', tokenAuthMiddleware); // 2. Check token auth (Authorization header wins)
-apiRouter.use('*', authMiddleware);      // 3. Check session auth (fallback to cookie)
-apiRouter.use('*', spoofMiddleware);     // 4. Allow superadmin spoofing (after user is resolved)
-apiRouter.use('*', auditActorMiddleware); // 5. Actor context for audit logs
+apiRouter.use('*', prepareRequest);              // 1. Initialize context
+apiRouter.route('/telemetry/browser', …);        // Public, before auth
+apiRouter.route('/internal', internalRouter);    // Shared-secret auth only
+apiRouter.use('/auth/*', authRateLimit);         // BetterAuth handles its own auth
+apiRouter.all('/auth/*', (c) => auth.handler(c.req.raw));
+apiRouter.route('/unsubscribe', …);              // Public, signed link
+apiRouter.use('*', tokenAuthMiddleware);         // 2. Token auth (Authorization header wins)
+apiRouter.use('*', authMiddleware);              // 3. Session auth
+apiRouter.use('*', spoofMiddleware);             // 4. Superadmin spoofing (after user is resolved)
+apiRouter.use('*', auditActorMiddleware);        // 5. Actor context for audit logs
 apiRouter.use('*', apiRateLimit);
 ```
 
@@ -522,7 +523,7 @@ router.get('/me', validateUser, handler);  // 401 if no user
 
 ### validateActor
 
-Requires any actor (user OR org/space token):
+Requires `getActor(c).user`:
 
 ```typescript
 import { validateActor } from '#/middleware/validations/validateActor';
@@ -530,11 +531,7 @@ import { validateActor } from '#/middleware/validations/validateActor';
 router.get('/resource', validateActor, handler);  // 401 if no user from getActor()
 ```
 
-**Difference from validateUser:**
-- `validateUser` requires `c.get('user')` to be set (session or user token only)
-- `validateActor` requires `getActor(c).user` to be set (works with org/space tokens that have user relations)
-
-Use `validateActor` for endpoints that should work with both session and token auth, including org/space tokens.
+`getActor(c).user` falls back from `c.get('user')` to the organizationUser / spaceUser / token user. Token auth already calls `setUserContext` for User, OrganizationUser and SpaceUser tokens, so in practice both validators admit the same callers.
 
 ### validateNotToken
 
@@ -560,60 +557,13 @@ router.get('/admin/users', validateSuperadmin, handler);  // 403 if not superadm
 
 ## Choosing Between validateUser and validateActor
 
-Use this decision tree:
+| Credential | `c.get('user')` | `validateUser` | `validateActor` |
+|------------|-----------------|----------------|-----------------|
+| Session | ✅ | ✅ | ✅ |
+| User token | ✅ | ✅ | ✅ |
+| OrganizationUser token | ✅ (scoped to its org) | ✅ | ✅ |
+| SpaceUser token | ✅ (scoped to its space) | ✅ | ✅ |
+| Organization token | ❌ (no user) | ❌ 401 | ❌ 401 |
+| Space token | ❌ (no user) | ❌ 401 | ❌ 401 |
 
-```
-Does the endpoint need to work with org/space tokens (no user context)?
-├─ YES → Use validateActor
-│   ├─ Examples: Batch API, org-level operations
-│   └─ Checks: getActor(c).user is set (works with delegated tokens)
-└─ NO → Use validateUser
-    ├─ Examples: /me endpoints, user-specific operations
-    └─ Checks: c.get('user') is set (requires JWT or user token)
-```
-
-### validateUser - Requires User Context
-
-Requires `c.get('user')` to be set:
-
-**Works with:**
-- ✅ JWT auth (authMiddleware via BetterAuth)
-- ✅ User tokens (`token.ownerModel === 'User'`)
-- ✅ OrganizationUser tokens (`token.ownerModel === 'OrganizationUser'`)
-- ✅ SpaceUser tokens (`token.ownerModel === 'SpaceUser'`)
-
-**Does NOT work with:**
-- ❌ Organization tokens (`token.ownerModel === 'Organization'`)
-- ❌ Space tokens (`token.ownerModel === 'Space'`)
-
-### validateActor - More Permissive
-
-Requires `getActor(c).user` to be set:
-
-**Works with:**
-- ✅ All of the above validateUser cases
-- ✅ Organization tokens with organizationUser relation
-- ✅ Space tokens with spaceUser relation
-
-More permissive - works with all token types that have user relations.
-
-### When to Use Each
-
-| Endpoint Type | Middleware | Reason |
-|--------------|------------|---------|
-| `/me/*` | `validateUser` | Always requires actual user context |
-| `/organization/:id/users` | `validateActor` | Org tokens need to list org users |
-| `/organization/:id/spaces` | `validateActor` | Org tokens need to access org resources |
-| `/batch` | `validateActor` | Should work with all token types |
-| User profile update | `validateUser` | Modifying user requires user session |
-| `/me/tokens` (create) | `validateUser` | Token creation requires user |
-
-### Example
-
-```typescript
-// ❌ Wrong - org tokens can't access org resources
-router.get('/organization/:id/users', validateUser, handler);
-
-// ✅ Correct - org tokens can access org resources
-router.get('/organization/:id/users', validateActor, handler);
-```
+Organization and Space tokens are created without a `userId` (`organizationCreateToken`, `spaceCreateToken`); token auth only sets up their permissions. A route meant for them must skip both validators and rely on `validatePermission`. Use `validateUser` for `/me/*` and anything that acts as a person; `validateNotToken` where a token must never be enough.

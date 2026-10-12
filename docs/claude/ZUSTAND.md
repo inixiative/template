@@ -246,9 +246,9 @@ Replaces `permix` with a fresh instance (called on logout).
 const permissions = useAppStore((state) => state.permissions);
 <Button show={permissions.check('organization', org, 'manage')}>Edit</Button>
 
-// usePermission returns { show, disable, disabledText }
+// usePermission returns { show, disable, disabledText }; Button takes show / disabled / disabledText
 const editBtn = usePermission({ permissions, model: 'organization', record: org, action: 'manage' });
-<Button {...editBtn}>Edit</Button>
+<Button show={editBtn.show} disabled={editBtn.disable}>Edit</Button>
 ```
 
 ---
@@ -422,11 +422,11 @@ The target's own query wins on conflicts; the current hash is kept unless the ta
 // Single value
 const user = useAppStore((state) => state.auth.user);
 
-// Multiple values
-const { user, isAuthenticated } = useAppStore((state) => ({
-  user: state.auth.user,
-  isAuthenticated: state.auth.isAuthenticated,
-}));
+// Multiple values — an object selector needs useShallow (zustand v5), or it re-renders forever
+import { useShallow } from 'zustand/react/shallow';
+const { user, isAuthenticated } = useAppStore(
+  useShallow((state) => ({ user: state.auth.user, isAuthenticated: state.auth.isAuthenticated })),
+);
 
 // Entire slice
 const auth = useAppStore((state) => state.auth);
@@ -469,7 +469,7 @@ import { useAppStore } from '@template/ui/store';
 
 const state = useAppStore.getState();
 const user = state.auth.user;
-const canEdit = state.permissions.check('organization', org, 'update');
+const canEdit = state.permissions.check('organization', org, 'manage');
 
 // Call actions
 await useAppStore.getState().auth.initialize();

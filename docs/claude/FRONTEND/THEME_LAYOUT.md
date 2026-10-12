@@ -77,13 +77,14 @@ Dropdown to switch between Personal and the user's organizations and spaces (fro
 - Organization with 0 spaces → one item, switches to the organization.
 - Organization with 1 space → one item, switches to that space.
 - Organization with 2+ spaces → accordion listing its spaces plus the organization itself.
+- Each multi-space organization's accordion has a Manage item; `onManageOrganizations` adds a "Your Organizations" item.
 - `locked` → shows the current context label with no dropdown (superadmin).
 
 Switching calls `tenant.setOrganization(id)` / `tenant.setSpace(id)`; the URL `?org=` / `?space=` follow.
 
 ### Sidebar
 
-Renders `navigation.navConfig[tenant.context.type]`. Items whose `access` fails and `alias` items are skipped; children nest up to three levels and auto-expand along the active route. Clicking navigates with `navigatePreserving(fullPath, 'context')`. Nav config format: [ROUTING_NAVIGATION.md](ROUTING_NAVIGATION.md#navigation).
+Renders `navigation.navConfig[tenant.context.type]`. Items whose `access` fails and `alias` items are skipped; children nest three levels below the top and auto-expand along the active route. Clicking navigates with `navigatePreserving(fullPath, 'context')`. Nav config format: [ROUTING_NAVIGATION.md](ROUTING_NAVIGATION.md#navigation).
 
 ### UserMenu
 
@@ -158,7 +159,7 @@ Same pattern for secondary, tertiary, quaternary and accent. **Browser support:*
 **Location:** `packages/ui/src/hooks/`
 
 - **`useThemePersistence()`** - Loads `localStorage.theme` into `ui.theme` on mount and saves changes back.
-- **`useDarkMode(theme)`** - `'light'` removes `.dark` from `<html>`, `'dark'` adds it, `'system'` follows `prefers-color-scheme`.
+- **`useDarkMode(theme)`** - `'light'` removes `.dark` from `<html>`, `'dark'` adds it, `'system'` reads `prefers-color-scheme` when the theme changes.
 - **`useSpaceTheme(spaceTheme)`** - Sets `--space-{key}` CSS properties for each non-empty key; wraps `logo`, `logoDark`, `favicon` in `url()`; clears the previous keys on change or `null`.
 - **`useLanguage()`** - Sets `document.documentElement.lang` from the browser language.
 
@@ -172,7 +173,7 @@ Light / dark / system button group bound to `ui.theme`. Shown by `ProfileFormCar
 
 **Location:** `packages/ui/src/types/`
 
-- `SpaceTheme` - every property optional (or `null`): `primary`, `primary1`–`primary4`, `primaryForeground`, the same for `secondary`, `tertiary`, `quaternary`, `accent`, plus `logo`, `logoDark`, `favicon`. Colors are HSL without the wrapper: `"262 80% 46%"`.
+- `SpaceTheme` - the whole object may be `null`; every property is optional: `primary`, `primary1`–`primary4`, `primaryForeground`, the same for `secondary`, `tertiary`, `quaternary`, `accent`, plus `logo`, `logoDark`, `favicon`. Colors are HSL without the wrapper: `"262 80% 46%"`.
 - `AppTheme` - the complete platform theme (all properties required).
 
 ### Usage in Root Component

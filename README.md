@@ -31,7 +31,7 @@ compose, and in the ~95k curated lines of TypeScript that make them compose *cor
 | **Structure** | 4 applications (`api`, `web`, `admin`, `superadmin`) + 6 shared packages |
 | **API surface** | 111 route modules, auto-registered, each generating OpenAPI 3.1 |
 | **Tests** | 205 test files across apps and packages |
-| **Documentation** | 47 focused modules in `docs/claude/` (~16,600 lines total) |
+| **Documentation** | 45 focused modules in `docs/claude/` (~16,600 lines total) |
 | **Ecosystem** | Consumes [`json-rules`](https://github.com/inixiative/json-rules), [`permissions`](https://github.com/inixiative/permissions), [`atlas`](https://github.com/inixiative/atlas), [`prisma-map`](https://github.com/inixiative/prisma-map) |
 
 ## What's Here That Isn't in a Starter Kit

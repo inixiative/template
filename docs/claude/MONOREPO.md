@@ -11,6 +11,7 @@
     - [@template/db](#templatedb)
     - [@template/shared](#templateshared)
     - [@template/ui](#templateui)
+    - [@template/sdk](#templatesdk)
     - [@template/permissions](#templatepermissions)
     - [@template/email](#templateemail)
 - [Path Aliases](#path-aliases)
@@ -75,6 +76,7 @@ Defined in root `package.json`:
 | `packages/permissions` | `@template/permissions` |
 | `packages/email` | `@template/email` |
 | `packages/ui` | `@template/ui` |
+| `packages/sdk` | `@template/sdk` |
 | `apps/api` | `api` |
 | `apps/web` | `web` |
 | `apps/admin` | `admin` |
@@ -139,12 +141,13 @@ ui/src/components/
 └── utility/           # ErrorBoundary, NotFound
 ```
 
-**OpenAPI client:**
-- Auto-generated from API spec (`openapi.gen.json`)
-- Type-safe API calls
-- Located in `apiClient/`
-
 See `docs/claude/FRONTEND.md` for detailed frontend patterns.
+
+#### @template/sdk
+
+**Location:** `packages/sdk/`
+
+API client generated from `openapi.gen.json` by hey-api: operations, types, schemas and TanStack Query helpers. See `docs/claude/FRONTEND/API_CLIENT.md`.
 
 #### @template/permissions
 
@@ -333,8 +336,8 @@ bun add -d <package>
 | Looking For | Location |
 |-------------|----------|
 | API routes | `apps/api/src/modules/<model>/routes/` |
-| Database hooks | `apps/api/src/modules/<model>/hooks/` |
-| Background jobs | `apps/api/src/modules/<model>/jobs/` or `apps/api/src/jobs/` |
+| Database hooks | `apps/api/src/hooks/` |
+| Background jobs | `apps/api/src/jobs/` |
 | Prisma schema | `packages/db/prisma/schema/` (modular — one `.prisma` file per model) |
 | Database client | `packages/db/src/client.ts` |
 | Logger | `packages/shared/src/logger/` |

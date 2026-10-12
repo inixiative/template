@@ -5,7 +5,7 @@
 ## Contents
 
 - [What an adapter module is](#what-an-adapter-module-is)
-- [Module layout (Option β)](#module-layout-option)
+- [Module layout](#module-layout)
 - [Adapter primitives](#adapter-primitives)
   - [makeAdapterRouter — pick-one per environment](#makeadapterrouter--pick-one-per-environment)
   - [makeBroadcastRegistry — fan-out across providers](#makebroadcastregistry--fan-out-across-providers)
@@ -37,7 +37,7 @@ Three concerns inside an adapter module:
 
 ---
 
-## Module layout (Option β)
+## Module layout
 
 This is the canonical structure. All new adapter modules follow it.
 

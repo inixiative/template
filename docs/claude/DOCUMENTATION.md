@@ -8,6 +8,18 @@
 - [Before Starting Work](#before-starting-work)
 - [Doc Structure](#doc-structure)
   - [TOC Required](#toc-required)
+  - [Standard Sections](#standard-sections)
+  - [Stub Format](#stub-format)
+  - [Code Examples](#code-examples)
+  - [Diagrams with Mermaid](#diagrams-with-mermaid)
+- [Doc Maintenance](#doc-maintenance)
+  - [After Implementing Features](#after-implementing-features)
+  - [Keep Docs Honest](#keep-docs-honest)
+- [Doc Alignment Review](#doc-alignment-review)
+  - [Process](#process)
+  - [Example Review Findings](#example-review-findings)
+  - [Review Prompt Template](#review-prompt-template)
+  - [When to Run](#when-to-run)
 
 <!-- toc:end -->
 
@@ -49,7 +61,7 @@ The docs contain patterns, conventions, and decisions. Reading them prevents:
 
 ### TOC Required
 
-Every doc carries a generated contents list between `<!-- toc:start -->` / `<!-- toc:end -->`. Regenerate after adding or removing headings: `bun run docs:toc` (`scripts/docs/regenToc.ts`, which covers `docs/claude/**`, `FEATURES.md`, `COMPARISONS.md`, `TODO.md`, `README.md`).
+Every doc carries a generated contents list between the `toc:start` / `toc:end` HTML comment markers. Regenerate after adding or removing headings: `bun run docs:toc` (`scripts/docs/regenToc.ts`, which covers `docs/claude/**`, `FEATURES.md`, `COMPARISONS.md`, `TODO.md`, `README.md`).
 
 ### Standard Sections
 

@@ -214,7 +214,7 @@ const { data, isFetching } = useQuery({
 
 ## Settings
 
-Settings are nested routes, not tabs: `apps/*/app/routes/_authenticated/settings/{profile,tokens,webhooks,integrations,authProviders,update,transfer}.tsx`, each mounting a page from `@template/ui/pages`. `settings.tsx` redirects `/settings` to `/settings/profile`. The nav config's settings item decides which entries each context sees (Auth Providers: organization owners; Update / Transfer: spaces).
+Settings are nested routes, not tabs: `apps/{web,admin}/app/routes/_authenticated/settings/{profile,tokens,webhooks,integrations,authProviders,update,transfer}.tsx` (superadmin: profile, tokens, webhooks, integrations), each mounting a page from `@template/ui/pages`. `settings.tsx` redirects `/settings` to `/settings/profile`. The nav config's settings item decides which entries each context sees (Auth Providers: organization owners; Update / Transfer: spaces).
 
 Pages adapt to the current context. `ProfilePage` switches on `tenant.context.type`:
 

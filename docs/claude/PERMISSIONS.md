@@ -380,7 +380,7 @@ if (!permix.check('organization', 'manage', orgId)) {
 
 ### Via Validation Middleware
 
-Authentication gates run first: `validateUser` (needs `c.get('user')`) or `validateActor` (needs `getActor(c).user`, so org/space tokens with a membership pass). Which to pick: [AUTH.md](./AUTH.md#choosing-between-validateuser-and-validateactor).
+Authentication gates run first: `validateUser` (needs `c.get('user')`) or `validateActor` (needs `getActor(c).user`; Organization and Space tokens carry no user and fail both). Which to pick: [AUTH.md](./AUTH.md#choosing-between-validateuser-and-validateactor).
 
 The template uses a unified `validatePermission` middleware that leverages ReBAC for permission checks:
 

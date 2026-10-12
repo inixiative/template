@@ -105,7 +105,7 @@ export const Route = createFileRoute('/_public/login')({
 **LoginForm / SignupForm behavior:**
 - Fetch providers with `useAuthProviders()`; render a "Continue with {name}" button per enabled provider, then the email form.
 - Provider icons are Iconify slugs (`simple-icons:google`, `simple-icons:github`, `lucide:shield`, fallback `lucide:key`).
-- Errors go through `describeError` and show twice: inline and as a toast.
+- Sign-in errors go through `describeError` and show inline and as a toast; provider-load errors show inline only.
 - A provider-load failure shows "Unable to load authentication providers. You can still log in with email and password." and keeps the email form.
 - `LoginForm` reads `?error=` (set by the callback page on failure) into its initial error.
 - On success: `navigatePreserving(search.redirectTo || '/dashboard', 'context')`.
@@ -227,6 +227,8 @@ redirectPreservingContext(beforeLoadCtx, to);  // throw a redirect keeping org/s
 BETTER_AUTH_SECRET=<random-secret>
 GOOGLE_CLIENT_ID=<id>
 GOOGLE_CLIENT_SECRET=<secret>
+GITHUB_CLIENT_ID=<id>          # listed by platformProviders.ts when set
+GITHUB_CLIENT_SECRET=<secret>
 
 # Frontends
 VITE_API_URL=http://localhost:8000

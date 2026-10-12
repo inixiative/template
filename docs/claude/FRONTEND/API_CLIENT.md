@@ -188,10 +188,10 @@ Options: `config`, `sectionId?`, `shareableUrl?`, `scrollRestore?`, `defaultPage
 import { useInfiniteData } from '@template/ui/hooks';
 
 const feed = useInfiniteData({
-  config: makeDataConfig('activityReadMany'),
-  queryKey: ['activity'],
-  queryFn: (page, filterQuery) => fetchActivity({ ...filterQuery, page }),
-  sectionId: 'activityFeed',
+  config: makeDataConfig('adminOrganizationReadMany'),
+  queryKey: ['orgs'],
+  queryFn: (page, filterQuery) => fetchOrgPage({ ...filterQuery, page }), // returns one page
+  sectionId: 'orgFeed',
 });
 
 <Table
