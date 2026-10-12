@@ -4,13 +4,22 @@
  * @partOf primitive:websockets
  * @uses none
  */
+import { getRedisClient } from '@template/db';
 import { streamSnapshotFrame } from '#/ws/dataFrame';
-import { sendTo } from '#/ws/delivery';
+import { sendFrame, sendTo } from '#/ws/delivery';
+import { readStreamSeq } from '#/ws/queries/readStreamSeq';
 import { byId } from '#/ws/registry';
 import { rejectDataStream } from '#/ws/rejectDataStream';
+import { streamSeqKeyFor } from '#/ws/streamSeq';
 import { fetchStreamSnapshot } from '#/ws/streamSnapshot';
 import { subscribeToStream, unsubscribeFromStream } from '#/ws/streamSubscriptions';
 import type { WSSocket } from '#/ws/types';
+
+// Seq first: every append at or below it is already in the snapshot that follows.
+const readSnapshot = async (ws: WSSocket, stream: string) => {
+  const seq = await readStreamSeq(getRedisClient(), streamSeqKeyFor(stream, ws.data.userId));
+  return { seq, read: await fetchStreamSnapshot(ws.data.headers, stream) };
+};
 
 // Subscribed before the snapshot read so no later append is missed; held appends flush after it.
 export const openDataStream = async (ws: WSSocket, stream: string): Promise<void> => {
@@ -19,7 +28,7 @@ export const openDataStream = async (ws: WSSocket, stream: string): Promise<void
   const held: string[] = [];
   ws.data.heldAppends.set(stream, held);
 
-  const read = await fetchStreamSnapshot(ws.data.headers, stream).catch((error: unknown) => {
+  const { seq, read } = await readSnapshot(ws, stream).catch((error: unknown) => {
     unsubscribeFromStream(ws, stream);
     throw error;
   });
@@ -28,8 +37,8 @@ export const openDataStream = async (ws: WSSocket, stream: string): Promise<void
   if (read.access !== 'granted') return rejectDataStream(ws, stream, read.access);
   ws.data.heldAppends.delete(stream);
   sendTo(ws, { type: 'opened', stream });
-  sendTo(ws, streamSnapshotFrame(stream, read.payload));
-  for (const message of held) ws.send(message);
+  sendTo(ws, streamSnapshotFrame(stream, seq, read.payload));
+  for (const message of held) sendFrame(ws, message);
 };
 
 export const closeDataStream = (ws: WSSocket, stream: string): void => {

@@ -93,7 +93,7 @@ const key = `cache:User:${id}`;  // Don't do this
 | `bull` | `bull:*` | BullMQ job queues (managed by BullMQ) |
 | `cache` | `cache:*` | Application cache (user lookups, tokens, etc.) |
 | `job` | `job:*` | Singleton job locks (cron run-once) |
-| `ws` | `ws:*` | WebSocket pub/sub channels |
+| `ws` | `ws:*` | WebSocket pub/sub channels and data-stream seq counters (`ws:seq:{<stream>}`) |
 | `otp` | `otp:*` | One-time passwords / verification codes |
 | `session` | `session:*` | BetterAuth sessions (via secondaryStorage) |
 | `limit` | `limit:*` | Rate limiting counters |
@@ -186,6 +186,10 @@ const WS_CHANNEL = 'ws:broadcast';
 // Messages include type: 'user' | 'channel' | 'broadcast'
 await pub.publish(WS_CHANNEL, JSON.stringify({ type: 'channel', target: 'org:123', event }));
 ```
+
+Stream appends are published by a Lua script that also `INCR`s the stream's `ws:seq:{<stream>}`
+counter, so every instance shares one sequence per stream (see
+[WEBSOCKETS.md](WEBSOCKETS.md#sequence-numbers)).
 
 ### BullMQ (`bull:*`)
 

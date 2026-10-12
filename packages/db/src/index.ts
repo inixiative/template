@@ -60,6 +60,7 @@ export {
   getRedisClient,
   getRedisPub,
   getRedisSub,
+  type RedisEval,
   type RedisNamespace,
   redisNamespace,
   upsertCache,

@@ -69,6 +69,7 @@ describe('dispatchMessage', () => {
     const append = (type: string, payload: unknown): WSEvent => ({
       category: 'data',
       action: 'append',
+      seq: 1,
       stream,
       type,
       payload,
@@ -76,12 +77,18 @@ describe('dispatchMessage', () => {
 
     it('stores a snapshot as the stream query data', async () => {
       const payload = await snapshot();
-      dispatchMessage({ category: 'data', action: 'snapshot', stream, payload });
+      dispatchMessage({ category: 'data', action: 'snapshot', seq: 1, stream, payload });
       expect(qc().getQueryData<unknown>(key)).toEqual(payload);
     });
 
     it('folds an append into the snapshot by the stream kind', async () => {
-      dispatchMessage({ category: 'data', action: 'snapshot', stream, payload: await snapshot() });
+      dispatchMessage({
+        category: 'data',
+        action: 'snapshot',
+        seq: 1,
+        stream,
+        payload: await snapshot(),
+      });
       const created = await contactStreamRow({ id: '0002' });
       dispatchMessage(append('upsert', created));
       expect(
@@ -98,7 +105,7 @@ describe('dispatchMessage', () => {
 
     it('requests a fresh snapshot instead of folding an op its kind does not define', async () => {
       const payload = await snapshot();
-      dispatchMessage({ category: 'data', action: 'snapshot', stream, payload });
+      dispatchMessage({ category: 'data', action: 'snapshot', seq: 1, stream, payload });
 
       dispatchMessage(append('append', {}));
 
@@ -128,11 +135,18 @@ describe('dispatchMessage', () => {
       dispatchMessage({
         category: 'data',
         action: 'snapshot',
+        seq: 1,
         stream,
         payload: { data: [removed, kept] },
       });
       dispatchMessage(append('remove', { id: '0002' }));
-      dispatchMessage({ category: 'data', action: 'snapshot', stream, payload: { data: [kept] } });
+      dispatchMessage({
+        category: 'data',
+        action: 'snapshot',
+        seq: 1,
+        stream,
+        payload: { data: [kept] },
+      });
 
       dispatchMessage(append('upsert', removed));
 
@@ -153,6 +167,7 @@ describe('dispatchMessage', () => {
       dispatchMessage({
         category: 'data',
         action: 'snapshot',
+        seq: 1,
         stream,
         payload: { data: [removed, kept] },
       });
@@ -164,6 +179,7 @@ describe('dispatchMessage', () => {
       dispatchMessage({
         category: 'data',
         action: 'append',
+        seq: 1,
         stream,
         type: 'upsert',
         payload: removed,
@@ -184,6 +200,7 @@ describe('dispatchMessage', () => {
       dispatchMessage({
         category: 'data',
         action: 'snapshot',
+        seq: 1,
         stream,
         payload: { data: [current] },
       });
@@ -200,6 +217,7 @@ describe('dispatchMessage', () => {
       dispatchMessage({
         category: 'data',
         action: 'snapshot',
+        seq: 1,
         stream: unknown,
         payload: { data: [] },
       });
