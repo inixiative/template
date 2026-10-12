@@ -21,6 +21,3 @@ const isPerRecipient = (audience: StreamAudience | undefined): boolean =>
 
 export const streamSeqKeyFor = (stream: string, userId: string | null): string =>
   streamSeqKey(stream, isPerRecipient(streamDefinitionOf(stream)?.audience) ? userId : null);
-
-// Clock-seeded so a counter re-created after expiry starts above its old values: holders see a gap.
-export const streamSeqSeed = (): string => String(Date.now() * 1000);

@@ -58,6 +58,10 @@ append is authorized for every holder, shaped exactly like the route's response,
 other writers, and folded on the client by its kind. If a refetch per change is affordable, use a
 channel.
 
+Ephemeral signals (presence, typing) use user/channel events, which are lossy by design; data
+streams are the reliable lane (seq + resync). The two lanes are the choice between "drop it if
+missed" and "detect the loss and repair it": pick the lane, not a per-stream delivery option.
+
 ## Channel registry and authorization
 
 `packages/shared/src/ws/channels.ts` exports `WS_CHANNELS`, the query-channel registry;
@@ -278,17 +282,28 @@ The client (`createApiWebsocket`) keeps the last seq per open stream:
   next snapshot, and re-sends `open` (`websocket.resync`) for a fresh one.
 
 The counter's TTL (one day) is refreshed by every append and every open, so only an idle stream's
-counter expires. A counter is seeded from the clock, so one re-created after expiry starts above any
-seq it gave out before and holders resync instead of ignoring every append.
+counter expires. A counter is seeded inside the script from Redis `TIME` in microseconds, one clock
+for every instance, so one re-created after expiry or a flush starts above any seq it gave out
+before and holders resync instead of ignoring every append. An instance whose own clock lags
+cannot seed it low.
 
 The server never drifts silently. Bun's `ws.send` returns `0` when it drops a frame (closed, or over
 its backpressure limit); `sendFrame` (`apps/api/src/ws/delivery.ts`), behind every send, then closes
-the connection (`1013 frame dropped`), and the client reconnects and re-opens its streams. If Redis
-cannot sequence an append, its local holders get a retryable `error` for the stream and re-open
-with backoff, and the instance keeps re-publishing a `streamResync` for that stream (once a second,
-one per stream) until Redis takes it, so holders on every other instance re-open too. Opens need
-the counter, so while Redis is down every open answers a retryable `error` and the client backs
-off. There is no replay buffer, no queue and no acknowledgement.
+the connection (`1013 frame dropped`), and the client reconnects and re-opens its streams.
+
+A Redis outage does not fail a publish. The client is created with `maxRetriesPerRequest: null`
+and ioredis's offline queue on (`packages/db/src/redis/client.ts`), so a sequencing `eval`, a seq
+read for an open, and every channel or user `publish` wait through the outage and run once Redis is
+back. A stream's appends queue behind its waiting one (`inStreamOrder`), and opens hang rather than
+answer `error`. Nothing adds a timeout: the seq already covers what an outage loses. The subscriber
+connection is down too, so appends published while it reconnects never reach this instance's
+holders, and their next append arrives past a gap and triggers a resync.
+
+When Redis answers a sequencing `eval` with an error, its local holders get a retryable `error` for
+the stream and re-open with backoff, and the instance keeps re-publishing a `streamResync` for that
+stream (once a second, one per stream) until Redis takes it, so holders on every other instance
+re-open too. A stream queued while that publisher is running goes out in the same run. There is no
+replay buffer, no queue and no acknowledgement.
 
 The seq cannot deduplicate a change that lands both in a snapshot read and in an append published
 after its stamp; list folds absorb that (upserts are idempotent), but a `log` fold appends the entry

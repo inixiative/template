@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test';
 import { getRedisClient } from '@template/db';
 import { publishStreamAppend } from '#/ws/queries/publishStreamAppend';
 import { readStreamSeq } from '#/ws/queries/readStreamSeq';
@@ -9,6 +9,10 @@ const stream = 'seqtest:stream';
 describe('stream seq counter', () => {
   beforeEach(async () => {
     await getRedisClient().del(streamSeqKey(stream));
+  });
+
+  afterEach(() => {
+    setSystemTime();
   });
 
   const publish = () =>
@@ -42,9 +46,21 @@ describe('stream seq counter', () => {
     let last = 0;
     for (let i = 0; i < 50; i++) last = await publish();
     await getRedisClient().del(streamSeqKey(stream));
-    await new Promise((resolve) => setTimeout(resolve, 2));
+    setSystemTime(new Date(Date.now() + 60_000));
 
     expect(await publish()).toBeGreaterThan(last + 1);
+  });
+
+  it('the seed comes from the Redis clock, so an instance whose clock lags cannot seed below held seqs', async () => {
+    const last = await publish();
+    await getRedisClient().del(streamSeqKey(stream));
+    const laggingClock = spyOn(Date, 'now').mockReturnValue(Date.now() - 60 * 60_000);
+    try {
+      expect(await readStreamSeq(getRedisClient(), streamSeqKey(stream))).toBeGreaterThan(last);
+      expect(await publish()).toBeGreaterThan(last + 1);
+    } finally {
+      laggingClock.mockRestore();
+    }
   });
 
   it('seqs survive the round trip exactly (no float formatting in the script)', async () => {

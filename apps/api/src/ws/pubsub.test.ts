@@ -155,6 +155,41 @@ describe('ws pubsub (redis round trip)', () => {
     ]);
   });
 
+  it('a resync queued while another is publishing goes out in the same run', async () => {
+    const redis = getRedisPub();
+    const evalSpy = spyOn(redis, 'eval').mockImplementation((() =>
+      Promise.reject(new Error('redis down'))) as never);
+    const realPublish = redis.publish.bind(redis);
+    const published: string[] = [];
+    let releaseFirst = () => {};
+    const firstHeld = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    let calls = 0;
+    const publishSpy = spyOn(redis, 'publish').mockImplementation((async (
+      channel: string,
+      message: string,
+    ) => {
+      if (calls++ === 0) await firstHeld;
+      published.push(message);
+      return realPublish(channel, message);
+    }) as never);
+    try {
+      await appendToStream('pubsub:resync-first', { type: 'upsert', payload: { id: 'x' } });
+      await appendToStream('pubsub:resync-second', { type: 'upsert', payload: { id: 'y' } });
+      releaseFirst();
+      await waitFor(() => published.length === 2, 500);
+    } finally {
+      evalSpy.mockRestore();
+      publishSpy.mockRestore();
+    }
+
+    expect(published.map((message) => JSON.parse(message).target)).toEqual([
+      'pubsub:resync-first',
+      'pubsub:resync-second',
+    ]);
+  });
+
   it('a resync from another instance closes the stream on local holders as retryable', async () => {
     const handle = createTestSocket({ connectionId: 'pubsub-foreign-resync' });
     addConnection(handle.socket);

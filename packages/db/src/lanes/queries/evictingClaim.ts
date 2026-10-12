@@ -4,7 +4,7 @@
  * @partOf infrastructure:redis
  * @uses none
  */
-import type { LaneRedis } from '@template/db/lanes/types';
+import type { RedisEval } from '@template/db/redis/types';
 
 // Take the baton: record jobId as the lane's holder, evicting whoever held it (last claim wins).
 // The claim happens at ENQUEUE time but is only refreshed by watchLane once the job RUNS, so the TTL
@@ -25,7 +25,7 @@ return previous
 `;
 
 export const evictingClaim = async (
-  redis: LaneRedis,
+  redis: RedisEval,
   lane: string,
   jobId: string,
   laneTtlSec: number,

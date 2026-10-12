@@ -4,9 +4,10 @@
  * @partOf infrastructure:prisma, infrastructure:redis
  * @uses none
  */
+import type { RedisEval } from '@template/db/redis/types';
 import type { Redis } from 'ioredis';
 
-export type LockRedis = Pick<Redis, 'set' | 'get' | 'eval'>;
+export type LockRedis = Pick<Redis, 'set' | 'get'> & RedisEval;
 export type LockLostReason = 'token_mismatch' | 'refresh_errors';
 export type LockReleaseResult = 'released' | 'notHeld' | 'unconfirmed';
 

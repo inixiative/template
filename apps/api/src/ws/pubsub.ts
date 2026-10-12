@@ -18,7 +18,7 @@ import { byId, byStream } from '#/ws/registry';
 import { rejectDataStream } from '#/ws/rejectDataStream';
 import { inStreamOrder } from '#/ws/streamPublishOrder';
 import { streamSeqKey } from '#/ws/streamSeq';
-import type { WSOutbound, WSSocket } from '#/ws/types';
+import type { WSOutbound } from '#/ws/types';
 
 const WS_CHANNEL = 'ws:broadcast';
 
@@ -57,9 +57,10 @@ const deliverStreamAppend = ({
     sendToStreamLocal(target, () => shared);
     return;
   }
-  const seqOf = (ws: WSSocket) =>
-    ws.data.userId ? seqs[userIds.indexOf(ws.data.userId)] : undefined;
-  sendToStreamLocal(target, (ws) => frame(seqOf(ws)));
+  const seqByUserId = new Map(userIds.map((userId, index) => [userId, seqs[index]]));
+  sendToStreamLocal(target, (ws) =>
+    frame(ws.data.userId ? seqByUserId.get(ws.data.userId) : undefined),
+  );
 };
 
 const deliverLocal = (message: PubSubMessage): void => {
@@ -140,7 +141,8 @@ const publishPendingResyncs = async (): Promise<void> => {
   if (publishingResyncs) return;
   publishingResyncs = true;
   try {
-    for (const stream of [...pendingResyncs]) {
+    while (pendingResyncs.size > 0) {
+      const [stream] = pendingResyncs;
       const message = { type: 'streamResync', target: stream, origin: INSTANCE_ID };
       await getRedisPub().publish(WS_CHANNEL, JSON.stringify(message));
       pendingResyncs.delete(stream);
@@ -177,6 +179,7 @@ export const appendToStream = (
         append,
       });
     } catch (err) {
+      // maxRetriesPerRequest: null queues the eval through an outage; only a Redis error lands here.
       log.error(`Failed to publish a stream append (${stream}); resyncing its holders:`, err);
       resyncEverywhere(stream);
     }

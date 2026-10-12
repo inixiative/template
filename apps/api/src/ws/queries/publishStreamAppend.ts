@@ -4,18 +4,15 @@
  * @partOf primitive:websockets
  * @uses infrastructure:redis
  */
-import { STREAM_SEQ_TTL_MS, streamSeqSeed } from '#/ws/streamSeq';
+import type { RedisEval } from '@template/db';
+import { STREAM_SEQ_TTL_MS } from '#/ws/streamSeq';
 
 // One script so publish order is seq order across instances; GET keeps each seq out of Lua's %.14g.
-const PUBLISH_WITH_SEQS =
-  "local seqs = {} for i, key in ipairs(KEYS) do redis.call('SET', key, ARGV[3], 'NX') redis.call('INCR', key) redis.call('PEXPIRE', key, ARGV[4]) seqs[i] = redis.call('GET', key) end local joined = table.concat(seqs, ',') redis.call('PUBLISH', ARGV[1], '{\"seqs\":[' .. joined .. '],' .. string.sub(ARGV[2], 2)) return joined";
-
-type EvalCapable = {
-  eval: (script: string, numKeys: number, ...args: (string | number)[]) => Promise<unknown>;
-};
+// A new counter is seeded from Redis TIME (µs), one clock for every instance, so it starts above old seqs.
+const PUBLISH_WITH_SEQS = `local now = redis.call('TIME') local seed = now[1] .. string.format('%06d', tonumber(now[2])) local seqs = {} for i, key in ipairs(KEYS) do redis.call('SET', key, seed, 'NX') redis.call('INCR', key) redis.call('PEXPIRE', key, ARGV[3]) seqs[i] = redis.call('GET', key) end local joined = table.concat(seqs, ',') redis.call('PUBLISH', ARGV[1], '{"seqs":[' .. joined .. '],' .. string.sub(ARGV[2], 2)) return joined`;
 
 export const publishStreamAppend = async (
-  redis: EvalCapable,
+  redis: RedisEval,
   channel: string,
   seqKeys: string[],
   message: Record<string, unknown>,
@@ -26,7 +23,6 @@ export const publishStreamAppend = async (
     ...seqKeys,
     channel,
     JSON.stringify(message),
-    streamSeqSeed(),
     String(STREAM_SEQ_TTL_MS),
   )) as string;
   return joined.split(',').map(Number);
