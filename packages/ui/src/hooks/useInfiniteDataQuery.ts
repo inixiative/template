@@ -29,6 +29,7 @@ export type UseInfiniteDataQueryResult<TItem> = {
   data: TItem[];
   pageCount: number;
   isLoading: boolean;
+  isError: boolean;
   isFetchingNextPage: boolean;
   hasNextPage: boolean;
   fetchNextPage: () => void;
@@ -82,6 +83,7 @@ export function useInfiniteDataQuery<TItem>(
     data,
     pageCount,
     isLoading: query.isLoading,
+    isError: query.isError,
     isFetchingNextPage: query.isFetchingNextPage,
     hasNextPage: query.hasNextPage,
     fetchNextPage: () => query.fetchNextPage(),
