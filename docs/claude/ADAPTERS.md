@@ -5,7 +5,7 @@
 ## Contents
 
 - [What an adapter module is](#what-an-adapter-module-is)
-- [Module layout (Option β)](#module-layout-option-)
+- [Module layout (Option β)](#module-layout-option)
 - [Adapter primitives](#adapter-primitives)
   - [makeAdapterRouter — pick-one per environment](#makeadapterrouter--pick-one-per-environment)
   - [makeBroadcastRegistry — fan-out across providers](#makebroadcastregistry--fan-out-across-providers)
@@ -114,7 +114,7 @@ Use when: **caller explicitly picks which provider** by name (not env-derived). 
 | Exported adapter | Module name (no role suffix) | `errorReporter`, `storage` |
 | Module-level singleton | `__` prefix | `let __client: S3Client \| null = null` |
 
-The `__` prefix is the template-wide convention for **internal/private** items (see `AI/ENTRYPOINT.md` and code-style memory). Never use a single `_` prefix for private — single `_` means "unused" in this codebase.
+The `__` prefix is the template-wide convention for **internal/private** items (see [NAMING.md](NAMING.md#underscore-prefix)). Never use a single `_` prefix for private — single `_` means "unused" in this codebase.
 
 ---
 

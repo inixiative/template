@@ -179,7 +179,7 @@ See `docs/claude/COMMUNICATIONS.md` for details.
 
 | Context | Alias | Example |
 |---------|-------|---------|
-| Within an app | `#/` | `import { getUser } from '#/lib/context/getUser'` |
+| Within an app | `#/` | `import { getActor } from '#/lib/context/getActor'` |
 | Shared packages | `@template/` | `import { db } from '@template/db'` |
 | Within a shared package | `@template/` | `import { log } from '@template/shared/logger'` |
 | Top-level barrel exports | Relative | `export { foo } from './foo'` |
@@ -188,7 +188,7 @@ See `docs/claude/COMMUNICATIONS.md` for details.
 
 ```typescript
 // In apps/api - use #/ for internal imports
-import { getUser } from '#/lib/context/getUser';
+import { getActor } from '#/lib/context/getActor';
 import { authMiddleware } from '#/middleware/auth/authMiddleware';
 ```
 
@@ -216,6 +216,11 @@ export { logScope } from './scope';
 ```
 
 Actual code files always use aliases.
+
+**Rules:**
+- No relative imports (`./`, `../`) in source, except in barrel/index files.
+- App code never uses `##/` or `~/`; package code never uses `#/`, `##/`, or `~/`.
+- Prefer package subpath imports (`@template/shared/logger`) over broad root imports.
 
 ### TypeScript Configuration
 
@@ -350,11 +355,11 @@ bun add -d <package>
 
 ```typescript
 // Good - direct imports
-import { getUser } from '#/lib/context/getUser';
-import { cache } from '#/lib/cache/cache';
+import { getActor } from '#/lib/context/getActor';
+import { emailRegistry } from '#/lib/email';
 
 // Bad - intermediate barrel
-import { getUser, cache } from '#/lib';
+import { getActor, emailRegistry } from '#/lib';
 ```
 
 Direct imports:

@@ -1,26 +1,40 @@
 # Logging and monitoring
 
+<!-- toc:start -->
+
+## Contents
+
+- [Structured logging](#structured-logging)
+- [Setup](#setup)
+  - [New Relic traces/metrics + Better Stack logs](#new-relic-tracesmetrics--better-stack-logs)
+  - [Browser setup](#browser-setup)
+- [Inspect locally without any provider](#inspect-locally-without-any-provider)
+- [Coverage and limits](#coverage-and-limits)
+- [Following an incident across two services](#following-an-incident-across-two-services)
+
+<!-- toc:end -->
+
 The application emits three kinds of evidence:
 
 | Signal | Answers | Example |
 | --- | --- | --- |
-| Structured logs | What happened, with which identifiers? | Reminder delivery failed; job ID and attempt |
+| Structured logs | What happened, with which identifiers? | Webhook delivery failed; job ID and attempt |
 | Traces | Where did this operation spend time or fail? | Browser → API → Prisma/Redis → worker |
 | Metrics | How often, how slow, how much? | Error rate, request latency, queue depth, memory |
 
-Pino and Consola are logger libraries, not hosting services. The existing shared logger is the adapter boundary: Pino writes JSON in hosted environments; Consola displays readable output in local/test. OpenTelemetry carries logs, traces and metrics to an OTLP-compatible destination. The SDK uses fetch-based OTLP/HTTP JSON exporters, adapted from Zealot's Bun approach; it does not rely on Node monkey-patching under Bun.
+Pino and Consola are logger libraries, not hosting services. The existing shared logger is the adapter boundary: Pino writes JSON in hosted environments; Consola displays readable output in local/test. OpenTelemetry carries logs, traces and metrics to an OTLP-compatible destination. The SDK uses fetch-based OTLP/HTTP JSON exporters; it does not rely on Node monkey-patching under Bun.
 
 ## Structured logging
 
 ```typescript
 import { log, withLogContext } from '@template/shared/logger';
 
-await withLogContext({ botId, operation: 'sendReminder' }, async () => {
-  log.info({ event: 'reminder.sent', reminderId }, 'Reminder sent');
+await withLogContext({ webhookSubscriptionId, operation: 'sendWebhook' }, async () => {
+  log.info({ event: 'webhook.sent', webhookEventId }, 'Webhook sent');
 });
 ```
 
-Both `log.info(fields, message)` and `log.info(message, fields)` preserve object fields. Child bindings survive: `log.child({ component: 'whatsapp', botId })`. Nested objects stay objects in Pino output; OTLP log attributes serialize nested objects as JSON for compatibility with providers that require primitive attribute values. Put frequently searched identifiers in top-level fields.
+Both `log.info(fields, message)` and `log.info(message, fields)` preserve object fields. Child bindings survive: `log.child({ component: 'webhooks', webhookSubscriptionId })`. Nested objects stay objects in Pino output; OTLP log attributes serialize nested objects as JSON for compatibility with providers that require primitive attribute values. Put frequently searched identifiers in top-level fields.
 
 `logScope(id, fn)` adds a display scope. Passing `LogScope.worker` as the last argument appends a scope. `withLogContext(fields, fn)` adds named searchable fields across async calls. API logs acquire `requestId`; worker logs acquire `jobId`, `jobName`, and `attempt`. Active spans add `trace_id` and `span_id`, including on error logs.
 
@@ -38,7 +52,7 @@ Headless setup accepts `bun run init:agent --section=monitoring` with `MONITORIN
 
 ```dotenv
 OTEL_ENABLED=true
-OTEL_SERVICE_NAME=tribe
+OTEL_SERVICE_NAME=template
 OTEL_EXPORTER_OTLP_ENDPOINT=https://otlp.nr-data.net
 OTEL_EXPORTER_OTLP_HEADERS=api-key=YOUR_NEW_RELIC_LICENSE_KEY
 OTEL_EXPORTER_OTLP_LOGS_ENDPOINT=https://YOUR_INGESTING_HOST/v1/logs
@@ -93,7 +107,7 @@ The pinned Collector validates real OTLP requests and prints all three signal ty
 | Redis | Command duration/outcome; no keys/values; callback/pipeline semantics retained | Redis server memory, evictions, replication; blocking/pubsub commands excluded |
 | Runtime | Process RSS, heap usage and CPU time | Host/container/disk/network metrics via infrastructure agents or Collector receivers |
 | Browser | Navigation load, SDK requests, unhandled/React errors; cross-service trace IDs | Web Vitals, source maps, session replay, pre-initialization failures |
-| Business | `withSpan`, `recordDuration`, structured event fields available to integrations | WhatsApp connectivity, delivery receipts, LLM latency/token/cost, storage/email/webhook outcomes |
+| Business | `withSpan`, `recordDuration`, structured event fields available to integrations | Delivery receipts, LLM latency/token/cost, storage/email/webhook outcomes |
 
 Trace sampling uses a parent-based ratio; metrics and logs remain independent. Changing the ratio can leave logs with trace IDs whose spans were not retained. Labels on built-in metrics are bounded route/model/operation/state names; user/job IDs belong in logs and spans, never metric labels.
 
@@ -105,8 +119,8 @@ The warning is a JSON record with `event=telemetry.export.failed`, the affected 
 
 1. Open the failed/slow operation in New Relic and copy its trace ID.
 2. Search Better Stack logs for `trace_id` with that value.
-3. Follow `requestId`, `jobId`, `botId`, and the structured `event` field to understand the domain event.
+3. Follow `requestId`, `jobId`, and the structured `event` field to understand the domain event.
 
-Retention is separate: a trace may outlive its logs. Provider deep links and saved dashboards can be added after account/source IDs are known. The [superadmin alert proposal](./MONITORING_ALERTS.md) builds on these signals in a separate PR.
+Retention is separate: a trace may outlive its logs. Provider deep links and saved dashboards can be added after account/source IDs are known. Superadmin alerting on these signals is proposed in `tickets/OTEL-002-superadmin-alerts.md`.
 
 The existing Sentry error-reporter adapter remains available independently; enabling OTel does not configure or remove it.

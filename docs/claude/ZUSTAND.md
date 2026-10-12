@@ -9,35 +9,22 @@
   - [State](#state)
   - [Actions](#actions)
     - [initialize()](#initialize)
-    - [hydrate(data)](#hydratedata)
-    - [setUser(user)](#setuseruser)
-    - [setSession(session)](#setsessionsession)
+    - [refreshMe()](#refreshme)
+    - [signIn(method) / signUp(method)](#signinmethod--signupmethod)
     - [setStrategy(strategy)](#setstrategystrategy)
-    - [getOrganizationOptions()](#getorganizationoptions)
-    - [getUserMenu(fallbackName?)](#getusermenufallbackname)
-    - [requireAuth(onSuccess?)](#requireauthonsuccess)
+    - [setSpoof(email)](#setspoofemail)
     - [logout()](#logout)
   - [Usage Patterns](#usage-patterns)
 - [2. PermissionsSlice](#2-permissionsslice)
   - [State](#state)
   - [Actions](#actions)
-    - [hydrate(me)](#hydrateme)
+    - [setup(me)](#setupme)
     - [check(model, record, action)](#checkmodel-record-action)
     - [clear()](#clear)
   - [Usage Patterns](#usage-patterns)
 - [3. TenantSlice](#3-tenantslice)
   - [State](#state)
   - [Actions](#actions)
-    - [setPublic()](#setpublic)
-    - [setPersonal(personal?)](#setpersonalpersonal)
-    - [selectOrganization(organizationId)](#selectorganizationorganizationid)
-    - [selectSpace(spaceId)](#selectspacespaceid)
-    - [setOrganization(organization, space?)](#setorganizationorganization-space)
-    - [setSpace(organization, space)](#setspaceorganization-space)
-    - [setPage(page)](#setpagepage)
-  - [Helper Methods](#helper-methods)
-    - [getCurrentContext()](#getcurrentcontext)
-    - [getNavContext()](#getnavcontext)
   - [Usage Patterns](#usage-patterns)
 - [4. ClientSlice](#4-clientslice)
   - [State](#state)
@@ -48,17 +35,9 @@
 - [5. UISlice](#5-uislice)
   - [State](#state)
   - [Actions](#actions)
-    - [setTheme(theme)](#setthemetheme)
-    - [hydrateSettings(settings)](#hydratesettingssettings)
-    - [updateTheme(theme)](#updatethemetheme)
-    - [setLoading(loading)](#setloadingloading)
-  - [Usage Patterns](#usage-patterns)
 - [6. NavigationSlice](#6-navigationslice)
   - [State](#state)
   - [Actions](#actions)
-    - [setNavigate(fn)](#setnavigatefn)
-    - [setNavConfig(config)](#setnavconfigconfig)
-    - [setCurrentPath(path)](#setcurrentpathpath)
 - [Access Patterns](#access-patterns)
   - [Reading State](#reading-state)
   - [Calling Actions](#calling-actions)
@@ -72,7 +51,7 @@
   - [3. Actions](#3-actions)
   - [4. Type Safety](#4-type-safety)
   - [5. Side Effects](#5-side-effects)
-- [Migration Guide](#migration-guide)
+- [Adding or Removing a Slice](#adding-or-removing-a-slice)
   - [Adding a New Slice](#adding-a-new-slice)
   - [Removing a Slice](#removing-a-slice)
 - [File Reference](#file-reference)
@@ -125,9 +104,9 @@ export type AppStore = ClientSlice & AuthSlice & NavigationSlice & PermissionsSl
 Apps consume it directly:
 
 ```typescript
-// apps/web/app/main.tsx — wire the QueryClient into the store at boot
-import { useAppStore } from '@template/ui/store';
-useAppStore.getState().setClient(queryClient);
+// apps/web/app/main.tsx — createAppQueryClient wires the QueryClient into the store
+import { createAppQueryClient } from '@template/ui/lib/createAppQueryClient';
+const queryClient = createAppQueryClient();
 
 // any app component
 const theme = useAppStore((state) => state.ui.theme);
@@ -149,139 +128,75 @@ const theme = useAppStore((state) => state.ui.theme);
 
 ## 1. AuthSlice
 
-**Location:** `packages/ui/src/store/slices/auth.ts`
+**Location:** `packages/ui/src/store/slices/auth.ts` (type: `packages/ui/src/store/types/auth.ts`)
 
 ### State
 
 ```typescript
 {
-  user: AuthUser | null;
-  session: AuthSession | null;
-  organizationUsers: AuthOrganizationUser[] | null;  // User's org memberships
-  organizations: AuthOrganization[] | null;           // Full org objects
-  spaceUsers: AuthSpaceUser[] | null;                 // User's space memberships
-  spaces: AuthSpace[] | null;                         // Full space objects
-  strategy: AuthStrategy;                             // 'login' | 'embed'
+  client: BetterAuthClient;                         // createAuthClient({ baseURL: VITE_API_URL })
+  user: User | null;                                // /me minus memberships
+  organizations: Record<string, Organization> | null; // keyed by id
+  spaces: Record<string, Space> | null;             // keyed by id
+  spaceUsers: Record<string, SpaceUser> | null;     // keyed by spaceId
+  strategy: AuthStrategy;                           // { type: 'login' } | { type: 'embed'; parentOrigin? }
+  spoofUserEmail: string | null;                    // who we are spoofing (sent as a header)
+  spoofingUserEmail: string | null;                 // the real superadmin, from x-spoofing-user-email
   isAuthenticated: boolean;
-  isEmbedded: boolean;                                // Embed mode active
+  isEmbedded: boolean;
   isInitialized: boolean;
 }
 ```
+
+Memberships are dictionaries, not arrays. `/me` is fetched and hydrated by
+`fetchAndHydrateMe` (`packages/ui/src/lib/auth/fetchAndHydrateMe.ts`), which also calls
+`permissions.setup(me)`.
 
 ### Actions
 
 #### initialize()
 
-Fetches `/me` endpoint, hydrates auth + permissions:
+Runs once (no-op when `isInitialized`). If a bearer token is stored, fetches `/me`,
+hydrates auth + permissions and authenticates the websocket. On failure it logs out and
+rethrows. Always sets `isInitialized`. Called by the `requireAuth` / `requirePublic`
+route guards.
 
-```typescript
-const user = await auth.initialize();
+#### refreshMe()
 
-// Internally:
-// 1. Calls GET /me
-// 2. Hydrates auth state
-// 3. Calls permissions.hydrate()
-// 4. Sets isInitialized = true
-```
+Re-fetches `/me` and re-hydrates (after a membership or profile change).
 
-**Used in:** `_authenticated.tsx` layouts
+#### signIn(method) / signUp(method)
 
-#### hydrate(data)
-
-Manually set auth state (used by `initialize()` or after login):
-
-```typescript
-auth.hydrate({
-  user,
-  session,
-  organizationUsers,
-  organizations,
-  spaceUsers,
-  spaces,
-});
-
-// Side effect: Sets tenant.context to 'personal' or 'public'
-```
-
-#### setUser(user)
-
-Update current user:
-
-```typescript
-auth.setUser(updatedUser);
-```
-
-#### setSession(session)
-
-Update session (rarely used - mainly JWT):
-
-```typescript
-auth.setSession(session);
-```
+Unified auth entry points (`AuthMethod`: email, oauth, saml; see
+[AUTH.md](AUTH.md)). Email sign-in hydrates `/me` immediately; OAuth hydrates on the
+callback route. `signUp` returns a `SignUpResult` and hydrates only when it is
+`'authenticated'`.
 
 #### setStrategy(strategy)
-
-Set auth strategy (login vs embed):
 
 ```typescript
 auth.setStrategy({ type: 'embed', parentOrigin: 'https://parent.com' });
 auth.setStrategy({ type: 'login' });
 ```
 
-#### getOrganizationOptions()
+Sets `isEmbedded` from the strategy type.
 
-Transform orgs + spaces into ContextSelector format:
+#### setSpoof(email)
 
-```typescript
-const options = auth.getOrganizationOptions();
-// Returns: [{ id, name, spaces: [{ id, name }] }]
-```
-
-#### getUserMenu(fallbackName?)
-
-Get user data for UserMenu component:
-
-```typescript
-const menu = auth.getUserMenu();
-// Returns: { name, email, avatarUrl }
-```
-
-#### requireAuth(onSuccess?)
-
-Trigger auth flow if not authenticated:
-
-```typescript
-auth.requireAuth(() => {
-  // Called if already authenticated
-});
-
-// If not authenticated:
-// - login strategy: Shows login modal (TODO)
-// - embed strategy: Posts message to parent
-```
+Sets `spoofUserEmail` (or `null` to exit), re-hydrates `/me` as the spoofed user and
+re-identifies the websocket.
 
 #### logout()
 
-Clear auth state and return to public context:
-
-```typescript
-await auth.logout();
-
-// Side effect: Calls tenant.setPublic()
-```
+Revokes the server session, then (always) clears the token, auth state and permissions,
+calls `tenant.setPublic()` and navigates to `/login`. Throws if the server revoke failed.
 
 ### Usage Patterns
 
 ```typescript
-// Access state
 const user = useAppStore((state) => state.auth.user);
 const isAuth = useAppStore((state) => state.auth.isAuthenticated);
-
-// Call actions
-const initialize = useAppStore((state) => state.auth.initialize);
 const logout = useAppStore((state) => state.auth.logout);
-
-await initialize();
 await logout();
 ```
 
@@ -295,9 +210,10 @@ await logout();
 
 ```typescript
 {
-  permissions: Permix & {
-    check: (model, record, action) => boolean;
-    hydrate: (me) => Promise<void>;
+  permissions: {
+    permix: Permix;
+    check: (model: AccessorName, record: HydratedRecord, action: ActionRule) => boolean;
+    setup: (me: UserWithRelations) => Promise<void>;
     clear: () => void;
   }
 }
@@ -305,68 +221,34 @@ await logout();
 
 ### Actions
 
-#### hydrate(me)
+#### setup(me)
 
-Set up ReBAC permissions (called by `auth.initialize()`):
-
-```typescript
-await permissions.hydrate({
-  id: user.id,
-  platformRole: user.platformRole,
-  organizationUsers: [
-    { organizationId: 'org1', role: 'owner', entitlements: {...} }
-  ],
-  spaceUsers: [
-    { spaceId: 'space1', role: 'admin', entitlements: {...} }
-  ],
-});
-
-// Internally:
-// 1. Sets userId in Permix
-// 2. Checks if superadmin
-// 3. Calls setupOrgContext() for each org
-// 4. Calls setupSpaceContext() for each space
-```
-
-**Matches backend permission setup** - frontend permissions mirror backend.
+Called by `fetchAndHydrateMe`. Sets the Permix user id; a superadmin gets
+`setSuperadmin(true)` and stops there. Otherwise it applies `getUserPermissions`, then
+`getOrgPermissions` per `organizationUsers` row and `getSpacePermissions` per
+`spaceUsers` row (role + entitlements), mirroring the backend setup.
 
 #### check(model, record, action)
 
-Check if user can perform action on record:
+ReBAC check (`rebac/check` over `rebacSchema`) against the hydrated record:
 
 ```typescript
-const canEdit = permissions.check('organization', org, 'update');
-const canDelete = permissions.check('space', space, 'delete');
-
-if (canEdit) {
-  // Show edit button
-}
+const canManage = permissions.check('organization', org, 'manage');
 ```
-
-**Models:** `'organization'`, `'space'`, `'customer'`, etc.
-**Actions:** `'create'`, `'read'`, `'update'`, `'delete'`, `'manage'`, etc.
 
 #### clear()
 
-Reset permissions (called on logout):
-
-```typescript
-permissions.clear();
-```
+Replaces `permix` with a fresh instance (called on logout).
 
 ### Usage Patterns
 
 ```typescript
-// Check permissions
 const permissions = useAppStore((state) => state.permissions);
-const canManage = permissions.check('organization', org, 'manage');
+<Button show={permissions.check('organization', org, 'manage')}>Edit</Button>
 
-// In components
-<Button show={canManage}>Edit Organization</Button>
-
-// usePermission hook (wrapper)
-const { can } = usePermission('organization', org);
-<Button show={can('update')}>Edit</Button>
+// usePermission returns { show, disable, disabledText }
+const editBtn = usePermission({ permissions, model: 'organization', record: org, action: 'manage' });
+<Button {...editBtn}>Edit</Button>
 ```
 
 ---
@@ -380,134 +262,44 @@ const { can } = usePermission('organization', org);
 ```typescript
 {
   context: {
-    type: 'public' | 'personal' | 'organization' | 'space';
+    type: 'public' | 'user' | 'organization' | 'space';
     organization?: Organization;
     space?: Space;
-    personal?: any;
   };
   page: {
-    organization?: Organization;  // From route params
+    organization?: Organization;
     space?: Space;
   };
 }
 ```
 
-**Difference:**
-- **context**: Global app-level context (shown in ContextSelector dropdown)
-- **page**: Route-specific context (from URL params like `/org/:orgId`)
+- **context**: the app-level context shown in the ContextSelector.
+- **page**: the record a page is about, passed to nav `access` checks.
 
 ### Actions
 
-#### setPublic()
+| Action | Effect |
+|---|---|
+| `setPublic()` | `{ type: 'public' }` |
+| `setUser()` | `{ type: 'user' }` (personal) |
+| `setOrganization(organizationId)` | Looks up `auth.organizations`; returns `false` if missing |
+| `setSpace(spaceId)` | Looks up `auth.spaces` and its organization; returns `false` if either is missing |
+| `setPage(page)` / `clearPage()` | Set or reset `page` |
 
-Switch to public context (only when logged out):
-
-```typescript
-tenant.setPublic();
-// Sets: { type: 'public' }
-```
-
-#### setPersonal(personal?)
-
-Switch to personal context:
-
-```typescript
-tenant.setPersonal();
-// Sets: { type: 'personal' }
-```
-
-#### selectOrganization(organizationId)
-
-Switch to organization by ID (looks up from `auth.organizations`):
-
-```typescript
-const success = tenant.selectOrganization('org-123');
-// Returns: boolean (false if org not found)
-```
-
-#### selectSpace(spaceId)
-
-Switch to space by ID (looks up from `auth.spaces`):
-
-```typescript
-const success = tenant.selectSpace('space-456');
-// Returns: boolean (false if space not found)
-// Also sets parent organization
-```
-
-#### setOrganization(organization, space?)
-
-Directly set organization context:
-
-```typescript
-tenant.setOrganization(orgObject, spaceObject);
-```
-
-#### setSpace(organization, space)
-
-Directly set space context:
-
-```typescript
-tenant.setSpace(orgObject, spaceObject);
-```
-
-#### setPage(page)
-
-Set page context from route params:
-
-```typescript
-tenant.setPage({ organization: org, space: space });
-```
-
-### Helper Methods
-
-#### getCurrentContext()
-
-Get formatted context for display:
-
-```typescript
-const ctx = tenant.getCurrentContext();
-// Returns: { type, label, organizationId?, spaceId? }
-
-// Examples:
-// { type: 'personal', label: 'Personal' }
-// { type: 'organization', label: 'Acme Inc', organizationId: 'org-123' }
-// { type: 'space', label: 'Marketing', spaceId: 'space-456' }
-```
-
-#### getNavContext()
-
-Get effective context for navigation (page takes precedence over context):
-
-```typescript
-const navCtx = tenant.getNavContext();
-// Returns: { organization?, space? }
-
-// Precedence: page.organization > context.organization
-```
+`useAuthenticatedRouting` keeps context and the `?org=` / `?space=` URL params in sync
+and falls back to a context the nav config authorizes.
 
 ### Usage Patterns
 
 ```typescript
-// Read context
 const tenant = useAppStore((state) => state.tenant);
-const contextType = tenant.context.type;
-const currentOrg = tenant.context.organization;
-
-// Switch context
-tenant.setPersonal();
-tenant.selectOrganization('org-123');
-tenant.selectSpace('space-456');
-
-// ContextSelector usage
-<ContextSelector
-  currentContext={tenant.getCurrentContext()}
-  organizations={organizationOptions}
-  onSelectPersonal={() => tenant.setPersonal()}
-  onSelectOrganization={(id) => tenant.selectOrganization(id)}
-  onSelectSpace={(spaceId) => tenant.selectSpace(spaceId)}
-/>
+tenant.setUser();
+tenant.setOrganization('org-123');
+tenant.setSpace('space-456');
 ```
+
+`ContextSelector` reads `tenant` and `auth` from the store itself; it takes only
+`locked`, `onManageOrganizations` and `className`.
 
 ---
 
@@ -515,16 +307,16 @@ tenant.selectSpace('space-456');
 
 **Location:** `packages/ui/src/store/slices/client.ts` (type: `packages/ui/src/store/types/client.ts`)
 
-Holds the TanStack `QueryClient` and the live-query websocket. The store is the
-home for the query client so it can be reached outside React (e.g. `auth.initialize()`
-fetches `/me` before render).
+Holds the TanStack `QueryClient` and the API websocket. The store is the home for the
+query client so it can be reached outside React.
 
 ### State
 
 ```typescript
 {
-  client: QueryClient | null;   // TanStack Query client (set at app boot)
-  websocket: ApiWebsocket;      // live-query websocket (channelKey subscriptions)
+  client: QueryClient | null;   // set at app boot
+  websocket: ApiWebsocket;      // live-query channels and data streams
+  setClient: (client: QueryClient) => void;
 }
 ```
 
@@ -532,34 +324,24 @@ fetches `/me` before render).
 
 #### setClient(client)
 
-Wire the app's `QueryClient` into the store (called once in `main.tsx`). Also
-subscribes the query cache to live-query channels: when an observer is added for a
-registered live query, the websocket subscribes to its `channelKey`; when removed,
-it unsubscribes.
-
-```typescript
-// apps/web/app/main.tsx
-useAppStore.getState().setClient(queryClient);
-```
+Called by `createAppQueryClient()` (`packages/ui/src/lib/createAppQueryClient.ts`), which
+each app's `main.tsx` uses. It subscribes the query cache: an observer added to a data-stream
+query opens the stream, one added to a registered live query subscribes its `channelKey`;
+removing the observer closes or unsubscribes.
 
 ### Live queries
 
 `createClientSlice` derives the `ws(s)://` URL from `VITE_API_URL`, builds the
-`ApiWebsocket` (`createApiWebsocket`), and on reconnect refetches any live queries
-to recover invalidations missed while disconnected. Live-query registration lives in
+`ApiWebsocket` (`createApiWebsocket`), and on reconnect invalidates live queries to recover
+invalidations missed while disconnected. Live-query registration lives in
 `@template/shared/ws` (`LIVE_QUERIES`, `channelKey`); the connect is driven by
 `useApiWebsocket` (see [WEBSOCKETS.md](WEBSOCKETS.md)).
 
 ### Usage Patterns
 
 ```typescript
-// Access the query client
 const client = useAppStore((state) => state.client);
 client?.invalidateQueries({ queryKey: ['organizations'] });
-
-// Or via hook
-import { useQueryClient } from '@tanstack/react-query';
-const queryClient = useQueryClient();
 ```
 
 ---
@@ -572,74 +354,26 @@ const queryClient = useQueryClient();
 
 ```typescript
 {
-  theme: 'light' | 'dark' | 'system';
+  theme: 'light' | 'dark' | 'system';  // default 'system'
   isLoading: boolean;
-  isInitialized: boolean;
-  appName: string;        // From VITE_APP_NAME
-  shortName: string;      // From VITE_APP_SHORT_NAME
-  logo: string;           // From VITE_APP_LOGO_URL (optional; shown next to shortName in the shell)
-  description: string;    // From VITE_APP_DESCRIPTION
+  projectName: string;   // VITE_PROJECT_NAME
+  appName: string;       // VITE_APP_NAME
+  shortName: string;     // VITE_APP_SHORT_NAME
+  logo: string;          // VITE_APP_LOGO_URL (optional)
+  description: string;   // VITE_APP_DESCRIPTION
 }
 ```
 
 ### Actions
 
-#### setTheme(theme)
+| Action | Effect |
+|---|---|
+| `setTheme(theme)` | Sets the preference (used by `ThemeToggle`) |
+| `setLoading(loading)` | Global loading flag |
+| `updateTheme(theme)` | Sets the theme; server persistence is not built |
 
-Set theme preference:
-
-```typescript
-ui.setTheme('dark');
-ui.setTheme('light');
-ui.setTheme('system');
-```
-
-**Used by:** `ThemeToggle` component in settings
-
-#### hydrateSettings(settings)
-
-Hydrate UI settings (from localStorage):
-
-```typescript
-ui.hydrateSettings({ theme: 'dark' });
-// Sets isInitialized = true
-```
-
-**Used by:** `useThemePersistence` hook in `__root.tsx`
-
-#### updateTheme(theme)
-
-Update theme with API persistence (TODO):
-
-```typescript
-await ui.updateTheme('dark');
-// Currently just calls setTheme
-// TODO: Persist to backend /me/settings
-```
-
-#### setLoading(loading)
-
-Set global loading state:
-
-```typescript
-ui.setLoading(true);
-// ... do work
-ui.setLoading(false);
-```
-
-### Usage Patterns
-
-```typescript
-// Read theme
-const theme = useAppStore((state) => state.ui.theme);
-
-// Set theme (in ThemeToggle)
-const setTheme = useAppStore((state) => state.ui.setTheme);
-<button onClick={() => setTheme('dark')}>Dark Mode</button>
-
-// App metadata
-const appName = useAppStore((state) => state.ui.appName);
-```
+`useThemePersistence` (in each `__root.tsx`) loads `theme` from `localStorage` on mount and
+writes it back on change.
 
 ---
 
@@ -651,53 +385,32 @@ const appName = useAppStore((state) => state.ui.appName);
 
 ```typescript
 {
-  navigate: ((options: any) => void) | null;
+  navigate: ((options: { to: string; search?: Record<string, string>; hash?: string }) => void) | null;
   navConfig: NavConfig | null;
-  currentPath: string;
+  currentRouteMatch: RouteMatch | null;
+  flowId: string | null;
 }
 ```
 
 ### Actions
 
-#### setNavigate(fn)
+| Action | Effect |
+|---|---|
+| `setNavigate(fn)` | Stores the TanStack Router `navigate` |
+| `setNavConfig(config)` | Stores the app's nav config |
+| `setCurrentRouteMatch(match)` | Set by `useAuthenticatedRouting` |
+| `navigatePreserving(to, policy)` | Navigate, carrying search params by policy |
+| `setFlowId(id)` | The active flow, carried as `?flow=` (see [FLOWS.md](FLOWS.md)) |
 
-Store TanStack Router navigate function:
+`navigatePreserving` policies:
+- `'context'`: keep `org` / `space`, plus `spoof` and `flow`;
+- `'spoof'`: keep only `spoof` and `flow`;
+- `'all'`: keep every current search param.
 
-```typescript
-navigation.setNavigate((options) => navigate(options));
-```
+The target's own query wins on conflicts; the current hash is kept unless the target sets one.
 
-#### setNavConfig(config)
-
-Store nav configuration:
-
-```typescript
-navigation.setNavConfig(navConfig);
-```
-
-#### setCurrentPath(path)
-
-Track current path:
-
-```typescript
-navigation.setCurrentPath('/dashboard');
-```
-
-**Usage in __root.tsx:**
-
-```typescript
-// Store TanStack Router navigate function
-const navigate = useNavigate();
-const setNavigate = useAppStore((state) => state.navigation.setNavigate);
-const setNavConfig = useAppStore((state) => state.navigation.setNavConfig);
-
-useEffect(() => {
-  setNavigate((options: any) => navigate(options));
-  setNavConfig(navConfig);
-}, [navigate, setNavigate, setNavConfig]);
-```
-
-**Purpose:** Centralize navigation for programmatic navigation outside React components.
+`useRegisterNavigation(navConfig)` in each app's `__root.tsx` wires `setNavigate` and
+`setNavConfig`, so code outside components can navigate.
 
 ---
 
@@ -767,26 +480,24 @@ await useAppStore.getState().auth.initialize();
 ## Slice Dependencies
 
 ```
-AuthSlice ──┬──> TenantSlice (sets context on login/logout)
-            └──> PermissionsSlice (hydrates permissions)
+AuthSlice ──┬──> PermissionsSlice (setup on /me, clear on logout)
+            ├──> TenantSlice (setPublic on logout)
+            ├──> ClientSlice (websocket identity)
+            └──> NavigationSlice (navigate to /login on logout)
 
 TenantSlice ───> AuthSlice (reads organizations/spaces)
 
-PermissionsSlice (standalone)
+NavigationSlice ───> AuthSlice (reads spoofUserEmail)
 
-ClientSlice (standalone)
-
-NavigationSlice (standalone)
-
-UISlice (standalone)
+PermissionsSlice, ClientSlice, UISlice (standalone)
 ```
 
 **Cross-slice access** is safe via `get()` in slice creators:
 
 ```typescript
-export const createAuthSlice: StateCreator<AuthSlice & TenantSlice> = (set, get) => ({
+export const createAuthSlice: StateCreator<AppStore, [], [], AuthSlice> = (set, get) => ({
   auth: {
-    logout: () => {
+    logout: async () => {
       set(/* clear auth */);
       get().tenant.setPublic(); // Access other slice
     },
@@ -854,7 +565,7 @@ useAppStore.getState().auth.user = newUser;
 
 **DO:** Export and use slice types:
 ```typescript
-import type { AuthSlice } from '@template/ui';
+import type { AuthSlice } from '@template/ui/store/types';
 ```
 
 **DON'T:** Use `any`:
@@ -883,7 +594,7 @@ const logout = () => {
 
 ---
 
-## Migration Guide
+## Adding or Removing a Slice
 
 ### Adding a New Slice
 
@@ -949,6 +660,8 @@ packages/ui/src/store/
 │   └── index.ts        # AppStore intersection + re-exports
 └── index.ts            # Composes useAppStore (shared by all apps)
 
+packages/ui/src/lib/createAppQueryClient.ts  # Builds the QueryClient and calls setClient
+
 apps/{web,admin,superadmin}/app/
-└── main.tsx            # Calls useAppStore.getState().setClient(queryClient)
+└── main.tsx            # const queryClient = createAppQueryClient()
 ```

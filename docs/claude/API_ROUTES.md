@@ -8,6 +8,8 @@
 - [Route Templates](#route-templates)
   - [Template Args](#template-args)
   - [Examples](#examples)
+- [Lens Wheres](#lens-wheres)
+  - [How pagination applies them](#how-pagination-applies-them)
 - [Controllers](#controllers)
   - [Respond Types](#respond-types)
 - [Module Examples](#module-examples)
@@ -24,13 +26,19 @@
   - [Pagination](#pagination)
   - [paginate() Utility](#paginate-utility)
   - [Search & Filtering](#search--filtering)
+  - [Route declaration (lens narrowing)](#route-declaration-lens-narrowing)
+  - [Dynamic per-request scope — `scopeNarrowing` middleware](#dynamic-per-request-scope--scopenarrowing-middleware)
+  - [Admin routes](#admin-routes)
+  - [Controller — `paginate()` integration](#controller--paginate-integration)
+  - [How it works](#how-it-works)
+  - [Security](#security)
   - [Bracket Notation Query Parsing](#bracket-notation-query-parsing)
   - [Relation Field Security](#relation-field-security)
   - [OrderBy](#orderby)
 - [Frontend Metadata](#frontend-metadata)
-  - [OpenAPI Extensions](#openapi-extensions)
+  - [OpenAPI surface (Phase 4 work-in-progress)](#openapi-surface-phase-4-work-in-progress)
   - [Extracting Metadata](#extracting-metadata)
-  - [DataTable Configuration](#datatable-configuration)
+  - [Data Config + Filters](#data-config--filters)
 - [Error Responses](#error-responses)
 - [Complex Operations & HTTP Status](#complex-operations--http-status)
   - [Batch Operations](#batch-operations)
@@ -398,33 +406,7 @@ GET /organizations/org_123/authProviders
 
 #### Integration with Frontend
 
-```typescript
-// packages/ui/src/hooks/useAuthProviders.ts
-import { useQuery } from '@tanstack/react-query';
-import { organizationReadAuthProvider } from '@template/ui/apiClient';
-import { apiQuery } from '@template/ui/lib';
-
-export const useAuthProviders = () => {
-  const search = useSearch({ strict: false }) as { org?: string };
-
-  const { data, isLoading, error } = useQuery({
-    queryKey: search.org ? ['authProviders', 'org', search.org] : ['authProviders', 'platform'],
-    queryFn: search.org
-      ? apiQuery((opts) => organizationReadAuthProvider({ ...opts, path: { id: search.org! } }))
-      : apiQuery((opts) => authProviderReadMany(opts)),
-    retry: 2,
-  });
-
-  // Flatten platform + organization providers for display
-  const providers = search.org && data?.platform && data?.organization
-    ? [...data.platform, ...data.organization]
-    : data ?? [];
-
-  return { providers, isLoading, error };
-};
-```
-
-See `docs/claude/AUTH.md` for complete frontend integration patterns.
+`useAuthProviders` (`packages/ui/src/hooks/useAuthProviders.ts`) reads these routes; see [FRONTEND/AUTH.md](FRONTEND/AUTH.md#useauthproviders).
 
 ---
 
@@ -916,8 +898,8 @@ function OrganizationsTable() {
 ### Data Config + Filters
 
 `makeDataConfig(operationId, options?)` builds a `DataConfig` from the operation's metadata
-(`searchableFields`, `orderableFields`, `enumFilters`, `searchMode`, `canSearch`, `canOrder`);
-`useDataFilters(config)` drives the live filter/search/order state. See FRONTEND.md for the full
+(`searchableFields`, `orderableFields`, `enumFilters`, `defaultOrderBy`, `canSearch`, `canOrder`);
+`useDataFilters(config)` drives the live filter/search/order state. See [FRONTEND/API_CLIENT.md](FRONTEND/API_CLIENT.md#data-hooks) for the full
 wiring (debounce, URL/history state, `buildFilterQuery`).
 
 ```typescript

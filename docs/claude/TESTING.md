@@ -22,6 +22,7 @@
   - [Composite Foreign Keys](#composite-foreign-keys)
   - [Cleanup](#cleanup)
   - [Test Data Patterns](#test-data-patterns)
+- [VCR (external services)](#vcr-external-services)
 - [Test App](#test-app)
 - [Request Helpers](#request-helpers)
 - [Frontend Testing (happy-dom)](#frontend-testing-happy-dom)
@@ -95,6 +96,8 @@ describe('userRead', () => {
 ## Factories
 
 Located in `packages/db/src/test/factories/`.
+
+Use a factory whenever one exists; never hand-build a DB record a factory covers.
 
 ### build vs create
 
@@ -367,6 +370,25 @@ export const createModel = modelFactory.create;
 ```
 
 ---
+
+## VCR (external services)
+
+Tests never call a live provider. A client that talks to an external service wraps each call in `VCR` from `@template/shared/vcr`:
+
+```typescript
+readonly vcr = new VCR(FIXTURES_DIR, { service: 'resend', version: () => '…', sanitizers });
+
+send(options) {
+  return this.vcr.capture('send', () => this.__send(options));
+}
+```
+
+- Outside tests `capture` calls straight through.
+- In tests the test queues a cassette per call (`client.vcr.queue('send', 'accepted')`); `capture` replays it, or records a sanitized one when the file is missing or its `version` differs from the service's current version.
+- A recorded `status >= 400` replays as a thrown error.
+- Sanitizers redact keys before a cassette is written; commit only sanitized cassettes.
+
+Used by `packages/email` (Resend, Bouncer) and every `init/api/*` client.
 
 ## Test App
 

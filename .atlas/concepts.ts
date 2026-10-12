@@ -4,7 +4,7 @@ import type { ConceptRegistry } from '@inixiative/atlas';
 // (feature / primitive / infrastructure); `module`/`package` are the constituent
 // categories that fill @partOf during stamping.
 export const CONCEPTS: ConceptRegistry = {
-  'feature:auth': { module: ['token', 'authProvider'], docs: ['AUTH.md'] },
+  'feature:auth': { module: ['token', 'authProvider'], docs: ['AUTH.md', 'FRONTEND/AUTH.md'] },
   'feature:tenancy': { module: ['organization', 'space', 'organizationUser', 'spaceUser'] },
   'feature:users': { module: ['user', 'me'] },
   'feature:inquiry': { module: ['inquiry'], docs: ['INQUIRIES.md'] },
@@ -26,12 +26,22 @@ export const CONCEPTS: ConceptRegistry = {
   'primitive:authz': { package: ['permissions'], docs: ['PERMISSIONS.md'] },
   'primitive:batch': { module: ['batch'], docs: ['BATCH.md'] },
   'primitive:flows': { module: ['flow'], docs: ['FLOWS.md'] },
-  'primitive:ui': { package: ['ui'], docs: ['FRONTEND.md', 'ZUSTAND.md'] }, // the component library
+  'primitive:ui': {
+    package: ['ui'],
+    docs: [
+      'FRONTEND.md',
+      'FRONTEND/ROUTING_NAVIGATION.md',
+      'FRONTEND/API_CLIENT.md',
+      'FRONTEND/COMPONENTS.md',
+      'FRONTEND/THEME_LAYOUT.md',
+      'ZUSTAND.md',
+    ],
+  }, // the component library
   'primitive:shared': {
     package: ['shared'],
     docs: ['CONCURRENCY.md', 'LOGGING.md', 'ENCRYPTION.md'],
   }, // shared utils/types
-  'primitive:sdk': { package: ['sdk'] }, // generated API client
+  'primitive:sdk': { package: ['sdk'], docs: ['FRONTEND/API_CLIENT.md'] }, // generated API client
   'primitive:appEvents': { module: ['appEvents'], docs: ['APP_EVENTS.md'] },
   'primitive:jobs': { module: ['jobs', 'job'], docs: ['JOBS.md'] }, // 'job' = admin/job enqueue surface
   'primitive:websockets': { module: ['ws'], docs: ['WEBSOCKETS.md', 'APP_EVENTS.md'] },

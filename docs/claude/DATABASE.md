@@ -39,13 +39,14 @@
 - [Transactions](#transactions)
   - [Manual Transaction](#manual-transaction)
   - [After Commit Callbacks](#after-commit-callbacks)
+  - [Finally Callbacks](#finally-callbacks)
+  - [Row Locks and Create-If-Missing](#row-locks-and-create-if-missing)
 - [Query Building Utilities](#query-building-utilities)
   - [buildWhereClause](#buildwhereclause)
   - [Soft-delete read scoping](#soft-delete-read-scoping)
   - [Path Notation Utilities](#path-notation-utilities)
 - [False Polymorphism](#false-polymorphism)
   - [Special Owner Values (No FK)](#special-owner-values-no-fk)
-- [Constraint Helpers (planned — not yet built)](#constraint-helpers-planned--not-yet-built)
 - [Registries](#registries)
 - [Schema Reference](#schema-reference)
 
@@ -742,12 +743,6 @@ enum EmailOwnerModel {
 3. Default (seeded baseline)
 
 See [HOOKS.md](HOOKS.md#false-polymorphism) for validation.
-
----
-
-## Constraint Helpers (planned — not yet built)
-
-DB-level constraint helpers (CHECK constraints, partial unique indexes, GIST indexes, exactly-one-FK polymorphic guards) are **not implemented yet** — `packages/db/src/constraints/` does not exist. App-level validation is handled today by the [rules hook](HOOKS.md#rules-registry); add these helpers when DB-level guards are needed. See TODO.md.
 
 ---
 
