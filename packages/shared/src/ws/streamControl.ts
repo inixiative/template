@@ -6,6 +6,8 @@
  */
 export type WSStreamAckFrame = { type: 'opened' | 'openRejected' | 'closed'; stream: string };
 
+export type WSStreamResyncFrame = { type: 'resync'; stream: string };
+
 export type WSFrameErrorFrame = {
   type: 'error';
   action: string;

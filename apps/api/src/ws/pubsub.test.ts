@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
-import { getRedisPub } from '@template/db';
+import { getRedisPub, getRedisSub } from '@template/db';
 
 import { appendToStream, initWebSocketPubSub, isPubSubEnabled, sendToChannel } from '#/ws/pubsub';
 import { publishStreamAppend } from '#/ws/queries/publishStreamAppend';
@@ -104,7 +104,7 @@ describe('ws pubsub (redis round trip)', () => {
     expect(seqs.map((seq) => seq - (seqs[0] as number))).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
   });
 
-  it('an append Redis cannot sequence closes the stream on local holders as retryable', async () => {
+  it('an append Redis cannot sequence resyncs the stream on local holders', async () => {
     const handle = createTestSocket({ connectionId: 'pubsub-down' });
     addConnection(handle.socket);
     subscribeToStream(handle.socket, 'pubsub:down');
@@ -119,7 +119,7 @@ describe('ws pubsub (redis round trip)', () => {
     }
 
     expect(handle.sent.map((message) => JSON.parse(message))).toEqual([
-      { type: 'error', action: 'open', stream: 'pubsub:down', retryable: true },
+      { type: 'resync', stream: 'pubsub:down' },
     ]);
     expect(handle.socket.data.streams.has('pubsub:down')).toBe(false);
     expect(pendingStreamQueues()).toBe(0);
@@ -190,7 +190,7 @@ describe('ws pubsub (redis round trip)', () => {
     ]);
   });
 
-  it('a resync from another instance closes the stream on local holders as retryable', async () => {
+  it('a resync from another instance resyncs the stream on local holders', async () => {
     const handle = createTestSocket({ connectionId: 'pubsub-foreign-resync' });
     addConnection(handle.socket);
     subscribeToStream(handle.socket, 'pubsub:foreign');
@@ -202,8 +202,50 @@ describe('ws pubsub (redis round trip)', () => {
     await waitFor(() => handle.sent.length > 0);
 
     expect(handle.sent.map((message) => JSON.parse(message))).toEqual([
-      { type: 'error', action: 'open', stream: 'pubsub:foreign', retryable: true },
+      { type: 'resync', stream: 'pubsub:foreign' },
     ]);
+  });
+
+  it('a subscriber reconnect resubscribes, then resyncs every locally held stream', async () => {
+    const quiet = createTestSocket({ connectionId: 'pubsub-reconnect-quiet' });
+    const busy = createTestSocket({ connectionId: 'pubsub-reconnect-busy' });
+    for (const { socket } of [quiet, busy]) addConnection(socket);
+    subscribeToStream(quiet.socket, 'pubsub:reconnect-quiet');
+    subscribeToStream(busy.socket, 'pubsub:reconnect-busy');
+    subscribeToStream(busy.socket, 'pubsub:reconnect-quiet');
+    const sub = getRedisSub();
+    const resubscribe = spyOn(sub, 'subscribe');
+    try {
+      sub.emit('close');
+      sub.emit('ready');
+      await waitFor(() => quiet.sent.length === 1 && busy.sent.length === 2);
+      expect(resubscribe).toHaveBeenCalledWith('ws:broadcast');
+    } finally {
+      resubscribe.mockRestore();
+    }
+
+    expect(quiet.sent.map((message) => JSON.parse(message))).toEqual([
+      { type: 'resync', stream: 'pubsub:reconnect-quiet' },
+    ]);
+    expect(new Set(busy.sent.map((message) => JSON.parse(message).stream))).toEqual(
+      new Set(['pubsub:reconnect-busy', 'pubsub:reconnect-quiet']),
+    );
+    expect(busy.socket.data.streams.size).toBe(0);
+
+    await appendToStream('pubsub:reconnect-quiet', { type: 'upsert', payload: { id: 'x' } });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(quiet.sent).toHaveLength(1);
+  });
+
+  it('a ready with no drop before it resyncs nothing', async () => {
+    const handle = createTestSocket({ connectionId: 'pubsub-ready-only' });
+    addConnection(handle.socket);
+    subscribeToStream(handle.socket, 'pubsub:ready-only');
+
+    getRedisSub().emit('ready');
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(handle.sent).toEqual([]);
   });
 
   it('counts a per-recipient stream per user, so an append for one user is no gap for another', async () => {

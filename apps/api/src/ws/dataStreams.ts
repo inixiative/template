@@ -5,25 +5,45 @@
  * @uses none
  */
 import { getRedisClient } from '@template/db';
+import { streamDefinitionOf, WS_MAX_STREAM_NAME_LENGTH } from '@template/shared/ws';
 import { streamSnapshotFrame } from '#/ws/dataFrame';
 import { sendFrame, sendTo } from '#/ws/delivery';
+import { claimStreamSeq } from '#/ws/queries/claimStreamSeq';
 import { readStreamSeq } from '#/ws/queries/readStreamSeq';
 import { byId } from '#/ws/registry';
 import { rejectDataStream } from '#/ws/rejectDataStream';
 import { streamSeqKeyFor } from '#/ws/streamSeq';
-import { fetchStreamSnapshot } from '#/ws/streamSnapshot';
+import { fetchStreamSnapshot, type StreamRead } from '#/ws/streamSnapshot';
 import { subscribeToStream, unsubscribeFromStream } from '#/ws/streamSubscriptions';
 import type { WSSocket } from '#/ws/types';
 
+const SEQ_CLAIM_ATTEMPTS = 3;
+
+const isOpenableStreamName = (stream: unknown): stream is string =>
+  typeof stream === 'string' &&
+  stream.length <= WS_MAX_STREAM_NAME_LENGTH &&
+  streamDefinitionOf(stream) !== null;
+
 // Seq first: every append at or below it is already in the snapshot that follows.
-const readSnapshot = async (ws: WSSocket, stream: string) => {
-  const seq = await readStreamSeq(getRedisClient(), streamSeqKeyFor(stream, ws.data.userId));
-  return { seq, read: await fetchStreamSnapshot(ws.data.headers, stream) };
+const readSnapshot = async (
+  ws: WSSocket,
+  stream: string,
+  attempt = 1,
+): Promise<{ seq: number; read: StreamRead }> => {
+  const redis = getRedisClient();
+  const seqKey = streamSeqKeyFor(stream, ws.data.userId);
+  const counter = await readStreamSeq(redis, seqKey);
+  const read = await fetchStreamSnapshot(ws.data.headers, stream);
+  if (read.access !== 'granted' || (await claimStreamSeq(redis, seqKey, counter)))
+    return { seq: counter.seq, read };
+  if (attempt >= SEQ_CLAIM_ATTEMPTS) return { seq: counter.seq, read: { access: 'retryable' } };
+  return readSnapshot(ws, stream, attempt + 1);
 };
 
 // Subscribed before the snapshot read so no later append is missed; held appends flush after it.
 export const openDataStream = async (ws: WSSocket, stream: string): Promise<void> => {
   if (!byId.has(ws.data.connectionId)) return;
+  if (!isOpenableStreamName(stream)) return rejectDataStream(ws, stream, 'rejected');
   subscribeToStream(ws, stream);
   const held: string[] = [];
   ws.data.heldAppends.set(stream, held);
