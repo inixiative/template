@@ -90,6 +90,7 @@ export const rebacSchema: RebacSchema = {
       },
     },
     'db:integration': { actions: ownerActions() },
+    'db:flow': { actions: ownerActions(['user']) },
 
     'db:organizationUser': {
       actions: {

@@ -5,6 +5,7 @@
  * @uses none
  */
 import { useLocation } from '@tanstack/react-router';
+import { useActiveFlow } from '@template/ui/hooks/flow/useActiveFlow';
 import {
   applyAuthorizedContext,
   hasContextChanged,
@@ -19,6 +20,8 @@ import {
 } from '@template/ui/hooks/useAuthenticatedRouting/urlSync';
 import { checkContextPermission } from '@template/ui/lib/checkContextPermission';
 import { findRoute } from '@template/ui/lib/findRoute';
+import { dropFlow } from '@template/ui/lib/flows/dropFlow';
+import { isOnFlowPath } from '@template/ui/lib/flows/isOnFlowPath';
 import { useAppStore } from '@template/ui/store';
 import { useEffect, useRef, useState } from 'react';
 
@@ -31,6 +34,9 @@ export const useAuthenticatedRouting = (): { isAuthorized: boolean } => {
   const tenant = useAppStore((state) => state.tenant);
   const permissions = useAppStore((state) => state.permissions);
   const auth = useAppStore((state) => state.auth);
+  const flowId = useAppStore((state) => state.navigation.flowId);
+  const flow = useActiveFlow();
+  const urlFlowId = parseRoutingSearchParams(search).flowId;
 
   // Handle context from query params (async for spoof)
   useEffect(() => {
@@ -39,10 +45,16 @@ export const useAuthenticatedRouting = (): { isAuthorized: boolean } => {
       syncStoreFromSearchParams({ searchParams, tenant, auth });
 
       if (searchParams.spoofEmail !== auth.spoofUserEmail) {
+        useAppStore.getState().navigation.setFlowId(null);
         await auth.setSpoof(searchParams.spoofEmail);
       }
     })();
   }, [search, auth, tenant]);
+
+  useEffect(() => {
+    const { navigation } = useAppStore.getState();
+    if (urlFlowId && urlFlowId !== navigation.flowId) navigation.setFlowId(urlFlowId);
+  }, [urlFlowId]);
 
   // Update URL when context or spoof changes
   useEffect(() => {
@@ -51,6 +63,7 @@ export const useAuthenticatedRouting = (): { isAuthorized: boolean } => {
       searchParams,
       context: tenant.context,
       spoofUserEmail: auth.spoofUserEmail,
+      flowId,
     });
 
     if (updates) replaceUrlSearchParams(updates);
@@ -59,9 +72,14 @@ export const useAuthenticatedRouting = (): { isAuthorized: boolean } => {
     tenant.context.organization?.id,
     tenant.context.space?.id,
     auth.spoofUserEmail,
+    flowId,
     search,
     tenant.context,
   ]);
+
+  useEffect(() => {
+    if (isAuthorized && flow && !isOnFlowPath(pathname, flow)) dropFlow();
+  }, [isAuthorized, flow, pathname]);
 
   // Check permissions and fallback to valid context
   useEffect(() => {

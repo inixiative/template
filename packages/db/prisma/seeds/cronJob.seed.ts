@@ -56,5 +56,17 @@ export const cronJobSeeds: SeedFile<CronJob> = {
       maxAttempts: 3,
       backoffMs: 5000,
     },
+    {
+      id: '01900000-0000-7000-8000-000000000004',
+      name: 'cleanStaleFlows',
+      jobId: 'cleanStaleFlows',
+      description: 'Deletes flows nobody has advanced for 15 minutes.',
+      pattern: '*/5 * * * *',
+      enabled: true,
+      handler: 'cleanStaleData',
+      payload: { model: 'Flow', retentionDays: 15 / (24 * 60), dateField: 'updatedAt' },
+      maxAttempts: 3,
+      backoffMs: 5000,
+    },
   ],
 };

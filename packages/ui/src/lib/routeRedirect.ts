@@ -5,6 +5,7 @@
  * @uses none
  */
 import { redirect } from '@tanstack/react-router';
+import { currentLocation, currentPath } from '@template/ui/lib/currentLocation';
 import { pickSearchParams } from '@template/ui/lib/searchParams';
 import type { AppStore } from '@template/ui/store/types';
 
@@ -25,8 +26,9 @@ const navigateToAuth = (
   getStore: () => AppStore,
   preserveSearch?: boolean,
 ) => {
-  const redirectTo = `${window.location.pathname}${window.location.search}${window.location.hash}`;
-  const searchAndHash = `${window.location.search}${window.location.hash}`;
+  const redirectTo = currentPath();
+  const { search, hash } = currentLocation();
+  const searchAndHash = `${search}${hash}`;
   const query = preserveSearch ? searchAndHash : `?redirectTo=${encodeURIComponent(redirectTo)}`;
   getStore().navigation.navigatePreserving(`${path}${query}`, 'all');
 };

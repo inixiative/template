@@ -3,6 +3,7 @@ import { clearHookRegistry, db } from '@template/db';
 import { TokenOwnerModel } from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
+  createFlow,
   createIntegration,
   createOrganization,
   createToken,
@@ -46,6 +47,15 @@ describe('hardDeleteOnTombstone — rows that cannot outlive their parent', () =
     await tombstoneUser(user.id);
 
     expect(await db.webhookSubscription.findUnique({ where: { id: subscription.id } })).toBeNull();
+  });
+
+  it('hard-deletes a tombstoned user’s flows', async () => {
+    const { entity: user } = await createUser();
+    const { entity: flow } = await createFlow({}, { user });
+
+    await tombstoneUser(user.id);
+
+    expect(await db.flow.findUnique({ where: { id: flow.id } })).toBeNull();
   });
 
   it('hard-deletes an organization’s tokens when the organization is tombstoned', async () => {

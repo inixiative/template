@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { serializeBracketQuery } from '@template/ui/lib/serializeBracketQuery';
+import { serializeBracketQuery } from '@template/shared/bracketQuery';
 
 describe('serializeBracketQuery', () => {
   it('serializes flat string value', () => {

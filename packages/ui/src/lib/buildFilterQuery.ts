@@ -9,8 +9,8 @@ import {
   isArrayFieldOperator,
   isCombinator,
   type ScalarFieldOperator,
+  serializeBracketQuery,
 } from '@template/shared/bracketQuery';
-import { serializeBracketQuery } from '@template/ui/lib/serializeBracketQuery';
 import { castArray } from 'lodash-es';
 
 // Values carry their real type end to end: serializeBracketQuery marks null/boolean with `[:]`

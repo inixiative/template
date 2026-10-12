@@ -6,6 +6,7 @@ export {
   useEmailRuleSurface,
   useEmailVariableScope,
 } from './email';
+export { type StartedFlow, useActiveFlow, useStartFlow } from './flow';
 export {
   useCancelInquiryMutation,
   useCreateInquiryMutation,
@@ -63,7 +64,7 @@ export { checkPermission, usePermission } from './usePermission';
 export { useMutation, useQuery } from './useQuery';
 export { useRegisterNavigation } from './useRegisterNavigation';
 export { useScrollState } from './useScrollState';
-export { useSectionHash } from './useSectionHash';
+export { useSectionHash, useSectionOpen } from './useSectionHash';
 export { useSpaceTheme } from './useSpaceTheme';
 export { useStream } from './useStream';
 export { useStreamAction } from './useStreamAction';

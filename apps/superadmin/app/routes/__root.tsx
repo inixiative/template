@@ -5,7 +5,7 @@
  * @uses primitive:ui
  */
 import { createRootRoute, Outlet } from '@tanstack/react-router';
-import { RootNotFound, RouteError, Toaster } from '@template/ui/components';
+import { FlowBanner, RootNotFound, RouteError, Toaster } from '@template/ui/components';
 import {
   useApiWebsocket,
   useDarkMode,
@@ -30,6 +30,7 @@ const RootComponent = () => {
   return (
     <>
       <Toaster />
+      <FlowBanner />
       <Outlet />
     </>
   );

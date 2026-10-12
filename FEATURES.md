@@ -26,6 +26,7 @@
   - [General Security](#general-security)
 - [User Management](#user-management)
 - [Inquiry System](#inquiry-system)
+- [Flows](#flows)
 - [Contact System](#contact-system)
 - [Customer Management](#customer-management)
 - [Segments](#segments)
@@ -412,6 +413,20 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 - ✅ **Status Tracking** - Full state machine. `sentAt` set once on first send (historical). `expiresAt` set on send via `computeExpiresAt(type)`, cleared when moved back to draft
 - ✅ **Audit Lineage** - `sourceInquiryId` set in actor context during resolution so all side-effect mutations link back to the causal inquiry
 - 🟡 **UI and flow completion** (ticket FEAT-001) - Invitation flow, approval UI, and onboarding integrations in progress
+
+---
+
+## Flows
+
+**A short-lived walk through a few in-app pages, checked by the server.** A convenience, not a contract: on any failure, or when the user leaves the flow's pages, the flow is deleted and the user is back on the normal site.
+
+- ✅ **Registry** - `FlowKey` enum + `flowRegistry` in `modules/flow/registry`, one file per flow: a bindings schema and `steps(bindings)`, each step a `to`, an `advance` (`auto` / `confirm`), a `readPath` built with `apiPath(operationId, …)` and a json-rules rule over the response
+- ✅ **Resolved at create** - steps are resolved and stored on the row; editing the registry never affects a running flow. Create checks too, so callers just create a flow instead of pre-checking whether it is needed
+- ✅ **Rechecked on every read** - from step 0, as the caller, with `readAllAsCaller` (batch sub-requests, every page via `fetchAllPages`). Steps can move backward. A failed read deletes the flow (404); a finished one is returned once and deleted
+- ✅ **Transient** - `cleanStaleData` deletes flows idle for 15 minutes
+- ✅ **Client** - only `flowId` in the store (`?flow=` mirrors it like `spoof`), the flow read from the query cache, one `FlowBanner` per app, every mutation rechecks via the `MutationCache`, one `flowNext` rule drives the banner and `Modal` close ("Continue" / "Finish"), leaving the flow's pages drops it
+
+[Learn more: FLOWS.md](docs/claude/FLOWS.md)
 
 ---
 
