@@ -20,6 +20,7 @@ kanban
     INFRA-007-data-lifecycle-retention-export-delete
     INFRA-008-disaster-recovery-and-restore-drills
     INFRA-005-platform-baseline-hosting-observability
+    OTEL-002-superadmin-alerts
     INFRA-003-cicd
     FE-001-web-tanstack-start-evaluation
     FEAT-006-localization
@@ -72,6 +73,7 @@ kanban
 
 **Infrastructure / Platform:**
 - [INFRA-005: Platform Baseline](./INFRA-005-platform-baseline-hosting-observability.md) - Pick default hosting + DB + observability stack
+- [OTEL-002: Superadmin Alerts](./OTEL-002-superadmin-alerts.md) - Signal queries, incident lifecycle, superadmin inbox
 - [INFRA-003: CI/CD Pipeline](./INFRA-003-cicd.md) - Decision-first CI/CD baseline, implement after platform selection
 - [INFRA-006: Tenant Isolation Test Matrix](./INFRA-006-tenant-isolation-test-matrix.md) - Prove cross-tenant isolation across auth modes
 - [INFRA-007: Data Lifecycle](./INFRA-007-data-lifecycle-retention-export-delete.md) - Retention, export, and delete/redaction operations
@@ -137,12 +139,12 @@ kanban
 
 ## Quick Stats
 
-- **Total Backlog Items**: 34
+- **Total Backlog Items**: 35
 - **Polish**: 3
 - **Enterprise**: 2
 - **Financial**: 2
 - **Communication**: 3
-- **Infrastructure**: 9
+- **Infrastructure**: 10
 - **Audit & Compliance**: 1
 - **Security & Encryption**: 3
 - **AI Developer Experience**: 2

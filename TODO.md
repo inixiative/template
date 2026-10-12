@@ -135,7 +135,7 @@
 
 ### Database
 
-- [ ] Wire constraint helpers into db lifecycle (local setup + CI/CD) if using them
+- [ ] DB-level constraint helpers (CHECK constraints, partial unique indexes, GIST indexes, exactly-one-FK polymorphic guards) in `packages/db/src/constraints/`, wired into the db lifecycle (local setup + CI/CD). App-level validation is the rules hook today ([HOOKS.md](docs/claude/HOOKS.md#rules-registry))
 
 ### Developer Experience
 

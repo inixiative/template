@@ -419,7 +419,7 @@ Two separate ownership chains, selected by the sender's tier — a user-actor wa
 | User | User → default |
 | Space | Space → Org (if `inheritToSpaces`) → default |
 | Organization | Org → default |
-| admin | admin only |
+| admin | admin → default |
 | default | default only |
 
 This cascade happens automatically during compose - `composeTemplate` and `composeComponent` handle lookup based on the ownership context.
@@ -721,7 +721,7 @@ lives in the audit log**:
 
 A `{{#if rule=…}}` block can name a row — "recipient is tagged X", "recipient is in space Y". Those
 edges are persisted so that "who references X" is an index and a stale rule is never evaluated
-(INFRA-030; Zealot ZLT-4441 is the same primitive on MySQL).
+(INFRA-030).
 
 - **`RuleReference`** (`packages/db/prisma/schema/ruleReference.prisma`): one row per
   (source row → target row), false-polymorphic on both ends — `sourceModel` + one typed FK per

@@ -65,7 +65,7 @@ gh --version
 | `bun run init` | Once per project lifecycle | Person forking the template |
 | `bun run setup` | Each new developer + periodically | Everyone |
 
-**Init**: Interactive setup that configures Infisical, generates secrets, and provisions services. See [INIT_SCRIPT.md](INIT_SCRIPT.md).
+**Init**: Interactive setup that configures Infisical, generates secrets, and provisions services. See [INIT_SCRIPT_PATTERNS.md](INIT_SCRIPT_PATTERNS.md).
 
 **Setup**: Installs deps, starts Docker, generates Prisma, seeds DB. Run by each developer and whenever the repo needs to be brought up to date.
 

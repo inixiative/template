@@ -27,7 +27,8 @@
     - [Boolean Flags - Execution State](#boolean-flags---execution-state)
     - [Complete Example](#complete-example)
     - [Animation/Loading State Pattern](#animationloading-state-pattern)
-  - [16. Bun-Native Resume Tests with VCR Fixtures](#16-bun-native-resume-tests-with-vcr-fixtures)
+  - [17. Bun-Native Resume Tests with VCR Fixtures](#17-bun-native-resume-tests-with-vcr-fixtures)
+- [Resource Naming](#resource-naming)
 - [File Structure](#file-structure)
 - [Creating a New Task View](#creating-a-new-task-view)
   - [1. Create View Component](#1-create-view-component)
@@ -1015,9 +1016,9 @@ const handleAction = async () => {
 - ❌ Never use IIFE pattern `(async () => { ... })()` - make handler async instead
 - ❌ Never use `setTimeout` before showing loading state
 
-### 16. Bun-Native Resume Tests with VCR Fixtures
+### 17. Bun-Native Resume Tests with VCR Fixtures
 
-**Pattern:** Provider task tests use `bun:test`, `mock.module(...)`, and fixture-backed `VCR` helpers.
+**Pattern:** Provider task tests use `bun:test`, `mock.module(...)`, and the shared `VCR` (`@template/shared/vcr`, see [TESTING.md](TESTING.md#vcr-external-services)). The `init/api/*` clients (all but `cloudflare` and `resend`) own a `vcr`; tests queue cassettes with `api.vcr.queue(method, fixture)`.
 
 **Why:**
 - ✅ Fast, deterministic task coverage without live provider calls
@@ -1034,21 +1035,33 @@ init/
 │   ├── railwayResume.test.ts
 │   └── vercelBootstrapResume.test.ts
 └── tests/
-    ├── fixtures/
-    │   ├── infisical/
-    │   ├── railway/
-    │   └── vercel/
-    └── mocks/
-        └── VCR.ts
+    ├── fixtures/              # One folder per provider client (github, infisical, planetscale, railway, vercel, …)
+    └── mocks/                 # config.mock.ts, system.mock.ts
 ```
 
 **Testing guidance:**
 - Unit test pure helpers directly
 - Use task-level resume tests for provider workflows
-- Record sanitized fixture values, then replay them via `VCR.require()`
+- Record sanitized cassettes, then replay them by queueing them per call
 - Mock module boundaries, not internal implementation details
 
 ---
+
+## Resource Naming
+
+Railway resources are named **`{project}-{env}-{app}`**: project name from `project.config.ts`, then `prod` / `staging`, then the app. Always project → environment → app, so a dashboard filters by `{project}-*` and several projects share one workspace without collisions.
+
+| Resource | Names | Source |
+|----------|-------|--------|
+| Railway services | `{project}-prod-api`, `{project}-prod-worker`, `{project}-prod-redis` (and `-staging-`) | `railwaySetup.ts` |
+| Redis volumes | `{project}-prod-redis-data`, `{project}-staging-redis-data` | `railwaySetup.ts` |
+| Railway Postgres | `{project}-prod-postgres`, volume `{project}-prod-postgres-data` (and `-staging-`) | `railwayPostgresSetup.ts` |
+| Infisical → Railway syncs | `{project}-prod-api-service-sync`, `{project}-prod-worker-service-sync` (and `-staging-`) | `railwaySetup.ts` |
+| Railway buckets | `{project}-prod-system`, `{project}-prod-user` (and `-staging-`) | `railwayBucketsSetup.ts` |
+| Vercel projects | `{project}-web`, `{project}-admin` (no environment) | `vercelSetup.ts` |
+| PlanetScale branches | `{project}-production-init`, `{project}-staging-init` | `planetscaleSetup.ts` |
+
+Names are template literals over the config's project name in `init/tasks/*Setup.ts`; never hardcode one.
 
 ## File Structure
 
@@ -1079,7 +1092,7 @@ init/
 │   └── ...
 ├── tasks/tests/               # Bun-native provider resume tests
 ├── tests/fixtures/            # Sanitized provider fixtures
-├── tests/mocks/               # Shared VCR/config/system mocks
+├── tests/mocks/               # Shared config/system mocks
 └── components/                # Reusable components
     └── OrgSelector.tsx
 ```

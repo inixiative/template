@@ -31,7 +31,7 @@ compose, and in the ~95k curated lines of TypeScript that make them compose *cor
 | **Structure** | 4 applications (`api`, `web`, `admin`, `superadmin`) + 6 shared packages |
 | **API surface** | 111 route modules, auto-registered, each generating OpenAPI 3.1 |
 | **Tests** | 205 test files across apps and packages |
-| **Documentation** | 39 focused modules in `docs/claude/` (~23,000 lines total) |
+| **Documentation** | 45 focused modules in `docs/claude/` (~16,600 lines total) |
 | **Ecosystem** | Consumes [`json-rules`](https://github.com/inixiative/json-rules), [`permissions`](https://github.com/inixiative/permissions), [`atlas`](https://github.com/inixiative/atlas), [`prisma-map`](https://github.com/inixiative/prisma-map) |
 
 ## What's Here That Isn't in a Starter Kit
@@ -99,6 +99,7 @@ bun run local
 - [Database](docs/claude/DATABASE.md) - Prisma and migrations
 - [API Patterns](docs/claude/API_ROUTES.md) - Routes, controllers, schemas
 - [Auth](docs/claude/AUTH.md) - Authentication
+- [Frontend](docs/claude/FRONTEND.md) - Routing, API client, components, theme
 - [Permissions](docs/claude/PERMISSIONS.md) - ReBAC authorization
 - [Segments](docs/claude/SEGMENTS.md) - Provider audiences, reconciliation and Owned/Memberships navigation
 - [Testing](docs/claude/TESTING.md) - Test setup

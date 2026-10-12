@@ -26,7 +26,7 @@ A generic, type-safe workflow engine for multi-party requests that require revie
 - **Admin**: `GET /admin/inquiries` — full list with all relations
 
 ### Handler System
-Each inquiry type has a handler defining source/target config, content/resolution schemas, optional pre-create validation, and a `handleApprove` side-effect. See [INQUIRIES.md](../docs/claude/INQUIRIES.md).
+Each inquiry type has a handler defining source/target config, content/resolution schemas, optional pre-create validation, and a `handleApprove` side-effect. See [INQUIRIES.md](../../docs/claude/INQUIRIES.md).
 
 ### Permissions (ReBAC)
 - `send` — source-side role check (org owner for all space types; org manage for invites)
@@ -58,5 +58,5 @@ Shared schemas with relation includes:
 
 ## Related
 
-- [INQUIRIES.md](../docs/claude/INQUIRIES.md) — full developer reference
-- [COMM-001](./COMM-001-email-system.md) — email system (needed for invite notifications)
+- [INQUIRIES.md](../../docs/claude/INQUIRIES.md) — full developer reference
+- [COMM-001](../COMM-001-email-system.md) — email system (needed for invite notifications)

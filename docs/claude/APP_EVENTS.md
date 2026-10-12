@@ -17,6 +17,10 @@
 
 ## Purpose and execution
 
+Business logic never calls email, SMS, analytics, or notification services directly; every side
+effect goes through an app event. Direct calls couple every controller to every channel and put
+provider outages in the request path. Nothing synchronous hits an external service.
+
 Business write paths emit events; handlers select side effects. Email delivery runs in jobs,
 WebSocket handoffs use Redis pub/sub, and observation records the event envelope. This keeps
 delivery logic out of controllers and lets each consumer evolve independently.

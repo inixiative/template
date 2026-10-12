@@ -25,6 +25,7 @@
 - [Permission Checks](#permission-checks)
   - [In Controllers](#in-controllers)
   - [Via Validation Middleware](#via-validation-middleware)
+    - [Resource Lookup Runs Before Authorization](#resource-lookup-runs-before-authorization)
 - [Entitlements](#entitlements)
   - [How Entitlements Are Applied](#how-entitlements-are-applied)
   - [Intersecting Entitlements](#intersecting-entitlements)
@@ -54,6 +55,7 @@
 - [Token Permissions](#token-permissions)
   - [Token Creation](#token-creation)
   - [Token Deletion](#token-deletion)
+- [Frontend Checks](#frontend-checks)
 - [Future Work](#future-work)
   - [Groups](#groups)
 
@@ -377,6 +379,8 @@ if (!permix.check('organization', 'manage', orgId)) {
 ```
 
 ### Via Validation Middleware
+
+Authentication gates run first: `validateUser` (needs `c.get('user')`) or `validateActor` (needs `getActor(c).user`; Organization and Space tokens carry no user and fail both). Which to pick: [AUTH.md](./AUTH.md#choosing-between-validateuser-and-validateactor).
 
 The template uses a unified `validatePermission` middleware that leverages ReBAC for permission checks:
 
@@ -913,6 +917,63 @@ token: {
 Additionally, org/space admins can delete tokens within their scope via delegation:
 - Org admins can delete OrgUser tokens (via `manage` on organization)
 - Space admins can delete SpaceUser tokens (via `manage` on space)
+
+---
+
+## Frontend Checks
+
+The frontend runs the same ReBAC engine. `permissions.setup(me)` (`packages/ui/src/store/slices/permissions.ts`) loads the user's own, organization and space permissions from `/me`, mirroring the backend setup. A superadmin gets `permix.setSuperadmin(true)` and every check passes.
+
+| Layer | Entry point |
+|-------|-------------|
+| Route | `validateUser` / `validateActor`, then `validatePermission` ([Validation Middleware](#validation-middleware)) |
+| Page | `_authenticated.tsx` → `useAuthenticatedRouting` → `checkContextPermission`: the nav item's `access` decides "can view"; on failure it falls back to the org (from a space), then user, then public context, else renders `Unauthorized` |
+| Nav item | `access(permissions, context, page?)` on `NavItem`; the Sidebar hides items that fail it |
+| Component | `checkPermission(permissions, model, record, action)` / `permissions.check(model, record, action)` |
+
+**Check:**
+
+```typescript
+import { checkPermission } from '@template/ui/hooks/usePermission';
+
+const permissions = useAppStore((state) => state.permissions);
+const canDelete = checkPermission(permissions, 'organization', org, 'own');  // false when record is missing
+```
+
+**Visibility.** `Button` takes `show?: boolean | (() => boolean)` and `disabledText` (setting it disables the button and replaces its text):
+
+```typescript
+<Button show={checkPermission(permissions, 'organization', org, 'own')}>Delete</Button>
+```
+
+**Nav access** (`apps/*/app/config/nav/features/*.ts`):
+
+```typescript
+export const settingsItem: NavItem = {
+  label: 'Settings',
+  path: '/settings',
+  access: (permissions, context) => permissions.check(...getContextParams(context), 'read'),
+  items: [
+    {
+      label: 'Auth Providers',
+      path: '/authProviders',
+      access: (permissions, context) =>
+        !!context.organization && permissions.check(...getContextParams(context), 'own'),
+    },
+  ],
+};
+```
+
+`getContextParams(context)` returns `[model, record]` for the current tenant context (organization, space, or the user).
+
+**usePermission** (`packages/ui/src/hooks/usePermission.ts`) wraps the check into `{ show, disable, disabledText? }`:
+
+```typescript
+const deleteAction = usePermission({ permissions, model: 'organization', record: org, action: 'own' });
+// params: disabledText? (default "You do not have permission to perform this action"), requireRecord? (default true)
+```
+
+**useInquiryPermission(inquiry, action, side)** fills the current context into the inquiry's source or target side, then checks `inquiry`.
 
 ---
 
