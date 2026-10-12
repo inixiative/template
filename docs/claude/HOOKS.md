@@ -30,6 +30,7 @@
 - [False Polymorphism](#false-polymorphism)
   - [Registry](#registry)
   - [Auto-Generated Validation](#auto-generated-validation)
+  - [Request Validation](#request-validation)
   - [Validation Errors](#validation-errors)
 - [Contact Rules](#contact-rules)
   - [Adding a Contact Type](#adding-a-contact-type)
@@ -338,21 +339,23 @@ cacheKey('Session', userId, ['userId'], true)  // → cache:Session:userId:abc:*
 Single source of truth in `@template/db` - used by both validation hooks and DB constraints:
 
 ```typescript
-import { FalsePolymorphismRegistry } from '@template/db';
+import { PolymorphismRegistry } from '@template/db';
 
 // packages/db/src/registries/falsePolymorphism.ts
-FalsePolymorphismRegistry = {
-  Token: [{
-    typeField: 'ownerModel',
-    fkMap: {
-      User: ['userId'],                          // Requires userId only
-      Organization: ['organizationId'],          // Requires organizationId only
-      OrganizationUser: ['organizationId', 'userId'],  // Requires both
-    },
-  }],
-  WebhookSubscription: [{ ... }],
-  Inquiry: [{ ... }],  // sourceModel + targetModel
-};
+PolymorphismRegistry = {
+  Token: {
+    axes: [{
+      field: 'ownerModel',
+      fkMap: {
+        User: ['userId'],                          // Requires userId only
+        Organization: ['organizationId'],          // Requires organizationId only
+        OrganizationUser: ['organizationId', 'userId'],  // Requires both
+      },
+    }],
+  },
+  WebhookSubscription: { ... },
+  Inquiry: { ... },  // sourceModel + targetModel axes
+} as const;
 ```
 
 ### Auto-Generated Validation
@@ -362,6 +365,21 @@ The registry auto-generates:
 1. **Rules** - Type field must be a valid enum value
 2. **FK validation** - Required FK fields must be present and non-null
 3. **Immutable fields** - Type field can't change after creation
+
+### Request Validation
+
+`polymorphicSchema(model, axisField, { only?, omit?, extend? })` (`@template/db`) is the request-boundary twin of the write rule: a `z.discriminatedUnion` with one strict arm per axis value, each carrying exactly that value's FKs as `uuidV7Schema`. A missing FK, an FK from another arm, or an omitted column is a 422.
+
+```typescript
+polymorphicSchema('Integration', 'ownerModel', {
+  only: ['User', 'Organization', 'Space'],   // keep these values (default: every value)
+  omit: ['userId'],                          // the server fills it (the caller); sending it is a 422
+  extend: { returnUrl: appPathSchema.optional() },  // fields shared by every arm
+});
+// { ownerModel: 'User' } | { ownerModel: 'Organization', organizationId } | { ownerModel: 'Space', organizationId, spaceId }
+```
+
+It throws at build time on an unknown model, axis or `only` value. Values with no FKs (`platform`, `admin`) get a discriminator-only arm. Arms are strict, so put every other field in `extend` rather than intersecting; `extend` may not redefine the discriminator or an axis FK. Strict is a little tighter than the write rule: an explicit `null` on a foreign FK passes `isEmpty` but is an unknown key here. One call covers one axis; `toRules.test.ts` checks every single-axis model against the write rule.
 
 ### Validation Errors
 

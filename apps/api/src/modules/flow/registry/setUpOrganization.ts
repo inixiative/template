@@ -12,7 +12,7 @@ import { z } from 'zod';
 import { apiPath } from '#/lib/openapi/apiPath';
 import type { FlowDefinition } from '#/modules/flow/registry/flowRegistry';
 
-const bindingsSchema = z.object({
+const bindingsSchema = z.strictObject({
   organizationId: uuidV7Schema,
   returnUrl: appPathSchema.optional(),
 });
