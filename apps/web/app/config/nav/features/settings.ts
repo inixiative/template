@@ -32,6 +32,12 @@ export const settingsItem: NavItem = {
       access: (permissions, context) => permissions.check(...getContextParams(context), 'operate'),
     },
     {
+      label: 'Integrations',
+      path: '/integrations',
+      icon: 'lucide:plug',
+      access: (permissions, context) => permissions.check(...getContextParams(context), 'read'),
+    },
+    {
       label: 'Auth Providers',
       path: '/authProviders',
       icon: 'lucide:shield-check',

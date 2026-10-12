@@ -6,4 +6,4 @@
  */
 import type { Redis } from 'ioredis';
 
-export type LaneRedis = Pick<Redis, 'eval'>;
+export type RedisEval = Pick<Redis, 'eval'>;

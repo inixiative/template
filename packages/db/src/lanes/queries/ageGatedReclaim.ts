@@ -4,7 +4,7 @@
  * @partOf infrastructure:redis
  * @uses none
  */
-import type { LaneRedis } from '@template/db/lanes/types';
+import type { RedisEval } from '@template/db/redis/types';
 
 // Self-heal for the residual expiry window (queue wait > base TTL): when a superseding job STARTS, it
 // re-asserts its claim iff the lane is vacant OR held by an OLDER job — never a newer one, so the
@@ -27,7 +27,7 @@ return 1
 `;
 
 export const ageGatedReclaim = (
-  redis: LaneRedis,
+  redis: RedisEval,
   lane: string,
   jobId: string,
   laneTtlSec: number,

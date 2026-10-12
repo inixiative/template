@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, spyOn } from 'bun:test';
 import { createHash, randomBytes } from 'node:crypto';
-import { db, unregisterDbHook } from '@template/db';
+import { db, getRedisClient, unregisterDbHook } from '@template/db';
 import type { Contact, Organization, User } from '@template/db/generated/client/client';
 import { PlatformRole, TokenOwnerModel } from '@template/db/generated/client/enums';
 import {
@@ -16,8 +16,11 @@ import { registerClearCacheHook } from '#/hooks/cache/hook';
 import { streamAppendFrame } from '#/ws/dataFrame';
 import { sendToStreamLocal } from '#/ws/delivery';
 import { websocketHandler } from '#/ws/handler';
-import { byStream, clearRegistry } from '#/ws/registry';
+import { appendToStream, initWebSocketPubSub } from '#/ws/pubsub';
+import { readStreamSeq } from '#/ws/queries/readStreamSeq';
+import { byId, byStream, clearRegistry } from '#/ws/registry';
 import { reauthorizeOpenStreams } from '#/ws/streamReauthorizeSweep';
+import { streamSeqKey } from '#/ws/streamSeq';
 import { createTestSocket } from '#tests/createTestSocket';
 import { createBearerToken } from '#tests/utils/createBearerToken';
 
@@ -31,6 +34,14 @@ const until = async (predicate: () => boolean, attempts = 10_000): Promise<void>
 };
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 50));
+
+const waitFor = async (predicate: () => boolean, timeoutMs = 3000): Promise<void> => {
+  const start = Date.now();
+  while (!predicate()) {
+    if (Date.now() - start > timeoutMs) throw new Error('waitFor timed out');
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+};
 
 const withStreamRouteStatus = async (
   status: number,
@@ -89,6 +100,7 @@ describe('data streams (real app)', () => {
     const [opened, snapshot] = frames(sent);
     expect(opened).toEqual({ type: 'opened', stream });
     expect(snapshot).toMatchObject({ category: 'data', action: 'snapshot', stream });
+    expect(snapshot.seq).toBeNumber();
     expect(snapshot.payload.data.map((row: { id: string }) => row.id)).toEqual([contact.id]);
     expect(snapshot.payload.pagination.total).toBe(1);
     expect([...(byStream.get(stream) ?? [])]).toEqual([socket.data.connectionId]);
@@ -195,8 +207,8 @@ describe('data streams (real app)', () => {
     const pending = websocketHandler.message(socket, openFrame(stream));
     await until(() => byStream.has(stream));
 
-    const append = streamAppendFrame(stream, 'remove', { id: 'in-flight' });
-    sendToStreamLocal(stream, append);
+    const append = streamAppendFrame(stream, 1, { type: 'remove', payload: { id: 'in-flight' } });
+    sendToStreamLocal(stream, () => JSON.stringify(append));
     expect(sent).toEqual([]);
     await pending;
 
@@ -211,8 +223,8 @@ describe('data streams (real app)', () => {
     await websocketHandler.message(socket, openFrame(stream));
     sent.length = 0;
 
-    const append = streamAppendFrame(stream, 'remove', { id: 'x' });
-    sendToStreamLocal(stream, append);
+    const append = streamAppendFrame(stream, 1, { type: 'remove', payload: { id: 'x' } });
+    sendToStreamLocal(stream, () => JSON.stringify(append));
 
     expect(frames(sent)).toEqual([append]);
   });
@@ -301,6 +313,98 @@ describe('data streams (real app)', () => {
     expect(sent).toEqual([]);
   });
 
+  describe('sequence numbers', () => {
+    // Its own member, so these reads do not spend the shared member's HTTP rate-limit budget.
+    let bearer: string;
+    beforeAll(async () => {
+      await initWebSocketPubSub();
+      const { context } = await createOrganizationUser({ role: 'member' }, { organization });
+      bearer = (await createBearerToken(context.user)).authorization;
+    });
+
+    const appendsOf = (sent: string[]) => frames(sent).filter((frame) => frame.action === 'append');
+
+    it('stamps the snapshot with the seq of the last append before its read', async () => {
+      await appendToStream(stream, { type: 'remove', payload: { id: 'before' } });
+      const counter = await readStreamSeq(getRedisClient(), streamSeqKey(stream));
+      const { socket, sent } = connect(bearer);
+      await websocketHandler.message(socket, openFrame(stream));
+
+      expect(frames(sent)[1]).toMatchObject({ action: 'snapshot', seq: counter });
+    });
+
+    it('an append landing during the snapshot read is delivered once, after the snapshot, one seq past it', async () => {
+      const { socket, sent } = connect(bearer);
+      let release = () => {};
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      let reading = false;
+      const realRequest = app.request.bind(app);
+      const spy = spyOn(app, 'request').mockImplementation((async (
+        input: string,
+        init?: RequestInit,
+      ) => {
+        if (!String(input).endsWith('/contacts')) return realRequest(input, init);
+        reading = true;
+        await gate;
+        return realRequest(input, init);
+      }) as never);
+      try {
+        const pending = websocketHandler.message(socket, openFrame(stream));
+        await waitFor(() => reading);
+        await appendToStream(stream, { type: 'remove', payload: { id: 'during' } });
+        await waitFor(() => socket.data.heldAppends.get(stream)?.length === 1);
+        release();
+        await pending;
+      } finally {
+        spy.mockRestore();
+      }
+
+      const [opened, snapshot, ...rest] = frames(sent);
+      expect(opened).toEqual({ type: 'opened', stream });
+      expect(rest).toEqual([
+        streamAppendFrame(stream, snapshot.seq + 1, { type: 'remove', payload: { id: 'during' } }),
+      ]);
+    });
+
+    it('a dropped frame closes the socket; a reconnect snapshots the current state at the current seq', async () => {
+      const dropped = connect(bearer);
+      await websocketHandler.message(dropped.socket, openFrame(stream));
+      dropped.dropSends();
+
+      const { entity: created } = await createContact(
+        { ownerModel: 'Organization', organizationId: organization.id },
+        { organization },
+      );
+      await appendToStream(stream, { type: 'upsert', payload: { id: created.id } });
+      await waitFor(() => dropped.closeInfo() !== null);
+
+      expect(dropped.closeInfo()).toEqual({ code: 1013, reason: 'frame dropped' });
+      expect(byId.has(dropped.socket.data.connectionId)).toBe(false);
+      expect(byStream.get(stream)?.has(dropped.socket.data.connectionId) ?? false).toBe(false);
+
+      const reconnected = connect(bearer);
+      await websocketHandler.message(reconnected.socket, openFrame(stream));
+      const snapshot = frames(reconnected.sent)[1];
+      expect(snapshot.seq).toBe(await readStreamSeq(getRedisClient(), streamSeqKey(stream)));
+      expect(snapshot.payload.data.map((row: { id: string }) => row.id)).toContain(created.id);
+
+      await appendToStream(stream, { type: 'remove', payload: { id: created.id } });
+      await waitFor(() => appendsOf(reconnected.sent).length === 1);
+      expect(appendsOf(reconnected.sent)[0].seq).toBe(snapshot.seq + 1);
+    });
+
+    it('a dropped snapshot closes the socket instead of leaving the stream open without one', async () => {
+      const { socket, dropSends, closeInfo } = connect(bearer);
+      dropSends();
+      await websocketHandler.message(socket, openFrame(stream));
+
+      expect(closeInfo()?.code).toBe(1013);
+      expect(byStream.has(stream)).toBe(false);
+    });
+  });
+
   describe('re-authorization of open streams', () => {
     it('keeps a stream the credential can still read', async () => {
       const { socket, sent } = connect(memberBearer);
@@ -333,7 +437,8 @@ describe('data streams (real app)', () => {
         unregisterDbHook('clearCache');
       }
       await reauthorizeOpenStreams();
-      sendToStreamLocal(stream, streamAppendFrame(stream, 'remove', { id: 'x' }));
+      const append = streamAppendFrame(stream, 1, { type: 'remove', payload: { id: 'x' } });
+      sendToStreamLocal(stream, () => JSON.stringify(append));
 
       expect(frames(revocable.sent)).toEqual([{ type: 'openRejected', stream }]);
       expect(revocable.socket.data.streams.has(stream)).toBe(false);

@@ -4,7 +4,7 @@
  * @partOf infrastructure:redis
  * @uses none
  */
-import type { LaneRedis } from '@template/db/lanes/types';
+import type { RedisEval } from '@template/db/redis/types';
 
 // Fenced release: drop the baton only if WE still hold it (atomic, so a concurrent claim isn't
 // clobbered). If our failed claim superseded a previous holder, also clear that tombstone only when
@@ -23,7 +23,7 @@ return 0
 `;
 
 export const fencedRelease = (
-  redis: LaneRedis,
+  redis: RedisEval,
   lane: string,
   jobId: string,
   previousHolder: string,

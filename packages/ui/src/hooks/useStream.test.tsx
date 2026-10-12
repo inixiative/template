@@ -65,6 +65,7 @@ describe('useStream / useStreamAction', () => {
       dispatchMessage({
         category: 'data',
         action: 'snapshot',
+        seq: 1,
         stream,
         payload: { data: [existing] },
       }),
@@ -75,6 +76,7 @@ describe('useStream / useStreamAction', () => {
       dispatchMessage({
         category: 'data',
         action: 'append',
+        seq: 1,
         stream,
         type: 'upsert',
         payload: created,
@@ -86,6 +88,7 @@ describe('useStream / useStreamAction', () => {
       dispatchMessage({
         category: 'data',
         action: 'append',
+        seq: 1,
         stream,
         type: 'remove',
         payload: { id: existing.id },
@@ -115,6 +118,7 @@ describe('useStream / useStreamAction', () => {
       dispatchMessage({
         category: 'data',
         action: 'snapshot',
+        seq: 1,
         stream,
         payload: { data: [existing] },
       }),
@@ -123,6 +127,7 @@ describe('useStream / useStreamAction', () => {
       dispatchMessage({
         category: 'data',
         action: 'append',
+        seq: 1,
         stream,
         type: 'remove',
         payload: { id: existing.id },
@@ -141,7 +146,13 @@ describe('useStream / useStreamAction', () => {
     const { result } = renderHook(() => useOrganizationContactsStream(organizationId), { wrapper });
 
     act(() =>
-      dispatchMessage({ category: 'data', action: 'snapshot', stream, payload: { data: [] } }),
+      dispatchMessage({
+        category: 'data',
+        action: 'snapshot',
+        seq: 1,
+        stream,
+        payload: { data: [] },
+      }),
     );
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 

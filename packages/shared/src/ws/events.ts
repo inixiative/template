@@ -12,6 +12,7 @@ export type WSStreamSnapshotEvent = {
   category: 'data';
   action: 'snapshot';
   stream: string;
+  seq: number;
   payload: unknown;
 };
 
@@ -19,6 +20,7 @@ export type WSStreamAppendEvent = {
   category: 'data';
   action: 'append';
   stream: string;
+  seq: number;
   type: string;
   payload: unknown;
   revive?: true;

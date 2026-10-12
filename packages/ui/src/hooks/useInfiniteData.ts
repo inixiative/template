@@ -32,6 +32,7 @@ export type InfiniteDataResult<TItem> = DataFilters & {
   data: TItem[];
   pageCount: number;
   isLoading: boolean;
+  isError: boolean;
   isFetchingNextPage: boolean;
   hasNextPage: boolean;
   fetchNextPage: () => void;
@@ -90,6 +91,7 @@ export function useInfiniteData<TItem>(
     data: query.data,
     pageCount: query.pageCount,
     isLoading: query.isLoading,
+    isError: query.isError,
     isFetchingNextPage: query.isFetchingNextPage,
     hasNextPage: query.hasNextPage,
     fetchNextPage: query.fetchNextPage,
