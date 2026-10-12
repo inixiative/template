@@ -7,3 +7,4 @@ export {
   getRedisSub,
 } from './client';
 export { type RedisNamespace, redisNamespace } from './namespaces';
+export type { RedisEval } from './types';

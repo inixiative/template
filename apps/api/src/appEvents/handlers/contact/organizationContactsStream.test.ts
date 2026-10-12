@@ -134,7 +134,12 @@ describe('organization contacts stream (app event → redis → open socket)', (
       .map((message) => JSON.parse(message))
       .find((frame) => frame.action === 'snapshot');
     handle.sent.length = 0;
-    return { ...handle, stream, snapshotRows: snapshot.payload.data as Array<{ id: string }> };
+    return {
+      ...handle,
+      stream,
+      snapshotSeq: snapshot.seq as number,
+      snapshotRows: snapshot.payload.data as Array<{ id: string }>,
+    };
   };
 
   const appends = (sent: string[]) =>
@@ -145,7 +150,7 @@ describe('organization contacts stream (app event → redis → open socket)', (
       { ownerModel: 'Organization', organizationId: organization.id },
       { organization },
     );
-    const { sent, stream, snapshotRows } = await openStream();
+    const { sent, stream, snapshotSeq, snapshotRows } = await openStream();
     const routeRow = snapshotRows.find((row) => row.id === contact.id);
 
     await emitAppEvent('contact.updated', { contact });
@@ -155,8 +160,22 @@ describe('organization contacts stream (app event → redis → open socket)', (
 
     expect(routeRow).toBeDefined();
     expect(appends(sent)).toEqual([
-      { category: 'data', action: 'append', stream, type: 'upsert', payload: routeRow },
-      { category: 'data', action: 'append', stream, type: 'remove', payload: { id: contact.id } },
+      {
+        category: 'data',
+        action: 'append',
+        stream,
+        seq: snapshotSeq + 1,
+        type: 'upsert',
+        payload: routeRow,
+      },
+      {
+        category: 'data',
+        action: 'append',
+        stream,
+        seq: snapshotSeq + 2,
+        type: 'remove',
+        payload: { id: contact.id },
+      },
     ]);
   });
 
