@@ -5,11 +5,11 @@
  * @uses none
  */
 import { faker } from '@faker-js/faker';
-import { createFactory } from '@template/db/test/factory';
+import { createFactory, getNextSeq } from '@template/db/test/factory';
 
 const integrationFactory = createFactory('Integration', {
   defaults: () => ({
-    name: faker.company.name(),
+    name: `${faker.company.name()} ${getNextSeq()}`,
   }),
 });
 
