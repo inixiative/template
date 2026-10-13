@@ -13,14 +13,23 @@ const SINGLETON_LOCK_TTL_MS = 300_000;
 const SINGLETON_LOCK_HEARTBEAT_MS = 60_000;
 const SINGLETON_LOCK_MAX_MISSED = 3;
 
+export type SingletonJobOptions<TPayload> = {
+  lockKey?: (payload: TPayload) => string;
+};
+
 export const makeSingletonJob = <TPayload = void>(
   handler: JobHandler<TPayload>,
+  { lockKey }: SingletonJobOptions<TPayload> = {},
 ): JobHandler<TPayload> => {
   const singleton: JobHandler<TPayload> = async (ctx, ...args: JobHandlerArgs<TPayload>) => {
-    // Lock lane prefers `data.id` (cron path: row's uuidv7) so one handler can serve
-    // multiple singleton lanes (e.g. one cron job per row); falls back to `job.name`
-    // for ad-hoc/test invocations without a faked id.
-    const identifier = (ctx.job.data as { id?: string } | undefined)?.id ?? ctx.job.name;
+    // With `lockKey`, the lane is (handler name, key from the payload), so one handler is a
+    // singleton per payload key and two handlers sharing a key never collide. Without it the
+    // lane prefers `data.id` (cron path: row's uuidv7) so one handler can serve multiple
+    // singleton lanes (e.g. one cron job per row); falls back to `job.name` for ad-hoc/test
+    // invocations without a faked id. Either way a busy lane skips the new run, never parks it.
+    const identifier = lockKey
+      ? `${ctx.job.name}:${lockKey(args[0] as TPayload)}`
+      : ((ctx.job.data as { id?: string } | undefined)?.id ?? ctx.job.name);
     if (!identifier) throw new Error('Singleton job missing id and name');
 
     const scope = { jobId: ctx.job.id, identifier };
