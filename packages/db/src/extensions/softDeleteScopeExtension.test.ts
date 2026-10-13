@@ -57,6 +57,18 @@ describe('softDeleteScope extension', () => {
     expect(await db.user.findUnique({ where: { id: user.id } })).toBeNull();
   });
 
+  it('withSoftDeleteScope restores the live-row scope inside withDeleted', async () => {
+    const { entity: user } = await createUser();
+    await tombstone('user', user.id);
+
+    const [unscoped, rescoped] = await db.withDeleted(async () => [
+      await db.user.findUnique({ where: { id: user.id } }),
+      await db.withSoftDeleteScope(() => db.user.findUnique({ where: { id: user.id } })),
+    ]);
+    expect(unscoped?.id).toBe(user.id);
+    expect(rescoped).toBeNull();
+  });
+
   it('hides a tombstoned membership on the permission read path (root and include tree)', async () => {
     const { entity: orgUser } = await createOrganizationUser();
     await tombstone('organizationUser', orgUser.id);

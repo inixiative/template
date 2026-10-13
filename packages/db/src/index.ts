@@ -113,7 +113,7 @@ export {
   type RuntimeDelegate,
   update,
 } from './utils/delegates';
-export { hasDeletedAt, lookupField, modelFields } from './utils/fieldMetadata';
+export { hasDeletedAt, lookupField, modelFields, SOFT_DELETE_MODELS } from './utils/fieldMetadata';
 // Prisma error narrowing
 export { isUniqueConstraintError } from './utils/isUniqueConstraintError';
 export { isWriteConflictError } from './utils/isWriteConflictError';

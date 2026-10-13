@@ -77,7 +77,7 @@ const bridgedStores = new Set<AsyncLocalStorage<unknown>>();
 
 export const registerDbHook = <T = Record<string, unknown>>(
   name: string,
-  model: string | string[] | '*',
+  model: string | readonly string[] | '*',
   timing: HookTiming,
   actions: DbAction[],
   hook: HookFunction<T>,
@@ -94,7 +94,7 @@ export const registerDbHook = <T = Record<string, unknown>>(
 
   hookRegistry.add(name);
   hookRegistrations.set(name, {
-    targets: castArray(model),
+    targets: [...castArray(model)],
     timing,
     actions,
     hook: hook as HookFunction,
@@ -194,7 +194,7 @@ const invariantRegistrations = new Map<string, DbInvariantRegistration>();
 
 export const registerDbInvariant = (
   name: string,
-  model: string | string[] | '*',
+  model: string | readonly string[] | '*',
   invariant: DbInvariant,
 ) => {
   if (invariantRegistrations.has(name)) {
@@ -202,7 +202,7 @@ export const registerDbInvariant = (
     return;
   }
 
-  const registration: DbInvariantRegistration = { targets: castArray(model), invariant };
+  const registration: DbInvariantRegistration = { targets: [...castArray(model)], invariant };
   invariantRegistrations.set(name, registration);
   for (const target of registration.targets) {
     registeredInvariants[target] ??= [];
