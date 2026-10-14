@@ -7,16 +7,27 @@
  */
 import { getJobSupersededBy, laneKey, reclaimLane, watchLane } from '@template/db';
 import { LogScope, log } from '@template/shared/logger';
-import { type JobHandler, type JobHandlerArgs, SupersededError } from '#/jobs/types';
+import { toJobHandler } from '#/jobs/toJobHandler';
+import {
+  type JobHandler,
+  type JobHandlerArgs,
+  type StagedJob,
+  SupersededError,
+} from '#/jobs/types';
 
 export type SupersedingJobHandler<TPayload = void> = JobHandler<TPayload> & {
   dedupeKeyFn?: (payload: TPayload) => string;
 };
 
+// A plain handler or `{ stages, finish }`. A staged superseding job may only add superseding children
+// (runJobStages refuses any other), and when a newer copy replaces it while it is parked in
+// `waiting-children`, enqueue evicts those children through their lanes (evictSupersededFlow). Once
+// they have ended, the old copy wakes, finds its tombstone below, and exits without running `finish`.
 export const makeSupersedingJob = <TPayload = void>(
-  handler: JobHandler<TPayload>,
+  definition: JobHandler<TPayload> | StagedJob<TPayload>,
   dedupeKeyFn: (payload: TPayload) => string,
 ): SupersedingJobHandler<TPayload> => {
+  const handler = toJobHandler(definition, { childrenMustSupersede: true });
   const h: SupersedingJobHandler<TPayload> = async (ctx, ...args: JobHandlerArgs<TPayload>) => {
     const { job } = ctx;
     const lane = laneKey(job.name, dedupeKeyFn(args[0] as TPayload));
@@ -63,6 +74,7 @@ export const makeSupersedingJob = <TPayload = void>(
     }
   };
   h.dedupeKeyFn = dedupeKeyFn;
+  h.isStaged = handler.isStaged;
   h.lane = handler.lane;
   return h;
 };

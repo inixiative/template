@@ -192,6 +192,40 @@ describe('makeSingletonJob', () => {
       await firstRun;
     });
 
+    test('a staged singleton skips its stages and finish while its key is busy', async () => {
+      const started = deferred();
+      const gate = deferred();
+      const firstRun = makeSingletonJob<ChannelPayload>(
+        async () => {
+          started.resolve();
+          await gate.promise;
+        },
+        { lockKey: channelKey },
+      )(ctx, ADP_FULL);
+      await started.promise;
+
+      const ran: string[] = [];
+      const staged = makeSingletonJob<ChannelPayload>(
+        {
+          stages: [
+            async () => {
+              ran.push('stage');
+            },
+          ],
+          finish: async () => {
+            ran.push('finish');
+          },
+        },
+        { lockKey: channelKey },
+      );
+      await staged(singletonContext('staged-job'), ADP_FULL);
+
+      expect(staged.isStaged).toBe(true);
+      expect(ran).toEqual([]);
+      gate.resolve();
+      await firstRun;
+    });
+
     test('does not take the data.id lane', async () => {
       const started = deferred();
       const gate = deferred();
@@ -237,5 +271,22 @@ describe('makeSingletonJob', () => {
     });
     expect(errorSpy).not.toHaveBeenCalledWith('singletonJob.lockLost', expect.anything());
     expect(await backingRedis.get(LOCK_KEY)).toHaveLength(36);
+  });
+
+  describe('singletonKey', () => {
+    test('is the lockKey result, whatever the job data says', () => {
+      const keyed = makeSingletonJob<{ sourceId: string }>(async () => {}, {
+        lockKey: ({ sourceId }) => sourceId,
+      });
+
+      expect(keyed.singletonKey?.({ sourceId: 'adp' }, { id: 'cron-row' })).toBe('adp');
+    });
+
+    test('is the cron row id for an unkeyed singleton, and absent for an ad hoc run', () => {
+      const unkeyed = makeSingletonJob(async () => {});
+
+      expect(unkeyed.singletonKey?.(undefined, { id: 'cron-row' })).toBe('cron-row');
+      expect(unkeyed.singletonKey?.(undefined, {})).toBeUndefined();
+    });
   });
 });

@@ -60,6 +60,9 @@ export type JobHandler<TPayload = void> = ((
   ...args: JobHandlerArgs<TPayload>
 ) => Promise<void>) & {
   lane?: JobLane;
+  // Set on a handler built from `{ stages, finish }` (runJobStages): a superseded copy may be parked
+  // with children that enqueue must evict (evictSupersededFlow).
+  isStaged?: boolean;
 };
 
 // Adds a child of the running job. Exists only on a stage's context: only a job can have children.

@@ -4,8 +4,15 @@ import { type Job, WaitingChildrenError } from 'bullmq';
 import { enqueueJob } from '#/jobs/enqueue';
 import type { CleanStaleDataPayload } from '#/jobs/handlers/cleanStaleData';
 import { makeJob } from '#/jobs/makeJob';
+import { makeSupersedingJob } from '#/jobs/makeSupersedingJob';
 import { queue } from '#/jobs/queue';
-import { type JobData, JobLane, JobType, type WorkerContext } from '#/jobs/types';
+import {
+  type JobData,
+  JobLane,
+  JobType,
+  type StageContext,
+  type WorkerContext,
+} from '#/jobs/types';
 import { createMockJob } from '#tests/createTestWorker';
 
 type FlowParent = Job<JobData> & { state: string; hasUnfinishedChildren: boolean };
@@ -127,5 +134,43 @@ describe('makeJob({ stages, finish })', () => {
     expect(ran).toEqual(['first', 'second', 'finish']);
     expect(job.data.stage).toBeUndefined();
     expect(job.state).toBe('active');
+  });
+
+  const supersedingParent = (job: FlowParent, addChild: (ctx: StageContext) => Promise<void>) =>
+    makeSupersedingJob<Record<string, never>>(
+      {
+        stages: [
+          async (ctx) => {
+            await addChild(ctx);
+            job.hasUnfinishedChildren = true;
+          },
+        ],
+        finish: async () => {},
+      },
+      () => 'one-lane',
+    );
+
+  it('a superseding job refuses a child that cannot be superseded, before adding it', async () => {
+    const job = flowParent(undefined);
+    const staged = supersedingParent(job, (ctx) =>
+      ctx.enqueueChildJob('cleanStaleData', { model: 'User', retentionDays: 1 }),
+    );
+
+    expect(staged.isStaged).toBe(true);
+    await expect(staged(contextFor(job), {})).rejects.toThrow(
+      `A superseding job's children must be superseding jobs, and "cleanStaleData" is not`,
+    );
+    expect(job.hasUnfinishedChildren).toBe(false);
+  });
+
+  it('a superseding job accepts a superseding child', async () => {
+    const job = flowParent(undefined);
+    const staged = supersedingParent(job, (ctx) =>
+      ctx.enqueueChildJob('reconcileSegment', { segmentId: Bun.randomUUIDv7() }),
+    );
+
+    await staged(contextFor(job), {});
+
+    expect(job.hasUnfinishedChildren).toBe(true);
   });
 });

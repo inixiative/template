@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import { type AuditActor, auditActorContext } from '@template/db/lib/auditActorContext';
+import { jobHandlers } from '#/jobs/handlers';
 import { processJob } from '#/jobs/processJob';
 import { queue } from '#/jobs/queue';
 import { slowLastFinishedKey } from '#/jobs/slowLaneSignals';
 import { createSlowSlotPool } from '#/jobs/slowSlotPool';
-import { type JobData, JobLane, JobType } from '#/jobs/types';
+import { type JobData, type JobHandler, JobLane, JobType, type WorkerContext } from '#/jobs/types';
 import { createMockJob } from '#tests/createTestWorker';
 
 const jobWith = (id: string, data: Partial<JobData> & { lane?: JobLane }) =>
@@ -76,6 +77,41 @@ describe('processJob', () => {
 
     expect(actors.map((actor) => actor?.actorJobName)).toEqual(['sendWebhook', 'sendWebhook']);
     expect(actors.map((actor) => actor?.integrationId)).toEqual(['integration-1', null]);
+  });
+
+  it('a cron tick does not run its handler: it enqueues the real run, marked with the cron row', async () => {
+    const handlerName = 'cronTickTest';
+    const ranDirectly: unknown[] = [];
+    const runs: Array<Pick<JobData, 'type' | 'id' | 'lane' | 'payload'>> = [];
+    const registry = jobHandlers as unknown as Record<string, JobHandler<unknown>>;
+    registry[handlerName] = async (ctx: WorkerContext) => {
+      const { type, id, lane, payload } = ctx.job.data as JobData;
+      runs.push({ type, id, lane, payload });
+    };
+
+    try {
+      await processJob(
+        createMockJob({
+          id: 'tick-job',
+          name: handlerName,
+          data: { type: JobType.cron, id: 'cron-row-id', lane: JobLane.slow, payload: { n: 1 } },
+        }),
+        {
+          handlers: {
+            [handlerName]: async (_ctx: unknown, payload: unknown) => {
+              ranDirectly.push(payload);
+            },
+          } as never,
+        },
+      );
+    } finally {
+      delete registry[handlerName];
+    }
+
+    expect(ranDirectly).toEqual([]);
+    expect(runs).toEqual([
+      { type: JobType.cronTrigger, id: 'cron-row-id', lane: JobLane.slow, payload: { n: 1 } },
+    ]);
   });
 
   it('rejects an unknown handler', async () => {

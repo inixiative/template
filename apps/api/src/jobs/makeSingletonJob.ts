@@ -7,7 +7,8 @@
  */
 import { createLock, type LockLostReason } from '@template/db';
 import { log } from '@template/shared/logger';
-import type { JobHandler, JobHandlerArgs } from '#/jobs/types';
+import { toJobHandler } from '#/jobs/toJobHandler';
+import type { JobData, JobHandler, JobHandlerArgs, StagedJob } from '#/jobs/types';
 
 const SINGLETON_LOCK_TTL_MS = 300_000;
 const SINGLETON_LOCK_HEARTBEAT_MS = 60_000;
@@ -17,11 +18,25 @@ export type SingletonJobOptions<TPayload> = {
   lockKey?: (payload: TPayload) => string;
 };
 
+// The singleton's key, which enqueue also uses as a BullMQ deduplication id (singletonDeduplicationId):
+// `lockKey(payload)`, else the cron row id (`data.id`, set on a cron run), else none. A run with no key
+// (an ad hoc run of an unkeyed singleton) is not deduplicated; its lock falls back to the handler name.
+export type SingletonJobHandler<TPayload = void> = JobHandler<TPayload> & {
+  singletonKey?: (payload: TPayload, data: Pick<JobData, 'id'>) => string | undefined;
+};
+
+// A plain handler or `{ stages, finish }`. Collision policy is binary: a singleton skips the new run,
+// superseding takes over, and nothing parks. A busy key skips here; the deduplication id added at
+// enqueue keeps the skip while a staged singleton is parked in `waiting-children` holding no lock.
 export const makeSingletonJob = <TPayload = void>(
-  handler: JobHandler<TPayload>,
+  definition: JobHandler<TPayload> | StagedJob<TPayload>,
   { lockKey }: SingletonJobOptions<TPayload> = {},
-): JobHandler<TPayload> => {
-  const singleton: JobHandler<TPayload> = async (ctx, ...args: JobHandlerArgs<TPayload>) => {
+): SingletonJobHandler<TPayload> => {
+  const handler = toJobHandler(definition);
+  const singleton: SingletonJobHandler<TPayload> = async (
+    ctx,
+    ...args: JobHandlerArgs<TPayload>
+  ) => {
     // With `lockKey`, the lane is (handler name, key from the payload), so one handler is a
     // singleton per payload key and two handlers sharing a key never collide. Without it the
     // lane prefers `data.id` (cron path: row's uuidv7) so one handler can serve multiple
@@ -81,6 +96,8 @@ export const makeSingletonJob = <TPayload = void>(
       }
     }
   };
+  singleton.singletonKey = (payload, { id }) => (lockKey ? lockKey(payload) : id);
+  singleton.isStaged = handler.isStaged;
   singleton.lane = handler.lane;
   return singleton;
 };
