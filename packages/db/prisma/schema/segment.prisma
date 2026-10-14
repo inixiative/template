@@ -45,8 +45,8 @@ model Segment {
 
   members           SegmentMember[]
   auditLogs         AuditLog[]
-  ruleReferences    RuleReference[] @relation("RuleReferenceSource")
-  targetedByRules   RuleReference[] @relation("RuleReferenceTarget")
+  sourceRuleReferences RuleReference[] @relation("RuleReferenceSource")
+  targetRuleReferences RuleReference[] @relation("RuleReferenceTarget")
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
