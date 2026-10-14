@@ -1,0 +1,16 @@
+{
+  "extends": "../../apps/api/tsconfig.json",
+  "compilerOptions": {
+    "paths": {
+      "#/*": ["../../apps/api/src/*"],
+      "@template/db": ["../../packages/db/src/index.ts"],
+      "@template/db/*": ["../../packages/db/src/*"],
+      "@template/shared": ["../../packages/shared/src/index.ts"],
+      "@template/shared/*": ["../../packages/shared/src/*"],
+      "bullmq": ["../../apps/api/node_modules/bullmq"],
+      "ioredis": ["../../apps/api/node_modules/ioredis"],
+      "zod": ["../../apps/api/node_modules/zod"]
+    }
+  },
+  "include": ["./**/*"]
+}
