@@ -6,13 +6,10 @@ import {
   createEmailTemplate,
   createOrganization,
   createSpace,
-  registerTestTracker,
 } from '@template/db/test';
 import { EmailRenderError } from '@template/email/errors/EmailRenderError';
 import { composeComponent, composeTemplate } from '@template/email/render/compose';
 import { parentOwner } from '@template/email/render/owner';
-
-registerTestTracker();
 
 describe('composeTemplate', () => {
   afterAll(async () => {

@@ -27,7 +27,7 @@ describe('cron add sites stamp the resolved lane', () => {
 
   afterEach(async () => {
     added.length = 0;
-    await db.cronJob.deleteMany({});
+    await cleanupTouchedTables(db);
   });
 
   afterAll(async () => {

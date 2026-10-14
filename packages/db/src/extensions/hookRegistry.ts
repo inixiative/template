@@ -167,11 +167,13 @@ export const runInBridgedContext = <TResult>(
   return enter(0);
 };
 
+// The test tracker belongs to the test process, not to any one test: the db client registers it
+// once, so clearing a test's hooks must not take it with them or every later file stops tracking.
+const PROCESS_HOOKS = new Set(['testTracker']);
+
 export const clearHookRegistry = () => {
-  hookRegistry.clear();
-  hookRegistrations.clear();
-  bridgedStores.clear();
-  for (const model of Object.keys(registeredHooks)) {
-    delete registeredHooks[model];
+  for (const name of [...hookRegistry]) {
+    if (!PROCESS_HOOKS.has(name)) unregisterDbHook(name);
   }
+  bridgedStores.clear();
 };

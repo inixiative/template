@@ -6,15 +6,8 @@
  */
 import { afterAll, afterEach, describe, expect, it } from 'bun:test';
 import { DbAction, db, HookTiming, registerDbHook, unregisterDbHook } from '@template/db';
-import {
-  cleanupTouchedTables,
-  createEmailComponent,
-  createEmailTemplate,
-  registerTestTracker,
-} from '@template/db/test';
+import { cleanupTouchedTables, createEmailComponent, createEmailTemplate } from '@template/db/test';
 import { recomputeDegradedComponentRefs } from '@template/email/render/recomputeDegradedComponentRefs';
-
-registerTestTracker();
 
 const cardBody = '{{#slot:inner:default}}{{#component:x}}{{/component:x}}{{/slot:inner:default}}';
 

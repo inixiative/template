@@ -47,7 +47,7 @@ describe('enqueueOrSpill', () => {
     added.length = 0;
     Object.assign(counts, { waiting: 0, prioritized: 0, active: 0 });
     await queue.redis.flushdb();
-    await db.jobOutbox.deleteMany({});
+    await cleanupTouchedTables(db);
   });
 
   afterAll(async () => {

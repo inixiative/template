@@ -2,12 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 import { faker } from '@faker-js/faker';
 import { db } from '@template/db';
 import { getNextSeq } from '@template/db/test/factory';
-import { cleanupTouchedTables, registerTestTracker } from '@template/db/test/testTracker';
+import { cleanupTouchedTables } from '@template/db/test/testTracker';
 
 describe('transactions', () => {
-  beforeEach(() => {
-    registerTestTracker();
-  });
+  beforeEach(() => {});
 
   afterEach(async () => {
     await cleanupTouchedTables(db);

@@ -1,7 +1,6 @@
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { type Db, db, type UserId } from '@template/db';
 import type { OrganizationUser, SpaceUser, User } from '@template/db/generated/client/client';
-import { registerTestTracker } from '@template/db/test';
 import { auth } from '#/lib/auth';
 import type { TokenWithRelations } from '#/lib/context/types';
 import { setupOrgPermissions } from '#/lib/permissions/setupOrgPermissions';
@@ -11,8 +10,6 @@ import { errorHandlerMiddleware } from '#/middleware/error/errorHandlerMiddlewar
 import { notFoundHandlerMiddleware } from '#/middleware/error/notFoundHandlerMiddleware';
 import { prepareRequest } from '#/middleware/prepareRequest';
 import type { AppEnv } from '#/types/appEnv';
-
-registerTestTracker();
 
 export type MountFn = (app: OpenAPIHono<AppEnv>) => void;
 

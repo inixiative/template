@@ -21,7 +21,7 @@ const fakeQueue = (existingKeys: string[]) => {
 
 describe('registerCronJobs removes orphaned repeatables', () => {
   afterEach(async () => {
-    await db.cronJob.deleteMany({});
+    await cleanupTouchedTables(db);
   });
 
   afterAll(async () => {

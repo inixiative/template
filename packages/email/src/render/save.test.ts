@@ -8,7 +8,6 @@ import {
   createOrganization,
   createSpace,
   createUser,
-  registerTestTracker,
 } from '@template/db/test';
 import { ConditionValidationError } from '@template/email/errors/ConditionValidationError';
 import { DependentTemplateError } from '@template/email/errors/DependentTemplateError';
@@ -18,8 +17,6 @@ import { TokenValidationError } from '@template/email/errors/TokenValidationErro
 import { guardedToken } from '@template/email/render/guardedToken';
 import { saveEmailTemplate } from '@template/email/render/save';
 import { emailLens } from '@template/email/rules/emailLens';
-
-registerTestTracker();
 
 const mjml = (content: string) =>
   `<mjml><mj-body><mj-section><mj-column>${content}</mj-column></mj-section></mj-body></mjml>`;

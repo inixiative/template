@@ -14,16 +14,13 @@ import {
   createOrganizationUser,
   createSession,
   createUser,
-  registerTestTracker,
 } from '@template/db/test';
 
 const tombstone = (model: 'user' | 'organization' | 'contact' | 'organizationUser', id: string) =>
   db.delegate(model).update({ where: { id }, data: { deletedAt: new Date() } });
 
 describe('softDeleteScope extension', () => {
-  beforeAll(() => {
-    registerTestTracker();
-  });
+  beforeAll(() => {});
 
   afterAll(async () => {
     await cleanupTouchedTables(db);

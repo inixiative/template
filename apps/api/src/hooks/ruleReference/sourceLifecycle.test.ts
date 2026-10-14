@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
 import { Operator } from '@inixiative/json-rules';
 import { clearHookRegistry, db, liveRuleReferenceKeys, ruleReferenceIssues } from '@template/db';
 import type { Space } from '@template/db/generated/client/client';
@@ -73,6 +73,9 @@ describe('ruleReference — a source takes its edges with it and brings them bac
     registerSegmentRuleReferencesHook();
     registerRuleReferenceTargetHook();
     registerSoftDeleteCascadeHook();
+  });
+
+  beforeEach(async () => {
     const { context } = await createOrganizationUser({ role: 'admin' });
     space = (await createSpace({}, { organization: context.organization })).entity;
   });
@@ -83,11 +86,7 @@ describe('ruleReference — a source takes its edges with it and brings them bac
   });
 
   afterEach(async () => {
-    await db.ruleReference.deleteMany({});
-    await db.withDeleted(async () => {
-      await db.$executeRaw`DELETE FROM "EmailTemplate"`;
-      await db.$executeRaw`DELETE FROM "EmailComponent"`;
-    });
+    await cleanupTouchedTables(db);
   });
 
   describe('email template source', () => {
