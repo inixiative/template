@@ -24,21 +24,27 @@ Port from Zealot once #2786 merges; that PR is the source of truth.
   RuntimeDelegate has no `groupBy`, but Postgres can do a real `DISTINCT`, so use `findMany` distinct.
   Confirm in a query log that the template's Prisma version sends `DISTINCT` and `LIMIT` (it was the
   `nativeDistinct` preview flag in some versions). Keep the fail-closed target ceiling.
-- **Three layers: root, branch, leaf.** Built on staged jobs (`makeJob({ stages, finish })`, landed in
-  the template in `ddcd65d3`; see `docs/claude/JOBS.md` → Staged Job).
+- **Three layers: root, branch, leaf.** Built on staged jobs (`{ stages, finish }`, landed in the template
+  in `ddcd65d3`; every job constructor takes it since the jobs-stages-dedup-eviction PR; see
+  `docs/claude/JOBS.md` → Staged Job).
   - **Root:** one singleton cron job, seeded as a cron row (`registerCronJobs` / the admin cronJob
     module), so it is visible and its frequency is adjustable. Each tick it walks the registered rolling
     caches. It only adds branches and supervises open ones; it is not itself a flow parent.
-  - **Branch:** a staged job, one per cache, added under a fixed job id (`rollingCacheBranchJobId(name)`)
-    with `removeOnComplete`/`removeOnFail`, so BullMQ refuses a second branch while one is open. Its one
-    stage resolves the target selector and adds a leaf per target via `ctx.enqueueChildJob`; it stays open
-    until every leaf has reported, and `finish` starts the timer, so the next refresh is one interval after
-    the data was fresh. A branch never refires while it is open.
+  - **Branch:** a keyed staged singleton, one per cache: `makeSingletonJob({ stages, finish }, { lockKey:
+    ({ name }) => name })`. It is added with the singleton's deduplication id (`<handler>-<name>`), which
+    holds while the branch is parked in `waiting-children`, so a second branch add while one is open is a
+    no-op; the lock guards each step it runs. Its one stage resolves the target selector and adds a leaf
+    per target via `ctx.enqueueChildJob`; it stays open until every leaf has reported, and `finish` starts
+    the timer, so the next refresh is one interval after the data was fresh. A branch never refires while
+    it is open. No fixed job id.
   - **Leaf:** one superseding job per target, keyed by the target's cache key, slow lane. A leaf that
     exhausts its retries keeps the last good value; `ignoreDependencyOnFailure` lets the branch close.
 - **Timer:** one key per cache in Redis with TTL = interval, in its own Redis namespace, not `cache:`
   (an evicted or flushed cache entry must not reschedule the refresh). A cache is due when its timer is
   gone and no branch is open.
+- **Finding the open branch:** the root reads `queue.getDeduplicationJobId('<branch handler>-<name>')`
+  and loads that job: waiting on leaves → supervise it; still queued or running its first step → leave
+  it alone; none → add a branch.
 - **Supervision, not refire:** while a branch is open, the root extends the TTL of its unfinished leaves'
   entries each tick. Past `maxExtensions + 1` intervals open, each unfinished leaf emits
   `rollingCache.leafStuck` with its provenance (cache, key, target row, pending since, intervals open) and
@@ -58,7 +64,8 @@ if not running; their due rules, overrun handling, executor and state all differ
 walk only if a third coordinator turns up with the same shape.
 
 Collision policy is binary: a singleton skips the new run, superseding takes over, and nothing parks
-(`makeSingletonJob(handler, { lockKey })` landed in `13bf9cb0`).
+(`makeSingletonJob(handler, { lockKey })` landed in `13bf9cb0`; its key became a BullMQ deduplication
+id, and superseding a staged job evicts its children, in the jobs-stages-dedup-eviction PR).
 
 ## Done when
 
