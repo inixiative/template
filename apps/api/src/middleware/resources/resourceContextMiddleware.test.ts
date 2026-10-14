@@ -9,13 +9,13 @@ import {
   createUser,
 } from '@template/db/test';
 import { getResource } from '#/lib/context/getResource';
-import { readRoute } from '#/lib/routeTemplates';
+import { readRoute, updateRoute } from '#/lib/routeTemplates';
 import { makeController } from '#/lib/utils/makeController';
 import { validateSuperadmin } from '#/middleware/validations/validateSuperadmin';
 import { Modules } from '#/modules/modules';
 import type { AppEnv } from '#/types/appEnv';
 import { createTestApp, type MountFn } from '#tests/createTestApp';
-import { get, json } from '#tests/utils/request';
+import { get, json, patch } from '#tests/utils/request';
 
 // Drives resourceContextMiddleware via the real readRoute template (which
 // auto-attaches the middleware via prepareMiddleware) so the test surface
@@ -42,9 +42,41 @@ const cronJobReadController = makeController(cronJobReadRoute, async (c, respond
   return respond.ok(resource);
 });
 
+// A route that may serve tombstones when the caller asks with ?includeDeleted=true.
+const orgHistoryRoute = readRoute({
+  model: Modules.organization,
+  action: 'history',
+  includeDeleted: true,
+  responseSchema: OrganizationScalarSchema,
+});
+
+const orgHistoryController = makeController(orgHistoryRoute, async (c, respond) => {
+  const resource = getResource<'organization'>(c);
+  return respond.ok(resource);
+});
+
+// A revive: a write that has to load the tombstone it brings back.
+const orgReviveRoute = updateRoute({
+  model: Modules.organization,
+  action: 'revive',
+  includeDeleted: true,
+  bodySchema: OrganizationScalarSchema.pick({ name: true }),
+  responseSchema: OrganizationScalarSchema,
+});
+
+const orgReviveController = makeController(orgReviveRoute, async (c, respond) => {
+  const resource = getResource<'organization'>(c);
+  const revived = await c
+    .get('db')
+    .organization.update({ where: { id: resource.id }, data: { deletedAt: null } });
+  return respond.ok(revived);
+});
+
 const mountRoutes: MountFn = (app) => {
   const orgRouter = new OpenAPIHono<AppEnv>();
   orgRouter.openapi(orgReadRoute, orgReadController);
+  orgRouter.openapi(orgHistoryRoute, orgHistoryController);
+  orgRouter.openapi(orgReviveRoute, orgReviveController);
   app.route('/api/v1/organization', orgRouter);
 
   const cronJobRouter = new OpenAPIHono<AppEnv>();
@@ -149,6 +181,39 @@ describe('resourceContextMiddleware', () => {
   it('refuses a superadmin endpoint to a non-superadmin', async () => {
     const response = await fetch(get(`/api/admin/organization/${deletedOrg.id}`));
     expect(response.status).toBe(403);
+  });
+
+  it('loads a soft-deleted resource on a route that declares includeDeleted, only when asked', async () => {
+    expect((await fetch(get(`/api/v1/organization/${deletedOrg.id}/history`))).status).toBe(404);
+    expect(
+      (await fetch(get(`/api/v1/organization/${deletedOrg.id}/history?includeDeleted=false`)))
+        .status,
+    ).toBe(404);
+
+    const response = await fetch(
+      get(`/api/v1/organization/${deletedOrg.id}/history?includeDeleted=true`),
+    );
+    expect(response.status).toBe(200);
+    const { data } = await json<Organization>(response);
+    expect(data.id).toBe(deletedOrg.id);
+  });
+
+  it('ignores ?includeDeleted on a route that does not declare it', async () => {
+    const response = await fetch(get(`/api/v1/organization/${deletedOrg.id}?includeDeleted=true`));
+    expect(response.status).toBe(404);
+  });
+
+  it('lets a write that declares includeDeleted revive its tombstone', async () => {
+    const { entity: gone } = await createOrganization();
+    await db.organization.update({ where: { id: gone.id }, data: { deletedAt: new Date() } });
+
+    const response = await fetch(
+      patch(`/api/v1/organization/${gone.id}/revive?includeDeleted=true`, { name: gone.name }),
+    );
+    expect(response.status).toBe(200);
+
+    const stored = await db.organization.findUnique({ where: { id: gone.id } });
+    expect(stored?.deletedAt).toBeNull();
   });
 
   it('leaves models without a deletedAt column unaffected', async () => {
