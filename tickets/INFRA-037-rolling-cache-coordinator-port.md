@@ -15,11 +15,15 @@ Port from Zealot once #2786 merges; that PR is the source of truth.
 
 - **`makeRollingCache`**, defined inline next to the code that reads it, and registered in one place.
   A CI rule (`rolling-cache-registered`) fails a rolling cache that isn't registered.
-- **Targets are a Prisma query.** `{ model, ...findMany args }`: `model` picks the delegate
-  (`runtimeDelegate`), and `where` / `select` / `distinct` go to it unchanged. There's no column-list
-  shorthand and no targets table: targets come from live data, and the compute callback and cache key
-  are code. Zealot #2786 runs distinct as `groupBy`, a real SQL `GROUP BY`; Postgres also has native
-  `findMany` distinct. Either is fine.
+- **Targets are a Prisma query, limited to what can go in a job payload.** `{ model, where?, distinct | select:
+  [cols] }`: `model` picks the delegate (`runtimeDelegate`), `where` is Prisma's own type, and the
+  columns are typed to JSON scalars, because each row becomes a job payload. An arbitrary `select`
+  could pull relations, BigInt or Date into a payload. There's no targets table: targets come from
+  live data, and the compute callback and cache key are code. Zealot #2786 runs distinct as
+  `groupBy` because Prisma dedupes `findMany` distinct in memory on MySQL. The template's
+  RuntimeDelegate has no `groupBy`, but Postgres can do a real `DISTINCT`, so use `findMany` distinct.
+  Confirm in a query log that the template's Prisma version sends `DISTINCT` and `LIMIT` (it was the
+  `nativeDistinct` preview flag in some versions). Keep the fail-closed target ceiling.
 - **One coordinator.** A singleton cron job, seeded as a cron row (`registerCronJobs` / the admin
   cronJob module), so it is visible and its frequency is adjustable. It walks the registered rolling caches each tick.
   Each cache keeps one timer per group in Redis with TTL = interval; a cache is due when its timer
