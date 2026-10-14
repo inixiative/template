@@ -20,6 +20,10 @@ export const sanitizeRequestSchema = <T extends ZodSchema>(
   schema: T,
   additionalSanitizeKeys: readonly string[] = [],
 ): SanitizedSchema<T> => {
+  if (schema._zod.def.checks?.length)
+    throw new Error(
+      'Body schema carries refinements that rebuilding its shape would drop; pass them as bodyRefinement instead',
+    );
   const allSanitizeKeys = [...BASE_SANITIZE_KEYS, ...additionalSanitizeKeys];
   const sanitizedShape = omit(schema.shape, allSanitizeKeys);
   const transformedShape = transformJsonFields(sanitizedShape);

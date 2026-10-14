@@ -7,7 +7,7 @@
  */
 import { createRoute } from '@hono/zod-openapi';
 import { securityForRoute } from '#/lib/auth/routeSecurity';
-import type { RouteArgs } from '#/lib/routeTemplates/types';
+import type { RouteArgs, RouteBuilderArgs, ZodSchema } from '#/lib/routeTemplates/types';
 import {
   buildOperationId,
   buildRequest,
@@ -17,7 +17,9 @@ import {
   prepareMiddleware,
 } from '#/lib/routeTemplates/utils';
 
-export const actionRoute = <const T extends RouteArgs>(args: T) => {
+export const actionRoute = <const T extends RouteArgs, Body extends ZodSchema>(
+  args: RouteBuilderArgs<T, Body>,
+) => {
   const {
     model,
     submodel,

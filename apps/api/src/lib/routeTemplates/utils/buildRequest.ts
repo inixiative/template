@@ -42,7 +42,7 @@ type TransformShape<S> = {
 };
 
 // Type that represents a sanitized body schema with base keys removed and JSON fields cast to Prisma types
-type SanitizedBodySchema<T extends ZodSchema> = z.ZodObject<
+export type SanitizedBodySchema<T extends ZodSchema> = z.ZodObject<
   TransformShape<Omit<T['shape'], BaseSanitizeKey>>
 >;
 

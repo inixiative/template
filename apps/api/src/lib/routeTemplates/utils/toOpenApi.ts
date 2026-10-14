@@ -20,6 +20,7 @@ const BUILDER_ONLY_KEYS = [
   'query',
   'responseSchema',
   'bodySchema',
+  'bodyRefinement',
   'sanitizeKeys',
   'skipId',
   'many',

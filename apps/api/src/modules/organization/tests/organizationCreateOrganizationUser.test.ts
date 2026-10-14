@@ -12,7 +12,7 @@ import { organizationCreateOrganizationUserController } from '#/modules/organiza
 import { organizationCreateOrganizationUserRoute } from '#/modules/organization/routes/organizationCreateOrganizationUser';
 import type { AppEnv } from '#/types/appEnv';
 import { createTestApp } from '#tests/createTestApp';
-import { json, jsonError, post } from '#tests/utils/request';
+import { json, jsonError, jsonValidationFailure, post } from '#tests/utils/request';
 
 type CreateOrganizationUserResponse = z.infer<
   typeof organizationCreateOrganizationUserRoute.responseSchema
@@ -89,5 +89,28 @@ describe('POST /api/v1/organization/:id/organizationUsers', () => {
 
     expect(response.status).toBe(409);
     expect(body.error).toBeDefined();
+  });
+
+  it('rejects a body with neither userId nor email with the schema-failure 400', async () => {
+    const path = `/api/v1/organization/${org.id}/organizationUsers`;
+    const membershipsBefore = await db.organizationUser.count({
+      where: { organizationId: org.id },
+    });
+
+    const refinementResponse = await fetch(post(path, { role: 'member' }));
+    const schemaResponse = await fetch(post(path, { email: 'not-an-email', role: 'member' }));
+    const refinementBody = await jsonValidationFailure(refinementResponse);
+    const schemaBody = await jsonValidationFailure(schemaResponse);
+
+    expect(refinementResponse.status).toBe(400);
+    expect(schemaResponse.status).toBe(400);
+    expect(Object.keys(refinementBody).sort()).toEqual(Object.keys(schemaBody).sort());
+    expect(Object.keys(refinementBody.error).sort()).toEqual(Object.keys(schemaBody.error).sort());
+    expect(refinementBody.success).toBe(false);
+    expect(refinementBody.error.name).toBe(schemaBody.error.name);
+    expect(refinementBody.error.message).toContain('Either userId or email is required');
+    expect(await db.organizationUser.count({ where: { organizationId: org.id } })).toBe(
+      membershipsBefore,
+    );
   });
 });

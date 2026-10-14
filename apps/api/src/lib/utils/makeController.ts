@@ -12,6 +12,7 @@ import {
   type ResponseMetadata,
   ResponseMetadataSchema,
 } from '#/lib/routeTemplates/responseMetadata';
+import { buildBodyRefinementSchema } from '#/lib/routeTemplates/utils/buildBodyRefinementSchema';
 import { isAuthProbe } from '#/lib/utils/authProbe';
 import type { AppEnv } from '#/types/appEnv';
 
@@ -63,12 +64,23 @@ export const makeController = <R extends RouteConfig, T>(
     respond: TypedResponders<R, T>,
   ) => TypedResponse | Promise<TypedResponse>,
 ): RouteHandler<R, AppEnv> => {
+  const bodyRefinement = buildBodyRefinementSchema(route);
+
   const impl = (c: RouteContext<R, AppEnv>) => {
     c.set('routeConfig', route);
 
     // WS subscribe probe: reaching the controller means every auth middleware passed —
     // answer without running the handler.
     if (isAuthProbe(c)) return c.body(null, 204) as unknown as TypedResponse;
+
+    if (
+      bodyRefinement &&
+      (bodyRefinement.bodyRequired || isJsonContentType(c.req.header('content-type')))
+    ) {
+      const body = (c.req as { valid: (target: 'json') => unknown }).valid('json');
+      const result = bodyRefinement.schema.safeParse(body);
+      if (!result.success) return c.json(result, 400) as unknown as TypedResponse;
+    }
 
     const statusCodes = Object.keys(route.responses || {}).map(Number);
     const responders: ResponderBag<T> = {};
@@ -118,6 +130,9 @@ export const makeController = <R extends RouteConfig, T>(
 
   return impl as unknown as RouteHandler<R, AppEnv>;
 };
+
+const isJsonContentType = (contentType: string | undefined) =>
+  Boolean(contentType && /^application\/([a-z-.]+\+)?json/.test(contentType));
 
 export class ResponseValidationError extends Error {
   constructor(

@@ -9,7 +9,6 @@ import { getResource } from '#/lib/context/getResource';
 import { makeError } from '#/lib/errors';
 import { makeController } from '#/lib/utils/makeController';
 import { organizationCreateOrganizationUserRoute } from '#/modules/organization/routes/organizationCreateOrganizationUser';
-import { validateOrganizationCreateOrganizationUserBody } from '#/modules/organization/validations/organizationCreateOrganizationUserBody';
 import { findUserOrCreateGuest } from '#/modules/user/services/findOrCreateGuest';
 
 export const organizationCreateOrganizationUserController = makeController(
@@ -20,7 +19,6 @@ export const organizationCreateOrganizationUserController = makeController(
     const body = c.req.valid('json');
     const permix = c.get('permix');
 
-    validateOrganizationCreateOrganizationUserBody(body);
     if (!check(permix, rebacSchema, 'organization', { id: org.id, role: body.role }, 'assign'))
       throw makeError({ status: 403, message: 'Access denied' });
 
