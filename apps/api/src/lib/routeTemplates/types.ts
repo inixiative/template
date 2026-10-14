@@ -6,11 +6,17 @@
  */
 import type { RouteConfig, z } from '@hono/zod-openapi';
 import type { LensNarrowing } from '@inixiative/json-rules';
+import type { SanitizedBodySchema } from '#/lib/routeTemplates/utils/buildRequest';
 import type { Module } from '#/modules/modules';
 
 export type ZodSchema = z.ZodObject<Record<string, z.ZodType>>;
 
 export type ZodResponseSchema = z.ZodType;
+
+export type BodyRefinement<Body = never> = (
+  body: Body,
+  ctx: z.RefinementCtx,
+) => void | Promise<void>;
 
 export type RouteArgs = Omit<RouteConfig, 'path' | 'method' | 'responses' | 'request'> & {
   model: Module;
@@ -28,4 +34,9 @@ export type RouteArgs = Omit<RouteConfig, 'path' | 'method' | 'responses' | 'req
   admin?: boolean;
   internal?: boolean;
   filterLens?: LensNarrowing;
+};
+
+export type RouteBuilderArgs<T extends RouteArgs, Body extends ZodSchema> = T & {
+  bodySchema?: Body;
+  bodyRefinement?: BodyRefinement<z.output<SanitizedBodySchema<Body>>>;
 };

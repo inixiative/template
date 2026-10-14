@@ -100,7 +100,8 @@ import { readRoute, createRoute, updateRoute, deleteRoute, actionRoute } from '#
 | `paginate` | boolean | Add pagination query params (requires `many`) |
 | `admin` | boolean | Adds 'Admin' prefix to operationId and tag |
 | `skipId` | boolean | Omit `:id` param from path |
-| `bodySchema` | ZodSchema | Request body validation |
+| `bodySchema` | ZodSchema | Request body validation (no object-level `.refine()`; route build throws) |
+| `bodyRefinement` | `(body, ctx) => void` | Cross-field body checks, run before the controller; not in OpenAPI/SDK |
 | `responseSchema` | ZodSchema | Response shape |
 | `query` | ZodSchema | Query params (merged with pagination if enabled) |
 | `params` | ZodSchema | Path params (merged with id if not skipped) |
@@ -1126,27 +1127,22 @@ export const userBodySchema = z.object({ ... });
 
 ### Cross-Field Validations
 
-**Don't use `.refine()` on route schemas** - it creates `ZodEffects` types that break hono-zod-openapi.
-
-Instead, create validation files and call `.parse()` manually in controller:
+Route build throws on a `bodySchema` that carries an object-level `.refine()`/`.superRefine()`: sanitizing rebuilds its shape and would drop them silently. Pass cross-field checks as `bodyRefinement`, a `superRefine` callback typed against the body. `makeController` runs it on the validated body before the handler; a failure returns the same 400 as a schema failure. With `many`, it runs per item. It is not part of the OpenAPI document or SDK.
 
 ```typescript
-// validations/organizationCreateUserBody.ts
-const schema = z.object({
-  userId: z.string().uuid().optional(),
-  email: z.string().email().optional(),
-}).refine((data) => data.userId || data.email, {
-  message: 'Either userId or email is required',
+createRoute({
+  model: Modules.organization,
+  submodel: Modules.organizationUser,
+  bodySchema,
+  bodyRefinement: (body, ctx) => {
+    if (!body.userId && !body.email)
+      ctx.addIssue({ code: 'custom', message: 'Either userId or email is required' });
+  },
+  responseSchema,
 });
-
-export const validateOrganizationCreateUserBody = (body: unknown) => schema.parse(body);
 ```
 
-```typescript
-// In controller
-const body = c.req.valid('json');
-validateOrganizationCreateUserBody(body);  // Throws ZodError if invalid
-```
+Field-level refinements (inside the shape) stay on the schema.
 
 ---
 
@@ -1190,7 +1186,7 @@ modules/<resource>/
 | `services/` | Complex business logic |
 | `schemas/` | Shared Zod schemas (when not colocated) |
 | `transformers/` | Data transformation functions |
-| `validations/` | Cross-field validation with `.refine()` |
+| `validations/` | Validation helpers that need the DB or context |
 | `utils/` | Module-specific utilities |
 | `handlers/` | Job handlers (in jobs module) |
 | `tests/` | Test files |
