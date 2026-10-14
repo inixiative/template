@@ -6,6 +6,7 @@
  */
 import { log, withLogContext } from '@template/shared/logger';
 import { recordDuration, SpanKind, withRemoteTrace, withSpan } from '@template/shared/telemetry';
+import { WaitingChildrenError } from 'bullmq';
 
 export const traceJob = <T>(
   job: {
@@ -37,6 +38,12 @@ export const traceJob = <T>(
           try {
             return await run();
           } catch (error) {
+            // A staged job parking in `waiting-children` (runJobStages) ends its attempt by throwing,
+            // but nothing failed: BullMQ runs it again once its children have reported.
+            if (error instanceof WaitingChildrenError) {
+              outcome = 'waitingChildren';
+              throw error;
+            }
             outcome = 'error';
             log.error({ err: error }, 'Job attempt failed');
             throw error;
