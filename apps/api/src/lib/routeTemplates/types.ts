@@ -13,7 +13,10 @@ export type ZodSchema = z.ZodObject<Record<string, z.ZodType>>;
 
 export type ZodResponseSchema = z.ZodType;
 
-export type BodyRefinement<Body = never> = (body: Body, ctx: z.RefinementCtx) => void;
+export type BodyRefinement<Body = never> = (
+  body: Body,
+  ctx: z.RefinementCtx,
+) => void | Promise<void>;
 
 export type RouteArgs = Omit<RouteConfig, 'path' | 'method' | 'responses' | 'request'> & {
   model: Module;

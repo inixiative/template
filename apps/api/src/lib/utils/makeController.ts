@@ -66,7 +66,7 @@ export const makeController = <R extends RouteConfig, T>(
 ): RouteHandler<R, AppEnv> => {
   const bodyRefinement = buildBodyRefinementSchema(route);
 
-  const impl = (c: RouteContext<R, AppEnv>) => {
+  const impl = async (c: RouteContext<R, AppEnv>) => {
     c.set('routeConfig', route);
 
     // WS subscribe probe: reaching the controller means every auth middleware passed —
@@ -78,7 +78,7 @@ export const makeController = <R extends RouteConfig, T>(
       (bodyRefinement.bodyRequired || isJsonContentType(c.req.header('content-type')))
     ) {
       const body = (c.req as { valid: (target: 'json') => unknown }).valid('json');
-      const result = bodyRefinement.schema.safeParse(body);
+      const result = await bodyRefinement.schema.safeParseAsync(body);
       if (!result.success) return c.json(result, 400) as unknown as TypedResponse;
     }
 

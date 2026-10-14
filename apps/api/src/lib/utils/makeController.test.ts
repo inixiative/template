@@ -164,6 +164,33 @@ describe('makeController', () => {
       expect(response.status).toBe(200);
     });
 
+    it('awaits an async refinement', async () => {
+      const route = actionRoute({
+        model: Modules.user,
+        action: 'range',
+        skipId: true,
+        bodySchema: rangeSchema,
+        bodyRefinement: async (range, ctx) => {
+          await Promise.resolve();
+          rangeRefinement(range, ctx);
+        },
+        responseSchema: z.object({ ran: z.boolean() }),
+      });
+      const app = new OpenAPIHono<AppEnv>();
+      app.openapi(
+        route,
+        makeController(route, (_c, respond) => respond.ok({ ran: true })),
+      );
+
+      const rejected = await app.request(post('/range', { min: 5, max: 1 }));
+      const accepted = await app.request(post('/range', { min: 1, max: 5 }));
+      const body = await jsonValidationFailure(rejected);
+
+      expect(rejected.status).toBe(400);
+      expect(body.error.message).toContain('min must not exceed max');
+      expect(accepted.status).toBe(200);
+    });
+
     it('refines each item of a many body', async () => {
       const route = createRoute({
         model: Modules.user,
