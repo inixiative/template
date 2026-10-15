@@ -14,7 +14,7 @@ The batch side of #2447, an upserting `findForUpdate` fence over many keys, is I
 
 Two `db.user.create` call sites outside factories:
 
-- `modules/user/services/findOrCreateGuest.ts` (`findUserOrCreateGuest`). It runs `findUnique({ email })` outside any lock, then creates inside `db.txn`. Callers: `organizationCreateOrganizationUser`, `resolveInquiryTarget`.
+- `modules/user/services/findOrCreateGuest.ts` (`findUserOrCreateGuest`). It runs `findUnique({ email })` outside any lock, then creates inside `db.txn`. Caller: `resolveInquiryTarget`.
 - `lib/identity/resolveUserByContact.ts`. It runs `contact.findFirst` and then `user.create` + `contact.create` in one txn, without a lock. The `User` gets a stub email from `ContactRegistry[type].toStubEmail`.
 
 Normalization:
