@@ -11,7 +11,8 @@ import { InquiryStatus } from '@template/db/generated/client/enums';
 export const inquiryCreateBodySchema = InquiryScalarInputSchema.omit({ resolution: true }).extend({
   content: z
     .unknown()
-    .describe('Shape depends on `type`; see GET /api/v1/inquiry/info (`types.<type>.content`).'),
+    .describe('Shape depends on `type`; see GET /api/v1/inquiry/info (`types.<type>.content`).')
+    .optional(),
   status: z.enum([InquiryStatus.draft, InquiryStatus.sent]).default(InquiryStatus.draft),
   targetUserId: z.string().optional(),
   targetOrganizationId: z.string().optional(),
