@@ -1,0 +1,49 @@
+{
+  "id": "naming-style",
+  "title": "Naming, style and lint",
+  "routing": "Is this about what to call something or how code is written rather than what it does: identifier, file, route operationId or Prisma model/field names, polymorphic side names (owner/source/target/resource/subject/actor), util vs helper, make/validate/get/is prefixes, _ vs __ prefixes, imports (#/, @template/, barrels), comments, type vs interface, enums as const objects, named exports, no any, or the Biome/lint scripts and CI rules (check-import-aliases, no-prisma-maps, no-isarray-cast, no-create-race-machinery) that enforce them?",
+  "concepts": [
+    "naming",
+    "code-style",
+    "lint-rules"
+  ],
+  "tokens": 9807,
+  "tokenMethod": "chars/4",
+  "runsAgreed": 1,
+  "sources": {
+    "docs": [
+      "AI/ENTRYPOINT.md",
+      "docs/claude/API_ROUTES.md",
+      "docs/claude/NAMING.md",
+      "docs/claude/SCRIPTS.md",
+      "docs/claude/STYLE.md"
+    ],
+    "docUnits": [
+      "doc:docs/claude/API_ROUTES.md#naming-conventions",
+      "doc:docs/claude/NAMING.md#terminology",
+      "doc:docs/claude/NAMING.md#backend",
+      "doc:docs/claude/NAMING.md#frontend",
+      "doc:docs/claude/NAMING.md#database",
+      "doc:docs/claude/NAMING.md#files-directories",
+      "doc:docs/claude/STYLE.md#naming-conventions",
+      "doc:docs/claude/STYLE.md#code-formatting",
+      "doc:docs/claude/STYLE.md#typescript",
+      "doc:docs/claude/STYLE.md#comments-logging",
+      "doc:AI/ENTRYPOINT.md#0-purpose-and-priority",
+      "doc:docs/claude/SCRIPTS.md#linting",
+      "doc:AI/ENTRYPOINT.md#0-0-critical-guardrails"
+    ],
+    "catalogClusters": [
+      "code-style-lint-checks",
+      "data-models",
+      "module-layout-monorepo",
+      "naming-vocabulary",
+      "request-response-schemas",
+      "structured-logging"
+    ],
+    "codeEntries": 12,
+    "docMembers": 43
+  },
+  "bypassLines": 11,
+  "glossaryTerms": 28
+}

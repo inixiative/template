@@ -1,0 +1,68 @@
+{
+  "id": "authentication-users",
+  "title": "Authentication and Users",
+  "routing": "Is this about who the caller is? BetterAuth sessions and the auth instance, OAuth sign-in and the one-time-token callback, AuthProvider/Account/Session/Token/Verification models, API tokens and TokenOwnerModel, the auth middleware chain (tokenAuthMiddleware, authMiddleware, spoofMiddleware), validateUser/validateActor/validateNotToken, the frontend auth slice, setToken/getToken, LoginForm/SignupForm, requireAuth/requirePublic, or User lookup and creation (findUserByEmail, findUserOrCreateGuest, normalizeEmail, redactUser, /me routes)?",
+  "concepts": [
+    "authentication",
+    "auth-middleware",
+    "frontend-auth",
+    "users"
+  ],
+  "tokens": 20696,
+  "tokenMethod": "chars/4",
+  "runsAgreed": 2,
+  "sources": {
+    "docs": [
+      "FEATURES.md",
+      "docs/claude/AUTH.md",
+      "docs/claude/FRONTEND/AUTH.md"
+    ],
+    "docUnits": [
+      "doc:docs/claude/AUTH.md#overview",
+      "doc:docs/claude/AUTH.md#betterauth-session",
+      "doc:docs/claude/AUTH.md#oauth-bearer-tokens",
+      "doc:docs/claude/AUTH.md#multi-provider-authentication-authprovider",
+      "doc:docs/claude/AUTH.md#token-authentication",
+      "doc:docs/claude/AUTH.md#token-types",
+      "doc:FEATURES.md#authentication-sessions",
+      "doc:docs/claude/AUTH.md#auth-middleware-chain",
+      "doc:docs/claude/AUTH.md#spoof-middleware",
+      "doc:docs/claude/AUTH.md#validation-middleware",
+      "doc:docs/claude/AUTH.md#choosing-between-validateuser-and-validateactor",
+      "doc:docs/claude/FRONTEND/AUTH.md#architecture",
+      "doc:docs/claude/FRONTEND/AUTH.md#unified-auth-method",
+      "doc:docs/claude/FRONTEND/AUTH.md#pages-and-forms",
+      "doc:docs/claude/FRONTEND/AUTH.md#useauthproviders",
+      "doc:docs/claude/FRONTEND/AUTH.md#oauth-callback",
+      "doc:docs/claude/FRONTEND/AUTH.md#guards",
+      "doc:docs/claude/FRONTEND/AUTH.md#auth-slice",
+      "doc:docs/claude/FRONTEND/AUTH.md#navigation-helpers",
+      "doc:docs/claude/FRONTEND/AUTH.md#security",
+      "doc:docs/claude/FRONTEND/AUTH.md#testing",
+      "doc:docs/claude/FRONTEND/AUTH.md#key-files",
+      "doc:FEATURES.md#user-management"
+    ],
+    "catalogClusters": [
+      "audit-logging",
+      "auth-middleware-validation",
+      "authentication-methods",
+      "caching-and-invalidation",
+      "encryption-key-rotation",
+      "environment-config",
+      "frontend-app-shells-routes",
+      "frontend-state-api-client",
+      "rate-limiting",
+      "request-context-access",
+      "request-response-schemas",
+      "roles-and-permissions",
+      "superadmin-operations",
+      "testing-helpers",
+      "ui-components",
+      "user-identity-management"
+    ],
+    "codeEntries": 77,
+    "docMembers": 61
+  },
+  "bypassLines": 21,
+  "glossaryTerms": 30
+}

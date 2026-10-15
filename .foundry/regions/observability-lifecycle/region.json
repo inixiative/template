@@ -1,0 +1,63 @@
+{
+  "id": "observability-lifecycle",
+  "title": "Logging, telemetry, shutdown",
+  "routing": "Is this about emitting or shipping logs, traces, metrics or errors, or about process start/stop: the log facade (log, withLogContext, logScope, ctx.log in jobs, frontend loggers, redaction), OpenTelemetry (withSpan, recordDuration, incrementCounter, traceJob, captureTraceContext/withRemoteTrace, telemetryMiddleware, telemetryExtension, browser telemetry, OTEL_* settings), the error reporter (Sentry/console), health checks, or graceful shutdown and in-process loops (initGracefulShutdown, onShutdown, sleepUnlessShuttingDown, makeUnrefInterval)?",
+  "concepts": [
+    "logging",
+    "telemetry",
+    "process-lifecycle"
+  ],
+  "tokens": 15342,
+  "tokenMethod": "chars/4",
+  "runsAgreed": 3,
+  "sources": {
+    "docs": [
+      "FEATURES.md",
+      "docs/claude/LOGGING.md"
+    ],
+    "docUnits": [
+      "doc:docs/claude/LOGGING.md#structured-logging",
+      "doc:docs/claude/LOGGING.md#setup",
+      "doc:docs/claude/LOGGING.md#inspect-locally-without-any-provider",
+      "doc:docs/claude/LOGGING.md#coverage-and-limits",
+      "doc:docs/claude/LOGGING.md#following-an-incident-across-two-services",
+      "doc:FEATURES.md#infrastructure-devops"
+    ],
+    "catalogClusters": [
+      "app-events-side-effects",
+      "audit-logging",
+      "authentication-methods",
+      "batch-request-execution",
+      "caching-and-invalidation",
+      "cron-and-recurring-work",
+      "data-access-rules",
+      "data-models",
+      "database-scripts-migrations",
+      "dev-setup-scripts",
+      "environment-config",
+      "error-handling",
+      "filtering-search-ordering",
+      "graceful-shutdown-lifecycle",
+      "job-overflow-outbox",
+      "lenses-multi-source",
+      "locks-and-serialization",
+      "module-layout-monorepo",
+      "mutation-hooks",
+      "naming-vocabulary",
+      "observability-telemetry",
+      "pagination",
+      "redis-infrastructure",
+      "request-context-access",
+      "route-registration-openapi",
+      "rule-references-registry",
+      "structured-logging",
+      "supersede-lanes",
+      "testing-helpers",
+      "websocket-connection-management"
+    ],
+    "codeEntries": 60,
+    "docMembers": 82
+  },
+  "bypassLines": 20,
+  "glossaryTerms": 30
+}

@@ -1,0 +1,60 @@
+{
+  "id": "email-templates",
+  "title": "Email templates and rendering",
+  "routing": "Is this about authoring, saving, composing or rendering an email's content: EmailTemplate / EmailComponent rows, MJML, {{#component:slug}} blocks, {{sender.*}}/{{recipient.*}}/{{data.*}}/{{system.*}} tokens, {{#if rule=\u2026}} / {{#each}} blocks, the owner cascade (composeTemplate, lookupCascade), the email lens (emailLens, emailLensFor, scopeEmailLens), saveEmailTemplate, settleTemplate, interpolate, preflight, the email registry's render policy, or recomposing what was sent?",
+  "concepts": [
+    "email-templates"
+  ],
+  "tokens": 26289,
+  "tokenMethod": "chars/4",
+  "runsAgreed": 3,
+  "sources": {
+    "docs": [
+      "FEATURES.md",
+      "docs/claude/COMMUNICATIONS.md"
+    ],
+    "docUnits": [
+      "doc:docs/claude/COMMUNICATIONS.md#email",
+      "doc:docs/claude/COMMUNICATIONS.md#email/implementation-status",
+      "doc:docs/claude/COMMUNICATIONS.md#email/package-structure",
+      "doc:docs/claude/COMMUNICATIONS.md#email/database-models",
+      "doc:docs/claude/COMMUNICATIONS.md#email/component-system",
+      "doc:docs/claude/COMMUNICATIONS.md#email/variable-interpolation",
+      "doc:docs/claude/COMMUNICATIONS.md#email/the-email-lens",
+      "doc:docs/claude/COMMUNICATIONS.md#email/cascade-resolution",
+      "doc:docs/claude/COMMUNICATIONS.md#email/render-pipeline",
+      "doc:docs/claude/COMMUNICATIONS.md#email/save-pipeline",
+      "doc:docs/claude/COMMUNICATIONS.md#email/mjml-validation",
+      "doc:docs/claude/COMMUNICATIONS.md#email/template-versioning-recompose",
+      "doc:docs/claude/COMMUNICATIONS.md#email/rule-references-the-rows-a-rule-names",
+      "doc:FEATURES.md#email-system"
+    ],
+    "catalogClusters": [
+      "audit-logging",
+      "caching-and-invalidation",
+      "data-models",
+      "email-composition-rendering",
+      "email-delivery-senders",
+      "error-handling",
+      "graceful-shutdown-lifecycle",
+      "job-definition-and-enqueue",
+      "json-rules-engine",
+      "lenses-multi-source",
+      "locks-and-serialization",
+      "messaging-channels-adapters",
+      "mutation-hooks",
+      "permission-rule-algebra",
+      "request-response-schemas",
+      "roles-and-permissions",
+      "rule-builder-ui-model",
+      "rule-references-registry",
+      "seeding-data",
+      "segments-membership",
+      "soft-delete-cascade"
+    ],
+    "codeEntries": 233,
+    "docMembers": 54
+  },
+  "bypassLines": 22,
+  "glossaryTerms": 30
+}

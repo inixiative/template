@@ -1,0 +1,56 @@
+{
+  "id": "frontend-apps-navigation",
+  "title": "Frontend apps, routes and navigation",
+  "routing": "Is this about the web/admin/superadmin apps' routes or navigation? \u2014 file routes under app/routes (__root, _authenticated, _public, _fullscreen, index vs parent routes, generate:routes), requireAuth/requirePublic guards and beforeLoad redirects, the per-app nav config (NavItem, NavConfig, access, alias, breadcrumbLabel, context files), Sidebar/breadcrumbs/page meta, tenant context switching (?org=/?space=, tenant.setOrganization/setSpace, useAuthenticatedRouting, ContextSelector), navigatePreserving, navigateToLogin/redirectPreservingContext.",
+  "concepts": [
+    "frontend-routing",
+    "navigation"
+  ],
+  "tokens": 17596,
+  "tokenMethod": "chars/4",
+  "runsAgreed": 3,
+  "sources": {
+    "docs": [
+      "FEATURES.md",
+      "docs/claude/APPS.md",
+      "docs/claude/FRONTEND.md",
+      "docs/claude/FRONTEND/AUTH.md",
+      "docs/claude/FRONTEND/ROUTING_NAVIGATION.md"
+    ],
+    "docUnits": [
+      "doc:docs/claude/APPS.md#the-three-apps",
+      "doc:docs/claude/APPS.md#key-insight",
+      "doc:docs/claude/APPS.md#frontend-architecture-overview",
+      "doc:docs/claude/APPS.md#example",
+      "doc:docs/claude/APPS.md#implementation-notes",
+      "doc:docs/claude/FRONTEND.md#where-to-read",
+      "doc:docs/claude/FRONTEND.md#stack",
+      "doc:docs/claude/FRONTEND.md#app-differences",
+      "doc:docs/claude/FRONTEND.md#conventions",
+      "doc:docs/claude/FRONTEND/ROUTING_NAVIGATION.md#routing",
+      "doc:FEATURES.md#frontend-apps",
+      "doc:FEATURES.md#frontend-architecture",
+      "doc:docs/claude/APPS.md#context-switching",
+      "doc:docs/claude/FRONTEND/AUTH.md#navigation-helpers",
+      "doc:docs/claude/FRONTEND/ROUTING_NAVIGATION.md#navigation"
+    ],
+    "catalogClusters": [
+      "authentication-methods",
+      "filtering-search-ordering",
+      "frontend-app-shells-routes",
+      "frontend-navigation-context",
+      "frontend-state-api-client",
+      "module-layout-monorepo",
+      "multi-tenancy-membership",
+      "pagination",
+      "roles-and-permissions",
+      "structured-logging",
+      "superadmin-operations",
+      "ui-components"
+    ],
+    "codeEntries": 102,
+    "docMembers": 56
+  },
+  "bypassLines": 25,
+  "glossaryTerms": 28
+}

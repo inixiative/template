@@ -1,0 +1,40 @@
+{
+  "id": "encryption",
+  "title": "Field-level encryption",
+  "routing": "Is this about storing a secret or sensitive value encrypted at rest, or reading it back: encryptField / decryptField, the ENCRYPTED_MODELS registry, encrypted{Field} / \u2026EncryptionMetadata / \u2026EncryptionKeyVersion columns, {PREFIX}_ENCRYPTION_KEY_CURRENT / _PREVIOUS / _VERSION env vars, AAD (buildAAD), key rotation (rotateEncryptionKeys) or the validate:encryption CI check?",
+  "concepts": [
+    "encryption"
+  ],
+  "tokens": 9062,
+  "tokenMethod": "chars/4",
+  "runsAgreed": 1,
+  "sources": {
+    "docs": [
+      "FEATURES.md",
+      "docs/claude/ENCRYPTION.md"
+    ],
+    "docUnits": [
+      "doc:docs/claude/ENCRYPTION.md#overview",
+      "doc:docs/claude/ENCRYPTION.md#field-scoped-encryption",
+      "doc:docs/claude/ENCRYPTION.md#adding-encrypted-fields",
+      "doc:docs/claude/ENCRYPTION.md#key-rotation",
+      "doc:docs/claude/ENCRYPTION.md#environment-variables",
+      "doc:docs/claude/ENCRYPTION.md#ci-validation",
+      "doc:docs/claude/ENCRYPTION.md#implementation-details",
+      "doc:docs/claude/ENCRYPTION.md#deployment-checklist",
+      "doc:docs/claude/ENCRYPTION.md#faq",
+      "doc:FEATURES.md#encryption-security"
+    ],
+    "catalogClusters": [
+      "batch-request-execution",
+      "data-access-rules",
+      "encryption-key-rotation",
+      "locks-and-serialization",
+      "prisma-schema-introspection"
+    ],
+    "codeEntries": 11,
+    "docMembers": 24
+  },
+  "bypassLines": 17,
+  "glossaryTerms": 23
+}

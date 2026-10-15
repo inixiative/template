@@ -1,0 +1,53 @@
+{
+  "id": "inquiries-flows",
+  "title": "Inquiries and Flows",
+  "routing": "Is this about a request one party makes of another that the other approves, denies or asks to change (invite, create or transfer a space, request access), or about a guided multi-page in-app walkthrough? Signals: Inquiry, InquiryType/InquiryStatus, inquiry handlers (contentSchema, handleApprove, autoApprove, unique, defaultExpirationDays), createInquiry/sendInquiry/resolveInquiry, InquiriesPage and the inquiry controls, registerInquiryType; Flow, FlowKey, flowRegistry, checkFlow, useStartFlow, FlowBanner, flowNext.",
+  "concepts": [
+    "inquiries",
+    "flows"
+  ],
+  "tokens": 21066,
+  "tokenMethod": "chars/4",
+  "runsAgreed": 3,
+  "sources": {
+    "docs": [
+      "FEATURES.md",
+      "docs/claude/FLOWS.md",
+      "docs/claude/INQUIRIES.md"
+    ],
+    "docUnits": [
+      "doc:docs/claude/INQUIRIES.md#overview",
+      "doc:docs/claude/INQUIRIES.md#data-model",
+      "doc:docs/claude/INQUIRIES.md#api-endpoints",
+      "doc:docs/claude/INQUIRIES.md#source-target-resolution",
+      "doc:docs/claude/INQUIRIES.md#handler-architecture",
+      "doc:docs/claude/INQUIRIES.md#response-schemas",
+      "doc:docs/claude/INQUIRIES.md#permissions-rebac",
+      "doc:docs/claude/INQUIRIES.md#adding-a-new-handler",
+      "doc:docs/claude/INQUIRIES.md#frontend",
+      "doc:FEATURES.md#inquiry-system",
+      "doc:docs/claude/FLOWS.md#preface",
+      "doc:docs/claude/FLOWS.md#registry",
+      "doc:docs/claude/FLOWS.md#lifecycle",
+      "doc:docs/claude/FLOWS.md#routes",
+      "doc:docs/claude/FLOWS.md#client",
+      "doc:docs/claude/FLOWS.md#adding-a-flow",
+      "doc:FEATURES.md#flows"
+    ],
+    "catalogClusters": [
+      "caching-and-invalidation",
+      "filtering-search-ordering",
+      "guided-flows",
+      "inquiry-lifecycle",
+      "permission-rule-algebra",
+      "request-response-schemas",
+      "roles-and-permissions",
+      "testing-helpers",
+      "testing-rules"
+    ],
+    "codeEntries": 88,
+    "docMembers": 58
+  },
+  "bypassLines": 25,
+  "glossaryTerms": 30
+}

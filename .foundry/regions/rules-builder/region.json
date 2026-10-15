@@ -1,0 +1,25 @@
+{
+  "id": "rules-builder",
+  "title": "Rule builder editor model",
+  "routing": "Is this about building or rendering a UI that edits a json-rules Condition \u2014 useRuleBuilder / usePermissionBuilder / useTransitionBuilder / useActionRuleBuilder, useFilteredCollection, createView / rawView / builderSource / RuleBuilderSource, Decoration facets and presets, LensView / lensScopeSurface / lensValuePicker pickers, LeafNode / ArrayNode descriptors, scope-reference pickers, or saving rules with parseSavedRule / stringifySavedRule?",
+  "concepts": [
+    "rules-builder"
+  ],
+  "tokens": 10563,
+  "tokenMethod": "chars/4",
+  "runsAgreed": 1,
+  "sources": {
+    "docs": [],
+    "docUnits": [],
+    "catalogClusters": [
+      "json-rules-engine",
+      "lenses-multi-source",
+      "rule-builder-ui-model",
+      "rule-references-registry"
+    ],
+    "codeEntries": 166,
+    "docMembers": 29
+  },
+  "bypassLines": 13,
+  "glossaryTerms": 25
+}

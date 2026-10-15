@@ -1,0 +1,848 @@
+{
+  "version": 1,
+  "project": "template",
+  "builtFrom": {
+    "docs": [
+      "docs/claude/**",
+      "AI/ENTRYPOINT.md",
+      "FEATURES.md"
+    ],
+    "catalog": ".foundry/catalog/catalog.json (feat/warden-catalog)",
+    "atlas": ".atlas/concepts.ts",
+    "method": "three independent LLM proposals, item-level majority vote (~/.foundry/evals/warden-regions)"
+  },
+  "concepts": [
+    {
+      "tag": "locks",
+      "atlas": "primitive:shared / mutex",
+      "description": "Mutual exclusion across processes and rows: createLock, withOwnerLock, db.findForUpdate (SELECT FOR UPDATE)",
+      "region": "concurrency-locks"
+    },
+    {
+      "tag": "concurrency-limits",
+      "atlas": "primitive:shared",
+      "description": "In-process coordination: serialized queues, getConcurrency caps, resolveAll bounded batches",
+      "region": "concurrency-locks"
+    },
+    {
+      "tag": "supersede-lanes",
+      "atlas": "primitive:shared",
+      "description": "Newest work for a key wins: claimLane/watchLane batons, superseding jobs",
+      "region": "concurrency-locks"
+    },
+    {
+      "tag": "recurring-timers",
+      "atlas": "primitive:shared",
+      "description": "Non-overlapping in-process recurring work: heartbeat, unref intervals",
+      "region": "concurrency-locks"
+    },
+    {
+      "tag": "debounce",
+      "atlas": "primitive:ui",
+      "description": "Debouncing values and callbacks before they hit the backend (useDebounce)",
+      "region": "concurrency-locks"
+    },
+    {
+      "tag": "redis",
+      "atlas": "infrastructure:redis",
+      "description": "Redis connections, key namespaces, built-in key uses",
+      "region": "redis-caching-rate-limits"
+    },
+    {
+      "tag": "caching",
+      "atlas": "primitive:caching",
+      "description": "Read-through cache(): cache keys, TTLs, single-flight, mutation-driven invalidation",
+      "region": "redis-caching-rate-limits"
+    },
+    {
+      "tag": "rate-limiting",
+      "atlas": null,
+      "description": "Fixed-window rate limits keyed by user/space/org/IP; 429 + Retry-After",
+      "region": "redis-caching-rate-limits"
+    },
+    {
+      "tag": "jobs",
+      "atlas": "primitive:jobs",
+      "description": "BullMQ background jobs: makeJob/makeSingletonJob/makeSupersedingJob, handlers, enqueueJob, workers",
+      "region": "jobs-cron"
+    },
+    {
+      "tag": "job-lanes",
+      "atlas": "primitive:jobs",
+      "description": "Fast/slow job lanes: withLanePriority, slot shares, lane pressure budget",
+      "region": "jobs-cron"
+    },
+    {
+      "tag": "job-outbox",
+      "atlas": "primitive:jobs",
+      "description": "Queue overflow buffer: JobOutbox spill and drain",
+      "region": "jobs-cron"
+    },
+    {
+      "tag": "cron",
+      "atlas": "feature:cronJob",
+      "description": "DB-stored cron jobs, repeatables, manual trigger, retention cleanup",
+      "region": "jobs-cron"
+    },
+    {
+      "tag": "app-events",
+      "atlas": "primitive:appEvents",
+      "description": "emitAppEvent side-effect bus: handlers, handoffs to email/ws/observe, commit deferral",
+      "region": "app-events-webhooks-adapters"
+    },
+    {
+      "tag": "webhooks",
+      "atlas": "feature:webhooks",
+      "description": "Outbound webhooks: subscriptions, signing, delivery jobs, SSRF-safe fetch",
+      "region": "app-events-webhooks-adapters"
+    },
+    {
+      "tag": "adapters",
+      "atlas": "primitive:adapter",
+      "description": "Provider adapter modules: one interface over provider implementations (makeAdapterRouter/Registry)",
+      "region": "app-events-webhooks-adapters"
+    },
+    {
+      "tag": "integrations",
+      "atlas": "feature:integrations",
+      "description": "Owner integrations and their synced records",
+      "region": "app-events-webhooks-adapters"
+    },
+    {
+      "tag": "object-storage",
+      "atlas": "infrastructure:storage",
+      "description": "Object storage client (S3) behind the adapter",
+      "region": "app-events-webhooks-adapters"
+    },
+    {
+      "tag": "ws-connections",
+      "atlas": "primitive:websockets",
+      "description": "WebSocket connection registry, authenticate frame, recovery, drain",
+      "region": "websockets"
+    },
+    {
+      "tag": "ws-streams",
+      "atlas": "primitive:websockets",
+      "description": "Refetch channels and data streams: registries, audience, re-authorization, seq",
+      "region": "websockets"
+    },
+    {
+      "tag": "email-templates",
+      "atlas": "feature:email",
+      "description": "Email templates and components: MJML, component refs, cascade, render/save, the email lens and rule blocks",
+      "region": "email-templates"
+    },
+    {
+      "tag": "email-delivery",
+      "atlas": "feature:email / integration:resend",
+      "description": "Email sending: sendEmail planner, deliverEmail, senders, provider adapters",
+      "region": "delivery-messaging-contacts"
+    },
+    {
+      "tag": "communication-preferences",
+      "atlas": null,
+      "description": "CommunicationKind opt-in/opt-out (acceptedKinds, canDeliver), unsubscribe links",
+      "region": "delivery-messaging-contacts"
+    },
+    {
+      "tag": "messaging",
+      "atlas": "primitive:messaging",
+      "description": "Non-email channels: per-ContactType message provider adapters",
+      "region": "delivery-messaging-contacts"
+    },
+    {
+      "tag": "contacts",
+      "atlas": "feature:contact",
+      "description": "Contact model: per-type registry, URL/handle parsers, contact rules",
+      "region": "delivery-messaging-contacts"
+    },
+    {
+      "tag": "json-rules",
+      "atlas": null,
+      "description": "@inixiative/json-rules engine: rule AST, operators, check/toPrisma plans, binding",
+      "region": "json-rules-lenses"
+    },
+    {
+      "tag": "lenses",
+      "atlas": null,
+      "description": "Lenses and narrowings over data: lensFor, composeLens, filterLens, scopeNarrowing",
+      "region": "json-rules-lenses"
+    },
+    {
+      "tag": "rule-references",
+      "atlas": null,
+      "description": "RuleReference edges: rows a stored rule names, sync, rule health/degradation",
+      "region": "json-rules-lenses"
+    },
+    {
+      "tag": "rules-builder",
+      "atlas": null,
+      "description": "@inixiative/rules-builder rule-editor model: facets, views, builder surfaces",
+      "region": "rules-builder"
+    },
+    {
+      "tag": "tenancy",
+      "atlas": "feature:tenancy",
+      "description": "Organizations, spaces and memberships; Personal/Org/Space contexts",
+      "region": "tenancy-permissions"
+    },
+    {
+      "tag": "permissions",
+      "atlas": "primitive:authz",
+      "description": "Roles, actions, Permix, ReBAC walks, entitlements, row-level overrides, validatePermission",
+      "region": "tenancy-permissions"
+    },
+    {
+      "tag": "superadmin",
+      "atlas": "superadmin",
+      "description": "Superadmin platform role, admin routes, superadmin app",
+      "region": "tenancy-permissions"
+    },
+    {
+      "tag": "authentication",
+      "atlas": "feature:auth",
+      "description": "BetterAuth sessions, OAuth, AuthProviders, API tokens and token types",
+      "region": "authentication-users"
+    },
+    {
+      "tag": "auth-middleware",
+      "atlas": "feature:auth",
+      "description": "Auth middleware chain, spoofing, validateUser/validateActor gates",
+      "region": "authentication-users"
+    },
+    {
+      "tag": "frontend-auth",
+      "atlas": "feature:auth",
+      "description": "Frontend auth: auth slice, login/signup forms, OAuth callback, guards",
+      "region": "authentication-users"
+    },
+    {
+      "tag": "users",
+      "atlas": "feature:users",
+      "description": "User lookup/creation (guests), me routes, email normalization, redaction",
+      "region": "authentication-users"
+    },
+    {
+      "tag": "route-templates",
+      "atlas": "primitive:routeTemplates",
+      "description": "Route templates (readRoute/createRoute/\u2026) and makeController responders",
+      "region": "api-routes-schemas"
+    },
+    {
+      "tag": "openapi",
+      "atlas": null,
+      "description": "Route auto-registration and OpenAPI spec generation",
+      "region": "api-routes-schemas"
+    },
+    {
+      "tag": "request-schemas",
+      "atlas": null,
+      "description": "Request/response zod schemas: generated Prisma zod, ScalarSchema, sanitizeRequestSchema",
+      "region": "api-routes-schemas"
+    },
+    {
+      "tag": "api-modules",
+      "atlas": null,
+      "description": "API module folder anatomy: routes/controllers/services/handlers",
+      "region": "api-routes-schemas"
+    },
+    {
+      "tag": "request-context",
+      "atlas": "primitive:requestContext",
+      "description": "Request lifecycle: AppEnv, prepareRequest, context setters/accessors, resource and job context",
+      "region": "request-context-errors-batch"
+    },
+    {
+      "tag": "errors",
+      "atlas": "primitive:errors",
+      "description": "makeError/AppError, global error handler, status conventions",
+      "region": "request-context-errors-batch"
+    },
+    {
+      "tag": "batch",
+      "atlas": "primitive:batch",
+      "description": "Batch API: rounds, execution strategies, interpolation, status tracking",
+      "region": "request-context-errors-batch"
+    },
+    {
+      "tag": "filtering-search",
+      "atlas": null,
+      "description": "List filtering/search/orderBy: bracket query notation, buildWhereClause, searchable/orderable fields",
+      "region": "filtering-pagination"
+    },
+    {
+      "tag": "pagination",
+      "atlas": null,
+      "description": "Offset and cursor pagination: paginate(), response metadata, pagination hooks",
+      "region": "filtering-pagination"
+    },
+    {
+      "tag": "db-client",
+      "atlas": "infrastructure:prisma",
+      "description": "The transaction-aware Prisma client: db.txn, onCommit/onFinally, scope, delegate typing, query helpers",
+      "region": "database"
+    },
+    {
+      "tag": "data-modeling",
+      "atlas": "infrastructure:prisma",
+      "description": "Schema conventions: split schema, UUIDv7/typed IDs, enum vs row, false polymorphism",
+      "region": "database"
+    },
+    {
+      "tag": "schema-introspection",
+      "atlas": "infrastructure:prisma",
+      "description": "Runtime schema maps (@inixiative/prisma-map) and model metadata helpers",
+      "region": "database"
+    },
+    {
+      "tag": "reference-data",
+      "atlas": "primitive:shared",
+      "description": "Static reference data: countries, currencies, languages, timezones + zod schemas",
+      "region": "database"
+    },
+    {
+      "tag": "db-scripts",
+      "atlas": "infrastructure:prisma",
+      "description": "Database commands: db push vs migrations, generate, dump/clone",
+      "region": "database"
+    },
+    {
+      "tag": "seeding",
+      "atlas": "infrastructure:seed",
+      "description": "Seed data and the hook-aware seed runner",
+      "region": "database"
+    },
+    {
+      "tag": "mutation-hooks",
+      "atlas": null,
+      "description": "Prisma mutation lifecycle hooks: registerDbHook, before/after, hook-safe bulk writes, model rules",
+      "region": "mutation-hooks"
+    },
+    {
+      "tag": "audit-log",
+      "atlas": "feature:auditLogs",
+      "description": "Audit log capture: enabled models, actor, diffs, redaction",
+      "region": "mutation-hooks"
+    },
+    {
+      "tag": "soft-delete",
+      "atlas": null,
+      "description": "Soft delete, tombstone, cascade and revive; soft-delete read scoping",
+      "region": "mutation-hooks"
+    },
+    {
+      "tag": "immutable-fields",
+      "atlas": null,
+      "description": "Immutable field stripping on update",
+      "region": "mutation-hooks"
+    },
+    {
+      "tag": "ordered-lists",
+      "atlas": null,
+      "description": "Dense position columns maintained by the orderedList hook",
+      "region": "mutation-hooks"
+    },
+    {
+      "tag": "encryption",
+      "atlas": "primitive:shared",
+      "description": "Field-level encryption (AES-256-GCM), keyrings, key rotation, CI version validation",
+      "region": "encryption"
+    },
+    {
+      "tag": "inquiries",
+      "atlas": "feature:inquiry",
+      "description": "Inquiries: the request/approval primitive, handlers, sources/targets, autoApprove",
+      "region": "inquiries-flows"
+    },
+    {
+      "tag": "flows",
+      "atlas": "primitive:flows",
+      "description": "Guided in-app flows: registry, server-checked steps, FlowBanner client",
+      "region": "inquiries-flows"
+    },
+    {
+      "tag": "customers",
+      "atlas": "feature:customer",
+      "description": "CustomerRef customer/provider pairs, provider routes and lens",
+      "region": "customers-segments"
+    },
+    {
+      "tag": "segments",
+      "atlas": "feature:segment",
+      "description": "Segments: provider-owned audiences, static/dynamic membership reconciliation",
+      "region": "customers-segments"
+    },
+    {
+      "tag": "logging",
+      "atlas": "primitive:shared / infrastructure:observability",
+      "description": "Structured logging: shared log facade, withLogContext, scopes, redaction",
+      "region": "observability-lifecycle"
+    },
+    {
+      "tag": "telemetry",
+      "atlas": "primitive:shared / infrastructure:observability",
+      "description": "OpenTelemetry spans/metrics, browser telemetry, error reporter",
+      "region": "observability-lifecycle"
+    },
+    {
+      "tag": "process-lifecycle",
+      "atlas": "primitive:lifecycle",
+      "description": "Graceful shutdown handlers, health checks, connection draining, unref intervals",
+      "region": "observability-lifecycle"
+    },
+    {
+      "tag": "frontend-store",
+      "atlas": "primitive:ui",
+      "description": "Shared Zustand store: slices, access patterns, adding slices",
+      "region": "frontend-state-api-client"
+    },
+    {
+      "tag": "api-client",
+      "atlas": "primitive:sdk",
+      "description": "Generated SDK, apiQuery/apiMutation, optimistic mutations, data hooks, form helpers",
+      "region": "frontend-state-api-client"
+    },
+    {
+      "tag": "frontend-routing",
+      "atlas": "primitive:ui",
+      "description": "The three frontend apps, file routes, layouts and app shells",
+      "region": "frontend-apps-navigation"
+    },
+    {
+      "tag": "navigation",
+      "atlas": "primitive:ui",
+      "description": "Nav config, permission-gated items, tenant context switching, URL context",
+      "region": "frontend-apps-navigation"
+    },
+    {
+      "tag": "ui-components",
+      "atlas": "primitive:ui",
+      "description": "packages/ui primitives, settings pages, modals, standard conditional props",
+      "region": "ui-components-theme"
+    },
+    {
+      "tag": "theme-layout",
+      "atlas": "primitive:ui",
+      "description": "AppShell layout system and multi-tier theme",
+      "region": "ui-components-theme"
+    },
+    {
+      "tag": "test-harness",
+      "atlas": null,
+      "description": "Test structure: running tests, createTestApp, request helpers, frontend tests",
+      "region": "testing"
+    },
+    {
+      "tag": "test-factories",
+      "atlas": null,
+      "description": "build/create factories and test tracker cleanup",
+      "region": "testing"
+    },
+    {
+      "tag": "vcr",
+      "atlas": "primitive:shared",
+      "description": "VCR record/replay of external provider calls",
+      "region": "testing"
+    },
+    {
+      "tag": "test-rules",
+      "atlas": null,
+      "description": "Rules for tests and their CI restrictions (no mocks, tracker registration, unhappy paths)",
+      "region": "testing"
+    },
+    {
+      "tag": "dev-setup",
+      "atlas": null,
+      "description": "Setup, local run, sanctioned scripts, Docker services, debugging",
+      "region": "dev-environment-tooling"
+    },
+    {
+      "tag": "worktrees",
+      "atlas": null,
+      "description": "Worktree lifecycle through repo scripts (slots, per-slot DBs/ports)",
+      "region": "dev-environment-tooling"
+    },
+    {
+      "tag": "env-config",
+      "atlas": "infrastructure:env",
+      "description": "Environment names/detection, env files, Infisical, with-env composition, adding env vars",
+      "region": "dev-environment-tooling"
+    },
+    {
+      "tag": "ci-deploy",
+      "atlas": null,
+      "description": "CI/CD pipelines, the full check, deploy environments and scripts",
+      "region": "dev-environment-tooling"
+    },
+    {
+      "tag": "init-script",
+      "atlas": null,
+      "description": "The init provisioning TUI (Ink): resumable idempotent tasks, Infisical/Railway/PlanetScale provisioning",
+      "region": "init-script"
+    },
+    {
+      "tag": "monorepo-layout",
+      "atlas": null,
+      "description": "Workspaces, packages, path aliases, import direction, where things live",
+      "region": "monorepo-architecture"
+    },
+    {
+      "tag": "dependencies",
+      "atlas": null,
+      "description": "Third-party dependency inventory and tech stack",
+      "region": "monorepo-architecture"
+    },
+    {
+      "tag": "architecture",
+      "atlas": null,
+      "description": "System overview: request and data flow, key architectural patterns",
+      "region": "monorepo-architecture"
+    },
+    {
+      "tag": "build-tooling",
+      "atlas": null,
+      "description": "Turborepo tasks, watch mode, codegen, build presets, hot reload",
+      "region": "monorepo-architecture"
+    },
+    {
+      "tag": "naming",
+      "atlas": null,
+      "description": "Naming conventions: identifiers, files, routes, schema names, polymorphic side names, vocabulary",
+      "region": "naming-style"
+    },
+    {
+      "tag": "code-style",
+      "atlas": null,
+      "description": "Code style: formatting, no comments, TypeScript rules, imports",
+      "region": "naming-style"
+    },
+    {
+      "tag": "lint-rules",
+      "atlas": null,
+      "description": "Biome, custom lint scripts and the CI rule runner that enforce style",
+      "region": "naming-style"
+    },
+    {
+      "tag": "engineering-process",
+      "atlas": null,
+      "description": "How agents work here: why-first, decomposition, YAGNI both ways, verification, reuse what exists",
+      "region": "engineering-process-docs"
+    },
+    {
+      "tag": "docs-process",
+      "atlas": null,
+      "description": "Docs workflow: read before, update after, doc structure and alignment review, doc routing",
+      "region": "engineering-process-docs"
+    },
+    {
+      "tag": "atlas",
+      "atlas": null,
+      "description": "Atlas code map: concept vocabulary, @atlas annotations, navigating by concept",
+      "region": "engineering-process-docs"
+    }
+  ],
+  "regions": [
+    {
+      "id": "concurrency-locks",
+      "tokens": 9328,
+      "concepts": [
+        "locks",
+        "concurrency-limits",
+        "supersede-lanes",
+        "recurring-timers",
+        "debounce"
+      ],
+      "runsAgreed": 2
+    },
+    {
+      "id": "redis-caching-rate-limits",
+      "tokens": 9021,
+      "concepts": [
+        "redis",
+        "caching",
+        "rate-limiting"
+      ],
+      "runsAgreed": 2
+    },
+    {
+      "id": "jobs-cron",
+      "tokens": 20543,
+      "concepts": [
+        "jobs",
+        "job-lanes",
+        "job-outbox",
+        "cron"
+      ],
+      "runsAgreed": 3
+    },
+    {
+      "id": "app-events-webhooks-adapters",
+      "tokens": 15236,
+      "concepts": [
+        "app-events",
+        "webhooks",
+        "adapters",
+        "integrations",
+        "object-storage"
+      ],
+      "runsAgreed": 1
+    },
+    {
+      "id": "websockets",
+      "tokens": 19943,
+      "concepts": [
+        "ws-connections",
+        "ws-streams"
+      ],
+      "runsAgreed": 3
+    },
+    {
+      "id": "email-templates",
+      "tokens": 26289,
+      "concepts": [
+        "email-templates"
+      ],
+      "runsAgreed": 3
+    },
+    {
+      "id": "delivery-messaging-contacts",
+      "tokens": 19386,
+      "concepts": [
+        "email-delivery",
+        "communication-preferences",
+        "messaging",
+        "contacts"
+      ],
+      "runsAgreed": 3
+    },
+    {
+      "id": "json-rules-lenses",
+      "tokens": 21096,
+      "concepts": [
+        "json-rules",
+        "lenses",
+        "rule-references"
+      ],
+      "runsAgreed": 1
+    },
+    {
+      "id": "rules-builder",
+      "tokens": 10563,
+      "concepts": [
+        "rules-builder"
+      ],
+      "runsAgreed": 1
+    },
+    {
+      "id": "tenancy-permissions",
+      "tokens": 22277,
+      "concepts": [
+        "tenancy",
+        "permissions",
+        "superadmin"
+      ],
+      "runsAgreed": 3
+    },
+    {
+      "id": "authentication-users",
+      "tokens": 20696,
+      "concepts": [
+        "authentication",
+        "auth-middleware",
+        "frontend-auth",
+        "users"
+      ],
+      "runsAgreed": 2
+    },
+    {
+      "id": "api-routes-schemas",
+      "tokens": 14708,
+      "concepts": [
+        "route-templates",
+        "openapi",
+        "request-schemas",
+        "api-modules"
+      ],
+      "runsAgreed": 2
+    },
+    {
+      "id": "request-context-errors-batch",
+      "tokens": 21480,
+      "concepts": [
+        "request-context",
+        "errors",
+        "batch"
+      ],
+      "runsAgreed": 2
+    },
+    {
+      "id": "filtering-pagination",
+      "tokens": 18865,
+      "concepts": [
+        "filtering-search",
+        "pagination"
+      ],
+      "runsAgreed": 3
+    },
+    {
+      "id": "database",
+      "tokens": 22906,
+      "concepts": [
+        "db-client",
+        "data-modeling",
+        "schema-introspection",
+        "reference-data",
+        "db-scripts",
+        "seeding"
+      ],
+      "runsAgreed": 3
+    },
+    {
+      "id": "mutation-hooks",
+      "tokens": 17014,
+      "concepts": [
+        "mutation-hooks",
+        "audit-log",
+        "soft-delete",
+        "immutable-fields",
+        "ordered-lists"
+      ],
+      "runsAgreed": 3
+    },
+    {
+      "id": "encryption",
+      "tokens": 9062,
+      "concepts": [
+        "encryption"
+      ],
+      "runsAgreed": 1
+    },
+    {
+      "id": "inquiries-flows",
+      "tokens": 21066,
+      "concepts": [
+        "inquiries",
+        "flows"
+      ],
+      "runsAgreed": 3
+    },
+    {
+      "id": "customers-segments",
+      "tokens": 11090,
+      "concepts": [
+        "customers",
+        "segments"
+      ],
+      "runsAgreed": 3
+    },
+    {
+      "id": "observability-lifecycle",
+      "tokens": 15342,
+      "concepts": [
+        "logging",
+        "telemetry",
+        "process-lifecycle"
+      ],
+      "runsAgreed": 3
+    },
+    {
+      "id": "frontend-state-api-client",
+      "tokens": 16197,
+      "concepts": [
+        "frontend-store",
+        "api-client"
+      ],
+      "runsAgreed": 3
+    },
+    {
+      "id": "frontend-apps-navigation",
+      "tokens": 17596,
+      "concepts": [
+        "frontend-routing",
+        "navigation"
+      ],
+      "runsAgreed": 3
+    },
+    {
+      "id": "ui-components-theme",
+      "tokens": 16710,
+      "concepts": [
+        "ui-components",
+        "theme-layout"
+      ],
+      "runsAgreed": 3
+    },
+    {
+      "id": "testing",
+      "tokens": 16322,
+      "concepts": [
+        "test-harness",
+        "test-factories",
+        "vcr",
+        "test-rules"
+      ],
+      "runsAgreed": 3
+    },
+    {
+      "id": "dev-environment-tooling",
+      "tokens": 20364,
+      "concepts": [
+        "dev-setup",
+        "worktrees",
+        "env-config",
+        "ci-deploy"
+      ],
+      "runsAgreed": 2
+    },
+    {
+      "id": "init-script",
+      "tokens": 15456,
+      "concepts": [
+        "init-script"
+      ],
+      "runsAgreed": 3
+    },
+    {
+      "id": "monorepo-architecture",
+      "tokens": 17908,
+      "concepts": [
+        "monorepo-layout",
+        "dependencies",
+        "architecture",
+        "build-tooling"
+      ],
+      "runsAgreed": 1
+    },
+    {
+      "id": "naming-style",
+      "tokens": 9807,
+      "concepts": [
+        "naming",
+        "code-style",
+        "lint-rules"
+      ],
+      "runsAgreed": 1
+    },
+    {
+      "id": "engineering-process-docs",
+      "tokens": 15217,
+      "concepts": [
+        "engineering-process",
+        "docs-process",
+        "atlas"
+      ],
+      "runsAgreed": 2
+    }
+  ],
+  "dropped": {
+    "doc:docs/claude/ARCHITECTURE.md#see-also": "pure navigation: a list of links to other docs",
+    "doc:docs/claude/BATCH.md#see-also": "Pure cross-reference list.",
+    "doc:docs/claude/CONCURRENCY.md#cross-references": "Pure cross-reference list.",
+    "doc:docs/claude/PERMISSIONS.md#future-work": "Planned (unbuilt) groups design; tickets/specs are not corpus.",
+    "doc:AI/ENTRYPOINT.md#9-frontend-conventions": "pure pointer to FRONTEND.md#conventions (17 tokens)",
+    "doc:FEATURES.md#how-to-read-this": "legend/navigation for the feature list",
+    "doc:FEATURES.md#coming-soon-ticketed-roadmap": "ticket roadmap; tickets are not corpus",
+    "doc:FEATURES.md#statistics": "codebase statistics",
+    "doc:FEATURES.md#unique-selling-points": "marketing summary that repeats other sections"
+  }
+}

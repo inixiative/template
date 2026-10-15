@@ -1,0 +1,57 @@
+{
+  "id": "tenancy-permissions",
+  "title": "Tenancy and Permissions",
+  "routing": "Is this about who may do what, and in which tenant? Organizations, Spaces, OrganizationUser/SpaceUser memberships, Role/PlatformRole, entitlements, the ReBAC rebacSchema and check(), permix, validatePermission/validateOwnerPermission, setupOrgPermissions/setupSpacePermissions, usePermission/checkPermission, permissionRules row overrides, or superadmin (validateSuperadmin, spoofing, admin routes)?",
+  "concepts": [
+    "tenancy",
+    "permissions",
+    "superadmin"
+  ],
+  "tokens": 22277,
+  "tokenMethod": "chars/4",
+  "runsAgreed": 3,
+  "sources": {
+    "docs": [
+      "FEATURES.md",
+      "docs/claude/AUTH.md",
+      "docs/claude/PERMISSIONS.md"
+    ],
+    "docUnits": [
+      "doc:FEATURES.md#multi-tenancy",
+      "doc:docs/claude/PERMISSIONS.md#overview",
+      "doc:docs/claude/PERMISSIONS.md#roles",
+      "doc:docs/claude/PERMISSIONS.md#actions",
+      "doc:docs/claude/PERMISSIONS.md#permix",
+      "doc:docs/claude/PERMISSIONS.md#permission-setup",
+      "doc:docs/claude/PERMISSIONS.md#permission-checks",
+      "doc:docs/claude/PERMISSIONS.md#entitlements",
+      "doc:docs/claude/PERMISSIONS.md#rebac",
+      "doc:docs/claude/PERMISSIONS.md#owner-polymorphic-models",
+      "doc:docs/claude/PERMISSIONS.md#row-level-overrides",
+      "doc:docs/claude/PERMISSIONS.md#space-permissions",
+      "doc:docs/claude/PERMISSIONS.md#validation-middleware",
+      "doc:docs/claude/PERMISSIONS.md#role-assignment",
+      "doc:docs/claude/PERMISSIONS.md#token-permissions",
+      "doc:docs/claude/PERMISSIONS.md#frontend-checks",
+      "doc:FEATURES.md#authorization-permissions",
+      "doc:docs/claude/AUTH.md#spoof-middleware",
+      "doc:FEATURES.md#admin-operations"
+    ],
+    "catalogClusters": [
+      "auth-middleware-validation",
+      "frontend-app-shells-routes",
+      "frontend-navigation-context",
+      "inquiry-lifecycle",
+      "multi-tenancy-membership",
+      "permission-rule-algebra",
+      "request-response-schemas",
+      "roles-and-permissions",
+      "superadmin-operations",
+      "ui-components"
+    ],
+    "codeEntries": 68,
+    "docMembers": 67
+  },
+  "bypassLines": 21,
+  "glossaryTerms": 30
+}

@@ -1,0 +1,63 @@
+{
+  "id": "engineering-process-docs",
+  "title": "Engineering process, docs, Atlas",
+  "routing": "Is this about how the agent should work rather than what the code does: understanding the why, decomposing, YAGNI in either direction, task intake and the circuit breaker, finding existing patterns before writing new code (FEATURES.md, COMPARISONS.md), verifying before asserting, adversarial review, reading or updating docs/claude (TOC via docs:toc, stubs, tickets/, tmp/AI_WORKSPACE), or the Atlas code map (@atlas blocks, @kind/@partOf/@uses, .atlas/concepts.ts, MAP.md, bunx atlas query/graph/stamp/check)?",
+  "concepts": [
+    "engineering-process",
+    "docs-process",
+    "atlas"
+  ],
+  "tokens": 15217,
+  "tokenMethod": "chars/4",
+  "runsAgreed": 2,
+  "sources": {
+    "docs": [
+      "AI/ENTRYPOINT.md",
+      "docs/claude/ATLAS.md",
+      "docs/claude/DEVELOPER.md",
+      "docs/claude/DOCUMENTATION.md",
+      "docs/claude/SCRIPTS.md"
+    ],
+    "docUnits": [
+      "doc:docs/claude/DEVELOPER.md#architectural-reviews",
+      "doc:AI/ENTRYPOINT.md#0-purpose-and-priority",
+      "doc:AI/ENTRYPOINT.md#0-0-critical-guardrails",
+      "doc:AI/ENTRYPOINT.md#0-1-understand-the-why-first",
+      "doc:AI/ENTRYPOINT.md#0-2-decomposition-by-default",
+      "doc:AI/ENTRYPOINT.md#0-3-yagni-scope-invention-vs-completion",
+      "doc:AI/ENTRYPOINT.md#0-4-interrogate-before-proposing-discovery-work",
+      "doc:AI/ENTRYPOINT.md#0-5-verification-discipline",
+      "doc:AI/ENTRYPOINT.md#1-mandatory-task-intake-always",
+      "doc:AI/ENTRYPOINT.md#2-execution-contract",
+      "doc:AI/ENTRYPOINT.md#3-circuit-breaker-stop-and-ask",
+      "doc:AI/ENTRYPOINT.md#4-pattern-discovery-before-implementation",
+      "doc:AI/ENTRYPOINT.md#7-core-engineering-standards",
+      "doc:AI/ENTRYPOINT.md#13-change-checklist",
+      "doc:docs/claude/DOCUMENTATION.md#workflow",
+      "doc:docs/claude/DOCUMENTATION.md#before-starting-work",
+      "doc:docs/claude/DOCUMENTATION.md#doc-structure",
+      "doc:docs/claude/DOCUMENTATION.md#doc-maintenance",
+      "doc:docs/claude/DOCUMENTATION.md#doc-alignment-review",
+      "doc:docs/claude/SCRIPTS.md#ai-workspace",
+      "doc:AI/ENTRYPOINT.md#11-quick-doc-routing",
+      "doc:AI/ENTRYPOINT.md#12-tickets-and-ai-workspace",
+      "doc:docs/claude/ATLAS.md#what-atlas-is",
+      "doc:docs/claude/ATLAS.md#the-concept-vocabulary",
+      "doc:docs/claude/ATLAS.md#the-atlas-annotation-block",
+      "doc:docs/claude/ATLAS.md#navigating-by-concept",
+      "doc:docs/claude/ATLAS.md#authoring-annotations",
+      "doc:docs/claude/ATLAS.md#the-atlas-config",
+      "doc:docs/claude/ATLAS.md#enforcement",
+      "doc:docs/claude/ATLAS.md#cross-references",
+      "doc:AI/ENTRYPOINT.md#11-5-atlas-the-code-map"
+    ],
+    "catalogClusters": [
+      "code-map-atlas",
+      "documentation-process"
+    ],
+    "codeEntries": 12,
+    "docMembers": 68
+  },
+  "bypassLines": 16,
+  "glossaryTerms": 29
+}

@@ -1,0 +1,58 @@
+{
+  "id": "frontend-state-api-client",
+  "title": "Frontend store and API client",
+  "routing": "Is this about frontend app state or calling the API from the frontend? \u2014 useAppStore and its slices (auth, tenant, permissions, navigation, ui, client), adding/removing a slice, selectors/useShallow, getState() outside React; the generated @template/sdk, apiQuery/apiMutation, useQuery/useMutation, query keys, invalidation, useOptimisticMutation/createOptimisticListTarget, makeContextQueries, useDebounce, useValidateUniqueness, generate:sdk.",
+  "concepts": [
+    "frontend-store",
+    "api-client"
+  ],
+  "tokens": 16197,
+  "tokenMethod": "chars/4",
+  "runsAgreed": 3,
+  "sources": {
+    "docs": [
+      "FEATURES.md",
+      "docs/claude/FRONTEND.md",
+      "docs/claude/FRONTEND/API_CLIENT.md",
+      "docs/claude/ZUSTAND.md"
+    ],
+    "docUnits": [
+      "doc:docs/claude/FRONTEND.md#state-management",
+      "doc:docs/claude/ZUSTAND.md#architecture",
+      "doc:docs/claude/ZUSTAND.md#1-authslice",
+      "doc:docs/claude/ZUSTAND.md#2-permissionsslice",
+      "doc:docs/claude/ZUSTAND.md#3-tenantslice",
+      "doc:docs/claude/ZUSTAND.md#4-clientslice",
+      "doc:docs/claude/ZUSTAND.md#5-uislice",
+      "doc:docs/claude/ZUSTAND.md#6-navigationslice",
+      "doc:docs/claude/ZUSTAND.md#access-patterns",
+      "doc:docs/claude/ZUSTAND.md#slice-dependencies",
+      "doc:docs/claude/ZUSTAND.md#devtools",
+      "doc:docs/claude/ZUSTAND.md#best-practices",
+      "doc:docs/claude/ZUSTAND.md#adding-or-removing-a-slice",
+      "doc:docs/claude/ZUSTAND.md#file-reference",
+      "doc:FEATURES.md#frontend-architecture",
+      "doc:docs/claude/FRONTEND/API_CLIENT.md#generated-sdk",
+      "doc:docs/claude/FRONTEND/API_CLIENT.md#apiquery-and-apimutation",
+      "doc:docs/claude/FRONTEND/API_CLIENT.md#optimistic-mutations",
+      "doc:docs/claude/FRONTEND/API_CLIENT.md#form-helpers",
+      "doc:docs/claude/FRONTEND/API_CLIENT.md#key-files",
+      "doc:FEATURES.md#frontend-hooks"
+    ],
+    "catalogClusters": [
+      "authentication-methods",
+      "filtering-search-ordering",
+      "frontend-navigation-context",
+      "frontend-state-api-client",
+      "roles-and-permissions",
+      "superadmin-operations",
+      "testing-rules",
+      "websocket-connection-management",
+      "websocket-realtime-delivery"
+    ],
+    "codeEntries": 30,
+    "docMembers": 71
+  },
+  "bypassLines": 27,
+  "glossaryTerms": 28
+}

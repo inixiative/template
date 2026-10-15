@@ -1,0 +1,55 @@
+{
+  "id": "init-script",
+  "title": "Init provisioning TUI",
+  "routing": "Is this about the `bun run init` Ink TUI under init/: its views (ConfigProvider/useConfig, viewState, OrgSelector, prompt()), its task functions (markComplete, isProgressComplete, syncConfig callbacks), project.config.ts / getProjectConfig, provider clients in init/api (Infisical, Railway, PlanetScale, Vercel; execAsync, getSecret/setSecret, retryWithTimeout), idempotent provisioning and resume, or the init VCR resume tests?",
+  "concepts": [
+    "init-script"
+  ],
+  "tokens": 15456,
+  "tokenMethod": "chars/4",
+  "runsAgreed": 3,
+  "sources": {
+    "docs": [
+      "docs/claude/INIT_SCRIPT_PATTERNS.md"
+    ],
+    "docUnits": [
+      "doc:docs/claude/INIT_SCRIPT_PATTERNS.md#architecture-overview",
+      "doc:docs/claude/INIT_SCRIPT_PATTERNS.md#core-patterns",
+      "doc:docs/claude/INIT_SCRIPT_PATTERNS.md#core-patterns/1-root-level-config-state-context-provider",
+      "doc:docs/claude/INIT_SCRIPT_PATTERNS.md#core-patterns/2-manual-sync-triggers-no-polling",
+      "doc:docs/claude/INIT_SCRIPT_PATTERNS.md#core-patterns/3-cache-busting-on-imports",
+      "doc:docs/claude/INIT_SCRIPT_PATTERNS.md#core-patterns/4-derived-state-with-usememo",
+      "doc:docs/claude/INIT_SCRIPT_PATTERNS.md#core-patterns/5-composable-prompts-always-use-this",
+      "doc:docs/claude/INIT_SCRIPT_PATTERNS.md#core-patterns/6-clean-status-lists",
+      "doc:docs/claude/INIT_SCRIPT_PATTERNS.md#core-patterns/7-suppress-console-logs-in-tasks",
+      "doc:docs/claude/INIT_SCRIPT_PATTERNS.md#core-patterns/8-always-fetch-from-source-never-trust-props",
+      "doc:docs/claude/INIT_SCRIPT_PATTERNS.md#core-patterns/9-retry-logic-for-async-initialization",
+      "doc:docs/claude/INIT_SCRIPT_PATTERNS.md#core-patterns/10-async-exec-for-smooth-animations",
+      "doc:docs/claude/INIT_SCRIPT_PATTERNS.md#core-patterns/11-railway-cli-vs-graphql-api",
+      "doc:docs/claude/INIT_SCRIPT_PATTERNS.md#core-patterns/12-token-input-flow-with-proper-state-management",
+      "doc:docs/claude/INIT_SCRIPT_PATTERNS.md#core-patterns/13-atomic-progress-flags-idempotent-api-calls",
+      "doc:docs/claude/INIT_SCRIPT_PATTERNS.md#core-patterns/14-orgselector-always-requires-oncancel",
+      "doc:docs/claude/INIT_SCRIPT_PATTERNS.md#core-patterns/15-interactive-user-prompts-for-required-input",
+      "doc:docs/claude/INIT_SCRIPT_PATTERNS.md#core-patterns/16-state-management-standards",
+      "doc:docs/claude/INIT_SCRIPT_PATTERNS.md#core-patterns/17-bun-native-resume-tests-with-vcr-fixtures",
+      "doc:docs/claude/INIT_SCRIPT_PATTERNS.md#resource-naming",
+      "doc:docs/claude/INIT_SCRIPT_PATTERNS.md#file-structure",
+      "doc:docs/claude/INIT_SCRIPT_PATTERNS.md#creating-a-new-task-view",
+      "doc:docs/claude/INIT_SCRIPT_PATTERNS.md#key-takeaways"
+    ],
+    "catalogClusters": [
+      "code-style-lint-checks",
+      "dev-setup-scripts",
+      "environment-config",
+      "guided-flows",
+      "module-layout-monorepo",
+      "naming-vocabulary",
+      "testing-helpers",
+      "testing-rules"
+    ],
+    "codeEntries": 0,
+    "docMembers": 63
+  },
+  "bypassLines": 0,
+  "glossaryTerms": 25
+}

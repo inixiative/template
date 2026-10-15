@@ -1,0 +1,55 @@
+{
+  "id": "mutation-hooks",
+  "title": "Mutation hooks and write lifecycle",
+  "routing": "Is this about what happens when a row is written, i.e. reacting to, validating, recording or reshaping Prisma creates/updates/deletes? Signals: registerDbHook, HookTiming/DbAction, before/after hooks, `previous`, createMany/updateMany vs createManyAndReturn/updateManyAndReturn, select on a write, RulesRegistry/shadowMerge, AuditLog/AUDIT_ENABLED_MODELS/auditActorContext/redact or ignore fields, deletedAt/soft delete/tombstone/revive/db.withDeleted/includeDeleted, immutable fields or FK stripping (ImmutableFieldsOverrides), position/sort columns (orderedListRegistry), or reaching for a DB trigger or db.raw.",
+  "concepts": [
+    "mutation-hooks",
+    "audit-log",
+    "soft-delete",
+    "immutable-fields",
+    "ordered-lists"
+  ],
+  "tokens": 17014,
+  "tokenMethod": "chars/4",
+  "runsAgreed": 3,
+  "sources": {
+    "docs": [
+      "docs/claude/ARCHITECTURE.md",
+      "docs/claude/DATABASE.md",
+      "docs/claude/HOOKS.md"
+    ],
+    "docUnits": [
+      "doc:docs/claude/ARCHITECTURE.md#data-flow",
+      "doc:docs/claude/ARCHITECTURE.md#key-patterns",
+      "doc:docs/claude/HOOKS.md#mutation-lifecycle",
+      "doc:docs/claude/HOOKS.md#registering-hooks",
+      "doc:docs/claude/HOOKS.md#application-hooks",
+      "doc:docs/claude/HOOKS.md#rules-registry",
+      "doc:docs/claude/HOOKS.md#supported-operations",
+      "doc:docs/claude/HOOKS.md#limitations",
+      "doc:docs/claude/HOOKS.md#audit-log",
+      "doc:docs/claude/DATABASE.md#query-building-utilities",
+      "doc:docs/claude/HOOKS.md#immutable-fields",
+      "doc:docs/claude/HOOKS.md#ordered-list"
+    ],
+    "catalogClusters": [
+      "app-events-side-effects",
+      "audit-logging",
+      "caching-and-invalidation",
+      "code-style-lint-checks",
+      "data-access-rules",
+      "error-handling",
+      "immutable-fields",
+      "mutation-hooks",
+      "ordered-lists",
+      "rule-references-registry",
+      "soft-delete-cascade",
+      "superadmin-operations",
+      "testing-rules"
+    ],
+    "codeEntries": 86,
+    "docMembers": 52
+  },
+  "bypassLines": 27,
+  "glossaryTerms": 30
+}

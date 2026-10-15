@@ -1,0 +1,64 @@
+{
+  "id": "delivery-messaging-contacts",
+  "title": "Delivery, messaging and contacts",
+  "routing": "Is this about getting a message out to a person: the sendEmail planner / deliverEmail job, EmailHandoff on an app event, the email registry's sender and recipients, CommunicationLog rows, idempotency keys, Resend/console clients or the Bouncer verifier, CommunicationKind opt-outs (Contact.acceptedKinds, canDeliver), unsubscribe links, the messageUser / messageContact lane and MessageProviderAdapter, or the Contact model and its per-type ContactRegistry / URL handle parsers?",
+  "concepts": [
+    "email-delivery",
+    "communication-preferences",
+    "messaging",
+    "contacts"
+  ],
+  "tokens": 19386,
+  "tokenMethod": "chars/4",
+  "runsAgreed": 3,
+  "sources": {
+    "docs": [
+      "FEATURES.md",
+      "docs/claude/APP_EVENTS.md",
+      "docs/claude/COMMUNICATIONS.md",
+      "docs/claude/HOOKS.md"
+    ],
+    "docUnits": [
+      "doc:docs/claude/APP_EVENTS.md#email-pipeline",
+      "doc:docs/claude/COMMUNICATIONS.md#email/email-clients",
+      "doc:docs/claude/COMMUNICATIONS.md#email/database-models",
+      "doc:docs/claude/COMMUNICATIONS.md#email/send-pipeline",
+      "doc:FEATURES.md#email-system",
+      "doc:docs/claude/COMMUNICATIONS.md#communication-preferences",
+      "doc:docs/claude/COMMUNICATIONS.md#overview",
+      "doc:docs/claude/COMMUNICATIONS.md#messaging-non-email-channels",
+      "doc:docs/claude/COMMUNICATIONS.md#notifications",
+      "doc:docs/claude/COMMUNICATIONS.md#sms",
+      "doc:docs/claude/HOOKS.md#contact-rules",
+      "doc:FEATURES.md#contact-system"
+    ],
+    "catalogClusters": [
+      "app-events-side-effects",
+      "audit-logging",
+      "authentication-methods",
+      "build-deploy-ci",
+      "contact-channel-definitions",
+      "data-access-rules",
+      "data-models",
+      "email-composition-rendering",
+      "email-delivery-senders",
+      "immutable-fields",
+      "lenses-multi-source",
+      "locks-and-serialization",
+      "messaging-channels-adapters",
+      "mutation-hooks",
+      "ordered-lists",
+      "permission-rule-algebra",
+      "rate-limiting",
+      "request-response-schemas",
+      "roles-and-permissions",
+      "route-templates-controllers",
+      "rule-references-registry",
+      "ui-components"
+    ],
+    "codeEntries": 98,
+    "docMembers": 70
+  },
+  "bypassLines": 23,
+  "glossaryTerms": 30
+}

@@ -1,0 +1,56 @@
+{
+  "id": "filtering-pagination",
+  "title": "List filtering and pagination",
+  "routing": "Is this about a list endpoint or list view \u2014 search, searchFields bracket-notation filters, orderBy, page/pageSize or cursors \u2014 i.e. paginate() / cursorPaginate(), buildWhereClause, buildOrderBy, a route's filterLens (picks, relations, root.where, enumOmits) or scopeNarrowing, prepareRequest / bracketQuery, searchablePaths / orderablePaths, validatePathNotation, or the frontend data hooks (makeDataConfig, useDataFilters, usePaginatedData, useInfiniteData, useQueryMetadata, Pagination)?",
+  "concepts": [
+    "filtering-search",
+    "pagination"
+  ],
+  "tokens": 18865,
+  "tokenMethod": "chars/4",
+  "runsAgreed": 3,
+  "sources": {
+    "docs": [
+      "docs/claude/API_ROUTES.md",
+      "docs/claude/DATABASE.md",
+      "docs/claude/FRONTEND/API_CLIENT.md"
+    ],
+    "docUnits": [
+      "doc:docs/claude/API_ROUTES.md#response-format/search-filtering",
+      "doc:docs/claude/API_ROUTES.md#response-format/route-declaration-lens-narrowing",
+      "doc:docs/claude/API_ROUTES.md#response-format/dynamic-per-request-scope-scopenarrowing-middleware",
+      "doc:docs/claude/API_ROUTES.md#response-format/admin-routes",
+      "doc:docs/claude/API_ROUTES.md#response-format/how-it-works",
+      "doc:docs/claude/API_ROUTES.md#response-format/security",
+      "doc:docs/claude/API_ROUTES.md#response-format/bracket-notation-query-parsing",
+      "doc:docs/claude/API_ROUTES.md#response-format/relation-field-security",
+      "doc:docs/claude/API_ROUTES.md#response-format/orderby",
+      "doc:docs/claude/API_ROUTES.md#frontend-metadata",
+      "doc:docs/claude/DATABASE.md#query-building-utilities",
+      "doc:docs/claude/API_ROUTES.md#response-format/pagination",
+      "doc:docs/claude/API_ROUTES.md#response-format/paginate-utility",
+      "doc:docs/claude/API_ROUTES.md#response-format/controller-paginate-integration",
+      "doc:docs/claude/FRONTEND/API_CLIENT.md#data-hooks"
+    ],
+    "catalogClusters": [
+      "error-handling",
+      "filtering-search-ordering",
+      "frontend-navigation-context",
+      "frontend-state-api-client",
+      "json-rules-engine",
+      "lenses-multi-source",
+      "naming-vocabulary",
+      "pagination",
+      "permission-rule-algebra",
+      "request-context-access",
+      "request-response-schemas",
+      "soft-delete-cascade",
+      "superadmin-operations",
+      "ui-components"
+    ],
+    "codeEntries": 72,
+    "docMembers": 40
+  },
+  "bypassLines": 23,
+  "glossaryTerms": 28
+}

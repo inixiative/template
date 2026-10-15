@@ -1,0 +1,69 @@
+{
+  "id": "app-events-webhooks-adapters",
+  "title": "App events, webhooks, adapters",
+  "routing": "Is this about a side effect leaving a business write (emitAppEvent, makeAppEvent, AppEventName, email/websocket handoffs, cb callbacks, observeRegistry, AppEvent rows, onCommit deferral), outbound webhooks (WebhookSubscription, WebhookEvent, sendWebhook, webhookEnabledModels, x-webhook-signature, validateWebhookUrl, circuit breaker, poisoned IntegrationRecord), wrapping an external provider behind an adapter (makeAdapterRouter, makeBroadcastRegistry, makeAdapterRegistry, types.ts + client/ + index.ts), owner Integrations and IntegrationRecords, or object storage (storage, createS3Client, S3/MinIO buckets)?",
+  "concepts": [
+    "app-events",
+    "webhooks",
+    "adapters",
+    "integrations",
+    "object-storage"
+  ],
+  "tokens": 15236,
+  "tokenMethod": "chars/4",
+  "runsAgreed": 1,
+  "sources": {
+    "docs": [
+      "AI/ENTRYPOINT.md",
+      "FEATURES.md",
+      "docs/claude/ADAPTERS.md",
+      "docs/claude/APP_EVENTS.md",
+      "docs/claude/COMMUNICATIONS.md",
+      "docs/claude/HOOKS.md"
+    ],
+    "docUnits": [
+      "doc:docs/claude/APP_EVENTS.md#purpose-and-execution",
+      "doc:docs/claude/APP_EVENTS.md#emitting-and-registering-events",
+      "doc:docs/claude/APP_EVENTS.md#handler-and-handoff-contracts",
+      "doc:docs/claude/APP_EVENTS.md#email-pipeline",
+      "doc:docs/claude/APP_EVENTS.md#websocket-handoffs",
+      "doc:docs/claude/APP_EVENTS.md#observe-pipeline",
+      "doc:docs/claude/APP_EVENTS.md#inquiry-events",
+      "doc:docs/claude/APP_EVENTS.md#source-map-and-pending-consumers",
+      "doc:AI/ENTRYPOINT.md#6-app-events-side-effects",
+      "doc:docs/claude/COMMUNICATIONS.md#webhooks",
+      "doc:docs/claude/HOOKS.md#webhooks",
+      "doc:FEATURES.md#webhooks",
+      "doc:docs/claude/ADAPTERS.md#what-an-adapter-module-is",
+      "doc:docs/claude/ADAPTERS.md#module-layout",
+      "doc:docs/claude/ADAPTERS.md#adapter-primitives",
+      "doc:docs/claude/ADAPTERS.md#naming-conventions",
+      "doc:docs/claude/ADAPTERS.md#existing-examples",
+      "doc:docs/claude/ADAPTERS.md#when-to-create-a-new-adapter-module",
+      "doc:docs/claude/ADAPTERS.md#what-not-to-do"
+    ],
+    "catalogClusters": [
+      "app-events-side-effects",
+      "data-access-rules",
+      "email-delivery-senders",
+      "environment-config",
+      "error-handling",
+      "immutable-fields",
+      "integrations-records",
+      "locks-and-serialization",
+      "messaging-channels-adapters",
+      "module-layout-monorepo",
+      "naming-vocabulary",
+      "observability-telemetry",
+      "outbound-webhooks",
+      "request-context-access",
+      "request-response-schemas",
+      "storage-clients",
+      "testing-rules"
+    ],
+    "codeEntries": 70,
+    "docMembers": 44
+  },
+  "bypassLines": 22,
+  "glossaryTerms": 30
+}
