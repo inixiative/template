@@ -281,9 +281,10 @@ export const refreshRollingCache = makeSingletonJob<RefreshRollingCachePayload>(
 
 - **The key:** `lockKey(payload)` when given; otherwise `data.id` (the cron row's id for a cron run, or
   an `id` passed to `enqueueJob`). A run with neither locks on the handler name.
-- **Deduplicated at enqueue:** when there is a key, `enqueueJob` adds the job with BullMQ's
-  `deduplication: { id: <handler>-<key> }` (`singletonDeduplicationId`), so while a job with that key
-  exists — queued, running, retrying, or parked waiting on its children — another add is a no-op.
+- **Deduplicated at enqueue:** when there is a key, `enqueueOrSpill` adds the job with BullMQ's
+  `deduplication: { id: <handler>-<key> }` (`singletonDeduplicationId`; kept on an outbox spill), so
+  while a job with that key exists — queued, running, retrying, or parked waiting on its children —
+  another add is a no-op and `enqueueJob` returns the holder's `jobId`.
   That covers what the lock cannot: a staged singleton releases its lock while it waits in
   `waiting-children`, but it still exists, so the skip holds.
 - **Locked while it runs:** each run takes `lock:job-singleton:<handler>:<key>` (keyed) or
@@ -550,7 +551,7 @@ Defined in the env schema (`apps/api/src/config/env.ts`), read lazily through `o
 
 ## Cron Jobs
 
-Stored in DB, registered on worker startup. **A tick never runs its handler:** `processJob` hands a `cron` job to `enqueueCronRun`, which enqueues the real run through `enqueueJob` as a `cronTrigger` job carrying the row's `id` — exactly what the admin trigger does. So a scheduled run and a manual trigger collide like any two enqueues (a singleton is deduplicated on the row; a superseding job takes over). A repeatable's job template cannot carry a deduplication id, which is why the tick hands off. On startup `registerCronJobs` also removes any BullMQ repeatable no enabled row registered (a renamed or disabled job left behind), unless a row failed to register. The `cronJobSync` hook moves the BullMQ repeatable when a row is created, updated or deleted inside `db.txn`. BullMQ's `removeRepeatable(name, repeat, jobId)` takes the job id as its third argument: a `jobId` inside `repeat` is overwritten, so the key never matches.
+Stored in DB, registered on worker startup. **A tick never runs its handler:** `processJob` hands a `cron` job to `enqueueCronRun`, which enqueues the real run through `enqueueJob` as a `cronTrigger` job carrying the row's `id`, with the row's attempts and backoff. The admin trigger (`triggerCronJob`) goes through the same `enqueueCronRun`. So a scheduled run and a manual trigger collide like any two enqueues (a singleton is deduplicated on the row; a superseding job takes over). A repeatable's job template cannot carry a deduplication id, which is why the tick hands off. On startup `registerCronJobs` also removes any BullMQ repeatable no enabled row registered (a renamed or disabled job left behind), unless a row failed to register. The `cronJobSync` hook moves the BullMQ repeatable when a row is created, updated or deleted inside `db.txn`. BullMQ's `removeRepeatable(name, repeat, jobId)` takes the job id as its third argument: a `jobId` inside `repeat` is overwritten, so the key never matches.
 
 ### Cron Patterns (UTC)
 

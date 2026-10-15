@@ -17,7 +17,7 @@ import { queue } from '#/jobs/queue';
 import { recordSlowFinished } from '#/jobs/slowLaneSignals';
 import { createSlowSlotPool, type SlowSlotPool } from '#/jobs/slowSlotPool';
 import { traceJob } from '#/jobs/traceJob';
-import { type JobData, JobType, type WorkerContext } from '#/jobs/types';
+import { type JobData, type JobOptions, JobType, type WorkerContext } from '#/jobs/types';
 
 type ProcessJobSeams = {
   handlers?: Partial<JobHandlers>;
@@ -75,8 +75,17 @@ export const processJob = async (
 
   // A cron tick never runs its handler: it enqueues the real run (see enqueueCronRun), so it takes no
   // slot and has no actor of its own.
-  if ((job.data as JobData | undefined)?.type === JobType.cron) {
-    await enqueueCronRun(job);
+  const data = job.data as JobData | undefined;
+  if (data?.type === JobType.cron) {
+    const placed = await enqueueCronRun({
+      handlerName: job.name,
+      cronJobId: data.id,
+      payload: data.payload,
+      lane: data.lane,
+      attempts: job.opts?.attempts,
+      backoff: job.opts?.backoff as JobOptions['backoff'],
+    });
+    log.info(`Cron tick ${job.name} (${job.id}) enqueued run ${placed.jobId}`, LogScope.worker);
     return;
   }
 

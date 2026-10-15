@@ -13,12 +13,12 @@ every constructor, a binary collision policy, and superseding children that hono
 
 **Collision policy is binary: a singleton skips, superseding takes over, nothing parks.**
 - `makeSingletonJob(definition, { lockKey })` (keyed skip landed in `13bf9cb0`) now exposes
-  `singletonKey`; `enqueueJob` adds a keyed singleton (or a singleton's cron run) with BullMQ
-  `deduplication: { id: singletonDeduplicationId(handler, key) }`, so the skip also holds while a staged
-  singleton is parked in `waiting-children`.
+  `singletonKey`; `enqueueOrSpill` adds a keyed singleton (or a singleton's cron run) with BullMQ
+  `deduplication: { id: singletonDeduplicationId(handler, key) }` and returns the holder's id when the
+  add was deduplicated, so the skip also holds while a staged singleton is parked in `waiting-children`.
 - Cron ticks enqueue: `processJob` hands a `cron` tick to `enqueueCronRun`, which enqueues the real run
-  as `cronTrigger` with the row id, like the admin trigger. A repeatable's template cannot carry a
-  deduplication id.
+  as `cronTrigger` with the row id and the row's attempts/backoff; `triggerCronJob` uses the same path.
+  A repeatable's template cannot carry a deduplication id.
 - CI: `no-job-parking` (only `claimSlotOrRequeue` may `moveToDelayed`/`new DelayedError`).
 - `sendWebhook` was already a plain job in the template; nothing to change.
 
@@ -44,6 +44,12 @@ write fails. Root `coordinateRollingCaches` (seeded cron row, every minute, sing
 (superseding by key, slow lane, `settleWithin` + `AbortSignal.any` timeout, emits
 `rollingCache.leafStuck` and throws). Barrel `apps/api/src/lib/rollingCaches.ts` imported by the worker;
 CI: `rolling-cache-registered`. No supervisor, no pending hash, no refire. Full rebuild only.
+
+**Supersedes template PR #191** (`jobs-stages-dedup-eviction`), which carried the earlier shape of
+these primitives (eviction via `evictSupersededFlow`/`readUnfinishedChildren`, `isStaged`). Its
+non-eviction parts (dedup in `enqueueOrSpill`, the cron run carrying the row's attempts/backoff, the
+shared trigger path, `traceJob` wait signals, `holdLaneWhileParked`, `jobFlowCheck`) are here in the
+3e52ece0a9 shape; #191 was closed unmerged.
 
 **Verification.** Unit tests for all of the above, plus `apps/api/scripts/jobFlowCheck.ts`, which runs
 flows, singleton deduplication, parent tombstones and cron hand-off against real Redis and a real worker.

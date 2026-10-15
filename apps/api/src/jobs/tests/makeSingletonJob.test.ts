@@ -193,6 +193,39 @@ describe('makeSingletonJob', () => {
       await firstRun;
     });
 
+    test('a staged singleton skips its stages and finish while its key is busy', async () => {
+      const started = deferred();
+      const gate = deferred();
+      const firstRun = makeSingletonJob<ChannelPayload>(
+        async () => {
+          started.resolve();
+          await gate.promise;
+        },
+        { lockKey: channelKey },
+      )(ctx, ADP_FULL);
+      await started.promise;
+
+      const ran: string[] = [];
+      const staged = makeSingletonJob<ChannelPayload>(
+        {
+          stages: [
+            async () => {
+              ran.push('stage');
+            },
+          ],
+          finish: async () => {
+            ran.push('finish');
+          },
+        },
+        { lockKey: channelKey },
+      );
+      await staged(singletonContext('staged-job'), ADP_FULL);
+
+      expect(ran).toEqual([]);
+      gate.resolve();
+      await firstRun;
+    });
+
     test('does not take the data.id lane', async () => {
       const started = deferred();
       const gate = deferred();
