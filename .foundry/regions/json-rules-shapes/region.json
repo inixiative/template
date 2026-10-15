@@ -1,0 +1,36 @@
+{
+  "id": "json-rules-shapes",
+  "title": "Writing a json-rules rule",
+  "routing": "Is this about what a rule can say: the Condition shapes (field rule with operator and value or path or { bind }, logical all / any, conditional if / then / else, array rule with arrayOperator and element condition, aggregate sum / avg, date rule with dateOperator), the operator catalog (Operator, FieldKind, getArrayOperators, getAggregateOperators), path semantics and $ / $$. scope references, offsets and unit amounts, relative and calendar date expressions (within / ago / ahead / this / last / next, notAfter / notWithin for dormancy, the explicit now, timeZone / weekStart), windowing (filter / orderBy / skip / take), NULL semantics, value comparison and enums, Prisma limitations (no paths through to-many, scalar-list contains), relations and field maps, the custom rule error, or 'one rule AST, three targets'?",
+  "concepts": [
+    "json-rules-shapes"
+  ],
+  "tokens": 11362,
+  "tokenMethod": "chars/4",
+  "runsAgreed": 0,
+  "sources": {
+    "docs": [
+      "@inixiative/json-rules/README.md"
+    ],
+    "docUnits": [
+      "doc:@inixiative/json-rules/README.md#preface",
+      "doc:@inixiative/json-rules/README.md#installation",
+      "doc:@inixiative/json-rules/README.md#quick-start",
+      "doc:@inixiative/json-rules/README.md#what-it-supports",
+      "doc:@inixiative/json-rules/README.md#operators",
+      "doc:@inixiative/json-rules/README.md#rule-shapes",
+      "doc:@inixiative/json-rules/README.md#path-semantics",
+      "doc:@inixiative/json-rules/README.md#examples",
+      "doc:@inixiative/json-rules/README.md#license"
+    ],
+    "catalogClusters": [
+      "json-rules-engine",
+      "lenses-multi-source",
+      "rule-builder-ui-model"
+    ],
+    "codeEntries": 2,
+    "docMembers": 45
+  },
+  "bypassLines": 15,
+  "glossaryTerms": 17
+}

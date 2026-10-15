@@ -9,6 +9,7 @@
 - [Glossary](#glossary)
 - [1. What this Warden covers](#1-what-this-warden-covers)
 - [2. The domain](#2-the-domain)
+- [2b. Under construction](#2b-under-construction)
 - [3. Everything that exists here, by class](#3-everything-that-exists-here-by-class)
   - [Class `tenancy`](#class-tenancy-organizations-spaces-and-memberships-personalorgspace-contexts)
   - [Class `superadmin`](#class-superadmin-superadmin-platform-role-admin-routes-superadmin-app)
@@ -30,7 +31,7 @@ Admin job-monitoring dashboard at /admin/queues.
 Collects a new org's name and an auto-derived, uniqueness-checked slug.
 
 **Four-Context Architecture**  
-User, Organization, Space and Public contexts, each with its own navigation, routes and permissions.
+User, Organization, Space and Public contexts, each with its own navigation, routes and permissions-roles / permissions-rebac.
 
 **Hierarchical Tokens**  
 Tokens scoped to User (cross-org), Organization (all spaces) or Space (one space).
@@ -89,15 +90,21 @@ Covers who the tenants are and how they nest (Organization → Space, with Organ
 
 ## 2. The domain
 
-An Organization is the top-level, data-isolated tenant; it owns users, spaces, integrations, tokens and content. A Space is a sub-container inside one organization (a project, team or workspace) with its own data isolation. Membership is an OrganizationUser or SpaceUser row carrying a Role and optional entitlements; a SpaceUser always requires the matching OrganizationUser, so space access is a subset of org access. validateNotLastOwner blocks removing or demoting an org's last owner. The API splits by scope: modules/organization and modules/space for org- and space-scoped endpoints (organizationCreateX, spaceReadManyX), modules/organizationUser and modules/spaceUser for one membership row and the tokens issued for it, and the me module for the caller's own data. The frontend has four contexts (User, Organization, Space, Public), tracked in the URL as ?org= and ?space= and held in the shared store; each app has organizations, spaces and users route folders. Inviting members, creating, updating and transferring spaces are inquiries (FEATURES.md lists the invitation system as in progress).
+An Organization is the top-level, data-isolated tenant; it owns users, spaces, integrations, tokens and content. A Space is a sub-container inside one organization (a project, team or workspace) with its own data isolation. Membership is an OrganizationUser or SpaceUser row carrying a Role and optional entitlements; a SpaceUser always requires the matching OrganizationUser, so space access is a subset of org access. validateNotLastOwner blocks removing or demoting an org's last owner. The API splits by scope: modules/organization and modules/space for org- and space-scoped endpoints (organizationCreateX, spaceReadManyX), modules/organizationUser and modules/spaceUser for one membership row and the tokens issued for it, and the me module for the caller's own data. The frontend has four contexts (User, Organization, Space, Public), tracked in the URL as ?org= and ?space= and held in the shared store; each app has organizations, spaces and users route folders. Inviting members, creating, updating and transferring spaces are inquiry-handlers / inquiry-routes-ui (FEATURES.md lists the invitation system as in progress).
 
 The superadmin is the platform role: PlatformRole.superadmin on User. validateSuperadmin gates the admin router, whose routes run inside db.withDeleted (only there do superadmins see soft-deleted rows); isSuperadmin is the inline branch; setup gives a superadmin permix.setSuperadmin(true) so every check passes. Admin operations (FEATURES.md § Admin Operations) include cache clearing, cron CRUD and manual triggers, job enqueueing, BullBoard at /admin/queues, inquiry and webhook oversight, and platform auth-provider management. spoofMiddleware lets a superadmin act as another user through the x-spoof-user-email header; the original admin is kept as spoofedBy and echoed in response headers. The superadmin app has its own communications, dashboard, settings and users routes.
 
-Related regions: `permissions` owns roles, actions, the ReBAC rules (space own delegating to organization own) and the route validators; `authentication` owns token types and where spoofMiddleware sits in the auth chain; `inquiries` owns invitations and space create/update/transfer flows; `frontend-apps-routing / navigation` owns the three apps, layouts and context-aware navigation; `frontend-store / api-client` owns the store slices that hold the current tenant; `jobs-cron` owns the cron and job machinery the admin routes drive.
+Related regions: `permissions-roles / permissions-rebac` owns roles, actions, the ReBAC rules (space own delegating to organization own) and the route validators; `authentication` owns token types and where spoofMiddleware sits in the auth chain; `inquiry-handlers / inquiry-routes-ui` owns invitations and space create/update/transfer flows; `frontend-apps-routing / navigation` owns the three apps, layouts and context-aware navigation; `frontend-store / api-client` owns the store slices that hold the current tenant; `jobs-cron` owns the cron and job machinery the admin routes drive.
+
+## 2b. Under construction
+
+Open work you cannot use yet. Do not build against it, and do not build what it would replace without saying so.
+
+- Email-based invitations to organizations: in progress — FEATURES.md § User Management (🟡 Invitation System); ticket FEAT-001
 
 ## 3. Everything that exists here, by class
 
-Point at a class when that is as specific as the moment allows, or at a member. Where a class has siblings an agent could confuse, a table under the class header says which to use when; its *Said as* line gives the plain words a user or agent uses for that job. Each member: **name** · kind `where` · the doc § that describes it (code members) or the code it is about (doc members): choose this when … . Quote the name and the where in a pointer ("look over here: createLock, packages/db/src/lock/createLock.ts, CONCURRENCY.md § Distributed Lock"). *Said as:* the ways a user or agent describes this job in a message or plan without knowing the name; match on these. *Signs you're bypassing it:* the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
+Find the problem in plain words, then point at the exact thing. Each class opens with job tables where a class has confusable siblings (which to use when; *Said as* gives the plain words for that job), then one table of every member: **Problem** is the job in the user's or agent's words (match on these); **Use** is the exact member, its kind and `where`, then when to choose it; **Read** is the doc § that describes it (code members) or the code it is about (doc members); **Signs you're bypassing it** is the hand-rolled code an agent writes when it rebuilds the primitive, plus the errors it throws. Quote Use and Read in a pointer ("look over here: createLock, packages/db/src/lock/createLock.ts, CONCURRENCY.md § Distributed Lock"). Code members come from the catalog, described from the code; doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
 
 ### Class `tenancy`: Organizations, spaces and memberships; Personal/Org/Space contexts
 
@@ -107,10 +114,6 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
-| **Organization** | top-level, data-isolated tenant | a sub-container inside an org (Space) |
-| **Space** | project/team container inside one organization; own delegates to the org | top-level tenant (Organization) |
-| **OrganizationUser** | a user's role and entitlements in one org | space-level access (SpaceUser) |
-| **SpaceUser** | a user's role in one space; requires the OrganizationUser first | org-wide membership (OrganizationUser) |
 
 **Job: put an API endpoint in the right tenant-scope module** (API modules by scope) — catalog: apps/api/src/modules/*
 
@@ -118,65 +121,35 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
-| **apps/api/src/modules/organization** | org-scoped endpoints (organizationCreateX / organizationReadManyX) | space-scoped (apps/api/src/modules/space) |
-| **apps/api/src/modules/space** | space-scoped endpoints (spaceCreateX / spaceReadManyX) | org-wide (apps/api/src/modules/organization) |
-| **apps/api/src/modules/organizationUser** | one org membership row: read/update/delete, issue its tokens | space membership (apps/api/src/modules/spaceUser) |
-| **apps/api/src/modules/spaceUser** | one space membership row | org membership (apps/api/src/modules/organizationUser) |
-| **apps/api/src/modules/me (auth-middleware-users)** | the caller's own data | tenant-scoped resources (organization or space module) |
 
-- **Organization** · model `packages/db/prisma/schema/organization.prisma` · in docs: docs/claude/API_ROUTES.md § File Organization; docs/claude/FRONTEND/COMPONENTS.md § Package Organization: sub-tenant scope: Space instead; a user's role in it: OrganizationUser
-  - *Said as:* "the top-level customer account", "the tenant whose data is isolated from the others", "a company signs up and gets its own area", "I'll add a tenant id column to the table", "the whole org, not a team inside it"
-- **OrganizationUser** · model `packages/db/prisma/schema/organizationUser.prisma` · in docs: FEATURES.md § Multi-Tenancy; docs/claude/TESTING.md § Factories: space-level membership: SpaceUser instead
-  - *Said as:* "a person's membership and role in one org", "someone belongs to this org as an admin", "I'll put the role on the user record", "the membership row, not the user", "org-wide, not a single space"
-- **Space** · model `packages/db/prisma/schema/space.prisma` · in docs: docs/claude/PERMISSIONS.md § Space Permissions; FEATURES.md § Multi-Tenancy: Sub-tenant scope under Organization; use Organization for top-level tenant ownership.
-  - *Said as:* "a project or team inside an org", "a sub-container under the organization", "I'll add a project model under organization", "scoped inside one org, not top level", "owners of the org inherit it"
-- **SpaceUser** · model `packages/db/prisma/schema/spaceUser.prisma` · in docs: FEATURES.md § Multi-Tenancy; docs/claude/AUTH.md § Token Types: Space-level access; org-wide access uses OrganizationUser, which every SpaceUser requires.
-  - *Said as:* "someone's role in one specific space", "add a member to this project", "I'll add a space member who isn't in the org yet", "space-level, not org-wide", "requires the org membership first"
-- **CreateOrganizationModal** · primitive `packages/ui/src/components/organizations/CreateOrganizationModal.tsx#CreateOrganizationModal` · in docs: docs/claude/FRONTEND/API_CLIENT.md § Form Helpers; docs/claude/FRONTEND/COMPONENTS.md § Package Organization: Creating organizations; don't rebuild slug derivation, reuse useValidateUniqueness for other unique fields.
-  - *Said as:* "the create-org dialog with name and slug", "derive the slug from the name and make sure it's unique", "I'll write my own slugify and uniqueness check", "the new organization form"
-  - *Signs you're bypassing it:* a new organization form with its own slugify of the name and its own slug uniqueness check (catalog: packages/ui/src/components/organizations/CreateOrganizationModal.tsx ("don't rebuild slug derivation, reuse useValidateUniqueness"))
-- **OrganizationProfilePage** · primitive `packages/ui/src/pages/OrganizationProfilePage.tsx#OrganizationProfilePage` · in docs: docs/claude/FRONTEND/COMPONENTS.md § Settings; docs/claude/FRONTEND/COMPONENTS.md § Modals and Pages: Organization context only; SpaceProfilePage or UserProfilePage for spaces and users.
-  - *Said as:* "the org settings page for name and details", "edit an organization's profile", "I'll build a settings page for the org", "org context only, not user or space"
-- **OrganizationSpacesPage** · primitive `packages/ui/src/pages/OrganizationSpacesPage.tsx#OrganizationSpacesPage` · in docs: docs/claude/FRONTEND/COMPONENTS.md § Modals and Pages: Spaces of one organization; OrganizationsPage lists organizations, OrganizationUsersPage lists members.
-  - *Said as:* "list the spaces in this organization", "the org's projects page", "I'll build a table of spaces under the org", "spaces of one org, not all orgs"
-- **validateNotLastOwner** · primitive `apps/api/src/modules/organization/validations/validateNotLastOwner.ts#validateNotLastOwner`: block removing or demoting an organization's last owner
-  - *Said as:* "don't let the last owner leave or get demoted", "an org must always keep an owner", "I'll count owners inline before removing the member", "block removing the final owner"
-  - *Throws:* makeError 422 VALIDATION_ERROR (`validation-error`, request-context-errors, inferred)
-  - *Signs you're bypassing it:* a db.organizationUser.count({ where: { role: 'owner' } }) guard written inline before removing or demoting a member (catalog: apps/api/src/modules/organization/validations/validateNotLastOwner.ts)
-- **apps/admin/app/routes/_authenticated/organizations** · system `apps/admin/app/routes/_authenticated/organizations`: Org-level tenancy screens go here; space-scoped screens: _authenticated/spaces; member/user screens: _authenticated/users.
-  - *Said as:* "org-level screens in the admin app", "where admin pages about an organization live", "I'll put the org screen under users", "admin app, organization pages"
-- **apps/admin/app/routes/_authenticated/spaces** · system `apps/admin/app/routes/_authenticated/spaces`: Space-scoped tenancy screens go here; organization-level screens: _authenticated/organizations.
-  - *Said as:* "space-level screens in the admin app", "where admin pages about a space live", "I'll put the space page under organizations", "admin app, space pages"
-- **apps/admin/app/routes/_authenticated/users** · system `apps/admin/app/routes/_authenticated/users`: Member and invitation screens for users go here; organization invitations: _authenticated/organizations.
-  - *Said as:* "member and invitation screens in the admin app", "where admin pages about members live", "I'll add the member list under organizations", "admin app, user pages"
-- **apps/api/src/modules/organization** · system `apps/api/src/modules/organization`: Org-scoped resources; space-scoped use space module, caller-owned use me module.
-  - *Said as:* "an endpoint for something that belongs to an org", "org-scoped create and list routes", "I'll add an org route to the user module", "org-wide, not one space", "we don't do nested org-scoped delete routes"
-- **apps/api/src/modules/organizationUser** · system `apps/api/src/modules/organizationUser`: Org membership rows; space memberships use spaceUser; creating memberships goes through organizationCreateOrganizationUser.
-  - *Said as:* "read, update or remove one org membership", "issue a key for an org member", "I'll add membership endpoints to the organization module", "the membership row, not the org", "org membership, not space membership"
-- **apps/api/src/modules/space** · system `apps/api/src/modules/space`: Space-scoped resources; org-wide use organization module, caller-owned use me module.
-  - *Said as:* "an endpoint for something that belongs to a space", "space-scoped create and list routes", "I'll put the space route in the org module", "one space, not the whole org", "space resources, not space members"
-- **apps/api/src/modules/spaceUser** · system `apps/api/src/modules/spaceUser`: Space membership rows; organization memberships use organizationUser instead.
-  - *Said as:* "read, update or remove one space membership", "a member's row in a space", "I'll add space member endpoints to the space module", "space membership, not org membership", "the membership row, not the space"
-- **apps/web/app/routes/_authenticated/organizations** · system `apps/web/app/routes/_authenticated/organizations`: Organization-level views go here; space-scoped pages belong in _authenticated/spaces, member lists in _authenticated/users.
-  - *Said as:* "org-level views in the web app", "where web pages about an organization live", "I'll put the org page under spaces", "web app, organization pages"
-- **apps/web/app/routes/_authenticated/spaces** · system `apps/web/app/routes/_authenticated/spaces`: Space-scoped views here; organization-level views in _authenticated/organizations.
-  - *Said as:* "space-level views in the web app", "where web pages about a space live", "I'll put the space page under organizations", "web app, space pages"
-- **apps/web/app/routes/_authenticated/users** · system `apps/web/app/routes/_authenticated/users`: Member and invitation lists here; organization invitations in _authenticated/organizations; own profile in settings.
-  - *Said as:* "member and invitation lists in the web app", "where web pages about members live", "I'll put my own profile under users", "web app, user pages"
-- **Context-aware navigation** · pattern FEATURES.md > Multi-Tenancy > Context-Aware Navigation: show or hide nav items by current context and user permissions
-  - *Said as:* "show nav items depending on where I am and what I may do", "the sidebar changes between personal, org and space", "I'll hardcode the menu per app", "the menu follows the current context"
-- **Four-context switching** · pattern FEATURES.md > Multi-Tenancy > Context Switching: switch frontend between User, Organization, Space and Public contexts with own nav and routes
-  - *Said as:* "switch between personal, org, space and public views", "each context has its own nav and routes", "I'll add an if on org id in the layout", "the context switcher"
-- **Hierarchical token scopes** · pattern FEATURES.md > Multi-Tenancy > Hierarchical Tokens: Pick the narrowest scope: Space for one space, Organization for all its spaces, User for cross-org.
-  - *Said as:* "a key for one space, a whole org, or across orgs", "pick the narrowest scope for this key", "I'll give the integration a user-wide key", "space, org or user scope"
-- **URL context sync** · pattern FEATURES.md > Multi-Tenancy > URL State Sync: Persist tenant context in URL rather than only local state.
-  - *Said as:* "the current org and space should be in the URL", "refresh keeps you in the same org", "I'll keep the selected org only in state", "shareable links carry the tenant"
-- **Access context through central store** · rule FEATURES.md > Multi-Tenancy > State Management: Any component needing current tenant or user context.
-  - *Said as:* "read the current org or space from the store", "I'll pass the current org down through props", "where components get the tenant context"
-- **Space membership requires org membership** · rule FEATURES.md > Multi-Tenancy > Space Memberships: Whenever granting space access or adding SpaceUser records.
-  - *Said as:* "you must be in the org before joining a space", "I'll add a space member who isn't in the org", "adding someone to a space who isn't a member"
-- **Tenant data isolation** · rule FEATURES.md > Multi-Tenancy > Organizations: All tenant-owned reads and writes.
-  - *Said as:* "one org must never see another's data", "every tenant-owned query is scoped", "I'll query the table without an org filter"
+| Problem | Use | Read | Signs you're bypassing it |
+|---|---|---|---|
+| the top-level customer account; the tenant whose data is isolated from the others; a company signs up and gets its own area; I'll add a tenant id column to the table; the whole org, not a team inside it | **Organization** · model `packages/db/prisma/schema/organization.prisma` — sub-tenant scope: Space instead; a user's role in it: OrganizationUser | docs/claude/API_ROUTES.md § File Organization; docs/claude/FRONTEND/COMPONENTS.md § Package Organization | — |
+| a person's membership and role in one org; someone belongs to this org as an admin; I'll put the role on the user record; the membership row, not the user; org-wide, not a single space | **OrganizationUser** · model `packages/db/prisma/schema/organizationUser.prisma` — space-level membership: SpaceUser instead | FEATURES.md § Multi-Tenancy; docs/claude/TESTING.md § Factories | — |
+| a project or team inside an org; a sub-container under the organization; I'll add a project model under organization; scoped inside one org, not top level; owners of the org inherit it | **Space** · model `packages/db/prisma/schema/space.prisma` — Sub-tenant scope under Organization; use Organization for top-level tenant ownership. | docs/claude/PERMISSIONS.md § Space Permissions; FEATURES.md § Multi-Tenancy | — |
+| someone's role in one specific space; add a member to this project; I'll add a space member who isn't in the org yet; space-level, not org-wide; requires the org membership first | **SpaceUser** · model `packages/db/prisma/schema/spaceUser.prisma` — Space-level access; org-wide access uses OrganizationUser, which every SpaceUser requires. | FEATURES.md § Multi-Tenancy; docs/claude/AUTH.md § Token Types | — |
+| the create-org dialog with name and slug; derive the slug from the name and make sure it's unique; I'll write my own slugify and uniqueness check; the new organization form | **CreateOrganizationModal** · primitive `packages/ui/src/components/organizations/CreateOrganizationModal.tsx#CreateOrganizationModal` — Creating organizations; don't rebuild slug derivation, reuse useValidateUniqueness for other unique fields. | docs/claude/FRONTEND/API_CLIENT.md § Form Helpers; docs/claude/FRONTEND/COMPONENTS.md § Package Organization | a new organization form with its own slugify of the name and its own slug uniqueness check (catalog: packages/ui/src/components/organizations/CreateOrganizationModal.tsx ("don't rebuild slug derivation, reuse useValidateUniqueness")) |
+| the org settings page for name and details; edit an organization's profile; I'll build a settings page for the org; org context only, not user or space | **OrganizationProfilePage** · primitive `packages/ui/src/pages/OrganizationProfilePage.tsx#OrganizationProfilePage` — Organization context only; SpaceProfilePage or UserProfilePage for spaces and users. | docs/claude/FRONTEND/COMPONENTS.md § Settings; docs/claude/FRONTEND/COMPONENTS.md § Modals and Pages | — |
+| list the spaces in this organization; the org's projects page; I'll build a table of spaces under the org; spaces of one org, not all orgs | **OrganizationSpacesPage** · primitive `packages/ui/src/pages/OrganizationSpacesPage.tsx#OrganizationSpacesPage` — Spaces of one organization; OrganizationsPage lists organizations, OrganizationUsersPage lists members. | docs/claude/FRONTEND/COMPONENTS.md § Modals and Pages | — |
+| don't let the last owner leave or get demoted; an org must always keep an owner; I'll count owners inline before removing the member; block removing the final owner | **validateNotLastOwner** · primitive `apps/api/src/modules/organization/validations/validateNotLastOwner.ts#validateNotLastOwner` — block removing or demoting an organization's last owner | — | a db.organizationUser.count({ where: { role: 'owner' } }) guard written inline before removing or demoting a member (catalog: apps/api/src/modules/organization/validations/validateNotLastOwner.ts). throws makeError 422 VALIDATION_ERROR (`validation-error`, request-context-errors, inferred) |
+| org-level screens in the admin app; where admin pages about an organization live; I'll put the org screen under users; admin app, organization pages | **apps/admin/app/routes/_authenticated/organizations** · system `apps/admin/app/routes/_authenticated/organizations` — Org-level tenancy screens go here; space-scoped screens: _authenticated/spaces; member/user screens: _authenticated/users. | — | — |
+| space-level screens in the admin app; where admin pages about a space live; I'll put the space page under organizations; admin app, space pages | **apps/admin/app/routes/_authenticated/spaces** · system `apps/admin/app/routes/_authenticated/spaces` — Space-scoped tenancy screens go here; organization-level screens: _authenticated/organizations. | — | — |
+| member and invitation screens in the admin app; where admin pages about members live; I'll add the member list under organizations; admin app, user pages | **apps/admin/app/routes/_authenticated/users** · system `apps/admin/app/routes/_authenticated/users` — Member and invitation screens for users go here; organization invitations: _authenticated/organizations. | — | — |
+| an endpoint for something that belongs to an org; org-scoped create and list routes; I'll add an org route to the user module; org-wide, not one space; we don't do nested org-scoped delete routes | **apps/api/src/modules/organization** · system `apps/api/src/modules/organization` — Org-scoped resources; space-scoped use space module, caller-owned use me module. | — | — |
+| read, update or remove one org membership; issue a key for an org member; I'll add membership endpoints to the organization module; the membership row, not the org; org membership, not space membership | **apps/api/src/modules/organizationUser** · system `apps/api/src/modules/organizationUser` — Org membership rows; space memberships use spaceUser; creating memberships goes through organizationCreateOrganizationUser. | — | — |
+| an endpoint for something that belongs to a space; space-scoped create and list routes; I'll put the space route in the org module; one space, not the whole org; space resources, not space members | **apps/api/src/modules/space** · system `apps/api/src/modules/space` — Space-scoped resources; org-wide use organization module, caller-owned use me module. | — | — |
+| read, update or remove one space membership; a member's row in a space; I'll add space member endpoints to the space module; space membership, not org membership; the membership row, not the space | **apps/api/src/modules/spaceUser** · system `apps/api/src/modules/spaceUser` — Space membership rows; organization memberships use organizationUser instead. | — | — |
+| org-level views in the web app; where web pages about an organization live; I'll put the org page under spaces; web app, organization pages | **apps/web/app/routes/_authenticated/organizations** · system `apps/web/app/routes/_authenticated/organizations` — Organization-level views go here; space-scoped pages belong in _authenticated/spaces, member lists in _authenticated/users. | — | — |
+| space-level views in the web app; where web pages about a space live; I'll put the space page under organizations; web app, space pages | **apps/web/app/routes/_authenticated/spaces** · system `apps/web/app/routes/_authenticated/spaces` — Space-scoped views here; organization-level views in _authenticated/organizations. | — | — |
+| member and invitation lists in the web app; where web pages about members live; I'll put my own profile under users; web app, user pages | **apps/web/app/routes/_authenticated/users** · system `apps/web/app/routes/_authenticated/users` — Member and invitation lists here; organization invitations in _authenticated/organizations; own profile in settings. | — | — |
+| show nav items depending on where I am and what I may do; the sidebar changes between personal, org and space; I'll hardcode the menu per app; the menu follows the current context | **Context-aware navigation** · pattern FEATURES.md > Multi-Tenancy > Context-Aware Navigation — show or hide nav items by current context and user permissions | part 4 | — |
+| switch between personal, org, space and public views; each context has its own nav and routes; I'll add an if on org id in the layout; the context switcher | **Four-context switching** · pattern FEATURES.md > Multi-Tenancy > Context Switching — switch frontend between User, Organization, Space and Public contexts with own nav and routes | part 4 | — |
+| a key for one space, a whole org, or across orgs; pick the narrowest scope for this key; I'll give the integration a user-wide key; space, org or user scope | **Hierarchical token scopes** · pattern FEATURES.md > Multi-Tenancy > Hierarchical Tokens — Pick the narrowest scope: Space for one space, Organization for all its spaces, User for cross-org. | part 4 | — |
+| the current org and space should be in the URL; refresh keeps you in the same org; I'll keep the selected org only in state; shareable links carry the tenant | **URL context sync** · pattern FEATURES.md > Multi-Tenancy > URL State Sync — Persist tenant context in URL rather than only local state. | part 4 | — |
+| read the current org or space from the store; I'll pass the current org down through props; where components get the tenant context | **Access context through central store** · rule FEATURES.md > Multi-Tenancy > State Management — Any component needing current tenant or user context. | part 4 | — |
+| you must be in the org before joining a space; I'll add a space member who isn't in the org; adding someone to a space who isn't a member | **Space membership requires org membership** · rule FEATURES.md > Multi-Tenancy > Space Memberships — Whenever granting space access or adding SpaceUser records. | part 4 | — |
+| one org must never see another's data; every tenant-owned query is scoped; I'll query the table without an org filter | **Tenant data isolation** · rule FEATURES.md > Multi-Tenancy > Organizations — All tenant-owned reads and writes. | part 4 | — |
+
 
 ### Class `superadmin`: Superadmin platform role, admin routes, superadmin app
 
@@ -186,11 +159,6 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
-| **PlatformRole** | platform-wide role on User (user | superadmin) | per-org or per-space access (Role (permissions)) |
-| **validateSuperadmin** | gate a whole platform-admin route (admin router); 403 otherwise | an inline branch inside logic (isSuperadmin) |
-| **isSuperadmin** | inline branch on superadmin inside middleware or logic | gating a route (validateSuperadmin) |
-| **permix.setSuperadmin (permissions)** | make every permix check pass; set by setup for superadmins | deciding route access (validateSuperadmin) |
-| **spoofMiddleware** | superadmin acts as another user via x-spoof-user-email; spoofedBy kept for audit | a custom as-user param (never) |
 
 **Job: add a superadmin-only API endpoint** (Admin API: module vs router) — catalog: apps/api/src/modules/admin, apps/api/src/routes/admin; FEATURES.md § Admin Operations
 
@@ -198,35 +166,21 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
-| **apps/api/src/modules/admin** | admin controllers: cache clear, audit logs, cron jobs, job enqueue | tenant-scoped endpoints (their feature module) |
-| **apps/api/src/routes/admin** | mount superadmin-only routes (runs validateSuperadmin, db.withDeleted) | tenant routes (feature modules) |
 
-- **PlatformRole** · model `packages/db/prisma/schema/user.prisma` · in docs: docs/claude/PERMISSIONS.md § Roles; docs/claude/NAMING.md § Database: Platform-wide gate: PlatformRole; per-organization or space access: Role instead.
-  - *Said as:* "superadmin is a real role on the user, not a magic string", "platform-wide role, user or superadmin", "I'll add an is-admin boolean to the user", "not a per-org role", "grant or revoke superadmin"
-- **isSuperadmin** · primitive `apps/api/src/lib/context/isSuperadmin.ts#isSuperadmin` · in docs: docs/claude/AUTH.md § Spoof Middleware; docs/claude/CONTEXT.md § Context Access: Inline branching on superadmin; gating a whole route belongs to middleware validators.
-  - *Said as:* "an inline branch for superadmins in middleware or logic", "skip this filter for platform admins", "I'll compare the platform role string inline", "a branch, not a route gate", "append deleted null unless the caller is superadmin"
-  - *Signs you're bypassing it:* inline user.platformRole === 'superadmin' comparisons (catalog: packages/permissions/src/roles/shared.ts and apps/api/src/lib/context/isSuperadmin.ts)
-- **spoofMiddleware** · primitive `apps/api/src/middleware/auth/spoofMiddleware.ts#spoofMiddleware` · in docs: docs/claude/AUTH.md § Spoof Middleware; docs/claude/AUTH.md § Auth Middleware Chain: let superadmins act as another user by swapping the context user
-  - *Said as:* "let a superadmin act as another user", "impersonate a customer to debug their account", "I'll add an as-user query parameter for support", "swap the request's user by header", "support impersonation, with the real admin kept for audit"
-  - *Signs you're bypassing it:* a custom as-user query parameter or header that swaps the context user for support, outside the x-spoof-user-email path (docs/claude/AUTH.md § Spoof Middleware)
-- **validateSuperadmin** · primitive `apps/api/src/middleware/validations/validateSuperadmin.ts#validateSuperadmin` · in docs: docs/claude/AUTH.md § Validation Middleware; docs/claude/CONTEXT.md § Resource Context: tenant-scoped access: validatePermission instead
-  - *Said as:* "this whole route is platform admins only", "403 unless the caller is a superadmin", "I'll test the platform role and throw in the handler", "a route gate, not an inline branch", "behind the current superadmin middleware"
-  - *Throws:* makeError 403 PERMISSION_DENIED (`permission-denied`, permissions)
-  - *Signs you're bypassing it:* an admin handler that checks platformRole itself and throws 403, instead of mounting under the admin router with validateSuperadmin (catalog: apps/api/src/middleware/validations/validateSuperadmin.ts; docs/claude/AUTH.md § Validation Middleware)
-- **apps/api/src/modules/admin** · system `apps/api/src/modules/admin`: expose superadmin endpoints for cache clearing, audit logs, cron jobs and job enqueue
-  - *Said as:* "the controllers for platform-admin operations", "clear the cache, read audit logs, run a cron job", "I'll put the admin endpoint in the feature module", "admin controllers, not the router"
-- **apps/api/src/routes/admin** · system `apps/api/src/routes/admin`: Platform-wide superadmin endpoints; tenant-scoped routes belong in their feature modules.
-  - *Said as:* "where superadmin-only routes get mounted", "the router that runs the superadmin gate and sees deleted rows", "I'll mount the admin route next to the tenant routes", "the mount point, not the controllers"
-- **apps/superadmin/app/routes/_authenticated/communications** · system `apps/superadmin/app/routes/_authenticated/communications`: show superadmin views of communications, inquiries and platform messages
-  - *Said as:* "superadmin view of messages and inquiries across the platform", "platform-wide communications screens", "where the superadmin inquiry pages live"
-- **apps/superadmin/app/routes/_authenticated/dashboard** · system `apps/superadmin/app/routes/_authenticated/dashboard`: show the superadmin landing dashboard
-  - *Said as:* "the superadmin landing page", "the admin home screen"
-- **apps/superadmin/app/routes/_authenticated/settings** · system `apps/superadmin/app/routes/_authenticated/settings`: manage superadmin profile, tokens, integrations and webhooks settings
-  - *Said as:* "superadmin profile, keys, integrations and webhooks settings", "the admin app's settings pages", "where superadmin settings live"
-- **apps/superadmin/app/routes/_authenticated/users** · system `apps/superadmin/app/routes/_authenticated/users`: superadmin pages for browsing and managing platform users
-  - *Said as:* "browse and manage every platform user", "the superadmin user list", "a management screen to list, grant and revoke superadmin"
-- **Superadmin routes bypass org permissions** · rule FEATURES.md › Admin Operations: platform-wide inquiry, webhook and organization oversight
-  - *Said as:* "platform admins oversee every org's inquiries and webhooks", "admin routes don't need org membership", "I'll require an org membership on the admin route"
+| Problem | Use | Read | Signs you're bypassing it |
+|---|---|---|---|
+| superadmin is a real role on the user, not a magic string; platform-wide role, user or superadmin; I'll add an is-admin boolean to the user; not a per-org role; grant or revoke superadmin | **PlatformRole** · model `packages/db/prisma/schema/user.prisma` — Platform-wide gate: PlatformRole; per-organization or space access: Role instead. | docs/claude/PERMISSIONS.md § Roles; docs/claude/NAMING.md § Database | — |
+| an inline branch for superadmins in middleware or logic; skip this filter for platform admins; I'll compare the platform role string inline; a branch, not a route gate; append deleted null unless the caller is superadmin | **isSuperadmin** · primitive `apps/api/src/lib/context/isSuperadmin.ts#isSuperadmin` — Inline branching on superadmin; gating a whole route belongs to middleware validators. | docs/claude/AUTH.md § Spoof Middleware; docs/claude/CONTEXT.md § Context Access | inline user.platformRole === 'superadmin' comparisons (catalog: packages/permissions/src/roles/shared.ts and apps/api/src/lib/context/isSuperadmin.ts) |
+| let a superadmin act as another user; impersonate a customer to debug their account; I'll add an as-user query parameter for support; swap the request's user by header; support impersonation, with the real admin kept for audit | **spoofMiddleware** · primitive `apps/api/src/middleware/auth/spoofMiddleware.ts#spoofMiddleware` — let superadmins act as another user by swapping the context user | docs/claude/AUTH.md § Spoof Middleware; docs/claude/AUTH.md § Auth Middleware Chain | a custom as-user query parameter or header that swaps the context user for support, outside the x-spoof-user-email path (docs/claude/AUTH.md § Spoof Middleware) |
+| this whole route is platform admins only; 403 unless the caller is a superadmin; I'll test the platform role and throw in the handler; a route gate, not an inline branch; behind the current superadmin middleware | **validateSuperadmin** · primitive `apps/api/src/middleware/validations/validateSuperadmin.ts#validateSuperadmin` — tenant-scoped access: validatePermission instead | docs/claude/AUTH.md § Validation Middleware; docs/claude/CONTEXT.md § Resource Context | an admin handler that checks platformRole itself and throws 403, instead of mounting under the admin router with validateSuperadmin (catalog: apps/api/src/middleware/validations/validateSuperadmin.ts; docs/claude/AUTH.md § Validation Middleware). throws makeError 403 PERMISSION_DENIED (`permission-denied`, permissions-roles) |
+| the controllers for platform-admin operations; clear the cache, read audit logs, run a cron job; I'll put the admin endpoint in the feature module; admin controllers, not the router | **apps/api/src/modules/admin** · system `apps/api/src/modules/admin` — expose superadmin endpoints for cache clearing, audit logs, cron jobs and job enqueue | — | — |
+| where superadmin-only routes get mounted; the router that runs the superadmin gate and sees deleted rows; I'll mount the admin route next to the tenant routes; the mount point, not the controllers | **apps/api/src/routes/admin** · system `apps/api/src/routes/admin` — Platform-wide superadmin endpoints; tenant-scoped routes belong in their feature modules. | — | — |
+| superadmin view of messages and inquiries across the platform; platform-wide communications screens; where the superadmin inquiry pages live | **apps/superadmin/app/routes/_authenticated/communications** · system `apps/superadmin/app/routes/_authenticated/communications` — show superadmin views of communications, inquiries and platform messages | — | — |
+| the superadmin landing page; the admin home screen | **apps/superadmin/app/routes/_authenticated/dashboard** · system `apps/superadmin/app/routes/_authenticated/dashboard` — show the superadmin landing dashboard | — | — |
+| superadmin profile, keys, integrations and webhooks settings; the admin app's settings pages; where superadmin settings live | **apps/superadmin/app/routes/_authenticated/settings** · system `apps/superadmin/app/routes/_authenticated/settings` — manage superadmin profile, tokens, integrations and webhooks settings | — | — |
+| browse and manage every platform user; the superadmin user list; a management screen to list, grant and revoke superadmin | **apps/superadmin/app/routes/_authenticated/users** · system `apps/superadmin/app/routes/_authenticated/users` — superadmin pages for browsing and managing platform users | — | — |
+| platform admins oversee every org's inquiries and webhooks; admin routes don't need org membership; I'll require an org membership on the admin route | **Superadmin routes bypass org permissions** · rule FEATURES.md › Admin Operations — platform-wide inquiry, webhook and organization oversight | part 4 | — |
+
 
 ## 4. The specifics, in full
 

@@ -74,7 +74,7 @@ Not here: `db.txn`, `db.findForUpdate`, delegates and constraint helpers are `da
 
 ## 3. Everything that exists here, by class
 
-Point at a class when that is as specific as the moment allows, or at a member. Where a class has siblings an agent could confuse, a table under the class header says which to use when; its *Said as* line gives the plain words a user or agent uses for that job. Each member: **name** · kind `where` · the doc § that describes it (code members) or the code it is about (doc members): choose this when … . Quote the name and the where in a pointer ("look over here: createLock, packages/db/src/lock/createLock.ts, CONCURRENCY.md § Distributed Lock"). *Said as:* the ways a user or agent describes this job in a message or plan without knowing the name; match on these. *Signs you're bypassing it:* the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
+Find the problem in plain words, then point at the exact thing. Each class opens with job tables where a class has confusable siblings (which to use when; *Said as* gives the plain words for that job), then one table of every member: **Problem** is the job in the user's or agent's words (match on these); **Use** is the exact member, its kind and `where`, then when to choose it; **Read** is the doc § that describes it (code members) or the code it is about (doc members); **Signs you're bypassing it** is the hand-rolled code an agent writes when it rebuilds the primitive, plus the errors it throws. Quote Use and Read in a pointer ("look over here: createLock, packages/db/src/lock/createLock.ts, CONCURRENCY.md § Distributed Lock"). Code members come from the catalog, described from the code; doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
 
 ### Class `data-modeling`: Schema conventions: split schema, UUIDv7/typed IDs, enum vs row, false polymorphism
 
@@ -84,10 +84,6 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
-| **PolymorphismRegistry** | declaring a model's polymorphic axes (edit it) | reading config in code (use getPolymorphismConfig) |
-| **getPolymorphismConfig** | reading a model's typeField → fkMap, or null | resolving a ref to its id (use resolveFalsePolymorphismRef) |
-| **resolveFalsePolymorphismRef** | resolving a polymorphic ref to its target id; guard with isFalsePolymorphismRef | raw config lookup (use getPolymorphismConfig) |
-| **polymorphicTarget (lib-prisma-map)** | reading which kind and id a row points at | declaring or configuring the axis (use PolymorphismRegistry) |
 
 **Job: label or group records (manual tags vs rule-defined segments)** (Tag vs TagCategory vs TagAttachment vs Segment) — catalog choose lines
 
@@ -95,63 +91,33 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
-| **TagCategory** | grouping a tag vocabulary | attaching a tag to a record (use TagAttachment) |
-| **Tag** | a manual label inside a category | rule-computed customer audiences (use Segment (customers-segments)) |
-| **TagAttachment** | linking a tag to a record | defining the vocabulary (use TagCategory/Tag) |
-| **Segment (customers-segments)** | a rule-defined audience of customer refs | arbitrary labels on resources (use Tag) |
 
-- **Tag** · model `packages/db/prisma/schema/tag.prisma`: Manual labels via TagAttachment; rule-computed customer audiences: Segment instead.
-  - *Said as:* "a manual label on a record", "let users tag things freely", "label records by hand, not by a rule", "a label chosen by a person, not computed"
-- **TagAttachment** · model `packages/db/prisma/schema/tagAttachment.prisma` · in docs: docs/claude/NAMING.md § Database: Linking a tag to a record: use this; defining the tag vocabulary itself: TagCategory/Tag instead.
-  - *Said as:* "attach a tag to this record", "link a label to a row", "which records carry this tag", "join table between tags and resources"
-- **TagCategory** · model `packages/db/prisma/schema/tagCategory.prisma` · in docs: docs/claude/HOOKS.md § Application Hooks: Grouping tags: use this; attaching a tag to a record: TagAttachment instead.
-  - *Said as:* "group tags into a vocabulary", "a set of related tags, like status or region", "define the tag vocabulary itself", "a namespace for tags"
-- **getPolymorphismConfig** · primitive `packages/db/src/registries/falsePolymorphism.ts#getPolymorphismConfig` · in docs: docs/claude/DATABASE.md § Registries: Use instead of indexing PolymorphismRegistry directly; resolving a ref to an id: resolveFalsePolymorphismRef instead.
-  - *Said as:* "which FK column does this owner kind use", "read the polymorphic mapping for a model", "I'll write a switch on the owner type to pick the column", "hand-write the type-to-column map", "look up the model's polymorphic axis config"
-  - *Signs you're bypassing it:* a hand-written `{ User: 'userId', Organization: 'organizationId' }` FK map or switch on ownerModel, instead of reading the PolymorphismRegistry through getPolymorphismConfig (docs/claude/DATABASE.md § Registries; docs/claude/HOOKS.md § False Polymorphism)
-- **ModelIdType** · primitive `packages/db/src/typedModelIds.ts#ModelIdType`: enumerate model names that have branded id types
-  - *Said as:* "which models have a branded id type", "list the models with typed ids"
-- **PolymorphismRegistry** · primitive `packages/db/src/registries/falsePolymorphism.ts#PolymorphismRegistry` · in docs: docs/claude/DATABASE.md § Registries; FEATURES.md § Database & ORM: Single source for polymorphic shape; read it via getPolymorphismConfig rather than importing the raw object.
-  - *Said as:* "declare which kinds a model can point at", "register a model's polymorphic axes", "a third hand-rolled owner-column map", "where the polymorphic shape is declared once", "register the new model so the hook enforces its target kinds", "one map of model to column for each discriminator"
-- **resolveFalsePolymorphismRef** · primitive `packages/db/src/registries/falsePolymorphism.ts#resolveFalsePolymorphismRef`: Guard with isFalsePolymorphismRef first; for raw config lookup use getPolymorphismConfig.
-  - *Said as:* "turn a polymorphic ref into the actual target id", "given kind and id, which row does it point at", "resolve the reference to its target", "pull the right FK out of the row based on its type"
-- **False polymorphism** · pattern docs/claude/HOOKS.md > False Polymorphism: instead of a single polymorphic ownerId without FK constraints
-  - *Said as:* "a model owned by either a user or an org", "point at one of several entity types safely", "polymorphic owner that still has real foreign keys", "the subject can be any of several models"
-- **Immutable seed-only defaults** · pattern docs/claude/DATABASE.md § False Polymorphism › Special Owner Values (No FK) · code: `User`, `Organization`: Resources that must never change after deployment; otherwise allow super admins to edit defaults.
-  - *Said as:* "defaults that must never change after deploy", "seeded resources nobody can edit", "lock the built-in defaults from editing"
-- **Owner resolution priority** · pattern docs/claude/DATABASE.md § False Polymorphism › Special Owner Values (No FK) · code: `User`, `Organization`: Resolving tenant-customizable resources such as email templates.
-  - *Said as:* "which template wins: the org's override or the default", "resolve a tenant-customizable resource, org first then default", "fall back to the default when the org has no override"
-- **Special owner values without FK** · pattern docs/claude/DATABASE.md § False Polymorphism › Special Owner Values (No FK) · code: `User`, `Organization`: default: seeded base readable by all, super-admin writes; admin: super-admin only; Organization: tenant overrides by org admins.
-  - *Said as:* "a default owner that isn't a real row", "a seeded base readable by everyone, writable by super admins", "an admin-only owner value", "owner values that have no foreign key"
-- **Typed model IDs** · pattern packages/db/src/typedModelIds.ts: Function signatures taking model IDs; use typed ID instead of plain string.
-  - *Said as:* "take a user id, not a plain string", "stop mixing up user ids and org ids", "branded id type for function signatures", "I'll make my own branded type for this id", "function argument typed as a plain string id"
-  - *Signs you're bypassing it:* function signatures taking `id: string` for model IDs, or ad-hoc branded types, instead of `UserId` / `OrganizationId` from typedModelIds.ts (docs/claude/DATABASE.md § Typed Model IDs)
-- **FalsePolymorphismRegistry** · primitive packages/db/src/registries/: Constraints, validation hooks and immutable fields read this rather than hand-declaring FK maps.
-  - *Said as:* "constraints and hooks read the FK map from one place", "hand-declare the FK map in the hook", "the registry that validation and immutable fields consult"
-- **integrationRecord.poisonedAt** · primitive packages/db/prisma/schema/integrationRecord.prisma: make sendWebhook skip a record poisoned in its integration
-  - *Said as:* "skip the webhook for a record that keeps failing", "mark a record as poisoned for this integration", "stop delivering for this one record"
-- **userId** · primitive packages/db/src/typedModelIds.ts: One constructor per model (organizationId, sessionId, spaceId, inquiryId, etc.); pick the matching model.
-  - *Said as:* "construct a typed user id from a string", "wrap the raw id in its branded type", "a constructor per model for typed ids", "brand the id before passing it along"
-- **createdAt/updatedAt timestamps** · rule docs/claude/DATABASE.md > Schema Conventions > DateTime Fields: Every model with timestamps.
-  - *Said as:* "every model gets created and updated timestamps", "add timestamps to the new model"
-- **False polymorphism over type+id** · rule docs/claude/DATABASE.md § False Polymorphism · code: `User`, `Organization`: Any model owned by or pointing at one of several entity types.
-  - *Said as:* "an owner type string plus an owner id", "entity type and entity id pair with runtime lookups", "discriminator enum plus one nullable FK per kind"
-  - *Signs you're bypassing it:* an `ownerType` / `ownerId` (or `entityType` + `entityId`) string pair with runtime lookups, instead of a discriminator enum plus one typed nullable FK per kind (docs/claude/DATABASE.md § False Polymorphism; docs/claude/ARCHITECTURE.md § Why False Polymorphism?)
-- **FK fields VarChar(36)** · rule docs/claude/DATABASE.md > Schema Conventions > Foreign Keys: Every foreign key field in the Prisma schema.
-  - *Said as:* "how to declare a foreign key column", "FK column type in the schema"
-  - *Signs you're bypassing it:* FK columns declared as plain `String` without `@db.VarChar(36)` (docs/claude/DATABASE.md § Schema Conventions › Foreign Keys)
-- **Schema files are source of truth** · rule packages/db/prisma/schema/: Documenting or changing models, fields, relations or enums.
-  - *Said as:* "where do I check what fields a model has", "the docs say one thing, the schema another", "document the model from the schema not from memory"
-- **Segment members written only by reconcile** · rule packages/db/prisma/schema/segmentMember.prisma: Any change to segment membership.
-  - *Said as:* "add this customer to the segment directly", "write a segment member row by hand", "membership comes from reconcile, not manual inserts"
-  - *Signs you're bypassing it:* any SegmentMember write outside applyMembershipDiff / the reconcile jobs (docs/claude/SEGMENTS.md § Static and dynamic membership; catalog entry on segmentMember.prisma)
-- **Separate concerns by lifecycle and ownership** · rule CLAUDE.md §0.2 Decomposition by Default: When tempted to 'just add a field', store a URL, or merge into one table.
-  - *Said as:* "just add a field to this table", "store the URL on the existing model", "merge these two things into one table", "split it into its own model because it lives differently"
-- **UUID v7 IDs** · rule FEATURES.md > Database & ORM: Every model primary key.
-  - *Said as:* "what id type for the new model", "use a random uuid for the primary key", "ids that sort by creation time"
-- **UUIDv7 primary keys** · rule docs/claude/DATABASE.md > Schema Conventions > ID Fields (UUIDv7): Every Prisma model's primary key.
-  - *Said as:* "generate the id in code with a random UUID", "autoincrement id for the new table", "time-ordered ids for the primary key", "the default id generator for a model"
-  - *Signs you're bypassing it:* `@default(uuid())` / `cuid()` / autoincrement ids or `crypto.randomUUID()`, instead of `@default(dbgenerated("uuidv7()")) @db.VarChar(36)` (and `uuidv7()` in code) (docs/claude/DATABASE.md § Schema Conventions › ID Fields (UUIDv7))
+| Problem | Use | Read | Signs you're bypassing it |
+|---|---|---|---|
+| a manual label on a record; let users tag things freely; label records by hand, not by a rule; a label chosen by a person, not computed | **Tag** · model `packages/db/prisma/schema/tag.prisma` — Manual labels via TagAttachment; rule-computed customer audiences: Segment instead. | — | — |
+| attach a tag to this record; link a label to a row; which records carry this tag; join table between tags and resources | **TagAttachment** · model `packages/db/prisma/schema/tagAttachment.prisma` — Linking a tag to a record: use this; defining the tag vocabulary itself: TagCategory/Tag instead. | docs/claude/NAMING.md § Database | — |
+| group tags into a vocabulary; a set of related tags, like status or region; define the tag vocabulary itself; a namespace for tags | **TagCategory** · model `packages/db/prisma/schema/tagCategory.prisma` — Grouping tags: use this; attaching a tag to a record: TagAttachment instead. | docs/claude/HOOKS.md § Application Hooks | — |
+| which FK column does this owner kind use; read the polymorphic mapping for a model; I'll write a switch on the owner type to pick the column; hand-write the type-to-column map; look up the model's polymorphic axis config | **getPolymorphismConfig** · primitive `packages/db/src/registries/falsePolymorphism.ts#getPolymorphismConfig` — Use instead of indexing PolymorphismRegistry directly; resolving a ref to an id: resolveFalsePolymorphismRef instead. | docs/claude/DATABASE.md § Registries | a hand-written `{ User: 'userId', Organization: 'organizationId' }` FK map or switch on ownerModel, instead of reading the PolymorphismRegistry through getPolymorphismConfig (docs/claude/DATABASE.md § Registries; docs/claude/HOOKS.md § False Polymorphism) |
+| which models have a branded id type; list the models with typed ids | **ModelIdType** · primitive `packages/db/src/typedModelIds.ts#ModelIdType` — enumerate model names that have branded id types | — | — |
+| declare which kinds a model can point at; register a model's polymorphic axes; a third hand-rolled owner-column map; where the polymorphic shape is declared once; register the new model so the hook enforces its target kinds; one map of model to column for each discriminator | **PolymorphismRegistry** · primitive `packages/db/src/registries/falsePolymorphism.ts#PolymorphismRegistry` — Single source for polymorphic shape; read it via getPolymorphismConfig rather than importing the raw object. | docs/claude/DATABASE.md § Registries; FEATURES.md § Database & ORM | — |
+| turn a polymorphic ref into the actual target id; given kind and id, which row does it point at; resolve the reference to its target; pull the right FK out of the row based on its type | **resolveFalsePolymorphismRef** · primitive `packages/db/src/registries/falsePolymorphism.ts#resolveFalsePolymorphismRef` — Guard with isFalsePolymorphismRef first; for raw config lookup use getPolymorphismConfig. | — | — |
+| a model owned by either a user or an org; point at one of several entity types safely; polymorphic owner that still has real foreign keys; the subject can be any of several models | **False polymorphism** · pattern docs/claude/HOOKS.md > False Polymorphism — instead of a single polymorphic ownerId without FK constraints | part 4 | — |
+| defaults that must never change after deploy; seeded resources nobody can edit; lock the built-in defaults from editing | **Immutable seed-only defaults** · pattern docs/claude/DATABASE.md § False Polymorphism › Special Owner Values (No FK) — Resources that must never change after deployment; otherwise allow super admins to edit defaults. | code `User`, `Organization` | — |
+| which template wins: the org's override or the default; resolve a tenant-customizable resource, org first then default; fall back to the default when the org has no override | **Owner resolution priority** · pattern docs/claude/DATABASE.md § False Polymorphism › Special Owner Values (No FK) — Resolving tenant-customizable resources such as email templates. | code `User`, `Organization` | — |
+| a default owner that isn't a real row; a seeded base readable by everyone, writable by super admins; an admin-only owner value; owner values that have no foreign key | **Special owner values without FK** · pattern docs/claude/DATABASE.md § False Polymorphism › Special Owner Values (No FK) — default: seeded base readable by all, super-admin writes; admin: super-admin only; Organization: tenant overrides by org admins. | code `User`, `Organization` | — |
+| take a user id, not a plain string; stop mixing up user ids and org ids; branded id type for function signatures; I'll make my own branded type for this id; function argument typed as a plain string id | **Typed model IDs** · pattern packages/db/src/typedModelIds.ts — Function signatures taking model IDs; use typed ID instead of plain string. | part 4 | function signatures taking `id: string` for model IDs, or ad-hoc branded types, instead of `UserId` / `OrganizationId` from typedModelIds.ts (docs/claude/DATABASE.md § Typed Model IDs) |
+| constraints and hooks read the FK map from one place; hand-declare the FK map in the hook; the registry that validation and immutable fields consult | **FalsePolymorphismRegistry** · primitive packages/db/src/registries/ — Constraints, validation hooks and immutable fields read this rather than hand-declaring FK maps. | part 4 | — |
+| skip the webhook for a record that keeps failing; mark a record as poisoned for this integration; stop delivering for this one record | **integrationRecord.poisonedAt** · primitive packages/db/prisma/schema/integrationRecord.prisma — make sendWebhook skip a record poisoned in its integration | part 4 | — |
+| construct a typed user id from a string; wrap the raw id in its branded type; a constructor per model for typed ids; brand the id before passing it along | **userId** · primitive packages/db/src/typedModelIds.ts — One constructor per model (organizationId, sessionId, spaceId, inquiryId, etc.); pick the matching model. | part 4 | — |
+| every model gets created and updated timestamps; add timestamps to the new model | **createdAt/updatedAt timestamps** · rule docs/claude/DATABASE.md > Schema Conventions > DateTime Fields — Every model with timestamps. | part 4 | — |
+| an owner type string plus an owner id; entity type and entity id pair with runtime lookups; discriminator enum plus one nullable FK per kind | **False polymorphism over type+id** · rule docs/claude/DATABASE.md § False Polymorphism — Any model owned by or pointing at one of several entity types. | code `User`, `Organization` | an `ownerType` / `ownerId` (or `entityType` + `entityId`) string pair with runtime lookups, instead of a discriminator enum plus one typed nullable FK per kind (docs/claude/DATABASE.md § False Polymorphism; docs/claude/ARCHITECTURE.md § Why False Polymorphism?) |
+| how to declare a foreign key column; FK column type in the schema | **FK fields VarChar(36)** · rule docs/claude/DATABASE.md > Schema Conventions > Foreign Keys — Every foreign key field in the Prisma schema. | part 4 | FK columns declared as plain `String` without `@db.VarChar(36)` (docs/claude/DATABASE.md § Schema Conventions › Foreign Keys) |
+| where do I check what fields a model has; the docs say one thing, the schema another; document the model from the schema not from memory | **Schema files are source of truth** · rule packages/db/prisma/schema/ — Documenting or changing models, fields, relations or enums. | part 4 | — |
+| add this customer to the segment directly; write a segment member row by hand; membership comes from reconcile, not manual inserts | **Segment members written only by reconcile** · rule packages/db/prisma/schema/segmentMember.prisma — Any change to segment membership. | part 4 | any SegmentMember write outside applyMembershipDiff / the reconcile jobs (docs/claude/SEGMENTS.md § Static and dynamic membership; catalog entry on segmentMember.prisma) |
+| just add a field to this table; store the URL on the existing model; merge these two things into one table; split it into its own model because it lives differently | **Separate concerns by lifecycle and ownership** · rule CLAUDE.md §0.2 Decomposition by Default — When tempted to 'just add a field', store a URL, or merge into one table. | part 4 | — |
+| what id type for the new model; use a random uuid for the primary key; ids that sort by creation time | **UUID v7 IDs** · rule FEATURES.md > Database & ORM — Every model primary key. | part 4 | — |
+| generate the id in code with a random UUID; autoincrement id for the new table; time-ordered ids for the primary key; the default id generator for a model | **UUIDv7 primary keys** · rule docs/claude/DATABASE.md > Schema Conventions > ID Fields (UUIDv7) — Every Prisma model's primary key. | part 4 | `@default(uuid())` / `cuid()` / autoincrement ids or `crypto.randomUUID()`, instead of `@default(dbgenerated("uuidv7()")) @db.VarChar(36)` (and `uuidv7()` in code) (docs/claude/DATABASE.md § Schema Conventions › ID Fields (UUIDv7)) |
+
 - *Also here, by name:* TagResource (`packages/db/prisma/schema/tagAttachment.prisma`); accountId (`packages/db/src/typedModelIds.ts`); appEventId (`packages/db/src/typedModelIds.ts`); auditLogId (`packages/db/src/typedModelIds.ts`); authProviderId (`packages/db/src/typedModelIds.ts`); contactId (`packages/db/src/typedModelIds.ts`); cronJobId (`packages/db/src/typedModelIds.ts`); customerRefId (`packages/db/src/typedModelIds.ts`); emailComponentId (`packages/db/src/typedModelIds.ts`); emailTemplateId (`packages/db/src/typedModelIds.ts`); inquiryId (`packages/db/src/typedModelIds.ts`); isFalsePolymorphismRef (`packages/db/src/registries/falsePolymorphism.ts`); organizationId (`packages/db/src/typedModelIds.ts`); organizationUserId (`packages/db/src/typedModelIds.ts`); sessionId (`packages/db/src/typedModelIds.ts`); spaceId (`packages/db/src/typedModelIds.ts`); spaceUserId (`packages/db/src/typedModelIds.ts`); tagAttachmentId (`packages/db/src/typedModelIds.ts`)
 
 ### Class `reference-data`: Static reference data: countries, currencies, languages, timezones + zod schemas
@@ -162,12 +128,6 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
-| **CountryCodeSchema** | a country field in a zod request schema | narrowing a plain string outside zod (use isCountryCode) |
-| **isCountryCode** | runtime narrowing outside zod | inside zod schemas (use CountryCodeSchema) |
-| **COUNTRY_CODES** | the readonly list of codes | validating input (use CountryCodeSchema) |
-| **countryByCode** | the whole country record | one field (use countryNameFor or callingCodeFor) |
-| **countryNameFor** | display name only | calling code (use callingCodeFor) |
-| **callingCodeFor** | phone calling code only | name or full record (use countryNameFor / countryByCode) |
 
 **Job: validate or look up a currency, language or timezone** (Currency, language and timezone: schema vs guard vs list vs lookup) — packages/shared/src/reference/*.ts (catalog)
 
@@ -175,57 +135,30 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
-| **CurrencyCodeSchema** | a currency field in a zod schema | narrowing outside zod (use isCurrencyCode) |
-| **currencyByCode** | one currency's record | iterating all (use CURRENCIES) |
-| **decimalsFor** | minor-unit decimals for a currency | the display symbol (use symbolFor) |
-| **LanguageCodeSchema** | a language field in a zod schema | a plain runtime guard (use isLanguageCode) |
-| **TimezoneIdSchema** | validating a timezone input | the raw list for pickers (use TIMEZONE_IDS) |
 
-- **callingCodeFor** · primitive `packages/shared/src/reference/countries.ts#callingCodeFor`: Need name or whole record: countryNameFor or countryByCode instead.
-  - *Said as:* "the phone prefix for a country", "dial code for this country code", "country calling code only"
-- **COUNTRIES** · primitive `packages/shared/src/reference/countries.ts#COUNTRIES`: list countries with ISO code, name and phone calling code
-  - *Said as:* "the full list of countries with names and codes", "iterate every country for a picker", "the country table itself", "a countries array with name and dial code"
-- **COUNTRY_CODES** · primitive `packages/shared/src/reference/countries.ts#COUNTRY_CODES`: Validating input: CountryCodeSchema or isCountryCode instead; full country records: countryByCode.
-  - *Said as:* "just the list of two-letter country codes", "the readonly array of ISO country codes", "enumerate valid country codes", "all country codes for a dropdown of codes"
-- **countryByCode** · primitive `packages/shared/src/reference/countries.ts#countryByCode`: Single field: callingCodeFor or countryNameFor; membership check: isCountryCode.
-  - *Said as:* "the whole country record for a code", "look up a country by its code", "give me name and calling code together"
-- **CountryCodeSchema** · primitive `packages/shared/src/reference/countries.ts#CountryCodeSchema`: Runtime narrowing of a plain string outside zod: isCountryCode instead.
-  - *Said as:* "validate the country field in the request", "a zod field for country", "regex for a two-letter country code", "hand-write a country list in the schema", "country must be a valid ISO code"
-  - *Signs you're bypassing it:* a hand-written country list, `z.string().length(2)` or regex for country codes in request schemas (catalog CountryCodeSchema (packages/shared/src/reference/countries.ts))
-- **countryNameFor** · primitive `packages/shared/src/reference/countries.ts#countryNameFor`: Calling code: callingCodeFor; whole record: countryByCode.
-  - *Said as:* "display name for a country code", "show the country name not the code", "country code to human-readable name"
-- **CURRENCIES** · primitive `packages/shared/src/reference/currencies.ts#CURRENCIES`: Lookup by code: currencyByCode; codes only: CURRENCY_CODES.
-  - *Said as:* "the full list of currencies", "iterate every currency", "a currencies table with symbols and decimals"
-- **CURRENCY_CODES** · primitive `packages/shared/src/reference/currencies.ts#CURRENCY_CODES`: Validating input: CurrencyCodeSchema; full records: currencyByCode.
-  - *Said as:* "just the three-letter currency codes", "the array of ISO currency codes", "valid currency codes for a dropdown"
-- **currencyByCode** · primitive `packages/shared/src/reference/currencies.ts#currencyByCode`: Iterating all currencies: CURRENCIES instead.
-  - *Said as:* "the whole currency record for a code", "look up one currency by its code", "symbol and decimals together for a currency"
-- **CurrencyCodeSchema** · primitive `packages/shared/src/reference/currencies.ts#CurrencyCodeSchema`: validate a currency code field in zod request schemas
-  - *Said as:* "validate a currency field in the request", "a zod field for currency codes", "three-letter string check for currency", "hand-write a currency array in the schema"
-  - *Signs you're bypassing it:* a hand-written currency array or `z.string().length(3)` for currency codes (catalog CurrencyCodeSchema (packages/shared/src/reference/currencies.ts))
-- **decimalsFor** · primitive `packages/shared/src/reference/currencies.ts#decimalsFor`: get the number of minor-unit decimals for a currency code
-  - *Said as:* "how many decimal places does this currency use", "minor units for a currency, yen has none", "divide by 100 for every currency", "a local table of currency decimals"
-  - *Signs you're bypassing it:* a local `{ USD: 2, JPY: 0 }` minor-unit table or hard-coded `/ 100` for every currency (catalog decimalsFor)
-- **isCountryCode** · primitive `packages/shared/src/reference/countries.ts#isCountryCode`: Inside zod request schemas: CountryCodeSchema instead.
-  - *Said as:* "narrow a plain string to a country code", "runtime check that a string is a valid country", "type guard for country codes outside zod"
-- **isCurrencyCode** · primitive `packages/shared/src/reference/currencies.ts#isCurrencyCode`: narrow an arbitrary string to a known CurrencyCode
-  - *Said as:* "narrow a string to a known currency code", "runtime check for a valid currency", "type guard for currency outside zod"
-- **isLanguageCode** · primitive `packages/shared/src/reference/languages.ts#isLanguageCode`: Inside request schemas: LanguageCodeSchema instead.
-  - *Said as:* "narrow a string to a known language code", "runtime check for a valid language", "type guard for language outside zod"
-- **languageByCode** · primitive `packages/shared/src/reference/languages.ts#languageByCode`: Iterating all languages: LANGUAGES instead.
-  - *Said as:* "look up one language by its code", "the language record for a code", "name of a language from its code"
-- **LanguageCodeSchema** · primitive `packages/shared/src/reference/languages.ts#LanguageCodeSchema`: Plain runtime type guard without zod: isLanguageCode instead.
-  - *Said as:* "validate a language field in the request", "a zod field for language codes", "regex for a two-letter language code", "hand-write the ISO language list"
-  - *Signs you're bypassing it:* a hand-written ISO 639-1 list or regex for language codes (catalog LanguageCodeSchema)
-- **LANGUAGES** · primitive `packages/shared/src/reference/languages.ts#LANGUAGES`: Lookup one code: languageByCode instead; codes only: LANGUAGE_CODES.
-  - *Said as:* "the full list of languages", "iterate every language for a picker", "the languages table itself"
-- **symbolFor** · primitive `packages/shared/src/reference/currencies.ts#symbolFor`: get the display symbol for a currency code
-  - *Said as:* "the display symbol for a currency", "currency code to its symbol", "show the currency symbol in the UI"
-- **TIMEZONE_IDS** · primitive `packages/shared/src/reference/timezones.ts#TIMEZONE_IDS`: Validating input: TimezoneIdSchema instead.
-  - *Said as:* "the raw list of timezones for a picker", "every IANA timezone id", "iterate all timezone names"
-- **TimezoneIdSchema** · primitive `packages/shared/src/reference/timezones.ts#TimezoneIdSchema`: Need the raw list for pickers: TIMEZONE_IDS instead.
-  - *Said as:* "validate a timezone field in the request", "a zod field for timezone", "check the timezone against the runtime's supported list inline", "plain string for the timezone field"
-  - *Signs you're bypassing it:* `z.string()` for a timezone field, or `Intl.supportedValuesOf('timeZone')` validation written inline (catalog TimezoneIdSchema (packages/shared/src/reference/timezones.ts))
+| Problem | Use | Read | Signs you're bypassing it |
+|---|---|---|---|
+| the phone prefix for a country; dial code for this country code; country calling code only | **callingCodeFor** · primitive `packages/shared/src/reference/countries.ts#callingCodeFor` — Need name or whole record: countryNameFor or countryByCode instead. | — | — |
+| the full list of countries with names and codes; iterate every country for a picker; the country table itself; a countries array with name and dial code | **COUNTRIES** · primitive `packages/shared/src/reference/countries.ts#COUNTRIES` — list countries with ISO code, name and phone calling code | — | — |
+| just the list of two-letter country codes; the readonly array of ISO country codes; enumerate valid country codes; all country codes for a dropdown of codes | **COUNTRY_CODES** · primitive `packages/shared/src/reference/countries.ts#COUNTRY_CODES` — Validating input: CountryCodeSchema or isCountryCode instead; full country records: countryByCode. | — | — |
+| the whole country record for a code; look up a country by its code; give me name and calling code together | **countryByCode** · primitive `packages/shared/src/reference/countries.ts#countryByCode` — Single field: callingCodeFor or countryNameFor; membership check: isCountryCode. | — | — |
+| validate the country field in the request; a zod field for country; regex for a two-letter country code; hand-write a country list in the schema; country must be a valid ISO code | **CountryCodeSchema** · primitive `packages/shared/src/reference/countries.ts#CountryCodeSchema` — Runtime narrowing of a plain string outside zod: isCountryCode instead. | — | a hand-written country list, `z.string().length(2)` or regex for country codes in request schemas (catalog CountryCodeSchema (packages/shared/src/reference/countries.ts)) |
+| display name for a country code; show the country name not the code; country code to human-readable name | **countryNameFor** · primitive `packages/shared/src/reference/countries.ts#countryNameFor` — Calling code: callingCodeFor; whole record: countryByCode. | — | — |
+| the full list of currencies; iterate every currency; a currencies table with symbols and decimals | **CURRENCIES** · primitive `packages/shared/src/reference/currencies.ts#CURRENCIES` — Lookup by code: currencyByCode; codes only: CURRENCY_CODES. | — | — |
+| just the three-letter currency codes; the array of ISO currency codes; valid currency codes for a dropdown | **CURRENCY_CODES** · primitive `packages/shared/src/reference/currencies.ts#CURRENCY_CODES` — Validating input: CurrencyCodeSchema; full records: currencyByCode. | — | — |
+| the whole currency record for a code; look up one currency by its code; symbol and decimals together for a currency | **currencyByCode** · primitive `packages/shared/src/reference/currencies.ts#currencyByCode` — Iterating all currencies: CURRENCIES instead. | — | — |
+| validate a currency field in the request; a zod field for currency codes; three-letter string check for currency; hand-write a currency array in the schema | **CurrencyCodeSchema** · primitive `packages/shared/src/reference/currencies.ts#CurrencyCodeSchema` — validate a currency code field in zod request schemas | — | a hand-written currency array or `z.string().length(3)` for currency codes (catalog CurrencyCodeSchema (packages/shared/src/reference/currencies.ts)) |
+| how many decimal places does this currency use; minor units for a currency, yen has none; divide by 100 for every currency; a local table of currency decimals | **decimalsFor** · primitive `packages/shared/src/reference/currencies.ts#decimalsFor` — get the number of minor-unit decimals for a currency code | — | a local `{ USD: 2, JPY: 0 }` minor-unit table or hard-coded `/ 100` for every currency (catalog decimalsFor) |
+| narrow a plain string to a country code; runtime check that a string is a valid country; type guard for country codes outside zod | **isCountryCode** · primitive `packages/shared/src/reference/countries.ts#isCountryCode` — Inside zod request schemas: CountryCodeSchema instead. | — | — |
+| narrow a string to a known currency code; runtime check for a valid currency; type guard for currency outside zod | **isCurrencyCode** · primitive `packages/shared/src/reference/currencies.ts#isCurrencyCode` — narrow an arbitrary string to a known CurrencyCode | — | — |
+| narrow a string to a known language code; runtime check for a valid language; type guard for language outside zod | **isLanguageCode** · primitive `packages/shared/src/reference/languages.ts#isLanguageCode` — Inside request schemas: LanguageCodeSchema instead. | — | — |
+| look up one language by its code; the language record for a code; name of a language from its code | **languageByCode** · primitive `packages/shared/src/reference/languages.ts#languageByCode` — Iterating all languages: LANGUAGES instead. | — | — |
+| validate a language field in the request; a zod field for language codes; regex for a two-letter language code; hand-write the ISO language list | **LanguageCodeSchema** · primitive `packages/shared/src/reference/languages.ts#LanguageCodeSchema` — Plain runtime type guard without zod: isLanguageCode instead. | — | a hand-written ISO 639-1 list or regex for language codes (catalog LanguageCodeSchema) |
+| the full list of languages; iterate every language for a picker; the languages table itself | **LANGUAGES** · primitive `packages/shared/src/reference/languages.ts#LANGUAGES` — Lookup one code: languageByCode instead; codes only: LANGUAGE_CODES. | — | — |
+| the display symbol for a currency; currency code to its symbol; show the currency symbol in the UI | **symbolFor** · primitive `packages/shared/src/reference/currencies.ts#symbolFor` — get the display symbol for a currency code | — | — |
+| the raw list of timezones for a picker; every IANA timezone id; iterate all timezone names | **TIMEZONE_IDS** · primitive `packages/shared/src/reference/timezones.ts#TIMEZONE_IDS` — Validating input: TimezoneIdSchema instead. | — | — |
+| validate a timezone field in the request; a zod field for timezone; check the timezone against the runtime's supported list inline; plain string for the timezone field | **TimezoneIdSchema** · primitive `packages/shared/src/reference/timezones.ts#TimezoneIdSchema` — Need the raw list for pickers: TIMEZONE_IDS instead. | — | `z.string()` for a timezone field, or `Intl.supportedValuesOf('timeZone')` validation written inline (catalog TimezoneIdSchema (packages/shared/src/reference/timezones.ts)) |
+
 - *Also here, by name:* LANGUAGE_CODES (`packages/shared/src/reference/languages.ts`); currentOffsetMinutes (`packages/shared/src/reference/timezones.ts`); isTimezoneId (`packages/shared/src/reference/timezones.ts`); timezoneIdSet (`packages/shared/src/reference/timezones.ts`)
 
 ## 4. The specifics, in full

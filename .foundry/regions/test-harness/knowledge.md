@@ -9,6 +9,7 @@
 - [Glossary](#glossary)
 - [1. What this Warden covers](#1-what-this-warden-covers)
 - [2. The domain](#2-the-domain)
+- [2b. Under construction](#2b-under-construction)
 - [3. Everything that exists here, by class](#3-everything-that-exists-here-by-class)
   - [Class `test-harness`](#class-test-harness-test-structure-running-tests-createtestapp-request-helpers-frontend-tests)
   - [Class `vcr`](#class-vcr-vcr-recordreplay-of-external-provider-calls)
@@ -92,9 +93,15 @@ External services are never called: a provider client wraps each call in `VCR` f
 
 Not here: `buildX` / `createX` factories, `createFactory`, `getNextSeq`, `cleanupTouchedTables` and the test CI rules (no-module-mocks, no-jest, spy-must-restore …) are `test-factories-rules`; `createLock` and job primitives under test are `concurrency-locks` and `jobs-cron`.
 
+## 2b. Under construction
+
+Open work you cannot use yet. Do not build against it, and do not build what it would replace without saying so.
+
+- End-to-end tests: no Playwright/Cypress suite is configured — FEATURES.md (🟣 End-to-End Tests); ticket TEST-001 (not started)
+
 ## 3. Everything that exists here, by class
 
-Point at a class when that is as specific as the moment allows, or at a member. Where a class has siblings an agent could confuse, a table under the class header says which to use when; its *Said as* line gives the plain words a user or agent uses for that job. Each member: **name** · kind `where` · the doc § that describes it (code members) or the code it is about (doc members): choose this when … . Quote the name and the where in a pointer ("look over here: createLock, packages/db/src/lock/createLock.ts, CONCURRENCY.md § Distributed Lock"). *Said as:* the ways a user or agent describes this job in a message or plan without knowing the name; match on these. *Signs you're bypassing it:* the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
+Find the problem in plain words, then point at the exact thing. Each class opens with job tables where a class has confusable siblings (which to use when; *Said as* gives the plain words for that job), then one table of every member: **Problem** is the job in the user's or agent's words (match on these); **Use** is the exact member, its kind and `where`, then when to choose it; **Read** is the doc § that describes it (code members) or the code it is about (doc members); **Signs you're bypassing it** is the hand-rolled code an agent writes when it rebuilds the primitive, plus the errors it throws. Quote Use and Read in a pointer ("look over here: createLock, packages/db/src/lock/createLock.ts, CONCURRENCY.md § Distributed Lock"). Code members come from the catalog, described from the code; doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
 
 ### Class `test-harness`: Test structure: running tests, createTestApp, request helpers, frontend tests
 
@@ -104,9 +111,6 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
-| **createTestApp** | route/HTTP tests | WebSocket handlers (createTestSocket); job handlers (createTestWorker) |
-| **createTestSocket** | WebSocket handler tests | HTTP route tests (use createTestApp) |
-| **createTestWorker** | background job handler tests | HTTP route tests (use createTestApp) |
 
 **Job: override env vars in a test** (setEnvOverride vs withEnv) — catalog setEnvOverride, withEnv; CI rule no-test-env-mutation
 
@@ -114,8 +118,6 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
-| **setEnvOverride** | overrides spanning several steps, cleared by resetEnvOverrides | one scoped override (use withEnv) |
-| **withEnv** | a scoped override within one test | overrides spanning several steps (use setEnvOverride) |
 
 **Job: run tests** (Test commands) — package.json scripts; docs/claude/TESTING.md
 
@@ -123,103 +125,49 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
-| **bun run test** | whole-repo tests | one package (bun run --cwd <pkg> test) |
-| **bun run test:fe** | frontend and UI tests | init scripts (use bun run test:init) |
-| **bun run test:init** | init/ scripts only | frontend tests (use bun run test:fe) |
-| **bun test** | a specific path from apps/api; injects .env.test | whole-repo runs (use bun run test) |
 
-- **cleanupTestJobs** · primitive `apps/api/src/jobs/cleanupTestJobs.ts#cleanupTestJobs`: remove leftover jobs in every state from the queue after tests
-  - *Said as:* "clear leftover jobs from the queue after the tests", "the queue still has jobs from the last run", "I'll obliterate the queue in afterAll"
-- **createBearerToken** · primitive `apps/api/tests/utils/createBearerToken.ts#createBearerToken`: mint a real bearer token for a test user to authenticate requests
-  - *Said as:* "authenticate a test request with a real token", "I'll insert a token row and sign the header myself", "get an Authorization header for this test user"
-  - *Signs you're bypassing it:* hand-inserting a session or token row and signing an Authorization header in a test (catalog entry createBearerToken)
-- **createRequest** · primitive `apps/api/tests/utils/request.ts#createRequest`: Plain DELETE: del shorthand instead.
-  - *Said as:* "build a request with a custom method or headers", "a plain delete without a body", "the low-level request builder behind the shorthand helpers"
-- **createTestApp** · primitive `apps/api/tests/createTestApp.ts#createTestApp` · in docs: docs/claude/TESTING.md § Test Structure; docs/claude/TESTING.md § Test App: Route/HTTP tests: createTestApp; WebSocket handler tests: createTestSocket instead.
-  - *Said as:* "spin up the API in a test and hit a route", "test this endpoint as a logged-in org admin", "I'll build a Hono app by hand and stub the auth middleware", "start a real server in the test and call it with fetch", "run the test under the standard harness, not against the bare database", "mount the module and make requests as a mock user"
-  - *Signs you're bypassing it:* constructing a Hono/OpenAPIHono app by hand in a test, stubbing auth middleware, or starting a real server and calling it with fetch (docs/claude/TESTING.md § Test App; § Test Structure)
-- **createTestApp** · primitive `apps/api/tests/index.ts#createTestApp` · in docs: docs/claude/TESTING.md § Test Structure; docs/claude/TESTING.md § Test App: Testing a background job handler: createTestWorker instead.
-  - *Said as:* "spin up the API in a test and hit a route", "test this endpoint as a logged-in org admin", "I'll build a Hono app by hand and stub the auth middleware", "start a real server in the test and call it with fetch", "run the test under the standard harness, not against the bare database", "mount the module and make requests as a mock user"
-  - *Signs you're bypassing it:* constructing a Hono/OpenAPIHono app by hand in a test, stubbing auth middleware, or starting a real server and calling it with fetch (docs/claude/TESTING.md § Test App; § Test Structure)
-- **createTestSocket** · primitive `apps/api/tests/createTestSocket.ts#createTestSocket`: Socket handler tests: createTestSocket; HTTP route tests: createTestApp instead.
-  - *Said as:* "test the websocket handler", "open a fake socket connection in a test and send frames", "check what a subscriber receives when the event fires", "I'll connect a real WebSocket client to a test server"
-- **createTestStore** · primitive `packages/ui/src/test/testStore.ts#createTestStore`: Use when a test needs custom initial state or isolation; testStore is the shared default instance.
-  - *Said as:* "a fresh store for this UI test with custom initial state", "I'll make a Zustand store inline in the test", "isolate store state between frontend tests", "the shared test store is leaking state between tests"
-  - *Signs you're bypassing it:* a test-local Zustand store or QueryClient with retries left on, or mutating the shared store between tests (catalog entry createTestStore)
-- **createTestWorker** · primitive `apps/api/tests/createTestWorker.ts#createTestWorker`: Only need a Job object: createMockJob. Testing HTTP routes: createTestApp instead.
-  - *Said as:* "run a job handler in a test", "is there a test helper for jobs like the one for the app", "get some basic tests on this job", "I'll build a fake Job object and call the handler directly", "exercise the background job end to end in a test"
-  - *Signs you're bypassing it:* a hand-built fake Job object and worker context to call a job handler directly (catalog entry createTestWorker)
-- **expectStreamAudience** · primitive `apps/api/tests/expectStreamAudience.ts#expectStreamAudience` · in docs: docs/claude/WEBSOCKETS.md § Data streams › Audience: assert which callers can and cannot receive a WebSocket stream
-  - *Said as:* "assert who can and cannot receive this stream", "prove the shared stream gives every caller the same rows", "add the audience fixture for the new stream"
-- **flushRedis** · primitive `packages/db/src/redis/client.ts#flushRedis` · in docs: docs/claude/REDIS.md § Testing: wipe all Redis data between tests; throws outside test env
-  - *Said as:* "wipe Redis between tests", "clear all cached keys before the next test", "I'll delete the keys I know about one by one"
-  - *Throws:* flushRedis outside test Error (`off-request-path`)
-- **json** · primitive `apps/api/tests/utils/request.ts#json` · in docs: @inixiative/config/README.md § versions.json (the BOM); docs/claude/TESTING.md § Request Helpers: Successful responses; jsonError for error-shaped bodies.
-  - *Said as:* "parse the successful response body and fail loudly if not ok", "read the data out of a 2xx response in a test", "I'll await res.json and unwrap the envelope myself"
-- **post** · primitive `apps/api/tests/utils/request.ts#post` · in docs: docs/claude/TESTING.md § Request Helpers; @inixiative/json-rules/docs/LENS.md § 13. End-to-end worked example: Create/action endpoints in tests; patch for updates, get for reads.
-  - *Said as:* "send a create request in a test", "hit the action endpoint with a body", "I'll build a new Request with method POST and JSON body"
-- **server** · primitive `packages/ui/src/test/mocks/server.ts#server` · in docs: docs/claude/WEBSOCKETS.md § Connection and recovery; docs/claude/API_ROUTES.md § Response Format › Route declaration (lens narrowing): Override responses per test with server.use rather than editing the shared handlers.
-  - *Said as:* "override the mocked API response for this one UI test", "I'll stub globalThis.fetch in the component test", "the shared request interceptor for frontend tests", "edit the handlers so this test gets a different response"
-  - *Signs you're bypassing it:* stubbing globalThis.fetch in UI tests or editing the shared MSW handlers for one test instead of server.use (catalog entry server)
-- **setEnvOverride** · primitive `packages/shared/src/utils/envOverrides.ts#setEnvOverride` · in docs: docs/claude/JOBS.md § Overflow Buffer: Persistent overrides across a test, cleared by resetEnvOverrides; for scoped overrides use withEnv.
-  - *Said as:* "change an env var for the rest of this test file", "stop writing process.env directly in the tests", "I'll save the env value, set it, and restore it in afterAll", "override config across several steps and reset afterwards"
-  - *Signs you're bypassing it:* saving and restoring process.env values by hand around a test (catalog entry setEnvOverride; no-test-env-mutation)
-- **withEnv** · primitive `packages/shared/src/utils/envOverrides.ts#withEnv`: Use for scoped overrides within one test; setEnvOverride plus resetEnvOverrides for overrides spanning several steps.
-  - *Said as:* "run just this block with a different env value", "temporarily set an env var for one call", "I'll set process.env before the call and unset it after", "scoped override that cleans itself up"
-- **bun run test** · script `package.json` · in docs: docs/claude/TESTING.md § Running Tests; docs/claude/TESTING.md § Frontend Testing (happy-dom): Whole-repo tests; run a single package's test via bun run --cwd <pkg> test.
-  - *Said as:* "run the whole test suite", "run all tests across the repo", "I'll cd into each package and run its tests", "the full test run before merging"
-- **bun run test:fe** · script `package.json`: Frontend and UI tests; init scripts: test:init instead.
-  - *Said as:* "run the frontend tests", "run the UI component and hook tests", "the DOM tests need the happy-dom preload", "test the React packages and apps"
-- **bun run test:init** · script `package.json`: Only for init/ scripts; frontend tests: test:fe instead.
-  - *Said as:* "test the setup scripts", "run the tests for the provisioning TUI", "the init folder has its own test command", "check the provisioning code without the app suite"
-- **New CI rules need fixtures** · pattern scripts/ci/rules, scripts/ci/rule-violations: add CI rules as scripts with pass/fail fixtures verified by --test
-  - *Said as:* "add pass and fail examples for the new CI rule", "a rule script with no self-test cases", "prove the lint rule catches the bad case and passes the good one"
-  - *Signs you're bypassing it:* a new rule script under scripts/ci/rules with no pass/fail cases in scripts/ci/rule-violations (FEATURES.md § Custom CI Rules (--test runs rule self-tests against fixtures))
-- **Run tests per package** · pattern docs/claude/TESTING.md § Running Tests · code: `registerTestTracker`, `cleanupTouchedTables`: Root `bun test` for everything; --cwd form for a single package.
-  - *Said as:* "run only this package's tests", "test one workspace without the whole repo", "I'll cd into the package first"
-- **__serialize** · primitive FEATURES.md > Testing & Quality: convert factory entities to API/UI shape with ISO date strings for assertions
-  - *Said as:* "turn the entity's dates into ISO strings for the assertion", "the API returns strings, the factory returns Dates", "compare the factory entity to the response body", "I'll JSON.parse JSON.stringify the entity"
-- **bun test** · primitive docs Testing: from apps/api it injects .env.test via with-env.sh; pass path for specific tests
-  - *Said as:* "run just this one test file", "run a single test path with the test env loaded", "I'll export the env vars and then run the file", "focus on one failing test"
-- **check-generated-files.sh** · primitive FEATURES.md > Custom Lint Checks: fail lint when Prisma or OpenAPI SDK outputs are stale
-  - *Said as:* "lint fails because the generated client is stale", "make sure the SDK and Prisma output were regenerated"
-  - *Signs you're bypassing it:* committing a schema or route change without regenerating, or hand-editing the Prisma client or OpenAPI SDK (scripts/lint/check-generated-files.sh; FEATURES.md › Custom Lint Checks)
-- **clearReceivedWebhooks** · primitive FEATURES.md > Testing & Quality: reset captured test webhook payloads between tests
-  - *Said as:* "reset captured webhook deliveries between tests", "clear the test webhook inbox"
-- **create*() / build*() factories** · primitive FEATURES.md > Testing & Quality: create* when the DB row is needed; build* for in-memory data only.
-  - *Said as:* "generate realistic test data with sensible defaults", "persist when needed, in-memory otherwise", "override only the fields the test cares about", "why aren't you using the factories"
-- **createUser** · primitive @template/db/test: Seeding test data in tests; prefer factories over raw Prisma inserts.
-  - *Said as:* "make a user for this test", "seed a test user with defaults", "I'll insert the user with a raw prisma create in the test"
-- **readRoute / createRoute / updateRoute** · primitive FEATURES.md > Route Templates: Standard CRUD endpoints; hand-defined route only for custom actions.
-  - *Said as:* "standard CRUD endpoints from the templates", "hand-defined routes only for custom actions"
-- **receivedWebhooks** · primitive FEATURES.md > Testing & Quality (POST /test/webhook): capture webhook deliveries in tests to assert payload, headers and signatures
-  - *Said as:* "assert the webhook payload, headers and signature that were delivered", "capture outbound webhooks in tests", "I'll spin up a local HTTP server to receive webhooks"
-- **run-ci-rules.sh** · primitive scripts/ci/run-ci-rules.sh: execute CI rule scripts alphabetically, or self-test them against fixtures
-  - *Said as:* "run all the CI rule scripts", "self-test the rules against their fixtures"
-  - *Signs you're bypassing it:* a new rule script under scripts/ci/rules with no pass/fail cases in scripts/ci/rule-violations, or a fixture edited so a failing rule passes (docs/claude/SCRIPTS.md § CI Rule Scripts; AI/ENTRYPOINT.md § 0.0 Critical Guardrails)
-- **turbo watch local** · primitive FEATURES.md > Development Workflow: hot-reload all apps and their workspace dependencies with task caching
-  - *Said as:* "hot reload all apps while developing", "rebuild dependents automatically when a shared package changes"
-- **DB-backed tests run serially** · rule docs/claude/TESTING.md § Running Tests › Concurrency · code: `registerTestTracker`, `cleanupTouchedTables`: Any package whose tests hit the database, including newly added packages.
-  - *Said as:* "tests truncating each other's tables, flaky", "the new package's DB tests need max concurrency one", "I'll run the files in parallel for speed"
-  - *Signs you're bypassing it:* a new package test script hitting the DB without --max-concurrency=1, producing flaky cross-file truncation (docs/claude/TESTING.md § Concurrency)
-- **Never hand-write validation schemas** · rule FEATURES.md > Prisma + Zod Generation: Any request input or model response schema.
-  - *Said as:* "why write a manual schema when the generated one exists", "use the generated zod schema for the model"
-- **No Jest or Vitest** · rule scripts/ci/rules/no-jest.sh, no-vitest.sh: All test files and package dependencies.
-  - *Said as:* "I'll add vitest for the frontend tests", "use the built-in test runner, nothing else", "jest.fn or vi.mock in a test file"
-  - *Signs you're bypassing it:* importing from jest, vitest or @jest/globals, jest.fn(), vi.mock(), or adding them as dependencies (scripts/ci/rules/no-jest.sh, no-vitest.sh (CI rules))
-- **Path aliases over relative imports** · rule FEATURES.md > Development Workflow: All imports in every package; enforced by check-import-aliases.sh.
-  - *Said as:* "no relative imports, use the alias", "dot-dot imports across folders"
-- **Run frontend UI tests** · rule docs/claude/FRONTEND/API_CLIENT.md § Testing · code: `makeDataConfig`, `useDataFilters`, `usePaginatedData`, `useInfiniteDataQuery`: Running frontend/UI hook and component tests.
-  - *Said as:* "how do I test these hooks on the frontend", "can we do tests for this stuff on the frontend", "run the data hook and component tests"
-- **Strict TypeScript, no any** · rule FEATURES.md > Type Safety & Code Generation: All application code across packages.
-  - *Said as:* "no any, we have the model types", "cast through unknown to silence the compiler"
-  - *Signs you're bypassing it:* `: any`, `as any`, or `as unknown as T` to silence the compiler (FEATURES.md › Type Safety & Code Generation; CLAUDE.md §7)
-- **Test scripts compose env via with** · rule docs/claude/TESTING.md § Running Tests › Environment Composition · code: `registerTestTracker`, `cleanupTouchedTables`: When adding or editing a package test script, especially DB-backed ones.
-  - *Said as:* "the new package test script needs the test env loaded", "I'll hardcode env vars in the test script", "wrap the test command so it gets the right env file"
-- **Tests live in module tests/ folder** · rule docs/claude/TESTING.md § Test Structure · code: `createTestApp`: Module tests must live in a tests/ folder inside the module, one file per action.
-  - *Said as:* "where do the tests for this module go", "one test file per action, inside the module", "I'll put the tests in a top-level tests directory"
-- **UI tests use serialized factories** · rule scripts/ci/rules/ui-serialized-factories.sh: Frontend/UI tests using factory data.
-  - *Said as:* "the component test fails on Date versus string", "pass the API-shaped entity to the component", "cast the factory entity to any for the UI test"
+| Problem | Use | Read | Signs you're bypassing it |
+|---|---|---|---|
+| clear leftover jobs from the queue after the tests; the queue still has jobs from the last run; I'll obliterate the queue in afterAll | **cleanupTestJobs** · primitive `apps/api/src/jobs/cleanupTestJobs.ts#cleanupTestJobs` — remove leftover jobs in every state from the queue after tests | — | — |
+| authenticate a test request with a real token; I'll insert a token row and sign the header myself; get an Authorization header for this test user | **createBearerToken** · primitive `apps/api/tests/utils/createBearerToken.ts#createBearerToken` — mint a real bearer token for a test user to authenticate requests | — | hand-inserting a session or token row and signing an Authorization header in a test (catalog entry createBearerToken) |
+| build a request with a custom method or headers; a plain delete without a body; the low-level request builder behind the shorthand helpers | **createRequest** · primitive `apps/api/tests/utils/request.ts#createRequest` — Plain DELETE: del shorthand instead. | — | — |
+| spin up the API in a test and hit a route; test this endpoint as a logged-in org admin; I'll build a Hono app by hand and stub the auth middleware; start a real server in the test and call it with fetch; run the test under the standard harness, not against the bare database; mount the module and make requests as a mock user | **createTestApp** · primitive `apps/api/tests/createTestApp.ts#createTestApp` — Route/HTTP tests: createTestApp; WebSocket handler tests: createTestSocket instead. | docs/claude/TESTING.md § Test Structure; docs/claude/TESTING.md § Test App | constructing a Hono/OpenAPIHono app by hand in a test, stubbing auth middleware, or starting a real server and calling it with fetch (docs/claude/TESTING.md § Test App; § Test Structure) |
+| spin up the API in a test and hit a route; test this endpoint as a logged-in org admin; I'll build a Hono app by hand and stub the auth middleware; start a real server in the test and call it with fetch; run the test under the standard harness, not against the bare database; mount the module and make requests as a mock user | **createTestApp** · primitive `apps/api/tests/index.ts#createTestApp` — Testing a background job handler: createTestWorker instead. | docs/claude/TESTING.md § Test Structure; docs/claude/TESTING.md § Test App | constructing a Hono/OpenAPIHono app by hand in a test, stubbing auth middleware, or starting a real server and calling it with fetch (docs/claude/TESTING.md § Test App; § Test Structure) |
+| test the websocket handler; open a fake socket connection in a test and send frames; check what a subscriber receives when the event fires; I'll connect a real WebSocket client to a test server | **createTestSocket** · primitive `apps/api/tests/createTestSocket.ts#createTestSocket` — Socket handler tests: createTestSocket; HTTP route tests: createTestApp instead. | — | — |
+| a fresh store for this UI test with custom initial state; I'll make a Zustand store inline in the test; isolate store state between frontend tests; the shared test store is leaking state between tests | **createTestStore** · primitive `packages/ui/src/test/testStore.ts#createTestStore` — Use when a test needs custom initial state or isolation; testStore is the shared default instance. | — | a test-local Zustand store or QueryClient with retries left on, or mutating the shared store between tests (catalog entry createTestStore) |
+| run a job handler in a test; is there a test helper for jobs like the one for the app; get some basic tests on this job; I'll build a fake Job object and call the handler directly; exercise the background job end to end in a test | **createTestWorker** · primitive `apps/api/tests/createTestWorker.ts#createTestWorker` — Only need a Job object: createMockJob. Testing HTTP routes: createTestApp instead. | — | a hand-built fake Job object and worker context to call a job handler directly (catalog entry createTestWorker) |
+| assert who can and cannot receive this stream; prove the shared stream gives every caller the same rows; add the audience fixture for the new stream | **expectStreamAudience** · primitive `apps/api/tests/expectStreamAudience.ts#expectStreamAudience` — assert which callers can and cannot receive a WebSocket stream | docs/claude/WEBSOCKETS.md § Data streams › Audience | — |
+| wipe Redis between tests; clear all cached keys before the next test; I'll delete the keys I know about one by one | **flushRedis** · primitive `packages/db/src/redis/client.ts#flushRedis` — wipe all Redis data between tests; throws outside test env | docs/claude/REDIS.md § Testing | throws flushRedis outside test Error (`off-request-path`) |
+| parse the successful response body and fail loudly if not ok; read the data out of a 2xx response in a test; I'll await res.json and unwrap the envelope myself | **json** · primitive `apps/api/tests/utils/request.ts#json` — Successful responses; jsonError for error-shaped bodies. | @inixiative/config/README.md § versions.json (the BOM); docs/claude/TESTING.md § Request Helpers | — |
+| send a create request in a test; hit the action endpoint with a body; I'll build a new Request with method POST and JSON body | **post** · primitive `apps/api/tests/utils/request.ts#post` — Create/action endpoints in tests; patch for updates, get for reads. | docs/claude/TESTING.md § Request Helpers; @inixiative/json-rules/docs/LENS.md § 13. End-to-end worked example | — |
+| override the mocked API response for this one UI test; I'll stub globalThis.fetch in the component test; the shared request interceptor for frontend tests; edit the handlers so this test gets a different response | **server** · primitive `packages/ui/src/test/mocks/server.ts#server` — Override responses per test with server.use rather than editing the shared handlers. | docs/claude/WEBSOCKETS.md § Connection and recovery; docs/claude/API_ROUTES.md § Response Format › Route declaration (lens narrowing) | stubbing globalThis.fetch in UI tests or editing the shared MSW handlers for one test instead of server.use (catalog entry server) |
+| change an env var for the rest of this test file; stop writing process.env directly in the tests; I'll save the env value, set it, and restore it in afterAll; override config across several steps and reset afterwards | **setEnvOverride** · primitive `packages/shared/src/utils/envOverrides.ts#setEnvOverride` — Persistent overrides across a test, cleared by resetEnvOverrides; for scoped overrides use withEnv. | docs/claude/JOBS.md § Overflow Buffer | saving and restoring process.env values by hand around a test (catalog entry setEnvOverride; no-test-env-mutation) |
+| run just this block with a different env value; temporarily set an env var for one call; I'll set process.env before the call and unset it after; scoped override that cleans itself up | **withEnv** · primitive `packages/shared/src/utils/envOverrides.ts#withEnv` — Use for scoped overrides within one test; setEnvOverride plus resetEnvOverrides for overrides spanning several steps. | — | — |
+| run the whole test suite; run all tests across the repo; I'll cd into each package and run its tests; the full test run before merging | **bun run test** · script `package.json` — Whole-repo tests; run a single package's test via bun run --cwd <pkg> test. | docs/claude/TESTING.md § Running Tests; docs/claude/TESTING.md § Frontend Testing (happy-dom) | — |
+| run the frontend tests; run the UI component and hook tests; the DOM tests need the happy-dom preload; test the React packages and apps | **bun run test:fe** · script `package.json` — Frontend and UI tests; init scripts: test:init instead. | — | — |
+| test the setup scripts; run the tests for the provisioning TUI; the init folder has its own test command; check the provisioning code without the app suite | **bun run test:init** · script `package.json` — Only for init/ scripts; frontend tests: test:fe instead. | — | — |
+| add pass and fail examples for the new CI rule; a rule script with no self-test cases; prove the lint rule catches the bad case and passes the good one | **New CI rules need fixtures** · pattern scripts/ci/rules, scripts/ci/rule-violations — add CI rules as scripts with pass/fail fixtures verified by --test | part 4 | a new rule script under scripts/ci/rules with no pass/fail cases in scripts/ci/rule-violations (FEATURES.md § Custom CI Rules (--test runs rule self-tests against fixtures)) |
+| run only this package's tests; test one workspace without the whole repo; I'll cd into the package first | **Run tests per package** · pattern docs/claude/TESTING.md § Running Tests — Root `bun test` for everything; --cwd form for a single package. | code `registerTestTracker`, `cleanupTouchedTables` | — |
+| turn the entity's dates into ISO strings for the assertion; the API returns strings, the factory returns Dates; compare the factory entity to the response body; I'll JSON.parse JSON.stringify the entity | **__serialize** · primitive FEATURES.md > Testing & Quality — convert factory entities to API/UI shape with ISO date strings for assertions | part 4 | — |
+| run just this one test file; run a single test path with the test env loaded; I'll export the env vars and then run the file; focus on one failing test | **bun test** · primitive docs Testing — from apps/api it injects .env.test via with-env.sh; pass path for specific tests | part 4 | — |
+| lint fails because the generated client is stale; make sure the SDK and Prisma output were regenerated | **check-generated-files.sh** · primitive FEATURES.md > Custom Lint Checks — fail lint when Prisma or OpenAPI SDK outputs are stale | part 4 | committing a schema or route change without regenerating, or hand-editing the Prisma client or OpenAPI SDK (scripts/lint/check-generated-files.sh; FEATURES.md › Custom Lint Checks) |
+| reset captured webhook deliveries between tests; clear the test webhook inbox | **clearReceivedWebhooks** · primitive FEATURES.md > Testing & Quality — reset captured test webhook payloads between tests | part 4 | — |
+| generate realistic test data with sensible defaults; persist when needed, in-memory otherwise; override only the fields the test cares about; why aren't you using the factories | **create*() / build*() factories** · primitive FEATURES.md > Testing & Quality — create* when the DB row is needed; build* for in-memory data only. | part 4 | — |
+| make a user for this test; seed a test user with defaults; I'll insert the user with a raw prisma create in the test | **createUser** · primitive @template/db/test — Seeding test data in tests; prefer factories over raw Prisma inserts. | part 4 | — |
+| standard CRUD endpoints from the templates; hand-defined routes only for custom actions | **readRoute / createRoute / updateRoute** · primitive FEATURES.md > Route Templates — Standard CRUD endpoints; hand-defined route only for custom actions. | part 4 | — |
+| assert the webhook payload, headers and signature that were delivered; capture outbound webhooks in tests; I'll spin up a local HTTP server to receive webhooks | **receivedWebhooks** · primitive FEATURES.md > Testing & Quality (POST /test/webhook) — capture webhook deliveries in tests to assert payload, headers and signatures | part 4 | — |
+| run all the CI rule scripts; self-test the rules against their fixtures | **run-ci-rules.sh** · primitive scripts/ci/run-ci-rules.sh — execute CI rule scripts alphabetically, or self-test them against fixtures | part 4 | a new rule script under scripts/ci/rules with no pass/fail cases in scripts/ci/rule-violations, or a fixture edited so a failing rule passes (docs/claude/SCRIPTS.md § CI Rule Scripts; AI/ENTRYPOINT.md § 0.0 Critical Guardrails) |
+| hot reload all apps while developing; rebuild dependents automatically when a shared package changes | **turbo watch local** · primitive FEATURES.md > Development Workflow — hot-reload all apps and their workspace dependencies with task caching | part 4 | — |
+| tests truncating each other's tables, flaky; the new package's DB tests need max concurrency one; I'll run the files in parallel for speed | **DB-backed tests run serially** · rule docs/claude/TESTING.md § Running Tests › Concurrency — Any package whose tests hit the database, including newly added packages. | code `registerTestTracker`, `cleanupTouchedTables` | a new package test script hitting the DB without --max-concurrency=1, producing flaky cross-file truncation (docs/claude/TESTING.md § Concurrency) |
+| why write a manual schema when the generated one exists; use the generated zod schema for the model | **Never hand-write validation schemas** · rule FEATURES.md > Prisma + Zod Generation — Any request input or model response schema. | part 4 | — |
+| I'll add vitest for the frontend tests; use the built-in test runner, nothing else; jest.fn or vi.mock in a test file | **No Jest or Vitest** · rule scripts/ci/rules/no-jest.sh, no-vitest.sh — All test files and package dependencies. | part 4 | importing from jest, vitest or @jest/globals, jest.fn(), vi.mock(), or adding them as dependencies (scripts/ci/rules/no-jest.sh, no-vitest.sh (CI rules)) |
+| no relative imports, use the alias; dot-dot imports across folders | **Path aliases over relative imports** · rule FEATURES.md > Development Workflow — All imports in every package; enforced by check-import-aliases.sh. | part 4 | — |
+| how do I test these hooks on the frontend; can we do tests for this stuff on the frontend; run the data hook and component tests | **Run frontend UI tests** · rule docs/claude/FRONTEND/API_CLIENT.md § Testing — Running frontend/UI hook and component tests. | code `makeDataConfig`, `useDataFilters`, `usePaginatedData`, `useInfiniteDataQuery` | — |
+| no any, we have the model types; cast through unknown to silence the compiler | **Strict TypeScript, no any** · rule FEATURES.md > Type Safety & Code Generation — All application code across packages. | part 4 | `: any`, `as any`, or `as unknown as T` to silence the compiler (FEATURES.md › Type Safety & Code Generation; CLAUDE.md §7) |
+| the new package test script needs the test env loaded; I'll hardcode env vars in the test script; wrap the test command so it gets the right env file | **Test scripts compose env via with** · rule docs/claude/TESTING.md § Running Tests › Environment Composition — When adding or editing a package test script, especially DB-backed ones. | code `registerTestTracker`, `cleanupTouchedTables` | — |
+| where do the tests for this module go; one test file per action, inside the module; I'll put the tests in a top-level tests directory | **Tests live in module tests/ folder** · rule docs/claude/TESTING.md § Test Structure — Module tests must live in a tests/ folder inside the module, one file per action. | code `createTestApp` | — |
+| the component test fails on Date versus string; pass the API-shaped entity to the component; cast the factory entity to any for the UI test | **UI tests use serialized factories** · rule scripts/ci/rules/ui-serialized-factories.sh — Frontend/UI tests using factory data. | part 4 | — |
+
 - *Also here, by name:* bun run pretest (`package.json`); contactStreamRow (`packages/ui/src/test/contactStreamRow.ts`); createMockJob (`apps/api/tests/createTestWorker.ts`); del (`apps/api/tests/utils/request.ts`); enumField (`apps/api/tests/utils/modelFields.ts`); get (`apps/api/tests/utils/request.ts`); handlers (`packages/ui/src/test/mocks/handlers.ts`); installEnvOverrideProxy (`packages/shared/src/utils/envOverrides.ts`); jsonError (`apps/api/tests/utils/request.ts`); patch (`apps/api/tests/utils/request.ts`); relationField (`apps/api/tests/utils/modelFields.ts`); resetEnvOverrides (`packages/shared/src/utils/envOverrides.ts`); scalarField (`apps/api/tests/utils/modelFields.ts`); testStore (`packages/ui/src/test/testStore.ts`)
 
 ### Class `vcr`: VCR record/replay of external provider calls
@@ -230,15 +178,12 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
-| **VCR** | request/response replay for any client calling an external service | event-stream providers (use emitFromCassette) |
-| **emitFromCassette** | event-stream providers | request/response replay (use VCR) |
 
-- **emitFromCassette** · primitive `packages/shared/src/vcr/emitFromCassette.ts#emitFromCassette`: Request/response replay: VCR instead; use this for event-stream providers.
-  - *Said as:* "replay a recorded event stream in the test", "replay recorded events for a streaming provider", "the provider emits events, not a single response", "feed the recorded event sequence onto the emitter", "I'll fake the event emitter by hand in the test"
-- **VCR** · primitive `packages/shared/src/vcr/vcr.ts#VCR`: Event-stream providers: emitFromCassette; plain module stubs: mock.module. Any client calling an external service wraps calls in VCR.
-  - *Said as:* "record the real provider once and replay it after", "don't stub the API in tests, use cassettes", "record the real API call once and replay it", "don't hit the live API in tests", "are you sure we have no record-and-replay for providers", "move away from spying on global fetch"
-  - *Throws:* VCR replayed provider error (`off-request-path`)
-  - *Signs you're bypassing it:* tests that hit a live provider, or nock/fetch stubs and mock.module around a provider client instead of vcr.capture with queued cassettes (docs/claude/TESTING.md § VCR (external services) (tests never call a live provider))
+| Problem | Use | Read | Signs you're bypassing it |
+|---|---|---|---|
+| replay a recorded event stream in the test; replay recorded events for a streaming provider; the provider emits events, not a single response; feed the recorded event sequence onto the emitter; I'll fake the event emitter by hand in the test | **emitFromCassette** · primitive `packages/shared/src/vcr/emitFromCassette.ts#emitFromCassette` — Request/response replay: VCR instead; use this for event-stream providers. | — | — |
+| record the real provider once and replay it after; don't stub the API in tests, use cassettes; record the real API call once and replay it; don't hit the live API in tests; are you sure we have no record-and-replay for providers; move away from spying on global fetch | **VCR** · primitive `packages/shared/src/vcr/vcr.ts#VCR` — Event-stream providers: emitFromCassette; plain module stubs: mock.module. Any client calling an external service wraps calls in VCR. | — | tests that hit a live provider, or nock/fetch stubs and mock.module around a provider client instead of vcr.capture with queued cassettes (docs/claude/TESTING.md § VCR (external services) (tests never call a live provider)). throws VCR replayed provider error (`off-request-path`) |
+
 - *Also here, by name:* cliVersion (`packages/shared/src/vcr/cliVersion.ts`); fetchVersion (`packages/shared/src/vcr/fetchVersion.ts`)
 
 ## 4. The specifics, in full

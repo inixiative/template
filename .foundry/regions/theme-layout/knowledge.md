@@ -9,6 +9,7 @@
 - [Glossary](#glossary)
 - [1. What this Warden covers](#1-what-this-warden-covers)
 - [2. The domain](#2-the-domain)
+- [2b. Under construction](#2b-under-construction)
 - [3. Everything that exists here, by class](#3-everything-that-exists-here-by-class)
   - [Class `theme-layout`](#class-theme-layout-appshell-layout-system-and-multi-tier-theme)
 - [4. The specifics, in full](#4-the-specifics-in-full)
@@ -67,9 +68,15 @@ Theme (§ Theme System) is three tiers of CSS variables in packages/shared/style
 
 Not here: the primitives (Button, Table, Select, toast …), modals with content, settings pages and the organize-by-domain rule are `ui-components`; the sidebar's nav items and context switching logic are `navigation`; the store slice that holds `ui.theme` is `frontend-store`.
 
+## 2b. Under construction
+
+Open work you cannot use yet. Do not build against it, and do not build what it would replace without saying so.
+
+- `useSpaceTheme()` returns mock values; space theming and white-label mode are not wired to data — FEATURES.md § Theming (🟡 useSpaceTheme); ticket FEAT-007 (not started)
+
 ## 3. Everything that exists here, by class
 
-Point at a class when that is as specific as the moment allows, or at a member. Where a class has siblings an agent could confuse, a table under the class header says which to use when; its *Said as* line gives the plain words a user or agent uses for that job. Each member: **name** · kind `where` · the doc § that describes it (code members) or the code it is about (doc members): choose this when … . Quote the name and the where in a pointer ("look over here: createLock, packages/db/src/lock/createLock.ts, CONCURRENCY.md § Distributed Lock"). *Said as:* the ways a user or agent describes this job in a message or plan without knowing the name; match on these. *Signs you're bypassing it:* the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
+Find the problem in plain words, then point at the exact thing. Each class opens with job tables where a class has confusable siblings (which to use when; *Said as* gives the plain words for that job), then one table of every member: **Problem** is the job in the user's or agent's words (match on these); **Use** is the exact member, its kind and `where`, then when to choose it; **Read** is the doc § that describes it (code members) or the code it is about (doc members); **Signs you're bypassing it** is the hand-rolled code an agent writes when it rebuilds the primitive, plus the errors it throws. Quote Use and Read in a pointer ("look over here: createLock, packages/db/src/lock/createLock.ts, CONCURRENCY.md § Distributed Lock"). Code members come from the catalog, described from the code; doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
 
 ### Class `theme-layout`: AppShell layout system and multi-tier theme
 
@@ -79,10 +86,6 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
-| **Page** | standard body for every page, e.g. a list with a Table | split list/detail views (use MasterDetailLayout) |
-| **MasterDetailLayout** | side-by-side list and detail | an overlay detail view (use ResponsiveDrawer) |
-| **ResponsiveDrawer** | record detail, profile or settings as an overlay | confirmations and forms (use Modal) |
-| **Modal** | confirmations and forms in a plain dialog | detail views (use ResponsiveDrawer) |
 
 **Job: choose the outer app shell for a route** (AppShell vs FullscreenLayout) — THEME_LAYOUT.md; ROUTING_NAVIGATION.md § File-Based Routes
 
@@ -97,56 +100,30 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
-| **AppTheme** | the complete platform baseline theme | tenant overrides (use SpaceTheme) |
-| **SpaceTheme** | partial tenant overrides | the complete platform theme (use AppTheme) |
-| **useThemePersistence** | loading/saving the theme to localStorage | toggling the .dark class (use useDarkMode (ui-components-theme)) |
 
-- **DetailPanel** · primitive `packages/ui/src/components/layout/DetailPanel.tsx#DetailPanel` · in docs: docs/claude/FRONTEND/THEME_LAYOUT.md § Layout System; docs/claude/FRONTEND/THEME_LAYOUT.md § Key Files: lay out a scrolling detail view with a fixed header and optional split
-  - *Said as:* "a scrolling detail view with a fixed header", "the body of a record detail", "I'll build a sticky header with scroll area"
-- **MasterDetailLayout** · primitive `packages/ui/src/components/layout/MasterDetailLayout.tsx#MasterDetailLayout` · in docs: docs/claude/FRONTEND/THEME_LAYOUT.md § Layout System; docs/claude/FRONTEND/THEME_LAYOUT.md § Key Files: Side-by-side list and detail; for an overlay detail view use ResponsiveDrawer instead.
-  - *Said as:* "list on the left, detail on the right", "a split view", "I'll make a two-column flex layout", "select a row and see details beside it"
-- **Modal** · primitive `packages/ui/src/components/layout/Modal.tsx#Modal` · in docs: docs/claude/FRONTEND/THEME_LAYOUT.md § Layout System; docs/claude/FRONTEND/THEME_LAYOUT.md § Key Files: Plain dialog; for detail views prefer ResponsiveDrawer, which becomes a Modal on small screens.
-  - *Said as:* "a confirmation dialog", "a form in a dialog", "I'll build a dialog with backdrop and escape handling", "are you sure prompt"
-  - *Signs you're bypassing it:* a custom dialog with its own backdrop, Escape handling and close button (docs/claude/FRONTEND/THEME_LAYOUT.md § Overlays and Panels)
-- **Page** · primitive `packages/ui/src/components/layout/Page.tsx#Page` · in docs: docs/claude/FRONTEND/COMPONENTS.md § Modals and Pages; docs/claude/FRONTEND/THEME_LAYOUT.md § Layout System: Standard body for every page, e.g. list pages with a Table; MasterDetailLayout only for split views.
-  - *Said as:* "the standard page body with title and actions", "I'll write my own title row for this page", "page header with description and buttons", "wrap the list in the normal page frame"
-  - *Signs you're bypassing it:* each page hand-writing its own title row, description and actions container (docs/claude/FRONTEND/THEME_LAYOUT.md § Header and Page)
-- **ResponsiveDrawer** · primitive `packages/ui/src/components/layout/ResponsiveDrawer.tsx#ResponsiveDrawer` · in docs: docs/claude/FRONTEND/THEME_LAYOUT.md § Layout System; docs/claude/FRONTEND/THEME_LAYOUT.md § Key Files: Recommended for detail views over raw Modal; use Modal for confirmations and forms.
-  - *Said as:* "a side drawer for record details", "an overlay that becomes a dialog on mobile", "I'll build a slide-over panel", "open the profile in a drawer"
-- **Root component app hooks** · pattern apps/{web,admin,superadmin}/app/routes/__root.tsx: install navigation, meta, language, theme, websocket and dark mode hooks once at root
-  - *Said as:* "install the app-wide hooks once at root", "I'll call the theme hook in every page", "shouldn't we do that at root"
-- **Shade generation via color-mix** · pattern packages/shared/styles/theme.css: derive shades 1–4 by mixing with white in light, black in dark mode
-  - *Said as:* "lighter and darker shades from one color", "I'll define each shade variable by hand", "derive the tints automatically"
-  - *Signs you're bypassing it:* hand-defined light/dark shade variables for a color instead of the color-mix derived --*-1..4 (docs/claude/FRONTEND/THEME_LAYOUT.md § Theme System)
-- **Three-tier theme CSS variables** · pattern packages/shared/styles/theme.css: layer platform colors, tenant overrides and active tokens components reference
-  - *Said as:* "platform colors, tenant overrides, then active tokens", "I'll hard-code a hex color in the component", "use the theme variable, not a palette class", "setting names are already the css variable names"
-  - *Signs you're bypassing it:* hard-coded hex/Tailwind palette colors (bg-blue-600) in components instead of the active theme tokens (--primary and shades) (docs/claude/FRONTEND/THEME_LAYOUT.md § Theme System (Architecture))
-- **AppTheme** · primitive packages/ui/src/types/AppTheme.ts: platform baseline; SpaceTheme for tenant overrides
-  - *Said as:* "the complete default platform theme", "every color the platform defines", "the baseline theme type", "the full theme, not an override"
-- **Header** · primitive packages/ui/src/components/layout/: show mobile menu button, breadcrumbs from nav chain and share button
-  - *Said as:* "the top bar with menu button, crumbs and share", "mobile menu button in the header", "I'll build a custom top bar"
-- **Layout components** · primitive packages/ui/src/components/layout/: provide shell, sidebar, header, page, modal, drawer and master-detail layouts
-  - *Said as:* "the shell, sidebar, header, page, modal and drawer set", "where are the layout building blocks", "I'll write my own layout pieces"
-- **navigatePreserving** · primitive Sidebar navigation: In-app navigation that must keep ?org=/?space=; plain navigate loses context.
-  - *Said as:* "navigate from the sidebar without losing org and space", "I'll use plain navigate in the layout", "keep the tenant when clicking a nav item"
-- **SpaceTheme** · primitive packages/ui/src/types/SpaceTheme.ts: tenant partial overrides; AppTheme for the complete platform theme
-  - *Said as:* "a tenant's partial color overrides", "what a space can customize", "the white-label override type", "optional brand colors and logo per space"
-- **tenant.setOrganization** · primitive tenant store: Organization context; tenant.setSpace for a space.
-  - *Said as:* "switch to an organization context from the layout", "set the org when they pick one", "I'll set the org in the url"
-- **tenant.setSpace** · primitive tenant store: Space context; tenant.setOrganization for an organization.
-  - *Said as:* "switch to a space context from the layout", "set the space when they pick one", "I'll set the space in the url"
-- **useLanguage** · primitive packages/ui/src/hooks/useLanguage.ts: set document lang attribute from the browser language
-  - *Said as:* "set the document language from the browser", "the lang attribute on html", "locale setup at root"
-- **useThemePersistence** · primitive packages/ui/src/hooks/useThemePersistence.ts: load localStorage theme into store on mount and save changes back
-  - *Said as:* "remember the theme across reloads", "load the saved theme on mount", "I'll read local storage for the theme in root", "save theme changes back to storage"
-- **Detail views use ResponsiveDrawer** · rule docs/claude/FRONTEND/THEME_LAYOUT.md § Layout System › Overlays and Panels · code: `AppShell`, `Page`, `Modal`, `Sidebar`: Showing a record detail, profile or settings panel as an overlay.
-  - *Said as:* "show the record detail as an overlay", "I'll open the detail in a centered modal", "a profile panel that slides in"
-  - *Signs you're bypassing it:* a record detail or profile panel built as a centered Modal or a custom slide-over with its own breakpoint logic (docs/claude/FRONTEND/THEME_LAYOUT.md § Overlays and Panels (ResponsiveDrawer recommended for detail views))
-- **Layout components read the store** · rule packages/ui/src/components/layout/: Any authenticated layout composition in web, admin or superadmin apps.
-  - *Said as:* "the layout gets tenant and auth itself", "I'll pass the user into the shell as props", "apps pass almost nothing to layouts"
-- **Theme colors as bare HSL** · rule docs/claude/FRONTEND/THEME_LAYOUT.md § Theme System › Types · code: `useSpaceTheme`, `Space`, `useDarkMode`, `ThemeToggle`: any SpaceTheme or AppTheme color value
-  - *Said as:* "I'll write the color as a hex string", "theme values are three hsl numbers, no wrapper", "how do I format a theme color"
-  - *Signs you're bypassing it:* SpaceTheme/AppTheme values written as '#7c3aed' or 'hsl(262 80% 46%)' instead of '262 80% 46%' (docs/claude/FRONTEND/THEME_LAYOUT.md § Types)
+| Problem | Use | Read | Signs you're bypassing it |
+|---|---|---|---|
+| a scrolling detail view with a fixed header; the body of a record detail; I'll build a sticky header with scroll area | **DetailPanel** · primitive `packages/ui/src/components/layout/DetailPanel.tsx#DetailPanel` — lay out a scrolling detail view with a fixed header and optional split | docs/claude/FRONTEND/THEME_LAYOUT.md § Layout System; docs/claude/FRONTEND/THEME_LAYOUT.md § Key Files | — |
+| list on the left, detail on the right; a split view; I'll make a two-column flex layout; select a row and see details beside it | **MasterDetailLayout** · primitive `packages/ui/src/components/layout/MasterDetailLayout.tsx#MasterDetailLayout` — Side-by-side list and detail; for an overlay detail view use ResponsiveDrawer instead. | docs/claude/FRONTEND/THEME_LAYOUT.md § Layout System; docs/claude/FRONTEND/THEME_LAYOUT.md § Key Files | — |
+| a confirmation dialog; a form in a dialog; I'll build a dialog with backdrop and escape handling; are you sure prompt | **Modal** · primitive `packages/ui/src/components/layout/Modal.tsx#Modal` — Plain dialog; for detail views prefer ResponsiveDrawer, which becomes a Modal on small screens. | docs/claude/FRONTEND/THEME_LAYOUT.md § Layout System; docs/claude/FRONTEND/THEME_LAYOUT.md § Key Files | a custom dialog with its own backdrop, Escape handling and close button (docs/claude/FRONTEND/THEME_LAYOUT.md § Overlays and Panels) |
+| the standard page body with title and actions; I'll write my own title row for this page; page header with description and buttons; wrap the list in the normal page frame | **Page** · primitive `packages/ui/src/components/layout/Page.tsx#Page` — Standard body for every page, e.g. list pages with a Table; MasterDetailLayout only for split views. | docs/claude/FRONTEND/COMPONENTS.md § Modals and Pages; docs/claude/FRONTEND/THEME_LAYOUT.md § Layout System | each page hand-writing its own title row, description and actions container (docs/claude/FRONTEND/THEME_LAYOUT.md § Header and Page) |
+| a side drawer for record details; an overlay that becomes a dialog on mobile; I'll build a slide-over panel; open the profile in a drawer | **ResponsiveDrawer** · primitive `packages/ui/src/components/layout/ResponsiveDrawer.tsx#ResponsiveDrawer` — Recommended for detail views over raw Modal; use Modal for confirmations and forms. | docs/claude/FRONTEND/THEME_LAYOUT.md § Layout System; docs/claude/FRONTEND/THEME_LAYOUT.md § Key Files | — |
+| install the app-wide hooks once at root; I'll call the theme hook in every page; shouldn't we do that at root | **Root component app hooks** · pattern apps/{web,admin,superadmin}/app/routes/__root.tsx — install navigation, meta, language, theme, websocket and dark mode hooks once at root | part 4 | — |
+| lighter and darker shades from one color; I'll define each shade variable by hand; derive the tints automatically | **Shade generation via color-mix** · pattern packages/shared/styles/theme.css — derive shades 1–4 by mixing with white in light, black in dark mode | part 4 | hand-defined light/dark shade variables for a color instead of the color-mix derived --*-1..4 (docs/claude/FRONTEND/THEME_LAYOUT.md § Theme System) |
+| platform colors, tenant overrides, then active tokens; I'll hard-code a hex color in the component; use the theme variable, not a palette class; setting names are already the css variable names | **Three-tier theme CSS variables** · pattern packages/shared/styles/theme.css — layer platform colors, tenant overrides and active tokens components reference | part 4 | hard-coded hex/Tailwind palette colors (bg-blue-600) in components instead of the active theme tokens (--primary and shades) (docs/claude/FRONTEND/THEME_LAYOUT.md § Theme System (Architecture)) |
+| the complete default platform theme; every color the platform defines; the baseline theme type; the full theme, not an override | **AppTheme** · primitive packages/ui/src/types/AppTheme.ts — platform baseline; SpaceTheme for tenant overrides | part 4 | — |
+| the top bar with menu button, crumbs and share; mobile menu button in the header; I'll build a custom top bar | **Header** · primitive packages/ui/src/components/layout/ — show mobile menu button, breadcrumbs from nav chain and share button | part 4 | — |
+| the shell, sidebar, header, page, modal and drawer set; where are the layout building blocks; I'll write my own layout pieces | **Layout components** · primitive packages/ui/src/components/layout/ — provide shell, sidebar, header, page, modal, drawer and master-detail layouts | part 4 | — |
+| navigate from the sidebar without losing org and space; I'll use plain navigate in the layout; keep the tenant when clicking a nav item | **navigatePreserving** · primitive Sidebar navigation — In-app navigation that must keep ?org=/?space=; plain navigate loses context. | part 4 | — |
+| a tenant's partial color overrides; what a space can customize; the white-label override type; optional brand colors and logo per space | **SpaceTheme** · primitive packages/ui/src/types/SpaceTheme.ts — tenant partial overrides; AppTheme for the complete platform theme | part 4 | — |
+| switch to an organization context from the layout; set the org when they pick one; I'll set the org in the url | **tenant.setOrganization** · primitive tenant store — Organization context; tenant.setSpace for a space. | part 4 | — |
+| switch to a space context from the layout; set the space when they pick one; I'll set the space in the url | **tenant.setSpace** · primitive tenant store — Space context; tenant.setOrganization for an organization. | part 4 | — |
+| set the document language from the browser; the lang attribute on html; locale setup at root | **useLanguage** · primitive packages/ui/src/hooks/useLanguage.ts — set document lang attribute from the browser language | part 4 | — |
+| remember the theme across reloads; load the saved theme on mount; I'll read local storage for the theme in root; save theme changes back to storage | **useThemePersistence** · primitive packages/ui/src/hooks/useThemePersistence.ts — load localStorage theme into store on mount and save changes back | part 4 | — |
+| show the record detail as an overlay; I'll open the detail in a centered modal; a profile panel that slides in | **Detail views use ResponsiveDrawer** · rule docs/claude/FRONTEND/THEME_LAYOUT.md § Layout System › Overlays and Panels — Showing a record detail, profile or settings panel as an overlay. | code `AppShell`, `Page`, `Modal`, `Sidebar` | a record detail or profile panel built as a centered Modal or a custom slide-over with its own breakpoint logic (docs/claude/FRONTEND/THEME_LAYOUT.md § Overlays and Panels (ResponsiveDrawer recommended for detail views)) |
+| the layout gets tenant and auth itself; I'll pass the user into the shell as props; apps pass almost nothing to layouts | **Layout components read the store** · rule packages/ui/src/components/layout/ — Any authenticated layout composition in web, admin or superadmin apps. | part 4 | — |
+| I'll write the color as a hex string; theme values are three hsl numbers, no wrapper; how do I format a theme color | **Theme colors as bare HSL** · rule docs/claude/FRONTEND/THEME_LAYOUT.md § Theme System › Types — any SpaceTheme or AppTheme color value | code `useSpaceTheme`, `Space`, `useDarkMode`, `ThemeToggle` | SpaceTheme/AppTheme values written as '#7c3aed' or 'hsl(262 80% 46%)' instead of '262 80% 46%' (docs/claude/FRONTEND/THEME_LAYOUT.md § Types) |
+
 
 ## 4. The specifics, in full
 

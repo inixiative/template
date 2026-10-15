@@ -6,7 +6,7 @@
     "audit-log",
     "soft-delete"
   ],
-  "tokens": 10612,
+  "tokens": 9839,
   "tokenMethod": "chars/4",
   "runsAgreed": 0,
   "sources": {

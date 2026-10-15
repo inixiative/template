@@ -9,6 +9,7 @@
 - [Glossary](#glossary)
 - [1. What this Warden covers](#1-what-this-warden-covers)
 - [2. The domain](#2-the-domain)
+- [2b. Under construction](#2b-under-construction)
 - [3. Everything that exists here, by class](#3-everything-that-exists-here-by-class)
   - [Class `scripts`](#class-scripts-the-sanctioned-packagejson-scripts-and-how-to-run-and-write-them)
   - [Class `lint-rules`](#class-lint-rules-biome-custom-lint-scripts-and-the-ci-rule-runner-that-enforce-style)
@@ -96,9 +97,15 @@ The tools an agent runs while changing template code and how they are wired: the
 
 Related regions: `conventions` holds the naming and code-style rules these linters enforce (no comments, imports, `type` over `interface`, no `any`); `monorepo-architecture` holds where code lives and the alias and tsconfig-paths rules behind `check-import-aliases`; `environments-deploy` holds the gate in context (what CI exists, deploy, releasing with `config train`); `dx-setup` holds setup, the local loop and worktrees; `lib-config`, `lib-atlas` and `lib-gloss` hold those libraries' full READMEs (Atlas annotations and navigation live in `lib-atlas`, writing a gloss in `lib-gloss`); a CI rule that guards a domain is explained by that domain's region (`concurrency-locks` for create races, `environments-deploy` for env coercion, `test-harness / test-factories-rules` for test mocks, `conventions` for `no-prisma-maps`).
 
+## 2b. Under construction
+
+Open work you cannot use yet. Do not build against it, and do not build what it would replace without saying so.
+
+- AI developer experience: built-in skills, rules, agents and MCP servers — FEATURES.md (🟣 AI-Native); ticket FEAT-014 (in progress)
+
 ## 3. Everything that exists here, by class
 
-Point at a class when that is as specific as the moment allows, or at a member. Where a class has siblings an agent could confuse, a table under the class header says which to use when; its *Said as* line gives the plain words a user or agent uses for that job. Each member: **name** · kind `where` · the doc § that describes it (code members) or the code it is about (doc members): choose this when … . Quote the name and the where in a pointer ("look over here: createLock, packages/db/src/lock/createLock.ts, CONCURRENCY.md § Distributed Lock"). *Said as:* the ways a user or agent describes this job in a message or plan without knowing the name; match on these. *Signs you're bypassing it:* the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
+Find the problem in plain words, then point at the exact thing. Each class opens with job tables where a class has confusable siblings (which to use when; *Said as* gives the plain words for that job), then one table of every member: **Problem** is the job in the user's or agent's words (match on these); **Use** is the exact member, its kind and `where`, then when to choose it; **Read** is the doc § that describes it (code members) or the code it is about (doc members); **Signs you're bypassing it** is the hand-rolled code an agent writes when it rebuilds the primitive, plus the errors it throws. Quote Use and Read in a pointer ("look over here: createLock, packages/db/src/lock/createLock.ts, CONCURRENCY.md § Distributed Lock"). Code members come from the catalog, described from the code; doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
 
 ### Class `scripts`: The sanctioned package.json scripts and how to run and write them
 
@@ -108,9 +115,6 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
-| **bun run start:api** | production API HTTP process | background jobs (use bun run start:worker) |
-| **bun run start:worker** | production job processing only | serving HTTP (use bun run start:api) |
-| **bun run start:web** | previewing the production frontend build, after build | local dev (use bun run local (dx-setup)) |
 
 **Job: start, stop or reset local database containers** (start:db vs stop:db vs reset:db) — package.json; docs/claude/DOCKER.md § Commands
 
@@ -118,23 +122,16 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
-| **bun run start:db** | boot the containers (identical to local:db) | you also need schema push and seed (use bun run reset:db) |
-| **bun run stop:db** | teardown only | recreate with schema and seed (use bun run reset:db) |
-| **bun run reset:db** | a full fresh local DB | keeping data (use db:push or db:seed (database-tooling)) |
 
-- **bun run reset:db** · script `package.json`: Full fresh local DB; start:db just boots containers, db:push alone keeps existing data.
-  - *Said as:* "wipe the local database and start fresh", "blow away the data, push schema, reseed", "I'll compose down with volumes, up, push and seed by hand", "nuke and rebuild the local db", "reset everything in the database"
-  - *Signs you're bypassing it:* a manual `docker-compose down -v && docker-compose up -d && bun run db:push && bun run db:seed` sequence (docs/claude/DOCKER.md § Troubleshooting › Reset Everything)
-- **bun run start:api** · script `package.json`: API HTTP process only; start:worker for background jobs, start:web for the frontend preview.
-  - *Said as:* "run the api in production", "start the http server for prod", "I'll start the worker with the api command", "the production api process"
-- **bun run start:db** · script `package.json`: Identical to local:db; reset:db when you also need schema push and seed.
-  - *Said as:* "boot the database containers", "start postgres and redis, nothing else", "I'll reset when I only need to start", "bring the containers up"
-- **bun run start:web** · script `package.json`: Previews the production build; run build first.
-  - *Said as:* "preview the production frontend build", "serve the built web app", "I'll use it for local dev", "check the production bundle locally"
-- **bun run start:worker** · script `package.json`: Job processing only; start:api serves HTTP requests.
-  - *Said as:* "run the job worker in production", "start only background processing", "I'll start the api to run jobs", "the production worker process"
-- **bun run stop:db** · script `package.json`: Teardown only; reset:db to recreate with schema and seed.
-  - *Said as:* "stop the database containers", "tear down the local services", "I'll stop and then push schema by hand", "shut down postgres and redis"
+| Problem | Use | Read | Signs you're bypassing it |
+|---|---|---|---|
+| wipe the local database and start fresh; blow away the data, push schema, reseed; I'll compose down with volumes, up, push and seed by hand; nuke and rebuild the local db; reset everything in the database | **bun run reset:db** · script `package.json` — Full fresh local DB; start:db just boots containers, db:push alone keeps existing data. | — | a manual `docker-compose down -v && docker-compose up -d && bun run db:push && bun run db:seed` sequence (docs/claude/DOCKER.md § Troubleshooting › Reset Everything) |
+| run the api in production; start the http server for prod; I'll start the worker with the api command; the production api process | **bun run start:api** · script `package.json` — API HTTP process only; start:worker for background jobs, start:web for the frontend preview. | — | — |
+| boot the database containers; start postgres and redis, nothing else; I'll reset when I only need to start; bring the containers up | **bun run start:db** · script `package.json` — Identical to local:db; reset:db when you also need schema push and seed. | — | — |
+| preview the production frontend build; serve the built web app; I'll use it for local dev; check the production bundle locally | **bun run start:web** · script `package.json` — Previews the production build; run build first. | — | — |
+| run the job worker in production; start only background processing; I'll start the api to run jobs; the production worker process | **bun run start:worker** · script `package.json` — Job processing only; start:api serves HTTP requests. | — | — |
+| stop the database containers; tear down the local services; I'll stop and then push schema by hand; shut down postgres and redis | **bun run stop:db** · script `package.json` — Teardown only; reset:db to recreate with schema and seed. | — | — |
+
 
 ### Class `lint-rules`: Biome, custom lint scripts and the CI rule runner that enforce style
 
@@ -144,12 +141,6 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
-| **bun run lint** | report Biome and post-Biome violations | you want fixes applied (use bun run lint:fix) |
-| **bun run lint:fix** | apply lint and formatting fixes | formatting only (use bun run format) |
-| **bun run format** | formatting only | lint rule fixes too (use bun run lint:fix) |
-| **bun run lint:imports** | just the import-alias check | everything (use bun run lint) |
-| **bun run lint:generated** | just the generated-file check | everything (use bun run lint) |
-| **bun run check (environments-deploy)** | before pushing: the full gate | running lint, typecheck or tests piecemeal |
 
 **Job: run the repo's custom lint and CI rule checks** (post-Biome scripts vs CI rules) — scripts/lint/*; scripts/ci/run-ci-rules.sh; docs/claude/SCRIPTS.md § CI Rule Scripts
 
@@ -157,11 +148,6 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
-| **run-post-biome-checks** | run all the custom lint scripts together | debugging one rule (run the single check-*.sh) |
-| **check-generated-files** | Prisma client or SDK out of date | 'x.gen 2.ts' sync-conflict copies (use check-finder-duplicates) |
-| **check-finder-duplicates** | Finder/sync-conflict duplicate files | stale generated output (use check-generated-files) |
-| **check-import-aliases** | relative internal imports that need #/ or @template/ | barrel index.ts re-exports, which may be relative |
-| **run-ci-rules.sh (dx-setup)** | the scripts/ci/rules checks; --test against fixtures | editing a rule or fixture to pass (fix the code) |
 
 **Job: configure Biome and pre-commit hooks from the shared presets** (Biome and hook presets) — @inixiative/config/README.md § Presets
 
@@ -169,55 +155,30 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
-| **@inixiative/config/biome/base.json** | every repo's Biome config | React code alone (add @inixiative/config/biome/react.json) |
-| **@inixiative/config/biome/react.json** | overlay for React packages | non-React code (base.json alone) |
-| **@inixiative/config/lefthook/base.yml** | pre-commit typecheck and Biome on staged files | the full gate (use bun run check) |
 
-- **check-finder-duplicates** · rule `scripts/lint/check-finder-duplicates.sh`: Stale or uncommitted generated output: check-generated-files instead.
-  - *Said as:* "a file named with a space-two got committed", "sync conflict copies of generated files", "I'll delete the duplicate files one by one", "finder duplicates in the tree"
-  - *Signs you're bypassing it:* committed 'routeTree.gen 2.ts' or 'dist 2' copies, or deleting such duplicates by hand one at a time (catalog check-finder-duplicates)
-- **check-generated-files** · rule `scripts/lint/check-generated-files.sh` · in docs: docs/claude/SCRIPTS.md § Linting; FEATURES.md § Developer Experience: Sync-conflict copies like 'x.gen 2.ts': check-finder-duplicates instead.
-  - *Said as:* "the prisma client or sdk is out of date", "did someone forget to regenerate after a schema change", "I'll hand-edit the generated client", "stale generated output in the commit"
-  - *Signs you're bypassing it:* committing a schema or route change without regenerating, or hand-editing the Prisma client or OpenAPI SDK (scripts/lint/check-generated-files.sh; FEATURES.md › Custom Lint Checks)
-- **check-import-aliases** · rule `scripts/lint/check-import-aliases.sh` · in docs: docs/claude/SCRIPTS.md § Linting; FEATURES.md § Developer Experience: require path aliases instead of relative imports
-  - *Said as:* "relative imports that should use the alias", "the import path check", "I'll import with dot-dot-slash here", "catch relative imports outside barrels"
-  - *Signs you're bypassing it:* `import { x } from '../../lib/utils/x'` or `'../shared/src/...'` in a non-barrel source file (scripts/lint/check-import-aliases.sh; docs/claude/SCRIPTS.md § Linting)
-- **no-isarray-cast** · rule `scripts/ci/rules/no-isarray-cast.sh`: CI check forbidding casts after Array.isArray narrowing
-  - *Said as:* "I'll cast after the array check", "casting right after narrowing to an array", "the ci rule about array casts"
-  - *Signs you're bypassing it:* `Array.isArray(value) ? (value as Foo[])` or `as unknown[]` right after an isArray check (scripts/ci/rules/no-isarray-cast.sh (CI rule))
-- **run-post-biome-checks** · rule `scripts/lint/run-post-biome-checks.sh` · in docs: docs/claude/SCRIPTS.md § Linting; FEATURES.md § Developer Experience: Runs all script checks together; call an individual check-*.sh only to debug one rule.
-  - *Said as:* "run all the custom lint scripts together", "the checks after biome", "I'll run each check script separately", "lint passed but the extra checks didn't run"
-- **bun run format** · script `package.json` · in docs: docs/claude/SCRIPTS.md § Linting; docs/claude/INIT_SCRIPT_PATTERNS.md § Core Patterns › 10. Async Exec for Smooth Animations: Formatting only; lint:fix to also apply lint fixes.
-  - *Said as:* "just reformat the code", "fix whitespace and formatting only", "I'll format with my own prettier", "format without touching lint rules"
-- **bun run lint** · script `package.json` · in docs: docs/claude/SCRIPTS.md § Linting; docs/claude/TURBOREPO.md § Loop Prevention: Report only; lint:fix to auto-apply fixes; check for the full gate.
-  - *Said as:* "report the lint violations", "see what biome complains about", "I'll run biome directly", "lint without fixing"
-- **bun run lint:fix** · script `package.json`: Fixes lint and formatting; format only reformats; lint only reports.
-  - *Said as:* "auto-fix the lint errors", "apply the fixes biome can make", "I'll fix the lint errors by hand", "clean up lint and formatting together"
-- **bun run lint:generated** · script `package.json`: Targeted generated-file check; lint for everything.
-  - *Said as:* "only check the generated files", "just the stale-generated check", "I'll run the whole lint for one check", "verify generated output is current"
-- **bun run lint:imports** · script `package.json`: Targeted import-alias check; lint for everything.
-  - *Said as:* "only check the import aliases", "just the relative import check", "I'll grep for relative imports myself", "verify the import paths"
-- **@inixiative/config/biome/base.json** · primitive @inixiative/config/biome/base.json: every repo; add biome/react.json overlay for React code.
-  - *Said as:* "the shared biome config every repo extends", "I'll write our own biome rules", "where the lint rules actually live", "extend the base biome preset"
-- **@inixiative/config/biome/react.json** · primitive @inixiative/config/biome/react.json: React packages only; base.json alone elsewhere.
-  - *Said as:* "the biome overlay for react code", "add react lint rules to a ui package", "I'll copy react rules into the local biome config", "the react preset on top of base"
-- **@inixiative/config/lefthook/base.yml** · primitive @inixiative/config/lefthook/base.yml: run typecheck and biome on staged files at pre-commit
-  - *Said as:* "run typecheck and lint on staged files at commit", "the pre-commit hook config", "I'll write a git hook script myself", "what runs before a commit"
-- **check-import-aliases.sh** · primitive scripts/lint/check-import-aliases.sh: fail on relative internal imports not using the #/ alias
-  - *Said as:* "the script that fails on relative internal imports", "where the import alias check is implemented", "fix the import, not the check"
-- **Imports follow alias rules** · rule CLAUDE.md §13 Change Checklist: Any added or moved import.
-  - *Said as:* "which alias do I import with", "I'll use a relative path for this import", "adding or moving an import"
-- **No any; canonical types** · rule CLAUDE.md §7 Core Engineering Standards: Avoid any and import canonical types from source modules.
-  - *Said as:* "I'll type it as any for now", "import the type from where it's defined", "stop declaring types that exist in the db or sdk"
-- **No code comments** · rule CLAUDE.md § 0. Purpose and Priority: All source files; @atlas annotation block is the sole standing exception.
-  - *Said as:* "I'll add a comment explaining this block", "no comments in source", "comments narrating the next line"
-  - *Signs you're bypassing it:* comments narrating what the next line does, restating a function name, or section-divider and reasoning comments (AI/ENTRYPOINT.md § 0. Purpose and Priority; docs/claude/STYLE.md § Comments & Logging)
-- **No scope invention** · rule CLAUDE.md §0.3 YAGNI — Scope Invention vs. Completion: Feature code leans trim; clearly adjacent noise is skipped.
-  - *Said as:* "I'll also clean up this adjacent thing while here", "don't widen the task beyond what was asked", "feature code stays trim"
-- **Path aliases** · rule docs/claude/MONOREPO.md § Path Aliases · code: `getActor`, `authMiddleware`, `Button`, `mutationLifeCycleExtension`: Import with #/ inside apps, @template/<pkg>/* elsewhere, relative only in barrels.
-  - *Said as:* "hash slash inside apps, at-template across packages", "which alias prefix goes where", "I'll use a relative import in the package", "relative only in barrel files"
-- **Use #/ alias, not relative imports** · rule scripts/lint/check-import-aliases.sh: all internal TypeScript imports
-  - *Said as:* "no relative imports", "please use absolute imports only", "I'll import with dot-dot-slash", "always use the hash alias for internal imports"
+| Problem | Use | Read | Signs you're bypassing it |
+|---|---|---|---|
+| a file named with a space-two got committed; sync conflict copies of generated files; I'll delete the duplicate files one by one; finder duplicates in the tree | **check-finder-duplicates** · rule `scripts/lint/check-finder-duplicates.sh` — Stale or uncommitted generated output: check-generated-files instead. | — | committed 'routeTree.gen 2.ts' or 'dist 2' copies, or deleting such duplicates by hand one at a time (catalog check-finder-duplicates) |
+| the prisma client or sdk is out of date; did someone forget to regenerate after a schema change; I'll hand-edit the generated client; stale generated output in the commit | **check-generated-files** · rule `scripts/lint/check-generated-files.sh` — Sync-conflict copies like 'x.gen 2.ts': check-finder-duplicates instead. | docs/claude/SCRIPTS.md § Linting; FEATURES.md § Developer Experience | committing a schema or route change without regenerating, or hand-editing the Prisma client or OpenAPI SDK (scripts/lint/check-generated-files.sh; FEATURES.md › Custom Lint Checks) |
+| relative imports that should use the alias; the import path check; I'll import with dot-dot-slash here; catch relative imports outside barrels | **check-import-aliases** · rule `scripts/lint/check-import-aliases.sh` — require path aliases instead of relative imports | docs/claude/SCRIPTS.md § Linting; FEATURES.md § Developer Experience | `import { x } from '../../lib/utils/x'` or `'../shared/src/...'` in a non-barrel source file (scripts/lint/check-import-aliases.sh; docs/claude/SCRIPTS.md § Linting) |
+| I'll cast after the array check; casting right after narrowing to an array; the ci rule about array casts | **no-isarray-cast** · rule `scripts/ci/rules/no-isarray-cast.sh` — CI check forbidding casts after Array.isArray narrowing | — | `Array.isArray(value) ? (value as Foo[])` or `as unknown[]` right after an isArray check (scripts/ci/rules/no-isarray-cast.sh (CI rule)) |
+| run all the custom lint scripts together; the checks after biome; I'll run each check script separately; lint passed but the extra checks didn't run | **run-post-biome-checks** · rule `scripts/lint/run-post-biome-checks.sh` — Runs all script checks together; call an individual check-*.sh only to debug one rule. | docs/claude/SCRIPTS.md § Linting; FEATURES.md § Developer Experience | — |
+| just reformat the code; fix whitespace and formatting only; I'll format with my own prettier; format without touching lint rules | **bun run format** · script `package.json` — Formatting only; lint:fix to also apply lint fixes. | docs/claude/SCRIPTS.md § Linting; docs/claude/INIT_SCRIPT_PATTERNS.md § Core Patterns › 10. Async Exec for Smooth Animations | — |
+| report the lint violations; see what biome complains about; I'll run biome directly; lint without fixing | **bun run lint** · script `package.json` — Report only; lint:fix to auto-apply fixes; check for the full gate. | docs/claude/SCRIPTS.md § Linting; docs/claude/TURBOREPO.md § Loop Prevention | — |
+| auto-fix the lint errors; apply the fixes biome can make; I'll fix the lint errors by hand; clean up lint and formatting together | **bun run lint:fix** · script `package.json` — Fixes lint and formatting; format only reformats; lint only reports. | — | — |
+| only check the generated files; just the stale-generated check; I'll run the whole lint for one check; verify generated output is current | **bun run lint:generated** · script `package.json` — Targeted generated-file check; lint for everything. | — | — |
+| only check the import aliases; just the relative import check; I'll grep for relative imports myself; verify the import paths | **bun run lint:imports** · script `package.json` — Targeted import-alias check; lint for everything. | — | — |
+| the shared biome config every repo extends; I'll write our own biome rules; where the lint rules actually live; extend the base biome preset | **@inixiative/config/biome/base.json** · primitive @inixiative/config/biome/base.json — every repo; add biome/react.json overlay for React code. | part 4 | — |
+| the biome overlay for react code; add react lint rules to a ui package; I'll copy react rules into the local biome config; the react preset on top of base | **@inixiative/config/biome/react.json** · primitive @inixiative/config/biome/react.json — React packages only; base.json alone elsewhere. | part 4 | — |
+| run typecheck and lint on staged files at commit; the pre-commit hook config; I'll write a git hook script myself; what runs before a commit | **@inixiative/config/lefthook/base.yml** · primitive @inixiative/config/lefthook/base.yml — run typecheck and biome on staged files at pre-commit | part 4 | — |
+| the script that fails on relative internal imports; where the import alias check is implemented; fix the import, not the check | **check-import-aliases.sh** · primitive scripts/lint/check-import-aliases.sh — fail on relative internal imports not using the #/ alias | part 4 | — |
+| which alias do I import with; I'll use a relative path for this import; adding or moving an import | **Imports follow alias rules** · rule CLAUDE.md §13 Change Checklist — Any added or moved import. | part 4 | — |
+| I'll type it as any for now; import the type from where it's defined; stop declaring types that exist in the db or sdk | **No any; canonical types** · rule CLAUDE.md §7 Core Engineering Standards — Avoid any and import canonical types from source modules. | part 4 | — |
+| I'll add a comment explaining this block; no comments in source; comments narrating the next line | **No code comments** · rule CLAUDE.md § 0. Purpose and Priority — All source files; @atlas annotation block is the sole standing exception. | part 4 | comments narrating what the next line does, restating a function name, or section-divider and reasoning comments (AI/ENTRYPOINT.md § 0. Purpose and Priority; docs/claude/STYLE.md § Comments & Logging) |
+| I'll also clean up this adjacent thing while here; don't widen the task beyond what was asked; feature code stays trim | **No scope invention** · rule CLAUDE.md §0.3 YAGNI — Scope Invention vs. Completion — Feature code leans trim; clearly adjacent noise is skipped. | part 4 | — |
+| hash slash inside apps, at-template across packages; which alias prefix goes where; I'll use a relative import in the package; relative only in barrel files | **Path aliases** · rule docs/claude/MONOREPO.md § Path Aliases — Import with #/ inside apps, @template/<pkg>/* elsewhere, relative only in barrels. | code `getActor`, `authMiddleware`, `Button`, `mutationLifeCycleExtension` | — |
+| no relative imports; please use absolute imports only; I'll import with dot-dot-slash; always use the hash alias for internal imports | **Use #/ alias, not relative imports** · rule scripts/lint/check-import-aliases.sh — all internal TypeScript imports | part 4 | — |
+
 - *Also here, by name:* bun run lint:postBiome (`package.json`)
 
 ### Class `build-tooling`: Turborepo tasks, watch mode, codegen, build presets, hot reload
@@ -228,11 +189,6 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
-| **node** | tsup for Node/server packages | React/UI packages (use react) |
-| **react** | tsup for React/UI packages | non-UI packages (use node) |
-| **@inixiative/config/tsconfig/base.json** | pure bun libraries and backend workspaces | node types needed (use @inixiative/config/tsconfig/node.json) |
-| **@inixiative/config/tsconfig/node.json** | packages needing node types | DOM/JSX (use @inixiative/config/tsconfig/react.json) |
-| **@inixiative/config/tsconfig/react.json** | React/DOM packages (ui, sdk) | frontend apps (use tsconfig.frontend.json (monorepo-architecture)) |
 
 **Job: keep a repo's toolchain pinned and release ecosystem packages** (config sync vs check vs scan vs train) — @inixiative/config/README.md § CLI; § Release flow
 
@@ -240,10 +196,6 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
-| **config sync** | apply versions.json pins and presets locally | verifying only (use config check) |
-| **config check** | read-only gate, in CI | fixing drift (use config sync) |
-| **config scan (lib-config)** | audit every checkout | one repo (use config check) |
-| **config train (lib-config)** | releasing ecosystem packages | picking up toolchain changes downstream (use config sync) |
 
 **Job: generate code (OpenAPI, clients) from the schema** (codegen tasks) — turbo.json; docs/claude/TURBOREPO.md § Task Dependencies
 
@@ -251,74 +203,38 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
-| **generate:openapi** | OpenAPI spec from routes | the client (use generate:sdk) |
-| **Generation chain via dependsOn** | wiring a generator so schema changes cascade | a script running the generators in sequence by hand |
 
-- **node** · package `@inixiative/config/tsup#node` · in docs: @inixiative/rules-builder/README.md § Quick start; @inixiative/rules-builder/README.md § Decoration — hoisting, relabeling & aliasing: Node/server packages; React UI packages: react preset instead. Extend rather than writing per-package tsup config.
-  - *Said as:* "the tsup preset for a server package", "build a node package", "I'll write a full tsup config for the package", "which build preset for a backend lib"
-  - *Signs you're bypassing it:* a per-package tsup.config.ts spelling out format, dts, target and externals instead of `export default node({ entry })` (@inixiative/config/tsup#node (catalog); @inixiative/config/README.md#Presets)
-- **react** · package `@inixiative/config/tsup#react` · in docs: @inixiative/config/README.md § Presets; @inixiative/config/README.md § CLI: React/UI packages; non-UI packages: node preset instead.
-  - *Said as:* "the tsup preset for a ui package", "build a react component package", "I'll hand-write tsup for the ui package", "which build preset for components"
-  - *Signs you're bypassing it:* a hand-written tsup config for a React/UI package instead of `export default react({ entry })` (@inixiative/config/tsup#react (catalog))
-- **Adopt config via extends stubs** · pattern @inixiative/config/README.md § Presets · code: `typecheck`: adopt shared toolchain with tsconfig, biome, tsup stub files plus devDependency
-  - *Said as:* "adopt the shared toolchain in a repo", "stub files that extend the presets", "I'll copy the config files wholesale", "set up biome, tsconfig and tsup from the shared package"
-- **Env composition with turbo watch** · pattern docs/claude/TURBOREPO.md § Environment Composition with Turbo: Pointing local apps at prod/staging/test env; plain turbo watch for local env.
-  - *Said as:* "run the local app against staging env", "point local at prod data", "run the watch command with a cloud environment composed", "I'll export the staging env then run turbo"
-- **Generation chain via dependsOn** · pattern turbo.json: cascade schema changes through db:generate, generate:openapi, generate:sdk, then restart apps
-  - *Said as:* "schema changes should regenerate the client and sdk automatically", "wire the generator so it cascades", "I'll write a script that runs the generators in order", "the sdk didn't regenerate after the schema change"
-  - *Signs you're bypassing it:* a script that runs db:generate, generate:openapi and generate:sdk in sequence by hand, or a new generator step wired outside turbo.json dependsOn (docs/claude/TURBOREPO.md § Task Dependencies; § Watch Mode › How it works)
-- **@inixiative/config/tsconfig/base.json** · primitive @inixiative/config/tsconfig/base.json: bun libraries; node.json for node types, react.json for DOM/JSX packages.
-  - *Said as:* "the tsconfig for a pure bun or backend workspace", "which tsconfig does a backend package extend", "I'll write compiler options in the package tsconfig", "the base typescript preset"
-- **@inixiative/config/tsconfig/node.json** · primitive @inixiative/config/tsconfig/node.json: packages needing node types; base.json for pure bun, react.json for DOM/JSX.
-  - *Said as:* "the tsconfig when a package needs node types", "which tsconfig preset for node apis", "I'll add node types to the base config myself", "typescript preset with node"
-- **@inixiative/config/tsconfig/react.json** · primitive @inixiative/config/tsconfig/react.json: React/DOM packages; base.json or node.json otherwise.
-  - *Said as:* "the tsconfig for dom and jsx packages", "which tsconfig for the ui and sdk packages", "I'll add jsx settings to the base config", "typescript preset with react"
-- **build / typecheck / test** · primitive turbo.json: run cached production build, type checking and test suites across apps
-  - *Said as:* "run the build, types and tests across every package", "the cached turbo tasks", "I'll run the type checker in each package by hand", "type-check the whole repo"
-- **config check** · primitive @inixiative/config/README.md § CLI · code: `typecheck`, `registry`: read-only CI gate; use sync to apply fixes, scan for all checkouts
-  - *Said as:* "verify the toolchain pins without changing anything", "the read-only drift check for ci", "I'll fix the versions while checking", "is this repo's toolchain in line"
-- **config sync** · primitive @inixiative/config/README.md § CLI · code: `typecheck`, `registry`: to fix drift locally; check only reports; refuses dirty tree without --force
-  - *Said as:* "pull the pinned toolchain versions into this repo", "fix the toolchain drift locally", "I'll edit the package versions to match", "apply the presets and pins"
-  - *Signs you're bypassing it:* hand-editing package.json versions or preset files to match versions.json (@inixiative/config/README.md#CLI)
-- **generate:openapi** · primitive turbo.json: produce the OpenAPI spec from API routes
-  - *Said as:* "regenerate the openapi spec from the routes", "the spec is stale after a route change", "I'll also regenerate the client with this", "produce the api spec"
-- **inixiative-config sync** · primitive @inixiative/config/README.md § Release flow: downstream adoption of toolchain changes; publishing releases: train instead.
-  - *Said as:* "pick up a toolchain change downstream", "update this repo to the new pins", "I'll release to get the toolchain change"
-- **start:api / start:worker / start:web** · primitive package.json: Production runs; local dev uses bun run local instead.
-  - *Said as:* "the production start commands", "which command runs each service in prod", "I'll use these for local dev"
-- **sync** · primitive @inixiative/config/README.md § (preface) › @inixiative/config: to update pins; check to verify without writing.
-  - *Said as:* "update the pins in this repo", "apply the shared toolchain versions", "I'll just check without writing"
-- **turbo run --graph / --output-logs / --force** · primitive docs/claude/TURBOREPO.md § Debugging: inspect the task graph, show full logs, or bypass the cache
-  - *Said as:* "see the task graph", "show the full logs of a turbo task", "bypass the turbo cache", "why did turbo skip this task"
-- **turbo watch local#pkg** · primitive turbo.json: Single app dev; bun run local for the full stack; local:worker#api for the worker.
-  - *Said as:* "run one package in watch mode", "start a single app with reload", "I'll run the whole stack for one app", "filter turbo to one package"
-- **versions.json** · primitive @inixiative/config/versions.json: pin bun, toolchain, required packages, lane sets and consumer repos
-  - *Said as:* "where the toolchain versions are pinned", "which typescript and biome versions we use", "I'll bump typescript in one repo", "the bill of materials for the ecosystem"
-- **@types/bun required with TS 6** · rule @inixiative/config/README.md § versions.json (the BOM): all repos on TypeScript 6.0
-  - *Said as:* "the bun types package on typescript six", "I'll drop the bun types dependency"
-- **CLI vs Renovate division** · rule @inixiative/config/README.md: dependency updates in any lib repo
-  - *Said as:* "who bumps dependencies: the config cli or renovate", "I'll let renovate bump typescript", "renovate must stay off the toolchain packages"
-- **Ecosystem deps at blessed versions** · rule @inixiative/config/README.md § CLI · code: `typecheck`, `registry`: Root and workspace members of either lane; workspace:/file:/link: exempt.
-  - *Said as:* "I'll bump this inixiative package to a newer version", "which version of a sibling package do we depend on", "ecosystem deps match the blessed set"
-  - *Signs you're bypassing it:* an @inixiative/* dependency bumped to a version other than the one versions.json blesses (@inixiative/config/README.md#CLI)
-- **Generated files use .gen. and are excluded from inputs** · rule docs/claude/TURBOREPO.md § Loop Prevention: Any template-owned generated file; Prisma-owned internals exempt unless generator emits .gen.
-  - *Said as:* "watch mode regenerates forever", "name the generated file so turbo ignores it", "I'll add the generated output to the task inputs", "a new generator output without the gen marker"
-  - *Signs you're bypassing it:* a new generated file without `.gen.` in its name, or a turbo inputs glob that includes generated output so watch mode regenerates forever (docs/claude/TURBOREPO.md § Loop Prevention)
-- **Repos held to union of lanes** · rule @inixiative/config/README.md § versions.json (the BOM): repos mixing primitives and agentic packages
-  - *Said as:* "a repo using both primitives and agentic packages", "which blessed set applies when a repo mixes lanes"
-- **Required repo scaffolding** · rule @inixiative/config/README.md § CLI · code: `typecheck`, `registry`: Every ecosystem repo.
-  - *Said as:* "what every ecosystem repo must have", "set up a new inixiative repo", "the files and scripts the check expects"
-- **Scope ignoreDeprecations to dts build** · rule @inixiative/config/tsup: tsup builds under TypeScript 6.0
-  - *Said as:* "the deprecation-ignore flag only in the dts step", "I'll set the deprecation flag globally in tsconfig"
-- **Stubs hold only extends and reviewed overrides** · rule @inixiative/config/README.md § Presets · code: `typecheck`: every repo adopting @inixiative/config
-  - *Said as:* "the local biome config has drifted from the preset", "I'll copy the preset and tweak it locally", "stub files just extend"
-  - *Signs you're bypassing it:* a repo's biome.json or tsconfig copied wholesale from the preset with drifted local edits (@inixiative/config/README.md#Presets)
-- **Toolchain pins at root only** · rule @inixiative/config/README.md § CLI · code: `typecheck`, `registry`: Any repo in the ecosystem declaring toolchain dependencies.
-  - *Said as:* "I'll add typescript to the package's dev dependencies", "where do typescript and biome get declared", "toolchain deps belong at the root"
-  - *Signs you're bypassing it:* typescript, @biomejs/biome or @types/bun declared in a workspace package.json (@inixiative/config/README.md#CLI)
-- **Turbo task names match package scripts** · rule docs/claude/TURBOREPO.md § Task Naming Convention: When adding a script or turbo task to any package.
-  - *Said as:* "turbo uses hash and non-turbo uses colon", "I'll name the turbo task differently from the script", "adding a script and its turbo task"
-  - *Signs you're bypassing it:* a turbo.json task named differently from the package.json script it should run, or a script using a delimiter other than `:` (docs/claude/TURBOREPO.md § Task Naming Convention)
+| Problem | Use | Read | Signs you're bypassing it |
+|---|---|---|---|
+| the tsup preset for a server package; build a node package; I'll write a full tsup config for the package; which build preset for a backend lib | **node** · package `@inixiative/config/tsup#node` — Node/server packages; React UI packages: react preset instead. Extend rather than writing per-package tsup config. | @inixiative/rules-builder/README.md § Quick start; @inixiative/rules-builder/README.md § Decoration — hoisting, relabeling & aliasing | a per-package tsup.config.ts spelling out format, dts, target and externals instead of `export default node({ entry })` (@inixiative/config/tsup#node (catalog); @inixiative/config/README.md#Presets) |
+| the tsup preset for a ui package; build a react component package; I'll hand-write tsup for the ui package; which build preset for components | **react** · package `@inixiative/config/tsup#react` — React/UI packages; non-UI packages: node preset instead. | @inixiative/config/README.md § Presets; @inixiative/config/README.md § CLI | a hand-written tsup config for a React/UI package instead of `export default react({ entry })` (@inixiative/config/tsup#react (catalog)) |
+| adopt the shared toolchain in a repo; stub files that extend the presets; I'll copy the config files wholesale; set up biome, tsconfig and tsup from the shared package | **Adopt config via extends stubs** · pattern @inixiative/config/README.md § Presets — adopt shared toolchain with tsconfig, biome, tsup stub files plus devDependency | code `typecheck` | — |
+| run the local app against staging env; point local at prod data; run the watch command with a cloud environment composed; I'll export the staging env then run turbo | **Env composition with turbo watch** · pattern docs/claude/TURBOREPO.md § Environment Composition with Turbo — Pointing local apps at prod/staging/test env; plain turbo watch for local env. | part 4 | — |
+| schema changes should regenerate the client and sdk automatically; wire the generator so it cascades; I'll write a script that runs the generators in order; the sdk didn't regenerate after the schema change | **Generation chain via dependsOn** · pattern turbo.json — cascade schema changes through db:generate, generate:openapi, generate:sdk, then restart apps | part 4 | a script that runs db:generate, generate:openapi and generate:sdk in sequence by hand, or a new generator step wired outside turbo.json dependsOn (docs/claude/TURBOREPO.md § Task Dependencies; § Watch Mode › How it works) |
+| the tsconfig for a pure bun or backend workspace; which tsconfig does a backend package extend; I'll write compiler options in the package tsconfig; the base typescript preset | **@inixiative/config/tsconfig/base.json** · primitive @inixiative/config/tsconfig/base.json — bun libraries; node.json for node types, react.json for DOM/JSX packages. | part 4 | — |
+| the tsconfig when a package needs node types; which tsconfig preset for node apis; I'll add node types to the base config myself; typescript preset with node | **@inixiative/config/tsconfig/node.json** · primitive @inixiative/config/tsconfig/node.json — packages needing node types; base.json for pure bun, react.json for DOM/JSX. | part 4 | — |
+| the tsconfig for dom and jsx packages; which tsconfig for the ui and sdk packages; I'll add jsx settings to the base config; typescript preset with react | **@inixiative/config/tsconfig/react.json** · primitive @inixiative/config/tsconfig/react.json — React/DOM packages; base.json or node.json otherwise. | part 4 | — |
+| run the build, types and tests across every package; the cached turbo tasks; I'll run the type checker in each package by hand; type-check the whole repo | **build / typecheck / test** · primitive turbo.json — run cached production build, type checking and test suites across apps | part 4 | — |
+| verify the toolchain pins without changing anything; the read-only drift check for ci; I'll fix the versions while checking; is this repo's toolchain in line | **config check** · primitive @inixiative/config/README.md § CLI — read-only CI gate; use sync to apply fixes, scan for all checkouts | code `typecheck`, `registry` | — |
+| pull the pinned toolchain versions into this repo; fix the toolchain drift locally; I'll edit the package versions to match; apply the presets and pins | **config sync** · primitive @inixiative/config/README.md § CLI — to fix drift locally; check only reports; refuses dirty tree without --force | code `typecheck`, `registry` | hand-editing package.json versions or preset files to match versions.json (@inixiative/config/README.md#CLI) |
+| regenerate the openapi spec from the routes; the spec is stale after a route change; I'll also regenerate the client with this; produce the api spec | **generate:openapi** · primitive turbo.json — produce the OpenAPI spec from API routes | part 4 | — |
+| pick up a toolchain change downstream; update this repo to the new pins; I'll release to get the toolchain change | **inixiative-config sync** · primitive @inixiative/config/README.md § Release flow — downstream adoption of toolchain changes; publishing releases: train instead. | part 4 | — |
+| the production start commands; which command runs each service in prod; I'll use these for local dev | **start:api / start:worker / start:web** · primitive package.json — Production runs; local dev uses bun run local instead. | part 4 | — |
+| update the pins in this repo; apply the shared toolchain versions; I'll just check without writing | **sync** · primitive @inixiative/config/README.md § (preface) › @inixiative/config — to update pins; check to verify without writing. | part 4 | — |
+| see the task graph; show the full logs of a turbo task; bypass the turbo cache; why did turbo skip this task | **turbo run --graph / --output-logs / --force** · primitive docs/claude/TURBOREPO.md § Debugging — inspect the task graph, show full logs, or bypass the cache | part 4 | — |
+| run one package in watch mode; start a single app with reload; I'll run the whole stack for one app; filter turbo to one package | **turbo watch local#pkg** · primitive turbo.json — Single app dev; bun run local for the full stack; local:worker#api for the worker. | part 4 | — |
+| where the toolchain versions are pinned; which typescript and biome versions we use; I'll bump typescript in one repo; the bill of materials for the ecosystem | **versions.json** · primitive @inixiative/config/versions.json — pin bun, toolchain, required packages, lane sets and consumer repos | part 4 | — |
+| the bun types package on typescript six; I'll drop the bun types dependency | **@types/bun required with TS 6** · rule @inixiative/config/README.md § versions.json (the BOM) — all repos on TypeScript 6.0 | part 4 | — |
+| who bumps dependencies: the config cli or renovate; I'll let renovate bump typescript; renovate must stay off the toolchain packages | **CLI vs Renovate division** · rule @inixiative/config/README.md — dependency updates in any lib repo | part 4 | — |
+| I'll bump this inixiative package to a newer version; which version of a sibling package do we depend on; ecosystem deps match the blessed set | **Ecosystem deps at blessed versions** · rule @inixiative/config/README.md § CLI — Root and workspace members of either lane; workspace:/file:/link: exempt. | code `typecheck`, `registry` | an @inixiative/* dependency bumped to a version other than the one versions.json blesses (@inixiative/config/README.md#CLI) |
+| watch mode regenerates forever; name the generated file so turbo ignores it; I'll add the generated output to the task inputs; a new generator output without the gen marker | **Generated files use .gen. and are excluded from inputs** · rule docs/claude/TURBOREPO.md § Loop Prevention — Any template-owned generated file; Prisma-owned internals exempt unless generator emits .gen. | part 4 | a new generated file without `.gen.` in its name, or a turbo inputs glob that includes generated output so watch mode regenerates forever (docs/claude/TURBOREPO.md § Loop Prevention) |
+| a repo using both primitives and agentic packages; which blessed set applies when a repo mixes lanes | **Repos held to union of lanes** · rule @inixiative/config/README.md § versions.json (the BOM) — repos mixing primitives and agentic packages | part 4 | — |
+| what every ecosystem repo must have; set up a new inixiative repo; the files and scripts the check expects | **Required repo scaffolding** · rule @inixiative/config/README.md § CLI — Every ecosystem repo. | code `typecheck`, `registry` | — |
+| the deprecation-ignore flag only in the dts step; I'll set the deprecation flag globally in tsconfig | **Scope ignoreDeprecations to dts build** · rule @inixiative/config/tsup — tsup builds under TypeScript 6.0 | part 4 | — |
+| the local biome config has drifted from the preset; I'll copy the preset and tweak it locally; stub files just extend | **Stubs hold only extends and reviewed overrides** · rule @inixiative/config/README.md § Presets — every repo adopting @inixiative/config | code `typecheck` | a repo's biome.json or tsconfig copied wholesale from the preset with drifted local edits (@inixiative/config/README.md#Presets) |
+| I'll add typescript to the package's dev dependencies; where do typescript and biome get declared; toolchain deps belong at the root | **Toolchain pins at root only** · rule @inixiative/config/README.md § CLI — Any repo in the ecosystem declaring toolchain dependencies. | code `typecheck`, `registry` | typescript, @biomejs/biome or @types/bun declared in a workspace package.json (@inixiative/config/README.md#CLI) |
+| turbo uses hash and non-turbo uses colon; I'll name the turbo task differently from the script; adding a script and its turbo task | **Turbo task names match package scripts** · rule docs/claude/TURBOREPO.md § Task Naming Convention — When adding a script or turbo task to any package. | part 4 | a turbo.json task named differently from the package.json script it should run, or a script using a delimiter other than `:` (docs/claude/TURBOREPO.md § Task Naming Convention) |
+
 
 ## 4. The specifics, in full
 

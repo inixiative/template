@@ -9,6 +9,7 @@
 - [Glossary](#glossary)
 - [1. What this Warden covers](#1-what-this-warden-covers)
 - [2. The domain](#2-the-domain)
+- [2b. Under construction](#2b-under-construction)
 - [3. Everything that exists here, by class](#3-everything-that-exists-here-by-class)
   - [Class `lib-rules-builder`](#class-lib-rules-builder-the-rules-builder-library-quick-start-sourced-fields-collection-filtering-array-rules-decoration-serialization-api-readme)
 - [4. The specifics, in full](#4-the-specifics-in-full)
@@ -83,11 +84,17 @@ The `@inixiative/rules-builder` library's own documentation (README): install an
 
 The README (in part 4) documents the library on its own terms. Quick start: install, build a view from a lens or narrowing, hand it to the builder, draw the descriptor tree with your own renderers (headless builder, bring your own renderers). Sourced fields take their options from data (`sourceValues` materialised from json-rules source queries), never from free text. Filtering a collection in hand (`useFilteredCollection`) runs `check()` in memory and wants stable inputs. Array (list/relation) rules become `ArrayNode`s; a path crossing several lists seeds nested array nodes; relations are off until the narrowing enables them; `value.path.scopes` and `LeafNode.scopes` / `ArrayNode.scopes` carry scope references that are `check()`-only and must never be hand-spelled as prefixes. Decoration hoists, relabels and aliases lens paths; facet kind follows the path's shape; a collection facet has two wheres (fixed `where` = identity, not security; `defaultWhere` = editable), and one relation can be split into tagged sources. Preset facets carry variables (`FacetCondition`, `VariableControl`, variable placement rules, preset validation) with `facetId` as the facet's identity ignoring defaults; `normalizeGroups` reads stored conditions and filters back into builder groups. Rules are gated against the narrowed lens, values are coerced to real types, moves are moves not copies, and rules persist with their binding (`SavedRule`, serialization). The API section lists every export.
 
-Not here: the template's hooks, views and components that wrap this library are `rules-builder`; the engine the rules run on is `json-rules-engine`; lenses are `lens-model` and `lens-usage`.
+Not here: the template's hooks, views and components that wrap this library are `rules-builder`; the engine the rules run on is `json-rules-shapes / json-rules-runtime`; lenses are `lens-model` and `lens-usage`.
+
+## 2b. Under construction
+
+Open work you cannot use yet. Do not build against it, and do not build what it would replace without saying so.
+
+- Builder surface (exposedSurface done; projection + describeRule), preset facet knobs, lens builder and source-map importer — tickets INFRA-017, INFRA-029 (in progress); INFRA-018, INFRA-013 (not started)
 
 ## 3. Everything that exists here, by class
 
-Point at a class when that is as specific as the moment allows, or at a member. Where a class has siblings an agent could confuse, a table under the class header says which to use when; its *Said as* line gives the plain words a user or agent uses for that job. Each member: **name** · kind `where` · the doc § that describes it (code members) or the code it is about (doc members): choose this when … . Quote the name and the where in a pointer ("look over here: createLock, packages/db/src/lock/createLock.ts, CONCURRENCY.md § Distributed Lock"). *Said as:* the ways a user or agent describes this job in a message or plan without knowing the name; match on these. *Signs you're bypassing it:* the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
+Find the problem in plain words, then point at the exact thing. Each class opens with job tables where a class has confusable siblings (which to use when; *Said as* gives the plain words for that job), then one table of every member: **Problem** is the job in the user's or agent's words (match on these); **Use** is the exact member, its kind and `where`, then when to choose it; **Read** is the doc § that describes it (code members) or the code it is about (doc members); **Signs you're bypassing it** is the hand-rolled code an agent writes when it rebuilds the primitive, plus the errors it throws. Quote Use and Read in a pointer ("look over here: createLock, packages/db/src/lock/createLock.ts, CONCURRENCY.md § Distributed Lock"). Code members come from the catalog, described from the code; doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
 
 ### Class `lib-rules-builder`: The rules-builder library: quick start, sourced fields, collection filtering, array rules, decoration, serialization, API (README)
 
@@ -97,9 +104,6 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
-| **Server ships builder via builderSource** | the server knows the lens; serialize a RuleBuilderSource and resolve it on the client | the lens is already in hand on the client (createView in rules-builder) |
-| **Headless builder, bring your own renderers** | you render the descriptor tree yourself; the library exports no components | expecting an exported RuleTree component (copy the reference renderer) |
-| **Relations off until narrowing enables them** | a bare source offers its anchor's columns only; narrow to open relations | needing every relation on (rawView / withAllRelations in rules-builder) |
 
 **Job: fill a field's choices from data, or filter rows already loaded** (Data-backed options and in-memory filtering: Sourced field options vs Stable useFilteredCollection inputs) — README.md § Sourced fields (data-backed options), § Filtering a collection in hand
 
@@ -107,8 +111,6 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
-| **Sourced field options** | a field's values come from rows (sourceValues from json-rules source queries) | free-text or constant enums (plain ValueControl) |
-| **Stable useFilteredCollection inputs** | display-only filtering of rows fetched whole, with memoized rule and rows | fetching filtered rows from the API (filterLens in api-routes; lenses) |
 
 **Job: present lens paths as named, relabeled or preset choices without changing what the rule means** (Decoration: Decoration facets vs Preset facet vs Tagged sources on one relation vs Two wheres) — README.md § Decoration — hoisting, relabeling & aliasing (and › Two wheres, › Splitting one relation into tagged sources)
 
@@ -116,11 +118,6 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
-| **Decoration facets** | hoist and relabel real lens paths; presentation only, every facet emits its dotted path | changing what a rule may reach (narrow the lens instead) |
-| **Preset facet** | a fixed condition with Variable slots the user fills (presetSeed, VariableControl) | the user should edit the whole condition (plain facet) |
-| **Tagged sources on one relation** | one enrichment relation must appear as several sources, each leading with a different slug | a second relation or model (add it to the lens) |
-| **Two wheres** | a collection facet: fixed where is identity for rehydration, defaultWhere is editable | treating the fixed where as security (Fixed where is not security) |
-| **Facet kind by path shape** | deciding whether a path is a leaf, an array node or a scoped group | forcing a kind by hand |
 
 **Job: write a rule over a list or relation, possibly several lists deep** (Array rules and scopes: ArrayNode vs Nested array nodes vs scope refs) — README.md § Array (list/relation) rules
 
@@ -128,10 +125,6 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
-| **ArrayNode** | a rule over one list or relation (LeafNode.scopes / ArrayNode.scopes carry the scope) | a scalar path (LeafNode) |
-| **Nested array nodes for multi-list paths** | a path crossing several lists; each list seeds a nested array node | a single list (one ArrayNode) |
-| **Scope refs are check()-only** | value.path.scopes referencing an outer item; evaluated in memory | expecting the backend compiler to honour scope refs (toPrisma / toSql) |
-| **Never hand-spell scope prefixes** | always let the builder emit scope references | writing $0. or similar prefixes by hand |
 
 **Job: store a rule the editor produced and load it back** (Saving and reading rules: Persist rules with their binding vs Serialization vs normalizeGroups) — README.md § Serialization
 
@@ -139,81 +132,40 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
-| **Persist rules with their binding** | a SavedRule stores the condition together with its binding | storing the bare condition and guessing the lens later |
-| **SavedRule** | the serialized shape (parseSavedRule / stringifySavedRule in rules-builder) | ad-hoc JSON of the descriptor tree |
-| **normalizeGroups** | reading stored conditions and filters back into builder groups | building a fresh rule (the hooks in rules-builder) |
-| **Coerce rule values to real types** | values typed as the field's kind on the way in and out | comparing strings to numbers or dates |
-| **Move, not copy** | moving a node in the tree keeps its identity | duplicating nodes on drag |
 
-- **Decoration facets** · pattern @inixiative/rules-builder/README.md § Decoration: alias a relation slice as a named picker entry with fixed where and kind
-  - *Said as:* "a named picker entry with a fixed where and kind", "alias a filtered relation slice", "a picker entry for a slice of a relation"
-- **Headless builder, bring your own renderers** · pattern @inixiative/rules-builder/README.md § Quick start › Rendering values · code: `useRuleBuilder`, `User`, `withAllRelations`, `lensVisit`: reference renderers are copy-paste, not exported; start from them over writing from scratch
-  - *Said as:* "the builder renders nothing, I write the inputs", "start from the copy-paste renderers", "I'll write the rule tree renderer from scratch"
-  - *Signs you're bypassing it:* Writing a rule-tree renderer and value-input coercion matrix from scratch instead of starting from the copy-paste reference renderers (RuleTree.tsx / RuleTreeShadcn.tsx). (@inixiative/rules-builder/README.md § Rendering values)
-- **Preset facet** · pattern @inixiative/rules-builder/README.md Decoration: fixed reusable rule; path facets instead when user picks field/operator/value
-  - *Said as:* "a fixed reusable rule the user inserts", "a named canned condition in the picker", "preset versus path facet"
-- **Server ships builder via builderSource** · pattern @inixiative/rules-builder/README.md API: server serializes its lens with builderSource; client resolves it into a view
-  - *Said as:* "the server serializes the lens, the client turns it into a view", "how the builder gets its source from the API", "the server to client builder handoff"
-- **Sourced field options** · pattern @inixiative/rules-builder/README.md § Sourced fields (data-backed options) · code: `materializeSourceQuery`, `toSourceQueries`, `composeNarrowed`, `useRuleBuilder`: rows already in memory: materializeSources(lens, rows, { now }) instead
-  - *Said as:* "data-backed selects in the editor", "I'll fetch option lists by hand and wire custom selects", "options from source queries into the builder", "constrained pickers instead of free-text ids"
-  - *Signs you're bypassing it:* Fetching option lists by hand and wiring custom selects into the editor instead of passing toSourceQueries + materializeSourceQuery results as sourceValues. (@inixiative/rules-builder/README.md § Sourced fields (data-backed options))
-- **Tagged sources on one relation** · pattern @inixiative/rules-builder/README.md § Decoration — hoisting, relabeling & aliasing › Splitting one relation into tagged sources › Splitting one relation into tagged sources · code: `Decoration`, `validateDecoration`: Shared enrichment tables discriminated by system/source; no new primitive needed.
-  - *Said as:* "split a shared enrichment table by system", "I'll add a table per integration", "several facets on one path, each with a system slug"
-  - *Signs you're bypassing it:* A new table, primitive or relation per integration to separate a shared enrichment table's rows, instead of several facets on the same path each leading its where with a system slug. (@inixiative/rules-builder/README.md › Splitting one relation into tagged sources ("needs no new primitive"))
-- **ArrayNode** · primitive @inixiative/rules-builder ArrayNode: List or relation fields; scalar columns use LeafNode.
-  - *Said as:* "the node for a list or relation field", "a list field in the builder tree", "to-many node versus scalar leaf"
-- **FacetCondition** · primitive @inixiative/rules-builder FacetCondition: type a Condition whose rules may carry variable slots
-  - *Said as:* "a condition whose leaves can hold a variable slot", "type the rule template with placeholders in it", "I'll extend the Condition type with a placeholder marker"
-- **facetId** · primitive @inixiative/rules-builder: compute facet identity ignoring defaults and defaultWhere
-  - *Said as:* "two facets that differ only in defaults should count as the same", "a stable identity for a facet", "I'll compare facets by deep-equal including their defaults"
-- **LeafNode.scopes / ArrayNode.scopes** · primitive @inixiative/rules-builder LeafNode.scopes, ArrayNode.scopes: Field mode referencing ancestor columns; value.path.scopes for path-mode comparisons.
-  - *Said as:* "reference an ancestor's column in field mode", "which outer scopes may a nested field name", "I'll concatenate the dollar prefix onto the field", "rule on a parent column from inside the array"
-- **LeafNode.valid** · primitive @inixiative/rules-builder LeafNode: mark the exact bad input via field.valid/value.valid rather than row valid
-  - *Said as:* "mark which input is bad: field or value", "validity per field and value, not per row", "flag the exact bad input"
-- **normalizeGroups** · primitive @inixiative/rules-builder: convert conditions and filters into builder group shape for reading templates
-  - *Said as:* "turn stored conditions and filters into the builder's group shape", "read a saved template back into the editor", "I'll write a converter from stored rules to builder groups"
-- **SavedRule** · primitive @inixiative/rules-builder SavedRule: package a rule with its source reference and captured sourceValues
-  - *Said as:* "a rule with its source and captured values", "a rule loses meaning without its binding", "what gets persisted for a rule"
-- **value.path.scopes** · primitive @inixiative/rules-builder value.path.scopes: Comparing against an ancestor's value; LeafNode.scopes for ruling on an ancestor's field.
-  - *Said as:* "compare against an ancestor's value", "path-mode comparison to an outer scope", "the value locations a path may name", "an element compared to a root column"
-- **ValueControl** · primitive @inixiative/rules-builder: expose options, shape and kind signals to pick the right value input
-  - *Said as:* "which input to render for this value", "options, shape and kind for the value input", "branch on the reported range shape"
-- **VariableControl** · primitive @inixiative/rules-builder VariableControl: expose per-slot editable control on an atomic preset node
-  - *Said as:* "the per-slot control on a preset node", "an editable knob on an atomic preset", "render the tunable slot"
-- **Coerce rule values to real types** · rule @inixiative/rules-builder/README.md § Quick start › Rendering values · code: `useRuleBuilder`, `User`, `withAllRelations`, `lensVisit`: whenever a value input writes into a Condition
-  - *Said as:* "the input writes the string true into the rule", "store numbers and booleans, not strings", "coerce before writing into the condition"
-  - *Signs you're bypassing it:* Value inputs writing raw strings ("true", "10") into a Condition instead of coerced booleans and numbers. (@inixiative/rules-builder/README.md § Rendering values ("store true, not \"true\""))
-- **Facet kind by path shape** · rule @inixiative/rules-builder/README.md Decoration: any path facet; json-rules mis-matches scalar operators over list paths
-  - *Said as:* "the facet kind follows the path's shape", "a scalar operator over a list path", "a list path means an array facet"
-- **Fixed where is not security** · rule @inixiative/rules-builder/README.md § Nesting: When a facet filter seems to restrict data access.
-  - *Said as:* "the facet's fixed where restricts access", "a presentation filter, not an access boundary", "access must be bounded by the lens"
-  - *Signs you're bypassing it:* Relying on a facet's fixed where to restrict which rows a user can reach; access must be bounded by the lens narrowing. (@inixiative/rules-builder/README.md § Decoration › Nesting ("The fixed where is presentation, not security"))
-- **Gate rules against the narrowed lens** · rule @inixiative/rules-builder/README.md § Quick start › Relations are off until the narrowing turns them on · code: `useRuleBuilder`, `User`, `withAllRelations`, `lensVisit`: any rule check outside the builder
-  - *Said as:* "validate builder output against the shipped surface", "check the saved rule against the real lens", "the projection isn't the gate"
-  - *Signs you're bypassing it:* Validating, coercing or describing builder output against the projected or shipped surface instead of the narrowed lens (useRuleBuilder().lens / composeNarrowed(source)). (@inixiative/rules-builder/README.md › Relations are off until the narrowing turns them on)
-- **Move, not copy** · rule @inixiative/rules-builder/README.md § Decoration: Whenever a facet aliases a whole top-level relation.
-  - *Said as:* "a facet consuming a whole top-level field", "the aliased relation appears twice in the picker", "move the field into the facet"
-- **Nested array nodes for multi-list paths** · rule @inixiative/rules-builder/README.md § Nesting: Any collection path crossing more than one list.
-  - *Said as:* "orders.items.sku as a flat field", "a path crossing two lists", "nest array nodes per list"
-  - *Signs you're bypassing it:* A flat field condition over a path that crosses one or more lists (orders.items.sku) instead of nested array nodes; json-rules silently mis-matches it. (@inixiative/rules-builder/README.md § Decoration › Nesting)
-- **Never hand-spell scope prefixes** · rule @inixiative/rules-builder/README.md — Scope references: Any renderer offering scope references inside array sub-builders.
-  - *Said as:* "I'll concatenate the scope prefix in the renderer", "use the pre-prefixed scope options", "the renderer builds the dollar path"
-  - *Signs you're bypassing it:* Renderer code concatenating '$$.' / '$$$.' onto field names for scope references instead of using the pre-prefixed options on LeafNode.scopes / value.path.scopes. (@inixiative/rules-builder/README.md § Scope references ("so a renderer never spells a prefix"))
-- **Persist rules with their binding** · rule @inixiative/rules-builder/README.md § Serialization · code: `parseSavedRule`, `stringifySavedRule`, `RuleBuilderSource`, `registry`: Whenever persisting a rule.
-  - *Said as:* "store the bare condition without its source", "save the rule with its source and values", "a saved rule needs its binding"
-- **Preset validation** · rule @inixiative/rules-builder/README.md Variables: every preset facet
-  - *Said as:* "check every preset is a valid rule", "preset facets must validate against the lens", "a bad preset in the decoration"
-- **Relations off until narrowing enables them** · rule @inixiative/rules-builder/README.md § Quick start › Relations are off until the narrowing turns them on · code: `useRuleBuilder`, `User`, `withAllRelations`, `lensVisit`: root.relations for a specific path; mapDefaults for wherever a model is visited
-  - *Said as:* "the related fields don't show in the builder", "turn on the relation for a path", "relations are hidden by default"
-- **Scope refs are check()-only** · rule @inixiative/rules-builder/README.md — Scope references: Rules using $$./$$$. scope refs that might run server-side.
-  - *Said as:* "a rule with scope refs run server-side", "scope references don't compile to SQL", "parent refs only in memory"
-- **Stable useFilteredCollection inputs** · rule @inixiative/rules-builder/README.md — Filtering a collection in hand: Every useFilteredCollection call.
-  - *Said as:* "inline literals for source or rows", "memoize the inputs to the filter hook", "re-renders because the options object is new"
-  - *Signs you're bypassing it:* Passing inline object/array literals for source, rows or checkOptions to useFilteredCollection without memoizing them. (@inixiative/rules-builder/README.md § Filtering a collection in hand)
-- **Two wheres** · rule @inixiative/rules-builder/README.md Two wheres: collection facets
-  - *Said as:* "the fixed where and the user's where on a collection facet", "a facet's leading conditions versus the editable ones", "two filters on one collection facet"
-- **Variable placement** · rule @inixiative/rules-builder/README.md Variables: authoring preset templates with slots
-  - *Said as:* "where a slot sits in the preset template", "the variable in the value position", "authoring a template with open slots"
+| Problem | Use | Read | Signs you're bypassing it |
+|---|---|---|---|
+| a named picker entry with a fixed where and kind; alias a filtered relation slice; a picker entry for a slice of a relation | **Decoration facets** · pattern @inixiative/rules-builder/README.md § Decoration — alias a relation slice as a named picker entry with fixed where and kind | part 4 | — |
+| the builder renders nothing, I write the inputs; start from the copy-paste renderers; I'll write the rule tree renderer from scratch | **Headless builder, bring your own renderers** · pattern @inixiative/rules-builder/README.md § Quick start › Rendering values — reference renderers are copy-paste, not exported; start from them over writing from scratch | code `useRuleBuilder`, `User`, `withAllRelations`, `lensVisit` | Writing a rule-tree renderer and value-input coercion matrix from scratch instead of starting from the copy-paste reference renderers (RuleTree.tsx / RuleTreeShadcn.tsx). (@inixiative/rules-builder/README.md § Rendering values) |
+| a fixed reusable rule the user inserts; a named canned condition in the picker; preset versus path facet | **Preset facet** · pattern @inixiative/rules-builder/README.md Decoration — fixed reusable rule; path facets instead when user picks field/operator/value | part 4 | — |
+| the server serializes the lens, the client turns it into a view; how the builder gets its source from the API; the server to client builder handoff | **Server ships builder via builderSource** · pattern @inixiative/rules-builder/README.md API — server serializes its lens with builderSource; client resolves it into a view | part 4 | — |
+| data-backed selects in the editor; I'll fetch option lists by hand and wire custom selects; options from source queries into the builder; constrained pickers instead of free-text ids | **Sourced field options** · pattern @inixiative/rules-builder/README.md § Sourced fields (data-backed options) — rows already in memory: materializeSources(lens, rows, { now }) instead | code `materializeSourceQuery`, `toSourceQueries`, `composeNarrowed`, `useRuleBuilder` | Fetching option lists by hand and wiring custom selects into the editor instead of passing toSourceQueries + materializeSourceQuery results as sourceValues. (@inixiative/rules-builder/README.md § Sourced fields (data-backed options)) |
+| split a shared enrichment table by system; I'll add a table per integration; several facets on one path, each with a system slug | **Tagged sources on one relation** · pattern @inixiative/rules-builder/README.md § Decoration — hoisting, relabeling & aliasing › Splitting one relation into tagged sources › Splitting one relation into tagged sources — Shared enrichment tables discriminated by system/source; no new primitive needed. | code `Decoration`, `validateDecoration` | A new table, primitive or relation per integration to separate a shared enrichment table's rows, instead of several facets on the same path each leading its where with a system slug. (@inixiative/rules-builder/README.md › Splitting one relation into tagged sources ("needs no new primitive")) |
+| the node for a list or relation field; a list field in the builder tree; to-many node versus scalar leaf | **ArrayNode** · primitive @inixiative/rules-builder ArrayNode — List or relation fields; scalar columns use LeafNode. | part 4 | — |
+| a condition whose leaves can hold a variable slot; type the rule template with placeholders in it; I'll extend the Condition type with a placeholder marker | **FacetCondition** · primitive @inixiative/rules-builder FacetCondition — type a Condition whose rules may carry variable slots | part 4 | — |
+| two facets that differ only in defaults should count as the same; a stable identity for a facet; I'll compare facets by deep-equal including their defaults | **facetId** · primitive @inixiative/rules-builder — compute facet identity ignoring defaults and defaultWhere | part 4 | — |
+| reference an ancestor's column in field mode; which outer scopes may a nested field name; I'll concatenate the dollar prefix onto the field; rule on a parent column from inside the array | **LeafNode.scopes / ArrayNode.scopes** · primitive @inixiative/rules-builder LeafNode.scopes, ArrayNode.scopes — Field mode referencing ancestor columns; value.path.scopes for path-mode comparisons. | part 4 | — |
+| mark which input is bad: field or value; validity per field and value, not per row; flag the exact bad input | **LeafNode.valid** · primitive @inixiative/rules-builder LeafNode — mark the exact bad input via field.valid/value.valid rather than row valid | part 4 | — |
+| turn stored conditions and filters into the builder's group shape; read a saved template back into the editor; I'll write a converter from stored rules to builder groups | **normalizeGroups** · primitive @inixiative/rules-builder — convert conditions and filters into builder group shape for reading templates | part 4 | — |
+| a rule with its source and captured values; a rule loses meaning without its binding; what gets persisted for a rule | **SavedRule** · primitive @inixiative/rules-builder SavedRule — package a rule with its source reference and captured sourceValues | part 4 | — |
+| compare against an ancestor's value; path-mode comparison to an outer scope; the value locations a path may name; an element compared to a root column | **value.path.scopes** · primitive @inixiative/rules-builder value.path.scopes — Comparing against an ancestor's value; LeafNode.scopes for ruling on an ancestor's field. | part 4 | — |
+| which input to render for this value; options, shape and kind for the value input; branch on the reported range shape | **ValueControl** · primitive @inixiative/rules-builder — expose options, shape and kind signals to pick the right value input | part 4 | — |
+| the per-slot control on a preset node; an editable knob on an atomic preset; render the tunable slot | **VariableControl** · primitive @inixiative/rules-builder VariableControl — expose per-slot editable control on an atomic preset node | part 4 | — |
+| the input writes the string true into the rule; store numbers and booleans, not strings; coerce before writing into the condition | **Coerce rule values to real types** · rule @inixiative/rules-builder/README.md § Quick start › Rendering values — whenever a value input writes into a Condition | code `useRuleBuilder`, `User`, `withAllRelations`, `lensVisit` | Value inputs writing raw strings ("true", "10") into a Condition instead of coerced booleans and numbers. (@inixiative/rules-builder/README.md § Rendering values ("store true, not \"true\"")) |
+| the facet kind follows the path's shape; a scalar operator over a list path; a list path means an array facet | **Facet kind by path shape** · rule @inixiative/rules-builder/README.md Decoration — any path facet; json-rules mis-matches scalar operators over list paths | part 4 | — |
+| the facet's fixed where restricts access; a presentation filter, not an access boundary; access must be bounded by the lens | **Fixed where is not security** · rule @inixiative/rules-builder/README.md § Nesting — When a facet filter seems to restrict data access. | part 4 | Relying on a facet's fixed where to restrict which rows a user can reach; access must be bounded by the lens narrowing. (@inixiative/rules-builder/README.md § Decoration › Nesting ("The fixed where is presentation, not security")) |
+| validate builder output against the shipped surface; check the saved rule against the real lens; the projection isn't the gate | **Gate rules against the narrowed lens** · rule @inixiative/rules-builder/README.md § Quick start › Relations are off until the narrowing turns them on — any rule check outside the builder | code `useRuleBuilder`, `User`, `withAllRelations`, `lensVisit` | Validating, coercing or describing builder output against the projected or shipped surface instead of the narrowed lens (useRuleBuilder().lens / composeNarrowed(source)). (@inixiative/rules-builder/README.md › Relations are off until the narrowing turns them on) |
+| a facet consuming a whole top-level field; the aliased relation appears twice in the picker; move the field into the facet | **Move, not copy** · rule @inixiative/rules-builder/README.md § Decoration — Whenever a facet aliases a whole top-level relation. | part 4 | — |
+| orders.items.sku as a flat field; a path crossing two lists; nest array nodes per list | **Nested array nodes for multi-list paths** · rule @inixiative/rules-builder/README.md § Nesting — Any collection path crossing more than one list. | part 4 | A flat field condition over a path that crosses one or more lists (orders.items.sku) instead of nested array nodes; json-rules silently mis-matches it. (@inixiative/rules-builder/README.md § Decoration › Nesting) |
+| I'll concatenate the scope prefix in the renderer; use the pre-prefixed scope options; the renderer builds the dollar path | **Never hand-spell scope prefixes** · rule @inixiative/rules-builder/README.md — Scope references — Any renderer offering scope references inside array sub-builders. | part 4 | Renderer code concatenating '$$.' / '$$$.' onto field names for scope references instead of using the pre-prefixed options on LeafNode.scopes / value.path.scopes. (@inixiative/rules-builder/README.md § Scope references ("so a renderer never spells a prefix")) |
+| store the bare condition without its source; save the rule with its source and values; a saved rule needs its binding | **Persist rules with their binding** · rule @inixiative/rules-builder/README.md § Serialization — Whenever persisting a rule. | code `parseSavedRule`, `stringifySavedRule`, `RuleBuilderSource`, `registry` | — |
+| check every preset is a valid rule; preset facets must validate against the lens; a bad preset in the decoration | **Preset validation** · rule @inixiative/rules-builder/README.md Variables — every preset facet | part 4 | — |
+| the related fields don't show in the builder; turn on the relation for a path; relations are hidden by default | **Relations off until narrowing enables them** · rule @inixiative/rules-builder/README.md § Quick start › Relations are off until the narrowing turns them on — root.relations for a specific path; mapDefaults for wherever a model is visited | code `useRuleBuilder`, `User`, `withAllRelations`, `lensVisit` | — |
+| a rule with scope refs run server-side; scope references don't compile to SQL; parent refs only in memory | **Scope refs are check()-only** · rule @inixiative/rules-builder/README.md — Scope references — Rules using $$./$$$. scope refs that might run server-side. | part 4 | — |
+| inline literals for source or rows; memoize the inputs to the filter hook; re-renders because the options object is new | **Stable useFilteredCollection inputs** · rule @inixiative/rules-builder/README.md — Filtering a collection in hand — Every useFilteredCollection call. | part 4 | Passing inline object/array literals for source, rows or checkOptions to useFilteredCollection without memoizing them. (@inixiative/rules-builder/README.md § Filtering a collection in hand) |
+| the fixed where and the user's where on a collection facet; a facet's leading conditions versus the editable ones; two filters on one collection facet | **Two wheres** · rule @inixiative/rules-builder/README.md Two wheres — collection facets | part 4 | — |
+| where a slot sits in the preset template; the variable in the value position; authoring a template with open slots | **Variable placement** · rule @inixiative/rules-builder/README.md Variables — authoring preset templates with slots | part 4 | — |
+
 
 ## 4. The specifics, in full
 

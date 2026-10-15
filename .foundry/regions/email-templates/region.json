@@ -1,13 +1,13 @@
 {
   "id": "email-templates",
-  "title": "Email templates and rendering",
-  "routing": "Is this about an email's stored content and how it becomes a message: EmailTemplate / EmailComponent rows, MJML and {{#component:slug}} blocks, componentRefs, the owner cascade (composeTemplate, composeComponent, lookupCascade, inheritToSpaces), saving (saveEmailTemplate, saveEmailComponents, validateMjml, validateConditions, validateTokens, validateNoCycle, emailSeedSavers), rendering (settleTemplate, renderForRecipient, interpolate, evaluateConditions, RenderIssue, the registry's onIssue / substitute policy), preflight, or versioning and recompose (emailVersioning, AuditLog.componentVersions, recomposeSnapshot)?",
+  "title": "Email templates and components",
+  "routing": "Is this about the email content models and who owns them: EmailTemplate and EmailComponent, the {{#component:slug}} block markup, componentRefs staying slug-keyed, the owner cascade (ownerModel: default, admin, Organization, Space, User, OrganizationUser, SpaceUser; inheritToSpaces), system tokens and sender identity vs branding, template versioning through the audit log (emailVersioning, AuditLog.componentVersions, recomposeCommunication / recomposeSnapshot), the emailTemplate module and rule surface, seeding templates (emailSeedSavers), edge staleness and preventHardDelete?",
   "concepts": [
     "email-templates"
   ],
-  "tokens": 25078,
+  "tokens": 8772,
   "tokenMethod": "chars/4",
-  "runsAgreed": 1,
+  "runsAgreed": 0,
   "sources": {
     "docs": [
       "FEATURES.md",
@@ -19,33 +19,23 @@
       "doc:docs/claude/COMMUNICATIONS.md#email/package-structure",
       "doc:docs/claude/COMMUNICATIONS.md#email/database-models",
       "doc:docs/claude/COMMUNICATIONS.md#email/component-system",
-      "doc:docs/claude/COMMUNICATIONS.md#email/variable-interpolation",
-      "doc:docs/claude/COMMUNICATIONS.md#email/cascade-resolution",
-      "doc:docs/claude/COMMUNICATIONS.md#email/render-pipeline",
-      "doc:docs/claude/COMMUNICATIONS.md#email/save-pipeline",
-      "doc:docs/claude/COMMUNICATIONS.md#email/mjml-validation",
       "doc:docs/claude/COMMUNICATIONS.md#email/template-versioning-recompose",
       "doc:FEATURES.md#email-system"
     ],
     "catalogClusters": [
       "audit-logging",
-      "caching-and-invalidation",
       "email-composition-rendering",
-      "error-handling",
-      "graceful-shutdown-lifecycle",
       "job-definition-and-enqueue",
-      "json-rules-engine",
       "locks-and-serialization",
       "messaging-channels-adapters",
       "mutation-hooks",
       "request-response-schemas",
-      "roles-and-permissions",
       "seeding-data",
       "soft-delete-cascade"
     ],
-    "codeEntries": 165,
-    "docMembers": 41
+    "codeEntries": 15,
+    "docMembers": 21
   },
   "bypassLines": 21,
-  "glossaryTerms": 29
+  "glossaryTerms": 16
 }

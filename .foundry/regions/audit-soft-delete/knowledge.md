@@ -9,6 +9,7 @@
 - [Glossary](#glossary)
 - [1. What this Warden covers](#1-what-this-warden-covers)
 - [2. The domain](#2-the-domain)
+- [2b. Under construction](#2b-under-construction)
 - [3. Everything that exists here, by class](#3-everything-that-exists-here-by-class)
   - [Class `audit-log`](#class-audit-log-audit-log-capture-enabled-models-actor-diffs-redaction)
   - [Class `soft-delete`](#class-soft-delete-soft-delete-tombstone-cascade-and-revive-soft-delete-read-scoping)
@@ -83,9 +84,15 @@ Soft delete: `SOFT_DELETE_MODELS` (`isSoftDeleteModel`, `hasDeletedAt`) have a `
 
 Not here: `registerDbHook`, `mutationLifeCycle`, rules, immutable fields and ordered lists are `mutation-hooks`; `db.txn` and `db.findForUpdate` are `database-client`; the request-side actor (sessions, tokens, spoofing) is `auth-middleware-users`; Signet and Segment delete lifecycle rules are stated in the org CLAUDE.md.
 
+## 2b. Under construction
+
+Open work you cannot use yet. Do not build against it, and do not build what it would replace without saying so.
+
+- The endpoint decides soft-delete visibility (review); audit log hardening, inquiry lineage and the explorer (in progress) — tickets DB-003 (review), FEAT-017 (in progress)
+
 ## 3. Everything that exists here, by class
 
-Point at a class when that is as specific as the moment allows, or at a member. Where a class has siblings an agent could confuse, a table under the class header says which to use when; its *Said as* line gives the plain words a user or agent uses for that job. Each member: **name** · kind `where` · the doc § that describes it (code members) or the code it is about (doc members): choose this when … . Quote the name and the where in a pointer ("look over here: createLock, packages/db/src/lock/createLock.ts, CONCURRENCY.md § Distributed Lock"). *Said as:* the ways a user or agent describes this job in a message or plan without knowing the name; match on these. *Signs you're bypassing it:* the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
+Find the problem in plain words, then point at the exact thing. Each class opens with job tables where a class has confusable siblings (which to use when; *Said as* gives the plain words for that job), then one table of every member: **Problem** is the job in the user's or agent's words (match on these); **Use** is the exact member, its kind and `where`, then when to choose it; **Read** is the doc § that describes it (code members) or the code it is about (doc members); **Signs you're bypassing it** is the hand-rolled code an agent writes when it rebuilds the primitive, plus the errors it throws. Quote Use and Read in a pointer ("look over here: createLock, packages/db/src/lock/createLock.ts, CONCURRENCY.md § Distributed Lock"). Code members come from the catalog, described from the code; doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
 
 ### Class `audit-log`: Audit log capture: enabled models, actor, diffs, redaction
 
@@ -95,9 +102,6 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
-| **auditActorMiddleware** | request path: records the authenticated user as actor | jobs (use jobAuditActor) |
-| **jobAuditActor** | writes attributed to a job and its integration | HTTP requests (auditActorMiddleware already sets it) |
-| **auditActorContext** | scoping an actor around other code | touching auditActorStore directly or threading user ids |
 | *no actor argument or column* | attributing a write: the scoped actor (auditActorMiddleware on requests, jobAuditActor in jobs) is recorded by the hook; don't thread the user id or add createdBy / approverUserId columns (HOOKS.md § Audit Log › Actor Context, Enabling Audit) | code that writes outside both scopes (wrap it in auditActorContext.scope) |
 
 **Job: control which models and fields reach the audit log** (What reaches the log: AUDIT_ENABLED_MODELS vs isAuditEnabled vs redactFields registry vs ignoreFields registry vs processAuditData vs redactChangeDiff) — docs/claude/HOOKS.md § Field Processing Pipeline, § Registries
@@ -106,12 +110,6 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
-| **AUDIT_ENABLED_MODELS** | opting a model in | checking membership (use isAuditEnabled) |
-| **isAuditEnabled** | membership check; narrows to AuditSubjectModel | registering a model (edit AUDIT_ENABLED_MODELS) |
-| **redactFields registry** | sensitive values → [REDACTED] | noise fields (use ignoreFields registry) |
-| **ignoreFields registry** | noise fields (updatedAt, lastLoginAt) | secrets (use redactFields registry) |
-| **processAuditData** | default audit payload (ignore + redact) | diffs only (use redactChangeDiff) |
-| **redactChangeDiff** | redacting a change diff | whole records (redactSensitiveFields, per its choose line) |
 
 **Job: record that something happened to a model (change history vs named event)** (AuditLog vs AppEvent) — catalog AuditLog
 
@@ -119,38 +117,23 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
-| **AuditLog** | mutation history with diffs, written by the hook | named domain events (use AppEvent (app-events-webhooks-adapters)) |
 
-- **AuditLog** · model `packages/db/prisma/schema/auditLog.prisma` · in docs: docs/claude/COMMUNICATIONS.md § Email › Template Versioning & Recompose; docs/claude/NAMING.md § Database: Mutation history with diffs; for named domain events without diffs use AppEvent.
-  - *Said as:* "a history of who changed what, with diffs", "I'll add a per-domain events table for history", "a timeline of changes to this record", "a status history table with a writer", "read the change history for a row"
-- **AUDIT_ENABLED_MODELS** · primitive `packages/db/src/registries/auditEnabledModels.ts#AUDIT_ENABLED_MODELS` · in docs: docs/claude/HOOKS.md § Audit Log: Register models here; check membership with isAuditEnabled.
-  - *Said as:* "turn on audit history for this model", "write audit rows by hand in the service", "add a created-by column so we know who did it", "this model should have change history", "opt a model into the audit log"
-  - *Signs you're bypassing it:* writing audit rows by hand in a service (`db.auditLog.create`), or adding `createdBy` / `approverUserId` / 'who changed it' columns and parameters that the audit log already records (docs/claude/HOOKS.md § Audit Log › Enabling Audit for a Model)
-- **auditActorContext** · primitive `packages/db/src/lib/auditActorContext.ts#auditActorContext` · in docs: docs/claude/HOOKS.md § Audit Log; docs/claude/APP_EVENTS.md § Purpose and execution: Use scope rather than touching auditActorStore directly; it awaits inside the store so lazy thenables keep the actor.
-  - *Said as:* "record the actor for writes outside a request", "set the actor around a block of code", "thread the acting user id through the function arguments", "ad-hoc actor and email threaded per call site", "the real principal already rides the context"
-  - *Signs you're bypassing it:* threading the acting user id through function arguments so a write can be attributed, or setting the actor store directly (docs/claude/HOOKS.md § Audit Log › Actor Context)
-- **auditActorMiddleware** · primitive `apps/api/src/middleware/auth/auditActorMiddleware.ts#auditActorMiddleware` · in docs: docs/claude/AUTH.md § Auth Middleware Chain: record the authenticated user as the actor for audit logs and app events
-  - *Said as:* "the request's user becomes the audit actor", "who did this on an HTTP request", "set the actor from the session on every request", "the middleware that records who is acting"
-- **computeDiff** · primitive `apps/api/src/hooks/auditLog/utils.ts#computeDiff`: compute per-field before/after diff between two record snapshots
-  - *Said as:* "before and after per field", "what changed between the two snapshots", "field-level diff of two records"
-- **isAuditEnabled** · primitive `packages/db/src/registries/auditEnabledModels.ts#isAuditEnabled`: Use instead of reading AUDIT_ENABLED_MODELS directly; also narrows type to AuditSubjectModel.
-  - *Said as:* "is this model audited", "check whether the model is in the audit list", "read the enabled-models array directly", "narrow the model to an audited one"
-- **jobAuditActor** · primitive `apps/api/src/jobs/jobAuditActor.ts#jobAuditActor`: build an audit actor attributing writes to a job and its integration
-  - *Said as:* "who did this in the audit log when a job runs", "attribute the job's writes to the job and its integration", "a job writing with no actor", "pass a fake user id for the background job", "record the actor for background work"
-  - *Signs you're bypassing it:* a job writing with no actor, or passing a fake user id, instead of scoping writes to the job's audit actor (catalog jobAuditActor)
-- **processAuditData** · primitive `apps/api/src/hooks/auditLog/utils.ts#processAuditData`: Default for audit payloads; filterForAudit only when redaction is not wanted.
-  - *Said as:* "prepare the record for the audit payload", "ignore noise and redact secrets before storing", "the default audit payload processing", "filter and redact in one step"
-- **redactChangeDiff** · primitive `packages/db/src/registries/redactFields.ts#redactChangeDiff`: For diffs only; whole records use redactSensitiveFields, arbitrary nested payloads use redactPayload.
-  - *Said as:* "redact secrets inside a diff", "scrub the before and after values of sensitive fields", "the diff still shows the token hash", "mask sensitive fields in the change set"
-- **Audit pipeline: ignore, redact, diff** · pattern docs/claude/HOOKS.md § Audit Log › Field Processing Pipeline · code: `auditActorContext`, `AUDIT_ENABLED_MODELS`, `Inquiry`: filter and redact records then diff; skip writing when the diff is empty
-  - *Said as:* "how a change becomes an audit row", "hand-written diff and redaction before storing", "skip the audit row when nothing changed"
-  - *Signs you're bypassing it:* a hand-written diff or redaction of passwords and token hashes before storing a change record (docs/claude/HOOKS.md § Field Processing Pipeline)
-- **ignoreFields registry** · primitive packages/db/src/registries/ignoreFields.ts: Non-meaningful changes; secrets go in redactFields.
-  - *Said as:* "fields the audit log shouldn't bother with", "updated-at and last-login shouldn't make audit rows", "add a noise field to the ignore list", "non-meaningful changes to leave out"
-- **redactFields registry** · primitive packages/db/src/registries/redactFields.ts: Sensitive values; noise fields go in ignoreFields.
-  - *Said as:* "mask the password hash in the audit log", "fields that show as redacted", "register a sensitive field so it never appears in history", "secrets in the audit payload"
-- **Soft delete recorded as delete** · rule docs/claude/HOOKS.md § Audit Log › Soft Delete Detection · code: `auditActorContext`, `AUDIT_ENABLED_MODELS`, `Inquiry`: Any soft-delete on audited models.
-  - *Said as:* "a soft delete should show as a delete in history", "the audit log says update when a row was tombstoned", "detect a tombstone and log it as a delete"
+| Problem | Use | Read | Signs you're bypassing it |
+|---|---|---|---|
+| a history of who changed what, with diffs; I'll add a per-domain events table for history; a timeline of changes to this record; a status history table with a writer; read the change history for a row | **AuditLog** · model `packages/db/prisma/schema/auditLog.prisma` — Mutation history with diffs; for named domain events without diffs use AppEvent. | docs/claude/COMMUNICATIONS.md § Email › Template Versioning & Recompose; docs/claude/NAMING.md § Database | — |
+| turn on audit history for this model; write audit rows by hand in the service; add a created-by column so we know who did it; this model should have change history; opt a model into the audit log | **AUDIT_ENABLED_MODELS** · primitive `packages/db/src/registries/auditEnabledModels.ts#AUDIT_ENABLED_MODELS` — Register models here; check membership with isAuditEnabled. | docs/claude/HOOKS.md § Audit Log | writing audit rows by hand in a service (`db.auditLog.create`), or adding `createdBy` / `approverUserId` / 'who changed it' columns and parameters that the audit log already records (docs/claude/HOOKS.md § Audit Log › Enabling Audit for a Model) |
+| record the actor for writes outside a request; set the actor around a block of code; thread the acting user id through the function arguments; ad-hoc actor and email threaded per call site; the real principal already rides the context | **auditActorContext** · primitive `packages/db/src/lib/auditActorContext.ts#auditActorContext` — Use scope rather than touching auditActorStore directly; it awaits inside the store so lazy thenables keep the actor. | docs/claude/HOOKS.md § Audit Log; docs/claude/APP_EVENTS.md § Purpose and execution | threading the acting user id through function arguments so a write can be attributed, or setting the actor store directly (docs/claude/HOOKS.md § Audit Log › Actor Context) |
+| the request's user becomes the audit actor; who did this on an HTTP request; set the actor from the session on every request; the middleware that records who is acting | **auditActorMiddleware** · primitive `apps/api/src/middleware/auth/auditActorMiddleware.ts#auditActorMiddleware` — record the authenticated user as the actor for audit logs and app events | docs/claude/AUTH.md § Auth Middleware Chain | — |
+| before and after per field; what changed between the two snapshots; field-level diff of two records | **computeDiff** · primitive `apps/api/src/hooks/auditLog/utils.ts#computeDiff` — compute per-field before/after diff between two record snapshots | — | — |
+| is this model audited; check whether the model is in the audit list; read the enabled-models array directly; narrow the model to an audited one | **isAuditEnabled** · primitive `packages/db/src/registries/auditEnabledModels.ts#isAuditEnabled` — Use instead of reading AUDIT_ENABLED_MODELS directly; also narrows type to AuditSubjectModel. | — | — |
+| who did this in the audit log when a job runs; attribute the job's writes to the job and its integration; a job writing with no actor; pass a fake user id for the background job; record the actor for background work | **jobAuditActor** · primitive `apps/api/src/jobs/jobAuditActor.ts#jobAuditActor` — build an audit actor attributing writes to a job and its integration | — | a job writing with no actor, or passing a fake user id, instead of scoping writes to the job's audit actor (catalog jobAuditActor) |
+| prepare the record for the audit payload; ignore noise and redact secrets before storing; the default audit payload processing; filter and redact in one step | **processAuditData** · primitive `apps/api/src/hooks/auditLog/utils.ts#processAuditData` — Default for audit payloads; filterForAudit only when redaction is not wanted. | — | — |
+| redact secrets inside a diff; scrub the before and after values of sensitive fields; the diff still shows the token hash; mask sensitive fields in the change set | **redactChangeDiff** · primitive `packages/db/src/registries/redactFields.ts#redactChangeDiff` — For diffs only; whole records use redactSensitiveFields, arbitrary nested payloads use redactPayload. | — | — |
+| how a change becomes an audit row; hand-written diff and redaction before storing; skip the audit row when nothing changed | **Audit pipeline: ignore, redact, diff** · pattern docs/claude/HOOKS.md § Audit Log › Field Processing Pipeline — filter and redact records then diff; skip writing when the diff is empty | code `auditActorContext`, `AUDIT_ENABLED_MODELS`, `Inquiry` | a hand-written diff or redaction of passwords and token hashes before storing a change record (docs/claude/HOOKS.md § Field Processing Pipeline) |
+| fields the audit log shouldn't bother with; updated-at and last-login shouldn't make audit rows; add a noise field to the ignore list; non-meaningful changes to leave out | **ignoreFields registry** · primitive packages/db/src/registries/ignoreFields.ts — Non-meaningful changes; secrets go in redactFields. | part 4 | — |
+| mask the password hash in the audit log; fields that show as redacted; register a sensitive field so it never appears in history; secrets in the audit payload | **redactFields registry** · primitive packages/db/src/registries/redactFields.ts — Sensitive values; noise fields go in ignoreFields. | part 4 | — |
+| a soft delete should show as a delete in history; the audit log says update when a row was tombstoned; detect a tombstone and log it as a delete | **Soft delete recorded as delete** · rule docs/claude/HOOKS.md § Audit Log › Soft Delete Detection — Any soft-delete on audited models. | code `auditActorContext`, `AUDIT_ENABLED_MODELS`, `Inquiry` | — |
+
 - *Also here, by name:* AuditAction (`packages/db/prisma/schema/auditLog.prisma`); AuditSubjectModel (`packages/db/prisma/schema/auditLog.prisma`); auditActorStore (`packages/db/src/lib/auditActorContext.ts`); auditLogResponseSchema (`apps/api/src/modules/admin/auditLog/schemas/auditLogResponseSchema.ts`); buildContextFkFields (`apps/api/src/hooks/auditLog/utils.ts`); buildSubjectFkFields (`apps/api/src/hooks/auditLog/utils.ts`); filterForAudit (`apps/api/src/hooks/auditLog/utils.ts`); includeAuditLogResponse (`apps/api/src/modules/admin/auditLog/schemas/auditLogResponseSchema.ts`); nullAuditActor (`packages/db/src/lib/auditActorContext.ts`)
 
 ### Class `soft-delete`: Soft delete, tombstone, cascade and revive; soft-delete read scoping
@@ -161,11 +144,6 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
-| **softDeleteScopeExtension** | always on: injects deletedAt: null into reads, write wheres and includes | hand-writing deletedAt: null |
-| **db.withDeleted** | revive, redaction/GDPR, tombstone inspection, tests; await inside | a role check that skips the filter |
-| **includeDeletedMiddleware** | a route that opts in per request | non-route code (wrap in db.withDeleted) |
-| **liveWhere** | engine for where clauses; normally applied by the extension | queries (rely on softDeleteScopeExtension) |
-| **liveIncludes** | engine for nested includes; normally applied by the extension | top-level filters (liveWhere) |
 
 **Job: soft-delete or revive a record and its children** (Delete and revive: tombstoneChildren vs reviveChildren vs revive vs CASCADE_EXEMPT vs HARD_DELETE_ON_TOMBSTONE vs REGENERATE_ON_REVIVE) — docs/claude/HOOKS.md § Application Hooks (softDeleteCascade); catalog
 
@@ -173,12 +151,6 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
-| **tombstoneChildren** | forward soft-delete cascade | undoing it (use reviveChildren) |
-| **reviveChildren** | undoing a cascade | the forward delete (use tombstoneChildren) |
-| **revive** | restoring tombstoned rows | an app-event upsert (pass its revive option) |
-| **CASCADE_EXEMPT** | non-owning references the cascade must skip | special cases inside tombstoneChildren |
-| **HARD_DELETE_ON_TOMBSTONE** | ephemeral grants (sessions, tokens) that must not revive | rows that come back with the parent |
-| **REGENERATE_ON_REVIVE** | rebuilding hard-deleted rows (e.g. RuleReference) on revive | rows that should stay gone (HARD_DELETE_ON_TOMBSTONE) |
 
 **Job: check whether a model is soft-deleted** (isSoftDeleteModel vs hasDeletedAt vs SOFT_DELETE_MODELS) — catalog
 
@@ -186,56 +158,29 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
-| **isSoftDeleteModel** | checking the soft-delete registry | reading SOFT_DELETE_MODELS or its set directly |
-| **hasDeletedAt** | does one model have a deletedAt column | the full list (use SOFT_DELETE_MODELS) |
-| **SOFT_DELETE_MODELS** | the full list | one model (use hasDeletedAt / isSoftDeleteModel) |
 
-- **CASCADE_EXEMPT** · primitive `apps/api/src/hooks/softDeleteCascade/cascadeExempt.ts#CASCADE_EXEMPT`: Exclude non-owning references from tombstone cascade instead of special-casing in tombstoneChildren.
-  - *Said as:* "the cascade shouldn't follow this relation", "a reference that isn't ownership, don't tombstone it", "special-case the relation inside the cascade", "skip non-owning references when deleting"
-  - *Signs you're bypassing it:* an `if (relation === ...) continue` special case added inside tombstoneChildren (catalog CASCADE_EXEMPT)
-- **HARD_DELETE_ON_TOMBSTONE** · primitive `packages/db/src/registries/hardDeleteOnTombstone.ts#HARD_DELETE_ON_TOMBSTONE` · in docs: docs/claude/HOOKS.md § Application Hooks: Membership checks: isHardDeletedOnTombstone instead of scanning the array.
-  - *Said as:* "sessions and tokens should really go when the user is deleted", "ephemeral grants must not come back on revive", "hard-delete these children instead of tombstoning", "special-case token deletion in the cascade", "rows that must never revive with the parent"
-  - *Signs you're bypassing it:* special-casing session/token/grant deletion inside a cascade, or letting ephemeral grants revive with their parent (docs/claude/HOOKS.md § Application Hooks (softDeleteCascade))
-- **hasDeletedAt** · primitive `packages/db/src/utils/fieldMetadata.ts#hasDeletedAt`: Need the full list: SOFT_DELETE_MODELS instead.
-  - *Said as:* "does this model have a deleted-at column", "check the schema for soft-delete support on one model", "one model, soft-deletable or not", "field-level check for the deleted column"
-- **includeDeletedMiddleware** · primitive `apps/api/src/middleware/resources/includeDeletedMiddleware.ts#includeDeletedMiddleware`: Request-driven opt-in; in non-route code wrap the call in db.withDeleted directly.
-  - *Said as:* "let this route return deleted rows when asked", "a query flag to include deleted records", "per-request opt-in to tombstones", "admin route that lists deleted items"
-- **isHardDeletedOnTombstone** · primitive `packages/db/src/registries/hardDeleteOnTombstone.ts#isHardDeletedOnTombstone`: Prefer over direct HARD_DELETE_ON_TOMBSTONE_SET access; it narrows the model type.
-  - *Said as:* "is this model hard-deleted when its parent is tombstoned", "check the hard-delete list for a model", "scan the hard-delete array directly"
-- **isSoftDeleteModel** · primitive `packages/db/src/registries/softDeleteModels.ts#isSoftDeleteModel`: Use instead of reading SOFT_DELETE_MODELS or the set directly.
-  - *Said as:* "is this model soft-deleted", "check the soft-delete registry for a model", "read the models list directly", "narrow to a soft-delete model"
-- **liveIncludes** · primitive `packages/db/src/extensions/softDeleteScope.ts#liveIncludes` · in docs: docs/claude/DATABASE.md § Query Building Utilities: Nested includes; top-level filters: liveWhere instead. Normally applied automatically by softDeleteScopeExtension.
-  - *Said as:* "filter deleted rows out of nested includes", "the include tree still returns deleted children", "live filter for nested relations", "the engine behind include scoping"
-- **liveWhere** · primitive `packages/db/src/extensions/softDeleteScope.ts#liveWhere` · in docs: docs/claude/DATABASE.md § Query Building Utilities: Where clauses; nested includes: liveIncludes instead. Normally applied automatically by softDeleteScopeExtension.
-  - *Said as:* "the where clause that filters out deleted rows", "add the live filter to a compiled where", "deleted-at null at every relation hop", "the engine behind the read filter"
-- **REGENERATE_ON_REVIVE** · primitive `apps/api/src/hooks/softDeleteCascade/regenerateOnRevive.ts#REGENERATE_ON_REVIVE`: rebuild rows hard-deleted on tombstone, such as RuleReference, when the parent is revived
-  - *Said as:* "rebuild the derived rows when the parent comes back", "hard-deleted rows that must be recreated on revive", "regenerate the references after a revive", "rows gone on delete, remade on restore"
-- **registerSoftDeleteCascadeHook** · primitive `apps/api/src/hooks/softDeleteCascade/hook.ts#registerSoftDeleteCascadeHook`: cascade soft deletes to child rows after validating each model's delete behavior
-  - *Said as:* "wire up the cascade hook", "validate delete behavior per model at startup", "install the soft-delete cascade"
-- **revive** · primitive `packages/db/src/utils/revive.ts#revive` · in docs: docs/claude/DATABASE.md § Query Building Utilities; docs/claude/HOOKS.md § Application Hooks: Restoring tombstoned rows via app-event upsert: pass the revive option on the upsert instead.
-  - *Said as:* "bring a deleted row back", "set deleted-at back to null", "restore the tombstoned record and its children", "un-delete this record", "restoring a row via the upsert path"
-  - *Signs you're bypassing it:* `db.x.update({ data: { deletedAt: null } })` plus hand-restoring children, instead of revive / the revive-on-upsert path (catalog revive; docs/claude/CONTEXT.md → Soft-Delete Invisibility (Revive via create-path upsert))
-- **reviveChildren** · primitive `apps/api/src/hooks/softDeleteCascade/cascade.ts#reviveChildren`: Undoing a cascade; pair with tombstoneChildren, which does the forward soft delete.
-  - *Said as:* "bring the children back with the parent", "undo the cascade", "restore the child rows too", "the revive side of the cascade"
-- **SOFT_DELETE_MODELS** · primitive `packages/db/src/utils/fieldMetadata.ts#SOFT_DELETE_MODELS`: Checking one model: hasDeletedAt instead.
-  - *Said as:* "all the models that soft-delete", "the list of soft-deletable models", "iterate every tombstone-capable model", "which models have tombstones"
-- **softDeleteScopeExtension** · primitive `packages/db/src/extensions/softDeleteScopeExtension.ts#softDeleteScopeExtension` · in docs: docs/claude/DATABASE.md § Query Building Utilities: Prefer over hand-calling liveWhere/liveIncludes in queries.
-  - *Said as:* "hide deleted rows from every read automatically", "add the deleted-at filter to every query by hand", "a middleware that adds the deleted filter", "reads only return live rows", "deleted rows keep showing up in a relation include"
-  - *Signs you're bypassing it:* calling liveWhere/liveIncludes by hand in queries, or a middleware that adds deletedAt filters (docs/claude/DATABASE.md § Soft-delete read scoping)
-- **tombstoneChildren** · primitive `apps/api/src/hooks/softDeleteCascade/cascade.ts#tombstoneChildren`: Forward soft-delete cascade; reviveChildren reverses it; CASCADE_EXEMPT lists relations skipped.
-  - *Said as:* "soft-delete the children when the parent goes", "forward cascade of the tombstone", "mark each child relation deleted", "the delete side of the cascade"
-  - *Signs you're bypassing it:* a service loop setting `deletedAt` on each child relation after deleting a parent (docs/claude/HOOKS.md § Application Hooks (softDeleteCascade))
-- **db.withDeleted** · primitive packages/db/src/extensions/softDeleteScopeExtension.ts: revive, redaction/GDPR, tombstone inspection and tests; explicit deletedAt in where also opts out per query
-  - *Said as:* "I need to see the tombstoned rows here", "read a deleted row on purpose", "skip the deleted filter if the user is superadmin", "check the tombstone before reviving", "the test needs to read the soft-deleted row"
-  - *Signs you're bypassing it:* a role check (`if (isSuperadmin) skip deletedAt filter`) or a manual `deletedAt: { not: null }` override to read tombstones, instead of the endpoint wrapping work in `await db.withDeleted(...)` (docs/claude/CONTEXT.md → Soft-Delete Invisibility; docs/claude/DATABASE.md § Soft-delete read scoping)
-- **Await inside db.withDeleted** · rule docs/claude/DATABASE.md > Soft-delete read scoping: every db.withDeleted use
-  - *Said as:* "return the promise from the callback without awaiting", "the query still ran scoped inside the escape hatch", "await the read inside the block"
-  - *Signs you're bypassing it:* `db.withDeleted(() => db.x.findMany(...))` returning the lazy promise without awaiting it inside the callback, so the query runs scoped (docs/claude/DATABASE.md § Soft-delete read scoping)
-- **Endpoint decides tombstone visibility** · rule docs/claude/DATABASE.md > Soft-delete read scoping: any route needing tombstones; superadmins on non-admin routes stay scoped
-  - *Said as:* "who gets to see deleted rows", "superadmins see tombstones everywhere", "the route decides whether deleted rows show"
-- **No hand-written deletedAt: null** · rule docs/claude/DATABASE.md > Soft-delete read scoping: any query on a model with a deletedAt column
-  - *Said as:* "add deleted-at null to the where", "filter the include by hand for deleted rows", "the live filter in paginate calls and lenses"
-  - *Signs you're bypassing it:* `where: { deletedAt: null, ... }` in services, paginate calls or lenses, or include trees filtered by hand (docs/claude/DATABASE.md § Soft-delete read scoping)
+| Problem | Use | Read | Signs you're bypassing it |
+|---|---|---|---|
+| the cascade shouldn't follow this relation; a reference that isn't ownership, don't tombstone it; special-case the relation inside the cascade; skip non-owning references when deleting | **CASCADE_EXEMPT** · primitive `apps/api/src/hooks/softDeleteCascade/cascadeExempt.ts#CASCADE_EXEMPT` — Exclude non-owning references from tombstone cascade instead of special-casing in tombstoneChildren. | — | an `if (relation === ...) continue` special case added inside tombstoneChildren (catalog CASCADE_EXEMPT) |
+| sessions and tokens should really go when the user is deleted; ephemeral grants must not come back on revive; hard-delete these children instead of tombstoning; special-case token deletion in the cascade; rows that must never revive with the parent | **HARD_DELETE_ON_TOMBSTONE** · primitive `packages/db/src/registries/hardDeleteOnTombstone.ts#HARD_DELETE_ON_TOMBSTONE` — Membership checks: isHardDeletedOnTombstone instead of scanning the array. | docs/claude/HOOKS.md § Application Hooks | special-casing session/token/grant deletion inside a cascade, or letting ephemeral grants revive with their parent (docs/claude/HOOKS.md § Application Hooks (softDeleteCascade)) |
+| does this model have a deleted-at column; check the schema for soft-delete support on one model; one model, soft-deletable or not; field-level check for the deleted column | **hasDeletedAt** · primitive `packages/db/src/utils/fieldMetadata.ts#hasDeletedAt` — Need the full list: SOFT_DELETE_MODELS instead. | — | — |
+| let this route return deleted rows when asked; a query flag to include deleted records; per-request opt-in to tombstones; admin route that lists deleted items | **includeDeletedMiddleware** · primitive `apps/api/src/middleware/resources/includeDeletedMiddleware.ts#includeDeletedMiddleware` — Request-driven opt-in; in non-route code wrap the call in db.withDeleted directly. | — | — |
+| is this model hard-deleted when its parent is tombstoned; check the hard-delete list for a model; scan the hard-delete array directly | **isHardDeletedOnTombstone** · primitive `packages/db/src/registries/hardDeleteOnTombstone.ts#isHardDeletedOnTombstone` — Prefer over direct HARD_DELETE_ON_TOMBSTONE_SET access; it narrows the model type. | — | — |
+| is this model soft-deleted; check the soft-delete registry for a model; read the models list directly; narrow to a soft-delete model | **isSoftDeleteModel** · primitive `packages/db/src/registries/softDeleteModels.ts#isSoftDeleteModel` — Use instead of reading SOFT_DELETE_MODELS or the set directly. | — | — |
+| filter deleted rows out of nested includes; the include tree still returns deleted children; live filter for nested relations; the engine behind include scoping | **liveIncludes** · primitive `packages/db/src/extensions/softDeleteScope.ts#liveIncludes` — Nested includes; top-level filters: liveWhere instead. Normally applied automatically by softDeleteScopeExtension. | docs/claude/DATABASE.md § Query Building Utilities | — |
+| the where clause that filters out deleted rows; add the live filter to a compiled where; deleted-at null at every relation hop; the engine behind the read filter | **liveWhere** · primitive `packages/db/src/extensions/softDeleteScope.ts#liveWhere` — Where clauses; nested includes: liveIncludes instead. Normally applied automatically by softDeleteScopeExtension. | docs/claude/DATABASE.md § Query Building Utilities | — |
+| rebuild the derived rows when the parent comes back; hard-deleted rows that must be recreated on revive; regenerate the references after a revive; rows gone on delete, remade on restore | **REGENERATE_ON_REVIVE** · primitive `apps/api/src/hooks/softDeleteCascade/regenerateOnRevive.ts#REGENERATE_ON_REVIVE` — rebuild rows hard-deleted on tombstone, such as RuleReference, when the parent is revived | — | — |
+| wire up the cascade hook; validate delete behavior per model at startup; install the soft-delete cascade | **registerSoftDeleteCascadeHook** · primitive `apps/api/src/hooks/softDeleteCascade/hook.ts#registerSoftDeleteCascadeHook` — cascade soft deletes to child rows after validating each model's delete behavior | — | — |
+| bring a deleted row back; set deleted-at back to null; restore the tombstoned record and its children; un-delete this record; restoring a row via the upsert path | **revive** · primitive `packages/db/src/utils/revive.ts#revive` — Restoring tombstoned rows via app-event upsert: pass the revive option on the upsert instead. | docs/claude/DATABASE.md § Query Building Utilities; docs/claude/HOOKS.md § Application Hooks | `db.x.update({ data: { deletedAt: null } })` plus hand-restoring children, instead of revive / the revive-on-upsert path (catalog revive; docs/claude/CONTEXT.md → Soft-Delete Invisibility (Revive via create-path upsert)) |
+| bring the children back with the parent; undo the cascade; restore the child rows too; the revive side of the cascade | **reviveChildren** · primitive `apps/api/src/hooks/softDeleteCascade/cascade.ts#reviveChildren` — Undoing a cascade; pair with tombstoneChildren, which does the forward soft delete. | — | — |
+| all the models that soft-delete; the list of soft-deletable models; iterate every tombstone-capable model; which models have tombstones | **SOFT_DELETE_MODELS** · primitive `packages/db/src/utils/fieldMetadata.ts#SOFT_DELETE_MODELS` — Checking one model: hasDeletedAt instead. | — | — |
+| hide deleted rows from every read automatically; add the deleted-at filter to every query by hand; a middleware that adds the deleted filter; reads only return live rows; deleted rows keep showing up in a relation include | **softDeleteScopeExtension** · primitive `packages/db/src/extensions/softDeleteScopeExtension.ts#softDeleteScopeExtension` — Prefer over hand-calling liveWhere/liveIncludes in queries. | docs/claude/DATABASE.md § Query Building Utilities | calling liveWhere/liveIncludes by hand in queries, or a middleware that adds deletedAt filters (docs/claude/DATABASE.md § Soft-delete read scoping) |
+| soft-delete the children when the parent goes; forward cascade of the tombstone; mark each child relation deleted; the delete side of the cascade | **tombstoneChildren** · primitive `apps/api/src/hooks/softDeleteCascade/cascade.ts#tombstoneChildren` — Forward soft-delete cascade; reviveChildren reverses it; CASCADE_EXEMPT lists relations skipped. | — | a service loop setting `deletedAt` on each child relation after deleting a parent (docs/claude/HOOKS.md § Application Hooks (softDeleteCascade)) |
+| I need to see the tombstoned rows here; read a deleted row on purpose; skip the deleted filter if the user is superadmin; check the tombstone before reviving; the test needs to read the soft-deleted row | **db.withDeleted** · primitive packages/db/src/extensions/softDeleteScopeExtension.ts — revive, redaction/GDPR, tombstone inspection and tests; explicit deletedAt in where also opts out per query | part 4 | a role check (`if (isSuperadmin) skip deletedAt filter`) or a manual `deletedAt: { not: null }` override to read tombstones, instead of the endpoint wrapping work in `await db.withDeleted(...)` (docs/claude/CONTEXT.md → Soft-Delete Invisibility; docs/claude/DATABASE.md § Soft-delete read scoping) |
+| return the promise from the callback without awaiting; the query still ran scoped inside the escape hatch; await the read inside the block | **Await inside db.withDeleted** · rule docs/claude/DATABASE.md > Soft-delete read scoping — every db.withDeleted use | part 4 | `db.withDeleted(() => db.x.findMany(...))` returning the lazy promise without awaiting it inside the callback, so the query runs scoped (docs/claude/DATABASE.md § Soft-delete read scoping) |
+| who gets to see deleted rows; superadmins see tombstones everywhere; the route decides whether deleted rows show | **Endpoint decides tombstone visibility** · rule docs/claude/DATABASE.md > Soft-delete read scoping — any route needing tombstones; superadmins on non-admin routes stay scoped | part 4 | — |
+| add deleted-at null to the where; filter the include by hand for deleted rows; the live filter in paginate calls and lenses | **No hand-written deletedAt: null** · rule docs/claude/DATABASE.md > Soft-delete read scoping — any query on a model with a deletedAt column | part 4 | `where: { deletedAt: null, ... }` in services, paginate calls or lenses, or include trees filtered by hand (docs/claude/DATABASE.md § Soft-delete read scoping) |
+
 - *Also here, by name:* HARD_DELETE_ON_TOMBSTONE_SET (`packages/db/src/registries/hardDeleteOnTombstone.ts`); SOFT_DELETE_MODELS (`packages/db/src/registries/softDeleteModels.ts`); SOFT_DELETE_MODEL_SET (`packages/db/src/registries/softDeleteModels.ts`); childRelations (`apps/api/src/hooks/softDeleteCascade/childRelations.ts`); deleteBehaviorViolations (`apps/api/src/hooks/softDeleteCascade/validateDeleteBehavior.ts`); validateDeleteBehavior (`apps/api/src/hooks/softDeleteCascade/validateDeleteBehavior.ts`)
 
 ## 4. The specifics, in full

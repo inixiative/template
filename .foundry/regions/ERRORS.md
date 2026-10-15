@@ -50,7 +50,7 @@ Basis: `documented` = a doc states the class; `convention` = no status documente
 
 | Error | Where | Region | Thrown by | Basis | Source |
 |---|---|---|---|---|---|
-| **makeError 403 PERMISSION_DENIED** | `apps/api/src/lib/errors/makeError.ts (labels from packages/shared/src/errors/types.ts HTTP_ERROR_MAP)` | [permissions](permissions/knowledge.md) | validatePermission, validateNotToken, validateSuperadmin, validateOwnerPermission, Granular create permission via hydrated partial | documented | docs/claude/API_ROUTES.md § Error Responses (HTTP_ERROR_MAP table) |
+| **makeError 403 PERMISSION_DENIED** | `apps/api/src/lib/errors/makeError.ts (labels from packages/shared/src/errors/types.ts HTTP_ERROR_MAP)` | [permissions-roles](permissions-roles/knowledge.md) | validatePermission, validateNotToken, validateSuperadmin, validateOwnerPermission, Granular create permission via hydrated partial | documented | docs/claude/API_ROUTES.md § Error Responses (HTTP_ERROR_MAP table) |
 
 ## `resource-not-found`
 
@@ -69,7 +69,7 @@ Basis: `documented` = a doc states the class; `convention` = no status documente
 
 | Error | Where | Region | Thrown by | Basis | Source |
 |---|---|---|---|---|---|
-| **DivergentDuplicateSlugError** | `packages/email/src/errors/DivergentDuplicateSlugError.ts` | [email-templates](email-templates/knowledge.md) | — | convention | email-templates part 3 (Also here) |
+| **DivergentDuplicateSlugError** | `packages/email/src/errors/DivergentDuplicateSlugError.ts` | [email-render](email-render/knowledge.md) | — | convention | email-templates part 3 (Also here) |
 | **FindForUpdateLockTimeoutError** | `packages/db/src/lock/findForUpdateLockTimeoutError.ts` | [database-client](database-client/knowledge.md) | db.findForUpdate, acquireFindForUpdateLock | convention | docs/claude/DATABASE.md § Transactions › Row Locks and Create-If-Missing |
 | **isUniqueConstraintError** | `packages/db/src/utils/isUniqueConstraintError.ts#isUniqueConstraintError` | [request-context-errors](request-context-errors/knowledge.md) | — *(inferred: db, query)* | documented | catalog isUniqueConstraintError; docs/claude/ERRORS.md § The global handler |
 | **isWriteConflictError** | `packages/db/src/utils/isWriteConflictError.ts#isWriteConflictError` | [request-context-errors](request-context-errors/knowledge.md) | — *(inferred: db.txn)* | convention | catalog isWriteConflictError |
@@ -81,7 +81,7 @@ Basis: `documented` = a doc states the class; `convention` = no status documente
 
 | Error | Where | Region | Thrown by | Basis | Source |
 |---|---|---|---|---|---|
-| **makeError 410 RESOURCE_GONE** | `apps/api/src/lib/errors/makeError.ts (labels from packages/shared/src/errors/types.ts HTTP_ERROR_MAP)` | [inquiries](inquiries/knowledge.md) | validateInquiryNotExpired | documented | docs/claude/API_ROUTES.md § Error Responses (HTTP_ERROR_MAP table) |
+| **makeError 410 RESOURCE_GONE** | `apps/api/src/lib/errors/makeError.ts (labels from packages/shared/src/errors/types.ts HTTP_ERROR_MAP)` | [inquiry-handlers](inquiry-handlers/knowledge.md) | validateInquiryNotExpired | documented | docs/claude/API_ROUTES.md § Error Responses (HTTP_ERROR_MAP table) |
 
 ## `payload-too-large`
 
@@ -99,13 +99,13 @@ Basis: `documented` = a doc states the class; `convention` = no status documente
 
 | Error | Where | Region | Thrown by | Basis | Source |
 |---|---|---|---|---|---|
-| **ConditionValidationError** | `packages/email/src/errors/ConditionValidationError.ts` | [email-templates](email-templates/knowledge.md) | — *(inferred: assertValidConditions)* | documented | docs/claude/COMMUNICATIONS.md § Email › Rule References (the lens gate answers 422) |
-| **DependentTemplateError** | `packages/email/src/errors/DependentTemplateError.ts` | [email-templates](email-templates/knowledge.md) | — *(inferred: validateDependents)* | convention | email-templates part 3 (Also here) |
+| **ConditionValidationError** | `packages/email/src/errors/ConditionValidationError.ts` | [email-render](email-render/knowledge.md) | — *(inferred: assertValidConditions)* | documented | docs/claude/COMMUNICATIONS.md § Email › Rule References (the lens gate answers 422) |
+| **DependentTemplateError** | `packages/email/src/errors/DependentTemplateError.ts` | [email-render](email-render/knowledge.md) | — *(inferred: validateDependents)* | convention | email-templates part 3 (Also here) |
 | **makeError 422 VALIDATION_ERROR** | `apps/api/src/lib/errors/makeError.ts (labels from packages/shared/src/errors/types.ts HTTP_ERROR_MAP)` | [request-context-errors](request-context-errors/knowledge.md) | validateInquiryHandler, RulesRegistry, assertValidConditions, meCreateFlow *(inferred: validateSegmentConditions, assertSegmentReferencesOwned, findReferenceCycle, validateNotLastOwner, validateNoCycle)* | documented | docs/claude/API_ROUTES.md § Error Responses (HTTP_ERROR_MAP table) |
 | **MjmlValidationError** | `packages/email/src/errors/MjmlValidationError.ts` | [email-templates](email-templates/knowledge.md) | validateMjml | convention | docs/claude/COMMUNICATIONS.md § Email › MJML Validation |
-| **ParseBlocksError** | `packages/email/src/errors/ParseBlocksError.ts` | [email-templates](email-templates/knowledge.md) | — *(inferred: parseBlocks)* | convention | email-templates part 3 (Also here) |
+| **ParseBlocksError** | `packages/email/src/errors/ParseBlocksError.ts` | [email-render](email-render/knowledge.md) | — *(inferred: parseBlocks)* | convention | email-templates part 3 (Also here) |
 | **RuleReferenceError** | `packages/db/src/utils/ruleReferenceError.ts#RuleReferenceError` | [json-rules](json-rules/knowledge.md) | syncRuleReferenceEdges, syncRuleReferences *(inferred: saveEmailTemplate)* | convention | docs/claude/COMMUNICATIONS.md § Email › Rule References |
-| **TokenValidationError** | `packages/email/src/errors/TokenValidationError.ts` | [email-templates](email-templates/knowledge.md) | — *(inferred: assertValidTokens)* | convention | email-templates part 3 (Also here) |
+| **TokenValidationError** | `packages/email/src/errors/TokenValidationError.ts` | [email-render](email-render/knowledge.md) | — *(inferred: assertValidTokens)* | convention | email-templates part 3 (Also here) |
 | **ZodError** | `zod (apps/api/src/middleware/error/isZodError.ts detects it)` | [request-context-errors](request-context-errors/knowledge.md) | webhookUrlSchema, meCreateFlow *(inferred: createRoute, readRoute, updateRoute, deleteRoute, actionRoute, Generated Zod schemas)* | documented | docs/claude/ERRORS.md § The global handler |
 
 ## `rate-limited`
@@ -122,7 +122,7 @@ Basis: `documented` = a doc states the class; `convention` = no status documente
 | **cache key Error** | `packages/db/src/redis/cache.ts (validateKey)` | [redis-caching-rate-limits](redis-caching-rate-limits/knowledge.md) | validateKey, cache | convention | catalog validateKey |
 | **db.onCommit outside transaction Error** | `@template/db` | [database-client](database-client/knowledge.md) | db.onCommit | convention | docs/claude/DATABASE.md § Transactions › After Commit Callbacks |
 | **db.parallel aggregated failure** | `apps/api/src/appEvents (makeAppEvent / db.parallel)` | [app-events-webhooks](app-events-webhooks/knowledge.md) | db.parallel | convention | docs/claude/APP_EVENTS.md § Purpose and execution |
-| **engineGlobals.with async-callback Error** | `@inixiative/json-rules engineGlobals.with` | [json-rules-engine](json-rules-engine/knowledge.md) | engineGlobals.with | convention | @inixiative/json-rules/README.md § Engine Globals |
+| **engineGlobals.with async-callback Error** | `@inixiative/json-rules engineGlobals.with` | [json-rules-runtime](json-rules-runtime/knowledge.md) | engineGlobals.with | convention | @inixiative/json-rules/README.md § Engine Globals |
 | **fetchAllPages cap Error** | `packages/shared/src/utils/fetchAllPages.ts#fetchAllPages` | [pagination](pagination/knowledge.md) | fetchAllPages | convention | catalog fetchAllPages |
 | **makeError 500 SERVER_ERROR** | `apps/api/src/lib/errors/makeError.ts (labels from packages/shared/src/errors/types.ts HTTP_ERROR_MAP)` | [request-context-errors](request-context-errors/knowledge.md) | errorHandlerMiddleware, POST /api/v1/batch/execute | documented | docs/claude/API_ROUTES.md § Error Responses (HTTP_ERROR_MAP table) |
 | **orderedList buildScope Error** | `apps/api/src/hooks/orderedList/` | [mutation-hooks](mutation-hooks/knowledge.md) | buildScope | convention | catalog buildScope |
@@ -131,7 +131,7 @@ Basis: `documented` = a doc states the class; `convention` = no status documente
 | **RuleEvaluationError** | `packages/shared/src/rules/errors.ts#RuleEvaluationError` | [json-rules](json-rules/knowledge.md) | — *(inferred: withRule)* | convention | catalog RuleEvaluationError |
 | **searchPaths stray-entry Error** | `apps/api/src/lib/prisma/paginate.ts` | [pagination](pagination/knowledge.md) | paginate | documented | docs/claude/API_ROUTES.md § Response Format › Search & Filtering |
 | **validateJobId Error** | `apps/api/src/jobs/validateJobId.ts#validateJobId` | [jobs-cron](jobs-cron/knowledge.md) | validateJobId | convention | docs/claude/JOBS.md § Enqueuing Jobs; catalog validateJobId |
-| **validateRole Error** | `apps/api/src/lib/permissions/validateRole.ts#validateRole` | [permissions](permissions/knowledge.md) | validateRole | documented | docs/claude/PERMISSIONS.md § Permission Setup › Role Validation |
+| **validateRole Error** | `apps/api/src/lib/permissions/validateRole.ts#validateRole` | [permissions-roles](permissions-roles/knowledge.md) | validateRole | documented | docs/claude/PERMISSIONS.md § Permission Setup › Role Validation |
 
 ## `bad-gateway`
 
@@ -164,11 +164,11 @@ Basis: `documented` = a doc states the class; `convention` = no status documente
 |---|---|---|---|---|---|
 | **classifyResendError** | `packages/email (named in email-delivery part 3 "Also here"; catalog EmailProviderError Use line)` | [email-delivery](email-delivery/knowledge.md) | — | documented | catalog EmailProviderError |
 | **EmailProviderError** | `packages/email/src/errors/EmailProviderError.ts#EmailProviderError` | [email-delivery](email-delivery/knowledge.md) | deliverEmailMessage | documented | docs/claude/COMMUNICATIONS.md § Email › Send Pipeline › Deliver (deliverEmail), step 8 |
-| **EmailRenderError** | `packages/email/src/errors/EmailRenderError.ts#EmailRenderError` | [email-templates](email-templates/knowledge.md) | settleTemplate | documented | docs/claude/COMMUNICATIONS.md § Email › Send Pipeline › Deliver (deliverEmail) › Render issues |
+| **EmailRenderError** | `packages/email/src/errors/EmailRenderError.ts#EmailRenderError` | [email-render](email-render/knowledge.md) | settleTemplate | documented | docs/claude/COMMUNICATIONS.md § Email › Send Pipeline › Deliver (deliverEmail) › Render issues |
 | **flushRedis outside test Error** | `packages/db/src/redis/client.ts#flushRedis` | [test-harness](test-harness/knowledge.md) | flushRedis | documented | catalog flushRedis |
 | **isEmailContentError** | `packages/email/src/errors/isEmailContentError.ts#isEmailContentError` | [email-delivery](email-delivery/knowledge.md) | — | documented | docs/claude/COMMUNICATIONS.md § Email › Send Pipeline › Deliver (deliverEmail), step 2 |
 | **makeContextQueries missing-context Error** | `packages/ui/src/lib/makeContextQueries.ts#makeContextQueries` | [api-client](api-client/knowledge.md) | makeContextQueries | documented | docs/claude/FRONTEND/API_CLIENT.md § Context Queries |
-| **retryWithTimeout timeout Error** | `init/utils/retry.ts` | [init-script](init-script/knowledge.md) | retryWithTimeout | documented | docs/claude/INIT_SCRIPT_PATTERNS.md § 9. Retry Logic for Async Initialization |
+| **retryWithTimeout timeout Error** | `init/utils/retry.ts` | [init-architecture](init-architecture/knowledge.md) | retryWithTimeout | documented | docs/claude/INIT_SCRIPT_PATTERNS.md § 9. Retry Logic for Async Initialization |
 | **SupersededError** | `apps/api/src/jobs/types.ts#SupersededError` | [concurrency-locks](concurrency-locks/knowledge.md) | — | documented | catalog SupersededError; docs/claude/JOBS.md § Handler Patterns › Superseding Job |
 | **Unknown job handler Error** | `apps/api/src/jobs (worker)` | [jobs-cron](jobs-cron/knowledge.md) | — | documented | docs/claude/JOBS.md § Error Boundaries |
 | **VCR replayed provider error** | `packages/shared/src/vcr/vcr.ts` | [test-harness](test-harness/knowledge.md) | VCR, vcr.capture | documented | docs/claude/TESTING.md § VCR (external services) |
@@ -177,7 +177,7 @@ Basis: `documented` = a doc states the class; `convention` = no status documente
 
 | Error | Where | Region | Thrown by | Basis | Source |
 |---|---|---|---|---|---|
-| **UsageError** | `@inixiative/json-rules#UsageError` | [json-rules-engine](json-rules-engine/knowledge.md) | check, toPrisma, toSql, materializeSourceQuery, materializeSources | documented | @inixiative/json-rules/README.md § Error Handling |
+| **UsageError** | `@inixiative/json-rules#UsageError` | [json-rules-runtime](json-rules-runtime/knowledge.md) | check, toPrisma, toSql, materializeSourceQuery, materializeSources | documented | @inixiative/json-rules/README.md § Error Handling |
 
 ## `lens-refusal`
 
@@ -189,4 +189,4 @@ Basis: `documented` = a doc states the class; `convention` = no status documente
 
 | Error | Where | Region | Thrown by | Basis | Source |
 |---|---|---|---|---|---|
-| **json-rules rule-shape Error** | `@inixiative/json-rules (plain Error)` | [json-rules-engine](json-rules-engine/knowledge.md) | check, toPrisma, toSql, assertValidRule *(inferred: assertValidFieldMaps, assertValidNarrowing)* | documented | @inixiative/json-rules/README.md § Error Handling |
+| **json-rules rule-shape Error** | `@inixiative/json-rules (plain Error)` | [json-rules-runtime](json-rules-runtime/knowledge.md) | check, toPrisma, toSql, assertValidRule *(inferred: assertValidFieldMaps, assertValidNarrowing)* | documented | @inixiative/json-rules/README.md § Error Handling |

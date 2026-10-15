@@ -1,0 +1,43 @@
+{
+  "id": "permissions-roles",
+  "title": "Roles, actions and permission checks",
+  "routing": "Is this about who may do what by role: PlatformRole and superadmin, Role on OrganizationUser / SpaceUser (owner, admin, member, viewer; roleHierarchy, greaterRole / lesserRole / rolesAtOrAbove, isSuperadmin), StandardAction tiers (own \u2287 manage \u2287 operate \u2287 read), the per-request Permix (setupOrgPermissions / setupSpacePermissions / setupUserPermissions, setupOrgContext / setupSpaceContext / setupUserContext, permix.setup / check / setSuperadmin / getJSON), entitlements and their allow-override, tokens never exceeding the user's role, validateRole, validatePermission and the validation middleware order, role assignment (assign, leave), session-only actions, or frontend checks (permissions-roles / permissions-rebac.check, usePermission / checkPermission, NavItem.access, Button show / disabledText)?",
+  "concepts": [
+    "permissions-roles"
+  ],
+  "tokens": 14252,
+  "tokenMethod": "chars/4",
+  "runsAgreed": 0,
+  "sources": {
+    "docs": [
+      "FEATURES.md",
+      "docs/claude/PERMISSIONS.md"
+    ],
+    "docUnits": [
+      "doc:docs/claude/PERMISSIONS.md#overview",
+      "doc:docs/claude/PERMISSIONS.md#roles",
+      "doc:docs/claude/PERMISSIONS.md#actions",
+      "doc:docs/claude/PERMISSIONS.md#permix",
+      "doc:docs/claude/PERMISSIONS.md#permission-setup",
+      "doc:docs/claude/PERMISSIONS.md#permission-checks",
+      "doc:docs/claude/PERMISSIONS.md#entitlements",
+      "doc:docs/claude/PERMISSIONS.md#validation-middleware",
+      "doc:docs/claude/PERMISSIONS.md#role-assignment",
+      "doc:docs/claude/PERMISSIONS.md#token-permissions",
+      "doc:docs/claude/PERMISSIONS.md#frontend-checks",
+      "doc:FEATURES.md#authorization-permissions"
+    ],
+    "catalogClusters": [
+      "auth-middleware-validation",
+      "frontend-navigation-context",
+      "permission-rule-algebra",
+      "roles-and-permissions",
+      "soft-delete-cascade",
+      "ui-components"
+    ],
+    "codeEntries": 26,
+    "docMembers": 32
+  },
+  "bypassLines": 24,
+  "glossaryTerms": 21
+}

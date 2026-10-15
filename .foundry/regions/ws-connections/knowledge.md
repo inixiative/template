@@ -9,6 +9,7 @@
 - [Glossary](#glossary)
 - [1. What this Warden covers](#1-what-this-warden-covers)
 - [2. The domain](#2-the-domain)
+- [2b. Under construction](#2b-under-construction)
 - [3. Everything that exists here, by class](#3-everything-that-exists-here-by-class)
   - [Class `ws-connections`](#class-ws-connections-websocket-connection-registry-authenticate-frame-recovery-drain)
 - [4. The specifics, in full](#4-the-specifics-in-full)
@@ -97,11 +98,17 @@ The upgrade (`acceptWebSocket`, `websocketHandler`) starts anonymous. Credential
 
 Sending has two layers. Business code publishes through `sendToChannel`, `sendToUser`, `broadcast` or `appendToStream`, which go over Redis `ws:broadcast` so every API instance delivers to its own registry. The `*Local` senders (`sendToChannelLocal`, `sendToUserLocal`, `sendToStreamLocal`, `broadcastLocal`, `sendTo`) are that per-instance delivery step. Calling them from business code skips the other instances. When Redis fails, channel, user and broadcast messages fall back to local delivery. On the client, `useApiWebsocket` is mounted once per app root, and `createApiWebsocket` owns reconnecting. It replays identity, then subscribes, then opens, waits for acknowledgements before invalidating live queries, and settles stream opens and closes for `streamSettleMs` so holder churn stays under the frame limit. `dispatchMessage` is the single inbound entry.
 
-Related regions: the `ws-streams` region owns what travels on the socket: channel families (`WS_CHANNELS`, `channelKey`, `refetch`), data streams (`defineStream`, `streamAppend`, seq, re-authorization, folds and hooks). The two regions share many members, and this one is the connection side. The app-event handler that returns WebSocket handoffs is `app-events-webhooks / adapters-integrations`. Redis clients and key conventions are `redis-caching-rate-limits`. The auth middleware and spoofing that `/me` runs are `authentication`. The QueryClient and store the socket feeds are `frontend-store / api-client`. Graceful shutdown and connection draining in general are `observability-lifecycle`.
+Related regions: the `ws-channels / ws-data-streams` region owns what travels on the socket: channel families (`WS_CHANNELS`, `channelKey`, `refetch`), data streams (`defineStream`, `streamAppend`, seq, re-authorization, folds and hooks). The two regions share many members, and this one is the connection side. The app-event handler that returns WebSocket handoffs is `app-events-webhooks / adapters-integrations`. Redis clients and key conventions are `redis-caching-rate-limits`. The auth middleware and spoofing that `/me` runs are `authentication`. The QueryClient and store the socket feeds are `frontend-store / api-client`. Graceful shutdown and connection draining in general are `observability-lifecycle`.
+
+## 2b. Under construction
+
+Open work you cannot use yet. Do not build against it, and do not build what it would replace without saying so.
+
+- WebSockets: current transport and remaining consumers in review — ticket INFRA-004
 
 ## 3. Everything that exists here, by class
 
-Point at a class when that is as specific as the moment allows, or at a member. Where a class has siblings an agent could confuse, a table under the class header says which to use when; its *Said as* line gives the plain words a user or agent uses for that job. Each member: **name** · kind `where` · the doc § that describes it (code members) or the code it is about (doc members): choose this when … . Quote the name and the where in a pointer ("look over here: createLock, packages/db/src/lock/createLock.ts, CONCURRENCY.md § Distributed Lock"). *Said as:* the ways a user or agent describes this job in a message or plan without knowing the name; match on these. *Signs you're bypassing it:* the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
+Find the problem in plain words, then point at the exact thing. Each class opens with job tables where a class has confusable siblings (which to use when; *Said as* gives the plain words for that job), then one table of every member: **Problem** is the job in the user's or agent's words (match on these); **Use** is the exact member, its kind and `where`, then when to choose it; **Read** is the doc § that describes it (code members) or the code it is about (doc members); **Signs you're bypassing it** is the hand-rolled code an agent writes when it rebuilds the primitive, plus the errors it throws. Quote Use and Read in a pointer ("look over here: createLock, packages/db/src/lock/createLock.ts, CONCURRENCY.md § Distributed Lock"). Code members come from the catalog, described from the code; doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
 
 ### Class `ws-connections`: WebSocket connection registry, authenticate frame, recovery, drain
 
@@ -111,11 +118,6 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
-| **sendToChannel (ws-streams)** | a hint to every subscriber of a registered channel, on every API instance | one user's sockets (use sendToUser); row data (use appendToStream) |
-| **sendToUser (ws-streams)** | every open socket of one user across instances (e.g. a membership refetch) | a channel audience (use sendToChannel) |
-| **broadcast (ws-streams)** | one event to every connected client on every instance | a scoped audience (use sendToChannel or sendToUser) |
-| **appendToStream (ws-streams)** | sequenced appends to a data stream, published through Redis in per-stream order | lossy hints (use sendToChannel); never loop sockets with a local counter |
-| **sendToChannelLocal (ws-streams)** | this instance's own delivery after the Redis fan-out | business code: other instances never deliver (use sendToChannel) |
 
 **Job: send a WebSocket message on this instance** (sendFrame vs sendTo vs the *Local senders (one instance)) — apps/api/src/ws/delivery.ts; docs/claude/WEBSOCKETS.md § Sequence numbers
 
@@ -123,11 +125,6 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
-| **sendFrame (ws-streams)** | every server send; closes the socket (1013) when Bun drops a frame | never raw ws.send; fan-out to many sockets (use broadcastLocal or sendToChannelLocal) |
-| **sendTo (ws-streams)** | you already hold the socket and send one event | all of a user's sockets (use sendToUserLocal) |
-| **sendToUserLocal (ws-streams)** | a user's sockets on this instance | a channel audience (use sendToChannelLocal); cross-instance (use sendToUser) |
-| **sendToStreamLocal (ws-streams)** | payload differs per socket or some sockets are skipped (return null) | identical payloads (use sendToChannelLocal) |
-| **broadcastLocal (ws-streams)** | every socket connected to this instance | every instance (use broadcast) |
 
 **Job: authenticate a socket and authorize its subscriptions** (resolveIdentity vs setIdentity vs canSubscribe vs resolveOperationRoute) — docs/claude/WEBSOCKETS.md § Connection and recovery; § Channel registry and authorization
 
@@ -135,58 +132,31 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
-| **resolveIdentity** | turn authenticate-frame headers into anonymous, user or failure via /api/v1/me | recording the result on the socket (use setIdentity) |
-| **setIdentity** | attach or replace the user and header state on a socket after resolving | deciding who the headers are (use resolveIdentity) |
-| **canSubscribe** | authorize a channel subscribe by probing its HTTP route; only 2xx grants | only the route lookup (use resolveOperationRoute) |
-| **resolveOperationRoute (ws-streams)** | map a canonical channel name to its route | a permission decision (use canSubscribe, which calls it) |
 
-- **acceptWebSocket** · primitive `apps/api/src/ws/handler.ts#acceptWebSocket`: upgrade an incoming HTTP request to a WebSocket connection
-  - *Said as:* "upgrade the http request to a websocket", "handle the websocket upgrade in the server fetch", "I'll check the upgrade header myself", "where sockets get accepted"
-- **canSubscribe** · primitive `apps/api/src/ws/probe.ts#canSubscribe` · in docs: docs/claude/WEBSOCKETS.md § Channel registry and authorization: Only need the route lookup: resolveOperationRoute; identity only: resolveIdentity.
-  - *Said as:* "is this socket allowed to subscribe to the channel", "authorize the subscription by hitting the real route", "I'll write a permission check for the channel", "only a success from the route grants it", "check access before adding the socket to a channel"
-  - *Signs you're bypassing it:* a hand-written permission check for a channel subscribe instead of probing the channel's HTTP route (docs/claude/WEBSOCKETS.md § Channel registry and authorization)
-- **cleanupStaleConnections** · primitive `apps/api/src/ws/lifecycle.ts#cleanupStaleConnections`: Shutdown: drainConnections instead; this is for periodic stale sweeps.
-  - *Said as:* "drop sockets that stopped pinging", "the periodic sweep of dead connections", "I'll track last-seen and close old ones", "idle socket cleanup"
-- **clearRegistry** · primitive `apps/api/src/ws/registry.ts#clearRegistry`: one socket closing: removeConnection instead
-  - *Said as:* "wipe every connection index", "reset the socket registry between tests", "clear all sockets on shutdown", "I'll empty the maps by hand"
-- **createWebSocketClient** · primitive `packages/shared/src/ws/createWebSocketClient.ts#createWebSocketClient`: open a client WebSocket connection with message and open callbacks
-  - *Said as:* "open a client socket with message and open callbacks", "connect to the server socket from code", "I'll construct a raw websocket and wire handlers", "the shared client-side socket opener"
-- **removeConnection** · primitive `apps/api/src/ws/registry.ts#removeConnection`: single index entry: deindexFrom; wipe everything: clearRegistry
-  - *Said as:* "drop a closed socket from every index", "clean up when one socket closes", "I'll delete it from each map myself", "deregister the connection"
-- **resolveIdentity** · primitive `apps/api/src/ws/probe.ts#resolveIdentity`: Persist result on socket: setIdentity; channel permission: canSubscribe.
-  - *Said as:* "figure out who this socket is from its headers", "turn the authenticate frame into a user or anonymous", "I'll decode the token on the socket myself", "resolve the socket's user through the me endpoint", "a failure from me is not the same as anonymous"
-- **routeAccessOf** · primitive `apps/api/src/ws/routeAccess.ts#routeAccessOf` · in docs: docs/claude/WEBSOCKETS.md § Data streams › Authorization and re-authorization: classify an HTTP status into granted, denied or retryable stream access
-  - *Said as:* "was the probe granted, denied or should we retry", "classify the status code for stream access", "I'll treat anything but 200 as denied", "map http status to access outcome"
-- **setIdentity** · primitive `apps/api/src/ws/identity.ts#setIdentity`: Resolving who the headers belong to: resolveIdentity first, then setIdentity to record it.
-  - *Said as:* "record the resolved user on the socket", "attach the user and headers to the connection", "I'll stash the user on the socket data object", "replace the socket's identity after re-auth"
-- **websocketHandler** · primitive `apps/api/src/ws/handler.ts#websocketHandler`: handle socket open, message and close events, registering connections
-  - *Said as:* "the open, message and close handlers for sockets", "where incoming frames are dispatched", "I'll write my own socket event handlers", "register the connection on open"
-- **Heartbeat and idle sweep** · pattern WebSocket docs, Connection and recovery: detect dead sockets via 30s ping, 5s pong timeout, 5-minute idle sweep
-  - *Said as:* "detect dead sockets with ping and pong", "reconnect if pong doesn't come back", "I'll add my own keepalive timer", "sweep connections idle too long"
-- **Per-connection frame serialization** · pattern WebSocket docs, Connection and recovery: process each connection's frames serially, answering ping before the queue
-  - *Said as:* "process one socket's frames in order", "answer ping before the queued work", "I'll handle frames as they arrive in parallel", "bound the pending frame queue"
-- **WS identity via /api/v1/me** · pattern WebSocket docs, Connection and recovery: resolve socket identity through normal auth and spoof middleware via /me probe
-  - *Said as:* "authenticate the socket through normal auth middleware", "spoof should work over the socket too", "I'll verify the socket token separately from http", "the me probe decides who the socket is"
-- **operationRoute** · primitive apps/api/src/ws/operationRoute.ts: authorize a channel subscribe by probing its canonical route with socket credentials
-  - *Said as:* "map a channel name to its http route", "the canonical channel name resolver", "I'll parse the channel string myself", "probe the route with the socket's credentials"
-- **WS_FRAME_LIMIT** · primitive packages/shared/src/ws/frameLimits.ts: WebSocket frame limits; HTTP rate limiting covers snapshot reads and subscribe probes
-  - *Said as:* "how many frames a socket may send per window", "rate limit on socket frames", "I'll count messages per second myself"
-- **WSHandoff** · primitive docs/claude/WEBSOCKETS.md § Contract · code: `streamAppend`: message handoff for hints; streamAppend handoff for data streams
-  - *Said as:* "what a handler returns to push over the socket", "target channels or user ids from an app event", "the shape of a websocket push", "hint handoff versus stream append handoff"
-  - *Signs you're bypassing it:* a hand-built { kind: 'stream', target, append } object in a handler instead of streamAppend(STREAM_DEFINITIONS.x, params, op, payload) (docs/claude/APP_EVENTS.md § WebSocket handoffs ("Stream handoffs are never built by hand"))
-- **Authenticate frame, not query token** · rule WebSocket docs, Connection and recovery: WebSocket authentication; spoof/unspoof send new authenticate frames, logout clears identity
-  - *Said as:* "I'll put the token in the socket url", "credentials go in a frame after connecting", "how does the socket log in", "spoof sends a new authenticate frame"
-  - *Signs you're bypassing it:* new WebSocket(`${url}?token=...`) or reading credentials from the upgrade URL (docs/claude/WEBSOCKETS.md § Connection and recovery)
-- **Channel subscribe authorization** · rule apps/api/src/ws/operationRoute.ts: every WebSocket channel subscribe
-  - *Said as:* "every subscribe must be authorized", "I'll trust the client's subscribe request", "no channel without a permission check"
-- **Drop subscriptions on identity change** · rule WebSocket docs, Connection and recovery: any authenticate frame on an existing connection
-  - *Said as:* "re-auth as someone else should clear their channels", "I'll keep the subscriptions after re-authenticating", "a narrower token drops the streams"
-  - *Signs you're bypassing it:* keeping a socket's channels or streams after an authenticate frame that changes the user or the credential (docs/claude/WEBSOCKETS.md § Connection and recovery)
-- **Retryable errors on transient failure** · rule WebSocket docs, Connection and recovery: /me failures, pending-queue overflow, replay overruns
-  - *Said as:* "a 500 from me shouldn't log the socket out", "tell the client to retry instead of dropping the frame", "I'll treat the auth failure as no user", "queue full should answer with retryable"
-  - *Signs you're bypassing it:* treating a 429/5xx from /me as 'no user', or silently dropping a frame when the pending queue is full (docs/claude/WEBSOCKETS.md § Connection and recovery)
-- **Subscriptions authorized by the HTTP route** · rule apps/api/src/ws/probe.ts: Every channel subscription.
-  - *Said as:* "the route's permission decides the subscription", "I'll write a separate access check for channels", "same permission as the api route"
+| Problem | Use | Read | Signs you're bypassing it |
+|---|---|---|---|
+| upgrade the http request to a websocket; handle the websocket upgrade in the server fetch; I'll check the upgrade header myself; where sockets get accepted | **acceptWebSocket** · primitive `apps/api/src/ws/handler.ts#acceptWebSocket` — upgrade an incoming HTTP request to a WebSocket connection | — | — |
+| is this socket allowed to subscribe to the channel; authorize the subscription by hitting the real route; I'll write a permission check for the channel; only a success from the route grants it; check access before adding the socket to a channel | **canSubscribe** · primitive `apps/api/src/ws/probe.ts#canSubscribe` — Only need the route lookup: resolveOperationRoute; identity only: resolveIdentity. | docs/claude/WEBSOCKETS.md § Channel registry and authorization | a hand-written permission check for a channel subscribe instead of probing the channel's HTTP route (docs/claude/WEBSOCKETS.md § Channel registry and authorization) |
+| drop sockets that stopped pinging; the periodic sweep of dead connections; I'll track last-seen and close old ones; idle socket cleanup | **cleanupStaleConnections** · primitive `apps/api/src/ws/lifecycle.ts#cleanupStaleConnections` — Shutdown: drainConnections instead; this is for periodic stale sweeps. | — | — |
+| wipe every connection index; reset the socket registry between tests; clear all sockets on shutdown; I'll empty the maps by hand | **clearRegistry** · primitive `apps/api/src/ws/registry.ts#clearRegistry` — one socket closing: removeConnection instead | — | — |
+| open a client socket with message and open callbacks; connect to the server socket from code; I'll construct a raw websocket and wire handlers; the shared client-side socket opener | **createWebSocketClient** · primitive `packages/shared/src/ws/createWebSocketClient.ts#createWebSocketClient` — open a client WebSocket connection with message and open callbacks | — | — |
+| drop a closed socket from every index; clean up when one socket closes; I'll delete it from each map myself; deregister the connection | **removeConnection** · primitive `apps/api/src/ws/registry.ts#removeConnection` — single index entry: deindexFrom; wipe everything: clearRegistry | — | — |
+| figure out who this socket is from its headers; turn the authenticate frame into a user or anonymous; I'll decode the token on the socket myself; resolve the socket's user through the me endpoint; a failure from me is not the same as anonymous | **resolveIdentity** · primitive `apps/api/src/ws/probe.ts#resolveIdentity` — Persist result on socket: setIdentity; channel permission: canSubscribe. | — | — |
+| was the probe granted, denied or should we retry; classify the status code for stream access; I'll treat anything but 200 as denied; map http status to access outcome | **routeAccessOf** · primitive `apps/api/src/ws/routeAccess.ts#routeAccessOf` — classify an HTTP status into granted, denied or retryable stream access | docs/claude/WEBSOCKETS.md § Data streams › Authorization and re-authorization | — |
+| record the resolved user on the socket; attach the user and headers to the connection; I'll stash the user on the socket data object; replace the socket's identity after re-auth | **setIdentity** · primitive `apps/api/src/ws/identity.ts#setIdentity` — Resolving who the headers belong to: resolveIdentity first, then setIdentity to record it. | — | — |
+| the open, message and close handlers for sockets; where incoming frames are dispatched; I'll write my own socket event handlers; register the connection on open | **websocketHandler** · primitive `apps/api/src/ws/handler.ts#websocketHandler` — handle socket open, message and close events, registering connections | — | — |
+| detect dead sockets with ping and pong; reconnect if pong doesn't come back; I'll add my own keepalive timer; sweep connections idle too long | **Heartbeat and idle sweep** · pattern WebSocket docs, Connection and recovery — detect dead sockets via 30s ping, 5s pong timeout, 5-minute idle sweep | part 4 | — |
+| process one socket's frames in order; answer ping before the queued work; I'll handle frames as they arrive in parallel; bound the pending frame queue | **Per-connection frame serialization** · pattern WebSocket docs, Connection and recovery — process each connection's frames serially, answering ping before the queue | part 4 | — |
+| authenticate the socket through normal auth middleware; spoof should work over the socket too; I'll verify the socket token separately from http; the me probe decides who the socket is | **WS identity via /api/v1/me** · pattern WebSocket docs, Connection and recovery — resolve socket identity through normal auth and spoof middleware via /me probe | part 4 | — |
+| map a channel name to its http route; the canonical channel name resolver; I'll parse the channel string myself; probe the route with the socket's credentials | **operationRoute** · primitive apps/api/src/ws/operationRoute.ts — authorize a channel subscribe by probing its canonical route with socket credentials | part 4 | — |
+| how many frames a socket may send per window; rate limit on socket frames; I'll count messages per second myself | **WS_FRAME_LIMIT** · primitive packages/shared/src/ws/frameLimits.ts — WebSocket frame limits; HTTP rate limiting covers snapshot reads and subscribe probes | part 4 | — |
+| what a handler returns to push over the socket; target channels or user ids from an app event; the shape of a websocket push; hint handoff versus stream append handoff | **WSHandoff** · primitive docs/claude/WEBSOCKETS.md § Contract — message handoff for hints; streamAppend handoff for data streams | code `streamAppend` | a hand-built { kind: 'stream', target, append } object in a handler instead of streamAppend(STREAM_DEFINITIONS.x, params, op, payload) (docs/claude/APP_EVENTS.md § WebSocket handoffs ("Stream handoffs are never built by hand")) |
+| I'll put the token in the socket url; credentials go in a frame after connecting; how does the socket log in; spoof sends a new authenticate frame | **Authenticate frame, not query token** · rule WebSocket docs, Connection and recovery — WebSocket authentication; spoof/unspoof send new authenticate frames, logout clears identity | part 4 | new WebSocket(`${url}?token=...`) or reading credentials from the upgrade URL (docs/claude/WEBSOCKETS.md § Connection and recovery) |
+| every subscribe must be authorized; I'll trust the client's subscribe request; no channel without a permission check | **Channel subscribe authorization** · rule apps/api/src/ws/operationRoute.ts — every WebSocket channel subscribe | part 4 | — |
+| re-auth as someone else should clear their channels; I'll keep the subscriptions after re-authenticating; a narrower token drops the streams | **Drop subscriptions on identity change** · rule WebSocket docs, Connection and recovery — any authenticate frame on an existing connection | part 4 | keeping a socket's channels or streams after an authenticate frame that changes the user or the credential (docs/claude/WEBSOCKETS.md § Connection and recovery) |
+| a 500 from me shouldn't log the socket out; tell the client to retry instead of dropping the frame; I'll treat the auth failure as no user; queue full should answer with retryable | **Retryable errors on transient failure** · rule WebSocket docs, Connection and recovery — /me failures, pending-queue overflow, replay overruns | part 4 | treating a 429/5xx from /me as 'no user', or silently dropping a frame when the pending queue is full (docs/claude/WEBSOCKETS.md § Connection and recovery) |
+| the route's permission decides the subscription; I'll write a separate access check for channels; same permission as the api route | **Subscriptions authorized by the HTTP route** · rule apps/api/src/ws/probe.ts — Every channel subscription. | part 4 | — |
+
 - *Also here, by name:* AUTH_PROBE_HEADER (`apps/api/src/lib/utils/authProbe.ts`); AUTH_PROBE_SECRET (`apps/api/src/lib/utils/authProbe.ts`); SYSTEM_PROBE_SECRET (`apps/api/src/lib/utils/authProbe.ts`); WS_FRAME_WINDOW_MS (`packages/shared/src/ws/frameLimits.ts`); WS_MAX_PENDING_FRAMES (`packages/shared/src/ws/frameLimits.ts`); addConnection (`apps/api/src/ws/registry.ts`); byChannel (`apps/api/src/ws/registry.ts`); byId (`apps/api/src/ws/registry.ts`); byStream (`apps/api/src/ws/registry.ts`); byUser (`apps/api/src/ws/registry.ts`); deindexFrom (`apps/api/src/ws/registry.ts`); getConnectionStats (`apps/api/src/ws/lifecycle.ts`); indexInto (`apps/api/src/ws/registry.ts`); sanitizeWSHeaders (`apps/api/src/ws/probe.ts`); startStaleSweep (`apps/api/src/ws/handler.ts`); updateLastPing (`apps/api/src/ws/lifecycle.ts`)
 
 ## 4. The specifics, in full

@@ -9,6 +9,7 @@
 - [Glossary](#glossary)
 - [1. What this Warden covers](#1-what-this-warden-covers)
 - [2. The domain](#2-the-domain)
+- [2a. Migrations in progress](#2a-migrations-in-progress)
 - [3. Everything that exists here, by class](#3-everything-that-exists-here-by-class)
   - [Class `openapi`](#class-openapi-route-auto-registration-and-openapi-spec-generation)
   - [Class `request-schemas`](#class-request-schemas-requestresponse-zod-schemas-generated-prisma-zod-scalarschema-sanitizerequestschema)
@@ -76,9 +77,17 @@ Registration: `autoRegisterRoutes` mounts route/controller pairs from a module d
 
 Not here: route templates, controllers, the { data } envelope and module layout are `api-routes`; Prisma zod generation itself and model naming are `data-modeling`; error schemas are `request-context-errors`.
 
+## 2a. Migrations in progress
+
+We are moving from A to B. Do not copy A, even where you find it next door.
+
+| Moving from (don't copy) | To (copy this) | Read |
+|---|---|---|
+| Routes mounted by hand in module index.ts (API_ROUTES.md § Router Exports) | `autoRegisterRoutes` over routes/ + controllers/ | FEATURES.md § API Architecture & Routing › File-Based Route Auto-Registration |
+
 ## 3. Everything that exists here, by class
 
-Point at a class when that is as specific as the moment allows, or at a member. Where a class has siblings an agent could confuse, a table under the class header says which to use when; its *Said as* line gives the plain words a user or agent uses for that job. Each member: **name** · kind `where` · the doc § that describes it (code members) or the code it is about (doc members): choose this when … . Quote the name and the where in a pointer ("look over here: createLock, packages/db/src/lock/createLock.ts, CONCURRENCY.md § Distributed Lock"). *Said as:* the ways a user or agent describes this job in a message or plan without knowing the name; match on these. *Signs you're bypassing it:* the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
+Find the problem in plain words, then point at the exact thing. Each class opens with job tables where a class has confusable siblings (which to use when; *Said as* gives the plain words for that job), then one table of every member: **Problem** is the job in the user's or agent's words (match on these); **Use** is the exact member, its kind and `where`, then when to choose it; **Read** is the doc § that describes it (code members) or the code it is about (doc members); **Signs you're bypassing it** is the hand-rolled code an agent writes when it rebuilds the primitive, plus the errors it throws. Quote Use and Read in a pointer ("look over here: createLock, packages/db/src/lock/createLock.ts, CONCURRENCY.md § Distributed Lock"). Code members come from the catalog, described from the code; doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
 
 ### Class `openapi`: Route auto-registration and OpenAPI spec generation
 
@@ -88,8 +97,6 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
-| **autoRegisterRoutes** | default for module routes: drop files in routes/ and controllers/; admin/internal variants wrap it | docs don't distinguish when hand mounting is still right; see API_ROUTES.md § Router Exports |
-| **Mount routes in module index (api-routes)** | the module index.ts exports the router that routes are registered on | importing every route and controller by hand (use autoRegisterRoutes) |
 
 **Job: build or resolve an API path or query from an operation** (apiPath vs resolveOperation vs serializeBracketQuery) — catalog apiPath / resolveOperation; docs/claude/FLOWS.md § Registry › readPath
 
@@ -97,8 +104,6 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
-| **apiPath** | a full path-plus-query string for an operationId (e.g. a flow readPath) | you need the operation metadata itself (use resolveOperation) |
-| **resolveOperation** | resolved operation details in-process (e.g. websockets) | you want a ready path string (use apiPath) |
 
 **Job: decide whether an endpoint is public or internal** (apps/api/src/routes/api vs apps/api/src/routes/internal) — catalog routes/api, routes/internal
 
@@ -106,26 +111,17 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
-| **apps/api/src/routes/api** | public tenant endpoints | internal/ops calls (use apps/api/src/routes/internal); liveness goes in routes/health |
-| **apps/api/src/routes/internal** | non-public service calls | public endpoints (use apps/api/src/routes/api) |
 
-- **apiPath** · primitive `apps/api/src/lib/openapi/apiPath.ts#apiPath` · in docs: docs/claude/FLOWS.md § Registry; FEATURES.md § Flows: Need a full path string with query (e.g. flow readPath); for the operation metadata itself use resolveOperation.
-  - *Said as:* "build the full URL with query string for an operation", "I'll concatenate the path and filter params by hand", "get the read path for a flow from its operation id", "turn an operation id into a request path"
-  - *Signs you're bypassing it:* string-concatenating API paths and filter[...] query strings by hand for an operation (catalog apiPath)
-- **app** · primitive `apps/api/src/app.ts#app`: hold the API's OpenAPIHono instance for mounting routes and internal batch routing
-  - *Said as:* "the main Hono instance everything mounts on", "where routes get attached to the server", "the instance used for internal batch routing"
-- **autoRegisterRoutes** · primitive `apps/api/src/lib/utils/autoRegisterRoutes.ts#autoRegisterRoutes` · in docs: FEATURES.md § API Architecture & Routing: Default for module routes; drop files in routes/ and controllers/ instead of manual imports. Admin/internal variants wrap it.
-  - *Said as:* "pick up every route file in the module automatically", "I'll import each route and controller and register them one by one", "drop a file in routes and it's served", "register all the module's routes at once", "no manual imports for new routes"
-  - *Signs you're bypassing it:* a module index.ts that imports every route and controller by hand and calls router.openapi(route, controller) line by line (FEATURES.md § API Architecture & Routing (File-Based Route Auto-Registration: "No manual imports needed"))
-- **resolveOperation** · primitive `apps/api/src/lib/openapi/resolveOperation.ts#resolveOperation` · in docs: docs/claude/WEBSOCKETS.md § Channel registry and authorization: Need resolved operation details in-process (e.g. websockets); for a ready path-plus-query string use apiPath.
-  - *Said as:* "look up an operation's details by its id in-process", "find the route metadata for an operation without building a URL", "which path and method does this operation id map to", "resolve the operation for a websocket channel"
-- **securityRequirements** · primitive `apps/api/src/lib/auth/securitySchemes.ts#securityRequirements`: Use in route configs; securitySchemes holds the scheme definitions themselves.
-  - *Said as:* "declare which auth the route accepts in OpenAPI", "I'll write the security array with bearerAuth by hand", "mark the route as needing a token in the spec"
-  - *Signs you're bypassing it:* hand-written security: [{ bearerAuth: [] }] arrays in route configs (catalog securityRequirements)
-- **apps/api/src/routes/api** · system `apps/api/src/routes/api`: Public tenant endpoints; internal/ops calls go in routes/internal, liveness in routes/health.
-  - *Said as:* "a public endpoint tenants call", "where do customer-facing routes live", "mount this under the public API", "the normal API surface"
-- **apps/api/src/routes/internal** · system `apps/api/src/routes/internal`: Non-public service calls; public endpoints belong in routes/api.
-  - *Said as:* "an endpoint only our own services call", "a non-public ops route", "where do service-to-service calls go", "an internal route that isn't exposed to tenants"
+| Problem | Use | Read | Signs you're bypassing it |
+|---|---|---|---|
+| build the full URL with query string for an operation; I'll concatenate the path and filter params by hand; get the read path for a flow from its operation id; turn an operation id into a request path | **apiPath** · primitive `apps/api/src/lib/openapi/apiPath.ts#apiPath` — Need a full path string with query (e.g. flow readPath); for the operation metadata itself use resolveOperation. | docs/claude/FLOWS.md § Registry; FEATURES.md § Flows | string-concatenating API paths and filter[...] query strings by hand for an operation (catalog apiPath) |
+| the main Hono instance everything mounts on; where routes get attached to the server; the instance used for internal batch routing | **app** · primitive `apps/api/src/app.ts#app` — hold the API's OpenAPIHono instance for mounting routes and internal batch routing | — | — |
+| pick up every route file in the module automatically; I'll import each route and controller and register them one by one; drop a file in routes and it's served; register all the module's routes at once; no manual imports for new routes | **autoRegisterRoutes** · primitive `apps/api/src/lib/utils/autoRegisterRoutes.ts#autoRegisterRoutes` — Default for module routes; drop files in routes/ and controllers/ instead of manual imports. Admin/internal variants wrap it. | FEATURES.md § API Architecture & Routing | a module index.ts that imports every route and controller by hand and calls router.openapi(route, controller) line by line (FEATURES.md § API Architecture & Routing (File-Based Route Auto-Registration: "No manual imports needed")) |
+| look up an operation's details by its id in-process; find the route metadata for an operation without building a URL; which path and method does this operation id map to; resolve the operation for a websocket channel | **resolveOperation** · primitive `apps/api/src/lib/openapi/resolveOperation.ts#resolveOperation` — Need resolved operation details in-process (e.g. websockets); for a ready path-plus-query string use apiPath. | docs/claude/WEBSOCKETS.md § Channel registry and authorization | — |
+| declare which auth the route accepts in OpenAPI; I'll write the security array with bearerAuth by hand; mark the route as needing a token in the spec | **securityRequirements** · primitive `apps/api/src/lib/auth/securitySchemes.ts#securityRequirements` — Use in route configs; securitySchemes holds the scheme definitions themselves. | — | hand-written security: [{ bearerAuth: [] }] arrays in route configs (catalog securityRequirements) |
+| a public endpoint tenants call; where do customer-facing routes live; mount this under the public API; the normal API surface | **apps/api/src/routes/api** · system `apps/api/src/routes/api` — Public tenant endpoints; internal/ops calls go in routes/internal, liveness in routes/health. | — | — |
+| an endpoint only our own services call; a non-public ops route; where do service-to-service calls go; an internal route that isn't exposed to tenants | **apps/api/src/routes/internal** · system `apps/api/src/routes/internal` — Non-public service calls; public endpoints belong in routes/api. | — | — |
+
 - *Also here, by name:* Tags (`apps/api/src/modules/tags.ts`); autoRegisterAdminRoutes (`apps/api/src/lib/utils/autoRegisterRoutes.ts`); autoRegisterInternalRoutes (`apps/api/src/lib/utils/autoRegisterRoutes.ts`); buildOperationId (`apps/api/src/lib/routeTemplates/utils/buildOperationId.ts`); buildTags (`apps/api/src/lib/routeTemplates/utils/buildTags.ts`); errorResponses (`apps/api/src/lib/routeTemplates/errorResponses.ts`); registerSecuritySchemes (`apps/api/src/lib/auth/securitySchemes.ts`); securityForRoute (`apps/api/src/lib/auth/routeSecurity.ts`); securitySchemes (`apps/api/src/lib/auth/securitySchemes.ts`); toOpenApi (`apps/api/src/lib/routeTemplates/utils/toOpenApi.ts`)
 
 ### Class `request-schemas`: Request/response zod schemas: generated Prisma zod, ScalarSchema, sanitizeRequestSchema
@@ -136,10 +132,6 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
-| **<Model>ScalarSchema (api-routes)** | response (or any) schema describing a model's fields, narrowed with .omit | body inputs (use Inputs from generated zod) |
-| **Inputs from generated zod** | body schemas mirroring Prisma create/update inputs | response shapes (use <Model>ScalarSchema) |
-| **sanitizeRequestSchema** | removing client-unsettable keys from a generated schema | a hand-written reduced copy or long .omit chains |
-| **UserWithRelationsSchema** | a user plus memberships | plain user fields (use <Model>ScalarSchema) |
 
 **Job: validate a UUIDv7 or app path (zod field vs boolean check)** (Zod field vs boolean check: uuidV7Schema / isUuidV7, appPathSchema / isAppPath) — catalog packages/shared/src/utils/isUuidV7.ts, isAppPath.ts
 
@@ -147,10 +139,6 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
-| **uuidV7Schema** | id fields inside a zod schema | imperative checks (use isUuidV7) |
-| **isUuidV7** | imperative boolean checks | zod schemas (use uuidV7Schema) |
-| **appPathSchema** | zod fields like a flow returnUrl | plain boolean checks (use isAppPath) |
-| **isAppPath** | imperative checks | zod schemas (use appPathSchema) |
 
 **Job: validate fields across a request body** (No .refine() on route schemas vs Cross-field validation in controller) — docs/claude/API_ROUTES.md § Cross-Field Validations
 
@@ -158,36 +146,21 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
-| **No .refine() on route schemas** | single-field constraints stay in the route schema; no .refine (ZodEffects breaks hono-zod-openapi) | cross-field rules (use Cross-field validation in controller) |
-| **Cross-field validation in controller** | cross-field constraints: a validations/ file parsed in the controller | single-field constraints (keep in the route schema) |
 
-- **appPathSchema** · primitive `packages/shared/src/utils/isAppPath.ts#appPathSchema` · in docs: docs/claude/FLOWS.md § Registry: Zod fields like flow returnUrl; plain boolean checks: isAppPath instead.
-  - *Said as:* "validate a return URL is a safe in-app path", "I'll check it startsWith slash and not double slash", "a zod field for a redirect path", "the returnUrl must stay inside the app"
-  - *Signs you're bypassing it:* hand-rolled returnUrl checks (startsWith('/') && !startsWith('//'), length caps) in a zod schema (catalog appPathSchema)
-- **isAppPath** · primitive `packages/shared/src/utils/isAppPath.ts#isAppPath`: Imperative checks; in zod schemas use appPathSchema.
-  - *Said as:* "check if a string is an in-app path", "a boolean check for a safe relative path", "is this redirect target local"
-- **isUuidV7** · primitive `packages/shared/src/utils/isUuidV7.ts#isUuidV7`: Imperative checks; in zod schemas use uuidV7Schema.
-  - *Said as:* "check if a string is a valid id", "a boolean test for our id format", "is this an id or a slug"
-- **sanitizeRequestSchema** · primitive `apps/api/src/lib/routeTemplates/utils/sanitizeRequestSchema.ts#sanitizeRequestSchema`: Removing client-unsettable fields from generated schemas instead of hand-writing a reduced zod schema.
-  - *Said as:* "drop server-managed keys from the generated schema", "I'll write a trimmed copy of the generated schema", "a long omit chain just to remove ownerId", "take the client-unsettable fields out of the body schema", "the body schema shouldn't accept the owner id"
-  - *Signs you're bypassing it:* a hand-written reduced copy of a generated schema, or long .omit chains, just to drop server-managed keys like ownerId (catalog sanitizeRequestSchema)
-- **UserWithRelationsSchema** · primitive `packages/db/src/types/userWithRelations.ts#UserWithRelationsSchema`: Need user plus memberships: use this instead of plain UserScalarSchema.
-  - *Said as:* "the user with their memberships in the response", "a schema for the user plus their orgs and spaces", "return the full user object with relations", "the shape of the logged-in user"
-- **uuidV7Schema** · primitive `packages/shared/src/utils/isUuidV7.ts#uuidV7Schema`: Schema fields; boolean checks outside zod: isUuidV7.
-  - *Said as:* "validate an id field in a schema", "I'll use z.string().uuid() for the id", "a zod field for our ids", "a regex for uuid v7 in the schema"
-  - *Signs you're bypassing it:* z.string().uuid() or a hand-written uuidv7 regex on id fields (catalog uuidV7Schema)
-- **Cross-field validation in controller** · pattern docs/claude/API_ROUTES.md § Schemas › Cross-Field Validations · code: `createRoute`: cross-field constraints; single-field constraints stay in the route schema
-  - *Said as:* "one field depends on another in the body", "validate that endDate is after startDate", "I'll add a refine on the body schema for this", "where do checks across two fields go"
-- **Colocate route schemas** · rule docs/claude/API_ROUTES.md § Schemas › Colocation Rule · code: `createRoute`: Every route schema; separate file only when reused by several routes
-  - *Said as:* "where does the schema for this route live", "put the schema next to the route", "a shared schemas file only when several routes use it"
-- **Default to ScalarSchema for responses** · rule docs/claude/API_ROUTES.md § Schemas · code: `createRoute`: Any route schema describing a model's fields
-  - *Said as:* "what schema to use for the response", "the response shape for a model's fields", "use the generated model schema for responses"
-- **Inputs from generated zod** · rule docs/claude/API_ROUTES.md § Schemas · code: `createRoute`: Body schemas mirroring Prisma create/update inputs
-  - *Said as:* "the body schema for a create or update", "I'll hand-type the body schema for this model", "mirror the Prisma create input in zod", "where does the request body schema come from"
-  - *Signs you're bypassing it:* a hand-typed body schema that duplicates a Prisma create/update input instead of the generated CreateInput/UpdateInput zod schema (docs/claude/API_ROUTES.md § Schemas (Inputs from Generated))
-- **No .refine() on route schemas** · rule docs/claude/API_ROUTES.md § Schemas › Cross-Field Validations · code: `createRoute`: Any cross-field validation on route inputs
-  - *Said as:* "I'll add a refine to the body schema", "refine breaks the OpenAPI generation", "no superRefine on route inputs", "why can't I use refine here"
-  - *Signs you're bypassing it:* .refine()/.superRefine() on a route's bodySchema or query schema (produces ZodEffects that breaks hono-zod-openapi) instead of a validations/ file parsed in the controller (docs/claude/API_ROUTES.md § Schemas, Cross-Field Validations)
+| Problem | Use | Read | Signs you're bypassing it |
+|---|---|---|---|
+| validate a return URL is a safe in-app path; I'll check it startsWith slash and not double slash; a zod field for a redirect path; the returnUrl must stay inside the app | **appPathSchema** · primitive `packages/shared/src/utils/isAppPath.ts#appPathSchema` — Zod fields like flow returnUrl; plain boolean checks: isAppPath instead. | docs/claude/FLOWS.md § Registry | hand-rolled returnUrl checks (startsWith('/') && !startsWith('//'), length caps) in a zod schema (catalog appPathSchema) |
+| check if a string is an in-app path; a boolean check for a safe relative path; is this redirect target local | **isAppPath** · primitive `packages/shared/src/utils/isAppPath.ts#isAppPath` — Imperative checks; in zod schemas use appPathSchema. | — | — |
+| check if a string is a valid id; a boolean test for our id format; is this an id or a slug | **isUuidV7** · primitive `packages/shared/src/utils/isUuidV7.ts#isUuidV7` — Imperative checks; in zod schemas use uuidV7Schema. | — | — |
+| drop server-managed keys from the generated schema; I'll write a trimmed copy of the generated schema; a long omit chain just to remove ownerId; take the client-unsettable fields out of the body schema; the body schema shouldn't accept the owner id | **sanitizeRequestSchema** · primitive `apps/api/src/lib/routeTemplates/utils/sanitizeRequestSchema.ts#sanitizeRequestSchema` — Removing client-unsettable fields from generated schemas instead of hand-writing a reduced zod schema. | — | a hand-written reduced copy of a generated schema, or long .omit chains, just to drop server-managed keys like ownerId (catalog sanitizeRequestSchema) |
+| the user with their memberships in the response; a schema for the user plus their orgs and spaces; return the full user object with relations; the shape of the logged-in user | **UserWithRelationsSchema** · primitive `packages/db/src/types/userWithRelations.ts#UserWithRelationsSchema` — Need user plus memberships: use this instead of plain UserScalarSchema. | — | — |
+| validate an id field in a schema; I'll use z.string().uuid() for the id; a zod field for our ids; a regex for uuid v7 in the schema | **uuidV7Schema** · primitive `packages/shared/src/utils/isUuidV7.ts#uuidV7Schema` — Schema fields; boolean checks outside zod: isUuidV7. | — | z.string().uuid() or a hand-written uuidv7 regex on id fields (catalog uuidV7Schema) |
+| one field depends on another in the body; validate that endDate is after startDate; I'll add a refine on the body schema for this; where do checks across two fields go | **Cross-field validation in controller** · pattern docs/claude/API_ROUTES.md § Schemas › Cross-Field Validations — cross-field constraints; single-field constraints stay in the route schema | code `createRoute` | — |
+| where does the schema for this route live; put the schema next to the route; a shared schemas file only when several routes use it | **Colocate route schemas** · rule docs/claude/API_ROUTES.md § Schemas › Colocation Rule — Every route schema; separate file only when reused by several routes | code `createRoute` | — |
+| what schema to use for the response; the response shape for a model's fields; use the generated model schema for responses | **Default to ScalarSchema for responses** · rule docs/claude/API_ROUTES.md § Schemas — Any route schema describing a model's fields | code `createRoute` | — |
+| the body schema for a create or update; I'll hand-type the body schema for this model; mirror the Prisma create input in zod; where does the request body schema come from | **Inputs from generated zod** · rule docs/claude/API_ROUTES.md § Schemas — Body schemas mirroring Prisma create/update inputs | code `createRoute` | a hand-typed body schema that duplicates a Prisma create/update input instead of the generated CreateInput/UpdateInput zod schema (docs/claude/API_ROUTES.md § Schemas (Inputs from Generated)) |
+| I'll add a refine to the body schema; refine breaks the OpenAPI generation; no superRefine on route inputs; why can't I use refine here | **No .refine() on route schemas** · rule docs/claude/API_ROUTES.md § Schemas › Cross-Field Validations — Any cross-field validation on route inputs | code `createRoute` | .refine()/.superRefine() on a route's bodySchema or query schema (produces ZodEffects that breaks hono-zod-openapi) instead of a validations/ file parsed in the controller (docs/claude/API_ROUTES.md § Schemas, Cross-Field Validations) |
+
 - *Also here, by name:* ResponseMetadataSchema (`apps/api/src/lib/routeTemplates/responseMetadata.ts`); idParamsSchema (`apps/api/src/lib/routeTemplates/idParamsSchema.ts`); transformJsonFields (`apps/api/src/lib/routeTemplates/utils/transformJsonFields.ts`); validateOrganizationCreateOrganizationUserBody (`apps/api/src/modules/organization/validations/organizationCreateOrganizationUserBody.ts`)
 
 ## 4. The specifics, in full

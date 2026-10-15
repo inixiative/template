@@ -6,7 +6,7 @@
     "auth-middleware",
     "users"
   ],
-  "tokens": 11224,
+  "tokens": 10413,
   "tokenMethod": "chars/4",
   "runsAgreed": 0,
   "sources": {

@@ -1,12 +1,12 @@
 {
   "id": "api-routes",
   "title": "API routes, controllers and modules",
-  "routing": "Is this about adding or shaping an endpoint: route templates (readRoute, createRoute, updateRoute, deleteRoute, actionRoute) and their args (model, submodel, action, many, paginate, admin, sanitizeKeys, filterLens, middleware), makeController and respond.ok / respond.created / respond.noContent, the { data } envelope, operationId naming, router exports and mounting, or where code goes inside an API module (routes/, controllers/, services/, handlers/, permissions/, validations/, MODULES.md)?",
+  "routing": "Is this about adding or shaping an endpoint: route templates (readRoute, createRoute, updateRoute, deleteRoute, actionRoute) and their args (model, submodel, action, many, paginate, admin, sanitizeKeys, filterLens, middleware), makeController and respond.ok / respond.created / respond.noContent, the { data } envelope, operationId naming, router exports and mounting, or where code goes inside an API module (routes/, controllers/, services/, handlers/, permissions-roles / permissions-rebac/, validations/, MODULES.md)?",
   "concepts": [
     "route-templates",
     "api-modules"
   ],
-  "tokens": 16362,
+  "tokens": 15577,
   "tokenMethod": "chars/4",
   "runsAgreed": 1,
   "sources": {

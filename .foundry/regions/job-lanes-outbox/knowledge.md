@@ -9,6 +9,7 @@
 - [Glossary](#glossary)
 - [1. What this Warden covers](#1-what-this-warden-covers)
 - [2. The domain](#2-the-domain)
+- [2b. Under construction](#2b-under-construction)
 - [3. Everything that exists here, by class](#3-everything-that-exists-here-by-class)
   - [Class `job-lanes`](#class-job-lanes-fastslow-job-lanes-withlanepriority-slot-shares-lane-pressure-budget)
   - [Class `job-outbox`](#class-job-outbox-queue-overflow-buffer-joboutbox-spill-and-drain)
@@ -113,9 +114,15 @@ The overflow buffer sits in front of BullMQ. When depth crosses `JOBS_MAX_QUEUE_
 
 Related regions: defining handlers, `enqueueJob`, staged jobs, cron and BullBoard are in `jobs-cron`. The primitives used here (`createLock`, `createSerializedQueue`, `claimLane` / `watchLane`, `heartbeat`) and the lock-versus-lane comparison are in `concurrency-locks`. Redis connections and key namespaces are in `redis-caching-rate-limits`. Email fan-out planning (`sendEmail`, `deliverEmail`) is in `email-delivery`. Gauges and the observability pipeline are in `observability-lifecycle`.
 
+## 2b. Under construction
+
+Open work you cannot use yet. Do not build against it, and do not build what it would replace without saying so.
+
+- Outbox drain: per-worker loop + poison-row quarantine, and the overflow buffer itself, are in review — tickets INFRA-022, INFRA-021
+
 ## 3. Everything that exists here, by class
 
-Point at a class when that is as specific as the moment allows, or at a member. Where a class has siblings an agent could confuse, a table under the class header says which to use when; its *Said as* line gives the plain words a user or agent uses for that job. Each member: **name** · kind `where` · the doc § that describes it (code members) or the code it is about (doc members): choose this when … . Quote the name and the where in a pointer ("look over here: createLock, packages/db/src/lock/createLock.ts, CONCURRENCY.md § Distributed Lock"). *Said as:* the ways a user or agent describes this job in a message or plan without knowing the name; match on these. *Signs you're bypassing it:* the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
+Find the problem in plain words, then point at the exact thing. Each class opens with job tables where a class has confusable siblings (which to use when; *Said as* gives the plain words for that job), then one table of every member: **Problem** is the job in the user's or agent's words (match on these); **Use** is the exact member, its kind and `where`, then when to choose it; **Read** is the doc § that describes it (code members) or the code it is about (doc members); **Signs you're bypassing it** is the hand-rolled code an agent writes when it rebuilds the primitive, plus the errors it throws. Quote Use and Read in a pointer ("look over here: createLock, packages/db/src/lock/createLock.ts, CONCURRENCY.md § Distributed Lock"). Code members come from the catalog, described from the code; doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
 
 ### Class `job-lanes`: Fast/slow job lanes: withLanePriority, slot shares, lane pressure budget
 
@@ -125,11 +132,6 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
-| **withLanePriority** | slow jobs go in the shared queue at SLOW_LANE_PRIORITY so fast work is always picked first | newer work replacing older for a key (use makeSupersedingJob / claimLane) |
-| **claimLane (concurrency-locks)** | supersede lane: newest job for a dedupe key wins (enqueue and drain re-claim it) | fast/slow ordering (use withLanePriority) |
-| **watchLane (concurrency-locks)** | a running superseding job detects it was usurped | claiming (use claimLane) |
-| **makeSingletonJob (jobs-cron)** | one run at a time; keeps its handler's declared lane | newest wins (use makeSupersedingJob) |
-| **createLock (concurrency-locks)** | cross-process exclusion, e.g. the single outbox drainer | job ordering (use withLanePriority) |
 
 **Job: choose and enforce a job's fast or slow lane** (Choosing and enforcing a lane) — docs/claude/JOBS.md § Choosing a Lane, § Priority, § Slots, § Enqueuing Jobs
 
@@ -137,82 +139,43 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
-| **Fast and slow job lanes** | declare a handler default lane for bulk or fan-out work | size known per enqueue (use Per-enqueue lane by work size) |
-| **Per-enqueue lane by work size** | producer knows the size (sendEmail fanOutLane) | size unknown (declare the handler default) |
-| **bypass enqueue option (jobs-cron)** | latency-critical job must never spill | default: adhoc may spill under overflow |
-| **SlowSlotPool** | per-worker cap on running slow jobs (JOBS_SLOW_SLOT_FRACTION) | cross-process limits (it is per worker by design) |
 | *no lane declared (fast default)* | ordinary small work: buildJobData falls back to fast when the request, enqueue option and handler declare no lane; an envelope with no lane is fast everywhere (JOBS.md § Choosing a Lane) | bulk or fan-out work (declare the slow lane on the handler, or set lane per enqueue when the size is known) |
 
-- **createSlowSlotPool** · primitive `apps/api/src/jobs/slowSlotPool.ts#createSlowSlotPool`: In-process slot limit for slow jobs only; cross-process serialization belongs to locks-and-serialization helpers.
-  - *Said as:* "cap how many slow jobs this worker runs at once", "slow work shouldn't fill every slot", "I'll keep a counter of running slow jobs", "per-worker share for slow jobs"
-- **isLaneOverflowing** · primitive `apps/api/src/jobs/outbox/flag.ts#isLaneOverflowing`: Use for spill decisions; isOverflowing checks only one lane's own flag.
-  - *Said as:* "is this lane overflowing, should I spill", "slow should also respect fast's overflow", "I'll count the queue and compare to a threshold", "the spill decision for one lane"
-- **readSlowLaneState** · primitive `apps/api/src/jobs/readSlowLaneState.ts#readSlowLaneState` · in docs: docs/claude/JOBS.md § Fast and Slow Lanes › Pressure: One Budget, Divided by Lane; docs/claude/JOBS.md § Overflow Buffer: Whole-lane snapshot for gauges and outbox drain; readSlowDeferred or readSlowIdleMs only for a single signal.
-  - *Said as:* "a snapshot of the slow lane for gauges and the drain", "how backed up is slow work", "I'll read each slow signal separately", "idle time, deferred count and depth in one read"
-- **withLanePriority** · primitive `apps/api/src/jobs/lanePriority.ts#withLanePriority` · in docs: docs/claude/CONCURRENCY.md § Job Lanes (`withLanePriority`); docs/claude/JOBS.md § Fast and Slow Lanes › Priority: Fast Work Is Always Picked First: Newer work replacing older for a key: superseding jobs instead.
-  - *Said as:* "slow jobs wait at the lowest priority so fast work is picked first", "keep bulk jobs from blocking foreground jobs", "I'll make a second queue for background work", "I'll reserve a worker pool for bulk jobs", "we're not paying for a separate queue, use pressure and priority", "this is ordering, not a lock or a semaphore"
-  - *Signs you're bypassing it:* a second BullMQ queue or a reserved worker pool for background work, or ad-hoc numeric priorities, to keep bulk jobs from blocking foreground jobs (docs/claude/CONCURRENCY.md § Job Lanes; docs/claude/JOBS.md § Priority)
-- **Fast and slow job lanes** · pattern docs/claude/JOBS.md § Fast and Slow Lanes: Bulk or fan-out work; size-dependent producers set lane per enqueue instead of handler default.
-  - *Said as:* "declare this handler as slow because it fans out", "bulk work goes in the slow lane by default", "I'll add a bulk job constructor with a flag", "the lane is a tag on the job data, defaulted by the handler", "same queue, capacity divided by lane"
-- **Lane-divided depth budget overflow** · pattern docs/claude/JOBS.md § Pressure: Spill fast when whole budget full, slow when its share or budget full; drain fast then slow
-  - *Said as:* "one depth budget shared, slow gets a share", "spill fast when the whole budget is full, slow when its share is", "drain fast rows first, then slow", "I'll give slow jobs their own queue and cap"
-- **Per-enqueue lane by work size** · pattern sendEmail (fanOutLane): When size is known at enqueue time; otherwise declare the handler default lane.
-  - *Said as:* "the producer knows how many recipients, pick the lane then", "small sends stay fast, big fan-outs go slow", "I'll throttle big sends with a delay", "set the lane per enqueue when the size is known"
-  - *Signs you're bypassing it:* a separate queue, or a home-made throttle/delay, for big fan-outs instead of setting `lane: 'slow'` on the enqueue when the size is known (docs/claude/JOBS.md § Choosing a Lane (sendEmail fanOutLane))
-- **cronJobSync** · primitive cronJobSync hook: sync cron job rows to BullMQ repeats with lane stamped
-  - *Said as:* "cron repeatables carry their lane too", "the cron row's lane is stamped on the repeatable"
-- **dedupeLatestPerLane** · primitive apps/api/src/jobs/outbox/: collapse superseding lane rows in a batch to the latest one
-  - *Said as:* "collapse several spilled rows for one key to the newest", "only the last superseding row in a batch matters"
-- **EMAIL_SLOW_LANE_MIN_RECIPIENTS** · primitive sendEmail: set recipient threshold above which deliverEmail fan-out goes slow
-  - *Said as:* "how many recipients before an email send goes slow", "the recipient threshold for the slow lane"
-- **JobData.lane** · primitive JobData.lane: Missing lane means fast everywhere.
-  - *Said as:* "the lane field on the job envelope", "a job with no lane is fast"
-- **jobs.slow.deferred** · primitive docs/claude/JOBS.md § Fast and Slow Lanes › Pressure: One Budget, Divided by Lane › Slow-Lane Signals · code: `enqueueOrSpill`, `readSlowLaneState`: parked part only; jobs.slow.queued for total slow backlog
-  - *Said as:* "how many slow jobs are parked right now", "the parked part, not the total slow backlog"
-- **jobs.slow.idle_ms** · primitive docs/claude/JOBS.md § Fast and Slow Lanes › Pressure: One Budget, Divided by Lane › Slow-Lane Signals · code: `enqueueOrSpill`, `readSlowLaneState`: hung handlers or no workers; queue depth alone cannot distinguish a stall from normal draining
-  - *Said as:* "is the slow lane stalled or just draining", "how long since a slow job finished", "depth alone can't tell a hang from normal draining"
-- **jobs.slow.parked** · primitive jobs/claimSlotOrRequeue.ts: count each slow-job park
-  - *Said as:* "count each time a slow job gets parked", "how often slow work is refused a slot"
-- **jobs.slow.queued** · primitive docs/claude/JOBS.md § Fast and Slow Lanes › Pressure: One Budget, Divided by Lane › Slow-Lane Signals · code: `enqueueOrSpill`, `readSlowLaneState`: total slow backlog; jobs.slow.deferred for parked part only
-  - *Said as:* "the total slow backlog", "everything slow waiting, parked or not"
-- **JOBS_MAX_QUEUE_DEPTH** · primitive env JOBS_MAX_QUEUE_DEPTH: set shared depth budget of waiting, prioritized, active and deferred slow jobs
-  - *Said as:* "the shared depth budget: waiting plus prioritized plus active", "how full can the queue get before spilling", "I'll cap slow jobs by slot count instead"
-- **JOBS_SLOW_PARK_MAX_MS** · primitive env JOBS_SLOW_PARK_MAX_MS: cap the widening park window for refused slow jobs (60 s)
-  - *Said as:* "the longest a refused slow job waits before retrying", "cap the widening park window"
-- **JOBS_SLOW_QUEUE_DEPTH_FRACTION** · primitive env JOBS_SLOW_QUEUE_DEPTH_FRACTION: set share of depth budget slow jobs may fill
-  - *Said as:* "what share of the depth budget slow jobs may fill", "slow may fill a configurable share of the budget"
-- **JOBS_SLOW_SLOT_FRACTION** · primitive env JOBS_SLOW_SLOT_FRACTION: set share of each worker's slots slow jobs may use (min one)
-  - *Said as:* "what share of a worker's slots slow jobs may use", "fix the slow-lane cap as a value, at least one slot"
-- **JOBS_WORKER_CONCURRENCY** · primitive env JOBS_WORKER_CONCURRENCY: set number of concurrent job slots per worker
-  - *Said as:* "concurrent job slots per worker", "how many jobs a worker runs at once"
-- **lanePriority** · primitive apps/api/src/jobs/lanePriority.ts: map slow lane to lowest BullMQ priority
-  - *Said as:* "map the slow lane to the lowest priority number", "the priority value slow jobs get"
-- **Slow deferral list** · primitive jobs/slowLaneSignals.ts: track slow jobs parked or delayed so lane depth counts them
-  - *Said as:* "track parked slow jobs so the depth count includes them", "a sorted set of deferred slow jobs by due time"
-- **slowLaneCheck.ts** · primitive apps/api/scripts/slowLaneCheck.ts: real-infrastructure validation of lane behavior; unit tests with inline jobs for handler logic
-  - *Said as:* "validate lane behaviour against real redis and workers", "a script that exercises lanes on real infrastructure"
-- **SlowSlotPool** · primitive jobs/slowSlotPool.ts: cap per-worker running slow jobs at their slot share
-  - *Said as:* "stop slow jobs from taking every slot on the worker", "I'll add a counter so slow jobs can't exceed N", "I'll run slow jobs on a separate worker", "per-worker cap on running slow jobs"
-  - *Signs you're bypassing it:* a hand-rolled counter or a separate worker to stop slow jobs filling every slot, instead of the per-worker slot share (JOBS_SLOW_SLOT_FRACTION) enforced by SlowSlotPool and claimSlotOrRequeue (docs/claude/JOBS.md § Slots: Slow Work Uses at Most Its Share)
-- **Bounded teardown awaits** · rule apps/api/scripts/slowLaneCheck.ts: script and process teardown
-  - *Said as:* "teardown shouldn't hang forever on a close", "put a timeout on shutdown awaits in scripts"
-- **Cap explicit priority at SLOW_LANE_PRIORITY** · rule docs/claude/JOBS.md § Priority: Any producer accepting an explicit priority.
-  - *Said as:* "a priority above the limit collides scores and loses order", "never let a caller pass a priority past the slow value"
-  - *Signs you're bypassing it:* passing a priority at or above BullMQ's PRIORITY_LIMIT, which collides scores and loses FIFO order (docs/claude/JOBS.md § Priority: Fast Work Is Always Picked First)
-- **Destructive scripts require explicit confirmation** · rule apps/api/scripts/slowLaneCheck.ts: scripts that obliterate queues or empty JobOutbox
-  - *Said as:* "a script that empties queues must ask first", "obliterating the queue needs an explicit flag"
-- **Every queue.add stamps lane and priority** · rule docs/claude/JOBS.md § Fast and Slow Lanes › Choosing a Lane › Choosing a Lane · code: `buildJobData`, `makeJob`, `sendEmail`, `deliverEmail`: Any new site that adds jobs to BullMQ.
-  - *Said as:* "a new place adds to the queue without the lane", "slow work jumped ahead because the add skipped the lane", "every add goes through the envelope and priority"
-  - *Signs you're bypassing it:* a new `queue.add(...)` site that does not apply withLanePriority / the envelope lane, so slow work jumps ahead of fast (docs/claude/JOBS.md § Choosing a Lane)
-- **Lane config in env schema** · rule apps/api/src/config/env.ts: any new job lane setting
-  - *Said as:* "a new lane knob belongs in the env schema", "don't read lane settings from process env directly"
-- **Lane signals never fail jobs** · rule jobs/slowLaneSignals.ts: Idle clock and deferral list writes.
-  - *Said as:* "a signal write failing must not fail the job", "idle clock and deferral writes are best effort"
-- **Record deferral before moveToDelayed** · rule jobs/slowLaneSignals.ts: Parking slow jobs or adding delayed slow jobs.
-  - *Said as:* "record the park before delaying so the count never misses it", "a parked job must never be outside the count"
-- **Stop loops via shared object, not captured let** · rule apps/api/scripts/slowLaneCheck.ts: any long-running polling loop under Bun
-  - *Said as:* "the polling loop didn't stop when I flipped the flag", "I'll stop the loop with a captured boolean", "bun read the captured variable stale for thirty seconds"
-  - *Signs you're bypassing it:* a polling loop stopped by a captured `let running` flag, which Bun was observed reading stale for 30 s, instead of a shared object (`loops.isRunning`) (docs/claude/JOBS.md § Validating Against Real Infrastructure)
+| Problem | Use | Read | Signs you're bypassing it |
+|---|---|---|---|
+| cap how many slow jobs this worker runs at once; slow work shouldn't fill every slot; I'll keep a counter of running slow jobs; per-worker share for slow jobs | **createSlowSlotPool** · primitive `apps/api/src/jobs/slowSlotPool.ts#createSlowSlotPool` — In-process slot limit for slow jobs only; cross-process serialization belongs to locks-and-serialization helpers. | — | — |
+| is this lane overflowing, should I spill; slow should also respect fast's overflow; I'll count the queue and compare to a threshold; the spill decision for one lane | **isLaneOverflowing** · primitive `apps/api/src/jobs/outbox/flag.ts#isLaneOverflowing` — Use for spill decisions; isOverflowing checks only one lane's own flag. | — | — |
+| a snapshot of the slow lane for gauges and the drain; how backed up is slow work; I'll read each slow signal separately; idle time, deferred count and depth in one read | **readSlowLaneState** · primitive `apps/api/src/jobs/readSlowLaneState.ts#readSlowLaneState` — Whole-lane snapshot for gauges and outbox drain; readSlowDeferred or readSlowIdleMs only for a single signal. | docs/claude/JOBS.md § Fast and Slow Lanes › Pressure: One Budget, Divided by Lane; docs/claude/JOBS.md § Overflow Buffer | — |
+| slow jobs wait at the lowest priority so fast work is picked first; keep bulk jobs from blocking foreground jobs; I'll make a second queue for background work; I'll reserve a worker pool for bulk jobs; we're not paying for a separate queue, use pressure and priority; this is ordering, not a lock or a semaphore | **withLanePriority** · primitive `apps/api/src/jobs/lanePriority.ts#withLanePriority` — Newer work replacing older for a key: superseding jobs instead. | docs/claude/CONCURRENCY.md § Job Lanes (`withLanePriority`); docs/claude/JOBS.md § Fast and Slow Lanes › Priority: Fast Work Is Always Picked First | a second BullMQ queue or a reserved worker pool for background work, or ad-hoc numeric priorities, to keep bulk jobs from blocking foreground jobs (docs/claude/CONCURRENCY.md § Job Lanes; docs/claude/JOBS.md § Priority) |
+| declare this handler as slow because it fans out; bulk work goes in the slow lane by default; I'll add a bulk job constructor with a flag; the lane is a tag on the job data, defaulted by the handler; same queue, capacity divided by lane | **Fast and slow job lanes** · pattern docs/claude/JOBS.md § Fast and Slow Lanes — Bulk or fan-out work; size-dependent producers set lane per enqueue instead of handler default. | part 4 | — |
+| one depth budget shared, slow gets a share; spill fast when the whole budget is full, slow when its share is; drain fast rows first, then slow; I'll give slow jobs their own queue and cap | **Lane-divided depth budget overflow** · pattern docs/claude/JOBS.md § Pressure — Spill fast when whole budget full, slow when its share or budget full; drain fast then slow | part 4 | — |
+| the producer knows how many recipients, pick the lane then; small sends stay fast, big fan-outs go slow; I'll throttle big sends with a delay; set the lane per enqueue when the size is known | **Per-enqueue lane by work size** · pattern sendEmail (fanOutLane) — When size is known at enqueue time; otherwise declare the handler default lane. | part 4 | a separate queue, or a home-made throttle/delay, for big fan-outs instead of setting `lane: 'slow'` on the enqueue when the size is known (docs/claude/JOBS.md § Choosing a Lane (sendEmail fanOutLane)) |
+| cron repeatables carry their lane too; the cron row's lane is stamped on the repeatable | **cronJobSync** · primitive cronJobSync hook — sync cron job rows to BullMQ repeats with lane stamped | part 4 | — |
+| collapse several spilled rows for one key to the newest; only the last superseding row in a batch matters | **dedupeLatestPerLane** · primitive apps/api/src/jobs/outbox/ — collapse superseding lane rows in a batch to the latest one | part 4 | — |
+| how many recipients before an email send goes slow; the recipient threshold for the slow lane | **EMAIL_SLOW_LANE_MIN_RECIPIENTS** · primitive sendEmail — set recipient threshold above which deliverEmail fan-out goes slow | part 4 | — |
+| the lane field on the job envelope; a job with no lane is fast | **JobData.lane** · primitive JobData.lane — Missing lane means fast everywhere. | part 4 | — |
+| how many slow jobs are parked right now; the parked part, not the total slow backlog | **jobs.slow.deferred** · primitive docs/claude/JOBS.md § Fast and Slow Lanes › Pressure: One Budget, Divided by Lane › Slow-Lane Signals — parked part only; jobs.slow.queued for total slow backlog | code `enqueueOrSpill`, `readSlowLaneState` | — |
+| is the slow lane stalled or just draining; how long since a slow job finished; depth alone can't tell a hang from normal draining | **jobs.slow.idle_ms** · primitive docs/claude/JOBS.md § Fast and Slow Lanes › Pressure: One Budget, Divided by Lane › Slow-Lane Signals — hung handlers or no workers; queue depth alone cannot distinguish a stall from normal draining | code `enqueueOrSpill`, `readSlowLaneState` | — |
+| count each time a slow job gets parked; how often slow work is refused a slot | **jobs.slow.parked** · primitive jobs/claimSlotOrRequeue.ts — count each slow-job park | part 4 | — |
+| the total slow backlog; everything slow waiting, parked or not | **jobs.slow.queued** · primitive docs/claude/JOBS.md § Fast and Slow Lanes › Pressure: One Budget, Divided by Lane › Slow-Lane Signals — total slow backlog; jobs.slow.deferred for parked part only | code `enqueueOrSpill`, `readSlowLaneState` | — |
+| the shared depth budget: waiting plus prioritized plus active; how full can the queue get before spilling; I'll cap slow jobs by slot count instead | **JOBS_MAX_QUEUE_DEPTH** · primitive env JOBS_MAX_QUEUE_DEPTH — set shared depth budget of waiting, prioritized, active and deferred slow jobs | part 4 | — |
+| the longest a refused slow job waits before retrying; cap the widening park window | **JOBS_SLOW_PARK_MAX_MS** · primitive env JOBS_SLOW_PARK_MAX_MS — cap the widening park window for refused slow jobs (60 s) | part 4 | — |
+| what share of the depth budget slow jobs may fill; slow may fill a configurable share of the budget | **JOBS_SLOW_QUEUE_DEPTH_FRACTION** · primitive env JOBS_SLOW_QUEUE_DEPTH_FRACTION — set share of depth budget slow jobs may fill | part 4 | — |
+| what share of a worker's slots slow jobs may use; fix the slow-lane cap as a value, at least one slot | **JOBS_SLOW_SLOT_FRACTION** · primitive env JOBS_SLOW_SLOT_FRACTION — set share of each worker's slots slow jobs may use (min one) | part 4 | — |
+| concurrent job slots per worker; how many jobs a worker runs at once | **JOBS_WORKER_CONCURRENCY** · primitive env JOBS_WORKER_CONCURRENCY — set number of concurrent job slots per worker | part 4 | — |
+| map the slow lane to the lowest priority number; the priority value slow jobs get | **lanePriority** · primitive apps/api/src/jobs/lanePriority.ts — map slow lane to lowest BullMQ priority | part 4 | — |
+| track parked slow jobs so the depth count includes them; a sorted set of deferred slow jobs by due time | **Slow deferral list** · primitive jobs/slowLaneSignals.ts — track slow jobs parked or delayed so lane depth counts them | part 4 | — |
+| validate lane behaviour against real redis and workers; a script that exercises lanes on real infrastructure | **slowLaneCheck.ts** · primitive apps/api/scripts/slowLaneCheck.ts — real-infrastructure validation of lane behavior; unit tests with inline jobs for handler logic | part 4 | — |
+| stop slow jobs from taking every slot on the worker; I'll add a counter so slow jobs can't exceed N; I'll run slow jobs on a separate worker; per-worker cap on running slow jobs | **SlowSlotPool** · primitive jobs/slowSlotPool.ts — cap per-worker running slow jobs at their slot share | part 4 | a hand-rolled counter or a separate worker to stop slow jobs filling every slot, instead of the per-worker slot share (JOBS_SLOW_SLOT_FRACTION) enforced by SlowSlotPool and claimSlotOrRequeue (docs/claude/JOBS.md § Slots: Slow Work Uses at Most Its Share) |
+| teardown shouldn't hang forever on a close; put a timeout on shutdown awaits in scripts | **Bounded teardown awaits** · rule apps/api/scripts/slowLaneCheck.ts — script and process teardown | part 4 | — |
+| a priority above the limit collides scores and loses order; never let a caller pass a priority past the slow value | **Cap explicit priority at SLOW_LANE_PRIORITY** · rule docs/claude/JOBS.md § Priority — Any producer accepting an explicit priority. | part 4 | passing a priority at or above BullMQ's PRIORITY_LIMIT, which collides scores and loses FIFO order (docs/claude/JOBS.md § Priority: Fast Work Is Always Picked First) |
+| a script that empties queues must ask first; obliterating the queue needs an explicit flag | **Destructive scripts require explicit confirmation** · rule apps/api/scripts/slowLaneCheck.ts — scripts that obliterate queues or empty JobOutbox | part 4 | — |
+| a new place adds to the queue without the lane; slow work jumped ahead because the add skipped the lane; every add goes through the envelope and priority | **Every queue.add stamps lane and priority** · rule docs/claude/JOBS.md § Fast and Slow Lanes › Choosing a Lane › Choosing a Lane — Any new site that adds jobs to BullMQ. | code `buildJobData`, `makeJob`, `sendEmail`, `deliverEmail` | a new `queue.add(...)` site that does not apply withLanePriority / the envelope lane, so slow work jumps ahead of fast (docs/claude/JOBS.md § Choosing a Lane) |
+| a new lane knob belongs in the env schema; don't read lane settings from process env directly | **Lane config in env schema** · rule apps/api/src/config/env.ts — any new job lane setting | part 4 | — |
+| a signal write failing must not fail the job; idle clock and deferral writes are best effort | **Lane signals never fail jobs** · rule jobs/slowLaneSignals.ts — Idle clock and deferral list writes. | part 4 | — |
+| record the park before delaying so the count never misses it; a parked job must never be outside the count | **Record deferral before moveToDelayed** · rule jobs/slowLaneSignals.ts — Parking slow jobs or adding delayed slow jobs. | part 4 | — |
+| the polling loop didn't stop when I flipped the flag; I'll stop the loop with a captured boolean; bun read the captured variable stale for thirty seconds | **Stop loops via shared object, not captured let** · rule apps/api/scripts/slowLaneCheck.ts — any long-running polling loop under Bun | part 4 | a polling loop stopped by a captured `let running` flag, which Bun was observed reading stale for 30 s, instead of a shared object (`loops.isRunning`) (docs/claude/JOBS.md § Validating Against Real Infrastructure) |
+
 - *Also here, by name:* SLOW_LANE_PRIORITY (`apps/api/src/jobs/lanePriority.ts`); claimSlotOrRequeue (`apps/api/src/jobs/claimSlotOrRequeue.ts`); pruneSlowDeferred (`apps/api/src/jobs/slowLaneSignals.ts`); readSlowDeferred (`apps/api/src/jobs/slowLaneSignals.ts`); readSlowIdleMs (`apps/api/src/jobs/slowLaneSignals.ts`); recordSlowDeferral (`apps/api/src/jobs/slowLaneSignals.ts`); recordSlowFinished (`apps/api/src/jobs/slowLaneSignals.ts`); releaseSlowDeferral (`apps/api/src/jobs/slowLaneSignals.ts`); slowParkDelayMs (`apps/api/src/jobs/slowLaneSignals.ts`); slowSlotCapacity (`apps/api/src/jobs/slowSlotPool.ts`)
 
 ### Class `job-outbox`: Queue overflow buffer: JobOutbox spill and drain
@@ -223,11 +186,6 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
-| **enqueueJob (jobs-cron)** | every producer; spill happens behind it | testing routing directly (use enqueueOrSpill) |
-| **enqueueOrSpill** | tests of queue routing and overflow | normal callers (use enqueueJob) |
-| **shouldSpill** | the spill decision: adhoc && !bypass && overflowing | never ad-hoc queue.count() checks in producers |
-| **spillToOutbox** | every spill, batched by the accumulator, resolves on commit | never write JobOutbox rows directly |
-| **flushOutbox (observability-lifecycle)** | shutdown drain of the accumulator after intake stops | normal spills (use spillToOutbox) |
 
 **Job: drain the job outbox safely** (Draining and serializing: startOutboxDrainLoop vs runDrainOutboxPass vs runOnOutboxQueue vs createLock) — docs/claude/JOBS.md § Drain Loop, § Overflow Flag, § Queue Depth Probe
 
@@ -235,66 +193,34 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
-| **startOutboxDrainLoop** | worker startup; per-worker ~2s in-process interval, idempotent | one manual pass (use runDrainOutboxPass); not a cron |
-| **runDrainOutboxPass** | one drain tick, in tests or manually | continuous draining (use startOutboxDrainLoop) |
-| **Single-drainer via createLock** | only one worker drains at a time (service outbox-drain) | in-process ordering (use runOnOutboxQueue) |
-| **runOnOutboxQueue** | every JobOutbox write, flush and drain alike (in-process mutex) | cross-process exclusion (createLock); other resources (createSerializedQueue) |
-| **withOverflowRenew** | keep overflow flag TTLs alive around long drain work | renew one lane once (renewOverflow) |
-| **isLaneOverflowing** | spill decision for a lane; slow also honours fast overflow | depth numbers (use queueDepths) |
 
-- **JobOutbox** · model `packages/db/prisma/schema/jobOutbox.prisma` · in docs: docs/claude/JOBS.md § Overflow Buffer; docs/claude/JOBS.md § Fast and Slow Lanes › Validating Against Real Infrastructure: normal enqueue: job enqueue helpers instead; spill here only on queue overflow
-  - *Said as:* "hold the job durably when the queue is full and re-admit later", "degrade with a durable fallback, not silent drop", "no second parking mechanism, the buffer already is one", "I'll park slow jobs with a delayed move and a token", "the table of spilled job intent"
-- **enqueueOrSpill** · primitive `apps/api/src/jobs/enqueueOrSpill.ts#enqueueOrSpill` · in docs: docs/claude/JOBS.md § Fast and Slow Lanes › Pressure: One Budget, Divided by Lane; docs/claude/JOBS.md § Job System: Normal callers use enqueueJob; call this directly only to test queue routing and overflow behaviour.
-  - *Said as:* "test that an enqueue spills under overflow", "the routing seam between queue and buffer", "I'll call the spill path from a normal producer", "exercise overflow routing directly in a test"
-- **queueDepths** · primitive `apps/api/src/jobs/outbox/queueDepth.ts#queueDepths` · in docs: docs/claude/JOBS.md § Overflow Buffer; docs/claude/JOBS.md § Fast and Slow Lanes › Validating Against Real Infrastructure: Use before deciding to spill or drain; laneDepth narrows the result to one lane.
-  - *Said as:* "how deep is each lane right now", "read the depth before deciding to spill or drain", "I'll count the queue myself in the producer", "lane depths, cached briefly"
-- **runDrainOutboxPass** · primitive `apps/api/src/jobs/outbox/drain/pass.ts#runDrainOutboxPass` · in docs: docs/claude/JOBS.md § Overflow Buffer: One-off or test drain; for continuous draining use startOutboxDrainLoop, which calls this each tick under a Redis lock.
-  - *Said as:* "run one drain tick by hand", "drain the buffer once in a test", "I'll loop over the buffer rows and re-add them", "a single pass, not the loop"
-- **runOnOutboxQueue** · primitive `apps/api/src/jobs/outbox/mutex.ts#runOnOutboxQueue` · in docs: docs/claude/JOBS.md § Overflow Buffer: Any JobOutbox table write; other in-process critical sections: createSerializedQueue, cross-process: a Redis lock.
-  - *Said as:* "every write to the buffer table goes through one in-process mutex", "my buffer write raced the flush", "I'll write the buffer row directly", "serialize flush and drain in this process"
-  - *Signs you're bypassing it:* a JobOutbox write outside the shared serialized queue, racing the flush or drain (docs/claude/JOBS.md § Queue Depth Probe (all JobOutbox writes run through one serialized queue))
-- **shouldSpill** · primitive `apps/api/src/jobs/outbox/types.ts#shouldSpill` · in docs: docs/claude/JOBS.md § Overflow Buffer; docs/claude/JOBS.md § Job System: Use this predicate rather than ad-hoc overflow checks; flow children always enqueue direct.
-  - *Said as:* "should this enqueue go to the buffer or the queue", "ad-hoc, not bypassed, and overflowing means spill", "I'll check if the queue count is above N in the producer", "flow children always go direct"
-  - *Signs you're bypassing it:* ad-hoc overflow checks (`if (await queue.count() > N)`) in producers instead of the shouldSpill predicate and the enqueue seam (docs/claude/JOBS.md § Spill Routing)
-- **spillToOutbox** · primitive `apps/api/src/jobs/outbox/accumulator.ts#spillToOutbox` · in docs: docs/claude/JOBS.md § Overflow Buffer; docs/claude/JOBS.md § Job System: Route every spill (fan-out and superseding) through this; never write outbox rows directly.
-  - *Said as:* "put the job in the buffer because the queue is full", "spills are batched and resolve when the transaction commits", "I'll insert a row in the buffer table myself", "a home-made queue-too-full retry-later buffer"
-  - *Signs you're bypassing it:* writing JobOutbox rows directly with db.jobOutbox.create, or a home-made 'queue too full, retry later' buffer (docs/claude/JOBS.md § Overflow Buffer › Accumulator)
-- **startOutboxDrainLoop** · primitive `apps/api/src/jobs/outbox/drain/loop.ts#startOutboxDrainLoop` · in docs: docs/claude/JOBS.md § Overflow Buffer: Worker startup only; idempotent. Pair with stopOutboxDrainLoop on shutdown. Not a queued cron; for one manual pass call runDrainOutboxPass.
-  - *Said as:* "move spilled rows back into the queue every couple of seconds", "started once at worker startup, idempotent", "I'll add a cron that re-enqueues spilled rows", "I'll set an interval to drain the buffer"
-  - *Signs you're bypassing it:* a cron job or a new setInterval to re-enqueue spilled rows, instead of the per-worker drain loop started once at worker startup (docs/claude/JOBS.md § Drain Loop (not a queued cron))
-- **withOverflowRenew** · primitive `apps/api/src/jobs/outbox/flag.ts#withOverflowRenew` · in docs: docs/claude/JOBS.md § Overflow Buffer: Use around long drain work; renewOverflow renews one lane once only.
-  - *Said as:* "keep the overflow flag alive during a long drain", "renew the flag TTLs while the work runs", "the flag expired mid-drain"
-- **Overflow buffer in front of BullMQ** · pattern apps/api/src/jobs/outbox/: Only adhoc jobs; cron, cronTrigger and flow children always enqueue direct to BullMQ.
-  - *Said as:* "what happens when the queue is overloaded", "only ad-hoc jobs spill, cron and children go direct", "I'll drop jobs when the queue is too deep", "a durable buffer before the queue"
-- **Overflow flag keys** · pattern docs/claude/JOBS.md § Overflow Buffer › Overflow Flag · code: `JobOutbox`, `queueDepths`, `withOverflowRenew`, `shouldSpill`: per-lane Redis flag set-once via NX with drain-renewed TTL, self-clearing if drain dies
-  - *Said as:* "a per-lane redis flag set once, renewed by the drain", "self-clearing if the drain dies"
-- **Single-drainer via createLock** · pattern docs/claude/JOBS.md § Overflow Buffer › Drain Loop · code: `JobOutbox`, `queueDepths`, `withOverflowRenew`, `shouldSpill`: Cross-process exclusion of a periodic task; in-process serialization uses createSerializedQueue.
-  - *Said as:* "only one worker should drain at a time", "two workers both re-admitting the same rows", "I'll use a flat set-nx lock with no heartbeat in the drain", "cross-process exclusion for the periodic drain"
-- **JOBS_OUTBOX_FLUSH_LINGER_MS** · primitive apps/api/src/config/env.ts: set linger before flushing a partial accumulator batch
-  - *Said as:* "how long a partial batch waits before flushing", "the linger before a small spill batch is written"
-- **JOBS_OUTBOX_FLUSH_MAX_ROWS** · primitive apps/api/src/config/env.ts: set accumulator row count that forces an inline flush
-  - *Said as:* "how many spilled rows force an inline flush", "the batch size that flushes immediately"
-- **JOBS_OVERFLOW_STUCK_MS** · primitive apps/api/src/config/env.ts: set overflow age that triggers stuck warning
-  - *Said as:* "warn when overflow has lasted too long", "the age at which overflow counts as stuck"
-- **JOBS_OVERFLOW_TTL_MS** · primitive apps/api/src/config/env.ts: set overflow flag TTL renewed by drain heartbeat
-  - *Said as:* "how long the overflow flag lives between renewals", "the flag TTL the drain heartbeat renews"
-- **Outbox config** · primitive apps/api/src/jobs/outbox/config.ts: supply outbox caps, linger and TTLs from the env schema
-  - *Said as:* "where buffer caps, linger and TTLs come from", "the buffer settings read from env"
-- **Outbox drain loop** · primitive apps/api/src/jobs/outbox/drain/: move spilled outbox rows back into BullMQ per worker
-  - *Said as:* "the per-worker loop that re-admits spilled rows", "how buffered jobs get back to the queue", "I'll re-enqueue the buffered rows from a scheduled job"
-- **Outbox mutex** · primitive apps/api/src/jobs/outbox/mutex.ts: in-process outbox serialization only; cross-process needs a lock
-  - *Said as:* "the in-process lock around buffer writes", "ordering buffer writes in this process only", "cross-process needs a real lock, this is in-process"
-- **Flow children never spill to outbox** · rule docs/claude/JOBS.md § Handler Patterns › Staged Job (Fan Out and Wait) · code: `makeJob`, `makeSupersedingJob`, `redisNamespace`, `makeSingletonJob`: any child job of a staged parent
-  - *Said as:* "a child of a staged parent went into the buffer", "children lose their parent link if buffered"
-- **Only adhoc non-flow jobs spill** · rule docs/claude/JOBS.md § Overflow Buffer › Spill Routing · code: `JobOutbox`, `queueDepths`, `withOverflowRenew`, `shouldSpill`: Any change to enqueue routing or outbox spill logic.
-  - *Said as:* "cron, cron trigger and flow children always enqueue direct", "I'll buffer everything when overflowing"
-  - *Signs you're bypassing it:* a spill path that buffers cron, cronTrigger or flow-child jobs (the drain's re-add loses a child's parent link) (docs/claude/JOBS.md § Spill Routing)
-- **Overflow config via env schema** · rule apps/api/src/config/env.ts: Adding or reading outbox tuning knobs.
-  - *Said as:* "a new buffer tuning knob goes in the env schema", "don't hardcode buffer limits"
-- **Serialize all JobOutbox writes** · rule docs/claude/JOBS.md § Overflow Buffer › Queue Depth Probe · code: `JobOutbox`, `queueDepths`, `withOverflowRenew`, `shouldSpill`: Any code touching the JobOutbox table.
-  - *Said as:* "anything touching the buffer table goes through the shared queue", "a direct buffer write races the drain"
-- **Spill resolves on commit** · rule docs/claude/JOBS.md § Overflow Buffer › Accumulator · code: `JobOutbox`, `queueDepths`, `withOverflowRenew`, `shouldSpill`: Any buffered or batched durable write path in the outbox.
-  - *Said as:* "the spill should only count once the transaction commits", "a buffered write resolving before commit"
+| Problem | Use | Read | Signs you're bypassing it |
+|---|---|---|---|
+| hold the job durably when the queue is full and re-admit later; degrade with a durable fallback, not silent drop; no second parking mechanism, the buffer already is one; I'll park slow jobs with a delayed move and a token; the table of spilled job intent | **JobOutbox** · model `packages/db/prisma/schema/jobOutbox.prisma` — normal enqueue: job enqueue helpers instead; spill here only on queue overflow | docs/claude/JOBS.md § Overflow Buffer; docs/claude/JOBS.md § Fast and Slow Lanes › Validating Against Real Infrastructure | — |
+| test that an enqueue spills under overflow; the routing seam between queue and buffer; I'll call the spill path from a normal producer; exercise overflow routing directly in a test | **enqueueOrSpill** · primitive `apps/api/src/jobs/enqueueOrSpill.ts#enqueueOrSpill` — Normal callers use enqueueJob; call this directly only to test queue routing and overflow behaviour. | docs/claude/JOBS.md § Fast and Slow Lanes › Pressure: One Budget, Divided by Lane; docs/claude/JOBS.md § Job System | — |
+| how deep is each lane right now; read the depth before deciding to spill or drain; I'll count the queue myself in the producer; lane depths, cached briefly | **queueDepths** · primitive `apps/api/src/jobs/outbox/queueDepth.ts#queueDepths` — Use before deciding to spill or drain; laneDepth narrows the result to one lane. | docs/claude/JOBS.md § Overflow Buffer; docs/claude/JOBS.md § Fast and Slow Lanes › Validating Against Real Infrastructure | — |
+| run one drain tick by hand; drain the buffer once in a test; I'll loop over the buffer rows and re-add them; a single pass, not the loop | **runDrainOutboxPass** · primitive `apps/api/src/jobs/outbox/drain/pass.ts#runDrainOutboxPass` — One-off or test drain; for continuous draining use startOutboxDrainLoop, which calls this each tick under a Redis lock. | docs/claude/JOBS.md § Overflow Buffer | — |
+| every write to the buffer table goes through one in-process mutex; my buffer write raced the flush; I'll write the buffer row directly; serialize flush and drain in this process | **runOnOutboxQueue** · primitive `apps/api/src/jobs/outbox/mutex.ts#runOnOutboxQueue` — Any JobOutbox table write; other in-process critical sections: createSerializedQueue, cross-process: a Redis lock. | docs/claude/JOBS.md § Overflow Buffer | a JobOutbox write outside the shared serialized queue, racing the flush or drain (docs/claude/JOBS.md § Queue Depth Probe (all JobOutbox writes run through one serialized queue)) |
+| should this enqueue go to the buffer or the queue; ad-hoc, not bypassed, and overflowing means spill; I'll check if the queue count is above N in the producer; flow children always go direct | **shouldSpill** · primitive `apps/api/src/jobs/outbox/types.ts#shouldSpill` — Use this predicate rather than ad-hoc overflow checks; flow children always enqueue direct. | docs/claude/JOBS.md § Overflow Buffer; docs/claude/JOBS.md § Job System | ad-hoc overflow checks (`if (await queue.count() > N)`) in producers instead of the shouldSpill predicate and the enqueue seam (docs/claude/JOBS.md § Spill Routing) |
+| put the job in the buffer because the queue is full; spills are batched and resolve when the transaction commits; I'll insert a row in the buffer table myself; a home-made queue-too-full retry-later buffer | **spillToOutbox** · primitive `apps/api/src/jobs/outbox/accumulator.ts#spillToOutbox` — Route every spill (fan-out and superseding) through this; never write outbox rows directly. | docs/claude/JOBS.md § Overflow Buffer; docs/claude/JOBS.md § Job System | writing JobOutbox rows directly with db.jobOutbox.create, or a home-made 'queue too full, retry later' buffer (docs/claude/JOBS.md § Overflow Buffer › Accumulator) |
+| move spilled rows back into the queue every couple of seconds; started once at worker startup, idempotent; I'll add a cron that re-enqueues spilled rows; I'll set an interval to drain the buffer | **startOutboxDrainLoop** · primitive `apps/api/src/jobs/outbox/drain/loop.ts#startOutboxDrainLoop` — Worker startup only; idempotent. Pair with stopOutboxDrainLoop on shutdown. Not a queued cron; for one manual pass call runDrainOutboxPass. | docs/claude/JOBS.md § Overflow Buffer | a cron job or a new setInterval to re-enqueue spilled rows, instead of the per-worker drain loop started once at worker startup (docs/claude/JOBS.md § Drain Loop (not a queued cron)) |
+| keep the overflow flag alive during a long drain; renew the flag TTLs while the work runs; the flag expired mid-drain | **withOverflowRenew** · primitive `apps/api/src/jobs/outbox/flag.ts#withOverflowRenew` — Use around long drain work; renewOverflow renews one lane once only. | docs/claude/JOBS.md § Overflow Buffer | — |
+| what happens when the queue is overloaded; only ad-hoc jobs spill, cron and children go direct; I'll drop jobs when the queue is too deep; a durable buffer before the queue | **Overflow buffer in front of BullMQ** · pattern apps/api/src/jobs/outbox/ — Only adhoc jobs; cron, cronTrigger and flow children always enqueue direct to BullMQ. | part 4 | — |
+| a per-lane redis flag set once, renewed by the drain; self-clearing if the drain dies | **Overflow flag keys** · pattern docs/claude/JOBS.md § Overflow Buffer › Overflow Flag — per-lane Redis flag set-once via NX with drain-renewed TTL, self-clearing if drain dies | code `JobOutbox`, `queueDepths`, `withOverflowRenew`, `shouldSpill` | — |
+| only one worker should drain at a time; two workers both re-admitting the same rows; I'll use a flat set-nx lock with no heartbeat in the drain; cross-process exclusion for the periodic drain | **Single-drainer via createLock** · pattern docs/claude/JOBS.md § Overflow Buffer › Drain Loop — Cross-process exclusion of a periodic task; in-process serialization uses createSerializedQueue. | code `JobOutbox`, `queueDepths`, `withOverflowRenew`, `shouldSpill` | — |
+| how long a partial batch waits before flushing; the linger before a small spill batch is written | **JOBS_OUTBOX_FLUSH_LINGER_MS** · primitive apps/api/src/config/env.ts — set linger before flushing a partial accumulator batch | part 4 | — |
+| how many spilled rows force an inline flush; the batch size that flushes immediately | **JOBS_OUTBOX_FLUSH_MAX_ROWS** · primitive apps/api/src/config/env.ts — set accumulator row count that forces an inline flush | part 4 | — |
+| warn when overflow has lasted too long; the age at which overflow counts as stuck | **JOBS_OVERFLOW_STUCK_MS** · primitive apps/api/src/config/env.ts — set overflow age that triggers stuck warning | part 4 | — |
+| how long the overflow flag lives between renewals; the flag TTL the drain heartbeat renews | **JOBS_OVERFLOW_TTL_MS** · primitive apps/api/src/config/env.ts — set overflow flag TTL renewed by drain heartbeat | part 4 | — |
+| where buffer caps, linger and TTLs come from; the buffer settings read from env | **Outbox config** · primitive apps/api/src/jobs/outbox/config.ts — supply outbox caps, linger and TTLs from the env schema | part 4 | — |
+| the per-worker loop that re-admits spilled rows; how buffered jobs get back to the queue; I'll re-enqueue the buffered rows from a scheduled job | **Outbox drain loop** · primitive apps/api/src/jobs/outbox/drain/ — move spilled outbox rows back into BullMQ per worker | part 4 | — |
+| the in-process lock around buffer writes; ordering buffer writes in this process only; cross-process needs a real lock, this is in-process | **Outbox mutex** · primitive apps/api/src/jobs/outbox/mutex.ts — in-process outbox serialization only; cross-process needs a lock | part 4 | — |
+| a child of a staged parent went into the buffer; children lose their parent link if buffered | **Flow children never spill to outbox** · rule docs/claude/JOBS.md § Handler Patterns › Staged Job (Fan Out and Wait) — any child job of a staged parent | code `makeJob`, `makeSupersedingJob`, `redisNamespace`, `makeSingletonJob` | — |
+| cron, cron trigger and flow children always enqueue direct; I'll buffer everything when overflowing | **Only adhoc non-flow jobs spill** · rule docs/claude/JOBS.md § Overflow Buffer › Spill Routing — Any change to enqueue routing or outbox spill logic. | code `JobOutbox`, `queueDepths`, `withOverflowRenew`, `shouldSpill` | a spill path that buffers cron, cronTrigger or flow-child jobs (the drain's re-add loses a child's parent link) (docs/claude/JOBS.md § Spill Routing) |
+| a new buffer tuning knob goes in the env schema; don't hardcode buffer limits | **Overflow config via env schema** · rule apps/api/src/config/env.ts — Adding or reading outbox tuning knobs. | part 4 | — |
+| anything touching the buffer table goes through the shared queue; a direct buffer write races the drain | **Serialize all JobOutbox writes** · rule docs/claude/JOBS.md § Overflow Buffer › Queue Depth Probe — Any code touching the JobOutbox table. | code `JobOutbox`, `queueDepths`, `withOverflowRenew`, `shouldSpill` | — |
+| the spill should only count once the transaction commits; a buffered write resolving before commit | **Spill resolves on commit** · rule docs/claude/JOBS.md § Overflow Buffer › Accumulator — Any buffered or batched durable write path in the outbox. | code `JobOutbox`, `queueDepths`, `withOverflowRenew`, `shouldSpill` | — |
+
 - *Also here, by name:* DEPTH_CACHE_MS (`apps/api/src/jobs/outbox/config.ts`); JobLane (`packages/db/prisma/schema/jobOutbox.prisma`); MAX_DRAIN_ATTEMPTS (`apps/api/src/jobs/outbox/config.ts`); SHUTDOWN_FLUSH_RETRIES (`apps/api/src/jobs/outbox/config.ts`); SLOW_DEFERRED_GRACE_MS (`apps/api/src/jobs/slowLaneSignals.ts`); SLOW_PARK_MIN_MS (`apps/api/src/jobs/slowLaneSignals.ts`); SLOW_PARK_MS_PER_QUEUED (`apps/api/src/jobs/slowLaneSignals.ts`); clearOverflow (`apps/api/src/jobs/outbox/flag.ts`); flagKey (`apps/api/src/jobs/outbox/config.ts`); flushLinger (`apps/api/src/jobs/outbox/config.ts`); flushMaxRows (`apps/api/src/jobs/outbox/config.ts`); flushQueue (`apps/api/src/jobs/outbox/mutex.ts`); hasPendingFastSpills (`apps/api/src/jobs/outbox/accumulator.ts`); hasPendingSlowSpills (`apps/api/src/jobs/outbox/accumulator.ts`); hasPendingSpills (`apps/api/src/jobs/outbox/accumulator.ts`); isOverflowing (`apps/api/src/jobs/outbox/flag.ts`); laneDepth (`apps/api/src/jobs/outbox/queueDepth.ts`); laneDepthCap (`apps/api/src/jobs/outbox/config.ts`); laneDepthsFrom (`apps/api/src/jobs/outbox/queueDepth.ts`); lowWater (`apps/api/src/jobs/outbox/config.ts`); maxQueueDepth (`apps/api/src/jobs/outbox/config.ts`); maxSlowQueueDepth (`apps/api/src/jobs/outbox/config.ts`); outboxLaneOf (`apps/api/src/jobs/outbox/types.ts`); overflowStuckMs (`apps/api/src/jobs/outbox/config.ts`); overflowTtlSec (`apps/api/src/jobs/outbox/config.ts`); recordDelayedSlowAdd (`apps/api/src/jobs/slowLaneSignals.ts`); renewOverflow (`apps/api/src/jobs/outbox/flag.ts`); stopOutboxDrainLoop (`apps/api/src/jobs/outbox/drain/loop.ts`); toCreateInput (`apps/api/src/jobs/outbox/types.ts`); tripIfFull (`apps/api/src/jobs/outbox/flag.ts`); warnIfOverflowStuck (`apps/api/src/jobs/outbox/flag.ts`)
 
 ## 4. The specifics, in full

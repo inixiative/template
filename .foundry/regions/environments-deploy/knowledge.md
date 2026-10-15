@@ -9,6 +9,8 @@
 - [Glossary](#glossary)
 - [1. What this Warden covers](#1-what-this-warden-covers)
 - [2. The domain](#2-the-domain)
+- [2a. Migrations in progress](#2a-migrations-in-progress)
+- [2b. Under construction](#2b-under-construction)
 - [3. Everything that exists here, by class](#3-everything-that-exists-here-by-class)
   - [Class `env-config`](#class-env-config-environment-namesdetection-env-files-infisical-with-env-composition-adding-env-vars)
   - [Class `ci-deploy`](#class-ci-deploy-cicd-pipelines-the-full-check-deploy-environments-and-scripts)
@@ -98,11 +100,25 @@ How environment variables reach a process in each of the five environments, and 
 
 `ci-deploy` is the gate and the release path. `bun run check` (lint, typecheck, backend and frontend tests, the CI rules) is the full gate, run instead of a subset; `check-generated-files.sh` fails on a stale Prisma client or SDK; `bun run build` builds every workspace; `start:api` / `start:worker` / `start:web` are production runs (local dev is `bun run local`); `bun run deploy` calls `scripts/deployment/deploy.sh` and `wait-for-api.sh` waits on the health check. CI itself is not built in template: CICD.md says no CI workflow is committed and the pipeline, promotion flow and migration strategy are tracked in `tickets/INFRA-003` and `INFRA-005`, so the branch → pr (ephemeral per-PR database-client / data-modeling branch, previews, Infisical secrets) → staging (main) → prod (manual) flow in ENVIRONMENTS.md is the intended model, not a running pipeline, and the gate is `bun run check` run locally. Ecosystem library repos do have CI: the two-line caller of `inixiative/config`'s `lib-ci.yml` (pinned bun, frozen install, `config check`, the repo check), and @inixiative packages are released only with `config train` from the default branch. When a check fails, fix the code, never the CI rule or its fixtures.
 
-Related regions: `dx-setup` for bring-up, Docker and worktrees (it runs sync-env during setup); `encryption` for keyring env vars, secret handling and the not-yet-wired encryption version check (overlaps here on Infisical and adding env vars); `init-script` for how init provisions Infisical and cloud services; `dx-tools` for what each lint script, CI rule and turbo task does; `database-tooling` for db:push vs db:migrate per environment; `test-harness / test-factories-rules` for test env composition and overrides; `lib-config` for the `train`, `check` and `sync` CLI in full; `observability-lifecycle` for what LOG_LEVEL, SENTRY_* and OTEL_* switch on.
+Related regions: `dx-setup` for bring-up, Docker and worktrees (it runs sync-env during setup); `encryption` for keyring env vars, secret handling and the not-yet-wired encryption version check (overlaps here on Infisical and adding env vars); `init-architecture / init-tasks` for how init provisions Infisical and cloud services; `dx-tools` for what each lint script, CI rule and turbo task does; `database-tooling` for db:push vs db:migrate per environment; `test-harness / test-factories-rules` for test env composition and overrides; `lib-config` for the `train`, `check` and `sync` CLI in full; `observability-lifecycle` for what LOG_LEVEL, SENTRY_* and OTEL_* switch on.
+
+## 2a. Migrations in progress
+
+We are moving from A to B. Do not copy A, even where you find it next door.
+
+| Moving from (don't copy) | To (copy this) | Read |
+|---|---|---|
+| Pre-launch: every deployed database is disposable; releases `prisma db push --accept-data-loss` (`scripts/db/release.sh`), `setup.sh` pushes and seeds, schema changes are `bun run db:push` (`db:push:dev` in a worktree) | Launched (`launched: true` in `project.config.ts`, flipped by init's Launch step): releases `prisma migrate deploy` only, schema changes go through `bun run db:migrate` and committed migrations starting at `0_init`; `setup.sh` skips push and seed | DATABASE.md § Schema Changes: Push Before Launch, Migrations After; INIT_SCRIPT_PATTERNS.md § Direction: pre-launch → launched (PR #195); SCRIPTS.md § Database |
+
+## 2b. Under construction
+
+Open work you cannot use yet. Do not build against it, and do not build what it would replace without saying so.
+
+- Deploy hook that runs `scripts/db/release.sh` (Railway pre-deploy): not built; CI/CD hardening (tests, scans, gates, rollback) and the platform baseline (hosting, observability, CDN, DNS) are undecided — INIT_SCRIPT_PATTERNS.md § Direction (PR #195); tickets INFRA-003, INFRA-005 (not started)
 
 ## 3. Everything that exists here, by class
 
-Point at a class when that is as specific as the moment allows, or at a member. Where a class has siblings an agent could confuse, a table under the class header says which to use when; its *Said as* line gives the plain words a user or agent uses for that job. Each member: **name** · kind `where` · the doc § that describes it (code members) or the code it is about (doc members): choose this when … . Quote the name and the where in a pointer ("look over here: createLock, packages/db/src/lock/createLock.ts, CONCURRENCY.md § Distributed Lock"). *Said as:* the ways a user or agent describes this job in a message or plan without knowing the name; match on these. *Signs you're bypassing it:* the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
+Find the problem in plain words, then point at the exact thing. Each class opens with job tables where a class has confusable siblings (which to use when; *Said as* gives the plain words for that job), then one table of every member: **Problem** is the job in the user's or agent's words (match on these); **Use** is the exact member, its kind and `where`, then when to choose it; **Read** is the doc § that describes it (code members) or the code it is about (doc members); **Signs you're bypassing it** is the hand-rolled code an agent writes when it rebuilds the primitive, plus the errors it throws. Quote Use and Read in a pointer ("look over here: createLock, packages/db/src/lock/createLock.ts, CONCURRENCY.md § Distributed Lock"). Code members come from the catalog, described from the code; doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
 
 ### Class `env-config`: Environment names/detection, env files, Infisical, with-env composition, adding env vars
 
@@ -112,9 +128,6 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
-| **isTest / isLocal / isPR / isStaging / isProd** | branching on the running environment | comparing process.env.ENVIRONMENT by hand (use the flag) |
-| **isTest** | test-only behaviour | changing env inside a test (use withEnv / setEnvOverride (testing)) |
-| **Environment** | typing an environment name: local, test, pr, staging, prod | production/development/dev (use Canonical environment names) |
 
 **Job: supply env values to a process** (where env values come from) — docs/claude/ENVIRONMENTS.md § File-Based Environments; § Infisical; § with-env Composition
 
@@ -122,11 +135,6 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
-| **File-based env inheritance** | local and test: root .env.<env> then the app's | pr/staging/prod (use Infisical for cloud secrets) |
-| **Infisical for cloud secrets** | pr, staging and prod secrets | local/test (use File-based env inheritance) |
-| **bun run with** | running any command, test scripts included, with an env composed | sourcing .env files or calling infisical run directly |
-| **with-env.sh** | the script behind bun run with; docs don't distinguish them | export $(cat .env...) (use bun run with) |
-| **bun run sync-env** | create or top up .env files from the examples | loading env for a command (use bun run with) |
 
 **Job: read or add an env var in code** (reading and adding env vars in code) — docs/claude/ENVIRONMENTS.md § Adding Environment Variables; scripts/ci/rules/no-inline-env-coercion.sh
 
@@ -134,82 +142,39 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
-| **Zod-validated env schema** | code reads any env var: apps/<app>/src/config/env.ts | raw process.env reads scattered in modules |
-| **no-inline-env-coercion** | the CI rule that fails casts/defaults on process.env | editing the rule to pass (fix it in the env schema) |
-| **Adding an environment variable** | a new var: example file, env file, schema, Infisical per cloud env | only one of those places |
-| **Encryption env vars per keyring (encryption)** | adding or rotating an encrypted-field keyring (3 vars per envPrefix) | one global ENCRYPTION_KEY (see encryption) |
 
-- **isLocal** · primitive `packages/shared/src/utils/env.ts#isLocal` · in docs: docs/claude/ENVIRONMENTS.md § Environment Detection: Use the matching flag (isTest, isPR, isStaging, isProd) for other environments instead of reading process.env.ENVIRONMENT.
-  - *Said as:* "only do this when running locally", "am I in local dev", "I'll compare the environment string to local"
-- **isProd** · primitive `packages/shared/src/utils/env.ts#isProd` · in docs: docs/claude/ENVIRONMENTS.md § Environment Detection: Use the matching flag (isStaging, isPR, isLocal, isTest) for other environments.
-  - *Said as:* "only in production", "am I running in prod", "I'll check the environment variable equals prod"
-- **isTest** · primitive `packages/shared/src/utils/env.ts#isTest` · in docs: docs/claude/ENVIRONMENTS.md § Environment Detection; docs/claude/JOBS.md § Enqueuing Jobs: Other environments: isLocal, isPR, isStaging or isProd. To change env values within a test, use withEnv or setEnvOverride.
-  - *Said as:* "only when tests are running", "skip this under test", "I'll check the node env variable equals test", "behavior only for the test run"
-  - *Signs you're bypassing it:* `process.env.NODE_ENV === 'test'` checks, or a test that assigns process.env to change behavior instead of withEnv / setEnvOverride (catalog isTest (choose line); docs/claude/ENVIRONMENTS.md § Environment Detection)
-- **wrapEnvWithOverrides** · primitive `packages/shared/src/utils/envOverrides.ts#wrapEnvWithOverrides`: wrap an env object so runtime overrides are parsed and applied on read
-  - *Said as:* "apply runtime overrides when env is read", "wrap env so overrides are parsed on read", "I'll mutate the env object for the override"
-- **no-inline-env-coercion** · rule `scripts/ci/rules/no-inline-env-coercion.sh`: forbid casting or defaulting process.env values outside the central zod env schema
-  - *Said as:* "I'll default the env var inline with a fallback", "casting or number-parsing the env in a module", "the ci rule about env coercion", "defaults land in the example env file, not in a parser fallback"
-  - *Signs you're bypassing it:* `Number(process.env.X ?? 10)`, `process.env.X as string`, `process.env.X || 'default'` in a module instead of the app's env schema (scripts/ci/rules/no-inline-env-coercion.sh (CI rule))
-- **bun run sync-env** · script `package.json` · in docs: docs/claude/ENVIRONMENTS.md § File-Based Environments; docs/claude/ENVIRONMENTS.md § Adding Environment Variables: Refresh env files only; full machine setup uses setup; loading env for a command uses with.
-  - *Said as:* "refresh my env files after a pull added keys", "create the env files from the examples", "I'll copy the example env by hand", "my env is missing new keys"
-  - *Signs you're bypassing it:* hand-copying .env.local.example to .env.local or editing env files to add newly required keys (FEATURES.md › Smart Env File Sync; docs/claude/SETUP.md § Environment Variables)
-- **bun run with** · script `package.json` · in docs: docs/claude/ENVIRONMENTS.md § with-env Composition; docs/claude/TURBOREPO.md § Environment Composition with Turbo: Use in package test scripts (with --max-concurrency=1 for DB tests) instead of hand-loading env files.
-  - *Said as:* "run this command with the right env loaded", "run the test command with the test env composed", "I'll source the env file and then run it", "run something against staging env", "the one way to run a command with an environment"
-  - *Signs you're bypassing it:* a package test script that loads .env.test by hand or sets env vars inline instead of `bun run with test <app> bun test` (docs/claude/TESTING.md § Environment Composition; docs/claude/ENVIRONMENTS.md § Package.json Scripts)
-- **Branch deployment flow** · pattern docs/claude/ENVIRONMENTS.md § Environment Names › Deployment Flow · code: `Flow`: promote feature branches to ephemeral pr, main to staging, manual to prod
-  - *Said as:* "staging and prod both deploy from main", "what does a pr branch deploy to", "how do changes get promoted to prod", "I'll make a separate branch for staging"
-- **Cache TTLs** · pattern FEATURES.md › Redis Use Cases: cache sessions 5min, permission evaluations 10min and token hashes 10min in Redis
-  - *Said as:* "how long are sessions and permissions cached", "the cache lifetimes in redis", "I'll pick my own ttl for this cache"
-- **File-based env inheritance** · pattern docs/claude/ENVIRONMENTS.md § File-Based Environments · code: `sync-env`: local/test only; pr/staging/prod use Infisical.
-  - *Said as:* "where does local env come from", "root env file then the app's env file", "the app's values override the root's", "I'll keep one env file for everything"
-- **Redis namespaces** · pattern FEATURES.md › Namespace Support: prefix Redis keys per use case to avoid collisions and allow selective clearing
-  - *Said as:* "prefix redis keys per use", "keys from two features collide", "I'll write keys without a namespace"
-- **Request ID correlation** · pattern FEATURES.md › Logging & Observability: follow one request through logs, queries and errors via a middleware-generated ID
-  - *Said as:* "follow one request through the logs", "tie log lines to the request", "I'll generate my own request id"
-- **Separate Redis connections** · pattern FEATURES.md › Multiple Redis Connections: keep blocking pub/sub and BullMQ off the main client connection
-  - *Said as:* "pub sub blocks the main redis client", "queues on their own redis connection", "I'll reuse the main client for subscribing"
-- **Swappable providers via adapters** · pattern FEATURES.md › Error Reporter Adapter: wrap external providers in adapters so swapping them needs no application code changes
-  - *Said as:* "swap the error reporter without touching app code", "wrap the vendor behind an adapter", "I'll call the vendor sdk directly from the module"
-- **Zod-validated env schema** · pattern docs/claude/ENVIRONMENTS.md § Adding Environment Variables › In Code · code: `sync-env`: Recommended over raw process.env access.
-  - *Said as:* "read the env var through the schema", "where does code read env vars", "I'll read the env directly in the module", "validate all env on startup", "the env schema already handles coercion and defaults"
-  - *Signs you're bypassing it:* raw `const apiKey = process.env.API_KEY` reads scattered through code with no schema entry (docs/claude/ENVIRONMENTS.md § Adding Environment Variables › In Code)
-- **docker compose up** · primitive FEATURES.md › Docker Compose for Supporting Services: services only; run Bun servers natively via Turborepo watch, not in containers
-  - *Said as:* "start only the supporting services in containers", "I'll dockerize the api for local dev", "bun servers run natively, databases in docker"
-  - *Signs you're bypassing it:* a Dockerfile or compose service that runs the API, worker or frontends in containers for local dev (FEATURES.md › Docker Compose for Supporting Services)
-- **Environment** · primitive @template/shared/utils: type the canonical environment names: local, test, pr, staging, prod
-  - *Said as:* "the type for an environment name", "which names are valid environments", "I'll type it as a plain string", "local, test, pr, staging, prod"
-- **errorReporter** · primitive @template/shared/adapter: Sentry when SENTRY_ENABLED=true and SENTRY_DSN set in prod/staging/pr; console otherwise
-  - *Said as:* "where do errors get reported", "send errors to sentry in cloud envs", "I'll call sentry directly"
-- **isTest / isLocal / isPR / isStaging / isProd** · primitive packages/shared/src/utils/env.ts: Use these flags instead of comparing process.env.ENVIRONMENT by hand.
-  - *Said as:* "branch on which environment we're in", "we should add these to shared env", "I'll compare the environment string by hand", "is this prod or staging", "the environment flags"
-  - *Signs you're bypassing it:* `process.env.ENVIRONMENT === 'prod'` or `process.env.NODE_ENV` comparisons written inline (docs/claude/ENVIRONMENTS.md § Environment Detection; catalog isTest/isLocal/isProd)
-- **LOG_LEVEL** · primitive FEATURES.md › Logging & Observability: set minimum log level: silent, error, warn, info, debug or trace
-  - *Said as:* "turn down the logging", "set the minimum log level", "I'll add a debug flag of my own"
-- **REDIS_BULLMQ_URL** · primitive docs/claude/ENVIRONMENTS.md § Common Variables · code: `Variable`: Set only when queues need a separate Redis from REDIS_URL.
-  - *Said as:* "a separate redis for the queues", "when do queues need their own redis"
-- **sync-env.sh** · primitive sync-env.sh: after pulling code that adds env variables; with-env.sh for deployed environments
-  - *Said as:* "the script behind refreshing env files", "create missing env files from examples", "I'll copy the example files myself"
-- **with-env.sh** · primitive scripts/deployment/with-env.sh: Always use instead of sourcing .env files or calling infisical run directly.
-  - *Said as:* "the script that composes env for a command", "how does the env get loaded for a command", "I'll source the env file in my script", "infisical for cloud, files for local"
-  - *Signs you're bypassing it:* `source .env.local`, dotenv loading in a script, or `infisical run --env=prod -- ...` called directly instead of `bun run with` (docs/claude/ENVIRONMENTS.md § with-env Composition; FEATURES.md › Infisical Secrets Management)
-- **Adding an environment variable** · rule docs/claude/ENVIRONMENTS.md § Adding Environment Variables · code: `sync-env`: Whenever code reads a new env variable.
-  - *Said as:* "add a new env var everywhere it needs to be", "I'll just read the new var in code", "the four places a new variable goes", "a new secret for staging and prod too"
-  - *Signs you're bypassing it:* code reading a new env var with no entry in .env.local.example, the env schema or Infisical pr/staging/prod (docs/claude/ENVIRONMENTS.md § Adding Environment Variables)
-- **Canonical environment names** · rule docs/claude/ENVIRONMENTS.md § Environment Names · code: `Flow`: Any env name in scripts, secrets config or code.
-  - *Said as:* "with-env expects prod, not production", "I'll call the environment development", "which environment names are allowed", "never dev or production as a name"
-  - *Signs you're bypassing it:* `production`, `development` or `dev` used as an environment name in scripts, Infisical config or code (docs/claude/ENVIRONMENTS.md § Environment Names)
-- **Infisical for cloud secrets** · rule docs/claude/ENVIRONMENTS.md § Infisical (Cloud Environments) · code: `Token`: Cloud environments; local/test use .env files.
-  - *Said as:* "where do staging and prod secrets live", "no doppler, we are using infisical now", "I'll check in a prod env file", "cloud secrets come from the secret manager"
-  - *Signs you're bypassing it:* `infisical export --env=prod > .env.prod` kept around as the source of cloud secrets, or a per-environment env file checked into deploy config (docs/claude/ENVIRONMENTS.md § Infisical (Cloud Environments))
-- **Mock Redis in tests** · rule FEATURES.md › Redis with IORedis: all tests touching Redis
-  - *Said as:* "tests shouldn't hit real redis", "I'll connect to redis in the test"
-- **No committed env files** · rule FEATURES.md › Infisical Secrets Management: any secret or environment value for pr, staging or prod
-  - *Said as:* "I'll commit the staging env file", "never check in real secret values", "only example env files are tracked"
-  - *Signs you're bypassing it:* committing a .env.staging / .env.prod or real secret values instead of the .env.*.example files plus Infisical (FEATURES.md § Infrastructure & DevOps › Infisical Secrets Management)
-- **Run commands through with-env** · rule docs/claude/ENVIRONMENTS.md § with-env Composition: Any dev, test or start command needing env variables.
-  - *Said as:* "I'll export the env file into the shell", "prefix env vars inline on the command", "every dev, test or start command needs env composed"
-  - *Signs you're bypassing it:* `export $(cat .env.local | xargs) && bun run ...` or env vars prefixed inline on a dev, test or start command (docs/claude/ENVIRONMENTS.md § with-env Composition)
+| Problem | Use | Read | Signs you're bypassing it |
+|---|---|---|---|
+| only do this when running locally; am I in local dev; I'll compare the environment string to local | **isLocal** · primitive `packages/shared/src/utils/env.ts#isLocal` — Use the matching flag (isTest, isPR, isStaging, isProd) for other environments instead of reading process.env.ENVIRONMENT. | docs/claude/ENVIRONMENTS.md § Environment Detection | — |
+| only in production; am I running in prod; I'll check the environment variable equals prod | **isProd** · primitive `packages/shared/src/utils/env.ts#isProd` — Use the matching flag (isStaging, isPR, isLocal, isTest) for other environments. | docs/claude/ENVIRONMENTS.md § Environment Detection | — |
+| only when tests are running; skip this under test; I'll check the node env variable equals test; behavior only for the test run | **isTest** · primitive `packages/shared/src/utils/env.ts#isTest` — Other environments: isLocal, isPR, isStaging or isProd. To change env values within a test, use withEnv or setEnvOverride. | docs/claude/ENVIRONMENTS.md § Environment Detection; docs/claude/JOBS.md § Enqueuing Jobs | `process.env.NODE_ENV === 'test'` checks, or a test that assigns process.env to change behavior instead of withEnv / setEnvOverride (catalog isTest (choose line); docs/claude/ENVIRONMENTS.md § Environment Detection) |
+| apply runtime overrides when env is read; wrap env so overrides are parsed on read; I'll mutate the env object for the override | **wrapEnvWithOverrides** · primitive `packages/shared/src/utils/envOverrides.ts#wrapEnvWithOverrides` — wrap an env object so runtime overrides are parsed and applied on read | — | — |
+| I'll default the env var inline with a fallback; casting or number-parsing the env in a module; the ci rule about env coercion; defaults land in the example env file, not in a parser fallback | **no-inline-env-coercion** · rule `scripts/ci/rules/no-inline-env-coercion.sh` — forbid casting or defaulting process.env values outside the central zod env schema | — | `Number(process.env.X ?? 10)`, `process.env.X as string`, `process.env.X \|\| 'default'` in a module instead of the app's env schema (scripts/ci/rules/no-inline-env-coercion.sh (CI rule)) |
+| refresh my env files after a pull added keys; create the env files from the examples; I'll copy the example env by hand; my env is missing new keys | **bun run sync-env** · script `package.json` — Refresh env files only; full machine setup uses setup; loading env for a command uses with. | docs/claude/ENVIRONMENTS.md § File-Based Environments; docs/claude/ENVIRONMENTS.md § Adding Environment Variables | hand-copying .env.local.example to .env.local or editing env files to add newly required keys (FEATURES.md › Smart Env File Sync; docs/claude/SETUP.md § Environment Variables) |
+| run this command with the right env loaded; run the test command with the test env composed; I'll source the env file and then run it; run something against staging env; the one way to run a command with an environment | **bun run with** · script `package.json` — Use in package test scripts (with --max-concurrency=1 for DB tests) instead of hand-loading env files. | docs/claude/ENVIRONMENTS.md § with-env Composition; docs/claude/TURBOREPO.md § Environment Composition with Turbo | a package test script that loads .env.test by hand or sets env vars inline instead of `bun run with test <app> bun test` (docs/claude/TESTING.md § Environment Composition; docs/claude/ENVIRONMENTS.md § Package.json Scripts) |
+| staging and prod both deploy from main; what does a pr branch deploy to; how do changes get promoted to prod; I'll make a separate branch for staging | **Branch deployment flow** · pattern docs/claude/ENVIRONMENTS.md § Environment Names › Deployment Flow — promote feature branches to ephemeral pr, main to staging, manual to prod | code `Flow` | — |
+| how long are sessions and permissions cached; the cache lifetimes in redis; I'll pick my own ttl for this cache | **Cache TTLs** · pattern FEATURES.md › Redis Use Cases — cache sessions 5min, permission evaluations 10min and token hashes 10min in Redis | part 4 | — |
+| where does local env come from; root env file then the app's env file; the app's values override the root's; I'll keep one env file for everything | **File-based env inheritance** · pattern docs/claude/ENVIRONMENTS.md § File-Based Environments — local/test only; pr/staging/prod use Infisical. | code `sync-env` | — |
+| prefix redis keys per use; keys from two features collide; I'll write keys without a namespace | **Redis namespaces** · pattern FEATURES.md › Namespace Support — prefix Redis keys per use case to avoid collisions and allow selective clearing | part 4 | — |
+| follow one request through the logs; tie log lines to the request; I'll generate my own request id | **Request ID correlation** · pattern FEATURES.md › Logging & Observability — follow one request through logs, queries and errors via a middleware-generated ID | part 4 | — |
+| pub sub blocks the main redis client; queues on their own redis connection; I'll reuse the main client for subscribing | **Separate Redis connections** · pattern FEATURES.md › Multiple Redis Connections — keep blocking pub/sub and BullMQ off the main client connection | part 4 | — |
+| swap the error reporter without touching app code; wrap the vendor behind an adapter; I'll call the vendor sdk directly from the module | **Swappable providers via adapters** · pattern FEATURES.md › Error Reporter Adapter — wrap external providers in adapters so swapping them needs no application code changes | part 4 | — |
+| read the env var through the schema; where does code read env vars; I'll read the env directly in the module; validate all env on startup; the env schema already handles coercion and defaults | **Zod-validated env schema** · pattern docs/claude/ENVIRONMENTS.md § Adding Environment Variables › In Code — Recommended over raw process.env access. | code `sync-env` | raw `const apiKey = process.env.API_KEY` reads scattered through code with no schema entry (docs/claude/ENVIRONMENTS.md § Adding Environment Variables › In Code) |
+| start only the supporting services in containers; I'll dockerize the api for local dev; bun servers run natively, databases in docker | **docker compose up** · primitive FEATURES.md › Docker Compose for Supporting Services — services only; run Bun servers natively via Turborepo watch, not in containers | part 4 | a Dockerfile or compose service that runs the API, worker or frontends in containers for local dev (FEATURES.md › Docker Compose for Supporting Services) |
+| the type for an environment name; which names are valid environments; I'll type it as a plain string; local, test, pr, staging, prod | **Environment** · primitive @template/shared/utils — type the canonical environment names: local, test, pr, staging, prod | part 4 | — |
+| where do errors get reported; send errors to sentry in cloud envs; I'll call sentry directly | **errorReporter** · primitive @template/shared/adapter — Sentry when SENTRY_ENABLED=true and SENTRY_DSN set in prod/staging/pr; console otherwise | part 4 | — |
+| branch on which environment we're in; we should add these to shared env; I'll compare the environment string by hand; is this prod or staging; the environment flags | **isTest / isLocal / isPR / isStaging / isProd** · primitive packages/shared/src/utils/env.ts — Use these flags instead of comparing process.env.ENVIRONMENT by hand. | part 4 | `process.env.ENVIRONMENT === 'prod'` or `process.env.NODE_ENV` comparisons written inline (docs/claude/ENVIRONMENTS.md § Environment Detection; catalog isTest/isLocal/isProd) |
+| turn down the logging; set the minimum log level; I'll add a debug flag of my own | **LOG_LEVEL** · primitive FEATURES.md › Logging & Observability — set minimum log level: silent, error, warn, info, debug or trace | part 4 | — |
+| a separate redis for the queues; when do queues need their own redis | **REDIS_BULLMQ_URL** · primitive docs/claude/ENVIRONMENTS.md § Common Variables — Set only when queues need a separate Redis from REDIS_URL. | code `Variable` | — |
+| the script behind refreshing env files; create missing env files from examples; I'll copy the example files myself | **sync-env.sh** · primitive sync-env.sh — after pulling code that adds env variables; with-env.sh for deployed environments | part 4 | — |
+| the script that composes env for a command; how does the env get loaded for a command; I'll source the env file in my script; infisical for cloud, files for local | **with-env.sh** · primitive scripts/deployment/with-env.sh — Always use instead of sourcing .env files or calling infisical run directly. | part 4 | `source .env.local`, dotenv loading in a script, or `infisical run --env=prod -- ...` called directly instead of `bun run with` (docs/claude/ENVIRONMENTS.md § with-env Composition; FEATURES.md › Infisical Secrets Management) |
+| add a new env var everywhere it needs to be; I'll just read the new var in code; the four places a new variable goes; a new secret for staging and prod too | **Adding an environment variable** · rule docs/claude/ENVIRONMENTS.md § Adding Environment Variables — Whenever code reads a new env variable. | code `sync-env` | code reading a new env var with no entry in .env.local.example, the env schema or Infisical pr/staging/prod (docs/claude/ENVIRONMENTS.md § Adding Environment Variables) |
+| with-env expects prod, not production; I'll call the environment development; which environment names are allowed; never dev or production as a name | **Canonical environment names** · rule docs/claude/ENVIRONMENTS.md § Environment Names — Any env name in scripts, secrets config or code. | code `Flow` | `production`, `development` or `dev` used as an environment name in scripts, Infisical config or code (docs/claude/ENVIRONMENTS.md § Environment Names) |
+| where do staging and prod secrets live; no doppler, we are using infisical now; I'll check in a prod env file; cloud secrets come from the secret manager | **Infisical for cloud secrets** · rule docs/claude/ENVIRONMENTS.md § Infisical (Cloud Environments) — Cloud environments; local/test use .env files. | code `Token` | `infisical export --env=prod > .env.prod` kept around as the source of cloud secrets, or a per-environment env file checked into deploy config (docs/claude/ENVIRONMENTS.md § Infisical (Cloud Environments)) |
+| tests shouldn't hit real redis; I'll connect to redis in the test | **Mock Redis in tests** · rule FEATURES.md › Redis with IORedis — all tests touching Redis | part 4 | — |
+| I'll commit the staging env file; never check in real secret values; only example env files are tracked | **No committed env files** · rule FEATURES.md › Infisical Secrets Management — any secret or environment value for pr, staging or prod | part 4 | committing a .env.staging / .env.prod or real secret values instead of the .env.*.example files plus Infisical (FEATURES.md § Infrastructure & DevOps › Infisical Secrets Management) |
+| I'll export the env file into the shell; prefix env vars inline on the command; every dev, test or start command needs env composed | **Run commands through with-env** · rule docs/claude/ENVIRONMENTS.md § with-env Composition — Any dev, test or start command needing env variables. | part 4 | `export $(cat .env.local \| xargs) && bun run ...` or env vars prefixed inline on a dev, test or start command (docs/claude/ENVIRONMENTS.md § with-env Composition) |
+
 - *Also here, by name:* isPR (`packages/shared/src/utils/env.ts`); isStaging (`packages/shared/src/utils/env.ts`)
 
 ### Class `ci-deploy`: CI/CD pipelines, the full check, deploy environments and scripts
@@ -220,11 +185,6 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
-| **bun run check** | before pushing: lint, typecheck, tests, CI rules | running the parts one by one and calling it green |
-| **bun run typecheck** | whole-repo type check | frontend only after route regen (use bun run typecheck:fe) |
-| **bun run typecheck:fe** | frontend apps with fresh generated routes | whole repo (use bun run typecheck) |
-| **check-generated-files.sh (dx-setup)** | fails on a stale Prisma client or SDK | sync-conflict copies (use check-finder-duplicates (dx-tools)) |
-| **run-ci-rules.sh (dx-setup)** | the CI rules; --test checks them against fixtures | Biome-adjacent lint scripts (use run-post-biome-checks.sh) |
 
 **Job: build, run and deploy the app** (build, run and deploy) — package.json; apps/api package.json; docs/claude/SCRIPTS.md § Deployment Scripts
 
@@ -232,11 +192,6 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
-| **bun run build** | production build of every workspace | local dev (use bun run local (dx-setup)) |
-| **bun run start (dx-setup)** | production API run | the worker (use bun run start:worker) |
-| **bun run start:worker (dx-tools)** | production worker | local worker (use bun run local:worker (dx-setup)) |
-| **bun run deploy** | deploy via scripts/deployment/deploy.sh | waiting for health (use scripts/deployment/wait-for-api.sh) |
-| **scripts/deployment/wait-for-api.sh (dx-setup)** | block until the API health check passes | Postgres readiness (use scripts/db/wait-postgres.sh (dx-setup)) |
 
 **Job: release ecosystem packages and run ecosystem CI** (ecosystem release and CI commands) — @inixiative/config/README.md § CLI; § Release flow; § CI
 
@@ -244,65 +199,34 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
-| **config train** | releasing @inixiative packages from the default branch | only reporting drift (use config scan) |
-| **config scan** | audit drift across all checkouts | one repo (use inixiative-config check) |
-| **inixiative-config check** | read-only toolchain and lockfile check for one repo, in CI | fixing drift (use config sync (dx-tools)) |
-| **lib-ci.yml** | CI for an ecosystem lib repo via the shared caller | template itself, which commits no CI workflow yet |
 
-- **bun run build** · script `package.json` · in docs: AI/ENTRYPOINT.md § 0.3. YAGNI — Scope Invention vs. Completion; docs/claude/TESTING.md § Factories: build every workspace app and package for production
-  - *Said as:* "build every package for production", "the production build", "I'll build each app separately", "compile everything for release"
-- **bun run check** · script `package.json` · in docs: @inixiative/permissions/README.md § The check engine; @inixiative/json-rules/README.md § Root-Array Rules in `check()`: Before pushing: check instead of running lint, typecheck or tests individually.
-  - *Said as:* "run the full check before pushing", "run everything: lint, types, tests, rules", "I'll run lint and typecheck and call it green", "is the repo green", "the whole gate, not a subset"
-  - *Signs you're bypassing it:* running lint, typecheck or a subset of tests individually and calling the change green (catalog `bun run check`; root CLAUDE.md merging rules (full check))
-- **bun run deploy** · script `package.json` · in docs: docs/claude/SCRIPTS.md § Deployment Scripts; docs/claude/DATABASE.md § Scripts: deploy the project via the deployment script
-  - *Said as:* "deploy to an environment", "ship it to staging", "I'll run the deploy script directly", "push this to prod"
-- **bun run typecheck** · script `package.json` · in docs: docs/claude/CICD.md § GitHub Actions; AI/ENTRYPOINT.md § 10. Testing and Validation: Whole-repo check; frontend apps only after route regen: typecheck:fe. Same as tsc alias.
-  - *Said as:* "type-check the whole repo", "run the type checker across everything", "I'll run the type checker in one package", "any type errors anywhere"
-- **bun run typecheck:fe** · script `package.json`: Frontend apps only, with fresh generated routes; whole repo: typecheck instead.
-  - *Said as:* "type-check the frontends after regenerating routes", "frontend types only", "I'll run the whole typecheck for a frontend change", "check the web apps with fresh routes"
-- **Consumer sync via review branch** · pattern @inixiative/config/README.md § CLI · code: `typecheck`, `registry`: land consumer ecosystem bumps through a reviewed branch, never publishing
-  - *Said as:* "bump the ecosystem versions in a consumer repo", "land the version bumps through a reviewed branch", "I'll publish from the consumer repo"
-- **Release lanes in dependency order, config last** · pattern @inixiative/config/README.md § Release flow: use --lane=agentic to leave primitives untouched
-  - *Said as:* "release the agentic packages without touching primitives", "what order do packages publish in", "I'll release config first"
-- **Workspace member publish** · pattern @inixiative/config/README.md § CLI · code: `typecheck`, `registry`: publish workspace packages with workspace: ranges rewritten to released versions
-  - *Said as:* "publish a workspace package with real versions", "the workspace ranges get rewritten on publish", "I'll publish with the workspace protocol in place"
-- **config scan** · primitive @inixiative/config/README.md § CLI · code: `typecheck`, `registry`: multi-repo audit; check for a single repo, train to actually release
-  - *Said as:* "audit every checkout for toolchain drift", "which repos are out of date", "I'll run the check in each repo by hand", "scan all my repos"
-- **config train** · primitive @inixiative/config/README.md § CLI · code: `typecheck`, `registry`: releasing ecosystem packages; scan only reports drift without publishing
-  - *Said as:* "release the inixiative packages", "publish a new version of a library", "I'll npm publish by hand", "release via train, never raw publish", "ship the release train"
-  - *Signs you're bypassing it:* running `npm publish` or `bun publish` by hand for an @inixiative/* package, or bumping dependents one by one, instead of bumping the version and running train (@inixiative/config/README.md § Release flow ("A release is train"))
-- **inixiative-config check** · primitive @inixiative/config/README.md § CI: verify a repo's toolchain coherence and lockfile format
-  - *Said as:* "the read-only toolchain check in ci", "verify one repo's toolchain and lockfile", "I'll fix drift from ci", "does this repo pass the toolchain check"
-- **inixiative-config train** · primitive @inixiative/config/README.md § Release flow: releasing packages; downstream toolchain pickup without release: sync instead.
-  - *Said as:* "the release command", "publish the lanes from the default branch", "I'll sync to release"
-- **lib-ci.yml** · primitive inixiative/config/.github/workflows/lib-ci.yml: run pinned bun, frozen install, config check and repo check in CI
-  - *Said as:* "ci for a library repo", "the shared workflow lib repos call", "I'll write a full ci workflow for this lib", "two-line ci caller"
-- **train --dry-run** · primitive @inixiative/config/README.md: print each planned release step without running any
-  - *Said as:* "show what the release would do", "preview the release steps", "I'll just run the release and see"
-- **train --push** · primitive @inixiative/config/README.md: omit to only print the push commands.
-  - *Said as:* "actually push the release commits", "the release printed the push commands but didn't push"
-- **atlas check in CI** · rule @inixiative/atlas/README.md § CLI: Every CI run and before pushing annotation changes.
-  - *Said as:* "verify the annotations in ci", "I'll skip the annotation check"
-- **Commands reject foreign flags** · rule @inixiative/config/README.md: every inixiative-config command
-  - *Said as:* "the config command rejected my flag", "I'll pass an extra flag through"
-- **Fix the cause directly** · rule CLAUDE.md § 0.0 Critical Guardrails: Any breakage or failure encountered during work.
-  - *Said as:* "I'll stash to compare against head", "I'll edit the ci rule so it passes", "fix the failure at its source", "revert changes to bisect the break"
-  - *Signs you're bypassing it:* `git stash` to compare against HEAD, reverting changes to bisect, or editing scripts/ci/rules or rule-violations fixtures to make a failure pass (AI/ENTRYPOINT.md § 0.0 Critical Guardrails)
-- **Frozen lockfile installs in CI** · rule @inixiative/config/README.md § CI: all lib repo CI
-  - *Said as:* "I'll run a plain install in ci", "the lockfile drifted during ci", "install with the lockfile frozen"
-  - *Signs you're bypassing it:* a CI job running plain `bun install` (lockfile can drift) before checks (@inixiative/config/README.md § CI)
-- **Lanes cascade one way** · rule @inixiative/config/README.md § versions.json (the BOM): publishing or depending across @inixiative lanes
-  - *Said as:* "can an agentic package depend on primitives", "I'll have a primitive depend on an agentic package", "primitives ship first, agentic builds on them"
-- **Lib repos use the shared CI caller** · rule @inixiative/config/README.md § CI: every lib repo
-  - *Said as:* "I'll write a custom ci workflow for the lib", "set up ci on a new library repo", "every lib repo calls the shared workflow"
-  - *Signs you're bypassing it:* a lib repo with its own full CI workflow installing bun, deps and running checks, instead of the two-line caller of inixiative/config/.github/workflows/lib-ci.yml (@inixiative/config/README.md § CI)
-- **No git commands unless asked** · rule CLAUDE.md § 0.0 Critical Guardrails: Any comparison against HEAD or clean state.
-  - *Said as:* "I'll git stash to check", "don't run git to compare against clean", "git only when asked"
-- **Run check in CI** · rule @inixiative/config/README.md § CLI · code: `typecheck`, `registry`: CI pipelines of ecosystem repos.
-  - *Said as:* "what does ci run for ecosystem repos", "ci should run the toolchain check", "I'll skip the check in the pipeline"
-- **Train ships default branch from origin** · rule @inixiative/config/README.md § CLI · code: `typecheck`, `registry`: Releasing via train.
-  - *Said as:* "I'll release from my feature branch", "release from main as it is on origin", "my checkout is behind, can I release"
-  - *Signs you're bypassing it:* publishing a package from a feature branch or a checkout behind origin (@inixiative/config/README.md § CLI (train only ships the default branch))
+| Problem | Use | Read | Signs you're bypassing it |
+|---|---|---|---|
+| build every package for production; the production build; I'll build each app separately; compile everything for release | **bun run build** · script `package.json` — build every workspace app and package for production | AI/ENTRYPOINT.md § 0.3. YAGNI — Scope Invention vs. Completion; docs/claude/TESTING.md § Factories | — |
+| run the full check before pushing; run everything: lint, types, tests, rules; I'll run lint and typecheck and call it green; is the repo green; the whole gate, not a subset | **bun run check** · script `package.json` — Before pushing: check instead of running lint, typecheck or tests individually. | @inixiative/permissions/README.md § The check engine; @inixiative/json-rules/README.md § Root-Array Rules in `check()` | running lint, typecheck or a subset of tests individually and calling the change green (catalog `bun run check`; root CLAUDE.md merging rules (full check)) |
+| deploy to an environment; ship it to staging; I'll run the deploy script directly; push this to prod | **bun run deploy** · script `package.json` — deploy the project via the deployment script | docs/claude/SCRIPTS.md § Deployment Scripts; docs/claude/DATABASE.md § Scripts | — |
+| type-check the whole repo; run the type checker across everything; I'll run the type checker in one package; any type errors anywhere | **bun run typecheck** · script `package.json` — Whole-repo check; frontend apps only after route regen: typecheck:fe. Same as tsc alias. | docs/claude/CICD.md § GitHub Actions; AI/ENTRYPOINT.md § 10. Testing and Validation | — |
+| type-check the frontends after regenerating routes; frontend types only; I'll run the whole typecheck for a frontend change; check the web apps with fresh routes | **bun run typecheck:fe** · script `package.json` — Frontend apps only, with fresh generated routes; whole repo: typecheck instead. | — | — |
+| bump the ecosystem versions in a consumer repo; land the version bumps through a reviewed branch; I'll publish from the consumer repo | **Consumer sync via review branch** · pattern @inixiative/config/README.md § CLI — land consumer ecosystem bumps through a reviewed branch, never publishing | code `typecheck`, `registry` | — |
+| release the agentic packages without touching primitives; what order do packages publish in; I'll release config first | **Release lanes in dependency order, config last** · pattern @inixiative/config/README.md § Release flow — use --lane=agentic to leave primitives untouched | part 4 | — |
+| publish a workspace package with real versions; the workspace ranges get rewritten on publish; I'll publish with the workspace protocol in place | **Workspace member publish** · pattern @inixiative/config/README.md § CLI — publish workspace packages with workspace: ranges rewritten to released versions | code `typecheck`, `registry` | — |
+| audit every checkout for toolchain drift; which repos are out of date; I'll run the check in each repo by hand; scan all my repos | **config scan** · primitive @inixiative/config/README.md § CLI — multi-repo audit; check for a single repo, train to actually release | code `typecheck`, `registry` | — |
+| release the inixiative packages; publish a new version of a library; I'll npm publish by hand; release via train, never raw publish; ship the release train | **config train** · primitive @inixiative/config/README.md § CLI — releasing ecosystem packages; scan only reports drift without publishing | code `typecheck`, `registry` | running `npm publish` or `bun publish` by hand for an @inixiative/* package, or bumping dependents one by one, instead of bumping the version and running train (@inixiative/config/README.md § Release flow ("A release is train")) |
+| the read-only toolchain check in ci; verify one repo's toolchain and lockfile; I'll fix drift from ci; does this repo pass the toolchain check | **inixiative-config check** · primitive @inixiative/config/README.md § CI — verify a repo's toolchain coherence and lockfile format | part 4 | — |
+| the release command; publish the lanes from the default branch; I'll sync to release | **inixiative-config train** · primitive @inixiative/config/README.md § Release flow — releasing packages; downstream toolchain pickup without release: sync instead. | part 4 | — |
+| ci for a library repo; the shared workflow lib repos call; I'll write a full ci workflow for this lib; two-line ci caller | **lib-ci.yml** · primitive inixiative/config/.github/workflows/lib-ci.yml — run pinned bun, frozen install, config check and repo check in CI | part 4 | — |
+| show what the release would do; preview the release steps; I'll just run the release and see | **train --dry-run** · primitive @inixiative/config/README.md — print each planned release step without running any | part 4 | — |
+| actually push the release commits; the release printed the push commands but didn't push | **train --push** · primitive @inixiative/config/README.md — omit to only print the push commands. | part 4 | — |
+| verify the annotations in ci; I'll skip the annotation check | **atlas check in CI** · rule @inixiative/atlas/README.md § CLI — Every CI run and before pushing annotation changes. | part 4 | — |
+| the config command rejected my flag; I'll pass an extra flag through | **Commands reject foreign flags** · rule @inixiative/config/README.md — every inixiative-config command | part 4 | — |
+| I'll stash to compare against head; I'll edit the ci rule so it passes; fix the failure at its source; revert changes to bisect the break | **Fix the cause directly** · rule CLAUDE.md § 0.0 Critical Guardrails — Any breakage or failure encountered during work. | part 4 | `git stash` to compare against HEAD, reverting changes to bisect, or editing scripts/ci/rules or rule-violations fixtures to make a failure pass (AI/ENTRYPOINT.md § 0.0 Critical Guardrails) |
+| I'll run a plain install in ci; the lockfile drifted during ci; install with the lockfile frozen | **Frozen lockfile installs in CI** · rule @inixiative/config/README.md § CI — all lib repo CI | part 4 | a CI job running plain `bun install` (lockfile can drift) before checks (@inixiative/config/README.md § CI) |
+| can an agentic package depend on primitives; I'll have a primitive depend on an agentic package; primitives ship first, agentic builds on them | **Lanes cascade one way** · rule @inixiative/config/README.md § versions.json (the BOM) — publishing or depending across @inixiative lanes | part 4 | — |
+| I'll write a custom ci workflow for the lib; set up ci on a new library repo; every lib repo calls the shared workflow | **Lib repos use the shared CI caller** · rule @inixiative/config/README.md § CI — every lib repo | part 4 | a lib repo with its own full CI workflow installing bun, deps and running checks, instead of the two-line caller of inixiative/config/.github/workflows/lib-ci.yml (@inixiative/config/README.md § CI) |
+| I'll git stash to check; don't run git to compare against clean; git only when asked | **No git commands unless asked** · rule CLAUDE.md § 0.0 Critical Guardrails — Any comparison against HEAD or clean state. | part 4 | — |
+| what does ci run for ecosystem repos; ci should run the toolchain check; I'll skip the check in the pipeline | **Run check in CI** · rule @inixiative/config/README.md § CLI — CI pipelines of ecosystem repos. | code `typecheck`, `registry` | — |
+| I'll release from my feature branch; release from main as it is on origin; my checkout is behind, can I release | **Train ships default branch from origin** · rule @inixiative/config/README.md § CLI — Releasing via train. | code `typecheck`, `registry` | publishing a package from a feature branch or a checkout behind origin (@inixiative/config/README.md § CLI (train only ships the default branch)) |
+
 - *Also here, by name:* bun run tsc (`package.json`)
 
 ## 4. The specifics, in full

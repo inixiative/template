@@ -131,16 +131,40 @@
       "region": "ws-connections"
     },
     {
-      "tag": "ws-streams",
+      "tag": "ws-channels",
       "atlas": "primitive:websockets",
-      "description": "Refetch channels and data streams: registries, audience, re-authorization, seq",
-      "region": "ws-streams"
+      "description": "Refetch channels: the WS contract, channels vs streams, channel registry and subscribe authorization, publishing a refetch (WS_CHANNELS, LIVE_QUERIES, sendToChannel / sendToUser / broadcast), the client socket and horizontal scaling",
+      "region": "ws-channels"
+    },
+    {
+      "tag": "ws-data-streams",
+      "atlas": "primitive:websockets",
+      "description": "Data streams: defineStream / STREAM_DEFINITIONS, audience, authorization and re-authorization sweeps, ordering, sequence numbers and resync, producing appends (streamAppend, routeRow, appendToStream), useStream / useStreamAction and the stream folds",
+      "region": "ws-data-streams"
+    },
+    {
+      "tag": "ws-data-streams",
+      "atlas": "primitive:websockets",
+      "description": "Data streams: defineStream / STREAM_DEFINITIONS, audience, authorization and re-authorization sweeps, ordering, sequence numbers and resync, producing appends (streamAppend, routeRow, appendToStream), useStream / useStreamAction and the stream folds",
+      "region": "ws-data-streams"
     },
     {
       "tag": "email-templates",
       "atlas": "feature:email",
-      "description": "Email templates and components: MJML, component refs, the owner cascade, compose/render/save pipeline, versioning",
+      "description": "Email templates and components: EmailTemplate / EmailComponent models, the owner cascade, component refs, versioning and recompose, the emailTemplate module and seed savers",
       "region": "email-templates"
+    },
+    {
+      "tag": "email-render",
+      "atlas": "feature:email",
+      "description": "Compose, render and save pipeline for email: interpolation and variable prefixes, conditions, cascade lookup, expand/settle, per-recipient render, MJML validation, preflight, render errors (packages/email/src/render and validations)",
+      "region": "email-render"
+    },
+    {
+      "tag": "email-render",
+      "atlas": "feature:email",
+      "description": "Compose, render and save pipeline for email: interpolation and variable prefixes, conditions, cascade lookup, expand/settle, per-recipient render, MJML validation, preflight, render errors (packages/email/src/render and validations)",
+      "region": "email-render"
     },
     {
       "tag": "email-lens",
@@ -185,10 +209,22 @@
       "region": "json-rules"
     },
     {
-      "tag": "lib-json-rules",
+      "tag": "json-rules-shapes",
       "atlas": "@inixiative/json-rules",
-      "description": "The json-rules engine: rule shapes, operators, path semantics, introspection, runtime validation, engine globals, errors, TypeScript types, verbs, timezones (README, VERBS, TIMEZONE)",
-      "region": "json-rules-engine"
+      "description": "Writing a json-rules rule: quick start, what it supports, operators, rule shapes (field, logical, conditional, array, aggregate, date), path semantics, scope references, offsets and date expressions, windowing, NULL semantics, Prisma limitations (README)",
+      "region": "json-rules-shapes"
+    },
+    {
+      "tag": "json-rules-runtime",
+      "atlas": "@inixiative/json-rules",
+      "description": "Running, validating and typing rules: the three rails (check / toPrisma / executePrismaPlan) and where they differ, rule introspection (describeRule, getOperatorsForKind), runtime validation (validateRule, assertValidRule, validateNarrowing), bindRule, engine globals, TypeScript types, error classes (UsageError, LensRefusal), root-array rules",
+      "region": "json-rules-runtime"
+    },
+    {
+      "tag": "json-rules-runtime",
+      "atlas": "@inixiative/json-rules",
+      "description": "Running, validating and typing rules: the three rails (check / toPrisma / executePrismaPlan) and where they differ, rule introspection (describeRule, getOperatorsForKind), runtime validation (validateRule, assertValidRule, validateNarrowing), bindRule, engine globals, TypeScript types, error classes (UsageError, LensRefusal), root-array rules",
+      "region": "json-rules-runtime"
     },
     {
       "tag": "lib-json-rules-dates",
@@ -239,10 +275,22 @@
       "region": "lib-rules-builder"
     },
     {
-      "tag": "permissions",
+      "tag": "permissions-roles",
       "atlas": "primitive:authz",
-      "description": "Roles, actions, Permix, ReBAC walks, entitlements, row-level overrides, validatePermission",
-      "region": "permissions"
+      "description": "Roles, actions and checks: Role / PlatformRole, StandardAction, Permix setup per context (setupOrg / Space / UserPermissions), permix.check in controllers, validatePermission / validateRole middleware, entitlements and token restriction, role assignment, frontend checks (usePermission, permissions.check, NavItem.access)",
+      "region": "permissions-roles"
+    },
+    {
+      "tag": "permissions-rebac",
+      "atlas": "primitive:authz",
+      "description": "ReBAC and row-level authority: the @inixiative/permissions check engine (createPermissions, createRebacCheck, createHydrator, actionRuleSchema), rebacSchema and action delegation, owner-polymorphic models (ownerActions, validateOwnerPermission, polymorphicIs), row-level overrides and space \u2192 organization delegation",
+      "region": "permissions-rebac"
+    },
+    {
+      "tag": "permissions-rebac",
+      "atlas": "primitive:authz",
+      "description": "ReBAC and row-level authority: the @inixiative/permissions check engine (createPermissions, createRebacCheck, createHydrator, actionRuleSchema), rebacSchema and action delegation, owner-polymorphic models (ownerActions, validateOwnerPermission, polymorphicIs), row-level overrides and space \u2192 organization delegation",
+      "region": "permissions-rebac"
     },
     {
       "tag": "tenancy",
@@ -407,10 +455,22 @@
       "region": "encryption"
     },
     {
-      "tag": "inquiries",
+      "tag": "inquiry-handlers",
       "atlas": "feature:inquiry",
-      "description": "Inquiries: the request/approval primitive, handlers, sources/targets, autoApprove",
-      "region": "inquiries"
+      "description": "Inquiry model and handlers: the Inquiry row and status flow, source / target resolution, the handler contract (validate, autoApprove, handleApprove, unique, expiry), services (createInquiry, sendInquiry, resolveInquiry), status validations and ReBAC send / resolve rules",
+      "region": "inquiry-handlers"
+    },
+    {
+      "tag": "inquiry-routes-ui",
+      "atlas": "feature:inquiry",
+      "description": "Inquiry API and frontend: endpoints and create / list / cancel routes, response schemas and the standardized includes, the per-type UI registry, mutation hooks, context queries, query keys and pages",
+      "region": "inquiry-routes-ui"
+    },
+    {
+      "tag": "inquiry-routes-ui",
+      "atlas": "feature:inquiry",
+      "description": "Inquiry API and frontend: endpoints and create / list / cancel routes, response schemas and the standardized includes, the per-type UI registry, mutation hooks, context queries, query keys and pages",
+      "region": "inquiry-routes-ui"
     },
     {
       "tag": "flows",
@@ -581,10 +641,22 @@
       "region": "monorepo-architecture"
     },
     {
-      "tag": "init-script",
+      "tag": "init-architecture",
       "atlas": null,
-      "description": "The init provisioning TUI (Ink): resumable idempotent tasks, Infisical/Railway/PlanetScale provisioning",
-      "region": "init-script"
+      "description": "The init TUI's architecture: root config state provider and syncConfig, manual sync triggers, cache-busted imports, derived state (setupState), state management standards, resource naming, file structure, creating a new task view, the pre-launch \u2192 launched direction",
+      "region": "init-architecture"
+    },
+    {
+      "tag": "init-tasks",
+      "atlas": null,
+      "description": "Writing an init task: composable prompts, clean status lists, suppressing console logs, fetching from source not props, retry for async initialization, async exec for animations, Railway CLI vs GraphQL, token input flow, atomic progress flags and idempotent API calls, OrgSelector onCancel, interactive prompts for required input, Bun-native resume tests with VCR",
+      "region": "init-tasks"
+    },
+    {
+      "tag": "init-tasks",
+      "atlas": null,
+      "description": "Writing an init task: composable prompts, clean status lists, suppressing console logs, fetching from source not props, retry for async initialization, async exec for animations, Railway CLI vs GraphQL, token input flow, atomic progress flags and idempotent API calls, OrgSelector onCancel, interactive prompts for required input, Bun-native resume tests with VCR",
+      "region": "init-tasks"
     },
     {
       "tag": "engineering-process",
@@ -656,7 +728,7 @@
   "regions": [
     {
       "id": "concurrency-locks",
-      "tokens": 16089,
+      "tokens": 14608,
       "concepts": [
         "locks",
         "concurrency-limits",
@@ -668,7 +740,7 @@
     },
     {
       "id": "redis-caching-rate-limits",
-      "tokens": 13302,
+      "tokens": 12360,
       "concepts": [
         "redis",
         "caching",
@@ -678,7 +750,7 @@
     },
     {
       "id": "jobs-cron",
-      "tokens": 16198,
+      "tokens": 15399,
       "concepts": [
         "jobs",
         "cron"
@@ -687,7 +759,7 @@
     },
     {
       "id": "job-lanes-outbox",
-      "tokens": 15142,
+      "tokens": 14363,
       "concepts": [
         "job-lanes",
         "job-outbox"
@@ -696,7 +768,7 @@
     },
     {
       "id": "app-events-webhooks",
-      "tokens": 15249,
+      "tokens": 14421,
       "concepts": [
         "app-events",
         "webhooks"
@@ -705,7 +777,7 @@
     },
     {
       "id": "adapters-integrations",
-      "tokens": 8635,
+      "tokens": 8184,
       "concepts": [
         "adapters",
         "integrations",
@@ -715,31 +787,47 @@
     },
     {
       "id": "ws-connections",
-      "tokens": 7053,
+      "tokens": 6503,
       "concepts": [
         "ws-connections"
       ],
       "runsAgreed": 0
     },
     {
-      "id": "ws-streams",
-      "tokens": 23822,
+      "id": "ws-channels",
+      "tokens": 10002,
       "concepts": [
-        "ws-streams"
+        "ws-channels"
       ],
-      "runsAgreed": 2
+      "runsAgreed": 0
+    },
+    {
+      "id": "ws-data-streams",
+      "tokens": 14592,
+      "concepts": [
+        "ws-data-streams"
+      ],
+      "runsAgreed": 0
     },
     {
       "id": "email-templates",
-      "tokens": 25078,
+      "tokens": 8772,
       "concepts": [
         "email-templates"
       ],
-      "runsAgreed": 1
+      "runsAgreed": 0
+    },
+    {
+      "id": "email-render",
+      "tokens": 17076,
+      "concepts": [
+        "email-render"
+      ],
+      "runsAgreed": 0
     },
     {
       "id": "email-lens",
-      "tokens": 13132,
+      "tokens": 12436,
       "concepts": [
         "email-lens"
       ],
@@ -747,7 +835,7 @@
     },
     {
       "id": "email-delivery",
-      "tokens": 14419,
+      "tokens": 13800,
       "concepts": [
         "email-delivery",
         "communication-preferences"
@@ -756,7 +844,7 @@
     },
     {
       "id": "messaging-contacts",
-      "tokens": 13195,
+      "tokens": 12345,
       "concepts": [
         "messaging",
         "contacts"
@@ -765,7 +853,7 @@
     },
     {
       "id": "json-rules",
-      "tokens": 16969,
+      "tokens": 15634,
       "concepts": [
         "json-rules",
         "rule-references"
@@ -773,16 +861,24 @@
       "runsAgreed": 0
     },
     {
-      "id": "json-rules-engine",
-      "tokens": 21408,
+      "id": "json-rules-shapes",
+      "tokens": 11362,
       "concepts": [
-        "lib-json-rules"
+        "json-rules-shapes"
+      ],
+      "runsAgreed": 0
+    },
+    {
+      "id": "json-rules-runtime",
+      "tokens": 10506,
+      "concepts": [
+        "json-rules-runtime"
       ],
       "runsAgreed": 0
     },
     {
       "id": "json-rules-dates",
-      "tokens": 5030,
+      "tokens": 5024,
       "concepts": [
         "lib-json-rules-dates"
       ],
@@ -790,7 +886,7 @@
     },
     {
       "id": "json-rules-backends",
-      "tokens": 7818,
+      "tokens": 7684,
       "concepts": [
         "lib-json-rules-backends"
       ],
@@ -798,7 +894,7 @@
     },
     {
       "id": "lenses",
-      "tokens": 13989,
+      "tokens": 13026,
       "concepts": [
         "lenses"
       ],
@@ -806,7 +902,7 @@
     },
     {
       "id": "lens-model",
-      "tokens": 13120,
+      "tokens": 12614,
       "concepts": [
         "lib-json-rules-lens"
       ],
@@ -814,7 +910,7 @@
     },
     {
       "id": "lens-usage",
-      "tokens": 19792,
+      "tokens": 19232,
       "concepts": [
         "lib-json-rules-lens-usage"
       ],
@@ -822,7 +918,7 @@
     },
     {
       "id": "lens-sources",
-      "tokens": 8863,
+      "tokens": 8311,
       "concepts": [
         "lib-json-rules-lens-sources"
       ],
@@ -830,7 +926,7 @@
     },
     {
       "id": "rules-builder",
-      "tokens": 17732,
+      "tokens": 16729,
       "concepts": [
         "rules-builder"
       ],
@@ -838,23 +934,31 @@
     },
     {
       "id": "lib-rules-builder",
-      "tokens": 13087,
+      "tokens": 12318,
       "concepts": [
         "lib-rules-builder"
       ],
       "runsAgreed": 0
     },
     {
-      "id": "permissions",
-      "tokens": 23146,
+      "id": "permissions-roles",
+      "tokens": 14252,
       "concepts": [
-        "permissions"
+        "permissions-roles"
       ],
-      "runsAgreed": 2
+      "runsAgreed": 0
+    },
+    {
+      "id": "permissions-rebac",
+      "tokens": 10124,
+      "concepts": [
+        "permissions-rebac"
+      ],
+      "runsAgreed": 0
     },
     {
       "id": "tenancy",
-      "tokens": 9841,
+      "tokens": 9279,
       "concepts": [
         "tenancy",
         "superadmin"
@@ -863,7 +967,7 @@
     },
     {
       "id": "authentication",
-      "tokens": 14328,
+      "tokens": 13844,
       "concepts": [
         "authentication"
       ],
@@ -871,7 +975,7 @@
     },
     {
       "id": "auth-middleware-users",
-      "tokens": 11224,
+      "tokens": 10413,
       "concepts": [
         "auth-middleware",
         "users"
@@ -880,7 +984,7 @@
     },
     {
       "id": "frontend-auth",
-      "tokens": 8393,
+      "tokens": 8018,
       "concepts": [
         "frontend-auth"
       ],
@@ -888,7 +992,7 @@
     },
     {
       "id": "api-routes",
-      "tokens": 16362,
+      "tokens": 15577,
       "concepts": [
         "route-templates",
         "api-modules"
@@ -897,7 +1001,7 @@
     },
     {
       "id": "api-schemas-openapi",
-      "tokens": 6280,
+      "tokens": 5733,
       "concepts": [
         "openapi",
         "request-schemas"
@@ -906,7 +1010,7 @@
     },
     {
       "id": "request-context-errors",
-      "tokens": 19348,
+      "tokens": 18091,
       "concepts": [
         "request-context",
         "errors"
@@ -915,7 +1019,7 @@
     },
     {
       "id": "batch",
-      "tokens": 10590,
+      "tokens": 10213,
       "concepts": [
         "batch"
       ],
@@ -923,7 +1027,7 @@
     },
     {
       "id": "filtering-search",
-      "tokens": 18502,
+      "tokens": 17705,
       "concepts": [
         "filtering-search"
       ],
@@ -931,7 +1035,7 @@
     },
     {
       "id": "pagination",
-      "tokens": 9282,
+      "tokens": 8780,
       "concepts": [
         "pagination"
       ],
@@ -939,7 +1043,7 @@
     },
     {
       "id": "database-client",
-      "tokens": 10025,
+      "tokens": 9553,
       "concepts": [
         "db-client"
       ],
@@ -947,7 +1051,7 @@
     },
     {
       "id": "data-modeling",
-      "tokens": 12828,
+      "tokens": 12128,
       "concepts": [
         "data-modeling",
         "reference-data"
@@ -956,7 +1060,7 @@
     },
     {
       "id": "database-tooling",
-      "tokens": 7406,
+      "tokens": 7291,
       "concepts": [
         "db-scripts",
         "seeding"
@@ -965,7 +1069,7 @@
     },
     {
       "id": "mutation-hooks",
-      "tokens": 15458,
+      "tokens": 14680,
       "concepts": [
         "mutation-hooks",
         "immutable-fields",
@@ -975,7 +1079,7 @@
     },
     {
       "id": "audit-soft-delete",
-      "tokens": 10612,
+      "tokens": 9839,
       "concepts": [
         "audit-log",
         "soft-delete"
@@ -984,7 +1088,7 @@
     },
     {
       "id": "encryption",
-      "tokens": 19416,
+      "tokens": 18675,
       "concepts": [
         "encryption",
         "secrets"
@@ -992,16 +1096,24 @@
       "runsAgreed": 0
     },
     {
-      "id": "inquiries",
-      "tokens": 23269,
+      "id": "inquiry-handlers",
+      "tokens": 12329,
       "concepts": [
-        "inquiries"
+        "inquiry-handlers"
       ],
-      "runsAgreed": 3
+      "runsAgreed": 0
+    },
+    {
+      "id": "inquiry-routes-ui",
+      "tokens": 11901,
+      "concepts": [
+        "inquiry-routes-ui"
+      ],
+      "runsAgreed": 0
     },
     {
       "id": "flows",
-      "tokens": 9517,
+      "tokens": 9071,
       "concepts": [
         "flows"
       ],
@@ -1009,7 +1121,7 @@
     },
     {
       "id": "customers-segments",
-      "tokens": 15365,
+      "tokens": 14648,
       "concepts": [
         "customers",
         "segments"
@@ -1018,7 +1130,7 @@
     },
     {
       "id": "observability-lifecycle",
-      "tokens": 17668,
+      "tokens": 16663,
       "concepts": [
         "logging",
         "telemetry",
@@ -1028,7 +1140,7 @@
     },
     {
       "id": "frontend-store",
-      "tokens": 12194,
+      "tokens": 11704,
       "concepts": [
         "frontend-store"
       ],
@@ -1036,7 +1148,7 @@
     },
     {
       "id": "api-client",
-      "tokens": 9422,
+      "tokens": 8998,
       "concepts": [
         "api-client"
       ],
@@ -1044,7 +1156,7 @@
     },
     {
       "id": "frontend-apps-routing",
-      "tokens": 14589,
+      "tokens": 14108,
       "concepts": [
         "frontend-routing"
       ],
@@ -1052,7 +1164,7 @@
     },
     {
       "id": "navigation",
-      "tokens": 10308,
+      "tokens": 9699,
       "concepts": [
         "navigation"
       ],
@@ -1060,7 +1172,7 @@
     },
     {
       "id": "ui-components",
-      "tokens": 15534,
+      "tokens": 14896,
       "concepts": [
         "ui-components"
       ],
@@ -1068,7 +1180,7 @@
     },
     {
       "id": "theme-layout",
-      "tokens": 6464,
+      "tokens": 6273,
       "concepts": [
         "theme-layout"
       ],
@@ -1076,7 +1188,7 @@
     },
     {
       "id": "test-harness",
-      "tokens": 11471,
+      "tokens": 11068,
       "concepts": [
         "test-harness",
         "vcr"
@@ -1085,7 +1197,7 @@
     },
     {
       "id": "test-factories-rules",
-      "tokens": 11547,
+      "tokens": 10775,
       "concepts": [
         "test-factories",
         "test-rules"
@@ -1094,7 +1206,7 @@
     },
     {
       "id": "dx-setup",
-      "tokens": 14852,
+      "tokens": 13969,
       "concepts": [
         "dev-setup",
         "worktrees"
@@ -1103,7 +1215,7 @@
     },
     {
       "id": "environments-deploy",
-      "tokens": 13580,
+      "tokens": 12822,
       "concepts": [
         "env-config",
         "ci-deploy"
@@ -1112,7 +1224,7 @@
     },
     {
       "id": "dx-tools",
-      "tokens": 13267,
+      "tokens": 12266,
       "concepts": [
         "scripts",
         "lint-rules",
@@ -1122,7 +1234,7 @@
     },
     {
       "id": "conventions",
-      "tokens": 10770,
+      "tokens": 9844,
       "concepts": [
         "naming",
         "code-style"
@@ -1131,7 +1243,7 @@
     },
     {
       "id": "monorepo-architecture",
-      "tokens": 19359,
+      "tokens": 18015,
       "concepts": [
         "monorepo-layout",
         "dependencies",
@@ -1140,16 +1252,24 @@
       "runsAgreed": 1
     },
     {
-      "id": "init-script",
-      "tokens": 21624,
+      "id": "init-architecture",
+      "tokens": 11183,
       "concepts": [
-        "init-script"
+        "init-architecture"
       ],
-      "runsAgreed": 3
+      "runsAgreed": 0
+    },
+    {
+      "id": "init-tasks",
+      "tokens": 12522,
+      "concepts": [
+        "init-tasks"
+      ],
+      "runsAgreed": 0
     },
     {
       "id": "engineering-process-docs",
-      "tokens": 13529,
+      "tokens": 12832,
       "concepts": [
         "engineering-process",
         "docs-process"
@@ -1158,7 +1278,7 @@
     },
     {
       "id": "lib-permissions",
-      "tokens": 8174,
+      "tokens": 7825,
       "concepts": [
         "lib-permissions"
       ],
@@ -1166,7 +1286,7 @@
     },
     {
       "id": "lib-transitions",
-      "tokens": 4858,
+      "tokens": 4984,
       "concepts": [
         "lib-transitions"
       ],
@@ -1174,7 +1294,7 @@
     },
     {
       "id": "lib-prisma-map",
-      "tokens": 14565,
+      "tokens": 13910,
       "concepts": [
         "lib-prisma-map",
         "schema-introspection"
@@ -1183,7 +1303,7 @@
     },
     {
       "id": "lib-atlas",
-      "tokens": 16008,
+      "tokens": 15305,
       "concepts": [
         "lib-atlas",
         "atlas"
@@ -1192,7 +1312,7 @@
     },
     {
       "id": "lib-gloss",
-      "tokens": 5534,
+      "tokens": 5523,
       "concepts": [
         "lib-gloss",
         "gloss"
@@ -1201,7 +1321,7 @@
     },
     {
       "id": "lib-config",
-      "tokens": 11029,
+      "tokens": 10495,
       "concepts": [
         "lib-config"
       ],
