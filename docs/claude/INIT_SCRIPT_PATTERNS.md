@@ -362,14 +362,14 @@ await onStepComplete?.(); // View updates via config sync
 **Implementation:**
 ```typescript
 // ❌ Bad: Rely on password object from previous step
-if (!(await isProgressComplete('planetscale', 'initProdMigrationTable'))) {
+if (!(await isComplete('planetscale', 'initProdMigrationTable'))) {
   const prodConnectionString = productionPassword.connection_strings.general; // undefined if resuming!
   await initPrismaMigrationTable(prodConnectionString);
 }
 
 // ✅ Good: Fetch from Infisical (where step 8 stored it)
-if (!(await isProgressComplete('planetscale', 'initProdMigrationTable'))) {
-  const prodConnectionString = getSecret('DATABASE_URL', {
+if (!(await isComplete('planetscale', 'initProdMigrationTable'))) {
+  const prodConnectionString = await getSecretAsync('DATABASE_URL', {
     projectId: infisicalProjectId,
     environment: 'prod',
     path: '/api',
@@ -378,7 +378,7 @@ if (!(await isProgressComplete('planetscale', 'initProdMigrationTable'))) {
 }
 
 // ✅ Good: Re-read from config (don't trust local variables)
-if (!(await isProgressComplete('planetscale', 'configureDB'))) {
+if (!(await isComplete('planetscale', 'configureDB'))) {
   const latestConfig = await getProjectConfig();
   const orgName = latestConfig.planetscale.organization;
   const dbName = latestConfig.planetscale.database;
@@ -387,7 +387,7 @@ if (!(await isProgressComplete('planetscale', 'configureDB'))) {
 ```
 
 **Rule of thumb:**
-- Secrets → Always fetch from Infisical with `getSecret()`
+- Secrets → Always fetch from Infisical with `getSecretAsync()`
 - Config metadata → Always re-read from config with `getProjectConfig()`
 - Never pass connection strings, passwords, or API keys between steps
 
@@ -574,7 +574,7 @@ const handleTokenSubmit = async () => {
 
   try {
     // Store token in Infisical
-    await setSecret(projectId, 'root', 'RAILWAY_TOKEN', workspaceToken.trim());
+    await setSecretAsync(projectId, 'root', 'RAILWAY_TOKEN', workspaceToken.trim());
 
     setStoringToken(false);  // Hide storing spinner
 
@@ -826,7 +826,7 @@ const runSetup = async (workspaceId: string) => {
   // Check if token exists in Infisical
   let hasToken = false;
   try {
-    const token = getSecret('RAILWAY_WORKSPACE_TOKEN', {
+    const token = await getSecretAsync('RAILWAY_WORKSPACE_TOKEN', {
       projectId: infisicalProjectId,
       environment: 'root',
     });
@@ -882,7 +882,7 @@ const handleTokenSubmit = async () => {
   if (!workspaceToken.trim()) return;
 
   // Store in Infisical
-  setSecret(infisicalProjectId, 'root', 'RAILWAY_WORKSPACE_TOKEN', workspaceToken.trim());
+  await setSecretAsync(infisicalProjectId, 'root', 'RAILWAY_WORKSPACE_TOKEN', workspaceToken.trim());
 
   // Continue with setup
   await runSetup(workspaceId);

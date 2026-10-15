@@ -23,9 +23,9 @@
   - [Per Keyring (3 vars)](#per-keyring-3-vars)
   - [Example: Auth Provider Secrets](#example-auth-provider-secrets)
   - [Validation](#validation)
-- [CI Validation](#ci-validation)
+- [Deploy-Time Validation](#deploy-time-validation)
   - [Validation Rules](#validation-rules)
-  - [CI Integration](#ci-integration)
+  - [Wiring It (not built)](#wiring-it-not-built)
 - [Implementation Details](#implementation-details)
   - [Type Safety](#type-safety)
   - [Encryption Payload](#encryption-payload)
@@ -46,10 +46,10 @@ AES-256-GCM field-level encryption with automatic key rotation. Encryption infra
 ```
 encryption/
 ├── types.ts            # EncryptedFieldData, EncryptionKeyring
-├── registry.ts         # ENCRYPTED_MODELS - model → keys[] mapping
+├── registry.ts         # ENCRYPTED_MODELS - model → { keyName: config } map, getFieldNames()
 ├── helpers.ts          # encryptField(), decryptField()
 ├── encryptionService.ts # Low-level crypto operations
-├── validation.ts       # CI version validation
+├── validation.ts       # validateEncryptionVersions() — deploy-time version check (not wired, see below)
 └── envValidation.ts    # Environment schema validation
 ```
 
@@ -71,24 +71,18 @@ Each encrypted field gets its own version tracking and metadata (not model-level
 
 ```prisma
 model AuthProvider {
-  id             String @id @default(uuid())
+  id             String @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
   organizationId String
 
-  // Field 1: Secrets encryption
-  encryptedSecrets                        String?
-  encryptedSecretsEncryptionMetadata      Json?    // { iv, authTag }
-  encryptedSecretsEncryptionKeyVersion    Int?     // 1, 2, 3, etc.
+  encryptedSecrets           String // Base64 AES-256-GCM ciphertext
+  encryptedSecretsMetadata   Json   // { iv, authTag }
+  encryptedSecretsKeyVersion Int    // 1, 2, 3, etc.
 
-  // Field 2: API keys (future example)
-  encryptedApiKey                         String?
-  encryptedApiKeyEncryptionMetadata       Json?
-  encryptedApiKeyEncryptionKeyVersion     Int?
-
-  @@index([encryptedSecretsEncryptionKeyVersion])
+  @@index([encryptedSecretsKeyVersion])
 }
 ```
 
-**Convention**: `encrypted{Field}`, `encrypted{Field}EncryptionMetadata`, `encrypted{Field}EncryptionKeyVersion`
+**Convention**: `encrypted{Key}`, `encrypted{Key}Metadata`, `encrypted{Key}KeyVersion`, where `{Key}` is the registry key name upper-first (`secrets` → `encryptedSecrets`). `getFieldNames(keyName)` derives all three; the registry never lists column names.
 
 ### Registry Structure
 
@@ -96,18 +90,16 @@ model AuthProvider {
 // packages/db/src/lib/encryption/registry.ts
 export const ENCRYPTED_MODELS = {
   authProvider: {
-    model: "authProvider",  // Prisma accessor name
-    keys: [
-      {
-        encryptedField: "encryptedSecrets",
-        metadataField: "encryptedSecretsEncryptionMetadata",
-        versionField: "encryptedSecretsEncryptionKeyVersion",
-        envPrefix: "AUTH_PROVIDER_SECRETS",
-        buildAAD: (r) => `authProvider:${(r as any).id}:${(r as any).organizationId}`,
+    model: 'authProvider', // Prisma accessor name
+    keys: {
+      secrets: {
+        envPrefix: 'AUTH_PROVIDER_SECRETS',
+        buildAAD: (r: Pick<AuthProvider, 'id' | 'organizationId'>) =>
+          `authProvider:${r.id}:${r.organizationId}`,
       },
-    ],
-  },
-};
+    },
+  } satisfies EncryptedModelConfig<'authProvider'>,
+} as const;
 ```
 
 **AAD (Additional Authenticated Data)**: Only use **immutable** fields (id, organizationId). Never use mutable fields (name, provider, etc.) - changing them would make old ciphertext undecryptable.
@@ -124,11 +116,11 @@ export const ENCRYPTED_MODELS = {
 model ExistingModel {
   // ... existing fields ...
 
-  encryptedApiKey                         String?
-  encryptedApiKeyEncryptionMetadata       Json?
-  encryptedApiKeyEncryptionKeyVersion     Int?
+  encryptedApiKey           String?
+  encryptedApiKeyMetadata   Json?
+  encryptedApiKeyKeyVersion Int?
 
-  @@index([encryptedApiKeyEncryptionKeyVersion])
+  @@index([encryptedApiKeyKeyVersion])
 }
 ```
 
@@ -146,19 +138,17 @@ Generate keys: `openssl rand -base64 32`
 
 ```typescript
 export const ENCRYPTED_MODELS = {
+  // ...authProvider
   existingModel: {
-    model: "existingModel",
-    keys: [
-      {
-        encryptedField: "encryptedApiKey",
-        metadataField: "encryptedApiKeyEncryptionMetadata",
-        versionField: "encryptedApiKeyEncryptionKeyVersion",
-        envPrefix: "API_KEY",
-        buildAAD: (r) => `existingModel:${(r as any).id}`,
+    model: 'existingModel',
+    keys: {
+      apiKey: {
+        envPrefix: 'API_KEY',
+        buildAAD: (r: Pick<ExistingModel, 'id'>) => `existingModel:${r.id}`,
       },
-    ],
-  },
-};
+    },
+  } satisfies EncryptedModelConfig<'existingModel'>,
+} as const;
 ```
 
 ### 4. Use in Controllers
@@ -169,7 +159,6 @@ import { ENCRYPTED_MODELS } from '@template/db/lib/encryption/registry';
 
 // Encrypt before create
 const body = c.req.valid('json');
-const keyConfig = ENCRYPTED_MODELS.existingModel.keys[0];
 const encryptedData = await encryptField(
   'existingModel',
   'apiKey',
@@ -205,7 +194,7 @@ const decrypted = await decryptField(
 
 2. **Worker startup auto-enqueues rotation job**:
    - Iterates all models/keys in `ENCRYPTED_MODELS`
-   - Finds records with `encryptedSecretsEncryptionKeyVersion = 1`
+   - Finds records with `encryptedSecretsKeyVersion = 1`
    - Re-encrypts with version 2
 
 3. **Job processes in parallel**:
@@ -215,9 +204,9 @@ const decrypted = await decryptField(
 
 4. **Verify completion**:
    ```sql
-   SELECT encryptedSecretsEncryptionKeyVersion, COUNT(*)
-   FROM auth_provider
-   GROUP BY encryptedSecretsEncryptionKeyVersion;
+   SELECT "encryptedSecretsKeyVersion", COUNT(*)
+   FROM "AuthProvider"
+   GROUP BY "encryptedSecretsKeyVersion";
    -- Should show only version 2
    ```
 
@@ -254,7 +243,7 @@ If another process already rotated the record (changing the version), the where 
 
 - **Max 2 versions at once**: Current + previous
 - **One version gap only**: Can only rotate from v(n-1) → v(n)
-- **CI enforcement**: Deploy blocked if >1 version gap detected
+- **Deploy-time check**: `validateEncryptionVersions` detects a >1 version gap, but nothing runs it yet (see [Deploy-Time Validation](#deploy-time-validation))
 
 ---
 
@@ -290,44 +279,24 @@ Env schema validates:
 
 ---
 
-## CI Validation
+## Deploy-Time Validation
 
-**Prevents deploying bad key versions** - runs before deployment can proceed.
+**Not wired.** `validateEncryptionVersions(db)` (`packages/db/src/lib/encryption/validation.ts`) exists and is tested (`validation.test.ts`), but no script runs it: there is no `validate:encryption` package script and no `.github/workflows` in the repo. Until something calls it before a deploy, the version rules below are only as enforced as the person deploying.
 
 ### Validation Rules
 
-```typescript
-// packages/db/src/lib/encryption/validation.ts
-export const validateEncryptionVersions = async (db: PrismaClient) => {
-  // For each model → key in registry:
+For each model → key in the registry it compares the env version with the versions in the database and returns `{ valid, errors }` (it doesn't throw):
 
-  // 1. Version cannot go down
-  if (currentVersion < maxDbVersion) throw Error('Version downgrade!');
+- Missing `{PREFIX}_ENCRYPTION_VERSION` / `_KEY_CURRENT`, or a non-integer version
+- Version > 1 without `_KEY_PREVIOUS`; current and previous keys identical
+- Version downgrade (env version < highest DB version)
+- Version jump > 1
+- Bump while records are still on more than one version
+- More than 2 versions in the database
 
-  // 2. Can only increment by 1
-  if (currentVersion > maxDbVersion + 1) throw Error('Version jump too large!');
+### Wiring It (not built)
 
-  // 3. Can only bump if all records on latest
-  if (currentVersion > maxDbVersion && versions.length > 1) {
-    throw Error('Mixed versions detected!');
-  }
-
-  // 4. Max 2 versions in system
-  if (versions.length > 2) throw Error('Too many versions!');
-};
-```
-
-### CI Integration
-
-```yaml
-# .github/workflows/deploy.yml (when CI exists)
-- name: Validate Encryption Versions
-  run: |
-    cd packages/db
-    bun run validate:encryption
-```
-
-**Result**: Can't deploy with bad version configurations - CI fails first.
+The intended shape is a pre-deploy step that runs `validateEncryptionVersions` against the target database and fails the deploy when `valid` is false — part of the deploy pipeline that doesn't exist yet ([CICD.md](CICD.md)).
 
 ---
 
@@ -401,7 +370,8 @@ export const makeSingletonJob = <T>(handler: JobHandler<T>) => {
 ```typescript
 // 1. Auto-discovery
 for (modelName in ENCRYPTED_MODELS) {
-  for (keyConfig of modelConfig.keys) {
+  for ([keyName, keyConfig] of Object.entries(modelConfig.keys)) {
+    const { versionField } = getFieldNames(keyName);
 
     // 2. Read target version from env
     const targetVersion = parseInt(process.env[`${envPrefix}_ENCRYPTION_VERSION`]);
@@ -449,7 +419,7 @@ const results = await resolveAll(allRotations, getConcurrency([ConcurrencyType.d
    - Move current key to `_KEY_PREVIOUS`
    - Set new key as `_KEY_CURRENT`
 
-4. ✅ Run CI validation (automatic in pipeline)
+4. ✅ Run `validateEncryptionVersions` against the target database by hand (no pipeline runs it yet)
 
 5. ✅ Deploy and monitor BullBoard for job completion
 
@@ -465,7 +435,7 @@ const results = await resolveAll(allRotations, getConcurrency([ConcurrencyType.d
 ## FAQ
 
 **Q: Can I skip versions (v1 → v3)?**
-A: No. CI validation blocks this. Must go v1 → v2 → v3.
+A: No. Must go v1 → v2 → v3. `validateEncryptionVersions` reports a jump, but nothing runs it automatically yet.
 
 **Q: What if rotation fails mid-way?**
 A: Safe to retry! Idempotent updates skip already-rotated records.

@@ -255,7 +255,7 @@ This repo is mapped by **atlas** (`.atlas/` config + `@atlas` annotations + `MAP
 ## 12. Tickets and AI Workspace
 
 - Tickets: `tickets/README.md`
-- Put deep analysis/reports in `/tmp/AI_WORKSPACE/` to keep chat concise.
+- Put deep analysis/reports in the repo's `tmp/AI_WORKSPACE/` (gitignored except its README; see `docs/claude/SCRIPTS.md`) to keep chat concise.
 
 ## 13. Change Checklist
 

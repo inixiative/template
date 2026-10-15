@@ -758,34 +758,34 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 ## Tech Stack
 
 **Backend:**
-- Bun 1.3.10 (runtime & package manager)
-- Hono ^4.11 (web framework)
-- Prisma ^7.2 (ORM)
+- Bun 1.4.2 (runtime & package manager; `.bun-version`)
+- Hono ^4.12 (web framework)
+- Prisma ^7.4 (ORM)
 - PostgreSQL 18 (alpine)
 - Redis 7 (alpine)
-- BetterAuth ^1.5 (authentication)
-- Permix ^0.5 (ReBAC authorization)
-- BullMQ ^5.67 (job queue)
-- IORedis ^5.9 (Redis client)
+- BetterAuth ^1.6 (authentication)
+- Permix ^3.6 (ReBAC authorization)
+- BullMQ ^5.70 (job queue)
+- IORedis ^5.10 (Redis client)
 
 **Frontend:**
 - React ^19.2 (with React DOM ^19.2)
-- TypeScript ^5.9
-- TanStack Router ^1.159 (file-based routing)
+- TypeScript 6.0.3 (pinned by the shared `@inixiative/config` toolchain)
+- TanStack Router ^1.166 (file-based routing)
 - TanStack Query ^5.90 (server state)
 - Zustand ^5.0 (client state)
 - Vite ^7.3 (build tool)
 - Tailwind CSS ^4.1 (styling)
 - Shadcn UI + React Aria Components (accessible components)
-- Lucide React ^0.525 (icons)
+- Iconify React ^6 (icons)
 
 **Developer Tools:**
-- Turborepo ^2.8 canary (monorepo orchestration)
+- Turborepo ^2.8 (monorepo orchestration)
 - Bun native test runner (testing)
-- Biome ^2.3 (linting/formatting)
+- Biome 2.5.2 (linting/formatting)
 - Docker Compose (local services)
 - Infisical (secrets management)
-- OpenAPI-TS ^0.86 + Scalar (API docs)
+- OpenAPI-TS ^0.97 + Scalar (API docs)
 - @hey-api/client-fetch ^0.13 (SDK generation)
 
 ---

@@ -376,14 +376,14 @@ const orgId: OrganizationId = organizationId('org-456');
 
 ```typescript
 // Function signatures enforce correct ID types
-async function getUser(id: UserId): Promise<User> { ... }
-async function getOrg(id: OrganizationId): Promise<Organization> { ... }
+async function loadUser(id: UserId): Promise<User> { ... }
+async function loadOrganization(id: OrganizationId): Promise<Organization> { ... }
 
 // Compile-time error: can't pass UserId where OrganizationId expected
-getOrg(userId('abc'));  // ❌ Type error
+loadOrganization(userId('abc'));  // ❌ Type error
 
 // Correct usage
-getOrg(organizationId('abc'));  // ✓
+loadOrganization(organizationId('abc'));  // ✓
 ```
 
 ### Available Types
