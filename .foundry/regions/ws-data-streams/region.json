@@ -8,7 +8,9 @@
   "files": {
     "recognise": {
       "path": "recognise.md",
-      "tokens": 2920
+      "tokens": 2948,
+      "experimental": true,
+      "note": "recognise/pick split under test (model round); not the standard"
     },
     "knowledge": {
       "path": "knowledge.md",
