@@ -127,7 +127,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `locks`: Mutual exclusion across processes and rows: createLock, withOwnerLock, db.findForUpdate (SELECT FOR UPDATE)
 
-**Choosing among siblings: createLock vs withOwnerLock vs db.findForUpdate vs claimLane vs withLanePriority** (CONCURRENCY.md (preface table; Distributed Lock; Supersede Lanes; Job Lanes); DATABASE.md § Transactions)
+**Job: serialize writers across processes or jobs (one owner, one row, one dedupe key)** (createLock vs withOwnerLock vs db.findForUpdate vs claimLane vs withLanePriority) — CONCURRENCY.md (preface table; Distributed Lock; Supersede Lanes; Job Lanes); DATABASE.md § Transactions
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -138,8 +138,11 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **Idempotent version-precondition update (encryption)** | at-most-once row transition by compare-and-set, no lock | cross-process critical section (createLock) |
 | **claimLane** | newest job per (handlerName, dedupeKey) wins; inverse of a lock | first holder must keep it (createLock) |
 | **withLanePriority (job-lanes-outbox)** | background jobs yield to foreground in one queue; ordering, not a lock | exclusion (createLock); newest-wins (claimLane) |
+| *plain write in db.txn* | the write does not depend on a value read first: every mutation already runs in its own transaction (mutationLifeCycle); wrap several in db.txn only when they must commit together (DATABASE.md § Transactions) | read-then-update or find-then-create (db.findForUpdate; a read-then-update in a txn with no row lock is the bypass sign) |
+| *unique constraint, let the insert fail* | a duplicate is the caller's mistake: plain create, the unique index rejects it and the global handler maps P2002 to 409 'Resource already exists' (ERRORS.md § The global handler; addUniqueWhereNotNull for nullable columns) | create-if-missing must return the existing row (db.findForUpdate upserting: true); never catch the violation and re-read: no-create-race-machinery fails new P2002 / isUniqueConstraintError( catches |
+| *bare upsert* | only where the rule does not reach: seed files (ID-based upsert by id, DATABASE.md § Seeding; seed, test and factory paths are excluded) and the existing JobOutbox flush (superseding lanes via upsert, last-writer-wins, JOBS.md § Accumulator) | any new create-if-missing in apps/ or packages/: no-create-race-machinery fails a file whose .upsert( count rises against the merge base; fence with db.findForUpdate upserting: true |
 
-**Choosing among siblings: In-process serialization: createSerializedQueue vs Outbox mutex vs inStreamOrder vs getConcurrency vs resolveAll** (CONCURRENCY.md (Serialized Queue; Concurrency Limits; Bounded Batch); JOBS.md § Queue Depth Probe)
+**Job: serialize or bound work inside one process** (In-process serialization: createSerializedQueue vs Outbox mutex vs inStreamOrder vs getConcurrency vs resolveAll) — CONCURRENCY.md (Serialized Queue; Concurrency Limits; Bounded Batch); JOBS.md § Queue Depth Probe
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -149,13 +152,16 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **inStreamOrder** | one WebSocket stream's appends in emitted order | cross-process sections (createLock) |
 | **getConcurrency** | cap N in flight by the ConcurrencyType resources touched | full serialization (createSerializedQueue) |
 | **resolveAll** | bounded batch of thunks, ordered results | ordering writes to one resource (createSerializedQueue) |
+| *just run them* | the operations are independent: no serialization or lock needed (CONCURRENCY.md § Serialized Queue › When NOT to use) | async callsites read-modify-write one shared resource (createSerializedQueue); processes race for it (createLock) |
 
 - **acquireFindForUpdateLock** `packages/db/src/lock/acquireFindForUpdateLock.ts#acquireFindForUpdateLock`: Row-level fencing inside a DB transaction; whole-resource ownership across processes: createLock instead.
+  - *Throws:* FindForUpdateLockTimeoutError (`conflict`, database)
 - **createLock** `packages/db/src/lock/createLock.ts#createLock`: Cross-process ownership; in-process write ordering: createSerializedQueue; superseding lane work: claimLane/watchLane; row fencing in a transaction: acquireFindForUpdateLock.
   - *Signs you're bypassing it:* a hand-rolled Redis SET NX PX lock with setInterval renewal, or an in-memory flag to stop two instances owning the same resource (docs/claude/CONCURRENCY.md § Distributed Lock (createLock))
 - **makeSingletonJob** `apps/api/src/jobs/makeSingletonJob.ts#makeSingletonJob`: Only one run at a time: this; newer run should replace older: makeSupersedingJob; plain job: makeJob.
   - *Signs you're bypassing it:* a job handler that takes its own Redis lock or checks a 'running' flag to avoid concurrent runs (catalog: makeSingletonJob (wrap a job handler so a Redis lock prevents concurrent runs))
 - **withOwnerLock** `apps/api/src/lib/locks/withOwnerLock.ts#withOwnerLock`: Cross-row validation like segment cycle checks under one owner; not re-entrant, nested same-scope calls deadlock until timeout and return 409.
+  - *Throws:* makeError 409 CONFLICT (`conflict`, request-context-errors)
   - *Signs you're bypassing it:* a custom per-owner lock or advisory lock around cross-row validation such as segment cycle checks (catalog: withOwnerLock (serialize writes colliding across rows of one owner, before the transaction opens))
 - **Create-if-missing via fenced findForUpdate** `docs/claude/DATABASE.md#Row Locks and Create-If-Missing`: Any create-if-missing; never bare upsert or caught unique violation.
   - *Signs you're bypassing it:* a bare prisma .upsert(, or find-then-create wrapped in try/catch on P2002 / a unique violation (docs/claude/DATABASE.md § Row Locks and Create-If-Missing; CI rule no-create-race-machinery)
@@ -163,6 +169,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
   - *Signs you're bypassing it:* using only a Redis lock (or only an in-process queue) for a resource one instance owns and writes concurrently (docs/claude/CONCURRENCY.md (preface: the canonical pair))
 - **Train machine-wide lock** `~/.inixiative/train.lock`: allow one release train per machine via atomic pid/host/start-time lock
 - **db.findForUpdate** `db.findForUpdate`: Row-level locking in a txn; pass upserting: true for create-if-missing; createLock alone for non-row critical sections.
+  - *Throws:* FindForUpdateLockTimeoutError (`conflict`, database)
   - *Signs you're bypassing it:* a raw $queryRaw `SELECT … FOR UPDATE`, or a read-then-update in a transaction with no row lock (docs/claude/DATABASE.md § Row Locks and Create-If-Missing)
 - **Serialized queue errors propagate uncaught** `docs/claude/CONCURRENCY.md#error-model`: any createSerializedQueue use
   - *Signs you're bypassing it:* wrapping each queue.run body in a catch that swallows errors (docs/claude/CONCURRENCY.md § Serialized Queue › Error model)
@@ -172,7 +179,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `concurrency-limits`: In-process coordination: serialized queues, getConcurrency caps, resolveAll bounded batches
 
-**Choosing among siblings: The two kinds of 'lane': claimLane / watchLane vs withLanePriority** (docs/claude/CONCURRENCY.md (preface table; Supersede Lanes; Job Lanes: 'a different thing from the supersede lanes'))
+**Job: control which job runs when several compete (newest-wins vs priority)** (The two kinds of 'lane': claimLane / watchLane vs withLanePriority) — docs/claude/CONCURRENCY.md (preface table; Supersede Lanes; Job Lanes: 'a different thing from the supersede lanes')
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -181,7 +188,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **Fast/slow job lanes** | the JobData.lane label (fast|slow) that withLanePriority acts on; detail in job-lanes-outbox | deciding which job for a key wins (use Superseding jobs via lanes) |
 | **Superseding jobs via lanes** | only the most recent enqueue for a key should finish | first holder must win (use createLock); job ordering (use withLanePriority) |
 
-**Choosing among siblings: Owning and ordering one resource: Lock plus serialized queue vs single primitives** (docs/claude/CONCURRENCY.md (preface: canonical pair; Serialized Queue › When to use))
+**Job: own one resource and order writes to it** (Owning and ordering one resource: Lock plus serialized queue vs single primitives) — docs/claude/CONCURRENCY.md (preface: canonical pair; Serialized Queue › When to use)
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -189,6 +196,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **createSerializedQueue** | in-process write ordering only | processes race (use createLock, or both) |
 | **createLock** | cross-process ownership only | the owner's own writes interleave (pair with createSerializedQueue) |
 | **Per-stream-key publish queue** | WebSocket stream appends in emitted order (inStreamOrder, a queue per stream key) | general resources (use createSerializedQueue) |
+| *just run them* | the operations are independent: no serialization or lock needed (CONCURRENCY.md § Serialized Queue › When NOT to use) | async callsites read-modify-write one shared resource (createSerializedQueue); processes race for it (createLock) |
 
 - **createSerializedQueue** `packages/shared/src/utils/serializedQueue.ts#createSerializedQueue`: In-process ordering only; cross-process races: createLock; only-newest-holder work: claimLane/watchLane; bounded parallelism: resolveAll.
   - *Signs you're bypassing it:* a module-level `let pending = Promise.resolve()` chain, a boolean busy flag, or an async-mutex dependency to order writes to one resource (docs/claude/CONCURRENCY.md § Serialized Queue (createSerializedQueue))
@@ -205,7 +213,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `supersede-lanes`: Newest work for a key wins: claimLane/watchLane batons, superseding jobs
 
-**Choosing among siblings: Job wrappers: makeSupersedingJob vs makeSingletonJob vs makeJob vs withLanePriority** (docs/claude/JOBS.md § Superseding Job; FEATURES.md § Background Jobs & Cron; CONCURRENCY.md § Supersede Lanes, § Job Lanes)
+**Job: run background work with the right concurrency semantics** (Job wrappers: makeSupersedingJob vs makeSingletonJob vs makeJob vs withLanePriority) — docs/claude/JOBS.md § Superseding Job; FEATURES.md § Background Jobs & Cron; CONCURRENCY.md § Supersede Lanes, § Job Lanes
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -214,7 +222,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **makeJob (jobs-cron)** | independent runs may execute concurrently | runs must not overlap (use makeSingletonJob) or newest wins (use makeSupersedingJob) |
 | **withLanePriority (job-lanes-outbox)** | bulk work should yield to foreground work; orthogonal to the wrappers, which keep their lane | dedupe or newest-wins (use makeSupersedingJob) |
 
-**Choosing among siblings: Lane calls: claimLane vs reclaimLane vs releaseLane vs watchLane** (docs/claude/CONCURRENCY.md § Supersede Lanes; catalog lanes.ts)
+**Job: hold, watch or give up a supersede lane inside a job** (Lane calls: claimLane vs reclaimLane vs releaseLane vs watchLane) — docs/claude/CONCURRENCY.md § Supersede Lanes; catalog lanes.ts
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -231,6 +239,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **reclaimLane** `packages/db/src/lanes/lanes.ts#reclaimLane`: Stale-holder takeover; use claimLane to start fresh and evict older jobs.
 - **releaseLane** `packages/db/src/lanes/lanes.ts#releaseLane`: Ends a claimLane/reclaimLane hold; for one-off critical sections use createLock instead.
 - **SupersededError** `apps/api/src/jobs/types.ts#SupersededError`: Job superseded by newer lane work: throw this rather than a generic Error so it isn't treated as failure.
+  - *Error class:* `off-request-path` (Raised where no live HTTP request is being served (job workers, app bootstrap, scripts, tests, frontend): plain Error is fine and nothing maps it to a status.)
   - *Signs you're bypassing it:* a superseded job throwing a generic Error or returning silently mid-way (catalog: SupersededError (throw this rather than a generic Error so it isn't treated as failure))
 - **watchLane** `packages/db/src/lanes/lanes.ts#watchLane`: Newest-wins across processes; exclusive non-superseding sections: createLock; in-process ordering: createSerializedQueue.
 - **Fast/slow job lanes** `docs/claude/CONCURRENCY.md § Job Lanes`: prioritizing foreground over background; not a lock or semaphore
@@ -245,7 +254,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `recurring-timers`: Non-overlapping in-process recurring work: heartbeat, unref intervals
 
-**Choosing among siblings: Recurring work: heartbeat vs setInterval vs cron vs drain loop** (docs/claude/CONCURRENCY.md § Recurring Beat; JOBS.md § Cron Jobs, § Overflow Buffer › Drain Loop)
+**Job: run work repeatedly on a timer** (Recurring work: heartbeat vs setInterval vs cron vs drain loop) — docs/claude/CONCURRENCY.md § Recurring Beat; JOBS.md § Cron Jobs, § Overflow Buffer › Drain Loop
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -259,7 +268,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `debounce`: Debouncing values and callbacks before they hit the backend (useDebounce)
 
-**Choosing among siblings: useDebounce vs useDebouncedCallback** (docs/claude/FRONTEND/API_CLIENT.md § Form Helpers)
+**Job: debounce user input before it triggers work** (useDebounce vs useDebouncedCallback) — docs/claude/FRONTEND/API_CLIENT.md § Form Helpers
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|

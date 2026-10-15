@@ -122,7 +122,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `json-rules`: @inixiative/json-rules engine: rule AST, operators, check/toPrisma plans, binding
 
-**Choosing among siblings: validateRule vs assertValidRule vs validateRuleForLens** (@inixiative/json-rules/README.md § Error Handling; catalog validateRuleForLens)
+**Job: validate a rule before evaluating or saving it** (validateRule vs assertValidRule vs validateRuleForLens) — @inixiative/json-rules/README.md § Error Handling; catalog validateRuleForLens
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -131,7 +131,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **validateRuleForLens** | any template rule owner validating a rule against its lens (grammar, vocabulary, open arms) | never write a per-owner check instead; shape-only with no lens (validateRule) |
 | **validateRuleInLens (lens-usage)** | the library's path and enum gate of a rule against a lens | template rule owners go through validateRuleForLens |
 
-**Choosing among siblings: check vs toPrisma vs toSql** (@inixiative/json-rules/README.md § Backend Support Matrix)
+**Job: evaluate a rule in memory or compile it to a database query** (check vs toPrisma vs toSql) — @inixiative/json-rules/README.md § Backend Support Matrix
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -139,7 +139,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **toPrisma (json-rules-backends)** | database filtering through Prisma; read its where via executePrismaPlan | in-memory rows (check); column selection (toLensSelect) |
 | **toSql (json-rules-backends)** | a raw parameterized PostgreSQL WHERE plus LEFT JOINs | array element operators or relation lists (toPrisma) |
 
-**Choosing among siblings: bindRule vs bindWhere vs bindLens** (catalog entries; README § Rule Introspection, § Bindings in a Lens)
+**Job: fill a rule's or lens's bind tokens** (bindRule vs bindWhere vs bindLens) — catalog entries; README § Rule Introspection, § Bindings in a Lens
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -147,14 +147,14 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **bindWhere** | template email code binding values into a where-condition rule | lens narrowings (bindLens); docs don't distinguish it from bindRule otherwise |
 | **bindLens (lenses)** | binding a lens narrowing's tokens, in stages | rule conditions (bindRule / bindWhere) |
 
-**Choosing among siblings: scopedRule vs narrowToElements** (catalog entries (packages/email/src/rules/scopedRule.ts))
+**Job: evaluate a rule inside an email template loop** (scopedRule vs narrowToElements) — catalog entries (packages/email/src/rules/scopedRule.ts)
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **scopedRule (email-lens)** | rewriting a rule inside {{#each}} loops into nested any conditions | pinning scope data to the element being rendered (narrowToElements) |
 | **narrowToElements (email-lens)** | evaluating at render with a concrete looped element | rewriting the rule itself (scopedRule) |
 
-**Choosing among siblings: RuleEvaluationError vs RuleDegradedError vs UsageError** (catalog entries; README § Error Handling)
+**Job: classify a rule evaluation failure** (RuleEvaluationError vs RuleDegradedError vs UsageError) — catalog entries; README § Error Handling
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -164,6 +164,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 - **bindWhere** `apps/api/src/lib/email/bindWhere.ts#bindWhere`: For rule conditions; for lens narrowings use bindLens.
 - **RuleEvaluationError** `packages/shared/src/rules/errors.ts#RuleEvaluationError`: Runtime evaluation failure: this; rule invalid or missing bindings: RuleDegradedError.
+  - *Error class:* `server-error` (The server is broken or misconfigured, not the caller's fault: route misconfig, missing config, developer misuse, internal invariants. Raw Error on the request path becomes this via respond500.); classified by convention; inferred throwers: withRule
 - **validateRuleForLens** `packages/db/src/validations/validateRuleForLens.ts#validateRuleForLens`: Shared validation for every rule owner; use instead of per-owner checks.
   - *Signs you're bypassing it:* A per-owner rule validation function (one for segments, one for email) instead of the shared gate. (catalog entry validateRuleForLens)
 - **Aggregate rule** `@inixiative/json-rules/README.md › Rule Shapes › Aggregate Rule`: numeric totals/means over arrays; array rule for per-element checks
@@ -187,6 +188,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **Condition** `@inixiative/json-rules/README.md — TypeScript Types`: strict typed rules: StrictCondition instead
 - **engineGlobals.reset** `@inixiative/json-rules engineGlobals.reset`: restore all engine defaults to their initial values
 - **engineGlobals.with** `@inixiative/json-rules engineGlobals.with`: scoped override instead of set/reset; callback must be synchronous, Promise-returning callbacks throw
+  - *Throws:* engineGlobals.with async-callback Error (`server-error`, json-rules-engine)
   - *Signs you're bypassing it:* engineGlobals.set before a call and reset after it (leaking the override when the call throws) instead of a scoped engineGlobals.with, or an async callback, which throws. (@inixiative/json-rules/README.md § Engine Globals)
 - **FieldMapEntry.isRequired** `@inixiative/json-rules/README.md — NULL Semantics`: declare column or relation-hop nullability so compilers add NULL arms
 - **getAggregateOperators** `@inixiative/json-rules getAggregateOperators`: aggregate rules; getOperatorsForKind for per-field rules.
@@ -231,7 +233,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `rule-references`: RuleReference edges: rows a stored rule names, sync, rule health/degradation
 
-**Choosing among siblings: ruleReferences vs dynamicRuleReferences vs describeRuleSources vs syncRuleReferenceEdges** (docs/claude/COMMUNICATIONS.md § Rule References)
+**Job: find or record the rows a rule references** (ruleReferences vs dynamicRuleReferences vs describeRuleSources vs syncRuleReferenceEdges) — docs/claude/COMMUNICATIONS.md § Rule References
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -240,7 +242,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **describeRuleSources (lens-sources)** | the engine's per-source values a rule names; fail closed on dynamic | template code wanting row references (ruleReferences) |
 | **syncRuleReferenceEdges** | the one writer of edges, from every rule-bearing column's save path | a mutation hook or hand create/delete of RuleReference rows |
 
-**Choosing among siblings: The edge writers by surface** (docs/claude/COMMUNICATIONS.md § Rule References; catalog entries)
+**Job: write rule reference edges for a rule-bearing surface** (The edge writers by surface) — docs/claude/COMMUNICATIONS.md § Rule References; catalog entries
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -249,7 +251,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **syncSegmentEdges** | after a segment write ('save') or a full recompute ('rebuild') | email sources (syncRuleReferences) |
 | **regenerateRuleReferences** | manual rebuilds outside hooks; the target hook calls it itself | an ordinary save (the surface's sync) |
 
-**Choosing among siblings: withRule vs ruleIssues vs ruleReferenceIssues vs liveRuleReferences** (docs/claude/COMMUNICATIONS.md § Rule References; catalog entries)
+**Job: evaluate a stored rule safely and list its issues** (withRule vs ruleIssues vs ruleReferenceIssues vs liveRuleReferences) — docs/claude/COMMUNICATIONS.md § Rule References; catalog entries
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -259,7 +261,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **liveRuleReferences** | the still-usable references from edges, failing closed | membership only (liveRuleReferenceKeys); full report (ruleHealthFromEdges) |
 | **ruleVocabularyIssues (lenses)** | save- or render-time lens validation only | full health with bindings and live refs (ruleIssues / withRule) |
 
-**Choosing among siblings: contentRuleReferences vs contentReferenceScopes vs emailRuleReferences** (catalog entries (packages/email/src/rules))
+**Job: collect the rule references inside an email template** (contentRuleReferences vs contentReferenceScopes vs emailRuleReferences) — catalog entries (packages/email/src/rules)
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -277,16 +279,20 @@ Point at a class when that is as specific as the moment allows, or at a member. 
   - *Signs you're bypassing it:* Hand-written SELECT … FOR UPDATE on the rows a rule references, in arbitrary model order, before writing edges. (catalog entry lockedTargetStates (locks models in name order to avoid deadlocks))
 - **regenerateRuleReferences** `apps/api/src/hooks/ruleReference/regenerate.ts#regenerateRuleReferences`: Called by registerRuleReferenceTargetHook automatically; call directly only for manual rebuilds outside hooks.
 - **RuleDegradedError** `packages/shared/src/rules/errors.ts#RuleDegradedError`: Degraded rule (missing binding, stale lens, dead row): this; evaluation failure itself: RuleEvaluationError.
+  - *Error class:* `server-error` (The server is broken or misconfigured, not the caller's fault: route misconfig, missing config, developer misuse, internal invariants. Raw Error on the request path becomes this via respond500.); classified by convention; inferred throwers: withRule
 - **ruleHealthFromEdges** `packages/db/src/utils/ruleReferenceHealth.ts#ruleHealthFromEdges`: Just the usable references: liveRuleReferences.
 - **ruleIssues** `packages/shared/src/rules/withRule.ts#ruleIssues`: Owner reads reporting problems: ruleIssues; branching evaluation on health: withRule; lens-only checks: ruleVocabularyIssues.
 - **RuleReferenceError** `packages/db/src/utils/ruleReferenceError.ts#RuleReferenceError`: signal a rule names a missing or invalid referenced row on save
+  - *Error class:* `validation-error` (Submitted data fails schema validation or a business rule (Zod issues, RulesRegistry).); classified by convention; thrown by syncRuleReferenceEdges, syncRuleReferences; inferred throwers: saveEmailTemplate
 - **ruleReferenceIssues** `packages/db/src/utils/ruleReferenceHealth.ts#ruleReferenceIssues`: Reads stored edge rows only; to extract references from a rule itself use ruleReferences.
 - **ruleReferences** `packages/db/src/utils/ruleReferences.ts#ruleReferences`: Evaluation-time sources: dynamicRuleReferences; persisting edges: pass result to syncRuleReferenceEdges.
   - *Signs you're bypassing it:* A hand-written walker that pulls id values out of a rule to record its references. (docs/claude/COMMUNICATIONS.md § Rule References ("Extraction is the lens's"))
 - **syncRuleReferenceEdges** `packages/db/src/utils/syncRuleReferenceEdges.ts#syncRuleReferenceEdges`: Call for every new rule-bearing column; ruleReferences only extracts, this writes edges.
+  - *Throws:* RuleReferenceError (`validation-error`)
   - *Signs you're bypassing it:* A new rule-bearing column whose save path doesn't write edges, or edges written by a mutation hook / hand create-delete instead of the set-diff sync. (docs/claude/COMMUNICATIONS.md § Rule References ("Edges are written by the save path, not a hook"))
 - **syncSegmentEdges** `apps/api/src/modules/segment/lib/syncSegmentEdges.ts#syncSegmentEdges`: Use 'rebuild' mode to recompute all edges; default 'save' after a segment write.
 - **withRule** `packages/shared/src/rules/withRule.ts#withRule`: Use whenever evaluating a stored rule; ruleIssues only to report problems without branching.
+  - *Throws:* RuleEvaluationError (`server-error`, inferred); RuleDegradedError (`server-error`, inferred)
   - *Signs you're bypassing it:* Evaluating a persisted rule directly with check / toPrisma without first asking whether its bindings are supplied, the lens still admits it and the rows it names are live. (docs/claude/COMMUNICATIONS.md § Rule References (withRule is the one fork a stored rule is evaluated through anywhere))
 - **Adding a referenceable model** `docs/claude/COMMUNICATIONS.md`: make a model referenceable by rules
 - **Degraded rules change nothing** `docs/claude/COMMUNICATIONS.md withRule`: A degraded rule never matches nor touches existing state and must report why.

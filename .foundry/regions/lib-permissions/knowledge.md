@@ -117,7 +117,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `lib-permissions`: The @inixiative/permissions library (README): the ReBAC engine template's permissions build on
 
-**Choosing among siblings: createPermissions vs createRebacCheck vs check vs permix.check** (@inixiative/permissions/README.md § The check engine, § The permix wrapper)
+**Job: build or run a permission check** (createPermissions vs createRebacCheck vs check vs permix.check) — @inixiative/permissions/README.md § The check engine, § The permix wrapper
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -126,7 +126,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **check (permissions)** | relations, self or abac rules matter | grant-only lookup (permix.check) |
 | **permix.check** | grant-only lookup of what permix.setup loaded | the access walks a relation (check) |
 
-**Choosing among siblings: Relation walks: rel vs Bridges, and hydration** (README § Bridges (cross-source rel walks), § Hydration (Prisma example))
+**Job: check permissions that walk relations** (Relation walks: rel vs Bridges, and hydration) — README § Bridges (cross-source rel walks), § Hydration (Prisma example)
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -134,7 +134,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **Hydrate ownership closure before checking** | before every ReBAC check (createHydrator) | cross-source data (Bridges) |
 | **Cache in hydrator load seam** | cross-call caching: wrap load | per-call dedupe (createHydrator already does it) |
 
-**Choosing among siblings: Row overrides** (README § Writing a schema)
+**Job: widen permissions on a single record** (Row overrides) — README § Writing a schema
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|

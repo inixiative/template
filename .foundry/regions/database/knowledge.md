@@ -122,7 +122,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `db-client`: The transaction-aware Prisma client: db.txn, onCommit/onFinally, scope, delegate typing, query helpers
 
-**Choosing among siblings: db.txn vs db.onCommit vs db.onFinally vs db.findForUpdate vs db.raw vs runInTransactionContext** (docs/claude/DATABASE.md § Client Methods; § Transactions)
+**Job: make several writes, locks or side effects behave correctly around a transaction** (db.txn vs db.onCommit vs db.onFinally vs db.findForUpdate vs db.raw vs runInTransactionContext) — docs/claude/DATABASE.md § Client Methods; § Transactions
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -134,7 +134,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **runInTransactionContext** | re-entering an already-open transaction's scope | normal access (use db directly) |
 | **createLock (concurrency-locks)** | Redis lock around a cross-process critical section | serializing a DB row inside a txn (use db.findForUpdate) |
 
-**Choosing among siblings: query vs Pass the delegate vs toAccessor** (docs/claude/DATABASE.md § Delegate Typing)
+**Job: write a helper that works across models** (query vs Pass the delegate vs toAccessor) — docs/claude/DATABASE.md § Delegate Typing
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -142,7 +142,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **Pass the delegate** | the caller knows the model: hand `db.user` to the helper | building the delegate from a string (yields an untyped union) |
 | **toAccessor (lib-prisma-map)** | converting a model name to an accessor string | getting a typed delegate (use Pass the delegate) |
 
-**Choosing among siblings: addUniqueWhereNotNull vs addCheckConstraint vs addGistIndex** (FEATURES.md § Advanced Constraints)
+**Job: add a database constraint or index that Prisma can't express** (addUniqueWhereNotNull vs addCheckConstraint vs addGistIndex) — FEATURES.md § Advanced Constraints
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -151,8 +151,10 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **addGistIndex** | range/geometric or exclusion queries | plain uniqueness or value checks |
 
 - **db** `packages/db/src/client.ts#db`: Always over constructing a new PrismaClient; inside an open transaction it routes to that transaction's scope.
+  - *Throws:* Prisma.PrismaClientValidationError (`bad-request`, request-context-errors, inferred); Prisma P2002 (unique constraint) (`conflict`, request-context-errors, inferred); Prisma P2025 (record not found) (`resource-not-found`, request-context-errors, inferred); isUniqueConstraintError (`conflict`, request-context-errors, inferred); Bulk write refusal (createMany / updateMany) (`server-error`, mutation-hooks, inferred)
   - *Signs you're bypassing it:* `new PrismaClient()` or a second client instance, or a transaction client threaded by hand through function arguments, instead of importing `db` from `@template/db` (FEATURES.md § Database & ORM (Automatic Transaction Merging); catalog db)
 - **query** `packages/db/src/utils/delegates.ts#query`: Use when code is generic over models; individual exports (findMany, update, del) are aliases of its methods.
+  - *Throws:* Prisma.PrismaClientValidationError (`bad-request`, request-context-errors, inferred); Prisma P2002 (unique constraint) (`conflict`, request-context-errors, inferred); Prisma P2025 (record not found) (`resource-not-found`, request-context-errors, inferred); isUniqueConstraintError (`conflict`, request-context-errors, inferred)
 - **runInTransactionContext** `packages/db/src/client.ts#runInTransactionContext`: Only to re-enter an existing open transaction; for normal access use db directly.
 - **no-create-race-machinery** `scripts/ci/rules/no-create-race-machinery.sh`: Find-then-create races: use findForUpdate upserting, not .upsert or unique-violation catches. Ratchets per file against the merge base.
   - *Signs you're bypassing it:* find-then-create guarded by a bare `.upsert(`, or a `try { create } catch (P2002) { re-read }` unique-violation catch, instead of `db.findForUpdate(model, where, { upserting: true })` inside db.txn (scripts/ci/rules/no-create-race-machinery.sh; docs/claude/DATABASE.md § Transactions › Row Locks and Create-If-Missing)
@@ -171,19 +173,24 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **create* factories** `docs/claude/TESTING.md`: Test data setup; override only fields the test cares about.
 - **Database dump/restore/clone** `FEATURES.md > Database & ORM > Database Utilities`: copy database state between environments, truncating webhook subscriptions on clone
 - **db.findForUpdate** `@template/db > Client Methods`: In-txn row serialization; for cross-process non-row ownership use createLock.
+  - *Throws:* FindForUpdateLockTimeoutError (`conflict`)
   - *Signs you're bypassing it:* a raw `$queryRaw` `SELECT … FOR UPDATE`, or a read-then-update inside a transaction with no row lock (docs/claude/DATABASE.md § Transactions › Row Locks and Create-If-Missing; § Client Methods)
 - **db.getScopeId** `@template/db > Client Methods`: read the current AsyncLocalStorage scope id
   - *Signs you're bypassing it:* generating a separate correlation ID or passing requestId into db/log helpers by hand (docs/claude/CONTEXT.md § Database Scope)
 - **db.isInTxn** `@template/db`: detect whether the current call is inside a transaction
 - **db.onCommit** `@template/db > Client Methods`: Side effects only on success; db.onFinally to run on commit or rollback.
+  - *Throws:* db.onCommit outside transaction Error (`server-error`)
   - *Signs you're bypassing it:* sending email, calling an external API or enqueuing a job directly inside db.txn (so it fires even if the transaction rolls back), or a hand-built after-commit callback list (docs/claude/DATABASE.md § Transactions › After Commit Callbacks; FEATURES.md § Post-Commit Callbacks)
 - **db.onFinally** `@template/db > Client Methods`: Cleanup regardless of outcome; db.onCommit for success-only effects.
 - **db.raw** `@template/db > Client Methods`: Only when work must escape the current txn; otherwise use db.<model>.
   - *Signs you're bypassing it:* `db.raw.<model>` used for ordinary writes (silently skipping the transaction and every hook) where `db.<model>` was meant (docs/claude/DATABASE.md § Client Methods; docs/claude/ARCHITECTURE.md § Why Hooks Instead of Triggers?)
 - **db.scope** `@template/db > Client Methods`: open an AsyncLocalStorage context that carries transaction state
 - **db.txn** `@template/db > Client Methods`: Multi-write atomicity; nested db.<model> calls join it automatically.
+  - *Throws:* Prisma P2034 (write conflict / deadlock) (`conflict`, request-context-errors, inferred); isWriteConflictError (`conflict`, request-context-errors, inferred)
 - **FindForUpdateLockTimeoutError** `db.findForUpdate`: signal the upsert fence lock was not acquired within waitMs, rolling back
+  - *Error class:* `conflict` (The request collides with current state: duplicate, ambiguous lookup, lock contention, illegal transition (conflict 409).); classified by convention; thrown by db.findForUpdate, acquireFindForUpdateLock
 - **Generated Zod schemas** `FEATURES.md > Database & ORM > Zod Schema Generation`: Prefer over hand-written request/response types.
+  - *Throws:* ZodError (`validation-error`, request-context-errors, inferred)
 - **isModelName / isAccessorName** `FEATURES.md > Model Name Utilities`: guard and convert between model names (User) and accessor names (user)
 - **mutationLifeCycle** `@template/db > Delegate Typing > Mutation Lifecycle Pattern`: Hooks get previous automatically; don't refetch it yourself.
   - *Signs you're bypassing it:* a hook or service re-fetching the old row before an update, when hooks already receive `previous` (docs/claude/DATABASE.md § Delegate Typing › Mutation Lifecycle Pattern)
@@ -198,7 +205,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `data-modeling`: Schema conventions: split schema, UUIDv7/typed IDs, enum vs row, false polymorphism
 
-**Choosing among siblings: PolymorphismRegistry vs getPolymorphismConfig vs resolveFalsePolymorphismRef vs polymorphicTarget** (docs/claude/DATABASE.md § Registries; catalog)
+**Job: declare or read a polymorphic reference** (PolymorphismRegistry vs getPolymorphismConfig vs resolveFalsePolymorphismRef vs polymorphicTarget) — docs/claude/DATABASE.md § Registries; catalog
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -207,7 +214,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **resolveFalsePolymorphismRef** | resolving a polymorphic ref to its target id; guard with isFalsePolymorphismRef | raw config lookup (use getPolymorphismConfig) |
 | **polymorphicTarget (lib-prisma-map)** | reading which kind and id a row points at | declaring or configuring the axis (use PolymorphismRegistry) |
 
-**Choosing among siblings: Tag vs TagCategory vs TagAttachment vs Segment** (catalog choose lines)
+**Job: label or group records (manual tags vs rule-defined segments)** (Tag vs TagCategory vs TagAttachment vs Segment) — catalog choose lines
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -249,7 +256,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `reference-data`: Static reference data: countries, currencies, languages, timezones + zod schemas
 
-**Choosing among siblings: Country helpers: CountryCodeSchema vs isCountryCode vs COUNTRY_CODES vs countryByCode vs countryNameFor vs callingCodeFor** (packages/shared/src/reference/countries.ts (catalog))
+**Job: validate or look up a country** (Country helpers: CountryCodeSchema vs isCountryCode vs COUNTRY_CODES vs countryByCode vs countryNameFor vs callingCodeFor) — packages/shared/src/reference/countries.ts (catalog)
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -260,7 +267,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **countryNameFor** | display name only | calling code (use callingCodeFor) |
 | **callingCodeFor** | phone calling code only | name or full record (use countryNameFor / countryByCode) |
 
-**Choosing among siblings: Currency, language and timezone: schema vs guard vs list vs lookup** (packages/shared/src/reference/*.ts (catalog))
+**Job: validate or look up a currency, language or timezone** (Currency, language and timezone: schema vs guard vs list vs lookup) — packages/shared/src/reference/*.ts (catalog)
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|

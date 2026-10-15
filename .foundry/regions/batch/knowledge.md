@@ -94,7 +94,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `batch`: Batch API: rounds, execution strategies, interpolation, status tracking
 
-**Choosing among siblings: transactionAll vs transactionPerRound vs allowFailures vs failOnRound** (docs/claude/BATCH.md § Execution Strategies, § Status Tracking)
+**Job: choose how a batch of API requests commits or fails** (transactionAll vs transactionPerRound vs allowFailures vs failOnRound) — docs/claude/BATCH.md § Execution Strategies, § Status Tracking
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -103,7 +103,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **allowFailures** | attempt every request; each commits independently (bulk ops) | later steps depend on earlier success (failOnRound) |
 | **failOnRound** | stop after the first round with a failure, no rollback | rollback needed (transactionAll / transactionPerRound) |
 
-**Choosing among siblings: Batch entry points: POST /api/v1/batch/execute vs executeBatch vs executeRequest vs registerBatch vs readAsCaller vs readAllAsCaller** (docs/claude/BATCH.md § Overview, § Implementation Patterns; docs/claude/FLOWS.md § Lifecycle; catalog)
+**Job: run many API requests, or read API lists, as the caller in one go** (Batch entry points: POST /api/v1/batch/execute vs executeBatch vs executeRequest vs registerBatch vs readAsCaller vs readAllAsCaller) — docs/claude/BATCH.md § Overview, § Implementation Patterns; docs/claude/FLOWS.md § Lifecycle; catalog
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -136,6 +136,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
   - *Signs you're bypassing it:* a new batch strategy not added to BatchExecutionStrategies, or a hand-maintained strategy name union/enum (docs/claude/BATCH.md § Implementation Patterns)
 - **In-memory batch registry** `docs/claude/BATCH.md#Known Limitations`: Single-instance only; multi-instance deployments need a Redis-backed registry instead.
 - **POST /api/v1/batch/execute** `docs/claude/BATCH.md > Overview`: run many API requests in ordered rounds within one HTTP call
+  - *Throws:* makeError 400 BAD_REQUEST (`bad-request`, request-context-errors); makeError 500 SERVER_ERROR (`server-error`, request-context-errors)
   - *Signs you're bypassing it:* a bespoke bulk/multi-step endpoint, or a client firing sequential requests and threading ids between them, where one batch call with rounds and interpolation would do (docs/claude/BATCH.md § Overview; FEATURES.md § API Architecture & Routing (Batch API))
 - **StrategyExecutor** `apps/api/src/modules/batch`: define the signature every batch strategy implements, returning BatchResult
 - **summary.status** `docs/claude/BATCH.md > Status Tracking`: Overall outcome; inspect per-request result.error for which requests failed.

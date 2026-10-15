@@ -117,7 +117,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `jobs`: BullMQ background jobs: makeJob/makeSingletonJob/makeSupersedingJob, handlers, enqueueJob, workers
 
-**Choosing among siblings: Job wrappers: makeJob vs makeSingletonJob vs makeSupersedingJob vs staged jobs** (FEATURES.md § Background Jobs & Cron; docs/claude/JOBS.md § Handler Patterns, § Staged Job (Fan Out and Wait))
+**Job: run background work with the right concurrency semantics** (Job wrappers: makeJob vs makeSingletonJob vs makeSupersedingJob vs staged jobs) — FEATURES.md § Background Jobs & Cron; docs/claude/JOBS.md § Handler Patterns, § Staged Job (Fan Out and Wait)
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -126,7 +126,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **makeSupersedingJob (concurrency-locks)** | newer job with the same dedupe key supersedes the older (cooperative ctx.signal) | every run must complete (use makeSingletonJob) |
 | **Staged job fan-out and wait** | a job fans out and must wait for its children: makeJob stages + ctx.enqueueChildJob | single-step work (plain makeJob); never a pending hash or polling loop |
 
-**Choosing among siblings: Getting work onto the queue: enqueueJob vs ctx.enqueueChildJob vs queue vs enqueueOrSpill vs admin route** (docs/claude/JOBS.md § Enqueuing Jobs, § Staged Job, § Admin Routes; catalog queue, processJob, enqueueOrSpill)
+**Job: put work onto the job queue** (Getting work onto the queue: enqueueJob vs ctx.enqueueChildJob vs queue vs enqueueOrSpill vs admin route) — docs/claude/JOBS.md § Enqueuing Jobs, § Staged Job, § Admin Routes; catalog queue, processJob, enqueueOrSpill
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -136,6 +136,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **enqueueOrSpill (job-lanes-outbox)** | testing routing/overflow directly | normal producers (use enqueueJob) |
 | **processJob** | the worker's per-job entrypoint | scheduling work (use enqueueJob) |
 | **POST /api/admin/job** | a manual one-off run | rerun a stored cron (POST /api/admin/cronJob/:id/trigger) |
+| *inline call, no job* | light, best-effort, idempotent work after commit: a makeAppEvent cb runs inline, each task isolated by db.parallel allSettled; observation upserts AppEvent directly and is not a separate BullMQ job (APP_EVENTS.md § Purpose and execution, § Observe pipeline) | heavy or retryable work (enqueueJob from the event cb); a direct email/SMS/analytics call (always an app-event handoff); in tests enqueueJob already runs the handler inline |
 
 - **buildJobData** `apps/api/src/jobs/buildJobData.ts#buildJobData`: build the job envelope and resolve its lane: request, then enqueue option, then handler default, then fast
 - **enqueueJob** `apps/api/src/jobs/enqueue.ts#enqueueJob`: Default way to queue work; inside a running stage use ctx.enqueueChildJob for children; test routing/overflow: enqueueOrSpill directly.
@@ -150,6 +151,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **queue** `apps/api/src/jobs/queue.ts#queue`: Enqueue through the job enqueue helpers so outbox spill applies; use queue directly for inspection or low-level ops.
 - **runJobStages** `apps/api/src/jobs/runJobStages.ts#runJobStages`: Multi-stage jobs that fan out children; a plain handler for single-step work.
 - **validateJobId** `apps/api/src/jobs/validateJobId.ts#validateJobId`: Throwing guard at enqueue; for a non-throwing check use isValidJobId.
+  - *Throws:* validateJobId Error (`server-error`)
   - *Signs you're bypassing it:* custom job ids built with ':' separators (e.g. `sync:${id}`) or '0', which BullMQ rejects later, instead of ids that pass validateJobId (docs/claude/JOBS.md § Enqueuing Jobs)
 - **apps/api/src/routes/bullBoard** `apps/api/src/routes/bullBoard`: serve the Bull Board dashboard for inspecting job queues
 - **Fast/slow job lanes** `FEATURES.md › Background Jobs & Cron`: large fan-outs use slow lane; fast lane for latency-sensitive work
@@ -199,7 +201,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `cron`: DB-stored cron jobs, repeatables, manual trigger, retention cleanup
 
-**Choosing among siblings: Scheduling: CronJob vs registerCronJobs vs cronJobSync vs trigger vs one-off job** (docs/claude/JOBS.md § Cron Jobs, § Admin Routes)
+**Job: run work on a schedule, now, or once** (Scheduling: CronJob vs registerCronJobs vs cronJobSync vs trigger vs one-off job) — docs/claude/JOBS.md § Cron Jobs, § Admin Routes
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -209,7 +211,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **triggerCronJob** | run a stored cron now (POST /api/admin/cronJob/:id/trigger) | arbitrary background work (use enqueueJob) |
 | **heartbeat (concurrency-locks)** | an in-process non-overlapping timer | scheduled work across instances (use CronJob) |
 
-**Choosing among siblings: Retention: cleanStaleData vs archiveStaleRecords** (catalog cleanStaleData, archiveStaleRecords; cleanStaleFlows cron row)
+**Job: clear out stale rows past retention** (Retention: cleanStaleData vs archiveStaleRecords) — catalog cleanStaleData, archiveStaleRecords; cleanStaleFlows cron row
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|

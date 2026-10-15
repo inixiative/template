@@ -120,7 +120,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `rules-builder`: @inixiative/rules-builder rule-editor model: facets, views, builder surfaces
 
-**Choosing among siblings: Which builder hook** (@inixiative/rules-builder/README.md § Quick start, § Filtering a collection in hand)
+**Job: edit a rule in a React builder** (Which builder hook) — @inixiative/rules-builder/README.md § Quick start, § Filtering a collection in hand
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -130,7 +130,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **useActionRuleBuilder** | action-rule editors in React | no React state (setActionNode / removeActionNode) |
 | **useFilteredCollection** | display-only filtering of rows fetched whole (calendar, Kanban) | server-side filtering (useRuleBuilder) |
 
-**Choosing among siblings: Where the builder's view comes from** (@inixiative/rules-builder/README.md § Relations are off until the narrowing turns them on; § API)
+**Job: give a rule builder its view of the data** (Where the builder's view comes from) — @inixiative/rules-builder/README.md § Relations are off until the narrowing turns them on; § API
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -141,7 +141,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **composeNarrowed** | gating against what the source allows | every relation on in the first layer (withAllRelations) |
 | **withAllRelations** | every relation on in a source's first layer | the source's narrowed lens (composeNarrowed) |
 
-**Choosing among siblings: Field and value pickers** (catalog entries (@inixiative/rules-builder))
+**Job: pick fields and values in a rule builder** (Field and value pickers) — catalog entries (@inixiative/rules-builder)
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -151,7 +151,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **lensScopeSurface** | a scope's values and to-many loop portals as data | one field / path picker (lensValuePicker); React (useLensScopeSurface) |
 | **lensValuePicker** | picking one path | a whole scope's values and loops (lensScopeSurface) |
 
-**Choosing among siblings: Facets and scope references** (@inixiative/rules-builder/README.md § Two wheres, § Variables, § Scope references)
+**Job: insert facets and reference ancestor scopes in a rule builder** (Facets and scope references) — @inixiative/rules-builder/README.md § Two wheres, § Variables, § Scope references
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|

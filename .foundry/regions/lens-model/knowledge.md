@@ -111,7 +111,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `lib-json-rules-lens`: The json-rules Lens model: why lenses exist, the two kinds of narrowing, anchor layers, the all filter-first trick, composition, defaults, enum narrowing, the type shape (LENS.md §1–8)
 
-**Choosing among siblings: The three forms of a lens** (@inixiative/json-rules/README.md § TypeScript Types (A lens has three forms); docs/LENS.md §9 Storing a lens)
+**Job: define, store and reload a lens** (The three forms of a lens) — @inixiative/json-rules/README.md § TypeScript Types (A lens has three forms); docs/LENS.md §9 Storing a lens
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -121,7 +121,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **StoredLens** | the persistence type, one record per layer with its parents | passing to evaluators (a composed Lens / LensNarrowing) |
 | **projectLens (lens-usage)** | what a lens exposes, by path or by model | a gate; gate against the narrowing |
 
-**Choosing among siblings: Reading one thing through a lens** (@inixiative/json-rules/docs/VERBS.md § Public API (project, walk, read))
+**Job: read one value or path through a lens** (Reading one thing through a lens) — @inixiative/json-rules/docs/VERBS.md § Public API (project, walk, read)
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -129,7 +129,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **readLensValue (lens-usage)** | one value off a row, clamps checked; what a template interpolates | schema-only resolution (walkLensPath) |
 | **walkLensPath (lens-usage)** | whether one dotted path resolves, hop by hop | reading data (readLensValue) |
 
-**Choosing among siblings: validateNarrowing vs LensRefusal vs validateRuleInLens** (@inixiative/json-rules/docs/LENS.md §2, §5; README § Error Handling)
+**Job: check a narrowing or rule against a lens and handle its refusal** (validateNarrowing vs LensRefusal vs validateRuleInLens) — @inixiative/json-rules/docs/LENS.md §2, §5; README § Error Handling
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -137,7 +137,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **LensRefusal** | the error every runtime posture throws for what the lens can't do | caller input faults (UsageError) |
 | **validateRuleInLens (lens-usage)** | a rule's paths and enum values against the lens | checking the narrowing itself (validateNarrowing) |
 
-**Choosing among siblings: Binds across layers** (@inixiative/json-rules/README.md § Bindings in a Lens)
+**Job: pass bind values through a layered lens** (Binds across layers) — @inixiative/json-rules/README.md § Bindings in a Lens
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -148,6 +148,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **clampLens** `@inixiative/json-rules#clampLens`: Resolving bind tokens rather than adding restrictions: bindLens instead; restacking stored layers: composeLens.
   - *Signs you're bypassing it:* Stacking a new later narrowing layer whose clamp reads columns the slot hides (refused since json-rules 3.4), or spreading a where into a lens, instead of merging the scope into the first narrowing with clampLens. (@inixiative/json-rules/docs/LENS.md §1 (clampLens); docs/claude/COMMUNICATIONS.md § The email lens)
 - **LensRefusal** `@inixiative/json-rules#LensRefusal`: Lens shape faults; caller input faults throw UsageError. validateNarrowing reports the same refusal ahead of time.
+  - *Error class:* `lens-refusal` (json-rules LensRefusal (with code): the lens itself cannot do it (a later clamp reads what its parent hides, a clamp or source a compile has no form for, a link a source path cannot carry). Fix the lens; validateNarrowing reports it ahead of time.); thrown by toPrisma, toSql, toSourceQueries, toLensSelect, projectLens, lensVisit, narrowRule, materializeSources
 - **validateNarrowing** `@inixiative/json-rules#validateNarrowing`: Checks the narrowing itself; to gate a rule against a lens use validateRuleInLens. assertValidNarrowing throws instead.
   - *Signs you're bypassing it:* Finding a bad narrowing layer at query time through a silently empty result, instead of validateNarrowing / assertValidNarrowing when the layer is built. (@inixiative/json-rules/docs/LENS.md §5 ("find bad lens code at construction, not at query time"))
 - **Compile under a lens** `@inixiative/json-rules/README.md — Compiling under a lens`: When a lens scopes the rule; pass map/model directly only without a lens.

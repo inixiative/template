@@ -105,7 +105,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `ws-connections`: WebSocket connection registry, authenticate frame, recovery, drain
 
-**Choosing among siblings: sendToChannel vs sendToUser vs broadcast vs appendToStream (cross-instance publish)** (docs/claude/WEBSOCKETS.md § Frontend and horizontal scaling; § Contract)
+**Job: deliver a WebSocket message across instances** (sendToChannel vs sendToUser vs broadcast vs appendToStream (cross-instance publish)) — docs/claude/WEBSOCKETS.md § Frontend and horizontal scaling; § Contract
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -115,7 +115,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **appendToStream (ws-streams)** | sequenced appends to a data stream, published through Redis in per-stream order | lossy hints (use sendToChannel); never loop sockets with a local counter |
 | **sendToChannelLocal (ws-streams)** | this instance's own delivery after the Redis fan-out | business code: other instances never deliver (use sendToChannel) |
 
-**Choosing among siblings: sendFrame vs sendTo vs the *Local senders (one instance)** (apps/api/src/ws/delivery.ts; docs/claude/WEBSOCKETS.md § Sequence numbers)
+**Job: send a WebSocket message on this instance** (sendFrame vs sendTo vs the *Local senders (one instance)) — apps/api/src/ws/delivery.ts; docs/claude/WEBSOCKETS.md § Sequence numbers
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -125,7 +125,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **sendToStreamLocal (ws-streams)** | payload differs per socket or some sockets are skipped (return null) | identical payloads (use sendToChannelLocal) |
 | **broadcastLocal (ws-streams)** | every socket connected to this instance | every instance (use broadcast) |
 
-**Choosing among siblings: resolveIdentity vs setIdentity vs canSubscribe vs resolveOperationRoute** (docs/claude/WEBSOCKETS.md § Connection and recovery; § Channel registry and authorization)
+**Job: authenticate a socket and authorize its subscriptions** (resolveIdentity vs setIdentity vs canSubscribe vs resolveOperationRoute) — docs/claude/WEBSOCKETS.md § Connection and recovery; § Channel registry and authorization
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|

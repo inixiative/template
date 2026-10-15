@@ -106,7 +106,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `env-config`: Environment names/detection, env files, Infisical, with-env composition, adding env vars
 
-**Choosing among siblings: detecting the environment** (docs/claude/ENVIRONMENTS.md § Environment Names; § Environment Detection)
+**Job: branch on the running environment** (detecting the environment) — docs/claude/ENVIRONMENTS.md § Environment Names; § Environment Detection
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -114,7 +114,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **isTest** | test-only behaviour | changing env inside a test (use withEnv / setEnvOverride (testing)) |
 | **Environment** | typing an environment name: local, test, pr, staging, prod | production/development/dev (use Canonical environment names) |
 
-**Choosing among siblings: where env values come from** (docs/claude/ENVIRONMENTS.md § File-Based Environments; § Infisical; § with-env Composition)
+**Job: supply env values to a process** (where env values come from) — docs/claude/ENVIRONMENTS.md § File-Based Environments; § Infisical; § with-env Composition
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -124,7 +124,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **with-env.sh** | the script behind bun run with; docs don't distinguish them | export $(cat .env...) (use bun run with) |
 | **bun run sync-env** | create or top up .env files from the examples | loading env for a command (use bun run with) |
 
-**Choosing among siblings: reading and adding env vars in code** (docs/claude/ENVIRONMENTS.md § Adding Environment Variables; scripts/ci/rules/no-inline-env-coercion.sh)
+**Job: read or add an env var in code** (reading and adding env vars in code) — docs/claude/ENVIRONMENTS.md § Adding Environment Variables; scripts/ci/rules/no-inline-env-coercion.sh
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -179,7 +179,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `ci-deploy`: CI/CD pipelines, the full check, deploy environments and scripts
 
-**Choosing among siblings: the gate: check vs its parts** (package.json; docs/claude/SCRIPTS.md § Linting; § CI Rule Scripts)
+**Job: verify the repo passes before pushing** (the gate: check vs its parts) — package.json; docs/claude/SCRIPTS.md § Linting; § CI Rule Scripts
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -189,7 +189,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **check-generated-files.sh (dx-setup)** | fails on a stale Prisma client or SDK | sync-conflict copies (use check-finder-duplicates (dx-tools)) |
 | **run-ci-rules.sh (dx-setup)** | the CI rules; --test checks them against fixtures | Biome-adjacent lint scripts (use run-post-biome-checks.sh) |
 
-**Choosing among siblings: build, run and deploy** (package.json; apps/api package.json; docs/claude/SCRIPTS.md § Deployment Scripts)
+**Job: build, run and deploy the app** (build, run and deploy) — package.json; apps/api package.json; docs/claude/SCRIPTS.md § Deployment Scripts
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -199,7 +199,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **bun run deploy** | deploy via scripts/deployment/deploy.sh | waiting for health (use scripts/deployment/wait-for-api.sh) |
 | **scripts/deployment/wait-for-api.sh (dx-setup)** | block until the API health check passes | Postgres readiness (use scripts/db/wait-postgres.sh (dx-setup)) |
 
-**Choosing among siblings: ecosystem release and CI commands** (@inixiative/config/README.md § CLI; § Release flow; § CI)
+**Job: release ecosystem packages and run ecosystem CI** (ecosystem release and CI commands) — @inixiative/config/README.md § CLI; § Release flow; § CI
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|

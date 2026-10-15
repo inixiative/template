@@ -118,7 +118,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `monorepo-layout`: Workspaces, packages, path aliases, import direction, where things live
 
-**Choosing among siblings: import alias rules** (docs/claude/MONOREPO.md § Path Aliases; § Avoid Barrel Files)
+**Job: import code across the monorepo** (import alias rules) — docs/claude/MONOREPO.md § Path Aliases; § Avoid Barrel Files
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -129,7 +129,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **Barrels only for top-level package API** | deciding whether an index.ts may exist | a nested barrel (import the source file) |
 | **Forbidden alias prefixes** | spotting ##/ or ~/, or #/ inside a package | never; use #/ in apps, @template/ in packages |
 
-**Choosing among siblings: where new code goes** (docs/claude/MONOREPO.md § Where to Find Things; § Package Descriptions; § Adding Dependencies)
+**Job: decide where new code goes in the monorepo** (where new code goes) — docs/claude/MONOREPO.md § Where to Find Things; § Package Descriptions; § Adding Dependencies
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -139,7 +139,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **Cross-app tests in tests/** | E2E or load tests spanning apps | unit/integration tests (stay in their package) |
 | **Add dependencies per workspace** | adding a package to the workspace that imports it | bun add at the repo root |
 
-**Choosing among siblings: request-flow middleware named in ARCHITECTURE.md** (docs/claude/ARCHITECTURE.md § Request Flow)
+**Job: authenticate and gate a request in the middleware chain** (request-flow middleware named in ARCHITECTURE.md) — docs/claude/ARCHITECTURE.md § Request Flow
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -180,6 +180,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **tsconfig.frontend.json** `tsconfig.frontend.json`: Frontend apps; packages/ui and sdk extend react.json directly.
 - **turbo watch local** `FEATURES.md > Core Platform > Turborepo Orchestration`: Filter with #app to run one app; omit to run all.
 - **validatePermission** `docs/claude/ARCHITECTURE.md#Request Flow`: permission gates; validateNotToken to reject API-token callers
+  - *Throws:* HTTPException (`caller-error`, request-context-errors, inferred); makeError 403 PERMISSION_DENIED (`permission-denied`, permissions)
   - *Signs you're bypassing it:* a handler that loads the resource itself and calls permix.check / throws 403 by hand on a route where resourceContextMiddleware + validatePermission(action) would do it (docs/claude/PERMISSIONS.md § Validation Middleware)
 - **with-env.sh** `with-env.sh`: Use instead of committed .env files; secrets come from Infisical per environment.
   - *Signs you're bypassing it:* `source .env.local`, dotenv loading in a script, or `infisical run --env=prod -- ...` called directly instead of `bun run with` (docs/claude/ENVIRONMENTS.md § with-env Composition; FEATURES.md › Infisical Secrets Management)
@@ -225,14 +226,14 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `dependencies`: Third-party dependency inventory and tech stack
 
-**Choosing among siblings: transactionAll vs transactionPerRound** (FEATURES.md › Context Isolation in Batch API)
+**Job: choose how a batch of API requests commits or fails** (transactionAll vs transactionPerRound) — FEATURES.md › Context Isolation in Batch API
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **transactionAll (batch)** | the whole batch is all-or-nothing | rounds should commit independently (use transactionPerRound) |
 | **transactionPerRound (batch)** | each round commits on its own | whole-batch atomicity (use transactionAll) |
 
-**Choosing among siblings: stack pieces to check before adding a package** (docs/claude/DEPENDENCIES.md)
+**Job: check what the stack already provides before adding a package** (stack pieces to check before adding a package) — docs/claude/DEPENDENCIES.md
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -243,7 +244,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **BullMQ jobs and cron** | background jobs and schedules | another queue or setInterval |
 | **Add planned deps to owning package** | date formatting, payments, storage, images: the planned package | a different library for the same job |
 
-**Choosing among siblings: request identity** (FEATURES.md › Multi-Strategy Authentication; › Request Context Scoping)
+**Job: read or establish who the caller is on a request** (request identity) — FEATURES.md › Multi-Strategy Authentication; › Request Context Scoping
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -271,7 +272,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `architecture`: System overview: request and data flow, key architectural patterns
 
-**Choosing among siblings: Where request state lives** (FEATURES.md › Architectural Patterns › Request Context Scoping; Context Isolation in Batch API)
+**Job: give a handler or middleware access to the request's db, user, org, space and permissions** (Where request state lives) — FEATURES.md › Architectural Patterns › Request Context Scoping; Context Isolation in Batch API
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -279,14 +280,14 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **No global request state** | you are about to stash request data on a module or singleton | the data is already on AppEnv: read it there |
 | **Batch context isolation** | a batched request must see its own AppEnv | single requests, which get their AppEnv from prepareRequest |
 
-**Choosing among siblings: How a caller authenticates** (FEATURES.md › Architectural Patterns › Multi-Strategy Authentication)
+**Job: authenticate a caller (or impersonate one as superadmin)** (How a caller authenticates) — FEATURES.md › Architectural Patterns › Multi-Strategy Authentication
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **Multi-strategy authentication** | a normal caller: session cookie, Bearer token or URL token through the one middleware chain | impersonation |
 | **x-spoof-user-email** | a superadmin impersonates a user | any normal caller (use the chain above) |
 
-**Choosing among siblings: Permissions resolved, not denormalized** (FEATURES.md › Architectural Patterns › Hierarchical Permission Inheritance; Permission-Based Menu Rendering)
+**Job: decide what a user may see or do, from inherited permissions** (Permissions resolved, not denormalized) — FEATURES.md › Architectural Patterns › Hierarchical Permission Inheritance; Permission-Based Menu Rendering
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -294,14 +295,14 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **Permission-based menu rendering** | deciding what navigation a user sees | checking an action on the server (use the permission check) |
 | **Hide unauthorized nav items** | every navigation item | rendering a disabled item the user cannot reach |
 
-**Choosing among siblings: Test data** (FEATURES.md › Architectural Patterns › Factory Pattern for Test Data)
+**Job: create records for a test and assert against API responses** (Test data) — FEATURES.md › Architectural Patterns › Factory Pattern for Test Data
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **create*/build* factories** | any test needs records: override only the fields the test is about | hand-built fixtures or raw db.create |
 | **entity.__serialize** | asserting against an API response | asserting raw model values |
 
-**Choosing among siblings: Encryption key versions** (FEATURES.md › Architectural Patterns › Encryption Versioning)
+**Job: rotate an encryption key without breaking stored data** (Encryption key versions) — FEATURES.md › Architectural Patterns › Encryption Versioning
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|

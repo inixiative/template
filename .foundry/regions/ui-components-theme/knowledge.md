@@ -124,7 +124,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `ui-components`: packages/ui primitives, settings pages, modals, standard conditional props
 
-**Choosing among siblings: Input vs PasswordInput vs SlugInput** (docs/claude/FRONTEND/COMPONENTS.md § Input & Label)
+**Job: choose a text input** (Input vs PasswordInput vs SlugInput) — docs/claude/FRONTEND/COMPONENTS.md § Input & Label
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -132,21 +132,21 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **PasswordInput** | secrets needing a reveal toggle | plain text (use Input) |
 | **SlugInput** | slug fields | plain text (Input); secrets (PasswordInput) |
 
-**Choosing among siblings: Select vs SearchableSelect** (docs/claude/FRONTEND/COMPONENTS.md § Select and SearchableSelect)
+**Job: choose a select input** (Select vs SearchableSelect) — docs/claude/FRONTEND/COMPONENTS.md § Select and SearchableSelect
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **Select** | short fixed option lists | typing to filter or remote search (use SearchableSelect) |
 | **SearchableSelect** | long or server-searched option lists | short fixed lists (use Select) |
 
-**Choosing among siblings: show prop vs disabledText prop** (docs/claude/FRONTEND/COMPONENTS.md § Standard Conditional Props)
+**Job: hide or disable UI the user can't use** (show prop vs disabledText prop) — docs/claude/FRONTEND/COMPONENTS.md § Standard Conditional Props
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **show prop** | hiding unauthorized UI entirely | keeping it visible but disabled (use disabledText prop) |
 | **disabledText prop** | showing why an action is unavailable | hiding it (use show prop) |
 
-**Choosing among siblings: NotFound vs RootNotFound vs Unauthorized** (catalog entries NotFound, RootNotFound, Unauthorized)
+**Job: show a not-found or unauthorized page** (NotFound vs RootNotFound vs Unauthorized) — catalog entries NotFound, RootNotFound, Unauthorized
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -154,7 +154,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **RootNotFound** | root router fallback outside any shell | within app pages (use NotFound) |
 | **Unauthorized** | permission failure | a missing route (use NotFound / RootNotFound) |
 
-**Choosing among siblings: Small confusable pairs** (catalog entries)
+**Job: match breakpoints or format enums in the UI** (Small confusable pairs) — catalog entries
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -244,7 +244,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `theme-layout`: AppShell layout system and multi-tier theme
 
-**Choosing among siblings: Page vs MasterDetailLayout vs ResponsiveDrawer vs Modal** (docs/claude/FRONTEND/THEME_LAYOUT.md § Header and Page; § Overlays and Panels)
+**Job: lay out a page or overlay** (Page vs MasterDetailLayout vs ResponsiveDrawer vs Modal) — docs/claude/FRONTEND/THEME_LAYOUT.md § Header and Page; § Overlays and Panels
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -253,14 +253,14 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **ResponsiveDrawer** | record detail, profile or settings as an overlay | confirmations and forms (use Modal) |
 | **Modal** | confirmations and forms in a plain dialog | detail views (use ResponsiveDrawer) |
 
-**Choosing among siblings: AppShell vs FullscreenLayout** (THEME_LAYOUT.md; ROUTING_NAVIGATION.md § File-Based Routes)
+**Job: choose the outer app shell for a route** (AppShell vs FullscreenLayout) — THEME_LAYOUT.md; ROUTING_NAVIGATION.md § File-Based Routes
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **AppShell (frontend-apps-navigation)** | every authenticated page | routes under _fullscreen (use FullscreenLayout) |
 | **FullscreenLayout (frontend-apps-navigation)** | routes under _fullscreen | normal pages with nav (use AppShell with Page) |
 
-**Choosing among siblings: Theme types and hooks** (docs/claude/FRONTEND/THEME_LAYOUT.md § Types; § Hooks)
+**Job: apply and persist a theme** (Theme types and hooks) — docs/claude/FRONTEND/THEME_LAYOUT.md § Types; § Hooks
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|

@@ -116,7 +116,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `customers`: CustomerRef customer/provider pairs, provider routes and lens
 
-**Choosing among siblings: Viewing a CustomerRef: includeCustomer vs includeProvider vs includeComplete; customerRefAsProviderSchema vs customerRefAsCustomerSchema** (catalog choose lines)
+**Job: load a customer relationship from the provider's or the customer's side** (Viewing a CustomerRef: includeCustomer vs includeProvider vs includeComplete; customerRefAsProviderSchema vs customerRefAsCustomerSchema) — catalog choose lines
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -126,7 +126,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **customerRefAsProviderSchema** | provider-facing listings | customer-facing (use customerRefAsCustomerSchema) |
 | **customerRefAsCustomerSchema** | customer-facing listings | provider-facing (use customerRefAsProviderSchema) |
 
-**Choosing among siblings: CustomerRef vs OrganizationUser** (catalog CustomerRef)
+**Job: record who is a customer of whom vs who is a member of an org** (CustomerRef vs OrganizationUser) — catalog CustomerRef
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -146,7 +146,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `segments`: Segments: provider-owned audiences, static/dynamic membership reconciliation
 
-**Choosing among siblings: Reconcile: reconcileSegment vs reconcileCustomerRefSegments vs reconcileCustomerRef vs applyMembershipDiff vs publishMembershipChanges** (docs/claude/SEGMENTS.md § Static and dynamic membership; catalog)
+**Job: recompute segment membership when rules or customers change** (Reconcile: reconcileSegment vs reconcileCustomerRefSegments vs reconcileCustomerRef vs applyMembershipDiff vs publishMembershipChanges) — docs/claude/SEGMENTS.md § Static and dynamic membership; catalog
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -156,7 +156,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **applyMembershipDiff** | persisting computed membership changes (only writer of SegmentMember) | computing matches (use evaluateSegment) |
 | **publishMembershipChanges** | emitting membership events from diffs | unrelated events (use appEvents directly) |
 
-**Choosing among siblings: Evaluate: evaluateSegment vs estimateSegmentReach vs compileSegmentWhere** (catalog; docs/claude/SEGMENTS.md § API)
+**Job: evaluate or preview who is in a segment** (Evaluate: evaluateSegment vs estimateSegmentReach vs compileSegmentWhere) — catalog; docs/claude/SEGMENTS.md § API
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -164,7 +164,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **estimateSegmentReach** | preview counts for draft conditions | a saved segment's members (use evaluateSegment) |
 | **compileSegmentWhere** | the composable query filter itself | matched ids (use evaluateSegment) |
 
-**Choosing among siblings: Validate and health: validateSegmentConditions vs assertSegmentReferencesOwned vs findReferenceCycle vs soundSegments vs withSegmentsRuleIssues** (docs/claude/SEGMENTS.md § Rule health and references; catalog)
+**Job: validate a segment and check its health** (Validate and health: validateSegmentConditions vs assertSegmentReferencesOwned vs findReferenceCycle vs soundSegments vs withSegmentsRuleIssues) — docs/claude/SEGMENTS.md § Rule health and references; catalog
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -179,6 +179,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **applyMembershipDiff** `apps/api/src/modules/segment/services/applyMembershipDiff.ts#applyMembershipDiff`: Persist computed membership changes; to compute matches use evaluateSegment, to notify use publishMembershipChanges.
   - *Signs you're bypassing it:* hand-computing added/removed member sets and issuing createMany/deleteMany on SegmentMember (catalog: applyMembershipDiff (persist computed membership changes))
 - **assertSegmentReferencesOwned** `apps/api/src/modules/segment/validations/assertSegmentReferencesOwned.ts#assertSegmentReferencesOwned`: Ownership and lens check on references; for condition shape validation use validateSegmentConditions.
+  - *Throws:* makeError 422 VALIDATION_ERROR (`validation-error`, request-context-errors, inferred)
   - *Signs you're bypassing it:* saving segment conditions that name tags or segments without checking they belong to the owner's lens (docs/claude/SEGMENTS.md § Rule health and references (refuses references outside the owner's live segments))
 - **compileSegmentWhere** `apps/api/src/modules/segment/services/evaluateSegment.ts#compileSegmentWhere`: Need the query filter itself to compose; for matched ids use evaluateSegment, for counts estimateSegmentReach.
 - **estimateSegmentReach** `apps/api/src/modules/segment/services/estimateSegmentReach.ts#estimateSegmentReach`: Preview counts for draft conditions; for a saved segment's member ids use evaluateSegment.
@@ -186,6 +187,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **evaluateSegment** `apps/api/src/modules/segment/services/evaluateSegment.ts#evaluateSegment`: Full recompute of a saved segment; draft conditions: estimateSegmentReach; raw filter: compileSegmentWhere.
   - *Signs you're bypassing it:* a hand-written prisma.customerRef.findMany where clause reproducing a segment's rule (docs/claude/SEGMENTS.md § Static and dynamic membership (reconcileSegment evaluates the whole set through toPrisma))
 - **findReferenceCycle** `apps/api/src/modules/segment/services/segmentReferenceGraph.ts#findReferenceCycle`: Validate before saving segment references; referencedBy finds dependents instead.
+  - *Throws:* makeError 422 VALIDATION_ERROR (`validation-error`, request-context-errors, inferred)
   - *Signs you're bypassing it:* a hand-written DFS over segment conditions to detect self-reference or cycles (docs/claude/SEGMENTS.md § Rule health and references)
 - **ownedSegments** `apps/api/src/modules/customerRef/lib/customerRefLens.ts#ownedSegments`: fetch an owner's live segments through the lens's Segment source
 - **publishMembershipChanges** `apps/api/src/modules/segment/services/publishMembershipChanges.ts#publishMembershipChanges`: After reconcileSegment/reconcileCustomerRef produce diffs; skips empty diffs. Emit unrelated events via appEvents directly.
@@ -211,6 +213,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **sweepableSegments** `apps/api/src/modules/segment/services/sweepableSegments.ts#sweepableSegments`: list live dynamic segments eligible for a membership sweep
 - **sweepSegments** `apps/api/src/jobs/handlers/sweepSegments.ts#sweepSegments`: Single segment: reconcileSegment; single customer: reconcileCustomerRefSegments.
 - **validateSegmentConditions** `apps/api/src/modules/segment/validations/validateSegmentConditions.ts#validateSegmentConditions`: Shape and field validation; reference ownership is assertSegmentReferencesOwned.
+  - *Throws:* makeError 422 VALIDATION_ERROR (`validation-error`, request-context-errors, inferred)
 - **validateSegmentReferences** `apps/api/src/modules/segment/validations/validateSegmentReferences.ts#validateSegmentReferences`: check segment rule conditions only reference records the owner may use
 - **withoutDegradedSegments** `apps/api/src/lib/email/withoutDegradedSegments.ts#withoutDegradedSegments`: drop segment references whose own rule is degraded from an email's live audience set
 - **withSegmentRuleIssues** `apps/api/src/modules/segment/services/withSegmentRuleIssues.ts#withSegmentRuleIssues`: Single segment; for lists use withSegmentsRuleIssues.

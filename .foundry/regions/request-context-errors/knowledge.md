@@ -115,7 +115,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `request-context`: Request lifecycle: AppEnv, prepareRequest, context setters/accessors, resource and job context
 
-**Choosing among siblings: Reading the context: Direct c.get() vs getActor vs getResource vs getValidatedBody / getValidatedQuery** (docs/claude/CONTEXT.md § Context Access, § Resource Context)
+**Job: read the request context in a handler** (Reading the context: Direct c.get() vs getActor vs getResource vs getValidatedBody / getValidatedQuery) — docs/claude/CONTEXT.md § Context Access, § Resource Context
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -125,7 +125,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **getValidatedBody** | typed JSON body from a generic Context | query string (use getValidatedQuery) |
 | **getValidatedQuery** | typed query string | JSON body (use getValidatedBody) |
 
-**Choosing among siblings: setUserContext vs refreshUserContext vs findUserWithRelations** (docs/claude/CONTEXT.md § Context Setters, § Refreshing Context)
+**Job: load or refresh the user in the request context** (setUserContext vs refreshUserContext vs findUserWithRelations) — docs/claude/CONTEXT.md § Context Setters, § Refreshing Context
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -133,7 +133,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **refreshUserContext** | after changing the user's memberships mid-request | you already hold UserWithRelations (use setUserContext) |
 | **findUserWithRelations (authentication)** | loading a user with orgs, spaces, memberships (10-minute cache) | updating request permissions (use refreshUserContext) |
 
-**Choosing among siblings: Row scoping: resourceContextMiddleware vs scopeNarrowing vs filterLens** (docs/claude/CONTEXT.md § Resource Context, § filterLens)
+**Job: scope which rows a route can reach** (Row scoping: resourceContextMiddleware vs scopeNarrowing vs filterLens) — docs/claude/CONTEXT.md § Resource Context, § filterLens
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -141,7 +141,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **scopeNarrowing (lenses)** | per-request row scope from context | fixed picks and where (static route filterLens) |
 | **filterLens** | the route's filter surface | shaping responses (responseSchema) |
 
-**Choosing among siblings: Caller identity sources** (docs/claude/AUTH.md; docs/claude/REDIS.md § Rate Limiting; catalog clientIp/clientAddress, isSuperadmin)
+**Job: identify the caller or their address** (Caller identity sources) — docs/claude/AUTH.md; docs/claude/REDIS.md § Rate Limiting; catalog clientIp/clientAddress, isSuperadmin
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -164,8 +164,10 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **refreshUserContext** `apps/api/src/lib/context/refreshUserContext.ts#refreshUserContext`: After mutating the user's memberships mid-request; when you already hold UserWithRelations, call setUserContext directly.
   - *Signs you're bypassing it:* re-querying the user's memberships and re-running permix setup by hand after adding/removing a membership, or carrying on with stale permissions (docs/claude/CONTEXT.md § Refreshing Context)
 - **resourceContextMiddleware** `apps/api/src/middleware/resources/resourceContextMiddleware.ts#resourceContextMiddleware`: per-request row filtering without loading one resource: scopeNarrowing instead
+  - *Throws:* makeError 404 RESOURCE_NOT_FOUND (`resource-not-found`); makeError 409 CONFLICT (`conflict`)
 - **setUserContext** `apps/api/src/lib/context/setUserContext.ts#setUserContext`: When you have a loaded UserWithRelations; to reload from DB use refreshUserContext. Read identity afterwards via getActor(c).
 - **Alternate resource lookup** `docs/claude/CONTEXT.md → Lookup Parameter`: only unique fields; non-unique matches return 409
+  - *Throws:* makeError 409 CONFLICT (`conflict`)
 - **API middleware order** `apps/api/src/routes/api.ts`: run cors, prepare, session auth, spoof, token auth, resource load, validation, handler in order
 - **Batch request minimal context** `apps/api/src/middleware/prepareRequest.ts`: set only db for /api/batch; full context setup happens per sub-request
 - **Scoped request context** `docs/claude/ARCHITECTURE.md#Why Scoped Context?`: give each request its own db view, requestId-tagged logs and shared transaction
@@ -199,7 +201,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `errors`: makeError/AppError, global error handler, status conventions
 
-**Choosing among siblings: What to throw: makeError vs raw Error vs HTTPException vs AppError vs errorHandlerMiddleware** (docs/claude/ERRORS.md § The rule, § makeError / AppError, § The global handler, § Shared packages can't use makeError)
+**Job: throw an error from server code with the right status** (What to throw: makeError vs raw Error vs HTTPException vs AppError vs errorHandlerMiddleware) — docs/claude/ERRORS.md § The rule, § makeError / AppError, § The global handler, § Shared packages can't use makeError
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -210,14 +212,14 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **HTTPException** | docs only say: switch to makeError when guidance or fieldErrors are needed | request-path caller errors needing guidance/fieldErrors (use makeError) |
 | **errorHandlerMiddleware** | let Zod, Prisma and package errors propagate; it maps 422/400/409/404/500 | catching and formatting them in controllers or calling respond422/respond500 |
 
-**Choosing among siblings: isUniqueConstraintError vs isWriteConflictError** (catalog packages/db/src/utils)
+**Job: detect a database constraint or write conflict** (isUniqueConstraintError vs isWriteConflictError) — catalog packages/db/src/utils
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **isUniqueConstraintError** | duplicate key on insert/update (P2002) | write conflict or deadlock (isWriteConflictError) |
 | **isWriteConflictError** | serialization conflict or deadlock (P2034) | duplicate unique key (isUniqueConstraintError) |
 
-**Choosing among siblings: Frontend: describeError vs handleApiError; ErrorBoundary vs RouteError** (catalog packages/ui/src/lib, components/utility/ErrorBoundary.tsx; docs/claude/FRONTEND/AUTH.md § Pages and Forms)
+**Job: show an error to the user in the frontend** (Frontend: describeError vs handleApiError; ErrorBoundary vs RouteError) — catalog packages/ui/src/lib, components/utility/ErrorBoundary.tsx; docs/claude/FRONTEND/AUTH.md § Pages and Forms
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -227,20 +229,26 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **RouteError** | errors in route loaders/rendering | arbitrary subtrees (ErrorBoundary) |
 
 - **UsageError** `@inixiative/json-rules#UsageError`: Caller input faults; lens shape faults throw LensRefusal instead.
+  - *Error class:* `usage` (json-rules UsageError: the caller's input is missing or malformed (no now for a relative date, invalid now or time zone, an unbound bind). Fix: supply the input.); thrown by check, toPrisma, toSql, materializeSourceQuery, materializeSources
 - **AppError** `apps/api/src/lib/errors/makeError.ts#AppError`: Throw via makeError rather than constructing HTTPException; don't set requestId yourself, the boundary stamps it.
+  - *Error class:* `caller-error` (On the live HTTP request path the caller sent something wrong: throw makeError({ status, message, guidance? }) so the response is a 4xx with the structured body. Umbrella for the error carriers (AppError, HTTPException); each status family has its own class.); thrown by makeError
   - *Signs you're bypassing it:* new HTTPException(status, { res: new Response(JSON.stringify({ error, message })) }) or a custom error class carrying status and body (catalog AppError; docs/claude/ERRORS.md § makeError / AppError)
 - **describeError** `packages/ui/src/lib/describeError.ts#describeError`: turn an unknown error into a displayable message, optionally with a friendly headline
 - **ErrorBoundary** `packages/ui/src/components/utility/ErrorBoundary.tsx#ErrorBoundary`: Router-level errors: RouteError as the route errorComponent instead.
 - **errorHandlerMiddleware** `apps/api/src/middleware/error/errorHandlerMiddleware.ts#errorHandlerMiddleware`: Throw typed errors and let this map them; don't call respond422/respond500 from handlers.
+  - *Throws:* makeError 500 SERVER_ERROR (`server-error`)
   - *Signs you're bypassing it:* try/catch blocks in controllers that catch ZodError or Prisma errors and format a 422/409/404 response themselves, or call respond422/respond500 directly (docs/claude/ERRORS.md § The global handler)
 - **handleApiError** `packages/ui/src/lib/handleApiError.ts#handleApiError`: turn an unknown API error into a user-facing error message
 - **HTTP_ERROR_MAP** `packages/shared/src/errors/types.ts#HTTP_ERROR_MAP`: Single source for error labels and types; derive error types from it instead of hand-declaring status unions.
   - *Signs you're bypassing it:* hand-declared unions of status codes or error labels ('NOT_FOUND' | 'CONFLICT' …) and per-status default messages (catalog HTTP_ERROR_MAP; docs/claude/API_ROUTES.md § Error Responses ("derived from HTTP_ERROR_MAP to prevent drift"))
 - **isUniqueConstraintError** `packages/db/src/utils/isUniqueConstraintError.ts#isUniqueConstraintError`: Duplicate key on insert/update: this; transaction write conflict or deadlock (P2034): isWriteConflictError instead.
+  - *Error class:* `conflict` (The request collides with current state: duplicate, ambiguous lookup, lock contention, illegal transition (conflict 409).); inferred throwers: db, query
   - *Signs you're bypassing it:* err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002' checks written inline (catalog isUniqueConstraintError)
 - **isWriteConflictError** `packages/db/src/utils/isWriteConflictError.ts#isWriteConflictError`: Serialization conflict or deadlock: this; duplicate unique key (P2002): isUniqueConstraintError instead.
+  - *Error class:* `conflict` (The request collides with current state: duplicate, ambiguous lookup, lock contention, illegal transition (conflict 409).); classified by convention; inferred throwers: db.txn
   - *Signs you're bypassing it:* inline err.code === 'P2034' / deadlock string matching before retrying a transaction (catalog isWriteConflictError)
 - **makeError** `apps/api/src/lib/errors/makeError.ts#makeError`: Use instead of throwing raw Error or hand-built responses; options limited to status, message, guidance, fieldErrors.
+  - *Throws:* AppError (`caller-error`)
   - *Signs you're bypassing it:* throw new Error('Not found') in a controller or service on the request path (serializes as an opaque 500), or return c.json({ error: '…' }, 404) with a hand-built body (docs/claude/ERRORS.md § The rule; docs/claude/API_ROUTES.md § Error Responses)
 - **RouteError** `packages/ui/src/components/utility/ErrorBoundary.tsx#RouteError`: Errors thrown in route loaders/rendering; for arbitrary subtrees use ErrorBoundary.
 - **withRetry** `packages/shared/src/utils/retry.ts#withRetry`: retry an async call a few times (default 3) before failing
@@ -250,6 +258,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
   - *Signs you're bypassing it:* Matching json-rules error message strings to decide whose fault an error is, instead of instanceof UsageError / LensRefusal. (@inixiative/json-rules/README.md § Error Handling)
 - **error handler middleware** `docs/claude/API_ROUTES.md#Error Responses`: normalize thrown, Zod and Prisma errors into the standard body with requestId
 - **HTTPException** `hono/http-exception`: makeError when guidance or fieldErrors are needed
+  - *Error class:* `caller-error` (On the live HTTP request path the caller sent something wrong: throw makeError({ status, message, guidance? }) so the response is a 4xx with the structured body. Umbrella for the error carriers (AppError, HTTPException); each status family has its own class.); thrown by Not-found via HTTPException, validateNotToken, validateOwnerPermission; inferred throwers: validatePermission
 - **Caller errors on request path use makeError** `docs/claude/ERRORS.md#The rule`: Request-path 4xx caller errors; genuine server faults stay raw Error; off-path code uses plain Error.
 - **Do not pass requestId to makeError** `docs/claude/API_ROUTES.md#Error Responses`: Every makeError call.
   - *Signs you're bypassing it:* makeError({ status: 404, requestId: c.get('requestId') }) or adding requestId to an error body by hand (docs/claude/API_ROUTES.md § Error Responses; docs/claude/ERRORS.md § makeError / AppError)

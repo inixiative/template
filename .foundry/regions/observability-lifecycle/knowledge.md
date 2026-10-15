@@ -129,7 +129,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `logging`: Structured logging: shared log facade, withLogContext, scopes, redaction
 
-**Choosing among siblings: withLogContext vs logScope vs setLogService vs log.child** (docs/claude/LOGGING.md § Structured logging)
+**Job: attach context fields to log lines** (withLogContext vs logScope vs setLogService vs log.child) — docs/claude/LOGGING.md § Structured logging
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -138,7 +138,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **setLogService** | process-wide constant fields | per-request or per-job fields (use withLogContext) |
 | **log.child** | bindings tied to a component logger | fields spanning async call chains (use withLogContext) |
 
-**Choosing among siblings: Which logger** (docs/claude/LOGGING.md § Structured logging; § Browser setup)
+**Job: choose the logger for where the code runs** (Which logger) — docs/claude/LOGGING.md § Structured logging; § Browser setup
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -146,7 +146,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **createFrontendLogger** | browser apps instead of console.* | backend code (use log) |
 | **pinoLogger** | only SDKs that require a pino logger | app logging (use log) |
 
-**Choosing among siblings: redactLogValue vs stringifyLogValue** (catalog redactLogValue, stringifyLogValue)
+**Job: redact a value before logging it** (redactLogValue vs stringifyLogValue) — catalog redactLogValue, stringifyLogValue
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -187,7 +187,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `telemetry`: OpenTelemetry spans/metrics, browser telemetry, error reporter
 
-**Choosing among siblings: withSpan vs withRemoteTrace vs recordDuration vs incrementCounter vs traceJob** (catalog telemetry operations; docs/claude/LOGGING.md § Coverage and limits)
+**Job: trace or measure work** (withSpan vs withRemoteTrace vs recordDuration vs incrementCounter vs traceJob) — catalog telemetry operations; docs/claude/LOGGING.md § Coverage and limits
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -198,14 +198,14 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **recordDuration** | latency metrics without a span | need a span too (withSpan); counts (incrementCounter) |
 | **incrementCounter** | counts of events | durations (recordDuration); timed spans (withSpan) |
 
-**Choosing among siblings: createSentryReporter vs createConsoleReporter** (FEATURES.md › Error Reporter Adapter)
+**Job: report errors to an error tracker** (createSentryReporter vs createConsoleReporter) — FEATURES.md › Error Reporter Adapter
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **createSentryReporter** | a Sentry DSN is configured | local/dev or no DSN (use createConsoleReporter) |
 | **createConsoleReporter** | local/dev or no DSN | production with a DSN (use createSentryReporter) |
 
-**Choosing among siblings: OTEL enable flags** (docs/claude/LOGGING.md § Browser setup; § New Relic traces/metrics + Better Stack logs)
+**Job: turn telemetry on and point it at an exporter** (OTEL enable flags) — docs/claude/LOGGING.md § Browser setup; § New Relic traces/metrics + Better Stack logs
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -268,7 +268,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `process-lifecycle`: Graceful shutdown handlers, health checks, connection draining, unref intervals
 
-**Choosing among siblings: Shutdown-aware helpers** (apps/api/src/lib/shutdown.ts; catalog makeUnrefInterval)
+**Job: run code that must stop cleanly at shutdown** (Shutdown-aware helpers) — apps/api/src/lib/shutdown.ts; catalog makeUnrefInterval
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -278,7 +278,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **sleepUnlessShuttingDown** | polling or backoff loops | a one-off check (use isShutdownInProgress) |
 | **makeUnrefInterval** | in-process loops instead of setInterval | scheduled cross-process work (cron jobs) |
 
-**Choosing among siblings: drainConnections vs cleanupStaleConnections** (apps/api/src/ws/lifecycle.ts)
+**Job: close WebSocket connections at shutdown or when stale** (drainConnections vs cleanupStaleConnections) — apps/api/src/ws/lifecycle.ts
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|

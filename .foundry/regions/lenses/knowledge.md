@@ -98,7 +98,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `lenses`: Lenses and narrowings over data: lensFor, composeLens, filterLens, scopeNarrowing
 
-**Choosing among siblings: Where a template lens starts** (catalog entries lensFor, lensFromOperation, lensFromSchema, customerRefLens; docs/claude/API_ROUTES.md)
+**Job: start a lens for a model, endpoint or schema** (Where a template lens starts) — catalog entries lensFor, lensFromOperation, lensFromSchema, customerRefLens; docs/claude/API_ROUTES.md
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -108,7 +108,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **customerRefLens** | the segment rule root, binding sources yourself | per-provider narrowing (resolvedCustomerRefLens); any non-segment use |
 | **createLens (lens-usage)** | a lens over your own FieldMaps and bridges | a Prisma model the template maps (lensFor) |
 
-**Choosing among siblings: Adding scope or hiding fields** (docs/claude/API_ROUTES.md § Lens Wheres; json-rules docs/LENS.md §1; CI rule no-lens-spread)
+**Job: add scope to a lens or hide fields** (Adding scope or hiding fields) — docs/claude/API_ROUTES.md § Lens Wheres; json-rules docs/LENS.md §1; CI rule no-lens-spread
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -118,7 +118,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **omitForeignKeys** | hide every FK id column, e.g. rule-tracked lenses | sensitive fields (redactLens) |
 | **lensWhere** | folding non-root lens clauses into paginate's composed where | hand-ANDing relation wheres into some / every / is |
 
-**Choosing among siblings: Loading rows and option values** (catalog entries fetchLens, toLensSelect, sourceQueryValues, sourceQueryWhere, emailSourceValues)
+**Job: load the rows or option values a lens allows** (Loading rows and option values) — catalog entries fetchLens, toLensSelect, sourceQueryValues, sourceQueryWhere, emailSourceValues
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -128,7 +128,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **sourceQueryWhere** | only a source query's scoped where | fetched values (sourceQueryValues) |
 | **emailSourceValues (email-lens)** | real picker options (Tag, Segment) per email lens slot | non-email sources (sourceQueryValues) |
 
-**Choosing among siblings: Resolving a path through a lens** (docs/claude/COMMUNICATIONS.md § The email lens; catalog entries)
+**Job: resolve a dotted path through a lens** (Resolving a path through a lens) — docs/claude/COMMUNICATIONS.md § The email lens; catalog entries
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -177,7 +177,9 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **Send model projection, never raw lens, to client** `json-rules docs, Projected`: server→client builder surface; per-path projectLens for server checks.
   - *Signs you're bypassing it:* Shipping the server's lens or narrowing (with its where clamps) to a browser builder instead of the model-keyed projection. (@inixiative/json-rules/README.md § TypeScript Types (Projected); docs/LENS.md §10)
 - **assertValidFieldMaps** `@inixiative/json-rules`: Throwing variant; validateFieldMaps returns { ok, errors }.
+  - *Throws:* json-rules rule-shape Error (`rule-shape`, json-rules-engine, inferred)
 - **assertValidNarrowing** `@inixiative/json-rules`: Throwing variant; validateNarrowing to collect errors.
+  - *Throws:* json-rules rule-shape Error (`rule-shape`, json-rules-engine, inferred)
 - **defaultRecipientNarrowing** `apps/api/src/lib/email/emailLensFor.ts`: Default; a stored recipient lens enabling organizationUsers/spaceUsers widens within the organization.
 - **from: 'mapDefaults' source pointer** `@inixiative/json-rules/README.md — Sources (path source pointer)`: Names any eligible row; a plain path source offers only reachable linked rows. Scope tenancy via mapDefaults to keep unlinked rows.
 - **getLensRoot** `@inixiative/json-rules`: find the base lens a narrowing chain is rooted at

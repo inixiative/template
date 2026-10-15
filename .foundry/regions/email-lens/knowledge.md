@@ -114,7 +114,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `email-lens`: The email lens and email rule blocks: sender/recipient/data/system lenses, recipient variables, rule references on templates, packages/email/src/rules
 
-**Choosing among siblings: Rule checks under the email lens** (docs/claude/COMMUNICATIONS.md § The email lens)
+**Job: check what a rule in an email template may read and reference** (Rule checks under the email lens) — docs/claude/COMMUNICATIONS.md § The email lens
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -125,7 +125,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **withRule (json-rules)** | render-time gate: a degraded rule never matches and reports why | save-time refusal (use validateConditions) |
 | **validateConditions (email-templates)** | refuse bad conditions at save, opaque-loop reads included | tokens (use validateTokens) |
 
-**Choosing among siblings: walkEmailLensPath vs emailTokenPathKind vs validateTokens vs walkLensPath** (docs/claude/COMMUNICATIONS.md § The email lens)
+**Job: resolve a token path through the email lens** (walkEmailLensPath vs emailTokenPathKind vs validateTokens vs walkLensPath) — docs/claude/COMMUNICATIONS.md § The email lens
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -134,7 +134,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **validateTokens (email-templates)** | reject template tokens absent from the narrowed lens at save | a single path (use emailTokenPathKind) |
 | **walkLensPath** | the json-rules traversal interpolate delegates to at render | email-lens checks at save (use walkEmailLensPath) |
 
-**Choosing among siblings: Building and scoping the lens** (docs/claude/COMMUNICATIONS.md § The email lens (The lens is the row owner's; Memberships are the sender's))
+**Job: build an email lens and scope it to what the sender may see** (Building and scoping the lens) — docs/claude/COMMUNICATIONS.md § The email lens (The lens is the row owner's; Memberships are the sender's)
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -143,7 +143,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **defaultRecipientNarrowing (lenses)** | default: a sender sees only its own level's memberships | widening: store a recipient lens enabling organizationUsers/spaceUsers |
 | **targetedBySender** | messageUser rules from Organization/Space senders reach only visible members | registry sends, which target the entity's own recipient |
 
-**Choosing among siblings: checkExpectations vs collectUnprovidedPathWarnings vs collectJsonOpacityWarnings** (catalog (packages/email/src/rules))
+**Job: warn about paths a component expects that the lens does not provide** (checkExpectations vs collectUnprovidedPathWarnings vs collectJsonOpacityWarnings) — catalog (packages/email/src/rules)
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -188,6 +188,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **scopedRule** `packages/email/src/rules/scopedRule.ts#scopedRule`: rewriting the condition for loops; pinning scope data to elements: narrowToElements instead
 - **scopeEmailLens** `packages/email/src/rules/scopeEmailLens.ts#scopeEmailLens`: narrow an email lens to the owner and sender of the row being saved or rendered
 - **syncRuleReferences** `packages/email/src/rules/syncRuleReferences.ts#syncRuleReferences`: record which rules an email source's contents reference, from its save path
+  - *Throws:* RuleReferenceError (`validation-error`, json-rules)
 - **targetedBySender** `apps/api/src/lib/messaging/senderTargeting.ts#targetedBySender`: Scope who a sender reaches; resolveUsers then evaluates the result.
   - *Signs you're bypassing it:* a recipient query from an Organization or Space sender that is not clamped to the sender's memberships (catalog: targetedBySender (restrict a recipient rule to users the sender's lens may reach))
 - **useEmailRuleSurface** `packages/ui/src/hooks/email/useEmailRuleSurface.ts#useEmailRuleSurface`: Template rule surface: this; variables in scope for a rule source: useEmailVariableScope instead.

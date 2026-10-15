@@ -127,7 +127,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `schema-introspection`: Runtime schema maps (@inixiative/prisma-map) and model metadata helpers
 
-**Choosing among siblings: Model-name helpers: ModelNames vs AccessorNames vs toAccessor vs isModelName** (docs/claude/DATABASE.md § Model Utilities)
+**Job: convert or check a Prisma model name** (Model-name helpers: ModelNames vs AccessorNames vs toAccessor vs isModelName) — docs/claude/DATABASE.md § Model Utilities
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -136,7 +136,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **toAccessor** | `'User'` → `'user'` | needing a typed delegate (pass `db.user`; see database) |
 | **isModelName** | guarding a PascalCase model name | camelCase accessors (use isAccessorName) |
 
-**Choosing among siblings: Field and relation metadata: modelFields vs lookupField vs getModelRelations vs getAccessorRelations vs getRelations vs relationForeignKey** (catalog; @inixiative/prisma-map/README.md § Relation Traversal)
+**Job: read a model's field and relation metadata** (Field and relation metadata: modelFields vs lookupField vs getModelRelations vs getAccessorRelations vs getRelations vs relationForeignKey) — catalog; @inixiative/prisma-map/README.md § Relation Traversal
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -147,7 +147,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **getRelations** | library: all relations of a model in a PrismaMap, with collapsed FK | one relation's FK (use relationForeignKey) |
 | **relationForeignKey** | collapsing one relation's FK | listing all relations (use getRelations) |
 
-**Choosing among siblings: Raw SQL names: tableName vs columnName vs storedValue vs aliasColumns** (@inixiative/prisma-map/README.md § Resolving DB identifiers; catalog aliasColumns)
+**Job: name tables, columns and enum values in raw SQL** (Raw SQL names: tableName vs columnName vs storedValue vs aliasColumns) — @inixiative/prisma-map/README.md § Resolving DB identifiers; catalog aliasColumns
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -156,7 +156,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **storedValue** | an enum member's stored value | identifiers (use tableName/columnName) |
 | **aliasColumns** | a full aliased select list for a model | one column (use columnName) |
 
-**Choosing among siblings: Building the map: buildPrismaMapV7 vs buildPrismaMapV6 vs parseSchemaText** (@inixiative/prisma-map/README.md § Quick Start, § API)
+**Job: build a Prisma schema map** (Building the map: buildPrismaMapV7 vs buildPrismaMapV6 vs parseSchemaText) — @inixiative/prisma-map/README.md § Quick Start, § API
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|

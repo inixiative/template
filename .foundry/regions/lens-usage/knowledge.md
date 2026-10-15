@@ -115,7 +115,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `lib-json-rules-lens-usage`: Building and using a lens: validate, narrowRule, projectLens, walkLensPath, fetching rows under a lens, describe-and-validate vs deny, migration, worked example (LENS.md §9–13, README § Lens utilities/bindings/fetching)
 
-**Choosing among siblings: The rule pipeline: validate, narrow, execute** (@inixiative/json-rules/docs/LENS.md §10, §11; README § Lens Utilities)
+**Job: safely run a user- or AI-written rule under a lens** (The rule pipeline: validate, narrow, execute) — @inixiative/json-rules/docs/LENS.md §10, §11; README § Lens Utilities
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -125,7 +125,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **check (json-rules-engine)** | in memory, on a narrowed rule | database-side filtering (toPrisma) |
 | **describeRule (json-rules-engine)** | a rule's sources, bridges and supportedTargets, to pick an executor | as the gate (validateRuleInLens) |
 
-**Choosing among siblings: Fetching and projecting under a lens** (@inixiative/json-rules/README.md § Fetching Under a Lens, § Lens Utilities)
+**Job: fetch rows and cut them to what a lens shows** (Fetching and projecting under a lens) — @inixiative/json-rules/README.md § Fetching Under a Lens, § Lens Utilities
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -135,7 +135,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **walkLensPath** | one own path (token, binding, guard) hop by hop | whole rules (validateRuleInLens); reading values (readLensValue) |
 | **fetchLens (lenses)** | template code loading every row a lens matches | library-level select building (toLensSelect) |
 
-**Choosing among siblings: bindLens vs bindRule** (@inixiative/json-rules/docs/VERBS.md § Public API (bind))
+**Job: fill bind tokens in a lens or rule** (bindLens vs bindRule) — @inixiative/json-rules/docs/VERBS.md § Public API (bind)
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -149,9 +149,12 @@ Point at a class when that is as specific as the moment allows, or at a member. 
   - *Signs you're bypassing it:* Re-nesting stored lens layers by hand (parent: fetched record) without checking each against the layers above it, instead of composeLens, which fails closed. (@inixiative/json-rules/docs/LENS.md §9 Storing a lens)
 - **createLens** `@inixiative/json-rules#createLens`: Always over hand-constructing a Lens object; composeLens/storeLens build on an existing lens instead.
 - **lensVisit** `@inixiative/json-rules#lensVisit`: One path on demand; use projectLens when you need the whole projected tree.
+  - *Throws:* LensRefusal (`lens-refusal`, lens-model)
 - **narrowRule** `@inixiative/json-rules#narrowRule`: Enforces lens clamps on authored rules; don't AND clamps onto the rule by hand.
+  - *Throws:* LensRefusal (`lens-refusal`, lens-model)
   - *Signs you're bypassing it:* ANDing a lens's clamp wheres onto an authored rule by hand (`{ all: [rule, clamp] }`, or inside an all's condition) instead of narrowRule(rule, lens), which puts an all clamp in the window filter. (@inixiative/json-rules/docs/LENS.md §4 (naive AND injection — wrong); catalog entry narrowRule)
 - **projectLens** `@inixiative/json-rules#projectLens`: Describes the lens surface; to cut actual rows use projectRows, to fetch them use toLensSelect.
+  - *Throws:* LensRefusal (`lens-refusal`, lens-model)
   - *Signs you're bypassing it:* Shipping the server's lens or narrowing (with its where clamps) to a browser builder instead of projectLens(…, { by: 'model' }), or gating a rule against that projection. (@inixiative/json-rules/docs/LENS.md §10 (the leak-safe surface; a surface is not a gate))
 - **projectRows** `@inixiative/json-rules#projectRows`: Whole rows; for one value use readLensValue. keepClampColumns output holds hidden values—re-check only, never show viewers.
   - *Signs you're bypassing it:* Deleting hidden keys from fetched rows by hand, or filtering clamped rows in application code, to match what a lens shows. (catalog entry projectRows; @inixiative/json-rules/README.md › Fetching Under a Lens)
@@ -160,6 +163,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **storeLens** `@inixiative/json-rules#storeLens`: Persisting lenses; composeLens to rebuild, createLens to define a new one.
   - *Signs you're bypassing it:* Persisting a composed lens as one nested JSON blob, or re-nesting stored layers by hand without validating each against its parents, instead of storeLens / composeLens. (@inixiative/json-rules/docs/LENS.md §9 Storing a lens; README § TypeScript Types (Stored))
 - **toLensSelect** `@inixiative/json-rules#toLensSelect`: Selects columns/relations; root where comes from toPrisma(rule, { lens }); follow with projectRows for to-one clamps.
+  - *Throws:* LensRefusal (`lens-refusal`, lens-model)
   - *Signs you're bypassing it:* A hand-written Prisma select / include tree mirroring a lens's picks and relations. (catalog entry toLensSelect)
 - **validateRuleInLens** `@inixiative/json-rules#validateRuleInLens`: Rule versus lens; for rule shape alone use validateRule, for a single path use walkLensPath.
   - *Signs you're bypassing it:* Hand-checking each field path of a user-supplied rule against an allowlist, or evaluating an external rule without gating it against the lens. (@inixiative/json-rules/docs/LENS.md §1 ("validateRuleInLens is the gatekeeper"))

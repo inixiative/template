@@ -132,7 +132,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `encryption`: Field-level encryption (AES-256-GCM), keyrings, key rotation, CI version validation
 
-**Choosing among siblings: Encrypting: encryptField vs decryptField vs createEncryption vs encryptionService vs ENCRYPTED_MODELS** (docs/claude/ENCRYPTION.md § Adding Encrypted Fields; catalog)
+**Job: encrypt or decrypt a stored secret field** (Encrypting: encryptField vs decryptField vs createEncryption vs encryptionService vs ENCRYPTED_MODELS) — docs/claude/ENCRYPTION.md § Adding Encrypted Fields; catalog
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -142,7 +142,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **encryptionService** | rarely; internals | feature code (use encryptField/decryptField) |
 | **ENCRYPTED_MODELS** | registering a new encrypted field (the rotation job picks it up) | per-model rotation code or hooks |
 
-**Choosing among siblings: Rotating: Key rotation procedure vs rotateEncryptionKeys vs validateEncryptionVersions vs Key rotation deployment checklist** (docs/claude/ENCRYPTION.md § Key Rotation, § CI Validation, § Deployment Checklist)
+**Job: rotate an encryption key** (Rotating: Key rotation procedure vs rotateEncryptionKeys vs validateEncryptionVersions vs Key rotation deployment checklist) — docs/claude/ENCRYPTION.md § Key Rotation, § CI Validation, § Deployment Checklist
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -215,7 +215,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `secrets`: Secrets around the app: Infisical storage, secret env vars and keyrings per environment (CI included), provider credentials, how keys rotate
 
-**Choosing among siblings: Where a secret lives: Infisical for cloud secrets vs No committed env files vs getSecret vs setSecret vs encryptionEnv** (docs/claude/ENVIRONMENTS.md § Infisical; INIT_SCRIPT_PATTERNS.md §8, §12; catalog encryptionEnv)
+**Job: store or read a cloud secret** (Where a secret lives: Infisical for cloud secrets vs No committed env files vs getSecret vs setSecret vs encryptionEnv) — docs/claude/ENVIRONMENTS.md § Infisical; INIT_SCRIPT_PATTERNS.md §8, §12; catalog encryptionEnv
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -225,7 +225,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **setSecret** | an init step storing a credential in Infisical | passing it as a prop to the next step |
 | **encryptionEnv (encryption)** | declaring encryption key env vars | hand-declared z.string() key entries |
 
-**Choosing among siblings: Stored credentials: Provider credentials encrypted, never hashed vs Encrypt secrets before storage vs Never store or log plaintext secrets vs Secrets encrypted, never returned** (docs/claude/AUTH.md › Encryption; API_ROUTES.md; FEATURES.md § General Security; CLAUDE.md §7)
+**Job: store a credential the server holds** (Stored credentials: Provider credentials encrypted, never hashed vs Encrypt secrets before storage vs Never store or log plaintext secrets vs Secrets encrypted, never returned) — docs/claude/AUTH.md › Encryption; API_ROUTES.md; FEATURES.md § General Security; CLAUDE.md §7
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|

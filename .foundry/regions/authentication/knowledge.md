@@ -120,7 +120,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `authentication`: BetterAuth sessions, OAuth, AuthProviders, API tokens and token types
 
-**Choosing among siblings: Auth models: Session vs Token vs Account vs AuthProvider vs Verification** (docs/claude/AUTH.md § Overview, § Token Types, § Multi-Provider Authentication; FEATURES.md § Authentication & Sessions)
+**Job: store an identity, login or credential on the right auth model** (Auth models: Session vs Token vs Account vs AuthProvider vs Verification) — docs/claude/AUTH.md § Overview, § Token Types, § Multi-Provider Authentication; FEATURES.md § Authentication & Sessions
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -130,7 +130,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **AuthProvider** | an organization's EMAIL/OAUTH/SAML login config, secrets encrypted | env-configured social providers (getPlatformProviders) |
 | **Verification** | short-lived verification values (email verification) | long-lived keys (Token) |
 
-**Choosing among siblings: Listing login providers** (docs/claude/AUTH.md § Multi-Provider Authentication › Operations; FRONTEND/AUTH.md § useAuthProviders)
+**Job: list the login providers available to a user or org** (Listing login providers) — docs/claude/AUTH.md § Multi-Provider Authentication › Operations; FRONTEND/AUTH.md § useAuthProviders
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -139,14 +139,14 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **adminAuthProviderReadMany** | superadmin view (/api/admin/authProvider) | public pages (authProviderReadMany) |
 | **getPlatformProviders** | server: social providers whose env vars are set | UI code (useAuthProviders) |
 
-**Choosing among siblings: Storing a credential: hash vs encrypt** (docs/claude/AUTH.md § Token Authentication, § Multi-Provider Authentication › Encryption)
+**Job: store a credential: hash it or encrypt it** (Storing a credential: hash vs encrypt) — docs/claude/AUTH.md § Token Authentication, § Multi-Provider Authentication › Encryption
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **API tokens stored as SHA-256 hash** | the server only verifies it, never replays it | must be replayed to a provider (encryptField) |
 | **encryptField (encryption)** | secrets the server must read back (AuthProvider secrets) | API keys (API tokens stored as SHA-256 hash) |
 
-**Choosing among siblings: Client token helpers** (docs/claude/FRONTEND/AUTH.md § Architecture; catalog packages/ui/src/lib/auth/token.ts)
+**Job: store and check the API token on the client** (Client token helpers) — docs/claude/FRONTEND/AUTH.md § Architecture; catalog packages/ui/src/lib/auth/token.ts
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -219,7 +219,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `auth-middleware`: Auth middleware chain, spoofing, validateUser/validateActor gates
 
-**Choosing among siblings: The auth middleware chain** (docs/claude/AUTH.md § Auth Middleware Chain, § Token Authentication, § Spoof Middleware)
+**Job: identify the caller on an incoming request (session, API token, spoof, basic auth, public)** (The auth middleware chain) — docs/claude/AUTH.md § Auth Middleware Chain, § Token Authentication, § Spoof Middleware
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -229,14 +229,14 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **basicAuthMiddleware** | static-credential gate | user sessions (authMiddleware) or keys (tokenAuthMiddleware) |
 | **Public routes mount before auth** | telemetry, internal, unsubscribe, BetterAuth | authenticated routes (after tokenAuthMiddleware) |
 
-**Choosing among siblings: Who is the caller** (docs/claude/AUTH.md § validateActor; CONTEXT.md § getActor)
+**Job: find out who is acting on a request** (Who is the caller) — docs/claude/AUTH.md § validateActor; CONTEXT.md § getActor
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **getActor (request-context-errors)** | token-scoped users must count as the actor | need the real credential user (c.get('user')) |
 | **spoofedBy** | the original superadmin behind a spoofed request | the effective user (getActor) |
 
-**Choosing among siblings: Rate limits and probes** (apps/api/src/routes/api.ts; catalog apps/api/src/lib/utils/authProbe.ts)
+**Job: throttle callers or recognize health probes** (Rate limits and probes) — apps/api/src/routes/api.ts; catalog apps/api/src/lib/utils/authProbe.ts
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -247,6 +247,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 - **authMiddleware** `apps/api/src/middleware/auth/authMiddleware.ts#authMiddleware`: API keys: tokenAuthMiddleware runs first and falls through here; fixed credentials: basicAuthMiddleware.
 - **basicAuthMiddleware** `apps/api/src/middleware/auth/basicAuthMiddleware.ts#basicAuthMiddleware`: User sessions: authMiddleware; API keys: tokenAuthMiddleware. Use this only for static-credential gates.
+  - *Throws:* makeError 401 AUTHENTICATION_FAILED (`authentication-failed`)
   - *Signs you're bypassing it:* parsing an Authorization: Basic header by hand to gate a route with fixed credentials (catalog: apps/api/src/middleware/auth/basicAuthMiddleware.ts)
 - **corsMiddleware** `apps/api/src/middleware/corsMiddleware.ts#corsMiddleware`: apply CORS with validated origins and allowed methods and headers
 - **getAllowedOrigins** `apps/api/src/middleware/corsMiddleware.ts#getAllowedOrigins`: Reuse for any trusted-origin list (BetterAuth trustedOrigins) instead of re-reading WEB_URL/ADMIN_URL env vars.
@@ -260,15 +261,19 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **tokenAuthMiddleware** `apps/api/src/middleware/auth/tokenAuthMiddleware.ts#tokenAuthMiddleware`: Browser sessions: authMiddleware; non-API-key bearers fall through to it. Revocations take effect within the 10-minute cache.
   - *Signs you're bypassing it:* a route that hashes the Authorization header and queries db.token itself (docs/claude/AUTH.md § Token Authentication)
 - **validateActor** `apps/api/src/middleware/validations/validateActor.ts#validateActor`: acting as the real credential user (/me/*): validateUser; org/space token routes: skip both, use validatePermission
+  - *Throws:* makeError 401 AUTHENTICATION_FAILED (`authentication-failed`)
 - **validateNotToken** `apps/api/src/middleware/validations/validateNotToken.ts#validateNotToken`: plain user presence: validateUser; actor including spoof: validateActor
+  - *Throws:* HTTPException (`caller-error`, request-context-errors); makeError 401 AUTHENTICATION_FAILED (`authentication-failed`); makeError 403 PERMISSION_DENIED (`permission-denied`, permissions)
   - *Signs you're bypassing it:* if (c.get('token')) throw 403 written inside a handler for a session-only action (docs/claude/PERMISSIONS.md § Validation Middleware › validateNotToken)
 - **validateUser** `apps/api/src/middleware/validations/validateUser.ts#validateUser`: allow spoofed actor user: validateActor; org/space token routes: skip, use validatePermission
+  - *Throws:* makeError 401 AUTHENTICATION_FAILED (`authentication-failed`)
   - *Signs you're bypassing it:* if (!c.get('user')) throw 401 written inside a handler (docs/claude/AUTH.md § Validation Middleware)
 - **Public routes mount before auth** `apps/api/src/routes/api.ts`: Public, signed-link or shared-secret routes (telemetry, internal, unsubscribe, BetterAuth); authenticated routes go after.
 - **organizationCreateToken** `docs/claude/AUTH.md#Choosing Between validateUser and validateActor`: Org-level machine access; OrganizationUser tokens when acting as a person.
 - **spaceCreateToken** `docs/claude/AUTH.md#Choosing Between validateUser and validateActor`: Space-level machine access; SpaceUser tokens when acting as a person.
 - **spoofedBy** `apps/api/src/middleware/auth/spoofMiddleware.ts`: record the original superadmin behind a spoofed request for audit
 - **validatePermission** `docs/claude/AUTH.md#Choosing Between validateUser and validateActor`: Org/Space token routes; validateUser/validateActor reject those tokens with 401.
+  - *Throws:* HTTPException (`caller-error`, request-context-errors, inferred); makeError 403 PERMISSION_DENIED (`permission-denied`, permissions)
   - *Signs you're bypassing it:* a handler that loads the resource itself and calls permix.check / throws 403 by hand on a route where resourceContextMiddleware + validatePermission(action) would do it (docs/claude/PERMISSIONS.md § Validation Middleware)
 - **Auth middleware order** `apps/api/src/routes/api.ts`: When adding or reordering global middleware; public routes mount before tokenAuthMiddleware.
 - **Org and Space token routes skip user validators** `docs/claude/AUTH.md#Choosing Between validateUser and validateActor`: Routes callable by userless Organization/Space tokens (organizationCreateToken, spaceCreateToken).
@@ -277,7 +282,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `users`: User lookup/creation (guests), me routes, email normalization, redaction
 
-**Choosing among siblings: Finding a user** (catalog: apps/api/src/modules/user/services/find.ts, findOrCreateGuest.ts; apps/api/src/lib/identity/resolveUserByContact.ts)
+**Job: find or create a user** (Finding a user) — catalog: apps/api/src/modules/user/services/find.ts, findOrCreateGuest.ts; apps/api/src/lib/identity/resolveUserByContact.ts
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -286,7 +291,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **findUserOrCreateGuest** | a missing user should be created as a guest | read-only (findUserByEmail) |
 | **resolveUserByContact** | find or create the user owning a contact type and value | plain email lookup (findUserByEmail) |
 
-**Choosing among siblings: Redaction** (catalog: packages/db/src/registries/redactFields.ts; FEATURES.md § User Management)
+**Job: redact user or record data** (Redaction) — catalog: packages/db/src/registries/redactFields.ts; FEATURES.md § User Management
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -295,7 +300,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **redactPayload** | model-agnostic deep masking | model known (redactSensitiveFields) |
 | **getRedactFields** | only the field names | actually masking (redactSensitiveFields) |
 
-**Choosing among siblings: me vs user module** (catalog: apps/api/src/modules/me, apps/api/src/modules/user)
+**Job: expose the caller's own account vs another user's** (me vs user module) — catalog: apps/api/src/modules/me, apps/api/src/modules/user
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|

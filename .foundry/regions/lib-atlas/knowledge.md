@@ -137,7 +137,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `atlas`: Atlas code map: concept vocabulary, @atlas annotations, navigating by concept
 
-**Choosing among siblings: bunx atlas graph vs bunx atlas query vs MAP.md** (docs/claude/ATLAS.md § Navigating by concept; AI/ENTRYPOINT.md § 11.5)
+**Job: find the files that belong to or use a concept** (bunx atlas graph vs bunx atlas query vs MAP.md) — docs/claude/ATLAS.md § Navigating by concept; AI/ENTRYPOINT.md § 11.5
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -145,7 +145,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **bunx atlas query** | files matching --kind/--partOf/--uses/--path or a json-rules predicate | whole-concept reverse indexes (use bunx atlas graph) |
 | **MAP.md** | high-altitude overview before opening the tree | precise lookups (use bunx atlas graph / bunx atlas query); never hand-edit (atlas generate) |
 
-**Choosing among siblings: atlas check vs atlas coverage vs atlas report** (@inixiative/atlas/README.md § CLI, § CI; examples/ci/README.md § Coverage gate)
+**Job: check, measure or report atlas annotation coverage** (atlas check vs atlas coverage vs atlas report) — @inixiative/atlas/README.md § CLI, § CI; examples/ci/README.md § Coverage gate
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -153,7 +153,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **atlas coverage** | unannotated files, @uses curation buckets, --min / --ratchet gates | visual per-concept work plans (use atlas report) |
 | **atlas report** | COVERAGE.md and atlas.html work plans per concept | plain gap lists or CI gates (use atlas coverage) |
 
-**Choosing among siblings: atlas stamp vs --overwrite vs @atlas pin vs hand-curated @uses** (docs/claude/ATLAS.md § bunx atlas stamp; @inixiative/atlas/README.md § The patcher)
+**Job: fill or resync a file's atlas annotations** (atlas stamp vs --overwrite vs @atlas pin vs hand-curated @uses) — docs/claude/ATLAS.md § bunx atlas stamp; @inixiative/atlas/README.md § The patcher
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -162,7 +162,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **@atlas pin** | keeping an exception block from being resynced by --overwrite | additive stamp, which never modifies existing tags anyway (atlas stamp) |
 | **Curate @uses by hand** | recording a file's load-bearing dependencies | derivable @kind/@partOf (use atlas stamp) |
 
-**Choosing among siblings: @partOf vs @uses vs @kind** (docs/claude/ATLAS.md § The @atlas annotation block)
+**Job: annotate a file's role, membership and dependencies** (@partOf vs @uses vs @kind) — docs/claude/ATLAS.md § The @atlas annotation block
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|

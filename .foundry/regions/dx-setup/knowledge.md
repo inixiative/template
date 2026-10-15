@@ -105,7 +105,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `dev-setup`: Setup, local run, sanctioned scripts, Docker services, debugging
 
-**Choosing among siblings: bun run setup vs init vs init:agent vs sync-env** (docs/claude/SETUP.md § Init vs Setup; § What Setup Does; docs/claude/DEVELOPER.md § Environment)
+**Job: set up a fresh clone or provision a new fork** (bun run setup vs init vs init:agent vs sync-env) — docs/claude/SETUP.md § Init vs Setup; § What Setup Does; docs/claude/DEVELOPER.md § Environment
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -114,7 +114,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **bun run init:agent** | agent or scripted init, section by section | a human at the terminal (use bun run init) |
 | **bun run sync-env (environments-deploy)** | only refreshing env files after a pull added keys | the whole machine needs bringing up (use bun run setup) |
 
-**Choosing among siblings: local:db vs reset:db vs db:seed** (docs/claude/DEVELOPER.md § Database; docs/claude/DOCKER.md § Commands)
+**Job: start, reset or seed the local database** (local:db vs reset:db vs db:seed) — docs/claude/DEVELOPER.md § Database; docs/claude/DOCKER.md § Commands
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -122,7 +122,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **bun run reset:db (dx-tools)** | wipe and rebuild: down, up, db:push, seed with prime | you want to keep existing data (use bun run db:seed) |
 | **bun run db:seed (database-tooling)** | add seed data to the existing database | wipe and reseed (use bun run reset:db) |
 
-**Choosing among siblings: bun run local vs turbo watch local#<app> vs local:worker vs start** (docs/claude/DEVELOPER.md § Development; docs/claude/SCRIPTS.md § Development)
+**Job: run the app locally (whole stack or one app)** (bun run local vs turbo watch local#<app> vs local:worker vs start) — docs/claude/DEVELOPER.md § Development; docs/claude/SCRIPTS.md § Development
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -131,7 +131,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **turbo watch local:worker#api** | the job worker alone, watched | all services at once (use bun run local) |
 | **bun run start (dx-setup)** | production run | local dev (use bun run local) |
 
-**Choosing among siblings: minio-init.sh vs minio-provision.sh** (docs/claude/DOCKER.md § Storage buckets)
+**Job: create local object-storage buckets** (minio-init.sh vs minio-provision.sh) — docs/claude/DOCKER.md § Storage buckets
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -216,7 +216,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `worktrees`: Worktree lifecycle through repo scripts (slots, per-slot DBs/ports)
 
-**Choosing among siblings: worktree:create / destroy vs raw git worktree** (docs/claude/SCRIPTS.md § Worktrees; AI/ENTRYPOINT.md § 0.0 Critical Guardrails; .claude/hooks/bashMainCheckoutGuard)
+**Job: work on a branch in an isolated worktree** (worktree:create / destroy vs raw git worktree) — docs/claude/SCRIPTS.md § Worktrees; AI/ENTRYPOINT.md § 0.0 Critical Guardrails; .claude/hooks/bashMainCheckoutGuard
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -226,7 +226,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **Worktree slots** | a branch needs its own ports, DBs, buckets, Redis DB | hand-picking names or ports (the slot assigns them) |
 | **No mutations in main checkout after entering a worktree** | the session has worked inside a worktree | committing or installing from the main checkout path (run it in the worktree) |
 
-**Choosing among siblings: where scratch work goes** (docs/claude/SCRIPTS.md § Writing New Scripts; tmp/)
+**Job: decide where scripts and scratch files go** (where scratch work goes) — docs/claude/SCRIPTS.md § Writing New Scripts; tmp/
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|

@@ -119,7 +119,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `job-lanes`: Fast/slow job lanes: withLanePriority, slot shares, lane pressure budget
 
-**Choosing among siblings: 'Lane' means two things: withLanePriority vs claimLane / watchLane vs createLock** (docs/claude/CONCURRENCY.md § Job Lanes ('a different thing from the supersede lanes'), § Supersede Lanes; JOBS.md § Superseding Job)
+**Job: keep slow jobs from blocking fast ones, or stop jobs from overlapping** ('Lane' means two things: withLanePriority vs claimLane / watchLane vs createLock) — docs/claude/CONCURRENCY.md § Job Lanes ('a different thing from the supersede lanes'), § Supersede Lanes; JOBS.md § Superseding Job
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -129,7 +129,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **makeSingletonJob (jobs-cron)** | one run at a time; keeps its handler's declared lane | newest wins (use makeSupersedingJob) |
 | **createLock (concurrency-locks)** | cross-process exclusion, e.g. the single outbox drainer | job ordering (use withLanePriority) |
 
-**Choosing among siblings: Choosing and enforcing a lane** (docs/claude/JOBS.md § Choosing a Lane, § Priority, § Slots, § Enqueuing Jobs)
+**Job: choose and enforce a job's fast or slow lane** (Choosing and enforcing a lane) — docs/claude/JOBS.md § Choosing a Lane, § Priority, § Slots, § Enqueuing Jobs
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -137,6 +137,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **Per-enqueue lane by work size** | producer knows the size (sendEmail fanOutLane) | size unknown (declare the handler default) |
 | **bypass enqueue option (jobs-cron)** | latency-critical job must never spill | default: adhoc may spill under overflow |
 | **SlowSlotPool** | per-worker cap on running slow jobs (JOBS_SLOW_SLOT_FRACTION) | cross-process limits (it is per worker by design) |
+| *no lane declared (fast default)* | ordinary small work: buildJobData falls back to fast when the request, enqueue option and handler declare no lane; an envelope with no lane is fast everywhere (JOBS.md § Choosing a Lane) | bulk or fan-out work (declare the slow lane on the handler, or set lane per enqueue when the size is known) |
 
 - **createSlowSlotPool** `apps/api/src/jobs/slowSlotPool.ts#createSlowSlotPool`: In-process slot limit for slow jobs only; cross-process serialization belongs to locks-and-serialization helpers.
 - **isLaneOverflowing** `apps/api/src/jobs/outbox/flag.ts#isLaneOverflowing`: Use for spill decisions; isOverflowing checks only one lane's own flag.
@@ -180,7 +181,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `job-outbox`: Queue overflow buffer: JobOutbox spill and drain
 
-**Choosing among siblings: Spilling: enqueueJob vs enqueueOrSpill vs shouldSpill vs spillToOutbox vs JobOutbox** (docs/claude/JOBS.md § Overflow Buffer (Spill Routing, Accumulator); catalog enqueueOrSpill)
+**Job: get a job onto the queue when the queue is overflowing** (Spilling: enqueueJob vs enqueueOrSpill vs shouldSpill vs spillToOutbox vs JobOutbox) — docs/claude/JOBS.md § Overflow Buffer (Spill Routing, Accumulator); catalog enqueueOrSpill
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -190,7 +191,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **spillToOutbox** | every spill, batched by the accumulator, resolves on commit | never write JobOutbox rows directly |
 | **flushOutbox (observability-lifecycle)** | shutdown drain of the accumulator after intake stops | normal spills (use spillToOutbox) |
 
-**Choosing among siblings: Draining and serializing: startOutboxDrainLoop vs runDrainOutboxPass vs runOnOutboxQueue vs createLock** (docs/claude/JOBS.md § Drain Loop, § Overflow Flag, § Queue Depth Probe)
+**Job: drain the job outbox safely** (Draining and serializing: startOutboxDrainLoop vs runDrainOutboxPass vs runOnOutboxQueue vs createLock) — docs/claude/JOBS.md § Drain Loop, § Overflow Flag, § Queue Depth Probe
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|

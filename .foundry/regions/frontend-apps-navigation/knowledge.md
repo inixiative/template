@@ -125,7 +125,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `frontend-routing`: The three frontend apps, file routes, layouts and app shells
 
-**Choosing among siblings: Route layout groups (web; admin and superadmin mirror them)** (docs/claude/FRONTEND/ROUTING_NAVIGATION.md § File-Based Routes)
+**Job: choose which route layout group a page lives under** (Route layout groups (web; admin and superadmin mirror them)) — docs/claude/FRONTEND/ROUTING_NAVIGATION.md § File-Based Routes
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -134,7 +134,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **apps/web/app/routes/_public** | signed-out pages | signed-in pages (use _authenticated) |
 | **apps/web/app/routes/_fullscreen** | chromeless pages: invoices, previews, print, embeds | signed-in pages with the shell (use _authenticated) |
 
-**Choosing among siblings: Redirects and navigation that keep context** (ROUTING_NAVIGATION.md § Guards; FRONTEND/AUTH.md § Navigation Helpers)
+**Job: redirect or navigate while keeping tenant context** (Redirects and navigation that keep context) — ROUTING_NAVIGATION.md § Guards; FRONTEND/AUTH.md § Navigation Helpers
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -143,7 +143,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **navigateToSignup** | linking from login to signup, preserveSearch true | the reverse (use navigateToLogin) |
 | **navigatePreserving** | in-app navigation that must keep tenant context | beforeLoad redirects (use redirectPreservingContext) |
 
-**Choosing among siblings: Gating: guards vs nav access vs permissions.check** (FEATURES.md § Route Guards; FRONTEND.md § Conventions)
+**Job: gate a page or action on auth and permissions** (Gating: guards vs nav access vs permissions.check) — FEATURES.md § Route Guards; FRONTEND.md § Conventions
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -234,7 +234,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `navigation`: Nav config, permission-gated items, tenant context switching, URL context
 
-**Choosing among siblings: Switching and syncing tenant context** (ROUTING_NAVIGATION.md § Navigating; APPS.md § Context Switching)
+**Job: switch or sync the org/space context while navigating** (Switching and syncing tenant context) — ROUTING_NAVIGATION.md § Navigating; APPS.md § Context Switching
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -244,14 +244,14 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **navigation.navigatePreserving** | navigating while keeping params ('context', 'spoof', 'all') | raw router navigate, which drops params |
 | **ContextSelector** | a custom shell; AppShell already includes it | a custom org/space dropdown, or passing tenant/auth as props |
 
-**Choosing among siblings: findRoute vs findRouteAcrossContexts** (catalog entries findRoute, findRouteAcrossContexts)
+**Job: find the route for a path** (findRoute vs findRouteAcrossContexts) — catalog entries findRoute, findRouteAcrossContexts
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **findRoute** | the context is known and fixed | the path may belong to another context (use findRouteAcrossContexts) |
 | **findRouteAcrossContexts** | the path may belong to another context | context already fixed (use findRoute) |
 
-**Choosing among siblings: URL hash and scroll state hooks** (catalog entries useSectionHash, useSectionOpen, useScrollState)
+**Job: keep section, modal or scroll state across navigation** (URL hash and scroll state hooks) — catalog entries useSectionHash, useSectionOpen, useScrollState
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -259,7 +259,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **useSectionOpen** | one modal or collapsible's open state in the hash | page-wide section sync (use useSectionHash) |
 | **useScrollState** | restoring scroll position | linking to a section by hash (use useSectionHash) |
 
-**Choosing among siblings: Page access: nav config vs in-page checks** (ROUTING_NAVIGATION.md § What the Nav Config Drives)
+**Job: decide who can view a page** (Page access: nav config vs in-page checks) — ROUTING_NAVIGATION.md § What the Nav Config Drives
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|

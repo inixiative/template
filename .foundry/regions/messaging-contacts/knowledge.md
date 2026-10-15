@@ -114,7 +114,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `messaging`: Non-email channels: per-ContactType message provider adapters
 
-**Choosing among siblings: messageUser vs messageContact vs sendEmail** (docs/claude/COMMUNICATIONS.md § Messaging › Jobs; § Send Pipeline)
+**Job: send a message to users or a contact (untemplated vs templated email)** (messageUser vs messageContact vs sendEmail) — docs/claude/COMMUNICATIONS.md § Messaging › Jobs; § Send Pipeline
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -122,7 +122,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **messageContact** | pre-rendered content to one Contact, gated on canDeliver | users chosen by rule (use messageUser) |
 | **sendEmail (email-delivery)** | templated email with cascade, CommunicationLog and planner | direct SMS, push or chat (use messageUser or messageContact) |
 
-**Choosing among siblings: messageProviderRegistry vs getMessageProviderAdapter vs MessageProviderAdapter** (docs/claude/COMMUNICATIONS.md § Messaging › Provider Registry; § SMS)
+**Job: register or look up the sender for a contact channel** (messageProviderRegistry vs getMessageProviderAdapter vs MessageProviderAdapter) — docs/claude/COMMUNICATIONS.md § Messaging › Provider Registry; § SMS
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -130,7 +130,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **messageProviderRegistry** | register an adapter under its ContactType | looking one up (use getMessageProviderAdapter) |
 | **getMessageProviderAdapter** | get the sender for a ContactType, or undefined | adding a channel (use messageProviderRegistry) |
 
-**Choosing among siblings: resolveUsers vs targetedBySender vs recipientVariables vs renderForRecipient** (docs/claude/COMMUNICATIONS.md § Messaging › Jobs; § The email lens)
+**Job: pick recipients and render per-recipient content** (resolveUsers vs targetedBySender vs recipientVariables vs renderForRecipient) — docs/claude/COMMUNICATIONS.md § Messaging › Jobs; § The email lens
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -156,6 +156,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **Unsubscribe HMAC capability link** `apps/api/src/lib/email/unsubscribe.ts`: Unauthenticated one-click unsubscribe; better-auth for login links, Token model for API keys/scoped capabilities.
   - *Signs you're bypassing it:* using better-auth magic links or the Token model for unsubscribe (docs/claude/COMMUNICATIONS.md § Communication Preferences (Auth boundary))
 - **db.onCommit** `docs/claude/COMMUNICATIONS.md#Webhooks`: defer side effects until the surrounding transaction commits
+  - *Throws:* db.onCommit outside transaction Error (`server-error`, database)
   - *Signs you're bypassing it:* sending email, calling an external API or enqueuing a job directly inside db.txn (so it fires even if the transaction rolls back), or a hand-built after-commit callback list (docs/claude/DATABASE.md § Transactions › After Commit Callbacks; FEATURES.md § Post-Commit Callbacks)
 - **MessageContent** `apps/api/src/lib/messaging`: carry text/html/media payload with interpolation tokens for dispatch
 - **MessageProviderAdapter** `apps/api/src/lib/messaging/providers.ts`: Add a new channel (e.g. Twilio SMS) by registering one under its ContactType.
@@ -171,7 +172,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `contacts`: Contact model: per-type registry, URL/handle parsers, contact rules
 
-**Choosing among siblings: ContactRegistry vs Contact vs contactRules vs ContactTypeDef** (docs/claude/HOOKS.md § Contact Rules; FEATURES.md § Contact System)
+**Job: store, parse and validate a contact address or handle** (ContactRegistry vs Contact vs contactRules vs ContactTypeDef) — docs/claude/HOOKS.md § Contact Rules; FEATURES.md § Contact System
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -180,7 +181,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **ContactTypeDef** | declare one type: inputSchema, parseInput, valueSchema, toValueKey, subtype, uniqueness | changing controllers, routes or hooks (see Adding a contact type) |
 | **contactRules** | the before-mutation hook that runs the registry on every Contact write | per-type checks in routes (use ContactRegistry) |
 
-**Choosing among siblings: canonicalUrl vs splitUrl vs parseSimpleHandleUrl vs emailAddressSchema** (catalog (packages/shared/src/contact))
+**Job: normalize or parse a contact URL or email string** (canonicalUrl vs splitUrl vs parseSimpleHandleUrl vs emailAddressSchema) — catalog (packages/shared/src/contact)
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|

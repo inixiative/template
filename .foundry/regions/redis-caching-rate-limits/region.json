@@ -7,7 +7,7 @@
     "caching",
     "rate-limiting"
   ],
-  "tokens": 10418,
+  "tokens": 10612,
   "tokenMethod": "chars/4",
   "runsAgreed": 2,
   "sources": {

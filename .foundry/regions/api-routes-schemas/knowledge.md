@@ -125,7 +125,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `route-templates`: Route templates (readRoute/createRoute/…) and makeController responders
 
-**Choosing among siblings: readRoute vs createRoute vs updateRoute vs deleteRoute vs actionRoute** (docs/claude/API_ROUTES.md § Route Templates)
+**Job: declare a CRUD or action API route** (readRoute vs createRoute vs updateRoute vs deleteRoute vs actionRoute) — docs/claude/API_ROUTES.md § Route Templates
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -135,7 +135,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **deleteRoute** | removing a model record | archive/restore-style custom verbs (use actionRoute) |
 | **actionRoute** | custom verbs beyond CRUD, e.g. /:id/activate | plain create/update/delete (use createRoute / updateRoute / deleteRoute) |
 
-**Choosing among siblings: respond.ok vs respond.created vs respond.noContent (makeController)** (docs/claude/API_ROUTES.md § Controllers, Respond Types)
+**Job: respond from a controller with the right status** (respond.ok vs respond.created vs respond.noContent (makeController)) — docs/claude/API_ROUTES.md § Controllers, Respond Types
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -144,7 +144,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **respond.created** | create endpoints (201) | anything else (use respond.ok) |
 | **respond.noContent** | delete endpoints (204) | returning a body (use respond.ok) |
 
-**Choosing among siblings: Route permission gates: validatePermission vs validateOwnerPermission vs validateNotToken vs check** (docs/claude/PERMISSIONS.md § Validation Middleware; docs/claude/API_ROUTES.md § Middleware)
+**Job: gate a route on permission** (Route permission gates: validatePermission vs validateOwnerPermission vs validateNotToken vs check) — docs/claude/PERMISSIONS.md § Validation Middleware; docs/claude/API_ROUTES.md § Middleware
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -154,15 +154,21 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **check (permissions)** | permission-aware filtering of results inside a controller | gating the whole route (use validatePermission via Route-level middleware option) |
 
 - **actionRoute** `apps/api/src/lib/routeTemplates/action.ts#actionRoute`: custom verbs beyond CRUD; for plain create/update/delete use createRoute, updateRoute or deleteRoute instead
+  - *Throws:* ZodError (`validation-error`, request-context-errors, inferred)
   - *Signs you're bypassing it:* a custom verb squeezed into updateRoute with a mode flag in the body, or a raw route with a hand-written '/:id/activate' path (docs/claude/API_ROUTES.md § Route Templates (Action examples))
 - **createRoute** `apps/api/src/lib/routeTemplates/create.ts#createRoute`: inserting a model record; use actionRoute for custom operations. Always import from #/lib/routeTemplates, never raw OpenAPI createRoute
+  - *Throws:* ZodError (`validation-error`, request-context-errors, inferred)
   - *Signs you're bypassing it:* importing createRoute from '@hono/zod-openapi' and hand-writing method, path, request, responses and operationId for a model endpoint (docs/claude/API_ROUTES.md § Route Templates ("Always use templates from #/lib/routeTemplates - never raw createRoute"))
 - **deleteRoute** `apps/api/src/lib/routeTemplates/delete.ts#deleteRoute`: removing a model record; use actionRoute for archive/restore-style custom verbs
+  - *Throws:* ZodError (`validation-error`, request-context-errors, inferred)
 - **makeController** `apps/api/src/lib/utils/makeController.ts#makeController`: Every route controller; required for paginate() to keep typed query params.
+  - *Throws:* ResponseValidationError (`server-error`, request-context-errors)
   - *Signs you're bypassing it:* plain async (c) => c.json(...) handlers registered on the router, with no responders and no response validation (docs/claude/API_ROUTES.md § Controllers; FEATURES.md § API Architecture & Routing (makeController))
 - **readRoute** `apps/api/src/lib/routeTemplates/read.ts#readRoute`: Reads only; writes use createRoute/updateRoute/deleteRoute, custom actions use actionRoute.
+  - *Throws:* ZodError (`validation-error`, request-context-errors, inferred)
   - *Signs you're bypassing it:* a hand-built list route with its own page/pageSize/orderBy query schema, path string and response shape instead of readRoute({ many: true, paginate: true }) (docs/claude/API_ROUTES.md § Route Templates; catalog readRoute)
 - **updateRoute** `apps/api/src/lib/routeTemplates/update.ts#updateRoute`: Mutating an existing record; createRoute for inserts, actionRoute for custom non-CRUD operations.
+  - *Throws:* ZodError (`validation-error`, request-context-errors, inferred)
 - **API module layout** `apps/api/src/modules/authProvider/`: Modules hold controllers/, routes/, schemas/, tests/ and an index.ts exporting routers.
 - **AppEnv request context** `FEATURES.md › Request Context Scoping`: any handler needing identity or tenant scope; never thread these manually
   - *Signs you're bypassing it:* module-level variables holding the current user/org, or user, db and requestId threaded through function parameters (FEATURES.md › Request Context Scoping)
@@ -170,6 +176,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
   - *Signs you're bypassing it:* creating the row with the secret from the request body and encrypting afterwards, or not at all (docs/claude/API_ROUTES.md — Example: Create Organization Provider)
 - **Mount routes in module index** `docs/claude/API_ROUTES.md#Router Exports`: register each route with its controller on the module router in index.ts
 - **Not-found via HTTPException** `docs/claude/API_ROUTES.md#Controllers`: throw HTTPException 404 in controllers when a record is missing
+  - *Throws:* HTTPException (`caller-error`, request-context-errors); makeError 404 RESOURCE_NOT_FOUND (`resource-not-found`, request-context-errors)
 - **Permission-aware read filtering** `docs/claude/API_ROUTES.md — Example: Read Organization Providers`: When a public route returns more data to privileged actors instead of splitting routes.
 - **Platform vs organization auth providers** `docs/claude/API_ROUTES.md — Platform vs Organization Providers`: Platform providers are static env config; org providers are DB rows with encrypted secrets owned by org owners.
 - **Pseudo-GraphQL filtering** `FEATURES.md › Pseudo-GraphQL Filtering`: list filtering on URL-based endpoints instead of custom query params or GraphQL
@@ -190,6 +197,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **sanitizeKeys** `#/lib/routeTemplates template args`: Body contains fields clients must not set; immutable-on-update fields belong to immutable field enforcement.
   - *Signs you're bypassing it:* delete body.organizationId / destructuring client-unsettable keys out of c.req.valid('json') in the controller before Prisma (docs/claude/API_ROUTES.md § Route Templates, Template Args)
 - **validatePermission** `#/middleware/validations/validatePermission`: single-owner resource; polymorphic User/Organization owner: validateOwnerPermission instead
+  - *Throws:* HTTPException (`caller-error`, request-context-errors, inferred); makeError 403 PERMISSION_DENIED (`permission-denied`, permissions)
   - *Signs you're bypassing it:* a handler that loads the resource itself and calls permix.check / throws 403 by hand on a route where resourceContextMiddleware + validatePermission(action) would do it (docs/claude/PERMISSIONS.md § Validation Middleware)
 - **Always use route templates** `#/lib/routeTemplates`: Every new API route definition.
 - **Create returns 201 with sanitized record** `docs/claude/API_ROUTES.md — Example: Create Organization Provider`: Create controllers.
@@ -206,14 +214,14 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `openapi`: Route auto-registration and OpenAPI spec generation
 
-**Choosing among siblings: autoRegisterRoutes vs Mount routes in module index** (FEATURES.md § API Architecture & Routing (File-Based Route Auto-Registration); docs/claude/API_ROUTES.md § Router Exports)
+**Job: register a module's routes in the API** (autoRegisterRoutes vs Mount routes in module index) — FEATURES.md § API Architecture & Routing (File-Based Route Auto-Registration); docs/claude/API_ROUTES.md § Router Exports
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **autoRegisterRoutes** | default for module routes: drop files in routes/ and controllers/; admin/internal variants wrap it | docs don't distinguish when hand mounting is still right; see API_ROUTES.md § Router Exports |
 | **Mount routes in module index** | the module index.ts exports the router that routes are registered on | importing every route and controller by hand (use autoRegisterRoutes) |
 
-**Choosing among siblings: apiPath vs resolveOperation vs serializeBracketQuery** (catalog apiPath / resolveOperation; docs/claude/FLOWS.md § Registry › readPath)
+**Job: build or resolve an API path or query from an operation** (apiPath vs resolveOperation vs serializeBracketQuery) — catalog apiPath / resolveOperation; docs/claude/FLOWS.md § Registry › readPath
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -221,7 +229,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **resolveOperation** | resolved operation details in-process (e.g. websockets) | you want a ready path string (use apiPath) |
 | **serializeBracketQuery (filtering-pagination)** | serializing a bracket query object on its own | building an API read path (apiPath calls it for you) |
 
-**Choosing among siblings: apps/api/src/routes/api vs apps/api/src/routes/internal** (catalog routes/api, routes/internal)
+**Job: decide whether an endpoint is public or internal** (apps/api/src/routes/api vs apps/api/src/routes/internal) — catalog routes/api, routes/internal
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -244,7 +252,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `request-schemas`: Request/response zod schemas: generated Prisma zod, ScalarSchema, sanitizeRequestSchema
 
-**Choosing among siblings: Where a route schema comes from: <Model>ScalarSchema vs Inputs from generated zod vs sanitizeRequestSchema vs UserWithRelationsSchema** (docs/claude/API_ROUTES.md § Schemas; catalog sanitizeRequestSchema, UserWithRelationsSchema)
+**Job: build a route's request or response schema** (Where a route schema comes from: <Model>ScalarSchema vs Inputs from generated zod vs sanitizeRequestSchema vs UserWithRelationsSchema) — docs/claude/API_ROUTES.md § Schemas; catalog sanitizeRequestSchema, UserWithRelationsSchema
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -253,7 +261,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **sanitizeRequestSchema** | removing client-unsettable keys from a generated schema | a hand-written reduced copy or long .omit chains |
 | **UserWithRelationsSchema** | a user plus memberships | plain user fields (use <Model>ScalarSchema) |
 
-**Choosing among siblings: Zod field vs boolean check: uuidV7Schema / isUuidV7, appPathSchema / isAppPath** (catalog packages/shared/src/utils/isUuidV7.ts, isAppPath.ts)
+**Job: validate a UUIDv7 or app path (zod field vs boolean check)** (Zod field vs boolean check: uuidV7Schema / isUuidV7, appPathSchema / isAppPath) — catalog packages/shared/src/utils/isUuidV7.ts, isAppPath.ts
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -262,7 +270,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **appPathSchema** | zod fields like a flow returnUrl | plain boolean checks (use isAppPath) |
 | **isAppPath** | imperative checks | zod schemas (use appPathSchema) |
 
-**Choosing among siblings: No .refine() on route schemas vs Cross-field validation in controller** (docs/claude/API_ROUTES.md § Cross-Field Validations)
+**Job: validate fields across a request body** (No .refine() on route schemas vs Cross-field validation in controller) — docs/claude/API_ROUTES.md § Cross-Field Validations
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -289,7 +297,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `api-modules`: API module folder anatomy: routes/controllers/services/handlers
 
-**Choosing among siblings: Where module code goes: services/ vs handlers/ vs utils/ vs shared locations** (docs/claude/MODULES.md § Core, § Domain logic, § Rules of thumb)
+**Job: decide where a new piece of API module code goes** (Where module code goes: services/ vs handlers/ vs utils/ vs shared locations) — docs/claude/MODULES.md § Core, § Domain logic, § Rules of thumb
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|

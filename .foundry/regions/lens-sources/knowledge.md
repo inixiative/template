@@ -96,7 +96,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `lib-json-rules-lens-sources`: Multi-source data under a lens: option sources, source queries, bridged sources and evaluating across bridges (README § Option Sources, § Evaluating Across Bridges)
 
-**Choosing among siblings: Producing option sets** (@inixiative/json-rules/README.md § Option Sources)
+**Job: produce picker option values for a lens's fields** (Producing option sets) — @inixiative/json-rules/README.md § Option Sources
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -106,7 +106,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **projectLens (lens-usage)** | attaching the option sets to each field as options | computing them (toSourceQueries / materializeSources) |
 | **sourceQueryValues (lenses)** | the template's fetched source values | library-level query building (toSourceQueries) |
 
-**Choosing among siblings: describeRuleSources vs listBindings** (@inixiative/json-rules/README.md § Lens Utilities, § Rule Introspection)
+**Job: list the values and binds a rule refers to** (describeRuleSources vs listBindings) — @inixiative/json-rules/README.md § Lens Utilities, § Rule Introspection
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -114,7 +114,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **listBindings** | the bind names one rule reads | a lens's whole chain (listLensBindings) |
 | **describeRule (json-rules-engine)** | a rule's sources, bridges crossed and supported targets | values per source (describeRuleSources) |
 
-**Choosing among siblings: Across a bridge** (@inixiative/json-rules/README.md § Sources across a bridge, § Evaluating Across Bridges)
+**Job: query or check data across a lens bridge** (Across a bridge) — @inixiative/json-rules/README.md § Sources across a bridge, § Evaluating Across Bridges
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -129,8 +129,10 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **listBindings** `@inixiative/json-rules#listBindings`: For one rule; for a lens's whole narrowing chain use listLensBindings.
   - *Signs you're bypassing it:* Walking a rule's JSON yourself to collect bind names or decide which are required. (@inixiative/json-rules/README.md § Rule Introspection ("Rule introspection belongs in the engine"))
 - **materializeSources** `@inixiative/json-rules#materializeSources`: In-memory rows from toLensSelect; for DB-side DISTINCT queries use toSourceQueries + materializeSourceQuery.
+  - *Throws:* UsageError (`usage`, json-rules-engine); LensRefusal (`lens-refusal`, lens-model)
   - *Signs you're bypassing it:* Collecting distinct values and labels from fetched rows by hand (a Set plus a sort) to fill a picker, instead of materializeSources over the rows fetched under the lens. (@inixiative/json-rules/README.md › Option Sources)
 - **toSourceQueries** `@inixiative/json-rules#toSourceQueries`: Field option sets from a lens: use this; for compiling a rule's WHERE use toSql or toPrisma instead.
+  - *Throws:* LensRefusal (`lens-refusal`, lens-model)
   - *Signs you're bypassing it:* Hand-written DISTINCT / groupBy queries to build picker option lists for lens fields. (catalog entry toSourceQueries; @inixiative/json-rules/README.md › Option Sources)
 - **Bridged source query flow** `@inixiative/json-rules/README.md — Sources across a bridge`: Cross-database sources; use Prisma form when sql.sql is null.
 - **Embed foreign rows under bridge keys** `@inixiative/json-rules/README.md — Evaluating Across Bridges`: Bidirectional: add back-ref object properties; batch: map anchors then root-array arrayOperator any.

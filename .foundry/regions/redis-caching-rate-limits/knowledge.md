@@ -117,7 +117,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `redis`: Redis connections, key namespaces, built-in key uses
 
-**Choosing among siblings: getRedisClient vs getRedisSub vs getRedisPub vs createRedisConnection** (docs/claude/REDIS.md § Connection Strategy, § Why Separate Connections?; JOBS.md § Worker Configuration)
+**Job: get the right Redis connection for the command** (getRedisClient vs getRedisSub vs getRedisPub vs createRedisConnection) — docs/claude/REDIS.md § Connection Strategy, § Why Separate Connections?; JOBS.md § Worker Configuration
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -150,7 +150,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `caching`: Read-through cache(): cache keys, TTLs, single-flight, mutation-driven invalidation
 
-**Choosing among siblings: Reading and writing the cache: cache vs upsertCache vs fetchOne vs hydrator load seam** (docs/claude/REDIS.md § cache() Get-or-Set; catalog fetchOne, upsertCache; @inixiative/permissions README § Hydration)
+**Job: read or write a cached value** (Reading and writing the cache: cache vs upsertCache vs fetchOne vs hydrator load seam) — docs/claude/REDIS.md § cache() Get-or-Set; catalog fetchOne, upsertCache; @inixiative/permissions README § Hydration
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -158,8 +158,9 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **upsertCache** | write a value you already have | it must be computed on miss (use cache) |
 | **fetchOne** | one record by key | you have the record and need relations (hydrate); rows from a lens (fetchLens) |
 | **Cache in hydrator load seam** | cross-call caching for permission hydration: wrap the single load read | within one call; the hydrator already de-dupes |
+| *read fresh, no cache* | correct invalidation would need a relationship/graph walk (webhook subscriptions reached via customerRef): fetch fresh, or cache only the slow-moving linkage side (REDIS.md § Invalidation conventions › Know what not to cache); within one hydration call the hydrator already de-dupes | keys reachable from the row (cache() + cacheReference, with a read-after-write test) |
 
-**Choosing among siblings: Invalidation: cacheReference vs clearKey vs automatic invalidation** (docs/claude/REDIS.md § Automatic Invalidation, § Invalidation conventions; HOOKS.md § Cache Invalidation)
+**Job: keep cached values fresh after data changes** (Invalidation: cacheReference vs clearKey vs automatic invalidation) — docs/claude/REDIS.md § Automatic Invalidation, § Invalidation conventions; HOOKS.md § Cache Invalidation
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -170,6 +171,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **Don't cache graph-walk reads** | invalidation would need a relationship walk: don't cache | keys reachable from the row (use cacheReference) |
 
 - **cache** `packages/db/src/redis/cache.ts#cache`: Read-through caching; upsertCache to write a known value, clearKey to invalidate.
+  - *Throws:* cache key Error (`server-error`)
   - *Signs you're bypassing it:* A hand-written `const hit = await redis.get(key); if (hit) return JSON.parse(hit); const v = await fn(); await redis.set(key, JSON.stringify(v), 'EX', ttl)` get-or-set without single-flight, negative caching or graceful degradation. (docs/claude/REDIS.md § cache() Get-or-Set; § Cache Fallback)
 - **cacheKey** `packages/db/src/redis/cache.ts#cacheKey`: Always use instead of hand-formatted key strings, or invalidation silently misses.
   - *Signs you're bypassing it:* Template-string cache keys (`cache:user:${id}`) or differently cased domains, so the clear never meets the write. (docs/claude/REDIS.md § Invalidation conventions ("Always build keys with cacheKey, never hand-format"))
@@ -186,6 +188,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
   - *Signs you're bypassing it:* a memo map wrapped around the whole hydrator or check call, or caching added inside the engine, instead of wrapping the single read passed as load (@inixiative/permissions/README.md § Hydration ("load is the cache seam"))
 - **In-memory Redis mock in tests** `packages/db/src/redis/client.ts`: route all Redis connections to one shared RedisMock in test env
 - **validateKey** `packages/db/src/redis/cache.ts`: throw when a cache key contains 'undefined' to catch bugs early
+  - *Throws:* cache key Error (`server-error`)
 - **Build cache keys only with cacheKey** `docs/claude/REDIS.md#Invalidation conventions`: Every cache read, write and invalidation.
   - *Signs you're bypassing it:* Any hand-formatted key in a cache read, write or clear. (docs/claude/REDIS.md § Invalidation conventions)
 - **Don't cache graph-walk reads** `docs/claude/REDIS.md#Invalidation conventions`: When correct invalidation would require traversing relationships.
@@ -198,7 +201,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `rate-limiting`: Fixed-window rate limits keyed by user/space/org/IP; 429 + Retry-After
 
-**Choosing among siblings: rateLimit vs apiRateLimit vs authRateLimit vs batch/spend limits** (docs/claude/REDIS.md § Rate Limiting; catalog rateLimit, rateLimitMax)
+**Job: rate-limit API routes** (rateLimit vs apiRateLimit vs authRateLimit vs batch/spend limits) — docs/claude/REDIS.md § Rate Limiting; catalog rateLimit, rateLimitMax
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -208,7 +211,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **rateLimitMax** | the one place limit values are set | never hardcode maxes or add a limit column |
 | **Batch sub-requests skip identity limits** | sub-requests are not counted by identity limits | spend/cost caps: a separate detector, not an apiRateLimit rule |
 
-**Choosing among siblings: Identities: userIdentity vs principalIdentity vs ipIdentity vs spaceIdentity vs organizationIdentity** (catalog rateLimit/identities.ts; docs/claude/REDIS.md § Rate Limiting)
+**Job: key a rate limit by user, principal, IP, space or org** (Identities: userIdentity vs principalIdentity vs ipIdentity vs spaceIdentity vs organizationIdentity) — catalog rateLimit/identities.ts; docs/claude/REDIS.md § Rate Limiting
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -220,13 +223,16 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **clientIp** | the IP key: trusted hop, IPv6 bucketed to /64 | raw nullable address (use clientAddress) |
 
 - **apiRateLimit** `apps/api/src/middleware/rateLimit/apiRateLimit.ts#apiRateLimit`: Auth endpoints: authRateLimit instead. Detectors that must run inside batches are separate, not apiRateLimit rules.
+  - *Throws:* makeError 429 RATE_LIMITED (`rate-limited`)
 - **authRateLimit** `apps/api/src/middleware/rateLimit/authRateLimit.ts#authRateLimit`: General API routes: apiRateLimit instead; this keys by IP for unauthenticated BetterAuth calls.
+  - *Throws:* makeError 429 RATE_LIMITED (`rate-limited`)
 - **clientIp** `apps/api/src/lib/clientIp.ts#clientIp`: Rate-limit or abuse keys; raw nullable address: clientAddress instead.
   - *Signs you're bypassing it:* Reading x-forwarded-for or the socket address by hand for a rate-limit or abuse key, without the trusted hop or /64 IPv6 bucketing. (docs/claude/REDIS.md § Rate Limiting; catalog entry clientIp)
 - **ipIdentity** `apps/api/src/middleware/rateLimit/identities.ts#ipIdentity`: Unauthenticated routes like /api/auth/*; authenticated callers: principalIdentity or userIdentity instead.
 - **organizationIdentity** `apps/api/src/middleware/rateLimit/identities.ts#organizationIdentity`: Org-wide caps; per-space caps: spaceIdentity; per-user caps: userIdentity.
 - **principalIdentity** `apps/api/src/middleware/rateLimit/identities.ts#principalIdentity`: Routes hit by both signed-in and anonymous callers; strictly authenticated: userIdentity; anonymous only: ipIdentity.
 - **rateLimit** `apps/api/src/middleware/rateLimit/rateLimit.ts#rateLimit`: reject requests with 429 when any fixed-window bucket exceeds its max
+  - *Throws:* makeError 429 RATE_LIMITED (`rate-limited`)
   - *Signs you're bypassing it:* A hand-written counter middleware (redis.incr + expire, or an in-memory Map of timestamps) that returns 429. (docs/claude/REDIS.md § Rate Limiting; catalog entry rateLimit)
 - **rateLimitMax** `apps/api/src/middleware/rateLimit/limits.ts#rateLimitMax`: The single seam for limit values; change limits here, never hardcode maxes in rules.
   - *Signs you're bypassing it:* Hard-coded max numbers in rate-limit rules, or a rateLimit column on Token, Organization or Space. (docs/claude/REDIS.md § Rate Limiting ("never a column on Token, Organization or Space"); catalog note "never hardcode maxes in rules")

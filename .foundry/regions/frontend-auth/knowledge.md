@@ -105,7 +105,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `frontend-auth`: Frontend auth: auth slice, login/signup forms, OAuth callback, guards
 
-**Choosing among siblings: Signing in and hydrating /me** (docs/claude/FRONTEND/AUTH.md § Architecture, § Auth Slice, § OAuth Callback, § Unified Auth Method)
+**Job: sign a user in or up and load /me into the store** (Signing in and hydrating /me) — docs/claude/FRONTEND/AUTH.md § Architecture, § Auth Slice, § OAuth Callback, § Unified Auth Method
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -118,7 +118,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **fetchAndHydrateMe (authentication)** | inside the slice or callback page | from components (auth.refreshMe) |
 | **auth.logout** | sign out: clears token, user, permissions, tenant, goes to /login | never clear these by hand |
 
-**Choosing among siblings: Guards and redirects** (docs/claude/FRONTEND/AUTH.md § Guards, § Navigation Helpers)
+**Job: guard routes and redirect without losing context** (Guards and redirects) — docs/claude/FRONTEND/AUTH.md § Guards, § Navigation Helpers
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -128,7 +128,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **navigatePreserving** | imperative in-app navigation keeping context | inside beforeLoad (redirectPreservingContext) |
 | **navigateToLogin (frontend-apps-navigation)** | go to login keeping redirectTo (preserveSearch on login↔signup links) | a hand-built ?redirectTo= |
 
-**Choosing among siblings: Login UI** (docs/claude/FRONTEND/AUTH.md § Pages and Forms)
+**Job: show a login or signup form** (Login UI) — docs/claude/FRONTEND/AUTH.md § Pages and Forms
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|

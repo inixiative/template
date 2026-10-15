@@ -127,7 +127,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `permissions`: Roles, actions, Permix, ReBAC walks, entitlements, row-level overrides, validatePermission
 
-**Choosing among siblings: Route validators (validate*)** (docs/claude/AUTH.md § Validation Middleware, § Choosing Between validateUser and validateActor; PERMISSIONS.md § Validation Middleware; apps/api/src/lib/permissions/validateRole.ts)
+**Job: gate an API route on who the caller is or what they may do** (Route validators (validate*)) — docs/claude/AUTH.md § Validation Middleware, § Choosing Between validateUser and validateActor; PERMISSIONS.md § Validation Middleware; apps/api/src/lib/permissions/validateRole.ts
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -139,7 +139,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **validateSuperadmin (tenancy)** | platform-admin routes; 403 unless superadmin | tenant access (validatePermission); inline branch (isSuperadmin) |
 | **validateRole** | not a gate: parses a role value in permission setup (code throws 500; doc says falls back to viewer) | gating a route (validatePermission) |
 
-**Choosing among siblings: Frontend gates by layer** (docs/claude/PERMISSIONS.md § Frontend Checks)
+**Job: gate a page, nav item or control in the frontend** (Frontend gates by layer) — docs/claude/PERMISSIONS.md § Frontend Checks
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -149,7 +149,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **checkPermission** | plain function or loop | a component control (usePermission) |
 | **useInquiryPermission (inquiries)** | inquiry rows, by source/target side | other models (usePermission) |
 
-**Choosing among siblings: check vs permix.check vs row overrides** (PERMISSIONS.md § Permix, § REBAC, § Row-Level Overrides)
+**Job: check a permission on a record** (check vs permix.check vs row overrides) — PERMISSIONS.md § Permix, § REBAC, § Row-Level Overrides
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -167,6 +167,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **buildPermissionRulesSchema** `packages/permissions/src/rebac/permissionRulesSchema.ts#buildPermissionRulesSchema`: Use in route schemas accepting permissionRules instead of hand-writing action enums; derives keys from rebacSchema.
   - *Signs you're bypassing it:* a hand-written zod enum or object of action keys for a permissionRules body field, a second source of truth beside rebacSchema (docs/claude/PERMISSIONS.md § Row-Level Overrides › Boundary validation)
 - **check** `packages/permissions/src/rebac/check.ts#check`: Core evaluator; define grants in rebacSchema or role maps, then call check rather than hand-rolling permission logic.
+  - *Throws:* UsageError (`usage`, json-rules-engine); json-rules rule-shape Error (`rule-shape`, json-rules-engine)
   - *Signs you're bypassing it:* if/else chains in a controller that look up an OrganizationUser or SpaceUser and compare its role, instead of declaring the rule in rebacSchema and calling check (catalog: packages/permissions/src/rebac/check.ts ("call check rather than hand-rolling permission logic"))
 - **checkPermission** `packages/ui/src/hooks/usePermission.ts#checkPermission`: Inside components prefer usePermission hook or permissions.check; use this in plain functions or loops.
   - *Signs you're bypassing it:* role comparisons inside a plain function or loop instead of checkPermission(permissions, model, record, action) (docs/claude/PERMISSIONS.md § Frontend Checks)
@@ -194,8 +195,10 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **usePermission** `packages/ui/src/hooks/usePermission.ts#usePermission`: Non-hook contexts or many records: checkPermission instead.
   - *Signs you're bypassing it:* a component that compares user.role or membership.role === 'owner' to show or disable a control (docs/claude/PERMISSIONS.md § Frontend Checks)
 - **validateOwnerPermission** `apps/api/src/middleware/validations/validateOwnerPermission.ts#validateOwnerPermission`: permission on the resource itself: validatePermission instead
+  - *Throws:* HTTPException (`caller-error`, request-context-errors); makeError 403 PERMISSION_DENIED (`permission-denied`)
   - *Signs you're bypassing it:* a switch on resource.ownerModel calling permix.check('user' | 'organization', …) per branch inside a controller (docs/claude/PERMISSIONS.md § Validation Middleware › validateOwnerPermission)
 - **validateRole** `apps/api/src/lib/permissions/validateRole.ts#validateRole`: parse an unknown value into a Role enum or throw
+  - *Throws:* validateRole Error (`server-error`)
   - *Signs you're bypassing it:* role: token.role as Role (a type assertion) when setting up permissions, instead of validating the value at runtime (docs/claude/PERMISSIONS.md § Permission Setup › Role Validation; apps/api/src/lib/permissions/validateRole.ts)
 - **Action delegation chain** `docs/claude/PERMISSIONS.md#Schema`: tier actions so read inherits operate, operate manage, manage own; own terminal or delegated
 - **Bridges** `@inixiative/permissions README — Bridges (cross-source rel walks)`: Cross-source edges only; same-source FK walks use plain rel with the injected resolver.
@@ -240,6 +243,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **setupSpaceContext** `docs/claude/PERMISSIONS.md#setupSpacePermissions`: Space scope; setupOrgContext for orgs.
 - **setupUserContext** `packages/permissions/src/roles/user.ts`: Actions on the user themselves; setupOrgContext for org scope.
 - **validatePermission** `#/middleware/validations/validatePermission`: Route-level authorization; permix.check inline for custom controller logic; validateUser/validateActor for authentication.
+  - *Throws:* HTTPException (`caller-error`, request-context-errors, inferred); makeError 403 PERMISSION_DENIED (`permission-denied`)
   - *Signs you're bypassing it:* a handler that loads the resource itself and calls permix.check / throws 403 by hand on a route where resourceContextMiddleware + validatePermission(action) would do it (docs/claude/PERMISSIONS.md § Validation Middleware)
 - **Authenticate before authorizing** `docs/claude/PERMISSIONS.md#Via Validation Middleware`: Org/Space tokens carry no user and fail both gates; see AUTH.md to choose.
 - **Bridge far-field data** `@inixiative/permissions README — Bridges (cross-source rel walks)`: When a bridge hop ends in an abac or self rule rather than an rbac grant.

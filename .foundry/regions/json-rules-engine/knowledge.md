@@ -111,7 +111,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `lib-json-rules`: The json-rules engine: rule shapes, operators, path semantics, introspection, runtime validation, engine globals, errors, TypeScript types, verbs, timezones (README, VERBS, TIMEZONE)
 
-**Choosing among siblings: The rule shapes** (@inixiative/json-rules/README.md § Rule Shapes)
+**Job: express a condition as a json-rules rule** (The rule shapes) — @inixiative/json-rules/README.md § Rule Shapes
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -122,7 +122,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **Logical rules (all/any)** | boolean composition of rules | a branch depends on a condition (Conditional rule (if/then/else)) |
 | **Conditional rule (if/then/else)** | which check applies depends on a condition | no branch needed (Logical rules (all/any)) |
 
-**Choosing among siblings: validateRule vs assertValidRule vs validateNarrowing vs validateFieldMaps** (@inixiative/json-rules/docs/VERBS.md § Public API (validate))
+**Job: validate a rule, narrowing or field map** (validateRule vs assertValidRule vs validateNarrowing vs validateFieldMaps) — @inixiative/json-rules/docs/VERBS.md § Public API (validate)
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -132,7 +132,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **validateFieldMaps** | field names in a map holding . or : | want a throw (assertValidFieldMaps) |
 | **validateRuleInLens (lens-usage)** | the security gate: a rule's paths and enum values against a lens | shape alone (validateRule) |
 
-**Choosing among siblings: UsageError vs LensRefusal vs a rule-shape error** (@inixiative/json-rules/README.md § Error Handling)
+**Job: catch and classify a json-rules error** (UsageError vs LensRefusal vs a rule-shape error) — @inixiative/json-rules/README.md § Error Handling
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -140,7 +140,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **LensRefusal (lens-model)** | the lens itself refuses (a later clamp reading hidden data, an uncarriable source) | caller input (UsageError) |
 | **Classify json-rules errors by class** | catching: instanceof UsageError / LensRefusal, rethrow the rest as shape errors | matching message strings |
 
-**Choosing among siblings: The operator catalog** (@inixiative/json-rules/README.md § Operator Catalog)
+**Job: list the operators a rule field accepts** (The operator catalog) — @inixiative/json-rules/README.md § Operator Catalog
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -148,7 +148,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **getArrayOperators (json-rules)** | array operators, per target | scalar or date fields (getOperatorsForKind) |
 | **getAggregateOperators (json-rules)** | the comparisons an aggregate rule takes | per-field rules (getOperatorsForKind) |
 
-**Choosing among siblings: parseScopeRef vs readScopeRef** (@inixiative/json-rules/README.md § Scope Refs)
+**Job: resolve a scope reference in a nested rule** (parseScopeRef vs readScopeRef) — @inixiative/json-rules/README.md § Scope Refs
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -156,9 +156,11 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **readScopeRef** | the scope a ref names in a stack; returns outOfBounds, never throws | structure only (parseScopeRef) |
 
 - **assertValidRule** `@inixiative/json-rules#assertValidRule`: Need issues returned rather than thrown: validateRule instead; checking a rule against a lens: validateRuleInLens.
+  - *Throws:* json-rules rule-shape Error (`rule-shape`)
 - **bindRule** `@inixiative/json-rules#bindRule`: Binding tokens inside a lens chain: bindLens instead; evaluating once: pass bindings to check.
   - *Signs you're bypassing it:* String-replacing tokens in rule JSON, or building a new rule literal per request with the caller's value inlined, instead of a { bind } token filled by bindRule or check's bindings. (@inixiative/json-rules/README.md § Path Semantics, § Rule Introspection)
 - **check** `@inixiative/json-rules#check`: Compiling to a database query instead of in-memory evaluation: toPrisma or toSql instead.
+  - *Throws:* UsageError (`usage`); json-rules rule-shape Error (`rule-shape`)
   - *Signs you're bypassing it:* A hand-written interpreter that walks a Condition's JSON to evaluate it against a row, or a JS predicate re-implementing a stored rule, instead of check(rule, row, { bindings, now }). (catalog entry check; @inixiative/json-rules/README.md § Runtime Validation)
 - **describeRule** `@inixiative/json-rules#describeRule`: For routing and UX; gating still uses validateRuleInLens. describeRuleSources when you need the literal values named per source.
 - **engineGlobals** `@inixiative/json-rules#engineGlobals`: read and set process-wide rule engine defaults by dotted path
@@ -169,6 +171,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
   - *Signs you're bypassing it:* Hand-built maps of foreign rows keyed by each bridge's join field, instead of indexBridges(lens, rawForeign). (@inixiative/json-rules/README.md › Evaluating Across Bridges)
 - **listLensBindings** `@inixiative/json-rules#listLensBindings`: Lens-level requirement with parent: refs collapsed; for a bare rule use listBindings.
 - **materializeSourceQuery** `@inixiative/json-rules#materializeSourceQuery`: After running toSourceQueries against a DB; for an already-fetched collection use materializeSources.
+  - *Throws:* UsageError (`usage`)
 - **Operator** `@inixiative/json-rules#Operator`: Scalar field conditions; DateOperator for dates, ArrayOperator for array traversal.
 - **orderRecords** `@inixiative/json-rules#orderRecords`: In-memory sort matching window semantics; for database ordering compile via toPrisma instead.
   - *Signs you're bypassing it:* A hand-rolled sort that tries to mimic a rule window's ordering (NULLs last, multi-key, stable) for in-memory rows. (catalog entry orderRecords; README Lens Utilities (orderRecords))
@@ -176,6 +179,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
   - *Signs you're bypassing it:* Hand-written `OR: [compiledWhere, extra]` / `AND: [...]` around compiled wheres, which mishandles compiled match-all / match-nothing arms (`AND: [x, { OR: [] }]` matches everything). (@inixiative/json-rules/docs/VERBS.md Public API (compose); catalog entry orWhere)
 - **readScopeRef** `@inixiative/json-rules#readScopeRef`: Resolves against scopes; parseScopeRef when you only need depth and path.
 - **UsageError** `@inixiative/json-rules#UsageError`: Caller input faults; lens shape faults throw LensRefusal instead.
+  - *Error class:* `usage` (json-rules UsageError: the caller's input is missing or malformed (no now for a relative date, invalid now or time zone, an unbound bind). Fix: supply the input.); thrown by check, toPrisma, toSql, materializeSourceQuery, materializeSources
 - **validateRule** `@inixiative/json-rules#validateRule`: Shape and target only; to check fields resolve through a lens use validateRuleInLens. assertValidRule throws instead.
 - **Aggregate rule** `@inixiative/json-rules/README.md › Rule Shapes › Aggregate Rule`: numeric totals/means over arrays; array rule for per-element checks
 - **Array rule** `@inixiative/json-rules/README.md › Rule Shapes › Array Rule`: per-element predicates; aggregate rule when comparing sum/avg of elements
@@ -196,12 +200,15 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **Windowing (filter/orderBy/skip/take)** `@inixiative/json-rules/README.md › Windowing`: first/last element rules; plain array rule when all elements matter
 - **aggregate** `@inixiative/json-rules/README.md — Aggregate Operators`: totals across a list; use array operators (all/any/atLeast) for per-element conditions
 - **assertValidFieldMaps** `@inixiative/json-rules`: Throwing variant; validateFieldMaps returns { ok, errors }.
+  - *Throws:* json-rules rule-shape Error (`rule-shape`, inferred)
 - **assertValidNarrowing** `@inixiative/json-rules`: Throwing variant; validateNarrowing to collect errors.
+  - *Throws:* json-rules rule-shape Error (`rule-shape`, inferred)
 - **bindOptional** `@inixiative/json-rules leaf bindOptional`: mark a leaf's bind optional so absence evaluates as null, never pruned
   - *Signs you're bypassing it:* Pruning a leaf from a rule (or substituting a match-all value) when its bind is absent, instead of bindOptional, which reads null and never prunes — `in` with nothing bound matches nothing. (@inixiative/json-rules/README.md § Rule Introspection)
 - **Condition** `@inixiative/json-rules/README.md — TypeScript Types`: strict typed rules: StrictCondition instead
 - **engineGlobals.reset** `@inixiative/json-rules engineGlobals.reset`: restore all engine defaults to their initial values
 - **engineGlobals.with** `@inixiative/json-rules engineGlobals.with`: scoped override instead of set/reset; callback must be synchronous, Promise-returning callbacks throw
+  - *Throws:* engineGlobals.with async-callback Error (`server-error`)
   - *Signs you're bypassing it:* engineGlobals.set before a call and reset after it (leaking the override when the call throws) instead of a scoped engineGlobals.with, or an async callback, which throws. (@inixiative/json-rules/README.md § Engine Globals)
 - **FieldMapEntry.isRequired** `@inixiative/json-rules/README.md — NULL Semantics`: declare column or relation-hop nullability so compilers add NULL arms
 - **from: 'mapDefaults' source pointer** `@inixiative/json-rules/README.md — Sources (path source pointer)`: Names any eligible row; a plain path source offers only reachable linked rows. Scope tenancy via mapDefaults to keep unlinked rows.

@@ -116,7 +116,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `email-delivery`: Email sending: sendEmail planner, deliverEmail, senders, provider adapters
 
-**Choosing among siblings: sendEmail vs deliverEmail vs deliverEmailMessage vs the messaging jobs** (docs/claude/COMMUNICATIONS.md § Send Pipeline; § Messaging › Jobs)
+**Job: send a message to users or a contact (templated email vs untemplated message)** (sendEmail vs deliverEmail vs deliverEmailMessage vs the messaging jobs) — docs/claude/COMMUNICATIONS.md § Send Pipeline; § Messaging › Jobs
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -125,7 +125,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **messageUser (messaging-contacts)** | untemplated content to users matched by a rule | a templated email (use sendEmail) |
 | **messageContact (messaging-contacts)** | pre-rendered content to one Contact | a templated email (use sendEmail) |
 
-**Choosing among siblings: createResendClient vs createConsoleClient vs defaultEmailClient vs emailRegistry** (docs/claude/COMMUNICATIONS.md § Email Clients; catalog (apps/api/src/lib/email.ts))
+**Job: choose the email provider client for a send** (createResendClient vs createConsoleClient vs defaultEmailClient vs emailRegistry) — docs/claude/COMMUNICATIONS.md § Email Clients; catalog (apps/api/src/lib/email.ts)
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -134,14 +134,14 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **defaultEmailClient** | the first registered provider for a single send | registering or enumerating providers (use emailRegistry) |
 | **emailRegistry** | register and enumerate provider adapters | one send client (use defaultEmailClient) |
 
-**Choosing among siblings: emailVerifier vs createBouncerVerifier vs createNoopVerifier** (catalog; docs/claude/COMMUNICATIONS.md § Deliver step 5)
+**Job: verify an email address is deliverable** (emailVerifier vs createBouncerVerifier vs createNoopVerifier) — catalog; docs/claude/COMMUNICATIONS.md § Deliver step 5
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **emailVerifier** | the app's verifier: Bouncer, or no-op without an API key | constructing a verifier yourself |
 | **createBouncerVerifier** | real deliverability checks via Bouncer | dev and tests (use createNoopVerifier) |
 
-**Choosing among siblings: resolveSender vs resolveFromAddress vs pickSender** (docs/claude/COMMUNICATIONS.md § Sender)
+**Job: resolve who an email is sent from** (resolveSender vs resolveFromAddress vs pickSender) — docs/claude/COMMUNICATIONS.md § Sender
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -149,7 +149,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **resolveFromAddress** | only the from-address (today DEFAULT_FROM_EMAIL) | display identity (use resolveSender) |
 | **pickSender** | resolve a SenderSpec's field references against an entity | loading the sender row (use resolveSender) |
 
-**Choosing among siblings: isEmailContentError vs EmailProviderError vs EmailRenderError** (docs/claude/COMMUNICATIONS.md § Deliver step 2, step 8; catalog)
+**Job: classify an email send or render failure** (isEmailContentError vs EmailProviderError vs EmailRenderError) — docs/claude/COMMUNICATIONS.md § Deliver step 2, step 8; catalog
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -168,10 +168,13 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **deliverEmail** `apps/api/src/jobs/handlers/deliverEmail.ts#deliverEmail`: Send email via sendEmail, which records CommunicationLog and fans out this job; non-template messages: messageUser or messageContact.
   - *Signs you're bypassing it:* enqueueJob('deliverEmail', …) from anywhere but the planner (catalog: deliverEmail (enqueued by sendEmail; do not enqueue 'deliverEmail' directly))
 - **deliverEmailMessage** `apps/api/src/lib/email/deliverEmailMessage.ts#deliverEmailMessage`: Use inside the deliver job; to start a send from an event, enqueue via plannerJobId/deliverJobId instead of calling directly.
+  - *Throws:* EmailProviderError (`off-request-path`)
 - **EmailProviderError** `packages/email/src/errors/EmailProviderError.ts#EmailProviderError`: Delivery-side failures; template rendering failures: EmailRenderError instead.
+  - *Error class:* `off-request-path` (Raised where no live HTTP request is being served (job workers, app bootstrap, scripts, tests, frontend): plain Error is fine and nothing maps it to a status.); thrown by deliverEmailMessage
 - **emailRegistry** `apps/api/src/lib/email.ts#emailRegistry`: Registering or enumerating providers; for a single send client use defaultEmailClient.
 - **emailVerifier** `apps/api/src/lib/email.ts#emailVerifier`: verify email addresses via Bouncer, or no-op when no API key
 - **isEmailContentError** `packages/email/src/errors/isEmailContentError.ts#isEmailContentError`: Use instead of chaining instanceof checks against each email error class.
+  - *Error class:* `off-request-path` (Raised where no live HTTP request is being served (job workers, app bootstrap, scripts, tests, frontend): plain Error is fine and nothing maps it to a status.)
   - *Signs you're bypassing it:* a chain of instanceof checks against EmailRenderError, MjmlValidationError, TokenValidationError and friends to decide retry vs fail (catalog: isEmailContentError (use instead of chaining instanceof checks))
 - **pickSender** `apps/api/src/lib/email/pickSender.ts#pickSender`: resolve a sender spec's field references against an entity, keeping the type
 - **resolveFromAddress** `apps/api/src/lib/email.ts#resolveFromAddress`: For sender identity display use resolveSender; this returns only the address, currently DEFAULT_FROM_EMAIL.

@@ -124,7 +124,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `frontend-store`: Shared Zustand store: slices, access patterns, adding slices
 
-**Choosing among siblings: tenant.setOrganization vs setSpace vs setUser vs setPublic vs setPage** (docs/claude/ZUSTAND.md § 3. TenantSlice)
+**Job: set the tenant scope the UI is acting in** (tenant.setOrganization vs setSpace vs setUser vs setPublic vs setPage) — docs/claude/ZUSTAND.md § 3. TenantSlice
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -134,7 +134,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **tenant.setPublic** | resetting context to public, e.g. on logout | a signed-in personal scope (use tenant.setUser) |
 | **tenant.setPage** | setting the page record for nav access checks | changing app-level context (use tenant.setOrganization / tenant.setSpace) |
 
-**Choosing among siblings: auth.initialize vs auth.refreshMe vs fetchAndHydrateMe; signIn vs signUp** (docs/claude/ZUSTAND.md § 1. AuthSlice; FRONTEND/AUTH.md § Auth Slice)
+**Job: load or refresh the signed-in user in the store** (auth.initialize vs auth.refreshMe vs fetchAndHydrateMe; signIn vs signUp) — docs/claude/ZUSTAND.md § 1. AuthSlice; FRONTEND/AUTH.md § Auth Slice
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -144,7 +144,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **auth.signIn** | existing accounts | new accounts (use auth.signUp) |
 | **auth.signUp** | new accounts | existing accounts (use auth.signIn) |
 
-**Choosing among siblings: Reading and changing store state** (docs/claude/ZUSTAND.md § Access Patterns; Best Practices)
+**Job: read or change store state** (Reading and changing store state) — docs/claude/ZUSTAND.md § Access Patterns; Best Practices
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -212,7 +212,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `api-client`: Generated SDK, apiQuery/apiMutation, optimistic mutations, data hooks, form helpers
 
-**Choosing among siblings: apiQuery vs apiMutation vs useQuery vs useMutation vs useOptimisticMutation** (docs/claude/FRONTEND/API_CLIENT.md § apiQuery and apiMutation; § Optimistic Mutations)
+**Job: read or write API data from a frontend component and keep the query cache in step** (apiQuery vs apiMutation vs useQuery vs useMutation vs useOptimisticMutation) — docs/claude/FRONTEND/API_CLIENT.md § apiQuery and apiMutation; § Optimistic Mutations
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -223,14 +223,14 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **useOptimisticMutation** | list create/delete with instant UI | no cached list needs updating (use useMutation) |
 | **createOptimisticListTarget** | the list target inside useOptimisticMutation | hand-written optimisticUpdate/reconcile (never) |
 
-**Choosing among siblings: useDebounce vs useDebouncedCallback** (docs/claude/FRONTEND/API_CLIENT.md § Form Helpers (useDebounce))
+**Job: debounce user input before it triggers work** (useDebounce vs useDebouncedCallback) — docs/claude/FRONTEND/API_CLIENT.md § Form Helpers (useDebounce)
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **useDebounce (concurrency-locks)** | debouncing a value that hits the backend | debouncing an action or setter (use useDebouncedCallback); local filtering (don't debounce) |
 | **useDebouncedCallback (concurrency-locks)** | debouncing an action or setter | debouncing a value (use useDebounce) |
 
-**Choosing among siblings: writeToHistoryState vs writeToHistoryStateAndUrl** (packages/ui/src/lib/dataStatePersistence.ts)
+**Job: keep page state in browser history, optionally in the URL** (writeToHistoryState vs writeToHistoryStateAndUrl) — packages/ui/src/lib/dataStatePersistence.ts
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -247,6 +247,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
   - *Signs you're bypassing it:* hand-written optimisticUpdate/reconcile functions that insert a placeholder row, filter by id or splice the response item into a cached list (docs/claude/FRONTEND/API_CLIENT.md § Optimistic Mutations)
 - **integrationContextQueries** `packages/ui/src/lib/integrationContextQueries.ts#integrationContextQueries`: Use for integration lists across tenant contexts instead of branching on context; built with makeContextQueries.
 - **makeContextQueries** `packages/ui/src/lib/makeContextQueries.ts#makeContextQueries`: Use when one list appears in user, organization and space contexts instead of per-page context switches.
+  - *Throws:* makeContextQueries missing-context Error (`off-request-path`)
   - *Signs you're bypassing it:* a page with if/switch on tenant.context.type choosing between me*/organization*/space* SDK calls and query keys (docs/claude/FRONTEND/API_CLIENT.md § Context Queries)
 - **readInitialState** `packages/ui/src/lib/dataStatePersistence.ts#readInitialState`: URL params only: readStateFromUrl instead.
 - **useMutation** `packages/ui/src/hooks/useQuery.ts#useMutation`: Reads: useQuery; realtime pushed data: useStream. Import from packages/ui, not @tanstack directly.

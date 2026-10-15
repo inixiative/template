@@ -135,7 +135,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `app-events`: emitAppEvent side-effect bus: handlers, handoffs to email/ws/observe, commit deferral
 
-**Choosing among siblings: Triggering side effects: emitAppEvent vs db.onCommit vs enqueueJob vs direct sends** (docs/claude/APP_EVENTS.md § Purpose and execution, § Handler and handoff contracts; COMMUNICATIONS.md § Send Pipeline)
+**Job: trigger a side effect (email, notification, job, push) after a domain write** (Triggering side effects: emitAppEvent vs db.onCommit vs enqueueJob vs direct sends) — docs/claude/APP_EVENTS.md § Purpose and execution, § Handler and handoff contracts; COMMUNICATIONS.md § Send Pipeline
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -146,8 +146,10 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **sendEmail (email-delivery)** | plans recipients from an EmailHandoff, then enqueues deliverEmail | never enqueue by hand with recipients (emit with an EmailHandoff) |
 | **deliverEmail (email-delivery)** | the per-recipient provider send | never enqueue directly (sendEmail does) |
 | **AppEvent** | the stored event stream for side effects | before/after mutation diffs (AuditLog) |
+| *inline call, no job* | light, best-effort, idempotent work after commit: a makeAppEvent cb runs inline, each task isolated by db.parallel allSettled; observation upserts AppEvent directly and is not a separate BullMQ job (APP_EVENTS.md § Purpose and execution, § Observe pipeline) | heavy or retryable work (enqueueJob from the event cb); a direct email/SMS/analytics call (always an app-event handoff); in tests enqueueJob already runs the handler inline |
+| *no event for model webhooks* | a model's mutations should notify webhook subscribers: add it to webhookEnabledModels; the webhooks hook enqueues sendWebhook on commit (HOOKS.md § Webhooks › Enabling Webhooks for a Model) | named domain side effects (emitAppEvent); never an event cb that looks up subscriptions and enqueues deliveries |
 
-**Choosing among siblings: WebSocket handoffs: sendToChannel vs sendToUser vs streamAppend vs refetch** (docs/claude/APP_EVENTS.md § WebSocket handoffs; WEBSOCKETS.md § Publishing a refetch, § Data streams)
+**Job: push a realtime update from the server to connected clients** (WebSocket handoffs: sendToChannel vs sendToUser vs streamAppend vs refetch) — docs/claude/APP_EVENTS.md § WebSocket handoffs; WEBSOCKETS.md § Publishing a refetch, § Data streams
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -168,9 +170,12 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **App event handler registry** `apps/api/src/appEvents/handlers/`: Registration alone doesn't prove a writer emits the event; verify an emit call exists.
 - **AppEventName** `apps/api/src/appEvents/handlers/index.ts`: enumerate valid event names typed against their payloads
 - **db.onCommit** `docs/claude/APP_EVENTS.md#Purpose and execution`: Inside db.txn when work must only happen after commit; emitAppEvent uses it automatically.
+  - *Throws:* db.onCommit outside transaction Error (`server-error`, database)
   - *Signs you're bypassing it:* sending email, calling an external API or enqueuing a job directly inside db.txn (so it fires even if the transaction rolls back), or a hand-built after-commit callback list (docs/claude/DATABASE.md § Transactions › After Commit Callbacks; FEATURES.md § Post-Commit Callbacks)
 - **db.parallel** `docs/claude/APP_EVENTS.md#Purpose and execution`: Use allSettled so one failed task doesn't block siblings; failures thrown after settlement.
+  - *Throws:* db.parallel aggregated failure (`server-error`)
 - **db.txn** `docs/claude/APP_EVENTS.md#Purpose and execution`: run writes in a transaction whose app events fire on commit
+  - *Throws:* Prisma P2034 (write conflict / deadlock) (`conflict`, request-context-errors, inferred); isWriteConflictError (`conflict`, request-context-errors, inferred)
 - **emit** `apps/api/src/appEvents/emit.ts`: emit typed app events with actor envelope, deferred until transaction commit
 - **observe** `apps/api/src/lib/observe.ts`: adapt app event outcomes into observation telemetry
 - **WSHandoff** `docs/claude/APP_EVENTS.md#Handler and handoff contracts`: kind 'channels' for channel subscribers, 'users' for specific users, 'stream' to append to a data stream.
@@ -190,7 +195,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `webhooks`: Outbound webhooks: subscriptions, signing, delivery jobs, SSRF-safe fetch
 
-**Choosing among siblings: Webhook registries: webhookEnabledModels vs webhookOwnerAllowedModels vs webhookModelSubscribers vs webhookRelatedModels** (docs/claude/HOOKS.md § Webhooks (Enabling Webhooks for a Model, Related Models); catalog registries/webhook)
+**Job: decide which model changes emit webhooks and to whom** (Webhook registries: webhookEnabledModels vs webhookOwnerAllowedModels vs webhookModelSubscribers vs webhookRelatedModels) — docs/claude/HOOKS.md § Webhooks (Enabling Webhooks for a Model, Related Models); catalog registries/webhook
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -199,7 +204,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **webhookModelSubscribers** | inverse lookup: from a changed model to owners | permitting subscriptions (use webhookOwnerAllowedModels) |
 | **webhookRelatedModels** | a child change fires the parent's webhook | never extra code to fire the parent |
 
-**Choosing among siblings: Delivery and URL safety: sendWebhook vs validateWebhookUrl vs webhookUrlSchema** (catalog sendWebhook, validateWebhookUrl, webhookUrlSchema; HOOKS.md § Webhooks)
+**Job: deliver webhooks and validate subscriber URLs** (Delivery and URL safety: sendWebhook vs validateWebhookUrl vs webhookUrlSchema) — catalog sendWebhook, validateWebhookUrl, webhookUrlSchema; HOOKS.md § Webhooks
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -223,6 +228,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **webhookRelatedModels** `packages/db/src/registries/webhook/relatedModels.ts#webhookRelatedModels`: Use for polymorphic related-record matching; webhookOwnerAllowedModels only lists permitted subscription models.
   - *Signs you're bypassing it:* extra code that fires a parent's webhook when a child record changes (docs/claude/HOOKS.md § Webhooks, Related Models)
 - **webhookUrlSchema** `apps/api/src/modules/webhookSubscription/schemas/webhookSubscriptionSchemas.ts#webhookUrlSchema`: Schema-level URL input checks; call validateWebhookUrl directly outside zod parsing.
+  - *Throws:* ZodError (`validation-error`, request-context-errors)
   - *Signs you're bypassing it:* url: z.string().url() on a webhook subscription body (catalog webhookUrlSchema)
 - **apps/api/src/modules/webhookSubscription** `apps/api/src/modules/webhookSubscription`: Managing an existing subscription; creation goes through me/organization/space CreateWebhookSubscription endpoints.
 - **Webhook circuit breaker** `docs/claude/HOOKS.md > Webhooks > Circuit Breaker`: general delivery failures; repeated 400/422 for one record on integration subscriptions poisons the record instead
@@ -239,7 +245,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `adapters`: Provider adapter modules: one interface over provider implementations (makeAdapterRouter/Registry)
 
-**Choosing among siblings: makeAdapterRouter vs makeAdapterRegistry vs makeBroadcastRegistry vs direct factory** (docs/claude/ADAPTERS.md § Adapter primitives, § What NOT to do; catalog)
+**Job: route a call to an external service's provider (by environment, key, tenant or all at once)** (makeAdapterRouter vs makeAdapterRegistry vs makeBroadcastRegistry vs direct factory) — docs/claude/ADAPTERS.md § Adapter primitives, § What NOT to do; catalog
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -271,7 +277,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `integrations`: Owner integrations and their synced records
 
-**Choosing among siblings: Integration vs IntegrationRecord, and the poison pair** (catalog integration.prisma, integrationRecord.prisma, findOwnedIntegration; HOOKS.md § Webhooks, Poisoned Records)
+**Job: work with an owner's provider integration and its synced records** (Integration vs IntegrationRecord, and the poison pair) — catalog integration.prisma, integrationRecord.prisma, findOwnedIntegration; HOOKS.md § Webhooks, Poisoned Records
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -296,7 +302,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `object-storage`: Object storage client (S3) behind the adapter
 
-**Choosing among siblings: storage vs createS3Client vs MinIO scripts** (docs/claude/ADAPTERS.md § What an adapter module is, § Existing examples; catalog createS3Client; scripts/db)
+**Job: read or write stored files, or provision local buckets** (storage vs createS3Client vs MinIO scripts) — docs/claude/ADAPTERS.md § What an adapter module is, § Existing examples; catalog createS3Client; scripts/db
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|

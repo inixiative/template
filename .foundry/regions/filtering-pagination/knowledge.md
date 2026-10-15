@@ -123,7 +123,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `filtering-search`: List filtering/search/orderBy: bracket query notation, buildWhereClause, searchable/orderable fields
 
-**Choosing among siblings: Building list where/orderBy: paginate vs buildWhereClause vs buildOrderBy vs fieldSearchOperator vs buildJsonWhere vs escapeLikePattern** (docs/claude/API_ROUTES.md § paginate() Utility; docs/claude/DATABASE.md § Query Building Utilities; catalog)
+**Job: build a list query's where and orderBy** (Building list where/orderBy: paginate vs buildWhereClause vs buildOrderBy vs fieldSearchOperator vs buildJsonWhere vs escapeLikePattern) — docs/claude/API_ROUTES.md § paginate() Utility; docs/claude/DATABASE.md § Query Building Utilities; catalog
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -134,7 +134,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **buildJsonWhere** | filters inside a JSON column path | plain scalar search (fieldSearchOperator) |
 | **escapeLikePattern** | raw LIKE/contains text you pass yourself | per-field search clauses (fieldSearchOperator escapes) |
 
-**Choosing among siblings: Where a filter lives: filterLens root.where vs scopeNarrowing vs redactLens vs lensWhere** (docs/claude/API_ROUTES.md § Route declaration, § Lens Wheres, § Dynamic per-request scope)
+**Job: decide where a list filter or row scope lives** (Where a filter lives: filterLens root.where vs scopeNarrowing vs redactLens vs lensWhere) — docs/claude/API_ROUTES.md § Route declaration, § Lens Wheres, § Dynamic per-request scope
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -143,7 +143,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **redactLens (lenses)** | a model-wide condition wherever the model appears (mapDefaults) | a root-only membership filter (root.where) |
 | **lensWhere (lenses)** | non-root lens clauses folded into relation branches | root clauses (buildWhereClause) |
 
-**Choosing among siblings: Allowed fields and sort: searchablePaths vs orderablePaths vs Lens-injected orderBy vs orderByRequestSchema** (docs/claude/API_ROUTES.md § OrderBy, § How it works)
+**Job: restrict which fields a list can filter and sort by** (Allowed fields and sort: searchablePaths vs orderablePaths vs Lens-injected orderBy vs orderByRequestSchema) — docs/claude/API_ROUTES.md § OrderBy, § How it works
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -152,7 +152,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **Lens-injected orderBy** | routes with a filterLens get orderBy automatically | routes without a lens (orderByRequestSchema) |
 | **orderByRequestSchema** | raw orderBy query schema without a lens; convert with parseOrderBy | a route with filterLens (Lens-injected orderBy) |
 
-**Choosing among siblings: Bracket query strings: c.get('bracketQuery') vs serializeBracketQuery vs buildFilterQuery** (docs/claude/API_ROUTES.md § Bracket Notation Query Parsing; catalog)
+**Job: read or build bracket-style query strings** (Bracket query strings: c.get('bracketQuery') vs serializeBracketQuery vs buildFilterQuery) — docs/claude/API_ROUTES.md § Bracket Notation Query Parsing; catalog
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -164,12 +164,15 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **buildFilterQuery** `packages/ui/src/lib/buildFilterQuery.ts#buildFilterQuery`: Frontend list views; pairs with debounce/URL-state wiring rather than hand-built query params.
   - *Signs you're bypassing it:* Hand-building URLSearchParams for list search/filters in a frontend view. (catalog entry buildFilterQuery; docs/claude/FRONTEND/API_CLIENT.md § Data Hooks)
 - **buildJsonWhere** `apps/api/src/lib/prisma/jsonFilter.ts#buildJsonWhere`: Filters inside JSON columns; plain scalar field search uses fieldSearchOperator.
+  - *Throws:* makeError 400 BAD_REQUEST (`bad-request`, request-context-errors)
 - **buildOrderBy** `apps/api/src/lib/prisma/buildOrderBy.ts#buildOrderBy`: Sorting list queries; filters and search go through buildWhereClause.
 - **buildOrderBySchema** `apps/api/src/lib/routeTemplates/filters/buildOrderBySchema.ts#buildOrderBySchema`: sorting params; for text search fields use buildSearchFieldsSchema
 - **buildSearchFieldsSchema** `apps/api/src/lib/routeTemplates/filters/buildSearchFieldsSchema.ts#buildSearchFieldsSchema`: search params; for sort params use buildOrderBySchema
 - **buildWhereClause** `apps/api/src/lib/prisma/buildWhereClause.ts#buildWhereClause`: Building list query filters; ordering uses buildOrderBy; paginate() calls this for you.
+  - *Throws:* makeError 400 BAD_REQUEST (`bad-request`, request-context-errors)
   - *Signs you're bypassing it:* Building a search where by hand (`OR: fields.map(f => ({ [f]: { contains: term, mode: 'insensitive' } }))`) and merging filters manually. (docs/claude/DATABASE.md § Query Building Utilities › buildWhereClause)
 - **coerceValueForField** `apps/api/src/lib/prisma/coerceValue.ts#coerceValueForField`: convert a raw filter value to the type a Prisma model field expects
+  - *Throws:* makeError 400 BAD_REQUEST (`bad-request`, request-context-errors)
 - **createAdvancedSearchSchema** `apps/api/src/lib/routeTemplates/searchSchema.ts#createAdvancedSearchSchema`: Use over generic advancedSearchSchema when the searchable fields are known.
 - **escapeLikePattern** `apps/api/src/lib/prisma/escapeLikePattern.ts#escapeLikePattern`: Raw LIKE/contains text only; for per-field search clauses use fieldSearchOperator.
   - *Signs you're bypassing it:* Passing user text straight into contains/startsWith/endsWith so % and _ act as wildcards. (docs/claude/DATABASE.md § buildWhereClause (escapes LIKE metacharacters); catalog entry escapeLikePattern)
@@ -179,6 +182,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **getQueryMetadataByOperation** `packages/ui/src/lib/getQueryMetadata.ts#getQueryMetadataByOperation`: Have operationId outside React; with path+method use getQueryMetadata; in components useQueryMetadata.
 - **getValidOperators** `apps/api/src/lib/prisma/scalarOperators.ts#getValidOperators`: enumerating allowed operators, e.g. for schemas; for a single yes/no check use isValidOperatorForField.
 - **isValidOperatorForField** `apps/api/src/lib/prisma/scalarOperators.ts#isValidOperatorForField`: single-operator validation; to list all allowed operators use getValidOperators.
+  - *Throws:* makeError 400 BAD_REQUEST (`bad-request`, request-context-errors, inferred)
 - **makeDataConfig** `packages/ui/src/lib/makeDataConfig.ts#makeDataConfig`: Feed to usePaginatedData or useInfiniteData instead of hand-declaring searchable, orderable fields or enum filters per table.
   - *Signs you're bypassing it:* Hand-declaring searchable/orderable field lists or enum filter options per table in the frontend. (docs/claude/API_ROUTES.md § Data Config + Filters ("no hand-maintained field lists"))
 - **orderablePaths** `packages/db/src/lens/orderablePaths.ts#orderablePaths`: Routes with filterLens get orderBy auto-injected; call directly only outside route templates. For search fields use searchablePaths.
@@ -194,6 +198,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **useDataFilters** `packages/ui/src/hooks/useDataFilters.ts#useDataFilters`: Filter state only; for fetching plus paging use usePaginatedData or useInfiniteData, which consume the same config.
 - **useQueryMetadata** `packages/ui/src/lib/getQueryMetadata.ts#useQueryMetadata`: Inside React components; outside them call getQueryMetadataByOperation or getQueryMetadata.
 - **validatePathNotation** `apps/api/src/lib/prisma/pathNotation.ts#validatePathNotation`: guard any user-supplied nested path before buildNestedPath; limits depth to 5 by default.
+  - *Throws:* makeError 400 BAD_REQUEST (`bad-request`, request-context-errors, inferred)
   - *Signs you're bypassing it:* Interpolating user-supplied dotted paths into Prisma where/orderBy without validation, or a hand-rolled regex check. (docs/claude/DATABASE.md § Path Notation Utilities; docs/claude/API_ROUTES.md § OrderBy Security)
 - **[:] literal segment** `docs/claude/API_ROUTES.md#Bracket Notation`: only null/true/false allowlisted; plain bracket values stay strings
 - **Admin bare lens** `docs/claude/API_ROUTES.md#Admin routes`: admin: true routes where superadmin skipFieldValidation bypasses picks
@@ -230,7 +235,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `pagination`: Offset and cursor pagination: paginate(), response metadata, pagination hooks
 
-**Choosing among siblings: paginate vs cursorPaginate vs buildWhereClause vs fetchAllPages vs readAllAsCaller** (docs/claude/API_ROUTES.md § paginate() Utility; docs/claude/FLOWS.md § Lifecycle; catalog paginate.ts, fetchAllPages, readAllAsCaller)
+**Job: list rows page by page, or read every page** (paginate vs cursorPaginate vs buildWhereClause vs fetchAllPages vs readAllAsCaller) — docs/claude/API_ROUTES.md § paginate() Utility; docs/claude/FLOWS.md § Lifecycle; catalog paginate.ts, fetchAllPages, readAllAsCaller
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -241,14 +246,14 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **fetchAllPages** | every row of a paginated source, capped (cap hit throws) | one page (paginate / usePaginatedData) |
 | **readAllAsCaller (batch)** | server reading every page of an API list as the caller | a single record (readAsCaller (batch)) |
 
-**Choosing among siblings: paginateRequestSchema vs cursorPaginateRequestSchema** (catalog apps/api/src/lib/routeTemplates/paginationSchemas.ts)
+**Job: declare a list endpoint's pagination query schema** (paginateRequestSchema vs cursorPaginateRequestSchema) — catalog apps/api/src/lib/routeTemplates/paginationSchemas.ts
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **paginateRequestSchema** | numbered pages with totals | cursor scrolling (cursorPaginateRequestSchema) |
 | **cursorPaginateRequestSchema** | large or live-changing lists | numbered pages (paginateRequestSchema) |
 
-**Choosing among siblings: Frontend list hooks: usePaginatedData vs useInfiniteData vs useInfiniteDataQuery vs useInfiniteScrollTrigger vs Pagination vs Table** (docs/claude/FRONTEND/API_CLIENT.md § Data Hooks, § Infinite Scroll Trigger, § Table and Pagination)
+**Job: show a paginated or infinite list in the UI** (Frontend list hooks: usePaginatedData vs useInfiniteData vs useInfiniteDataQuery vs useInfiniteScrollTrigger vs Pagination vs Table) — docs/claude/FRONTEND/API_CLIENT.md § Data Hooks, § Infinite Scroll Trigger, § Table and Pagination
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -266,8 +271,10 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **decodeCursor** `apps/api/src/lib/prisma/keysetCursor.ts#decodeCursor`: parse an opaque cursor string back into sort chain, values and filter hash
 - **encodeCursor** `apps/api/src/lib/prisma/keysetCursor.ts#encodeCursor`: pack sort chain, last-row values and filter hash into an opaque cursor
 - **fetchAllPages** `packages/shared/src/utils/fetchAllPages.ts#fetchAllPages`: Need every row, not one page; a cap hit throws, so bound large reads.
+  - *Throws:* fetchAllPages cap Error (`server-error`)
   - *Signs you're bypassing it:* A while loop incrementing page until an empty or short page to collect every row of a paginated endpoint. (catalog entry fetchAllPages)
 - **paginate** `apps/api/src/lib/prisma/paginate.ts#paginate`: page-number lists needing totals; deep or high-churn lists use cursorPaginate. Route templates with paginate: true wire it automatically.
+  - *Throws:* searchPaths stray-entry Error (`server-error`)
   - *Signs you're bypassing it:* A list controller with hand-written skip/take from page and pageSize, a separate count() call, a hand-built SORT_FIELD_MAP or in-memory sort, and its own pagination metadata instead of paginate(c, db.model, options). (docs/claude/API_ROUTES.md § paginate() Utility ("Use paginate() for list endpoints"))
 - **paginateRequestSchema** `apps/api/src/lib/routeTemplates/paginationSchemas.ts#paginateRequestSchema`: Numbered pages with totals: this; cursor-based scrolling: cursorPaginateRequestSchema instead.
 - **Pagination** `packages/ui/src/components/primitives/Pagination.tsx#Pagination`: Offset pages only; cursor/infinite-scroll lists use the API_CLIENT.md table pagination patterns instead.

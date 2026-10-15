@@ -91,7 +91,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `lib-json-rules-backends`: Compiling rules to backends: Prisma query planning, PostgreSQL SQL generation, the backend support matrix (README, toSql README)
 
-**Choosing among siblings: check vs toPrisma vs toSql vs executePrismaPlan** (@inixiative/json-rules/README.md § Backend Support Matrix, § Prisma Query Planning; src/toSql/README.md)
+**Job: evaluate a rule in memory or compile it to a database query** (check vs toPrisma vs toSql vs executePrismaPlan) — @inixiative/json-rules/README.md § Backend Support Matrix, § Prisma Query Planning; src/toSql/README.md
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -104,8 +104,10 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **executePrismaPlan** `@inixiative/json-rules#executePrismaPlan`: Always read a toPrisma plan's where through this; Prisma rejects unresolved step or field references.
   - *Signs you're bypassing it:* Taking toPrisma(rule, ...) output and spreading plan.steps[0].where straight into db.x.findMany instead of resolving it with executePrismaPlan. (@inixiative/json-rules/README.md § Path Semantics ("read a plan's where only through it"), § Prisma Query Planning)
 - **toPrisma** `@inixiative/json-rules#toPrisma`: Database filtering; for in-memory evaluation use check, for column selection use toLensSelect.
+  - *Throws:* UsageError (`usage`, json-rules-engine); LensRefusal (`lens-refusal`, lens-model); json-rules rule-shape Error (`rule-shape`, json-rules-engine)
   - *Signs you're bypassing it:* A hand-written Prisma where mirroring a stored or user rule, or a hand-rolled groupBy plus `id in` pair for “at least N related rows”, instead of toPrisma + executePrismaPlan. (@inixiative/json-rules/README.md § Prisma Query Planning)
 - **toSql** `@inixiative/json-rules#toSql`: Raw SQL: toSql; Prisma query plan: toPrisma; in-memory data: check().
+  - *Throws:* UsageError (`usage`, json-rules-engine); LensRefusal (`lens-refusal`, lens-model); json-rules rule-shape Error (`rule-shape`, json-rules-engine)
   - *Signs you're bypassing it:* Concatenating rule values into a SQL string or hand-quoting identifiers to filter rows by a rule, instead of toSql's parameterized WHERE and joins. (@inixiative/json-rules/src/toSql/README.md § Security)
 - **FieldMapSet requires mapName** `@inixiative/json-rules README > PostgreSQL SQL Generation`: whenever map is a FieldMapSet/lens rather than a single FieldMap
 

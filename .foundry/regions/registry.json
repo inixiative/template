@@ -656,7 +656,7 @@
   "regions": [
     {
       "id": "concurrency-locks",
-      "tokens": 12385,
+      "tokens": 13003,
       "concepts": [
         "locks",
         "concurrency-limits",
@@ -668,7 +668,7 @@
     },
     {
       "id": "redis-caching-rate-limits",
-      "tokens": 10418,
+      "tokens": 10612,
       "concepts": [
         "redis",
         "caching",
@@ -678,7 +678,7 @@
     },
     {
       "id": "jobs-cron",
-      "tokens": 12264,
+      "tokens": 12414,
       "concepts": [
         "jobs",
         "cron"
@@ -687,7 +687,7 @@
     },
     {
       "id": "job-lanes-outbox",
-      "tokens": 12030,
+      "tokens": 12146,
       "concepts": [
         "job-lanes",
         "job-outbox"
@@ -696,7 +696,7 @@
     },
     {
       "id": "app-events-webhooks-adapters",
-      "tokens": 16505,
+      "tokens": 16881,
       "concepts": [
         "app-events",
         "webhooks",
@@ -708,7 +708,7 @@
     },
     {
       "id": "ws-connections",
-      "tokens": 5673,
+      "tokens": 5695,
       "concepts": [
         "ws-connections"
       ],
@@ -716,7 +716,7 @@
     },
     {
       "id": "ws-streams",
-      "tokens": 17593,
+      "tokens": 17634,
       "concepts": [
         "ws-streams"
       ],
@@ -724,7 +724,7 @@
     },
     {
       "id": "email-templates",
-      "tokens": 18553,
+      "tokens": 18854,
       "concepts": [
         "email-templates"
       ],
@@ -732,7 +732,7 @@
     },
     {
       "id": "email-lens",
-      "tokens": 10149,
+      "tokens": 10206,
       "concepts": [
         "email-lens"
       ],
@@ -740,7 +740,7 @@
     },
     {
       "id": "email-delivery",
-      "tokens": 11780,
+      "tokens": 11937,
       "concepts": [
         "email-delivery",
         "communication-preferences"
@@ -749,7 +749,7 @@
     },
     {
       "id": "messaging-contacts",
-      "tokens": 10470,
+      "tokens": 10536,
       "concepts": [
         "messaging",
         "contacts"
@@ -758,7 +758,7 @@
     },
     {
       "id": "json-rules",
-      "tokens": 12271,
+      "tokens": 12602,
       "concepts": [
         "json-rules",
         "rule-references"
@@ -767,7 +767,7 @@
     },
     {
       "id": "json-rules-engine",
-      "tokens": 17394,
+      "tokens": 17583,
       "concepts": [
         "lib-json-rules"
       ],
@@ -783,7 +783,7 @@
     },
     {
       "id": "json-rules-backends",
-      "tokens": 7252,
+      "tokens": 7342,
       "concepts": [
         "lib-json-rules-backends"
       ],
@@ -791,7 +791,7 @@
     },
     {
       "id": "lenses",
-      "tokens": 10774,
+      "tokens": 10840,
       "concepts": [
         "lenses"
       ],
@@ -799,7 +799,7 @@
     },
     {
       "id": "lens-model",
-      "tokens": 12263,
+      "tokens": 12388,
       "concepts": [
         "lib-json-rules-lens"
       ],
@@ -807,7 +807,7 @@
     },
     {
       "id": "lens-usage",
-      "tokens": 18132,
+      "tokens": 18206,
       "concepts": [
         "lib-json-rules-lens-usage"
       ],
@@ -815,7 +815,7 @@
     },
     {
       "id": "lens-sources",
-      "tokens": 7859,
+      "tokens": 7916,
       "concepts": [
         "lib-json-rules-lens-sources"
       ],
@@ -823,7 +823,7 @@
     },
     {
       "id": "rules-builder",
-      "tokens": 19679,
+      "tokens": 19705,
       "concepts": [
         "rules-builder",
         "lib-rules-builder"
@@ -832,7 +832,7 @@
     },
     {
       "id": "permissions",
-      "tokens": 18425,
+      "tokens": 18553,
       "concepts": [
         "permissions"
       ],
@@ -840,7 +840,7 @@
     },
     {
       "id": "tenancy",
-      "tokens": 7481,
+      "tokens": 7546,
       "concepts": [
         "tenancy",
         "superadmin"
@@ -849,7 +849,7 @@
     },
     {
       "id": "authentication",
-      "tokens": 17873,
+      "tokens": 18089,
       "concepts": [
         "authentication",
         "auth-middleware",
@@ -859,7 +859,7 @@
     },
     {
       "id": "frontend-auth",
-      "tokens": 6744,
+      "tokens": 6762,
       "concepts": [
         "frontend-auth"
       ],
@@ -867,7 +867,7 @@
     },
     {
       "id": "api-routes-schemas",
-      "tokens": 16312,
+      "tokens": 16569,
       "concepts": [
         "route-templates",
         "openapi",
@@ -878,7 +878,7 @@
     },
     {
       "id": "request-context-errors",
-      "tokens": 15258,
+      "tokens": 15713,
       "concepts": [
         "request-context",
         "errors"
@@ -887,7 +887,7 @@
     },
     {
       "id": "batch",
-      "tokens": 8909,
+      "tokens": 8967,
       "concepts": [
         "batch"
       ],
@@ -895,7 +895,7 @@
     },
     {
       "id": "filtering-pagination",
-      "tokens": 19772,
+      "tokens": 19954,
       "concepts": [
         "filtering-search",
         "pagination"
@@ -904,7 +904,7 @@
     },
     {
       "id": "database",
-      "tokens": 15874,
+      "tokens": 16279,
       "concepts": [
         "db-client",
         "data-modeling",
@@ -914,7 +914,7 @@
     },
     {
       "id": "database-tooling",
-      "tokens": 5941,
+      "tokens": 5955,
       "concepts": [
         "db-scripts",
         "seeding"
@@ -923,7 +923,7 @@
     },
     {
       "id": "mutation-hooks",
-      "tokens": 19160,
+      "tokens": 19563,
       "concepts": [
         "mutation-hooks",
         "audit-log",
@@ -935,7 +935,7 @@
     },
     {
       "id": "encryption",
-      "tokens": 16686,
+      "tokens": 16700,
       "concepts": [
         "encryption",
         "secrets"
@@ -944,7 +944,7 @@
     },
     {
       "id": "inquiries",
-      "tokens": 17864,
+      "tokens": 18035,
       "concepts": [
         "inquiries"
       ],
@@ -952,7 +952,7 @@
     },
     {
       "id": "flows",
-      "tokens": 6808,
+      "tokens": 6885,
       "concepts": [
         "flows"
       ],
@@ -960,7 +960,7 @@
     },
     {
       "id": "customers-segments",
-      "tokens": 11534,
+      "tokens": 11655,
       "concepts": [
         "customers",
         "segments"
@@ -969,7 +969,7 @@
     },
     {
       "id": "observability-lifecycle",
-      "tokens": 13881,
+      "tokens": 13922,
       "concepts": [
         "logging",
         "telemetry",
@@ -979,7 +979,7 @@
     },
     {
       "id": "frontend-state-api-client",
-      "tokens": 16352,
+      "tokens": 16419,
       "concepts": [
         "frontend-store",
         "api-client"
@@ -988,7 +988,7 @@
     },
     {
       "id": "frontend-apps-navigation",
-      "tokens": 18134,
+      "tokens": 18180,
       "concepts": [
         "frontend-routing",
         "navigation"
@@ -997,7 +997,7 @@
     },
     {
       "id": "ui-components-theme",
-      "tokens": 16552,
+      "tokens": 16579,
       "concepts": [
         "ui-components",
         "theme-layout"
@@ -1006,7 +1006,7 @@
     },
     {
       "id": "testing",
-      "tokens": 16477,
+      "tokens": 16571,
       "concepts": [
         "test-harness",
         "test-factories",
@@ -1017,7 +1017,7 @@
     },
     {
       "id": "dx-setup",
-      "tokens": 11181,
+      "tokens": 11216,
       "concepts": [
         "dev-setup",
         "worktrees"
@@ -1026,7 +1026,7 @@
     },
     {
       "id": "environments-deploy",
-      "tokens": 10848,
+      "tokens": 10874,
       "concepts": [
         "env-config",
         "ci-deploy"
@@ -1035,7 +1035,7 @@
     },
     {
       "id": "dx-tools",
-      "tokens": 10311,
+      "tokens": 10373,
       "concepts": [
         "scripts",
         "lint-rules",
@@ -1045,7 +1045,7 @@
     },
     {
       "id": "conventions",
-      "tokens": 8578,
+      "tokens": 8609,
       "concepts": [
         "naming",
         "code-style"
@@ -1054,7 +1054,7 @@
     },
     {
       "id": "monorepo-architecture",
-      "tokens": 15548,
+      "tokens": 15689,
       "concepts": [
         "monorepo-layout",
         "dependencies",
@@ -1064,7 +1064,7 @@
     },
     {
       "id": "init-script",
-      "tokens": 18077,
+      "tokens": 18128,
       "concepts": [
         "init-script"
       ],
@@ -1072,7 +1072,7 @@
     },
     {
       "id": "engineering-process-docs",
-      "tokens": 11864,
+      "tokens": 11894,
       "concepts": [
         "engineering-process",
         "docs-process"
@@ -1081,7 +1081,7 @@
     },
     {
       "id": "lib-permissions",
-      "tokens": 6885,
+      "tokens": 6898,
       "concepts": [
         "lib-permissions"
       ],
@@ -1097,7 +1097,7 @@
     },
     {
       "id": "lib-prisma-map",
-      "tokens": 10918,
+      "tokens": 10939,
       "concepts": [
         "lib-prisma-map",
         "schema-introspection"
@@ -1106,7 +1106,7 @@
     },
     {
       "id": "lib-atlas",
-      "tokens": 12769,
+      "tokens": 12799,
       "concepts": [
         "lib-atlas",
         "atlas"
@@ -1124,7 +1124,7 @@
     },
     {
       "id": "lib-config",
-      "tokens": 8212,
+      "tokens": 8231,
       "concepts": [
         "lib-config"
       ],

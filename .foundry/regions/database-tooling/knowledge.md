@@ -104,7 +104,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `db-scripts`: Database commands: db push vs migrations, generate, dump/clone
 
-**Choosing among siblings: Schema delivery: db:generate vs db:push vs db:push:dev vs db:push:force vs db:migrate vs db:deploy** (docs/claude/DATABASE.md § Scripts; docs/claude/SCRIPTS.md § Database)
+**Job: get a schema change into a database** (Schema delivery: db:generate vs db:push vs db:push:dev vs db:push:force vs db:migrate vs db:deploy) — docs/claude/DATABASE.md § Scripts; docs/claude/SCRIPTS.md § Database
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -115,7 +115,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **bun run db:migrate** | the change must ship: create a migration file to review and commit | throwaway local sync (use db:push) |
 | **bun run db:deploy** | running pending migrations in CI and production | local iteration (use db:push) |
 
-**Choosing among siblings: Moving data: db:clone vs db:dump vs db:restore vs reset:db vs db:seed** (docs/claude/DATABASE.md § Scripts › Database Operations; docs/claude/SCRIPTS.md § Database)
+**Job: move, reset or seed database data** (Moving data: db:clone vs db:dump vs db:restore vs reset:db vs db:seed) — docs/claude/DATABASE.md § Scripts › Database Operations; docs/claude/SCRIPTS.md § Database
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -146,7 +146,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `seeding`: Seed data and the hook-aware seed runner
 
-**Choosing among siblings: seed vs seedTable vs db:seed vs test factories** (docs/claude/DATABASE.md § Seeding; catalog)
+**Job: fill a database with seed or test data** (seed vs seedTable vs db:seed vs test factories) — docs/claude/DATABASE.md § Seeding; catalog
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|

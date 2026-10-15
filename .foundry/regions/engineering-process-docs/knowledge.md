@@ -114,7 +114,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `docs-process`: Docs workflow: read before, update after, doc structure and alignment review, doc routing
 
-**Choosing among siblings: Where unfinished or extra writing goes: tickets vs stub vs AI workspace vs doc update** (docs/claude/DOCUMENTATION.md § Workflow, § Stub Format, § Doc Maintenance; AI/ENTRYPOINT.md § 12)
+**Job: decide where unfinished, extra or changed writing goes** (Where unfinished or extra writing goes: tickets vs stub vs AI workspace vs doc update) — docs/claude/DOCUMENTATION.md § Workflow, § Stub Format, § Doc Maintenance; AI/ENTRYPOINT.md § 12
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -123,7 +123,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **Deep analysis in AI workspace** | long analyses and reports: tmp/AI_WORKSPACE/<task>/ | pasted into chat or committed under docs/ |
 | **Update docs when behavior or contracts change** | a pattern, helper, convention or contract changed | aspirational features (Keep docs honest) |
 
-**Choosing among siblings: Intake vs execution contract vs circuit breaker vs interrogate** (AI/ENTRYPOINT.md § 0.3, § 0.4, § 1–3)
+**Job: run a task under the agent process rules (intake, contract, breaker)** (Intake vs execution contract vs circuit breaker vs interrogate) — AI/ENTRYPOINT.md § 0.3, § 0.4, § 1–3
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -133,7 +133,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **Interrogate before proposing** | modeling, naming or taxonomy work: surface forks first | clear in-scope execution (Mandatory task intake) |
 | **Flag scope judgment calls** | a genuine add-or-trim scope decision | obvious completion of the asked feature |
 
-**Choosing among siblings: Finding what exists and checking claims** (AI/ENTRYPOINT.md § 0, § 0.5, § 4; DOCUMENTATION.md § Before Starting Work)
+**Job: find what exists and verify a claim before acting** (Finding what exists and checking claims) — AI/ENTRYPOINT.md § 0, § 0.5, § 4; DOCUMENTATION.md § Before Starting Work
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|

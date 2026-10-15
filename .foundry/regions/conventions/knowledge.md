@@ -85,7 +85,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `naming`: Naming conventions: identifiers, files, routes, schema names, polymorphic side names, vocabulary
 
-**Choosing among siblings: polymorphic side names** (docs/claude/NAMING.md § Polymorphic Sides)
+**Job: name a polymorphic slot and its columns** (polymorphic side names) — docs/claude/NAMING.md § Polymorphic Sides
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -93,14 +93,14 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **Side-prefixed FKs and back-relations** | the typed FKs and back-relations of that slot | unprefixed segmentId on both ends |
 | **Never referenced* names** | tempted by referencedModel/referencedId | always; use Polymorphic side naming |
 
-**Choosing among siblings: _ vs __ prefixes** (docs/claude/NAMING.md › Backend › Underscore Prefix; docs/claude/STYLE.md § Variable Prefixes)
+**Job: prefix a name with _ or __** (_ vs __ prefixes) — docs/claude/NAMING.md › Backend › Underscore Prefix; docs/claude/STYLE.md § Variable Prefixes
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **Underscore prefix meanings** | _ unused binding; __ class private, brand, internal key | #private without a runtime-privacy need |
 | **Underscore variable prefixes** | STYLE.md's short form of the same rule; docs don't distinguish | see Underscore prefix meanings |
 
-**Choosing among siblings: constants and casing** (docs/claude/NAMING.md › Backend › Variables; Constants Pattern; docs/claude/STYLE.md § No TypeScript enum)
+**Job: name and case constants and value sets** (constants and casing) — docs/claude/NAMING.md › Backend › Variables; Constants Pattern; docs/claude/STYLE.md § No TypeScript enum
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -108,7 +108,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **Variable and constant casing** | SCREAMING_SNAKE primitives, PascalCase const objects, camelCase derived | a TS enum (use No TypeScript enum) |
 | **No TypeScript enum** | local value sets as const; domain values as Prisma enums | the enum keyword |
 
-**Choosing among siblings: file and function names** (docs/claude/NAMING.md § Terminology; § Backend; docs/claude/API_ROUTES.md § Naming Conventions)
+**Job: name a file or function** (file and function names) — docs/claude/NAMING.md § Terminology; § Backend; docs/claude/API_ROUTES.md § Naming Conventions
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -152,7 +152,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `code-style`: Code style: formatting, no comments, TypeScript rules, imports
 
-**Choosing among siblings: imports, index files and barrels** (docs/claude/STYLE.md § Imports; § Minimal Index Files; docs/claude/MONOREPO.md § Avoid Barrel Files)
+**Job: write imports and decide whether an index file may exist** (imports, index files and barrels) — docs/claude/STYLE.md § Imports; § Minimal Index Files; docs/claude/MONOREPO.md § Avoid Barrel Files
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -161,7 +161,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **No barrel files in lib** | shared utilities under lib/ | an index.ts in lib (import directly) |
 | **Barrels only for top-level package API (monorepo-architecture)** | the full alias and barrel rule set | style-only questions (use Minimal index files) |
 
-**Choosing among siblings: types** (docs/claude/STYLE.md § TypeScript; FEATURES.md › TypeScript Strict Mode)
+**Job: declare a type** (types) — docs/claude/STYLE.md § TypeScript; FEATURES.md › TypeScript Strict Mode
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -170,7 +170,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **Infer types from Zod and Prisma** | a type mirrors a schema or model | hand-writing the shape again |
 | **TypeScript strict, no any (monorepo-architecture)** | silencing the compiler is tempting | any, as any, as unknown as T |
 
-**Choosing among siblings: files, exports, comments** (docs/claude/STYLE.md § Code Formatting; § Comments & Logging; AI/ENTRYPOINT.md § 0)
+**Job: lay out a file's exports, comments and logging** (files, exports, comments) — docs/claude/STYLE.md § Code Formatting; § Comments & Logging; AI/ENTRYPOINT.md § 0
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|

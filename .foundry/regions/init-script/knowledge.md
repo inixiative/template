@@ -123,7 +123,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `init-script`: The init provisioning TUI (Ink): resumable idempotent tasks, Infisical/Railway/PlanetScale provisioning
 
-**Choosing among siblings: getProjectConfig vs useConfig vs ConfigProvider vs getSecret** (docs/claude/INIT_SCRIPT_PATTERNS.md § 1, § 3, § 8, § Creating a New Task View)
+**Job: read project config or secrets in the init script** (getProjectConfig vs useConfig vs ConfigProvider vs getSecret) — docs/claude/INIT_SCRIPT_PATTERNS.md § 1, § 3, § 8, § Creating a New Task View
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -133,7 +133,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **Tasks receive config as parameter** | every task function: config comes from the view | a task calling getProjectConfig itself |
 | **getSecret** | connection strings, passwords, keys: re-fetch from Infisical each step | non-secret metadata (getProjectConfig); never pass secrets between steps |
 
-**Choosing among siblings: Idempotent calls vs progress flags; createRailwayConnection vs ensureRailwayConnection** (docs/claude/INIT_SCRIPT_PATTERNS.md § 13)
+**Job: make an init step safe to rerun** (Idempotent calls vs progress flags; createRailwayConnection vs ensureRailwayConnection) — docs/claude/INIT_SCRIPT_PATTERNS.md § 13
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -143,7 +143,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **createRailwayConnection** | no efficient list endpoint: catch 'already exists', return existing | a list endpoint exists (ensureRailwayConnection); combine both for races |
 | **ensureRailwayConnection** | check-then-create via listRailwayConnections | no list endpoint (createRailwayConnection) |
 
-**Choosing among siblings: retryWithTimeout vs execAsync vs Railway CLI/GraphQL** (docs/claude/INIT_SCRIPT_PATTERNS.md § 9, § 10, § 11)
+**Job: call provider CLIs or APIs from init and wait for readiness** (retryWithTimeout vs execAsync vs Railway CLI/GraphQL) — docs/claude/INIT_SCRIPT_PATTERNS.md § 9, § 10, § 11
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -151,7 +151,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **execAsync** | any pscale/railway/infisical CLI call in init/api | execSync, which freezes spinners |
 | **Railway CLI for reads, GraphQL for mutations** | CLI for simple reads, GraphQL API for creates and updates | shelling out to create resources or a token for read-only listing |
 
-**Choosing among siblings: Derived setupState vs viewState vs execution flags** (docs/claude/INIT_SCRIPT_PATTERNS.md § 4, § 16)
+**Job: track init setup progress and UI state** (Derived setupState vs viewState vs execution flags) — docs/claude/INIT_SCRIPT_PATTERNS.md § 4, § 16
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -159,7 +159,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **viewState naming for UI navigation** | which screen is shown | running/loading values (Execution flag naming) |
 | **Execution flag naming** | async/execution status booleans | screen changes (viewState naming for UI navigation) |
 
-**Choosing among siblings: Bun-native resume tests with VCR vs api.vcr.queue** (docs/claude/INIT_SCRIPT_PATTERNS.md § 17)
+**Job: test init provider workflows without real calls** (Bun-native resume tests with VCR vs api.vcr.queue) — docs/claude/INIT_SCRIPT_PATTERNS.md § 17
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -203,6 +203,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
   - *Signs you're bypassing it:* hardcoded keyboard hint strings like "Press Enter to continue, Esc to cancel" in an init view (docs/claude/INIT_SCRIPT_PATTERNS.md § 5. Composable Prompts)
 - **prompts** `init/utils/prompts.ts`: compose interactive prompts for init views
 - **retryWithTimeout** `utils/retry.ts`: Waiting on async cloud provisioning in init; retry only specific not-ready errors, never 400/401/403/404/422.
+  - *Throws:* retryWithTimeout timeout Error (`off-request-path`)
   - *Signs you're bypassing it:* a hand-written for/while loop with setTimeout around a provider call, or retrying every error including 401/403/404 (docs/claude/INIT_SCRIPT_PATTERNS.md § 9. Retry Logic for Async Initialization)
 - **setSecret** `docs/claude/INIT_SCRIPT_PATTERNS.md §12`: store a credential in Infisical under a project environment path
 - **syncConfig** `init/utils/configState.tsx`: Use after task steps instead of polling or intervals.

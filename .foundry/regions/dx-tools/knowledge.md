@@ -102,7 +102,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `scripts`: The sanctioned package.json scripts and how to run and write them
 
-**Choosing among siblings: start:api vs start:worker vs start:web** (package.json (catalog choose lines))
+**Job: run a production process** (start:api vs start:worker vs start:web) — package.json (catalog choose lines)
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -110,7 +110,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **bun run start:worker** | production job processing only | serving HTTP (use bun run start:api) |
 | **bun run start:web** | previewing the production frontend build, after build | local dev (use bun run local (dx-setup)) |
 
-**Choosing among siblings: start:db vs stop:db vs reset:db** (package.json; docs/claude/DOCKER.md § Commands)
+**Job: start, stop or reset local database containers** (start:db vs stop:db vs reset:db) — package.json; docs/claude/DOCKER.md § Commands
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -128,7 +128,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `lint-rules`: Biome, custom lint scripts and the CI rule runner that enforce style
 
-**Choosing among siblings: lint vs lint:fix vs format vs the targeted checks vs check** (package.json; docs/claude/SCRIPTS.md § Linting)
+**Job: lint, format or gate code before pushing** (lint vs lint:fix vs format vs the targeted checks vs check) — package.json; docs/claude/SCRIPTS.md § Linting
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -139,7 +139,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **bun run lint:generated** | just the generated-file check | everything (use bun run lint) |
 | **bun run check (environments-deploy)** | before pushing: the full gate | running lint, typecheck or tests piecemeal |
 
-**Choosing among siblings: post-Biome scripts vs CI rules** (scripts/lint/*; scripts/ci/run-ci-rules.sh; docs/claude/SCRIPTS.md § CI Rule Scripts)
+**Job: run the repo's custom lint and CI rule checks** (post-Biome scripts vs CI rules) — scripts/lint/*; scripts/ci/run-ci-rules.sh; docs/claude/SCRIPTS.md § CI Rule Scripts
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -149,7 +149,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **check-import-aliases** | relative internal imports that need #/ or @template/ | barrel index.ts re-exports, which may be relative |
 | **run-ci-rules.sh (dx-setup)** | the scripts/ci/rules checks; --test against fixtures | editing a rule or fixture to pass (fix the code) |
 
-**Choosing among siblings: Biome and hook presets** (@inixiative/config/README.md § Presets)
+**Job: configure Biome and pre-commit hooks from the shared presets** (Biome and hook presets) — @inixiative/config/README.md § Presets
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -186,7 +186,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `build-tooling`: Turborepo tasks, watch mode, codegen, build presets, hot reload
 
-**Choosing among siblings: tsup node vs react; tsconfig base vs node vs react** (@inixiative/config/README.md § Presets; @inixiative/config/tsup; docs/claude/MONOREPO.md § TypeScript Configuration)
+**Job: build and type-check a package with the right shared preset** (tsup node vs react; tsconfig base vs node vs react) — @inixiative/config/README.md § Presets; @inixiative/config/tsup; docs/claude/MONOREPO.md § TypeScript Configuration
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -196,7 +196,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **@inixiative/config/tsconfig/node.json** | packages needing node types | DOM/JSX (use @inixiative/config/tsconfig/react.json) |
 | **@inixiative/config/tsconfig/react.json** | React/DOM packages (ui, sdk) | frontend apps (use tsconfig.frontend.json (monorepo-architecture)) |
 
-**Choosing among siblings: config sync vs check vs scan vs train** (@inixiative/config/README.md § CLI; § Release flow)
+**Job: keep a repo's toolchain pinned and release ecosystem packages** (config sync vs check vs scan vs train) — @inixiative/config/README.md § CLI; § Release flow
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -205,7 +205,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **config scan (lib-config)** | audit every checkout | one repo (use config check) |
 | **config train (lib-config)** | releasing ecosystem packages | picking up toolchain changes downstream (use config sync) |
 
-**Choosing among siblings: codegen tasks** (turbo.json; docs/claude/TURBOREPO.md § Task Dependencies)
+**Job: generate code (OpenAPI, clients) from the schema** (codegen tasks) — turbo.json; docs/claude/TURBOREPO.md § Task Dependencies
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|

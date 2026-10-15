@@ -111,7 +111,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `lib-config`: The @inixiative/config package (README): shared toolchain, sync/check/scan and the release train
 
-**Choosing among siblings: config check vs config sync vs config scan vs config train vs config ports** (@inixiative/config/README.md § CLI, § CI, § Release flow)
+**Job: keep a repo's toolchain in line and release ecosystem packages** (config check vs config sync vs config scan vs config train vs config ports) — @inixiative/config/README.md § CLI, § CI, § Release flow
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -121,7 +121,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **config train** | any @inixiative/* release, lanes in dependency order, config last | picking up toolchain changes without a release (config sync); never raw npm publish |
 | **config ports** | a project's local ports from ports.json | hand-picked or default ports (Port block allocation) |
 
-**Choosing among siblings: tsconfig base vs node vs react** (@inixiative/config/README.md § Presets)
+**Job: choose a shared tsconfig preset** (tsconfig base vs node vs react) — @inixiative/config/README.md § Presets
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -129,7 +129,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **@inixiative/config/tsconfig/node.json** | packages needing node types | DOM/JSX packages (tsconfig/react.json) |
 | **@inixiative/config/tsconfig/react.json** | React/DOM packages | non-UI packages (base.json or node.json) |
 
-**Choosing among siblings: tsup node vs react; biome base vs react** (@inixiative/config/README.md § Presets; catalog @inixiative/config/tsup)
+**Job: choose a shared tsup or Biome preset** (tsup node vs react; biome base vs react) — @inixiative/config/README.md § Presets; catalog @inixiative/config/tsup
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|

@@ -121,7 +121,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `ws-streams`: Refetch channels and data streams: registries, audience, re-authorization, seq
 
-**Choosing among siblings: refetch vs streamAppend vs routeRow vs appendToStream (producing a realtime update)** (docs/claude/WEBSOCKETS.md § Channels vs streams; § Data streams › Producing appends; docs/claude/APP_EVENTS.md § WebSocket handoffs)
+**Job: produce a realtime update for clients** (refetch vs streamAppend vs routeRow vs appendToStream (producing a realtime update)) — docs/claude/WEBSOCKETS.md § Channels vs streams; § Data streams › Producing appends; docs/claude/APP_EVENTS.md § WebSocket handoffs
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -130,7 +130,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **routeRow** | the row inside an upsert streamAppend, parsed by the route's responseSchema | invalidating only (use refetch) |
 | **appendToStream** | called by deliverWSHandoffs to sequence and publish an append | handler code returning handoffs (use streamAppend) |
 
-**Choosing among siblings: WS_CHANNELS vs LIVE_QUERIES vs STREAM_DEFINITIONS vs defineStream vs channelKey** (docs/claude/WEBSOCKETS.md § Channel registry and authorization; § Data streams › Stream definitions)
+**Job: register a realtime channel or stream** (WS_CHANNELS vs LIVE_QUERIES vs STREAM_DEFINITIONS vs defineStream vs channelKey) — docs/claude/WEBSOCKETS.md § Channel registry and authorization; § Data streams › Stream definitions
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -139,7 +139,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **defineStream** | declare one stream: family, kind, ordering, params, audience | declaring it outside packages/shared/src/ws/streamDefinitions.ts |
 | **channelKey** | build a channel name from { _id, path } | hand-built template strings; a family name (use WS_CHANNELS.x.name) |
 
-**Choosing among siblings: Stream (re-)authorization** (docs/claude/WEBSOCKETS.md § Data streams › Authorization and re-authorization)
+**Job: keep open streams authorized** (Stream (re-)authorization) — docs/claude/WEBSOCKETS.md § Data streams › Authorization and re-authorization
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -148,7 +148,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **reprobeStreamAccess** | probe whether a socket's headers still grant a stream | status already known (use routeAccessOf) |
 | **routeAccessOf (ws-connections)** | classify a status: 2xx granted, 429/5xx retryable, else rejected | needing the probe itself (use reprobeStreamAccess) |
 
-**Choosing among siblings: Client consumption** (docs/claude/WEBSOCKETS.md § Data streams › Frontend; § Contract)
+**Job: consume a realtime stream in the client** (Client consumption) — docs/claude/WEBSOCKETS.md § Data streams › Frontend; § Contract
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -236,6 +236,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **System probe secret rate-limit exemption** `docs/claude/WEBSOCKETS.md#authorization-and-re-authorization`: Only server-internal probes; client-driven opens and subscribes still count.
 - **Typed per-stream hook** `docs/claude/WEBSOCKETS.md#Frontend`: wrap useStream in a named hook that names the SDK response type
 - **db.parallel** `docs/claude/APP_EVENTS.md`: run tasks concurrently, optionally isolating failures with allSettled resolution
+  - *Throws:* db.parallel aggregated failure (`server-error`, app-events-webhooks-adapters)
 - **deliverWSHandoffs** `docs/claude/WEBSOCKETS.md#Producing appends`: deliver app-event WS handoffs, routing stream appends to appendToStream
 - **isPerCallerScope** `apps/api/src/ws/streamAudience.test.ts`: detect a route carrying per-request scopeNarrowing lens scope
 - **onCommit** `docs/claude/APP_EVENTS.md`: defer work until the surrounding transaction commits

@@ -101,7 +101,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `tenancy`: Organizations, spaces and memberships; Personal/Org/Space contexts
 
-**Choosing among siblings: Tenant models: Organization vs Space vs OrganizationUser vs SpaceUser** (FEATURES.md § Multi-Tenancy; docs/claude/PERMISSIONS.md § Space Permissions)
+**Job: model who belongs to which tenant** (Tenant models: Organization vs Space vs OrganizationUser vs SpaceUser) — FEATURES.md § Multi-Tenancy; docs/claude/PERMISSIONS.md § Space Permissions
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -110,7 +110,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **OrganizationUser** | a user's role and entitlements in one org | space-level access (SpaceUser) |
 | **SpaceUser** | a user's role in one space; requires the OrganizationUser first | org-wide membership (OrganizationUser) |
 
-**Choosing among siblings: API modules by scope** (catalog: apps/api/src/modules/*)
+**Job: put an API endpoint in the right tenant-scope module** (API modules by scope) — catalog: apps/api/src/modules/*
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -129,6 +129,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **OrganizationProfilePage** `packages/ui/src/pages/OrganizationProfilePage.tsx#OrganizationProfilePage`: Organization context only; SpaceProfilePage or UserProfilePage for spaces and users.
 - **OrganizationSpacesPage** `packages/ui/src/pages/OrganizationSpacesPage.tsx#OrganizationSpacesPage`: Spaces of one organization; OrganizationsPage lists organizations, OrganizationUsersPage lists members.
 - **validateNotLastOwner** `apps/api/src/modules/organization/validations/validateNotLastOwner.ts#validateNotLastOwner`: block removing or demoting an organization's last owner
+  - *Throws:* makeError 422 VALIDATION_ERROR (`validation-error`, request-context-errors, inferred)
   - *Signs you're bypassing it:* a db.organizationUser.count({ where: { role: 'owner' } }) guard written inline before removing or demoting a member (catalog: apps/api/src/modules/organization/validations/validateNotLastOwner.ts)
 - **apps/admin/app/routes/_authenticated/organizations** `apps/admin/app/routes/_authenticated/organizations`: Org-level tenancy screens go here; space-scoped screens: _authenticated/spaces; member/user screens: _authenticated/users.
 - **apps/admin/app/routes/_authenticated/spaces** `apps/admin/app/routes/_authenticated/spaces`: Space-scoped tenancy screens go here; organization-level screens: _authenticated/organizations.
@@ -150,7 +151,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `superadmin`: Superadmin platform role, admin routes, superadmin app
 
-**Choosing among siblings: Superadmin checks: PlatformRole vs isSuperadmin vs validateSuperadmin vs permix.setSuperadmin vs spoofMiddleware** (docs/claude/PERMISSIONS.md § Roles › PlatformRole, § Permix › Superadmin Bypass; docs/claude/AUTH.md § Validation Middleware, § Spoof Middleware)
+**Job: check or act as a superadmin** (Superadmin checks: PlatformRole vs isSuperadmin vs validateSuperadmin vs permix.setSuperadmin vs spoofMiddleware) — docs/claude/PERMISSIONS.md § Roles › PlatformRole, § Permix › Superadmin Bypass; docs/claude/AUTH.md § Validation Middleware, § Spoof Middleware
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -160,7 +161,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **permix.setSuperadmin (permissions)** | make every permix check pass; set by setup for superadmins | deciding route access (validateSuperadmin) |
 | **spoofMiddleware** | superadmin acts as another user via x-spoof-user-email; spoofedBy kept for audit | a custom as-user param (never) |
 
-**Choosing among siblings: Admin API: module vs router** (catalog: apps/api/src/modules/admin, apps/api/src/routes/admin; FEATURES.md § Admin Operations)
+**Job: add a superadmin-only API endpoint** (Admin API: module vs router) — catalog: apps/api/src/modules/admin, apps/api/src/routes/admin; FEATURES.md § Admin Operations
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -173,6 +174,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **spoofMiddleware** `apps/api/src/middleware/auth/spoofMiddleware.ts#spoofMiddleware`: let superadmins act as another user by swapping the context user
   - *Signs you're bypassing it:* a custom as-user query parameter or header that swaps the context user for support, outside the x-spoof-user-email path (docs/claude/AUTH.md § Spoof Middleware)
 - **validateSuperadmin** `apps/api/src/middleware/validations/validateSuperadmin.ts#validateSuperadmin`: tenant-scoped access: validatePermission instead
+  - *Throws:* makeError 403 PERMISSION_DENIED (`permission-denied`, permissions)
   - *Signs you're bypassing it:* an admin handler that checks platformRole itself and throws 403, instead of mounting under the admin router with validateSuperadmin (catalog: apps/api/src/middleware/validations/validateSuperadmin.ts; docs/claude/AUTH.md § Validation Middleware)
 - **apps/api/src/modules/admin** `apps/api/src/modules/admin`: expose superadmin endpoints for cache clearing, audit logs, cron jobs and job enqueue
 - **apps/api/src/routes/admin** `apps/api/src/routes/admin`: Platform-wide superadmin endpoints; tenant-scoped routes belong in their feature modules.

@@ -109,7 +109,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `inquiries`: Inquiries: the request/approval primitive, handlers, sources/targets, autoApprove
 
-**Choosing among siblings: Lifecycle: createInquiry vs sendInquiry vs resolveInquiry vs autoApprove** (docs/claude/INQUIRIES.md § Handler Architecture, § API Endpoints)
+**Job: move a request (inquiry) through its lifecycle** (Lifecycle: createInquiry vs sendInquiry vs resolveInquiry vs autoApprove) — docs/claude/INQUIRIES.md § Handler Architecture, § API Endpoints
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -118,7 +118,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **resolveInquiry** | approve/deny/changesRequested under a row lock with handleApprove | a controller setting approved and doing the side effect itself |
 | **autoApprove** | a type that needs no human review returns true | a skip-approval flag or a direct handleApprove call on create |
 
-**Choosing among siblings: Pre-create checks: unique vs validate vs validateInquiryHandler vs validateInquiryNotExpired** (docs/claude/INQUIRIES.md § Handler Architecture (unique enforcement, validate); catalog validations/)
+**Job: validate an inquiry before it is created** (Pre-create checks: unique vs validate vs validateInquiryHandler vs validateInquiryNotExpired) — docs/claude/INQUIRIES.md § Handler Architecture (unique enforcement, validate); catalog validations/
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -127,7 +127,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **validateInquiryHandler** | source/target model fit for the type (422) | uniqueness (validateInquiryPreCreate) |
 | **validateInquiryNotExpired** | expiry only | editable/resolvable gating (pair with validateInquiryStatus checks) |
 
-**Choosing among siblings: Side-matched includes: includeInquirySent vs includeInquiryReceived vs includeInquiryResponse** (docs/claude/INQUIRIES.md § Response Schemas › Standardized includes)
+**Job: load an inquiry with the relations its side needs** (Side-matched includes: includeInquirySent vs includeInquiryReceived vs includeInquiryResponse) — docs/claude/INQUIRIES.md § Response Schemas › Standardized includes
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -135,14 +135,14 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **includeInquiryReceived** | target-side resolve and received lists (inquiryReceivedResponseSchema) | source edits (includeInquirySent) |
 | **includeInquiryResponse** | single GET and admin lists, all six relations (inquiryResponseSchema) | one-sided mutations |
 
-**Choosing among siblings: inquiryTerminalStatuses vs isTerminalInquiry** (docs/claude/INQUIRIES.md § Adding a New Handler › Status utilities; § Frontend › Constants and utilities)
+**Job: check whether an inquiry is finished** (inquiryTerminalStatuses vs isTerminalInquiry) — docs/claude/INQUIRIES.md § Adding a New Handler › Status utilities; § Frontend › Constants and utilities
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **inquiryTerminalStatuses** | backend notIn queries | UI disabling (isTerminalInquiry) |
 | **isTerminalInquiry** | UI controls; also treats past expiresAt as terminal | Prisma filters (inquiryTerminalStatuses) |
 
-**Choosing among siblings: Sender vs recipient side: controls and refetch maps** (docs/claude/INQUIRIES.md § Frontend)
+**Job: render inquiry controls and refresh lists per side** (Sender vs recipient side: controls and refetch maps) — docs/claude/INQUIRIES.md § Frontend
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -198,9 +198,13 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **useSendInquiryMutation** `packages/ui/src/hooks/inquiry/useSendInquiryMutation.ts#useSendInquiryMutation`: Existing drafts; brand-new inquiries use useCreateInquiryMutation.
 - **useUpdateInquiryMutation** `packages/ui/src/hooks/inquiry/useUpdateInquiryMutation.ts#useUpdateInquiryMutation`: Changing content; status transitions use send, cancel or resolve mutations.
 - **validateInquiryHandler** `apps/api/src/modules/inquiry/validations/validateInquiryHandler.ts#validateInquiryHandler`: Model-fit check (422 on mismatch); status checks use validateInquiryIs*; uniqueness uses validateInquiryPreCreate.
+  - *Throws:* makeError 422 VALIDATION_ERROR (`validation-error`, request-context-errors)
 - **validateInquiryNotExpired** `apps/api/src/modules/inquiry/validations/validateInquiryStatus.ts#validateInquiryNotExpired`: Expiry only; pair with other status checks in validateInquiryStatus for editable/resolvable gating.
+  - *Throws:* makeError 410 RESOURCE_GONE (`resource-gone`)
 - **validateInquiryPreCreate** `apps/api/src/modules/inquiry/services/validateInquiryPreCreate.ts#validateInquiryPreCreate`: Set `unique` on the handler instead of calling validateUniqueInquiry in controllers; source/target fit is validateInquiryHandler.
+  - *Throws:* makeError 409 CONFLICT (`conflict`, request-context-errors, inferred)
 - **validateUniqueInquiry** `apps/api/src/modules/inquiry/validations/validateUniqueInquiry.ts#validateUniqueInquiry`: Don't call from controllers; set the handler `unique` flag and let validateInquiryPreCreate enforce it.
+  - *Throws:* makeError 409 CONFLICT (`conflict`, request-context-errors, inferred)
   - *Signs you're bypassing it:* validateUniqueInquiry called from a controller instead of setting the handler's unique flag (catalog: apps/api/src/modules/inquiry/validations/validateUniqueInquiry.ts)
 - **apps/admin/app/routes/_authenticated/communications** `apps/admin/app/routes/_authenticated/communications`: show admin pages for inquiries received and sent
 - **apps/api/src/modules/inquiry** `apps/api/src/modules/inquiry`: create, send, update, cancel and resolve inquiries, with superadmin create and listing
@@ -211,8 +215,10 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **Filtered InquiriesPage for typed lists** `docs/claude/INQUIRIES.md > Pages`: Invitations, applications, transfers lists instead of a bespoke list page.
   - *Signs you're bypassing it:* a new list page that queries inquiries for invitations, applications or transfers itself (docs/claude/INQUIRIES.md § Frontend › Pages)
 - **Granular create permission via hydrated partial** `inquiry docs, Create route permission pattern`: Per-type rules on not-yet-existing rows; validatePermission middleware for existing-resource routes.
+  - *Throws:* makeError 403 PERMISSION_DENIED (`permission-denied`, permissions)
 - **Handler unique flag** `docs/claude/INQUIRIES.md#unique enforcement`: 'targeted' for one per source+target+type; 'untargeted' for one per source+type regardless of target
 - **Handler validate hook** `docs/claude/INQUIRIES.md#validate — pre-create and pre-update checks`: Domain conflicts beyond uniqueness; use unique flag for one-open-inquiry constraints
+  - *Throws:* makeError 409 CONFLICT (`conflict`, request-context-errors)
   - *Signs you're bypassing it:* slug-collision or membership conflict checks written in the create or update controller instead of the handler's validate (docs/claude/INQUIRIES.md § Handler Architecture › validate)
 - **Inquiry handler per type** `docs/claude/INQUIRIES.md > Overview`: define source/target shape, content schema, validation and approval side effect per inquiry type
 - **Inquiry request/approval primitive** `FEATURES.md > Inquiry System`: invite, create space, transfer ownership, request access: Inquiry instead of bespoke endpoints
@@ -236,6 +242,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **unique** `inquiry handler (handlers/index.ts)`: 'targeted' for one per source+target+type; 'untargeted' for one per source+type regardless of target.
   - *Signs you're bypassing it:* a db.inquiry.findFirst for an existing open inquiry in the create controller before inserting (docs/claude/INQUIRIES.md § Handler Architecture › unique enforcement ("no controller code needed"))
 - **validate** `inquiry handler (handlers/index.ts)`: Business-rule checks; status checks use validateInquiryIs* utilities instead.
+  - *Throws:* makeError 409 CONFLICT (`conflict`, request-context-errors)
 - **Cancel inquiry soft-deletes** `DELETE /api/v1/inquiry/:id/cancel`: Only the source cancels; cancel sets canceled, clears expiresAt and soft-deletes.
 - **Create routes check permissions in-controller** `inquiry docs, Create route permission pattern`: Inquiry create routes needing per-type permission rules.
 - **Guest user via targetEmail** `docs/claude/INQUIRIES.md > Create body`: inviting someone without an account; targetUserId when the user exists

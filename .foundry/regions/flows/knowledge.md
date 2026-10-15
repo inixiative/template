@@ -97,7 +97,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `flows`: Guided in-app flows: registry, server-checked steps, FlowBanner client
 
-**Choosing among siblings: Starting vs checking: useStartFlow / meCreateFlow / createFlow vs checkFlow / flowRead** (docs/claude/FLOWS.md § Lifecycle, § Routes, § Client › Starting)
+**Job: start or recheck a multi-step flow** (Starting vs checking: useStartFlow / meCreateFlow / createFlow vs checkFlow / flowRead) — docs/claude/FLOWS.md § Lifecycle, § Routes, § Client › Starting
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -106,7 +106,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **checkFlow** | recompute step states from step 0 as the caller | starting a new flow (createFlow) |
 | **flowRead** | client recheck of a running flow; 404 once dropped or finished | ending it explicitly (flowDelete) |
 
-**Choosing among siblings: What's next: flowNext vs followFlow vs dropFlow** (docs/claude/FLOWS.md § Client › What's next, Dropping off)
+**Job: move a user to the next flow step, or leave the flow** (What's next: flowNext vs followFlow vs dropFlow) — docs/claude/FLOWS.md § Client › What's next, Dropping off
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -114,7 +114,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **followFlow** | acting on flowNext's result (navigate on) | abandoning without navigating (dropFlow) |
 | **dropFlow** | leaving/abandoning the flow | advancing to the next step (followFlow) |
 
-**Choosing among siblings: Client state: useActiveFlow vs flowReadQuery vs skipFlowInvalidate** (docs/claude/FLOWS.md § Client › State, Rechecks)
+**Job: read the active flow in client state** (Client state: useActiveFlow vs flowReadQuery vs skipFlowInvalidate) — docs/claude/FLOWS.md § Client › State, Rechecks
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -148,7 +148,9 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **cleanStaleFlows** `cron row cleanStaleFlows`: hard-delete flows untouched for 15 minutes, every 5 minutes
 - **flowDelete** `DELETE /api/v1/flow/:id`: end a flow explicitly
 - **flowRead** `GET /api/v1/flow/:id`: recheck a flow's steps; 404 once dropped or finished
+  - *Throws:* makeError 404 RESOURCE_NOT_FOUND (`resource-not-found`, request-context-errors)
 - **meCreateFlow** `POST /api/v1/me/flows`: start a flow from flowKey and bindings, returning computed step states
+  - *Throws:* makeError 422 VALIDATION_ERROR (`validation-error`, request-context-errors); ZodError (`validation-error`, request-context-errors)
 - **navigatePreserving** `packages/ui useAuthenticatedRouting`: navigate while keeping flow and spoof search params
 - **readAsCaller / readAllAsCaller** `batch module (registerBatch + executeRequest)`: readAllAsCaller for list reads; readAsCaller for single records
 - **returnUrl binding** `@template/shared/utils appPathSchema`: omit to end on /dashboard

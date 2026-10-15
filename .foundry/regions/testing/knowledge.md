@@ -133,7 +133,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `test-harness`: Test structure: running tests, createTestApp, request helpers, frontend tests
 
-**Choosing among siblings: createTestApp vs createTestSocket vs createTestWorker** (docs/claude/TESTING.md § Test App; § Test Structure)
+**Job: stand up the app, a socket or a worker in a test** (createTestApp vs createTestSocket vs createTestWorker) — docs/claude/TESTING.md § Test App; § Test Structure
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -141,14 +141,14 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **createTestSocket** | WebSocket handler tests | HTTP route tests (use createTestApp) |
 | **createTestWorker** | background job handler tests | HTTP route tests (use createTestApp) |
 
-**Choosing among siblings: setEnvOverride vs withEnv** (catalog setEnvOverride, withEnv; CI rule no-test-env-mutation)
+**Job: override env vars in a test** (setEnvOverride vs withEnv) — catalog setEnvOverride, withEnv; CI rule no-test-env-mutation
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **setEnvOverride** | overrides spanning several steps, cleared by resetEnvOverrides | one scoped override (use withEnv) |
 | **withEnv** | a scoped override within one test | overrides spanning several steps (use setEnvOverride) |
 
-**Choosing among siblings: Test commands** (package.json scripts; docs/claude/TESTING.md)
+**Job: run tests** (Test commands) — package.json scripts; docs/claude/TESTING.md
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -172,6 +172,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
   - *Signs you're bypassing it:* a hand-built fake Job object and worker context to call a job handler directly (catalog entry createTestWorker)
 - **expectStreamAudience** `apps/api/tests/expectStreamAudience.ts#expectStreamAudience`: assert which callers can and cannot receive a WebSocket stream
 - **flushRedis** `packages/db/src/redis/client.ts#flushRedis`: wipe all Redis data between tests; throws outside test env
+  - *Throws:* flushRedis outside test Error (`off-request-path`)
 - **json** `apps/api/tests/utils/request.ts#json`: Successful responses; jsonError for error-shaped bodies.
 - **post** `apps/api/tests/utils/request.ts#post`: Create/action endpoints in tests; patch for updates, get for reads.
 - **server** `packages/ui/src/test/mocks/server.ts#server`: Override responses per test with server.use rather than editing the shared handlers.
@@ -209,7 +210,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `test-factories`: build/create factories and test tracker cleanup
 
-**Choosing among siblings: buildX vs createX vs createFactory** (docs/claude/TESTING.md § Factories; § When to Create a New Factory)
+**Job: create test data** (buildX vs createX vs createFactory) — docs/claude/TESTING.md § Factories; § When to Create a New Factory
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -217,7 +218,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **createX** | the test needs a persisted row | fast in-memory unit tests (use buildX) |
 | **createFactory** | adding a factory for a new model | a model with an existing factory (use its createX/buildX) |
 
-**Choosing among siblings: Factory dependencies** (docs/claude/TESTING.md § Reusing Entities; § Triggering Optional Dependencies; § Test Data Patterns)
+**Job: share or wire dependencies between test factory records** (Factory dependencies) — docs/claude/TESTING.md § Reusing Entities; § Triggering Optional Dependencies; § Test Data Patterns
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -225,7 +226,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **Trigger optional factory dependencies** | the test needs an optional FK: pass {} | required FKs, which are inferred (Don't declare auto-inferred factory dependencies) |
 | **Composite FK factory dependency** | several fields point to one dependency | a simple non-inferable FK (string foreignKey) |
 
-**Choosing among siblings: Cleanup: tracker vs hand cleanup** (docs/claude/TESTING.md § Cleanup; scripts/lint/check-test-*.sh)
+**Job: clean up after tests** (Cleanup: tracker vs hand cleanup) — docs/claude/TESTING.md § Cleanup; scripts/lint/check-test-*.sh
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -252,6 +253,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
   - *Signs you're bypassing it:* new Request(url, { method, headers: { 'content-type': ... }, body: JSON.stringify(...) }) and manual await res.json() envelope unwrapping (docs/claude/TESTING.md § Request Helpers)
 - **TypedBuildResult** `@template/db/test`: Custom factories or tests relying on guaranteed context entries.
 - **vcr.capture** `@template/shared/vcr`: wrap one provider call so tests replay or re-record its cassette
+  - *Throws:* VCR replayed provider error (`off-request-path`)
   - *Signs you're bypassing it:* a provider client method calling the HTTP SDK directly with no capture wrapper (docs/claude/TESTING.md § VCR (external services))
 - **vcr.queue** `@template/shared/vcr`: select which cassette the next captured call replays in a test
 - **Always use factories for test data** `docs/claude/TESTING.md > Factories`: Any test needing DB records; write a new factory only when none exists.
@@ -272,7 +274,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `vcr`: VCR record/replay of external provider calls
 
-**Choosing among siblings: VCR vs emitFromCassette vs vcr.capture vs vcr.queue** (docs/claude/TESTING.md § VCR (external services))
+**Job: test code that calls an external service without live calls** (VCR vs emitFromCassette vs vcr.capture vs vcr.queue) — docs/claude/TESTING.md § VCR (external services)
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -283,12 +285,13 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 - **emitFromCassette** `packages/shared/src/vcr/emitFromCassette.ts#emitFromCassette`: Request/response replay: VCR instead; use this for event-stream providers.
 - **VCR** `packages/shared/src/vcr/vcr.ts#VCR`: Event-stream providers: emitFromCassette; plain module stubs: mock.module. Any client calling an external service wraps calls in VCR.
+  - *Throws:* VCR replayed provider error (`off-request-path`)
   - *Signs you're bypassing it:* tests that hit a live provider, or nock/fetch stubs and mock.module around a provider client instead of vcr.capture with queued cassettes (docs/claude/TESTING.md § VCR (external services) (tests never call a live provider))
 - *Also here, by name:* cliVersion (`packages/shared/src/vcr/cliVersion.ts`); fetchVersion (`packages/shared/src/vcr/fetchVersion.ts`)
 
 ### Class `test-rules`: Rules for tests and their CI restrictions (no mocks, tracker registration, unhappy paths)
 
-**Choosing among siblings: Mocking and env rules** (scripts/ci/rules/*.sh)
+**Job: mock or override things in a test without breaking the rules** (Mocking and env rules) — scripts/ci/rules/*.sh
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -297,7 +300,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **no-test-env-mutation** | env vars: setEnvOverride/withEnv or .env.test | globals (no-raw-global-assign-in-tests) |
 | **spy-must-restore** | every spyOn needs mock.restore or mockRestore | env vars (no-test-env-mutation) |
 
-**Choosing among siblings: Test data and cleanup rules** (scripts/ci/rules; scripts/lint)
+**Job: create and clean up test data within the rules** (Test data and cleanup rules) — scripts/ci/rules; scripts/lint
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
