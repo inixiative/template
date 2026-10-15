@@ -4,17 +4,18 @@ import {
   db,
   filterFields,
   HookTiming,
-  isFalsePolymorphismRef,
   isNoOpUpdate,
+  polymorphicTarget,
   registerDbHook,
   WEBHOOK_NOOP_FIELDS,
+  webhookAudienceAxes,
   webhookEnabledModels,
-  webhookRelatedModels,
 } from '@template/db';
 import type { WebhookModel, WebhookSubscription } from '@template/db/generated/client/client';
+import { WebhookOwnerModel } from '@template/db/generated/client/enums';
 import { auditActorContext, auditActorStore } from '@template/db/lib/auditActorContext';
 import { ConcurrencyType } from '@template/shared/utils';
-import { keyBy } from 'lodash-es';
+import { keyBy, uniq } from 'lodash-es';
 import { isManyAction } from '#/hooks/shared/hookRows';
 import { enqueueJob } from '#/jobs/enqueue';
 
@@ -55,12 +56,56 @@ const dbActionToWebhookAction = (dbAction: DbAction, hasPrevious: boolean): Webh
   return dbAction as unknown as WebhookAction;
 };
 
+type WebhookRow = Record<string, unknown> & { id: string };
+type Party = { kind: WebhookOwnerModel; id: string };
+
+const isWebhookModel = (model: string): model is WebhookModel =>
+  (webhookEnabledModels as readonly string[]).includes(model);
+
+const isOwnerModel = (kind: string): kind is WebhookOwnerModel =>
+  (Object.values(WebhookOwnerModel) as string[]).includes(kind);
+
+const recordParties = (model: WebhookModel, row: WebhookRow): Party[] =>
+  webhookAudienceAxes[model].flatMap((axis) => {
+    const target = polymorphicTarget(row, model, axis);
+    return target && isOwnerModel(target.kind) ? [{ kind: target.kind, id: target.id }] : [];
+  });
+
+const isPartyTo = (subscription: WebhookSubscription, parties: Party[]) => {
+  const owner = polymorphicTarget(subscription, 'WebhookSubscription', 'ownerModel');
+  return !!owner && parties.some((party) => party.kind === owner.kind && party.id === owner.id);
+};
+
+const partyIds = (parties: Party[], kind: WebhookOwnerModel) =>
+  uniq(parties.filter((party) => party.kind === kind).map((party) => party.id));
+
+const findPartySubscriptions = (model: WebhookModel, parties: Party[]) =>
+  db.webhookSubscription.findMany({
+    where: {
+      model,
+      isActive: true,
+      OR: [
+        {
+          ownerModel: WebhookOwnerModel.User,
+          userId: { in: partyIds(parties, WebhookOwnerModel.User) },
+        },
+        {
+          ownerModel: WebhookOwnerModel.Organization,
+          organizationId: { in: partyIds(parties, WebhookOwnerModel.Organization) },
+        },
+        {
+          ownerModel: WebhookOwnerModel.Space,
+          spaceId: { in: partyIds(parties, WebhookOwnerModel.Space) },
+        },
+      ],
+    },
+  });
+
 const processSingleRecord = (
   subscriptions: WebhookSubscription[],
-  webhookModel: string,
-  model: string,
+  model: WebhookModel,
   webhookAction: WebhookAction,
-  resultData: Record<string, unknown> & { id: string },
+  resultData: WebhookRow,
   previousData?: Record<string, unknown>,
 ) => {
   if (
@@ -70,14 +115,15 @@ const processSingleRecord = (
     return [];
   }
 
+  const parties = recordParties(model, resultData);
   const origin = auditActorContext.getScope()?.integrationId ?? null;
-  const targets = origin
-    ? subscriptions.filter((sub) => sub.integrationId !== origin)
-    : subscriptions;
+  const targets = subscriptions.filter(
+    (sub) => isPartyTo(sub, parties) && (!origin || sub.integrationId !== origin),
+  );
   if (targets.length === 0) return [];
 
   const payload: WebhookPayload = {
-    model: webhookModel,
+    model,
     action: webhookAction,
     resourceId: resultData.id,
     data: filterFields(model, resultData, WEBHOOK_NOOP_FIELDS),
@@ -106,70 +152,38 @@ export const registerWebhookHook = () => {
     actions,
     async (options: HookOptions) => {
       const { model, action: dbAction } = options;
+      if (!isWebhookModel(model)) return;
 
-      const relatedRefs = webhookRelatedModels[model];
-      const webhookTargets: string[] = relatedRefs?.length
-        ? relatedRefs.map((ref) => (isFalsePolymorphismRef(ref) ? ref.model : ref))
-        : [model];
-
-      const enabledTargets = webhookTargets.filter((m) =>
-        (webhookEnabledModels as readonly string[]).includes(m),
-      );
-      if (enabledTargets.length === 0) return;
-
-      let allCallbacks: (() => Promise<void>)[] = [];
-
-      // Prefetch all subscriptions for enabled models in one query, then group.
-      const allSubscriptions = await db.webhookSubscription.findMany({
-        where: { model: { in: enabledTargets as WebhookModel[] }, isActive: true },
-      });
-      const subscriptionsByModel = new Map<string, WebhookSubscription[]>();
-      for (const target of enabledTargets) subscriptionsByModel.set(target, []);
-      for (const sub of allSubscriptions) {
-        const bucket = subscriptionsByModel.get(sub.model);
-        if (bucket) bucket.push(sub);
-      }
-
-      // Process for each enabled target model
-      for (const webhookModel of enabledTargets) {
-        const subscriptions = subscriptionsByModel.get(webhookModel) ?? [];
-        if (subscriptions.length === 0) continue;
-
-        if (isManyAction(dbAction)) {
-          const { result, previous } = options as HookOptions & { action: ManyAction };
-          const results = (result ?? []) as (Record<string, unknown> & { id: string })[];
-          const previousById = keyBy(previous, 'id');
-
-          for (const resultData of results) {
-            const previousData = previousById[resultData.id];
-            const webhookAction = dbActionToWebhookAction(dbAction, previousData !== undefined);
-            const callbacks = processSingleRecord(
-              subscriptions,
-              webhookModel,
-              model,
-              webhookAction,
-              resultData,
-              previousData,
-            );
-            allCallbacks = allCallbacks.concat(callbacks);
-          }
-        } else {
-          const { result, previous } = options as HookOptions & { action: SingleAction };
-          const resultData = result as Record<string, unknown> & { id: string };
-          const previousData = previous as Record<string, unknown> | undefined;
-          const webhookAction = dbActionToWebhookAction(dbAction, !!previousData);
-          const callbacks = processSingleRecord(
-            subscriptions,
-            webhookModel,
-            model,
-            webhookAction,
-            resultData,
-            previousData,
-          );
-          allCallbacks = allCallbacks.concat(callbacks);
+      const records: { resultData: WebhookRow; previousData?: Record<string, unknown> }[] = [];
+      if (isManyAction(dbAction)) {
+        const { result, previous } = options as HookOptions & { action: ManyAction };
+        const previousById = keyBy(previous, 'id');
+        for (const resultData of (result ?? []) as WebhookRow[]) {
+          records.push({ resultData, previousData: previousById[resultData.id] });
         }
+      } else {
+        const { result, previous } = options as HookOptions & { action: SingleAction };
+        records.push({
+          resultData: result as WebhookRow,
+          previousData: previous as Record<string, unknown> | undefined,
+        });
       }
 
+      const parties = records.flatMap(({ resultData }) => recordParties(model, resultData));
+      if (parties.length === 0) return;
+
+      const subscriptions = await findPartySubscriptions(model, parties);
+      if (subscriptions.length === 0) return;
+
+      const allCallbacks = records.flatMap(({ resultData, previousData }) =>
+        processSingleRecord(
+          subscriptions,
+          model,
+          dbActionToWebhookAction(dbAction, previousData !== undefined),
+          resultData,
+          previousData,
+        ),
+      );
       if (allCallbacks.length === 0) return;
 
       db.onCommit(allCallbacks, ConcurrencyType.queue);
