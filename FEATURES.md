@@ -775,7 +775,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 - TanStack Query ^5.90 (server state)
 - Zustand ^5.0 (client state)
 - Vite ^7.3 (build tool)
-- Tailwind CSS ^4.1 (styling)
+- Tailwind CSS ^4.2 (styling)
 - Shadcn UI + React Aria Components (accessible components)
 - Iconify React ^6 (icons)
 

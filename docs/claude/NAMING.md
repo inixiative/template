@@ -66,7 +66,9 @@
 | Route handler | `<model><Action>` | `userCreate`, `organizationReadMany` |
 | Getter | `get<Thing>` | `getActor`, `getResource` |
 | Boolean getter | `is<Condition>` | `isAuthenticated`, `isSuperadmin` |
-| Factory | `create<Thing>` | `createUser`, `createOrganization` |
+| Constructor / factory | `make<Thing>` | `makeError`, `makeJob`, `makeController` |
+
+`create<Thing>` is reserved for writing a record (`createInquiry`, the DB test factories `createUser` / `createSpace` in `packages/db/src/test/factories`), not for constructing a value.
 
 ### Variables
 
