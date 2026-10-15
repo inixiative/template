@@ -19,6 +19,8 @@ Make actionable incidents visible to superadmins without binding domain logic to
 
 One rule (e.g. a background job exhausts its retries), the incident lifecycle (acknowledge, assign, resolve), a superadmin list/detail view, evidence links, and one existing delivery channel. Provider-native alerts keep handling infrastructure thresholds; the app owns product-specific incidents.
 
+Candidate first rule: a rolling-cache leaf stuck — count `rollingCache.leafStuck` AppEvent rows (one per leaf attempt that ran past its cache's `timeoutSeconds`, with cache, key, target and attempt as provenance). Zealot ships this as its "Rolling cache leaf stuck" rule with a runbook; it was left out of INFRA-037 because the template has no rules to seed it into.
+
 ## Open questions
 
 - The first rule, its threshold and window, and who receives it.

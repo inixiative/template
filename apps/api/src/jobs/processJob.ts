@@ -10,13 +10,14 @@ import { addLogBroadcast, LogScope, log, logScope } from '@template/shared/logge
 import type { Job } from 'bullmq';
 import { isSlowJobData } from '#/jobs/buildJobData';
 import { claimSlotOrRequeue } from '#/jobs/claimSlotOrRequeue';
+import { enqueueCronRun } from '#/jobs/enqueueCronRun';
 import { isValidHandlerName, type JobHandlers, jobHandlers } from '#/jobs/handlers';
 import { jobAuditActor } from '#/jobs/jobAuditActor';
 import { queue } from '#/jobs/queue';
 import { recordSlowFinished } from '#/jobs/slowLaneSignals';
 import { createSlowSlotPool, type SlowSlotPool } from '#/jobs/slowSlotPool';
 import { traceJob } from '#/jobs/traceJob';
-import type { WorkerContext } from '#/jobs/types';
+import { type JobData, JobType, type WorkerContext } from '#/jobs/types';
 
 type ProcessJobSeams = {
   handlers?: Partial<JobHandlers>;
@@ -70,6 +71,13 @@ export const processJob = async (
   if (!handler) {
     log.error(`Unknown job handler: ${job.name}`, LogScope.worker);
     throw new Error(`Unknown job handler: ${job.name}`);
+  }
+
+  // A cron tick never runs its handler: it enqueues the real run (see enqueueCronRun), so it takes no
+  // slot and has no actor of its own.
+  if ((job.data as JobData | undefined)?.type === JobType.cron) {
+    await enqueueCronRun(job);
+    return;
   }
 
   const releaseSlot = await claimSlotOrRequeue(job, queue, slowSlots);

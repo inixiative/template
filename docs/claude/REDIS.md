@@ -13,7 +13,8 @@
   - [Cache (`cache:*`)](#cache-cache)
   - [Sessions (`session:*`)](#sessions-session)
   - [Rate Limiting (`limit:*`)](#rate-limiting-limit)
-  - [Job Coordination (`job:*`)](#job-coordination-job)
+  - [Job Coordination (`job:*`, `lock:*`)](#job-coordination-job-lock)
+  - [Supersede Lanes (`lane:*`)](#supersede-lanes-lane)
   - [WebSocket Pub/Sub (`ws:*`)](#websocket-pubsub-ws)
   - [BullMQ (`bull:*`)](#bullmq-bull)
 - [Cache Utilities](#cache-utilities)
@@ -21,6 +22,8 @@
   - [cache() Get-or-Set](#cache-get-or-set)
   - [clearKey()](#clearkey)
   - [Automatic Invalidation](#automatic-invalidation)
+    - [Invalidation conventions](#invalidation-conventions)
+  - [Rolling Caches](#rolling-caches)
 - [Testing](#testing)
   - [In-Memory Mock](#in-memory-mock)
   - [Test Isolation](#test-isolation)
@@ -92,13 +95,14 @@ const key = `cache:User:${id}`;  // Don't do this
 |-----------|--------|---------|
 | `bull` | `bull:*` | BullMQ job queues (managed by BullMQ) |
 | `cache` | `cache:*` | Application cache (user lookups, tokens, etc.) |
-| `job` | `job:*` | Singleton job locks (cron run-once) |
+| `job` | `job:*` | Job-system state: overflow flags (`job:overflow`), the slow lane's deferral list and idle clock |
 | `ws` | `ws:*` | WebSocket pub/sub channels and data-stream seq counters (`ws:seq:{<stream>}`) |
 | `otp` | `otp:*` | One-time passwords / verification codes |
 | `session` | `session:*` | BetterAuth sessions (via secondaryStorage) |
 | `limit` | `limit:*` | Rate limiting counters |
 | `lock` | `lock:*` | Distributed locks via `createLock` |
-| `lane` | `lane:*` | Supersede lane batons via `claimLane`/`watchLane` |
+| `lane` | `lane:*` | Supersede lane batons via `claimLane`/`watchLane`, and per-job tombstones (`lane:superseded:<jobId>`) |
+| `rollingCache` | `rollingcache:*` | Rolling-cache timers (`rollingcache:timer:<name>`), kept out of `cache:` so a flush never reschedules a refresh |
 
 ---
 
@@ -157,13 +161,16 @@ Identity comes from `getActor` (session user, token owner, token scope), the IP 
 `x-forwarded-for` hop bucketed to /64 (`clientIp`). Maxes resolve through `rateLimitMax(tier, c)`,
 the seam for subscriptions / feature flags (INFRA-027) — never a column on Token, Organization or Space.
 
-### Job Coordination (`job:*`)
+### Job Coordination (`job:*`, `lock:*`)
 
-Singleton job locks:
+Singleton job locks are `createLock` locks on the queue's connection; BullMQ deduplication
+(`deduplication: { id: <handler>-<key> }`) keeps a second job for the same key from being added at all
+(see [JOBS.md](JOBS.md#singleton-job)):
 
 ```typescript
-// Singleton job lock (prevents concurrent runs)
-`${redisNamespace.job}:lock:${cronJobId}`
+// Singleton job lock (prevents concurrent runs): keyed by lockKey(payload), else the cron row id
+`${redisNamespace.lock}:job-singleton:${handlerName}:${key}`
+`${redisNamespace.lock}:job-singleton:${cronJobId}`
 ```
 
 ### Supersede Lanes (`lane:*`)
@@ -280,6 +287,56 @@ Correctness here is enforced by **discipline and tests, not by types** — nothi
 - **Invalidate on structure, not payload.** A record's payload change and its *linkage* change are different events. A payload update may *read* a relationship-reach cache (e.g. to fire a webhook); only a link change (a `CustomerRef`/subscription mutation) should *bust* it. Express this with different key sets per entry — e.g. `User` clears `user:id` but not `user:…:customerRefs`; only `CustomerRef` clears the linkage.
 - **Know what *not* to cache.** A read whose correct invalidation needs a relationship/graph walk (webhook subscriptions reached via `customerRef`) is fetched fresh, or cached only on the slow-moving *linkage* side. Caching it by affected-model can't be invalidated correctly — a missed clear is a stale read served silently.
 - **Tests are the enforcement.** Because none of the above is compiler-checked, every cached entity needs a read-after-write test (cache under the call-site key → mutate → assert cleared). That test catches drift; nothing else does.
+
+### Rolling Caches
+
+A value computed from stored data only to serve it fast — a count, a rollup, a picker vocabulary read
+on every load — is a **rolling cache**, not a table. A table of materialized values needs hand-written
+invalidation for every way its inputs change, and each one missed is a stale read nobody notices. A
+rolling cache recomputes on a fixed interval, and its entries outlive the longest a refresh can take,
+every retry included, so a read always hits. There is no invalidation to write.
+
+```typescript
+import { cacheKey, db, makeRollingCache } from '@template/db';
+
+export const spaceCounts = makeRollingCache({
+  name: 'spaceCounts',                          // unique; a second registration throws
+  intervalSeconds: 3600,                        // at least 300 (five coordinator ticks)
+  key: ({ id }) => cacheKey('spaceCounts', id),
+  compute: ({ id }) => db.space.count({ where: { organizationId: id } }),
+  targets: { model: 'Organization', args: { select: { id: true } } },
+});
+
+const count = await spaceCounts.read({ id: organizationId });
+```
+
+- **Define it inline**, in the module that owns the data (`packages/db/src/redis/makeRollingCache.ts`
+  is the primitive). It registers itself on import, like a factory.
+- **Register the module** in `apps/api/src/lib/rollingCaches.ts` (import-only). The worker imports
+  that barrel and its coordinator refreshes every registered cache; the `rolling-cache-registered`
+  CI rule fails a definition missing from it.
+- **`targets` is `{ model, args }`**, where `args` is that model's own Prisma `findMany` args — no
+  shorthand of our own. Each returned row is one refresh job's payload and the argument to `key` and
+  `compute`, typed by your `select`; select JSON-scalar columns, since the row crosses the queue as
+  JSON (a BigInt throws, a Date arrives as a string). `distinct` is a real `DISTINCT` on Postgres.
+  Resolution fails closed above `MAX_ROLLING_CACHE_TARGETS` (10,000) rather than refreshing a
+  partial list. A cache with one value for the whole system omits `targets`; `read()` takes no
+  argument.
+- **Three times.** `intervalSeconds` is how often a target is refreshed. `timeoutSeconds` (default:
+  one interval) is how long one leaf attempt may run before it reports itself stuck. `ttlSeconds`
+  (default: interval × (`ROLLING_CACHE_LEAF_ATTEMPTS` + 2)) is how long an entry lives; registration
+  throws unless it is longer than interval + every attempt × timeout + one tick.
+- **`read`** serves the cached value; a cold miss (first read after a deploy) computes through
+  `cache()`, so concurrent readers share one computation. **`refresh`** recomputes one target and
+  overwrites the entry (`force`); a refresh whose signal aborted while it computed writes nothing, and
+  a write that fails throws so the leaf retries.
+- **`compute` never returns null or undefined**: `cache()` keeps null for only a minute and reads
+  undefined as a miss. Return an empty value of the shape instead.
+- `getRollingCache(name)` throws for a name nothing registered; tests that define their own cache
+  remove it with `unregisterRollingCache`.
+
+Scheduling (root, branch and leaf jobs) is in [JOBS.md](JOBS.md#rolling-caches-root-branch-leaf).
+
 
 ---
 

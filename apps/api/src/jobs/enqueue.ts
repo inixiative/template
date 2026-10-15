@@ -12,8 +12,10 @@ import type { Job } from 'bullmq';
 import { buildJobData } from '#/jobs/buildJobData';
 import { enqueueOrSpill } from '#/jobs/enqueueOrSpill';
 import type { JobPayloads } from '#/jobs/handlers';
+import type { SingletonJobHandler } from '#/jobs/makeSingletonJob';
 import type { SupersedingJobHandler } from '#/jobs/makeSupersedingJob';
 import { queue } from '#/jobs/queue';
+import { singletonDeduplicationId } from '#/jobs/singletonDeduplicationId';
 import { type JobLane, type JobOptions, JobType, type WorkerContext } from '#/jobs/types';
 import { validateJobId } from '#/jobs/validateJobId';
 
@@ -42,8 +44,15 @@ export const enqueueJob = async <K extends keyof JobPayloads>(
   const { type = JobType.adhoc, id, lane, bypass = false, ...jobOptions } = options || {};
   validateJobId(jobOptions.jobId);
 
-  const handler = jobHandlers[handlerName] as SupersedingJobHandler<JobPayloads[K]>;
+  const handler = jobHandlers[handlerName] as SupersedingJobHandler<JobPayloads[K]> &
+    SingletonJobHandler<JobPayloads[K]>;
   const dedupeKey = handler.dedupeKeyFn ? handler.dedupeKeyFn(payload) : undefined;
+  // A keyed singleton (or a singleton's cron run) is added with BullMQ's deduplication id, so while a
+  // job with that key exists — queued, running, retrying, or parked waiting on its children — another
+  // add is a no-op. The run's own lock covers the rest (see makeSingletonJob).
+  const singletonKey = handler.singletonKey?.(payload, { id });
+  if (singletonKey)
+    jobOptions.deduplication = { id: singletonDeduplicationId(handlerName, singletonKey) };
 
   // In test, skip BullMQ entirely — just run the handler. Cascading effects
   // happen for real, errors propagate, no queue infrastructure involved.
@@ -63,7 +72,7 @@ export const enqueueJob = async <K extends keyof JobPayloads>(
     const ctx: WorkerContext = {
       db,
       queue,
-      job: { id: jobId, name: handlerName, data } as Job,
+      job: { id: jobId, name: handlerName, data, attemptsMade: 0 } as Job,
     };
     await (handler as (workerCtx: WorkerContext, p?: unknown) => Promise<void>)(ctx, payload);
     return { jobId, name: handlerName };

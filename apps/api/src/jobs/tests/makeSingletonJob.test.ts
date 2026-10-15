@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from 'bun:
 import { redisNamespace } from '@template/db/redis/namespaces';
 import { log } from '@template/shared/logger';
 import { makeSingletonJob } from '#/jobs/makeSingletonJob';
+import { singletonDeduplicationId } from '#/jobs/singletonDeduplicationId';
 import type { WorkerContext } from '#/jobs/types';
 import { createTestWorker } from '#tests/createTestWorker';
 
@@ -237,5 +238,17 @@ describe('makeSingletonJob', () => {
     });
     expect(errorSpy).not.toHaveBeenCalledWith('singletonJob.lockLost', expect.anything());
     expect(await backingRedis.get(LOCK_KEY)).toHaveLength(36);
+  });
+
+  test('exposes its key to enqueueJob: the lockKey result, else the cron row id, else none', () => {
+    const keyed = makeSingletonJob<{ recordId: string }>(async () => {}, {
+      lockKey: ({ recordId }) => recordId,
+    });
+    const unkeyed = makeSingletonJob(async () => {});
+
+    expect(keyed.singletonKey?.({ recordId: 'record-1' }, { id: 'cron-row' })).toBe('record-1');
+    expect(unkeyed.singletonKey?.(undefined, { id: 'cron-row' })).toBe('cron-row');
+    expect(unkeyed.singletonKey?.(undefined, {})).toBeUndefined();
+    expect(singletonDeduplicationId('sweepSegments', 'cron-row')).toBe('sweepSegments-cron-row');
   });
 });

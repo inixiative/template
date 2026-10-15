@@ -27,10 +27,12 @@ export { fetchOne, hydrate } from './hydrate';
 export {
   claimLane,
   getJobSupersededBy,
+  holdLaneWhileParked,
   laneKey,
   reclaimLane,
   releaseLane,
   supersededKey,
+  tombstoneJob,
   watchLane,
 } from './lanes';
 // Distributed lock
@@ -55,9 +57,23 @@ export {
   getRedisClient,
   getRedisPub,
   getRedisSub,
+  getRollingCache,
+  listRollingCaches,
+  MAX_ROLLING_CACHE_TARGETS,
+  MIN_ROLLING_CACHE_INTERVAL_SECONDS,
+  makeRollingCache,
   type RedisEval,
   type RedisNamespace,
+  type RegisteredRollingCache,
+  ROLLING_CACHE_LEAF_ATTEMPTS,
+  ROLLING_CACHE_TICK_SECONDS,
+  type RollingCache,
+  type RollingCacheConfig,
+  type RollingCacheFindManyArgs,
+  type RollingCacheTarget,
+  type RollingCacheTargets,
   redisNamespace,
+  unregisterRollingCache,
   upsertCache,
 } from './redis';
 // Registries (schema-level configuration)
