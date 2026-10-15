@@ -3,8 +3,28 @@ import { existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { execFileAsync } from '../../utils/exec';
 
-const adminUrl = process.env.DATABASE_URL;
-if (!adminUrl) throw new Error('DATABASE_URL is required: run with `bun run with test api`');
+const repoRoot = join(import.meta.dirname, '../../..');
+
+const testDatabaseUrl = (): string => {
+  if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
+  const composed = Bun.spawnSync(
+    [
+      'bash',
+      'scripts/deployment/with-env.sh',
+      'test',
+      'api',
+      'bash',
+      '-c',
+      'printf %s "$DATABASE_URL"',
+    ],
+    { cwd: repoRoot, stdout: 'pipe', stderr: 'pipe' },
+  );
+  const url = composed.stdout.toString();
+  if (!url) throw new Error('No test DATABASE_URL: .env.test is missing or with-env.sh failed');
+  return url;
+};
+
+const adminUrl = testDatabaseUrl();
 
 const suffix = Date.now().toString(36);
 const databaseNames = { prod: `launch_prod_${suffix}`, staging: `launch_staging_${suffix}` };
@@ -25,7 +45,7 @@ mock.module('../infisicalSetup', () => ({
 
 const { baselineDeployedDatabases } = await import('../baselineDeployedDatabases');
 
-const migrationsDir = join(import.meta.dirname, '../../../packages/db/prisma/migrations');
+const migrationsDir = join(repoRoot, 'packages/db/prisma/migrations');
 const migrationsExisted = existsSync(migrationsDir);
 const admin = new Bun.SQL(adminUrl);
 
