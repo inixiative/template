@@ -39,7 +39,7 @@
 ### Single-Line Early Exits
 
 ```typescript
-if (!user) throw new HTTPException(404, { message: 'Not found' });
+if (!user) throw makeError({ status: 404, message: 'Not found' });
 if (!valid) return null;
 ```
 

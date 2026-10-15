@@ -374,7 +374,7 @@ This prevents scenarios where database corruption or bugs could result in invali
 const permix = c.get('permix');
 
 if (!permix.check('organization', 'manage', orgId)) {
-  throw new HTTPException(403, { message: 'Access denied' });
+  throw makeError({ status: 403, message: 'Access denied' });
 }
 ```
 
@@ -817,7 +817,7 @@ export const validateOwnerPermission = makeMiddleware<Options>((options) => asyn
     if (orgId && permix.check('organization', action, orgId)) return next();
   }
 
-  throw new HTTPException(403, { message: 'Access denied' });
+  throw makeError({ status: 403, message: 'Access denied' });
 });
 ```
 
@@ -838,8 +838,8 @@ Blocks token-based auth for sensitive operations. Session-only.
 ```typescript
 // Tokens cannot: create other tokens, delete orgs, delete themselves
 export const validateNotToken = async (c, next) => {
-  if (!c.get('user')) throw new HTTPException(401, { message: 'Authentication required' });
-  if (c.get('token')) throw new HTTPException(403, { message: 'Tokens cannot perform this action' });
+  if (!c.get('user')) throw makeError({ status: 401, message: 'Authentication required' });
+  if (c.get('token')) throw makeError({ status: 403, message: 'Tokens cannot perform this action' });
   await next();
 };
 ```
@@ -872,7 +872,7 @@ check(permix, rebacSchema, 'organization', { id: orgId, role: targetRole }, 'ass
 // Or inline in controller:
 const action = ['owner', 'admin'].includes(targetRole) ? 'own' : 'manage';
 if (!permix.check('organization', action, orgId)) {
-  throw new HTTPException(403, { message: `Cannot assign ${targetRole} role` });
+  throw makeError({ status: 403, message: `Cannot assign ${targetRole} role` });
 }
 ```
 

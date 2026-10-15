@@ -69,7 +69,7 @@
 - **Pass body directly to Prisma** - don't destructure unless needed
 - Use `getResource(c)` for routes with `:id` - don't refetch
 - Use `paginate()` utility for list endpoints
-- Single-line throws: `if (!x) throw new HTTPException(404, { message: '...' })`
+- Single-line throws: `if (!x) throw makeError({ status: 404, message: '...' })` (`#/lib/errors`); never `new HTTPException`
 
 ### File naming
 - Pattern: `<admin?><model><action>` (e.g., `adminOrganizationsCreate`, `inquiriesRead`)
