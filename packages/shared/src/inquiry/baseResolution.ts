@@ -1,6 +1,6 @@
 /**
  * @atlas
- * @kind handler, schema
+ * @kind schema
  * @partOf feature:inquiry
  * @uses none
  */

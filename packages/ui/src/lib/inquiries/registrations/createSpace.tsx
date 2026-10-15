@@ -5,10 +5,11 @@
  * @uses primitive:sdk
  */
 import type { InquiryReceivedItem, InquirySentItem } from '@template/sdk';
+import type { SpaceContent } from '@template/shared/inquiry';
 import { registerInquiryType } from '@template/ui/lib/inquiries/registry';
 
 const CreateSpaceSourceSummary = ({ inquiry }: { inquiry: InquirySentItem }) => {
-  const content = inquiry.content as { name?: string; slug?: string } | null | undefined;
+  const content = inquiry.content as Partial<SpaceContent> | null | undefined;
   return (
     <span>
       {content?.name ?? '—'}

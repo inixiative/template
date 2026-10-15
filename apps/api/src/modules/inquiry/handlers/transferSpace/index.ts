@@ -1,16 +1,17 @@
 import type { OrganizationId, SpaceId } from '@template/db';
 import { InquiryResourceModel } from '@template/db/generated/client/enums';
-import { z } from 'zod';
+import {
+  baseResolutionInputSchema,
+  type TransferSpaceContent,
+  transferSpaceContentSchema,
+} from '@template/shared/inquiry';
 import { emitAppEvent } from '#/appEvents/emit';
-import { baseResolutionInputSchema } from '#/modules/inquiry/handlers/schemas';
 import type { InquiryHandler } from '#/modules/inquiry/handlers/types';
-
-type TransferSpaceContent = Record<string, never>;
 
 export const transferSpaceHandler: InquiryHandler<TransferSpaceContent> = {
   sources: [{ sourceModel: InquiryResourceModel.Space }],
   targets: [{ targetModel: InquiryResourceModel.Organization }],
-  contentSchema: z.object({}),
+  contentSchema: transferSpaceContentSchema,
   resolutionInputSchema: baseResolutionInputSchema,
   resolutionSchema: baseResolutionInputSchema,
   unique: 'untargeted',

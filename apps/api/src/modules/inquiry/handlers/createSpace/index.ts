@@ -1,23 +1,17 @@
 import type { Db, OrganizationId } from '@template/db';
 import { InquiryResourceModel, InquiryType } from '@template/db/generated/client/enums';
-import { z } from 'zod';
+import {
+  baseResolutionInputSchema,
+  type CreateSpaceResolution,
+  createSpaceResolutionSchema,
+  type SpaceContent,
+  spaceContentSchema,
+} from '@template/shared/inquiry';
 import { makeError } from '#/lib/errors';
-import { baseResolutionInputSchema } from '#/modules/inquiry/handlers/schemas';
 import type { Inquiry, InquiryHandler } from '#/modules/inquiry/handlers/types';
 import { inquiryTerminalStatuses } from '#/modules/inquiry/validations/validateInquiryStatus';
 
-export const spaceContentSchema = z.object({
-  name: z.string(),
-  slug: z.string(),
-});
-
-const resolutionSchema = baseResolutionInputSchema.extend({
-  spaceId: z.string().optional(),
-});
-
-export type SpaceContent = z.infer<typeof spaceContentSchema>;
 type CreateSpaceContent = SpaceContent;
-type CreateSpaceResolution = z.infer<typeof resolutionSchema>;
 
 const validate = async (
   db: Db,
@@ -54,7 +48,7 @@ export const createSpaceHandler: InquiryHandler<CreateSpaceContent, CreateSpaceR
   targets: [{ targetModel: InquiryResourceModel.admin }],
   contentSchema: spaceContentSchema,
   resolutionInputSchema: baseResolutionInputSchema,
-  resolutionSchema,
+  resolutionSchema: createSpaceResolutionSchema,
   defaultExpirationDays: 90,
   validate,
   autoApprove: async () => false,

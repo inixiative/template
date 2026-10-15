@@ -6,9 +6,9 @@
  */
 import type { Db, Prisma, PrismaBaseArgs } from '@template/db';
 import type { InquiryResourceModel } from '@template/db/generated/client/enums';
+import type { BaseResolution } from '@template/shared/inquiry';
 import type { z } from 'zod';
 import type { AppEventHandlerDefinition } from '#/appEvents/types';
-import type { BaseResolution } from '#/modules/inquiry/handlers/schemas';
 import type { includeInquiryResponse } from '#/modules/inquiry/queries/inquiryIncludes';
 
 export type Inquiry = Prisma.InquiryGetPayload<PrismaBaseArgs>;

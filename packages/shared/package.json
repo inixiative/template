@@ -30,6 +30,8 @@
     "./contact/defs": "./src/contact/defs/index.ts",
     "./contact/defs/*": "./src/contact/defs/*.ts",
     "./contact/*": "./src/contact/*.ts",
+    "./inquiry": "./src/inquiry/index.ts",
+    "./inquiry/*": "./src/inquiry/*.ts",
     "./reference": "./src/reference/index.ts",
     "./reference/*": "./src/reference/*.ts",
     "./vcr": "./src/vcr/index.ts",
