@@ -5,6 +5,7 @@
  * @uses none
  */
 import { getOrderedListFieldsByModel } from '@template/db/registries/orderedList';
+import { pickColumns } from '@template/db/utils/pickColumns';
 import { isEqual, omit } from 'lodash-es';
 
 export type FieldRegistry = Record<string, string[]>;
@@ -44,7 +45,10 @@ export const filterFields = <T extends Record<string, unknown>>(
   data: T,
   registry: FieldRegistry,
 ): Partial<T> =>
-  omit(data, [...(registry._global ?? []), ...(registry[model] ?? [])]) as Partial<T>;
+  omit(pickColumns(model, data), [
+    ...(registry._global ?? []),
+    ...(registry[model] ?? []),
+  ]) as Partial<T>;
 
 export const isNoOpUpdate = <T extends Record<string, unknown>>(
   model: string,

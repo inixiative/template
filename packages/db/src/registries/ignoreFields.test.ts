@@ -47,9 +47,25 @@ describe('filterFields', () => {
     expect(result).not.toHaveProperty('updatedAt');
     expect(result).toMatchObject({ id: '1', name: 'tok' });
   });
+
+  it('keeps only the model columns, dropping included relations', () => {
+    const data = {
+      id: '1',
+      name: 'test',
+      organizationUsers: [{ id: 'ou' }],
+      auditLogsAsSubject: [{ actorToken: { keyHash: 'h' } }],
+    };
+    expect(filterFields('User', data, NOOP_FIELDS)).toEqual({ id: '1', name: 'test' });
+  });
 });
 
 describe('isNoOpUpdate', () => {
+  it('ignores included relations when comparing', () => {
+    const previous = { id: '123', name: 'Test' };
+    const current = { id: '123', name: 'Test', organizationUsers: [{ id: 'ou' }] };
+    expect(isNoOpUpdate('User', current, previous, NOOP_FIELDS)).toBe(true);
+  });
+
   it('returns false when no previous data', () => {
     expect(isNoOpUpdate('User', { id: '123', name: 'Test' }, undefined, NOOP_FIELDS)).toBe(false);
   });
