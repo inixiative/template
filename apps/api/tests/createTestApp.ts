@@ -3,6 +3,7 @@ import { type Db, db, type UserId } from '@template/db';
 import type { OrganizationUser, SpaceUser, User } from '@template/db/generated/client/client';
 import { auth } from '#/lib/auth';
 import type { TokenWithRelations } from '#/lib/context/types';
+import { validationDefaultHook } from '#/lib/openapi/validationDefaultHook';
 import { setupOrgPermissions } from '#/lib/permissions/setupOrgPermissions';
 import { setupSpacePermissions } from '#/lib/permissions/setupSpacePermissions';
 import { setupUserPermissions } from '#/lib/permissions/setupUserPermissions';
@@ -22,7 +23,7 @@ type CreateTestAppOptions = {
 };
 
 export const createTestApp = (options?: CreateTestAppOptions) => {
-  const app = new OpenAPIHono<AppEnv>();
+  const app = new OpenAPIHono<AppEnv>({ defaultHook: validationDefaultHook });
 
   app.onError(errorHandlerMiddleware);
 

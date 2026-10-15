@@ -5,6 +5,7 @@
  */
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { registerSecuritySchemes } from '#/lib/auth/securitySchemes';
+import { validationDefaultHook } from '#/lib/openapi/validationDefaultHook';
 import { errorHandlerMiddleware } from '#/middleware/error/errorHandlerMiddleware';
 import { notFoundHandlerMiddleware } from '#/middleware/error/notFoundHandlerMiddleware';
 import { telemetryMiddleware } from '#/middleware/telemetryMiddleware';
@@ -12,7 +13,7 @@ import { Tags } from '#/modules/tags';
 import { routes } from '#/routes';
 import type { AppEnv } from '#/types/appEnv';
 
-export const app = new OpenAPIHono<AppEnv>();
+export const app = new OpenAPIHono<AppEnv>({ defaultHook: validationDefaultHook });
 
 app.use('*', telemetryMiddleware);
 

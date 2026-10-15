@@ -82,7 +82,7 @@ describe('admin/job', () => {
         }),
       );
 
-      expect(response.status).toBe(400);
+      expect(response.status).toBe(422);
     });
 
     it('accepts the slow-lane priority and rejects anything past it', async () => {
@@ -102,7 +102,7 @@ describe('admin/job', () => {
       );
 
       expect(at.status).toBe(201);
-      expect(past.status).toBe(400);
+      expect(past.status).toBe(422);
     });
 
     it('rejects invalid handler name', async () => {
@@ -114,7 +114,7 @@ describe('admin/job', () => {
       );
       const body = await jsonError(response);
 
-      expect(response.status).toBe(400);
+      expect(response.status).toBe(422);
       expect(body.error).toBeDefined();
     });
   });
