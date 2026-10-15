@@ -279,7 +279,7 @@ foreignKey: 'webhookSubscriptionId'
 
 ### Cleanup
 
-Tests are DB-backed: they write real rows through the real client with the factories, and reset with `cleanupTouchedTables`. There is no per-test transaction rollback, and mocks stay minimal.
+Tests are DB-backed: they write real rows through the real client with the factories, and reset with `cleanupTouchedTables`. Mocks stay minimal.
 
 ```typescript
 import { cleanupTouchedTables } from '@template/db/test';

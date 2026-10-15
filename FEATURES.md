@@ -127,10 +127,10 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 - ✅ **BetterAuth Integration** - Session auth via BetterAuth ^1.6. Handles email/password, OAuth, verification flows, and session lifecycle out of the box
 - ✅ **Email/Password Auth** - Password hashing via BetterAuth. Sign-in returns a session token; the SPAs store it in localStorage via `setToken()` and send it as `Authorization: Bearer <token>`. Email verification is required before sign-in
 - ✅ **OAuth Flow → Bearer Token** - The provider redirects to the API, which appends a single-use one-time token to `/auth/callback#ott=…` (fragment, never logged). The callback page exchanges it for the session token and stores it via `setToken()`. The session token never appears in a URL
-- ✅ **Redis-Backed Sessions** - The session token is an opaque id, not a JWT; its record lives in Redis (`secondaryStorage`, TTL = 7-day sliding expiry), so deleting the key revokes the session at once. Every bearer request resolves the session from Redis. The one JWT is BetterAuth's encrypted (JWE) cookie cache, which lets cookie clients skip Redis for up to 7 days. Details: [AUTH.md](docs/claude/AUTH.md#session-storage-strategy)
+- ✅ **Redis-Backed Bearer Sessions** - The web apps send BetterAuth's session token as `Authorization: Bearer` (`apiFetchInternal`). It is an opaque token, not a JWT (only the `bearer()` plugin, no `jwt()`); its record lives in Redis (`secondaryStorage`, 7-day sliding TTL), so deleting the key revokes the session at once. BetterAuth's encrypted (JWE) cookie cache applies only to cookie-based clients. Details: [AUTH.md](docs/claude/AUTH.md#session-storage-strategy)
 - ✅ **Redis Secondary Storage** - BetterAuth's `secondaryStorage` is Redis: session records, each user's active-session list, and the OAuth one-time tokens (consumed atomically with `GETDEL`)
 - ✅ **OAuth Social Providers** - Google wired via BetterAuth social plugin (callback handling, account linking, token issuance). Microsoft/GitHub are scaffolded in `platformProviders` but not yet configured in the BetterAuth client — adding them is config, not code
-- ✅ **BetterAuth Models** - Verification (email verification tokens) and Account (OAuth provider linkage) models in Prisma. The `Session` model exists for BetterAuth's schema, but sessions are stored in Redis, not in it
+- ✅ **BetterAuth Models** - Verification (email verification tokens) and Account (OAuth provider linkage) models in Prisma. `Session` is BetterAuth's default model and is unused: sessions live in Redis
 
 ### Multi-Provider Auth (AuthProvider)
 
@@ -144,7 +144,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 - ✅ **Bearer Token Auth** - `Authorization: Bearer <key>` header for API access. SHA-256 hashed at rest. 10-minute Redis cache for frequently-used tokens avoids DB lookup per request
 - ✅ **URL Token Fallback** - `?token=<key>` query param for contexts that can't set headers (WebSocket upgrades, email links). Same validation pipeline as Bearer tokens
 - ✅ **Hierarchical Token Scopes** - Tokens scoped to User (cross-org), Organization (all spaces in org), or Space (single space only). Scope determines which resources the token can access
-- ✅ **Personal Access Tokens** - Users create named tokens with optional expiry dates. Token value shown once at creation, only hash stored. Usage tracking updates `lastUsedAt` on every request
+- ✅ **Personal Access Tokens** - Users create named tokens with optional expiry dates. Token value shown once at creation, only hash stored. `lastUsedAt` is touched on token-cache misses only (about every 10 minutes per token), keeping a write off every request
 - ✅ **Token CRUD** - Full lifecycle management. List tokens (with last-used metadata), create with name+expiry, delete by ID. Tokens scoped to the owning User/Org/Space
 
 ### User Impersonation
@@ -245,7 +245,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **Request Scoping** - Database client scoped per-request for tracing and logging. All queries tagged with request ID for debugging
 
-- ✅ **DB-Backed Test Isolation** - Tests write real rows through the real client (factories), with no per-test transaction rollback. The db client registers a test tracker in every test process; `cleanupTouchedTables()` empties the tables a file wrote. Files run one at a time (`--max-concurrency=1`). [Learn more: TESTING.md](docs/claude/TESTING.md#cleanup)
+- ✅ **DB-Backed Test Isolation** - Tests write real rows through the real client (factories). The db client registers a test tracker in every test process; `cleanupTouchedTables()` empties the tables a file wrote. Files run one at a time (`--max-concurrency=1`). [Learn more: TESTING.md](docs/claude/TESTING.md#cleanup)
 
 - ✅ **23 Database Models** - user, account, session, verification, authProvider, organization, organizationUser, space, spaceUser, token, webhookSubscription, webhookEvent, inquiry, customerRef, cronJob, emailTemplate, emailComponent, auditLog, contact, appEvent, tag, tagAttachment, tagCategory
 
@@ -661,7 +661,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 ### Caching & Performance
 
-- ✅ **Redis with IORedis** - Distributed caching layer (Redis 7 alpine). Singleton connections with automatic reconnection, error handling, and connection pooling. Mock Redis in tests for isolation
+- ✅ **Redis with IORedis** - Distributed caching layer (Redis 7 alpine). Singleton connections with automatic reconnection, error handling, and connection pooling. Tests get one shared in-memory `ioredis-mock` client (`createRedisConnection` in test); a test that needs real Redis (BullMQ repeatables) opens its own connection
 
 - ✅ **Redis Use Cases** - Session store (BetterAuth `secondaryStorage`, 7-day sliding TTL), cached reads via `cache()` (API tokens 10min, user lookups, permission hydration), BullMQ job queue persistence, WebSocket pub/sub for multi-server broadcasting, rate-limit windows, locks
 
