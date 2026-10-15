@@ -65,7 +65,7 @@ Signs you're bypassing it: two `?` in one expression; several temporary variable
 
 ### Two States Are a Boolean
 
-An option with two states is a `boolean` (`preserveSearch?: boolean`, `dark: boolean`), not a string union, mode enum or config object. Add structure only when a third state exists. — fb: 2026-02-07, 2026-02-14
+An option with two states that won't grow a third is a `boolean` (`preserveSearch?: boolean`, `dark: boolean`), not a string union, mode or config object. Anything that might grow a third value is an enum from the start (as the polymorphic party enums are). — fb: 2026-02-07, 2026-02-14
 
 ### Module-Scope Constants
 

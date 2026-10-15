@@ -62,7 +62,7 @@ Local → PR (feature branch) → main → Staging + Prod
 | `feature/*`, `fix/*`, etc. | `pr` | On PR creation |
 | `main` | `staging` **and** `prod` | On merge to main |
 
-Both Railway environments track `main`: init connects every staging and prod service to the repo on
+This is what the template's init sets up (a project that changes its deploy flow documents its own): both Railway environments track `main`, because init connects every staging and prod service to the repo on
 `main` with a deploy trigger (`connectServiceToGitHubAndVerify` in `init/tasks/railwaySetup.ts`).
 There is no manual promotion step; a merge to `main` is a production deploy. — fb: 2026-03-02
 
