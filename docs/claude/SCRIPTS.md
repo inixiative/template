@@ -49,7 +49,7 @@ scripts/
 │   ├── dump.sh             # Export database
 │   ├── restore.sh          # Import database
 │   ├── clone.sh            # Clone remote → local (with webhook cleanup)
-│   ├── push-dev.sh         # db:push:dev — worktree-aware, refuses non-local DATABASE_URLs
+│   ├── push-dev.sh         # db:push:dev — worktree-aware, refuses non-local DATABASE_URLs, regenerates the Prisma client after the push
 │   ├── release.sh          # Release-time database step
 │   ├── pg-init.sh          # Postgres initialization
 │   ├── minio-init.sh       # MinIO container entrypoint (creates the four base buckets)
