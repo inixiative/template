@@ -76,9 +76,28 @@
 |------|------------|---------|
 | ID types | `<Model>Id` | `UserId`, `OrganizationId` |
 | Context values | camelCase | `user`, `organization`, `permix` |
+| Model rows | the full model name | `organizationUser`, `webhookSubscription` |
 | Primitive constants | SCREAMING_SNAKE | `DEFAULT_PAGE_SIZE`, `MAX_RETRIES` |
 | Object constants (enums/registries) | PascalCase | `Modules`, `JobType`, `BatchStatus` |
 | Derived helpers (Zod enums, etc) | camelCase | `batchStatusEnum`, `moduleKeys` |
+
+**A variable holding a model row is named for the model, in full.** The model name is how every
+other layer refers to it (accessor, route, tag, permission), so the variable matches. `resource` is
+right only in model-generic code that handles any model. — fb: 2026-01-25, 2026-01-26, 2026-01-29
+
+```typescript
+// Good
+const organizationUser = getResource<'organizationUser'>(c);
+const webhookSubscription = getResource<'webhookSubscription'>(c);
+
+// Bad
+const orgUser = getResource<'organizationUser'>(c);
+const target = getResource<'organizationUser'>(c);
+const subscription = getResource<'webhookSubscription'>(c);
+```
+
+Signs you're bypassing it: `org`, `orgUser`, `sub`, `target` for a row whose model has a name; a
+function taking `orgId` and `userId` when the caller already holds the `organizationUser`.
 
 ### Underscore Prefix
 
@@ -207,7 +226,13 @@ TODO: Tailwind conventions
 | Model | PascalCase singular | `User`, `Organization` |
 | Field | camelCase | `firstName`, `organizationId` |
 | Enum | PascalCase | `Role`, `PlatformRole` |
-| Relation | camelCase, descriptive | `organization`, `members`, `createdBy` |
+| Relation | camelCase, the full related model name (plural for lists), plus a side or role prefix when one model is related twice | `organization`, `organizationUsers`, `webhookSubscriptions`, `sourceSegment` |
+
+Relations never shorten or rename the model (`members`, `subscriptions`, `org`): factory FK
+inference, `include` paths and the polymorphism registries all key on the model name, and a
+renamed relation is where they break. A role prefix is added only to tell two relations to the same
+model apart (`sourceSegment` / `targetSegment`, see [Polymorphic Sides](#polymorphic-sides)). —
+fb: 2026-01-25
 
 ### Polymorphic Sides
 
@@ -242,6 +267,16 @@ TODO: Document ID format
 ---
 
 ## Files & Directories
+
+**camelCase everywhere, never kebab-case**: files, directories, route paths, tags and tool names in
+`apps/` and `packages/` follow the camelCase that Prisma accessors use, so a model reads the same in
+a path, a file and a variable. — fb: 2026-01-25, 2026-02-09, 2026-02-11
+
+| Good | Bad |
+|---|---|
+| `modules/authProvider/`, `modules/webhookSubscription/` | `modules/auth-provider/`, `modules/webhook-subscription/` |
+| `GET /api/v1/organization/:id/authProviders` | `GET /api/v1/org/:id/auth-providers` |
+| `authProviderReadMany.ts` | `auth-provider-read-many.ts` |
 
 ### Backend Structure
 

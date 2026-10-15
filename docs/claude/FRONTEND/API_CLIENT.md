@@ -6,6 +6,7 @@
 
 - [Generated SDK](#generated-sdk)
 - [apiQuery and apiMutation](#apiquery-and-apimutation)
+  - [Error Toasts](#error-toasts)
   - [Context Queries](#context-queries)
 - [Optimistic Mutations](#optimistic-mutations)
 - [Data Hooks](#data-hooks)
@@ -80,6 +81,15 @@ const mutation = useMutation({
 
 await mutation.mutateAsync({ body: { name, slug } });
 ```
+
+### Error Toasts
+
+Errors toast once, centrally: `createAppQueryClient` (`packages/ui/src/lib/createAppQueryClient.ts`) sends every failed query and mutation to `handleApiError`, which reads the thrown error's `message`, `guidance` and `fieldErrors` and picks the toast (fix input, try again, log in, request access). The client toasts on errors only; a success message is the caller's choice. — fb: 2026-02-11, 2026-02-14
+
+- Let the error throw: `apiFetchInternal` throws the API's full error object, and the toaster needs all of it. Don't catch it to toast by hand, and don't rethrow a bare `new Error(message)`.
+- A caller that shows the error itself (a form rendering `fieldErrors` inline, a background poll) sets `meta: { skipErrorToast: true }` on its query or mutation (`flowReadQuery.ts` does).
+
+Signs you're bypassing it: `try { await mutateAsync(…) } catch (e) { toast.error(…) }`; two toasts for one failure.
 
 ### Context Queries
 

@@ -340,6 +340,14 @@ Each worktree owns a slot (1–9), recorded in `.worktrees/.slots/<N>` and as `W
 
 **Temporary/experimental**: Use `tmp/` directory (gitignored).
 
+**Run in another directory with `--cwd`**: package scripts and commands target a workspace with
+`bun --cwd <dir>` / `bun run --cwd <dir>` (as the root `package.json` does), never `cd <dir> && …`.
+A `cd` changes where every later command lands and hides that from the reader. — fb: 2026-02-01
+
+**End the process**: a TS script that opens connections (Prisma, Redis, a queue) ends with
+`process.exit(code)` once its work is done (`scripts/checkLaunched.ts`), or the open handles keep it
+alive and a background run hangs. — fb: 2026-02-05
+
 ---
 
 ## AI Workspace

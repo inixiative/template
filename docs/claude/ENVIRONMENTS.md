@@ -49,19 +49,22 @@ type Environment = 'local' | 'test' | 'pr' | 'staging' | 'prod';
 | `test` | Automated tests | `.env.test` files | CI/CD only |
 | `pr` | Pull request previews | Infisical `pr` environment | Ephemeral (deleted when PR closes) |
 | `staging` | Pre-production | Infisical `staging` environment | Persistent (main branch) |
-| `prod` | Production | Infisical `prod` environment | Persistent (manual promotion) |
+| `prod` | Production | Infisical `prod` environment | Persistent (main branch) |
 
 ### Deployment Flow
 
 ```
-Local → PR (feature branch) → Staging (main) → Prod (manual)
+Local → PR (feature branch) → main → Staging + Prod
 ```
 
 | Branch Type | Auto-deploys to | When |
 |-------------|-----------------|------|
 | `feature/*`, `fix/*`, etc. | `pr` | On PR creation |
-| `main` | `staging` | On merge to main |
-| Manual promotion | `prod` | After staging validation |
+| `main` | `staging` **and** `prod` | On merge to main |
+
+Both Railway environments track `main`: init connects every staging and prod service to the repo on
+`main` with a deploy trigger (`connectServiceToGitHubAndVerify` in `init/tasks/railwaySetup.ts`).
+There is no manual promotion step; a merge to `main` is a production deploy. — fb: 2026-03-02
 
 **PR environments** are ephemeral - created for each PR and destroyed when PR closes. Each gets its own:
 - PlanetScale database branch

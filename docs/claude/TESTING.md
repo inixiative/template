@@ -68,6 +68,17 @@ modules/user/
     └── userReadMany.test.ts
 ```
 
+**Test the real thing.** A test exercises production code against real rows: create them with
+factories in setup (`createUser()` before each test), call the real route or function, assert on
+what it did. Module mocks are banned outright (`no-module-mocks` CI rule; external services go
+through [VCR](#vcr-external-services)). A fake you wrote (a hand-built store, a stub service) and a
+test that asserts on that fake prove nothing about the code: delete both and test the real one
+(the real store via `createTestStore`, the real route via the test app). — fb: 2026-01-25, 2026-02-10
+
+Signs you're bypassing it: a test file defining its own implementation of the thing under test;
+assertions on a mock's call count as the only check; `if (...) mockReturnValue(...)` chains standing in
+for data the factories could create.
+
 ### Basic Test
 
 ```typescript
@@ -98,6 +109,11 @@ describe('userRead', () => {
 Located in `packages/db/src/test/factories/`.
 
 Use a factory whenever one exists; never hand-build a DB record a factory covers.
+
+Every factory injects the bookkeeping columns a model has: `id` (`Bun.randomUUIDv7()`, the same v7
+format as the schema default), `createdAt`, `updatedAt` and `deletedAt: null` (`packages/db/src/test/factory.ts`).
+Don't pass them; override one only when the test is about it (an explicit past `createdAt` for
+ordering). — fb: 2026-01-25
 
 ### build vs create
 

@@ -561,6 +561,11 @@ setTheme: (theme) => set((state) => ({ ui: { ...state.ui, theme } }))
 useAppStore.getState().auth.user = newUser;
 ```
 
+**DON'T:** Add a second action that writes what an existing setter already writes. Loading saved
+or fetched values calls the setter (`setTheme(saved.theme)`); there is no `hydrateTheme` /
+`hydrateSettings` beside it. One writer per field keeps side effects (persistence, derived state)
+in one place. — fb: 2026-02-09
+
 ### 4. Type Safety
 
 **DO:** Export and use slice types:
