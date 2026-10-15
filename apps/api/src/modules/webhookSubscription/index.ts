@@ -17,9 +17,7 @@ webhookSubscriptionRouter.openapi(
 // Protected routes (create via /me or /organization submodels)
 webhookSubscriptionRouter.use('*', validateActor);
 
-await autoRegisterRoutes(webhookSubscriptionRouter, import.meta.dirname, {
-  skip: ['webhookSubscriptionInfo'],
-});
+await autoRegisterRoutes(webhookSubscriptionRouter, import.meta.dirname);
 
 export const adminWebhookSubscriptionRouter = new OpenAPIHono<AppEnv>();
 
