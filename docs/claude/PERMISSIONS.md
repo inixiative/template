@@ -339,17 +339,21 @@ All permission setup functions validate role values before use to prevent permis
 
 ```typescript
 import { Role } from '@template/db/generated/client/enums';
+import { makeError } from '#/lib/errors';
 
 export const validateRole = (value: unknown): Role => {
   if (typeof value === 'string' && Object.values(Role).includes(value as Role)) {
     return value as Role;
   }
-  return Role.viewer; // Fail closed (most restrictive)
+  throw makeError({
+    status: 500,
+    message: `Invalid role value: ${JSON.stringify(value)}. Expected one of: ${Object.values(Role).join(', ')}`,
+  });
 };
 ```
 
 **Security principles:**
-- **Fail closed**: Invalid roles default to `viewer` (most restrictive), not `owner`
+- **Fail loud**: an invalid role is a 500 that names the bad value, not a silent downgrade to `viewer`; a corrupted row stops the request instead of running with a guessed role
 - **Runtime validation**: Type assertions alone don't protect against corrupted DB values
 - **Defense in depth**: Extra safety layer even though API validation should prevent invalid data
 
