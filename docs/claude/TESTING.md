@@ -42,7 +42,7 @@ bun run --cwd packages/db test     # Run DB package tests only
 
 ### Concurrency
 
-DB-backed tests must run with `--max-concurrency=1` to prevent cross-file interference. All packages that hit the database use a shared `registerTestTracker` singleton; concurrent file execution causes `cleanupTouchedTables` from one file to truncate tables used by another.
+DB-backed tests must run with `--max-concurrency=1` to prevent cross-file interference. Every test process tracks the tables it writes in one shared set (see [Cleanup](#cleanup)); concurrent file execution would let `cleanupTouchedTables` from one file clear tables another file is still using.
 
 ```json
 "test": "bun run --cwd ../.. with test api bun test --max-concurrency=1"
@@ -279,6 +279,8 @@ foreignKey: 'webhookSubscriptionId'
 
 ### Cleanup
 
+Tests are DB-backed: they write real rows through the real client with the factories, and reset with `cleanupTouchedTables`. Mocks stay minimal.
+
 ```typescript
 import { cleanupTouchedTables } from '@template/db/test';
 
@@ -286,6 +288,11 @@ afterAll(async () => {
   await cleanupTouchedTables(db);
 });
 ```
+
+- **The tracker is always on.** `packages/db/src/client.ts` calls `registerTestTracker()` when the client loads; in a test environment it records every table a create/update/upsert/delete touches (outside test it's a no-op). Never call `registerTestTracker()` in a test file: `scripts/lint/check-test-tracker-registration.sh` fails it.
+- **`cleanupTouchedTables(db)` empties those tables** and resets the set (`packages/db/src/test/testTracker.ts`). It bypasses the soft-delete scope, so soft-deleted rows go too.
+- **Cleanup is per file.** Most files seed in `beforeAll` and clean in `afterAll`. Clean in `afterEach` only when every test seeds its own rows; a per-test cleanup deletes a `beforeAll` seed.
+- **Never delete rows by hand** (`delete`/`deleteMany`/`TRUNCATE`/`DELETE FROM`) in an after hook: `scripts/lint/check-test-hand-cleanup.sh` fails it. A hand delete either duplicates the cleanup or hides a write the tracker missed; fix the blind spot instead. Ruling: [DB-004](../../tickets/DB-004-test-tracker-always-on.md).
 
 ### Test Data Patterns
 

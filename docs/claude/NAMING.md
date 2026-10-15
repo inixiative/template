@@ -64,7 +64,7 @@
 | Type | Convention | Example |
 |------|------------|---------|
 | Route handler | `<model><Action>` | `userCreate`, `organizationReadMany` |
-| Getter | `get<Thing>` | `getUser`, `getOrganization` |
+| Getter | `get<Thing>` | `getActor`, `getResource` |
 | Boolean getter | `is<Condition>` | `isAuthenticated`, `isSuperadmin` |
 | Factory | `create<Thing>` | `createUser`, `createOrganization` |
 
@@ -102,7 +102,7 @@ Two distinct meanings — **don't mix them**:
 
 | Context | Alias | Example |
 |---------|-------|---------|
-| Within an app | `#/` | `import { getUser } from '#/lib/context/getUser'` |
+| Within an app | `#/` | `import { getActor } from '#/lib/context/getActor'` |
 | Shared packages | `@template/` | `import { db } from '@template/db'` |
 | Within a shared package | `@template/` | `import { log } from '@template/shared/logger'` |
 | Top-level barrel exports | Relative | `export { foo } from './foo'` |
@@ -111,7 +111,7 @@ Two distinct meanings — **don't mix them**:
 // apps/api/src/modules/user/routes/userCreate.ts
 import { db } from '@template/db';                    // Shared package
 import { log } from '@template/shared/logger';        // Shared package
-import { getUser } from '#/lib/context/getUser';      // Internal to app
+import { getActor } from '#/lib/context/getActor';    // Internal to app
 
 // packages/shared/src/logger/index.ts (top-level barrel)
 export { log } from './logger';                       // Relative OK here

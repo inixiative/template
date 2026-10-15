@@ -135,8 +135,8 @@ bun run build           # Build to dist/
 # Schema operations (proxied to @template/db)
 bun run db:generate          # Generate Prisma client
 bun run db:push              # Push schema (dev only)
-bun run db:migrate           # Create migration
-bun run db:deploy            # Run migrations (production)
+bun run db:migrate           # Create migration (after launch)
+bun run db:deploy            # Apply migrations (after launch; pre-launch prod uses db push, see DATABASE.md)
 bun run db:studio            # Open Prisma Studio
 bun run db:seed              # Seed database
 bun run db:seed --prime      # Include prime dev data
