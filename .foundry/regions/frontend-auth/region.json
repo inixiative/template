@@ -2,16 +2,22 @@
   "id": "frontend-auth",
   "title": "Frontend Authentication",
   "routing": "Is this about signing in or out in the browser apps? The store's auth slice (auth.initialize, auth.signIn, auth.signUp, auth.refreshMe, auth.logout, auth.setSpoof, auth.setStrategy), fetchAndHydrateMe, LoginForm/SignupForm and the login/signup pages, useAuthProviders and social buttons, the OAuth callback page, requireAuth/requirePublic/authGuard route guards, redirectTo handling (navigateToLogin, navigateToSignup, navigatePreserving, redirectPreservingContext), or the embed auth strategy (useAuthStrategy)?",
-  "concepts": [
-    "frontend-auth"
-  ],
+  "concepts": ["frontend-auth"],
   "tokens": 8018,
   "tokenMethod": "chars/4",
+  "files": {
+    "recognise": {
+      "path": "recognise.md",
+      "tokens": 1644
+    },
+    "knowledge": {
+      "path": "knowledge.md",
+      "tokens": 8018
+    }
+  },
   "runsAgreed": 0,
   "sources": {
-    "docs": [
-      "docs/claude/FRONTEND/AUTH.md"
-    ],
+    "docs": ["docs/claude/FRONTEND/AUTH.md"],
     "docUnits": [
       "doc:docs/claude/FRONTEND/AUTH.md#architecture",
       "doc:docs/claude/FRONTEND/AUTH.md#unified-auth-method",

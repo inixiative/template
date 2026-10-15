@@ -1,13 +1,20 @@
 {
   "id": "engineering-process-docs",
   "title": "Engineering process and docs",
-  "routing": "Is this about how the agent should work rather than what the code does: understanding the why before the how, decomposing into concerns, YAGNI in either direction and flagging scope judgment calls, interrogating before proposing on shape-finding work, verifying before asserting, task intake, the execution contract and circuit breaker, pattern discovery and reuse before writing new code (FEATURES.md, COMPARISONS.md), adversarial and architectural reviews, the change checklist, or the docs workflow (read the routed docs/claude file first, update it when a contract changes, TOC via bun run docs:toc, stubs, Mermaid, keep docs honest, doc alignment review, tickets/ and tmp/AI_WORKSPACE)?",
-  "concepts": [
-    "engineering-process",
-    "docs-process"
-  ],
-  "tokens": 12832,
+  "routing": "Is this about how the agent should work rather than what the code does: checking FEATURES.md or COMPARISONS.md before building or declaring something missing (coming-soon items, status markers), reading the pertinent doc first, understanding the why before the how, decomposing, building the right interface from the start, flagging scope calls, interrogating before proposing, verifying a command or claim before asserting it or handing it over, editing files manually not via sed, explaining the design before implementing, fixing pre-existing issues, no backwards compatibility or legacy aliases, no comments or doc comments, never swallowing errors, scratch notes and test scripts in the tmp AI workspace, testing in tmp before handoff, not deleting other agents' work, task intake, the execution contract and circuit breaker, adversarial reviews, the change checklist, or the docs workflow (TOC, stubs, alignment review, tickets for open questions)?",
+  "concepts": ["engineering-process", "docs-process"],
+  "tokens": 13221,
   "tokenMethod": "chars/4",
+  "files": {
+    "recognise": {
+      "path": "recognise.md",
+      "tokens": 2007
+    },
+    "knowledge": {
+      "path": "knowledge.md",
+      "tokens": 13221
+    }
+  },
   "runsAgreed": 1,
   "sources": {
     "docs": [
@@ -40,9 +47,7 @@
       "doc:AI/ENTRYPOINT.md#11-quick-doc-routing",
       "doc:AI/ENTRYPOINT.md#12-tickets-and-ai-workspace"
     ],
-    "catalogClusters": [
-      "documentation-process"
-    ],
+    "catalogClusters": ["documentation-process"],
     "codeEntries": 1,
     "docMembers": 25
   },

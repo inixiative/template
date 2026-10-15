@@ -2,25 +2,27 @@
   "id": "navigation",
   "title": "Navigation config and tenant context",
   "routing": "Is this about who can see which page and how context moves with the user: the per-app nav config (apps/*/app/config/nav, userContext / organizationContext / spaceContext / publicContext, NavConfig, NavItem and its access rule, adding a nav item), useAuthenticatedRouting, findRoute / findRouteAcrossContexts, checkContextPermission, getContextParams, the Unauthorized fallback, Sidebar / UserMenu / ContextSelector, useRegisterNavigation, usePageMeta / useBreadcrumbs / buildBreadcrumbs, useSectionHash / useSectionOpen / useScrollState, tenant context in ?org= / ?space= / ?spoof= / ?flow=, tenant.setOrganization / setSpace / setUser / setPublic, or navigation.navigatePreserving vs the raw router navigate?",
-  "concepts": [
-    "navigation"
-  ],
+  "concepts": ["navigation"],
   "tokens": 9699,
   "tokenMethod": "chars/4",
+  "files": {
+    "recognise": {
+      "path": "recognise.md",
+      "tokens": 1687
+    },
+    "knowledge": {
+      "path": "knowledge.md",
+      "tokens": 9699
+    }
+  },
   "runsAgreed": 0,
   "sources": {
-    "docs": [
-      "docs/claude/APPS.md",
-      "docs/claude/FRONTEND/ROUTING_NAVIGATION.md"
-    ],
+    "docs": ["docs/claude/APPS.md", "docs/claude/FRONTEND/ROUTING_NAVIGATION.md"],
     "docUnits": [
       "doc:docs/claude/APPS.md#context-switching",
       "doc:docs/claude/FRONTEND/ROUTING_NAVIGATION.md#navigation"
     ],
-    "catalogClusters": [
-      "frontend-app-shells-routes",
-      "frontend-navigation-context"
-    ],
+    "catalogClusters": ["frontend-app-shells-routes", "frontend-navigation-context"],
     "codeEntries": 52,
     "docMembers": 14
   },

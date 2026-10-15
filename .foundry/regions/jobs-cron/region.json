@@ -2,19 +2,22 @@
   "id": "jobs-cron",
   "title": "Background jobs and cron",
   "routing": "Is this about running work outside the request: defining, registering, enqueuing or scheduling a background job? Signals: makeJob / makeSingletonJob / makeSupersedingJob, enqueueJob, ctx.enqueueChildJob or job stages, handlers/index.ts registration, WorkerContext / ctx.log, job ids, the BullMQ queue / Worker / processJob, BullBoard, CronJob rows, cron patterns, registerCronJobs / cronJobSync / removeRepeatable, admin job or cron trigger routes, cleanStaleData / archiveStaleRecords, or a fire-and-forget promise, setTimeout or node-cron schedule standing in for a job. (Fast/slow lanes and the JobOutbox overflow buffer are job-lanes-outbox.)",
-  "concepts": [
-    "jobs",
-    "cron"
-  ],
+  "concepts": ["jobs", "cron"],
   "tokens": 15399,
   "tokenMethod": "chars/4",
+  "files": {
+    "recognise": {
+      "path": "recognise.md",
+      "tokens": 2875
+    },
+    "knowledge": {
+      "path": "knowledge.md",
+      "tokens": 15399
+    }
+  },
   "runsAgreed": 0,
   "sources": {
-    "docs": [
-      "FEATURES.md",
-      "docs/claude/CONTEXT.md",
-      "docs/claude/JOBS.md"
-    ],
+    "docs": ["FEATURES.md", "docs/claude/CONTEXT.md", "docs/claude/JOBS.md"],
     "docUnits": [
       "doc:docs/claude/CONTEXT.md#job-context",
       "doc:docs/claude/JOBS.md#job-system",

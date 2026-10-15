@@ -2,16 +2,22 @@
   "id": "inquiry-handlers",
   "title": "Inquiry model and handlers",
   "routing": "Is this about a request one party makes of another and how it is decided: the Inquiry row (sourceModel / targetModel false polymorphism, InquiryStatus draft \u2192 sent \u2192 approved / denied / changesRequested / canceled, sentAt, expiresAt), InquiryHandler per type (sources, targets, contentSchema, resolutionInputSchema, resolutionSchema, validate, unique, defaultExpirationDays, handleApprove, autoApprove), the services (createInquiry, sendInquiry, resolveInquiry, resolveInquirySource / resolveInquiryTarget, computeExpiresAt, validateInquiryPreCreate, validateUniqueInquiry, validateInquiryHandler, validateInquiryNotExpired, inquiryTerminalStatuses), adding a new inquiry type, or who may send / resolve / read (the per-type ReBAC rule)?",
-  "concepts": [
-    "inquiry-handlers"
-  ],
+  "concepts": ["inquiry-handlers"],
   "tokens": 12329,
   "tokenMethod": "chars/4",
+  "files": {
+    "recognise": {
+      "path": "recognise.md",
+      "tokens": 2310
+    },
+    "knowledge": {
+      "path": "knowledge.md",
+      "tokens": 12329
+    }
+  },
   "runsAgreed": 0,
   "sources": {
-    "docs": [
-      "docs/claude/INQUIRIES.md"
-    ],
+    "docs": ["docs/claude/INQUIRIES.md"],
     "docUnits": [
       "doc:docs/claude/INQUIRIES.md#overview",
       "doc:docs/claude/INQUIRIES.md#data-model",
@@ -20,11 +26,7 @@
       "doc:docs/claude/INQUIRIES.md#permissions-rebac",
       "doc:docs/claude/INQUIRIES.md#adding-a-new-handler"
     ],
-    "catalogClusters": [
-      "data-models",
-      "inquiry-lifecycle",
-      "roles-and-permissions"
-    ],
+    "catalogClusters": ["data-models", "inquiry-lifecycle", "roles-and-permissions"],
     "codeEntries": 26,
     "docMembers": 26
   },

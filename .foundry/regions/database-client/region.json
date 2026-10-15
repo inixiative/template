@@ -2,18 +2,22 @@
   "id": "database-client",
   "title": "Database client and transactions",
   "routing": "Is this about using the db client from @template/db: db.<model> calls, db.txn, db.onCommit, db.onFinally, db.raw, db.scope / db.getScopeId / db.isInTxn, runInTransactionContext, db.findForUpdate (and FindForUpdateLockTimeoutError, upserting: true), mutations auto-wrapped in transactions by mutationLifeCycle, passing the delegate (query.findMany(db.user, \u2026)), Prisma delegate typing, no-raw-transaction / no-create-race-machinery, the post-transaction job queue, test transaction isolation, or the constraint helpers addUniqueWhereNotNull / addCheckConstraint / addGistIndex?",
-  "concepts": [
-    "db-client"
-  ],
+  "concepts": ["db-client"],
   "tokens": 9553,
   "tokenMethod": "chars/4",
+  "files": {
+    "recognise": {
+      "path": "recognise.md",
+      "tokens": 1969
+    },
+    "knowledge": {
+      "path": "knowledge.md",
+      "tokens": 9553
+    }
+  },
   "runsAgreed": 0,
   "sources": {
-    "docs": [
-      "FEATURES.md",
-      "docs/claude/CONTEXT.md",
-      "docs/claude/DATABASE.md"
-    ],
+    "docs": ["FEATURES.md", "docs/claude/CONTEXT.md", "docs/claude/DATABASE.md"],
     "docUnits": [
       "doc:docs/claude/CONTEXT.md#database-scope",
       "doc:docs/claude/DATABASE.md#delegate-typing",

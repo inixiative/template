@@ -2,17 +2,22 @@
   "id": "batch",
   "title": "Batch API",
   "routing": "Is this about running several API requests in one call or reading an API path in-process as the caller: POST /api/v1/batch/execute, rounds of sub-requests, the strategies transactionAll / transactionPerRound / allowFailures / failOnRound, <<round.request.path>> interpolation, summary.status success/partialSuccess/failed, X-Batch-Id, registerBatch/unregisterBatch, executeBatch/executeRequest, StrategyExecutor, BatchExecutionStrategies, or readAsCaller / readAllAsCaller?",
-  "concepts": [
-    "batch"
-  ],
+  "concepts": ["batch"],
   "tokens": 10213,
   "tokenMethod": "chars/4",
+  "files": {
+    "recognise": {
+      "path": "recognise.md",
+      "tokens": 1516
+    },
+    "knowledge": {
+      "path": "knowledge.md",
+      "tokens": 10213
+    }
+  },
   "runsAgreed": 0,
   "sources": {
-    "docs": [
-      "docs/claude/API_ROUTES.md",
-      "docs/claude/BATCH.md"
-    ],
+    "docs": ["docs/claude/API_ROUTES.md", "docs/claude/BATCH.md"],
     "docUnits": [
       "doc:docs/claude/API_ROUTES.md#complex-operations-http-status",
       "doc:docs/claude/BATCH.md#overview",

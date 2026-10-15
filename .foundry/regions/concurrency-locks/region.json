@@ -2,15 +2,19 @@
   "id": "concurrency-locks",
   "title": "Concurrency, locks and lanes",
   "routing": "Is this about two things running at once and who goes first: a race between processes or transactions (createLock, withOwnerLock, db.findForUpdate / upserting: true, find-then-create, upsert or unique-violation catches), ordering in-process writes (createSerializedQueue), capping parallelism (getConcurrency, resolveAll, Promise.all over many items), newest-wins jobs (claimLane / watchLane, makeSupersedingJob, SupersededError), singleton jobs (makeSingletonJob), a recurring timer (heartbeat instead of setInterval), or debouncing a backend-hitting input (useDebounce / useDebouncedCallback)?",
-  "concepts": [
-    "locks",
-    "concurrency-limits",
-    "supersede-lanes",
-    "recurring-timers",
-    "debounce"
-  ],
+  "concepts": ["locks", "concurrency-limits", "supersede-lanes", "recurring-timers", "debounce"],
   "tokens": 14608,
   "tokenMethod": "chars/4",
+  "files": {
+    "recognise": {
+      "path": "recognise.md",
+      "tokens": 2719
+    },
+    "knowledge": {
+      "path": "knowledge.md",
+      "tokens": 14608
+    }
+  },
   "runsAgreed": 2,
   "sources": {
     "docs": [

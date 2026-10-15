@@ -2,12 +2,19 @@
   "id": "dx-setup",
   "title": "Dev setup and worktrees",
   "routing": "Is this about getting the repo running on a machine rather than app logic: bun run setup vs bun run init / init:agent, the local loop (bun run local, turbo watch local#<app>, local:worker#api), Docker services (local:db / start:db, stop:db, reset:db, pg-init.sh, minio-init.sh / minio-provision.sh, wait-postgres.sh, the pinned compose project name), prime seed users and local API tokens, worktrees (worktree:create/list/destroy, slots 1-9, --skip-db, ready / WITH GAPS, bashMainCheckoutGuard, no raw git worktree), local ports from the @inixiative/config ports.json registry, or local debugging (redis-cli, BullBoard, db:studio)?",
-  "concepts": [
-    "dev-setup",
-    "worktrees"
-  ],
+  "concepts": ["dev-setup", "worktrees"],
   "tokens": 13969,
   "tokenMethod": "chars/4",
+  "files": {
+    "recognise": {
+      "path": "recognise.md",
+      "tokens": 3175
+    },
+    "knowledge": {
+      "path": "knowledge.md",
+      "tokens": 13969
+    }
+  },
   "runsAgreed": 0,
   "sources": {
     "docs": [

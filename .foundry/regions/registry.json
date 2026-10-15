@@ -2,11 +2,7 @@
   "version": 1,
   "project": "template",
   "builtFrom": {
-    "docs": [
-      "docs/claude/**",
-      "AI/ENTRYPOINT.md",
-      "FEATURES.md"
-    ],
+    "docs": ["docs/claude/**", "AI/ENTRYPOINT.md", "FEATURES.md"],
     "catalog": ".foundry/catalog/catalog.json (feat/warden-catalog)",
     "atlas": ".atlas/concepts.ts",
     "libraries": {
@@ -729,6 +725,7 @@
     {
       "id": "concurrency-locks",
       "tokens": 14608,
+      "recogniseTokens": 2719,
       "concepts": [
         "locks",
         "concurrency-limits",
@@ -741,590 +738,484 @@
     {
       "id": "redis-caching-rate-limits",
       "tokens": 12360,
-      "concepts": [
-        "redis",
-        "caching",
-        "rate-limiting"
-      ],
+      "recogniseTokens": 2189,
+      "concepts": ["redis", "caching", "rate-limiting"],
       "runsAgreed": 2
     },
     {
       "id": "jobs-cron",
       "tokens": 15399,
-      "concepts": [
-        "jobs",
-        "cron"
-      ],
+      "recogniseTokens": 2875,
+      "concepts": ["jobs", "cron"],
       "runsAgreed": 0
     },
     {
       "id": "job-lanes-outbox",
       "tokens": 14363,
-      "concepts": [
-        "job-lanes",
-        "job-outbox"
-      ],
+      "recogniseTokens": 2415,
+      "concepts": ["job-lanes", "job-outbox"],
       "runsAgreed": 0
     },
     {
       "id": "app-events-webhooks",
       "tokens": 14421,
-      "concepts": [
-        "app-events",
-        "webhooks"
-      ],
+      "recogniseTokens": 2799,
+      "concepts": ["app-events", "webhooks"],
       "runsAgreed": 1
     },
     {
       "id": "adapters-integrations",
       "tokens": 8184,
-      "concepts": [
-        "adapters",
-        "integrations",
-        "object-storage"
-      ],
+      "recogniseTokens": 1716,
+      "concepts": ["adapters", "integrations", "object-storage"],
       "runsAgreed": 0
     },
     {
       "id": "ws-connections",
       "tokens": 6503,
-      "concepts": [
-        "ws-connections"
-      ],
+      "recogniseTokens": 1391,
+      "concepts": ["ws-connections"],
       "runsAgreed": 0
     },
     {
       "id": "ws-channels",
       "tokens": 10002,
-      "concepts": [
-        "ws-channels"
-      ],
+      "recogniseTokens": 2146,
+      "concepts": ["ws-channels"],
       "runsAgreed": 0
     },
     {
       "id": "ws-data-streams",
       "tokens": 14592,
-      "concepts": [
-        "ws-data-streams"
-      ],
+      "recogniseTokens": 2920,
+      "concepts": ["ws-data-streams"],
       "runsAgreed": 0
     },
     {
       "id": "email-templates",
       "tokens": 8772,
-      "concepts": [
-        "email-templates"
-      ],
+      "recogniseTokens": 1610,
+      "concepts": ["email-templates"],
       "runsAgreed": 0
     },
     {
       "id": "email-render",
       "tokens": 17076,
-      "concepts": [
-        "email-render"
-      ],
+      "recogniseTokens": 3318,
+      "concepts": ["email-render"],
       "runsAgreed": 0
     },
     {
       "id": "email-lens",
       "tokens": 12436,
-      "concepts": [
-        "email-lens"
-      ],
+      "recogniseTokens": 2418,
+      "concepts": ["email-lens"],
       "runsAgreed": 0
     },
     {
       "id": "email-delivery",
       "tokens": 13800,
-      "concepts": [
-        "email-delivery",
-        "communication-preferences"
-      ],
+      "recogniseTokens": 2142,
+      "concepts": ["email-delivery", "communication-preferences"],
       "runsAgreed": 0
     },
     {
       "id": "messaging-contacts",
       "tokens": 12345,
-      "concepts": [
-        "messaging",
-        "contacts"
-      ],
+      "recogniseTokens": 2325,
+      "concepts": ["messaging", "contacts"],
       "runsAgreed": 0
     },
     {
       "id": "json-rules",
       "tokens": 15634,
-      "concepts": [
-        "json-rules",
-        "rule-references"
-      ],
+      "recogniseTokens": 3669,
+      "concepts": ["json-rules", "rule-references"],
       "runsAgreed": 0
     },
     {
       "id": "json-rules-shapes",
       "tokens": 11362,
-      "concepts": [
-        "json-rules-shapes"
-      ],
+      "recogniseTokens": 2081,
+      "concepts": ["json-rules-shapes"],
       "runsAgreed": 0
     },
     {
       "id": "json-rules-runtime",
       "tokens": 10506,
-      "concepts": [
-        "json-rules-runtime"
-      ],
+      "recogniseTokens": 1458,
+      "concepts": ["json-rules-runtime"],
       "runsAgreed": 0
     },
     {
       "id": "json-rules-dates",
       "tokens": 5024,
-      "concepts": [
-        "lib-json-rules-dates"
-      ],
+      "recogniseTokens": 321,
+      "concepts": ["lib-json-rules-dates"],
       "runsAgreed": 0
     },
     {
       "id": "json-rules-backends",
       "tokens": 7684,
-      "concepts": [
-        "lib-json-rules-backends"
-      ],
+      "recogniseTokens": 603,
+      "concepts": ["lib-json-rules-backends"],
       "runsAgreed": 0
     },
     {
       "id": "lenses",
       "tokens": 13026,
-      "concepts": [
-        "lenses"
-      ],
+      "recogniseTokens": 2718,
+      "concepts": ["lenses"],
       "runsAgreed": 0
     },
     {
       "id": "lens-model",
       "tokens": 12614,
-      "concepts": [
-        "lib-json-rules-lens"
-      ],
+      "recogniseTokens": 872,
+      "concepts": ["lib-json-rules-lens"],
       "runsAgreed": 0
     },
     {
       "id": "lens-usage",
       "tokens": 19232,
-      "concepts": [
-        "lib-json-rules-lens-usage"
-      ],
+      "recogniseTokens": 1074,
+      "concepts": ["lib-json-rules-lens-usage"],
       "runsAgreed": 0
     },
     {
       "id": "lens-sources",
       "tokens": 8311,
-      "concepts": [
-        "lib-json-rules-lens-sources"
-      ],
+      "recogniseTokens": 976,
+      "concepts": ["lib-json-rules-lens-sources"],
       "runsAgreed": 0
     },
     {
       "id": "rules-builder",
       "tokens": 16729,
-      "concepts": [
-        "rules-builder"
-      ],
+      "recogniseTokens": 2938,
+      "concepts": ["rules-builder"],
       "runsAgreed": 1
     },
     {
       "id": "lib-rules-builder",
       "tokens": 12318,
-      "concepts": [
-        "lib-rules-builder"
-      ],
+      "recogniseTokens": 1746,
+      "concepts": ["lib-rules-builder"],
       "runsAgreed": 0
     },
     {
       "id": "permissions-roles",
       "tokens": 14252,
-      "concepts": [
-        "permissions-roles"
-      ],
+      "recogniseTokens": 2229,
+      "concepts": ["permissions-roles"],
       "runsAgreed": 0
     },
     {
       "id": "permissions-rebac",
       "tokens": 10124,
-      "concepts": [
-        "permissions-rebac"
-      ],
+      "recogniseTokens": 1653,
+      "concepts": ["permissions-rebac"],
       "runsAgreed": 0
     },
     {
       "id": "tenancy",
       "tokens": 9279,
-      "concepts": [
-        "tenancy",
-        "superadmin"
-      ],
+      "recogniseTokens": 2051,
+      "concepts": ["tenancy", "superadmin"],
       "runsAgreed": 0
     },
     {
       "id": "authentication",
       "tokens": 13844,
-      "concepts": [
-        "authentication"
-      ],
+      "recogniseTokens": 2742,
+      "concepts": ["authentication"],
       "runsAgreed": 0
     },
     {
       "id": "auth-middleware-users",
       "tokens": 10413,
-      "concepts": [
-        "auth-middleware",
-        "users"
-      ],
+      "recogniseTokens": 2345,
+      "concepts": ["auth-middleware", "users"],
       "runsAgreed": 0
     },
     {
       "id": "frontend-auth",
       "tokens": 8018,
-      "concepts": [
-        "frontend-auth"
-      ],
+      "recogniseTokens": 1644,
+      "concepts": ["frontend-auth"],
       "runsAgreed": 0
     },
     {
       "id": "api-routes",
       "tokens": 15577,
-      "concepts": [
-        "route-templates",
-        "api-modules"
-      ],
+      "recogniseTokens": 3204,
+      "concepts": ["route-templates", "api-modules"],
       "runsAgreed": 1
     },
     {
       "id": "api-schemas-openapi",
       "tokens": 5733,
-      "concepts": [
-        "openapi",
-        "request-schemas"
-      ],
+      "recogniseTokens": 1376,
+      "concepts": ["openapi", "request-schemas"],
       "runsAgreed": 0
     },
     {
       "id": "request-context-errors",
       "tokens": 18091,
-      "concepts": [
-        "request-context",
-        "errors"
-      ],
+      "recogniseTokens": 3123,
+      "concepts": ["request-context", "errors"],
       "runsAgreed": 0
     },
     {
       "id": "batch",
       "tokens": 10213,
-      "concepts": [
-        "batch"
-      ],
+      "recogniseTokens": 1516,
+      "concepts": ["batch"],
       "runsAgreed": 0
     },
     {
       "id": "filtering-search",
       "tokens": 17705,
-      "concepts": [
-        "filtering-search"
-      ],
+      "recogniseTokens": 2574,
+      "concepts": ["filtering-search"],
       "runsAgreed": 2
     },
     {
       "id": "pagination",
       "tokens": 8780,
-      "concepts": [
-        "pagination"
-      ],
+      "recogniseTokens": 1281,
+      "concepts": ["pagination"],
       "runsAgreed": 0
     },
     {
       "id": "database-client",
       "tokens": 9553,
-      "concepts": [
-        "db-client"
-      ],
+      "recogniseTokens": 1969,
+      "concepts": ["db-client"],
       "runsAgreed": 0
     },
     {
       "id": "data-modeling",
       "tokens": 12128,
-      "concepts": [
-        "data-modeling",
-        "reference-data"
-      ],
+      "recogniseTokens": 2050,
+      "concepts": ["data-modeling", "reference-data"],
       "runsAgreed": 0
     },
     {
       "id": "database-tooling",
       "tokens": 7291,
-      "concepts": [
-        "db-scripts",
-        "seeding"
-      ],
+      "recogniseTokens": 1468,
+      "concepts": ["db-scripts", "seeding"],
       "runsAgreed": 0
     },
     {
       "id": "mutation-hooks",
       "tokens": 14680,
-      "concepts": [
-        "mutation-hooks",
-        "immutable-fields",
-        "ordered-lists"
-      ],
+      "recogniseTokens": 2903,
+      "concepts": ["mutation-hooks", "immutable-fields", "ordered-lists"],
       "runsAgreed": 0
     },
     {
       "id": "audit-soft-delete",
       "tokens": 9839,
-      "concepts": [
-        "audit-log",
-        "soft-delete"
-      ],
+      "recogniseTokens": 1859,
+      "concepts": ["audit-log", "soft-delete"],
       "runsAgreed": 0
     },
     {
       "id": "encryption",
       "tokens": 18675,
-      "concepts": [
-        "encryption",
-        "secrets"
-      ],
+      "recogniseTokens": 2334,
+      "concepts": ["encryption", "secrets"],
       "runsAgreed": 0
     },
     {
       "id": "inquiry-handlers",
       "tokens": 12329,
-      "concepts": [
-        "inquiry-handlers"
-      ],
+      "recogniseTokens": 2310,
+      "concepts": ["inquiry-handlers"],
       "runsAgreed": 0
     },
     {
       "id": "inquiry-routes-ui",
       "tokens": 11901,
-      "concepts": [
-        "inquiry-routes-ui"
-      ],
+      "recogniseTokens": 2154,
+      "concepts": ["inquiry-routes-ui"],
       "runsAgreed": 0
     },
     {
       "id": "flows",
       "tokens": 9071,
-      "concepts": [
-        "flows"
-      ],
+      "recogniseTokens": 2360,
+      "concepts": ["flows"],
       "runsAgreed": 1
     },
     {
       "id": "customers-segments",
       "tokens": 14648,
-      "concepts": [
-        "customers",
-        "segments"
-      ],
+      "recogniseTokens": 3199,
+      "concepts": ["customers", "segments"],
       "runsAgreed": 3
     },
     {
       "id": "observability-lifecycle",
       "tokens": 16663,
-      "concepts": [
-        "logging",
-        "telemetry",
-        "process-lifecycle"
-      ],
+      "recogniseTokens": 3077,
+      "concepts": ["logging", "telemetry", "process-lifecycle"],
       "runsAgreed": 3
     },
     {
       "id": "frontend-store",
       "tokens": 11704,
-      "concepts": [
-        "frontend-store"
-      ],
+      "recogniseTokens": 2004,
+      "concepts": ["frontend-store"],
       "runsAgreed": 0
     },
     {
       "id": "api-client",
       "tokens": 8998,
-      "concepts": [
-        "api-client"
-      ],
+      "recogniseTokens": 1588,
+      "concepts": ["api-client"],
       "runsAgreed": 0
     },
     {
       "id": "frontend-apps-routing",
       "tokens": 14108,
-      "concepts": [
-        "frontend-routing"
-      ],
+      "recogniseTokens": 2765,
+      "concepts": ["frontend-routing"],
       "runsAgreed": 0
     },
     {
       "id": "navigation",
       "tokens": 9699,
-      "concepts": [
-        "navigation"
-      ],
+      "recogniseTokens": 1687,
+      "concepts": ["navigation"],
       "runsAgreed": 0
     },
     {
       "id": "ui-components",
       "tokens": 14896,
-      "concepts": [
-        "ui-components"
-      ],
+      "recogniseTokens": 2260,
+      "concepts": ["ui-components"],
       "runsAgreed": 2
     },
     {
       "id": "theme-layout",
       "tokens": 6273,
-      "concepts": [
-        "theme-layout"
-      ],
+      "recogniseTokens": 1084,
+      "concepts": ["theme-layout"],
       "runsAgreed": 0
     },
     {
       "id": "test-harness",
       "tokens": 11068,
-      "concepts": [
-        "test-harness",
-        "vcr"
-      ],
+      "recogniseTokens": 2040,
+      "concepts": ["test-harness", "vcr"],
       "runsAgreed": 0
     },
     {
       "id": "test-factories-rules",
-      "tokens": 10775,
-      "concepts": [
-        "test-factories",
-        "test-rules"
-      ],
+      "tokens": 10979,
+      "recogniseTokens": 2469,
+      "concepts": ["test-factories", "test-rules"],
       "runsAgreed": 0
     },
     {
       "id": "dx-setup",
       "tokens": 13969,
-      "concepts": [
-        "dev-setup",
-        "worktrees"
-      ],
+      "recogniseTokens": 3175,
+      "concepts": ["dev-setup", "worktrees"],
       "runsAgreed": 0
     },
     {
       "id": "environments-deploy",
       "tokens": 12822,
-      "concepts": [
-        "env-config",
-        "ci-deploy"
-      ],
+      "recogniseTokens": 2302,
+      "concepts": ["env-config", "ci-deploy"],
       "runsAgreed": 0
     },
     {
       "id": "dx-tools",
       "tokens": 12266,
-      "concepts": [
-        "scripts",
-        "lint-rules",
-        "build-tooling"
-      ],
+      "recogniseTokens": 2575,
+      "concepts": ["scripts", "lint-rules", "build-tooling"],
       "runsAgreed": 0
     },
     {
       "id": "conventions",
       "tokens": 9844,
-      "concepts": [
-        "naming",
-        "code-style"
-      ],
+      "recogniseTokens": 2049,
+      "concepts": ["naming", "code-style"],
       "runsAgreed": 1
     },
     {
       "id": "monorepo-architecture",
       "tokens": 18015,
-      "concepts": [
-        "monorepo-layout",
-        "dependencies",
-        "architecture"
-      ],
+      "recogniseTokens": 3459,
+      "concepts": ["monorepo-layout", "dependencies", "architecture"],
       "runsAgreed": 1
     },
     {
       "id": "init-architecture",
-      "tokens": 11183,
-      "concepts": [
-        "init-architecture"
-      ],
+      "tokens": 11363,
+      "recogniseTokens": 2282,
+      "concepts": ["init-architecture"],
       "runsAgreed": 0
     },
     {
       "id": "init-tasks",
-      "tokens": 12522,
-      "concepts": [
-        "init-tasks"
-      ],
+      "tokens": 12742,
+      "recogniseTokens": 1862,
+      "concepts": ["init-tasks"],
       "runsAgreed": 0
     },
     {
       "id": "engineering-process-docs",
-      "tokens": 12832,
-      "concepts": [
-        "engineering-process",
-        "docs-process"
-      ],
+      "tokens": 13221,
+      "recogniseTokens": 2007,
+      "concepts": ["engineering-process", "docs-process"],
       "runsAgreed": 1
     },
     {
       "id": "lib-permissions",
       "tokens": 7825,
-      "concepts": [
-        "lib-permissions"
-      ],
+      "recogniseTokens": 1213,
+      "concepts": ["lib-permissions"],
       "runsAgreed": 0
     },
     {
       "id": "lib-transitions",
       "tokens": 4984,
-      "concepts": [
-        "lib-transitions"
-      ],
+      "recogniseTokens": 328,
+      "concepts": ["lib-transitions"],
       "runsAgreed": 0
     },
     {
       "id": "lib-prisma-map",
       "tokens": 13910,
-      "concepts": [
-        "lib-prisma-map",
-        "schema-introspection"
-      ],
+      "recogniseTokens": 2918,
+      "concepts": ["lib-prisma-map", "schema-introspection"],
       "runsAgreed": 0
     },
     {
       "id": "lib-atlas",
       "tokens": 15305,
-      "concepts": [
-        "lib-atlas",
-        "atlas"
-      ],
+      "recogniseTokens": 3102,
+      "concepts": ["lib-atlas", "atlas"],
       "runsAgreed": 0
     },
     {
       "id": "lib-gloss",
       "tokens": 5523,
-      "concepts": [
-        "lib-gloss",
-        "gloss"
-      ],
+      "recogniseTokens": 330,
+      "concepts": ["lib-gloss", "gloss"],
       "runsAgreed": 0
     },
     {
       "id": "lib-config",
       "tokens": 10495,
-      "concepts": [
-        "lib-config"
-      ],
+      "recogniseTokens": 2610,
+      "concepts": ["lib-config"],
       "runsAgreed": 0
     }
   ],

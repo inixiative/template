@@ -2,26 +2,27 @@
   "id": "audit-soft-delete",
   "title": "Audit log and soft delete",
   "routing": "Is this about recording who changed what, or about rows that are deleted but kept: AuditLog, AUDIT_ENABLED_MODELS / isAuditEnabled, auditActorContext / auditActorMiddleware / jobAuditActor, computeDiff, processAuditData, redactChangeDiff, the ignoreFields and redactFields registries, soft delete (SOFT_DELETE_MODELS, isSoftDeleteModel, hasDeletedAt, deletedAt, softDeleteScopeExtension, liveWhere / liveIncludes), db.withDeleted and includeDeletedMiddleware, tombstones and cascade (registerSoftDeleteCascadeHook, tombstoneChildren, CASCADE_EXEMPT, HARD_DELETE_ON_TOMBSTONE), or revive / reviveChildren / REGENERATE_ON_REVIVE?",
-  "concepts": [
-    "audit-log",
-    "soft-delete"
-  ],
+  "concepts": ["audit-log", "soft-delete"],
   "tokens": 9839,
   "tokenMethod": "chars/4",
+  "files": {
+    "recognise": {
+      "path": "recognise.md",
+      "tokens": 1859
+    },
+    "knowledge": {
+      "path": "knowledge.md",
+      "tokens": 9839
+    }
+  },
   "runsAgreed": 0,
   "sources": {
-    "docs": [
-      "docs/claude/DATABASE.md",
-      "docs/claude/HOOKS.md"
-    ],
+    "docs": ["docs/claude/DATABASE.md", "docs/claude/HOOKS.md"],
     "docUnits": [
       "doc:docs/claude/HOOKS.md#audit-log",
       "doc:docs/claude/DATABASE.md#query-building-utilities"
     ],
-    "catalogClusters": [
-      "audit-logging",
-      "soft-delete-cascade"
-    ],
+    "catalogClusters": ["audit-logging", "soft-delete-cascade"],
     "codeEntries": 39,
     "docMembers": 8
   },

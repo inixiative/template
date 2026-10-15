@@ -2,19 +2,22 @@
   "id": "dx-tools",
   "title": "Scripts, lint and build tooling",
   "routing": "Is this about which repo tool to run or how the tooling is wired: which package.json script (lint, lint:fix, format, lint:imports, lint:generated, typecheck, typecheck:fe, check, build, start:api/start:worker/start:web, start:db/stop:db/reset:db), where a new script goes (scripts/<category>/, tmp/), Biome and its @inixiative/config presets, the post-Biome lint scripts (check-import-aliases, check-generated-files, check-finder-duplicates), the CI rules under scripts/ci/rules with their rule-violations fixtures and run-ci-rules.sh --test, lefthook, turbo.json tasks (the db:generate \u2192 generate:openapi \u2192 generate:sdk / generate:routes chain, .gen. files and loop prevention, caching, task naming, #pkg filters, --graph/--force/--output-logs), or the shared toolchain presets (tsconfig base/node/react, tsup node/react, versions.json, config sync/check)?",
-  "concepts": [
-    "scripts",
-    "lint-rules",
-    "build-tooling"
-  ],
+  "concepts": ["scripts", "lint-rules", "build-tooling"],
   "tokens": 12266,
   "tokenMethod": "chars/4",
+  "files": {
+    "recognise": {
+      "path": "recognise.md",
+      "tokens": 2575
+    },
+    "knowledge": {
+      "path": "knowledge.md",
+      "tokens": 12266
+    }
+  },
   "runsAgreed": 0,
   "sources": {
-    "docs": [
-      "docs/claude/SCRIPTS.md",
-      "docs/claude/TURBOREPO.md"
-    ],
+    "docs": ["docs/claude/SCRIPTS.md", "docs/claude/TURBOREPO.md"],
     "docUnits": [
       "doc:docs/claude/SCRIPTS.md#script-locations",
       "doc:docs/claude/SCRIPTS.md#development",

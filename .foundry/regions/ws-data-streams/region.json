@@ -2,16 +2,22 @@
   "id": "ws-data-streams",
   "title": "WebSocket data streams",
   "routing": "Is this about pushing incremental data (not a hint) over the socket: defineStream and STREAM_DEFINITIONS (streamDefinitionFor / streamDefinitionOf), stream kind list vs log and ordering, the required audience (shared vs perRecipient, expectStreamAudience, isPerCallerScope), openDataStream / closeDataStream / rejectDataStream and the snapshot (fetchStreamSnapshot, resolveStreamRoute), re-authorization sweeps (startStreamReauthorizeSweep, reauthorizeOpenStreams, reprobeStreamAccess, x-auth-probe), ordering and sequence numbers (streamSeqKeyFor, seq gap \u2192 streamResync, no replay), producing appends (streamAppend, routeRow, appendToStream, deliverWSHandoffs, sendToStreamLocal), the frames (streamSnapshotFrame, streamAppendFrame), or the frontend (useStream, useStreamAction, STREAM_FOLDS, listStream / logStream, dataStreamQueryKey, addStreamListener)?",
-  "concepts": [
-    "ws-data-streams"
-  ],
+  "concepts": ["ws-data-streams"],
   "tokens": 14592,
   "tokenMethod": "chars/4",
+  "files": {
+    "recognise": {
+      "path": "recognise.md",
+      "tokens": 2920
+    },
+    "knowledge": {
+      "path": "knowledge.md",
+      "tokens": 14592
+    }
+  },
   "runsAgreed": 0,
   "sources": {
-    "docs": [
-      "docs/claude/WEBSOCKETS.md"
-    ],
+    "docs": ["docs/claude/WEBSOCKETS.md"],
     "docUnits": [
       "doc:docs/claude/WEBSOCKETS.md#data-streams",
       "doc:docs/claude/WEBSOCKETS.md#data-streams/stream-definitions",

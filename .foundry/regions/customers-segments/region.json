@@ -2,18 +2,22 @@
   "id": "customers-segments",
   "title": "Customers and segments",
   "routing": "Is this about provider/customer relationships or audiences built over them: CustomerRef (customer/provider pairs, includeCustomer/includeProvider, customerRefLens), Segment / SegmentMember, segment conditions and their reach, membership reconciliation (reconcileSegment, reconcileCustomerRefSegments, sweepSegments, RECONCILE_TRIGGERS, applyMembershipDiff), segment rule health (soundSegments, withSegmentsRuleIssues), or segment membership events and pages?",
-  "concepts": [
-    "customers",
-    "segments"
-  ],
+  "concepts": ["customers", "segments"],
   "tokens": 14648,
   "tokenMethod": "chars/4",
+  "files": {
+    "recognise": {
+      "path": "recognise.md",
+      "tokens": 3199
+    },
+    "knowledge": {
+      "path": "knowledge.md",
+      "tokens": 14648
+    }
+  },
   "runsAgreed": 3,
   "sources": {
-    "docs": [
-      "FEATURES.md",
-      "docs/claude/SEGMENTS.md"
-    ],
+    "docs": ["FEATURES.md", "docs/claude/SEGMENTS.md"],
     "docUnits": [
       "doc:FEATURES.md#customer-management",
       "doc:docs/claude/SEGMENTS.md#purpose-and-ownership",

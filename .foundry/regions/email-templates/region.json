@@ -2,17 +2,22 @@
   "id": "email-templates",
   "title": "Email templates and components",
   "routing": "Is this about the email content models and who owns them: EmailTemplate and EmailComponent, the {{#component:slug}} block markup, componentRefs staying slug-keyed, the owner cascade (ownerModel: default, admin, Organization, Space, User, OrganizationUser, SpaceUser; inheritToSpaces), system tokens and sender identity vs branding, template versioning through the audit log (emailVersioning, AuditLog.componentVersions, recomposeCommunication / recomposeSnapshot), the emailTemplate module and rule surface, seeding templates (emailSeedSavers), edge staleness and preventHardDelete?",
-  "concepts": [
-    "email-templates"
-  ],
+  "concepts": ["email-templates"],
   "tokens": 8772,
   "tokenMethod": "chars/4",
+  "files": {
+    "recognise": {
+      "path": "recognise.md",
+      "tokens": 1610
+    },
+    "knowledge": {
+      "path": "knowledge.md",
+      "tokens": 8772
+    }
+  },
   "runsAgreed": 0,
   "sources": {
-    "docs": [
-      "FEATURES.md",
-      "docs/claude/COMMUNICATIONS.md"
-    ],
+    "docs": ["FEATURES.md", "docs/claude/COMMUNICATIONS.md"],
     "docUnits": [
       "doc:docs/claude/COMMUNICATIONS.md#email",
       "doc:docs/claude/COMMUNICATIONS.md#email/implementation-status",

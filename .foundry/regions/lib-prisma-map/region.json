@@ -2,18 +2,22 @@
   "id": "lib-prisma-map",
   "title": "Prisma-map and schema introspection",
   "routing": "Is this about reading the Prisma schema at runtime instead of hand-declaring it? Signals: the @inixiative/prisma-map library (buildPrismaMapV7 / buildPrismaMapV6, parseRuntimeDataModel, parseSchemaText, buildFromSchemaFile, ScalarField / EnumField / RelationField, fromFields / toFields, getRelations / relationForeignKey, tableName / columnName / storedValue and the DbIdentifier / DbValue brands, the /// @tagClass(key: value) DSL and parseTagClasses), or the template's use of it: prismaMap.gen.ts, ModelNames / AccessorNames / toAccessor / toModelName / isModelName, modelFields / lookupField, getModelRelations / getAccessorRelations, hydrate, aliasColumns in raw SQL, polymorphicTarget / polymorphicKeyColumn, withDiscriminatorDefaults, walkWhere.",
-  "concepts": [
-    "lib-prisma-map",
-    "schema-introspection"
-  ],
+  "concepts": ["lib-prisma-map", "schema-introspection"],
   "tokens": 13910,
   "tokenMethod": "chars/4",
+  "files": {
+    "recognise": {
+      "path": "recognise.md",
+      "tokens": 2918
+    },
+    "knowledge": {
+      "path": "knowledge.md",
+      "tokens": 13910
+    }
+  },
   "runsAgreed": 0,
   "sources": {
-    "docs": [
-      "@inixiative/prisma-map/README.md",
-      "docs/claude/DATABASE.md"
-    ],
+    "docs": ["@inixiative/prisma-map/README.md", "docs/claude/DATABASE.md"],
     "docUnits": [
       "doc:@inixiative/prisma-map/README.md#preface",
       "doc:@inixiative/prisma-map/README.md#installation",
@@ -31,9 +35,7 @@
       "doc:@inixiative/prisma-map/README.md#license",
       "doc:docs/claude/DATABASE.md#model-utilities"
     ],
-    "catalogClusters": [
-      "prisma-schema-introspection"
-    ],
+    "catalogClusters": ["prisma-schema-introspection"],
     "codeEntries": 66,
     "docMembers": 8
   },

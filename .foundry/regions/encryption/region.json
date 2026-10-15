@@ -2,12 +2,19 @@
   "id": "encryption",
   "title": "Encryption and secrets",
   "routing": "Is this about a secret: encrypting a field at rest or reading it back (encryptField / decryptField, the ENCRYPTED_MODELS registry, encrypted{Key} / \u2026Metadata / \u2026KeyVersion columns, buildAAD), an encryption keyring ({PREFIX}_ENCRYPTION_VERSION / _KEY_CURRENT / _KEY_PREVIOUS) in any environment including test and CI, rotating or cycling keys (rotateEncryptionKeys, validateEncryptionVersions), storing a provider credential, or where secret env vars live and how they get in (Infisical, with-env, .env.local / .env.test, adding an env var)?",
-  "concepts": [
-    "encryption",
-    "secrets"
-  ],
+  "concepts": ["encryption", "secrets"],
   "tokens": 18675,
   "tokenMethod": "chars/4",
+  "files": {
+    "recognise": {
+      "path": "recognise.md",
+      "tokens": 2334
+    },
+    "knowledge": {
+      "path": "knowledge.md",
+      "tokens": 18675
+    }
+  },
   "runsAgreed": 0,
   "sources": {
     "docs": [

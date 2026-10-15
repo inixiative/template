@@ -2,12 +2,19 @@
   "id": "request-context-errors",
   "title": "Request context and errors",
   "routing": "Is this about what a live API request carries or how it fails: reading identity, tenant, resource or validated input from the Hono context (AppEnv, c.get('user'|'db'|'requestId'|'bracketQuery'), getActor, getResource, getValidatedBody/getValidatedQuery, setUserContext, refreshUserContext, resourceContextMiddleware, resourceContextArgs, ?lookup=, prepareRequest, db.scope / db.getScopeId, clientIp/clientAddress), or throwing and mapping an API error (makeError, AppError, errorHandlerMiddleware, HTTP_ERROR_MAP, guidance, fieldErrors, status codes, Prisma P2002/P2025/P2034, isUniqueConstraintError, isWriteConflictError, raw Error vs makeError, frontend describeError/handleApiError/RouteError)?",
-  "concepts": [
-    "request-context",
-    "errors"
-  ],
+  "concepts": ["request-context", "errors"],
   "tokens": 18091,
   "tokenMethod": "chars/4",
+  "files": {
+    "recognise": {
+      "path": "recognise.md",
+      "tokens": 3123
+    },
+    "knowledge": {
+      "path": "knowledge.md",
+      "tokens": 18091
+    }
+  },
   "runsAgreed": 0,
   "sources": {
     "docs": [

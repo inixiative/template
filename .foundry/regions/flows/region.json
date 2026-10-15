@@ -2,17 +2,22 @@
   "id": "flows",
   "title": "Guided flows",
   "routing": "Is this about a guided in-app walkthrough across a few pages (an onboarding or setup wizard with Continue/Finish): Flow, FlowKey, flowRegistry and its registry files, bindingsSchema, FlowStep (to, advance auto/confirm, readPath, rule), checkFlow/createFlow, meCreateFlow/flowRead/flowDelete, useStartFlow, useActiveFlow, FlowBanner, flowNext/followFlow/dropFlow, navigation.flowId and ?flow=, skipFlowInvalidate, cleanStaleFlows?",
-  "concepts": [
-    "flows"
-  ],
+  "concepts": ["flows"],
   "tokens": 9071,
   "tokenMethod": "chars/4",
+  "files": {
+    "recognise": {
+      "path": "recognise.md",
+      "tokens": 2360
+    },
+    "knowledge": {
+      "path": "knowledge.md",
+      "tokens": 9071
+    }
+  },
   "runsAgreed": 1,
   "sources": {
-    "docs": [
-      "FEATURES.md",
-      "docs/claude/FLOWS.md"
-    ],
+    "docs": ["FEATURES.md", "docs/claude/FLOWS.md"],
     "docUnits": [
       "doc:docs/claude/FLOWS.md#preface",
       "doc:docs/claude/FLOWS.md#registry",

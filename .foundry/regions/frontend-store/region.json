@@ -2,18 +2,22 @@
   "id": "frontend-store",
   "title": "Frontend store (Zustand slices)",
   "routing": "Is this about client-side state in the frontend: the one shared Zustand store useAppStore / AppStore from @template/ui/store, its slices (AuthSlice: auth.initialize / signIn / signUp / logout / refreshMe / setSpoof / setStrategy; PermissionsSlice: permissions-roles / permissions-rebac.setup / check / clear; TenantSlice: tenant.setOrganization / setSpace / setUser / setPublic / setPage; ClientSlice; UISlice: ui.setTheme / setLoading, useThemePersistence; NavigationSlice: navigatePreserving, setFlowId), adding or removing a slice, narrow selectors and useShallow, getState() outside React, actions with side effects, or a component that wants its own store or to put server data in the store?",
-  "concepts": [
-    "frontend-store"
-  ],
+  "concepts": ["frontend-store"],
   "tokens": 11704,
   "tokenMethod": "chars/4",
+  "files": {
+    "recognise": {
+      "path": "recognise.md",
+      "tokens": 2004
+    },
+    "knowledge": {
+      "path": "knowledge.md",
+      "tokens": 11704
+    }
+  },
   "runsAgreed": 0,
   "sources": {
-    "docs": [
-      "FEATURES.md",
-      "docs/claude/FRONTEND.md",
-      "docs/claude/ZUSTAND.md"
-    ],
+    "docs": ["FEATURES.md", "docs/claude/FRONTEND.md", "docs/claude/ZUSTAND.md"],
     "docUnits": [
       "doc:docs/claude/FRONTEND.md#state-management",
       "doc:docs/claude/ZUSTAND.md#architecture",

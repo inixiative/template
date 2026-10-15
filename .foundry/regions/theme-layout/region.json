@@ -2,17 +2,22 @@
   "id": "theme-layout",
   "title": "Layout system and theme",
   "routing": "Is this about how a page is framed and coloured: the layout components (AppShell, Header, Page, Modal, ResponsiveDrawer, DetailPanel, MasterDetailLayout), layout components reading the store themselves, detail views as drawers, the root component's app hooks (useThemePersistence, useLanguage, nav registration), the three-tier theme CSS variables (--app-*, --space-*, active tokens like --primary), shade generation via color-mix, AppTheme / SpaceTheme as bare HSL values, or white-label mode?",
-  "concepts": [
-    "theme-layout"
-  ],
+  "concepts": ["theme-layout"],
   "tokens": 6273,
   "tokenMethod": "chars/4",
+  "files": {
+    "recognise": {
+      "path": "recognise.md",
+      "tokens": 1084
+    },
+    "knowledge": {
+      "path": "knowledge.md",
+      "tokens": 6273
+    }
+  },
   "runsAgreed": 0,
   "sources": {
-    "docs": [
-      "docs/claude/APPS.md",
-      "docs/claude/FRONTEND/THEME_LAYOUT.md"
-    ],
+    "docs": ["docs/claude/APPS.md", "docs/claude/FRONTEND/THEME_LAYOUT.md"],
     "docUnits": [
       "doc:docs/claude/APPS.md#white-label-mode",
       "doc:docs/claude/FRONTEND/THEME_LAYOUT.md#layout-system",
