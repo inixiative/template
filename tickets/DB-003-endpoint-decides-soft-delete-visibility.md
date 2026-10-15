@@ -82,7 +82,7 @@ the extension's implementation and stay as that — they lose every other caller
   run inside the bypass unchanged.
 - **Batch actions run under `db.withDeleted`** so a find-then-create collides with a tombstone
   instead of duplicating it. They don't necessarily revive it. A read inside one that must stay
-  live uses `db.withSoftDeleteScope` (backported here) rather than a hand-written `deletedAt: null`.
+  live uses `db.withoutDeleted` (backported here) rather than a hand-written `deletedAt: null`.
 - **Imports never revive.** A sync that meets a removed or banned record skips it. Bringing one
   back is a manual, superadmin act, and the audit log keeps the history.
 - **`SOFT_DELETE_MODELS`** (backported) is the set of models with `deletedAt`, exported for other
