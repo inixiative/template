@@ -5,6 +5,7 @@
 ## Contents
 
 - [What this is for](#what-this-is-for)
+- [Two documents per region](#two-documents-per-region)
 - [The row: Problem, Use, Read, Signs](#the-row-problem-use-read-signs)
   - [Problem is the job in plain words](#problem-is-the-job-in-plain-words)
   - [Use is the exact thing](#use-is-the-exact-thing)
@@ -16,6 +17,8 @@
 - [Errors, two-sided](#errors-two-sided)
 - [Migrations in progress](#migrations-in-progress)
 - [Under construction](#under-construction)
+- [When this is not your domain](#when-this-is-not-your-domain)
+- [When the Warden misses its own moments](#when-the-warden-misses-its-own-moments)
 - [What not to write](#what-not-to-write)
 - [How the region builder uses this](#how-the-region-builder-uses-this)
 
@@ -30,6 +33,22 @@ Foundry's Wardens read our docs. At each moment of a coding agent's work (the us
 The pointer fails in a specific way when docs are written only for people who already know the names. The agent says "two jobs keep writing the same row"; the doc says `db.findForUpdate`. The Warden finds the area but not the thing. Aron (2026-10-15): "We should have broad language in the docs and good examples of function class names, function names, and systems, in whatever format the agent needs them, in order to make this task tenable."
 
 This doc is the language guidance for writing **domain knowledge**: the parts of `docs/claude/*` that name a primitive, pattern, rule or system and say when to use it. The conventions for doc structure (TOC, stubs, alignment review) stay in [DOCUMENTATION.md](DOCUMENTATION.md); this doc is about the words. The region builder (`.foundry/regions/`) follows these rules when it assembles Warden knowledge from the docs and the code catalog; a doc written this way needs no translation.
+
+---
+
+## Two documents per region
+
+Recognising a moment and picking the thing are different tasks, run by different models, so each region is rendered as **two documents from one source**; nothing is hand-copied between them.
+
+| Document | Reader | Size | Holds |
+|---|---|---|---|
+| `recognise.md` | the yes/no classifier (a small, fast model) | 1–4k tokens | the concept in plain words, what the region exists for (the job lines), how people say its problems (the Problem column and *Said as* lines, deduplicated), and *When this is not your domain*. **No identifiers, no tables.** |
+| `knowledge.md` | the namer (a larger model, asked only once the moment is recognised) | up to 20k tokens | parts 1–2 as its header, then the Problem \| Use \| Read \| Signs tables, the sibling tables, the identifier lines and the doc sections in full |
+
+A doc written in the shape below feeds both: its Problem cells and phrasings become `recognise.md`, its rows and sections become `knowledge.md`. Write the plain-language half as if the reader has never seen the code; write the exact half as if the reader will grep it.
+
+- Good: a region whose `recognise.md` says "two jobs keep writing the same row" and whose `knowledge.md` row says `**db.findForUpdate** · primitive packages/db/src/client.ts`.
+- Bad: a `recognise.md` that lists `createLock`, `claimLane`, `createSerializedQueue`: a classifier that does not know the names learns nothing from them.
 
 ---
 
@@ -166,6 +185,32 @@ Only in-progress, in-review and designed work goes here, plus roadmap items an a
 
 ---
 
+## When this is not your domain
+
+A region that fires on moments nobody owns is as costly as one that misses its own. Each region names three to five moments that **mention its words but belong elsewhere**, with the region that answers, phrased for a yes/no classifier:
+
+| Sounds like this region | Belongs to |
+|---|---|
+| A lazily created client for an external service (`client ??= new …`) | adapters-integrations |
+| Who is recorded as the actor on a write made by a job | audit-soft-delete |
+| Returning the related rows an inquiry's sender needs in one call | inquiry-routes-ui |
+
+- Good: taken from the region's real false positives (the eval's wrong-yes moments, mapped to their owner), so the examples are the confusions that actually happen.
+- Bad: `anything not about the database` (names no moment and no owner; the classifier cannot use it).
+
+Where the doc's own boundary says "X is the Y region", that sentence is already a negative example; write it as a moment, not as a list of identifiers.
+
+---
+
+## When the Warden misses its own moments
+
+When a region does not recognise the moments it owns, the fix is in the plain-language half, not in more identifiers. Rewrite the region's concept, purpose and phrasings in the asker's words, sourced from the corrections that pointed at it, until a reader who does not know the names would still say "that is about this".
+
+- Good: test-harness went from recognising 0 of its 11 moments to 3 after its concept said "record the real provider once and replay it", "don't stub the API in tests, use cassettes", "move away from spying on global fetch" (Aron's words), instead of "VCR cassettes, `vcr.queue`, `vcr.capture`".
+- Bad: adding `createFactory`, `buildX` and `createX` to a region that already named them, when the moments say "seed a user for this test" and "why not use these factories".
+
+---
+
 ## What not to write
 
 Domain docs are read by a model with a fixed budget per region (about 20k tokens). Every line that is not a row, a rule or a boundary costs recall. Do not write:
@@ -185,4 +230,4 @@ Domain docs are read by a model with a fixed budget per region (about 20k tokens
 
 ## How the region builder uses this
 
-The Warden knowledge in `.foundry/regions/<region>/knowledge.md` is generated, never hand-edited. The builder reads `docs/claude/**`, the agent entrypoint (`CLAUDE.md`), `FEATURES.md` and the code catalog, cuts them into concept regions under the size ceiling, and renders each region as: what it covers, the domain, *Migrations in progress*, *Under construction*, then part 3 (every member as a Problem | Use | Read | Signs row, sibling tables per job with *Said as*, errors two-sided) and part 4 (the doc sections verbatim). A doc that follows this guide flows through unchanged: its rows become the Warden's rows, its phrasings become what the Warden matches on, its Read cells become the pointers it quotes. A doc that does not is the gap the Warden misses by.
+The Warden documents in `.foundry/regions/<region>/` (`recognise.md` and `knowledge.md`) are generated, never hand-edited. The builder reads `docs/claude/**`, the agent entrypoint (`CLAUDE.md`), `FEATURES.md` and the code catalog, cuts them into concept regions under the size ceiling, and renders each region twice: `recognise.md` (concept, purpose, how people say the problems, when it is not yours) and `knowledge.md` (what it covers, the domain, *Migrations in progress*, *Under construction*, then part 3 (every member as a Problem | Use | Read | Signs row, sibling tables per job with *Said as*, errors two-sided) and part 4, the doc sections verbatim). A doc that follows this guide flows through unchanged: its phrasings become `recognise.md`, its rows become the namer's rows, its Read cells become the pointers it quotes. A doc that does not is the gap the Warden misses by.
