@@ -107,11 +107,13 @@ The template depends on this package (root devDependency; tsconfig, biome.json a
 
 ## 3. Everything that exists here, by class
 
-Point at a class when that is as specific as the moment allows, or at a member. Where a class has siblings an agent could confuse, a table under the class header says which to use when. Each member: **name** `where`: choose this when … . Where the docs or code give material, a second line describes the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
+Point at a class when that is as specific as the moment allows, or at a member. Where a class has siblings an agent could confuse, a table under the class header says which to use when; its *Said as* line gives the plain words a user or agent uses for that job. Each member: **name** · kind `where` · the doc § that describes it (code members) or the code it is about (doc members): choose this when … . Quote the name and the where in a pointer ("look over here: createLock, packages/db/src/lock/createLock.ts, CONCURRENCY.md § Distributed Lock"). *Said as:* the ways a user or agent describes this job in a message or plan without knowing the name; match on these. *Signs you're bypassing it:* the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
 
 ### Class `lib-config`: The @inixiative/config package (README): shared toolchain, sync/check/scan and the release train
 
 **Job: keep a repo's toolchain in line and release ecosystem packages** (config check vs config sync vs config scan vs config train vs config ports) — @inixiative/config/README.md § CLI, § CI, § Release flow
+
+*Said as:* "is this repo on the shared typescript and biome versions", "how do I release this package", "bring the repo onto the new toolchain pins", "which of our repos have drifted", "what port should this service use locally", "I'll run npm publish from the package"
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -123,6 +125,8 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 **Job: choose a shared tsconfig preset** (tsconfig base vs node vs react) — @inixiative/config/README.md § Presets
 
+*Said as:* "which typescript config does this package extend", "this package needs node types", "this package has jsx", "I'll write a full tsconfig for the package"
+
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **@inixiative/config/tsconfig/base.json** | pure bun libraries | node types needed (tsconfig/node.json) or DOM/JSX (tsconfig/react.json) |
@@ -131,6 +135,8 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 **Job: choose a shared tsup or Biome preset** (tsup node vs react; biome base vs react) — @inixiative/config/README.md § Presets; catalog @inixiative/config/tsup
 
+*Said as:* "how do I set up the build for this package", "which lint config does this repo extend", "the ui package needs the extra lint rules", "I'll write a tsup config with format, dts and target", "I'll copy a biome config into the repo"
+
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **node** | tsup for node/server packages: node({ entry }) | React/UI packages (react) |
@@ -138,56 +144,96 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **@inixiative/config/biome/base.json** | every repo | React code alone: add the react.json overlay on top |
 | **@inixiative/config/biome/react.json** | overlay for React packages | non-React code (biome/base.json alone) |
 
-- **node** `@inixiative/config/tsup#node`: Node/server packages; React UI packages: react preset instead. Extend rather than writing per-package tsup config.
+- **node** · package `@inixiative/config/tsup#node` · in docs: @inixiative/config/README.md § Presets; @inixiative/config/README.md § CLI: Node/server packages; React UI packages: react preset instead. Extend rather than writing per-package tsup config.
+  - *Said as:* "the bundler preset for a server or library package", "build this package with the shared settings, just pass the entry", "I'll write a tsup config with format, dts, target and externals", "the non-ui build preset", "how do I set up the build for a backend package"
   - *Signs you're bypassing it:* a per-package tsup.config.ts spelling out format, dts, target and externals instead of `export default node({ entry })` (@inixiative/config/tsup#node (catalog); @inixiative/config/README.md#Presets)
-- **react** `@inixiative/config/tsup#react`: React/UI packages; non-UI packages: node preset instead.
+- **react** · package `@inixiative/config/tsup#react` · in docs: @inixiative/config/README.md § Presets; @inixiative/config/README.md § CLI: React/UI packages; non-UI packages: node preset instead.
+  - *Said as:* "the bundler preset for a component package", "build the ui package with the shared settings", "I'll hand-write the tsup config for the component library", "the build preset that handles jsx", "set up bundling for a package that ships components"
   - *Signs you're bypassing it:* a hand-written tsup config for a React/UI package instead of `export default react({ entry })` (@inixiative/config/tsup#react (catalog))
-- **Adopt config via extends stubs** `@inixiative/config/README.md#Presets`: adopt shared toolchain with tsconfig, biome, tsup stub files plus devDependency
-- **Consumer sync via review branch** `@inixiative/config/README.md#CLI`: land consumer ecosystem bumps through a reviewed branch, never publishing
-- **Release lanes in dependency order, config last** `@inixiative/config/README.md#Release flow`: use --lane=agentic to leave primitives untouched
-- **Workspace member publish** `@inixiative/config/README.md#CLI`: publish workspace packages with workspace: ranges rewritten to released versions
-- **@inixiative/config/biome/base.json** `@inixiative/config/biome/base.json`: every repo; add biome/react.json overlay for React code.
-- **@inixiative/config/biome/react.json** `@inixiative/config/biome/react.json`: React packages only; base.json alone elsewhere.
-- **@inixiative/config/lefthook/base.yml** `@inixiative/config/lefthook/base.yml`: run typecheck and biome on staged files at pre-commit
-- **@inixiative/config/tsconfig/base.json** `@inixiative/config/tsconfig/base.json`: bun libraries; node.json for node types, react.json for DOM/JSX packages.
-- **@inixiative/config/tsconfig/node.json** `@inixiative/config/tsconfig/node.json`: packages needing node types; base.json for pure bun, react.json for DOM/JSX.
-- **@inixiative/config/tsconfig/react.json** `@inixiative/config/tsconfig/react.json`: React/DOM packages; base.json or node.json otherwise.
-- **config check** `@inixiative/config/README.md#CLI`: read-only CI gate; use sync to apply fixes, scan for all checkouts
-- **config ports** `@inixiative/config/README.md#CLI`: print each project's assigned local ports from ports.json
-- **config scan** `@inixiative/config/README.md#CLI`: multi-repo audit; check for a single repo, train to actually release
-- **config sync** `@inixiative/config/README.md#CLI`: to fix drift locally; check only reports; refuses dirty tree without --force
+- **Adopt config via extends stubs** · pattern @inixiative/config/README.md § Presets · code: `typecheck`: adopt shared toolchain with tsconfig, biome, tsup stub files plus devDependency
+  - *Said as:* "bring a new repo onto the shared toolchain", "set up lint, typescript and build config for a fresh repo", "I'll copy the configs over from another repo", "three small files that extend the presets plus one dev dependency", "how does a repo adopt the shared config"
+- **Consumer sync via review branch** · pattern @inixiative/config/README.md § CLI · code: `typecheck`, `registry`: land consumer ecosystem bumps through a reviewed branch, never publishing
+  - *Said as:* "update template's ecosystem deps as a branch for review", "a consuming repo gets a PR, not a direct commit", "I'll push the dependency bump straight to main in the consumer", "the train opens a branch in each consumer instead of publishing it", "land the bump in an app repo through review"
+- **Release lanes in dependency order, config last** · pattern @inixiative/config/README.md § Release flow: use --lane=agentic to leave primitives untouched
+  - *Said as:* "release the primitives before the agentic packages", "publish in the order the packages depend on each other", "I'll publish foundry before the package it depends on", "the config package ships last so it records the new state", "release only the agentic side and leave the primitives alone"
+- **Workspace member publish** · pattern @inixiative/config/README.md § CLI · code: `typecheck`, `registry`: publish workspace packages with workspace: ranges rewritten to released versions
+  - *Said as:* "publish a package that lives inside a monorepo", "the workspace ranges need to become real versions when publishing", "I'll rewrite the workspace dependencies by hand before publishing", "pack the member so its sibling deps resolve to released versions", "publish one package out of a workspace"
+- **@inixiative/config/biome/base.json** · primitive @inixiative/config/biome/base.json: every repo; add biome/react.json overlay for React code.
+  - *Said as:* "the shared formatter and linter rules every repo extends", "I'll copy a biome config into this repo", "single quotes, line width 100, the usual rules", "the linter config a repo starts from", "extend the shared lint rules"
+- **@inixiative/config/biome/react.json** · primitive @inixiative/config/biome/react.json: React packages only; base.json alone elsewhere.
+  - *Said as:* "the extra lint rules for component code", "layer the ui lint rules on top of the base", "I'll turn on the hooks lint rules by hand", "the overlay for packages that render components"
+- **@inixiative/config/lefthook/base.yml** · primitive @inixiative/config/lefthook/base.yml: run typecheck and biome on staged files at pre-commit
+  - *Said as:* "run typecheck and lint on staged files before commit", "the shared pre-commit hooks", "I'll write a pre-commit hook script in the repo", "set up git hooks the same way as the other repos"
+- **@inixiative/config/tsconfig/base.json** · primitive @inixiative/config/tsconfig/base.json: bun libraries; node.json for node types, react.json for DOM/JSX packages.
+  - *Said as:* "the tsconfig for a plain bun library", "which typescript preset for a package with no dom and no node types", "I'll write a full tsconfig for this package", "extend the shared base typescript config"
+- **@inixiative/config/tsconfig/node.json** · primitive @inixiative/config/tsconfig/node.json: packages needing node types; base.json for pure bun, react.json for DOM/JSX.
+  - *Said as:* "this package needs node types", "the typescript preset for server packages", "I'll add the node types to the base config myself", "tsconfig for a package that uses fs or process"
+- **@inixiative/config/tsconfig/react.json** · primitive @inixiative/config/tsconfig/react.json: React/DOM packages; base.json or node.json otherwise.
+  - *Said as:* "the typescript preset for a package with jsx", "this package renders components and needs dom types", "I'll set jsx and dom lib in the package tsconfig", "tsconfig for the ui package"
+- **config check** · primitive @inixiative/config/README.md § CLI · code: `typecheck`, `registry`: read-only CI gate; use sync to apply fixes, scan for all checkouts
+  - *Said as:* "is this repo's toolchain in line with the shared pins", "fail CI if the typescript or biome version drifted", "verify without changing anything", "I'll compare the package versions against the shared list in a script", "the lockfile resolves an ecosystem package to the wrong version", "the read-only gate that reports drift"
+- **config ports** · primitive @inixiative/config/README.md § CLI · code: `typecheck`, `registry`: print each project's assigned local ports from ports.json
+  - *Said as:* "what ports does this project use locally", "which port is kingdom's postgres on", "I'll put the api on 3001 to avoid the clash", "look up the assigned local ports for a project", "the local port a service should listen on"
+- **config scan** · primitive @inixiative/config/README.md § CLI · code: `typecheck`, `registry`: multi-repo audit; check for a single repo, train to actually release
+  - *Said as:* "check every checkout on this machine at once", "which of our repos are behind on the toolchain", "audit all the clones under this folder for drift", "I'll loop over the repos and run the check in each", "report across the ecosystem without publishing anything"
+- **config sync** · primitive @inixiative/config/README.md § CLI · code: `typecheck`, `registry`: to fix drift locally; check only reports; refuses dirty tree without --force
+  - *Said as:* "bring this repo onto the shared toolchain versions", "apply the pinned versions and re-lock", "I'll bump typescript in package.json by hand to match", "pick up the new toolchain pins locally", "fix the drift the check reported"
   - *Signs you're bypassing it:* hand-editing package.json versions or preset files to match versions.json (@inixiative/config/README.md#CLI)
-- **config train** `@inixiative/config/README.md#CLI`: releasing ecosystem packages; scan only reports drift without publishing
+- **config train** · primitive @inixiative/config/README.md § CLI · code: `typecheck`, `registry`: releasing ecosystem packages; scan only reports drift without publishing
+  - *Said as:* "release the new version of this package to npm", "publish the primitives and bump every repo that depends on them", "I'll run npm publish from the package folder", "ship json-rules and then update its dependents one by one", "cut a release of the agentic packages", "how do I publish an ecosystem package"
   - *Signs you're bypassing it:* running `npm publish` or `bun publish` by hand for an @inixiative/* package, or bumping dependents one by one, instead of bumping the version and running train (@inixiative/config/README.md § Release flow ("A release is train"))
-- **inixiative-config check** `@inixiative/config/README.md#CI`: verify a repo's toolchain coherence and lockfile format
-- **inixiative-config sync** `@inixiative/config/README.md#Release flow`: downstream adoption of toolchain changes; publishing releases: train instead.
-- **inixiative-config train** `@inixiative/config/README.md#Release flow`: releasing packages; downstream toolchain pickup without release: sync instead.
-- **ports.json** `@inixiative/config/ports.json`: export collision-free local port assignments per project
-- **sync** `@inixiative/config/README.md#@inixiative/config`: to update pins; check to verify without writing.
-- **train --dry-run** `@inixiative/config/README.md`: print each planned release step without running any
-- **train --push** `@inixiative/config/README.md`: omit to only print the push commands.
-- **versions.json** `@inixiative/config/versions.json`: pin bun, toolchain, required packages, lane sets and consumer repos
-- **@types/bun required with TS 6** `@inixiative/config/README.md#versions.json (the BOM)`: all repos on TypeScript 6.0
-- **CLI vs Renovate division** `@inixiative/config/README.md`: dependency updates in any lib repo
-- **Commands reject foreign flags** `@inixiative/config/README.md`: every inixiative-config command
-- **Ecosystem deps at blessed versions** `@inixiative/config/README.md#CLI`: Root and workspace members of either lane; workspace:/file:/link: exempt.
+- **inixiative-config check** · primitive @inixiative/config/README.md § CI: verify a repo's toolchain coherence and lockfile format
+  - *Said as:* "the CI step that verifies the toolchain is coherent", "is the lockfile in the right format and committed", "I'll add a script that greps package.json for the versions"
+- **inixiative-config sync** · primitive @inixiative/config/README.md § Release flow: downstream adoption of toolchain changes; publishing releases: train instead.
+  - *Said as:* "the downstream repo picks up the toolchain change", "update the pins here without releasing anything", "I'll edit the versions in each repo manually"
+- **inixiative-config train** · primitive @inixiative/config/README.md § Release flow: releasing packages; downstream toolchain pickup without release: sync instead.
+  - *Said as:* "the release command for ecosystem packages", "publish and cascade the bump through the dependents", "I'll publish with npm and bump the dependents myself"
+- **ports.json** · primitive @inixiative/config/ports.json: export collision-free local port assignments per project
+  - *Said as:* "the registry of local ports per project", "where the port assignments are recorded", "add the new project's port block to the registry", "I'll hardcode the ports in the compose file", "the file that keeps projects from colliding on ports"
+- **sync** · primitive @inixiative/config/README.md § (preface) › @inixiative/config: to update pins; check to verify without writing.
+  - *Said as:* "update the pins in this repo", "write the blessed versions into package.json and re-lock", "I'll change the version numbers by hand", "apply, as opposed to just verify"
+- **train --dry-run** · primitive @inixiative/config/README.md: print each planned release step without running any
+  - *Said as:* "show me what the release would do without doing it", "preview the publish plan", "I'll just run the release and see what happens", "print each release step and run none of them"
+- **train --push** · primitive @inixiative/config/README.md: omit to only print the push commands.
+  - *Said as:* "actually push the release commits and open the PRs", "the train committed but nothing went to origin", "I'll push the repos by hand after the release", "push every repo the release touched"
+- **versions.json** · primitive @inixiative/config/versions.json: pin bun, toolchain, required packages, lane sets and consumer repos
+  - *Said as:* "where the blessed versions live", "the bill of materials for the ecosystem", "which version of typescript are we all on", "I'll keep a list of package versions in the readme", "the one file that names the toolchain pins and lanes"
+- **@types/bun required with TS 6** · rule @inixiative/config/README.md § versions.json (the BOM): all repos on TypeScript 6.0
+  - *Said as:* "typescript stopped finding bun's types", "add the bun types package, typescript 6 no longer auto-includes them", "I'll add a types reference in each file"
+- **CLI vs Renovate division** · rule @inixiative/config/README.md: dependency updates in any lib repo
+  - *Said as:* "who bumps this dependency, the bot or the tool", "the bot must not touch typescript or biome", "I'll let the dependency bot bump the toolchain", "the bot owns ordinary deps, the tool owns the toolchain"
+- **Commands reject foreign flags** · rule @inixiative/config/README.md: every inixiative-config command
+  - *Said as:* "it exited with a usage error on my flag", "a misspelled flag fails before anything runs", "I'll pass the push flag to the sync command"
+- **Ecosystem deps at blessed versions** · rule @inixiative/config/README.md § CLI · code: `typecheck`, `registry`: Root and workspace members of either lane; workspace:/file:/link: exempt.
+  - *Said as:* "every repo depends on the same version of our packages", "I'll bump json-rules to the newest in just this repo", "the declared range has to admit the blessed version", "a stale lockfile resolving an old version of our package", "workspace and file links are exempt from the version check"
   - *Signs you're bypassing it:* an @inixiative/* dependency bumped to a version other than the one versions.json blesses (@inixiative/config/README.md#CLI)
-- **Frozen lockfile installs in CI** `@inixiative/config/README.md#CI`: all lib repo CI
+- **Frozen lockfile installs in CI** · rule @inixiative/config/README.md § CI: all lib repo CI
+  - *Said as:* "CI must install exactly what the lockfile says", "I'll run plain install in the CI job", "the lockfile drifted during the CI install"
   - *Signs you're bypassing it:* a CI job running plain `bun install` (lockfile can drift) before checks (@inixiative/config/README.md § CI)
-- **Lanes cascade one way** `@inixiative/config/README.md#versions.json (the BOM)`: publishing or depending across @inixiative lanes
-- **Lib repos use the shared CI caller** `@inixiative/config/README.md#CI`: every lib repo
+- **Lanes cascade one way** · rule @inixiative/config/README.md § versions.json (the BOM): publishing or depending across @inixiative lanes
+  - *Said as:* "the agentic packages build on the primitives, never the reverse", "I'll have a primitive depend on an agentic package", "primitives ship first, then what depends on them", "which lane does this package belong to"
+- **Lib repos use the shared CI caller** · rule @inixiative/config/README.md § CI: every lib repo
+  - *Said as:* "a library repo's CI should be two lines", "I'll write a full workflow installing bun and running checks", "reuse the shared CI workflow instead of copying it", "set up CI for a new library repo"
   - *Signs you're bypassing it:* a lib repo with its own full CI workflow installing bun, deps and running checks, instead of the two-line caller of inixiative/config/.github/workflows/lib-ci.yml (@inixiative/config/README.md § CI)
-- **Port block allocation** `@inixiative/config/README.md#CLI`: Adding a project or service needing local ports.
+- **Port block allocation** · rule @inixiative/config/README.md § CLI · code: `typecheck`, `registry`: Adding a project or service needing local ports.
+  - *Said as:* "pick a port for the new service", "I'll use 5433 for the second postgres", "give the new project its own block of ports", "avoid a default port so nothing collides with another project", "the service default plus a hundred times the project number"
   - *Signs you're bypassing it:* hard-coded or hand-picked local ports (5433, 3001, 8001) in compose, env examples or scripts (@inixiative/config/README.md#CLI (ports.json registry))
-- **Repos held to union of lanes** `@inixiative/config/README.md#versions.json (the BOM)`: repos mixing primitives and agentic packages
-- **Required repo scaffolding** `@inixiative/config/README.md#CLI`: Every ecosystem repo.
-- **Run check in CI** `@inixiative/config/README.md#CLI`: CI pipelines of ecosystem repos.
-- **Scope ignoreDeprecations to dts build** `@inixiative/config/tsup`: tsup builds under TypeScript 6.0
-- **Stubs hold only extends and reviewed overrides** `@inixiative/config/README.md#Presets`: every repo adopting @inixiative/config
+- **Repos held to union of lanes** · rule @inixiative/config/README.md § versions.json (the BOM): repos mixing primitives and agentic packages
+  - *Said as:* "a repo that uses both primitives and agentic packages", "which blessed set applies to a mixed repo", "I'll check this repo against one lane only"
+- **Required repo scaffolding** · rule @inixiative/config/README.md § CLI · code: `typecheck`, `registry`: Every ecosystem repo.
+  - *Said as:* "what every ecosystem repo must have", "the required scripts, hooks and stubs for a repo", "I'll skip the test script in this small package", "the repo is missing a committed lockfile"
+- **Run check in CI** · rule @inixiative/config/README.md § CLI · code: `typecheck`, `registry`: CI pipelines of ecosystem repos.
+  - *Said as:* "add the toolchain drift check to the pipeline", "I'll trust local checks and skip it in CI", "every ecosystem repo's CI runs the check"
+- **Scope ignoreDeprecations to dts build** · rule @inixiative/config/tsup: tsup builds under TypeScript 6.0
+  - *Said as:* "the types build fails on a deprecation under typescript 6", "I'll set ignore deprecations in the whole tsconfig", "silence the baseUrl deprecation only where the declarations build"
+- **Stubs hold only extends and reviewed overrides** · rule @inixiative/config/README.md § Presets · code: `typecheck`: every repo adopting @inixiative/config
+  - *Said as:* "the repo's lint config is a full copy with local edits", "I'll copy the preset into the repo and tweak it", "config files extend the preset and add almost nothing", "don't let the local config drift from the shared one"
   - *Signs you're bypassing it:* a repo's biome.json or tsconfig copied wholesale from the preset with drifted local edits (@inixiative/config/README.md#Presets)
-- **Toolchain pins at root only** `@inixiative/config/README.md#CLI`: Any repo in the ecosystem declaring toolchain dependencies.
+- **Toolchain pins at root only** · rule @inixiative/config/README.md § CLI · code: `typecheck`, `registry`: Any repo in the ecosystem declaring toolchain dependencies.
+  - *Said as:* "typescript is declared in a workspace package", "I'll add biome to this package's dev dependencies", "declare the toolchain once at the root, exact versions", "two copies of typescript in the lockfile"
   - *Signs you're bypassing it:* typescript, @biomejs/biome or @types/bun declared in a workspace package.json (@inixiative/config/README.md#CLI)
-- **Train ships default branch from origin** `@inixiative/config/README.md#CLI`: Releasing via train.
+- **Train ships default branch from origin** · rule @inixiative/config/README.md § CLI · code: `typecheck`, `registry`: Releasing via train.
+  - *Said as:* "I'll publish from my feature branch", "the release only ships what is on main at origin", "my checkout is behind origin so the release skipped it", "never publish a package from a branch"
   - *Signs you're bypassing it:* publishing a package from a feature branch or a checkout behind origin (@inixiative/config/README.md § CLI (train only ships the default branch))
 
 ## 4. The specifics, in full

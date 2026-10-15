@@ -115,15 +115,17 @@ Two front ends share one set of tasks. The interactive Ink TUI (`bun run init`, 
 
 The transition, from the code: init is being cut over from the TUI to headless section runs, and the cut-over is not finished. `init:agent` covers project, infisical, planetscale, railway and monitoring (monitoring runs only when selected, not in the full flow). Vercel, Resend, Cloudflare Pages, Railway buckets, Railway Postgres, bouncer and launch are still TUI-only. Aron: "they're supposed to be cut over; not all built yet; this will eventually do that." When adding or changing a provider step, keep the task function TUI-free and driven by config, progress flags and Infisical, so the headless runner can call it. INIT_SCRIPT_PATTERNS.md describes only the TUI today; a Direction section for it is coming in a doc PR, and this region will be rebuilt from it. Two names drift between the doc and the code: the doc's `isProgressComplete` is `isComplete` in `init/utils/progressTracking.ts`, and its `getSecret` / `setSecret` are `getSecretAsync` / `setSecretAsync` (`init/tasks/infisicalSetup.ts`) over `infisicalApi.getSecret`.
 
-Resume and idempotency are the core: one progress flag per externally verifiable provider fact, each step guarded by its flag, secrets re-fetched from Infisical and metadata re-read from config rather than passed between steps, create calls that return the existing resource on 'already exists' (catch-error, check-then-create, or both), `retryWithTimeout` with specific not-ready conditions for async provisioning, `execAsync` instead of `execSync`, Railway CLI for reads and GraphQL for mutations, and `{project}-{env}-{app}` resource names built from the config. Provider tasks are tested with bun:test resume tests that queue VCR cassettes on each init/api client (`bun run test:init`). Related regions: `dx-setup` owns `bun run setup`, local Docker and worktrees, and `environments-deploy` owns env files, with-env and CI/deploy after launch; `encryption` owns Infisical as the secret store and the encryption keyrings that the Infisical section seeds for prod and staging; `testing` owns the shared VCR primitive (`@template/shared/vcr`); `observability-lifecycle` owns what the monitoring section's OTEL settings mean.
+Resume and idempotency are the core: one progress flag per externally verifiable provider fact, each step guarded by its flag, secrets re-fetched from Infisical and metadata re-read from config rather than passed between steps, create calls that return the existing resource on 'already exists' (catch-error, check-then-create, or both), `retryWithTimeout` with specific not-ready conditions for async provisioning, `execAsync` instead of `execSync`, Railway CLI for reads and GraphQL for mutations, and `{project}-{env}-{app}` resource names built from the config. Provider tasks are tested with bun:test resume tests that queue VCR cassettes on each init/api client (`bun run test:init`). Related regions: `dx-setup` owns `bun run setup`, local Docker and worktrees, and `environments-deploy` owns env files, with-env and CI/deploy after launch; `encryption` owns Infisical as the secret store and the encryption keyrings that the Infisical section seeds for prod and staging; `test-harness / test-factories-rules` owns the shared VCR primitive (`@template/shared/vcr`); `observability-lifecycle` owns what the monitoring section's OTEL settings mean.
 
 ## 3. Everything that exists here, by class
 
-Point at a class when that is as specific as the moment allows, or at a member. Where a class has siblings an agent could confuse, a table under the class header says which to use when. Each member: **name** `where`: choose this when … . Where the docs or code give material, a second line describes the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
+Point at a class when that is as specific as the moment allows, or at a member. Where a class has siblings an agent could confuse, a table under the class header says which to use when; its *Said as* line gives the plain words a user or agent uses for that job. Each member: **name** · kind `where` · the doc § that describes it (code members) or the code it is about (doc members): choose this when … . Quote the name and the where in a pointer ("look over here: createLock, packages/db/src/lock/createLock.ts, CONCURRENCY.md § Distributed Lock"). *Said as:* the ways a user or agent describes this job in a message or plan without knowing the name; match on these. *Signs you're bypassing it:* the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
 
 ### Class `init-script`: The init provisioning TUI (Ink): resumable idempotent tasks, Infisical/Railway/PlanetScale provisioning
 
 **Job: read project config or secrets in the init script** (getProjectConfig vs useConfig vs ConfigProvider vs getSecret) — docs/claude/INIT_SCRIPT_PATTERNS.md § 1, § 3, § 8, § Creating a New Task View
+
+*Said as:* "where do I read the project config in init", "get the current config inside a view or a task", "fetch the password or connection string for this step", "the config I read is stale", "how does config reach the task"
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -135,6 +137,8 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 **Job: make an init step safe to rerun** (Idempotent calls vs progress flags; createRailwayConnection vs ensureRailwayConnection) — docs/claude/INIT_SCRIPT_PATTERNS.md § 13
 
+*Said as:* "running setup again shouldn't break", "resume where setup left off", "it already exists, don't fail", "mark the step done so a rerun skips it", "a second run recreates things"
+
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **Idempotent provider setup calls** | creates, config updates, secret storage | deletes or renames (Atomic progress flags) |
@@ -145,6 +149,8 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 **Job: call provider CLIs or APIs from init and wait for readiness** (retryWithTimeout vs execAsync vs Railway CLI/GraphQL) — docs/claude/INIT_SCRIPT_PATTERNS.md § 9, § 10, § 11
 
+*Said as:* "wait until the database is provisioned", "shell out to the provider cli", "which call creates the service", "retry until it's ready"
+
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **retryWithTimeout** | waiting on DB, branch or role provisioning; retry not-ready errors only | 400/401/403/404/422 (never retry) |
@@ -152,6 +158,8 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **Railway CLI for reads, GraphQL for mutations** | CLI for simple reads, GraphQL API for creates and updates | shelling out to create resources or a token for read-only listing |
 
 **Job: track init setup progress and UI state** (Derived setupState vs viewState vs execution flags) — docs/claude/INIT_SCRIPT_PATTERNS.md § 4, § 16
+
+*Said as:* "which screen is showing versus is it running", "is setup new, stale or complete", "the status flashes on mount", "how do I name the loading flag"
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -161,99 +169,168 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 **Job: test init provider workflows without real calls** (Bun-native resume tests with VCR vs api.vcr.queue) — docs/claude/INIT_SCRIPT_PATTERNS.md § 17
 
+*Said as:* "test the provisioning without real calls", "replay recorded provider responses", "test that resume works after a partial run", "don't hit the live provider in tests"
+
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **Bun-native resume tests with VCR** | provider workflows in init tasks | pure helpers (unit test directly) |
 | **api.vcr.queue** | replaying cassettes for init/api clients that own a vcr | cloudflare and resend (mock.module) |
 
-- **Bun-native resume tests with VCR** `init/tasks/tests/*Resume.test.ts`: Provider workflows in init tasks; unit test pure helpers directly instead.
+- **Bun-native resume tests with VCR** · pattern init/tasks/tests/*Resume.test.ts: Provider workflows in init tasks; unit test pure helpers directly instead.
+  - *Said as:* "test the provider workflow without hitting the real API", "test that a half-finished setup resumes correctly", "I'll mock fetch for the provider calls in the test", "record the provider responses once and replay them"
   - *Signs you're bypassing it:* Vitest, live provider calls, or hand-written fetch mocks in init tests instead of queued VCR cassettes (docs/claude/INIT_SCRIPT_PATTERNS.md § 17. Bun-Native Resume Tests with VCR Fixtures)
-- **Cache-bust dynamic config imports** `init/utils/getProjectConfig.ts`: get fresh module contents on repeated dynamic imports of a .ts config
-- **Clean status lists** `docs/claude/INIT_SCRIPT_PATTERNS.md > Clean Status Lists`: Init task progress display instead of streaming logs; resumable from config progress.
-- **Idempotent provider setup calls** `createRailwayConnection, createRailwaySync — docs/claude/INIT_SCRIPT_PATTERNS.md §13`: Creates, config updates, secret storage; destructive ops (deletes, renames) use progress flags instead.
-- **Init config state flow** `docs/claude/INIT_SCRIPT_PATTERNS.md > Architecture Overview`: Updating init TUI state; derive view labels instead of storing grouped state.
-- **Init file layout** `docs/claude/INIT_SCRIPT_PATTERNS.md — File Structure`: Adding a new init setup task; mirror InfisicalSetupView/infisicalSetup as reference.
-- **Init script task view** `docs/claude/INIT_SCRIPT_PATTERNS.md#Creating a New Task View`: add a TUI setup task as view, task function, and app wiring
-- **Interactive prompt for missing required input** `docs/claude/INIT_SCRIPT_PATTERNS.md — 15. Interactive User Prompts for Required Input`: Manual tokens or credentials or user decisions during setup, instead of failing with an error that requires a retry.
+- **Cache-bust dynamic config imports** · pattern init/utils/getProjectConfig.ts: get fresh module contents on repeated dynamic imports of a .ts config
+  - *Said as:* "repeated import keeps giving the old config", "force a fresh module load on each import", "add a cache-busting query to the dynamic import"
+- **Clean status lists** · pattern docs/claude/INIT_SCRIPT_PATTERNS.md > Clean Status Lists: Init task progress display instead of streaming logs; resumable from config progress.
+  - *Said as:* "show every step with a tick instead of streaming logs", "the setup screen should list the steps and their status", "I'll print progress lines as the task runs"
+- **Idempotent provider setup calls** · pattern createRailwayConnection, createRailwaySync — docs/claude/INIT_SCRIPT_PATTERNS.md §13: Creates, config updates, secret storage; destructive ops (deletes, renames) use progress flags instead.
+  - *Said as:* "running the create twice should not fail", "make the setup call safe to run again", "if the resource already exists, just use it", "I'll guard the create with a did-it-already flag only"
+- **Init config state flow** · pattern docs/claude/INIT_SCRIPT_PATTERNS.md > Architecture Overview: Updating init TUI state; derive view labels instead of storing grouped state.
+  - *Said as:* "how config changes flow into the init screens", "derive the labels from config instead of storing grouped state", "I'll keep a separate state object for the step groups"
+- **Init file layout** · pattern docs/claude/INIT_SCRIPT_PATTERNS.md — File Structure: Adding a new init setup task; mirror InfisicalSetupView/infisicalSetup as reference.
+  - *Said as:* "where does a new provider setup go in init", "add a new provider: which files do I create", "mirror the existing provider setup as the reference"
+- **Init script task view** · pattern docs/claude/INIT_SCRIPT_PATTERNS.md § Creating a New Task View: add a TUI setup task as view, task function, and app wiring
+  - *Said as:* "add a new setup task to the TUI", "a new screen for provisioning another provider", "wire the view, task function and app together"
+- **Interactive prompt for missing required input** · pattern docs/claude/INIT_SCRIPT_PATTERNS.md — 15. Interactive User Prompts for Required Input: Manual tokens or credentials or user decisions during setup, instead of failing with an error that requires a retry.
+  - *Said as:* "if the user needs to do something, prompt them and wait", "ask for the token in the UI instead of failing", "I'll throw an error telling them to create the token and rerun", "we always want to prompt the github connection"
   - *Signs you're bypassing it:* a task that throws 'missing token, create one and rerun' instead of a token-input view that stores it in Infisical (docs/claude/INIT_SCRIPT_PATTERNS.md § 15. Interactive User Prompts for Required Input)
-- **Railway CLI for reads, GraphQL for mutations** `docs/claude/INIT_SCRIPT_PATTERNS.md#11`: Simple Railway reads: CLI; mutations: GraphQL API.
+- **Railway CLI for reads, GraphQL for mutations** · pattern docs/claude/INIT_SCRIPT_PATTERNS.md § 11: Simple Railway reads: CLI; mutations: GraphQL API.
+  - *Said as:* "list from the CLI, create through the API", "which Railway call do I use to create a service", "I'll shell out to the CLI to create the resource", "I need an API token just to list workspaces"
   - *Signs you're bypassing it:* managing a Railway API token for read-only workspace listing, or shelling out to the CLI to create resources (docs/claude/INIT_SCRIPT_PATTERNS.md § 11. Railway CLI vs GraphQL API)
-- **Retry async provisioning with specific conditions** `docs/claude/INIT_SCRIPT_PATTERNS.md#9`: Database, branch, role creation or state transitions; 3-5s delays, ~5min DB timeouts; don't retry auth, validation, 404 or 409.
-- **Token input loading-state sequencing** `handleTokenSubmit — docs/claude/INIT_SCRIPT_PATTERNS.md §12`: prevent blank screens and UI jumps while storing tokens and advancing setup steps
-- **api.vcr.queue** `init/api/* clients (except cloudflare, resend)`: Init provider clients that own a vcr; mock.module for cloudflare and resend boundaries.
-- **checkPrerequisites** `init/utils/checkPrerequisites.ts`: verify required CLIs and sessions before running tasks
-- **ConfigProvider** `init/utils/configState.tsx`: Init TUI config state: wrap app once instead of drilling config props or reading the file per view.
-- **createRailwayConnection** `createRailwayConnection`: Catch-error idempotency; ensureRailwayConnection when checking first via list.
+- **Retry async provisioning with specific conditions** · pattern docs/claude/INIT_SCRIPT_PATTERNS.md § 9: Database, branch, role creation or state transitions; 3-5s delays, ~5min DB timeouts; don't retry auth, validation, 404 or 409.
+  - *Said as:* "wait for the database to come up before continuing", "retry only on not-ready, with delays and a cap", "I'll retry every error until it works"
+- **Token input loading-state sequencing** · pattern handleTokenSubmit — docs/claude/INIT_SCRIPT_PATTERNS.md §12: prevent blank screens and UI jumps while storing tokens and advancing setup steps
+  - *Said as:* "show a loading indicator after they paste the token so it doesn't look hung", "the screen goes blank after pressing enter", "I'll switch views first and set loading after"
+- **api.vcr.queue** · primitive init/api/* clients (except cloudflare, resend): Init provider clients that own a vcr; mock.module for cloudflare and resend boundaries.
+  - *Said as:* "queue the canned responses for the provider client", "replay recorded provider responses in this test", "I'll stub the client method directly in the test", "feed the cassette into the client before the step runs"
+- **checkPrerequisites** · primitive init/utils/checkPrerequisites.ts: verify required CLIs and sessions before running tasks
+  - *Said as:* "check the CLIs are installed and logged in before starting", "add docker to the prereqs, both installed and running", "fail early if a required tool is missing"
+- **ConfigProvider** · primitive init/utils/configState.tsx: Init TUI config state: wrap app once instead of drilling config props or reading the file per view.
+  - *Said as:* "hold the init config in one place for every screen", "wrap the whole app once with the config state", "I'll read the config file in each view separately", "one root config state instead of prop drilling"
+- **createRailwayConnection** · primitive createRailwayConnection: Catch-error idempotency; ensureRailwayConnection when checking first via list.
+  - *Said as:* "catch the already-exists error and return the existing one", "there's no way to list them, so try the create and handle duplicate", "the create throws when it already exists", "I'll let the create fail on a duplicate and ask for a rerun"
   - *Signs you're bypassing it:* a provider create call that throws on 'already exists' instead of finding and returning the existing resource (docs/claude/INIT_SCRIPT_PATTERNS.md § 13. Atomic Progress Flags + Idempotent API Calls)
-- **createRailwaySync** `createRailwaySync`: create an Infisical-to-Railway secret sync, skipping if it already exists
-- **detectSetupState** `docs/claude/INIT_SCRIPT_PATTERNS.md — 16. State Management Standards / SetupState`: compute new, stale, incomplete or complete setup status from config
-- **ensureRailwayConnection** `ensureRailwayConnection`: When an efficient list endpoint exists; createRailwayConnection catch-error when none; combine both for races.
-- **execAsync** `init/api/ (docs/claude/INIT_SCRIPT_PATTERNS.md#10)`: Always over execSync in init code.
+- **createRailwaySync** · primitive createRailwaySync: create an Infisical-to-Railway secret sync, skipping if it already exists
+  - *Said as:* "wire the secrets to sync into the deploy service", "connect the secret store to the hosting service, skip if already wired", "I'll create the sync and ignore a duplicate error"
+- **detectSetupState** · primitive docs/claude/INIT_SCRIPT_PATTERNS.md — 16. State Management Standards / SetupState: compute new, stale, incomplete or complete setup status from config
+  - *Said as:* "figure out whether setup is fresh, stale or finished", "work out how far setup got from the saved config", "I'll compare each flag by hand to decide the status"
+- **ensureRailwayConnection** · primitive ensureRailwayConnection: When an efficient list endpoint exists; createRailwayConnection catch-error when none; combine both for races.
+  - *Said as:* "check if it exists first, then create it", "list the existing ones before creating", "look it up and only create when missing", "find or create the connection"
+- **execAsync** · primitive init/api/ (docs/claude/INIT_SCRIPT_PATTERNS.md § 10): Always over execSync in init code.
+  - *Said as:* "run the CLI without freezing the spinner", "shell out to the provider CLI from init", "I'll call the CLI synchronously and wait", "the spinner stops while the command runs"
   - *Signs you're bypassing it:* `execSync(...)` in init/api/ clients, freezing spinners (docs/claude/INIT_SCRIPT_PATTERNS.md § 10. Async Exec for Smooth Animations)
-- **getProjectConfig** `init/utils/getProjectConfig.ts`: Reading project config in init: use instead of a plain import(), which returns stale cached data.
+- **getProjectConfig** · primitive init/utils/getProjectConfig.ts: Reading project config in init: use instead of a plain import(), which returns stale cached data.
+  - *Said as:* "read the project config fresh, not the cached import", "re-read the config file after a step changed it", "the config import keeps returning stale values", "I'll just import the config file again to re-read it"
   - *Signs you're bypassing it:* a plain `await import('project.config.ts')` that returns stale cached config on repeat reads (docs/claude/INIT_SCRIPT_PATTERNS.md § 3. Cache Busting on Imports)
-- **getSecret** `init script (docs/claude/INIT_SCRIPT_PATTERNS.md#8)`: Secrets in init steps; non-secret metadata: getProjectConfig instead.
+- **getSecret** · primitive init script (docs/claude/INIT_SCRIPT_PATTERNS.md § 8): Secrets in init steps; non-secret metadata: getProjectConfig instead.
+  - *Said as:* "pull the password from the secret store each step", "never trust a connection string passed from the last step", "fetch the token from Infisical when the step needs it", "I'll pass the database password from step one into step two", "always pull from infisical in steps with passwords"
   - *Signs you're bypassing it:* passing a connection string, password or API key from one init step to the next instead of re-fetching it from Infisical (docs/claude/INIT_SCRIPT_PATTERNS.md § 8 (in code: getSecretAsync in init/tasks/infisicalSetup.ts))
-- **isProgressComplete** `init script (docs/claude/INIT_SCRIPT_PATTERNS.md#8)`: check whether a named init step already finished, enabling resume
-- **listRailwayConnections** `listRailwayConnections`: list Infisical Railway app connections in a project to find existing ones
-- **markComplete** `docs/claude/INIT_SCRIPT_PATTERNS.md > Manual Sync Triggers`: record a setup step as done in project config progress
-- **markComplete / isComplete** `init/utils/progressTracking.ts`: record and check per-step progress flags for resumable setup
-- **OrgSelector** `docs/claude/INIT_SCRIPT_PATTERNS.md — Selector onCancel`: let the user pick an organization or workspace from a provider during setup
-- **prompt** `init/utils/prompts.ts`: compose keyboard hint text from commands in consistent order
+- **isProgressComplete** · primitive init script (docs/claude/INIT_SCRIPT_PATTERNS.md § 8): check whether a named init step already finished, enabling resume
+  - *Said as:* "check whether this step already finished", "skip the step if it's already done", "resume where setup left off", "I'll re-run every step and rely on idempotency"
+- **listRailwayConnections** · primitive listRailwayConnections: list Infisical Railway app connections in a project to find existing ones
+  - *Said as:* "fetch the existing connections for this project", "see what's already connected in the project", "find an existing connection by name"
+- **markComplete** · primitive docs/claude/INIT_SCRIPT_PATTERNS.md > Manual Sync Triggers: record a setup step as done in project config progress
+  - *Said as:* "record that this step is done", "mark the step done so a rerun skips it", "write the progress flag after the remote write succeeds", "I'll write a done marker into the config myself"
+- **markComplete / isComplete** · primitive init/utils/progressTracking.ts: record and check per-step progress flags for resumable setup
+  - *Said as:* "record that this setup step finished", "check whether the step already ran before doing it again", "resume setup from where it stopped", "skip steps that are already done on rerun", "I'll track finished steps in a local variable"
+- **OrgSelector** · primitive docs/claude/INIT_SCRIPT_PATTERNS.md — Selector onCancel: let the user pick an organization or workspace from a provider during setup
+  - *Said as:* "let the user pick a workspace or organization", "a picker for the provider's orgs", "I'll build a select list for the workspaces"
+- **prompt** · primitive init/utils/prompts.ts: compose keyboard hint text from commands in consistent order
+  - *Said as:* "you choose a set of commands and it composes them in the same order every time", "we have a helper for this stuff", "compose the keyboard hint line from the available commands", "I'll write the press-enter-to-continue text by hand"
   - *Signs you're bypassing it:* hardcoded keyboard hint strings like "Press Enter to continue, Esc to cancel" in an init view (docs/claude/INIT_SCRIPT_PATTERNS.md § 5. Composable Prompts)
-- **prompts** `init/utils/prompts.ts`: compose interactive prompts for init views
-- **retryWithTimeout** `utils/retry.ts`: Waiting on async cloud provisioning in init; retry only specific not-ready errors, never 400/401/403/404/422.
+- **prompts** · primitive init/utils/prompts.ts: compose interactive prompts for init views
+  - *Said as:* "the helper for interactive prompt text in init views", "a general way of listing commands", "build the hint line for a view"
+- **retryWithTimeout** · primitive utils/retry.ts: Waiting on async cloud provisioning in init; retry only specific not-ready errors, never 400/401/403/404/422.
+  - *Said as:* "wait until the database is actually ready", "keep polling until provisioning finishes, then give up after a while", "retry only the not-ready errors, never a 401 or 404", "I'll write a while loop with a sleep around the call", "the branch isn't ready yet, retry a few times"
   - *Throws:* retryWithTimeout timeout Error (`off-request-path`)
   - *Signs you're bypassing it:* a hand-written for/while loop with setTimeout around a provider call, or retrying every error including 401/403/404 (docs/claude/INIT_SCRIPT_PATTERNS.md § 9. Retry Logic for Async Initialization)
-- **setSecret** `docs/claude/INIT_SCRIPT_PATTERNS.md §12`: store a credential in Infisical under a project environment path
-- **syncConfig** `init/utils/configState.tsx`: Use after task steps instead of polling or intervals.
+- **setSecret** · primitive docs/claude/INIT_SCRIPT_PATTERNS.md §12: store a credential in Infisical under a project environment path
+  - *Said as:* "store the token in the secret store under the right environment", "make sure to upload to infisical", "save the credential for later steps to fetch"
+- **syncConfig** · primitive init/utils/configState.tsx: Use after task steps instead of polling or intervals.
+  - *Said as:* "re-read the config after a step finishes", "a sync which just triggers a re-read", "I'll poll the config file on an interval"
   - *Signs you're bypassing it:* setInterval polling of the project config file to refresh init views (docs/claude/INIT_SCRIPT_PATTERNS.md § 2. Manual Sync Triggers (No Polling))
-- **useConfig** `init/utils/configState.tsx`: read current project config and a re-sync callback inside init views
-- **Atomic progress flags** `docs/claude/INIT_SCRIPT_PATTERNS.md §13`: Any resumable init/setup step that writes to a remote provider.
+- **useConfig** · primitive init/utils/configState.tsx: read current project config and a re-sync callback inside init views
+  - *Said as:* "a view needs the current config and a way to re-sync", "read config inside an init screen", "get the config hook in a view instead of passing props", "I'll pass config down to each view as a prop"
+- **Atomic progress flags** · rule docs/claude/INIT_SCRIPT_PATTERNS.md §13: Any resumable init/setup step that writes to a remote provider.
+  - *Said as:* "one done flag per remote write", "just a boolean of each step", "don't mark the step complete until it actually succeeded", "I'll set one flag after the whole section finishes", "it failed and still got marked as complete"
   - *Signs you're bypassing it:* one umbrella progress flag such as 'configureEverything' or 'createPasswords' marked after several remote writes (docs/claude/INIT_SCRIPT_PATTERNS.md § 13. Atomic Progress Flags + Idempotent API Calls › Rules)
-- **Cache-bust config imports** `docs/claude/INIT_SCRIPT_PATTERNS.md#Key Takeaways`: Init script config reads.
-- **CLI vs GraphQL API split** `docs/claude/INIT_SCRIPT_PATTERNS.md — When to use each`: Any init script call to the hosting provider.
-- **Derive view state with useMemo** `docs/claude/INIT_SCRIPT_PATTERNS.md > Derived State with useMemo`: Any init view state computable from config, avoiding mount flicker.
-- **Derived setupState** `docs/claude/INIT_SCRIPT_PATTERNS.md — 16. State Management Standards / SetupState`: Business setup status ('new' | 'stale' | 'incomplete' | 'complete'); use viewState for screens.
+- **Cache-bust config imports** · rule docs/claude/INIT_SCRIPT_PATTERNS.md § Key Takeaways · code: `User`: Init script config reads.
+  - *Said as:* "the config read returns stale data", "every config read must get the fresh file", "I'll import the config module normally"
+- **CLI vs GraphQL API split** · rule docs/claude/INIT_SCRIPT_PATTERNS.md — When to use each: Any init script call to the hosting provider.
+  - *Said as:* "which should I use, the CLI or the API", "reads through the CLI, writes through the API", "I'll create the service with a CLI command"
+- **Derive view state with useMemo** · rule docs/claude/INIT_SCRIPT_PATTERNS.md > Derived State with useMemo: Any init view state computable from config, avoiding mount flicker.
+  - *Said as:* "compute the view state from config, don't store it", "the view flickers to the wrong state on mount", "I'll set it in an effect after loading"
+- **Derived setupState** · rule docs/claude/INIT_SCRIPT_PATTERNS.md — 16. State Management Standards / SetupState: Business setup status ('new' | 'stale' | 'incomplete' | 'complete'); use viewState for screens.
+  - *Said as:* "is the setup new, stale, partly done or complete", "compute the setup status from config instead of storing it", "I'll set the status in an effect after reading config", "the status flashes wrong on mount"
   - *Signs you're bypassing it:* useState + useEffect that sets setupState from config, causing a flash on mount (docs/claude/INIT_SCRIPT_PATTERNS.md § 4. Derived State with useMemo; § 16 SetupState)
-- **Escape cancels when idle** `docs/claude/INIT_SCRIPT_PATTERNS.md#1. Create View Component`: Init script task views.
-- **Execution flag naming** `docs/claude/INIT_SCRIPT_PATTERNS.md — 16. State Management Standards / Boolean Flags`: Any async or execution status in setup views; screen changes belong in viewState instead.
-- **Fetch from source of truth** `docs/claude/INIT_SCRIPT_PATTERNS.md#Key Takeaways`: Init script reads of secrets or project metadata.
-- **Fetch from source when resuming** `docs/claude/INIT_SCRIPT_PATTERNS.md > Always Fetch from Source, Never Trust Props`: Resuming any init step that depends on earlier secrets or config.
+- **Escape cancels when idle** · rule docs/claude/INIT_SCRIPT_PATTERNS.md § Creating a New Task View › 1. Create View Component: Init script task views.
+  - *Said as:* "escape should back out when nothing is running", "let the user cancel with escape", "I'll ignore escape in this view"
+- **Execution flag naming** · rule docs/claude/INIT_SCRIPT_PATTERNS.md — 16. State Management Standards / Boolean Flags: Any async or execution status in setup views; screen changes belong in viewState instead.
+  - *Said as:* "a boolean for whether the step is running", "track loading while something async happens", "I'll add a loading value to the screen state instead of a flag", "name the busy flag by what it's doing"
+- **Fetch from source of truth** · rule docs/claude/INIT_SCRIPT_PATTERNS.md § Key Takeaways · code: `User`: Init script reads of secrets or project metadata.
+  - *Said as:* "read it from where it actually lives, not a copy", "re-fetch the secret or config rather than trusting a value in memory", "I'll keep the connection string in a variable for later steps"
+- **Fetch from source when resuming** · rule docs/claude/INIT_SCRIPT_PATTERNS.md > Always Fetch from Source, Never Trust Props: Resuming any init step that depends on earlier secrets or config.
+  - *Said as:* "on resume the earlier step's values are gone", "a later step reads what the earlier step set, which is undefined on resume", "re-fetch from the store when picking up where we left off"
   - *Signs you're bypassing it:* a later step reading a connection string or password from a variable set by an earlier step (undefined on resume) (docs/claude/INIT_SCRIPT_PATTERNS.md § 8. Always Fetch from Source, Never Trust Props)
-- **Init source of truth** `docs/claude/INIT_SCRIPT_PATTERNS.md > Current implementation notes`: Any change to infrastructure provisioning init flow.
-- **Init task tests with VCR** `docs/claude/INIT_SCRIPT_PATTERNS.md > Current implementation notes`: Testing init tasks that call external providers.
-- **Init testing guidance** `docs/claude/INIT_SCRIPT_PATTERNS.md — Testing guidance`: Any test for init scripts; Vitest is not used.
-- **Launch preflight gate** `docs/claude/INIT_SCRIPT_PATTERNS.md > Current implementation notes`: Launching a provisioned project.
-- **Manual config sync, no polling** `docs/claude/INIT_SCRIPT_PATTERNS.md > Manual Sync Triggers`: Every init setup task that advances step progress.
-- **Manual sync, not polling** `docs/claude/INIT_SCRIPT_PATTERNS.md#Key Takeaways`: Init script views reflecting task progress.
-- **Mask sensitive setup inputs** `docs/claude/INIT_SCRIPT_PATTERNS.md — 15. Interactive User Prompts for Required Input`: Any init-script input that collects a token, password or credential.
+- **Init source of truth** · rule docs/claude/INIT_SCRIPT_PATTERNS.md > Current implementation notes: Any change to infrastructure provisioning init flow.
+  - *Said as:* "which doc describes how init works", "where the provisioning flow is specified", "changing the init flow, what do I read first"
+- **Init task tests with VCR** · rule docs/claude/INIT_SCRIPT_PATTERNS.md > Current implementation notes: Testing init tasks that call external providers.
+  - *Said as:* "how do we test init tasks that call providers", "test a provisioning task with recorded responses", "I'll hit the real provider in the test"
+- **Init testing guidance** · rule docs/claude/INIT_SCRIPT_PATTERNS.md — Testing guidance: Any test for init scripts; Vitest is not used.
+  - *Said as:* "what test runner do init tests use", "I'll write the init tests with vitest", "how should init scripts be tested"
+- **Launch preflight gate** · rule docs/claude/INIT_SCRIPT_PATTERNS.md > Current implementation notes: Launching a provisioned project.
+  - *Said as:* "check everything is provisioned before launching", "the launch step should verify first and set the flag", "I'll launch without checking the earlier sections finished"
+- **Manual config sync, no polling** · rule docs/claude/INIT_SCRIPT_PATTERNS.md > Manual Sync Triggers: Every init setup task that advances step progress.
+  - *Said as:* "refresh the view when the step completes, not on a timer", "I'll poll the config every second", "trigger a re-read after each step"
+- **Manual sync, not polling** · rule docs/claude/INIT_SCRIPT_PATTERNS.md § Key Takeaways · code: `User`: Init script views reflecting task progress.
+  - *Said as:* "the view should update when the task tells it", "no interval watching the config file", "call the sync after the step instead of polling"
+- **Mask sensitive setup inputs** · rule docs/claude/INIT_SCRIPT_PATTERNS.md — 15. Interactive User Prompts for Required Input: Any init-script input that collects a token, password or credential.
+  - *Said as:* "hide the token as they type it", "the password shows in plain text in the terminal", "mask the input field for credentials"
   - *Signs you're bypassing it:* a TextInput collecting a token or password without mask="*" (docs/claude/INIT_SCRIPT_PATTERNS.md § 15 › Key points)
-- **Never hardcode prompt text** `init/utils/prompts.ts`: Any keyboard instruction text shown in an init TUI view.
-- **No async IIFE in handlers** `docs/claude/INIT_SCRIPT_PATTERNS.md — Animation/Loading State Pattern`: Any init UI event handler doing async work.
+- **Never hardcode prompt text** · rule init/utils/prompts.ts: Any keyboard instruction text shown in an init TUI view.
+  - *Said as:* "don't hand-write the press enter text", "the keyboard hint strings are hardcoded in the view", "compose the hint instead of a literal string"
+- **No async IIFE in handlers** · rule docs/claude/INIT_SCRIPT_PATTERNS.md — Animation/Loading State Pattern: Any init UI event handler doing async work.
+  - *Said as:* "I'll wrap the handler body in an async arrow and call it", "async work in an event handler", "don't inline an immediately-invoked async in the handler"
   - *Signs you're bypassing it:* `(async () => { ... })()` inside an init view event handler (docs/claude/INIT_SCRIPT_PATTERNS.md § 16 › Animation/Loading State Pattern)
-- **No console logs in tasks** `docs/claude/INIT_SCRIPT_PATTERNS.md#Key Takeaways`: Every init script task function.
-- **No console.log in init tasks** `docs/claude/INIT_SCRIPT_PATTERNS.md > Suppress Console Logs in Tasks`: All task files run under the init TUI, e.g. infisicalSetup.ts.
+- **No console logs in tasks** · rule docs/claude/INIT_SCRIPT_PATTERNS.md § Key Takeaways · code: `User`: Every init script task function.
+  - *Said as:* "we don't need those console logs", "the task prints and garbles the screen", "no logging to stdout from a task"
+- **No console.log in init tasks** · rule docs/claude/INIT_SCRIPT_PATTERNS.md > Suppress Console Logs in Tasks: All task files run under the init TUI, e.g. infisicalSetup.ts.
+  - *Said as:* "the output is garbled during init", "I'll add a console log to see what's happening in the task", "logging from a task breaks the terminal UI"
   - *Signs you're bypassing it:* console.log / console.error in init/tasks/*.ts under the TUI, garbling Ink output (docs/claude/INIT_SCRIPT_PATTERNS.md § 7. Suppress Console Logs in Tasks)
-- **No execSync in init** `init/api/`: All CLI calls (pscale, railway, infisical) in init scripts so spinners keep animating.
-- **No hardcoded resource names** `init/tasks/*Setup.ts`: Any init setup task creating provider resources.
-- **No setTimeout before loading state** `docs/claude/INIT_SCRIPT_PATTERNS.md — Animation/Loading State Pattern`: Init views where animations fail to show; use the onStepComplete delay instead.
-- **OrgSelector requires onCancel** `OrgSelector — docs/claude/INIT_SCRIPT_PATTERNS.md §14`: Every OrgSelector usage in init script UIs.
+- **No execSync in init** · rule init/api/: All CLI calls (pscale, railway, infisical) in init scripts so spinners keep animating.
+  - *Said as:* "the spinner freezes while the command runs", "I'll run the CLI synchronously", "use the async exec for CLI calls"
+- **No hardcoded resource names** · rule init/tasks/*Setup.ts: Any init setup task creating provider resources.
+  - *Said as:* "build the service name from the project and environment", "I'll name the service template-api directly", "resource names come from the config"
+- **No setTimeout before loading state** · rule docs/claude/INIT_SCRIPT_PATTERNS.md — Animation/Loading State Pattern: Init views where animations fail to show; use the onStepComplete delay instead.
+  - *Said as:* "I'll add a small delay so the spinner shows", "the animation never shows before the step runs", "set loading first, don't sleep"
+- **OrgSelector requires onCancel** · rule OrgSelector — docs/claude/INIT_SCRIPT_PATTERNS.md §14: Every OrgSelector usage in init script UIs.
+  - *Said as:* "the picker needs a way to back out", "I'll make cancel optional on the selector", "every selector must take a cancel handler"
   - *Signs you're bypassing it:* `onCancel?: () => void` on a selector, or an OrgSelector rendered without onCancel (docs/claude/INIT_SCRIPT_PATTERNS.md § 14. OrgSelector Always Requires onCancel)
-- **Railway resource naming** `init/tasks/*Setup.ts`: All Railway services, volumes, syncs, buckets; Vercel omits env, PlanetScale uses {project}-{env}-init.
+- **Railway resource naming** · rule init/tasks/*Setup.ts: All Railway services, volumes, syncs, buckets; Vercel omits env, PlanetScale uses {project}-{env}-init.
+  - *Said as:* "what do I name the service, volume or bucket", "project dash env dash app order", "I'll hardcode the bucket name"
   - *Signs you're bypassing it:* a hardcoded service, volume, sync or bucket name, or one not in {project}-{env}-{app} order (docs/claude/INIT_SCRIPT_PATTERNS.md § Resource Naming)
-- **Re-read state between init steps** `docs/claude/INIT_SCRIPT_PATTERNS.md#8`: Every resumable init step guarded by isProgressComplete; never pass connection strings, passwords or API keys between steps.
-- **Required onCancel on selector views** `docs/claude/INIT_SCRIPT_PATTERNS.md — Selector onCancel`: Every init-script selection view such as OrgSelector.
-- **Retry async provisioning** `docs/claude/INIT_SCRIPT_PATTERNS.md#Key Takeaways`: Init script tasks calling cloud provider APIs.
-- **running=false before selectors** `docs/claude/INIT_SCRIPT_PATTERNS.md §12 Key rules`: Whenever transitioning to a selector such as workspace-select.
+- **Re-read state between init steps** · rule docs/claude/INIT_SCRIPT_PATTERNS.md § 8: Every resumable init step guarded by isProgressComplete; never pass connection strings, passwords or API keys between steps.
+  - *Said as:* "each step re-reads what it needs instead of trusting earlier steps", "guard the step with its flag and fetch inputs fresh", "I'll carry the password in a local variable across steps"
+- **Required onCancel on selector views** · rule docs/claude/INIT_SCRIPT_PATTERNS.md — Selector onCancel: Every init-script selection view such as OrgSelector.
+  - *Said as:* "selection screens need a cancel path", "the org picker can't be dismissed", "I'll leave off cancel on this picker"
+- **Retry async provisioning** · rule docs/claude/INIT_SCRIPT_PATTERNS.md § Key Takeaways · code: `User`: Init script tasks calling cloud provider APIs.
+  - *Said as:* "wait for the cloud resource to become ready", "retry provisioning until it's up", "I'll call it once and fail if not ready"
+- **running=false before selectors** · rule docs/claude/INIT_SCRIPT_PATTERNS.md §12 Key rules: Whenever transitioning to a selector such as workspace-select.
+  - *Said as:* "the picker shows a spinner instead of the list", "stop the running state before showing the selector", "I'll switch to the selector while still running"
   - *Signs you're bypassing it:* switching viewState to a selector while running is still true, so the selector shows a spinner (docs/claude/INIT_SCRIPT_PATTERNS.md § 12. Token Input Flow › Key rules)
-- **Set loading state before async work** `docs/claude/INIT_SCRIPT_PATTERNS.md — Animation/Loading State Pattern`: Every init view handler that triggers async setup work.
-- **Set loading state before changing view** `docs/claude/INIT_SCRIPT_PATTERNS.md §12 Key rules`: Every view transition in init script Ink UIs.
-- **Show all steps upfront** `docs/claude/INIT_SCRIPT_PATTERNS.md#Key Takeaways`: Init script task views.
-- **Tasks receive config as parameter** `docs/claude/INIT_SCRIPT_PATTERNS.md#2. Create Task Function`: Every init script task function.
+- **Set loading state before async work** · rule docs/claude/INIT_SCRIPT_PATTERNS.md — Animation/Loading State Pattern: Every init view handler that triggers async setup work.
+  - *Said as:* "flip loading on before kicking off the step", "I'll start the async work and set loading after", "the UI doesn't show progress until the work ends"
+- **Set loading state before changing view** · rule docs/claude/INIT_SCRIPT_PATTERNS.md §12 Key rules: Every view transition in init script Ink UIs.
+  - *Said as:* "set loading, then change the screen", "the screen jumps blank between views", "I'll change the view and then set loading"
+- **Show all steps upfront** · rule docs/claude/INIT_SCRIPT_PATTERNS.md § Key Takeaways · code: `User`: Init script task views.
+  - *Said as:* "list every step before any of them runs", "the user should see all the steps with their status", "I'll add steps to the list as they complete"
+- **Tasks receive config as parameter** · rule docs/claude/INIT_SCRIPT_PATTERNS.md § Creating a New Task View › 2. Create Task Function: Every init script task function.
+  - *Said as:* "the task should get config from the view, not load it", "I'll have the task read the config file itself", "pass config into the setup function", "task functions take config as an argument"
   - *Signs you're bypassing it:* a task function that calls getProjectConfig() itself instead of taking config from the view (docs/claude/INIT_SCRIPT_PATTERNS.md § Creating a New Task View › 2. Create Task Function)
-- **View reflects persisted state** `docs/claude/INIT_SCRIPT_PATTERNS.md §13 Rules`: Designing init script status views.
-- **viewState naming for UI navigation** `docs/claude/INIT_SCRIPT_PATTERNS.md — 16. State Management Standards / ViewState`: Every setup view; never name it state and never put running or loading values in it.
+- **View reflects persisted state** · rule docs/claude/INIT_SCRIPT_PATTERNS.md §13 Rules: Designing init script status views.
+  - *Said as:* "the screen should show what's saved, not what's in memory", "status comes from the persisted flags", "I'll track done steps in component state"
+- **viewState naming for UI navigation** · rule docs/claude/INIT_SCRIPT_PATTERNS.md — 16. State Management Standards / ViewState: Every setup view; never name it state and never put running or loading values in it.
+  - *Said as:* "which screen is showing right now", "track the current screen of the TUI", "I'll put running inside the screen state enum", "name the screen state, not a generic state"
   - *Signs you're bypassing it:* `const [state, setState]` for screens, or 'running' / 'loading' / 'executing' values inside ViewState alongside a running boolean (docs/claude/INIT_SCRIPT_PATTERNS.md § 16. State Management Standards › ViewState)
 
 ## 4. The specifics, in full

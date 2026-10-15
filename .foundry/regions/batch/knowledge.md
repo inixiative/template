@@ -86,15 +86,17 @@ POST /api/v1/batch/execute takes { strategy, requests: rounds[][], headers? }. R
 
 Pick the strategy by failure semantics: transactionAll when everything must commit or roll back together; transactionPerRound when each round is atomic and earlier rounds may stay committed; allowFailures to attempt everything with each request committing on its own; failOnRound to stop after the first round with a failure, without rollback. Each strategy is a StrategyExecutor listed in BatchExecutionStrategies (constants.ts), which also derives the type and zod enum. Internally, registerBatch puts the db and the caller's base context in an in-memory registry; prepareRequest sees X-Batch-Id, skips re-authentication and deep-clones the mutable context (user, organizationUsers, spaces, token, …) into each sub-request with a fresh permix. readAsCaller and readAllAsCaller reuse that machinery to read one API path, or every page of a list (through fetchAllPages, capped), with the caller's session, permissions, tenancy and rate-limit exemption; Flows read their steps this way. The registry is in memory, so it does not span several server instances.
 
-Related regions: the per-request context that sub-requests clone and the general 200-vs-4xx status rules are `request-context-errors`; the endpoints being batched are `api-routes-schemas`; fetchAllPages and list pagination are `filtering-pagination`; Flows, the main in-process user of readAllAsCaller, are `flows`; db.txn and the transaction client are `database`; bounded in-process concurrency (resolveAll) is `concurrency-locks`.
+Related regions: the per-request context that sub-requests clone and the general 200-vs-4xx status rules are `request-context-errors`; the endpoints being batched are `api-routes / api-schemas-openapi`; fetchAllPages and list pagination are `filtering-search / pagination`; Flows, the main in-process user of readAllAsCaller, are `flows`; db.txn and the transaction client are `database-client / data-modeling`; bounded in-process concurrency (resolveAll) is `concurrency-locks`.
 
 ## 3. Everything that exists here, by class
 
-Point at a class when that is as specific as the moment allows, or at a member. Where a class has siblings an agent could confuse, a table under the class header says which to use when. Each member: **name** `where`: choose this when … . Where the docs or code give material, a second line describes the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
+Point at a class when that is as specific as the moment allows, or at a member. Where a class has siblings an agent could confuse, a table under the class header says which to use when; its *Said as* line gives the plain words a user or agent uses for that job. Each member: **name** · kind `where` · the doc § that describes it (code members) or the code it is about (doc members): choose this when … . Quote the name and the where in a pointer ("look over here: createLock, packages/db/src/lock/createLock.ts, CONCURRENCY.md § Distributed Lock"). *Said as:* the ways a user or agent describes this job in a message or plan without knowing the name; match on these. *Signs you're bypassing it:* the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
 
 ### Class `batch`: Batch API: rounds, execution strategies, interpolation, status tracking
 
 **Job: choose how a batch of API requests commits or fails** (transactionAll vs transactionPerRound vs allowFailures vs failOnRound) — docs/claude/BATCH.md § Execution Strategies, § Status Tracking
+
+*Said as:* "should the whole batch roll back if one fails", "all or nothing, or keep going", "stop at the first failure but keep earlier results", "which execution strategy"
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -105,6 +107,8 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 **Job: run many API requests, or read API lists, as the caller in one go** (Batch entry points: POST /api/v1/batch/execute vs executeBatch vs executeRequest vs registerBatch vs readAsCaller vs readAllAsCaller) — docs/claude/BATCH.md § Overview, § Implementation Patterns; docs/claude/FLOWS.md § Lifecycle; catalog
 
+*Said as:* "run several API calls in one request", "read the API as the current user from the server", "fetch every page of a list internally", "feed the first result's id into the second call"
+
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **POST /api/v1/batch/execute** | a client running many API requests in ordered rounds in one call | a bespoke bulk endpoint or client-side request chaining |
@@ -113,46 +117,75 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **registerBatch** | low-level batch setup in a strategy; pair with unregisterBatch | caller-scoped reads (readAsCaller / readAllAsCaller) |
 | **readAsCaller** | server-side read of one API path as the caller | a paginated list (readAllAsCaller) |
 | **readAllAsCaller** | every page of a list endpoint as the caller, capped (walks fetchAllPages) | a single record (readAsCaller) |
-| **fetchAllPages (filtering-pagination)** | collecting every page from any page-fetching function | reading an API list as the caller in-process (readAllAsCaller) |
 
-- **allowFailures** `apps/api/src/modules/batch/services/strategies/allowFailures.ts#allowFailures`: Partial success fine; stop at first failed round with failOnRound; all-or-nothing with transactionAll or transactionPerRound.
-- **executeBatch** `apps/api/src/modules/batch/services/executor.ts#executeBatch`: Entry point for whole batches; for one sub-request use executeRequest, for caller-scoped reads readAsCaller/readAllAsCaller.
-- **executeRequest** `apps/api/src/modules/batch/services/strategies/executeRequest.ts#executeRequest`: Low-level single dispatch; callers wanting caller-scoped reads should use readAsCaller.
-- **failOnRound** `apps/api/src/modules/batch/services/strategies/failOnRound.ts#failOnRound`: Halt on failure without rollback; continue regardless with allowFailures; rollback needs transactionAll or transactionPerRound.
-- **readAllAsCaller** `apps/api/src/modules/batch/services/readAllAsCaller.ts#readAllAsCaller`: List reads across pages; single record use readAsCaller. Both keep caller's session, permissions, tenancy and rate-limit exemption.
+- **allowFailures** · primitive `apps/api/src/modules/batch/services/strategies/allowFailures.ts#allowFailures` · in docs: docs/claude/BATCH.md § Basic Usage; docs/claude/BATCH.md § Execution Strategies: Partial success fine; stop at first failed round with failOnRound; all-or-nothing with transactionAll or transactionPerRound.
+  - *Said as:* "try every request, failures don't stop the rest", "bulk operation where each commits on its own", "I'll loop and catch per item so one failure doesn't abort", "partial success is fine"
+- **executeBatch** · primitive `apps/api/src/modules/batch/services/executor.ts#executeBatch`: Entry point for whole batches; for one sub-request use executeRequest, for caller-scoped reads readAsCaller/readAllAsCaller.
+  - *Said as:* "run the whole batch under its strategy", "the entry point for a batch", "I'll loop the rounds myself in the controller", "dispatch all rounds and build the summary"
+- **executeRequest** · primitive `apps/api/src/modules/batch/services/strategies/executeRequest.ts#executeRequest` · in docs: docs/claude/FLOWS.md § Lifecycle: Low-level single dispatch; callers wanting caller-scoped reads should use readAsCaller.
+  - *Said as:* "dispatch one sub-request inside a strategy", "the low-level single call", "I'll fetch the API's own URL from inside the server"
+- **failOnRound** · primitive `apps/api/src/modules/batch/services/strategies/failOnRound.ts#failOnRound` · in docs: docs/claude/BATCH.md § Execution Strategies; docs/claude/BATCH.md § Status Tracking: Halt on failure without rollback; continue regardless with allowFailures; rollback needs transactionAll or transactionPerRound.
+  - *Said as:* "stop at the first round that fails, keep what already happened", "later steps depend on the earlier ones succeeding", "no rollback, just stop", "I'll break out of the loop on the first error"
+- **readAllAsCaller** · primitive `apps/api/src/modules/batch/services/readAllAsCaller.ts#readAllAsCaller` · in docs: docs/claude/FLOWS.md § Registry; docs/claude/FLOWS.md § Lifecycle: List reads across pages; single record use readAsCaller. Both keep caller's session, permissions, tenancy and rate-limit exemption.
+  - *Said as:* "fetch every page of a list as the current user", "I'll loop calling the list endpoint until has-more is false", "walk all pages server-side with the caller's permissions", "read the whole list in-process, capped"
   - *Signs you're bypassing it:* a hand-written page loop calling a list endpoint until hasMore is false (catalog readAllAsCaller)
-- **readAsCaller** `apps/api/src/modules/batch/services/readAsCaller.ts#readAsCaller`: Single reads; paginated lists use readAllAsCaller.
+- **readAsCaller** · primitive `apps/api/src/modules/batch/services/readAsCaller.ts#readAsCaller` · in docs: docs/claude/FLOWS.md § Lifecycle: Single reads; paginated lists use readAllAsCaller.
+  - *Said as:* "read an API path server-side as the current user", "I'll fetch our own URL with the cookies forwarded", "call the endpoint internally with the caller's session and tenancy", "reuse the route's own validation and permissions from inside"
   - *Signs you're bypassing it:* fetch() to the API's own URL with forwarded cookies/Authorization, or app.request with copied headers, to read data as the current user (catalog readAsCaller ("with the caller's session, permissions and tenancy"))
-- **registerBatch** `apps/api/src/modules/batch/services/batchRegistry.ts#registerBatch`: Low-level batch setup; for caller-scoped reads prefer readAllAsCaller / readAsCaller. Pair with unregisterBatch.
-- **transactionAll** `apps/api/src/modules/batch/services/strategies/transactionAll.ts#transactionAll`: All-or-nothing batch; per-round atomicity use transactionPerRound; no rollback use allowFailures or failOnRound.
-- **transactionPerRound** `apps/api/src/modules/batch/services/strategies/transactionPerRound.ts#transactionPerRound`: Pick when each round must commit or roll back atomically; use sequential or parallel strategies when rounds need no transaction.
-- **apps/api/src/modules/batch** `apps/api/src/modules/batch`: execute a batch of API requests in one call
-- **Batch API with result interpolation** `FEATURES.md > Unique Selling Points`: run multiple API operations atomically, feeding earlier results into later requests
-- **Batch context inheritance** `apps/api/src/middleware/prepareRequest.ts`: Internal batch sub-requests only; auth middleware in apps/api/src/middleware/auth skips when batch context exists.
-- **Batch request interpolation** `docs/claude/BATCH.md > Request Interpolation`: feed values from earlier round responses into later request path, body or headers
-- **Batch timeout calculation** `docs/claude/BATCH.md > Security > Timeout Calculation`: Transaction strategies enforce it over the whole batch; non-transaction strategies may exceed it.
-- **keyof typeof constants for enums** `apps/api/src/modules/batch/constants.ts`: Closed sets of named options with implementations; avoids hand-maintained union types and enum lists.
-- **Strategy implementation structure** `docs/claude/BATCH.md > Pattern: Strategy Implementation`: Adding a new batch strategy; also add it to BatchExecutionStrategies.
+- **registerBatch** · primitive `apps/api/src/modules/batch/services/batchRegistry.ts#registerBatch` · in docs: docs/claude/BATCH.md § Implementation Patterns; docs/claude/FLOWS.md § Lifecycle: Low-level batch setup; for caller-scoped reads prefer readAllAsCaller / readAsCaller. Pair with unregisterBatch.
+  - *Said as:* "low-level batch setup inside a strategy", "mark that sub-requests belong to this batch", "pair it with the unregister"
+- **transactionAll** · primitive `apps/api/src/modules/batch/services/strategies/transactionAll.ts#transactionAll` · in docs: docs/claude/BATCH.md § Execution Strategies; docs/claude/BATCH.md § Status Tracking: All-or-nothing batch; per-round atomicity use transactionPerRound; no rollback use allowFailures or failOnRound.
+  - *Said as:* "everything succeeds or everything rolls back", "all or nothing across the whole batch", "I'll wrap the loop in one transaction by hand", "no partial success possible"
+- **transactionPerRound** · primitive `apps/api/src/modules/batch/services/strategies/transactionPerRound.ts#transactionPerRound` · in docs: docs/claude/BATCH.md § Execution Strategies; docs/claude/BATCH.md § Status Tracking: Pick when each round must commit or roll back atomically; use sequential or parallel strategies when rounds need no transaction.
+  - *Said as:* "each round is atomic, earlier rounds stay committed", "roll back just the failing round", "I'll open a transaction per step", "atomic steps, not an atomic whole"
+- **apps/api/src/modules/batch** · system `apps/api/src/modules/batch`: execute a batch of API requests in one call
+  - *Said as:* "execute many API requests in one call", "where the batch endpoint lives", "I'll build a bulk endpoint for this"
+- **Batch API with result interpolation** · pattern FEATURES.md > Unique Selling Points: run multiple API operations atomically, feeding earlier results into later requests
+  - *Said as:* "create the parent, then use its id in the next request", "run several operations atomically feeding earlier results forward", "I'll have the client chain requests and thread the ids", "multiple API operations in one call"
+- **Batch context inheritance** · pattern apps/api/src/middleware/prepareRequest.ts: Internal batch sub-requests only; auth middleware in apps/api/src/middleware/auth skips when batch context exists.
+  - *Said as:* "sub-requests inherit the caller's auth without re-authenticating", "auth middleware skips when batch context exists", "I'll copy the headers onto each sub-request"
+- **Batch request interpolation** · pattern docs/claude/BATCH.md > Request Interpolation: feed values from earlier round responses into later request path, body or headers
+  - *Said as:* "reference a value from an earlier response in a later path or body", "feed round one's id into round two", "I'll substitute the ids in the client between calls", "placeholders resolved from previous results"
+- **Batch timeout calculation** · pattern docs/claude/BATCH.md > Security > Timeout Calculation: Transaction strategies enforce it over the whole batch; non-transaction strategies may exceed it.
+  - *Said as:* "how long can the whole batch take", "transaction strategies enforce the timeout over the batch", "scale the timeout with the record count"
+- **keyof typeof constants for enums** · pattern apps/api/src/modules/batch/constants.ts: Closed sets of named options with implementations; avoids hand-maintained union types and enum lists.
+  - *Said as:* "a closed set of named options with implementations", "I'll maintain a union type and a list of names by hand"
+- **Strategy implementation structure** · pattern docs/claude/BATCH.md > Pattern: Strategy Implementation: Adding a new batch strategy; also add it to BatchExecutionStrategies.
+  - *Said as:* "add a new execution strategy", "I'll add a strategy function but forget the registry", "the shape every strategy follows"
   - *Signs you're bypassing it:* a new batch strategy not added to BatchExecutionStrategies, or a hand-maintained strategy name union/enum (docs/claude/BATCH.md § Implementation Patterns)
-- **In-memory batch registry** `docs/claude/BATCH.md#Known Limitations`: Single-instance only; multi-instance deployments need a Redis-backed registry instead.
-- **POST /api/v1/batch/execute** `docs/claude/BATCH.md > Overview`: run many API requests in ordered rounds within one HTTP call
+- **In-memory batch registry** · primitive docs/claude/BATCH.md § Known Limitations · code: `registry`, `allowFailures`, `failOnRound`: Single-instance only; multi-instance deployments need a Redis-backed registry instead.
+  - *Said as:* "the batch registry only works on one instance", "multi-instance needs a redis-backed registry", "where in-flight batches are tracked"
+- **POST /api/v1/batch/execute** · primitive docs/claude/BATCH.md > Overview: run many API requests in ordered rounds within one HTTP call
+  - *Said as:* "run many API requests in ordered rounds in one call", "I'll build a bespoke bulk endpoint", "the client fires sequential requests and threads ids between them", "do these five writes in one round trip", "a multi-step operation as one HTTP call"
   - *Throws:* makeError 400 BAD_REQUEST (`bad-request`, request-context-errors); makeError 500 SERVER_ERROR (`server-error`, request-context-errors)
   - *Signs you're bypassing it:* a bespoke bulk/multi-step endpoint, or a client firing sequential requests and threading ids between them, where one batch call with rounds and interpolation would do (docs/claude/BATCH.md § Overview; FEATURES.md § API Architecture & Routing (Batch API))
-- **StrategyExecutor** `apps/api/src/modules/batch`: define the signature every batch strategy implements, returning BatchResult
-- **summary.status** `docs/claude/BATCH.md > Status Tracking`: Overall outcome; inspect per-request result.error for which requests failed.
-- **Batch always returns 200** `docs/claude/BATCH.md > HTTP Status Code Semantics`: All batch responses; only 400 for invalid/nested batches and 500 for unexpected server errors.
+- **StrategyExecutor** · primitive apps/api/src/modules/batch: define the signature every batch strategy implements, returning BatchResult
+  - *Said as:* "the signature every strategy implements", "what a strategy function returns"
+- **summary.status** · primitive docs/claude/BATCH.md > Status Tracking: Overall outcome; inspect per-request result.error for which requests failed.
+  - *Said as:* "did the batch succeed, partly succeed or fail", "which requests failed, look at each result's error", "the overall outcome field"
+- **Batch always returns 200** · rule docs/claude/BATCH.md > HTTP Status Code Semantics: All batch responses; only 400 for invalid/nested batches and 500 for unexpected server errors.
+  - *Said as:* "I'll return 207 for partial failure", "the batch call itself succeeded even if items failed", "status lives in the payload, not the HTTP code"
   - *Signs you're bypassing it:* a batch or bulk endpoint answering 207/4xx for partial failure instead of 200 with summary.status (docs/claude/BATCH.md § Status Tracking › HTTP Status Code Semantics; docs/claude/API_ROUTES.md § Complex Operations & HTTP Status)
-- **Batch operations return 200 with payload status** `docs/claude/API_ROUTES.md#Batch Operations`: Batch, bulk, multi-step ops; use 4xx/5xx for validation, auth, security and single-resource failures.
+- **Batch operations return 200 with payload status** · rule docs/claude/API_ROUTES.md § Complex Operations & HTTP Status › Batch Operations: Batch, bulk, multi-step ops; use 4xx/5xx for validation, auth, security and single-resource failures.
+  - *Said as:* "bulk and multi-step endpoints answer 200 with a status field", "I'll return a 4xx when some items fail"
   - *Signs you're bypassing it:* a batch or bulk endpoint answering 207/4xx for partial failure instead of 200 with summary.status (docs/claude/API_ROUTES.md § Complex Operations & HTTP Status)
-- **Batch rounds run sequentially** `docs/claude/BATCH.md#Known Limitations`: Any batch using interpolation between requests.
-- **Batch size limits** `docs/claude/BATCH.md > Security > Limits`: Every batch request.
-- **Deep clone mutable batch context** `apps/api/src/middleware/prepareRequest.ts`: When injecting batch context into sub-requests; share only read-only values like app.
+- **Batch rounds run sequentially** · rule docs/claude/BATCH.md § Known Limitations · code: `registry`, `allowFailures`, `failOnRound`: Any batch using interpolation between requests.
+  - *Said as:* "rounds go one after another so interpolation works", "I'll run the rounds in parallel"
+- **Batch size limits** · rule docs/claude/BATCH.md > Security > Limits: Every batch request.
+  - *Said as:* "how many requests can a batch hold", "cap requests per batch and per round"
+- **Deep clone mutable batch context** · rule apps/api/src/middleware/prepareRequest.ts: When injecting batch context into sub-requests; share only read-only values like app.
+  - *Said as:* "I'll share the parent's user object across sub-requests", "sub-requests mutated each other's context", "clone mutable context, share only read-only values"
   - *Signs you're bypassing it:* sharing the parent context's user/organizationUsers objects by reference across batch sub-requests (docs/claude/BATCH.md § Implementation Patterns, Pattern: Batch Context)
-- **Interpolation references only earlier rounds** `docs/claude/BATCH.md > Security Validations`: any batch request using interpolation
-- **No nested batches** `docs/claude/BATCH.md > Security > Singleton Pattern`: Every batch sub-request.
-- **No nested batches or absolute URLs** `docs/claude/BATCH.md > Overview`: every batched request
-- **Relative paths only in batch** `docs/claude/BATCH.md > Security > Absolute URL Protection`: Every batch sub-request path.
-- **Transaction strategy timeout is batch-wide** `docs/claude/BATCH.md#Known Limitations`: Batches using a transaction strategy.
+- **Interpolation references only earlier rounds** · rule docs/claude/BATCH.md > Security Validations: any batch request using interpolation
+  - *Said as:* "a placeholder pointing at a later or same round", "you can only reference rounds that already ran"
+- **No nested batches** · rule docs/claude/BATCH.md > Security > Singleton Pattern: Every batch sub-request.
+  - *Said as:* "a batch request inside a batch", "sub-requests can't call the batch endpoint"
+- **No nested batches or absolute URLs** · rule docs/claude/BATCH.md > Overview: every batched request
+  - *Said as:* "a sub-request with a full URL or another batch", "every batched request is a relative path, never nested"
+- **Relative paths only in batch** · rule docs/claude/BATCH.md > Security > Absolute URL Protection: Every batch sub-request path.
+  - *Said as:* "I'll put the full URL in the sub-request path", "sub-request paths are relative"
+- **Transaction strategy timeout is batch-wide** · rule docs/claude/BATCH.md § Known Limitations · code: `registry`, `allowFailures`, `failOnRound`: Batches using a transaction strategy.
+  - *Said as:* "the transaction timeout covers all rounds, not each one", "a long batch under a transaction hits the one overall timeout"
 - *Also here, by name:* BatchStatus (`apps/api/src/modules/batch/constants.ts`); batchExecutionStrategies (`apps/api/src/modules/batch/services/executor.ts`); batchExecutionStrategyEnum (`apps/api/src/modules/batch/constants.ts`); batchStatusEnum (`apps/api/src/modules/batch/constants.ts`); getBatchContext (`apps/api/src/modules/batch/services/batchRegistry.ts`); interpolateRequest (`apps/api/src/modules/batch/services/interpolation.ts`); interpolateValue (`apps/api/src/modules/batch/services/interpolation.ts`); refreshBatchContext (`apps/api/src/modules/batch/services/batchRegistry.ts`); unregisterBatch (`apps/api/src/modules/batch/services/batchRegistry.ts`)
 
 ## 4. The specifics, in full

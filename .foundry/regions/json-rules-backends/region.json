@@ -1,11 +1,11 @@
 {
   "id": "json-rules-backends",
   "title": "Compiling rules to Prisma and SQL",
-  "routing": "Is this about turning a json-rules Condition into a database query \u2014 a toPrisma plan with groupBy steps and { __field } references read through executePrismaPlan, toSql's parameterized WHERE plus LEFT JOINs ({ map, model, alias }, mapName for a FieldMapSet), compiling with { lens }, Json null checks and Prisma's AnyNull, the Backend Support Matrix of what check / toPrisma / toSql each run, the compilers' NULL arms and isRequired licensing, Prisma and SQL limitations, or where the rails differ (case mapping, collation, non-array Json)?",
+  "routing": "Is this about turning a json-rules Condition into a database-client / data-modeling query \u2014 a toPrisma plan with groupBy steps and { __field } references read through executePrismaPlan, toSql's parameterized WHERE plus LEFT JOINs ({ map, model, alias }, mapName for a FieldMapSet), compiling with { lens }, Json null checks and Prisma's AnyNull, the Backend Support Matrix of what check / toPrisma / toSql each run, the compilers' NULL arms and isRequired licensing, Prisma and SQL limitations, or where the rails differ (case mapping, collation, non-array Json)?",
   "concepts": [
     "lib-json-rules-backends"
   ],
-  "tokens": 7342,
+  "tokens": 7818,
   "tokenMethod": "chars/4",
   "runsAgreed": 0,
   "sources": {

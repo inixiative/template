@@ -58,7 +58,7 @@ Compute every sourced field options in memory from rows already fetched under th
 A source down a relation path, offering only the rows reachable from there.
 
 **recheck**  
-On a bridged source query, the conjuncts the database could not decide; its rows are candidates, not options.
+On a bridged source query, the conjuncts the database-client / data-modeling could not decide; its rows are candidates, not options.
 
 **rowShape**  
 materializeSourceQuery's row form: prisma (nested labels) or sql (flat __label / __group_i).
@@ -84,19 +84,21 @@ Multi-source data under a json-rules lens (README § Option Sources, § Evaluati
 
 ## 2. The domain
 
-A narrowing node's `sources` declares where a field's options come from: a bare eligibility `Condition` or a `SourceSpec` `{ where?, label?, groupBy? }`. Against a database, `toSourceQueries(lens, { now })` compiles one DISTINCT query per sourced field in Prisma and SQL form (bind the lens with `bindLens` first; a relative date needs the clock); run the Prisma form, with `steps` through `executePrismaPlan`, and `materializeSourceQuery(query, rows)` turns the rows into options. From rows already fetched under the lens, `materializeSources(lens, rows, { now })` gives every sourced field's options. `projectLens(lens, { sourceValues })` attaches them to each field as `options`. Options never offer a value the lens disallows nor come through a row it hides: each source `where` is narrowed under the whole lens as `narrowRule` narrows a rule. A source down a relation path offers only the rows reachable from there; a `from: 'mapDefaults'` pointer offers every row the model's own source admits — scope tenancy through `mapDefaults` to keep unlinked rows — and `materializeSources` refuses a pointer.
+A narrowing node's `sources` declares where a field's options come from: a bare eligibility `Condition` or a `SourceSpec` `{ where?, label?, groupBy? }`. Against a database-client / data-modeling, `toSourceQueries(lens, { now })` compiles one DISTINCT query per sourced field in Prisma and SQL form (bind the lens with `bindLens` first; a relative date needs the clock); run the Prisma form, with `steps` through `executePrismaPlan`, and `materializeSourceQuery(query, rows)` turns the rows into options. From rows already fetched under the lens, `materializeSources(lens, rows, { now })` gives every sourced field's options. `projectLens(lens, { sourceValues })` attaches them to each field as `options`. Options never offer a value the lens disallows nor come through a row it hides: each source `where` is narrowed under the whole lens as `narrowRule` narrows a rule. A source down a relation path offers only the rows reachable from there; a `from: 'mapDefaults'` pointer offers every row the model's own source admits — scope tenancy through `mapDefaults` to keep unlinked rows — and `materializeSources` refuses a pointer.
 
-Across a bridge one database can't decide a source, so its query over-fetches (what reads across compiles to TRUE) and carries a `recheck`: its rows are candidates, not options. Load the far side onto each candidate under its bridge field and call `materializeSourceQuery(query, rows, { lens })`; when `sql.sql` is null, run the Prisma form. `describeRuleSources(rule, lens)` answers the reverse question — the literal values a rule names at each declared source, `dynamic: true` when they can't be enumerated, so callers fail closed — and `listBindings` lists one rule's bind names. Evaluating across bridges: `check()` is bridge-unaware and walks plain properties, so the caller embeds foreign rows under bridge keys (`'salesforce:Contact'`), pre-indexed with `indexBridges`; a one-to-many bridge array does not fan out mid-path, so iterate it with an array operator or an index; bidirectional traversal uses object back-references, and a batch is a root-array rule.
+Across a bridge one database-client / data-modeling can't decide a source, so its query over-fetches (what reads across compiles to TRUE) and carries a `recheck`: its rows are candidates, not options. Load the far side onto each candidate under its bridge field and call `materializeSourceQuery(query, rows, { lens })`; when `sql.sql` is null, run the Prisma form. `describeRuleSources(rule, lens)` answers the reverse question — the literal values a rule names at each declared source, `dynamic: true` when they can't be enumerated, so callers fail closed — and `listBindings` lists one rule's bind names. Evaluating across bridges: `check()` is bridge-unaware and walks plain properties, so the caller embeds foreign rows under bridge keys (`'salesforce:Contact'`), pre-indexed with `indexBridges`; a one-to-many bridge array does not fan out mid-path, so iterate it with an array operator or an index; bidirectional traversal uses object back-references, and a batch is a root-array rule.
 
 Which question goes where across the eight rules and lens regions: the template's own rule code (`validateRuleForLens`, `bindWhere`, email rule scoping in loops, the hooks `RulesRegistry`) and `RuleReference` edges and rule health (`withRule`) → `json-rules`; the rule language itself: shapes, operators and the operator catalog, paths and `$` scope refs, offsets, dates with `now` / `timeZone`, what NULL means, windowing, binding and introspection, `validateRule`, `UsageError`, `engineGlobals`, the types and VERBS.md → `json-rules-engine`; compiling a rule to Prisma or SQL and what each rail runs (`toPrisma` + `executePrismaPlan`, `toSql`, `{ lens }` compiles, the Backend Support Matrix, the compilers' NULL arms, where the rails differ) → `json-rules-backends`; what a lens is: layers that only narrow, schema vs data narrowing, relations turned on and the model-default tree, the three `where` anchors, filter-first under `all`, composition and `validateNarrowing` codes, `LensRefusal`, enum narrowing, the type shape and the composed / stored / projected forms → `lens-model`; the template's own lenses (`lensFor`, a route's `filterLens`, `scopeNarrowing`, `lensWhere`, `redactLens`, `omitForeignKeys`, `fetchLens`, `sourceQueryValues`, `lensFromOperation`, `customerRefLens`, the `no-lens-spread` rule) → `lenses`; putting a lens to work in code: building it from FieldMaps and bridges, binding and storing it, the `validateRuleInLens` → `narrowRule` → execute flow, fetching and cutting rows (`toLensSelect`, `projectRows`), single-path reads (`readLensValue`, `walkLensPath`, `lensVisit`), `projectLens`, describe vs deny, migration → `lens-usage`; option sources for pickers (`sources`, `toSourceQueries`, `materializeSourceQuery`, `materializeSources`, `from: 'mapDefaults'`, bridged `recheck`), `describeRuleSources`, and evaluating rules over data stitched across bridges → here; a UI that edits a rule over a lens (views, hooks, facets, pickers) and saving it as a `SavedRule` → `rules-builder`. Template helpers built on these: `sourceQueryValues` / `sourceQueryWhere` (`lenses`), `emailSourceValues` (`email-lens`); `RuleReference` extraction from `describeRuleSources` is `json-rules`.
 
 ## 3. Everything that exists here, by class
 
-Point at a class when that is as specific as the moment allows, or at a member. Where a class has siblings an agent could confuse, a table under the class header says which to use when. Each member: **name** `where`: choose this when … . Where the docs or code give material, a second line describes the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
+Point at a class when that is as specific as the moment allows, or at a member. Where a class has siblings an agent could confuse, a table under the class header says which to use when; its *Said as* line gives the plain words a user or agent uses for that job. Each member: **name** · kind `where` · the doc § that describes it (code members) or the code it is about (doc members): choose this when … . Quote the name and the where in a pointer ("look over here: createLock, packages/db/src/lock/createLock.ts, CONCURRENCY.md § Distributed Lock"). *Said as:* the ways a user or agent describes this job in a message or plan without knowing the name; match on these. *Signs you're bypassing it:* the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
 
 ### Class `lib-json-rules-lens-sources`: Multi-source data under a lens: option sources, source queries, bridged sources and evaluating across bridges (README § Option Sources, § Evaluating Across Bridges)
 
 **Job: produce picker option values for a lens's fields** (Producing option sets) — @inixiative/json-rules/README.md § Option Sources
+
+*Said as:* "picker options for a lens field", "distinct values for the select", "constrained pickers instead of free text", "I'll write a groupBy for the options"
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -108,6 +110,8 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 **Job: list the values and binds a rule refers to** (describeRuleSources vs listBindings) — @inixiative/json-rules/README.md § Lens Utilities, § Rule Introspection
 
+*Said as:* "what values and binds does this rule use", "which ids does the rule name", "which placeholders does the rule read"
+
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **describeRuleSources** | the literal values a rule names at each declared source; fail closed on dynamic | maps read, bridges, targets (describeRule) |
@@ -115,6 +119,8 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **describeRule (json-rules-engine)** | a rule's sources, bridges crossed and supported targets | values per source (describeRuleSources) |
 
 **Job: query or check data across a lens bridge** (Across a bridge) — @inixiative/json-rules/README.md § Sources across a bridge, § Evaluating Across Bridges
+
+*Said as:* "data across two sources", "the rule crosses a bridge", "options or evaluation across the bridge"
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -124,27 +130,39 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **Embed foreign rows under bridge keys** | check() over cross-source data; it is bridge-unaware | expecting check to fetch the far side |
 | **Iterate 1-many bridge arrays explicitly** | a path crossing a one-to-many bridge array | a dotted path through the array (reads undefined) |
 
-- **describeRuleSources** `@inixiative/json-rules#describeRuleSources`: Use for values per source; describeRule instead for maps read, bridges and supported targets.
+- **describeRuleSources** · package `@inixiative/json-rules#describeRuleSources` · in docs: @inixiative/json-rules/README.md § Lens & Multi-Source Data › Option Sources; docs/claude/COMMUNICATIONS.md § Email › Rule References (the rows a rule names): Use for values per source; describeRule instead for maps read, bridges and supported targets.
+  - *Said as:* "the literal values the rule names per source", "which ids does this rule name at each source", "I'll scan the conditions for id literals", "fail closed when the values are dynamic"
   - *Signs you're bypassing it:* Recursively scanning conditions for id literals to find which rows a rule names. (docs/claude/COMMUNICATIONS.md § Rule References ("Extraction is the lens's"); README § Lens Utilities)
-- **listBindings** `@inixiative/json-rules#listBindings`: For one rule; for a lens's whole narrowing chain use listLensBindings.
+- **listBindings** · package `@inixiative/json-rules#listBindings` · in docs: @inixiative/json-rules/README.md § Rule Introspection; @inixiative/json-rules/README.md § Path Semantics: For one rule; for a lens's whole narrowing chain use listLensBindings.
+  - *Said as:* "which binds does this rule read", "the placeholder names in one rule", "I'll walk the rule JSON for bind names", "which bindings are required"
   - *Signs you're bypassing it:* Walking a rule's JSON yourself to collect bind names or decide which are required. (@inixiative/json-rules/README.md § Rule Introspection ("Rule introspection belongs in the engine"))
-- **materializeSources** `@inixiative/json-rules#materializeSources`: In-memory rows from toLensSelect; for DB-side DISTINCT queries use toSourceQueries + materializeSourceQuery.
+- **materializeSources** · package `@inixiative/json-rules#materializeSources` · in docs: @inixiative/json-rules/README.md § Lens & Multi-Source Data › Option Sources; @inixiative/json-rules/README.md § TypeScript Types: In-memory rows from toLensSelect; for DB-side DISTINCT queries use toSourceQueries + materializeSourceQuery.
+  - *Said as:* "picker options from rows I already fetched", "distinct values and labels from the rows in hand", "I'll collect a Set of values and sort it", "options for every sourced field from fetched rows"
   - *Throws:* UsageError (`usage`, json-rules-engine); LensRefusal (`lens-refusal`, lens-model)
   - *Signs you're bypassing it:* Collecting distinct values and labels from fetched rows by hand (a Set plus a sort) to fill a picker, instead of materializeSources over the rows fetched under the lens. (@inixiative/json-rules/README.md › Option Sources)
-- **toSourceQueries** `@inixiative/json-rules#toSourceQueries`: Field option sets from a lens: use this; for compiling a rule's WHERE use toSql or toPrisma instead.
+- **toSourceQueries** · package `@inixiative/json-rules#toSourceQueries` · in docs: @inixiative/json-rules/README.md § Lens & Multi-Source Data › Option Sources; @inixiative/rules-builder/README.md § Sourced fields (data-backed options): Field option sets from a lens: use this; for compiling a rule's WHERE use toSql or toPrisma instead.
+  - *Said as:* "one distinct query per sourced field", "constrained pickers instead of free-text ids", "I'll write a groupBy per field for the options", "the option queries a lens's fields need", "which brand-scoped values the picker should offer"
   - *Throws:* LensRefusal (`lens-refusal`, lens-model)
   - *Signs you're bypassing it:* Hand-written DISTINCT / groupBy queries to build picker option lists for lens fields. (catalog entry toSourceQueries; @inixiative/json-rules/README.md › Option Sources)
-- **Bridged source query flow** `@inixiative/json-rules/README.md — Sources across a bridge`: Cross-database sources; use Prisma form when sql.sql is null.
-- **Embed foreign rows under bridge keys** `@inixiative/json-rules/README.md — Evaluating Across Bridges`: Bidirectional: add back-ref object properties; batch: map anchors then root-array arrayOperator any.
+- **Bridged source query flow** · pattern @inixiative/json-rules/README.md — Sources across a bridge: Cross-database sources; use Prisma form when sql.sql is null.
+  - *Said as:* "options for a field across the bridge", "a source whose where reads the other database", "picker values across two data sources", "fetch, load the far side, then recheck"
+- **Embed foreign rows under bridge keys** · pattern @inixiative/json-rules/README.md — Evaluating Across Bridges: Bidirectional: add back-ref object properties; batch: map anchors then root-array arrayOperator any.
+  - *Said as:* "put the foreign rows on the row before evaluating", "the evaluator doesn't fetch the far side", "I'll fetch the related rows during evaluation", "attach the bridged data under the bridge key"
   - *Signs you're bypassing it:* A custom evaluator that fetches or joins foreign rows during rule evaluation, instead of embedding them under bridge keys before check(). (@inixiative/json-rules/README.md › Evaluating Across Bridges ("check() itself is bridge-unaware"))
-- **Fetching option sources from the database** `@inixiative/json-rules/README.md > Option Sources`: database-backed options; materializeSources for rows already in hand
-- **Bind lens before compiling source queries** `@inixiative/json-rules/README.md > Option Sources`: Any toSourceQueries call on a narrowing with binds or relative dates
-- **Iterate 1-many bridge arrays explicitly** `@inixiative/json-rules/README.md — Evaluating Across Bridges`: Whenever a rule path crosses a 1-many bridge array.
-- **Options respect lens narrowing** `@inixiative/json-rules/README.md > Option Sources`: Declaring any narrowing source
+- **Fetching option sources from the database** · pattern @inixiative/json-rules/README.md > Option Sources: database-backed options; materializeSources for rows already in hand
+  - *Said as:* "database-backed picker options", "distinct values for a field from the database", "options from a query rather than rows in hand"
+- **Bind lens before compiling source queries** · rule @inixiative/json-rules/README.md > Option Sources: Any toSourceQueries call on a narrowing with binds or relative dates
+  - *Said as:* "bind the lens before asking for option queries", "source queries with unbound placeholders", "relative dates need now before the source compile"
+- **Iterate 1-many bridge arrays explicitly** · rule @inixiative/json-rules/README.md — Evaluating Across Bridges: Whenever a rule path crosses a 1-many bridge array.
+  - *Said as:* "the path across a one-to-many bridge reads undefined", "loop the bridged array with an array rule", "a dotted path through a bridge list", "an array rule per hop across the one-to-many bridge"
+- **Options respect lens narrowing** · rule @inixiative/json-rules/README.md > Option Sources: Declaring any narrowing source
+  - *Said as:* "the picker shows every tenant's rows", "options the lens wouldn't allow", "I'll query the model directly for picker options", "options never offer a disallowed value"
   - *Signs you're bypassing it:* Picker options from an unscoped query over the model (every tenant's rows) instead of the lens's declared sources, whose where is narrowed under the whole lens. (@inixiative/json-rules/README.md › Option Sources ("Options never offer a value the lens disallows"))
-- **Treat recheck rows as candidates** `@inixiative/json-rules/README.md — Sources across a bridge`: Any source whose path, where, label or axis reads across a bridge.
+- **Treat recheck rows as candidates** · rule @inixiative/json-rules/README.md — Sources across a bridge: Any source whose path, where, label or axis reads across a bridge.
+  - *Said as:* "offer the bridged rows straight to the picker", "recheck the candidates after loading the far side", "the first query's rows aren't final"
   - *Signs you're bypassing it:* Offering a bridged source query's rows straight to a picker without loading the far side and re-checking them with materializeSourceQuery(query, rows, { lens }). (@inixiative/json-rules/README.md › Sources across a bridge)
-- **Use Prisma form when SQL is null** `@inixiative/json-rules/README.md — Sources across a bridge`: Bridged source queries whose recheck reads through a local relation.
+- **Use Prisma form when SQL is null** · rule @inixiative/json-rules/README.md — Sources across a bridge: Bridged source queries whose recheck reads through a local relation.
+  - *Said as:* "the recheck has no SQL form", "sql is null, so use the Prisma form", "a bridged recheck through a local relation", "the local relation form of a bridged recheck"
 
 ## 4. The specifics, in full
 

@@ -101,17 +101,19 @@ The @inixiative/json-rules engine as a language (README, docs/VERBS.md, docs/TIM
 
 A `Condition` is one JSON tree: a Field rule (`operator` with a `value`, a `path` or a `{ bind }`), a Date rule (`dateOperator`), an Array rule (`arrayOperator` over a list or to-many relation, with an element `condition`), an Aggregate rule (`sum` / `avg` compared to a value; `sum([]) = avg([]) = 0`), `all` / `any`, `if` / `then` / `else`, or a boolean — each with an optional custom `error`, which `check()` returns on failure. Values compare as JSON and types never cross (`'3'` never equals `3`) unless the rule carries `coerceType` (`coerceRule` stamps it from a lens); an enum compares only against its declared values. A bare `path` reads the root row; inside an array rule `$.` is the current element and each extra `$` one enclosing element — only array and aggregate rules add levels. An `offset` moves the comparison value, and a relative-date unit may be read from the row. Dates: points (`{ ago }`, `{ ahead }`, `{ start }`, `{ end }`) pair with `before` / `after` / `notBefore` / `notAfter`, ranges (`{ this }`, `{ last }`, `{ next }`, rolling `{ ago }`) with `within` / `notWithin`; magnitudes are positive, and `now` is an explicit input every evaluator throws without, localized by `timeZone` (a name or a value source, UTC by default, one zone per evaluation) and `weekStart`; zoneless dates anchor in that zone (TIMEZONE.md). NULL: negations and `notBefore` / `notAfter` / `notWithin` / `notBetween` / `dayNotIn` match NULL and positive operators never do, so a dormancy rule is `notAfter` / `notWithin`. Windowing runs filter → orderBy → skip → take before the predicate, and what an empty window means is the author's choice (`all` is vacuously true).
 
-Around the AST: `{ bind }` tokens carry caller values — `bindRule` fills them before compiling, `check` takes `bindings`, `bindOptional` makes an absent one null (the leaf is never pruned) — and introspection stays in the engine (`listBindings`, `describeRule`), never a hand-written walk. Rules from JSON, a database, an API or an editor are validated first: `validateRule` returns issues for a target, `assertValidRule` throws. Errors say whose input went wrong: `UsageError` (no `now`, a bad zone, an unbound bind), `LensRefusal` (the lens), anything else a rule-shape error. `engineGlobals` holds process defaults by dotted path (`string.caseInsensitive`, `string.fuzzy`, `prismaOptions.*`) and `engineGlobals.with` scopes a synchronous override. The operator catalog is the only operator list, and VERBS.md fixes one public name and one implementation per operation (`test/verbs.test.ts`; no public name starts with `resolve`). Part 3 also lists some lens members (`clampLens`, `lensVisit`, `readLensValue`, `stitchFieldMaps`, relations and clamp rules) because they share the README; their home is the lens regions below.
+Around the AST: `{ bind }` tokens carry caller values — `bindRule` fills them before compiling, `check` takes `bindings`, `bindOptional` makes an absent one null (the leaf is never pruned) — and introspection stays in the engine (`listBindings`, `describeRule`), never a hand-written walk. Rules from JSON, a database-client / data-modeling, an API or an editor are validated first: `validateRule` returns issues for a target, `assertValidRule` throws. Errors say whose input went wrong: `UsageError` (no `now`, a bad zone, an unbound bind), `LensRefusal` (the lens), anything else a rule-shape error. `engineGlobals` holds process defaults by dotted path (`string.caseInsensitive`, `string.fuzzy`, `prismaOptions.*`) and `engineGlobals.with` scopes a synchronous override. The operator catalog is the only operator list, and VERBS.md fixes one public name and one implementation per operation (`test/verbs.test.ts`; no public name starts with `resolve`). Part 3 also lists some lens members (`clampLens`, `lensVisit`, `readLensValue`, `stitchFieldMaps`, relations and clamp rules) because they share the README; their home is the lens regions below.
 
 Which question goes where across the eight rules and lens regions: the template's own rule code (`validateRuleForLens`, `bindWhere`, email rule scoping in loops, the hooks `RulesRegistry`) and `RuleReference` edges and rule health (`withRule`) → `json-rules`; the rule language itself: shapes, operators and the operator catalog, paths and `$` scope refs, offsets, dates with `now` / `timeZone`, what NULL means, windowing, binding and introspection, `validateRule`, `UsageError`, `engineGlobals`, the types and VERBS.md → here; compiling a rule to Prisma or SQL and what each rail runs (`toPrisma` + `executePrismaPlan`, `toSql`, `{ lens }` compiles, the Backend Support Matrix, the compilers' NULL arms, where the rails differ) → `json-rules-backends`; what a lens is: layers that only narrow, schema vs data narrowing, relations turned on and the model-default tree, the three `where` anchors, filter-first under `all`, composition and `validateNarrowing` codes, `LensRefusal`, enum narrowing, the type shape and the composed / stored / projected forms → `lens-model`; the template's own lenses (`lensFor`, a route's `filterLens`, `scopeNarrowing`, `lensWhere`, `redactLens`, `omitForeignKeys`, `fetchLens`, `sourceQueryValues`, `lensFromOperation`, `customerRefLens`, the `no-lens-spread` rule) → `lenses`; putting a lens to work in code: building it from FieldMaps and bridges, binding and storing it, the `validateRuleInLens` → `narrowRule` → execute flow, fetching and cutting rows (`toLensSelect`, `projectRows`), single-path reads (`readLensValue`, `walkLensPath`, `lensVisit`), `projectLens`, describe vs deny, migration → `lens-usage`; option sources for pickers (`sources`, `toSourceQueries`, `materializeSourceQuery`, `materializeSources`, `from: 'mapDefaults'`, bridged `recheck`), `describeRuleSources`, and evaluating rules over data stitched across bridges → `lens-sources`; a UI that edits a rule over a lens (views, hooks, facets, pickers) and saving it as a `SavedRule` → `rules-builder`. Also not here: generating FieldMaps (with enum values and `isRequired`) from the Prisma schema (`lib-prisma-map`), and ReBAC permission rules, whose `check` is @inixiative/permissions' (`lib-permissions`).
 
 ## 3. Everything that exists here, by class
 
-Point at a class when that is as specific as the moment allows, or at a member. Where a class has siblings an agent could confuse, a table under the class header says which to use when. Each member: **name** `where`: choose this when … . Where the docs or code give material, a second line describes the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
+Point at a class when that is as specific as the moment allows, or at a member. Where a class has siblings an agent could confuse, a table under the class header says which to use when; its *Said as* line gives the plain words a user or agent uses for that job. Each member: **name** · kind `where` · the doc § that describes it (code members) or the code it is about (doc members): choose this when … . Quote the name and the where in a pointer ("look over here: createLock, packages/db/src/lock/createLock.ts, CONCURRENCY.md § Distributed Lock"). *Said as:* the ways a user or agent describes this job in a message or plan without knowing the name; match on these. *Signs you're bypassing it:* the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
 
 ### Class `lib-json-rules`: The json-rules engine: rule shapes, operators, path semantics, introspection, runtime validation, engine globals, errors, TypeScript types, verbs, timezones (README, VERBS, TIMEZONE)
 
 **Job: express a condition as a json-rules rule** (The rule shapes) — @inixiative/json-rules/README.md § Rule Shapes
+
+*Said as:* "how do I write this condition as a rule", "express the predicate in rule JSON", "which rule shape fits this check"
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -124,6 +126,8 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 **Job: validate a rule, narrowing or field map** (validateRule vs assertValidRule vs validateNarrowing vs validateFieldMaps) — @inixiative/json-rules/docs/VERBS.md § Public API (validate)
 
+*Said as:* "check the rule, narrowing or map before using it", "is this valid", "throw or return the issues"
+
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **validateRule** | a rule's shape and compile target, issues returned | paths must resolve through a lens (validateRuleInLens) |
@@ -134,6 +138,8 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 **Job: catch and classify a json-rules error** (UsageError vs LensRefusal vs a rule-shape error) — @inixiative/json-rules/README.md § Error Handling
 
+*Said as:* "whose fault is this error", "catch the engine's errors", "the lens refused versus bad input"
+
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **UsageError** | the caller's input: no now, bad time zone, an unbound bind | the lens can't do it (LensRefusal) |
@@ -141,6 +147,8 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **Classify json-rules errors by class** | catching: instanceof UsageError / LensRefusal, rethrow the rest as shape errors | matching message strings |
 
 **Job: list the operators a rule field accepts** (The operator catalog) — @inixiative/json-rules/README.md § Operator Catalog
+
+*Said as:* "which operators does this field accept", "the operator menu for a field type", "list valid operators for the editor", "I'll hard-code the operator list"
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -150,113 +158,192 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 **Job: resolve a scope reference in a nested rule** (parseScopeRef vs readScopeRef) — @inixiative/json-rules/README.md § Scope Refs
 
+*Said as:* "resolve a parent reference in a nested rule", "read the dollar-prefixed ref", "how far up does this ref go"
+
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **parseScopeRef (json-rules)** | only a ref's depth and path | reading the value (readScopeRef) |
 | **readScopeRef** | the scope a ref names in a stack; returns outOfBounds, never throws | structure only (parseScopeRef) |
 
-- **assertValidRule** `@inixiative/json-rules#assertValidRule`: Need issues returned rather than thrown: validateRule instead; checking a rule against a lens: validateRuleInLens.
+- **assertValidRule** · package `@inixiative/json-rules#assertValidRule` · in docs: @inixiative/json-rules/README.md § Error Handling; @inixiative/json-rules/README.md § TypeScript Types: Need issues returned rather than thrown: validateRule instead; checking a rule against a lens: validateRuleInLens.
+  - *Said as:* "throw if the rule is malformed", "guard the input and get a typed rule back", "fail fast on a bad rule shape", "I'll sniff the shape to decide if it's a rule"
   - *Throws:* json-rules rule-shape Error (`rule-shape`)
-- **bindRule** `@inixiative/json-rules#bindRule`: Binding tokens inside a lens chain: bindLens instead; evaluating once: pass bindings to check.
+- **bindRule** · package `@inixiative/json-rules#bindRule` · in docs: @inixiative/json-rules/README.md § Path Semantics; @inixiative/json-rules/README.md § Rule Introspection: Binding tokens inside a lens chain: bindLens instead; evaluating once: pass bindings to check.
+  - *Said as:* "fill the placeholders in the rule before compiling", "substitute the tenant id into the rule", "I'll build the rule literal per request with the value inlined", "a standalone rule's binds, not a lens's"
   - *Signs you're bypassing it:* String-replacing tokens in rule JSON, or building a new rule literal per request with the caller's value inlined, instead of a { bind } token filled by bindRule or check's bindings. (@inixiative/json-rules/README.md § Path Semantics, § Rule Introspection)
-- **check** `@inixiative/json-rules#check`: Compiling to a database query instead of in-memory evaluation: toPrisma or toSql instead.
+- **check** · package `@inixiative/json-rules#check` · in docs: @inixiative/json-rules/README.md § Root-Array Rules in `check()`; @inixiative/permissions/README.md § The check engine: Compiling to a database query instead of in-memory evaluation: toPrisma or toSql instead.
+  - *Said as:* "evaluate the rule against this object in memory", "does this row match the rule", "filter the rows in memory with the rule", "I'll write a function that walks the rule and tests the row", "use the in-process sliver, not the compiler"
   - *Throws:* UsageError (`usage`); json-rules rule-shape Error (`rule-shape`)
   - *Signs you're bypassing it:* A hand-written interpreter that walks a Condition's JSON to evaluate it against a row, or a JS predicate re-implementing a stored rule, instead of check(rule, row, { bindings, now }). (catalog entry check; @inixiative/json-rules/README.md § Runtime Validation)
-- **describeRule** `@inixiative/json-rules#describeRule`: For routing and UX; gating still uses validateRuleInLens. describeRuleSources when you need the literal values named per source.
-- **engineGlobals** `@inixiative/json-rules#engineGlobals`: read and set process-wide rule engine defaults by dotted path
-- **FieldKind** `@inixiative/json-rules#FieldKind`: Pass to getOperatorsForKind to list valid operators; NUMERIC_KINDS groups the numeric kinds.
-- **getOperatorsForKind** `@inixiative/json-rules#getOperatorsForKind`: Field/date conditions; getArrayOperators for array operators, getAggregateOperators for aggregates.
+- **describeRule** · package `@inixiative/json-rules#describeRule` · in docs: @inixiative/json-rules/README.md § Path Semantics; @inixiative/json-rules/README.md § TypeScript Types: For routing and UX; gating still uses validateRuleInLens. describeRuleSources when you need the literal values named per source.
+  - *Said as:* "what sources and targets does this rule use", "which executor can run this rule", "does the rule cross a bridge", "report the rule's supported targets to the builder"
+- **engineGlobals** · package `@inixiative/json-rules#engineGlobals` · in docs: @inixiative/json-rules/README.md § Engine Globals; @inixiative/json-rules/README.md § TypeScript Types: read and set process-wide rule engine defaults by dotted path
+  - *Said as:* "set the default time zone for the whole process", "process-wide engine defaults", "change the default provider globally"
+- **FieldKind** · package `@inixiative/json-rules#FieldKind` · in docs: @inixiative/json-rules/README.md § TypeScript Types; @inixiative/json-rules/docs/VERBS.md § Public API: Pass to getOperatorsForKind to list valid operators; NUMERIC_KINDS groups the numeric kinds.
+  - *Said as:* "the type of a field: string, int, date", "which kind is this column, for operator purposes", "a third type system for field types"
+- **getOperatorsForKind** · package `@inixiative/json-rules#getOperatorsForKind` · in docs: @inixiative/json-rules/README.md § TypeScript Types; @inixiative/json-rules/docs/VERBS.md § Public API: Field/date conditions; getArrayOperators for array operators, getAggregateOperators for aggregates.
+  - *Said as:* "which operators does a string field take", "the operator menu for a field type", "I'll hard-code a switch from type to operators", "valid operators for a date field on Prisma"
   - *Signs you're bypassing it:* A hard-coded switch mapping field types to operator lists in a rule editor or validator. (@inixiative/json-rules/README.md § Operator Catalog; docs/VERBS.md (no list of operators elsewhere))
-- **indexBridges** `@inixiative/json-rules#indexBridges`: Shapes rule eval data; for source option rows use materializeSourceQuery instead.
+- **indexBridges** · package `@inixiative/json-rules#indexBridges` · in docs: @inixiative/json-rules/README.md § TypeScript Types; @inixiative/json-rules/README.md § Lens & Multi-Source Data › Option Sources: Shapes rule eval data; for source option rows use materializeSourceQuery instead.
+  - *Said as:* "index the foreign rows by the join field", "shape the cross-source data for evaluation", "I'll build a map of foreign rows keyed by id"
   - *Signs you're bypassing it:* Hand-built maps of foreign rows keyed by each bridge's join field, instead of indexBridges(lens, rawForeign). (@inixiative/json-rules/README.md › Evaluating Across Bridges)
-- **listLensBindings** `@inixiative/json-rules#listLensBindings`: Lens-level requirement with parent: refs collapsed; for a bare rule use listBindings.
-- **materializeSourceQuery** `@inixiative/json-rules#materializeSourceQuery`: After running toSourceQueries against a DB; for an already-fetched collection use materializeSources.
+- **listLensBindings** · package `@inixiative/json-rules#listLensBindings` · in docs: @inixiative/json-rules/README.md § TypeScript Types; @inixiative/json-rules/README.md § Lens & Multi-Source Data › Bindings in a Lens: Lens-level requirement with parent: refs collapsed; for a bare rule use listBindings.
+  - *Said as:* "which binds does the whole lens chain need", "the bind names across every layer", "what values must I supply before using this lens"
+- **materializeSourceQuery** · package `@inixiative/json-rules#materializeSourceQuery` · in docs: @inixiative/json-rules/README.md § TypeScript Types; @inixiative/json-rules/README.md § Lens & Multi-Source Data › Option Sources: After running toSourceQueries against a DB; for an already-fetched collection use materializeSources.
+  - *Said as:* "turn the query's rows into picker options", "options from a source query result", "recheck the bridged candidates against the lens"
   - *Throws:* UsageError (`usage`)
-- **Operator** `@inixiative/json-rules#Operator`: Scalar field conditions; DateOperator for dates, ArrayOperator for array traversal.
-- **orderRecords** `@inixiative/json-rules#orderRecords`: In-memory sort matching window semantics; for database ordering compile via toPrisma instead.
+- **Operator** · package `@inixiative/json-rules#Operator` · in docs: @inixiative/json-rules/README.md § Rule Shapes; @inixiative/json-rules/README.md § Runtime Validation: Scalar field conditions; DateOperator for dates, ArrayOperator for array traversal.
+  - *Said as:* "the comparison operator enum", "equals, in, contains as a type", "which operator type for a scalar field"
+- **orderRecords** · package `@inixiative/json-rules#orderRecords` · in docs: @inixiative/json-rules/README.md § TypeScript Types; @inixiative/json-rules/README.md § Lens & Multi-Source Data › Lens Utilities: In-memory sort matching window semantics; for database ordering compile via toPrisma instead.
+  - *Said as:* "sort the rows the way the window would", "in-memory sort with nulls last and multiple keys", "I'll write a comparator to mimic the rule's ordering"
   - *Signs you're bypassing it:* A hand-rolled sort that tries to mimic a rule window's ordering (NULLs last, multi-key, stable) for in-memory rows. (catalog entry orderRecords; README Lens Utilities (orderRecords))
-- **orWhere** `@inixiative/json-rules#orWhere`: Use with andWhere instead of hand-written `OR: [...]` so compiled false/true fold correctly.
+- **orWhere** · package `@inixiative/json-rules#orWhere` · in docs: @inixiative/json-rules/docs/VERBS.md § Public API: Use with andWhere instead of hand-written `OR: [...]` so compiled false/true fold correctly.
+  - *Said as:* "OR two compiled wheres together", "combine the compiled where with an extra clause", "I'll wrap them in an OR array by hand", "match-all and match-nothing fold correctly when combined"
   - *Signs you're bypassing it:* Hand-written `OR: [compiledWhere, extra]` / `AND: [...]` around compiled wheres, which mishandles compiled match-all / match-nothing arms (`AND: [x, { OR: [] }]` matches everything). (@inixiative/json-rules/docs/VERBS.md Public API (compose); catalog entry orWhere)
-- **readScopeRef** `@inixiative/json-rules#readScopeRef`: Resolves against scopes; parseScopeRef when you only need depth and path.
-- **UsageError** `@inixiative/json-rules#UsageError`: Caller input faults; lens shape faults throw LensRefusal instead.
+- **readScopeRef** · package `@inixiative/json-rules#readScopeRef` · in docs: @inixiative/json-rules/README.md § TypeScript Types; @inixiative/json-rules/docs/VERBS.md § Public API: Resolves against scopes; parseScopeRef when you only need depth and path.
+  - *Said as:* "read the value a scope reference points at", "resolve the parent reference against the stack", "out of bounds instead of throwing"
+- **UsageError** · package `@inixiative/json-rules#UsageError` · in docs: @inixiative/json-rules/README.md § Error Handling; @inixiative/json-rules/README.md § Lens & Multi-Source Data › Option Sources: Caller input faults; lens shape faults throw LensRefusal instead.
+  - *Said as:* "the caller forgot to pass now", "an unbound placeholder at evaluation", "a bad time zone from the caller", "whose fault is this error: the input"
   - *Error class:* `usage` (json-rules UsageError: the caller's input is missing or malformed (no now for a relative date, invalid now or time zone, an unbound bind). Fix: supply the input.); thrown by check, toPrisma, toSql, materializeSourceQuery, materializeSources
-- **validateRule** `@inixiative/json-rules#validateRule`: Shape and target only; to check fields resolve through a lens use validateRuleInLens. assertValidRule throws instead.
-- **Aggregate rule** `@inixiative/json-rules/README.md › Rule Shapes › Aggregate Rule`: numeric totals/means over arrays; array rule for per-element checks
-- **Array rule** `@inixiative/json-rules/README.md › Rule Shapes › Array Rule`: per-element predicates; aggregate rule when comparing sum/avg of elements
-- **Classify json-rules errors by class** `@inixiative/json-rules/README.md#Error Handling`: catch UsageError for input, LensRefusal for lens, rethrow others as rule shape
+- **validateRule** · package `@inixiative/json-rules#validateRule` · in docs: @inixiative/json-rules/README.md § Error Handling; @inixiative/json-rules/README.md § Path Semantics: Shape and target only; to check fields resolve through a lens use validateRuleInLens. assertValidRule throws instead.
+  - *Said as:* "is this rule well-formed", "list the problems with the rule's shape", "can this rule compile to the target", "I'll check the rule structurally myself"
+- **Aggregate rule** · pattern @inixiative/json-rules/README.md › Rule Shapes › Aggregate Rule: numeric totals/means over arrays; array rule for per-element checks
+  - *Said as:* "sum of the line items over a thousand", "average of these values compared to a number", "total across a list, not each element", "count or sum of related rows in a rule"
+- **Array rule** · pattern @inixiative/json-rules/README.md › Rule Shapes › Array Rule: per-element predicates; aggregate rule when comparing sum/avg of elements
+  - *Said as:* "every item in the list must match", "at least one related row satisfies this", "a condition on each element of a list", "none of the children may be flagged"
+- **Classify json-rules errors by class** · pattern @inixiative/json-rules/README.md § Error Handling · code: `validateRule`, `UsageError`, `LensRefusal`, `assertValidRule`: catch UsageError for input, LensRefusal for lens, rethrow others as rule shape
+  - *Said as:* "which error is the caller's fault and which is the lens's", "I'll match on the error message", "catch by error class, rethrow the rest"
   - *Signs you're bypassing it:* Matching json-rules error message strings to decide whose fault an error is, instead of instanceof UsageError / LensRefusal. (@inixiative/json-rules/README.md § Error Handling)
-- **Conditional rule (if/then/else)** `@inixiative/json-rules/README.md › Rule Shapes › Conditional Rule`: branching logic; plain all/any when no branch is needed
-- **Date rule** `@inixiative/json-rules/README.md › Rule Shapes › Date Rule`: date fields; use dateOperator instead of numeric Operator comparisons
-- **Field rule** `@inixiative/json-rules/README.md › Rule Shapes › Field Rule`: single scalar comparison; dates use dateOperator, arrays use arrayOperator or aggregate
-- **Lens narrowing with anchored where clauses** `@inixiative/json-rules/README.md`: Per-model clamps everywhere: mapDefaults; anchor-only: root.where; on descent: root.relations[R].where.
-- **Logical rules (all/any)** `@inixiative/json-rules/README.md › Rule Shapes › Logical Rules`: boolean composition; use if/then/else when a branch depends on a condition
-- **notAfter / notWithin for NULL-inclusive dormancy** `@inixiative/json-rules/README.md › Relative & Calendar Date Expressions`: when never-set should match; onOrBefore/before skip NULL
+- **Conditional rule (if/then/else)** · pattern @inixiative/json-rules/README.md › Rule Shapes › Conditional Rule: branching logic; plain all/any when no branch is needed
+  - *Said as:* "if this holds then require that, otherwise this", "a branch in the rule depending on another condition", "different checks depending on the plan type", "when X applies use rule A, else rule B"
+- **Date rule** · pattern @inixiative/json-rules/README.md › Rule Shapes › Date Rule: date fields; use dateOperator instead of numeric Operator comparisons
+  - *Said as:* "compare a date field in a rule", "created before some date", "a condition on a timestamp column", "I'll compare the date as a number"
+- **Field rule** · pattern @inixiative/json-rules/README.md › Rule Shapes › Field Rule: single scalar comparison; dates use dateOperator, arrays use arrayOperator or aggregate
+  - *Said as:* "one column compared to a value", "status equals active, as a rule", "a single scalar comparison in the rule", "the simplest leaf: field, operator, value"
+- **Lens narrowing with anchored where clauses** · pattern @inixiative/json-rules/README.md: Per-model clamps everywhere: mapDefaults; anchor-only: root.where; on descent: root.relations[R].where.
+  - *Said as:* "where should the tenant clamp go in the lens", "a clamp on every visit of the model", "restrict only the root rows, not the relations"
+- **Logical rules (all/any)** · pattern @inixiative/json-rules/README.md › Rule Shapes › Logical Rules: boolean composition; use if/then/else when a branch depends on a condition
+  - *Said as:* "all of these must hold", "any one of these conditions", "AND and OR of rules", "group the conditions together in a boolean tree"
+- **notAfter / notWithin for NULL-inclusive dormancy** · pattern @inixiative/json-rules/README.md › Relative & Calendar Date Expressions: when never-set should match; onOrBefore/before skip NULL
+  - *Said as:* "users who haven't logged in for 30 days, including never", "not since 30 days should include never-set rows", "dormant rows where the date is null or old"
   - *Signs you're bypassing it:* A dormancy rule (“not since 30 days”) written with before / onOrBefore, silently dropping never-set rows, or a hand-added `OR col IS NULL` arm. (@inixiative/json-rules/README.md › Relative & Calendar Date Expressions; § NULL Semantics)
-- **Offsets as value sources** `@inixiative/json-rules/README.md Offsets and Unit Amounts`: Edges the date expression grammar can't name; size shifts from row amounts, not stored { ago } values.
-- **One rule AST, three targets** `@inixiative/json-rules/README.md — Quick Start`: write a rule once and evaluate in memory, via Prisma or as SQL
+- **Offsets as value sources** · pattern @inixiative/json-rules/README.md Offsets and Unit Amounts: Edges the date expression grammar can't name; size shifts from row amounts, not stored { ago } values.
+  - *Said as:* "shift the comparison by an amount from another column", "the deadline minus a per-row number of days", "compare against the value adjusted by an offset read from the row"
+- **One rule AST, three targets** · pattern @inixiative/json-rules/README.md — Quick Start: write a rule once and evaluate in memory, via Prisma or as SQL
+  - *Said as:* "write the condition once, run it in memory and in the database", "the same predicate as a JS filter, a Prisma where and SQL", "one rule, evaluated in-process or compiled to a query"
   - *Signs you're bypassing it:* The same condition written three times — a JS filter, a Prisma where and a SQL fragment — instead of one Condition run through check / toPrisma / toSql. (@inixiative/json-rules/README.md (preface, Quick Start))
-- **Relative and calendar date expressions** `@inixiative/json-rules/README.md › Relative & Calendar Date Expressions`: points ({ago},{ahead},{start},{end}) with before/after; ranges ({this},{last},{next},{ago}) with within/notWithin
-- **Scope references with $ prefixes** `@inixiative/json-rules/README.md Scope References`: Bare path reads root row; only array/aggregate rules add levels, not all/any/if.
-- **Windowing (filter/orderBy/skip/take)** `@inixiative/json-rules/README.md › Windowing`: first/last element rules; plain array rule when all elements matter
-- **aggregate** `@inixiative/json-rules/README.md — Aggregate Operators`: totals across a list; use array operators (all/any/atLeast) for per-element conditions
-- **assertValidFieldMaps** `@inixiative/json-rules`: Throwing variant; validateFieldMaps returns { ok, errors }.
+- **Relative and calendar date expressions** · pattern @inixiative/json-rules/README.md › Relative & Calendar Date Expressions: points ({ago},{ahead},{start},{end}) with before/after; ranges ({this},{last},{next},{ago}) with within/notWithin
+  - *Said as:* "thirty days ago", "within the last week", "the start of this month"
+- **Scope references with $ prefixes** · pattern @inixiative/json-rules/README.md Scope References: Bare path reads root row; only array/aggregate rules add levels, not all/any/if.
+  - *Said as:* "refer to the parent row from inside the array rule", "compare an element against a column on the root", "reach an outer scope from a nested condition"
+- **Windowing (filter/orderBy/skip/take)** · pattern @inixiative/json-rules/README.md › Windowing: first/last element rules; plain array rule when all elements matter
+  - *Said as:* "the most recent order must be paid", "only the first element after sorting", "a rule on the latest related row"
+- **aggregate** · primitive @inixiative/json-rules/README.md — Aggregate Operators: totals across a list; use array operators (all/any/atLeast) for per-element conditions
+  - *Said as:* "sum these up instead of looping over them", "these can be done all in aggregate functions, not individually", "average across the related rows"
+- **assertValidFieldMaps** · primitive @inixiative/json-rules: Throwing variant; validateFieldMaps returns { ok, errors }.
+  - *Said as:* "throw if the field map is malformed", "field names with dots or colons in them", "fail fast on a bad field map"
   - *Throws:* json-rules rule-shape Error (`rule-shape`, inferred)
-- **assertValidNarrowing** `@inixiative/json-rules`: Throwing variant; validateNarrowing to collect errors.
+- **assertValidNarrowing** · primitive @inixiative/json-rules: Throwing variant; validateNarrowing to collect errors.
+  - *Said as:* "throw if the narrowing is invalid", "fail at construction on a bad lens layer", "a throwing check for the narrowing chain"
   - *Throws:* json-rules rule-shape Error (`rule-shape`, inferred)
-- **bindOptional** `@inixiative/json-rules leaf bindOptional`: mark a leaf's bind optional so absence evaluates as null, never pruned
+- **bindOptional** · primitive @inixiative/json-rules leaf bindOptional: mark a leaf's bind optional so absence evaluates as null, never pruned
+  - *Said as:* "the bind may be missing and that's fine", "if no value is bound treat it as null", "I'll prune the leaf when the bind is absent"
   - *Signs you're bypassing it:* Pruning a leaf from a rule (or substituting a match-all value) when its bind is absent, instead of bindOptional, which reads null and never prunes — `in` with nothing bound matches nothing. (@inixiative/json-rules/README.md § Rule Introspection)
-- **Condition** `@inixiative/json-rules/README.md — TypeScript Types`: strict typed rules: StrictCondition instead
-- **engineGlobals.reset** `@inixiative/json-rules engineGlobals.reset`: restore all engine defaults to their initial values
-- **engineGlobals.with** `@inixiative/json-rules engineGlobals.with`: scoped override instead of set/reset; callback must be synchronous, Promise-returning callbacks throw
+- **Condition** · primitive @inixiative/json-rules/README.md — TypeScript Types: strict typed rules: StrictCondition instead
+  - *Said as:* "the type of the rule JSON", "the shape of a stored rule", "type the conditions column"
+- **engineGlobals.reset** · primitive @inixiative/json-rules engineGlobals.reset: restore all engine defaults to their initial values
+  - *Said as:* "put the engine defaults back", "undo every global override after the test", "restore the default time zone and provider"
+- **engineGlobals.with** · primitive @inixiative/json-rules engineGlobals.with: scoped override instead of set/reset; callback must be synchronous, Promise-returning callbacks throw
+  - *Said as:* "temporarily override an engine default for one call", "set the default, run, then reset after", "I'll set the global before and reset it in finally"
   - *Throws:* engineGlobals.with async-callback Error (`server-error`)
   - *Signs you're bypassing it:* engineGlobals.set before a call and reset after it (leaking the override when the call throws) instead of a scoped engineGlobals.with, or an async callback, which throws. (@inixiative/json-rules/README.md § Engine Globals)
-- **FieldMapEntry.isRequired** `@inixiative/json-rules/README.md — NULL Semantics`: declare column or relation-hop nullability so compilers add NULL arms
-- **from: 'mapDefaults' source pointer** `@inixiative/json-rules/README.md — Sources (path source pointer)`: Names any eligible row; a plain path source offers only reachable linked rows. Scope tenancy via mapDefaults to keep unlinked rows.
-- **getLensRoot** `@inixiative/json-rules`: find the base lens a narrowing chain is rooted at
-- **Operator catalog constants** `@inixiative/json-rules FieldKind, RuleTarget, ValueShape, NUMERIC_KINDS, ALL_KINDS`: enumerate field kinds, compile targets and operand shapes for rule builders
-- **orderBy / take / skip windowing** `@inixiative/json-rules/README.md — What It Supports`: toPrisma compiles only the extremal case and filter alone; full windowing needs check()
-- **path and $$. scope refs** `@inixiative/json-rules/README.md — What It Supports`: comparing to data values instead of literal value
-- **prismaOptions.anyNull** `@inixiative/json-rules toPrisma prismaOptions.anyNull`: Only when using a different client than the installed @prisma/client.
-- **prismaOptions.datasource.provider** `@inixiative/json-rules README > Engine Globals`: per-call option overrides the global; set globally only for a non-postgresql default
-- **Rule error** `@inixiative/json-rules rule error property`: set the custom failure message check() returns for a rule
-- **string.fuzzy** `@inixiative/json-rules README > Engine Globals`: only for check(); toSql/toPrisma refuse contains/notContains when fuzzy is on
-- **timeZone / weekStart options** `@inixiative/json-rules/README.md › The now contract and config`: localize now and period boundaries; set week start for calendar periods
-- **validateFieldMaps** `@inixiative/json-rules`: Non-throwing; assertValidFieldMaps to throw.
-- **within / ago / ahead / this / last / next** `@inixiative/json-rules/README.md — What It Supports`: relative windows; before/after/between for fixed dates
-- **Aggregate empty and NULL semantics** `@inixiative/json-rules/README.md › Rule Shapes › Aggregate Rule`: any aggregate rule
-- **Aggregate/count relation rules need a field map** `@inixiative/json-rules/README.md — Prisma Limitations`: atLeast/atMost/exactly and sum/avg over relation lists.
-- **Bridge fields addressed with fieldMap:Model** `@inixiative/json-rules/README.md FieldMap & FieldMapSet`: rules crossing sources
-- **Calendar units whole and non-negative** `@inixiative/json-rules/README.md Offsets and Unit Amounts`: Any relative-date unit or offset amount.
-- **Empty window semantics are author-driven** `@inixiative/json-rules/README.md › Windowing`: windowed array rules where an empty array should not match
-- **Enum comparisons** `@inixiative/json-rules/README.md — Value Comparison`: Any rule on an enum field.
-- **Explicit now input** `@inixiative/json-rules/README.md › The now contract and config`: any rule containing relative or period date expressions; evaluators throw otherwise
+- **FieldMapEntry.isRequired** · primitive @inixiative/json-rules/README.md — NULL Semantics: declare column or relation-hop nullability so compilers add NULL arms
+  - *Said as:* "mark the column as never null", "declare a relation hop nullable so the compiler adds null handling", "tell the compiler which fields can be null"
+- **from: 'mapDefaults' source pointer** · primitive @inixiative/json-rules/README.md — Sources (path source pointer): Names any eligible row; a plain path source offers only reachable linked rows. Scope tenancy via mapDefaults to keep unlinked rows.
+  - *Said as:* "offer every eligible row, not only the linked ones", "the picker should list rows not yet linked", "a source pointer naming any row of the model"
+- **getLensRoot** · primitive @inixiative/json-rules: find the base lens a narrowing chain is rooted at
+  - *Said as:* "which base lens is this narrowing built on", "find the root of the chain", "the lens at the bottom of the layers"
+- **Operator catalog constants** · primitive @inixiative/json-rules FieldKind, RuleTarget, ValueShape, NUMERIC_KINDS, ALL_KINDS: enumerate field kinds, compile targets and operand shapes for rule builders
+  - *Said as:* "the list of field kinds", "enumerate the compile targets", "which kinds count as numeric"
+- **orderBy / take / skip windowing** · primitive @inixiative/json-rules/README.md — What It Supports: toPrisma compiles only the extremal case and filter alone; full windowing needs check()
+  - *Said as:* "sort the related rows and test the first", "latest row only, compiled to Prisma", "take and skip inside a rule"
+- **path and $$. scope refs** · primitive @inixiative/json-rules/README.md — What It Supports: comparing to data values instead of literal value
+  - *Said as:* "compare one field to another field", "compare against another column's value, not a literal", "end date after start date on the same row"
+- **prismaOptions.anyNull** · primitive @inixiative/json-rules toPrisma prismaOptions.anyNull: Only when using a different client than the installed @prisma/client.
+  - *Said as:* "the Prisma null sentinel from a different client", "Json null checks with another Prisma client", "pass my own AnyNull instance"
+- **prismaOptions.datasource.provider** · primitive @inixiative/json-rules README > Engine Globals: per-call option overrides the global; set globally only for a non-postgresql default
+  - *Said as:* "compile for a database that isn't Postgres", "set the provider for one compile call", "the default provider for every compile"
+- **Rule error** · primitive @inixiative/json-rules rule error property: set the custom failure message check() returns for a rule
+  - *Said as:* "a custom message when the rule fails", "tell the user why the rule rejected them", "must be 18 or older as the failure text"
+- **string.fuzzy** · primitive @inixiative/json-rules README > Engine Globals: only for check(); toSql/toPrisma refuse contains/notContains when fuzzy is on
+  - *Said as:* "typo-tolerant contains on strings", "fuzzy matching in the in-memory filter", "approximate match in the search box"
+- **timeZone / weekStart options** · primitive @inixiative/json-rules/README.md › The now contract and config: localize now and period boundaries; set week start for calendar periods
+  - *Said as:* "the week should start on Sunday", "evaluate dates in the user's time zone", "this month in New York time"
+- **validateFieldMaps** · primitive @inixiative/json-rules: Non-throwing; assertValidFieldMaps to throw.
+  - *Said as:* "check the field map for bad names", "errors in the field map, returned not thrown", "a non-throwing field map check"
+- **within / ago / ahead / this / last / next** · primitive @inixiative/json-rules/README.md — What It Supports: relative windows; before/after/between for fixed dates
+  - *Said as:* "in the last 7 days", "sometime in the next month", "created this year"
+- **Aggregate empty and NULL semantics** · rule @inixiative/json-rules/README.md › Rule Shapes › Aggregate Rule: any aggregate rule
+  - *Said as:* "what does a sum over an empty list match", "average of nothing, with nulls ignored", "an aggregate over an empty array"
+- **Aggregate/count relation rules need a field map** · rule @inixiative/json-rules/README.md — Prisma Limitations: atLeast/atMost/exactly and sum/avg over relation lists.
+  - *Said as:* "at least N related rows needs the map", "counting a relation in a rule fails without the field map", "sum over a relation needs model and map"
+- **Bridge fields addressed with fieldMap:Model** · rule @inixiative/json-rules/README.md FieldMap & FieldMapSet: rules crossing sources
+  - *Said as:* "name a field on the other source", "address a column across the bridge", "rules that span two field maps"
+- **Calendar units whole and non-negative** · rule @inixiative/json-rules/README.md Offsets and Unit Amounts: Any relative-date unit or offset amount.
+  - *Said as:* "half a month is not allowed", "no fractional or negative units in a date expression", "1.5 weeks ago isn't valid"
+- **Empty window semantics are author-driven** · rule @inixiative/json-rules/README.md › Windowing: windowed array rules where an empty array should not match
+  - *Said as:* "an empty list shouldn't match the window rule", "no rows means no match; say so in the rule", "decide what an empty window means"
+- **Enum comparisons** · rule @inixiative/json-rules/README.md — Value Comparison: Any rule on an enum field.
+  - *Said as:* "comparing an enum field to a string", "enum values compare exactly against the declared list", "no contains or ordering on an enum"
+- **Explicit now input** · rule @inixiative/json-rules/README.md › The now contract and config: any rule containing relative or period date expressions; evaluators throw otherwise
+  - *Said as:* "pass now in rather than reading the clock", "I'll compute thirty days ago in code and put the date in the rule", "the evaluator throws without a now"
   - *Signs you're bypassing it:* Computing `new Date(Date.now() - 30 * 86400000)` (or dayjs().subtract) into a rule's value instead of { ago: { days: 30 } } evaluated with an explicit now. (@inixiative/json-rules/README.md › The now contract and config)
-- **Gate user rules with validateRuleInLens** `@inixiative/json-rules/README.md`: Any user-supplied rule evaluated against a lens.
-- **Later clamps read only parent-visible relations** `@inixiative/json-rules/README.md Relations`: writing where clamps in non-first narrowings
-- **Narrowing composition is intersection** `@inixiative/json-rules/README.md`: Whenever chaining LensNarrowing layers.
-- **Negations match NULL** `@inixiative/json-rules/README.md — NULL Semantics`: notEquals, notIn, notContains, notMatches, notBetween, notBefore, notAfter, notWithin, dayNotIn.
+- **Gate user rules with validateRuleInLens** · rule @inixiative/json-rules/README.md: Any user-supplied rule evaluated against a lens.
+  - *Said as:* "a user-written rule must be gated before it runs", "I'll trust the rule the client sent", "check the rule's paths against the lens first"
+- **Later clamps read only parent-visible relations** · rule @inixiative/json-rules/README.md Relations: writing where clamps in non-first narrowings
+  - *Said as:* "my later clamp reads a hidden column and gets refused", "a where in a child layer on a relation the parent hides", "clamps in non-first layers see less"
+- **Narrowing composition is intersection** · rule @inixiative/json-rules/README.md: Whenever chaining LensNarrowing layers.
+  - *Said as:* "stacking layers can only take away", "a child layer can't add a field back", "layers intersect, never union"
+- **Negations match NULL** · rule @inixiative/json-rules/README.md — NULL Semantics: notEquals, notIn, notContains, notMatches, notBetween, notBefore, notAfter, notWithin, dayNotIn.
+  - *Said as:* "not equals should include never-set rows", "notIn matches null too", "I'll add an OR is null to the negation"
   - *Signs you're bypassing it:* Hand-adding `OR field IS NULL` / `{ equals: null }` arms or a separate notExists branch around a negated operator to keep never-set rows; the negation already matches them. (@inixiative/json-rules/README.md § NULL Semantics)
-- **Never return keepClampColumns output to viewers** `@inixiative/json-rules/README.md — projectRows`: Whenever projecting lens rows for any response.
+- **Never return keepClampColumns output to viewers** · rule @inixiative/json-rules/README.md — projectRows: Whenever projecting lens rows for any response.
+  - *Said as:* "keep the hidden columns for the recheck but don't return them", "the recheck rows leak hidden values", "strip the clamp columns before responding"
   - *Signs you're bypassing it:* Returning projectRows(…, { keepClampColumns: true }) rows in an API response. (@inixiative/json-rules/README.md › Fetching Under a Lens)
-- **No field paths through to-many relations** `@inixiative/json-rules/README.md — Prisma Limitations`: Any rule touching a to-many relation's columns.
+- **No field paths through to-many relations** · rule @inixiative/json-rules/README.md — Prisma Limitations: Any rule touching a to-many relation's columns.
+  - *Said as:* "posts.title as a field path", "a dotted path through a list relation", "use an array rule, not a path into the list"
   - *Signs you're bypassing it:* A field rule on a dotted path through a list relation (`posts.title`) instead of an array rule on `posts`. (@inixiative/json-rules/README.md § Prisma Limitations)
-- **Non-array Json in array rules is a data error** `@inixiative/json-rules/README.md — Where the Rails Differ`: When writing array, aggregate, empty or notEmpty rules over Json values.
-- **One public name per operation** `@inixiative/json-rules/README.md — TypeScript Types; docs/VERBS.md`: adding or renaming json-rules exports
+- **Non-array Json in array rules is a data error** · rule @inixiative/json-rules/README.md — Where the Rails Differ: When writing array, aggregate, empty or notEmpty rules over Json values.
+  - *Said as:* "an array rule over a Json column that isn't an array", "the Json value is not a list in an array rule", "what happens when the Json isn't an array"
+- **One public name per operation** · rule @inixiative/json-rules/README.md — TypeScript Types; docs/VERBS.md: adding or renaming json-rules exports
+  - *Said as:* "add an alias export for this function", "a second name for the same operation", "I'll export a resolve helper too"
   - *Signs you're bypassing it:* Adding an alias export or a second function for an operation json-rules already names (or a public name starting with resolve). (@inixiative/json-rules/docs/VERBS.md; README § TypeScript Types)
-- **Positive date operators never match NULL** `@inixiative/json-rules/README.md — NULL Semantics`: before, between, dayIn and other positive dateOperators.
-- **Positive magnitudes in date expressions** `@inixiative/json-rules/README.md › Relative & Calendar Date Expressions`: every ago/ahead expression
-- **Rails agree except engine differences** `@inixiative/json-rules/README.md — Where the Rails Differ`: When the same rule runs both in memory and in the database.
-- **Read Prisma plan where only through executePrismaPlan** `@inixiative/json-rules/README.md Path Semantics`: Whenever consuming toPrisma output.
-- **Relations turned on via relation object only** `@inixiative/json-rules/README.md Relations`: exposing any relation or bridge in a lens
+- **Positive date operators never match NULL** · rule @inixiative/json-rules/README.md — NULL Semantics: before, between, dayIn and other positive dateOperators.
+  - *Said as:* "before a date skips null rows", "null dates never match before or between", "the positive date operator drops never-set rows"
+- **Positive magnitudes in date expressions** · rule @inixiative/json-rules/README.md › Relative & Calendar Date Expressions: every ago/ahead expression
+  - *Said as:* "negative days ago", "ago with a negative number", "flip the sign to go forward instead of using ahead"
+- **Rails agree except engine differences** · rule @inixiative/json-rules/README.md — Where the Rails Differ: When the same rule runs both in memory and in the database.
+  - *Said as:* "in-memory and database give the same answer", "where do the evaluator and the compilers disagree", "same rule, same result on both rails"
+- **Read Prisma plan where only through executePrismaPlan** · rule @inixiative/json-rules/README.md Path Semantics: Whenever consuming toPrisma output.
+  - *Said as:* "spread the plan's where into findMany", "use the compiled where directly", "the where has placeholders Prisma rejects"
+- **Relations turned on via relation object only** · rule @inixiative/json-rules/README.md Relations: exposing any relation or bridge in a lens
+  - *Said as:* "turn the relation on in picks", "a relation listed as a field gives wrong kind", "enable the relation in the first layer"
   - *Signs you're bypassing it:* Relation names listed in picks (wrong_kind), or a later layer trying to turn a relation on, instead of relations on the first narrowing. (@inixiative/json-rules/README.md › Relations; docs/LENS.md §12 To 3.4)
-- **Root-array rules are fieldless and check-only** `@inixiative/json-rules/README.md#Root-Array Rules in check()`: When evaluating a rule against an array of rows.
-- **Rule introspection belongs in the engine** `@inixiative/json-rules/README.md — Rule Introspection`: Whenever code needs a rule's bind names or contents.
+- **Root-array rules are fieldless and check-only** · rule @inixiative/json-rules/README.md § Root-Array Rules in check(): When evaluating a rule against an array of rows.
+  - *Said as:* "evaluate the rule against a list of rows", "a rule over the whole array in memory", "the data is an array, not a row"
+- **Rule introspection belongs in the engine** · rule @inixiative/json-rules/README.md — Rule Introspection: Whenever code needs a rule's bind names or contents.
+  - *Said as:* "walk the rule tree to find the bind names", "I'll write a recursive helper over all and any", "read what a stored rule names"
   - *Signs you're bypassing it:* A recursive helper outside json-rules that descends `all` / `any` / `condition` to read what a stored rule names or needs; it goes blind silently when the format grows a node type. (@inixiative/json-rules/README.md § Rule Introspection; docs/VERBS.md (traverse a condition tree))
-- **Scalar-list membership via contains** `@inixiative/json-rules/README.md — Prisma Limitations`: Prisma output over scalar lists/Json arrays; use toSql or check for aggregates on them.
-- **Scope pointer tenancy through mapDefaults** `@inixiative/json-rules/README.md — Sources (path source pointer)`: Whenever a field uses from: 'mapDefaults' and must offer unlinked rows.
-- **Strict JSON value comparison** `@inixiative/json-rules/README.md — Value Comparison`: When a rule's literal type differs from the field's type.
-- **toPrisma windowing compiles only extremal case** `@inixiative/json-rules/README.md › Windowing › Compilation`: windowed rules meant for Prisma compilation
-- **Validate external rules first** `@inixiative/json-rules/README.md#Error Handling`: Whenever rules originate outside code.
+- **Scalar-list membership via contains** · rule @inixiative/json-rules/README.md — Prisma Limitations: Prisma output over scalar lists/Json arrays; use toSql or check for aggregates on them.
+  - *Said as:* "the tags array contains a value, through Prisma", "membership in a scalar list", "a sum over a Json array isn't possible in Prisma"
+- **Scope pointer tenancy through mapDefaults** · rule @inixiative/json-rules/README.md — Sources (path source pointer): Whenever a field uses from: 'mapDefaults' and must offer unlinked rows.
+  - *Said as:* "scope the any-row picker to the tenant", "unlinked rows, but only this tenant's", "tenancy on a pointer source"
+- **Strict JSON value comparison** · rule @inixiative/json-rules/README.md — Value Comparison: When a rule's literal type differs from the field's type.
+  - *Said as:* "the string 3 against a number column", "the literal's type differs from the field's type", "no loose equality in rules"
+- **toPrisma windowing compiles only extremal case** · rule @inixiative/json-rules/README.md › Windowing › Compilation: windowed rules meant for Prisma compilation
+  - *Said as:* "only first or last compiles to Prisma", "skip and take don't compile to a query", "the window rule needs in-memory evaluation"
+- **Validate external rules first** · rule @inixiative/json-rules/README.md § Error Handling · code: `validateRule`, `UsageError`, `LensRefusal`, `assertValidRule`: Whenever rules originate outside code.
+  - *Said as:* "validate the rule from the request body before running it", "a rule from the database straight into the evaluator", "I'll trust the rule the editor sent"
   - *Signs you're bypassing it:* Passing a rule from an API body, a database row or an editor straight to check / toPrisma / toSql without validateRule / assertValidRule (or the lens gate). (@inixiative/json-rules/README.md § Error Handling)
 - *Also here, by name:* ALL_KINDS (`@inixiative/json-rules`); ArrayOperator (`@inixiative/json-rules`); NUMERIC_KINDS (`@inixiative/json-rules`); RuleTarget (`@inixiative/json-rules`); SourceOptionOrder (`@inixiative/json-rules`); ValueShape (`@inixiative/json-rules`); andWhere (`@inixiative/json-rules`); getAggregateOperators (`@inixiative/json-rules`); getArrayOperators (`@inixiative/json-rules`); getValueShape (`@inixiative/json-rules`); matchAll (`@inixiative/json-rules`); matchNothing (`@inixiative/json-rules`); parseScopeRef (`@inixiative/json-rules`)
 

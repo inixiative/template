@@ -124,15 +124,17 @@ Field encryption. Any value the server must later replay to a third party (OAuth
 
 Keyrings and rotation. Each `envPrefix` has three env vars: `{PREFIX}_ENCRYPTION_VERSION` (integer), `{PREFIX}_ENCRYPTION_KEY_CURRENT` (base64 32 bytes, `openssl rand -base64 32`) and optional `{PREFIX}_ENCRYPTION_KEY_PREVIOUS`, validated at boot by `encryptionEnv` in `apps/api/src/config/env.ts`. Per environment: local and test read them from `apps/api/.env.local` / `.env.test` (the examples ship a 32-zero-byte test key at version 1, which is also what tests in CI run with); prod and staging get them in Infisical under `/api`, seeded at version 1 with a random key by the init script's Infisical section (`ensureProdEncryptionKeys` / `ensureStagingEncryptionKeys`, which refuses to overwrite a half-set keyring). To rotate: bump the version by exactly one, move the current key to `_KEY_PREVIOUS`, set a new current key, deploy. Worker startup enqueues the singleton `rotateEncryptionKeys` job, which walks the registry and re-encrypts rows still on the previous version with an idempotent `updateManyAndReturn` (old version in the where clause) under `resolveAll` + `getConcurrency([ConcurrencyType.db])`; decryption accepts both keys meanwhile, so there is no downtime. Keep `_KEY_PREVIOUS` until every row is verified on the new version. `validateEncryptionVersions` (`packages/db/src/lib/encryption/validation.ts`, with tests) returns `{ valid, errors }` for a downgrade, a jump of more than one, a bump over mixed versions, more than two versions, a missing previous key above version 1, or current = previous. The CI for it is not finished: there is no `validate:encryption` script in `packages/db` and no `.github/workflows` in template, so the deploy-time check that ENCRYPTION.md § CI Validation describes does not run yet; until it does, run the function yourself before a rotation deploy.
 
-Env secrets. Environments are `local | test | pr | staging | prod`. Cloud secrets live in Infisical (one project, environments pr / staging / prod, `.infisical.json` marks it configured); local and test use uncommitted `.env.local` / `.env.test` created from the examples by `bun run sync-env`. `bun run with <env> <app> <command>` (`scripts/deployment/with-env.sh`) runs through `infisical run` for cloud envs and sources root then app env files otherwise. Adding a var means the `.env.*.example` file, your own env file, each Infisical environment (`infisical secrets set`), and the app's zod env schema. No env files or secret values are committed. Related regions: `dx-setup` owns env config and with-env too (overlap is fine; go there for setup, worktrees and CI/deploy); `init-script` provisions Infisical and seeds the keyrings; `authentication / frontend-auth` owns `AuthProvider` and the hashing side (bcrypt passwords, SHA-256 API token hashes, which are not encryption); `jobs-cron` and `concurrency-locks` own the job runner, `makeSingletonJob`, `createLock` and `resolveAll` that rotation uses; `mutation-hooks` owns audit-log redaction; `ui-components-theme` owns `SecretRevealModal` for showing a new secret once.
+Env secrets. Environments are `local | test | pr | staging | prod`. Cloud secrets live in Infisical (one project, environments pr / staging / prod, `.infisical.json` marks it configured); local and test use uncommitted `.env.local` / `.env.test` created from the examples by `bun run sync-env`. `bun run with <env> <app> <command>` (`scripts/deployment/with-env.sh`) runs through `infisical run` for cloud envs and sources root then app env files otherwise. Adding a var means the `.env.*.example` file, your own env file, each Infisical environment (`infisical secrets set`), and the app's zod env schema. No env files or secret values are committed. Related regions: `dx-setup` owns env config and with-env too (overlap is fine; go there for setup, worktrees and CI/deploy); `init-script` provisions Infisical and seeds the keyrings; `authentication / frontend-auth` owns `AuthProvider` and the hashing side (bcrypt passwords, SHA-256 API token hashes, which are not encryption); `jobs-cron` and `concurrency-locks` own the job runner, `makeSingletonJob`, `createLock` and `resolveAll` that rotation uses; `mutation-hooks` owns audit-log redaction; `ui-components / theme-layout` owns `SecretRevealModal` for showing a new secret once.
 
 ## 3. Everything that exists here, by class
 
-Point at a class when that is as specific as the moment allows, or at a member. Where a class has siblings an agent could confuse, a table under the class header says which to use when. Each member: **name** `where`: choose this when … . Where the docs or code give material, a second line describes the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
+Point at a class when that is as specific as the moment allows, or at a member. Where a class has siblings an agent could confuse, a table under the class header says which to use when; its *Said as* line gives the plain words a user or agent uses for that job. Each member: **name** · kind `where` · the doc § that describes it (code members) or the code it is about (doc members): choose this when … . Quote the name and the where in a pointer ("look over here: createLock, packages/db/src/lock/createLock.ts, CONCURRENCY.md § Distributed Lock"). *Said as:* the ways a user or agent describes this job in a message or plan without knowing the name; match on these. *Signs you're bypassing it:* the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
 
 ### Class `encryption`: Field-level encryption (AES-256-GCM), keyrings, key rotation, CI version validation
 
 **Job: encrypt or decrypt a stored secret field** (Encrypting: encryptField vs decryptField vs createEncryption vs encryptionService vs ENCRYPTED_MODELS) — docs/claude/ENCRYPTION.md § Adding Encrypted Fields; catalog
+
+*Said as:* "encrypt or decrypt a stored secret field", "store a credential safely", "a sensitive column at rest"
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -144,6 +146,8 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 **Job: rotate an encryption key** (Rotating: Key rotation procedure vs rotateEncryptionKeys vs validateEncryptionVersions vs Key rotation deployment checklist) — docs/claude/ENCRYPTION.md § Key Rotation, § CI Validation, § Deployment Checklist
 
+*Said as:* "rotate an encryption key", "change the encryption key safely", "re-encrypt after a key change"
+
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **Key rotation procedure** | changing a key: old → _KEY_PREVIOUS, new _KEY_CURRENT, bump _VERSION by one | replacing _KEY_CURRENT in place |
@@ -151,71 +155,112 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **validateEncryptionVersions** | checking stored versions are safe to bump (no validate:encryption script or workflow yet) | hand-written GROUP BY scripts |
 | **Key rotation deployment checklist** | deploy sequencing; keep _KEY_PREVIOUS until all rows verified | dropping _KEY_PREVIOUS in the bump deploy |
 
-- **createEncryption** `packages/db/src/lib/encryption/encryptionService.ts#createEncryption`: Low-level service; for model fields use encryptField/decryptField instead.
+- **createEncryption** · primitive `packages/db/src/lib/encryption/encryptionService.ts#createEncryption`: Low-level service; for model fields use encryptField/decryptField instead.
+  - *Said as:* "the low-level encrypt and decrypt service", "an encryption service with an explicit keyring", "build a keyring from process env in the controller", "encryption outside the model-field path"
   - *Signs you're bypassing it:* building a keyring from process.env in a controller to encrypt a model field (catalog: createEncryption (low-level service; for model fields use encryptField/decryptField))
-- **decryptField** `packages/db/src/lib/encryption/helpers.ts#decryptField`: Use over createEncryption for model fields; key name typos fail at compile time.
+- **decryptField** · primitive `packages/db/src/lib/encryption/helpers.ts#decryptField` · in docs: docs/claude/AUTH.md § Multi-Provider Authentication (AuthProvider); docs/claude/ENCRYPTION.md § Adding Encrypted Fields: Use over createEncryption for model fields; key name typos fail at compile time.
+  - *Said as:* "read the stored credential back in plaintext", "decrypt the field so I can call the provider", "build a keyring from env and decrypt by hand", "the ciphertext is unreadable, handle that case", "get the secret off the row to use it"
   - *Signs you're bypassing it:* reading encrypted columns and decrypting them with createEncryption and hand-picked env keys (catalog: decryptField (use over createEncryption for model fields; key name typos fail at compile time))
-- **ENCRYPTED_MODELS** `packages/db/src/lib/encryption/registry.ts#ENCRYPTED_MODELS`: Adding a field here is the only step needed to encrypt it.
+- **ENCRYPTED_MODELS** · primitive `packages/db/src/lib/encryption/registry.ts#ENCRYPTED_MODELS` · in docs: docs/claude/ENCRYPTION.md § Adding Encrypted Fields; docs/claude/ENCRYPTION.md § Overview: Adding a field here is the only step needed to encrypt it.
+  - *Said as:* "register the new encrypted field", "which models have encrypted fields", "write rotation code for my new field", "the keys and CI check light up automatically when I register it", "pre-built encrypted columns per integration", "store the bot tokens in a cloud secrets manager"
   - *Signs you're bypassing it:* writing per-model rotation code, a new rotation job, or custom hooks for a newly encrypted field (docs/claude/ENCRYPTION.md § Adding Encrypted Fields (zero code changes needed; the rotation job automatically handles the new field))
-- **encryptField** `packages/db/src/lib/encryption/helpers.ts#encryptField`: Use instead of ad-hoc credential storage or calling createEncryption directly.
+- **encryptField** · primitive `packages/db/src/lib/encryption/helpers.ts#encryptField` · in docs: docs/claude/AUTH.md § Multi-Provider Authentication (AuthProvider); docs/claude/ENCRYPTION.md § Overview: Use instead of ad-hoc credential storage or calling createEncryption directly.
+  - *Said as:* "store the OAuth client secret safely", "encrypt this credential before saving it", "call node crypto directly to encrypt the value", "base64 the secret before storing", "put the token in a plain json column", "seal the access and refresh tokens on the row"
   - *Signs you're bypassing it:* calling node crypto createCipheriv directly, base64-encoding a secret, or storing a provider credential in plain text or a plain Json column (catalog: encryptField (use instead of ad-hoc credential storage or calling createEncryption directly))
-- **encryptionEnv** `packages/db/src/lib/encryption/envValidation.ts#encryptionEnv`: Prefer over hand-declaring key env vars; wraps encryptionKeySchema and the version refinement.
+- **encryptionEnv** · primitive `packages/db/src/lib/encryption/envValidation.ts#encryptionEnv`: Prefer over hand-declaring key env vars; wraps encryptionKeySchema and the version refinement.
+  - *Said as:* "declare the env vars for the encryption keys", "hand-write zod string entries for the key env vars", "validate the keyring env at startup", "key env plus version with its refinement"
   - *Signs you're bypassing it:* hand-declared z.string() env entries for encryption keys and versions (catalog: encryptionEnv (prefer over hand-declaring key env vars))
-- **rotateEncryptionKeys** `apps/api/src/jobs/handlers/rotateEncryptionKeys.ts#rotateEncryptionKeys`: re-encrypt every registered encrypted field holding a stale key version
+- **rotateEncryptionKeys** · primitive `apps/api/src/jobs/handlers/rotateEncryptionKeys.ts#rotateEncryptionKeys` · in docs: docs/claude/ENCRYPTION.md § Key Rotation; FEATURES.md § Encryption & Security: re-encrypt every registered encrypted field holding a stale key version
+  - *Said as:* "re-encrypt everything on the old key", "a migration script to rotate the key", "the job that moves rows to the new key version", "re-encrypt rows still on the stale version", "a new job to re-encrypt after a key change"
   - *Signs you're bypassing it:* a one-off migration script or new job that re-encrypts rows after a key change (docs/claude/ENCRYPTION.md § Key Rotation (worker startup auto-enqueues the rotation job))
-- **validateEncryptionVersions** `packages/db/src/lib/encryption/validation.ts#validateEncryptionVersions`: check stored encrypted fields against expected encryption key versions, collecting errors
+- **validateEncryptionVersions** · primitive `packages/db/src/lib/encryption/validation.ts#validateEncryptionVersions` · in docs: docs/claude/ENCRYPTION.md § CI Validation: check stored encrypted fields against expected encryption key versions, collecting errors
+  - *Said as:* "is it safe to bump the key version", "check what versions the stored rows are on", "a SQL group by on the version column", "are all rows on the current version yet", "a script to decide if the bump is safe"
   - *Signs you're bypassing it:* a hand-written SQL GROUP BY on the key version column or a new script to decide whether a version bump is safe (packages/db/src/lib/encryption/validation.ts (+ validation.test.ts); docs/claude/ENCRYPTION.md § CI Validation)
-- **Adding an encrypted field** `docs/claude/ENCRYPTION.md#Adding Encrypted Fields`: add field triplet to schema, three env vars, and a registry entry; no rotation code
+- **Adding an encrypted field** · pattern docs/claude/ENCRYPTION.md § Adding Encrypted Fields · code: `ENCRYPTED_MODELS`, `registry`, `encryptField`, `decryptField`: add field triplet to schema, three env vars, and a registry entry; no rotation code
+  - *Said as:* "add an encrypted field to a model", "steps to encrypt a new column", "a new per-feature encryption helper", "schema triplet, env vars, registry entry"
   - *Signs you're bypassing it:* a new per-feature encryption helper or encryption manager, or a field encrypted without schema triplet + keyring env vars + registry entry (docs/claude/ENCRYPTION.md § Adding Encrypted Fields)
-- **Auth transport by flow** `FEATURES.md > General Security > HTTP-Only Cookie / Bearer Token`: cookie for email/password (CSRF double-submit); Bearer for OAuth
-- **Field-level encryption registry** `FEATURES.md > Unique Selling Points`: encrypt sensitive fields with AES-256-GCM, auto-rotate keys, and validate them in CI
-- **Idempotent rotation precondition** `FEATURES.md > Field-Level Encryption Engine > Idempotent Rotation`: re-encrypt only rows still on the old version so reruns never double-encrypt
+- **Auth transport by flow** · pattern FEATURES.md > General Security > HTTP-Only Cookie / Bearer Token: cookie for email/password (CSRF double-submit); Bearer for OAuth
+  - *Said as:* "cookie or bearer token for this login flow", "how does the session travel for OAuth vs password", "CSRF for the cookie flow"
+- **Field-level encryption registry** · pattern FEATURES.md > Unique Selling Points: encrypt sensitive fields with AES-256-GCM, auto-rotate keys, and validate them in CI
+  - *Said as:* "encrypt sensitive fields with automatic rotation", "the encryption system as a whole", "encrypted columns with CI checks"
+- **Idempotent rotation precondition** · pattern FEATURES.md > Field-Level Encryption Engine > Idempotent Rotation: re-encrypt only rows still on the old version so reruns never double-encrypt
+  - *Said as:* "rerunning the rotation double-encrypts rows", "only re-encrypt rows still on the old version", "update by id without checking the version", "rotation is safe to run twice"
   - *Signs you're bypassing it:* a rotation update using update({ where: { id } }) without the old version in the where clause (docs/claude/ENCRYPTION.md § Key Rotation › Idempotent Protection and FAQ (why updateManyAndReturn))
-- **Idempotent version-precondition update** `docs/claude/ENCRYPTION.md#Idempotent Protection`: Optimistic per-row races; use createLock for cross-process critical sections instead.
-- **Key rotation job flow** `docs/claude/ENCRYPTION.md#Rotation Job Flow`: re-encrypt stale-version records from env target version with concurrency-limited idempotent updates
-- **Me routes for self-service** `FEATURES.md > User Management > Me Endpoint System`: own data: /me; managing other users: admin routes
-- **Rate limiting windows** `FEATURES.md > General Security > Rate Limiting`: limit requests with atomic Redis fixed windows AND-checked per user, space, org
-- **Singleton job locking** `FEATURES.md > Field-Level Encryption Engine > Singleton Job Locking`: cross-worker singleton jobs such as key rotation
-- **Version-guarded idempotent update** `docs/claude/ENCRYPTION.md#FAQ`: Concurrent retryable rewrites; plain update when no race on the record version.
+- **Idempotent version-precondition update** · pattern docs/claude/ENCRYPTION.md § Key Rotation › Idempotent Protection · code: `ENCRYPTED_MODELS`, `resolveAll`, `rotateEncryptionKeys`: Optimistic per-row races; use createLock for cross-process critical sections instead.
+  - *Said as:* "two workers rotating the same row", "optimistic per-row race during rotation", "a lock around each re-encrypt"
+- **Key rotation job flow** · pattern docs/claude/ENCRYPTION.md § Implementation Details › Rotation Job Flow · code: `encryptField`, `decryptField`, `makeSingletonJob`, `createLock`: re-encrypt stale-version records from env target version with concurrency-limited idempotent updates
+  - *Said as:* "how the rotation job works end to end", "the rotation job's steps", "concurrency-limited re-encryption from the target version"
+- **Me routes for self-service** · pattern FEATURES.md > User Management > Me Endpoint System: own data: /me; managing other users: admin routes
+  - *Said as:* "a user editing their own profile", "own data vs managing other users", "self-service endpoints for own data"
+- **Rate limiting windows** · pattern FEATURES.md > General Security > Rate Limiting: limit requests with atomic Redis fixed windows AND-checked per user, space, org
+  - *Said as:* "limit requests per user, space and org", "fixed window rate limiting in redis", "throttle this endpoint"
+- **Singleton job locking** · pattern FEATURES.md > Field-Level Encryption Engine > Singleton Job Locking: cross-worker singleton jobs such as key rotation
+  - *Said as:* "only one worker should run the rotation", "cross-worker singleton job", "two workers picked up the rotation"
+- **Version-guarded idempotent update** · pattern docs/claude/ENCRYPTION.md § FAQ: Concurrent retryable rewrites; plain update when no race on the record version.
+  - *Said as:* "put the version in the where clause", "an already-rotated flag on the row", "a lock around the re-encrypt update", "concurrent retryable rewrite of the same row"
   - *Signs you're bypassing it:* a lock or 'already rotated' flag added around a re-encrypt update instead of putting the version in the where clause (docs/claude/ENCRYPTION.md § FAQ (why updateManyAndReturn instead of update))
-- **DecryptFieldInput** `packages/db/src/lib/encryption`: type the record shape decryptField accepts for a model and key
-- **EncryptedFieldData** `packages/db/src/lib/encryption`: describe the AES-256-GCM payload stored across encrypted, metadata and version columns
-- **Encryption keyring env vars** `ENCRYPTION_KEY_CURRENT / ENCRYPTION_KEY_PREVIOUS / ENCRYPTION_KEY_VERSION`: supply current and previous keys plus version for dual-key decryption
-- **encryptionService** `@template/db/lib/encryption/encryptionService.ts`: Rarely; prefer encryptField/decryptField which handle registry, versions and metadata.
+- **DecryptFieldInput** · primitive packages/db/src/lib/encryption: type the record shape decryptField accepts for a model and key
+  - *Said as:* "the record shape decrypt accepts", "type the row I pass to decrypt"
+- **EncryptedFieldData** · primitive packages/db/src/lib/encryption: describe the AES-256-GCM payload stored across encrypted, metadata and version columns
+  - *Said as:* "the shape of the stored ciphertext payload", "encrypted, metadata and version columns together", "what the encrypted blob contains"
+- **Encryption keyring env vars** · primitive ENCRYPTION_KEY_CURRENT / ENCRYPTION_KEY_PREVIOUS / ENCRYPTION_KEY_VERSION: supply current and previous keys plus version for dual-key decryption
+  - *Said as:* "the current and previous key plus version", "which env vars hold the encryption keys", "dual-key decryption during a rotation"
+- **encryptionService** · primitive @template/db/lib/encryption/encryptionService.ts: Rarely; prefer encryptField/decryptField which handle registry, versions and metadata.
+  - *Said as:* "import the encryption internals directly in feature code", "the service underneath the field helpers", "a new encryption manager for this feature", "the internal service, rarely needed"
   - *Signs you're bypassing it:* importing encryptionService directly in feature code (catalog: encryptionService (rarely; prefer encryptField/decryptField which handle registry, versions and metadata))
-- **POST /admin/jobs/enqueue** `docs/claude/ENCRYPTION.md#Manual Trigger`: Manual or ad-hoc runs; normal code enqueues jobs programmatically.
-- **RuntimeDelegate** `packages/db/src/lib/encryption`: type dynamically selected Prisma model delegates with a single cast instead of any
-- **User-scoped tokens** `FEATURES.md > User Management > User-Scoped Tokens`: API automation as a user; sessions for interactive use
-- **AAD uses immutable fields only** `packages/db/src/lib/encryption/registry.ts buildAAD`: Every registry key entry.
+- **POST /admin/jobs/enqueue** · primitive docs/claude/ENCRYPTION.md § Key Rotation › Manual Trigger · code: `ENCRYPTED_MODELS`, `resolveAll`, `rotateEncryptionKeys`: Manual or ad-hoc runs; normal code enqueues jobs programmatically.
+  - *Said as:* "kick off the rotation by hand", "manually trigger a job", "run the job now from the admin API"
+- **RuntimeDelegate** · primitive packages/db/src/lib/encryption: type dynamically selected Prisma model delegates with a single cast instead of any
+  - *Said as:* "pick the Prisma model dynamically with one cast", "resolve the delegate from a model name without any", "cast at every call site for a dynamic model", "a method missing on the dynamic delegate type"
+- **User-scoped tokens** · primitive FEATURES.md > User Management > User-Scoped Tokens: API automation as a user; sessions for interactive use
+  - *Said as:* "an API token that acts as a user", "automation as a user without a session", "scripted access to the API as me"
+- **AAD uses immutable fields only** · rule packages/db/src/lib/encryption/registry.ts buildAAD: Every registry key entry.
+  - *Said as:* "which fields bind the ciphertext", "including the name in the AAD", "old ciphertext became undecryptable after a rename"
   - *Signs you're bypassing it:* a buildAAD that includes name, provider or another mutable field (docs/claude/ENCRYPTION.md § Field-Scoped Encryption (never use mutable fields; changing them makes old ciphertext undecryptable))
-- **CI encryption version validation** `FEATURES.md > Field-Level Encryption Engine > CI Version Validation`: every deploy
-- **Encrypted field column naming** `docs/claude/ENCRYPTION.md#Database Schema Pattern`: Every new encrypted field in the Prisma schema.
+- **CI encryption version validation** · rule FEATURES.md > Field-Level Encryption Engine > CI Version Validation: every deploy
+  - *Said as:* "CI checks the key versions before deploy", "block the deploy on a bad version bump", "validate encryption on every deploy"
+- **Encrypted field column naming** · rule docs/claude/ENCRYPTION.md § Field-Scoped Encryption › Database Schema Pattern · code: `AuthProvider`, `registry`, `ENCRYPTED_MODELS`: Every new encrypted field in the Prisma schema.
+  - *Said as:* "how to name the encrypted columns", "one encrypted column for the whole model", "metadata and version stored at model level", "the three columns for an encrypted field"
   - *Signs you're bypassing it:* a single encrypted column, metadata and version stored at model level, or column names that don't match getFieldNames (encrypted{Key}, encrypted{Key}Metadata, encrypted{Key}KeyVersion) (docs/claude/ENCRYPTION.md § Field-Scoped Encryption › Database Schema Pattern; registry.ts getFieldNames)
-- **Encryption env vars per keyring** `@template/db/lib/encryption/envValidation.ts`: Adding or rotating any encrypted field keyring.
+- **Encryption env vars per keyring** · rule @template/db/lib/encryption/envValidation.ts: Adding or rotating any encrypted field keyring.
+  - *Said as:* "one global encryption key for everything", "three env vars for each encrypted field", "a separate keyring per field"
   - *Signs you're bypassing it:* one global ENCRYPTION_KEY shared by every encrypted field instead of three vars per envPrefix (docs/claude/ENCRYPTION.md § Environment Variables › Per Keyring (3 vars))
-- **Encryption version bumps by one only** `docs/claude/ENCRYPTION.md#CI Validation`: Every encryption key rotation; CI validate:encryption enforces it before deploy.
+- **Encryption version bumps by one only** · rule docs/claude/ENCRYPTION.md § CI Validation · code: `validateEncryptionVersions`, `registry`, `Integration`: Every encryption key rotation; CI validate:encryption enforces it before deploy.
+  - *Said as:* "jump the version from one to three", "reuse an old version number", "bump while rows are on mixed versions", "versions only go up by one"
   - *Signs you're bypassing it:* setting the version from 1 to 3, reusing an old version, or bumping while rows are still on mixed versions (docs/claude/ENCRYPTION.md § CI Validation (rules in validateEncryptionVersions; the validate:encryption script and workflow do not exist yet))
-- **Field-scoped encryption** `docs/claude/ENCRYPTION.md#FAQ`: Adding encryption to any field, including existing ones (unencrypted until next update or migration).
-- **Key rotation deployment checklist** `docs/claude/ENCRYPTION.md#Deployment Checklist`: Any encryption key rotation; keep _KEY_PREVIOUS until all records verified on the new version.
+- **Field-scoped encryption** · rule docs/claude/ENCRYPTION.md § FAQ: Adding encryption to any field, including existing ones (unencrypted until next update or migration).
+  - *Said as:* "encrypt an existing column", "existing rows stay unencrypted until updated", "encryption per field, not per table"
+- **Key rotation deployment checklist** · rule docs/claude/ENCRYPTION.md § Deployment Checklist: Any encryption key rotation; keep _KEY_PREVIOUS until all records verified on the new version.
+  - *Said as:* "the order of steps when deploying a key rotation", "drop the previous key in the same deploy", "when can I remove the old key", "keep the previous key until every row is verified"
   - *Signs you're bypassing it:* dropping _KEY_PREVIOUS in the same deploy that bumps the version (docs/claude/ENCRYPTION.md § Deployment Checklist)
-- **Key rotation procedure** `FEATURES.md > Field-Level Encryption Engine > 3 Env Vars Per Keyring`: every key rotation; CI blocks version gaps, downgrades or mixed versions
+- **Key rotation procedure** · rule FEATURES.md > Field-Level Encryption Engine > 3 Env Vars Per Keyring: every key rotation; CI blocks version gaps, downgrades or mixed versions
+  - *Said as:* "how do I rotate the encryption key", "swap the current key in place", "move the old key to previous and bump the version", "changing a key", "generate a new key and update the env"
   - *Signs you're bypassing it:* replacing _KEY_CURRENT in place without moving the old key to _KEY_PREVIOUS and bumping _VERSION (FEATURES.md § Field-Level Encryption Engine › 3 Env Vars Per Keyring; docs/claude/ENCRYPTION.md § Deployment Checklist)
-- **Never store or log plaintext secrets** `FEATURES.md > General Security > Password Hashing / Token Hashing`: any credential persisted
+- **Never store or log plaintext secrets** · rule FEATURES.md > General Security > Password Hashing / Token Hashing: any credential persisted
+  - *Said as:* "the log line includes the token", "print the decrypted credential in the error message", "a password in plaintext anywhere", "redact secrets from logs"
   - *Signs you're bypassing it:* a log line or error message that includes a token, password or decrypted credential (FEATURES.md § General Security › Password Hashing / Token Hashing)
-- **No dangerouslySetInnerHTML** `FEATURES.md > General Security > XSS Prevention`: all frontend rendering
+- **No dangerouslySetInnerHTML** · rule FEATURES.md > General Security > XSS Prevention: all frontend rendering
+  - *Said as:* "render the HTML string in React", "inject markup into the page"
   - *Signs you're bypassing it:* rendering HTML strings via dangerouslySetInnerHTML (FEATURES.md § General Security › XSS Prevention)
-- **No raw SQL** `FEATURES.md > General Security > SQL Injection Prevention`: all database access
-- **One key version gap at a time** `@template/db/lib/encryption/validation.ts`: Every key rotation deploy.
-- **Register encrypted fields in ENCRYPTED_MODELS** `FEATURES.md > Encryption & Security > Field-Level Encryption Engine`: any sensitive field stored at rest, e.g. OAuth client secrets
+- **No raw SQL** · rule FEATURES.md > General Security > SQL Injection Prevention: all database access
+  - *Said as:* "write the query in raw SQL", "SQL injection risk in a string query", "use the client, not raw SQL"
+- **One key version gap at a time** · rule @template/db/lib/encryption/validation.ts: Every key rotation deploy.
+  - *Said as:* "skip a version during rotation", "the version is two ahead of the rows", "rotate one version at a time"
+- **Register encrypted fields in ENCRYPTED_MODELS** · rule FEATURES.md > Encryption & Security > Field-Level Encryption Engine: any sensitive field stored at rest, e.g. OAuth client secrets
+  - *Said as:* "encrypted columns in the schema but no registry entry", "rotation never sees my new field", "a sensitive field stored at rest"
   - *Signs you're bypassing it:* encrypted columns added to the schema with no registry entry, so rotation, validation and audit redaction never see them (FEATURES.md § Encryption & Security › Registry Pattern)
-- **Secrets encrypted, never returned** `CLAUDE.md §7 Core Engineering Standards`: Encrypt secrets at rest and never return them in API responses.
+- **Secrets encrypted, never returned** · rule CLAUDE.md §7 Core Engineering Standards: Encrypt secrets at rest and never return them in API responses.
+  - *Said as:* "the response includes the encrypted columns", "return the decrypted secret in the API", "strip the secret from the response schema", "secrets at rest, omitted from responses"
   - *Signs you're bypassing it:* a response schema or select that returns encryptedSecrets / metadata / version columns or the decrypted secret (CLAUDE.md §7 Core Engineering Standards; docs/claude/AUTH.md Operations (secrets omitted))
-- **Typed IDs** `FEATURES.md > User Management > User CRUD`: all model IDs
+- **Typed IDs** · rule FEATURES.md > User Management > User CRUD: all model IDs
+  - *Said as:* "model ids should be branded types", "an id as a plain string"
 - *Also here, by name:* createEncryptionEnvRefinement (`packages/db/src/lib/encryption/envValidation.ts`); encryptionKeySchema (`packages/db/src/lib/encryption/envValidation.ts`); getEncryptedFieldsByModel (`packages/db/src/lib/encryption/registry.ts`); getFieldNames (`packages/db/src/lib/encryption/registry.ts`)
 
 ### Class `secrets`: Secrets around the app: Infisical storage, secret env vars and keyrings per environment (CI included), provider credentials, how keys rotate
 
 **Job: store or read a cloud secret** (Where a secret lives: Infisical for cloud secrets vs No committed env files vs getSecret vs setSecret vs encryptionEnv) — docs/claude/ENVIRONMENTS.md § Infisical; INIT_SCRIPT_PATTERNS.md §8, §12; catalog encryptionEnv
+
+*Said as:* "store or read a cloud secret", "where do secrets go for staging and prod", "env vars for secrets"
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -227,6 +272,8 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 **Job: store a credential the server holds** (Stored credentials: Provider credentials encrypted, never hashed vs Encrypt secrets before storage vs Never store or log plaintext secrets vs Secrets encrypted, never returned) — docs/claude/AUTH.md › Encryption; API_ROUTES.md; FEATURES.md § General Security; CLAUDE.md §7
 
+*Said as:* "store a credential the server holds", "hash or encrypt this secret", "a provider credential we need to replay"
+
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **Provider credentials encrypted, never hashed** | secrets the server must replay to a third party | passwords/tokens checked only (hash those) |
@@ -234,23 +281,34 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **Never store or log plaintext secrets** | every log line and error | n/a: always applies |
 | **Secrets encrypted, never returned (encryption)** | response schemas and selects | returning encrypted columns or decrypted values |
 
-- **SecretRevealModal** `packages/ui/src/components/utility/SecretRevealModal.tsx#SecretRevealModal`: Any one-time secret display (API tokens, webhook secrets) instead of a custom modal.
+- **SecretRevealModal** · primitive `packages/ui/src/components/utility/SecretRevealModal.tsx#SecretRevealModal` · in docs: docs/claude/FRONTEND/COMPONENTS.md § Package Organization; docs/claude/FRONTEND/COMPONENTS.md § Settings: Any one-time secret display (API tokens, webhook secrets) instead of a custom modal.
+  - *Said as:* "show the new API token once", "a custom modal with a copy button for the secret", "reveal the webhook secret one time", "display a secret the user can't see again"
   - *Signs you're bypassing it:* a custom modal that displays a new API token or webhook secret with its own copy logic (docs/claude/FRONTEND/COMPONENTS.md § Modals and Pages; catalog entry SecretRevealModal)
-- **Encrypt secrets before storage** `docs/claude/API_ROUTES.md — Example: Create Organization Provider`: Extract secrets from the body, encrypt them with encryptField, then create the row.
+- **Encrypt secrets before storage** · pattern docs/claude/API_ROUTES.md — Example: Create Organization Provider: Extract secrets from the body, encrypt them with encryptField, then create the row.
+  - *Said as:* "create the row then encrypt the secret after", "pull the secrets out of the body and encrypt first", "the create route takes a client secret", "store the provider credentials on create"
   - *Signs you're bypassing it:* creating the row with the secret from the request body and encrypting afterwards, or not at all (docs/claude/API_ROUTES.md — Example: Create Organization Provider)
-- **System probe secret rate-limit exemption** `docs/claude/WEBSOCKETS.md#authorization-and-re-authorization`: Only server-internal probes; client-driven opens and subscribes still count.
-- **getSecret** `init script (docs/claude/INIT_SCRIPT_PATTERNS.md#8)`: Secrets in init steps; non-secret metadata: getProjectConfig instead.
+- **System probe secret rate-limit exemption** · pattern docs/claude/WEBSOCKETS.md § Data streams › Authorization and re-authorization › Authorization and re-authorization · code: `openDataStream`, `resolveStreamRoute`, `fetchStreamSnapshot`, `routeAccessOf`: Only server-internal probes; client-driven opens and subscribes still count.
+  - *Said as:* "internal probes shouldn't count against the rate limit", "the server's own health probe gets throttled", "exempt system probes from limits"
+- **getSecret** · primitive init script (docs/claude/INIT_SCRIPT_PATTERNS.md § 8): Secrets in init steps; non-secret metadata: getProjectConfig instead.
+  - *Said as:* "read the credential from the secret store in an init step", "pass the connection string from the previous step", "fetch the password from the vault at this step", "an init step needs an API key"
   - *Signs you're bypassing it:* passing a connection string, password or API key from one init step to the next instead of re-fetching it from Infisical (docs/claude/INIT_SCRIPT_PATTERNS.md § 8. Always Fetch from Source, Never Trust Props)
-- **setSecret** `docs/claude/INIT_SCRIPT_PATTERNS.md §12`: store a credential in Infisical under a project environment path
-- **Encrypt OAuth client secrets** `FEATURES.md > Encrypted Secrets`: Any stored provider credential.
-- **Infisical for cloud secrets** `docs/claude/ENVIRONMENTS.md#Infisical (Cloud Environments)`: Cloud environments; local/test use .env files.
+- **setSecret** · primitive docs/claude/INIT_SCRIPT_PATTERNS.md §12: store a credential in Infisical under a project environment path
+  - *Said as:* "store the credential in the secret store from init", "save the generated key for the environment", "hand the secret to the next step as a prop", "write a secret under the project's environment path"
+- **Encrypt OAuth client secrets** · rule FEATURES.md > Encrypted Secrets: Any stored provider credential.
+  - *Said as:* "where do OAuth client secrets go", "store the provider's client secret", "a stored provider credential"
+- **Infisical for cloud secrets** · rule docs/claude/ENVIRONMENTS.md § Infisical (Cloud Environments) · code: `Token`: Cloud environments; local/test use .env files.
+  - *Said as:* "where do staging and prod secrets live", "set the env var directly on the host", "copy the env file to the server", "inject secrets into the cloud environment", "secrets for pr, staging and prod"
   - *Signs you're bypassing it:* a hand-copied env file or a secret set directly on a pr/staging/prod host instead of Infisical injected via with-env (docs/claude/ENVIRONMENTS.md § Infisical (Cloud Environments); § with-env Composition)
-- **No committed env files** `FEATURES.md › Infisical Secrets Management`: any secret or environment value for pr, staging or prod
+- **No committed env files** · rule FEATURES.md › Infisical Secrets Management: any secret or environment value for pr, staging or prod
+  - *Said as:* "commit the staging env file", "real secret values in the repo", "which env files are okay to check in", "example env files only"
   - *Signs you're bypassing it:* committing a .env.staging / .env.prod or real secret values instead of the .env.*.example files plus Infisical (FEATURES.md § Infrastructure & DevOps › Infisical Secrets Management)
-- **Provider credentials encrypted, never hashed** `docs/claude/AUTH.md › Encryption`: Any stored credential the server must later replay to a third party.
+- **Provider credentials encrypted, never hashed** · rule docs/claude/AUTH.md › Encryption: Any stored credential the server must later replay to a third party.
+  - *Said as:* "hash the provider secret like a password", "the server must replay this secret to a third party", "reversible storage for a credential we send onward", "hash or encrypt this token"
   - *Signs you're bypassing it:* hashing a provider secret that must be replayed to a third party (docs/claude/AUTH.md › Encryption)
-- **Provider credentials only in /api secrets** `docs/claude/LOGGING.md#Setup`: Any telemetry secret or browser build variable.
-- **Resource existence is non-secret** `docs/claude/PERMISSIONS.md#Resource Lookup Runs Before Authorization`: Only resources that must hide existence from non-members need custom middleware.
+- **Provider credentials only in /api secrets** · rule docs/claude/LOGGING.md § Setup: Any telemetry secret or browser build variable.
+  - *Said as:* "telemetry key in the browser build", "which secrets can the frontend see", "the logging token belongs on the API only"
+- **Resource existence is non-secret** · rule docs/claude/PERMISSIONS.md § Permission Checks › Resource Lookup Runs Before Authorization · code: `resourceContextMiddleware`, `validateUser`, `validateActor`, `getActor`: Only resources that must hide existence from non-members need custom middleware.
+  - *Said as:* "return 404 so non-members can't tell it exists", "the lookup runs before the permission check", "hide whether the resource exists"
 - *Also here, by name:* AUTH_PROBE_SECRET (`apps/api/src/lib/utils/authProbe.ts`); SYSTEM_PROBE_SECRET (`apps/api/src/lib/utils/authProbe.ts`)
 
 ## 4. The specifics, in full

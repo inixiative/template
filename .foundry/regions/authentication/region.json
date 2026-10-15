@@ -1,15 +1,13 @@
 {
   "id": "authentication",
-  "title": "Authentication and Users",
-  "routing": "Is this about who the caller is on the server? The BetterAuth auth instance and Session, the OAuth one-time-token handoff (oauthHandoffPlugins, #ott), AuthProvider/Account/Verification, platform providers, API Token rows and TokenOwnerModel (User/Organization/OrganizationUser/Space/SpaceUser tokens, createToken, organizationCreateToken), the auth middleware chain (tokenAuthMiddleware, authMiddleware, spoofMiddleware, basicAuthMiddleware, auditActorMiddleware, authRateLimit), getActor and the validateUser/validateActor/validateNotToken gates, or User identity helpers (findUserByEmail, findUserWithRelations, findUserOrCreateGuest, normalizeEmail, redactUser, the me module)?",
+  "title": "Authentication: sessions, providers, tokens",
+  "routing": "Is this about how a caller proves who it is: BetterAuth sessions and the auth instance (apps/api/src/lib/auth.ts), email/password or Google sign-in, OAuth callback and the one-time token (/auth/callback#ott=), AuthProvider rows per organization vs platform providers (getPlatformProviders), Account, Session, Verification, API keys as Token rows (createToken, SHA-256 keyHash, TokenOwnerModel, token scopes, TokensPage), or the frontend auth strategy (detectAuthStrategy, setToken/getToken, fetchAndHydrateMe)?",
   "concepts": [
-    "authentication",
-    "auth-middleware",
-    "users"
+    "authentication"
   ],
-  "tokens": 18089,
+  "tokens": 14328,
   "tokenMethod": "chars/4",
-  "runsAgreed": 2,
+  "runsAgreed": 0,
   "sources": {
     "docs": [
       "FEATURES.md",
@@ -22,27 +20,19 @@
       "doc:docs/claude/AUTH.md#multi-provider-authentication-authprovider",
       "doc:docs/claude/AUTH.md#token-authentication",
       "doc:docs/claude/AUTH.md#token-types",
-      "doc:FEATURES.md#authentication-sessions",
-      "doc:docs/claude/AUTH.md#auth-middleware-chain",
-      "doc:docs/claude/AUTH.md#spoof-middleware",
-      "doc:docs/claude/AUTH.md#validation-middleware",
-      "doc:docs/claude/AUTH.md#choosing-between-validateuser-and-validateactor",
-      "doc:FEATURES.md#user-management"
+      "doc:FEATURES.md#authentication-sessions"
     ],
     "catalogClusters": [
       "auth-middleware-validation",
       "authentication-methods",
       "caching-and-invalidation",
       "encryption-key-rotation",
-      "request-context-access",
       "request-response-schemas",
-      "roles-and-permissions",
-      "superadmin-operations",
-      "user-identity-management"
+      "superadmin-operations"
     ],
-    "codeEntries": 73,
-    "docMembers": 34
+    "codeEntries": 40,
+    "docMembers": 26
   },
   "bypassLines": 21,
-  "glossaryTerms": 27
+  "glossaryTerms": 16
 }

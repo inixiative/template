@@ -1,32 +1,16 @@
 {
   "id": "rules-builder",
-  "title": "Rule builder editor model",
-  "routing": "Is this about building or rendering a UI that edits a json-rules Condition over a lens \u2014 useRuleBuilder / usePermissionBuilder / useTransitionBuilder / useActionRuleBuilder, useFilteredCollection, buildRoot / buildActionRoot, createView / rawView / resolve / builderSource / RuleBuilderSource, composeNarrowed / withAllRelations, Decoration facets, presets and Variables (matchFacet, presetSeed, validateDecoration), LensView / lensScopeSurface / lensValuePicker pickers, LeafNode / ArrayNode / ValueControl descriptors, scope-reference pickers, sourceValues for sourced fields, setSchemaAction for ReBAC schemas, or saving a rule with parseSavedRule / stringifySavedRule?",
+  "title": "Rule builder: template usage",
+  "routing": "Is this about editing a rule in the UI with @inixiative/rules-builder as the template uses it: useRuleBuilder / usePermissionBuilder / useTransitionBuilder / useActionRuleBuilder, useFilteredCollection for in-memory filtering, views (createView, rawView, resolve, builderSource / RuleBuilderSource, LensBuilderSource), composeNarrowed, Decoration and facets (describeFacets, matchFacet, presetSeed, Variable, variableSlots), the descriptor tree (GroupNode, LeafNode, ArrayNode, ValueControl, VariableControl), lens scope surfaces and value pickers (useLensScopeSurface, useLensValuePicker), or saved rules (parseSavedRule, stringifySavedRule, SavedRule)?",
   "concepts": [
-    "rules-builder",
-    "lib-rules-builder"
+    "rules-builder"
   ],
-  "tokens": 19705,
+  "tokens": 17732,
   "tokenMethod": "chars/4",
-  "runsAgreed": 0,
+  "runsAgreed": 1,
   "sources": {
-    "docs": [
-      "@inixiative/rules-builder/README.md"
-    ],
-    "docUnits": [
-      "doc:@inixiative/rules-builder/README.md#preface",
-      "doc:@inixiative/rules-builder/README.md#install",
-      "doc:@inixiative/rules-builder/README.md#quick-start",
-      "doc:@inixiative/rules-builder/README.md#sourced-fields-data-backed-options",
-      "doc:@inixiative/rules-builder/README.md#filtering-a-collection-in-hand",
-      "doc:@inixiative/rules-builder/README.md#array-list-relation-rules",
-      "doc:@inixiative/rules-builder/README.md#decoration-hoisting-relabeling-aliasing",
-      "doc:@inixiative/rules-builder/README.md#decoration-hoisting-relabeling-aliasing/two-where-s",
-      "doc:@inixiative/rules-builder/README.md#decoration-hoisting-relabeling-aliasing/splitting-one-relation-into-tagged-sources",
-      "doc:@inixiative/rules-builder/README.md#serialization",
-      "doc:@inixiative/rules-builder/README.md#api",
-      "doc:@inixiative/rules-builder/README.md#related"
-    ],
+    "docs": [],
+    "docUnits": [],
     "catalogClusters": [
       "json-rules-engine",
       "lenses-multi-source",
@@ -37,5 +21,5 @@
     "docMembers": 29
   },
   "bypassLines": 19,
-  "glossaryTerms": 28
+  "glossaryTerms": 26
 }

@@ -106,15 +106,17 @@ Messaging is a separate lane from email for direct per-`ContactType` channels (S
 
 `Contact` is one false-polymorphic table (`ownerModel` + nullable `userId` / `organizationId` / `spaceId`) for email, phone, website and 19 social or messaging handles. Never add address columns to User, Organization or Space. `User.email` is login identity only. Each type is a `ContactTypeDef` in `ContactRegistry`: a loose `inputSchema`, a `parseInput` normalizer, a strict `valueSchema`, a `toValueKey` projection (E.164, `classifier:handle`), subtype and uniqueness rules, and display. The `contactRules` before-mutation hook runs the registry on every Contact write, shadow-merging partial updates with `previous`. Per-owner uniqueness is three partial uniques on `valueKey`. Adding a type means a def file, a `ContactType` enum value, and a registry entry, with no controller, route or hook change. URL parsing reuses `canonicalUrl`, `splitUrl` and `parseSimpleHandleUrl`, and bare email checks use `emailAddressSchema`. The contact routes are owner-scoped create/list under `/me`, `/organization/:id` and `/space/:id`, plus by-id read/update/delete and an admin list. A Contact also carries what delivery reads: `acceptedKinds`, gated by `canDeliver`, and `deliverability`, distinct from `verifiedAt`.
 
-Related regions: templated email (planner, deliverEmail, CommunicationLog, unsubscribe and the `canDeliver` preference semantics) is `email-delivery`. Recipient rendering and the recipient lens (`renderForRecipient`, `emailLensFor`, `targetedBySender`) are shared with `email-templates` and `email-lens`. The broadcast-registry adapter pattern is `app-events-webhooks-adapters`, which also owns outbound webhooks. The `position` column is the orderedList hook in `mutation-hooks`. Row-level `permissionRules` and `ownerActions` are `permissions`. Route templates and `sanitizeKeys` are `api-routes-schemas`. `CustomerRef` and segments are `customers-segments`.
+Related regions: templated email (planner, deliverEmail, CommunicationLog, unsubscribe and the `canDeliver` preference semantics) is `email-delivery`. Recipient rendering and the recipient lens (`renderForRecipient`, `emailLensFor`, `targetedBySender`) are shared with `email-templates` and `email-lens`. The broadcast-registry adapter pattern is `app-events-webhooks / adapters-integrations`, which also owns outbound webhooks. The `position` column is the orderedList hook in `mutation-hooks`. Row-level `permissionRules` and `ownerActions` are `permissions`. Route templates and `sanitizeKeys` are `api-routes / api-schemas-openapi`. `CustomerRef` and segments are `customers-segments`.
 
 ## 3. Everything that exists here, by class
 
-Point at a class when that is as specific as the moment allows, or at a member. Where a class has siblings an agent could confuse, a table under the class header says which to use when. Each member: **name** `where`: choose this when … . Where the docs or code give material, a second line describes the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
+Point at a class when that is as specific as the moment allows, or at a member. Where a class has siblings an agent could confuse, a table under the class header says which to use when; its *Said as* line gives the plain words a user or agent uses for that job. Each member: **name** · kind `where` · the doc § that describes it (code members) or the code it is about (doc members): choose this when … . Quote the name and the where in a pointer ("look over here: createLock, packages/db/src/lock/createLock.ts, CONCURRENCY.md § Distributed Lock"). *Said as:* the ways a user or agent describes this job in a message or plan without knowing the name; match on these. *Signs you're bypassing it:* the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
 
 ### Class `messaging`: Non-email channels: per-ContactType message provider adapters
 
 **Job: send a message to users or a contact (untemplated vs templated email)** (messageUser vs messageContact vs sendEmail) — docs/claude/COMMUNICATIONS.md § Messaging › Jobs; § Send Pipeline
+
+*Said as:* "send an SMS", "text these users", "message one phone number", "push to everyone matching a rule"
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -124,6 +126,8 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 **Job: register or look up the sender for a contact channel** (messageProviderRegistry vs getMessageProviderAdapter vs MessageProviderAdapter) — docs/claude/COMMUNICATIONS.md § Messaging › Provider Registry; § SMS
 
+*Said as:* "add Twilio for text messages", "which adapter sends sms", "register a new channel", "where do I plug in a provider"
+
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **MessageProviderAdapter** | write the per-channel send (contact, content, kind, options) | an inline SDK call switched on contact.type |
@@ -132,6 +136,8 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 **Job: pick recipients and render per-recipient content** (resolveUsers vs targetedBySender vs recipientVariables vs renderForRecipient) — docs/claude/COMMUNICATIONS.md § Messaging › Jobs; § The email lens
 
+*Said as:* "who gets this message", "turn the rule into users", "fill in each recipient's data", "limit the audience to the sender's members"
+
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **targetedBySender** | clamp a recipient rule to users the sender's lens may reach | listing the users (use resolveUsers) |
@@ -139,40 +145,62 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **recipientVariables (email-lens)** | load recipient and model-lens data rows through their lenses at send time | interpolating (use renderForRecipient) |
 | **renderForRecipient (email-templates)** | render text for one recipient, shared by email and messaging | rendering the queued payload directly |
 
-- **getMessageProviderAdapter** `apps/api/src/lib/messaging/providers.ts#getMessageProviderAdapter`: Look up a sender; register new adapters on messageProviderRegistry instead.
-- **messageContact** `apps/api/src/jobs/handlers/messageContact.ts#messageContact`: One external Contact; users targeted by rule: messageUser; templated email: sendEmail.
-- **messageProviderRegistry** `apps/api/src/lib/messaging/providers.ts#messageProviderRegistry`: Add a provider here; read via getMessageProviderAdapter.
+- **getMessageProviderAdapter** · primitive `apps/api/src/lib/messaging/providers.ts#getMessageProviderAdapter` · in docs: docs/claude/COMMUNICATIONS.md § Messaging (non-email channels): Look up a sender; register new adapters on messageProviderRegistry instead.
+  - *Said as:* "which sender handles sms", "look up the adapter for this contact type", "get the channel's sender or undefined", "find who sends for this kind of contact"
+- **messageContact** · primitive `apps/api/src/jobs/handlers/messageContact.ts#messageContact` · in docs: docs/claude/COMMUNICATIONS.md § Messaging (non-email channels): One external Contact; users targeted by rule: messageUser; templated email: sendEmail.
+  - *Said as:* "send this text to one phone number", "message a single known contact", "pre-rendered content to one address, respecting opt-outs", "SMS one person, not a rule"
+- **messageProviderRegistry** · primitive `apps/api/src/lib/messaging/providers.ts#messageProviderRegistry` · in docs: docs/claude/COMMUNICATIONS.md § Messaging (non-email channels); docs/claude/ADAPTERS.md § Adapter primitives: Add a provider here; read via getMessageProviderAdapter.
+  - *Said as:* "add Twilio for sms", "register a sender for a channel", "I'll switch on the contact type and call the SDK", "wire up a new messaging channel", "where channel adapters are registered"
   - *Signs you're bypassing it:* a switch on contact.type that calls Twilio or another SDK inline for SMS/push (docs/claude/COMMUNICATIONS.md § Messaging › Provider Registry and § SMS (register a MessageProviderAdapter under the ContactType))
-- **messageUser** `apps/api/src/jobs/handlers/messageUser.ts#messageUser`: Users selected by rule, sender defaults to platform; single Contact: messageContact; templated email: sendEmail.
-- **resolveUsers** `apps/api/src/lib/messaging/resolveUsers.ts#resolveUsers`: Recipient targeting by rule; check sender scope with targetedBySender.
+- **messageUser** · primitive `apps/api/src/jobs/handlers/messageUser.ts#messageUser` · in docs: docs/claude/COMMUNICATIONS.md § Messaging (non-email channels); docs/claude/COMMUNICATIONS.md § Email › The email lens: Users selected by rule, sender defaults to platform; single Contact: messageContact; templated email: sendEmail.
+  - *Said as:* "text everyone who matches this rule", "send an SMS to users in this segment", "push a notification to users chosen by a rule", "a non-email message to many users", "untemplated content to a rule-selected audience"
+- **resolveUsers** · primitive `apps/api/src/lib/messaging/resolveUsers.ts#resolveUsers` · in docs: docs/claude/COMMUNICATIONS.md § Messaging (non-email channels): Recipient targeting by rule; check sender scope with targetedBySender.
+  - *Said as:* "turn the rule into the actual list of users", "I'll write a findMany for the recipients", "compile the audience rule through the recipient lens", "who matches this targeting rule", "audience resolution shared by email, messaging and notifications"
   - *Signs you're bypassing it:* a hand-written prisma.user.findMany for message recipients instead of compiling the json-rules rule through the recipient lens (docs/claude/COMMUNICATIONS.md § Messaging › Jobs)
-- **settleCommunication** `apps/api/src/lib/messaging/settleCommunication.ts#settleCommunication`: update matching communication log rows to a final delivery state
-- **targetedBySender** `apps/api/src/lib/messaging/senderTargeting.ts#targetedBySender`: Scope who a sender reaches; resolveUsers then evaluates the result.
+- **settleCommunication** · primitive `apps/api/src/lib/messaging/settleCommunication.ts#settleCommunication`: update matching communication log rows to a final delivery state
+  - *Said as:* "mark the log rows as delivered or failed", "update the communication log to its final state", "record the outcome on matching log rows"
+- **targetedBySender** · primitive `apps/api/src/lib/messaging/senderTargeting.ts#targetedBySender` · in docs: docs/claude/COMMUNICATIONS.md § Email › The email lens: Scope who a sender reaches; resolveUsers then evaluates the result.
+  - *Said as:* "an org sender can only reach its own members", "clamp the audience to what the sender may see", "bound the rule before resolving users", "who is this sender allowed to message"
   - *Signs you're bypassing it:* a recipient query from an Organization or Space sender that is not clamped to the sender's memberships (catalog: targetedBySender (restrict a recipient rule to users the sender's lens may reach))
-- **Communication preferences on Contact.acceptedKinds** `docs/claude/COMMUNICATIONS.md#Communication Preferences`: store per-channel opt-in/out as CommunicationKind[] on Contact, gated by canDeliver
+- **Communication preferences on Contact.acceptedKinds** · pattern docs/claude/COMMUNICATIONS.md § Communication Preferences · code: `Contact`, `canDeliver`, `User`, `saveEmailTemplate`: store per-channel opt-in/out as CommunicationKind[] on Contact, gated by canDeliver
+  - *Said as:* "where do opt-ins and opt-outs live", "I'll add a preferences table per user", "I'll add a boolean opt-out column on the user", "store which kinds a contact accepts, on the contact"
   - *Signs you're bypassing it:* a new per-user preferences table or boolean opt-out columns on User (docs/claude/COMMUNICATIONS.md § Communication Preferences)
-- **Contact.deliverability suppression** `docs/claude/COMMUNICATIONS.md#Communication Preferences`: Address validity; acceptedKinds for preference; verifiedAt for channel ownership.
-- **Per-ContactType messaging via adapter lane** `docs/claude/COMMUNICATIONS.md#Overview`: direct SMS/push/chat: messaging lane; email has its own senders; outbound webhooks for HTTP callbacks
-- **Unsubscribe HMAC capability link** `apps/api/src/lib/email/unsubscribe.ts`: Unauthenticated one-click unsubscribe; better-auth for login links, Token model for API keys/scoped capabilities.
+- **Contact.deliverability suppression** · pattern docs/claude/COMMUNICATIONS.md § Communication Preferences · code: `Contact`, `canDeliver`, `User`, `saveEmailTemplate`: Address validity; acceptedKinds for preference; verifiedAt for channel ownership.
+  - *Said as:* "skip addresses that bounce", "deliverability is not the same as opted out", "a bounced address is suppressed, not unsubscribed"
+- **Per-ContactType messaging via adapter lane** · pattern docs/claude/COMMUNICATIONS.md § Overview: direct SMS/push/chat: messaging lane; email has its own senders; outbound webhooks for HTTP callbacks
+  - *Said as:* "sms and push are a separate lane from email", "direct messages don't go through templates", "non-email channels dispatch through adapters"
+- **Unsubscribe HMAC capability link** · pattern apps/api/src/lib/email/unsubscribe.ts: Unauthenticated one-click unsubscribe; better-auth for login links, Token model for API keys/scoped capabilities.
+  - *Said as:* "a signed link that unsubscribes without login", "I'll use a magic link for unsubscribe", "I'll mint a token row for the unsubscribe link", "one-click opt-out from an email"
   - *Signs you're bypassing it:* using better-auth magic links or the Token model for unsubscribe (docs/claude/COMMUNICATIONS.md § Communication Preferences (Auth boundary))
-- **db.onCommit** `docs/claude/COMMUNICATIONS.md#Webhooks`: defer side effects until the surrounding transaction commits
-  - *Throws:* db.onCommit outside transaction Error (`server-error`, database)
+- **db.onCommit** · primitive docs/claude/COMMUNICATIONS.md § Webhooks · code: `sendWebhook`: defer side effects until the surrounding transaction commits
+  - *Said as:* "only send after the transaction commits", "I'll fire the notification inside the transaction", "the fact that I have to manually defer it is the signal", "enqueue the job once the write is committed", "defer the side effect until the write lands"
+  - *Throws:* db.onCommit outside transaction Error (`server-error`, database-client)
   - *Signs you're bypassing it:* sending email, calling an external API or enqueuing a job directly inside db.txn (so it fires even if the transaction rolls back), or a hand-built after-commit callback list (docs/claude/DATABASE.md § Transactions › After Commit Callbacks; FEATURES.md § Post-Commit Callbacks)
-- **MessageContent** `apps/api/src/lib/messaging`: carry text/html/media payload with interpolation tokens for dispatch
-- **MessageProviderAdapter** `apps/api/src/lib/messaging/providers.ts`: Add a new channel (e.g. Twilio SMS) by registering one under its ContactType.
-- **userEmailContact** `docs/claude/COMMUNICATIONS.md#Communication Preferences`: create an email Contact for every new User so preferences exist
-- **Auth boundary for links and tokens** `docs/claude/COMMUNICATIONS.md#Communication Preferences`: Choosing credential mechanism for an emailed or external link.
-- **POST-only unsubscribe endpoint** `apps/api/src/routes/unsubscribe.ts`: Non-system emails; prevents GET prefetch scanners from unsubscribing.
+- **MessageContent** · primitive apps/api/src/lib/messaging: carry text/html/media payload with interpolation tokens for dispatch
+  - *Said as:* "the text, html and media payload for a message", "what shape does the message body take", "the content with its placeholders"
+- **MessageProviderAdapter** · primitive apps/api/src/lib/messaging/providers.ts: Add a new channel (e.g. Twilio SMS) by registering one under its ContactType.
+  - *Said as:* "the function shape for sending on one channel", "write the sms sender", "the per-channel send signature", "implement a provider for a contact type"
+- **userEmailContact** · primitive docs/claude/COMMUNICATIONS.md § Communication Preferences · code: `Contact`, `canDeliver`, `User`, `saveEmailTemplate`: create an email Contact for every new User so preferences exist
+  - *Said as:* "every new user gets an email contact", "create the contact row at signup so preferences exist", "where does the user's email contact come from"
+- **Auth boundary for links and tokens** · rule docs/claude/COMMUNICATIONS.md § Communication Preferences · code: `Contact`, `canDeliver`, `User`, `saveEmailTemplate`: Choosing credential mechanism for an emailed or external link.
+  - *Said as:* "which auth mechanism for an emailed link", "login links, api keys and unsubscribe links are different things", "don't use the login system for one-click links"
+- **POST-only unsubscribe endpoint** · rule apps/api/src/routes/unsubscribe.ts: Non-system emails; prevents GET prefetch scanners from unsubscribing.
+  - *Said as:* "a GET route that unsubscribes on visit", "link scanners shouldn't unsubscribe people", "the opt-out must be a post"
   - *Signs you're bypassing it:* a GET route that unsubscribes on visit (docs/claude/COMMUNICATIONS.md § Communication Preferences (POST-only so GET prefetch can never unsubscribe))
-- **Rich preferences in-app only** `docs/claude/COMMUNICATIONS.md#Communication Preferences`: Any preference management beyond single-kind unsubscribe.
+- **Rich preferences in-app only** · rule docs/claude/COMMUNICATIONS.md § Communication Preferences · code: `Contact`, `canDeliver`, `User`, `saveEmailTemplate`: Any preference management beyond single-kind unsubscribe.
+  - *Said as:* "manage all your email preferences from the link", "the link does one kind, full management needs login", "preference settings live in the app"
   - *Signs you're bypassing it:* an emailed link that lets the recipient toggle every kind or manage all preferences (docs/claude/COMMUNICATIONS.md § Communication Preferences)
-- **Shared recipient rendering** `apps/api/src/lib/email/renderForRecipient.ts`: Any send that interpolates recipient, sender or data tokens.
-- **Unconditional unsubscribe URL in templates** `saveEmailTemplate`: Every non-system email template.
+- **Shared recipient rendering** · rule apps/api/src/lib/email/renderForRecipient.ts: Any send that interpolates recipient, sender or data tokens.
+  - *Said as:* "sms uses the same per-recipient render as email", "I'll build my own variables for the text message", "one render helper for every channel"
+- **Unconditional unsubscribe URL in templates** · rule saveEmailTemplate: Every non-system email template.
+  - *Said as:* "the unsubscribe token must be outside any if block", "every non-system template includes the opt-out link", "why can't the unsubscribe link be conditional"
 - *Also here, by name:* CommunicationChannel (`packages/db/prisma/schema/communicationLog.prisma`)
 
 ### Class `contacts`: Contact model: per-type registry, URL/handle parsers, contact rules
 
 **Job: store, parse and validate a contact address or handle** (ContactRegistry vs Contact vs contactRules vs ContactTypeDef) — docs/claude/HOOKS.md § Contact Rules; FEATURES.md § Contact System
+
+*Said as:* "store a user's phone number", "add a twitter handle to the org", "validate a contact on save", "where do addresses and handles live"
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -183,6 +211,8 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 **Job: normalize or parse a contact URL or email string** (canonicalUrl vs splitUrl vs parseSimpleHandleUrl vs emailAddressSchema) — catalog (packages/shared/src/contact)
 
+*Said as:* "parse the profile url", "is this a valid email string", "normalize the website address", "pull the handle out of the link"
+
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **canonicalUrl** | a whole URL normalized without query and fragment | path segments (use splitUrl); a handle (use parseSimpleHandleUrl) |
@@ -190,37 +220,63 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **parseSimpleHandleUrl** | a parser for a new host-plus-handle network | existing networks: their parseXUrl via ContactRegistry |
 | **emailAddressSchema** | check a bare string is an email address | a full email contact with lowercasing (emailDef via ContactRegistry) |
 
-- **Contact** `packages/db/prisma/schema/contact.prisma`: Reachable addresses and social handles; User.email only for login identity. Polymorphic owner via ownerModel.
-- **canonicalUrl** `packages/shared/src/contact/parsers/url.ts#canonicalUrl`: Need a full normalized URL; to get path segments use splitUrl, to get a handle use parseSimpleHandleUrl
-- **ContactRegistry** `packages/shared/src/contact/registry.ts#ContactRegistry`: Entry point for any contact type; prefer it over calling individual parsers like parseYoutubeUrl. Register new types here.
+- **Contact** · model `packages/db/prisma/schema/contact.prisma` · in docs: docs/claude/HOOKS.md § Contact Rules; FEATURES.md § Contact System: Reachable addresses and social handles; User.email only for login identity. Polymorphic owner via ownerModel.
+  - *Said as:* "where do phone numbers and social handles live", "I'll add a phone column on the user", "store an org's twitter handle", "one table for every address and handle", "the user's login email is not the same as their reachable address"
+- **canonicalUrl** · primitive `packages/shared/src/contact/parsers/url.ts#canonicalUrl`: Need a full normalized URL; to get path segments use splitUrl, to get a handle use parseSimpleHandleUrl
+  - *Said as:* "normalize the profile url, drop the query string", "clean up a website address", "the same url in a canonical form", "strip tracking params and the fragment"
+- **ContactRegistry** · primitive `packages/shared/src/contact/registry.ts#ContactRegistry` · in docs: docs/claude/HOOKS.md § Contact Rules; FEATURES.md § Contact System: Entry point for any contact type; prefer it over calling individual parsers like parseYoutubeUrl. Register new types here.
+  - *Said as:* "parse and validate any contact type in one place", "I'll switch on the type in the controller", "the entry point for every contact type's rules", "where do I register a new handle type", "look up the parser and schema for a type"
   - *Signs you're bypassing it:* new email/phone/handle columns on User, Organization or Space, or a per-type validation switch in a controller (FEATURES.md § Contact System; docs/claude/HOOKS.md § Contact Rules)
-- **emailAddressSchema** `packages/shared/src/contact/defs/email.ts#emailAddressSchema`: Plain address string check; for full email contact objects with lowercasing use emailDef instead.
+- **emailAddressSchema** · primitive `packages/shared/src/contact/defs/email.ts#emailAddressSchema`: Plain address string check; for full email contact objects with lowercasing use emailDef instead.
+  - *Said as:* "is this string an email address", "I'll write an email regex", "validate a bare address", "check the email format, without lowercasing"
   - *Signs you're bypassing it:* a hand-written email regex to validate an address string (catalog: emailAddressSchema)
-- **parseSimpleHandleUrl** `packages/shared/src/contact/parsers/url.ts#parseSimpleHandleUrl`: Building a parser for a new host-plus-handle network; existing networks call their parseXUrl wrapper instead
+- **parseSimpleHandleUrl** · primitive `packages/shared/src/contact/parsers/url.ts#parseSimpleHandleUrl`: Building a parser for a new host-plus-handle network; existing networks call their parseXUrl wrapper instead
+  - *Said as:* "pull the handle out of a profile url", "I'll write a regex for the new network's url", "parse a host plus handle link", "add a parser for a new social network"
   - *Signs you're bypassing it:* a fresh regex to pull a handle out of a single-host profile URL (catalog: parseSimpleHandleUrl / canonicalUrl / splitUrl (shared URL parsers))
-- **splitUrl** `packages/shared/src/contact/parsers/url.ts#splitUrl`: Custom parsers needing path segments; single-handle hosts use parseSimpleHandleUrl, whole normalized URL uses canonicalUrl
-- **apps/api/src/modules/contact** `apps/api/src/modules/contact`: read, update and delete contacts, with a superadmin listing
-- **Adding a contact type** `docs/claude/HOOKS.md > Adding a Contact Type`: New contact channels; never change controllers, routes or hooks for a new type.
+- **splitUrl** · primitive `packages/shared/src/contact/parsers/url.ts#splitUrl`: Custom parsers needing path segments; single-handle hosts use parseSimpleHandleUrl, whole normalized URL uses canonicalUrl
+  - *Said as:* "get the path segments of a url", "I need the url parts for a custom parser", "break the url into pieces"
+- **apps/api/src/modules/contact** · system `apps/api/src/modules/contact`: read, update and delete contacts, with a superadmin listing
+  - *Said as:* "the contact crud endpoints", "read, update, delete a contact, plus the admin list", "the api module for contacts"
+- **Adding a contact type** · pattern docs/claude/HOOKS.md > Adding a Contact Type: New contact channels; never change controllers, routes or hooks for a new type.
+  - *Said as:* "add a mastodon handle type", "support a new social network", "I'll change the controller and hook for the new type", "a def file, an enum value and a registry entry"
   - *Signs you're bypassing it:* changing contact controllers, routes or the contactRules hook to support a new type (docs/claude/HOOKS.md § Adding a Contact Type (no controller, route, or hook change needed))
-- **Owner-scoped contact routes** `FEATURES.md › Contact System › Endpoints`: create/list under the owner route, read/update/delete by id, admin list separately
-- **Partial unique per polymorphic owner FK** `FEATURES.md › Contact System › Single Contact Model`: false-polymorphic owner FKs: one partial unique per FK instead of a single composite over all FKs
+- **Owner-scoped contact routes** · pattern FEATURES.md › Contact System › Endpoints: create/list under the owner route, read/update/delete by id, admin list separately
+  - *Said as:* "contacts are created under me, the org or the space", "where do the contact routes live", "list an org's contacts"
+- **Partial unique per polymorphic owner FK** · pattern FEATURES.md › Contact System › Single Contact Model: false-polymorphic owner FKs: one partial unique per FK instead of a single composite over all FKs
+  - *Said as:* "one composite unique over all the owner columns", "stop duplicates per owner when the owner is polymorphic", "nulls are distinct so the composite unique doesn't work", "one partial unique per owner column"
   - *Signs you're bypassing it:* one composite @@unique over all the nullable owner FKs, which Postgres lets duplicate because NULLs are distinct (FEATURES.md § Contact System › Single Contact Model)
-- **Shadow-merge updates with previous** `FEATURES.md › Contact System › contactRules Hook`: validate partial updates against the merged previous-plus-new record in before-mutation hooks
-- **contactRules** `FEATURES.md › Contact System › contactRules Hook`: contact validation; position ordering is handled by the orderedList hook instead
-- **ContactTypeDef** `packages/shared/src/contact/defs/<type>.ts`: declare input schema, parser, canonical schema, valueKey projection, subtype and uniqueness
-- **HOOK_IGNORE_FIELDS** `FEATURES.md › Contact System › Ordered List Hook`: mark ordering-only field changes as noise for audit, webhooks and no-op detection
-- **Ordered-list core algorithm** `apps/api/src/lib/prisma/orderedList.ts`: compute position shifts with one CTE UPDATE per scope
-- **orderedList hook** `apps/api/src/hooks/orderedList/`: keep dense 1..N position columns per scope across creates, updates, deletes and restores
-- **orderedList registry** `packages/db/src/registries/orderedList.ts`: declare which model fields are ordered and their scope fields
-- **permissionRules** `FEATURES.md › Contact System › Row-Level Permission Overrides`: sharing individual rows; additive only — cannot restrict schema rules
-- **sanitizeKeys** `FEATURES.md › Contact System › Endpoints`: strip disallowed keys such as owner FKs from request bodies
+- **Shadow-merge updates with previous** · pattern FEATURES.md › Contact System › contactRules Hook: validate partial updates against the merged previous-plus-new record in before-mutation hooks
+  - *Said as:* "validate a partial update against the full record", "merge the old row with the patch before checking", "the update only has some fields, how do I validate the type"
+- **contactRules** · primitive FEATURES.md › Contact System › contactRules Hook: contact validation; position ordering is handled by the orderedList hook instead
+  - *Said as:* "the hook that validates every contact write", "normalize the value and compute the key on save", "I'll validate the contact in the route", "where contact validation happens"
+- **ContactTypeDef** · primitive packages/shared/src/contact/defs/<type>.ts: declare input schema, parser, canonical schema, valueKey projection, subtype and uniqueness
+  - *Said as:* "define how one contact type parses and validates", "the per-type definition file", "declare the input schema, parser and uniqueness for a type", "what makes up a type definition"
+- **HOOK_IGNORE_FIELDS** · primitive FEATURES.md › Contact System › Ordered List Hook: mark ordering-only field changes as noise for audit, webhooks and no-op detection
+  - *Said as:* "position changes shouldn't show in the audit log", "treat ordering-only updates as noise", "I'll add a re-entrancy guard so audit doesn't fire on cascades", "which fields don't count as a real change"
+  - *Signs you're bypassing it:* filtering updatedAt or other noisy fields out of webhook payloads or audit diffs inside the webhook or hook code, or re-listing encrypted/position fields per model (docs/claude/HOOKS.md § Webhooks, Ignored Fields)
+- **Ordered-list core algorithm** · primitive apps/api/src/lib/prisma/orderedList.ts: compute position shifts with one CTE UPDATE per scope
+  - *Said as:* "shift the positions with one update per scope", "the math behind the position column", "renumber the list in one statement"
+- **orderedList hook** · primitive apps/api/src/hooks/orderedList/: keep dense 1..N position columns per scope across creates, updates, deletes and restores
+  - *Said as:* "keep the position column dense", "I'll renumber positions in the controller", "reorder contacts and keep one to N", "a soft-deleted row leaves the live order"
+- **orderedList registry** · primitive packages/db/src/registries/orderedList.ts: declare which model fields are ordered and their scope fields
+  - *Said as:* "declare that this model's position field is ordered", "register the scope fields for ordering", "which models have managed positions"
+- **permissionRules** · primitive FEATURES.md › Contact System › Row-Level Permission Overrides: sharing individual rows; additive only — cannot restrict schema rules
+  - *Said as:* "make this one contact readable by anyone", "share a single row without changing the schema rules", "per-row overrides that only grant, never restrict", "let someone else read my row"
+- **sanitizeKeys** · primitive FEATURES.md › Contact System › Endpoints: strip disallowed keys such as owner FKs from request bodies
+  - *Said as:* "strip the owner ids from the request body", "I'll delete body.organizationId in the controller", "you're still making too many schemas, just use the built-ins", "don't let the client set created-by or deleted-at", "which keys can the body not touch"
   - *Signs you're bypassing it:* delete body.organizationId / destructuring client-unsettable keys out of c.req.valid('json') in the controller before Prisma (docs/claude/API_ROUTES.md § Route Templates, Template Args)
-- **Add contact types via registry, not schema** `FEATURES.md › Contact System › Per-Type Registry`: whenever a new contact channel or handle type is needed
-- **Contact position via orderedList** `docs/claude/HOOKS.md > Contact Rules`: Any Contact create, move, soft delete or bulk write touching position.
-- **Expose only read for row sharing** `FEATURES.md › Contact System › Row-Level Permission Overrides`: routes accepting permissionRules
-- **Inject owner FKs from auth context** `FEATURES.md › Contact System › Endpoints`: owner-scoped create/update routes
-- **No bulk position writes** `apps/api/src/hooks/orderedList/`: updateManyAndReturn on ordered-list models
-- **Page enables only its own query** `FEATURES.md › Segments › Nested Navigation`: sibling pages under nested navigation
+- **Add contact types via registry, not schema** · rule FEATURES.md › Contact System › Per-Type Registry: whenever a new contact channel or handle type is needed
+  - *Said as:* "a new channel means a registry entry, not a column", "I'll add a column for the new handle", "extend the types without changing the schema"
+- **Contact position via orderedList** · rule docs/claude/HOOKS.md > Contact Rules: Any Contact create, move, soft delete or bulk write touching position.
+  - *Said as:* "ordering is the hook's job, not the contact rules", "don't touch position in the contact hook"
+- **Expose only read for row sharing** · rule FEATURES.md › Contact System › Row-Level Permission Overrides: routes accepting permissionRules
+  - *Said as:* "routes accept sharing overrides for read only", "don't let a row rule grant write", "sharing means others can read, not edit"
+- **Inject owner FKs from auth context** · rule FEATURES.md › Contact System › Endpoints: owner-scoped create/update routes
+  - *Said as:* "the owner comes from who's logged in, not the body", "I'll trust the organizationId in the request", "clients can't move rows across owners"
+- **No bulk position writes** · rule apps/api/src/hooks/orderedList/: updateManyAndReturn on ordered-list models
+  - *Said as:* "updateMany on the position column should throw", "can't bulk-set positions"
+- **Page enables only its own query** · rule FEATURES.md › Segments › Nested Navigation: sibling pages under nested navigation
+  - *Said as:* "sibling pages shouldn't fire each other's queries", "each nested page loads only its own data"
 - *Also here, by name:* CONTACT_CREATE_IMMUTABLE_FIELDS (`apps/api/src/modules/contact/schemas/contactSchemas.ts`); CONTACT_UPDATE_IMMUTABLE_FIELDS (`apps/api/src/modules/contact/schemas/contactSchemas.ts`); ContactOwnerModel (`packages/db/prisma/schema/contact.prisma`); ContactType (`packages/db/prisma/schema/contact.prisma`); DeliverabilityStatus (`packages/db/prisma/schema/contact.prisma`); EMAIL_SUBTYPES (`packages/shared/src/contact/constants/email.ts`); GITHUB_CLASSIFIERS (`packages/shared/src/contact/constants/github.ts`); LINKEDIN_CLASSIFIERS (`packages/shared/src/contact/constants/linkedin.ts`); PHONE_SUBTYPES (`packages/shared/src/contact/constants/phone.ts`); WEBSITE_SUBTYPES (`packages/shared/src/contact/constants/website.ts`); blueskyDef (`packages/shared/src/contact/defs/bluesky.ts`); contactCreateBodySchema (`apps/api/src/modules/contact/schemas/contactSchemas.ts`); contactPicks (`apps/api/src/modules/contact/schemas/contactPicks.ts`); contactReadResponseSchema (`apps/api/src/modules/contact/schemas/contactSchemas.ts`); contactUpdateBodySchema (`apps/api/src/modules/contact/schemas/contactSchemas.ts`); discordDef (`packages/shared/src/contact/defs/discord.ts`); emailDef (`packages/shared/src/contact/defs/email.ts`); facebookDef (`packages/shared/src/contact/defs/facebook.ts`); githubDef (`packages/shared/src/contact/defs/github.ts`); instagramDef (`packages/shared/src/contact/defs/instagram.ts`); lineDef (`packages/shared/src/contact/defs/line.ts`); linkedinDef (`packages/shared/src/contact/defs/linkedin.ts`); mastodonDef (`packages/shared/src/contact/defs/mastodon.ts`); parseBlueskyUrl (`packages/shared/src/contact/parsers/bluesky.ts`); parseFacebookUrl (`packages/shared/src/contact/parsers/facebook.ts`); parseGithubUrl (`packages/shared/src/contact/parsers/github.ts`); parseInstagramUrl (`packages/shared/src/contact/parsers/instagram.ts`); parseLinkedinUrl (`packages/shared/src/contact/parsers/linkedin.ts`); parseMastodonUrl (`packages/shared/src/contact/parsers/mastodon.ts`); parseRedditUrl (`packages/shared/src/contact/parsers/reddit.ts`); parseTelegramUrl (`packages/shared/src/contact/parsers/telegram.ts`); parseThreadsUrl (`packages/shared/src/contact/parsers/threads.ts`); parseTiktokUrl (`packages/shared/src/contact/parsers/tiktok.ts`); parseTwitterUrl (`packages/shared/src/contact/parsers/twitter.ts`); parseYoutubeUrl (`packages/shared/src/contact/parsers/youtube.ts`); phoneDef (`packages/shared/src/contact/defs/phone.ts`); redditDef (`packages/shared/src/contact/defs/reddit.ts`); signalDef (`packages/shared/src/contact/defs/signal.ts`); skypeDef (`packages/shared/src/contact/defs/skype.ts`); stripQueryAndFragment (`packages/shared/src/contact/parsers/url.ts`); stripWwwAndProtocol (`packages/shared/src/contact/parsers/url.ts`); telegramDef (`packages/shared/src/contact/defs/telegram.ts`); threadsDef (`packages/shared/src/contact/defs/threads.ts`); tiktokDef (`packages/shared/src/contact/defs/tiktok.ts`); trimSlashes (`packages/shared/src/contact/parsers/url.ts`); twitterDef (`packages/shared/src/contact/defs/twitter.ts`); viberDef (`packages/shared/src/contact/defs/viber.ts`); websiteDef (`packages/shared/src/contact/defs/website.ts`); wechatDef (`packages/shared/src/contact/defs/wechat.ts`); whatsappDef (`packages/shared/src/contact/defs/whatsapp.ts`); youtubeDef (`packages/shared/src/contact/defs/youtube.ts`)
 
 ## 4. The specifics, in full

@@ -108,15 +108,17 @@ Outbound email is event-driven and never a direct client call. Business logic em
 
 Preferences live on `Contact.acceptedKinds` (`CommunicationKind`). `system` always delivers, `platform` and `activity` are opt-out, and `marketing` is opt-in. Read them only through `canDeliver`, which messaging shares. Every User gets an email Contact at creation (`userEmailContact`). Unsubscribe is a stateless HMAC capability link bound to `{userId, contactId, kind}` (`signUnsubscribe`, `unsubscribeUrl`, `verifyUnsubscribe`). It goes to a pre-auth, POST-only route, so GET prefetch never unsubscribes. Non-system templates must contain an unconditional `{{system.unsubscribeUrl}}`, and one rendered for a recipient with no contact fails `unsubscribe_unavailable`. Rich preference management is the authenticated in-app surface, not the link. Deliverability and `verifiedAt` are separate from preference.
 
-Related regions: template content, the cascade, save, render-issue policy (`onIssue`, `substitute`) and recompose are `email-templates`. The recipient and sender lenses, `emailLensFor` and `targetedBySender` are `email-lens`. The non-email lane (`messageUser`, `messageContact`, provider adapters) and the `Contact` model are `messaging-contacts`. Emitting the app event and its handoff contract is `app-events-webhooks-adapters`. BullMQ jobs are `jobs-cron`. The slow lane is `job-lanes-outbox`. Login links and API tokens are `authentication`.
+Related regions: template content, the cascade, save, render-issue policy (`onIssue`, `substitute`) and recompose are `email-templates`. The recipient and sender lenses, `emailLensFor` and `targetedBySender` are `email-lens`. The non-email lane (`messageUser`, `messageContact`, provider adapters) and the `Contact` model are `messaging-contacts`. Emitting the app event and its handoff contract is `app-events-webhooks / adapters-integrations`. BullMQ jobs are `jobs-cron`. The slow lane is `job-lanes-outbox`. Login links and API tokens are `authentication`.
 
 ## 3. Everything that exists here, by class
 
-Point at a class when that is as specific as the moment allows, or at a member. Where a class has siblings an agent could confuse, a table under the class header says which to use when. Each member: **name** `where`: choose this when … . Where the docs or code give material, a second line describes the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
+Point at a class when that is as specific as the moment allows, or at a member. Where a class has siblings an agent could confuse, a table under the class header says which to use when; its *Said as* line gives the plain words a user or agent uses for that job. Each member: **name** · kind `where` · the doc § that describes it (code members) or the code it is about (doc members): choose this when … . Quote the name and the where in a pointer ("look over here: createLock, packages/db/src/lock/createLock.ts, CONCURRENCY.md § Distributed Lock"). *Said as:* the ways a user or agent describes this job in a message or plan without knowing the name; match on these. *Signs you're bypassing it:* the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
 
 ### Class `email-delivery`: Email sending: sendEmail planner, deliverEmail, senders, provider adapters
 
 **Job: send a message to users or a contact (templated email vs untemplated message)** (sendEmail vs deliverEmail vs deliverEmailMessage vs the messaging jobs) — docs/claude/COMMUNICATIONS.md § Send Pipeline; § Messaging › Jobs
+
+*Said as:* "send an email to the user", "notify these people by text", "how do I send a message from here", "email everyone when this happens"
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -127,6 +129,8 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 **Job: choose the email provider client for a send** (createResendClient vs createConsoleClient vs defaultEmailClient vs emailRegistry) — docs/claude/COMMUNICATIONS.md § Email Clients; catalog (apps/api/src/lib/email.ts)
 
+*Said as:* "which email client do I use", "don't send real emails in dev", "add another email provider", "send through Resend"
+
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **createResendClient** | real delivery through Resend with a caller-supplied API key | dev and tests (use createConsoleClient) |
@@ -136,12 +140,16 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 **Job: verify an email address is deliverable** (emailVerifier vs createBouncerVerifier vs createNoopVerifier) — catalog; docs/claude/COMMUNICATIONS.md § Deliver step 5
 
+*Said as:* "check the address before sending", "is this email deliverable", "skip the bounce check in tests"
+
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **emailVerifier** | the app's verifier: Bouncer, or no-op without an API key | constructing a verifier yourself |
 | **createBouncerVerifier** | real deliverability checks via Bouncer | dev and tests (use createNoopVerifier) |
 
 **Job: resolve who an email is sent from** (resolveSender vs resolveFromAddress vs pickSender) — docs/claude/COMMUNICATIONS.md § Sender
+
+*Said as:* "who is this email from", "what's the from address", "set the sender to the org"
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -151,70 +159,112 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 **Job: classify an email send or render failure** (isEmailContentError vs EmailProviderError vs EmailRenderError) — docs/claude/COMMUNICATIONS.md § Deliver step 2, step 8; catalog
 
+*Said as:* "should this failure retry", "the provider rejected it versus the template broke", "classify why the send failed"
+
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **isEmailContentError** | decide fail-without-retry for render, parse, MJML, token and condition errors | chains of instanceof checks |
 | **EmailProviderError** | a classified provider send failure | rendering failures (use EmailRenderError) |
 | **EmailRenderError (email-templates)** | render-time failure, e.g. onIssue 'fail' | provider failures (use EmailProviderError) |
 
-- **CommunicationLog** `packages/db/prisma/schema/communicationLog.prisma`: Per-send delivery facts; AuditLog for data mutations instead. Template/component versions pinned via CommunicationComponentVersion.
-- **SenderType** `packages/db/prisma/schema/communication.prisma`: Sender identity only; template branding cascades separately by scope.
-- **createBouncerVerifier** `packages/email/src/client/verification/bouncer.ts#createBouncerVerifier`: Real address verification; skip checks in dev/tests: createNoopVerifier instead.
-- **createConsoleClient** `packages/email/src/client/console.ts#createConsoleClient`: Dev/test without a provider; real delivery per tenant API key: createResendClient instead.
+- **CommunicationLog** · model `packages/db/prisma/schema/communicationLog.prisma` · in docs: docs/claude/COMMUNICATIONS.md § Email › Send Pipeline; docs/claude/COMMUNICATIONS.md § Email › Database Models: Per-send delivery facts; AuditLog for data mutations instead. Template/component versions pinned via CommunicationComponentVersion.
+  - *Said as:* "the record of every email we tried to send", "where do I see whether the email went out", "one row per recipient per send", "the delivery log, not the audit log", "the fence that makes a send at-most-once"
+- **SenderType** · model `packages/db/prisma/schema/communication.prisma` · in docs: docs/claude/COMMUNICATIONS.md § Email › Database Models; docs/claude/COMMUNICATIONS.md § Email › Send Pipeline: Sender identity only; template branding cascades separately by scope.
+  - *Said as:* "is the sender the platform, an org, a space or a user", "the enum for who sends", "sender identity type, not template branding"
+- **createBouncerVerifier** · primitive `packages/email/src/client/verification/bouncer.ts#createBouncerVerifier`: Real address verification; skip checks in dev/tests: createNoopVerifier instead.
+  - *Said as:* "real deliverability checks through Bouncer", "ask the verification service whether this address bounces", "the production verifier", "check if the address is deliverable"
+- **createConsoleClient** · primitive `packages/email/src/client/console.ts#createConsoleClient` · in docs: docs/claude/COMMUNICATIONS.md § Email › Email Clients; docs/claude/ADAPTERS.md § Existing examples: Dev/test without a provider; real delivery per tenant API key: createResendClient instead.
+  - *Said as:* "don't actually send in dev, just log it", "I'll branch on NODE_ENV to skip the send", "the fake client for tests", "print the email instead of sending it"
   - *Signs you're bypassing it:* an if (NODE_ENV !== 'production') branch that skips or fakes the send (docs/claude/COMMUNICATIONS.md § Email Clients)
-- **createNoopVerifier** `packages/email/src/client/verification/noop.ts#createNoopVerifier`: Dev/tests or no verifier key; real verification: createBouncerVerifier instead.
-- **createResendClient** `packages/email/src/client/resend.ts#createResendClient`: Real delivery; pick explicitly per email, not via makeAdapterRouter. Local/dev: createConsoleClient instead.
-- **defaultEmailClient** `apps/api/src/lib/email.ts#defaultEmailClient`: Single-provider sends; to fan out to all providers use emailRegistry directly.
-- **deliverEmail** `apps/api/src/jobs/handlers/deliverEmail.ts#deliverEmail`: Send email via sendEmail, which records CommunicationLog and fans out this job; non-template messages: messageUser or messageContact.
+- **createNoopVerifier** · primitive `packages/email/src/client/verification/noop.ts#createNoopVerifier`: Dev/tests or no verifier key; real verification: createBouncerVerifier instead.
+  - *Said as:* "skip address verification in dev and tests", "a verifier that always passes", "no bouncer key, so don't verify"
+- **createResendClient** · primitive `packages/email/src/client/resend.ts#createResendClient` · in docs: docs/claude/COMMUNICATIONS.md § Email › Email Clients; docs/claude/ADAPTERS.md § Naming conventions: Real delivery; pick explicitly per email, not via makeAdapterRouter. Local/dev: createConsoleClient instead.
+  - *Said as:* "the real provider client with the tenant's API key", "send through Resend for this org", "the production email client", "pick the provider explicitly per email"
+- **defaultEmailClient** · primitive `apps/api/src/lib/email.ts#defaultEmailClient`: Single-provider sends; to fan out to all providers use emailRegistry directly.
+  - *Said as:* "the client to use for a single send", "which provider do we send with by default", "the first registered email provider", "give me the email client"
+- **deliverEmail** · primitive `apps/api/src/jobs/handlers/deliverEmail.ts#deliverEmail` · in docs: docs/claude/COMMUNICATIONS.md § Email › Send Pipeline; docs/claude/APP_EVENTS.md § Email pipeline: Send email via sendEmail, which records CommunicationLog and fans out this job; non-template messages: messageUser or messageContact.
+  - *Said as:* "the per-recipient job that actually sends", "deliver one logged email to one person", "I'll enqueue the delivery job myself", "the second job in the fan-out"
   - *Signs you're bypassing it:* enqueueJob('deliverEmail', …) from anywhere but the planner (catalog: deliverEmail (enqueued by sendEmail; do not enqueue 'deliverEmail' directly))
-- **deliverEmailMessage** `apps/api/src/lib/email/deliverEmailMessage.ts#deliverEmailMessage`: Use inside the deliver job; to start a send from an event, enqueue via plannerJobId/deliverJobId instead of calling directly.
+- **deliverEmailMessage** · primitive `apps/api/src/lib/email/deliverEmailMessage.ts#deliverEmailMessage` · in docs: docs/claude/COMMUNICATIONS.md § Email › Send Pipeline: Use inside the deliver job; to start a send from an event, enqueue via plannerJobId/deliverJobId instead of calling directly.
+  - *Said as:* "the function inside the delivery job that renders, gates and sends", "where the queued to sending claim happens", "the deliver step body, not the job wrapper", "I'll call the delivery function directly to send now"
   - *Throws:* EmailProviderError (`off-request-path`)
-- **EmailProviderError** `packages/email/src/errors/EmailProviderError.ts#EmailProviderError`: Delivery-side failures; template rendering failures: EmailRenderError instead.
+- **EmailProviderError** · primitive `packages/email/src/errors/EmailProviderError.ts#EmailProviderError`: Delivery-side failures; template rendering failures: EmailRenderError instead.
+  - *Said as:* "the error for a failed provider send", "the provider rejected the message", "a send failure, not a render failure"
   - *Error class:* `off-request-path` (Raised where no live HTTP request is being served (job workers, app bootstrap, scripts, tests, frontend): plain Error is fine and nothing maps it to a status.); thrown by deliverEmailMessage
-- **emailRegistry** `apps/api/src/lib/email.ts#emailRegistry`: Registering or enumerating providers; for a single send client use defaultEmailClient.
-- **emailVerifier** `apps/api/src/lib/email.ts#emailVerifier`: verify email addresses via Bouncer, or no-op when no API key
-- **isEmailContentError** `packages/email/src/errors/isEmailContentError.ts#isEmailContentError`: Use instead of chaining instanceof checks against each email error class.
+- **emailRegistry** · primitive `apps/api/src/lib/email.ts#emailRegistry` · in docs: docs/claude/MONOREPO.md § Where to Find Things: Registering or enumerating providers; for a single send client use defaultEmailClient.
+  - *Said as:* "register the email provider adapters", "list the providers we can send through", "add a second email provider", "fan out to every provider"
+- **emailVerifier** · primitive `apps/api/src/lib/email.ts#emailVerifier`: verify email addresses via Bouncer, or no-op when no API key
+  - *Said as:* "the app's address checker", "verify the address before we send", "I'll construct the bouncer client myself", "no-op when there's no verification key"
+- **isEmailContentError** · primitive `packages/email/src/errors/isEmailContentError.ts#isEmailContentError` · in docs: docs/claude/COMMUNICATIONS.md § Email › Send Pipeline: Use instead of chaining instanceof checks against each email error class.
+  - *Said as:* "is this a content problem we shouldn't retry", "I'll chain instanceof checks for each email error type", "decide retry versus fail from the error", "render, parse and token errors are final"
   - *Error class:* `off-request-path` (Raised where no live HTTP request is being served (job workers, app bootstrap, scripts, tests, frontend): plain Error is fine and nothing maps it to a status.)
   - *Signs you're bypassing it:* a chain of instanceof checks against EmailRenderError, MjmlValidationError, TokenValidationError and friends to decide retry vs fail (catalog: isEmailContentError (use instead of chaining instanceof checks))
-- **pickSender** `apps/api/src/lib/email/pickSender.ts#pickSender`: resolve a sender spec's field references against an entity, keeping the type
-- **resolveFromAddress** `apps/api/src/lib/email.ts#resolveFromAddress`: For sender identity display use resolveSender; this returns only the address, currently DEFAULT_FROM_EMAIL.
-- **resolveSender** `apps/api/src/lib/email/resolveSender.ts#resolveSender`: Identity only; branding/template comes from the cascade, not here.
+- **pickSender** · primitive `apps/api/src/lib/email/pickSender.ts#pickSender`: resolve a sender spec's field references against an entity, keeping the type
+  - *Said as:* "resolve the sender spec's fields against the entity", "turn a sender declaration into the actual row reference", "which field on the entity names the sender"
+- **resolveFromAddress** · primitive `apps/api/src/lib/email.ts#resolveFromAddress` · in docs: docs/claude/COMMUNICATIONS.md § Email › Send Pipeline: For sender identity display use resolveSender; this returns only the address, currently DEFAULT_FROM_EMAIL.
+  - *Said as:* "just the from email address", "what address does it go out from", "the from field, not the display identity"
+- **resolveSender** · primitive `apps/api/src/lib/email/resolveSender.ts#resolveSender` · in docs: docs/claude/COMMUNICATIONS.md § Email › Send Pipeline: Identity only; branding/template comes from the cascade, not here.
+  - *Said as:* "who is this email from", "load the sending org or user as the sender variable", "I'll read the org name off the template row for the from", "the sender's identity, separate from the look of the template", "figure out the sender row through its lens"
   - *Signs you're bypassing it:* reading organization.name / a from-address off the template row to decide who an email is sent as (docs/claude/COMMUNICATIONS.md § Sender (identity is separate from branding))
-- **sendEmail** `apps/api/src/jobs/handlers/sendEmail.ts#sendEmail`: App events: attach an email handoff (deliverEmailHandoffs enqueues this) instead of enqueuing directly.
+- **sendEmail** · primitive `apps/api/src/jobs/handlers/sendEmail.ts#sendEmail` · in docs: docs/claude/COMMUNICATIONS.md § Email › Send Pipeline; docs/claude/APP_EVENTS.md § Email pipeline: App events: attach an email handoff (deliverEmailHandoffs enqueues this) instead of enqueuing directly.
+  - *Said as:* "send the welcome email when a user signs up", "I'll call the email client from the handler", "I'll enqueue the send job with the recipient list", "kick off a templated email from an event", "queue the emails through the event channel, kill the synchronous sends"
   - *Signs you're bypassing it:* calling createResendClient(...).send / defaultEmailClient().send from business logic, or enqueuing sendEmail by hand with a recipient list, instead of emitting an app event with an email handoff (docs/claude/COMMUNICATIONS.md § Send Pipeline (event-driven, two BullMQ jobs, never a direct client call; no caller-supplied recipients))
-- **unsubscribeUrl** `apps/api/src/lib/email/unsubscribe.ts#unsubscribeUrl`: Prefer over signUnsubscribe when you need the clickable link rather than the raw token.
+- **unsubscribeUrl** · primitive `apps/api/src/lib/email/unsubscribe.ts#unsubscribeUrl`: Prefer over signUnsubscribe when you need the clickable link rather than the raw token.
+  - *Said as:* "the unsubscribe link for this recipient", "I'll store an unsubscribe token in a table", "generate the signed one-click link", "build the clickable opt-out url"
   - *Signs you're bypassing it:* storing an unsubscribe token row in the database, or building the unsubscribe link by hand (docs/claude/COMMUNICATIONS.md § Communication Preferences (signed HMAC capability link, no DB token row))
-- **verifyUnsubscribe** `apps/api/src/lib/email/unsubscribe.ts#verifyUnsubscribe`: Counterpart to signUnsubscribe/unsubscribeUrl; use in the unsubscribe handler only.
-- **apps/api/src/routes/unsubscribe** `apps/api/src/routes/unsubscribe`: handle email unsubscribe link requests
-- **CommunicationLog find-or-create** `docs/claude/COMMUNICATIONS.md#Planner (sendEmail)`: dedupe per-recipient sends via queued log row keyed on idempotencyKey
+- **verifyUnsubscribe** · primitive `apps/api/src/lib/email/unsubscribe.ts#verifyUnsubscribe`: Counterpart to signUnsubscribe/unsubscribeUrl; use in the unsubscribe handler only.
+  - *Said as:* "check the unsubscribe token is genuine", "validate the signed link when they click it", "the counterpart that verifies the link in the handler"
+- **apps/api/src/routes/unsubscribe** · system `apps/api/src/routes/unsubscribe`: handle email unsubscribe link requests
+  - *Said as:* "the endpoint the unsubscribe link hits", "where does the opt-out link land", "the route handling unsubscribe clicks"
+- **CommunicationLog find-or-create** · pattern docs/claude/COMMUNICATIONS.md § Planner (sendEmail): dedupe per-recipient sends via queued log row keyed on idempotencyKey
+  - *Said as:* "make sure we never send the same email twice", "I'll rely on the job id to dedupe sends", "I'll keep a set of recipients already sent", "one queued row per recipient, keyed on the event", "a retry shouldn't create a fresh log row"
   - *Signs you're bypassing it:* relying on BullMQ job ids or an in-memory set to avoid duplicate sends, or creating a fresh log row per attempt (docs/claude/COMMUNICATIONS.md § Planner (sendEmail) step 3 (the at-most-once fence, durable beyond BullMQ retention))
-- **Email planner/deliver fan-out** `docs/claude/COMMUNICATIONS.md#Send Pipeline`: plan email once, then deliver per recipient as separate queued jobs
-- **Email send planner** `COMMUNICATIONS.md#planner-sendemail`: resolve ownership, hydrate recipients, create idempotent CommunicationLog per recipient, enqueue deliverEmail
-- **CommunicationLog.renderIssues** `CommunicationLog`: record render issues of a degraded send for later inspection
-- **deliverEmailHandoffs** `docs/claude/APP_EVENTS.md#Email pipeline`: enqueue sendEmail jobs for handoffs with deterministic planner job IDs
-- **email registry** `apps/api/src/lib/email/registry.ts`: define per-template entity lens, sender, recipient rules, data lens and render policy
-- **EmailClient.send** `packages/email/src/client/types.ts`: deliver one email with recipients, sender, subject, HTML, tags and metadata
-- **EmailEntry** `apps/api/src/lib/email/registry.ts`: declare per-template entity, sender, recipients, cc/bcc and data as lenses
-- **EmailHandoff** `docs/claude/APP_EVENTS.md#Handler and handoff contracts`: request a templated email with binding data from an event handler
-- **Email preference acceptance** `FEATURES.md — Preferences and Verification`: Every email send.
-- **Event-anchored idempotency keys** `docs/claude/COMMUNICATIONS.md`: Every email plan/deliver step; intentional resends emit a distinct event.
+- **Email planner/deliver fan-out** · pattern docs/claude/COMMUNICATIONS.md § Email › Send Pipeline › Send Pipeline · code: `deliverEmail`, `registry`, `CommunicationLog`, `sendEmail`: plan email once, then deliver per recipient as separate queued jobs
+  - *Said as:* "plan once, then one job per recipient", "split a send into per-recipient deliveries", "the two-job shape of outbound email", "why are there two jobs for one email"
+- **Email send planner** · pattern COMMUNICATIONS.md § planner-sendemail: resolve ownership, hydrate recipients, create idempotent CommunicationLog per recipient, enqueue deliverEmail
+  - *Said as:* "resolve who gets the email and queue each one", "the planner that turns an event into deliveries", "resolve the template owner, load recipients, log intent", "where recipients are figured out"
+- **CommunicationLog.renderIssues** · primitive CommunicationLog: record render issues of a degraded send for later inspection
+  - *Said as:* "record what degraded in this send", "where are the render problems of a sent email stored", "see why the email went out with empty blocks"
+- **deliverEmailHandoffs** · primitive docs/claude/APP_EVENTS.md § Email pipeline · code: `registry`, `sendEmail`, `CommunicationLog`, `deliverEmail`: enqueue sendEmail jobs for handoffs with deterministic planner job IDs
+  - *Said as:* "turn the event's email handoff into a planner job", "the bridge from app events to the email planner", "deterministic job ids so the same event doesn't plan twice", "the handler-side step that enqueues the planner"
+- **email registry** · primitive apps/api/src/lib/email/registry.ts: define per-template entity lens, sender, recipient rules, data lens and render policy
+  - *Said as:* "declare the welcome email: who sends it, who gets it, what data", "where each email type says its recipients and lens", "add a new email kind to the app", "the per-template configuration in code"
+- **EmailClient.send** · primitive packages/email/src/client/types.ts: deliver one email with recipients, sender, subject, HTML, tags and metadata
+  - *Said as:* "the one method a provider client implements", "deliver one message with recipients, subject and html", "the adapter interface for sending"
+- **EmailEntry** · primitive apps/api/src/lib/email/registry.ts: declare per-template entity, sender, recipients, cc/bcc and data as lenses
+  - *Said as:* "the config object for one email slug", "declare entity, sender, recipients and data as lenses", "the shape of a registry entry"
+- **EmailHandoff** · primitive docs/claude/APP_EVENTS.md § Handler and handoff contracts · code: `registry`: request a templated email with binding data from an event handler
+  - *Said as:* "ask for an email from inside an event handler", "the handler returns which template and what data", "request a templated email without naming recipients", "hand the email off from the event"
+- **Email preference acceptance** · rule FEATURES.md — Preferences and Verification: Every email send.
+  - *Said as:* "every send must respect the contact's preferences", "no email goes without the preference check"
+- **Event-anchored idempotency keys** · rule docs/claude/COMMUNICATIONS.md: Every email plan/deliver step; intentional resends emit a distinct event.
+  - *Said as:* "I'll put a timestamp in the idempotency key", "the key comes from the event, so a retry is the same send", "to resend on purpose, emit a new event"
   - *Signs you're bypassing it:* an idempotency key built from a timestamp or random id, or mutated to force a resend (docs/claude/COMMUNICATIONS.md § Deliver (intentional resends are distinct events, never key mutation))
-- **Event-driven email send** `docs/claude/COMMUNICATIONS.md#Send Pipeline`: Any outbound email from business logic.
+- **Event-driven email send** · rule docs/claude/COMMUNICATIONS.md § Email › Send Pipeline › Send Pipeline · code: `deliverEmail`, `registry`, `CommunicationLog`, `sendEmail`: Any outbound email from business logic.
+  - *Said as:* "send the email from the route handler", "outbound email starts with an event, never a client call", "move the inline sends behind events", "the service shouldn't talk to the provider directly"
   - *Signs you're bypassing it:* an email sent inline in a route or service handler through a provider client (docs/claude/COMMUNICATIONS.md § Send Pipeline)
-- **List-Unsubscribe headers on non-system email** `Email docs § Deliver step 6`: All non-system sends.
-- **No addresses on the queue** `docs/claude/COMMUNICATIONS.md#Planner (sendEmail)`: Any per-recipient delivery job.
+- **List-Unsubscribe headers on non-system email** · rule Email docs § Deliver step 6: All non-system sends.
+  - *Said as:* "add the one-click unsubscribe headers", "mail clients need the unsubscribe header for non-system mail"
+- **No addresses on the queue** · rule docs/claude/COMMUNICATIONS.md § Planner (sendEmail): Any per-recipient delivery job.
+  - *Said as:* "I'll put the recipient's email in the job payload", "the job carries an id, delivery re-reads the address", "don't put user rows on the queue"
   - *Signs you're bypassing it:* a job payload carrying the recipient's email address or hydrated user row instead of the recipient id plus the bound targeting where (docs/claude/COMMUNICATIONS.md § Planner (sendEmail) step 2)
-- **No caller-supplied recipients** `SendEmailPayload`: Any email send payload.
-- **No recipients on email handoffs** `docs/claude/APP_EVENTS.md#Handler and handoff contracts`: Any event that sends email.
-- **Only queued email logs are open** `lib/email/deliverEmailMessage.ts`: Every email delivery, retry, duplicate job or re-dispatch.
+- **No caller-supplied recipients** · rule SendEmailPayload: Any email send payload.
+  - *Said as:* "I'll pass the list of recipients to send", "recipients come from the registry's lens, not the caller", "the send payload has no to field"
+- **No recipients on email handoffs** · rule docs/claude/APP_EVENTS.md § Handler and handoff contracts · code: `registry`: Any event that sends email.
+  - *Said as:* "the handler can't say who gets it", "handoffs carry template and data only"
+- **Only queued email logs are open** · rule lib/email/deliverEmailMessage.ts: Every email delivery, retry, duplicate job or re-dispatch.
+  - *Said as:* "a retry shouldn't reopen a failed row", "only a queued row can be sent", "I'll reset the status back to queued and resend"
   - *Signs you're bypassing it:* a retry or resend path that reopens a sending/failed row or sends without the queued → sending compare-and-set claim (docs/claude/COMMUNICATIONS.md § Deliver (only a queued row is open; every terminal write is CAS-guarded))
-- **Provider send idempotency and retry policy** `lib/email/deliverEmailMessage.ts`: Every provider email send; outcome failures are recorded, not thrown.
-- **Unsubscribe link mandatory** `docs/claude/COMMUNICATIONS.md#render-issues`: All non-system templates.
+- **Provider send idempotency and retry policy** · rule lib/email/deliverEmailMessage.ts: Every provider email send; outcome failures are recorded, not thrown.
+  - *Said as:* "retry only rate limits and server errors", "send with an idempotency key so the provider dedupes", "record the failure, don't throw it", "what do we retry on the provider side"
+- **Unsubscribe link mandatory** · rule docs/claude/COMMUNICATIONS.md § render-issues: All non-system templates.
+  - *Said as:* "every non-system template needs an unsubscribe link", "the save should refuse a marketing template without the opt-out", "why did the save complain about a missing unsubscribe"
 - *Also here, by name:* CommunicationComponentVersion (`packages/db/prisma/schema/communicationLog.prisma`); CommunicationKind (`packages/db/prisma/schema/communication.prisma`); CommunicationReasonCode (`packages/db/prisma/schema/communicationLog.prisma`); CommunicationStatus (`packages/db/prisma/schema/communicationLog.prisma`); addressesThrough (`apps/api/src/lib/email/renderForRecipient.ts`); classifyResendError (`packages/email/src/client/classifyResendError.ts`); communicationReasonCodeFor (`apps/api/src/lib/email/communicationReasonCode.ts`); deliverJobId (`apps/api/src/lib/email/idempotency.ts`); plannerJobId (`apps/api/src/lib/email/idempotency.ts`); signUnsubscribe (`apps/api/src/lib/email/unsubscribe.ts`); unsubscribeLinkPresent (`packages/email/src/preflight/checks/unsubscribeLinkPresent.ts`)
 
 ### Class `communication-preferences`: CommunicationKind opt-in/opt-out (acceptedKinds, canDeliver), unsubscribe links
 
-- **canDeliver** `apps/api/src/lib/messaging/canDeliver.ts#canDeliver`: check whether a contact accepts a communication kind; system always passes
+- **canDeliver** · primitive `apps/api/src/lib/messaging/canDeliver.ts#canDeliver` · in docs: docs/claude/COMMUNICATIONS.md § Email › Send Pipeline; docs/claude/COMMUNICATIONS.md § Communication Preferences: check whether a contact accepts a communication kind; system always passes
+  - *Said as:* "check the user hasn't opted out before sending", "I'll check if the kind is in the accepted list inline", "does this contact accept marketing", "the consent gate shared by email and messaging", "system messages always go, marketing needs opt-in"
   - *Signs you're bypassing it:* inline checks like contact.acceptedKinds.includes(kind) or kind === 'system' before a send (docs/claude/COMMUNICATIONS.md § Communication Preferences and § Messaging (the shared gate for both lanes))
 
 ## 4. The specifics, in full

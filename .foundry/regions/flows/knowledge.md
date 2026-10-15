@@ -89,15 +89,17 @@ Flows are registered in code like inquiry handlers: flowRegistry maps each FlowK
 
 Lifecycle: meCreateFlow parses bindings and runs checkFlow, which re-evaluates from step 0 as the caller (readAllAsCaller/readAsCaller), stops at the first step that does not hold, computes stepStates and currentStep (never stored), and deletes the row when every step holds. Don't pre-check: a flow that is already complete comes back finished and is never stored. Any read error, a fetchAllPages cap or a lost race drops the flow (404). cleanStaleFlows deletes flows idle for 15 minutes. On the client everything lives in packages/ui and pages need no flow code: the store keeps only navigation.flowId (mirrored by ?flow= like spoof), useActiveFlow reads the flow from the query cache, every successful mutation rechecks it unless it sets skipFlowInvalidate, flowNext is the one rule for Finish/Continue/nothing, FlowBanner (mounted once per app) and any Modal's close button follow it, and leaving the flow's pages drops it. Adding a flow means a FlowKey enum value, a registry file and a caller in the registry test.
 
-Related regions: the step reads run through `batch` (readAllAsCaller, registerBatch); step rules are json-rules (`json-rules`, `json-rules-engine`); apiPath and route operationIds are `api-routes-schemas`; searchFields queries and fetchAllPages are `filtering-pagination`; the cleanStaleData cron row is `jobs-cron`; the navigation store and MutationCache are `frontend-state-api-client`; search-param preservation and the ?flow=/spoof mirroring are `frontend-apps-navigation`; Modal and useSectionOpen deep links are `ui-components-theme` and `filtering-pagination`; the code-registry pattern it copies is `inquiries`.
+Related regions: the step reads run through `batch` (readAllAsCaller, registerBatch); step rules are json-rules (`json-rules`, `json-rules-engine`); apiPath and route operationIds are `api-routes / api-schemas-openapi`; searchFields queries and fetchAllPages are `filtering-search / pagination`; the cleanStaleData cron row is `jobs-cron`; the navigation store and MutationCache are `frontend-store / api-client`; search-param preservation and the ?flow=/spoof mirroring are `frontend-apps-routing / navigation`; Modal and useSectionOpen deep links are `ui-components / theme-layout` and `filtering-search / pagination`; the code-registry pattern it copies is `inquiries`.
 
 ## 3. Everything that exists here, by class
 
-Point at a class when that is as specific as the moment allows, or at a member. Where a class has siblings an agent could confuse, a table under the class header says which to use when. Each member: **name** `where`: choose this when … . Where the docs or code give material, a second line describes the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
+Point at a class when that is as specific as the moment allows, or at a member. Where a class has siblings an agent could confuse, a table under the class header says which to use when; its *Said as* line gives the plain words a user or agent uses for that job. Each member: **name** · kind `where` · the doc § that describes it (code members) or the code it is about (doc members): choose this when … . Quote the name and the where in a pointer ("look over here: createLock, packages/db/src/lock/createLock.ts, CONCURRENCY.md § Distributed Lock"). *Said as:* the ways a user or agent describes this job in a message or plan without knowing the name; match on these. *Signs you're bypassing it:* the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
 
 ### Class `flows`: Guided in-app flows: registry, server-checked steps, FlowBanner client
 
 **Job: start or recheck a multi-step flow** (Starting vs checking: useStartFlow / meCreateFlow / createFlow vs checkFlow / flowRead) — docs/claude/FLOWS.md § Lifecycle, § Routes, § Client › Starting
+
+*Said as:* "start the guided setup for this user", "has the user finished onboarding yet", "re-check which steps are done", "I'll ask whether they need the flow before starting it", "begin the walkthrough and see where they are"
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -108,6 +110,8 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 **Job: move a user to the next flow step, or leave the flow** (What's next: flowNext vs followFlow vs dropFlow) — docs/claude/FLOWS.md § Client › What's next, Dropping off
 
+*Said as:* "where does the user go next", "they finished this step, take them onward", "let them leave the walkthrough", "show Continue or Finish", "I'll compute the next page from the current step"
+
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **flowNext** | the one rule for Finish / Continue / nothing | a page computing the next step from currentStep |
@@ -116,59 +120,100 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 **Job: read the active flow in client state** (Client state: useActiveFlow vs flowReadQuery vs skipFlowInvalidate) — docs/claude/FLOWS.md § Client › State, Rechecks
 
+*Said as:* "read the active walkthrough on the frontend", "where does the flow live in client state", "this mutation shouldn't refetch the flow", "keep the flow in the store"
+
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **useActiveFlow** | reading the active flow (query cache, keyed by navigation.flowId) | copying the flow into the store; change it with setFlowId |
 | **flowReadQuery** | the flow read query definition | only the cache key (flowReadQueryKeyFor) |
 | **skipFlowInvalidate** | a mutation that must not trigger a flow recheck | normal mutations (MutationCache rechecks automatically) |
 
-- **Flow** `packages/db/prisma/schema/flow.prisma`: persist a user's guided flow step progress and return URL
-- **checkFlow** `apps/api/src/modules/flow/services/checkFlow.ts#checkFlow`: Computing step completion for an existing flow; use createFlow to start a new one.
+- **Flow** · model `packages/db/prisma/schema/flow.prisma` · in docs: docs/claude/ARCHITECTURE.md § Request Flow; docs/claude/ARCHITECTURE.md § Data Flow: persist a user's guided flow step progress and return URL
+  - *Said as:* "remember where the user is in a multi-step setup", "the row that holds a guided walkthrough in progress", "I'll add an onboarding progress table with a step column", "store which setup steps this user still has to do"
+- **checkFlow** · primitive `apps/api/src/modules/flow/services/checkFlow.ts#checkFlow` · in docs: docs/claude/FLOWS.md § Lifecycle: Computing step completion for an existing flow; use createFlow to start a new one.
+  - *Said as:* "recompute which steps are done, from the first one, as the user", "re-evaluate the walkthrough every time it's read", "did they finish step two yet", "I'll store completed-step flags and flip them from the pages", "work out the current step from live data, not stored state"
   - *Signs you're bypassing it:* persisting completed-step flags or currentStep on the Flow row and advancing them from pages (docs/claude/FLOWS.md § Lifecycle (stepStates computed, not stored))
-- **createFlow** `apps/api/src/modules/flow/services/createFlow.ts#createFlow`: Starting a new flow for a user; use checkFlow to evaluate progress on an existing one.
-- **dropFlow** `packages/ui/src/lib/flows/dropFlow.ts#dropFlow`: Advancing to the next step instead of leaving: followFlow.
-- **FlowBanner** `packages/ui/src/components/flows/FlowBanner.tsx#FlowBanner`: show the active guided flow's Continue/Finish button across the app
-- **flowNext** `packages/ui/src/lib/flows/flowNext.ts#flowNext`: The one rule for what's next; pass its result to followFlow to act on it.
+- **createFlow** · primitive `apps/api/src/modules/flow/services/createFlow.ts#createFlow`: Starting a new flow for a user; use checkFlow to evaluate progress on an existing one.
+  - *Said as:* "start a guided setup for this user on the server", "begin the walkthrough with these bindings", "I'll check whether they need onboarding before creating it", "create the flow and let it tell you if it's already done"
+- **dropFlow** · primitive `packages/ui/src/lib/flows/dropFlow.ts#dropFlow`: Advancing to the next step instead of leaving: followFlow.
+  - *Said as:* "leave the walkthrough without finishing it", "the user wandered off, abandon the flow", "stop guiding them and go back to the normal site", "clear the active flow without navigating anywhere"
+- **FlowBanner** · primitive `packages/ui/src/components/flows/FlowBanner.tsx#FlowBanner` · in docs: docs/claude/FLOWS.md § Client; FEATURES.md § Flows: show the active guided flow's Continue/Finish button across the app
+  - *Said as:* "guide the user through the steps they still need to do", "show a Continue or Finish button while setup is in progress", "the banner at the top that says what's next", "I'll add a Continue button to each onboarding page", "one place in the app shell that nudges the user onward"
+- **flowNext** · primitive `packages/ui/src/lib/flows/flowNext.ts#flowNext` · in docs: docs/claude/FLOWS.md § Client; FEATURES.md § Flows: The one rule for what's next; pass its result to followFlow to act on it.
+  - *Said as:* "what should the user do next in the walkthrough", "Finish, Continue to the next page, or nothing", "I'll compute the next step from the current step on this page", "the single rule for what the button says and where it goes"
   - *Signs you're bypassing it:* a page or component computing the next step or Finish target from currentStep itself (docs/claude/FLOWS.md § Client › What's next)
-- **flowReadQuery** `packages/ui/src/lib/flows/flowReadQuery.ts#flowReadQuery`: Only need the cache key for invalidation: flowReadQueryKeyFor instead.
-- **flowRegistry** `apps/api/src/modules/flow/registry/flowRegistry.ts#flowRegistry`: map each FlowKey to its guided flow definition of bindings and steps
-- **followFlow** `packages/ui/src/lib/flows/followFlow.ts#followFlow`: Abandoning the flow without navigating: dropFlow instead.
-- **isOnFlowPath** `packages/ui/src/lib/flows/isOnFlowPath.ts#isOnFlowPath`: tell whether a pathname belongs to an active flow, including its return URL
-- **useActiveFlow** `packages/ui/src/hooks/flow/useActiveFlow.ts#useActiveFlow`: Read the flow with this; change it with setFlowId on the navigation store.
+- **flowReadQuery** · primitive `packages/ui/src/lib/flows/flowReadQuery.ts#flowReadQuery` · in docs: docs/claude/FLOWS.md § Client: Only need the cache key for invalidation: flowReadQueryKeyFor instead.
+  - *Said as:* "the query that fetches the active walkthrough", "how the client reads the flow from the cache", "I'll write my own fetch for the flow row", "the query definition, not just its key"
+- **flowRegistry** · primitive `apps/api/src/modules/flow/registry/flowRegistry.ts#flowRegistry` · in docs: docs/claude/FLOWS.md § Registry; docs/claude/FLOWS.md § Adding a flow: map each FlowKey to its guided flow definition of bindings and steps
+  - *Said as:* "where each guided setup is defined", "map a flow key to its steps and bindings", "I'll hardcode the onboarding steps in the component", "the list of walkthroughs the server knows about"
+- **followFlow** · primitive `packages/ui/src/lib/flows/followFlow.ts#followFlow`: Abandoning the flow without navigating: dropFlow instead.
+  - *Said as:* "act on what's next: navigate to the step or finish", "take the user to the next page of the walkthrough", "I'll call navigate with the step URL myself", "go where the next-step rule says and clear the flow when done"
+- **isOnFlowPath** · primitive `packages/ui/src/lib/flows/isOnFlowPath.ts#isOnFlowPath`: tell whether a pathname belongs to an active flow, including its return URL
+  - *Said as:* "is this page part of the active walkthrough", "does leaving this route mean they left the flow", "check the current path against the flow's pages and return URL", "I'll compare the pathname to a hardcoded list of onboarding routes"
+- **useActiveFlow** · primitive `packages/ui/src/hooks/flow/useActiveFlow.ts#useActiveFlow` · in docs: docs/claude/FLOWS.md § Client: Read the flow with this; change it with setFlowId on the navigation store.
+  - *Said as:* "read the walkthrough the user is currently in", "get the active flow from client state", "I'll copy the flow object into the store", "the hook that gives you the current flow or nothing", "only the id lives in the store, the data comes from the cache"
   - *Signs you're bypassing it:* the flow object copied into the Zustand store instead of only navigation.flowId plus the query cache (docs/claude/FLOWS.md § Client › State)
-- **useStartFlow** `packages/ui/src/hooks/flow/useStartFlow.ts#useStartFlow`: start a guided onboarding flow from the UI and refresh affected queries
-- **apps/api/src/modules/flow** `apps/api/src/modules/flow`: read and delete guided flows
-- **Add a flow as one registry file** `apps/api/src/modules/flow/registry/`: define a flow's bindingsSchema and steps in its own registry file
-- **Adding a flow** `docs/claude/FLOWS.md — Adding a flow`: register a new guided flow end to end with enum key, registry entry and test
-- **Flow recheck on read** `FEATURES.md > Flows > Rechecked on every read`: re-evaluate all steps from step 0 as the caller on every read
+- **useStartFlow** · primitive `packages/ui/src/hooks/flow/useStartFlow.ts#useStartFlow` · in docs: docs/claude/FLOWS.md § Client: start a guided onboarding flow from the UI and refresh affected queries
+  - *Said as:* "kick off the guided setup from a button", "start onboarding from the UI and refresh what it touches", "I'll first ask the server whether they still need the flow", "returns whether it actually started and the flow itself", "begin the walkthrough when they click get started"
+- **apps/api/src/modules/flow** · system `apps/api/src/modules/flow`: read and delete guided flows
+  - *Said as:* "the backend endpoints for guided walkthroughs", "read and end a flow over the API", "where the flow routes live on the server", "the module behind recheck and delete"
+- **Add a flow as one registry file** · pattern apps/api/src/modules/flow/registry/: define a flow's bindingsSchema and steps in its own registry file
+  - *Said as:* "a new walkthrough gets its own file in the registry", "define the bindings schema and steps together in one place", "I'll spread the new flow's steps across a few modules", "one file per guided setup"
+- **Adding a flow** · pattern docs/claude/FLOWS.md — Adding a flow: register a new guided flow end to end with enum key, registry entry and test
+  - *Said as:* "add a new guided walkthrough end to end", "a new onboarding sequence needs a key, a registry entry and a test", "the steps to register a flow", "wire up a new multi-step setup"
+- **Flow recheck on read** · pattern FEATURES.md > Flows > Rechecked on every read: re-evaluate all steps from step 0 as the caller on every read
+  - *Said as:* "re-evaluate every step from the start each time", "steps can move backward if the data disappears", "I'll persist which steps are done on the row", "the server decides progress by reading live data as the user"
   - *Signs you're bypassing it:* persisting completed-step flags or currentStep on the Flow row and advancing them from pages (docs/claude/FLOWS.md § Lifecycle (stepStates computed, not stored))
-- **Flow step rule over { data }** `docs/claude/FLOWS.md#registry`: list reads: notEmpty/atLeast/any; single reads: conditions on the record
-- **Modal close continues flow** `packages/ui Modal`: turn an open modal's close button into the flow's next action
-- **callerFor** `modules/flow/tests/flowRegistry.test.ts`: supply a factory-built caller so the registry test can run each flow
-- **cleanStaleFlows** `cron row cleanStaleFlows`: hard-delete flows untouched for 15 minutes, every 5 minutes
-- **flowDelete** `DELETE /api/v1/flow/:id`: end a flow explicitly
-- **flowRead** `GET /api/v1/flow/:id`: recheck a flow's steps; 404 once dropped or finished
+- **Flow step rule over { data }** · pattern docs/claude/FLOWS.md § Registry · code: `apiPath`, `registry`, `flowRegistry`, `interpolate`: list reads: notEmpty/atLeast/any; single reads: conditions on the record
+  - *Said as:* "a step holds when the list isn't empty or has at least two", "a step holds when the record has this field set", "how to write the condition that says a step is done", "I'll write a custom function to check step completion"
+- **Modal close continues flow** · pattern packages/ui Modal: turn an open modal's close button into the flow's next action
+  - *Said as:* "closing the dialog should move them to the next step", "the modal's close button becomes the continue button", "I'll add a separate Next button inside the modal", "after they create the thing in a dialog, carry on the walkthrough"
+- **callerFor** · primitive modules/flow/tests/flowRegistry.test.ts: supply a factory-built caller so the registry test can run each flow
+  - *Said as:* "give the registry test a real user to run each flow as", "the test needs a caller built from factories", "I'll mock the session for the flow test"
+- **cleanStaleFlows** · primitive cron row cleanStaleFlows: hard-delete flows untouched for 15 minutes, every 5 minutes
+  - *Said as:* "delete walkthroughs nobody has touched in fifteen minutes", "clean up abandoned flows on a schedule", "I'll add a cron to purge old onboarding rows"
+- **flowDelete** · primitive DELETE /api/v1/flow/:id: end a flow explicitly
+  - *Said as:* "end the walkthrough explicitly over the API", "the delete endpoint for a flow", "the client tells the server to drop the flow"
+- **flowRead** · primitive GET /api/v1/flow/:id: recheck a flow's steps; 404 once dropped or finished
+  - *Said as:* "re-check the walkthrough from the client", "fetch the flow and get back which steps hold", "it 404s once finished or dropped, that's expected", "I'll poll a status endpoint for onboarding progress"
   - *Throws:* makeError 404 RESOURCE_NOT_FOUND (`resource-not-found`, request-context-errors)
-- **meCreateFlow** `POST /api/v1/me/flows`: start a flow from flowKey and bindings, returning computed step states
+- **meCreateFlow** · primitive POST /api/v1/me/flows: start a flow from flowKey and bindings, returning computed step states
+  - *Said as:* "the endpoint that starts a walkthrough for the current user", "post a flow key and bindings, get back the computed steps", "start the flow over the API", "I'll add a route that checks whether onboarding is needed"
   - *Throws:* makeError 422 VALIDATION_ERROR (`validation-error`, request-context-errors); ZodError (`validation-error`, request-context-errors)
-- **navigatePreserving** `packages/ui useAuthenticatedRouting`: navigate while keeping flow and spoof search params
-- **readAsCaller / readAllAsCaller** `batch module (registerBatch + executeRequest)`: readAllAsCaller for list reads; readAsCaller for single records
-- **returnUrl binding** `@template/shared/utils appPathSchema`: omit to end on /dashboard
-- **setFlowId** `packages/ui store navigation.flowId`: only the id in store; flow data via useActiveFlow
-- **skipFlowInvalidate** `packages/ui app MutationCache`: opt a mutation out of rechecking the active flow on success
-- **advance confirm for must-see pages** `docs/claude/FLOWS.md#registry`: steps showing one-time secrets such as token values
-- **Any flow read error drops the flow** `docs/claude/FLOWS.md#lifecycle`: handling failures during checkFlow
-- **Don't pre-check; create and see** `docs/claude/FLOWS.md#lifecycle`: starting any flow
+- **navigatePreserving** · primitive packages/ui useAuthenticatedRouting: navigate while keeping flow and spoof search params
+  - *Said as:* "navigate without losing the flow and spoof params", "keep the flow id in the URL when moving between pages", "I'll call navigate and lose the search params"
+- **readAsCaller / readAllAsCaller** · primitive batch module (registerBatch + executeRequest): readAllAsCaller for list reads; readAsCaller for single records
+  - *Said as:* "run the step's read as the user, with their permissions", "fetch every page of the list for a step check", "a single record read versus a list read inside the flow", "I'll query the database directly to check the step"
+- **returnUrl binding** · primitive @template/shared/utils appPathSchema: omit to end on /dashboard
+  - *Said as:* "where to send them when the walkthrough finishes", "end on the dashboard unless told otherwise", "only in-app paths are allowed as the return destination"
+- **setFlowId** · primitive packages/ui store navigation.flowId: only the id in store; flow data via useActiveFlow
+  - *Said as:* "change which flow is active in the store", "only the id goes in the store, nothing else", "I'll put the whole flow object in the store"
+- **skipFlowInvalidate** · primitive packages/ui app MutationCache: opt a mutation out of rechecking the active flow on success
+  - *Said as:* "this mutation shouldn't trigger a flow recheck", "opt a mutation out of refetching the walkthrough", "every successful mutation rechecks the flow unless told not to", "I'll add my own invalidation after this mutation"
+- **advance confirm for must-see pages** · rule docs/claude/FLOWS.md § Registry · code: `apiPath`, `registry`, `flowRegistry`, `interpolate`: steps showing one-time secrets such as token values
+  - *Said as:* "don't auto-advance past a page showing a one-time secret", "wait for the user to click before moving on", "the step holds but they still need to read the page"
+- **Any flow read error drops the flow** · rule docs/claude/FLOWS.md § Lifecycle · code: `checkFlow`, `Flow`, `registry`, `readAllAsCaller`: handling failures during checkFlow
+  - *Said as:* "if a step's read fails, the flow is gone", "a failing check deletes the flow and returns not found", "I'll retry or mark the step as errored"
+- **Don't pre-check; create and see** · rule docs/claude/FLOWS.md § Lifecycle · code: `checkFlow`, `Flow`, `registry`, `readAllAsCaller`: starting any flow
+  - *Said as:* "don't ask whether they need onboarding, just start it", "create runs the same checks and comes back complete if done", "I'll add a query to see if the user still needs the flow", "a flow whose steps all hold is never stored"
   - *Signs you're bypassing it:* a query asking whether the user still needs a flow before calling useStartFlow / meCreateFlow (docs/claude/FLOWS.md § Lifecycle; Client › Starting)
-- **Every flow must be covered by the registry test** `modules/flow/tests/flowRegistry.test.ts`: whenever a FlowKey is added
-- **Flow client code lives in packages/ui** `docs/claude/FLOWS.md#client`: building any page a flow visits
+- **Every flow must be covered by the registry test** · rule modules/flow/tests/flowRegistry.test.ts: whenever a FlowKey is added
+  - *Said as:* "add the new flow to the registry test", "the test proves every step's read is a real route", "a new flow key without test coverage"
+- **Flow client code lives in packages/ui** · rule docs/claude/FLOWS.md § Client · code: `flowReadQuery`, `useActiveFlow`, `useAuthenticatedRouting`, `flowNext`: building any page a flow visits
+  - *Said as:* "pages need no flow code of their own", "I'll add a continue button to this specific page", "flow handling belongs in the shared UI package", "don't sprinkle walkthrough checks across app pages"
   - *Signs you're bypassing it:* flow-specific Continue buttons or flow checks added to individual app pages (docs/claude/FLOWS.md § Client ("pages need no flow code"))
-- **Flow client state** `FEATURES.md > Flows > Client`: frontend flow handling
-- **Flow step shape** `FEATURES.md > Flows > Registry`: defining flow steps
-- **Flow steps are immutable once stored** `docs/claude/FLOWS.md#lifecycle`: changing a flow definition
-- **Flows resolved at create** `FEATURES.md > Flows > Resolved at create`: starting any flow
-- **Leaving flow pages drops the flow** `docs/claude/FLOWS.md#client`: designing step to URLs
-- **Push predicates into readPath query** `docs/claude/FLOWS.md#registry`: defining a flow step's readPath and rule
+- **Flow client state** · rule FEATURES.md > Flows > Client: frontend flow handling
+  - *Said as:* "how the frontend keeps track of the active walkthrough", "the id in the store, the data in the query cache", "I'll keep onboarding state in a context provider"
+- **Flow step shape** · rule FEATURES.md > Flows > Registry: defining flow steps
+  - *Said as:* "what a step consists of: target page, advance mode, read, rule", "define the fields a step has", "a step done in place has no target page"
+- **Flow steps are immutable once stored** · rule docs/claude/FLOWS.md § Lifecycle · code: `checkFlow`, `Flow`, `registry`, `readAllAsCaller`: changing a flow definition
+  - *Said as:* "editing the registry won't change a running walkthrough", "steps are copied onto the row at create", "I'll change the steps and expect live flows to update"
+- **Flows resolved at create** · rule FEATURES.md > Flows > Resolved at create: starting any flow
+  - *Said as:* "steps are computed and stored when the flow starts", "create checks too, so just create instead of asking", "I'll resolve the steps lazily on each read"
+- **Leaving flow pages drops the flow** · rule docs/claude/FLOWS.md § Client · code: `flowReadQuery`, `useActiveFlow`, `useAuthenticatedRouting`, `flowNext`: designing step to URLs
+  - *Said as:* "if they navigate away from the walkthrough it ends", "design step pages so wandering off means abandoning", "I'll keep the flow alive across unrelated pages"
+- **Push predicates into readPath query** · rule docs/claude/FLOWS.md § Registry · code: `apiPath`, `registry`, `flowRegistry`, `interpolate`: defining a flow step's readPath and rule
+  - *Said as:* "filter in the route's query, not in the step rule", "let the list endpoint do the filtering the step needs", "I'll fetch the whole list and filter it in the rule", "the rule only judges what comes back"
   - *Signs you're bypassing it:* a step rule that filters a whole list in json-rules for conditions the route's searchFields could express in the readPath query (docs/claude/FLOWS.md § Registry › readPath)
 - *Also here, by name:* FlowKey (`packages/db/prisma/schema/flow.prisma`); flowCreateBodySchema (`apps/api/src/modules/flow/schemas/flowSchemas.ts`); flowReadQueryKeyFor (`packages/ui/src/lib/flows/flowReadQuery.ts`); flowResponseSchema (`apps/api/src/modules/flow/schemas/flowSchemas.ts`); flowStepSchema (`apps/api/src/modules/flow/schemas/flowSchemas.ts`); pathnameOf (`packages/ui/src/lib/flows/pathnameOf.ts`); setUpOrganizationFlow (`apps/api/src/modules/flow/registry/setUpOrganization.ts`)
 

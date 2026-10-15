@@ -1,0 +1,48 @@
+{
+  "id": "frontend-store",
+  "title": "Frontend store (Zustand slices)",
+  "routing": "Is this about client-side state in the frontend: the one shared Zustand store useAppStore / AppStore from @template/ui/store, its slices (AuthSlice: auth.initialize / signIn / signUp / logout / refreshMe / setSpoof / setStrategy; PermissionsSlice: permissions.setup / check / clear; TenantSlice: tenant.setOrganization / setSpace / setUser / setPublic / setPage; ClientSlice; UISlice: ui.setTheme / setLoading, useThemePersistence; NavigationSlice: navigatePreserving, setFlowId), adding or removing a slice, narrow selectors and useShallow, getState() outside React, actions with side effects, or a component that wants its own store or to put server data in the store?",
+  "concepts": [
+    "frontend-store"
+  ],
+  "tokens": 12194,
+  "tokenMethod": "chars/4",
+  "runsAgreed": 0,
+  "sources": {
+    "docs": [
+      "FEATURES.md",
+      "docs/claude/FRONTEND.md",
+      "docs/claude/ZUSTAND.md"
+    ],
+    "docUnits": [
+      "doc:docs/claude/FRONTEND.md#state-management",
+      "doc:docs/claude/ZUSTAND.md#architecture",
+      "doc:docs/claude/ZUSTAND.md#1-authslice",
+      "doc:docs/claude/ZUSTAND.md#2-permissionsslice",
+      "doc:docs/claude/ZUSTAND.md#3-tenantslice",
+      "doc:docs/claude/ZUSTAND.md#4-clientslice",
+      "doc:docs/claude/ZUSTAND.md#5-uislice",
+      "doc:docs/claude/ZUSTAND.md#6-navigationslice",
+      "doc:docs/claude/ZUSTAND.md#access-patterns",
+      "doc:docs/claude/ZUSTAND.md#slice-dependencies",
+      "doc:docs/claude/ZUSTAND.md#devtools",
+      "doc:docs/claude/ZUSTAND.md#best-practices",
+      "doc:docs/claude/ZUSTAND.md#adding-or-removing-a-slice",
+      "doc:docs/claude/ZUSTAND.md#file-reference",
+      "doc:FEATURES.md#frontend-architecture"
+    ],
+    "catalogClusters": [
+      "authentication-methods",
+      "frontend-navigation-context",
+      "frontend-state-api-client",
+      "guided-flows",
+      "roles-and-permissions",
+      "superadmin-operations",
+      "websocket-realtime-delivery"
+    ],
+    "codeEntries": 6,
+    "docMembers": 46
+  },
+  "bypassLines": 27,
+  "glossaryTerms": 14
+}

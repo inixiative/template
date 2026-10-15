@@ -1,21 +1,18 @@
 {
   "id": "mutation-hooks",
-  "title": "Mutation hooks and write lifecycle",
-  "routing": "Is this about what happens when a row is written, i.e. reacting to, validating, recording or reshaping Prisma creates/updates/deletes? Signals: registerDbHook, HookTiming/DbAction, before/after hooks, `previous`, createMany/updateMany vs createManyAndReturn/updateManyAndReturn, select on a write, RulesRegistry/shadowMerge, AuditLog/AUDIT_ENABLED_MODELS/auditActorContext/redact or ignore fields, deletedAt/soft delete/tombstone/revive/db.withDeleted/includeDeleted, immutable fields or FK stripping (ImmutableFieldsOverrides), position/sort columns (orderedListRegistry), or reaching for a DB trigger or db.raw.",
+  "title": "Mutation hooks, immutable fields, ordered lists",
+  "routing": "Is this about what runs around a db write: the mutationLifeCycle extension, registerDbHook / registerHooks, before and after hooks, previous and shadowMerge, writtenPatches, isNoOpUpdate / NOOP_FIELDS / HOOK_IGNORE_FIELDS, the RulesRegistry (getRule, rules, contactRules, segmentConditions), createManyAndReturn / updateManyAndReturn instead of createMany / updateMany, no-select-on-mutations, db.raw to skip hooks, immutable fields (GLOBAL_IMMUTABLE_FIELDS, getImmutableFields, ImmutableFieldsOverrides, FK fields auto-immutable), or ordered lists (orderedListRegistry, orderedList hook, buildScope, nextSortOrderRaw, bulkAssignAppend / bulkAssignNegatives)?",
   "concepts": [
     "mutation-hooks",
-    "audit-log",
-    "soft-delete",
     "immutable-fields",
     "ordered-lists"
   ],
-  "tokens": 19563,
+  "tokens": 15458,
   "tokenMethod": "chars/4",
-  "runsAgreed": 3,
+  "runsAgreed": 0,
   "sources": {
     "docs": [
       "docs/claude/ARCHITECTURE.md",
-      "docs/claude/DATABASE.md",
       "docs/claude/HOOKS.md"
     ],
     "docUnits": [
@@ -27,13 +24,10 @@
       "doc:docs/claude/HOOKS.md#rules-registry",
       "doc:docs/claude/HOOKS.md#supported-operations",
       "doc:docs/claude/HOOKS.md#limitations",
-      "doc:docs/claude/HOOKS.md#audit-log",
-      "doc:docs/claude/DATABASE.md#query-building-utilities",
       "doc:docs/claude/HOOKS.md#immutable-fields",
       "doc:docs/claude/HOOKS.md#ordered-list"
     ],
     "catalogClusters": [
-      "audit-logging",
       "caching-and-invalidation",
       "customers-providers",
       "data-access-rules",
@@ -48,9 +42,9 @@
       "segments-membership",
       "soft-delete-cascade"
     ],
-    "codeEntries": 86,
-    "docMembers": 53
+    "codeEntries": 47,
+    "docMembers": 46
   },
   "bypassLines": 27,
-  "glossaryTerms": 30
+  "glossaryTerms": 18
 }

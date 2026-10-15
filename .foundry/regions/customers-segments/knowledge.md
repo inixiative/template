@@ -112,11 +112,13 @@ Not here: the generic `RuleReference` / `withRule` / lens machinery is in the js
 
 ## 3. Everything that exists here, by class
 
-Point at a class when that is as specific as the moment allows, or at a member. Where a class has siblings an agent could confuse, a table under the class header says which to use when. Each member: **name** `where`: choose this when … . Where the docs or code give material, a second line describes the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
+Point at a class when that is as specific as the moment allows, or at a member. Where a class has siblings an agent could confuse, a table under the class header says which to use when; its *Said as* line gives the plain words a user or agent uses for that job. Each member: **name** · kind `where` · the doc § that describes it (code members) or the code it is about (doc members): choose this when … . Quote the name and the where in a pointer ("look over here: createLock, packages/db/src/lock/createLock.ts, CONCURRENCY.md § Distributed Lock"). *Said as:* the ways a user or agent describes this job in a message or plan without knowing the name; match on these. *Signs you're bypassing it:* the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
 
 ### Class `customers`: CustomerRef customer/provider pairs, provider routes and lens
 
 **Job: load a customer relationship from the provider's or the customer's side** (Viewing a CustomerRef: includeCustomer vs includeProvider vs includeComplete; customerRefAsProviderSchema vs customerRefAsCustomerSchema) — catalog choose lines
+
+*Said as:* "load the relationship from the provider's side or the customer's", "who are my customers", "who are my providers", "which include and response shape for this view", "I'll write the include for both sides by hand"
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -128,25 +130,36 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 **Job: record who is a customer of whom vs who is a member of an org** (CustomerRef vs OrganizationUser) — catalog CustomerRef
 
+*Said as:* "is this person a customer or a member", "who is a customer of whom versus who belongs to the org", "I'll reuse the membership table for customers", "record that this org buys from that provider"
+
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **CustomerRef** | who is a customer of which provider | tenant membership (use OrganizationUser (tenancy)) |
 | **OrganizationUser (tenancy)** | membership in an org | customer/provider relationships (use CustomerRef) |
 
-- **CustomerRef** `packages/db/prisma/schema/customerRef.prisma`: Use for customer-provider relationships; tenant membership belongs in OrganizationUser/SpaceUser instead.
+- **CustomerRef** · model `packages/db/prisma/schema/customerRef.prisma` · in docs: docs/claude/SEGMENTS.md § Purpose and ownership; docs/claude/SEGMENTS.md § Remaining work: Use for customer-provider relationships; tenant membership belongs in OrganizationUser/SpaceUser instead.
+  - *Said as:* "record that this user or org is a customer of that provider", "who is a customer of whom", "I'll reuse the org membership table for customers", "I'll add a join table between providers and their customers", "the external identity a provider holds for a customer"
   - *Signs you're bypassing it:* using OrganizationUser / SpaceUser or a new join table to model who is a customer of whom (catalog: CustomerRef (tenant membership belongs in OrganizationUser/SpaceUser instead))
-- **customerRefAsCustomerSchema** `apps/api/src/modules/customerRef/schemas/customerRefSchemas.ts#customerRefAsCustomerSchema`: Customer-facing listings; customerRefAsProviderSchema when the provider views its customers.
-- **customerRefAsProviderSchema** `apps/api/src/modules/customerRef/schemas/customerRefSchemas.ts#customerRefAsProviderSchema`: Provider-facing listings; customerRefAsCustomerSchema when the customer views its providers.
-- **hydrateCustomerRefs** `apps/api/src/modules/segment/services/hydrateCustomerRefs.ts#hydrateCustomerRefs`: load customer refs by id for an owner with their linked records
-- **includeComplete** `apps/api/src/modules/customerRef/queries/customerRefIncludes.ts#includeComplete`: Need both sides; includeCustomer or includeProvider when only one side is needed.
-- **includeCustomer** `apps/api/src/modules/customerRef/queries/customerRefIncludes.ts#includeCustomer`: Provider viewing its customers; includeProvider for the other side, includeComplete for both.
+- **customerRefAsCustomerSchema** · primitive `apps/api/src/modules/customerRef/schemas/customerRefSchemas.ts#customerRefAsCustomerSchema`: Customer-facing listings; customerRefAsProviderSchema when the provider views its customers.
+  - *Said as:* "the response shape when a customer lists their providers", "customer-facing listing of the relationship", "what the customer sees about who serves them", "I'll write a response schema for the customer's view"
+- **customerRefAsProviderSchema** · primitive `apps/api/src/modules/customerRef/schemas/customerRefSchemas.ts#customerRefAsProviderSchema`: Provider-facing listings; customerRefAsCustomerSchema when the customer views its providers.
+  - *Said as:* "the response shape when a provider lists its customers", "provider-facing listing with the customer attached", "what the provider sees about each customer", "I'll write a response schema for the provider's view"
+- **hydrateCustomerRefs** · primitive `apps/api/src/modules/segment/services/hydrateCustomerRefs.ts#hydrateCustomerRefs`: load customer refs by id for an owner with their linked records
+  - *Said as:* "load these customer ids for an owner with their linked records", "turn a list of customer ids into full rows", "I'll fetch each customer ref one by one"
+- **includeComplete** · primitive `apps/api/src/modules/customerRef/queries/customerRefIncludes.ts#includeComplete`: Need both sides; includeCustomer or includeProvider when only one side is needed.
+  - *Said as:* "load the relationship with both the customer and the provider", "I need both sides of the pair", "the admin view that shows everyone involved", "I'll include every customer and provider relation by hand"
+- **includeCustomer** · primitive `apps/api/src/modules/customerRef/queries/customerRefIncludes.ts#includeCustomer`: Provider viewing its customers; includeProvider for the other side, includeComplete for both.
+  - *Said as:* "the provider is looking at its customers", "load who the customer is, from the provider's side", "attach the customer user, org or space to each row", "I'll write the include for the customer relations myself"
   - *Signs you're bypassing it:* hand-written include objects for customerUser/customerOrganization/customerSpace on a CustomerRef query (catalog: includeCustomer / includeProvider / includeComplete)
-- **includeProvider** `apps/api/src/modules/customerRef/queries/customerRefIncludes.ts#includeProvider`: Customer viewing its providers; includeCustomer for the other side, includeComplete for both.
+- **includeProvider** · primitive `apps/api/src/modules/customerRef/queries/customerRefIncludes.ts#includeProvider`: Customer viewing its providers; includeCustomer for the other side, includeComplete for both.
+  - *Said as:* "the customer is looking at its providers", "load who the provider is, from the customer's side", "attach the provider org or space to each row", "I'll write the include for the provider relations myself"
 - *Also here, by name:* CustomerModel (`packages/db/prisma/schema/customerRef.prisma`); ProviderModel (`packages/db/prisma/schema/customerRef.prisma`); customerFilterSchema (`apps/api/src/modules/customerRef/schemas/customerRefQuerySchemas.ts`); customerRefCustomerFk (`apps/api/src/modules/segment/lib/segmentOwner.ts`); customerRefCustomerId (`apps/api/src/modules/segment/services/publishMembershipChanges.ts`); customerRefProviderFk (`apps/api/src/modules/segment/lib/segmentOwner.ts`); customerRefTags (`apps/api/src/modules/customerRef/schemas/customerRefSchemas.ts`); providerFilterSchema (`apps/api/src/modules/customerRef/schemas/customerRefQuerySchemas.ts`)
 
 ### Class `segments`: Segments: provider-owned audiences, static/dynamic membership reconciliation
 
 **Job: recompute segment membership when rules or customers change** (Reconcile: reconcileSegment vs reconcileCustomerRefSegments vs reconcileCustomerRef vs applyMembershipDiff vs publishMembershipChanges) — docs/claude/SEGMENTS.md § Static and dynamic membership; catalog
+
+*Said as:* "the rule changed, recompute who's in the audience", "a customer changed, update their memberships", "write the membership changes and tell everyone", "I'll re-evaluate every segment on every write", "keep the audience current"
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -158,6 +171,8 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 **Job: evaluate or preview who is in a segment** (Evaluate: evaluateSegment vs estimateSegmentReach vs compileSegmentWhere) — catalog; docs/claude/SEGMENTS.md § API
 
+*Said as:* "who matches this audience right now", "how many customers would this rule reach", "I need the filter itself to compose", "preview the audience before saving it"
+
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **evaluateSegment** | member ids of a saved segment | draft conditions (use estimateSegmentReach) |
@@ -165,6 +180,8 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **compileSegmentWhere** | the composable query filter itself | matched ids (use evaluateSegment) |
 
 **Job: validate a segment and check its health** (Validate and health: validateSegmentConditions vs assertSegmentReferencesOwned vs findReferenceCycle vs soundSegments vs withSegmentsRuleIssues) — docs/claude/SEGMENTS.md § Rule health and references; catalog
+
+*Said as:* "is this rule well-formed and safe to save", "the rule references a segment that isn't theirs", "a segment that includes itself", "skip the broken audiences", "show what's wrong with each segment"
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -174,70 +191,118 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **soundSegments** | dropping degraded segments | keeping all with issues (use withSegmentsRuleIssues) |
 | **withSegmentsRuleIssues** | rows annotated with rule issues | a state map (use segmentRuleStates) |
 
-- **Segment** `packages/db/prisma/schema/segment.prisma`: Rule-defined audiences: dynamic Segment; arbitrary labels on resources: Tag instead.
-- **SegmentMember** `packages/db/prisma/schema/segmentMember.prisma`: link one customer ref into a segment, unique per pair
-- **applyMembershipDiff** `apps/api/src/modules/segment/services/applyMembershipDiff.ts#applyMembershipDiff`: Persist computed membership changes; to compute matches use evaluateSegment, to notify use publishMembershipChanges.
+- **Segment** · model `packages/db/prisma/schema/segment.prisma` · in docs: FEATURES.md § Segments; docs/claude/SEGMENTS.md § Purpose and ownership: Rule-defined audiences: dynamic Segment; arbitrary labels on resources: Tag instead.
+  - *Said as:* "a rule-defined audience of customers", "the group of customers matching these conditions", "I'll add a static list of customer ids for the campaign", "label arbitrary resources, that's a tag, not this", "an audience that updates itself as customers change"
+- **SegmentMember** · model `packages/db/prisma/schema/segmentMember.prisma` · in docs: docs/claude/HOOKS.md § Application Hooks: link one customer ref into a segment, unique per pair
+  - *Said as:* "the row linking one customer into an audience", "who is currently in the segment", "I'll insert members directly into the join table", "written only by reconciliation, never by hand"
+- **applyMembershipDiff** · primitive `apps/api/src/modules/segment/services/applyMembershipDiff.ts#applyMembershipDiff`: Persist computed membership changes; to compute matches use evaluateSegment, to notify use publishMembershipChanges.
+  - *Said as:* "persist who joined and who left the audience", "write the computed membership changes to the database", "I'll compute added and removed sets and do a create-many and delete-many", "the only thing that writes membership rows", "apply the diff after evaluating the rule"
   - *Signs you're bypassing it:* hand-computing added/removed member sets and issuing createMany/deleteMany on SegmentMember (catalog: applyMembershipDiff (persist computed membership changes))
-- **assertSegmentReferencesOwned** `apps/api/src/modules/segment/validations/assertSegmentReferencesOwned.ts#assertSegmentReferencesOwned`: Ownership and lens check on references; for condition shape validation use validateSegmentConditions.
+- **assertSegmentReferencesOwned** · primitive `apps/api/src/modules/segment/validations/assertSegmentReferencesOwned.ts#assertSegmentReferencesOwned`: Ownership and lens check on references; for condition shape validation use validateSegmentConditions.
+  - *Said as:* "the rule names a tag or segment that isn't yours", "references must stay inside the owner's lens", "check the segments this rule points at belong to the owner", "I'll save conditions without checking what they reference"
   - *Throws:* makeError 422 VALIDATION_ERROR (`validation-error`, request-context-errors, inferred)
   - *Signs you're bypassing it:* saving segment conditions that name tags or segments without checking they belong to the owner's lens (docs/claude/SEGMENTS.md § Rule health and references (refuses references outside the owner's live segments))
-- **compileSegmentWhere** `apps/api/src/modules/segment/services/evaluateSegment.ts#compileSegmentWhere`: Need the query filter itself to compose; for matched ids use evaluateSegment, for counts estimateSegmentReach.
-- **estimateSegmentReach** `apps/api/src/modules/segment/services/estimateSegmentReach.ts#estimateSegmentReach`: Preview counts for draft conditions; for a saved segment's member ids use evaluateSegment.
+- **compileSegmentWhere** · primitive `apps/api/src/modules/segment/services/evaluateSegment.ts#compileSegmentWhere`: Need the query filter itself to compose; for matched ids use evaluateSegment, for counts estimateSegmentReach.
+  - *Said as:* "I need the query filter itself, not the results", "compose the audience's filter into a bigger query", "turn the rule into a where clause I can reuse", "I'll hand-write a where clause that mirrors the rule"
+- **estimateSegmentReach** · primitive `apps/api/src/modules/segment/services/estimateSegmentReach.ts#estimateSegmentReach`: Preview counts for draft conditions; for a saved segment's member ids use evaluateSegment.
+  - *Said as:* "how many customers would this rule match", "preview the audience size before saving", "count for draft conditions that aren't saved yet", "I'll create a throwaway segment to count matches", "show the reach number live in the builder"
   - *Signs you're bypassing it:* creating a throwaway segment, or counting with an unvalidated query, to preview how many customers a rule reaches (docs/claude/SEGMENTS.md § API (reach uses the same rule and reference admission checks as saving))
-- **evaluateSegment** `apps/api/src/modules/segment/services/evaluateSegment.ts#evaluateSegment`: Full recompute of a saved segment; draft conditions: estimateSegmentReach; raw filter: compileSegmentWhere.
+- **evaluateSegment** · primitive `apps/api/src/modules/segment/services/evaluateSegment.ts#evaluateSegment`: Full recompute of a saved segment; draft conditions: estimateSegmentReach; raw filter: compileSegmentWhere.
+  - *Said as:* "which customers match this saved audience right now", "get the member ids for a segment", "full recompute of who's in it", "I'll write a find-many that reproduces the rule", "run the rule against the customers"
   - *Signs you're bypassing it:* a hand-written prisma.customerRef.findMany where clause reproducing a segment's rule (docs/claude/SEGMENTS.md § Static and dynamic membership (reconcileSegment evaluates the whole set through toPrisma))
-- **findReferenceCycle** `apps/api/src/modules/segment/services/segmentReferenceGraph.ts#findReferenceCycle`: Validate before saving segment references; referencedBy finds dependents instead.
+- **findReferenceCycle** · primitive `apps/api/src/modules/segment/services/segmentReferenceGraph.ts#findReferenceCycle`: Validate before saving segment references; referencedBy finds dependents instead.
+  - *Said as:* "a segment that references itself, directly or through others", "detect a loop before saving segment references", "I'll write a DFS over the conditions to find cycles", "this audience includes an audience that includes it"
   - *Throws:* makeError 422 VALIDATION_ERROR (`validation-error`, request-context-errors, inferred)
   - *Signs you're bypassing it:* a hand-written DFS over segment conditions to detect self-reference or cycles (docs/claude/SEGMENTS.md § Rule health and references)
-- **ownedSegments** `apps/api/src/modules/customerRef/lib/customerRefLens.ts#ownedSegments`: fetch an owner's live segments through the lens's Segment source
-- **publishMembershipChanges** `apps/api/src/modules/segment/services/publishMembershipChanges.ts#publishMembershipChanges`: After reconcileSegment/reconcileCustomerRef produce diffs; skips empty diffs. Emit unrelated events via appEvents directly.
+- **ownedSegments** · primitive `apps/api/src/modules/customerRef/lib/customerRefLens.ts#ownedSegments`: fetch an owner's live segments through the lens's Segment source
+  - *Said as:* "fetch the owner's live audiences through the lens", "which segments does this org own", "I'll query segments by owner id directly"
+- **publishMembershipChanges** · primitive `apps/api/src/modules/segment/services/publishMembershipChanges.ts#publishMembershipChanges`: After reconcileSegment/reconcileCustomerRef produce diffs; skips empty diffs. Emit unrelated events via appEvents directly.
+  - *Said as:* "tell the rest of the system who joined or left", "emit the membership events from a diff", "I'll emit the added and removed events by hand after reconciling", "skip the events when nothing actually changed", "fire the segment events after membership moves"
   - *Signs you're bypassing it:* emitting segment or customerRef membership events by hand from a reconcile path (docs/claude/SEGMENTS.md § Events and email integration)
-- **RECONCILE_TRIGGERS** `apps/api/src/modules/segment/lib/reconcileTriggers.ts#RECONCILE_TRIGGERS`: map each model the segment lens reads to events that trigger reconciliation
+- **RECONCILE_TRIGGERS** · primitive `apps/api/src/modules/segment/lib/reconcileTriggers.ts#RECONCILE_TRIGGERS` · in docs: docs/claude/SEGMENTS.md § Remaining work; docs/claude/JOBS.md § Built-in Handlers: map each model the segment lens reads to events that trigger reconciliation
+  - *Said as:* "which events should recompute segment membership", "a new model is in the lens, what triggers a recheck", "I'll wire an ad hoc event handler to reconcile segments", "map each readable model to the events that change membership"
   - *Signs you're bypassing it:* a new model added to customerRefLens without a trigger entry, or an ad hoc event handler wired to reconcile segments (catalog: RECONCILE_TRIGGERS (add Model: [events] entries in segment/lib/reconcileTriggers.ts); docs/claude/SEGMENTS.md § Remaining work)
-- **reconcileCustomerOf** `apps/api/src/modules/segment/lib/reconcileCustomer.ts#reconcileCustomerOf`: reconcile segments for the customer a polymorphic row points at
-- **reconcileCustomerRef** `apps/api/src/modules/segment/services/reconcileCustomerRef.ts#reconcileCustomerRef`: Incremental, one customer changed; when a segment's conditions change use reconcileSegment for full recompute.
-- **reconcileCustomerRefSegments** `apps/api/src/jobs/handlers/reconcileCustomerRefSegments.ts#reconcileCustomerRefSegments`: One customer changed: use this; whole segment recompute: reconcileSegment; nightly all segments: sweepSegments.
-- **reconcileSegment** `apps/api/src/jobs/handlers/reconcileSegment.ts#reconcileSegment`: Segment rule changed: use this; single customer change: reconcileCustomerRefSegments; all dynamic segments: sweepSegments.
-- **reconcileSegment** `apps/api/src/modules/segment/services/reconcileSegment.ts#reconcileSegment`: Full recompute of one segment; for a single changed customer use reconcileCustomerRef instead.
-- **referencedBy** `apps/api/src/modules/segment/services/segmentReferenceGraph.ts#referencedBy`: Find dependents to reconcile or block deletion; use findReferenceCycle for cycle checks.
-- **ruleIssueSchema** `apps/api/src/modules/segment/schemas/segmentSchemas.ts#ruleIssueSchema`: describe rule validation issues as a binding/vocabulary discriminated union
-- **segmentNeedsReconcile** `apps/api/src/modules/segment/services/reconcileSegment.ts#segmentNeedsReconcile`: Gate before reconcileSegment on updates; isReconcilable alone ignores what changed.
-- **segmentOwnerId** `apps/api/src/modules/segment/lib/segmentOwner.ts#segmentOwnerId`: Segment-specific shortcut; for other polymorphic models call polymorphicTarget directly.
+- **reconcileCustomerOf** · primitive `apps/api/src/modules/segment/lib/reconcileCustomer.ts#reconcileCustomerOf`: reconcile segments for the customer a polymorphic row points at
+  - *Said as:* "a row changed, recompute the customer it points at", "find the customer behind this polymorphic row and reconcile", "I'll look up the customer id from the row myself"
+- **reconcileCustomerRef** · primitive `apps/api/src/modules/segment/services/reconcileCustomerRef.ts#reconcileCustomerRef`: Incremental, one customer changed; when a segment's conditions change use reconcileSegment for full recompute.
+  - *Said as:* "one customer changed, recheck their audiences", "incremental recompute for a single customer, in process", "the service that moves one customer in or out of segments", "I'll loop over every segment and re-evaluate it fully"
+- **reconcileCustomerRefSegments** · primitive `apps/api/src/jobs/handlers/reconcileCustomerRefSegments.ts#reconcileCustomerRefSegments` · in docs: docs/claude/SEGMENTS.md § Static and dynamic membership; docs/claude/JOBS.md § Built-in Handlers: One customer changed: use this; whole segment recompute: reconcileSegment; nightly all segments: sweepSegments.
+  - *Said as:* "one customer changed, enqueue the recheck", "the job that reconciles a single customer after a business event", "when a customer's data changes, update their memberships", "I'll recompute every segment because one customer changed"
+- **reconcileSegment** · primitive `apps/api/src/jobs/handlers/reconcileSegment.ts#reconcileSegment` · in docs: docs/claude/SEGMENTS.md § Static and dynamic membership; docs/claude/JOBS.md § Built-in Handlers: Segment rule changed: use this; single customer change: reconcileCustomerRefSegments; all dynamic segments: sweepSegments.
+  - *Said as:* "the rule changed, recompute the whole audience", "full recompute of one segment, as a job or in process", "after editing conditions, rebuild the member list", "I'll re-evaluate all segments because one rule changed", "recompute membership for this segment only"
+- **reconcileSegment** · primitive `apps/api/src/modules/segment/services/reconcileSegment.ts#reconcileSegment` · in docs: docs/claude/SEGMENTS.md § Static and dynamic membership; docs/claude/JOBS.md § Built-in Handlers: Full recompute of one segment; for a single changed customer use reconcileCustomerRef instead.
+  - *Said as:* "the rule changed, recompute the whole audience", "full recompute of one segment, as a job or in process", "after editing conditions, rebuild the member list", "I'll re-evaluate all segments because one rule changed", "recompute membership for this segment only"
+- **referencedBy** · primitive `apps/api/src/modules/segment/services/segmentReferenceGraph.ts#referencedBy`: Find dependents to reconcile or block deletion; use findReferenceCycle for cycle checks.
+  - *Said as:* "which segments depend on this one", "find dependents before deleting an audience", "what else references this segment", "I'll scan every segment's conditions for this id"
+- **ruleIssueSchema** · primitive `apps/api/src/modules/segment/schemas/segmentSchemas.ts#ruleIssueSchema`: describe rule validation issues as a binding/vocabulary discriminated union
+  - *Said as:* "describe what's wrong with a rule in the response", "the shape of a rule problem: binding or vocabulary", "return rule issues to the client in a typed form"
+- **segmentNeedsReconcile** · primitive `apps/api/src/modules/segment/services/reconcileSegment.ts#segmentNeedsReconcile`: Gate before reconcileSegment on updates; isReconcilable alone ignores what changed.
+  - *Said as:* "did this update actually change what matters for membership", "only recompute when the conditions or type changed", "I'll reconcile on every update regardless of what changed"
+- **segmentOwnerId** · primitive `apps/api/src/modules/segment/lib/segmentOwner.ts#segmentOwnerId`: Segment-specific shortcut; for other polymorphic models call polymorphicTarget directly.
+  - *Said as:* "who owns this segment, whichever column is set", "I'll do user id or org id or space id", "resolve the owning entity of a segment row"
   - *Signs you're bypassing it:* segment.userId ?? segment.organizationId ?? segment.spaceId to find a segment's owner (catalog: segmentOwnerId (segment-specific shortcut over polymorphicTarget))
-- **segmentRuleState** `apps/api/src/modules/segment/services/segmentRuleHealth.ts#segmentRuleState`: Single segment; for many segments use segmentRuleStates to batch queries.
-- **segmentRuleStates** `apps/api/src/modules/segment/services/segmentRuleHealth.ts#segmentRuleStates`: Batch form of segmentRuleState; for annotated segment rows use withSegmentsRuleIssues instead.
-- **sortByDependency** `apps/api/src/modules/segment/services/segmentReferenceGraph.ts#sortByDependency`: order segments so referenced segments come before the segments that reference them
+- **segmentRuleState** · primitive `apps/api/src/modules/segment/services/segmentRuleHealth.ts#segmentRuleState`: Single segment; for many segments use segmentRuleStates to batch queries.
+  - *Said as:* "is this one segment's rule healthy", "compute the health of a single rule", "I'll check this segment's references inline"
+- **segmentRuleStates** · primitive `apps/api/src/modules/segment/services/segmentRuleHealth.ts#segmentRuleStates`: Batch form of segmentRuleState; for annotated segment rows use withSegmentsRuleIssues instead.
+  - *Said as:* "health for many segments in one go", "a map of segment id to rule state", "I'll call the single health check in a loop"
+- **sortByDependency** · primitive `apps/api/src/modules/segment/services/segmentReferenceGraph.ts#sortByDependency`: order segments so referenced segments come before the segments that reference them
+  - *Said as:* "reconcile referenced segments before the ones that reference them", "order the audiences so dependencies come first", "I'll process segments in creation order", "segment-of-segment rules need a dependency order"
   - *Signs you're bypassing it:* reconciling segment-of-segment rules in arbitrary or creation order (FEATURES.md § Segments (segment-of-segment rules run in dependency order))
-- **soundSegments** `apps/api/src/modules/segment/services/withSegmentRuleIssues.ts#soundSegments`: Filter out broken segments; to keep all and inspect issues use withSegmentsRuleIssues.
+- **soundSegments** · primitive `apps/api/src/modules/segment/services/withSegmentRuleIssues.ts#soundSegments`: Filter out broken segments; to keep all and inspect issues use withSegmentsRuleIssues.
+  - *Said as:* "drop the broken segments from this list", "only the audiences whose rules still work", "skip degraded ones before reconciling or exposing", "I'll recompute health by reading each one's conditions", "filter out segments with reference problems"
   - *Signs you're bypassing it:* selecting segments to reconcile or expose without filtering degraded ones, or recomputing health by reading conditions (docs/claude/SEGMENTS.md § Rule health and references (degraded segments are skipped by reconciliation and sweep))
-- **sweepableSegments** `apps/api/src/modules/segment/services/sweepableSegments.ts#sweepableSegments`: list live dynamic segments eligible for a membership sweep
-- **sweepSegments** `apps/api/src/jobs/handlers/sweepSegments.ts#sweepSegments`: Single segment: reconcileSegment; single customer: reconcileCustomerRefSegments.
-- **validateSegmentConditions** `apps/api/src/modules/segment/validations/validateSegmentConditions.ts#validateSegmentConditions`: Shape and field validation; reference ownership is assertSegmentReferencesOwned.
+- **sweepableSegments** · primitive `apps/api/src/modules/segment/services/sweepableSegments.ts#sweepableSegments` · in docs: docs/claude/JOBS.md § Built-in Handlers: list live dynamic segments eligible for a membership sweep
+  - *Said as:* "which dynamic audiences are due for a sweep", "list the live segments the nightly job should queue", "I'll query all segments and filter in the job"
+- **sweepSegments** · primitive `apps/api/src/jobs/handlers/sweepSegments.ts#sweepSegments` · in docs: docs/claude/SEGMENTS.md § Static and dynamic membership; docs/claude/JOBS.md § Built-in Handlers: Single segment: reconcileSegment; single customer: reconcileCustomerRefSegments.
+  - *Said as:* "the nightly full recompute of every dynamic audience", "the backstop that catches anything events missed", "I'll add a cron that re-evaluates all segments", "queue sound dynamic segments in dependency order overnight"
+- **validateSegmentConditions** · primitive `apps/api/src/modules/segment/validations/validateSegmentConditions.ts#validateSegmentConditions`: Shape and field validation; reference ownership is assertSegmentReferencesOwned.
+  - *Said as:* "is this rule well-formed and are the fields real", "check the shape of the conditions before saving", "reject a condition on a field the lens doesn't expose", "I'll validate the rule JSON in the controller"
   - *Throws:* makeError 422 VALIDATION_ERROR (`validation-error`, request-context-errors, inferred)
-- **validateSegmentReferences** `apps/api/src/modules/segment/validations/validateSegmentReferences.ts#validateSegmentReferences`: check segment rule conditions only reference records the owner may use
-- **withoutDegradedSegments** `apps/api/src/lib/email/withoutDegradedSegments.ts#withoutDegradedSegments`: drop segment references whose own rule is degraded from an email's live audience set
-- **withSegmentRuleIssues** `apps/api/src/modules/segment/services/withSegmentRuleIssues.ts#withSegmentRuleIssues`: Single segment; for lists use withSegmentsRuleIssues.
-- **withSegmentsRuleIssues** `apps/api/src/modules/segment/services/withSegmentRuleIssues.ts#withSegmentsRuleIssues`: Need issues on rows; soundSegments to drop broken ones; segmentRuleStates for a state map.
-- **apps/api/src/modules/segment** `apps/api/src/modules/segment`: Operating on one segment by id; creating segments goes through me/organization/space CreateSegment endpoints.
-- **apps/web/app/routes/_authenticated/segments** `apps/web/app/routes/_authenticated/segments`: show segments the user owns and their segment memberships
-- **Segment membership diff events** `docs/claude/SEGMENTS.md#Events and email integration`: publish segment.membersAdded/Removed and customerRef.segmentsAdded/Removed from membership diffs, incl. deletion
-- **Segment membership realtime refetch** `docs/claude/SEGMENTS.md#Events and email integration`: refetch member-list channel for owners; meReadManySegmentMemberships refetch to user sockets
-- **Segment reconciliation** `docs/claude/SEGMENTS.md`: event-driven incremental reconciliation; nightly sweep is the full-recompute fallback
-- **Segments nav redirect** `apps/web/app/config/nav/features/segments.ts`: Nest Owned and Memberships under Segments; /segments redirects to Owned preserving org, space, spoof context.
-- **Segment reach endpoint** `docs/claude/SEGMENTS.md#API`: Previewing reach; create route to persist.
-- **Degraded segment handling** `docs/claude/SEGMENTS.md#Rule health and references`: Selecting segments to reconcile or expose to email lens.
-- **Degraded segments keep members** `FEATURES.md › Segments › Reference Health`: segments with broken rule references
+- **validateSegmentReferences** · primitive `apps/api/src/modules/segment/validations/validateSegmentReferences.ts#validateSegmentReferences`: check segment rule conditions only reference records the owner may use
+  - *Said as:* "the rule only references records the owner may use", "add save gating to the write path", "check referenced tags and segments against the owner", "I'll trust whatever ids the rule contains"
+- **withoutDegradedSegments** · primitive `apps/api/src/lib/email/withoutDegradedSegments.ts#withoutDegradedSegments` · in docs: docs/claude/COMMUNICATIONS.md § Email › Send Pipeline: drop segment references whose own rule is degraded from an email's live audience set
+  - *Said as:* "drop broken audiences from an email's recipient set", "don't send to a segment whose rule is degraded", "filter the live audience set before planning recipients"
+- **withSegmentRuleIssues** · primitive `apps/api/src/modules/segment/services/withSegmentRuleIssues.ts#withSegmentRuleIssues`: Single segment; for lists use withSegmentsRuleIssues.
+  - *Said as:* "attach rule problems to one segment", "annotate this segment with its issues", "the single-row form of adding issues"
+- **withSegmentsRuleIssues** · primitive `apps/api/src/modules/segment/services/withSegmentRuleIssues.ts#withSegmentsRuleIssues`: Need issues on rows; soundSegments to drop broken ones; segmentRuleStates for a state map.
+  - *Said as:* "return the rows with their rule problems attached", "keep every segment but show what's wrong with each", "annotate a list of segments with issues", "I'll compute health separately and merge it in"
+- **apps/api/src/modules/segment** · system `apps/api/src/modules/segment`: Operating on one segment by id; creating segments goes through me/organization/space CreateSegment endpoints.
+  - *Said as:* "the backend module for one segment by id", "read, update, delete and reach endpoints for audiences", "creating goes through the owner's create endpoints, not here", "where the segment routes live"
+- **apps/web/app/routes/_authenticated/segments** · system `apps/web/app/routes/_authenticated/segments`: show segments the user owns and their segment memberships
+  - *Said as:* "the pages showing segments I own and ones I'm in", "the segments section of the web app", "owned audiences and my memberships side by side", "where users browse their audiences"
+- **Segment membership diff events** · pattern docs/claude/SEGMENTS.md § Events and email integration · code: `User`, `Segment`: publish segment.membersAdded/Removed and customerRef.segmentsAdded/Removed from membership diffs, incl. deletion
+  - *Said as:* "publish who joined and who left after reconciliation", "fire events for members added and removed, including on deletion", "I'll emit a custom event when membership changes", "the customer-side and segment-side events from a diff"
+- **Segment membership realtime refetch** · pattern docs/claude/SEGMENTS.md § Events and email integration · code: `User`, `Segment`: refetch member-list channel for owners; meReadManySegmentMemberships refetch to user sockets
+  - *Said as:* "refresh the member list live when membership changes", "push the change to owners and to the affected user", "I'll poll the member list every few seconds", "tell the client to refetch after a member joins"
+- **Segment reconciliation** · pattern docs/claude/SEGMENTS.md: event-driven incremental reconciliation; nightly sweep is the full-recompute fallback
+  - *Said as:* "keep audiences up to date as data changes", "event-driven incremental updates with a nightly full sweep", "I'll recompute every segment on every write", "how membership stays correct over time"
+- **Segments nav redirect** · pattern apps/web/app/config/nav/features/segments.ts: Nest Owned and Memberships under Segments; /segments redirects to Owned preserving org, space, spoof context.
+  - *Said as:* "the segments link lands on Owned, keeping the context", "nest Owned and Memberships under one nav entry", "I'll add two top-level nav items for segments", "redirect the bare segments route to a child"
+- **Segment reach endpoint** · primitive docs/claude/SEGMENTS.md § API: Previewing reach; create route to persist.
+  - *Said as:* "preview how many customers a rule reaches", "the count endpoint for draft conditions", "show the audience size before creating it", "I'll create the segment first to see the count"
+- **Degraded segment handling** · rule docs/claude/SEGMENTS.md § Rule health and references · code: `RuleReference`, `ruleIssues`: Selecting segments to reconcile or expose to email lens.
+  - *Said as:* "what to do with a segment whose rule is broken", "skip degraded audiences when reconciling or sending", "I'll treat a broken rule like an empty one"
+- **Degraded segments keep members** · rule FEATURES.md › Segments › Reference Health: segments with broken rule references
+  - *Said as:* "a broken rule doesn't empty the audience", "don't clear membership when a reference breaks", "I'll recompute a degraded segment to zero members"
   - *Signs you're bypassing it:* clearing or recomputing membership of a segment whose rule is degraded (FEATURES.md § Segments › Reference Health)
-- **Every segment has a rule** `FEATURES.md › Segments`: creating any segment
-- **Hide rules from customer membership reads** `docs/claude/SEGMENTS.md#Rule health and references`: Customer-facing membership endpoints.
-- **Hide rules from membership reads** `FEATURES.md › Segments › Reference Health`: segment read endpoints
+- **Every segment has a rule** · rule FEATURES.md › Segments: creating any segment
+  - *Said as:* "a hand-picked audience is still a rule over customer ids", "no segment without conditions", "I'll add a static list type with no rule"
+- **Hide rules from customer membership reads** · rule docs/claude/SEGMENTS.md § Rule health and references · code: `RuleReference`, `ruleIssues`: Customer-facing membership endpoints.
+  - *Said as:* "customers shouldn't see why they're in an audience", "strip conditions from the customer-facing membership endpoint", "I'll return the segment with its rule to the member"
+- **Hide rules from membership reads** · rule FEATURES.md › Segments › Reference Health: segment read endpoints
+  - *Said as:* "membership responses never include the conditions or issues", "the segment read for a member omits the rule", "I'll reuse the owner's response schema for members"
   - *Signs you're bypassing it:* a customer-facing membership response that includes conditions or ruleIssues (docs/claude/SEGMENTS.md § Rule health and references)
-- **No direct segment member add/remove** `docs/claude/SEGMENTS.md#Static and dynamic membership`: Whenever building a fixed audience.
+- **No direct segment member add/remove** · rule docs/claude/SEGMENTS.md § Static and dynamic membership · code: `reconcileSegment`, `toPrisma`, `reconcileCustomerRefSegments`, `fetchLens`: Whenever building a fixed audience.
+  - *Said as:* "add this customer to the audience by hand", "I'll expose an endpoint to add and remove members", "a fixed audience is a rule over customer ids, not inserts", "there's no member add API on purpose"
   - *Signs you're bypassing it:* a route or service that calls db.segmentMember.create / delete to hand-pick members (docs/claude/SEGMENTS.md § Static and dynamic membership (a hand-picked audience is a static rule over customer-reference IDs; no direct member add/remove API))
-- **Reconcile via events, not write hooks** `docs/claude/SEGMENTS.md#Static and dynamic membership`: Any write affecting segment-readable data.
-- **Segment membership is CustomerRef-scoped** `docs/claude/SEGMENTS.md#Purpose and ownership`: Any segment rule or membership write.
-- **Segment rule save gate** `docs/claude/SEGMENTS.md#Rule health and references`: Segment create, update and reach.
-- **Segment type switch semantics** `docs/claude/SEGMENTS.md#Static and dynamic membership`: Segment type updates.
+- **Reconcile via events, not write hooks** · rule docs/claude/SEGMENTS.md § Static and dynamic membership · code: `reconcileSegment`, `toPrisma`, `reconcileCustomerRefSegments`, `fetchLens`: Any write affecting segment-readable data.
+  - *Said as:* "trigger membership recompute from events, not database hooks", "I'll add an after-update hook that reconciles segments", "any write that affects readable data goes through an event"
+- **Segment membership is CustomerRef-scoped** · rule docs/claude/SEGMENTS.md § Purpose and ownership · code: `CustomerRef`, `User`, `Organization`, `Space`: Any segment rule or membership write.
+  - *Said as:* "members are customer relationships, not users", "the audience is over the provider's customers", "I'll put user ids in the membership table"
+- **Segment rule save gate** · rule docs/claude/SEGMENTS.md § Rule health and references · code: `RuleReference`, `ruleIssues`: Segment create, update and reach.
+  - *Said as:* "validate the rule and its references on create, update and reach", "the checks that run before a rule is persisted", "I'll save the conditions and validate later"
+- **Segment type switch semantics** · rule docs/claude/SEGMENTS.md § Static and dynamic membership · code: `reconcileSegment`, `toPrisma`, `reconcileCustomerRefSegments`, `fetchLens`: Segment type updates.
+  - *Said as:* "switch an audience from static to dynamic", "what happens to membership when the type changes", "I'll flip the type column without recomputing"
 - *Also here, by name:* SEGMENT_CREATE_IMMUTABLE_FIELDS (`apps/api/src/modules/segment/schemas/segmentSchemas.ts`); SegmentType (`packages/db/prisma/schema/segment.prisma`); buildReferenceMap (`apps/api/src/modules/segment/services/segmentReferenceGraph.ts`); dynamicSegmentsOf (`apps/api/src/modules/segment/services/reconcileCustomerRef.ts`); includeSegmentForCustomer (`apps/api/src/modules/segment/queries/segmentIncludes.ts`); invalidSegmentConditions (`apps/api/src/modules/segment/lib/invalidSegmentConditions.ts`); isContinuous (`apps/api/src/modules/segment/services/reconcileSegment.ts`); isReconcilable (`apps/api/src/modules/segment/services/reconcileSegment.ts`); segmentCreateBodySchema (`apps/api/src/modules/segment/schemas/segmentSchemas.ts`); segmentCreated (`apps/api/src/appEvents/handlers/segment/segmentCreated.ts`); segmentMemberWithCustomerSchema (`apps/api/src/modules/segment/schemas/segmentSchemas.ts`); segmentMembershipSchema (`apps/api/src/modules/segment/schemas/segmentSchemas.ts`); segmentOwnerFk (`apps/api/src/modules/segment/lib/segmentOwner.ts`); segmentReachBodySchema (`apps/api/src/modules/segment/schemas/segmentSchemas.ts`); segmentReachResponseSchema (`apps/api/src/modules/segment/schemas/segmentSchemas.ts`); segmentReadResponseSchema (`apps/api/src/modules/segment/schemas/segmentSchemas.ts`); segmentRuleIssuesFromEdges (`apps/api/src/modules/segment/services/segmentRuleHealth.ts`); segmentUpdateBodySchema (`apps/api/src/modules/segment/schemas/segmentSchemas.ts`); selectSegmentForCustomer (`apps/api/src/modules/segment/queries/segmentIncludes.ts`)
 
 ## 4. The specifics, in full

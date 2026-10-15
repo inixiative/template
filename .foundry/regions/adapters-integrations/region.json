@@ -1,0 +1,44 @@
+{
+  "id": "adapters-integrations",
+  "title": "Adapters, integrations and storage",
+  "routing": "Is this about talking to an external provider behind one interface: adapter modules (ADAPTERS.md), makeAdapterRouter / makeAdapterRegistry / makeBroadcastRegistry, the adapter module layout and naming, env reads in index.ts, never importing a provider SDK in app code, the storage adapter and createS3Client, errorReporter, or owner integrations: Integration, IntegrationRecord, findOwnedIntegration, integrationProviders, poisoned records, the integration module and IntegrationsPage?",
+  "concepts": [
+    "adapters",
+    "integrations",
+    "object-storage"
+  ],
+  "tokens": 8635,
+  "tokenMethod": "chars/4",
+  "runsAgreed": 0,
+  "sources": {
+    "docs": [
+      "docs/claude/ADAPTERS.md"
+    ],
+    "docUnits": [
+      "doc:docs/claude/ADAPTERS.md#what-an-adapter-module-is",
+      "doc:docs/claude/ADAPTERS.md#module-layout",
+      "doc:docs/claude/ADAPTERS.md#adapter-primitives",
+      "doc:docs/claude/ADAPTERS.md#naming-conventions",
+      "doc:docs/claude/ADAPTERS.md#existing-examples",
+      "doc:docs/claude/ADAPTERS.md#when-to-create-a-new-adapter-module",
+      "doc:docs/claude/ADAPTERS.md#what-not-to-do"
+    ],
+    "catalogClusters": [
+      "email-delivery-senders",
+      "environment-config",
+      "error-handling",
+      "immutable-fields",
+      "integrations-records",
+      "messaging-channels-adapters",
+      "module-layout-monorepo",
+      "naming-vocabulary",
+      "request-response-schemas",
+      "storage-clients",
+      "testing-rules"
+    ],
+    "codeEntries": 21,
+    "docMembers": 13
+  },
+  "bypassLines": 22,
+  "glossaryTerms": 14
+}

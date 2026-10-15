@@ -1,0 +1,34 @@
+{
+  "id": "api-client",
+  "title": "API client, SDK and query hooks",
+  "routing": "Is this about calling the API from the frontend: the generated @template/sdk (bun run generate:sdk, hey-api), apiQuery / apiMutation and apiFetchInternal, bracketQuery, the useQuery / useMutation wrappers, useOptimisticMutation with createOptimisticListTarget, makeContextQueries and the per-model context queries (integrationContextQueries \u2026), useEventRefetch / useAppEvents, createAppQueryClient, form helpers (useValidateUniqueness, the derived debounced slug field), list state persistence (readInitialState, writeToHistoryState, writeToHistoryStateAndUrl), or a component doing a raw fetch?",
+  "concepts": [
+    "api-client"
+  ],
+  "tokens": 9422,
+  "tokenMethod": "chars/4",
+  "runsAgreed": 0,
+  "sources": {
+    "docs": [
+      "FEATURES.md",
+      "docs/claude/FRONTEND/API_CLIENT.md"
+    ],
+    "docUnits": [
+      "doc:docs/claude/FRONTEND/API_CLIENT.md#generated-sdk",
+      "doc:docs/claude/FRONTEND/API_CLIENT.md#apiquery-and-apimutation",
+      "doc:docs/claude/FRONTEND/API_CLIENT.md#optimistic-mutations",
+      "doc:docs/claude/FRONTEND/API_CLIENT.md#form-helpers",
+      "doc:docs/claude/FRONTEND/API_CLIENT.md#key-files",
+      "doc:FEATURES.md#frontend-hooks"
+    ],
+    "catalogClusters": [
+      "filtering-search-ordering",
+      "frontend-state-api-client",
+      "testing-rules"
+    ],
+    "codeEntries": 24,
+    "docMembers": 13
+  },
+  "bypassLines": 27,
+  "glossaryTerms": 17
+}

@@ -1,0 +1,28 @@
+{
+  "id": "api-schemas-openapi",
+  "title": "Request schemas and OpenAPI",
+  "routing": "Is this about what a route validates and documents: zod request/response schemas, the generated <Model>ScalarSchema and CreateInput/UpdateInput schemas from @template/db, sanitizeRequestSchema, uuidV7Schema / isUuidV7 / appPathSchema / isAppPath, .refine() on route schemas, where schemas live (colocated or schemas/), cross-field validation, or the OpenAPI side: autoRegisterRoutes, apiPath, resolveOperation, securityRequirements, the app (OpenAPIHono) instance, routes/api vs routes/internal, generate:openapi and the Scalar docs?",
+  "concepts": [
+    "openapi",
+    "request-schemas"
+  ],
+  "tokens": 6280,
+  "tokenMethod": "chars/4",
+  "runsAgreed": 0,
+  "sources": {
+    "docs": [
+      "docs/claude/API_ROUTES.md"
+    ],
+    "docUnits": [
+      "doc:docs/claude/API_ROUTES.md#schemas"
+    ],
+    "catalogClusters": [
+      "request-response-schemas",
+      "route-registration-openapi"
+    ],
+    "codeEntries": 27,
+    "docMembers": 5
+  },
+  "bypassLines": 24,
+  "glossaryTerms": 15
+}

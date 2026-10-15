@@ -1,12 +1,12 @@
 {
   "id": "database-tooling",
   "title": "Database scripts and seeding",
-  "routing": "Is this about moving schema or data in and out of a database rather than querying it? Signals: running or wiring `bun run db:generate` / `db:push` / `db:push:dev` / `db:push:force` / `db:migrate` / `db:deploy` / `db:studio`, `db:dump` / `db:restore` / `db:clone` / `db:truncate:webhooks`, `reset:db`, scripts/db/*.sh (clone, dump, restore, release), choosing push versus a migration file, or adding and running seed data: packages/db/prisma/seeds/*.seed.ts, a `SeedFile`, seeds/index.ts order, `prime: true`, `db:seed --prime`, seed / seedTable.",
+  "routing": "Is this about moving schema or data in and out of a database-client / data-modeling rather than querying it? Signals: running or wiring `bun run db:generate` / `db:push` / `db:push:dev` / `db:push:force` / `db:migrate` / `db:deploy` / `db:studio`, `db:dump` / `db:restore` / `db:clone` / `db:truncate:webhooks`, `reset:db`, scripts/db/*.sh (clone, dump, restore, release), choosing push versus a migration file, or adding and running seed data: packages/db/prisma/seeds/*.seed.ts, a `SeedFile`, seeds/index.ts order, `prime: true`, `db:seed --prime`, seed / seedTable.",
   "concepts": [
     "db-scripts",
     "seeding"
   ],
-  "tokens": 5955,
+  "tokens": 7406,
   "tokenMethod": "chars/4",
   "runsAgreed": 0,
   "sources": {

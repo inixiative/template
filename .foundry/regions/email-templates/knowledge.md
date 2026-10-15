@@ -120,11 +120,13 @@ Related regions: the four-root email lens that decides which tokens, paths and r
 
 ## 3. Everything that exists here, by class
 
-Point at a class when that is as specific as the moment allows, or at a member. Where a class has siblings an agent could confuse, a table under the class header says which to use when. Each member: **name** `where`: choose this when … . Where the docs or code give material, a second line describes the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
+Point at a class when that is as specific as the moment allows, or at a member. Where a class has siblings an agent could confuse, a table under the class header says which to use when; its *Said as* line gives the plain words a user or agent uses for that job. Each member: **name** · kind `where` · the doc § that describes it (code members) or the code it is about (doc members): choose this when … . Quote the name and the where in a pointer ("look over here: createLock, packages/db/src/lock/createLock.ts, CONCURRENCY.md § Distributed Lock"). *Said as:* the ways a user or agent describes this job in a message or plan without knowing the name; match on these. *Signs you're bypassing it:* the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
 
 ### Class `email-templates`: Email templates and components: MJML, component refs, the owner cascade, compose/render/save pipeline, versioning
 
 **Job: save email templates and components with validation** (saveEmailTemplate vs saveEmailComponents vs emailSeedSavers) — docs/claude/COMMUNICATIONS.md § Save Pipeline; § Template Versioning & Recompose (Seeds)
+
+*Said as:* "save an email template", "how do I write a template row", "persist the components with their references", "seed the system emails"
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -133,6 +135,8 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **emailSeedSavers** | savedByApp email seed files through apps/api/scripts/seed.ts | the packages/db seed or plain upserts, which skip save guards |
 
 **Job: resolve a template or component through the owner cascade** (composeTemplate vs composeComponent vs lookup* vs expand) — docs/claude/COMMUNICATIONS.md § Render Pipeline; § Cascade Resolution; catalog
+
+*Said as:* "which template does this org get", "resolve the email through the override chain", "find the component for this space", "assemble the email with its parts filled in"
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -144,6 +148,8 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 **Job: render an email for sending, previewing or reconstruction** (settleTemplate vs renderForRecipient vs interpolate vs recompose) — docs/claude/COMMUNICATIONS.md § Render Pipeline; § Deliver; § Template Versioning & Recompose
 
+*Said as:* "render the email", "fill in the template for this recipient", "turn the template into html for sending", "show what we actually sent"
+
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **settleTemplate** | resolve via the cascade and render subject and body with system tokens, collecting RenderIssues | mjml2html on stored MJML; a past send (use recomposeSnapshot) |
@@ -154,6 +160,8 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 **Job: validate an email template before saving or sending** (Save-time validators vs preflight) — docs/claude/COMMUNICATIONS.md § Save Pipeline; § MJML Validation; catalog
 
+*Said as:* "check the template before saving", "is this template valid", "lint the email before sending", "catch bad tokens and rules early"
+
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **validateMjml** | full-document MJML structure | component fragments (skip it); conditions (use validateConditions) |
@@ -162,140 +170,241 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **validateTokens** | whole-template token check against the narrowed lens | one path (use emailTokenPathKind) |
 | **runPreflight** | pre-send content checks: subject, image alt, preheader, spam phrases, unresolved lens paths | save validation (saveEmailTemplate runs the validators) |
 
-- **EmailComponent** `packages/db/prisma/schema/emailComponent.prisma`: Shared partials referenced via componentRefs; full sendable messages with subject: EmailTemplate instead.
-- **EmailTemplate** `packages/db/prisma/schema/emailTemplate.prisma`: Whole messages with subject and kind; reusable fragments belong in EmailComponent.
-- **assertValidConditions** `packages/email/src/validations/validateConditions/assertValidConditions.ts#assertValidConditions`: fail fast on email content conditions whose rule paths the lens cannot resolve
+- **EmailComponent** · model `packages/db/prisma/schema/emailComponent.prisma` · in docs: docs/claude/COMMUNICATIONS.md § Email › Database Models; docs/claude/COMMUNICATIONS.md § Email › Template Versioning & Recompose: Shared partials referenced via componentRefs; full sendable messages with subject: EmailTemplate instead.
+  - *Said as:* "a reusable chunk of email shared across templates", "the footer block every email includes", "where do shared email partials live"
+- **EmailTemplate** · model `packages/db/prisma/schema/emailTemplate.prisma` · in docs: docs/claude/COMMUNICATIONS.md § Email › Database Models; docs/claude/COMMUNICATIONS.md § Email › Template Versioning & Recompose: Whole messages with subject and kind; reusable fragments belong in EmailComponent.
+  - *Said as:* "the stored email with its subject and markup", "where do email templates live in the database", "I'll add a new model for branded templates", "a whole sendable message, not a fragment"
+- **assertValidConditions** · primitive `packages/email/src/validations/validateConditions/assertValidConditions.ts#assertValidConditions` · in docs: docs/claude/COMMUNICATIONS.md § Email › Save Pipeline; docs/claude/COMMUNICATIONS.md § Email › Rule References (the rows a rule names): fail fast on email content conditions whose rule paths the lens cannot resolve
+  - *Said as:* "fail the save if a rule path can't be resolved", "throw on bad conditions instead of shipping a render-time bomb", "refuse to save when the if rule reads something unavailable", "hard-stop the save on an invalid condition"
   - *Throws:* makeError 422 VALIDATION_ERROR (`validation-error`, request-context-errors); ConditionValidationError (`validation-error`, inferred)
   - *Signs you're bypassing it:* saving template MJML/subject without checking {{#if rule=…}} paths against the lens, leaving the error to surface at render (docs/claude/COMMUNICATIONS.md § Save Pipeline (fail fast instead of shipping a render-time time-bomb))
-- **assertValidTokens** `packages/email/src/validations/validateTokens/assertValidTokens.ts#assertValidTokens`: Throws on token issues; validateConditions returns condition issues instead of throwing.
+- **assertValidTokens** · primitive `packages/email/src/validations/validateTokens/assertValidTokens.ts#assertValidTokens`: Throws on token issues; validateConditions returns condition issues instead of throwing.
+  - *Said as:* "throw if the template uses a placeholder it can't", "fail hard on unknown tokens", "token check that stops the save"
   - *Throws:* TokenValidationError (`validation-error`, inferred)
-- **canNestMjml** `packages/email/src/render/authoring.ts#canNestMjml`: prefer over reading MJML_CHILD_TAGS directly
+- **canNestMjml** · primitive `packages/email/src/render/authoring.ts#canNestMjml`: prefer over reading MJML_CHILD_TAGS directly
+  - *Said as:* "can this MJML tag go inside that one", "I'll keep a table of which tags allow which children", "check the nesting rules for email markup"
   - *Signs you're bypassing it:* reading MJML_CHILD_TAGS directly, or a hand-written table of which mj-* tags may contain which (catalog: canNestMjml (prefer over reading MJML_CHILD_TAGS directly))
-- **canNestMjml** `packages/email/src/render/mjmlNesting.ts#canNestMjml`: Prefer over reading MJML_CHILD_TAGS directly; treats a null parent as root, so anything nests.
+- **canNestMjml** · primitive `packages/email/src/render/mjmlNesting.ts#canNestMjml`: Prefer over reading MJML_CHILD_TAGS directly; treats a null parent as root, so anything nests.
+  - *Said as:* "can this MJML tag go inside that one", "I'll keep a table of which tags allow which children", "check the nesting rules for email markup"
   - *Signs you're bypassing it:* reading MJML_CHILD_TAGS directly, or a hand-written table of which mj-* tags may contain which (catalog: canNestMjml (prefer over reading MJML_CHILD_TAGS directly))
-- **collectComponentRegions** `packages/email/src/render/authoring.ts#collectComponentRegions`: already-parsed nodes: collectComponentRegionsFromNodes instead
-- **collectComponentRegions** `packages/email/src/render/regions.ts#collectComponentRegions`: From an MJML string; with already parsed nodes use collectComponentRegionsFromNodes.
-- **collectRules** `packages/email/src/render/conditionParser/collectRules.ts#collectRules`: Use to check email conditions against a lens; skips rules on loop indexes, elements or other lens roots.
-- **collectSlugs** `packages/email/src/render/decompose.ts#collectSlugs`: list the component slugs used in an MJML email template
-- **collectSlugsFromNodes** `packages/email/src/render/nodes.ts#collectSlugsFromNodes`: gather the unique slugs referenced across an email node tree
-- **composeComponent** `packages/email/src/render/compose.ts#composeComponent`: Single reusable component only; for a full email with its referenced components use composeTemplate.
-- **composeTemplate** `packages/email/src/render/compose.ts#composeTemplate`: Use for whole emails; composeComponent for one component. Returns owner — the row that won the cascade — for settling sender.
+- **collectComponentRegions** · primitive `packages/email/src/render/authoring.ts#collectComponentRegions`: already-parsed nodes: collectComponentRegionsFromNodes instead
+  - *Said as:* "find where each component block starts and ends in the source", "locate the component spans in the MJML string", "map the component regions for the editor"
+- **collectComponentRegions** · primitive `packages/email/src/render/regions.ts#collectComponentRegions`: From an MJML string; with already parsed nodes use collectComponentRegionsFromNodes.
+  - *Said as:* "find where each component block starts and ends in the source", "locate the component spans in the MJML string", "map the component regions for the editor"
+- **collectRules** · primitive `packages/email/src/render/conditionParser/collectRules.ts#collectRules`: Use to check email conditions against a lens; skips rules on loop indexes, elements or other lens roots.
+  - *Said as:* "gather every rule the template evaluates", "list all the if and filter rules in the content", "pull the conditions out so I can check them against the lens"
+- **collectSlugs** · primitive `packages/email/src/render/decompose.ts#collectSlugs`: list the component slugs used in an MJML email template
+  - *Said as:* "list the components this template uses", "which slugs does this MJML reference", "get the set of component names from the source"
+- **collectSlugsFromNodes** · primitive `packages/email/src/render/nodes.ts#collectSlugsFromNodes`: gather the unique slugs referenced across an email node tree
+  - *Said as:* "unique slugs from an already-parsed node tree", "list referenced components when I already have the nodes"
+- **composeComponent** · primitive `packages/email/src/render/compose.ts#composeComponent` · in docs: docs/claude/COMMUNICATIONS.md § Email › Render Pipeline; docs/claude/COMMUNICATIONS.md § Email › Package Structure: Single reusable component only; for a full email with its referenced components use composeTemplate.
+  - *Said as:* "resolve just one shared block for the editor preview", "show this component as the space would see it", "render a single fragment through the override chain", "preview one reusable block, not the whole email"
+- **composeTemplate** · primitive `packages/email/src/render/compose.ts#composeTemplate` · in docs: docs/claude/COMMUNICATIONS.md § Email › Render Pipeline; docs/claude/COMMUNICATIONS.md § Email › Package Structure: Use for whole emails; composeComponent for one component. Returns owner — the row that won the cascade — for settling sender.
+  - *Said as:* "resolve the whole email for this sender and fill in its components", "which version of the template does this org actually get", "I'll loop over space, org, then default to find the template", "assemble the full email and tell me whose row won", "the same assembly we send the editor, then fill with recipient data"
   - *Signs you're bypassing it:* a hand-written loop of prisma.emailTemplate.findFirst calls per ownerModel (Space, then Organization, then default) followed by string-replacing {{#component:…}} blocks (docs/claude/COMMUNICATIONS.md § Email › Cascade Resolution (the cascade happens automatically during compose))
-- **computeDegradedComponentRefs** `packages/email/src/render/computeDegradedComponentRefs.ts#computeDegradedComponentRefs`: list component slugs referenced in MJML that lookup cannot resolve
-- **decompose** `packages/email/src/render/authoring.ts#decompose`: Use with parseBlocks for component extraction; decomposeNodes is its lower-level node pass.
-- **decompose** `packages/email/src/render/decompose.ts#decompose`: Use on raw MJML strings; decomposeNodes when you already hold parsed nodes.
-- **deriveTextFromHtml** `packages/email/src/render/deriveTextFromHtml.ts#deriveTextFromHtml`: produce plain-text email body from rendered HTML with collapsed whitespace
+- **computeDegradedComponentRefs** · primitive `packages/email/src/render/computeDegradedComponentRefs.ts#computeDegradedComponentRefs`: list component slugs referenced in MJML that lookup cannot resolve
+  - *Said as:* "which referenced components can't be resolved anymore", "find the component refs that point at nothing", "list the broken component references on this template"
+- **decompose** · primitive `packages/email/src/render/authoring.ts#decompose` · in docs: docs/claude/COMMUNICATIONS.md § Email › Implementation Status; AI/ENTRYPOINT.md § 0.1. Understand the Why First: Use with parseBlocks for component extraction; decomposeNodes is its lower-level node pass.
+  - *Said as:* "split the authored MJML into its component blocks", "pull the shared blocks out of the edited email for saving", "diff which blocks changed per slug and owner", "I'll write my own cascade-state diff for reset and revert"
+- **decompose** · primitive `packages/email/src/render/decompose.ts#decompose` · in docs: docs/claude/COMMUNICATIONS.md § Email › Implementation Status; AI/ENTRYPOINT.md § 0.1. Understand the Why First: Use on raw MJML strings; decomposeNodes when you already hold parsed nodes.
+  - *Said as:* "split the authored MJML into its component blocks", "pull the shared blocks out of the edited email for saving", "diff which blocks changed per slug and owner", "I'll write my own cascade-state diff for reset and revert"
+- **deriveTextFromHtml** · primitive `packages/email/src/render/deriveTextFromHtml.ts#deriveTextFromHtml`: produce plain-text email body from rendered HTML with collapsed whitespace
+  - *Said as:* "make the plain-text version of the email", "I'll strip the tags with a regex for the text part", "generate the text alternative from the rendered html"
   - *Signs you're bypassing it:* a hand-rolled tag-stripping regex to build the plain-text part of an email (catalog: deriveTextFromHtml (produce plain-text email body from rendered HTML))
-- **EmailRenderError** `packages/email/src/errors/EmailRenderError.ts#EmailRenderError`: Render-time failures; provider send failures: EmailProviderError; invalid rules: ConditionValidationError.
+- **EmailRenderError** · primitive `packages/email/src/errors/EmailRenderError.ts#EmailRenderError` · in docs: docs/claude/COMMUNICATIONS.md § Email › Package Structure; docs/claude/COMMUNICATIONS.md § Email › Send Pipeline: Render-time failures; provider send failures: EmailProviderError; invalid rules: ConditionValidationError.
+  - *Said as:* "the error for when rendering the template fails", "what to throw when the render policy says fail", "a render failure, not a provider failure"
   - *Error class:* `off-request-path` (Raised where no live HTTP request is being served (job workers, app bootstrap, scripts, tests, frontend): plain Error is fine and nothing maps it to a status.); thrown by settleTemplate
-- **emailTemplatePreflight** `apps/api/src/modules/emailTemplate/services/emailTemplatePreflight.ts#emailTemplatePreflight`: Validate a template before send; to inspect what rule data a template can reference, use emailTemplateRuleSurface instead.
-- **emailTemplateRuleSurface** `apps/api/src/modules/emailTemplate/services/emailTemplateRuleSurface.ts#emailTemplateRuleSurface`: Use to feed rule editors with available template data; for validating a template's content use emailTemplatePreflight.
-- **emailTokenPathKind** `packages/email/src/validations/validateTokens/tokenPathKind.ts#emailTokenPathKind`: Email lenses: use this; generic Lens or LensNarrowing: tokenPathKind instead.
-- **evaluateConditions** `packages/email/src/render/evaluateConditions.ts#evaluateConditions`: Runtime branch evaluation; guardedToken only writes an exists-guarded token into templates.
-- **expand** `packages/email/src/render/expand.ts#expand`: Default for owner-scoped lookup; expandWith to supply a custom component lookup (tests, previews).
-- **expandWith** `packages/email/src/render/expand.ts#expandWith`: Custom lookup only; normal rendering uses expand.
-- **guardedToken** `packages/email/src/render/guardedToken.ts#guardedToken`: Writing template text; evaluateConditions resolves it at render.
+- **emailTemplatePreflight** · primitive `apps/api/src/modules/emailTemplate/services/emailTemplatePreflight.ts#emailTemplatePreflight`: Validate a template before send; to inspect what rule data a template can reference, use emailTemplateRuleSurface instead.
+  - *Said as:* "the API-side pre-send check on a template", "validate this template before we send it", "the service that runs preflight for superadmins"
+- **emailTemplateRuleSurface** · primitive `apps/api/src/modules/emailTemplate/services/emailTemplateRuleSurface.ts#emailTemplateRuleSurface`: Use to feed rule editors with available template data; for validating a template's content use emailTemplatePreflight.
+  - *Said as:* "what data can this template's rules reference", "feed the rule editor the fields available to the template", "inspect the rule vocabulary for a template"
+- **emailTokenPathKind** · primitive `packages/email/src/validations/validateTokens/tokenPathKind.ts#emailTokenPathKind` · in docs: docs/claude/COMMUNICATIONS.md § Email › The email lens: Email lenses: use this; generic Lens or LensNarrowing: tokenPathKind instead.
+  - *Said as:* "classify one token path under the email lens", "is this placeholder a field, a relation, or unknown", "what kind of thing does this path point at", "check a single path, not the whole template"
+- **evaluateConditions** · primitive `packages/email/src/render/evaluateConditions.ts#evaluateConditions` · in docs: docs/claude/COMMUNICATIONS.md § Email › Render Pipeline; docs/claude/COMMUNICATIONS.md § Email › Package Structure: Runtime branch evaluation; guardedToken only writes an exists-guarded token into templates.
+  - *Said as:* "resolve the if else blocks for this recipient", "evaluate the conditional branches at render time", "I'll parse the if markers by walking characters myself", "decide which branch shows for this user"
+- **expand** · primitive `packages/email/src/render/expand.ts#expand` · in docs: docs/claude/COMMUNICATIONS.md § Email › Render Pipeline; docs/claude/COMMUNICATIONS.md § Email › Implementation Status: Default for owner-scoped lookup; expandWith to supply a custom component lookup (tests, previews).
+  - *Said as:* "inline the referenced components into the MJML", "preview the email with the component refs filled in", "the preview doesn't fill in the component references", "I'll re-implement the override-beats-default slot rule in my own walk", "resolve the component blocks before rendering"
+- **expandWith** · primitive `packages/email/src/render/expand.ts#expandWith`: Custom lookup only; normal rendering uses expand.
+  - *Said as:* "inline components using my own lookup for tests", "fill component refs from a custom source, not the database", "preview with an in-memory component map"
+- **guardedToken** · primitive `packages/email/src/render/guardedToken.ts#guardedToken`: Writing template text; evaluateConditions resolves it at render.
+  - *Said as:* "a token that falls back to text when the value is missing", "I'll hand-write an exists if-block around the variable", "emit a placeholder with a default when the field is empty"
   - *Signs you're bypassing it:* hand-writing an exists {{#if …}} wrapper with fallback text around a token (catalog: guardedToken (emit a variable token wrapped in an exists-condition with fallback text))
-- **hydrate** `packages/email/src/render/hydrate.ts#hydrate`: Custom body resolver; hydrateCascade for owner-scoped cascade lookup. Not the Prisma relation hydrate in FEATURES.md.
-- **hydrateCascade** `packages/email/src/render/hydrate.ts#hydrateCascade`: Default for stored templates; hydrate when supplying your own body resolver.
-- **interpolate** `packages/email/src/render/interpolate.ts#interpolate`: fill template placeholders with variables, narrowed to the lens projection, reporting errors to a sink
+- **hydrate** · primitive `packages/email/src/render/hydrate.ts#hydrate` · in docs: docs/claude/FRONTEND/AUTH.md § Auth Slice; @inixiative/permissions/README.md § Hydration (Prisma example): Custom body resolver; hydrateCascade for owner-scoped cascade lookup. Not the Prisma relation hydrate in FEATURES.md.
+  - *Said as:* "fill component blocks with my own body resolver", "resolve component content from a custom source", "fill the blocks when the bodies come from somewhere else", "the low-level fill, when I supply the lookup"
+  - *Signs you're bypassing it:* deep hand-written `include: { a: { include: { b: ... } } }` trees or per-row relation fetch loops (N+1), instead of `hydrate(accessor, record)` (FEATURES.md § Hydration System)
+- **hydrateCascade** · primitive `packages/email/src/render/hydrate.ts#hydrateCascade`: Default for stored templates; hydrate when supplying your own body resolver.
+  - *Said as:* "fill the component blocks from the stored components", "the full template with its components for editing", "I'll write per-row resolvers that query every tier again", "the decorations should use the same filled payload the editor gets"
+- **interpolate** · primitive `packages/email/src/render/interpolate.ts#interpolate` · in docs: docs/claude/COMMUNICATIONS.md § Email › Render Pipeline; docs/claude/COMMUNICATIONS.md § Email › Variable Interpolation: fill template placeholders with variables, narrowed to the lens projection, reporting errors to a sink
+  - *Said as:* "fill the placeholders in the template with the values", "replace the double-curly tokens with real data", "I'll regex-replace the mustaches myself", "substitute variables, limited to what the lens allows", "nested dotted tokens ship as literal text"
   - *Signs you're bypassing it:* String.replace / regex substitution of {{sender.*}}, {{recipient.*}} or {{data.*}} placeholders, or calling substituteVariables directly (docs/claude/COMMUNICATIONS.md § Variable Interpolation and § Render Pipeline; catalog: substituteVariables (use via interpolate))
-- **isStructurallyBalanced** `packages/email/src/render/conditionParser/isStructurallyBalanced.ts#isStructurallyBalanced`: check that if/each condition blocks in template text open and close in balanced order
-- **isValidBindingIdentifier** `packages/email/src/render/conditionParser/grammar.ts#isValidBindingIdentifier`: Also reject reserved names: combine with RESERVED_BINDING_NAMES.
-- **lookupCascade** `packages/email/src/render/lookupCascade.ts#lookupCascade`: Several components at once; lookupComponent for one slug, lookupAtOwner for a single tier.
+- **isStructurallyBalanced** · primitive `packages/email/src/render/conditionParser/isStructurallyBalanced.ts#isStructurallyBalanced`: check that if/each condition blocks in template text open and close in balanced order
+  - *Said as:* "are the if and each blocks opened and closed properly", "check the block markers are balanced", "catch an unterminated if before rendering"
+- **isValidBindingIdentifier** · primitive `packages/email/src/render/conditionParser/grammar.ts#isValidBindingIdentifier`: Also reject reserved names: combine with RESERVED_BINDING_NAMES.
+  - *Said as:* "is this loop variable name allowed", "check the each binding name is a valid slug"
+- **lookupCascade** · primitive `packages/email/src/render/lookupCascade.ts#lookupCascade` · in docs: docs/claude/COMMUNICATIONS.md § Email › Package Structure; docs/claude/COMMUNICATIONS.md § Email › Render Pipeline: Several components at once; lookupComponent for one slug, lookupAtOwner for a single tier.
+  - *Said as:* "fetch all the referenced components in one go", "resolve many slugs across the tiers at once", "I'll look up each component in a loop", "batch the component lookup instead of one query per slug", "one query per row per tier is an N+1"
   - *Signs you're bypassing it:* calling lookupComponent or findFirst once per slug in a loop to resolve many components (catalog: lookupCascade (several components at once))
-- **lookupComponent** `packages/email/src/render/lookupTemplate.ts#lookupComponent`: One slug; for many slugs use lookupCascade.
-- **lookupLens** `packages/email/src/render/lookupTemplate.ts#lookupLens`: Only have a slug; if the template row is already loaded use templateLens.
-- **lookupTemplate** `packages/email/src/render/lookupTemplate.ts#lookupTemplate`: Full template row; lookupLens when only the lens is needed, lookupAtOwner for one tier.
-- **parseBlocks** `packages/email/src/render/authoring.ts#parseBlocks`: Entry point for parsing; pair with decompose for component extraction, serialize to write back.
+- **lookupComponent** · primitive `packages/email/src/render/lookupTemplate.ts#lookupComponent` · in docs: docs/claude/COMMUNICATIONS.md § Email › Package Structure: One slug; for many slugs use lookupCascade.
+  - *Said as:* "find the one component this slug resolves to", "which override wins for this single block", "fetch a single fragment row through the tiers", "resolve one slug up the ownership chain"
+- **lookupLens** · primitive `packages/email/src/render/lookupTemplate.ts#lookupLens`: Only have a slug; if the template row is already loaded use templateLens.
+  - *Said as:* "get just the stored lens for a template slug", "load the template's lens without the row", "which fields does this template declare, by slug"
+- **lookupTemplate** · primitive `packages/email/src/render/lookupTemplate.ts#lookupTemplate` · in docs: docs/claude/COMMUNICATIONS.md § Email › Package Structure: Full template row; lookupLens when only the lens is needed, lookupAtOwner for one tier.
+  - *Said as:* "fetch the template row for a slug without rendering", "just load the stored template, no component filling", "which template row applies here, raw", "find the template without assembling anything"
+- **parseBlocks** · primitive `packages/email/src/render/authoring.ts#parseBlocks` · in docs: docs/claude/COMMUNICATIONS.md § Email › Implementation Status: Entry point for parsing; pair with decompose for component extraction, serialize to write back.
+  - *Said as:* "parse the template text into blocks", "the grammar for component refs, slots and conditions in the editor", "I'll write a separate editor grammar for the tokens", "map the cursor offset to the enclosing block", "turn the MJML string into a node tree"
   - *Throws:* ParseBlocksError (`validation-error`, inferred)
-- **parseBlocks** `packages/email/src/render/parseBlocks.ts#parseBlocks`: Raw node tree; for component regions only use collectComponentRegions instead.
+- **parseBlocks** · primitive `packages/email/src/render/parseBlocks.ts#parseBlocks` · in docs: docs/claude/COMMUNICATIONS.md § Email › Implementation Status: Raw node tree; for component regions only use collectComponentRegions instead.
+  - *Said as:* "parse the template text into blocks", "the grammar for component refs, slots and conditions in the editor", "I'll write a separate editor grammar for the tokens", "map the cursor offset to the enclosing block", "turn the MJML string into a node tree"
   - *Throws:* ParseBlocksError (`validation-error`, inferred)
-- **recomposeCommunication** `apps/api/src/lib/email/recompose.ts#recomposeCommunication`: re-render a past email's content from its communication log entry
-- **recomposeSnapshot** `apps/api/src/lib/email/recompose.ts#recomposeSnapshot`: Reproducing a past send; for fresh renders use renderForRecipient.
+- **recomposeCommunication** · primitive `apps/api/src/lib/email/recompose.ts#recomposeCommunication` · in docs: docs/claude/COMMUNICATIONS.md § Email › Template Versioning & Recompose: re-render a past email's content from its communication log entry
+  - *Said as:* "show exactly what we sent in that email", "rebuild a past email from its log entry", "reconstruct the message as it went out, not the current template", "what did this delivery look like at the time"
+- **recomposeSnapshot** · primitive `apps/api/src/lib/email/recompose.ts#recomposeSnapshot` · in docs: docs/claude/COMMUNICATIONS.md § Email › Template Versioning & Recompose: Reproducing a past send; for fresh renders use renderForRecipient.
+  - *Said as:* "rebuild the email from its pinned component versions", "splice the old component snapshots back into the template", "I'll store the final HTML on the log so we can show it", "reconstruct the as-sent version from the audit snapshots"
   - *Signs you're bypassing it:* storing the final rendered HTML on CommunicationLog, or re-rendering the current live template, to show what was sent (docs/claude/COMMUNICATIONS.md § Template Versioning & Recompose; § Database Models (CommunicationLog does not store the final provider HTML))
-- **recomputeDegradedComponentRefs** `packages/email/src/render/recomputeDegradedComponentRefs.ts#recomputeDegradedComponentRefs`: recompute and persist degraded component reference state for one email template record
-- **registry** `apps/api/src/lib/email/registry.ts#registry`: declare each email slug's entity lenses, slots and render policy
-- **renderForRecipient** `apps/api/src/lib/email/renderForRecipient.ts#renderForRecipient`: Fresh sends; for reproducing past sends use recomposeSnapshot.
+- **recomputeDegradedComponentRefs** · primitive `packages/email/src/render/recomputeDegradedComponentRefs.ts#recomputeDegradedComponentRefs`: recompute and persist degraded component reference state for one email template record
+  - *Said as:* "refresh the broken-reference state for one template", "recompute and store which refs are degraded", "mark the template's dangling component refs after a change"
+- **registry** · primitive `apps/api/src/lib/email/registry.ts#registry` · in docs: docs/claude/WEBSOCKETS.md § Channel registry and authorization; docs/claude/FLOWS.md § Registry: declare each email slug's entity lenses, slots and render policy
+  - *Said as:* "where each email slug declares its lenses and render policy", "the code entry for an email type", "declare what data the welcome email can use"
+- **renderForRecipient** · primitive `apps/api/src/lib/email/renderForRecipient.ts#renderForRecipient` · in docs: docs/claude/COMMUNICATIONS.md § Messaging (non-email channels); docs/claude/COMMUNICATIONS.md § Email › Send Pipeline: Fresh sends; for reproducing past sends use recomposeSnapshot.
+  - *Said as:* "render the email for each recipient", "fill in the recipient's name and data for this send", "I'll build the variables and substitute per user myself", "the per-recipient render step shared with SMS", "swap in each user's values before sending"
   - *Signs you're bypassing it:* a send path that builds its own recipient/sender/data variables and interpolates per recipient instead of the shared helper (catalog: Shared recipient rendering (any send that interpolates recipient, sender or data tokens))
-- **RESERVED_BINDING_NAMES** `packages/email/src/render/conditionParser/grammar.ts#RESERVED_BINDING_NAMES`: Only scope roots needed: RESERVED_SCOPE_ROOTS instead.
-- **runPreflight** `packages/email/src/preflight/runPreflight.ts#runPreflight`: Pass a subset of checks only to test one rule; default runs ALL_PREFLIGHT_CHECKS.
-- **sanitizeSubject** `packages/email/src/render/sanitizeSubject.ts#sanitizeSubject`: unescape HTML, strip control characters and collapse whitespace in email subjects
+- **RESERVED_BINDING_NAMES** · primitive `packages/email/src/render/conditionParser/grammar.ts#RESERVED_BINDING_NAMES`: Only scope roots needed: RESERVED_SCOPE_ROOTS instead.
+  - *Said as:* "names you can't use as a loop variable", "I'll keep a third hand-maintained list of reserved words", "derive the reserved names from the roots plus the grammar keywords"
+- **runPreflight** · primitive `packages/email/src/preflight/runPreflight.ts#runPreflight`: Pass a subset of checks only to test one rule; default runs ALL_PREFLIGHT_CHECKS.
+  - *Said as:* "run the pre-send checks on the content", "is there a subject, alt text, preheader, spam words", "lint the email before it goes out", "check for unresolved paths before sending"
+- **sanitizeSubject** · primitive `packages/email/src/render/sanitizeSubject.ts#sanitizeSubject`: unescape HTML, strip control characters and collapse whitespace in email subjects
+  - *Said as:* "clean up the rendered subject line", "unescape entities and collapse whitespace in the subject", "I'll strip the control characters from the subject myself"
   - *Signs you're bypassing it:* ad hoc unescaping or whitespace collapsing of a rendered subject line (catalog: sanitizeSubject)
-- **saveEmailComponents** `packages/email/src/render/save.ts#saveEmailComponents`: Use over saveComponents when rule references must stay synced; saveEmailTemplate for whole templates.
+- **saveEmailComponents** · primitive `packages/email/src/render/save.ts#saveEmailComponents` · in docs: docs/claude/COMMUNICATIONS.md § Email › Template Versioning & Recompose: Use over saveComponents when rule references must stay synced; saveEmailTemplate for whole templates.
+  - *Said as:* "save the reusable email fragments with their references synced", "write component rows without losing the rule links", "I'll call the raw component save and skip the reference sync", "persist shared email partials properly"
   - *Signs you're bypassing it:* writing EmailComponent rows with prisma or the raw saveComponents so their RuleReference edges are never synced (catalog: saveEmailComponents (use over saveComponents when rule references must stay synced); COMMUNICATIONS.md § Rule References)
-- **saveEmailTemplate** `apps/api/src/lib/email/saveEmailTemplate.ts#saveEmailTemplate`: Always save templates through this, including seeds via emailSeedSavers; components use saveEmailComponents.
+- **saveEmailTemplate** · primitive `apps/api/src/lib/email/saveEmailTemplate.ts#saveEmailTemplate` · in docs: docs/claude/COMMUNICATIONS.md § Email › Save Pipeline; docs/claude/COMMUNICATIONS.md § Email › Package Structure: Always save templates through this, including seeds via emailSeedSavers; components use saveEmailComponents.
+  - *Said as:* "save the email template with all its checks", "write a template row and keep its rule references synced", "I'll upsert the template directly with prisma", "the one door for writing template content", "the refs never get derived when I save it this way"
   - *Throws:* RuleReferenceError (`validation-error`, json-rules, inferred)
   - *Signs you're bypassing it:* prisma.emailTemplate.create/update/upsert called directly, or email rows seeded from the packages/db seed, skipping MJML/condition/token validation and rule-reference sync (docs/claude/COMMUNICATIONS.md § Email › Template Versioning & Recompose (seeds savedByApp) and § Rule References (saveEmailTemplate is the only writer of mjml/subject))
-- **saveEmailTemplate** `packages/email/src/render/save.ts#saveEmailTemplate`: Canonical template save path; saveTemplate is the raw row write without checks or reference sync.
+- **saveEmailTemplate** · primitive `packages/email/src/render/save.ts#saveEmailTemplate` · in docs: docs/claude/COMMUNICATIONS.md § Email › Save Pipeline; docs/claude/COMMUNICATIONS.md § Email › Package Structure: Canonical template save path; saveTemplate is the raw row write without checks or reference sync.
+  - *Said as:* "save the email template with all its checks", "write a template row and keep its rule references synced", "I'll upsert the template directly with prisma", "the one door for writing template content", "the refs never get derived when I save it this way"
   - *Throws:* RuleReferenceError (`validation-error`, json-rules, inferred)
   - *Signs you're bypassing it:* prisma.emailTemplate.create/update/upsert called directly, or email rows seeded from the packages/db seed, skipping MJML/condition/token validation and rule-reference sync (docs/claude/COMMUNICATIONS.md § Email › Template Versioning & Recompose (seeds savedByApp) and § Rule References (saveEmailTemplate is the only writer of mjml/subject))
-- **SCOPE_ROOTS** `packages/email/src/render/conditionParser/grammar.ts#SCOPE_ROOTS`: Membership checks: RESERVED_SCOPE_ROOTS instead.
-- **serialize** `packages/email/src/render/authoring.ts#serialize`: Inverse of parseBlocks; use after editing blocks.
-- **settle** `packages/email/src/render/settle/settle.ts#settle`: Entry point; settleBranches and settleEach are its internal block handlers.
-- **settleTemplate** `apps/api/src/lib/emailTemplate.ts#settleTemplate`: Use instead of rendering MJML directly; it applies the cascade, system tokens and RenderIssue collection.
+- **SCOPE_ROOTS** · primitive `packages/email/src/render/conditionParser/grammar.ts#SCOPE_ROOTS`: Membership checks: RESERVED_SCOPE_ROOTS instead.
+  - *Said as:* "the four token roots a template can use", "sender, recipient, data and system as a list"
+- **serialize** · primitive `packages/email/src/render/authoring.ts#serialize` · in docs: docs/claude/LOGGING.md § Structured logging: Inverse of parseBlocks; use after editing blocks.
+  - *Said as:* "write the edited blocks back to MJML text", "turn the block tree back into source", "the inverse of parsing, after an edit"
+- **settle** · primitive `packages/email/src/render/settle/settle.ts#settle` · in docs: docs/claude/COMMUNICATIONS.md § Email › The email lens; docs/claude/COMMUNICATIONS.md § Email › Send Pipeline: Entry point; settleBranches and settleEach are its internal block handlers.
+  - *Said as:* "the core block renderer for if, each and text", "an unterminated if dumps the rest of the template raw", "render the blocks and sink one error for a malformed marker", "walk the parsed blocks and produce the final text"
+- **settleTemplate** · primitive `apps/api/src/lib/emailTemplate.ts#settleTemplate` · in docs: docs/claude/COMMUNICATIONS.md § Email › Send Pipeline; docs/claude/COMMUNICATIONS.md § Communication Preferences: Use instead of rendering MJML directly; it applies the cascade, system tokens and RenderIssue collection.
+  - *Said as:* "render the subject and body for sending", "I'll just run mjml to html on the stored template", "resolve the template and render it, collecting problems rather than throwing", "turn the stored template into the final subject and html", "fill the system tokens like the unsubscribe link"
   - *Throws:* EmailRenderError (`off-request-path`)
   - *Signs you're bypassing it:* calling mjml2html on the stored template MJML directly, without the cascade, system tokens or RenderIssue collection (catalog: settleTemplate (use instead of rendering MJML directly))
-- **TOKEN_PATTERN** `packages/email/src/render/conditionParser/grammar.ts#TOKEN_PATTERN`: match {{root.path}} interpolation tokens in email template text
+- **TOKEN_PATTERN** · primitive `packages/email/src/render/conditionParser/grammar.ts#TOKEN_PATTERN`: match {{root.path}} interpolation tokens in email template text
+  - *Said as:* "the regex for the double-curly placeholders", "I'll write a new regex to find the mustache tokens", "match the variable tokens in template text"
   - *Signs you're bypassing it:* a new regex such as /\{\{\s*([\w.]+)\s*\}\}/ to find interpolation tokens in template text (catalog: TOKEN_PATTERN (match {{root.path}} interpolation tokens))
-- **validateConditions** `packages/email/src/validations/validateConditions/validateConditions.ts#validateConditions`: Template condition/loop checks; tokens: assertValidTokens; MJML markup: validateMjml; partial reference cycles: validateNoCycle.
-- **validateDependents** `packages/email/src/render/validateDependents.ts#validateDependents`: Same-owner checks only; other owners' templates are handled by the versioning hook.
+- **validateConditions** · primitive `packages/email/src/validations/validateConditions/validateConditions.ts#validateConditions` · in docs: docs/claude/COMMUNICATIONS.md § Email › Render Pipeline; docs/claude/COMMUNICATIONS.md § Email › The email lens: Template condition/loop checks; tokens: assertValidTokens; MJML markup: validateMjml; partial reference cycles: validateNoCycle.
+  - *Said as:* "list the problems with the if and each blocks", "check the conditions in the template against what it can read", "which rules in this template reference things the lens doesn't allow", "I'll sniff whether the condition looks like a rule myself", "return condition issues instead of throwing"
+- **validateDependents** · primitive `packages/email/src/render/validateDependents.ts#validateDependents`: Same-owner checks only; other owners' templates are handled by the versioning hook.
+  - *Said as:* "block the change if other templates of this owner depend on it", "check same-owner templates that reference this component", "I'll hand-write one owner filter per tier for the dependents walk", "what would break if I change this component"
   - *Throws:* DependentTemplateError (`validation-error`, inferred)
-- **validateMjml** `packages/email/src/validations/validateMjml.ts#validateMjml`: MJML structure only; template conditions: validateConditions; tokens: assertValidTokens.
+- **validateMjml** · primitive `packages/email/src/validations/validateMjml.ts#validateMjml` · in docs: docs/claude/COMMUNICATIONS.md § Email › MJML Validation; docs/claude/COMMUNICATIONS.md § Email › Package Structure: MJML structure only; template conditions: validateConditions; tokens: assertValidTokens.
+  - *Said as:* "check the MJML is well-formed before saving", "make sure the markup structure is valid", "reject broken email markup at save time", "is this a valid full email document"
   - *Throws:* MjmlValidationError (`validation-error`)
-- **validateNoCycle** `packages/email/src/validations/validateNoCycle.ts#validateNoCycle`: Template reference cycles; markup validity: validateMjml; condition checks: validateConditions.
+- **validateNoCycle** · primitive `packages/email/src/validations/validateNoCycle.ts#validateNoCycle` · in docs: docs/claude/COMMUNICATIONS.md § Email › Package Structure: Template reference cycles; markup validity: validateMjml; condition checks: validateConditions.
+  - *Said as:* "stop a component from including itself", "check for circular component references before saving", "I'll keep a tree scan for cycle checks beside the registry", "can we trust these not to have circular refs"
   - *Throws:* makeError 422 VALIDATION_ERROR (`validation-error`, request-context-errors, inferred)
-- **validateTokens** `packages/email/src/validations/validateTokens/validateTokens.ts#validateTokens`: Whole-template validation; use emailTokenPathKind or unknownMustaches only for single-path or stray-brace checks.
-- **visibleText** `packages/email/src/preflight/visibleText.ts#visibleText`: extract user-visible text from email HTML
-- **apps/api/src/modules/emailTemplate** `apps/api/src/modules/emailTemplate`: preflight email templates and expose their rule surface to superadmins
-- **CAS claim queued→sending** `lib/email/deliverEmailMessage.ts`: Per-row at-most-once claims; cross-process critical sections use locks instead.
-- **component block markup** `docs/claude/COMMUNICATIONS.md > Communications`: mark reusable email components inline in MJML templates
-- **Edge staleness via soft delete and purge** `ruleReference:target`: copy target soft deletes onto edges; purge nulls FK keeping targetId
-- **Email ownership cascade** `docs/claude/COMMUNICATIONS.md > Email > Database Models`: resolve templates by ownerModel false polymorphism with Space→Org→default and user chains
-- **Email slow lane for wide fan-outs** `JOBS.md § Fast and Slow Lanes`: Large sends: slow lane; small sends stay on the fast lane.
-- **Email template ownership cascade** `docs/claude/COMMUNICATIONS.md`: resolve stored MJML templates/components by owner tier cascade with audit-backed versions
-- **Shutdown-aware backoff** `lib/email/deliverEmailMessage.ts`: Retry loops held inside a claim that must not strand rows on deploy.
-- **Template and component cascade resolution** `docs/claude/COMMUNICATIONS.md#Cascade Resolution`: User-actor senders walk user chain; tenant/shared senders walk org chain; Space inherits Org only with inheritToSpaces.
-- **Template versioning via audit log** `docs/claude/COMMUNICATIONS.md#template-versioning--recompose`: Reconstructing what was sent; never pin versions on live EmailTemplate/EmailComponent rows.
+- **validateTokens** · primitive `packages/email/src/validations/validateTokens/validateTokens.ts#validateTokens` · in docs: docs/claude/COMMUNICATIONS.md § Email › Render Pipeline; docs/claude/COMMUNICATIONS.md § Email › The email lens: Whole-template validation; use emailTokenPathKind or unknownMustaches only for single-path or stray-brace checks.
+  - *Said as:* "check every placeholder in the template exists in the lens", "reject tokens the template isn't allowed to use", "make sure all the curly variables are real fields", "catch unknown variables at save, not at send"
+- **visibleText** · primitive `packages/email/src/preflight/visibleText.ts#visibleText`: extract user-visible text from email HTML
+  - *Said as:* "the text a reader actually sees in the html", "strip the markup to check the visible copy"
+- **apps/api/src/modules/emailTemplate** · system `apps/api/src/modules/emailTemplate`: preflight email templates and expose their rule surface to superadmins
+  - *Said as:* "the API routes for template preflight and rule surface", "the superadmin endpoints for checking templates"
+- **CAS claim queued→sending** · pattern lib/email/deliverEmailMessage.ts: Per-row at-most-once claims; cross-process critical sections use locks instead.
+  - *Said as:* "make sure two workers don't send the same email", "claim the row before sending so a retry can't double-send", "I'll check the status then update it in two steps"
+- **component block markup** · pattern docs/claude/COMMUNICATIONS.md > Communications: mark reusable email components inline in MJML templates
+  - *Said as:* "how to mark a reusable block inline in the template", "the tag syntax for embedding a component", "reference a shared footer from inside the MJML"
+- **Edge staleness via soft delete and purge** · pattern ruleReference:target: copy target soft deletes onto edges; purge nulls FK keeping targetId
+  - *Said as:* "what happens to the rule's edges when the target row is deleted", "mark the reference stale when the row it points at goes away", "keep the target id on the edge after purge"
+- **Email ownership cascade** · pattern docs/claude/COMMUNICATIONS.md > Email > Database Models: resolve templates by ownerModel false polymorphism with Space→Org→default and user chains
+  - *Said as:* "which tier's template wins: space, org or default", "templates owned by an org, space or user, resolved by precedence", "the override chain for email ownership"
+- **Email slow lane for wide fan-outs** · pattern JOBS.md § Fast and Slow Lanes: Large sends: slow lane; small sends stay on the fast lane.
+  - *Said as:* "a big send shouldn't block the small ones", "put the large campaign on the slow queue", "wide fan-outs go to the other lane"
+- **Email template ownership cascade** · pattern docs/claude/COMMUNICATIONS.md: resolve stored MJML templates/components by owner tier cascade with audit-backed versions
+  - *Said as:* "an org can override the platform's default template", "resolve the stored template by owner tier with versions", "per-tenant email overrides with history"
+- **Shutdown-aware backoff** · pattern lib/email/deliverEmailMessage.ts: Retry loops held inside a claim that must not strand rows on deploy.
+  - *Said as:* "don't strand the row in sending when we deploy mid-retry", "the retry sleep should wake early on shutdown", "back off between provider retries without getting killed mid-wait"
+- **Template and component cascade resolution** · pattern docs/claude/COMMUNICATIONS.md § Email › Cascade Resolution › Cascade Resolution · code: `User`, `OrganizationUser`, `SpaceUser`, `Space`: User-actor senders walk user chain; tenant/shared senders walk org chain; Space inherits Org only with inheritToSpaces.
+  - *Said as:* "a user actor walks the user chain, a tenant walks the org chain", "does a space inherit the org's template", "which ownership chain applies for this sender"
+- **Template versioning via audit log** · pattern docs/claude/COMMUNICATIONS.md § Email › Template Versioning & Recompose › Template Versioning & Recompose · code: `AuditLog`, `CommunicationLog`, `EmailTemplate`, `EmailComponent`: Reconstructing what was sent; never pin versions on live EmailTemplate/EmailComponent rows.
+  - *Said as:* "keep a history of template versions", "I'll add a version column to the template row", "know which component versions a template pointed at", "the version graph lives in the audit log, not the live rows"
   - *Signs you're bypassing it:* a version or pinned-component column on live EmailTemplate/EmailComponent rows instead of audit-log snapshots with componentVersions (docs/claude/COMMUNICATIONS.md § Template Versioning & Recompose (live rows keep slug refs; the version graph lives in the audit log))
-- **Two-phase email render pipeline** `docs/claude/COMMUNICATIONS.md#Render Pipeline`: compose template once, then interpolate per recipient
-- **AuditLog.componentVersions** `AuditLog`: map child slugs to snapshot audit-log ids, forming a traversable version tree
-- **bindOptional** `@template/shared/rules`: mark a rule binding that may be omitted and resolve to null
+- **Two-phase email render pipeline** · pattern docs/claude/COMMUNICATIONS.md § Email › Render Pipeline › Render Pipeline · code: `interpolate`, `composeTemplate`, `evaluateConditions`, `composeComponent`: compose template once, then interpolate per recipient
+  - *Said as:* "compose the template once, then fill per recipient", "don't re-resolve the components for every recipient", "separate the template assembly from the per-user substitution"
+- **AuditLog.componentVersions** · primitive AuditLog: map child slugs to snapshot audit-log ids, forming a traversable version tree
+  - *Said as:* "which snapshot of each child component this version used", "the map from component slug to its pinned audit entry", "the version tree pointer on a template snapshot"
+- **bindOptional** · primitive @template/shared/rules: mark a rule binding that may be omitted and resolve to null
+  - *Said as:* "a binding the rule can live without", "I'll prune the leaf when the bind is missing", "let a rule input be absent and read as null"
   - *Signs you're bypassing it:* Pruning a leaf from a rule (or substituting a match-all value) when its bind is absent, instead of bindOptional, which reads null and never prunes — `in` with nothing bound matches nothing. (@inixiative/json-rules/README.md § Rule Introspection)
-- **CommunicationChannel** `docs/claude/COMMUNICATIONS.md > Database Models > Enums`: select delivery channel email, sms, push or inApp
-- **Contact.deliverability** `Email docs § Deliverability`: cache bouncer pre-flight result for 30 days to skip undeliverable addresses
-- **db.findForUpdate** `packages/db`: row-level locks within a txn; cross-process work uses createLock
-  - *Throws:* FindForUpdateLockTimeoutError (`conflict`, database)
-- **EMAIL_SLOW_LANE_MIN_RECIPIENTS** `Email docs § Dispatch`: set the recipient count above which email fan-out runs on the slow lane
-- **emailSeedSavers** `apps/api/scripts/seed.ts`: For savedByApp seed files; plain seed upserts skip save guards.
-- **emailVersioning** `apps/api/src/hooks/emailVersioning`: stamp component versions and backprop fresh snapshots to ancestors on component changes
-- **inScope** `Email docs § Deliver gate ①`: Scope gate; preference opt-outs use canDeliver.
-- **mapRefs** `packages/email/src/render/extractRefs.ts`: extract component slugs referenced in MJML
+- **CommunicationChannel** · primitive docs/claude/COMMUNICATIONS.md > Database Models > Enums: select delivery channel email, sms, push or inApp
+  - *Said as:* "email, sms, push or in-app as an enum", "which channel this message went through"
+- **Contact.deliverability** · primitive Email docs § Deliverability: cache bouncer pre-flight result for 30 days to skip undeliverable addresses
+  - *Said as:* "cache whether the address bounces", "skip addresses we already know are undeliverable", "remember the bouncer verdict for a month"
+- **db.findForUpdate** · primitive packages/db: row-level locks within a txn; cross-process work uses createLock
+  - *Said as:* "lock the row while I update it", "read then write the template without a race", "I'll catch the unique violation and retry the create", "why isn't this just select for update inside the transaction", "key the lock on the slug and let it create if missing"
+  - *Throws:* FindForUpdateLockTimeoutError (`conflict`, database-client)
+- **EMAIL_SLOW_LANE_MIN_RECIPIENTS** · primitive Email docs § Dispatch: set the recipient count above which email fan-out runs on the slow lane
+  - *Said as:* "how many recipients before a send counts as large", "the threshold for moving a send to the slow lane"
+- **emailSeedSavers** · primitive apps/api/scripts/seed.ts: For savedByApp seed files; plain seed upserts skip save guards.
+  - *Said as:* "seed the system email templates", "the seed should go through the same save checks", "I'll upsert seed emails from the db seed", "seeded templates must pass the same guards as a real save"
+- **emailVersioning** · primitive apps/api/src/hooks/emailVersioning: stamp component versions and backprop fresh snapshots to ancestors on component changes
+  - *Said as:* "snapshot the template whenever a component it uses changes", "stamp which component versions this template resolved to", "this exact loop already exists for component references", "mark dependents when a referenced component goes missing"
+- **inScope** · primitive Email docs § Deliver gate ①: Scope gate; preference opt-outs use canDeliver.
+  - *Said as:* "is the recipient still within what the sender may reach", "the scope check before sending, separate from preferences"
+- **mapRefs** · primitive packages/email/src/render/extractRefs.ts: extract component slugs referenced in MJML
+  - *Said as:* "pull the component slugs out of the MJML", "I'll regex the component tags to get the slugs", "derive the refs from the markup on save", "which components does this template reference"
   - *Signs you're bypassing it:* a regex over {{#component:slug}} to pull component slugs or bodies out of MJML (docs/claude/COMMUNICATIONS.md § Component System › Extraction (mapRefs))
-- **onIssue** `apps/api/src/lib/email/registry.ts`: platform (default) for stable unbranded send; fail to wait for a fix via retries/DLQ; degrade to send with empty blocks.
-- **parseBlocks / decompose** `docs/claude/COMMUNICATIONS.md > Email > Implementation Status`: split authored MJML into reusable component blocks
-- **preventHardDelete** `packages/db`: block client hard deletes of a model
-- **resolveVariants** `packages/email/src/render/resolveVariants.ts`: match an existing component variant or create a new one
-- **RuleErrorSink** `@template/email/render`: collect render issues for degraded rules, failed filters and empty tokens
-- **ruleReference:target** `packages/db (referenced-side hook)`: stamp rule reference edges when a referenced target row changes
-- **substitute** `apps/api/src/lib/email/registry.ts`: Over onIssue 'platform' when a specific alternate template should go out; substitutes cannot chain.
-- **substituteVariables** `@template/email/render`: Use via interpolate.
-- **System tokens** `docs/claude/COMMUNICATIONS.md#Sender`: Sender-specific values: {{sender.*}} instead.
-- **Component MJML skips full-document validation** `docs/claude/COMMUNICATIONS.md#Save Pipeline`: Saving component fragments.
-- **Component refs stay slug-keyed** `docs/claude/COMMUNICATIONS.md`: componentRefs resolve by slug via owner cascade, never persisted ids in edge table.
+- **onIssue** · primitive apps/api/src/lib/email/registry.ts: platform (default) for stable unbranded send; fail to wait for a fix via retries/DLQ; degrade to send with empty blocks.
+  - *Said as:* "what should happen when a token or rule fails at render", "send the plain platform version if the branded one breaks", "fail the send and retry instead of sending with holes"
+- **parseBlocks / decompose** · primitive docs/claude/COMMUNICATIONS.md > Email > Implementation Status: split authored MJML into reusable component blocks
+  - *Said as:* "split authored MJML into reusable blocks", "extract the components from the edited email", "the parse and split step for the builder"
+- **preventHardDelete** · primitive packages/db: block client hard deletes of a model
+  - *Said as:* "don't let anyone hard-delete this model", "block real deletes on templates and components"
+- **resolveVariants** · primitive packages/email/src/render/resolveVariants.ts: match an existing component variant or create a new one
+  - *Said as:* "same MJML means the same component, don't create another", "match an existing variant or make a new one", "dedupe identical component bodies on save"
+- **RuleErrorSink** · primitive @template/email/render: collect render issues for degraded rules, failed filters and empty tokens
+  - *Said as:* "collect the render problems instead of throwing", "render nothing and report it", "where do degraded rules and empty tokens get recorded", "the callback that receives each render issue"
+- **ruleReference:target** · primitive packages/db (referenced-side hook): stamp rule reference edges when a referenced target row changes
+  - *Said as:* "update the rule edges when the row they point at changes", "the hook on the referenced side of a rule link", "stamp the edges when a referenced row is deleted"
+- **substitute** · primitive apps/api/src/lib/email/registry.ts: Over onIssue 'platform' when a specific alternate template should go out; substitutes cannot chain.
+  - *Said as:* "send a different named template when this one breaks", "the fallback template for a render failure", "name an alternate email to go out instead"
+- **substituteVariables** · primitive @template/email/render: Use via interpolate.
+  - *Said as:* "the raw placeholder replacement under the hood", "I'll call the low-level replace directly"
+- **System tokens** · primitive docs/claude/COMMUNICATIONS.md § Sender: Sender-specific values: {{sender.*}} instead.
+  - *Said as:* "the unsubscribe link and other platform-provided values", "values the rail fills in, not the sender", "where does the unsubscribe url token come from"
+- **Component MJML skips full-document validation** · rule docs/claude/COMMUNICATIONS.md § Email › Save Pipeline › Save Pipeline · code: `saveEmailTemplate`, `Organization`, `assertValidConditions`: Saving component fragments.
+  - *Said as:* "a fragment isn't a full document, don't validate it as one", "component markup has no mjml root tag"
+- **Component refs stay slug-keyed** · rule docs/claude/COMMUNICATIONS.md: componentRefs resolve by slug via owner cascade, never persisted ids in edge table.
+  - *Said as:* "store the component ids on the template", "refs resolve by slug so an override takes effect without resaving", "don't persist component ids in an edge table"
   - *Signs you're bypassing it:* persisting EmailComponent ids on the template or in an edge table instead of slug-keyed componentRefs (docs/claude/COMMUNICATIONS.md § Rule References (component references stay slug-keyed and do not ride this table))
-- **Identity separate from branding** `docs/claude/COMMUNICATIONS.md#Sender`: Choosing sender vs template for an email.
-- **Pre-claim errors retry, content errors fail** `lib/email/deliverEmailMessage.ts`: Any failure before the queued→sending claim.
-- **Render degrades silently, save validates** `docs/claude/COMMUNICATIONS.md#Interpolate (per recipient)`: All email rendering; render issues indicate drift since save.
-- **Render issue behaviour in registry** `apps/api/src/lib/email/registry.ts`: Any template needing non-default render-issue behaviour.
+- **Identity separate from branding** · rule docs/claude/COMMUNICATIONS.md § Sender: Choosing sender vs template for an email.
+  - *Said as:* "who it's from versus whose template it uses", "the sender name and the branding are decided separately", "the template cascade picks the look, not the sender"
+- **Pre-claim errors retry, content errors fail** · rule lib/email/deliverEmailMessage.ts: Any failure before the queued→sending claim.
+  - *Said as:* "a render error shouldn't be retried", "which failures retry and which are final", "anything before the claim can be retried safely"
+- **Render degrades silently, save validates** · rule docs/claude/COMMUNICATIONS.md § Email › Render Pipeline › Interpolate (per recipient) · code: `interpolate`, `composeTemplate`, `evaluateConditions`, `composeComponent`: All email rendering; render issues indicate drift since save.
+  - *Said as:* "rendering should never throw on a bad token", "catch it at save, render just records the issue", "a render issue means drift since save"
+- **Render issue behaviour in registry** · rule apps/api/src/lib/email/registry.ts: Any template needing non-default render-issue behaviour.
+  - *Said as:* "I'll add a fallback column on the template row", "where do I set what happens when rendering degrades", "render policy lives in code, never on the row"
   - *Signs you're bypassing it:* a render-policy or fallback column on the EmailTemplate row instead of render: { onIssue, substitute } on the code registry entry (docs/claude/COMMUNICATIONS.md § Render issues — behaviour lives in the registry entry ("never on the row"))
-- **Render issue policy** `docs/claude/COMMUNICATIONS.md > Email > Implementation Status`: when templates reference variables or rules
-- **Seed through api seed script** `apps/api/scripts/seed.ts`: Any seed including email templates/components; packages/db seed refuses savedByApp files.
+- **Render issue policy** · rule docs/claude/COMMUNICATIONS.md > Email > Implementation Status: when templates reference variables or rules
+  - *Said as:* "what happens when a template references something missing", "save refuses, render records, the entry decides"
+- **Seed through api seed script** · rule apps/api/scripts/seed.ts: Any seed including email templates/components; packages/db seed refuses savedByApp files.
+  - *Said as:* "seed the email templates with hooks running", "I'll insert seed rows with a one-off script", "the db seed refuses the email files, use the api one"
   - *Signs you're bypassing it:* inserting seed rows with a one-off script or `db.x.createMany` outside the seed runner, skipping hooks and save guards (packages/db seed refuses savedByApp files) (apps/api/scripts/seed.ts)
-- **Seeded rows meet save guards** `docs: Seeds`: Seeding email templates and components.
-- **Snapshot walk order children-before-parent** `apps/api/src/lib/email (component snapshot hook)`: Applies when versioning email templates and components via audit snapshots.
-- **Subject render issues are fatal** `docs/claude/COMMUNICATIONS.md#render-issues`: All email renders.
-- **variable prefixes** `docs/claude/COMMUNICATIONS.md > Variable Interpolation`: Any template variable substitution.
+- **Seeded rows meet save guards** · rule docs: Seeds: Seeding email templates and components.
+  - *Said as:* "a seeded template that wouldn't validate should fail the run", "seeds go through the same checks as a real save"
+- **Snapshot walk order children-before-parent** · rule apps/api/src/lib/email (component snapshot hook): Applies when versioning email templates and components via audit snapshots.
+  - *Said as:* "save the components before the template so the snapshot pins them", "the parent snapshot needs the children to exist first"
+- **Subject render issues are fatal** · rule docs/claude/COMMUNICATIONS.md § render-issues: All email renders.
+  - *Said as:* "a broken subject line should fail the send", "don't send with an empty subject token"
+- **variable prefixes** · rule docs/claude/COMMUNICATIONS.md > Variable Interpolation: Any template variable substitution.
+  - *Said as:* "what goes before the dot in a placeholder", "sender, recipient or data as the token root", "which prefix do I use for the user's name"
 - *Also here, by name:* BLOCK_TAG (`packages/email/src/render/blockTags.ts`); COMPONENT_SLUG_PATTERN (`packages/email/src/render/authoring.ts`); ConditionValidationError (`packages/email/src/errors/ConditionValidationError.ts`); DependentTemplateError (`packages/email/src/errors/DependentTemplateError.ts`); DivergentDuplicateSlugError (`packages/email/src/errors/DivergentDuplicateSlugError.ts`); EACH (`packages/email/src/render/authoring.ts`); EACH (`packages/email/src/render/conditionParser/grammar.ts`); EACH_MAX_DEPTH (`packages/email/src/render/limits.ts`); EACH_MAX_ELEMENTS (`packages/email/src/render/limits.ts`); ELSE (`packages/email/src/render/authoring.ts`); ELSE (`packages/email/src/render/conditionParser/grammar.ts`); ELSE_IF (`packages/email/src/render/authoring.ts`); ELSE_IF (`packages/email/src/render/conditionParser/grammar.ts`); END (`packages/email/src/render/authoring.ts`); END (`packages/email/src/render/conditionParser/grammar.ts`); END_EACH (`packages/email/src/render/authoring.ts`); END_EACH (`packages/email/src/render/conditionParser/grammar.ts`); EmailModels (`packages/email/src/render/types.ts`); EmailOwnerModel (`packages/db/prisma/schema/emailComponent.prisma`); IF (`packages/email/src/render/authoring.ts`); IF (`packages/email/src/render/conditionParser/grammar.ts`); MJML_CHILD_TAGS (`packages/email/src/render/authoring.ts`); MJML_CHILD_TAGS (`packages/email/src/render/mjmlNesting.ts`); MjmlValidationError (`packages/email/src/errors/MjmlValidationError.ts`); ParseBlocksError (`packages/email/src/errors/ParseBlocksError.ts`); RESERVED_BINDING_NAMES (`packages/email/src/render/authoring.ts`); RESERVED_SCOPE_ROOTS (`packages/email/src/render/conditionParser/grammar.ts`); SLUG_PATTERN (`packages/email/src/render/blockTags.ts`); SPAM_TRIGGER_PHRASES (`packages/email/src/preflight/checks/spamTriggerPhrases.ts`); SYSTEM_TOKENS (`packages/email/src/render/authoring.ts`); SYSTEM_TOKENS (`packages/email/src/render/systemTokens.ts`); TOKEN_PATTERN (`packages/email/src/render/authoring.ts`); TokenValidationError (`packages/email/src/errors/TokenValidationError.ts`); assertNoDuplicateExposedSlots (`packages/email/src/validations/assertNoDuplicateExposedSlots.ts`); assertNoDuplicateOverrideSlots (`packages/email/src/validations/assertNoDuplicateOverrideSlots.ts`); assertNoStrayTagShapes (`packages/email/src/validations/assertNoStrayTagShapes.ts`); bindsAs (`packages/email/src/validations/validateConditions/bindsAs.ts`); collapseComponentBodies (`packages/email/src/render/authoring.ts`); collapseComponentBodies (`packages/email/src/render/regions.ts`); collect (`packages/email/src/validations/validateConditions/collect.ts`); collectComponentRegionsFromNodes (`packages/email/src/render/authoring.ts`); collectComponentRegionsFromNodes (`packages/email/src/render/regions.ts`); collectContextPathRoots (`packages/email/src/validations/validateConditions/collectContextPathRoots.ts`); collectStraddleIssues (`packages/email/src/validations/validateConditions/collectStraddleIssues.ts`); componentTagPattern (`packages/email/src/render/authoring.ts`); componentTagPattern (`packages/email/src/render/blockTags.ts`); createVersionBumpSnapshot (`apps/api/src/hooks/emailVersioning/snapshot.ts`); decomposeNodes (`packages/email/src/render/authoring.ts`); decomposeNodes (`packages/email/src/render/decompose.ts`); emailTemplatePreflightBodySchema (`apps/api/src/modules/emailTemplate/schemas/emailTemplatePreflight.schema.ts`); emailTemplatePreflightFindingSchema (`apps/api/src/modules/emailTemplate/schemas/emailTemplatePreflight.schema.ts`); emailTemplatePreflightResponseSchema (`apps/api/src/modules/emailTemplate/schemas/emailTemplatePreflight.schema.ts`); emailTemplateRuleSurfaceBodySchema (`apps/api/src/modules/emailTemplate/schemas/emailTemplateRuleSurface.schema.ts`); emailTemplateRuleSurfaceResponseSchema (`apps/api/src/modules/emailTemplate/schemas/emailTemplateRuleSurface.schema.ts`); findEachBodyEnd (`packages/email/src/render/conditionParser/findEachBodyEnd.ts`); findJsonEnd (`packages/email/src/render/authoring.ts`); findJsonEnd (`packages/email/src/render/conditionParser/findJsonEnd.ts`); guardedToken (`packages/email/src/render/authoring.ts`); hasUnsafeSegment (`packages/email/src/render/settle/hasUnsafeSegment.ts`); imagesHaveAlt (`packages/email/src/preflight/checks/imagesHaveAlt.ts`); isOverrideSlot (`packages/email/src/render/nodes.ts`); isValidBindingIdentifier (`packages/email/src/render/authoring.ts`); lookupAtOwner (`packages/email/src/render/lookup.ts`); nextStructuralToken (`packages/email/src/render/conditionParser/nextStructuralToken.ts`); ownerScope (`apps/api/src/lib/emailTemplate.ts`); ownerScopeOf (`packages/email/src/render/save.ts`); parseEachBlock (`packages/email/src/render/authoring.ts`); parseEachBlock (`packages/email/src/render/conditionParser/parseEachBlock.ts`); parseIfBlock (`packages/email/src/render/conditionParser/parseIfBlock.ts`); parseRuleJson (`packages/email/src/render/conditionParser/parseRuleJson.ts`); preheaderPresent (`packages/email/src/preflight/checks/preheaderPresent.ts`); presenceGuards (`packages/email/src/validations/validateTokens/presenceGuards.ts`); readBareWord (`packages/email/src/render/conditionParser/readBareWord.ts`); readEachMarker (`packages/email/src/render/conditionParser/readEachMarker.ts`); readRuleMarker (`packages/email/src/render/conditionParser/readRuleMarker.ts`); recomposeFromSnapshots (`apps/api/src/lib/email/recompose.ts`); recomputeEmailDependents (`apps/api/src/jobs/handlers/recomputeEmailDependents.ts`); registerEmailTemplateSlugReservationHook (`apps/api/src/hooks/emailTemplateSlugReservation/hook.ts`); registerEmailVersioningHook (`apps/api/src/hooks/emailVersioning/hook.ts`); removeSlotOverride (`packages/email/src/render/authoring.ts`); removeSlotOverride (`packages/email/src/render/regions.ts`); renderPolicyFor (`apps/api/src/lib/email/registry.ts`); renderWarningFindings (`packages/email/src/preflight/checks/renderWarningFindings.ts`); resolveComponentVersions (`apps/api/src/hooks/emailVersioning/resolveComponentVersions.ts`); resolvePath (`packages/email/src/render/settle/resolvePath.ts`); saveComponents (`packages/email/src/render/saveComponents.ts`); saveScopedRow (`packages/email/src/render/saveScopedRow.ts`); saveTemplate (`packages/email/src/render/saveTemplate.ts`); serialize (`packages/email/src/render/decompose.ts`); settleBranches (`packages/email/src/render/settle/settleBranches.ts`); settleEach (`packages/email/src/render/settle/settleEach.ts`); settleText (`packages/email/src/render/settle/settleText.ts`); skipWhitespace (`packages/email/src/render/conditionParser/skipWhitespace.ts`); slotDefaultContent (`packages/email/src/render/authoring.ts`); slotDefaultContent (`packages/email/src/render/regions.ts`); spamTriggerPhrases (`packages/email/src/preflight/checks/spamTriggerPhrases.ts`); stripComponentBodies (`packages/email/src/render/stripComponentBodies.ts`); subjectPresent (`packages/email/src/preflight/checks/subjectPresent.ts`); substituteToken (`packages/email/src/render/settle/substituteToken.ts`); templateLens (`packages/email/src/render/lookupTemplate.ts`); toRuleData (`packages/email/src/render/settle/toRuleData.ts`); toScope (`packages/email/src/render/interpolate.ts`); unknownMustaches (`packages/email/src/validations/validateTokens/unknownMustaches.ts`); unresolvedLensPaths (`packages/email/src/preflight/checks/unresolvedLensPaths.ts`); validateEachAttributes (`packages/email/src/validations/validateConditions/validateEachAttributes.ts`); validateFieldRoots (`packages/email/src/validations/validateConditions/validateFieldRoots.ts`)
 
 ## 4. The specifics, in full

@@ -1,0 +1,48 @@
+{
+  "id": "app-events-webhooks",
+  "title": "App events and webhooks",
+  "routing": "Is this about a side effect leaving a business write (emitAppEvent, makeAppEvent, AppEventName, the handlers index, email/WebSocket handoffs, cb callbacks, streamAppend, observeRegistry, AppEvent rows, db.onCommit deferral, db.parallel allSettled) or outbound webhooks (WebhookSubscription, WebhookEvent, sendWebhook, the webhookDelivery hook, webhookEnabledModels, webhookRelatedModels, webhookOwnerAllowedModels, x-webhook-signature, validateWebhookUrl, webhookUrlSchema, circuit breaker, HOOK_IGNORE_FIELDS)?",
+  "concepts": [
+    "app-events",
+    "webhooks"
+  ],
+  "tokens": 15249,
+  "tokenMethod": "chars/4",
+  "runsAgreed": 1,
+  "sources": {
+    "docs": [
+      "AI/ENTRYPOINT.md",
+      "FEATURES.md",
+      "docs/claude/APP_EVENTS.md",
+      "docs/claude/COMMUNICATIONS.md",
+      "docs/claude/HOOKS.md"
+    ],
+    "docUnits": [
+      "doc:docs/claude/APP_EVENTS.md#purpose-and-execution",
+      "doc:docs/claude/APP_EVENTS.md#emitting-and-registering-events",
+      "doc:docs/claude/APP_EVENTS.md#handler-and-handoff-contracts",
+      "doc:docs/claude/APP_EVENTS.md#email-pipeline",
+      "doc:docs/claude/APP_EVENTS.md#websocket-handoffs",
+      "doc:docs/claude/APP_EVENTS.md#observe-pipeline",
+      "doc:docs/claude/APP_EVENTS.md#inquiry-events",
+      "doc:docs/claude/APP_EVENTS.md#source-map-and-pending-consumers",
+      "doc:AI/ENTRYPOINT.md#6-app-events-side-effects",
+      "doc:docs/claude/COMMUNICATIONS.md#webhooks",
+      "doc:docs/claude/HOOKS.md#webhooks",
+      "doc:FEATURES.md#webhooks"
+    ],
+    "catalogClusters": [
+      "app-events-side-effects",
+      "data-access-rules",
+      "mutation-hooks",
+      "observability-telemetry",
+      "outbound-webhooks",
+      "request-response-schemas",
+      "websocket-realtime-delivery"
+    ],
+    "codeEntries": 49,
+    "docMembers": 27
+  },
+  "bypassLines": 27,
+  "glossaryTerms": 27
+}

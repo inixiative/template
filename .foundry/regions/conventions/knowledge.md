@@ -77,15 +77,17 @@ The template's naming vocabulary and code-style rules: what identifiers, files, 
 
 `code-style` is how code reads (STYLE.md, AI/ENTRYPOINT.md § 0). No comments (a hard rule); one file, one named export; named exports only; semicolons, single quotes, trailing commas, 2-space indent, typed arrow functions; single-line early exits; `type` over `interface`; no TS `enum` (Prisma enum or `as const` object); types inferred from Zod or Prisma; index files only at module and package level; imports through `#/` or `@template/`; one-line logging; dependencies added to the owning workspace, never the root.
 
-Related regions: `dx-tools` for the tools that enforce these rules (Biome, check-import-aliases, CI rules); `monorepo-architecture` for where files go and the full alias and barrel rules; `database` for schema conventions beyond names (typed IDs, enum vs row, false polymorphism); `api-routes-schemas` for route templates; `lib-atlas` for the `@atlas` block, the one standing comment.
+Related regions: `dx-tools` for the tools that enforce these rules (Biome, check-import-aliases, CI rules); `monorepo-architecture` for where files go and the full alias and barrel rules; `database-client / data-modeling` for schema conventions beyond names (typed IDs, enum vs row, false polymorphism); `api-routes / api-schemas-openapi` for route templates; `lib-atlas` for the `@atlas` block, the one standing comment.
 
 ## 3. Everything that exists here, by class
 
-Point at a class when that is as specific as the moment allows, or at a member. Where a class has siblings an agent could confuse, a table under the class header says which to use when. Each member: **name** `where`: choose this when … . Where the docs or code give material, a second line describes the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
+Point at a class when that is as specific as the moment allows, or at a member. Where a class has siblings an agent could confuse, a table under the class header says which to use when; its *Said as* line gives the plain words a user or agent uses for that job. Each member: **name** · kind `where` · the doc § that describes it (code members) or the code it is about (doc members): choose this when … . Quote the name and the where in a pointer ("look over here: createLock, packages/db/src/lock/createLock.ts, CONCURRENCY.md § Distributed Lock"). *Said as:* the ways a user or agent describes this job in a message or plan without knowing the name; match on these. *Signs you're bypassing it:* the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
 
 ### Class `naming`: Naming conventions: identifiers, files, routes, schema names, polymorphic side names, vocabulary
 
 **Job: name a polymorphic slot and its columns** (polymorphic side names) — docs/claude/NAMING.md § Polymorphic Sides
+
+*Said as:* "what do I call the two ends of this relation", "name the columns for a thing that points at several models", "owner or source or subject"
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -95,12 +97,16 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 **Job: prefix a name with _ or __** (_ vs __ prefixes) — docs/claude/NAMING.md › Backend › Underscore Prefix; docs/claude/STYLE.md § Variable Prefixes
 
+*Said as:* "one or two underscores", "mark a parameter as unused", "naming an internal key"
+
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **Underscore prefix meanings** | _ unused binding; __ class private, brand, internal key | #private without a runtime-privacy need |
 | **Underscore variable prefixes** | STYLE.md's short form of the same rule; docs don't distinguish | see Underscore prefix meanings |
 
 **Job: name and case constants and value sets** (constants and casing) — docs/claude/NAMING.md › Backend › Variables; Constants Pattern; docs/claude/STYLE.md § No TypeScript enum
+
+*Said as:* "should this constant be uppercase", "how do I define a set of allowed values", "derive a type from the constant"
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -110,6 +116,8 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 **Job: name a file or function** (file and function names) — docs/claude/NAMING.md § Terminology; § Backend; docs/claude/API_ROUTES.md § Naming Conventions
 
+*Said as:* "what do I name this file", "what do I call the function", "name the list route", "helper or util"
+
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **Backend file naming** | route, hook, job, middleware, utility file names | list subresource names (use Plural ReadMany subresources) |
@@ -117,42 +125,66 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **Backend function naming** | get*/is*/route handler function names | factories and guards (use Preferred terminology: make*, validate*) |
 | **Preferred terminology** | util, services, make, validate, aToB | helper, handlers (outside jobs/frontend), require |
 
-- **no-prisma-maps** `scripts/ci/rules/no-prisma-maps.sh`: Enum-value @map remains allowed for legacy stored strings.
+- **no-prisma-maps** · rule `scripts/ci/rules/no-prisma-maps.sh`: Enum-value @map remains allowed for legacy stored strings.
+  - *Said as:* "I'll map the field to a snake case column", "rename the table in the database with a map", "the schema name is the column name, no mapping"
   - *Signs you're bypassing it:* `@map("snake_case_name")` on a field or `@@map("users")` on a model (scripts/ci/rules/no-prisma-maps.sh (CI rule))
-- **Backend directory layout** `docs/claude/NAMING.md#Backend Structure`: Model-specific routes, hooks and jobs go in modules/<model>; cross-cutting jobs in src/jobs; route mounting in src/routes.
-- **keyof typeof const objects** `apps/api/src/modules/batch/constants.ts`: Instead of hand-written string unions duplicating an object's keys.
+- **Backend directory layout** · pattern docs/claude/NAMING.md § Files & Directories › Backend Structure: Model-specific routes, hooks and jobs go in modules/<model>; cross-cutting jobs in src/jobs; route mounting in src/routes.
+  - *Said as:* "where does a model-specific job go", "a cross-cutting job that isn't about one model", "where do I mount the routes", "I'll put the hook in a shared hooks folder"
+- **keyof typeof const objects** · pattern apps/api/src/modules/batch/constants.ts: Instead of hand-written string unions duplicating an object's keys.
+  - *Said as:* "derive the union type from the object's keys", "I'll write out the string union and the object separately", "a type that only accepts the keys of this constant", "keep the type and the values in sync automatically"
   - *Signs you're bypassing it:* a hand-written string union that duplicates a const object's keys (docs/claude/NAMING.md › Backend › Constants Pattern: keyof typeof)
-- **Zod enum from const object** `apps/api/src/modules/batch/constants.ts`: Schemas validating values of a const-object enum.
-- **Backend file naming** `docs/claude/NAMING.md > Backend > Files`: Any new backend file.
-- **Backend function naming** `docs/claude/NAMING.md > Backend > Functions`: Any new backend function.
-- **Frontend component naming** `docs/claude/NAMING.md > Frontend > Components`: Any new frontend component, hook or context file.
-- **Function and folder naming prefixes** `docs/claude/STYLE.md#Naming Conventions`: Name util not helper, services not handlers, txn not transaction; make*/validate*/get*/is* prefixes.
+- **Zod enum from const object** · pattern apps/api/src/modules/batch/constants.ts: Schemas validating values of a const-object enum.
+  - *Said as:* "validate a value against the constant's keys", "I'll write the zod enum with the strings again", "a schema for the pseudo-enum values"
+- **Backend file naming** · rule docs/claude/NAMING.md > Backend > Files: Any new backend file.
+  - *Said as:* "what do I name the route file", "file name for a new hook, job or middleware", "I'll call the file utils or helpers", "match the file name to the function it exports"
+- **Backend function naming** · rule docs/claude/NAMING.md > Backend > Functions: Any new backend function.
+  - *Said as:* "what prefix for a function that fetches versus one that checks", "name a boolean check function", "I'll name the handler getUsersHandler", "a function that reads a value from context"
+- **Frontend component naming** · rule docs/claude/NAMING.md > Frontend > Components: Any new frontend component, hook or context file.
+  - *Said as:* "what do I name the component file", "naming a hook or context file on the frontend", "I'll name the component file in kebab case"
+- **Function and folder naming prefixes** · rule docs/claude/STYLE.md § Naming Conventions · code: `Variable`: Name util not helper, services not handlers, txn not transaction; make*/validate*/get*/is* prefixes.
+  - *Said as:* "a folder called helpers", "I'll name the transaction client tx", "the middleware guard named require something", "prefixes for factories, guards, getters and checks"
   - *Signs you're bypassing it:* a `helpers/` folder or `xHelper` name, a backend middleware guard named `require*`, or a transaction client named `tx` / `transaction` (docs/claude/STYLE.md § Naming Conventions; docs/claude/NAMING.md § Terminology)
-- **Import aliases** `docs/claude/NAMING.md > Backend > Imports`: Every import; relative paths only in top-level barrel index.ts re-exports.
-- **Never referenced* names** `docs/claude/NAMING.md#Polymorphic Sides`: Any polymorphic slot, FK or relation naming.
+- **Import aliases** · rule docs/claude/NAMING.md > Backend > Imports: Every import; relative paths only in top-level barrel index.ts re-exports.
+  - *Said as:* "hash for inside the app, at for shared packages", "absolute imports only", "I'll import with dot dot slash", "which alias do I use inside a package versus across"
+- **Never referenced* names** · rule docs/claude/NAMING.md § Database › Polymorphic Sides · code: `Inquiry`, `AuditLog`, `User`, `Organization`: Any polymorphic slot, FK or relation naming.
+  - *Said as:* "I'll call the columns referenced model and referenced id", "the thing this rule references", "pick the role name instead of referenced", "a generic pointer name for a polymorphic slot"
   - *Signs you're bypassing it:* `referencedModel` / `referencedId` slot names instead of source/target, resource, subject or actor (docs/claude/NAMING.md § Polymorphic Sides)
-- **No barrel files in lib** `docs/claude/NAMING.md#Backend Structure`: Any shared utility module under lib.
-- **No intermediate barrels** `docs/claude/NAMING.md > Backend > Imports`: Any import that could go through a non-top-level index file.
+- **No barrel files in lib** · rule docs/claude/NAMING.md § Files & Directories › Backend Structure: Any shared utility module under lib.
+  - *Said as:* "I'll add an index file to lib so imports are shorter", "import the utility from its own file", "a lib index re-exporting everything", "shared utils folder with a barrel"
+- **No intermediate barrels** · rule docs/claude/NAMING.md > Backend > Imports: Any import that could go through a non-top-level index file.
+  - *Said as:* "import from the source file, not through index re-exports", "I'll add a nested index that re-exports the folder", "importing from a folder path instead of the file", "a mid-level index file for convenience"
   - *Signs you're bypassing it:* a new nested index.ts re-exporting siblings, or imports from '#/lib' instead of the source file (docs/claude/NAMING.md › Backend › Imports; docs/claude/STYLE.md › Minimal Index Files)
-- **Plural ReadMany subresources** `docs/claude/NAMING.md > Backend > Files`: Route handlers reading a list of a subresource.
+- **Plural ReadMany subresources** · rule docs/claude/NAMING.md > Backend > Files: Route handlers reading a list of a subresource.
+  - *Said as:* "the list route of a sub-resource is named singular", "the list route should be named after the model and action", "naming the endpoint that lists an organization's spaces", "I'll name the list route getSpaces"
   - *Signs you're bypassing it:* a list route or operationId named `organizationReadManySpace` (singular subresource) or `getUsers` / `createUserHandler` (docs/claude/API_ROUTES.md § Naming Conventions; docs/claude/NAMING.md › Backend › Files)
-- **Polymorphic side naming** `docs/claude/NAMING.md#Polymorphic Sides`: owner for tenancy only; source/target for directed edges; resource for one-sided slots; subject for what a record is about; actor for who acted.
+- **Polymorphic side naming** · rule docs/claude/NAMING.md § Database › Polymorphic Sides · code: `Inquiry`, `AuditLog`, `User`, `Organization`: owner for tenancy only; source/target for directed edges; resource for one-sided slots; subject for what a record is about; actor for who acted.
+  - *Said as:* "what do I call the two ends of this edge", "owner is for tenancy only, this slot needs a different name", "which model is this row about, and who did it", "I'll add a type and id column pair for the thing it points at", "name the slot by its role: source, target, resource, subject, actor"
   - *Signs you're bypassing it:* `ownerModel` used for something other than tenancy, or a `type` + `id` string pair for a polymorphic slot (docs/claude/NAMING.md § Polymorphic Sides)
-- **Preferred terminology** `docs/claude/NAMING.md > Terminology`: All identifiers, folders and files; handlers only for jobs and frontend event handlers.
-- **Prisma schema naming case** `docs/claude/NAMING.md#Prisma Schema`: Every Prisma model, enum, field and relation declaration.
+- **Preferred terminology** · rule docs/claude/NAMING.md > Terminology: All identifiers, folders and files; handlers only for jobs and frontend event handlers.
+  - *Said as:* "helper or util, which word", "I'll make a helpers folder", "create or make for a factory function", "should the guard be called require or validate", "handlers versus services, what goes where"
+- **Prisma schema naming case** · rule docs/claude/NAMING.md § Database › Prisma Schema · code: `Inquiry`, `AuditLog`, `User`, `Organization`: Every Prisma model, enum, field and relation declaration.
+  - *Said as:* "it's a singular model, we don't do plural", "no kebab, camel case like the schema uses", "I'll name the field in snake case", "model and field casing in the schema"
   - *Signs you're bypassing it:* plural or snake_case model names, or snake_case fields in a .prisma file (docs/claude/NAMING.md § Database › Prisma Schema)
-- **Rename misleading names** `CLAUDE.md § 0. Purpose and Priority`: Any identifier, file or API name that does not describe its behavior.
-- **Route operationId naming** `docs/claude/API_ROUTES.md#Naming Conventions`: Every API route operationId and controller name.
-- **Side-prefixed FKs and back-relations** `docs/claude/NAMING.md#Polymorphic Sides`: Every typed FK and back-relation of a polymorphic model; models on both ends get both back-relations.
+- **Rename misleading names** · rule CLAUDE.md § 0. Purpose and Priority: Any identifier, file or API name that does not describe its behavior.
+  - *Said as:* "the name doesn't say what it does", "this function is called one thing but does another", "I'll leave the old name and add a comment explaining"
+- **Route operationId naming** · rule docs/claude/API_ROUTES.md § Naming Conventions · code: `Space`, `Token`: Every API route operationId and controller name.
+  - *Said as:* "the pattern is model, action, subresource, let's clean it up", "what do I call this route's operation id", "I'll name the controller after the HTTP verb", "naming an admin route versus a normal one"
+- **Side-prefixed FKs and back-relations** · rule docs/claude/NAMING.md § Database › Polymorphic Sides · code: `Inquiry`, `AuditLog`, `User`, `Organization`: Every typed FK and back-relation of a polymorphic model; models on both ends get both back-relations.
+  - *Said as:* "both ends of the edge have the same column name", "name the foreign keys after the side they belong to", "the back-relation on both models needs the side prefix", "I'll name the relation list after the edge model only"
   - *Signs you're bypassing it:* an edge model with unprefixed FKs like `segmentId` on both ends, or back-relations named `ruleReferences` instead of `sourceRuleReferences` / `targetRuleReferences` (docs/claude/NAMING.md § Polymorphic Sides)
-- **Underscore prefix meanings** `docs/claude/NAMING.md > Backend > Underscore Prefix`: Unused params/destructures: `_`; class privates, type brands, internal object keys: `__`; `#` only for runtime privacy.
+- **Underscore prefix meanings** · rule docs/claude/NAMING.md > Backend > Underscore Prefix: Unused params/destructures: `_`; class privates, type brands, internal object keys: `__`; `#` only for runtime privacy.
+  - *Said as:* "when do I use one underscore versus two", "mark an unused parameter", "an internal key that isn't part of the public shape", "should private fields use underscore or hash", "I'll prefix the module-private cache with one underscore"
   - *Signs you're bypassing it:* `_cache` for module-private state, `__unused` for an ignored parameter, or `#private` fields without a need for runtime privacy (docs/claude/NAMING.md › Backend › Underscore Prefix)
-- **Underscore variable prefixes** `docs/claude/STYLE.md#Variable Prefixes`: Prefix unused params with _ and unexported module-private state with __.
-- **Variable and constant casing** `docs/claude/NAMING.md > Backend > Variables`: Declaring types, constants, registries or derived helpers.
+- **Underscore variable prefixes** · rule docs/claude/STYLE.md § Naming Conventions › Variable Prefixes · code: `Variable`: Prefix unused params with _ and unexported module-private state with __.
+  - *Said as:* "the style doc version of the underscore rule", "prefix unused params so lint stays quiet", "module-private state with double underscore", "unused destructured binding naming"
+- **Variable and constant casing** · rule docs/claude/NAMING.md > Backend > Variables: Declaring types, constants, registries or derived helpers.
+  - *Said as:* "should this constant be all caps", "casing for a registry object versus a primitive constant", "how do I name a derived helper from a constant", "I'll make this an uppercase enum-like object"
 
 ### Class `code-style`: Code style: formatting, no comments, TypeScript rules, imports
 
 **Job: write imports and decide whether an index file may exist** (imports, index files and barrels) — docs/claude/STYLE.md § Imports; § Minimal Index Files; docs/claude/MONOREPO.md § Avoid Barrel Files
+
+*Said as:* "how do I import this", "can I add an index file here", "relative or alias import", "do I need a barrel"
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -163,6 +195,8 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 **Job: declare a type** (types) — docs/claude/STYLE.md § TypeScript; FEATURES.md › TypeScript Strict Mode
 
+*Said as:* "interface or type", "add an enum for these values", "write a type for the response", "the type already exists somewhere"
+
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **type over interface** | declaring object shapes | interface |
@@ -172,6 +206,8 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 **Job: lay out a file's exports, comments and logging** (files, exports, comments) — docs/claude/STYLE.md § Code Formatting; § Comments & Logging; AI/ENTRYPOINT.md § 0
 
+*Said as:* "one export per file", "should I comment this", "default export or named", "how much should the script log"
+
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **Atomic files** | one named export per file | a utils.ts of unrelated exports |
@@ -179,27 +215,39 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **No comments** | always; rename or restructure instead | the @atlas block and a rare one-line why are the only exceptions |
 | **Minimal logging** | one line per action, quiet scripts | banners, emojis, step-by-step progress |
 
-- **Single-line early exits** `docs/claude/STYLE.md#Single-Line Early Exits`: Guard and bail out on one line before main logic.
+- **Single-line early exits** · pattern docs/claude/STYLE.md § Code Formatting › Single-Line Early Exits: Guard and bail out on one line before main logic.
+  - *Said as:* "I'll wrap the guard in a braced if block", "bail out early on one line", "nested if else before the main logic"
   - *Signs you're bypassing it:* multi-line braced guard blocks or nested if/else before the main logic (docs/claude/STYLE.md § Single-Line Early Exits)
-- **Atomic files** `docs/claude/STYLE.md#Atomic Files`: Each file holds exactly one named export; helpers stay internal.
+- **Atomic files** · rule docs/claude/STYLE.md § Code Formatting › Atomic Files: Each file holds exactly one named export; helpers stay internal.
+  - *Said as:* "one export per file", "I'll put all the helpers in one utils file", "split this file, it exports three unrelated things", "where does the private helper go, same file"
   - *Signs you're bypassing it:* a utils.ts or helpers.ts exporting several unrelated functions for different consumers (docs/claude/STYLE.md § Atomic Files; AI/ENTRYPOINT.md § 0 (One file, one concern))
-- **Code formatting baseline** `docs/claude/STYLE.md#Code Formatting`: Use semicolons, single quotes, trailing commas, 2-space indent, typed arrow functions.
-- **Infer types from Zod and Prisma** `docs/claude/STYLE.md#Infer Types`: Derive types from Zod schemas or Prisma instead of hand-writing them.
+- **Code formatting baseline** · rule docs/claude/STYLE.md § Code Formatting: Use semicolons, single quotes, trailing commas, 2-space indent, typed arrow functions.
+  - *Said as:* "semicolons, single quotes, trailing commas", "I'll write this as a function declaration", "the formatter settings for the repo"
+- **Infer types from Zod and Prisma** · rule docs/claude/STYLE.md § TypeScript › Infer Types · code: `User`: Derive types from Zod schemas or Prisma instead of hand-writing them.
+  - *Said as:* "stop declaring types that already exist in the database or sdk", "that type already exists in the generated client", "I'll write a type that mirrors the schema", "derive the type from the schema instead of restating it", "it comes back from the sdk, don't redeclare it"
   - *Signs you're bypassing it:* hand-written TypeScript types that restate a zod schema or Prisma model (docs/claude/STYLE.md § Infer Types)
-- **Minimal index files** `docs/claude/STYLE.md#Minimal Index Files`: Index files exist only at module and package level, never nested.
+- **Minimal index files** · rule docs/claude/STYLE.md § Code Formatting › Minimal Index Files: Index files exist only at module and package level, never nested.
+  - *Said as:* "where may an index file exist", "I'll add an index to this subfolder", "index only at module and package level", "do I need a barrel for this folder"
   - *Signs you're bypassing it:* an index.ts below module level (e.g. `#/hooks/webhooks/constants/index.ts`) re-exporting its folder (docs/claude/STYLE.md § Code Formatting › Minimal Index Files)
-- **Minimal logging** `docs/claude/STYLE.md#Minimal Logging`: Log one line per action, no ASCII art or emojis; scripts quiet.
+- **Minimal logging** · rule docs/claude/STYLE.md § Comments & Logging › Minimal Logging: Log one line per action, no ASCII art or emojis; scripts quiet.
+  - *Said as:* "I'll add a banner and step-by-step progress output", "one line per action, no emojis", "the script prints too much", "log the result, not every step"
   - *Signs you're bypassing it:* emoji or ASCII-art banners and step-by-step progress logs in scripts instead of errors or one final result (docs/claude/STYLE.md § Minimal Logging)
-- **Named exports only** `docs/claude/STYLE.md#Code Formatting`: Export symbols by name, never as default exports.
+- **Named exports only** · rule docs/claude/STYLE.md § Code Formatting: Export symbols by name, never as default exports.
+  - *Said as:* "I'll export default the component", "default export or named", "every export by name", "a default-exported config object"
   - *Signs you're bypassing it:* `export default function ...` or default-exported objects (docs/claude/STYLE.md § Code Formatting)
-- **No comments** `docs/claude/STYLE.md#No Comments`: Omit code comments unless requested or truly non-obvious.
+- **No comments** · rule docs/claude/STYLE.md § Comments & Logging › No Comments: Omit code comments unless requested or truly non-obvious.
+  - *Said as:* "stop writing doc comments", "no comments in the code", "less comments in the code", "I'll add a comment explaining what the next line does", "section divider comments", "rename or restructure instead of explaining in a comment"
   - *Signs you're bypassing it:* comments narrating what the next line does, restating a function name, or section-divider and reasoning comments (AI/ENTRYPOINT.md § 0. Purpose and Priority; docs/claude/STYLE.md § Comments & Logging)
-- **No root-level dependencies** `docs/claude/STYLE.md#Dependencies`: Never install packages at repo root; add to the owning app or package.
+- **No root-level dependencies** · rule docs/claude/STYLE.md § Dependencies: Never install packages at repo root; add to the owning app or package.
+  - *Said as:* "I'll install the package at the repo root", "which workspace does this dependency belong to", "add the dep to the app that imports it"
   - *Signs you're bypassing it:* `bun add <pkg>` at the repo root for a runtime dependency that one app or package imports (docs/claude/STYLE.md § Dependencies)
-- **No TypeScript enum** `docs/claude/STYLE.md#No TypeScript enum`: Domain values: Prisma enum; local constant sets: as const object.
+- **No TypeScript enum** · rule docs/claude/STYLE.md § No TypeScript enum: Domain values: Prisma enum; local constant sets: as const object.
+  - *Said as:* "I'll add an enum for the statuses", "a list we use a lot, make it a pseudo enum constant", "domain values belong in the schema enum", "a local set of allowed values", "stop using the enum keyword"
   - *Signs you're bypassing it:* `enum Foo { ... }` in TypeScript for domain values instead of a Prisma enum or an `as const` object (docs/claude/STYLE.md § No TypeScript enum)
-- **Path aliases, no relative imports** `docs/claude/STYLE.md#Imports`: Same app/package: #/; other package: @template/* public entry.
-- **type over interface** `docs/claude/STYLE.md#TypeScript`: Declare object shapes with type aliases, not interface.
+- **Path aliases, no relative imports** · rule docs/claude/STYLE.md § Imports · code: `makeController`: Same app/package: #/; other package: @template/* public entry.
+  - *Said as:* "no relative imports", "I'll use a relative path since it's the same folder", "when is a relative import allowed", "hash alias in the same app, package alias across", "dot slash imports in app code"
+- **type over interface** · rule docs/claude/STYLE.md § TypeScript · code: `User`: Declare object shapes with type aliases, not interface.
+  - *Said as:* "I'll declare an interface for the props", "interface or type alias", "object shape declarations", "convert the interfaces to types"
   - *Signs you're bypassing it:* `interface Foo { ... }` declarations for object shapes (docs/claude/STYLE.md § TypeScript)
 
 ## 4. The specifics, in full

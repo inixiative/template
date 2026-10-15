@@ -101,15 +101,17 @@ An Inquiry has a source (who sends) and a target (who resolves), each stored wit
 
 Who may send, resolve and read is a per-type rule in the ReBAC schema; every new type needs a send rule. On the frontend, InquiriesPage (sent/received, type filters) is the base for every list and its wrappers (OrganizationSentInvitationsPage and the like); InquirySourceControls and InquiryTargetControls render the two sides' actions, gated by useInquiryPermission; registerInquiryType supplies per-type components; sourceMutations/targetMutations name the queries to refetch; isTerminalInquiry also treats expiry as terminal.
 
-Related regions: the ReBAC rules and permission checks are `permissions`; organizations, spaces and memberships that invitations and transfers change are `tenancy`; guest users created from targetEmail are `authentication` (users); app events fired on send and resolve, and the emails they trigger, are `app-events-webhooks-adapters` and `email-delivery`; cancel's soft delete and the audit trail are `mutation-hooks`; route templates and response schemas are `api-routes-schemas`; list filtering and paging are `filtering-pagination`; the same code-registry pattern for guided walkthroughs is `flows`.
+Related regions: the ReBAC rules and permission checks are `permissions`; organizations, spaces and memberships that invitations and transfers change are `tenancy`; guest users created from targetEmail are `authentication` (users); app events fired on send and resolve, and the emails they trigger, are `app-events-webhooks / adapters-integrations` and `email-delivery`; cancel's soft delete and the audit trail are `mutation-hooks`; route templates and response schemas are `api-routes / api-schemas-openapi`; list filtering and paging are `filtering-search / pagination`; the same code-registry pattern for guided walkthroughs is `flows`.
 
 ## 3. Everything that exists here, by class
 
-Point at a class when that is as specific as the moment allows, or at a member. Where a class has siblings an agent could confuse, a table under the class header says which to use when. Each member: **name** `where`: choose this when … . Where the docs or code give material, a second line describes the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
+Point at a class when that is as specific as the moment allows, or at a member. Where a class has siblings an agent could confuse, a table under the class header says which to use when; its *Said as* line gives the plain words a user or agent uses for that job. Each member: **name** · kind `where` · the doc § that describes it (code members) or the code it is about (doc members): choose this when … . Quote the name and the where in a pointer ("look over here: createLock, packages/db/src/lock/createLock.ts, CONCURRENCY.md § Distributed Lock"). *Said as:* the ways a user or agent describes this job in a message or plan without knowing the name; match on these. *Signs you're bypassing it:* the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
 
 ### Class `inquiries`: Inquiries: the request/approval primitive, handlers, sources/targets, autoApprove
 
 **Job: move a request (inquiry) through its lifecycle** (Lifecycle: createInquiry vs sendInquiry vs resolveInquiry vs autoApprove) — docs/claude/INQUIRIES.md § Handler Architecture, § API Endpoints
+
+*Said as:* "move the request from draft to sent to approved", "someone has to accept or reject this", "send the invite and wait for an answer", "approve it automatically when no review is needed", "I'll add approve and deny endpoints to this feature"
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -120,6 +122,8 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 **Job: validate an inquiry before it is created** (Pre-create checks: unique vs validate vs validateInquiryHandler vs validateInquiryNotExpired) — docs/claude/INQUIRIES.md § Handler Architecture (unique enforcement, validate); catalog validations/
 
+*Said as:* "don't let them send the same request twice", "check the request makes sense before saving it", "reject a recipient this type doesn't allow", "which check goes where before creating", "it expired, refuse it"
+
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **unique** | one open inquiry per source+target+type ('targeted') or per source+type ('untargeted') | other domain conflicts (validate); never validateUniqueInquiry from a controller |
@@ -129,6 +133,8 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 **Job: load an inquiry with the relations its side needs** (Side-matched includes: includeInquirySent vs includeInquiryReceived vs includeInquiryResponse) — docs/claude/INQUIRIES.md § Response Schemas › Standardized includes
 
+*Said as:* "return the related rows in one call", "include the sender or the recipient with the request", "which relations does this endpoint need to load", "return the sent and received relations with the update"
+
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **includeInquirySent** | source edit/send/create (with inquirySentResponseSchema) | target resolve (includeInquiryReceived) |
@@ -137,12 +143,16 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 **Job: check whether an inquiry is finished** (inquiryTerminalStatuses vs isTerminalInquiry) — docs/claude/INQUIRIES.md § Adding a New Handler › Status utilities; § Frontend › Constants and utilities
 
+*Said as:* "is this request finished", "only show open requests", "grey out the buttons once it's decided or expired", "filter out closed ones"
+
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **inquiryTerminalStatuses** | backend notIn queries | UI disabling (isTerminalInquiry) |
 | **isTerminalInquiry** | UI controls; also treats past expiresAt as terminal | Prisma filters (inquiryTerminalStatuses) |
 
 **Job: render inquiry controls and refresh lists per side** (Sender vs recipient side: controls and refetch maps) — docs/claude/INQUIRIES.md § Frontend
+
+*Said as:* "buttons for the person who sent it versus the person who got it", "refresh the right lists after approving or cancelling", "the inbox and the outbox need different controls", "what updates after the recipient answers"
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -151,120 +161,207 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **sourceMutations** | sender-side lists to refetch | recipient lists after resolution (targetMutations) |
 | **targetMutations** | recipient-side lists after approval/denial | ad-hoc invalidateQueries |
 
-- **Inquiry** `packages/db/prisma/schema/inquiry.prisma`: record a source-to-target request awaiting resolution, with status, content and expiry
+- **Inquiry** · model `packages/db/prisma/schema/inquiry.prisma` · in docs: FEATURES.md § Inquiry System; docs/claude/APP_EVENTS.md § Inquiry events: record a source-to-target request awaiting resolution, with status, content and expiry
+  - *Said as:* "one party asks another for something and waits for an answer", "an invite, access request or transfer that someone has to approve", "I'll add an invitation table with its own status column"
   - *Signs you're bypassing it:* a bespoke Invitation, TransferRequest or AccessRequest model with its own status column and approve/deny endpoints (FEATURES.md › Inquiry System ("Instead of building ad-hoc handlers for every common org action"))
-- **InquiryStatus** `packages/db/prisma/schema/inquiry.prisma`: track an inquiry from draft through sent, changes requested, to approved, denied or canceled
-- **AdminInquiriesPage** `packages/ui/src/pages/AdminInquiriesPage.tsx#AdminInquiriesPage`: show admins all inquiries paginated with status filtering
-- **baseResolutionInputSchema** `apps/api/src/modules/inquiry/handlers/schemas.ts#baseResolutionInputSchema`: Extend this for a handler's resolutionInputSchema; use contentSchema for data stored on create.
-- **computeExpiresAt** `apps/api/src/modules/inquiry/services/computeExpiresAt.ts#computeExpiresAt`: compute an inquiry's expiry from its type's defaultExpirationDays, or null
+- **InquiryStatus** · model `packages/db/prisma/schema/inquiry.prisma` · in docs: docs/claude/INQUIRIES.md § Frontend; docs/claude/INQUIRIES.md § Data Model: track an inquiry from draft through sent, changes requested, to approved, denied or canceled
+  - *Said as:* "where the request is: draft, sent, approved, denied", "what states can a request be in", "I'll add a pending and accepted flag to the request"
+- **AdminInquiriesPage** · primitive `packages/ui/src/pages/AdminInquiriesPage.tsx#AdminInquiriesPage` · in docs: docs/claude/INQUIRIES.md § Frontend; docs/claude/FRONTEND/COMPONENTS.md § Modals and Pages: show admins all inquiries paginated with status filtering
+  - *Said as:* "let admins see every request across the platform", "a superadmin list of all pending and past requests", "filter all requests by status in the admin app"
+- **baseResolutionInputSchema** · primitive `apps/api/src/modules/inquiry/handlers/schemas.ts#baseResolutionInputSchema` · in docs: docs/claude/INQUIRIES.md § Handler Architecture: Extend this for a handler's resolutionInputSchema; use contentSchema for data stored on create.
+  - *Said as:* "what the approver is allowed to submit when resolving", "the shared shape of a resolution body: explanation plus overrides", "start the resolve form schema from the common fields"
+- **computeExpiresAt** · primitive `apps/api/src/modules/inquiry/services/computeExpiresAt.ts#computeExpiresAt` · in docs: docs/claude/INQUIRIES.md § Data Model; docs/claude/INQUIRIES.md § Handler Architecture: compute an inquiry's expiry from its type's defaultExpirationDays, or null
+  - *Said as:* "work out when this request lapses", "I'll set the deadline to now plus thirty days when sending", "the expiry date comes from the type's default"
   - *Signs you're bypassing it:* date arithmetic such as now + 30 days written where an inquiry is sent (catalog: apps/api/src/modules/inquiry/services/computeExpiresAt.ts)
-- **createInquiry** `apps/api/src/modules/inquiry/services/createInquiry.ts#createInquiry`: Creating drafts; sendInquiry to send, resolveInquiry to approve or deny.
-- **getInquiryInterface** `packages/ui/src/lib/inquiries/registry.ts#getInquiryInterface`: Read side of the registry; to add a type's components use registerInquiryType in lib/inquiries/registrations/<type>.tsx.
-- **includeInquiryReceived** `apps/api/src/modules/inquiry/queries/inquiryIncludes.ts#includeInquiryReceived`: Target-side resolve; includeInquirySent for source edits/sends; includeInquiryResponse for full reads and admin lists.
-- **includeInquiryResponse** `apps/api/src/modules/inquiry/queries/inquiryIncludes.ts#includeInquiryResponse`: GET and admin lists; includeInquirySent for source edit/send; includeInquiryReceived for target resolve.
-- **includeInquirySent** `apps/api/src/modules/inquiry/queries/inquiryIncludes.ts#includeInquirySent`: Source edit/send; includeInquiryReceived for target resolve; includeInquiryResponse for full reads.
-- **InquiriesPage** `packages/ui/src/pages/InquiriesPage.tsx#InquiriesPage`: Base for any inquiry list; prefer existing wrappers like OrganizationSentInvitationsPage when one matches the direction and type.
-- **inquiryCreateBodySchema** `apps/api/src/modules/inquiry/schemas/inquiryCreateBodySchema.ts#inquiryCreateBodySchema`: Validating the create request; per-type payload goes in the handler's contentSchema.
-- **inquiryFiltersToSearchFields** `packages/ui/src/lib/inquiries/queryKeys.ts#inquiryFiltersToSearchFields`: convert UI inquiry filters into API search fields, using now for expiry
-- **inquiryReceivedResponseSchema** `apps/api/src/modules/inquiry/schemas/inquiryResponseSchemas.ts#inquiryReceivedResponseSchema`: Received lists and resolve; sent side uses inquirySentResponseSchema, single read uses inquiryResponseSchema.
-- **inquiryResponseSchema** `apps/api/src/modules/inquiry/schemas/inquiryResponseSchemas.ts#inquiryResponseSchema`: Single read and admin list; per-side lists use inquirySentResponseSchema or inquiryReceivedResponseSchema.
-- **inquirySentResponseSchema** `apps/api/src/modules/inquiry/schemas/inquiryResponseSchemas.ts#inquirySentResponseSchema`: Sent lists, create, update, send; received side uses inquiryReceivedResponseSchema, single read inquiryResponseSchema.
-- **InquirySourceControls** `packages/ui/src/components/inquiries/InquirySourceControls.tsx#InquirySourceControls`: Sender side only; the recipient resolving it uses InquiryTargetControls instead.
-- **InquiryTargetControls** `packages/ui/src/components/inquiries/InquiryTargetControls.tsx#InquiryTargetControls`: Recipient side; the sender cancelling uses InquirySourceControls instead.
+- **createInquiry** · primitive `apps/api/src/modules/inquiry/services/createInquiry.ts#createInquiry` · in docs: docs/claude/INQUIRIES.md § API Endpoints; docs/claude/INQUIRIES.md § Handler Architecture: Creating drafts; sendInquiry to send, resolveInquiry to approve or deny.
+  - *Said as:* "save a draft of the request before sending it", "create the request and send it in the same call", "start a new invite or access request", "I'll insert a request row with status draft"
+- **getInquiryInterface** · primitive `packages/ui/src/lib/inquiries/registry.ts#getInquiryInterface` · in docs: docs/claude/INQUIRIES.md § Frontend: Read side of the registry; to add a type's components use registerInquiryType in lib/inquiries/registrations/<type>.tsx.
+  - *Said as:* "look up the components registered for this request type", "which form and summary does this kind of request render with", "read the per-type UI registry entry"
+- **includeInquiryReceived** · primitive `apps/api/src/modules/inquiry/queries/inquiryIncludes.ts#includeInquiryReceived` · in docs: docs/claude/INQUIRIES.md § Response Schemas: Target-side resolve; includeInquirySent for source edits/sends; includeInquiryResponse for full reads and admin lists.
+  - *Said as:* "the recipient is resolving, load who sent it", "received list needs the sender side relations only", "the approve endpoint should return the source details", "I'll include every source and target relation on the resolve response"
+- **includeInquiryResponse** · primitive `apps/api/src/modules/inquiry/queries/inquiryIncludes.ts#includeInquiryResponse` · in docs: docs/claude/INQUIRIES.md § Response Schemas: GET and admin lists; includeInquirySent for source edit/send; includeInquiryReceived for target resolve.
+  - *Said as:* "a single read should return both sides fully", "the admin list needs every relation for the audit view", "load the request with all its parties for a GET", "the full response shape with sender and recipient attached"
+- **includeInquirySent** · primitive `apps/api/src/modules/inquiry/queries/inquiryIncludes.ts#includeInquirySent` · in docs: docs/claude/INQUIRIES.md § Response Schemas: Source edit/send; includeInquiryReceived for target resolve; includeInquiryResponse for full reads.
+  - *Said as:* "return the sent request with its target attached after the update", "the sender edits or sends, load the recipient side relations", "include the related rows in one call on create and send", "return the sent and received relations the sender needs", "I'll write the include object for the update endpoint by hand"
+- **InquiriesPage** · primitive `packages/ui/src/pages/InquiriesPage.tsx#InquiriesPage` · in docs: docs/claude/INQUIRIES.md § Frontend; docs/claude/FRONTEND/COMPONENTS.md § Modals and Pages: Base for any inquiry list; prefer existing wrappers like OrganizationSentInvitationsPage when one matches the direction and type.
+  - *Said as:* "the base list page for any kind of request", "build a list of invitations or applications", "I'll write a new page that queries requests for this type"
+- **inquiryCreateBodySchema** · primitive `apps/api/src/modules/inquiry/schemas/inquiryCreateBodySchema.ts#inquiryCreateBodySchema`: Validating the create request; per-type payload goes in the handler's contentSchema.
+  - *Said as:* "validate the body of a create request", "what fields the create endpoint accepts", "the per-type payload gets validated where exactly"
+- **inquiryFiltersToSearchFields** · primitive `packages/ui/src/lib/inquiries/queryKeys.ts#inquiryFiltersToSearchFields`: convert UI inquiry filters into API search fields, using now for expiry
+  - *Said as:* "turn the UI filters into the list query", "map status and expiry filters onto search params", "treat expired requests as closed in the list filter"
+- **inquiryReceivedResponseSchema** · primitive `apps/api/src/modules/inquiry/schemas/inquiryResponseSchemas.ts#inquiryReceivedResponseSchema` · in docs: docs/claude/INQUIRIES.md § Response Schemas: Received lists and resolve; sent side uses inquirySentResponseSchema, single read uses inquiryResponseSchema.
+  - *Said as:* "the response shape for the received list", "what a recipient sees when they load their inbox", "the resolve endpoint's response schema"
+- **inquiryResponseSchema** · primitive `apps/api/src/modules/inquiry/schemas/inquiryResponseSchemas.ts#inquiryResponseSchema` · in docs: docs/claude/INQUIRIES.md § Response Schemas: Single read and admin list; per-side lists use inquirySentResponseSchema or inquiryReceivedResponseSchema.
+  - *Said as:* "the full response shape for a single request read", "the admin list response with both parties", "what the GET by id returns"
+- **inquirySentResponseSchema** · primitive `apps/api/src/modules/inquiry/schemas/inquiryResponseSchemas.ts#inquirySentResponseSchema` · in docs: docs/claude/INQUIRIES.md § API Endpoints; docs/claude/INQUIRIES.md § Response Schemas: Sent lists, create, update, send; received side uses inquiryReceivedResponseSchema, single read inquiryResponseSchema.
+  - *Said as:* "the response shape for sent requests", "what create, update and send return to the sender", "the outbox list's response schema"
+- **InquirySourceControls** · primitive `packages/ui/src/components/inquiries/InquirySourceControls.tsx#InquirySourceControls` · in docs: docs/claude/INQUIRIES.md § Frontend; docs/claude/FRONTEND/COMPONENTS.md § Package Organization: Sender side only; the recipient resolving it uses InquiryTargetControls instead.
+  - *Said as:* "the sender's buttons: edit, send, cancel", "let the person who asked withdraw their request", "the outbox row needs its action buttons", "I'll add a cancel button that hits the cancel endpoint"
+- **InquiryTargetControls** · primitive `packages/ui/src/components/inquiries/InquiryTargetControls.tsx#InquiryTargetControls` · in docs: docs/claude/INQUIRIES.md § Frontend; docs/claude/FRONTEND/COMPONENTS.md § Package Organization: Recipient side; the sender cancelling uses InquirySourceControls instead.
+  - *Said as:* "approve or decline buttons for the recipient", "the inbox row needs accept and reject actions", "let the person asked answer the request", "I'll hand-build approve and decline buttons calling resolve"
   - *Signs you're bypassing it:* hand-built Approve/Decline buttons calling the resolve endpoint (docs/claude/INQUIRIES.md § Frontend › UI Components)
-- **inquiryTerminalStatuses** `apps/api/src/modules/inquiry/validations/validateInquiryStatus.ts#inquiryTerminalStatuses`: Backend queries; frontend isTerminalInquiry also counts expired as terminal.
+- **inquiryTerminalStatuses** · primitive `apps/api/src/modules/inquiry/validations/validateInquiryStatus.ts#inquiryTerminalStatuses` · in docs: docs/claude/INQUIRIES.md § Handler Architecture; docs/claude/INQUIRIES.md § Adding a New Handler: Backend queries; frontend isTerminalInquiry also counts expired as terminal.
+  - *Said as:* "filter out closed requests in a database query", "the list of finished statuses for a not-in filter", "only open requests on the backend", "I'll hardcode approved, denied and canceled in the where clause"
   - *Signs you're bypassing it:* a literal ['approved', 'denied', 'canceled'] array in a Prisma notIn filter (docs/claude/INQUIRIES.md § Adding a New Handler › Status utilities)
-- **isTerminalInquiry** `packages/ui/src/lib/inquiries/queryKeys.ts#isTerminalInquiry`: Disabling UI controls; prefer over INQUIRY_TERMINAL_STATUSES or backend inquiryTerminalStatuses because it also covers expiry.
+- **isTerminalInquiry** · primitive `packages/ui/src/lib/inquiries/queryKeys.ts#isTerminalInquiry` · in docs: docs/claude/INQUIRIES.md § Frontend: Disabling UI controls; prefer over INQUIRY_TERMINAL_STATUSES or backend inquiryTerminalStatuses because it also covers expiry.
+  - *Said as:* "disable the buttons once the request is finished or expired", "is this request still actionable in the UI", "treat a past deadline as closed on the frontend", "I'll check the status alone to grey out the controls"
   - *Signs you're bypassing it:* UI controls disabled on status alone, ignoring a passed expiresAt (docs/claude/INQUIRIES.md § Frontend › Constants and utilities)
-- **receivedInquiryContextQueries** `packages/ui/src/lib/inquiries/contextQueries.ts#receivedInquiryContextQueries`: Incoming inquiries list; outgoing ones: sentInquiryContextQueries instead.
-- **registerInquiryType** `packages/ui/src/lib/inquiries/registry.ts#registerInquiryType`: Call from lib/inquiries/registrations/<type>.tsx; list pages and controls read entries via getInquiryInterface.
-- **resolveInquiry** `apps/api/src/modules/inquiry/services/resolution.ts#resolveInquiry`: Resolving sent inquiries; createInquiry/sendInquiry for earlier stages. Also called by auto-approve on send.
+- **receivedInquiryContextQueries** · primitive `packages/ui/src/lib/inquiries/contextQueries.ts#receivedInquiryContextQueries` · in docs: docs/claude/INQUIRIES.md § Frontend: Incoming inquiries list; outgoing ones: sentInquiryContextQueries instead.
+  - *Said as:* "the query for the current context's inbox", "list requests addressed to this org, space or me", "load incoming requests for the current tenant"
+- **registerInquiryType** · primitive `packages/ui/src/lib/inquiries/registry.ts#registerInquiryType` · in docs: docs/claude/INQUIRIES.md § Frontend: Call from lib/inquiries/registrations/<type>.tsx; list pages and controls read entries via getInquiryInterface.
+  - *Said as:* "register the form and summary for a new request type", "add UI for a new kind of request", "I'll switch on the type inside the list page to pick components"
+- **resolveInquiry** · primitive `apps/api/src/modules/inquiry/services/resolution.ts#resolveInquiry` · in docs: docs/claude/INQUIRIES.md § Handler Architecture; docs/claude/INQUIRIES.md § Adding a New Handler: Resolving sent inquiries; createInquiry/sendInquiry for earlier stages. Also called by auto-approve on send.
+  - *Said as:* "approve or deny the request and apply its effect", "accept the invite and add the member", "ask the sender for changes before deciding", "I'll set status to approved in the controller and do the side effect", "run the approval side effect inside a locked transaction"
   - *Signs you're bypassing it:* a controller that sets status to approved and performs the side effect itself, outside the row-locked transaction and handleApprove (docs/claude/INQUIRIES.md § Handler Architecture; catalog: services/resolution.ts)
-- **resolveInquirySource** `apps/api/src/modules/inquiry/services/resolveInquirySource.ts#resolveInquirySource`: Route-inferred source; admin controller passes source `admin` explicitly. For the target side use resolveInquiryTarget.
-- **resolveInquiryTarget** `apps/api/src/modules/inquiry/services/resolveInquiryTarget.ts#resolveInquiryTarget`: Target side of an inquiry; for the requesting side use resolveInquirySource.
-- **sendInquiry** `apps/api/src/modules/inquiry/services/sendInquiry.ts#sendInquiry`: Use instead of updating status to sent by hand; it validates sendability and runs autoApprove/resolveInquiry.
+- **resolveInquirySource** · primitive `apps/api/src/modules/inquiry/services/resolveInquirySource.ts#resolveInquirySource` · in docs: docs/claude/INQUIRIES.md § Source & Target Resolution: Route-inferred source; admin controller passes source `admin` explicitly. For the target side use resolveInquiryTarget.
+  - *Said as:* "figure out who is sending from the route, not the body", "the sender is whichever org, space or user the route is under", "the admin route passes an explicit admin source"
+- **resolveInquiryTarget** · primitive `apps/api/src/modules/inquiry/services/resolveInquiryTarget.ts#resolveInquiryTarget` · in docs: docs/claude/INQUIRIES.md § Source & Target Resolution: Target side of an inquiry; for the requesting side use resolveInquirySource.
+  - *Said as:* "figure out who the request is addressed to", "resolve the recipient from the body's target fields", "look up the target org by slug or id"
+- **sendInquiry** · primitive `apps/api/src/modules/inquiry/services/sendInquiry.ts#sendInquiry` · in docs: docs/claude/INQUIRIES.md § Handler Architecture; docs/claude/INQUIRIES.md § Adding a New Handler: Use instead of updating status to sent by hand; it validates sendability and runs autoApprove/resolveInquiry.
+  - *Said as:* "send the draft to the recipient", "move the request from draft to sent", "check it can be sent, set the deadline, maybe auto-approve", "I'll update status to sent and set the timestamps myself"
   - *Signs you're bypassing it:* db.inquiry.update({ data: { status: 'sent' } }) with sentAt and expiresAt set by hand, skipping the sendability check and autoApprove (docs/claude/INQUIRIES.md § Handler Architecture)
-- **sentInquiryContextQueries** `packages/ui/src/lib/inquiries/contextQueries.ts#sentInquiryContextQueries`: Outgoing inquiries list; incoming ones: receivedInquiryContextQueries instead.
-- **sourceMutations** `packages/ui/src/lib/inquiries/queryKeys.ts#sourceMutations`: Sender-side lists; recipient lists refetching after resolution: targetMutations instead.
-- **SpaceTransferInquiryPage** `packages/ui/src/pages/SpaceTransferInquiryPage.tsx#SpaceTransferInquiryPage`: Transferring a space; for space field changes use SpaceUpdateInquiryPage.
-- **SpaceUpdateInquiryPage** `packages/ui/src/pages/SpaceUpdateInquiryPage.tsx#SpaceUpdateInquiryPage`: Requesting space changes via inquiry; ownership moves use SpaceTransferInquiryPage, direct edits SpaceProfilePage.
-- **targetMutations** `packages/ui/src/lib/inquiries/queryKeys.ts#targetMutations`: Recipient-side lists after approval/denial; sender lists: sourceMutations instead.
+- **sentInquiryContextQueries** · primitive `packages/ui/src/lib/inquiries/contextQueries.ts#sentInquiryContextQueries` · in docs: docs/claude/INQUIRIES.md § Frontend; docs/claude/FRONTEND/API_CLIENT.md § apiQuery and apiMutation: Outgoing inquiries list; incoming ones: receivedInquiryContextQueries instead.
+  - *Said as:* "the query for the current context's outbox", "list requests this org, space or user has sent", "load outgoing requests for the current tenant"
+- **sourceMutations** · primitive `packages/ui/src/lib/inquiries/queryKeys.ts#sourceMutations` · in docs: docs/claude/INQUIRIES.md § Frontend: Sender-side lists; recipient lists refetching after resolution: targetMutations instead.
+  - *Said as:* "which sender-side lists refresh after create, send or cancel", "the outbox should update after I send", "refetch the sent list when the sender acts", "I'll invalidate the sent query after this mutation by hand"
+- **SpaceTransferInquiryPage** · primitive `packages/ui/src/pages/SpaceTransferInquiryPage.tsx#SpaceTransferInquiryPage` · in docs: docs/claude/INQUIRIES.md § Frontend; docs/claude/FRONTEND/COMPONENTS.md § Modals and Pages: Transferring a space; for space field changes use SpaceUpdateInquiryPage.
+  - *Said as:* "move a space to another organization", "the page for handing a space over", "request a transfer of ownership"
+- **SpaceUpdateInquiryPage** · primitive `packages/ui/src/pages/SpaceUpdateInquiryPage.tsx#SpaceUpdateInquiryPage` · in docs: docs/claude/INQUIRIES.md § Frontend; docs/claude/FRONTEND/COMPONENTS.md § Modals and Pages: Requesting space changes via inquiry; ownership moves use SpaceTransferInquiryPage, direct edits SpaceProfilePage.
+  - *Said as:* "ask the org to change a space's details", "request edits to a space's fields", "a space member proposes a change the owners approve"
+- **targetMutations** · primitive `packages/ui/src/lib/inquiries/queryKeys.ts#targetMutations` · in docs: docs/claude/INQUIRIES.md § Frontend: Recipient-side lists after approval/denial; sender lists: sourceMutations instead.
+  - *Said as:* "which recipient-side lists refresh after approve or deny", "the member list should update after accepting an invite", "refetch the inbox and the affected list after resolving", "I'll call invalidate queries after resolving"
   - *Signs you're bypassing it:* ad-hoc queryClient.invalidateQueries calls after resolving an inquiry instead of adding the list's key to targetMutations (docs/claude/INQUIRIES.md § Frontend › Query key invalidation maps)
-- **useCancelInquiryMutation** `packages/ui/src/hooks/inquiry/useCancelInquiryMutation.ts#useCancelInquiryMutation`: Withdrawing an inquiry; resolving one uses useResolveInquiryMutation, editing uses useUpdateInquiryMutation.
-- **useCreateInquiryMutation** `packages/ui/src/hooks/inquiry/useCreateInquiryMutation.ts#useCreateInquiryMutation`: New inquiries; sending an existing draft uses useSendInquiryMutation.
-- **useInquiryPermission** `packages/ui/src/hooks/useInquiryPermission.ts#useInquiryPermission`: Inquiry rows only; gate inquiry action buttons with this rather than ad-hoc role checks.
+- **useCancelInquiryMutation** · primitive `packages/ui/src/hooks/inquiry/useCancelInquiryMutation.ts#useCancelInquiryMutation`: Withdrawing an inquiry; resolving one uses useResolveInquiryMutation, editing uses useUpdateInquiryMutation.
+  - *Said as:* "withdraw a request I sent", "cancel the invite from the frontend", "the hook for the sender backing out"
+- **useCreateInquiryMutation** · primitive `packages/ui/src/hooks/inquiry/useCreateInquiryMutation.ts#useCreateInquiryMutation`: New inquiries; sending an existing draft uses useSendInquiryMutation.
+  - *Said as:* "create a new request from the frontend", "the hook behind the create form", "send a brand-new invite from the UI"
+- **useInquiryPermission** · primitive `packages/ui/src/hooks/useInquiryPermission.ts#useInquiryPermission` · in docs: docs/claude/INQUIRIES.md § Frontend; docs/claude/PERMISSIONS.md § Frontend Checks: Inquiry rows only; gate inquiry action buttons with this rather than ad-hoc role checks.
+  - *Said as:* "should this user see the send or approve button", "gate request action buttons by permission", "I'll check the membership role to show approve"
   - *Signs you're bypassing it:* role checks on the current membership to gate inquiry Send/Approve buttons, ignoring which side the context fills (docs/claude/INQUIRIES.md § Frontend › useInquiryPermission)
-- **useResolveInquiryMutation** `packages/ui/src/hooks/inquiry/useResolveInquiryMutation.ts#useResolveInquiryMutation`: Recipient approving or denying; sender withdrawal uses useCancelInquiryMutation.
-- **useSendInquiryMutation** `packages/ui/src/hooks/inquiry/useSendInquiryMutation.ts#useSendInquiryMutation`: Existing drafts; brand-new inquiries use useCreateInquiryMutation.
-- **useUpdateInquiryMutation** `packages/ui/src/hooks/inquiry/useUpdateInquiryMutation.ts#useUpdateInquiryMutation`: Changing content; status transitions use send, cancel or resolve mutations.
-- **validateInquiryHandler** `apps/api/src/modules/inquiry/validations/validateInquiryHandler.ts#validateInquiryHandler`: Model-fit check (422 on mismatch); status checks use validateInquiryIs*; uniqueness uses validateInquiryPreCreate.
+- **useResolveInquiryMutation** · primitive `packages/ui/src/hooks/inquiry/useResolveInquiryMutation.ts#useResolveInquiryMutation`: Recipient approving or denying; sender withdrawal uses useCancelInquiryMutation.
+  - *Said as:* "approve or deny from the frontend", "the hook behind accept and reject", "the recipient's resolve action"
+- **useSendInquiryMutation** · primitive `packages/ui/src/hooks/inquiry/useSendInquiryMutation.ts#useSendInquiryMutation`: Existing drafts; brand-new inquiries use useCreateInquiryMutation.
+  - *Said as:* "send an existing draft from the UI", "the hook behind the send button", "move a saved draft to sent"
+- **useUpdateInquiryMutation** · primitive `packages/ui/src/hooks/inquiry/useUpdateInquiryMutation.ts#useUpdateInquiryMutation`: Changing content; status transitions use send, cancel or resolve mutations.
+  - *Said as:* "edit a draft's content from the frontend", "change what the request says before sending", "the hook for editing a request"
+- **validateInquiryHandler** · primitive `apps/api/src/modules/inquiry/validations/validateInquiryHandler.ts#validateInquiryHandler` · in docs: docs/claude/INQUIRIES.md § Source & Target Resolution; docs/claude/INQUIRIES.md § Handler Architecture: Model-fit check (422 on mismatch); status checks use validateInquiryIs*; uniqueness uses validateInquiryPreCreate.
+  - *Said as:* "can this kind of request go from this sender to this recipient", "reject a target model the type doesn't allow", "check the source and target fit the type", "I'll check the target model in the controller"
   - *Throws:* makeError 422 VALIDATION_ERROR (`validation-error`, request-context-errors)
-- **validateInquiryNotExpired** `apps/api/src/modules/inquiry/validations/validateInquiryStatus.ts#validateInquiryNotExpired`: Expiry only; pair with other status checks in validateInquiryStatus for editable/resolvable gating.
+- **validateInquiryNotExpired** · primitive `apps/api/src/modules/inquiry/validations/validateInquiryStatus.ts#validateInquiryNotExpired` · in docs: docs/claude/INQUIRIES.md § Adding a New Handler: Expiry only; pair with other status checks in validateInquiryStatus for editable/resolvable gating.
+  - *Said as:* "refuse to act on a request past its deadline", "it expired, return gone", "check only the expiry, not the status", "I'll compare the deadline to now in the handler"
   - *Throws:* makeError 410 RESOURCE_GONE (`resource-gone`)
-- **validateInquiryPreCreate** `apps/api/src/modules/inquiry/services/validateInquiryPreCreate.ts#validateInquiryPreCreate`: Set `unique` on the handler instead of calling validateUniqueInquiry in controllers; source/target fit is validateInquiryHandler.
+- **validateInquiryPreCreate** · primitive `apps/api/src/modules/inquiry/services/validateInquiryPreCreate.ts#validateInquiryPreCreate` · in docs: docs/claude/INQUIRIES.md § Handler Architecture: Set `unique` on the handler instead of calling validateUniqueInquiry in controllers; source/target fit is validateInquiryHandler.
+  - *Said as:* "run the duplicate and business checks before creating", "the pre-create gate that enforces one open request", "where uniqueness gets enforced for a new request"
   - *Throws:* makeError 409 CONFLICT (`conflict`, request-context-errors, inferred)
-- **validateUniqueInquiry** `apps/api/src/modules/inquiry/validations/validateUniqueInquiry.ts#validateUniqueInquiry`: Don't call from controllers; set the handler `unique` flag and let validateInquiryPreCreate enforce it.
+- **validateUniqueInquiry** · primitive `apps/api/src/modules/inquiry/validations/validateUniqueInquiry.ts#validateUniqueInquiry` · in docs: docs/claude/INQUIRIES.md § Handler Architecture: Don't call from controllers; set the handler `unique` flag and let validateInquiryPreCreate enforce it.
+  - *Said as:* "is there already an open request like this", "I'll look for an existing open request in the controller", "the duplicate check the pre-create gate runs"
   - *Throws:* makeError 409 CONFLICT (`conflict`, request-context-errors, inferred)
   - *Signs you're bypassing it:* validateUniqueInquiry called from a controller instead of setting the handler's unique flag (catalog: apps/api/src/modules/inquiry/validations/validateUniqueInquiry.ts)
-- **apps/admin/app/routes/_authenticated/communications** `apps/admin/app/routes/_authenticated/communications`: show admin pages for inquiries received and sent
-- **apps/api/src/modules/inquiry** `apps/api/src/modules/inquiry`: create, send, update, cancel and resolve inquiries, with superadmin create and listing
-- **apps/web/app/routes/_authenticated/communications** `apps/web/app/routes/_authenticated/communications`: web pages listing received and sent inquiries and communications
-- **Adding a new inquiry type** `handlers/index.ts; packages/db/prisma/schema/inquiry.prisma; packages/permissions/src/rebac/schema.ts`: add an inquiry type end to end with handler, enum, generated client and send rule
-- **Adding an inquiry handler** `docs/claude/INQUIRIES.md#Adding a New Handler`: add an inquiry type via handler folder with content and resolution schemas
-- **False polymorphism ownership** `FEATURES.md > Inquiry System > Polymorphic Ownership`: model polymorphic source and target via typed nullable FK columns
-- **Filtered InquiriesPage for typed lists** `docs/claude/INQUIRIES.md > Pages`: Invitations, applications, transfers lists instead of a bespoke list page.
+- **apps/admin/app/routes/_authenticated/communications** · system `apps/admin/app/routes/_authenticated/communications`: show admin pages for inquiries received and sent
+  - *Said as:* "the admin pages for received and sent requests", "where admins browse requests in the admin app", "admin inbox and outbox routes"
+- **apps/api/src/modules/inquiry** · system `apps/api/src/modules/inquiry`: create, send, update, cancel and resolve inquiries, with superadmin create and listing
+  - *Said as:* "the backend module for requests and approvals", "port the request workflow instead of building forms with their own approval status", "create, send, cancel and resolve endpoints for requests"
+- **apps/web/app/routes/_authenticated/communications** · system `apps/web/app/routes/_authenticated/communications`: web pages listing received and sent inquiries and communications
+  - *Said as:* "the web pages listing received and sent requests", "where users see their inbox and outbox", "the communications routes in the web app"
+- **Adding a new inquiry type** · pattern handlers/index.ts; packages/db/prisma/schema/inquiry.prisma; packages/permissions/src/rebac/schema.ts: add an inquiry type end to end with handler, enum, generated client and send rule
+  - *Said as:* "add a new kind of request end to end", "a new approval type needs handler, enum and permission", "wire up a new request type across backend, schema and client"
+- **Adding an inquiry handler** · pattern docs/claude/INQUIRIES.md § Adding a New Handler · code: `computeExpiresAt`, `User`, `inquiryTerminalStatuses`, `sendInquiry`: add an inquiry type via handler folder with content and resolution schemas
+  - *Said as:* "write the handler folder for a new request type", "define the content and resolution schemas for a new type", "the steps to add a handler"
+- **False polymorphism ownership** · pattern FEATURES.md > Inquiry System > Polymorphic Ownership: model polymorphic source and target via typed nullable FK columns
+  - *Said as:* "the sender can be a user, org, space or admin", "model either side with typed nullable foreign keys", "I'll store a generic party id and type string"
+- **Filtered InquiriesPage for typed lists** · pattern docs/claude/INQUIRIES.md > Pages: Invitations, applications, transfers lists instead of a bespoke list page.
+  - *Said as:* "a list of just invitations or just transfers", "filter the base list page instead of writing a new one", "I'll write a page that queries requests for this type"
   - *Signs you're bypassing it:* a new list page that queries inquiries for invitations, applications or transfers itself (docs/claude/INQUIRIES.md § Frontend › Pages)
-- **Granular create permission via hydrated partial** `inquiry docs, Create route permission pattern`: Per-type rules on not-yet-existing rows; validatePermission middleware for existing-resource routes.
+- **Granular create permission via hydrated partial** · pattern inquiry docs, Create route permission pattern: Per-type rules on not-yet-existing rows; validatePermission middleware for existing-resource routes.
+  - *Said as:* "check permission on a request that doesn't exist yet", "a high-role invite needs own, not just manage", "per-type permission rules at create time"
   - *Throws:* makeError 403 PERMISSION_DENIED (`permission-denied`, permissions)
-- **Handler unique flag** `docs/claude/INQUIRIES.md#unique enforcement`: 'targeted' for one per source+target+type; 'untargeted' for one per source+type regardless of target
-- **Handler validate hook** `docs/claude/INQUIRIES.md#validate — pre-create and pre-update checks`: Domain conflicts beyond uniqueness; use unique flag for one-open-inquiry constraints
+- **Handler unique flag** · pattern docs/claude/INQUIRIES.md § unique enforcement: 'targeted' for one per source+target+type; 'untargeted' for one per source+type regardless of target
+  - *Said as:* "one open request per sender and recipient and type", "dedup submissions across forms and callers", "the retake policy per form"
+- **Handler validate hook** · pattern docs/claude/INQUIRIES.md § validate — pre-create and pre-update checks: Domain conflicts beyond uniqueness; use unique flag for one-open-inquiry constraints
+  - *Said as:* "business checks beyond duplicates before create or update", "the slug is taken, reject the request", "I'll put the conflict check in the create controller"
   - *Throws:* makeError 409 CONFLICT (`conflict`, request-context-errors)
   - *Signs you're bypassing it:* slug-collision or membership conflict checks written in the create or update controller instead of the handler's validate (docs/claude/INQUIRIES.md § Handler Architecture › validate)
-- **Inquiry handler per type** `docs/claude/INQUIRIES.md > Overview`: define source/target shape, content schema, validation and approval side effect per inquiry type
-- **Inquiry request/approval primitive** `FEATURES.md > Inquiry System`: invite, create space, transfer ownership, request access: Inquiry instead of bespoke endpoints
+- **Inquiry handler per type** · pattern docs/claude/INQUIRIES.md > Overview: define source/target shape, content schema, validation and approval side effect per inquiry type
+  - *Said as:* "each kind of request defines its own shape and effect", "where a type says who can send, who resolves, what happens", "one handler per request type"
+- **Inquiry request/approval primitive** · pattern FEATURES.md > Inquiry System: invite, create space, transfer ownership, request access: Inquiry instead of bespoke endpoints
+  - *Said as:* "invite someone, request access, transfer ownership", "this project doesn't build an approval system", "I'll add approve and deny endpoints for this new request", "a survey is a request like the others, just one with no side effect"
   - *Signs you're bypassing it:* a bespoke Invitation, TransferRequest or AccessRequest model with its own status column and approve/deny endpoints (FEATURES.md › Inquiry System ("Instead of building ad-hoc handlers for every common org action"))
-- **Inquiry send permissions via ReBAC** `docs/claude/INQUIRIES.md#Current Handlers`: Use { rel: 'sourceSpace', action: 'own' } to allow delegation; dot-path when only org owners qualify
-- **Per-type inquiry UI registration** `packages/ui/src/lib/inquiries/registry.ts`: Adding UI for a new inquiry type instead of branching on type in pages or controls.
+- **Inquiry send permissions via ReBAC** · pattern docs/claude/INQUIRIES.md § Handler Architecture › Current Handlers · code: `Space`, `Organization`, `makeError`, `computeExpiresAt`: Use { rel: 'sourceSpace', action: 'own' } to allow delegation; dot-path when only org owners qualify
+  - *Said as:* "who may send this type of request", "allow delegation through the source space's own relation", "only org owners can send this one"
+- **Per-type inquiry UI registration** · pattern packages/ui/src/lib/inquiries/registry.ts: Adding UI for a new inquiry type instead of branching on type in pages or controls.
+  - *Said as:* "register components for a request type instead of branching", "add UI for a new type without touching the pages", "I'll switch on the type inside the controls"
   - *Signs you're bypassing it:* a switch on inquiry.type inside a list page or the inquiry controls to choose components (docs/claude/INQUIRIES.md § Frontend › Per-type UI registry)
-- **Resolver override opt-in** `docs/claude/INQUIRIES.md#resolvedContent and the Override Pattern`: Omit a field from resolutionInputSchema to lock it to the original inquiry.content
+- **Resolver override opt-in** · pattern docs/claude/INQUIRIES.md § resolvedContent and the Override Pattern: Omit a field from resolutionInputSchema to lock it to the original inquiry.content
+  - *Said as:* "the approver can change this field but not that one", "lock a field to what the sender submitted", "I'll merge the resolve body over the original content"
   - *Signs you're bypassing it:* handleApprove manually merging fields from the resolve body over inquiry.content (docs/claude/INQUIRIES.md § Handler Architecture › resolvedContent and the Override Pattern)
-- **Slug-based target lookup** `docs/claude/INQUIRIES.md#Target`: When callers know slugs, not IDs; otherwise pass targetOrganizationId/targetSpaceId.
-- **sourceInquiryId audit lineage** `FEATURES.md > Inquiry System > Audit Lineage`: link side-effect mutations back to the causal inquiry in audit logs
-- **autoApprove** `inquiry handler (handlers/index.ts)`: Required on every handler; return true only for types needing no human review.
+- **Slug-based target lookup** · pattern docs/claude/INQUIRIES.md § Source & Target Resolution › Target · code: `Organization`, `Space`, `User`, `OrganizationUser`: When callers know slugs, not IDs; otherwise pass targetOrganizationId/targetSpaceId.
+  - *Said as:* "the caller knows the org slug, not its id", "address the request by slug", "look up the recipient org or space by slug"
+- **sourceInquiryId audit lineage** · pattern FEATURES.md > Inquiry System > Audit Lineage: link side-effect mutations back to the causal inquiry in audit logs
+  - *Said as:* "link the resulting changes back to the request that caused them", "the audit log should show which approval created this row", "trace a membership back to its invite"
+- **autoApprove** · primitive inquiry handler (handlers/index.ts): Required on every handler; return true only for types needing no human review.
+  - *Said as:* "needs no human review, approve it on send", "a request with no side effect that just goes through", "let the request go straight through when the sender already manages the target", "I'll add a skip-approval flag to the create route", "the hook already exists, no new approval mechanism"
   - *Signs you're bypassing it:* a separate skip-approval flag, setting, or controller branch that calls handleApprove directly on create, instead of the handler's autoApprove returning true (docs/claude/INQUIRIES.md § Handler Architecture; Adding a New Handler step 4)
-- **defaultExpirationDays** `inquiry handler (handlers/index.ts)`: Omit for inquiries that never expire.
-- **falsePolymorphism hook** `FEATURES.md > Inquiry System > Polymorphic Ownership`: validate source/target polymorphic columns name exactly one User, Organization, Space or admin
-- **handleApprove** `handlers/<type>/index.ts`: apply an approved inquiry and return computed resolution fields
-- **Inquiry resource context middleware** `FEATURES.md > Inquiry System > Core API`: load inquiry with all includes in one DB round-trip for reads and mutations
-- **InquiryHandler** `handlers/index.ts`: define per-type inquiry sources, targets, schemas, validation, approval effect and expiry
-- **resolutionInputSchema** `handlers/<type>/index.ts`: what the resolver submits; stored shape with computed fields uses resolutionSchema
-- **resolutionSchema** `handlers/<type>/index.ts`: stored shape; same as resolutionInputSchema when nothing is computed
-- **unique** `inquiry handler (handlers/index.ts)`: 'targeted' for one per source+target+type; 'untargeted' for one per source+type regardless of target.
+- **defaultExpirationDays** · primitive inquiry handler (handlers/index.ts): Omit for inquiries that never expire.
+  - *Said as:* "how long until this kind of request lapses", "the previous one should close before the next can open", "requests of this type never expire"
+- **falsePolymorphism hook** · primitive FEATURES.md > Inquiry System > Polymorphic Ownership: validate source/target polymorphic columns name exactly one User, Organization, Space or admin
+  - *Said as:* "make sure exactly one party column is set on each side", "reject a request with both a user and an org as source", "validate the polymorphic columns on write"
+- **handleApprove** · primitive handlers/<type>/index.ts: apply an approved inquiry and return computed resolution fields
+  - *Said as:* "what actually happens when the request is approved", "add the member once the invite is accepted", "the side effect a type wants on approval"
+- **Inquiry resource context middleware** · primitive FEATURES.md > Inquiry System > Core API: load inquiry with all includes in one DB round-trip for reads and mutations
+  - *Said as:* "load the request once with everything for the route", "the GET needs no extra query, it's preloaded", "I'll fetch the request again inside the controller"
+- **InquiryHandler** · primitive handlers/index.ts: define per-type inquiry sources, targets, schemas, validation, approval effect and expiry
+  - *Said as:* "the contract every request type implements", "sources, targets, schemas, validation, approval effect and expiry in one place", "this is the existing handler hook, not a new mechanism"
+- **resolutionInputSchema** · primitive handlers/<type>/index.ts: what the resolver submits; stored shape with computed fields uses resolutionSchema
+  - *Said as:* "what the approver submits when resolving", "which fields the resolver may override", "the resolve request body shape"
+- **resolutionSchema** · primitive handlers/<type>/index.ts: stored shape; same as resolutionInputSchema when nothing is computed
+  - *Said as:* "what gets stored after approval, including computed fields", "the saved resolution shape", "same as the input when nothing is computed"
+- **unique** · primitive inquiry handler (handlers/index.ts): 'targeted' for one per source+target+type; 'untargeted' for one per source+type regardless of target.
+  - *Said as:* "one open request at a time per sender", "don't let them submit the same request twice", "dedup across forms and callers", "I'll query for an existing open request before inserting", "the retake policy per form"
   - *Signs you're bypassing it:* a db.inquiry.findFirst for an existing open inquiry in the create controller before inserting (docs/claude/INQUIRIES.md § Handler Architecture › unique enforcement ("no controller code needed"))
-- **validate** `inquiry handler (handlers/index.ts)`: Business-rule checks; status checks use validateInquiryIs* utilities instead.
+- **validate** · primitive inquiry handler (handlers/index.ts): Business-rule checks; status checks use validateInquiryIs* utilities instead.
+  - *Said as:* "domain checks before create or update beyond duplicates", "the slug is taken or they're already a member", "business rule conflicts for this request type", "I'll put the membership conflict check in the controller"
   - *Throws:* makeError 409 CONFLICT (`conflict`, request-context-errors)
-- **Cancel inquiry soft-deletes** `DELETE /api/v1/inquiry/:id/cancel`: Only the source cancels; cancel sets canceled, clears expiresAt and soft-deletes.
-- **Create routes check permissions in-controller** `inquiry docs, Create route permission pattern`: Inquiry create routes needing per-type permission rules.
-- **Guest user via targetEmail** `docs/claude/INQUIRIES.md > Create body`: inviting someone without an account; targetUserId when the user exists
-- **Hide drafts from received lists** `docs/claude/INQUIRIES.md > List — sent and received`: Received inquiry lists never include drafts; sent lists include targets, received include sources.
-- **Inquiry expiry and sentAt** `docs/claude/INQUIRIES.md > Data Model`: sentAt set once on first send; expiresAt set on send, reset on changesRequested, cleared on terminal/draft.
-- **Inquiry party polymorphism** `docs/claude/INQUIRIES.md > Data Model`: whenever writing or querying inquiry source/target
-- **Inquiry permissions send/resolve/read** `docs/claude/INQUIRIES.md > Lifecycle`: Inquiry edit, send and cancel need send; resolve needs resolve; get needs read; lists need manage on parent.
-- **Inquiry ReBAC permissions** `docs/claude/INQUIRIES.md#Permissions (ReBAC)`: Any inquiry action authorization; superadmin bypasses only for admin targets
-- **Inquiry state machine** `FEATURES.md > Inquiry System > Status Tracking`: any inquiry status transition
-- **Inquiry status flow** `docs/claude/INQUIRIES.md > Status Flow`: any inquiry status change
-- **Inquiry types need a send permission rule** `packages/permissions/src/rebac/schema.ts`: Whenever a new InquiryType is added.
+- **Cancel inquiry soft-deletes** · rule DELETE /api/v1/inquiry/:id/cancel: Only the source cancels; cancel sets canceled, clears expiresAt and soft-deletes.
+  - *Said as:* "only the sender can cancel and it soft-deletes", "cancel clears the deadline and marks it canceled", "withdrawing keeps the row for the audit trail"
+- **Create routes check permissions in-controller** · rule inquiry docs, Create route permission pattern: Inquiry create routes needing per-type permission rules.
+  - *Said as:* "the create route checks permission itself, not in middleware", "there's no row yet so middleware can't gate it", "I'll add a permission middleware to the create route"
+- **Guest user via targetEmail** · rule docs/claude/INQUIRIES.md > Create body: inviting someone without an account; targetUserId when the user exists
+  - *Said as:* "invite someone who doesn't have an account yet", "address the request to an email instead of a user id", "create a placeholder user for the invitee"
+- **Hide drafts from received lists** · rule docs/claude/INQUIRIES.md > List — sent and received: Received inquiry lists never include drafts; sent lists include targets, received include sources.
+  - *Said as:* "the recipient shouldn't see unsent drafts", "the inbox only shows sent requests", "sent lists include targets, received include sources"
+- **Inquiry expiry and sentAt** · rule docs/claude/INQUIRIES.md > Data Model: sentAt set once on first send; expiresAt set on send, reset on changesRequested, cleared on terminal/draft.
+  - *Said as:* "when the deadline is set, reset and cleared", "the sent timestamp is set once on first send", "clear the expiry when it goes back to draft"
+- **Inquiry party polymorphism** · rule docs/claude/INQUIRIES.md > Data Model: whenever writing or querying inquiry source/target
+  - *Said as:* "writing or querying who sent or received a request", "which party columns to set for an org source", "filter requests by their target organization"
+- **Inquiry permissions send/resolve/read** · rule docs/claude/INQUIRIES.md > Lifecycle: Inquiry edit, send and cancel need send; resolve needs resolve; get needs read; lists need manage on parent.
+  - *Said as:* "which action does editing need, which does approving need", "lists need manage on the parent", "reading needs read, resolving needs resolve"
+- **Inquiry ReBAC permissions** · rule docs/claude/INQUIRIES.md § Permissions (ReBAC): Any inquiry action authorization; superadmin bypasses only for admin targets
+  - *Said as:* "who is allowed to read, send or resolve this request", "superadmin only bypasses for admin targets", "authorize a request action"
+- **Inquiry state machine** · rule FEATURES.md > Inquiry System > Status Tracking: any inquiry status transition
+  - *Said as:* "which status transitions are legal", "can a denied request be sent again", "I'll let the controller set any status"
+- **Inquiry status flow** · rule docs/claude/INQUIRIES.md > Status Flow: any inquiry status change
+  - *Said as:* "how a request moves from draft to a decision", "changes requested goes back to sent", "what happens to status on cancel"
+- **Inquiry types need a send permission rule** · rule packages/permissions/src/rebac/schema.ts: Whenever a new InquiryType is added.
+  - *Said as:* "a new request type needs a send branch in the permission schema", "who can send the new type", "I'll check roles in the create controller for this type"
   - *Signs you're bypassing it:* per-type role checks written in the create controller instead of a send branch in the ReBAC schema (docs/claude/INQUIRIES.md § Adding a New Handler; § Permissions (ReBAC))
-- **Membership targets must exist** `docs/claude/INQUIRIES.md#Target`: When targeting a membership; User targets by email instead create a guest.
-- **Register every inquiry type handler** `handlers/index.ts`: When adding a new inquiry type
-- **Register list keys in targetMutations** `docs/claude/INQUIRIES.md > Query key invalidation maps`: Whenever an inquiry type's approval changes a list (e.g. transferSpace received by an org).
-- **Register user-sourced inquiry types for send** `schema.ts`: When creating a handler for a user-sourced inquiry type
-- **Server-inferred inquiry source** `docs/claude/INQUIRIES.md > Create — context-specific routes`: any new inquiry creation path
+- **Membership targets must exist** · rule docs/claude/INQUIRIES.md § Source & Target Resolution › Target · code: `Organization`, `Space`, `User`, `OrganizationUser`: When targeting a membership; User targets by email instead create a guest.
+  - *Said as:* "you can only target a membership that already exists", "invite by email creates a guest, membership targets don't", "the target org user wasn't found"
+- **Register every inquiry type handler** · rule handlers/index.ts: When adding a new inquiry type
+  - *Said as:* "add the new handler to the index", "every type in the enum needs a registered handler", "the new type isn't in the handlers map"
+- **Register list keys in targetMutations** · rule docs/claude/INQUIRIES.md > Query key invalidation maps: Whenever an inquiry type's approval changes a list (e.g. transferSpace received by an org).
+  - *Said as:* "approving this type changes a list, so refresh it", "the org's space list should update after a transfer is accepted", "I'll invalidate that list's query inline after resolve"
+- **Register user-sourced inquiry types for send** · rule schema.ts: When creating a handler for a user-sourced inquiry type
+  - *Said as:* "a user sends this type on their own behalf", "add the type to the self-send rule", "the new user-sourced type can't be sent"
+- **Server-inferred inquiry source** · rule docs/claude/INQUIRIES.md > Create — context-specific routes: any new inquiry creation path
+  - *Said as:* "the sender comes from the route, never the body", "I'll read the source id from the request body", "any new create path infers who is asking"
   - *Signs you're bypassing it:* a create route that reads sourceModel or sourceUserId from the request body (docs/claude/INQUIRIES.md § API Endpoints › Create; Source & Target Resolution)
-- **Service-only inquiry parties** `docs/claude/INQUIRIES.md#Source & Target Resolution`: When creating inquiries whose source or target is a membership, integration or token.
-- **Side-matched inquiry relations** `docs/claude/INQUIRIES.md#Standardized includes`: Any inquiry endpoint or mutation choosing a Prisma include and response schema
+- **Service-only inquiry parties** · rule docs/claude/INQUIRIES.md § Source & Target Resolution · code: `Organization`, `Space`, `User`, `OrganizationUser`: When creating inquiries whose source or target is a membership, integration or token.
+  - *Said as:* "a request whose source is an integration, token or membership", "no route creates those, a service sets the party", "the sending party is set by the service that holds it"
+- **Side-matched inquiry relations** · rule docs/claude/INQUIRIES.md § Response Schemas › Standardized includes · code: `includeInquirySent`, `includeInquiryResponse`, `inquiryResponseSchema`, `inquirySentResponseSchema`: Any inquiry endpoint or mutation choosing a Prisma include and response schema
+  - *Said as:* "pick the include and response schema for the side acting", "return the related rows the sender or recipient needs in one call", "I'll include all six relations on this mutation", "which include goes with which endpoint"
   - *Signs you're bypassing it:* a hand-written include of all six source and target relations on a source-side or target-side mutation (docs/claude/INQUIRIES.md § Response Schemas › Standardized includes)
-- **Transactional inquiry resolution** `FEATURES.md > Inquiry System > Resolution Actions`: executing an approved inquiry's side effects
+- **Transactional inquiry resolution** · rule FEATURES.md > Inquiry System > Resolution Actions: executing an approved inquiry's side effects
+  - *Said as:* "run the approval side effects inside the same transaction", "approve and apply atomically under a row lock", "I'll approve first and then do the side effect separately"
 - *Also here, by name:* INQUIRY_STATUS_COLORS (`packages/ui/src/lib/inquiries/queryKeys.ts`); INQUIRY_TERMINAL_STATUSES (`packages/ui/src/lib/inquiries/queryKeys.ts`); INQUIRY_TYPE_LABELS (`packages/ui/src/lib/inquiries/queryKeys.ts`); InquiryResourceModel (`packages/db/prisma/schema/inquiry.prisma`); InquiryType (`packages/db/prisma/schema/inquiry.prisma`); OrganizationIncomingTransfersPage (`packages/ui/src/pages/OrganizationIncomingTransfersPage.tsx`); OrganizationSentInvitationsPage (`packages/ui/src/pages/OrganizationSentInvitationsPage.tsx`); OrganizationSpaceApplicationsPage (`packages/ui/src/pages/OrganizationSpaceApplicationsPage.tsx`); UserReceivedInvitationsPage (`packages/ui/src/pages/UserReceivedInvitationsPage.tsx`); contentSchema (`apps/api/src/modules/inquiry/handlers/inviteOrganizationUser/schema.ts`); inquiryCreateSanitizeKeys (`apps/api/src/modules/inquiry/schemas/inquiryCreateBodySchema.ts`); inquiryPicks (`apps/api/src/modules/inquiry/schemas/inquiryPicks.ts`); inquiryResolutionStatusSchema (`apps/api/src/modules/inquiry/schemas/inquiryResolutionStatusSchema.ts`); inquiryResolved (`apps/api/src/appEvents/handlers/inquiry/inquiryResolved.ts`); inquirySent (`apps/api/src/appEvents/handlers/inquiry/inquirySent.ts`); inviteOrganizationUserAppEvents (`apps/api/src/modules/inquiry/handlers/inviteOrganizationUser/appEvents.ts`); mergeInquiryFilters (`packages/ui/src/lib/inquiries/queryKeys.ts`); resolveContent (`apps/api/src/modules/inquiry/services/resolveContent.ts`); useInquiryResolutionEffects (`packages/ui/src/hooks/inquiry/useInquiryResolutionEffects.ts`); useInquirySendEffects (`packages/ui/src/hooks/inquiry/useInquirySendEffects.ts`); validateInquiryIsCancelable (`apps/api/src/modules/inquiry/validations/validateInquiryStatus.ts`); validateInquiryIsEditable (`apps/api/src/modules/inquiry/validations/validateInquiryStatus.ts`); validateInquiryIsResolvable (`apps/api/src/modules/inquiry/validations/validateInquiryStatus.ts`); validateInquiryIsSendable (`apps/api/src/modules/inquiry/validations/validateInquiryStatus.ts`)
 
 ## 4. The specifics, in full

@@ -114,15 +114,17 @@ The template calls the engine; it does not reimplement it. Every rule owner (a s
 
 Rule references: a stored rule that names rows persists `RuleReference` edges, false-polymorphic on both ends (`sourceModel` / `targetModel` with typed FKs) with both axes in `PolymorphismRegistry`; `RULE_REFERENCEABLE_MODELS` is the registry's answer to which models a rule may name, and a rule-tracked lens names a row by its `id`, never an FK column. Extraction is the lens's: `ruleReferences(lens, rule)` reads them through `describeRuleSources`; a dynamic reference (a `bind` or `path` at an id source, `contains`, `between`) is refused at save (`dynamicRuleReferences`, `RuleReferenceError`). `syncRuleReferenceEdges` is the only writer, called from the save path, never a hook: set-diff, referenced rows locked with `db.findForUpdate` (`lockedTargetStates`), foreign rows refused by `admitRuleReferences`; email's front is `syncRuleReferences`, segments' is `syncSegmentEdges`. Staleness lives on the edge: the `ruleReference:target` hook stamps soft deletes, a purge sets the FK null, and `ruleReferenceIssues` reads both from edges included as `sourceRuleReferences`. Every stored rule runs through `withRule(health, { degraded, sound })` (`ruleIssues`, `liveRuleReferences`): a degraded rule never matches, never touches existing state, and nothing about degradation is stored.
 
-Which question goes where across the eight rules and lens regions: the template's own rule code (`validateRuleForLens`, `bindWhere`, email rule scoping in loops, the hooks `RulesRegistry`) and `RuleReference` edges and rule health (`withRule`) → here; the rule language itself: shapes, operators and the operator catalog, paths and `$` scope refs, offsets, dates with `now` / `timeZone`, what NULL means, windowing, binding and introspection, `validateRule`, `UsageError`, `engineGlobals`, the types and VERBS.md → `json-rules-engine`; compiling a rule to Prisma or SQL and what each rail runs (`toPrisma` + `executePrismaPlan`, `toSql`, `{ lens }` compiles, the Backend Support Matrix, the compilers' NULL arms, where the rails differ) → `json-rules-backends`; what a lens is: layers that only narrow, schema vs data narrowing, relations turned on and the model-default tree, the three `where` anchors, filter-first under `all`, composition and `validateNarrowing` codes, `LensRefusal`, enum narrowing, the type shape and the composed / stored / projected forms → `lens-model`; the template's own lenses (`lensFor`, a route's `filterLens`, `scopeNarrowing`, `lensWhere`, `redactLens`, `omitForeignKeys`, `fetchLens`, `sourceQueryValues`, `lensFromOperation`, `customerRefLens`, the `no-lens-spread` rule) → `lenses`; putting a lens to work in code: building it from FieldMaps and bridges, binding and storing it, the `validateRuleInLens` → `narrowRule` → execute flow, fetching and cutting rows (`toLensSelect`, `projectRows`), single-path reads (`readLensValue`, `walkLensPath`, `lensVisit`), `projectLens`, describe vs deny, migration → `lens-usage`; option sources for pickers (`sources`, `toSourceQueries`, `materializeSourceQuery`, `materializeSources`, `from: 'mapDefaults'`, bridged `recheck`), `describeRuleSources`, and evaluating rules over data stitched across bridges → `lens-sources`; a UI that edits a rule over a lens (views, hooks, facets, pickers) and saving it as a `SavedRule` → `rules-builder`. Also not here: the email lens and its slots (`email-lens`), email template saving and rendering (`email-templates`), segment membership (`customers-segments`), list filtering and paginate (`filtering-pagination`), ReBAC permission checks, whose `check` is @inixiative/permissions' and not json-rules' (`permissions`, `lib-permissions`), transition guards (`lib-transitions`), the hook lifecycle beyond the RulesRegistry (`mutation-hooks`), and general-purpose locks (`concurrency-locks`).
+Which question goes where across the eight rules and lens regions: the template's own rule code (`validateRuleForLens`, `bindWhere`, email rule scoping in loops, the hooks `RulesRegistry`) and `RuleReference` edges and rule health (`withRule`) → here; the rule language itself: shapes, operators and the operator catalog, paths and `$` scope refs, offsets, dates with `now` / `timeZone`, what NULL means, windowing, binding and introspection, `validateRule`, `UsageError`, `engineGlobals`, the types and VERBS.md → `json-rules-engine`; compiling a rule to Prisma or SQL and what each rail runs (`toPrisma` + `executePrismaPlan`, `toSql`, `{ lens }` compiles, the Backend Support Matrix, the compilers' NULL arms, where the rails differ) → `json-rules-backends`; what a lens is: layers that only narrow, schema vs data narrowing, relations turned on and the model-default tree, the three `where` anchors, filter-first under `all`, composition and `validateNarrowing` codes, `LensRefusal`, enum narrowing, the type shape and the composed / stored / projected forms → `lens-model`; the template's own lenses (`lensFor`, a route's `filterLens`, `scopeNarrowing`, `lensWhere`, `redactLens`, `omitForeignKeys`, `fetchLens`, `sourceQueryValues`, `lensFromOperation`, `customerRefLens`, the `no-lens-spread` rule) → `lenses`; putting a lens to work in code: building it from FieldMaps and bridges, binding and storing it, the `validateRuleInLens` → `narrowRule` → execute flow, fetching and cutting rows (`toLensSelect`, `projectRows`), single-path reads (`readLensValue`, `walkLensPath`, `lensVisit`), `projectLens`, describe vs deny, migration → `lens-usage`; option sources for pickers (`sources`, `toSourceQueries`, `materializeSourceQuery`, `materializeSources`, `from: 'mapDefaults'`, bridged `recheck`), `describeRuleSources`, and evaluating rules over data stitched across bridges → `lens-sources`; a UI that edits a rule over a lens (views, hooks, facets, pickers) and saving it as a `SavedRule` → `rules-builder`. Also not here: the email lens and its slots (`email-lens`), email template saving and rendering (`email-templates`), segment membership (`customers-segments`), list filtering and paginate (`filtering-search / pagination`), ReBAC permission checks, whose `check` is @inixiative/permissions' and not json-rules' (`permissions`, `lib-permissions`), transition guards (`lib-transitions`), the hook lifecycle beyond the RulesRegistry (`mutation-hooks`), and general-purpose locks (`concurrency-locks`).
 
 ## 3. Everything that exists here, by class
 
-Point at a class when that is as specific as the moment allows, or at a member. Where a class has siblings an agent could confuse, a table under the class header says which to use when. Each member: **name** `where`: choose this when … . Where the docs or code give material, a second line describes the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
+Point at a class when that is as specific as the moment allows, or at a member. Where a class has siblings an agent could confuse, a table under the class header says which to use when; its *Said as* line gives the plain words a user or agent uses for that job. Each member: **name** · kind `where` · the doc § that describes it (code members) or the code it is about (doc members): choose this when … . Quote the name and the where in a pointer ("look over here: createLock, packages/db/src/lock/createLock.ts, CONCURRENCY.md § Distributed Lock"). *Said as:* the ways a user or agent describes this job in a message or plan without knowing the name; match on these. *Signs you're bypassing it:* the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
 
 ### Class `json-rules`: @inixiative/json-rules engine: rule AST, operators, check/toPrisma plans, binding
 
 **Job: validate a rule before evaluating or saving it** (validateRule vs assertValidRule vs validateRuleForLens) — @inixiative/json-rules/README.md § Error Handling; catalog validateRuleForLens
+
+*Said as:* "is this rule well-formed before I save it", "reject a bad rule from the client", "which validator do I call on a rule", "validate the rule before evaluating it"
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -133,6 +135,8 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 **Job: evaluate a rule in memory or compile it to a database query** (check vs toPrisma vs toSql) — @inixiative/json-rules/README.md § Backend Support Matrix
 
+*Said as:* "run the rule in memory or in the database", "filter rows by a rule", "the same predicate, two executors", "evaluate this condition against the data"
+
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **check (json-rules-engine)** | evaluating in memory; the only rail for $$. refs, full windowing, root arrays | filtering in the database (toPrisma or toSql) |
@@ -140,6 +144,8 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **toSql (json-rules-backends)** | a raw parameterized PostgreSQL WHERE plus LEFT JOINs | array element operators or relation lists (toPrisma) |
 
 **Job: fill a rule's or lens's bind tokens** (bindRule vs bindWhere vs bindLens) — catalog entries; README § Rule Introspection, § Bindings in a Lens
+
+*Said as:* "fill the placeholders in the rule or lens", "plug the tenant id into the rule", "the rule has bind tokens, where do I fill them"
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -149,6 +155,8 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 **Job: evaluate a rule inside an email template loop** (scopedRule vs narrowToElements) — catalog entries (packages/email/src/rules/scopedRule.ts)
 
+*Said as:* "a rule inside an each loop in the email", "evaluate the condition per looped element", "rules inside template loops"
+
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **scopedRule (email-lens)** | rewriting a rule inside {{#each}} loops into nested any conditions | pinning scope data to the element being rendered (narrowToElements) |
@@ -156,84 +164,143 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 **Job: classify a rule evaluation failure** (RuleEvaluationError vs RuleDegradedError vs UsageError) — catalog entries; README § Error Handling
 
+*Said as:* "what kind of failure is this rule error", "the rule failed: whose fault is it", "degraded versus crashed versus bad input"
+
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **RuleEvaluationError** | a failure thrown while evaluating a rule | the rule is invalid, unbound or names a dead row (RuleDegradedError) |
 | **RuleDegradedError (json-rules)** | a stored rule can't be evaluated correctly | evaluation itself failed (RuleEvaluationError) |
 | **UsageError (json-rules-engine)** | the engine's caller-input fault: no now, bad zone, unbound bind | template wrapping of evaluation failures (RuleEvaluationError) |
 
-- **bindWhere** `apps/api/src/lib/email/bindWhere.ts#bindWhere`: For rule conditions; for lens narrowings use bindLens.
-- **RuleEvaluationError** `packages/shared/src/rules/errors.ts#RuleEvaluationError`: Runtime evaluation failure: this; rule invalid or missing bindings: RuleDegradedError.
+- **bindWhere** · primitive `apps/api/src/lib/email/bindWhere.ts#bindWhere`: For rule conditions; for lens narrowings use bindLens.
+  - *Said as:* "fill in the values of an email rule's condition before running it", "plug the recipient's values into the where rule", "I'll string-replace the placeholder in the rule JSON", "substitute the caller's value into the email condition", "the email rule has placeholders, where do I fill them"
+- **RuleEvaluationError** · primitive `packages/shared/src/rules/errors.ts#RuleEvaluationError`: Runtime evaluation failure: this; rule invalid or missing bindings: RuleDegradedError.
+  - *Said as:* "the rule blew up while running", "evaluation itself failed, not a bad rule", "what do I throw when running the rule crashes", "wrap the failure from evaluating a stored rule"
   - *Error class:* `server-error` (The server is broken or misconfigured, not the caller's fault: route misconfig, missing config, developer misuse, internal invariants. Raw Error on the request path becomes this via respond500.); classified by convention; inferred throwers: withRule
-- **validateRuleForLens** `packages/db/src/validations/validateRuleForLens.ts#validateRuleForLens`: Shared validation for every rule owner; use instead of per-owner checks.
+- **validateRuleForLens** · primitive `packages/db/src/validations/validateRuleForLens.ts#validateRuleForLens`: Shared validation for every rule owner; use instead of per-owner checks.
+  - *Said as:* "check the rule against its lens before saving it", "the shared save-time rule check every owner uses", "I'll write a validator for segment rules", "one gate for segments, email and every rule owner", "reject a rule naming fields this owner can't see"
   - *Signs you're bypassing it:* A per-owner rule validation function (one for segments, one for email) instead of the shared gate. (catalog entry validateRuleForLens)
-- **Aggregate rule** `@inixiative/json-rules/README.md › Rule Shapes › Aggregate Rule`: numeric totals/means over arrays; array rule for per-element checks
-- **Array rule** `@inixiative/json-rules/README.md › Rule Shapes › Array Rule`: per-element predicates; aggregate rule when comparing sum/avg of elements
-- **Conditional rule (if/then/else)** `@inixiative/json-rules/README.md › Rule Shapes › Conditional Rule`: branching logic; plain all/any when no branch is needed
-- **Date rule** `@inixiative/json-rules/README.md › Rule Shapes › Date Rule`: date fields; use dateOperator instead of numeric Operator comparisons
-- **Field rule** `@inixiative/json-rules/README.md › Rule Shapes › Field Rule`: single scalar comparison; dates use dateOperator, arrays use arrayOperator or aggregate
-- **Logical rules (all/any)** `@inixiative/json-rules/README.md › Rule Shapes › Logical Rules`: boolean composition; use if/then/else when a branch depends on a condition
-- **notAfter / notWithin for NULL-inclusive dormancy** `@inixiative/json-rules/README.md › Relative & Calendar Date Expressions`: when never-set should match; onOrBefore/before skip NULL
+- **Aggregate rule** · pattern @inixiative/json-rules/README.md › Rule Shapes › Aggregate Rule: numeric totals/means over arrays; array rule for per-element checks
+  - *Said as:* "sum of the line items over a thousand", "average of these values compared to a number", "total across a list, not each element", "count or sum of related rows in a rule"
+- **Array rule** · pattern @inixiative/json-rules/README.md › Rule Shapes › Array Rule: per-element predicates; aggregate rule when comparing sum/avg of elements
+  - *Said as:* "every item in the list must match", "at least one related row satisfies this", "a condition on each element of a list", "none of the children may be flagged"
+- **Conditional rule (if/then/else)** · pattern @inixiative/json-rules/README.md › Rule Shapes › Conditional Rule: branching logic; plain all/any when no branch is needed
+  - *Said as:* "if this holds then require that, otherwise this", "a branch in the rule depending on another condition", "different checks depending on the plan type", "when X applies use rule A, else rule B"
+- **Date rule** · pattern @inixiative/json-rules/README.md › Rule Shapes › Date Rule: date fields; use dateOperator instead of numeric Operator comparisons
+  - *Said as:* "compare a date field in a rule", "created before some date", "a condition on a timestamp column", "I'll compare the date as a number"
+- **Field rule** · pattern @inixiative/json-rules/README.md › Rule Shapes › Field Rule: single scalar comparison; dates use dateOperator, arrays use arrayOperator or aggregate
+  - *Said as:* "one column compared to a value", "status equals active, as a rule", "a single scalar comparison in the rule", "the simplest leaf: field, operator, value"
+- **Logical rules (all/any)** · pattern @inixiative/json-rules/README.md › Rule Shapes › Logical Rules: boolean composition; use if/then/else when a branch depends on a condition
+  - *Said as:* "all of these must hold", "any one of these conditions", "AND and OR of rules", "group the conditions together in a boolean tree"
+- **notAfter / notWithin for NULL-inclusive dormancy** · pattern @inixiative/json-rules/README.md › Relative & Calendar Date Expressions: when never-set should match; onOrBefore/before skip NULL
+  - *Said as:* "users who haven't logged in for 30 days, including never", "not since 30 days should include never-set rows", "dormant rows where the date is null or old", "I'll add an OR is null arm for never-set rows", "the condition should be one leaf, not a group"
   - *Signs you're bypassing it:* A dormancy rule ("not since 30 days") written with before / onOrBefore, silently dropping never-set rows, or a hand-added `OR col IS NULL` arm. (@inixiative/json-rules/README.md › Relative & Calendar Date Expressions; § NULL Semantics)
-- **Offsets as value sources** `@inixiative/json-rules/README.md Offsets and Unit Amounts`: Edges the date expression grammar can't name; size shifts from row amounts, not stored { ago } values.
-- **One rule AST, three targets** `@inixiative/json-rules/README.md — Quick Start`: write a rule once and evaluate in memory, via Prisma or as SQL
+- **Offsets as value sources** · pattern @inixiative/json-rules/README.md Offsets and Unit Amounts: Edges the date expression grammar can't name; size shifts from row amounts, not stored { ago } values.
+  - *Said as:* "shift the comparison by an amount from another column", "the deadline minus a per-row number of days", "compare against the value adjusted by an offset read from the row", "an edge the date grammar can't name"
+- **One rule AST, three targets** · pattern @inixiative/json-rules/README.md — Quick Start: write a rule once and evaluate in memory, via Prisma or as SQL
+  - *Said as:* "write the condition once, run it in memory and in the database", "the same predicate as a JS filter, a Prisma where and SQL", "one rule, evaluated in-process or compiled to a query", "I'll write the Prisma where and a matching filter function", "the same predicate, two executors"
   - *Signs you're bypassing it:* The same condition written three times — a JS filter, a Prisma where and a SQL fragment — instead of one Condition run through check / toPrisma / toSql. (@inixiative/json-rules/README.md (preface, Quick Start))
-- **Relative and calendar date expressions** `@inixiative/json-rules/README.md › Relative & Calendar Date Expressions`: points ({ago},{ahead},{start},{end}) with before/after; ranges ({this},{last},{next},{ago}) with within/notWithin
-- **Scope references with $ prefixes** `@inixiative/json-rules/README.md Scope References`: Bare path reads root row; only array/aggregate rules add levels, not all/any/if.
-- **Strict rule shapes** `StrictRule`: pair each rule operator with its operand's type for type-safe rule authoring
-- **Windowing (filter/orderBy/skip/take)** `@inixiative/json-rules/README.md › Windowing`: first/last element rules; plain array rule when all elements matter
-- **aggregate** `@inixiative/json-rules/README.md — Aggregate Operators`: totals across a list; use array operators (all/any/atLeast) for per-element conditions
-- **bindOptional** `@inixiative/json-rules leaf bindOptional`: mark a leaf's bind optional so absence evaluates as null, never pruned
+- **Relative and calendar date expressions** · pattern @inixiative/json-rules/README.md › Relative & Calendar Date Expressions: points ({ago},{ahead},{start},{end}) with before/after; ranges ({this},{last},{next},{ago}) with within/notWithin
+  - *Said as:* "thirty days ago", "within the last week", "the start of this month", "between two relative points in time", "a rolling window rather than a fixed date"
+- **Scope references with $ prefixes** · pattern @inixiative/json-rules/README.md Scope References: Bare path reads root row; only array/aggregate rules add levels, not all/any/if.
+  - *Said as:* "refer to the parent row from inside the array rule", "compare an element against a column on the root", "reach an outer scope from a nested condition", "how deep does the dollar prefix go"
+- **Strict rule shapes** · pattern StrictRule: pair each rule operator with its operand's type for type-safe rule authoring
+  - *Said as:* "type the rule so the operator matches the value type", "stop between from taking a single value at compile time", "typed rule authoring in TypeScript", "a rule type that rejects a mismatched operand"
+- **Windowing (filter/orderBy/skip/take)** · pattern @inixiative/json-rules/README.md › Windowing: first/last element rules; plain array rule when all elements matter
+  - *Said as:* "the most recent order must be paid", "only the first element after sorting", "a rule on the latest related row", "take the top N and then test them", "the newest matching item"
+- **aggregate** · primitive @inixiative/json-rules/README.md — Aggregate Operators: totals across a list; use array operators (all/any/atLeast) for per-element conditions
+  - *Said as:* "sum these up instead of looping over them", "these can be done all in aggregate functions, not individually", "average across the related rows", "a single total query rather than loading rows to add", "count or sum over a list inside a rule"
+- **bindOptional** · primitive @inixiative/json-rules leaf bindOptional: mark a leaf's bind optional so absence evaluates as null, never pruned
+  - *Said as:* "the bind may be missing and that's fine", "if no value is bound treat it as null", "I'll prune the leaf when the bind is absent", "an optional placeholder that reads null when unbound", "skip the condition when nothing is supplied"
   - *Signs you're bypassing it:* Pruning a leaf from a rule (or substituting a match-all value) when its bind is absent, instead of bindOptional, which reads null and never prunes — `in` with nothing bound matches nothing. (@inixiative/json-rules/README.md § Rule Introspection)
-- **Condition** `@inixiative/json-rules/README.md — TypeScript Types`: strict typed rules: StrictCondition instead
-- **engineGlobals.reset** `@inixiative/json-rules engineGlobals.reset`: restore all engine defaults to their initial values
-- **engineGlobals.with** `@inixiative/json-rules engineGlobals.with`: scoped override instead of set/reset; callback must be synchronous, Promise-returning callbacks throw
+- **Condition** · primitive @inixiative/json-rules/README.md — TypeScript Types: strict typed rules: StrictCondition instead
+  - *Said as:* "the type of the rule JSON", "the shape of a stored rule", "type the conditions column", "validate the payload with the engine's own schema at the boundary"
+- **engineGlobals.reset** · primitive @inixiative/json-rules engineGlobals.reset: restore all engine defaults to their initial values
+  - *Said as:* "put the engine defaults back", "undo every global override after the test", "restore the default time zone and provider"
+- **engineGlobals.with** · primitive @inixiative/json-rules engineGlobals.with: scoped override instead of set/reset; callback must be synchronous, Promise-returning callbacks throw
+  - *Said as:* "temporarily override an engine default for one call", "set the default, run, then reset after", "I'll set the global before and reset it in finally", "a scoped override of the engine settings", "run this with a different default zone"
   - *Throws:* engineGlobals.with async-callback Error (`server-error`, json-rules-engine)
   - *Signs you're bypassing it:* engineGlobals.set before a call and reset after it (leaking the override when the call throws) instead of a scoped engineGlobals.with, or an async callback, which throws. (@inixiative/json-rules/README.md § Engine Globals)
-- **FieldMapEntry.isRequired** `@inixiative/json-rules/README.md — NULL Semantics`: declare column or relation-hop nullability so compilers add NULL arms
-- **getAggregateOperators** `@inixiative/json-rules getAggregateOperators`: aggregate rules; getOperatorsForKind for per-field rules.
-- **getArrayOperators** `@inixiative/json-rules getArrayOperators`: array fields; getOperatorsForKind for scalar/date fields.
-- **Operator catalog constants** `@inixiative/json-rules FieldKind, RuleTarget, ValueShape, NUMERIC_KINDS, ALL_KINDS`: enumerate field kinds, compile targets and operand shapes for rule builders
-- **orderBy / take / skip windowing** `@inixiative/json-rules/README.md — What It Supports`: toPrisma compiles only the extremal case and filter alone; full windowing needs check()
-- **parseScopeRef** `@inixiative/json-rules parseScopeRef`: code resolving its own refs; readScopeRef to read the value.
-- **path and $$. scope refs** `@inixiative/json-rules/README.md — What It Supports`: comparing to data values instead of literal value
-- **prismaOptions.anyNull** `@inixiative/json-rules toPrisma prismaOptions.anyNull`: Only when using a different client than the installed @prisma/client.
-- **prismaOptions.datasource.provider** `@inixiative/json-rules README > Engine Globals`: per-call option overrides the global; set globally only for a non-postgresql default
-- **Rule error** `@inixiative/json-rules rule error property`: set the custom failure message check() returns for a rule
-- **string.fuzzy** `@inixiative/json-rules README > Engine Globals`: only for check(); toSql/toPrisma refuse contains/notContains when fuzzy is on
-- **timeZone / weekStart options** `@inixiative/json-rules/README.md › The now contract and config`: localize now and period boundaries; set week start for calendar periods
-- **within / ago / ahead / this / last / next** `@inixiative/json-rules/README.md — What It Supports`: relative windows; before/after/between for fixed dates
-- **Aggregate empty and NULL semantics** `@inixiative/json-rules/README.md › Rule Shapes › Aggregate Rule`: any aggregate rule
-- **Aggregate/count relation rules need a field map** `@inixiative/json-rules/README.md — Prisma Limitations`: atLeast/atMost/exactly and sum/avg over relation lists.
-- **Calendar units whole and non-negative** `@inixiative/json-rules/README.md Offsets and Unit Amounts`: Any relative-date unit or offset amount.
-- **Empty window semantics are author-driven** `@inixiative/json-rules/README.md › Windowing`: windowed array rules where an empty array should not match
-- **Enum comparisons** `@inixiative/json-rules/README.md — Value Comparison`: Any rule on an enum field.
-- **Explicit now input** `@inixiative/json-rules/README.md › The now contract and config`: any rule containing relative or period date expressions; evaluators throw otherwise
+- **FieldMapEntry.isRequired** · primitive @inixiative/json-rules/README.md — NULL Semantics: declare column or relation-hop nullability so compilers add NULL arms
+  - *Said as:* "mark the column as never null", "declare a relation hop nullable so the compiler adds null handling", "tell the compiler which fields can be null", "the field is required, so no null arm"
+- **getAggregateOperators** · primitive @inixiative/json-rules getAggregateOperators: aggregate rules; getOperatorsForKind for per-field rules.
+  - *Said as:* "which comparisons can a sum or average use", "the operator list for aggregate rules", "what can I compare a total against", "operators for the threshold on a count"
+- **getArrayOperators** · primitive @inixiative/json-rules getArrayOperators: array fields; getOperatorsForKind for scalar/date fields.
+  - *Said as:* "which operators apply to a list field", "operators for array and relation list fields", "all, any, at least for a list field", "the operator menu for a to-many relation"
+- **Operator catalog constants** · primitive @inixiative/json-rules FieldKind, RuleTarget, ValueShape, NUMERIC_KINDS, ALL_KINDS: enumerate field kinds, compile targets and operand shapes for rule builders
+  - *Said as:* "the list of field kinds", "enumerate the compile targets", "which kinds count as numeric", "constants for building a rule editor's menus", "I'll hard-code the list of field types"
+- **orderBy / take / skip windowing** · primitive @inixiative/json-rules/README.md — What It Supports: toPrisma compiles only the extremal case and filter alone; full windowing needs check()
+  - *Said as:* "sort the related rows and test the first", "latest row only, compiled to Prisma", "take and skip inside a rule", "order the list before applying the predicate"
+- **parseScopeRef** · primitive @inixiative/json-rules parseScopeRef: code resolving its own refs; readScopeRef to read the value.
+  - *Said as:* "how many levels up does this reference go", "split the dollar prefix from the path", "just the depth and path of a scope ref, not its value"
+- **path and $$. scope refs** · primitive @inixiative/json-rules/README.md — What It Supports: comparing to data values instead of literal value
+  - *Said as:* "compare one field to another field", "compare against another column's value, not a literal", "end date after start date on the same row", "a value taken from the data instead of a constant"
+- **prismaOptions.anyNull** · primitive @inixiative/json-rules toPrisma prismaOptions.anyNull: Only when using a different client than the installed @prisma/client.
+  - *Said as:* "the Prisma null sentinel from a different client", "Json null checks with another Prisma client", "pass my own AnyNull instance"
+- **prismaOptions.datasource.provider** · primitive @inixiative/json-rules README > Engine Globals: per-call option overrides the global; set globally only for a non-postgresql default
+  - *Said as:* "compile for a database that isn't Postgres", "set the provider for one compile call", "the default provider for every compile"
+- **Rule error** · primitive @inixiative/json-rules rule error property: set the custom failure message check() returns for a rule
+  - *Said as:* "a custom message when the rule fails", "tell the user why the rule rejected them", "must be 18 or older as the failure text"
+- **string.fuzzy** · primitive @inixiative/json-rules README > Engine Globals: only for check(); toSql/toPrisma refuse contains/notContains when fuzzy is on
+  - *Said as:* "typo-tolerant contains on strings", "fuzzy matching in the in-memory filter", "approximate match in the search box", "fuzzy only in memory; the compilers refuse it"
+- **timeZone / weekStart options** · primitive @inixiative/json-rules/README.md › The now contract and config: localize now and period boundaries; set week start for calendar periods
+  - *Said as:* "the week should start on Sunday", "evaluate dates in the user's time zone", "this month in New York time", "where do the week boundaries fall for last week"
+- **within / ago / ahead / this / last / next** · primitive @inixiative/json-rules/README.md — What It Supports: relative windows; before/after/between for fixed dates
+  - *Said as:* "in the last 7 days", "sometime in the next month", "created this year", "a rolling window relative to now", "due within the coming week"
+- **Aggregate empty and NULL semantics** · rule @inixiative/json-rules/README.md › Rule Shapes › Aggregate Rule: any aggregate rule
+  - *Said as:* "what does a sum over an empty list match", "average of nothing, with nulls ignored", "an aggregate over an empty array"
+- **Aggregate/count relation rules need a field map** · rule @inixiative/json-rules/README.md — Prisma Limitations: atLeast/atMost/exactly and sum/avg over relation lists.
+  - *Said as:* "at least N related rows needs the map", "counting a relation in a rule fails without the field map", "sum over a relation needs model and map"
+- **Calendar units whole and non-negative** · rule @inixiative/json-rules/README.md Offsets and Unit Amounts: Any relative-date unit or offset amount.
+  - *Said as:* "half a month is not allowed", "no fractional or negative units in a date expression", "1.5 weeks ago isn't valid"
+- **Empty window semantics are author-driven** · rule @inixiative/json-rules/README.md › Windowing: windowed array rules where an empty array should not match
+  - *Said as:* "an empty list shouldn't match the window rule", "no rows means no match; say so in the rule", "decide what an empty window means"
+- **Enum comparisons** · rule @inixiative/json-rules/README.md — Value Comparison: Any rule on an enum field.
+  - *Said as:* "comparing an enum field to a string", "enum values compare exactly against the declared list", "no contains or ordering on an enum"
+- **Explicit now input** · rule @inixiative/json-rules/README.md › The now contract and config: any rule containing relative or period date expressions; evaluators throw otherwise
+  - *Said as:* "pass now in rather than reading the clock", "I'll compute thirty days ago in code and put the date in the rule", "the evaluator throws without a now", "don't bake the current date into the rule"
   - *Signs you're bypassing it:* Computing `new Date(Date.now() - 30 * 86400000)` (or dayjs().subtract) into a rule's value instead of { ago: { days: 30 } } evaluated with an explicit now. (@inixiative/json-rules/README.md › The now contract and config)
-- **Iterate 1-many bridge arrays explicitly** `@inixiative/json-rules/README.md — Evaluating Across Bridges`: Whenever a rule path crosses a 1-many bridge array.
-- **Negations match NULL** `@inixiative/json-rules/README.md — NULL Semantics`: notEquals, notIn, notContains, notMatches, notBetween, notBefore, notAfter, notWithin, dayNotIn.
+- **Iterate 1-many bridge arrays explicitly** · rule @inixiative/json-rules/README.md — Evaluating Across Bridges: Whenever a rule path crosses a 1-many bridge array.
+  - *Said as:* "the path across a one-to-many bridge reads undefined", "loop the bridged array with an array rule", "a dotted path through a bridge list"
+- **Negations match NULL** · rule @inixiative/json-rules/README.md — NULL Semantics: notEquals, notIn, notContains, notMatches, notBetween, notBefore, notAfter, notWithin, dayNotIn.
+  - *Said as:* "not equals should include never-set rows", "notIn matches null too", "I'll add an OR is null to the negation", "the negated operator already keeps the nulls"
   - *Signs you're bypassing it:* Hand-adding `OR field IS NULL` / `{ equals: null }` arms or a separate notExists branch around a negated operator to keep never-set rows; the negation already matches them. (@inixiative/json-rules/README.md § NULL Semantics)
-- **No field paths through to-many relations** `@inixiative/json-rules/README.md — Prisma Limitations`: Any rule touching a to-many relation's columns.
+- **No field paths through to-many relations** · rule @inixiative/json-rules/README.md — Prisma Limitations: Any rule touching a to-many relation's columns.
+  - *Said as:* "posts.title as a field path", "a dotted path through a list relation", "use an array rule, not a path into the list"
   - *Signs you're bypassing it:* A field rule on a dotted path through a list relation (`posts.title`) instead of an array rule on `posts`. (@inixiative/json-rules/README.md § Prisma Limitations)
-- **Non-array Json in array rules is a data error** `@inixiative/json-rules/README.md — Where the Rails Differ`: When writing array, aggregate, empty or notEmpty rules over Json values.
-- **One public name per operation** `@inixiative/json-rules/README.md — TypeScript Types; docs/VERBS.md`: adding or renaming json-rules exports
+- **Non-array Json in array rules is a data error** · rule @inixiative/json-rules/README.md — Where the Rails Differ: When writing array, aggregate, empty or notEmpty rules over Json values.
+  - *Said as:* "an array rule over a Json column that isn't an array", "the Json value is not a list in an array rule", "what happens when the Json isn't an array"
+- **One public name per operation** · rule @inixiative/json-rules/README.md — TypeScript Types; docs/VERBS.md: adding or renaming json-rules exports
+  - *Said as:* "add an alias export for this function", "a second name for the same operation", "I'll export a resolve helper too"
   - *Signs you're bypassing it:* Adding an alias export or a second function for an operation json-rules already names (or a public name starting with resolve). (@inixiative/json-rules/docs/VERBS.md; README § TypeScript Types)
-- **Positive date operators never match NULL** `@inixiative/json-rules/README.md — NULL Semantics`: before, between, dayIn and other positive dateOperators.
-- **Positive magnitudes in date expressions** `@inixiative/json-rules/README.md › Relative & Calendar Date Expressions`: every ago/ahead expression
-- **Rails agree except engine differences** `@inixiative/json-rules/README.md — Where the Rails Differ`: When the same rule runs both in memory and in the database.
-- **Read Prisma plan where only through executePrismaPlan** `@inixiative/json-rules/README.md Path Semantics`: Whenever consuming toPrisma output.
-- **Root-array rules are fieldless and check-only** `@inixiative/json-rules/README.md#Root-Array Rules in check()`: When evaluating a rule against an array of rows.
-- **Rule introspection belongs in the engine** `@inixiative/json-rules/README.md — Rule Introspection`: Whenever code needs a rule's bind names or contents.
+- **Positive date operators never match NULL** · rule @inixiative/json-rules/README.md — NULL Semantics: before, between, dayIn and other positive dateOperators.
+  - *Said as:* "before a date skips null rows", "null dates never match before or between", "the positive date operator drops never-set rows"
+- **Positive magnitudes in date expressions** · rule @inixiative/json-rules/README.md › Relative & Calendar Date Expressions: every ago/ahead expression
+  - *Said as:* "negative days ago", "ago with a negative number", "flip the sign to go forward instead of using ahead"
+- **Rails agree except engine differences** · rule @inixiative/json-rules/README.md — Where the Rails Differ: When the same rule runs both in memory and in the database.
+  - *Said as:* "in-memory and database give the same answer", "where do the evaluator and the compilers disagree", "same rule, same result on both rails"
+- **Read Prisma plan where only through executePrismaPlan** · rule @inixiative/json-rules/README.md Path Semantics: Whenever consuming toPrisma output.
+  - *Said as:* "spread the plan's where into findMany", "use the compiled where directly", "the where has placeholders Prisma rejects"
+- **Root-array rules are fieldless and check-only** · rule @inixiative/json-rules/README.md § Root-Array Rules in check(): When evaluating a rule against an array of rows.
+  - *Said as:* "evaluate the rule against a list of rows", "a rule over the whole array in memory", "the data is an array, not a row"
+- **Rule introspection belongs in the engine** · rule @inixiative/json-rules/README.md — Rule Introspection: Whenever code needs a rule's bind names or contents.
+  - *Said as:* "walk the rule tree to find the bind names", "I'll write a recursive helper over all and any", "read what a stored rule names", "my own traversal of the condition JSON"
   - *Signs you're bypassing it:* A recursive helper outside json-rules that descends `all` / `any` / `condition` to read what a stored rule names or needs; it goes blind silently when the format grows a node type. (@inixiative/json-rules/README.md § Rule Introspection; docs/VERBS.md (traverse a condition tree))
-- **Scalar-list membership via contains** `@inixiative/json-rules/README.md — Prisma Limitations`: Prisma output over scalar lists/Json arrays; use toSql or check for aggregates on them.
-- **Strict JSON value comparison** `@inixiative/json-rules/README.md — Value Comparison`: When a rule's literal type differs from the field's type.
-- **toPrisma windowing compiles only extremal case** `@inixiative/json-rules/README.md › Windowing › Compilation`: windowed rules meant for Prisma compilation
-- **Validate external rules first** `@inixiative/json-rules/README.md#Error Handling`: Whenever rules originate outside code.
+- **Scalar-list membership via contains** · rule @inixiative/json-rules/README.md — Prisma Limitations: Prisma output over scalar lists/Json arrays; use toSql or check for aggregates on them.
+  - *Said as:* "the tags array contains a value, through Prisma", "membership in a scalar list", "a sum over a Json array isn't possible in Prisma"
+- **Strict JSON value comparison** · rule @inixiative/json-rules/README.md — Value Comparison: When a rule's literal type differs from the field's type.
+  - *Said as:* "the string 3 against a number column", "the literal's type differs from the field's type", "no loose equality in rules"
+- **toPrisma windowing compiles only extremal case** · rule @inixiative/json-rules/README.md › Windowing › Compilation: windowed rules meant for Prisma compilation
+  - *Said as:* "only first or last compiles to Prisma", "skip and take don't compile to a query", "the window rule needs in-memory evaluation"
+- **Validate external rules first** · rule @inixiative/json-rules/README.md § Error Handling · code: `validateRule`, `UsageError`, `LensRefusal`, `assertValidRule`: Whenever rules originate outside code.
+  - *Said as:* "validate the rule from the request body before running it", "a rule from the database straight into the evaluator", "I'll trust the rule the editor sent", "validate at the boundary with the engine's own validator"
   - *Signs you're bypassing it:* Passing a rule from an API body, a database row or an editor straight to check / toPrisma / toSql without validateRule / assertValidRule (or the lens gate). (@inixiative/json-rules/README.md § Error Handling)
 
 ### Class `rule-references`: RuleReference edges: rows a stored rule names, sync, rule health/degradation
 
 **Job: find or record the rows a rule references** (ruleReferences vs dynamicRuleReferences vs describeRuleSources vs syncRuleReferenceEdges) — docs/claude/COMMUNICATIONS.md § Rule References
+
+*Said as:* "which rows does this rule point at", "record what the rule references", "find the referenced ids in a rule", "I'll walk the rule for ids"
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -244,6 +311,8 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 **Job: write rule reference edges for a rule-bearing surface** (The edge writers by surface) — docs/claude/COMMUNICATIONS.md § Rule References; catalog entries
 
+*Said as:* "write the reference edges when this surface saves", "a new rule-bearing column needs edges", "which sync writes the edges here"
+
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **syncRuleReferenceEdges** | a new rule-bearing column: set-diff, targets locked, foreign rows refused | email content (syncRuleReferences); segments (syncSegmentEdges) |
@@ -252,6 +321,8 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **regenerateRuleReferences** | manual rebuilds outside hooks; the target hook calls it itself | an ordinary save (the surface's sync) |
 
 **Job: evaluate a stored rule safely and list its issues** (withRule vs ruleIssues vs ruleReferenceIssues vs liveRuleReferences) — docs/claude/COMMUNICATIONS.md § Rule References; catalog entries
+
+*Said as:* "is this stored rule still sound", "run the saved rule, or report why not", "list what's wrong with the rule", "has the rule gone stale"
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -263,46 +334,73 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 **Job: collect the rule references inside an email template** (contentRuleReferences vs contentReferenceScopes vs emailRuleReferences) — catalog entries (packages/email/src/rules)
 
+*Said as:* "the rules inside an email template", "which rows does this email's content reference", "collect references from the MJML"
+
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **contentRuleReferences (email-lens)** | a flat list of rules in MJML and subject | references split by slot lens (contentReferenceScopes) |
 | **contentReferenceScopes (email-lens)** | references grouped per lens slot scope | a flat list (contentRuleReferences) |
 | **emailRuleReferences (email-lens)** | the rows one email rule names | runtime-resolved refs (emailDynamicRuleReferences); evaluating (applyEmailLens) |
 
-- **RuleReference** `packages/db/prisma/schema/ruleReference.prisma`: Use to find rules depending on a target before deleting it; don't parse conditions JSON to discover references.
+- **RuleReference** · model `packages/db/prisma/schema/ruleReference.prisma` · in docs: docs/claude/COMMUNICATIONS.md § Email › Rule References (the rows a rule names); docs/claude/NAMING.md § Database: Use to find rules depending on a target before deleting it; don't parse conditions JSON to discover references.
+  - *Said as:* "which rules depend on this tag before I delete it", "the rows a saved rule points at", "I'll parse the conditions JSON to find references", "the liveness shadow of stored rules", "find every segment naming this space"
   - *Signs you're bypassing it:* Parsing conditions JSON across rows to find which rules depend on a Tag / Space / Segment before deleting it, instead of querying RuleReference by (targetModel, targetId). (catalog entry RuleReference; docs/claude/COMMUNICATIONS.md § Rule References)
-- **admitRuleReferences** `packages/db/src/utils/admitRuleReferences.ts#admitRuleReferences`: refuse rule references whose far side the source's composed where does not admit
-- **dynamicRuleReferences** `packages/db/src/utils/ruleReferences.ts#dynamicRuleReferences`: Static ids named in the rule: ruleReferences instead; this returns only bind/path/pattern/range sources.
-- **liveRuleReferenceKeys** `packages/db/src/utils/ruleReferenceHealth.ts#liveRuleReferenceKeys`: Need the reference objects, not keys: liveRuleReferences.
-- **liveRuleReferences** `packages/db/src/utils/ruleReferenceHealth.ts#liveRuleReferences`: Only membership checks needed: liveRuleReferenceKeys. Full per-rule health report: ruleHealthFromEdges.
-- **lockedTargetStates** `packages/db/src/utils/lockedTargetStates.ts#lockedTargetStates`: Guarding rule-reference edge writes against concurrent deletes inside a transaction; locks models in name order to avoid deadlocks. Not a general mutex: use locks cluster helpers.
+- **admitRuleReferences** · primitive `packages/db/src/utils/admitRuleReferences.ts#admitRuleReferences` · in docs: docs/claude/COMMUNICATIONS.md § Email › Rule References (the rows a rule names): refuse rule references whose far side the source's composed where does not admit
+  - *Said as:* "refuse references the source's where can't reach", "the referenced row is outside the owner's scope", "only admit far rows the composed where allows"
+- **dynamicRuleReferences** · primitive `packages/db/src/utils/ruleReferences.ts#dynamicRuleReferences` · in docs: docs/claude/COMMUNICATIONS.md § Email › Rule References (the rows a rule names): Static ids named in the rule: ruleReferences instead; this returns only bind/path/pattern/range sources.
+  - *Said as:* "references the rule resolves at runtime, not fixed ids", "binds and paths that make the referenced rows unknowable", "find the dynamic sources so save can refuse them", "a reference that depends on a bound value"
+- **liveRuleReferenceKeys** · primitive `packages/db/src/utils/ruleReferenceHealth.ts#liveRuleReferenceKeys`: Need the reference objects, not keys: liveRuleReferences.
+  - *Said as:* "just the set of still-live reference keys", "a membership check for live references", "which reference keys are still usable"
+- **liveRuleReferences** · primitive `packages/db/src/utils/ruleReferenceHealth.ts#liveRuleReferences`: Only membership checks needed: liveRuleReferenceKeys. Full per-rule health report: ruleHealthFromEdges.
+  - *Said as:* "the references that are still live, from the edges", "drop references to deleted rows", "usable reference objects, failing closed", "which referenced rows still exist"
+- **lockedTargetStates** · primitive `packages/db/src/utils/lockedTargetStates.ts#lockedTargetStates`: Guarding rule-reference edge writes against concurrent deletes inside a transaction; locks models in name order to avoid deadlocks. Not a general mutex: use locks cluster helpers.
+  - *Said as:* "lock the referenced rows while writing edges", "guard the edge write against a concurrent delete", "I'll select for update on the referenced rows", "a deadlock-free lock order over the referenced models"
   - *Signs you're bypassing it:* Hand-written SELECT … FOR UPDATE on the rows a rule references, in arbitrary model order, before writing edges. (catalog entry lockedTargetStates (locks models in name order to avoid deadlocks))
-- **regenerateRuleReferences** `apps/api/src/hooks/ruleReference/regenerate.ts#regenerateRuleReferences`: Called by registerRuleReferenceTargetHook automatically; call directly only for manual rebuilds outside hooks.
-- **RuleDegradedError** `packages/shared/src/rules/errors.ts#RuleDegradedError`: Degraded rule (missing binding, stale lens, dead row): this; evaluation failure itself: RuleEvaluationError.
+- **regenerateRuleReferences** · primitive `apps/api/src/hooks/ruleReference/regenerate.ts#regenerateRuleReferences`: Called by registerRuleReferenceTargetHook automatically; call directly only for manual rebuilds outside hooks.
+  - *Said as:* "rebuild the reference edges by hand", "recompute edges outside the save hook", "a manual rebuild of the references"
+- **RuleDegradedError** · primitive `packages/shared/src/rules/errors.ts#RuleDegradedError`: Degraded rule (missing binding, stale lens, dead row): this; evaluation failure itself: RuleEvaluationError.
+  - *Said as:* "the stored rule can't be trusted right now", "a missing binding or dead row, not a crash", "the error for a rule in a degraded state", "the rule names a deleted row"
   - *Error class:* `server-error` (The server is broken or misconfigured, not the caller's fault: route misconfig, missing config, developer misuse, internal invariants. Raw Error on the request path becomes this via respond500.); classified by convention; inferred throwers: withRule
-- **ruleHealthFromEdges** `packages/db/src/utils/ruleReferenceHealth.ts#ruleHealthFromEdges`: Just the usable references: liveRuleReferences.
-- **ruleIssues** `packages/shared/src/rules/withRule.ts#ruleIssues`: Owner reads reporting problems: ruleIssues; branching evaluation on health: withRule; lens-only checks: ruleVocabularyIssues.
-- **RuleReferenceError** `packages/db/src/utils/ruleReferenceError.ts#RuleReferenceError`: signal a rule names a missing or invalid referenced row on save
+- **ruleHealthFromEdges** · primitive `packages/db/src/utils/ruleReferenceHealth.ts#ruleHealthFromEdges`: Just the usable references: liveRuleReferences.
+  - *Said as:* "a full health report for a rule from its edges", "live and dead references in one report", "how healthy is this rule"
+- **ruleIssues** · primitive `packages/shared/src/rules/withRule.ts#ruleIssues` · in docs: docs/claude/SEGMENTS.md § Rule health and references; FEATURES.md § Segments: Owner reads reporting problems: ruleIssues; branching evaluation on health: withRule; lens-only checks: ruleVocabularyIssues.
+  - *Said as:* "list what's wrong with this rule", "report the rule's problems without evaluating it", "show the owner why their rule is degraded", "bindings, lens and dead references in one list"
+- **RuleReferenceError** · primitive `packages/db/src/utils/ruleReferenceError.ts#RuleReferenceError` · in docs: docs/claude/COMMUNICATIONS.md § Email › Rule References (the rows a rule names): signal a rule names a missing or invalid referenced row on save
+  - *Said as:* "the rule names a row that doesn't exist, on save", "reject a save pointing at a missing row", "a validation error for an invalid referenced row"
   - *Error class:* `validation-error` (Submitted data fails schema validation or a business rule (Zod issues, RulesRegistry).); classified by convention; thrown by syncRuleReferenceEdges, syncRuleReferences; inferred throwers: saveEmailTemplate
-- **ruleReferenceIssues** `packages/db/src/utils/ruleReferenceHealth.ts#ruleReferenceIssues`: Reads stored edge rows only; to extract references from a rule itself use ruleReferences.
-- **ruleReferences** `packages/db/src/utils/ruleReferences.ts#ruleReferences`: Evaluation-time sources: dynamicRuleReferences; persisting edges: pass result to syncRuleReferenceEdges.
+- **ruleReferenceIssues** · primitive `packages/db/src/utils/ruleReferenceHealth.ts#ruleReferenceIssues` · in docs: docs/claude/COMMUNICATIONS.md § Email › Rule References (the rows a rule names): Reads stored edge rows only; to extract references from a rule itself use ruleReferences.
+  - *Said as:* "which referenced rows were soft-deleted or purged", "staleness from the edge rows alone", "deleted targets read off the edges"
+- **ruleReferences** · primitive `packages/db/src/utils/ruleReferences.ts#ruleReferences` · in docs: docs/claude/COMMUNICATIONS.md § Email › Rule References (the rows a rule names): Evaluation-time sources: dynamicRuleReferences; persisting edges: pass result to syncRuleReferenceEdges.
+  - *Said as:* "extract the ids a rule names", "which rows does this rule point at", "I'll walk the rule to pull out id values", "the rows a saved rule references, through its lens"
   - *Signs you're bypassing it:* A hand-written walker that pulls id values out of a rule to record its references. (docs/claude/COMMUNICATIONS.md § Rule References ("Extraction is the lens's"))
-- **syncRuleReferenceEdges** `packages/db/src/utils/syncRuleReferenceEdges.ts#syncRuleReferenceEdges`: Call for every new rule-bearing column; ruleReferences only extracts, this writes edges.
+- **syncRuleReferenceEdges** · primitive `packages/db/src/utils/syncRuleReferenceEdges.ts#syncRuleReferenceEdges` · in docs: docs/claude/COMMUNICATIONS.md § Email › Rule References (the rows a rule names): Call for every new rule-bearing column; ruleReferences only extracts, this writes edges.
+  - *Said as:* "write the reference edges when the rule is saved", "set-diff the edges on save", "a new rule column needs its references recorded", "I'll add a mutation hook to create the edges", "edges are written by the save path, not a hook"
   - *Throws:* RuleReferenceError (`validation-error`)
   - *Signs you're bypassing it:* A new rule-bearing column whose save path doesn't write edges, or edges written by a mutation hook / hand create-delete instead of the set-diff sync. (docs/claude/COMMUNICATIONS.md § Rule References ("Edges are written by the save path, not a hook"))
-- **syncSegmentEdges** `apps/api/src/modules/segment/lib/syncSegmentEdges.ts#syncSegmentEdges`: Use 'rebuild' mode to recompute all edges; default 'save' after a segment write.
-- **withRule** `packages/shared/src/rules/withRule.ts#withRule`: Use whenever evaluating a stored rule; ruleIssues only to report problems without branching.
+- **syncSegmentEdges** · primitive `apps/api/src/modules/segment/lib/syncSegmentEdges.ts#syncSegmentEdges`: Use 'rebuild' mode to recompute all edges; default 'save' after a segment write.
+  - *Said as:* "update the segment's reference edges after saving it", "rebuild every segment's edges", "segment references after a write"
+- **withRule** · primitive `packages/shared/src/rules/withRule.ts#withRule` · in docs: docs/claude/COMMUNICATIONS.md § Email › Rule References (the rows a rule names); docs/claude/COMMUNICATIONS.md § Email › The email lens: Use whenever evaluating a stored rule; ruleIssues only to report problems without branching.
+  - *Said as:* "evaluate a stored rule only if it's still sound", "branch on whether the rule is degraded", "each PR hand-rolls the degraded fork", "the one place a saved rule gets evaluated", "run the rule, or say why it can't run"
   - *Throws:* RuleEvaluationError (`server-error`, inferred); RuleDegradedError (`server-error`, inferred)
   - *Signs you're bypassing it:* Evaluating a persisted rule directly with check / toPrisma without first asking whether its bindings are supplied, the lens still admits it and the rows it names are live. (docs/claude/COMMUNICATIONS.md § Rule References (withRule is the one fork a stored rule is evaluated through anywhere))
-- **Adding a referenceable model** `docs/claude/COMMUNICATIONS.md`: make a model referenceable by rules
-- **Degraded rules change nothing** `docs/claude/COMMUNICATIONS.md withRule`: A degraded rule never matches nor touches existing state and must report why.
-- **Dynamic references refused at save** `docs/claude/COMMUNICATIONS.md`: Save must refuse rules whose referenced rows cannot be determined.
-- **Generic reference include** `docs/claude/COMMUNICATIONS.md`: Consumers include sourceRuleReferences and never grow per-model includes.
-- **Never store degradation** `docs/claude/COMMUNICATIONS.md`: Rule degradation is never stored; staleness lives on edges as two signals.
-- **Referenceable models from registry** `packages/db PolymorphismRegistry.RuleReference`: Making a new model rule-referenceable.
-- **Rule reference edges persisted** `docs: Rule References`: Any rule-bearing model with {{#if rule=…}} referencing rows.
-- **Rule reference edges written by save path** `docs/claude/COMMUNICATIONS.md`: adding any rule-bearing column
-- **Stored rules evaluate only through withRule** `@template/shared/rules`: any evaluation of a persisted rule
+- **Adding a referenceable model** · pattern docs/claude/COMMUNICATIONS.md: make a model referenceable by rules
+  - *Said as:* "let rules reference this new model", "make segments able to point at this table", "register a model as a rule target"
+- **Degraded rules change nothing** · rule docs/claude/COMMUNICATIONS.md withRule: A degraded rule never matches nor touches existing state and must report why.
+  - *Said as:* "a degraded rule must not match anyone", "when the rule is broken, don't touch state", "a broken rule never adds or removes members"
+- **Dynamic references refused at save** · rule docs/claude/COMMUNICATIONS.md: Save must refuse rules whose referenced rows cannot be determined.
+  - *Said as:* "refuse saving a rule whose references can't be determined", "no binds in the referenced position", "reject rules with runtime-resolved references"
+- **Generic reference include** · rule docs/claude/COMMUNICATIONS.md: Consumers include sourceRuleReferences and never grow per-model includes.
+  - *Said as:* "include the references with the row", "I'll add a per-model include for segment references", "one generic include for every reference holder"
+- **Never store degradation** · rule docs/claude/COMMUNICATIONS.md: Rule degradation is never stored; staleness lives on edges as two signals.
+  - *Said as:* "don't persist a degraded flag", "a degraded column with its own propagation", "staleness lives on the edges, not a stored flag"
+- **Referenceable models from registry** · rule packages/db PolymorphismRegistry.RuleReference: Making a new model rule-referenceable.
+  - *Said as:* "the models rules can name come from the registry", "register the target model, don't hard-code a list", "which models are referenceable"
+- **Rule reference edges persisted** · rule docs: Rule References: Any rule-bearing model with {{#if rule=…}} referencing rows.
+  - *Said as:* "store what each rule references", "an edge row per referenced row", "persist the rule's references"
+- **Rule reference edges written by save path** · rule docs/claude/COMMUNICATIONS.md: adding any rule-bearing column
+  - *Said as:* "write the edges where the rule is saved", "the save path records references", "no hook for the edges"
+- **Stored rules evaluate only through withRule** · rule @template/shared/rules: any evaluation of a persisted rule
+  - *Said as:* "never evaluate a saved rule directly", "every stored rule runs through the health fork", "don't call the evaluator on a persisted rule"
 - *Also here, by name:* RULE_REFERENCEABLE_MODELS (`packages/db/src/utils/ruleReferenceable.ts`); RuleReferenceSourceModel (`packages/db/prisma/schema/ruleReference.prisma`); RuleReferenceTargetModel (`packages/db/prisma/schema/ruleReference.prisma`); bindValues (`apps/api/src/lib/email/bindValues.ts`); includeSegmentRuleReferences (`apps/api/src/modules/segment/queries/segmentIncludes.ts`); referenceKey (`packages/shared/src/rules/withRule.ts`); registerRuleReferenceTargetHook (`apps/api/src/hooks/ruleReference/targetHook.ts`); ruleReferenceStale (`apps/api/src/appEvents/handlers/ruleReference/ruleReferenceStale.ts`)
 
 ## 4. The specifics, in full

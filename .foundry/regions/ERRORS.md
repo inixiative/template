@@ -35,7 +35,7 @@ Basis: `documented` = a doc states the class; `convention` = no status documente
 
 | Error | Where | Region | Thrown by | Basis | Source |
 |---|---|---|---|---|---|
-| **BadRequestError** | `(none: appears only in catalog Use lines)` | [filtering-pagination](filtering-pagination/knowledge.md) | — | example-only | catalog isValidOperatorForField / validatePathNotation Use lines |
+| **BadRequestError** | `(none: appears only in catalog Use lines)` | [filtering-search](filtering-search/knowledge.md) | — | example-only | catalog isValidOperatorForField / validatePathNotation Use lines |
 | **HttpError** | `(none: appears only in an example)` | [lens-usage](lens-usage/knowledge.md) | — | example-only | json-rules lens docs example (gate.ok check) |
 | **makeError 400 BAD_REQUEST** | `apps/api/src/lib/errors/makeError.ts (labels from packages/shared/src/errors/types.ts HTTP_ERROR_MAP)` | [request-context-errors](request-context-errors/knowledge.md) | buildWhereClause, coerceValueForField, buildJsonWhere, POST /api/v1/batch/execute *(inferred: validatePathNotation, isValidOperatorForField)* | documented | docs/claude/API_ROUTES.md § Error Responses (HTTP_ERROR_MAP table) |
 | **Prisma.PrismaClientValidationError** | `@prisma/client` | [request-context-errors](request-context-errors/knowledge.md) | — *(inferred: db, query)* | documented | docs/claude/ERRORS.md § The global handler |
@@ -44,7 +44,7 @@ Basis: `documented` = a doc states the class; `convention` = no status documente
 
 | Error | Where | Region | Thrown by | Basis | Source |
 |---|---|---|---|---|---|
-| **makeError 401 AUTHENTICATION_FAILED** | `apps/api/src/lib/errors/makeError.ts (labels from packages/shared/src/errors/types.ts HTTP_ERROR_MAP)` | [authentication](authentication/knowledge.md) | validateUser, validateActor, validateNotToken, basicAuthMiddleware | documented | docs/claude/API_ROUTES.md § Error Responses (HTTP_ERROR_MAP table) |
+| **makeError 401 AUTHENTICATION_FAILED** | `apps/api/src/lib/errors/makeError.ts (labels from packages/shared/src/errors/types.ts HTTP_ERROR_MAP)` | [auth-middleware-users](auth-middleware-users/knowledge.md) | validateUser, validateActor, validateNotToken, basicAuthMiddleware | documented | docs/claude/API_ROUTES.md § Error Responses (HTTP_ERROR_MAP table) |
 
 ## `permission-denied`
 
@@ -70,7 +70,7 @@ Basis: `documented` = a doc states the class; `convention` = no status documente
 | Error | Where | Region | Thrown by | Basis | Source |
 |---|---|---|---|---|---|
 | **DivergentDuplicateSlugError** | `packages/email/src/errors/DivergentDuplicateSlugError.ts` | [email-templates](email-templates/knowledge.md) | — | convention | email-templates part 3 (Also here) |
-| **FindForUpdateLockTimeoutError** | `packages/db/src/lock/findForUpdateLockTimeoutError.ts` | [database](database/knowledge.md) | db.findForUpdate, acquireFindForUpdateLock | convention | docs/claude/DATABASE.md § Transactions › Row Locks and Create-If-Missing |
+| **FindForUpdateLockTimeoutError** | `packages/db/src/lock/findForUpdateLockTimeoutError.ts` | [database-client](database-client/knowledge.md) | db.findForUpdate, acquireFindForUpdateLock | convention | docs/claude/DATABASE.md § Transactions › Row Locks and Create-If-Missing |
 | **isUniqueConstraintError** | `packages/db/src/utils/isUniqueConstraintError.ts#isUniqueConstraintError` | [request-context-errors](request-context-errors/knowledge.md) | — *(inferred: db, query)* | documented | catalog isUniqueConstraintError; docs/claude/ERRORS.md § The global handler |
 | **isWriteConflictError** | `packages/db/src/utils/isWriteConflictError.ts#isWriteConflictError` | [request-context-errors](request-context-errors/knowledge.md) | — *(inferred: db.txn)* | convention | catalog isWriteConflictError |
 | **makeError 409 CONFLICT** | `apps/api/src/lib/errors/makeError.ts (labels from packages/shared/src/errors/types.ts HTTP_ERROR_MAP)` | [request-context-errors](request-context-errors/knowledge.md) | resourceContextMiddleware, Alternate resource lookup, withOwnerLock, validate, Handler validate hook *(inferred: validateInquiryPreCreate, validateUniqueInquiry)* | documented | docs/claude/API_ROUTES.md § Error Responses (HTTP_ERROR_MAP table) |
@@ -120,16 +120,16 @@ Basis: `documented` = a doc states the class; `convention` = no status documente
 |---|---|---|---|---|---|
 | **Bulk write refusal (createMany / updateMany)** | `packages/db (hooked client)` | [mutation-hooks](mutation-hooks/knowledge.md) | createManyAndReturn, updateManyAndReturn *(inferred: db)* | convention | docs/claude/HOOKS.md § Supported Operations |
 | **cache key Error** | `packages/db/src/redis/cache.ts (validateKey)` | [redis-caching-rate-limits](redis-caching-rate-limits/knowledge.md) | validateKey, cache | convention | catalog validateKey |
-| **db.onCommit outside transaction Error** | `@template/db` | [database](database/knowledge.md) | db.onCommit | convention | docs/claude/DATABASE.md § Transactions › After Commit Callbacks |
-| **db.parallel aggregated failure** | `apps/api/src/appEvents (makeAppEvent / db.parallel)` | [app-events-webhooks-adapters](app-events-webhooks-adapters/knowledge.md) | db.parallel | convention | docs/claude/APP_EVENTS.md § Purpose and execution |
+| **db.onCommit outside transaction Error** | `@template/db` | [database-client](database-client/knowledge.md) | db.onCommit | convention | docs/claude/DATABASE.md § Transactions › After Commit Callbacks |
+| **db.parallel aggregated failure** | `apps/api/src/appEvents (makeAppEvent / db.parallel)` | [app-events-webhooks](app-events-webhooks/knowledge.md) | db.parallel | convention | docs/claude/APP_EVENTS.md § Purpose and execution |
 | **engineGlobals.with async-callback Error** | `@inixiative/json-rules engineGlobals.with` | [json-rules-engine](json-rules-engine/knowledge.md) | engineGlobals.with | convention | @inixiative/json-rules/README.md § Engine Globals |
-| **fetchAllPages cap Error** | `packages/shared/src/utils/fetchAllPages.ts#fetchAllPages` | [filtering-pagination](filtering-pagination/knowledge.md) | fetchAllPages | convention | catalog fetchAllPages |
+| **fetchAllPages cap Error** | `packages/shared/src/utils/fetchAllPages.ts#fetchAllPages` | [pagination](pagination/knowledge.md) | fetchAllPages | convention | catalog fetchAllPages |
 | **makeError 500 SERVER_ERROR** | `apps/api/src/lib/errors/makeError.ts (labels from packages/shared/src/errors/types.ts HTTP_ERROR_MAP)` | [request-context-errors](request-context-errors/knowledge.md) | errorHandlerMiddleware, POST /api/v1/batch/execute | documented | docs/claude/API_ROUTES.md § Error Responses (HTTP_ERROR_MAP table) |
 | **orderedList buildScope Error** | `apps/api/src/hooks/orderedList/` | [mutation-hooks](mutation-hooks/knowledge.md) | buildScope | convention | catalog buildScope |
 | **ResponseValidationError** | `apps/api/src/lib/utils/makeController.ts` | [request-context-errors](request-context-errors/knowledge.md) | makeController | documented | docs/claude/ERRORS.md § The global handler |
 | **RuleDegradedError** | `packages/shared/src/rules/errors.ts#RuleDegradedError` | [json-rules](json-rules/knowledge.md) | — *(inferred: withRule)* | convention | catalog RuleDegradedError |
 | **RuleEvaluationError** | `packages/shared/src/rules/errors.ts#RuleEvaluationError` | [json-rules](json-rules/knowledge.md) | — *(inferred: withRule)* | convention | catalog RuleEvaluationError |
-| **searchPaths stray-entry Error** | `apps/api/src/lib/prisma/paginate.ts` | [filtering-pagination](filtering-pagination/knowledge.md) | paginate | documented | docs/claude/API_ROUTES.md § Response Format › Search & Filtering |
+| **searchPaths stray-entry Error** | `apps/api/src/lib/prisma/paginate.ts` | [pagination](pagination/knowledge.md) | paginate | documented | docs/claude/API_ROUTES.md § Response Format › Search & Filtering |
 | **validateJobId Error** | `apps/api/src/jobs/validateJobId.ts#validateJobId` | [jobs-cron](jobs-cron/knowledge.md) | validateJobId | convention | docs/claude/JOBS.md § Enqueuing Jobs; catalog validateJobId |
 | **validateRole Error** | `apps/api/src/lib/permissions/validateRole.ts#validateRole` | [permissions](permissions/knowledge.md) | validateRole | documented | docs/claude/PERMISSIONS.md § Permission Setup › Role Validation |
 
@@ -165,13 +165,13 @@ Basis: `documented` = a doc states the class; `convention` = no status documente
 | **classifyResendError** | `packages/email (named in email-delivery part 3 "Also here"; catalog EmailProviderError Use line)` | [email-delivery](email-delivery/knowledge.md) | — | documented | catalog EmailProviderError |
 | **EmailProviderError** | `packages/email/src/errors/EmailProviderError.ts#EmailProviderError` | [email-delivery](email-delivery/knowledge.md) | deliverEmailMessage | documented | docs/claude/COMMUNICATIONS.md § Email › Send Pipeline › Deliver (deliverEmail), step 8 |
 | **EmailRenderError** | `packages/email/src/errors/EmailRenderError.ts#EmailRenderError` | [email-templates](email-templates/knowledge.md) | settleTemplate | documented | docs/claude/COMMUNICATIONS.md § Email › Send Pipeline › Deliver (deliverEmail) › Render issues |
-| **flushRedis outside test Error** | `packages/db/src/redis/client.ts#flushRedis` | [testing](testing/knowledge.md) | flushRedis | documented | catalog flushRedis |
+| **flushRedis outside test Error** | `packages/db/src/redis/client.ts#flushRedis` | [test-harness](test-harness/knowledge.md) | flushRedis | documented | catalog flushRedis |
 | **isEmailContentError** | `packages/email/src/errors/isEmailContentError.ts#isEmailContentError` | [email-delivery](email-delivery/knowledge.md) | — | documented | docs/claude/COMMUNICATIONS.md § Email › Send Pipeline › Deliver (deliverEmail), step 2 |
-| **makeContextQueries missing-context Error** | `packages/ui/src/lib/makeContextQueries.ts#makeContextQueries` | [frontend-state-api-client](frontend-state-api-client/knowledge.md) | makeContextQueries | documented | docs/claude/FRONTEND/API_CLIENT.md § Context Queries |
+| **makeContextQueries missing-context Error** | `packages/ui/src/lib/makeContextQueries.ts#makeContextQueries` | [api-client](api-client/knowledge.md) | makeContextQueries | documented | docs/claude/FRONTEND/API_CLIENT.md § Context Queries |
 | **retryWithTimeout timeout Error** | `init/utils/retry.ts` | [init-script](init-script/knowledge.md) | retryWithTimeout | documented | docs/claude/INIT_SCRIPT_PATTERNS.md § 9. Retry Logic for Async Initialization |
 | **SupersededError** | `apps/api/src/jobs/types.ts#SupersededError` | [concurrency-locks](concurrency-locks/knowledge.md) | — | documented | catalog SupersededError; docs/claude/JOBS.md § Handler Patterns › Superseding Job |
 | **Unknown job handler Error** | `apps/api/src/jobs (worker)` | [jobs-cron](jobs-cron/knowledge.md) | — | documented | docs/claude/JOBS.md § Error Boundaries |
-| **VCR replayed provider error** | `packages/shared/src/vcr/vcr.ts` | [testing](testing/knowledge.md) | VCR, vcr.capture | documented | docs/claude/TESTING.md § VCR (external services) |
+| **VCR replayed provider error** | `packages/shared/src/vcr/vcr.ts` | [test-harness](test-harness/knowledge.md) | VCR, vcr.capture | documented | docs/claude/TESTING.md § VCR (external services) |
 
 ## `usage`
 

@@ -1,0 +1,28 @@
+{
+  "id": "test-factories-rules",
+  "title": "Test factories, cleanup and test rules",
+  "routing": "Is this about test data and the rules tests must follow: buildX / createX factories from @template/db/test, createFactory for a new model, FK auto-inference and the factory context (camelCase accessor keys), optional dependencies triggered with {}, getNextSeq, TypedBuildResult, entity.__serialize(), cleanupTouchedTables and the test tracker (registered by the db client, never called in tests), or the CI rules for tests: no-module-mocks, no-jest, no-vitest, no-direct-prisma-in-tests, no-raw-global-assign-in-tests, no-test-env-mutation, spy-must-restore, check-test-hand-cleanup, check-test-tracker-registration, ui-serialized-factories, committing only sanitized cassettes, and the validation discipline (exhaust validation before caveating, focused checks then full sweep)?",
+  "concepts": [
+    "test-factories",
+    "test-rules"
+  ],
+  "tokens": 11547,
+  "tokenMethod": "chars/4",
+  "runsAgreed": 0,
+  "sources": {
+    "docs": [
+      "docs/claude/TESTING.md"
+    ],
+    "docUnits": [
+      "doc:docs/claude/TESTING.md#factories"
+    ],
+    "catalogClusters": [
+      "testing-helpers",
+      "testing-rules"
+    ],
+    "codeEntries": 87,
+    "docMembers": 26
+  },
+  "bypassLines": 33,
+  "glossaryTerms": 16
+}

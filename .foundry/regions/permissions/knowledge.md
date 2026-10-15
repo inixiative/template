@@ -119,21 +119,23 @@ Authorization is layered (PERMISSIONS.md § Overview). PlatformRole on User make
 
 Decisions beyond plain grants come from the ReBAC engine. rebacSchema (packages/permissions/src/rebac/schema.ts) declares each model's actions as ActionRules: a string inherits another action on the same record, { rel, action } delegates along a relation (a dot-path such as sourceSpace.organization jumps to the ancestor and skips intermediate delegation), { self } matches the actor, { rule } is a json-rules condition, any/all compose, null is terminal. check() evaluates a hydrated record and ORs in the record's permissionRules, so row overrides only widen (validate them at the boundary with buildPermissionRulesSchema, typically read only). Space own delegates to organization own, so org owners inherit space access without copied rows. Owner-polymorphic models use ownerActions(); role grants and token creation use the assign action (high roles need own); self-removal uses leave. On routes, authenticate first (validateUser / validateActor, see the `authentication` region), then validatePermission(action) after resourceContextMiddleware, validateOwnerPermission for ownerModel resources, and validateNotToken for session-only actions. Resource lookup returns 404/409 before authorization on purpose: existence is non-secret.
 
-The frontend runs the same engine: permissions.setup(me) loads grants from /me, and gates go by layer: checkContextPermission (page), NavItem.access (nav), usePermission (one control, feeding Button show/disabledText), checkPermission (plain functions), useInquiryPermission (inquiry rows). Related regions: `lib-permissions` is the published @inixiative/permissions engine (createPermissions, createRebacCheck, createHydrator, Bridges) that packages/permissions builds on; `tenancy` owns Organization/Space/memberships and the superadmin role, admin routes and spoofing; `authentication` owns who the caller is, token types and the validateUser/validateActor gates; `inquiries` owns the inquiry lifecycle (only its send/resolve/read rules live here); `json-rules` and `json-rules-engine` own the condition language used in { rule }; `frontend-apps-navigation` owns nav config and page routing.
+The frontend runs the same engine: permissions.setup(me) loads grants from /me, and gates go by layer: checkContextPermission (page), NavItem.access (nav), usePermission (one control, feeding Button show/disabledText), checkPermission (plain functions), useInquiryPermission (inquiry rows). Related regions: `lib-permissions` is the published @inixiative/permissions engine (createPermissions, createRebacCheck, createHydrator, Bridges) that packages/permissions builds on; `tenancy` owns Organization/Space/memberships and the superadmin role, admin routes and spoofing; `authentication` owns who the caller is, token types and the validateUser/validateActor gates; `inquiries` owns the inquiry lifecycle (only its send/resolve/read rules live here); `json-rules` and `json-rules-engine` own the condition language used in { rule }; `frontend-apps-routing / navigation` owns nav config and page routing.
 
 ## 3. Everything that exists here, by class
 
-Point at a class when that is as specific as the moment allows, or at a member. Where a class has siblings an agent could confuse, a table under the class header says which to use when. Each member: **name** `where`: choose this when … . Where the docs or code give material, a second line describes the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
+Point at a class when that is as specific as the moment allows, or at a member. Where a class has siblings an agent could confuse, a table under the class header says which to use when; its *Said as* line gives the plain words a user or agent uses for that job. Each member: **name** · kind `where` · the doc § that describes it (code members) or the code it is about (doc members): choose this when … . Quote the name and the where in a pointer ("look over here: createLock, packages/db/src/lock/createLock.ts, CONCURRENCY.md § Distributed Lock"). *Said as:* the ways a user or agent describes this job in a message or plan without knowing the name; match on these. *Signs you're bypassing it:* the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
 
 ### Class `permissions`: Roles, actions, Permix, ReBAC walks, entitlements, row-level overrides, validatePermission
 
 **Job: gate an API route on who the caller is or what they may do** (Route validators (validate*)) — docs/claude/AUTH.md § Validation Middleware, § Choosing Between validateUser and validateActor; PERMISSIONS.md § Validation Middleware; apps/api/src/lib/permissions/validateRole.ts
 
+*Said as:* "who is allowed to hit this endpoint", "require a logged-in user on this route", "this must be a real session, not a key", "can the caller do this to the resource", "platform admins only", "the resource could be owned by a user or an org"
+
 | Member | Use when | Not when (use instead) |
 |---|---|---|
-| **validateUser (authentication)** | acting as a person (/me/*); 401 unless c.get('user') | Organization/Space token routes (skip; validatePermission) |
-| **validateActor (authentication)** | needs getActor(c).user (falls back to membership/token user) | docs: same callers as validateUser in practice; /me/* uses validateUser |
-| **validateNotToken (authentication)** | session-only: token minting, token self-delete, org delete; 403 for tokens | tokens are acceptable (validateUser) |
+| **validateUser (auth-middleware-users)** | acting as a person (/me/*); 401 unless c.get('user') | Organization/Space token routes (skip; validatePermission) |
+| **validateActor (auth-middleware-users)** | needs getActor(c).user (falls back to membership/token user) | docs: same callers as validateUser in practice; /me/* uses validateUser |
+| **validateNotToken (auth-middleware-users)** | session-only: token minting, token self-delete, org delete; 403 for tokens | tokens are acceptable (validateUser) |
 | **validatePermission** | action on the resource loaded by resourceContextMiddleware; sole gate for Org/Space tokens | owner-polymorphic resource (validateOwnerPermission) |
 | **validateOwnerPermission** | resource owned via ownerModel (Token, WebhookSubscription) | fixed owner chain (validatePermission) |
 | **validateSuperadmin (tenancy)** | platform-admin routes; 403 unless superadmin | tenant access (validatePermission); inline branch (isSuperadmin) |
@@ -141,9 +143,10 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 **Job: gate a page, nav item or control in the frontend** (Frontend gates by layer) — docs/claude/PERMISSIONS.md § Frontend Checks
 
+*Said as:* "hide this button if they can't do it", "show the nav item only to admins", "gate the page by permission", "filter the list to what the user may edit"
+
 | Member | Use when | Not when (use instead) |
 |---|---|---|
-| **checkContextPermission (frontend-apps-navigation)** | page gating via useAuthenticatedRouting | one control (usePermission) |
 | **NavItem.access** | nav item visibility | component actions (usePermission) |
 | **usePermission** | one control: { show, disable, disabledText } | plain functions or loops (checkPermission) |
 | **checkPermission** | plain function or loop | a component control (usePermission) |
@@ -151,124 +154,209 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 **Job: check a permission on a record** (check vs permix.check vs row overrides) — PERMISSIONS.md § Permix, § REBAC, § Row-Level Overrides
 
+*Said as:* "can this user do this to this record", "does the loaded grant cover this action", "share one record with one person"
+
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **check** | relation, self or abac rules on a hydrated record | route-level (validatePermission) |
 | **permix.check** | grant-only lookup of setup grants | access walks a relation (check) |
 | **Row-level permission overrides** | share one record (read), additive only | every row needs it (rebacSchema) |
 
-- **Role** `packages/db/prisma/schema/user.prisma`: Tenant or token access level: Role; platform superadmin gate: PlatformRole instead.
-- **actionRuleSchema** `@inixiative/permissions/actionRuleSchema#actionRuleSchema`: Validating whole ActionRule overrides; for the abac condition alone use json-rules validateRule, which this delegates to.
+- **Role** · model `packages/db/prisma/schema/user.prisma` · in docs: docs/claude/PERMISSIONS.md § Role Assignment; docs/claude/PERMISSIONS.md § Roles: Tenant or token access level: Role; platform superadmin gate: PlatformRole instead.
+  - *Said as:* "a member's access level in an org or space", "owner, admin, member or viewer", "I'll compare against the string owner"
+- **actionRuleSchema** · package `@inixiative/permissions/actionRuleSchema#actionRuleSchema` · in docs: @inixiative/permissions/README.md § Also exported; @inixiative/permissions/README.md § Writing a schema: Validating whole ActionRule overrides; for the abac condition alone use json-rules validateRule, which this delegates to.
+  - *Said as:* "validate a permission override before saving it", "is this tenant-authored rule even well formed", "I'll write a zod shape for the override by hand"
   - *Signs you're bypassing it:* persisting a tenant-authored permissionRules override unvalidated, or a hand-written zod union describing ActionRule (@inixiative/permissions/README.md § Writing a schema; § Also exported)
-- **createHydrator** `@inixiative/permissions#createHydrator`: Run before createRebacCheck; it dedupes loads per hydration and breaks cycles, but cross-call caching belongs in load.
+- **createHydrator** · package `@inixiative/permissions#createHydrator` · in docs: @inixiative/permissions/README.md § Hydration (Prisma example): Run before createRebacCheck; it dedupes loads per hydration and breaks cycles, but cross-call caching belongs in load.
+  - *Said as:* "load the parents a permission check needs", "fetch the owning org and space before deciding", "I'll write a recursive loader walking foreign keys with a seen set"
   - *Signs you're bypassing it:* a recursive hand-written loader that walks FK columns to fetch parent records, with its own seen-set to avoid cycles, before calling check (@inixiative/permissions/README.md § Hydration (Prisma example))
-- **createPermissions** `@inixiative/permissions#createPermissions`: Plain role/action checks: use this; relation-based or ABAC rules: createRebacCheck.
-- **createRebacCheck** `@inixiative/permissions#createRebacCheck`: Relation or rule-based access: use this; plain role checks: createPermissions. Hydrate records with createHydrator first.
-- **buildPermissionRulesSchema** `packages/permissions/src/rebac/permissionRulesSchema.ts#buildPermissionRulesSchema`: Use in route schemas accepting permissionRules instead of hand-writing action enums; derives keys from rebacSchema.
+- **createPermissions** · package `@inixiative/permissions#createPermissions` · in docs: docs/claude/PERMISSIONS.md § Permix; @inixiative/permissions/README.md § The permix wrapper: Plain role/action checks: use this; relation-based or ABAC rules: createRebacCheck.
+  - *Said as:* "a plain role-to-actions lookup client", "set up the grants object for a request", "I'll keep a map of role to allowed actions"
+- **createRebacCheck** · package `@inixiative/permissions#createRebacCheck` · in docs: @inixiative/permissions/README.md § The check engine; @inixiative/permissions/README.md § Hydration (Prisma example): Relation or rule-based access: use this; plain role checks: createPermissions. Hydrate records with createHydrator first.
+  - *Said as:* "build the engine that follows relations to decide access", "access that depends on the parent record", "I'll write a function that checks the org then the space"
+- **buildPermissionRulesSchema** · primitive `packages/permissions/src/rebac/permissionRulesSchema.ts#buildPermissionRulesSchema` · in docs: docs/claude/PERMISSIONS.md § Row-Level Overrides; FEATURES.md § Contact System: Use in route schemas accepting permissionRules instead of hand-writing action enums; derives keys from rebacSchema.
+  - *Said as:* "the request schema for per-record sharing rules", "which actions can an override mention", "I'll write an enum of action names in the route schema"
   - *Signs you're bypassing it:* a hand-written zod enum or object of action keys for a permissionRules body field, a second source of truth beside rebacSchema (docs/claude/PERMISSIONS.md § Row-Level Overrides › Boundary validation)
-- **check** `packages/permissions/src/rebac/check.ts#check`: Core evaluator; define grants in rebacSchema or role maps, then call check rather than hand-rolling permission logic.
+- **check** · primitive `packages/permissions/src/rebac/check.ts#check` · in docs: docs/claude/PERMISSIONS.md § Frontend Checks; docs/claude/PERMISSIONS.md § Permission Checks: Core evaluator; define grants in rebacSchema or role maps, then call check rather than hand-rolling permission logic.
+  - *Said as:* "can this user do this to this record", "decide access using relations, self or conditions", "I'll write an if-else on the membership role in the controller", "the evaluator, not the route gate"
   - *Throws:* UsageError (`usage`, json-rules-engine); json-rules rule-shape Error (`rule-shape`, json-rules-engine)
   - *Signs you're bypassing it:* if/else chains in a controller that look up an OrganizationUser or SpaceUser and compare its role, instead of declaring the rule in rebacSchema and calling check (catalog: packages/permissions/src/rebac/check.ts ("call check rather than hand-rolling permission logic"))
-- **checkPermission** `packages/ui/src/hooks/usePermission.ts#checkPermission`: Inside components prefer usePermission hook or permissions.check; use this in plain functions or loops.
+- **checkPermission** · primitive `packages/ui/src/hooks/usePermission.ts#checkPermission` · in docs: docs/claude/PERMISSIONS.md § Frontend Checks: Inside components prefer usePermission hook or permissions.check; use this in plain functions or loops.
+  - *Said as:* "permission test inside a loop or plain function", "filter a list to the rows the user may edit", "I'll compare roles inside the map callback", "outside a component, no hook"
   - *Signs you're bypassing it:* role comparisons inside a plain function or loop instead of checkPermission(permissions, model, record, action) (docs/claude/PERMISSIONS.md § Frontend Checks)
-- **createPermissions** `packages/permissions/src/client.ts#createPermissions`: build a typed Permix permissions client for checks
-- **getOrgPermissions** `packages/permissions/src/roles/organization.ts#getOrgPermissions`: Org-scoped grants; use getSpacePermissions for space memberships.
-- **getSpacePermissions** `packages/permissions/src/roles/space.ts#getSpacePermissions`: space-scoped grants; org membership rows use getOrgPermissions, a user's own record uses getUserPermissions
-- **getUserPermissions** `packages/permissions/src/roles/user.ts#getUserPermissions`: self-scoped grants applied first for non-superadmins; tenant scopes use getOrgPermissions or getSpacePermissions
-- **greaterRole** `packages/permissions/src/roles/shared.ts#greaterRole`: return the highest of several roles, ignoring nulls
-- **isSuperadmin** `packages/permissions/src/roles/shared.ts#isSuperadmin`: platform-wide bypass checks; tenant roles use rolesAtOrAbove or getSpacePermissions instead
+- **createPermissions** · primitive `packages/permissions/src/client.ts#createPermissions` · in docs: docs/claude/PERMISSIONS.md § Permix; @inixiative/permissions/README.md § The permix wrapper: build a typed Permix permissions client for checks
+  - *Said as:* "a plain role-to-actions lookup client", "set up the grants object for a request", "I'll keep a map of role to allowed actions"
+- **getOrgPermissions** · primitive `packages/permissions/src/roles/organization.ts#getOrgPermissions` · in docs: docs/claude/PERMISSIONS.md § Permission Setup; docs/claude/PERMISSIONS.md § Entitlements: Org-scoped grants; use getSpacePermissions for space memberships.
+  - *Said as:* "what an org membership grants", "grants for a role plus entitlements at org scope", "I'll compute the org grants inline in the middleware"
+- **getSpacePermissions** · primitive `packages/permissions/src/roles/space.ts#getSpacePermissions` · in docs: docs/claude/ZUSTAND.md § 2. PermissionsSlice: space-scoped grants; org membership rows use getOrgPermissions, a user's own record uses getUserPermissions
+  - *Said as:* "what a space membership grants", "space-scoped grants from a space role", "I'll derive space actions from the role by hand"
+- **getUserPermissions** · primitive `packages/permissions/src/roles/user.ts#getUserPermissions` · in docs: docs/claude/PERMISSIONS.md § Permission Setup; docs/claude/ZUSTAND.md § 2. PermissionsSlice: self-scoped grants applied first for non-superadmins; tenant scopes use getOrgPermissions or getSpacePermissions
+  - *Said as:* "what a user may do to their own record", "self-scoped grants applied first", "I'll special-case editing your own profile"
+- **greaterRole** · primitive `packages/permissions/src/roles/shared.ts#greaterRole` · in docs: docs/claude/PERMISSIONS.md § Roles: return the highest of several roles, ignoring nulls
+  - *Said as:* "take the higher of two roles", "the best role across several memberships", "I'll sort roles by index and pick the top"
+- **isSuperadmin** · primitive `packages/permissions/src/roles/shared.ts#isSuperadmin` · in docs: docs/claude/PERMISSIONS.md § Permission Setup; docs/claude/CONTEXT.md § Context Access: platform-wide bypass checks; tenant roles use rolesAtOrAbove or getSpacePermissions instead
+  - *Said as:* "a quick branch for platform admins inside logic", "skip this for superadmins", "I'll compare the platform role string inline"
   - *Signs you're bypassing it:* inline user.platformRole === 'superadmin' comparisons (catalog: packages/permissions/src/roles/shared.ts and apps/api/src/lib/context/isSuperadmin.ts)
-- **lesserRole** `packages/permissions/src/roles/shared.ts#lesserRole`: capping a role by another (e.g. inherited org role); for threshold lists use rolesAtOrAbove
+- **lesserRole** · primitive `packages/permissions/src/roles/shared.ts#lesserRole` · in docs: docs/claude/PERMISSIONS.md § Permission Setup; docs/claude/PERMISSIONS.md § Roles: capping a role by another (e.g. inherited org role); for threshold lists use rolesAtOrAbove
+  - *Said as:* "a key can't have more than its owner's role", "cap one role by another", "I'll compare role indexes by hand when combining them"
   - *Signs you're bypassing it:* a token's role used directly, or roleHierarchy.indexOf comparisons by hand, when combining a membership role with a token role (docs/claude/PERMISSIONS.md § Roles › Role Hierarchy; Token Permission Restriction)
-- **ownerActions** `packages/permissions/src/rebac/ownerActions.ts#ownerActions`: Use for models with nullable multi-owner FKs (Contact, WebhookSubscription) instead of writing per-action fan-out by hand.
+- **ownerActions** · primitive `packages/permissions/src/rebac/ownerActions.ts#ownerActions` · in docs: docs/claude/PERMISSIONS.md § Owner-Polymorphic Models; FEATURES.md § Contact System: Use for models with nullable multi-owner FKs (Contact, WebhookSubscription) instead of writing per-action fan-out by hand.
+  - *Said as:* "a model owned by a user, an org or a space", "the same rule fanned out across every possible owner", "I'll write the any-of-owners rule for every action"
   - *Signs you're bypassing it:* the same { any: [{ rel: 'user', action }, { rel: 'organization', action }, { rel: 'space', action }] } written out for every action of an owner-polymorphic model in rebacSchema (docs/claude/PERMISSIONS.md § Owner-Polymorphic Models)
-- **polymorphicBindings** `packages/db/src/registries/polymorphicIs.ts#polymorphicBindings`: Pair with polymorphicIs conditions; it supplies the bind values they reference.
-- **polymorphicIs** `packages/db/src/registries/polymorphicIs.ts#polymorphicIs`: Use instead of hand-writing per-kind key/discriminator arms; bind values with polymorphicBindings.
+- **polymorphicBindings** · primitive `packages/db/src/registries/polymorphicIs.ts#polymorphicBindings`: Pair with polymorphicIs conditions; it supplies the bind values they reference.
+  - *Said as:* "the values the owner-kind conditions refer to", "bind the ids for the polymorphic match"
+- **polymorphicIs** · primitive `packages/db/src/registries/polymorphicIs.ts#polymorphicIs`: Use instead of hand-writing per-kind key/discriminator arms; bind values with polymorphicBindings.
+  - *Said as:* "match on which kind of owner a row has", "a condition keyed by the owner discriminator and matching foreign key", "I'll write one arm per owner kind in the rule"
   - *Signs you're bypassing it:* hand-written per-kind arms matching ownerModel plus the matching FK column in a rule condition (catalog: packages/db/src/registries/polymorphicIs.ts)
-- **rebacSchema** `packages/permissions/src/rebac/schema.ts#rebacSchema`: Add model action rules here; role grants live in organizationRoles/getOrgPermissions, evaluation in check.
-- **rolesAtOrAbove** `packages/permissions/src/roles/shared.ts#rolesAtOrAbove`: minimum-role filters and queries; comparing two specific roles: lesserRole instead
+- **rebacSchema** · primitive `packages/permissions/src/rebac/schema.ts#rebacSchema` · in docs: docs/claude/PERMISSIONS.md § REBAC; docs/claude/PERMISSIONS.md § Row-Level Overrides: Add model action rules here; role grants live in organizationRoles/getOrgPermissions, evaluation in check.
+  - *Said as:* "where a model's actions and who gets them are declared", "add a permission rule for a new model", "I'll test the role in the controller instead of declaring it"
+- **rolesAtOrAbove** · primitive `packages/permissions/src/roles/shared.ts#rolesAtOrAbove`: minimum-role filters and queries; comparing two specific roles: lesserRole instead
+  - *Said as:* "everyone who is at least an admin", "a minimum-role filter for a query", "I'll write role in owner, admin literally"
   - *Signs you're bypassing it:* a literal role list such as where: { role: { in: ['owner', 'admin'] } } for a minimum-role filter (catalog: packages/permissions/src/roles/shared.ts#rolesAtOrAbove)
-- **setupOrgPermissions** `apps/api/src/lib/permissions/setupOrgPermissions.ts#setupOrgPermissions`: Org-scoped routes; space routes use setupSpacePermissions, user-scoped use setupUserPermissions.
-- **setupSpacePermissions** `apps/api/src/lib/permissions/setupSpacePermissions.ts#setupSpacePermissions`: Space-scoped routes; org routes use setupOrgPermissions, user-scoped use setupUserPermissions.
-- **setupUserPermissions** `apps/api/src/lib/permissions/setupUserPermissions.ts#setupUserPermissions`: User-scoped routes; org or space contexts use setupOrgPermissions or setupSpacePermissions.
-- **StandardAction** `packages/permissions/src/client.ts#StandardAction`: Base for new resource action sets; extend like InquiryAction when custom verbs are needed.
-- **usePermission** `packages/ui/src/hooks/usePermission.ts#usePermission`: Non-hook contexts or many records: checkPermission instead.
+- **setupOrgPermissions** · primitive `apps/api/src/lib/permissions/setupOrgPermissions.ts#setupOrgPermissions` · in docs: docs/claude/PERMISSIONS.md § Permission Setup; docs/claude/AUTH.md § Token Authentication: Org-scoped routes; space routes use setupSpacePermissions, user-scoped use setupUserPermissions.
+  - *Said as:* "populate the request's grants for an org route", "org-scoped permission setup in auth middleware", "I'll fetch the user again for an org-member key"
+- **setupSpacePermissions** · primitive `apps/api/src/lib/permissions/setupSpacePermissions.ts#setupSpacePermissions` · in docs: docs/claude/PERMISSIONS.md § Permission Setup; docs/claude/AUTH.md § Token Authentication: Space-scoped routes; org routes use setupOrgPermissions, user-scoped use setupUserPermissions.
+  - *Said as:* "populate the request's grants for a space route", "space-scoped permission setup", "I'll load the space membership in the handler"
+- **setupUserPermissions** · primitive `apps/api/src/lib/permissions/setupUserPermissions.ts#setupUserPermissions` · in docs: docs/claude/PERMISSIONS.md § Permission Setup; docs/claude/CONTEXT.md § Request Lifecycle: User-scoped routes; org or space contexts use setupOrgPermissions or setupSpacePermissions.
+  - *Said as:* "populate grants for a route about the user themselves", "user-scoped permission setup", "I'll skip permission setup on self routes"
+- **StandardAction** · primitive `packages/permissions/src/client.ts#StandardAction` · in docs: docs/claude/PERMISSIONS.md § Actions: Base for new resource action sets; extend like InquiryAction when custom verbs are needed.
+  - *Said as:* "the base verbs read, operate, manage, own", "start a new resource's action set", "I'll invent custom action names for this model"
+- **usePermission** · primitive `packages/ui/src/hooks/usePermission.ts#usePermission` · in docs: docs/claude/PERMISSIONS.md § Frontend Checks; docs/claude/ZUSTAND.md § 2. PermissionsSlice: Non-hook contexts or many records: checkPermission instead.
+  - *Said as:* "show or disable this button based on what the user may do", "one control gated on permission, with a disabled reason", "I'll compare the membership role in the component", "in a component, for one control"
   - *Signs you're bypassing it:* a component that compares user.role or membership.role === 'owner' to show or disable a control (docs/claude/PERMISSIONS.md § Frontend Checks)
-- **validateOwnerPermission** `apps/api/src/middleware/validations/validateOwnerPermission.ts#validateOwnerPermission`: permission on the resource itself: validatePermission instead
+- **validateOwnerPermission** · primitive `apps/api/src/middleware/validations/validateOwnerPermission.ts#validateOwnerPermission` · in docs: docs/claude/PERMISSIONS.md § Validation Middleware; FEATURES.md § Authorization & Permissions: permission on the resource itself: validatePermission instead
+  - *Said as:* "the resource is owned by whichever of user, org or space", "gate a route on a polymorphic owner", "I'll switch on the owner kind and test each branch", "owner-polymorphic, not a fixed owner chain"
   - *Throws:* HTTPException (`caller-error`, request-context-errors); makeError 403 PERMISSION_DENIED (`permission-denied`)
   - *Signs you're bypassing it:* a switch on resource.ownerModel calling permix.check('user' | 'organization', …) per branch inside a controller (docs/claude/PERMISSIONS.md § Validation Middleware › validateOwnerPermission)
-- **validateRole** `apps/api/src/lib/permissions/validateRole.ts#validateRole`: parse an unknown value into a Role enum or throw
+- **validateRole** · primitive `apps/api/src/lib/permissions/validateRole.ts#validateRole` · in docs: docs/claude/PERMISSIONS.md § Permission Setup: parse an unknown value into a Role enum or throw
+  - *Said as:* "make sure a role from the database is a real role", "parse a role value safely in permission setup", "I'll cast the key's role to the enum", "not a gate, a parser"
   - *Throws:* validateRole Error (`server-error`)
   - *Signs you're bypassing it:* role: token.role as Role (a type assertion) when setting up permissions, instead of validating the value at runtime (docs/claude/PERMISSIONS.md § Permission Setup › Role Validation; apps/api/src/lib/permissions/validateRole.ts)
-- **Action delegation chain** `docs/claude/PERMISSIONS.md#Schema`: tier actions so read inherits operate, operate manage, manage own; own terminal or delegated
-- **Bridges** `@inixiative/permissions README — Bridges (cross-source rel walks)`: Cross-source edges only; same-source FK walks use plain rel with the injected resolver.
+- **Action delegation chain** · pattern docs/claude/PERMISSIONS.md § REBAC › Schema · code: `Space`, `rebacSchema`, `Role`, `Organization`: tier actions so read inherits operate, operate manage, manage own; own terminal or delegated
+  - *Said as:* "read inherits from operate, operate from manage", "higher actions imply the lower ones", "I'll list every action separately per role"
+- **Bridges** · pattern @inixiative/permissions README — Bridges (cross-source rel walks): Cross-source edges only; same-source FK walks use plain rel with the injected resolver.
+  - *Said as:* "the relation hop crosses into another data source", "join to a record from a different schema in the rule", "I'll fetch the far record and compare keys before the check"
   - *Signs you're bypassing it:* fetching a record from another source (another fieldMap) and comparing join keys by hand before or after check, instead of declaring a bridge on the schema (@inixiative/permissions/README.md § Bridges (cross-source rel walks))
-- **Dot-path relation delegation** `docs/claude/PERMISSIONS.md#Dot-path vs. Single-hop Delegation`: Stricter ancestor-only check; single-hop { rel: 'sourceSpace', action: 'own' } instead when intermediate delegation should apply.
-- **Fresh Permix per request** `docs/claude/PERMISSIONS.md#How It Works`: create empty in prepareRequest, populate in auth middleware, check in validation or controllers
-- **Hydrate ownership closure before checking** `@inixiative/permissions/README.md#Hydration (Prisma example)`: Always for ReBAC checks; hand-attach extras only for self-references or polymorphic joins.
+- **Dot-path relation delegation** · pattern docs/claude/PERMISSIONS.md § REBAC › Dot-path vs. Single-hop Delegation · code: `Space`, `rebacSchema`, `Role`, `Organization`: Stricter ancestor-only check; single-hop { rel: 'sourceSpace', action: 'own' } instead when intermediate delegation should apply.
+  - *Said as:* "jump straight to the ancestor and skip the middle", "check the org directly, not via the space", "a multi-hop path in one relation rule"
+- **Fresh Permix per request** · pattern docs/claude/PERMISSIONS.md § Permix › How It Works · code: `prepareRequest`, `createPermissions`: create empty in prepareRequest, populate in auth middleware, check in validation or controllers
+  - *Said as:* "where the permissions client is created and filled", "created empty, filled by auth, read by validators", "I'll create the client once at module load"
+- **Hydrate ownership closure before checking** · pattern @inixiative/permissions/README.md § Hydration (Prisma example) · code: `createHydrator`, `buildPrismaMapV7`, `createRebacCheck`, `buildPrismaMapV6`: Always for ReBAC checks; hand-attach extras only for self-references or polymorphic joins.
+  - *Said as:* "load the whole ownership chain before deciding", "the check needs the parents present", "I'll build an include chain per route to load parents"
   - *Signs you're bypassing it:* ad-hoc include chains built per route or per action to load parents before a ReBAC check, instead of createHydrator / the hydrate step (@inixiative/permissions README › Hydration (Prisma example))
-- **Inquiry send/resolve per type** `docs/claude/PERMISSIONS.md#Schema (inquiry)`: Adding a new inquiry type: add its send and resolve branches here.
+- **Inquiry send/resolve per type** · pattern docs/claude/PERMISSIONS.md § Schema (inquiry): Adding a new inquiry type: add its send and resolve branches here.
+  - *Said as:* "who may send or resolve this kind of request", "add permission branches for a new inquiry type", "I'll test roles in the create controller for this type"
   - *Signs you're bypassing it:* per-type role checks written in the create controller instead of a send branch in rebacSchema (docs/claude/INQUIRIES.md § Adding a New Handler step 11; Permissions (ReBAC))
-- **JSON-rules entitlements** `FEATURES.md > ABAC / JSON-Rules Integration`: Conditional attribute logic; roles suffice for fixed grants.
-- **Layered frontend permission checks** `docs/claude/PERMISSIONS.md#Frontend Checks`: pick the entry point matching the layer being gated
-- **Multi-level roles** `FEATURES.md > Multi-Level RBAC`: Simple role grants; use JSON-rules entitlements for attribute logic, ReBAC graph for inherited access.
-- **Owner-polymorphic permissions via ownerActions** `docs/claude/PERMISSIONS.md#Owner-Polymorphic Models`: Models with nullable FKs to multiple owners (Contact, WebhookSubscription); compose extra custom actions by spreading.
-- **ReBAC permissions with Permix** `FEATURES.md > Unique Selling Points`: grant actions through relationship-based access checks evaluated by Permix
-- **Row-level permission overrides** `packages/permissions/src/rebac/check.ts`: Opt-in sharing of individual records; if every row needs the same override, change the schema rule instead.
-- **Self-leave action** `docs/claude/PERMISSIONS.md#Schema`: let users remove their own membership or token via self check
-- **Space permissions delegate to organization** `docs/claude/PERMISSIONS.md#Permission Flow`: Space-scoped resources; org owners inherit space permissions automatically.
+- **JSON-rules entitlements** · pattern FEATURES.md > ABAC / JSON-Rules Integration: Conditional attribute logic; roles suffice for fixed grants.
+  - *Said as:* "a grant that depends on an attribute, not just the role", "conditional access expressed as a rule", "I'll hardcode the condition in the handler"
+- **Layered frontend permission checks** · pattern docs/claude/PERMISSIONS.md § Frontend Checks · code: `checkPermission`, `usePermission`, `Button`, `validateUser`: pick the entry point matching the layer being gated
+  - *Said as:* "which permission helper for which UI layer", "page versus nav versus button gating", "I'll use the same check everywhere in the UI"
+- **Multi-level roles** · pattern FEATURES.md > Multi-Level RBAC: Simple role grants; use JSON-rules entitlements for attribute logic, ReBAC graph for inherited access.
+  - *Said as:* "simple role grants per org and space", "fixed grants by role", "I'll add a boolean column per capability"
+- **Owner-polymorphic permissions via ownerActions** · pattern docs/claude/PERMISSIONS.md § Owner-Polymorphic Models · code: `ownerActions`, `Contact`, `WebhookSubscription`, `User`: Models with nullable FKs to multiple owners (Contact, WebhookSubscription); compose extra custom actions by spreading.
+  - *Said as:* "permissions for a model with several possible owners", "contacts and webhooks owned by user, org or space", "I'll spread the owner rule by hand for each action"
+- **ReBAC permissions with Permix** · pattern FEATURES.md > Unique Selling Points: grant actions through relationship-based access checks evaluated by Permix
+  - *Said as:* "access follows relationships, not just roles", "the overall authorization approach", "I'll build role checks from scratch"
+- **Row-level permission overrides** · pattern packages/permissions/src/rebac/check.ts: Opt-in sharing of individual records; if every row needs the same override, change the schema rule instead.
+  - *Said as:* "share this one record with someone", "give one person read on a single row", "I'll add a shared-with column to the table", "per-record and additive, not a schema change"
+- **Self-leave action** · pattern docs/claude/PERMISSIONS.md § REBAC › Schema · code: `Space`, `rebacSchema`, `Role`, `Organization`: let users remove their own membership or token via self check
+  - *Said as:* "let someone remove their own membership", "a member leaves the org on their own", "I'll special-case deleting yourself"
+- **Space permissions delegate to organization** · pattern docs/claude/PERMISSIONS.md § Space Permissions › Permission Flow · code: `Space`, `SpaceUser`, `Role`, `Organization`: Space-scoped resources; org owners inherit space permissions automatically.
+  - *Said as:* "org owners should automatically have access to every space", "space access flows up to the org", "I'll copy org owners into the space members table"
   - *Signs you're bypassing it:* copying org owners into SpaceUser rows, or querying OrganizationUser beside SpaceUser in a space check, instead of letting space own delegate to organization own (docs/claude/PERMISSIONS.md § Space Permissions; FEATURES.md § Authorization & Permissions (Hierarchical Inheritance))
-- **Superadmin short-circuit** `packages/permissions/src/roles/organization.ts`: grant superadmins everything instead of computing role actions
-- **Three-layer permission model** `docs/claude/PERMISSIONS.md#Overview`: layer platform role, per-org RBAC role and JSON entitlements ABAC for authorization
-- **Typed resource union** `@inixiative/permissions README — The check engine`: Pass a resource union to createRebacCheck so schema and subjects typecheck without casts.
+- **Superadmin short-circuit** · pattern packages/permissions/src/roles/organization.ts: grant superadmins everything instead of computing role actions
+  - *Said as:* "superadmins get everything without computing roles", "superadmin is handled at the highest level only", "I'll add superadmin branches at every level"
+- **Three-layer permission model** · pattern docs/claude/PERMISSIONS.md § Overview · code: `OrganizationUser`, `PlatformRole`, `User`, `Role`: layer platform role, per-org RBAC role and JSON entitlements ABAC for authorization
+  - *Said as:* "platform role, org role and entitlements together", "how the permission layers stack", "the overall model of who can do what"
+- **Typed resource union** · pattern @inixiative/permissions README — The check engine: Pass a resource union to createRebacCheck so schema and subjects typecheck without casts.
+  - *Said as:* "typos in resource names should fail to compile", "typed resource keys for the engine", "I'll cast the resource string"
   - *Signs you're bypassing it:* `as` casts on resource strings or an untyped createRebacCheck where a typo in a resource key passes the compiler (@inixiative/permissions/README.md § The check engine)
-- **ActionRule** `@inixiative/permissions ActionRule`: express a permission as delegation, relation walk, self match, abac predicate, or composition
-- **Button show/disabledText** `packages/ui Button`: permission-gated actions instead of wrapping in conditionals
+- **ActionRule** · primitive @inixiative/permissions ActionRule: express a permission as delegation, relation walk, self match, abac predicate, or composition
+  - *Said as:* "the shape of one permission rule", "delegate, relation walk, self match or condition", "how a single action's grant is written"
+- **Button show/disabledText** · primitive packages/ui Button: permission-gated actions instead of wrapping in conditionals
+  - *Said as:* "hide or disable a button based on permission", "a disabled button that explains why", "I'll wrap the button in a conditional"
   - *Signs you're bypassing it:* {canEdit && <Button>...</Button>} or ternaries wrapping buttons for permission gating instead of show / disabledText (docs/claude/FRONTEND/COMPONENTS.md § Standard Conditional Props)
-- **db.withDeleted** `admin router`: admin routes only; ordinary routes keep tombstones hidden
+- **db.withDeleted** · primitive admin router: admin routes only; ordinary routes keep tombstones hidden
+  - *Said as:* "read soft-deleted rows on an admin route", "the escape hatch is the answer for seeing tombstones", "I'll skip the deleted filter when the user is a superadmin", "wrap the read; the where is never the place"
   - *Signs you're bypassing it:* a role check (`if (isSuperadmin) skip deletedAt filter`) or a manual `deletedAt: { not: null }` override to read tombstones, instead of the endpoint wrapping work in `await db.withDeleted(...)` (docs/claude/CONTEXT.md → Soft-Delete Invisibility; docs/claude/DATABASE.md § Soft-delete read scoping)
-- **Entitlements** `docs/claude/PERMISSIONS.md#Entitlements`: Grant a specific power to one member or token; change organizationRoles when every holder of a role needs it.
-- **NavItem.access** `apps/*/app/config/nav/features/*.ts`: nav visibility; component actions use usePermission or checkPermission
-- **permissionRules** `@inixiative/permissions README — Writing a schema`: Per-record widening only; it cannot revoke, so change the schema to restrict.
-- **permissions.check** `packages/ui/src/store/slices/permissions.ts`: inside nav access callbacks; components prefer checkPermission
-- **permissions.setup** `packages/ui/src/store/slices/permissions.ts`: load user, organization and space permissions from /me into the frontend ReBAC engine
-- **permix.check** `@inixiative/permissions createPermissions`: Grant-only lookup; use the rebac check for relation/abac rules.
+- **Entitlements** · primitive docs/claude/PERMISSIONS.md § Entitlements · code: `OrganizationUser`, `Token`, `getOrgPermissions`, `Role`: Grant a specific power to one member or token; change organizationRoles when every holder of a role needs it.
+  - *Said as:* "give one member a power their role doesn't have", "an extra grant on one membership or key", "I'll make a new role for just this person"
+- **NavItem.access** · primitive apps/*/app/config/nav/features/*.ts: nav visibility; component actions use usePermission or checkPermission
+  - *Said as:* "show this nav item only to people who may use it", "hide the menu entry by permission", "I'll filter the nav array by role in the layout", "nav visibility, not a button"
+- **permissionRules** · primitive @inixiative/permissions README — Writing a schema: Per-record widening only; it cannot revoke, so change the schema to restrict.
+  - *Said as:* "the per-record override column", "widen access on one row", "I'll write a narrower rule to revoke access"
+- **permissions.check** · primitive packages/ui/src/store/slices/permissions.ts: inside nav access callbacks; components prefer checkPermission
+  - *Said as:* "the store's check used inside nav access callbacks", "permission lookup from the frontend store", "I'll read the role from the store and compare"
+- **permissions.setup** · primitive packages/ui/src/store/slices/permissions.ts: load user, organization and space permissions from /me into the frontend ReBAC engine
+  - *Said as:* "load the user's grants into the frontend engine after login", "fill the client-side permission engine from the profile", "I'll pass the role list down as props"
+- **permix.check** · primitive @inixiative/permissions createPermissions: Grant-only lookup; use the rebac check for relation/abac rules.
+  - *Said as:* "does the loaded grant list include this action", "grant-only lookup, no relation walking", "I'll resolve the org id by hand and test the org grant", "what was set up, not what the relation implies"
   - *Signs you're bypassing it:* resolving record.organizationId by hand and calling permix.check('organization', action, id) where a { rel: 'organization', action } rule and check would walk it (@inixiative/permissions/README.md § The permix wrapper; § The check engine)
-- **permix.getJSON** `Permix`: export loaded permissions as resource-action boolean map
-- **permix.setSuperadmin** `packages/ui/src/store/slices/permissions.ts`: make every frontend permission check pass for a superadmin
-- **permix.setup** `@inixiative/permissions createPermissions`: load role-derived grants keyed by resource or resource:id
-- **permix.setUserId** `@inixiative/permissions createPermissions`: set the actor id used by self rules
-- **PermixLike** `@inixiative/permissions PermixLike`: define the grant-reading slice the check engine consumes
-- **setupOrgContext** `packages/permissions/src/roles/organization.ts`: Org scope; setupUserContext for self actions, setupSpaceContext for spaces.
-- **setupSpaceContext** `docs/claude/PERMISSIONS.md#setupSpacePermissions`: Space scope; setupOrgContext for orgs.
-- **setupUserContext** `packages/permissions/src/roles/user.ts`: Actions on the user themselves; setupOrgContext for org scope.
-- **validatePermission** `#/middleware/validations/validatePermission`: Route-level authorization; permix.check inline for custom controller logic; validateUser/validateActor for authentication.
+- **permix.getJSON** · primitive Permix: export loaded permissions as resource-action boolean map
+  - *Said as:* "dump the loaded grants as a flat map", "export permissions as resource to actions booleans"
+- **permix.setSuperadmin** · primitive packages/ui/src/store/slices/permissions.ts: make every frontend permission check pass for a superadmin
+  - *Said as:* "make every frontend check pass for a platform admin", "superadmin mode for the permission engine", "I'll special-case superadmin in each component", "the engine flag, not the route gate"
+- **permix.setup** · primitive @inixiative/permissions createPermissions: load role-derived grants keyed by resource or resource:id
+  - *Said as:* "load role-derived grants into the client", "register what this request may do", "I'll push actions into an array per resource"
+- **permix.setUserId** · primitive @inixiative/permissions createPermissions: set the actor id used by self rules
+  - *Said as:* "tell the engine who the actor is for self rules", "set the current user id for self matches", "I'll compare user ids inline for own-record checks"
+- **PermixLike** · primitive @inixiative/permissions PermixLike: define the grant-reading slice the check engine consumes
+  - *Said as:* "the minimal grant reader the engine needs", "the interface the check engine consumes"
+- **setupOrgContext** · primitive packages/permissions/src/roles/organization.ts: Org scope; setupUserContext for self actions, setupSpaceContext for spaces.
+  - *Said as:* "put the org and membership on the request", "org scope context setup", "I'll set the org on context in the handler"
+- **setupSpaceContext** · primitive docs/claude/PERMISSIONS.md § Permission Setup › setupSpacePermissions · code: `Role`, `validateRole`, `User`, `setupSpacePermissions`: Space scope; setupOrgContext for orgs.
+  - *Said as:* "put the space and its membership on the request", "space scope context setup", "I'll load the space in each handler"
+- **setupUserContext** · primitive packages/permissions/src/roles/user.ts: Actions on the user themselves; setupOrgContext for org scope.
+  - *Said as:* "context for actions on the user themselves", "self scope context setup", "I'll set the user context inline"
+- **validatePermission** · primitive  § /middleware/validations/validatePermission: Route-level authorization; permix.check inline for custom controller logic; validateUser/validateActor for authentication.
+  - *Said as:* "gate this route on an action against the loaded resource", "can the caller do this to the thing in the URL", "I'll load the resource and throw 403 by hand in the handler", "the one gate that works for org and space keys", "route-level authorization, not authentication"
   - *Throws:* HTTPException (`caller-error`, request-context-errors, inferred); makeError 403 PERMISSION_DENIED (`permission-denied`)
   - *Signs you're bypassing it:* a handler that loads the resource itself and calls permix.check / throws 403 by hand on a route where resourceContextMiddleware + validatePermission(action) would do it (docs/claude/PERMISSIONS.md § Validation Middleware)
-- **Authenticate before authorizing** `docs/claude/PERMISSIONS.md#Via Validation Middleware`: Org/Space tokens carry no user and fail both gates; see AUTH.md to choose.
-- **Bridge far-field data** `@inixiative/permissions README — Bridges (cross-source rel walks)`: When a bridge hop ends in an abac or self rule rather than an rbac grant.
-- **Entitlements allow-override** `docs/claude/PERMISSIONS.md#How Entitlements Are Applied`: Whenever role permissions and entitlements are merged; the role is not a hard ceiling (deny override is not used).
-- **Fresh Permix client per request** `FEATURES.md > Per-Request Isolation`: All permission evaluation.
+- **Authenticate before authorizing** · rule docs/claude/PERMISSIONS.md § Permission Checks › Via Validation Middleware · code: `resourceContextMiddleware`, `validateUser`, `validateActor`, `getActor`: Org/Space tokens carry no user and fail both gates; see AUTH.md to choose.
+  - *Said as:* "identify the caller before deciding what they may do", "org and space keys have no user and fail the user gates", "I'll run the permission check without a user gate first"
+- **Bridge far-field data** · rule @inixiative/permissions README — Bridges (cross-source rel walks): When a bridge hop ends in an abac or self rule rather than an rbac grant.
+  - *Said as:* "the hop needs fields from the far record", "pass far-side rows only when a rule reads them"
+- **Entitlements allow-override** · rule docs/claude/PERMISSIONS.md § Entitlements › How Entitlements Are Applied · code: `OrganizationUser`, `Token`, `getOrgPermissions`, `Role`: Whenever role permissions and entitlements are merged; the role is not a hard ceiling (deny override is not used).
+  - *Said as:* "an entitlement can grant beyond the role", "the role is not a hard ceiling", "I'll make entitlements only restrict"
+- **Fresh Permix client per request** · rule FEATURES.md > Per-Request Isolation: All permission evaluation.
+  - *Said as:* "never share the permissions client across requests", "one engine instance per request", "I'll cache the permissions client at module level"
   - *Signs you're bypassing it:* a module-level or cached permix instance reused across requests (FEATURES.md › Per-Request Isolation; docs/claude/PERMISSIONS.md § Permix)
-- **High-role assignment needs own** `docs/claude/PERMISSIONS.md#Schema`: Role assignment on organization or space and inviteOrganizationUser inquiries.
-- **Hydration stays in the app** `@inixiative/permissions README`: When wiring permissions into any app or extending the core.
-- **Resource existence is non-secret** `docs/claude/PERMISSIONS.md#Resource Lookup Runs Before Authorization`: Only resources that must hide existence from non-members need custom middleware.
-- **Role assignment requires assign action** `docs/claude/PERMISSIONS.md#Role Assignment`: Whenever a role is granted to a membership, including token creation.
+- **High-role assignment needs own** · rule docs/claude/PERMISSIONS.md § REBAC › Schema · code: `Space`, `rebacSchema`, `Role`, `Organization`: Role assignment on organization or space and inviteOrganizationUser inquiries.
+  - *Said as:* "only owners can make someone owner or admin", "granting a high role needs the own action", "I'll let admins promote to owner"
+- **Hydration stays in the app** · rule @inixiative/permissions README: When wiring permissions into any app or extending the core.
+  - *Said as:* "record loading belongs to the app, not the core", "I'll add Prisma loading inside the permissions package"
+- **Resource existence is non-secret** · rule docs/claude/PERMISSIONS.md § Permission Checks › Resource Lookup Runs Before Authorization · code: `resourceContextMiddleware`, `validateUser`, `validateActor`, `getActor`: Only resources that must hide existence from non-members need custom middleware.
+  - *Said as:* "404 before 403 is fine, ids aren't secret", "lookup runs before authorization on purpose", "I'll hide the resource's existence from non-members"
+- **Role assignment requires assign action** · rule docs/claude/PERMISSIONS.md § Role Assignment · code: `Role`, `rebacSchema`: Whenever a role is granted to a membership, including token creation.
+  - *Said as:* "who may hand out this role", "granting a role goes through the assign action", "I'll hardcode which roles can set which"
   - *Signs you're bypassing it:* a hard-coded ['owner', 'admin'].includes(targetRole) ? 'own' : 'manage' branch in each controller instead of checking the assign action (docs/claude/PERMISSIONS.md § Role Assignment)
-- **Row overrides limited to read** `docs/claude/PERMISSIONS.md#When to use it`: When adding permissionRules to a resource's route schemas.
-- **Row permission rules are additive only** `packages/permissions/src/rebac/check.ts`: Any resource with a permissionRules column.
-- **Row rules only widen** `@inixiative/permissions README — Writing a schema`: Whenever tenants author per-record permission overrides.
+- **Row overrides limited to read** · rule docs/claude/PERMISSIONS.md § Row-Level Overrides › When to use it · code: `buildPermissionRulesSchema`, `Contact`, `rebacSchema`: When adding permissionRules to a resource's route schemas.
+  - *Said as:* "per-record sharing is read only", "I'll let the override grant edit"
+- **Row permission rules are additive only** · rule packages/permissions/src/rebac/check.ts: Any resource with a permissionRules column.
+  - *Said as:* "an override can only add access", "I'll use the override to take access away"
+- **Row rules only widen** · rule @inixiative/permissions README — Writing a schema: Whenever tenants author per-record permission overrides.
+  - *Said as:* "a per-record rule cannot revoke what the schema grants", "restricting means changing the schema"
   - *Signs you're bypassing it:* writing null or a narrower rule into a record's permissionRules expecting it to revoke access the schema grants (@inixiative/permissions/README.md § Writing a schema)
-- **Secure defaults** `CLAUDE.md §7 Core Engineering Standards`: Enforce auth, permission and tenant boundary checks by default.
-- **Sensitive actions are session-only** `docs/claude/PERMISSIONS.md#validateNotToken`: Destructive or credential-minting routes.
-- **Space inherits org permissions** `FEATURES.md > Hierarchical Inheritance`: Any space-level permission check.
-- **SpaceUser requires OrganizationUser** `docs/claude/PERMISSIONS.md#Space Permissions`: Adding members to a space.
-- **Superadmins see soft-deleted rows only on admin routes** `docs/claude/PERMISSIONS.md#PlatformRole`: any superadmin read of soft-deleted data
-- **Token cannot exceed user's role** `docs/claude/PERMISSIONS.md#Role Hierarchy`: whenever deriving token permissions
-- **Token creation checks assign on parent** `docs/claude/PERMISSIONS.md#Token Creation`: Every token creation endpoint, alongside validateNotToken.
-- **Token self-deletion via leave** `docs/claude/PERMISSIONS.md#Token Deletion`: Token deletion permissions; never let a token delete itself (validateNotToken).
-- **Tokens restrict, never exceed, user role** `docs/claude/PERMISSIONS.md#Token Permission Restriction`: Any permission setup for token-authenticated requests.
-- **Validate roles at runtime, fail closed** `docs/claude/PERMISSIONS.md#Role Validation`: Every permission setup function reading roles from DB or tokens.
+- **Secure defaults** · rule CLAUDE.md §7 Core Engineering Standards: Enforce auth, permission and tenant boundary checks by default.
+  - *Said as:* "every route is gated unless it says otherwise", "default to checking auth, permission and tenant"
+- **Sensitive actions are session-only** · rule docs/claude/PERMISSIONS.md § Validation Middleware › validateNotToken · code: `validateOwnerPermission`, `validateNotToken`, `User`, `Organization`: Destructive or credential-minting routes.
+  - *Said as:* "keys can't mint keys or delete the org", "destructive actions need a real person's session", "I'll let an API key create more keys"
+- **Space inherits org permissions** · rule FEATURES.md > Hierarchical Inheritance: Any space-level permission check.
+  - *Said as:* "org access should carry into every space", "any space-level check includes the org", "I'll require a space membership for org owners"
+- **SpaceUser requires OrganizationUser** · rule docs/claude/PERMISSIONS.md § Space Permissions · code: `Space`, `SpaceUser`, `Role`, `Organization`: Adding members to a space.
+  - *Said as:* "you must be in the org before joining a space", "I'll add a space member who isn't in the org"
+- **Superadmins see soft-deleted rows only on admin routes** · rule docs/claude/PERMISSIONS.md § Roles › PlatformRole · code: `Role`, `PlatformRole`, `User`, `OrganizationUser`: any superadmin read of soft-deleted data
+  - *Said as:* "deleted rows stay hidden even for superadmins on normal routes", "tombstones only on the admin router", "I'll show deleted rows to superadmins everywhere"
+- **Token cannot exceed user's role** · rule docs/claude/PERMISSIONS.md § Roles › Role Hierarchy · code: `Role`, `PlatformRole`, `User`, `OrganizationUser`: whenever deriving token permissions
+  - *Said as:* "a key is never more powerful than its owner", "I'll let a key carry owner when the user is admin"
+- **Token creation checks assign on parent** · rule docs/claude/PERMISSIONS.md § Token Permissions › Token Creation · code: `Token`, `rebacSchema`, `User`, `Space`: Every token creation endpoint, alongside validateNotToken.
+  - *Said as:* "creating a key with a role is assigning that role", "minting a key checks assign on the org or space", "I'll let anyone create a key with any role"
+- **Token self-deletion via leave** · rule docs/claude/PERMISSIONS.md § Token Permissions › Token Deletion · code: `Token`, `rebacSchema`, `User`, `Space`: Token deletion permissions; never let a token delete itself (validateNotToken).
+  - *Said as:* "a key can be deleted through the leave action", "who may revoke this key", "I'll let a key delete itself"
+- **Tokens restrict, never exceed, user role** · rule docs/claude/PERMISSIONS.md § Permission Setup › Token Permission Restriction · code: `Role`, `validateRole`, `User`, `setupSpacePermissions`: Any permission setup for token-authenticated requests.
+  - *Said as:* "the key's role is capped at the user's role", "combine the membership role with the key role, taking the lower", "I'll use the key's role directly"
+- **Validate roles at runtime, fail closed** · rule docs/claude/PERMISSIONS.md § Permission Setup › Role Validation · code: `Role`, `validateRole`, `User`, `setupSpacePermissions`: Every permission setup function reading roles from DB or tokens.
+  - *Said as:* "a bad role value from the database must not become access", "confirm the role is real before trusting it", "I'll trust the role column as typed"
 - *Also here, by name:* InquiryAction (`packages/permissions/src/client.ts`); OrganizationAction (`packages/permissions/src/client.ts`); POLYMORPHIC_BINDS (`packages/db/src/registries/polymorphicIs.ts`); Row (`@inixiative/permissions`); SpaceAction (`packages/permissions/src/client.ts`); UserAction (`packages/permissions/src/client.ts`); allTrue (`packages/permissions/src/roles/shared.ts`); intersectEntitlements (`packages/permissions/src/roles/shared.ts`); organizationRoles (`packages/permissions/src/roles/organization.ts`); roleHierarchy (`packages/permissions/src/roles/shared.ts`); roleToStandardAction (`packages/permissions/src/roles/shared.ts`); spaceRoles (`packages/permissions/src/roles/space.ts`); userRoles (`packages/permissions/src/roles/user.ts`)
 
 ## 4. The specifics, in full

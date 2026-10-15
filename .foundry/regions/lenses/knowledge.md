@@ -90,15 +90,17 @@ The lenses the template builds on json-rules and where it wires them in: base le
 
 In the template a lens starts from `lensFor('Model')`, a base lens over the model's columns from the schema map, narrowed with picks and relations rather than built by hand. A route's `filterLens` narrows it and governs which filters and sorts the route accepts, not the response shape (that is the route's response schema). Context-dependent scope is a `scopeNarrowing` middleware layer stacked per request, not a hard-coded id in the controller's where; a static route-wide filter is `root.where`. Paginate ANDs root clauses through `buildWhereClause` and folds non-root lens clauses into the composed where with `lensWhere`. Wherever a model appears, `redactLens` strips redacted fields and `omitForeignKeys` hides every FK column, both riding `mapDefaults`; a rule-tracked lens names a row by its `id`, never an FK column. `fetchLens` loads every row a lens matches; `sourceQueryValues` / `sourceQueryWhere` give a source's values or its scoped where. On the frontend `lensFromOperation` (or `lensFromSchema` with only a raw schema) derives a filter lens from the OpenAPI operation. `customerRefLens` / `resolvedCustomerRefLens` are the rule root for segments, and `segmentLensFor` resolves the lens a segment owner's conditions are validated against. The `no-lens-spread` CI rule forbids spreading lens objects: add scope with `clampLens`, a narrowing layer or `composeLens`.
 
-Part 3 also lists the library's lens functions (`createLens`, `narrowRule`, `projectRows`, `toLensSelect`, `toSourceQueries`, …) and the email lens (`emailLensFor` / `emailLensAt`, `scopeEmailLens`, `narrowVariables`, `emailSurface`) because the template calls them here; point at the regions below for what they mean. Which question goes where across the eight rules and lens regions: the template's own rule code (`validateRuleForLens`, `bindWhere`, email rule scoping in loops, the hooks `RulesRegistry`) and `RuleReference` edges and rule health (`withRule`) → `json-rules`; the rule language itself: shapes, operators and the operator catalog, paths and `$` scope refs, offsets, dates with `now` / `timeZone`, what NULL means, windowing, binding and introspection, `validateRule`, `UsageError`, `engineGlobals`, the types and VERBS.md → `json-rules-engine`; compiling a rule to Prisma or SQL and what each rail runs (`toPrisma` + `executePrismaPlan`, `toSql`, `{ lens }` compiles, the Backend Support Matrix, the compilers' NULL arms, where the rails differ) → `json-rules-backends`; what a lens is: layers that only narrow, schema vs data narrowing, relations turned on and the model-default tree, the three `where` anchors, filter-first under `all`, composition and `validateNarrowing` codes, `LensRefusal`, enum narrowing, the type shape and the composed / stored / projected forms → `lens-model`; the template's own lenses (`lensFor`, a route's `filterLens`, `scopeNarrowing`, `lensWhere`, `redactLens`, `omitForeignKeys`, `fetchLens`, `sourceQueryValues`, `lensFromOperation`, `customerRefLens`, the `no-lens-spread` rule) → here; putting a lens to work in code: building it from FieldMaps and bridges, binding and storing it, the `validateRuleInLens` → `narrowRule` → execute flow, fetching and cutting rows (`toLensSelect`, `projectRows`), single-path reads (`readLensValue`, `walkLensPath`, `lensVisit`), `projectLens`, describe vs deny, migration → `lens-usage`; option sources for pickers (`sources`, `toSourceQueries`, `materializeSourceQuery`, `materializeSources`, `from: 'mapDefaults'`, bridged `recheck`), `describeRuleSources`, and evaluating rules over data stitched across bridges → `lens-sources`; a UI that edits a rule over a lens (views, hooks, facets, pickers) and saving it as a `SavedRule` → `rules-builder`. Also not here: the email lens itself (`email-lens`), email templates and rendering (`email-templates`), paginate and bracket filters (`filtering-pagination`), route declaration and response schemas (`api-routes-schemas`), segment membership (`customers-segments`), and ReBAC permissions (`permissions`).
+Part 3 also lists the library's lens functions (`createLens`, `narrowRule`, `projectRows`, `toLensSelect`, `toSourceQueries`, …) and the email lens (`emailLensFor` / `emailLensAt`, `scopeEmailLens`, `narrowVariables`, `emailSurface`) because the template calls them here; point at the regions below for what they mean. Which question goes where across the eight rules and lens regions: the template's own rule code (`validateRuleForLens`, `bindWhere`, email rule scoping in loops, the hooks `RulesRegistry`) and `RuleReference` edges and rule health (`withRule`) → `json-rules`; the rule language itself: shapes, operators and the operator catalog, paths and `$` scope refs, offsets, dates with `now` / `timeZone`, what NULL means, windowing, binding and introspection, `validateRule`, `UsageError`, `engineGlobals`, the types and VERBS.md → `json-rules-engine`; compiling a rule to Prisma or SQL and what each rail runs (`toPrisma` + `executePrismaPlan`, `toSql`, `{ lens }` compiles, the Backend Support Matrix, the compilers' NULL arms, where the rails differ) → `json-rules-backends`; what a lens is: layers that only narrow, schema vs data narrowing, relations turned on and the model-default tree, the three `where` anchors, filter-first under `all`, composition and `validateNarrowing` codes, `LensRefusal`, enum narrowing, the type shape and the composed / stored / projected forms → `lens-model`; the template's own lenses (`lensFor`, a route's `filterLens`, `scopeNarrowing`, `lensWhere`, `redactLens`, `omitForeignKeys`, `fetchLens`, `sourceQueryValues`, `lensFromOperation`, `customerRefLens`, the `no-lens-spread` rule) → here; putting a lens to work in code: building it from FieldMaps and bridges, binding and storing it, the `validateRuleInLens` → `narrowRule` → execute flow, fetching and cutting rows (`toLensSelect`, `projectRows`), single-path reads (`readLensValue`, `walkLensPath`, `lensVisit`), `projectLens`, describe vs deny, migration → `lens-usage`; option sources for pickers (`sources`, `toSourceQueries`, `materializeSourceQuery`, `materializeSources`, `from: 'mapDefaults'`, bridged `recheck`), `describeRuleSources`, and evaluating rules over data stitched across bridges → `lens-sources`; a UI that edits a rule over a lens (views, hooks, facets, pickers) and saving it as a `SavedRule` → `rules-builder`. Also not here: the email lens itself (`email-lens`), email templates and rendering (`email-templates`), paginate and bracket filters (`filtering-search / pagination`), route declaration and response schemas (`api-routes / api-schemas-openapi`), segment membership (`customers-segments`), and ReBAC permissions (`permissions`).
 
 ## 3. Everything that exists here, by class
 
-Point at a class when that is as specific as the moment allows, or at a member. Where a class has siblings an agent could confuse, a table under the class header says which to use when. Each member: **name** `where`: choose this when … . Where the docs or code give material, a second line describes the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
+Point at a class when that is as specific as the moment allows, or at a member. Where a class has siblings an agent could confuse, a table under the class header says which to use when; its *Said as* line gives the plain words a user or agent uses for that job. Each member: **name** · kind `where` · the doc § that describes it (code members) or the code it is about (doc members): choose this when … . Quote the name and the where in a pointer ("look over here: createLock, packages/db/src/lock/createLock.ts, CONCURRENCY.md § Distributed Lock"). *Said as:* the ways a user or agent describes this job in a message or plan without knowing the name; match on these. *Signs you're bypassing it:* the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
 
 ### Class `lenses`: Lenses and narrowings over data: lensFor, composeLens, filterLens, scopeNarrowing
 
 **Job: start a lens for a model, endpoint or schema** (Where a template lens starts) — catalog entries lensFor, lensFromOperation, lensFromSchema, customerRefLens; docs/claude/API_ROUTES.md
+
+*Said as:* "where do I get a lens for this model", "a lens for this endpoint", "the starting lens for the route", "I'll build the field list by hand"
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -110,6 +112,8 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 **Job: add scope to a lens or hide fields** (Adding scope or hiding fields) — docs/claude/API_ROUTES.md § Lens Wheres; json-rules docs/LENS.md §1; CI rule no-lens-spread
 
+*Said as:* "scope the list to the caller's tenant", "hide these fields from the output", "restrict the lens", "add a where to the lens"
+
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **scopeNarrowing** | a per-request, context-dependent scope on a route | a static route-wide filter (root.where); loading one :id row (resourceContextMiddleware) |
@@ -119,6 +123,8 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **lensWhere** | folding non-root lens clauses into paginate's composed where | hand-ANDing relation wheres into some / every / is |
 
 **Job: load the rows or option values a lens allows** (Loading rows and option values) — catalog entries fetchLens, toLensSelect, sourceQueryValues, sourceQueryWhere, emailSourceValues
+
+*Said as:* "load the rows the lens allows", "fetch what the lens matches", "option values for a field"
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -130,6 +136,8 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 **Job: resolve a dotted path through a lens** (Resolving a path through a lens) — docs/claude/COMMUNICATIONS.md § The email lens; catalog entries
 
+*Said as:* "does this dotted path resolve through the lens", "walk a token path", "read a path off the row"
+
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **walkLensPath (lens-usage)** | one dotted path (token, loop binding, guard) hop by hop | whole rules (validateRuleInLens); values (readLensValue) |
@@ -138,93 +146,153 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **resolveBindingPath (email-lens)** | rewriting bound paths to their sources | classifying a path (walkEmailLensPath) |
 | **readLensValue (lens-usage)** | one value off a row as the lens shows it | whole row sets (projectRows) |
 
-- **bindLens** `apps/api/src/lib/email/bindLens.ts#bindLens`: For lens narrowings; for rule conditions use bindWhere. Uncovered tokens stay, allowing staged binding.
+- **bindLens** · primitive `apps/api/src/lib/email/bindLens.ts#bindLens` · in docs: @inixiative/json-rules/README.md § Lens & Multi-Source Data › Bindings in a Lens; @inixiative/json-rules/README.md § TypeScript Types: For lens narrowings; for rule conditions use bindWhere. Uncovered tokens stay, allowing staged binding.
+  - *Said as:* "fill the tenant id into the lens narrowing", "the lens has placeholders for the org, fill them", "I'll rebuild the narrowing per request with the id spliced in", "bind the lens in stages, leaving some tokens open", "supply the values the lens layers need"
   - *Signs you're bypassing it:* Rebuilding a narrowing per request with the tenant id spliced into its where, instead of { bind } tokens filled by bindLens. (@inixiative/json-rules/README.md § Bindings in a Lens)
-- **customerRefLens** `apps/api/src/modules/customerRef/lib/customerRefLens.ts#customerRefLens`: The rule root lens for segments; whether it becomes a general customer lens is unresolved, so don't reuse it elsewhere yet.
-- **emailOwnerProvider** `packages/email/src/render/owner.ts#emailOwnerProvider`: convert an email owner reference into the lens owner used for data binding
-- **fetchLens** `packages/db/src/hydrate/fetchLens.ts#fetchLens`: Many rows from a lens: fetchLens; one record by identifier: fetchOne; loading relations on a record: hydrate.
+- **customerRefLens** · primitive `apps/api/src/modules/customerRef/lib/customerRefLens.ts#customerRefLens` · in docs: docs/claude/SEGMENTS.md § Purpose and ownership; docs/claude/SEGMENTS.md § Remaining work: The rule root lens for segments; whether it becomes a general customer lens is unresolved, so don't reuse it elsewhere yet.
+  - *Said as:* "the lens segment rules are written against", "the root lens for segment conditions", "bind the segment lens sources myself"
+- **emailOwnerProvider** · primitive `packages/email/src/render/owner.ts#emailOwnerProvider`: convert an email owner reference into the lens owner used for data binding
+  - *Said as:* "turn the email's owner reference into the lens owner", "which owner scopes this email's data", "the owner for data binding at render"
+- **fetchLens** · primitive `packages/db/src/hydrate/fetchLens.ts#fetchLens` · in docs: docs/claude/JOBS.md § Built-in Handlers; docs/claude/SEGMENTS.md § Static and dynamic membership: Many rows from a lens: fetchLens; one record by identifier: fetchOne; loading relations on a record: hydrate.
+  - *Said as:* "load every row the lens matches", "all the rows this lens allows, from the database", "I'll compile the where and call findMany myself", "fetch the segment's members through its lens"
   - *Signs you're bypassing it:* Compiling a lens where with toPrisma and calling findMany by hand to load every row a lens matches. (catalog entry fetchLens)
-- **lensFor** `packages/db/src/lens/lensFor.ts#lensFor`: Start point for route filterLens and template sender variables; narrow it with picks/relations rather than building lenses by hand.
+- **lensFor** · primitive `packages/db/src/lens/lensFor.ts#lensFor` · in docs: docs/claude/API_ROUTES.md § Response Format › Route declaration (lens narrowing); docs/claude/API_ROUTES.md § Response Format › Relation Field Security: Start point for route filterLens and template sender variables; narrow it with picks/relations rather than building lenses by hand.
+  - *Said as:* "the lens for a Prisma model", "start from the model's field map and narrow it", "I'll hand-build the field list for this model", "a filter lens for the route's model", "the base lens for sender variables"
   - *Signs you're bypassing it:* Building a base lens or field list for a Prisma model by hand instead of lensFor('Model') narrowed with picks / relations. (catalog entry lensFor; docs/claude/API_ROUTES.md (route filterLens))
-- **lensFromOperation** `packages/sdk/src/lenses/lensFromOperation.ts#lensFromOperation`: use instead of hand-declaring lens fields; endpoints sharing a response shape share the lens
+- **lensFromOperation** · primitive `packages/sdk/src/lenses/lensFromOperation.ts#lensFromOperation`: use instead of hand-declaring lens fields; endpoints sharing a response shape share the lens
+  - *Said as:* "a frontend lens for this endpoint's response", "derive the filterable fields from the OpenAPI spec", "I'll declare the filterable fields by hand on the client", "an endpoint-derived lens for in-memory filtering", "filter the fetched list on the client with real rules"
   - *Signs you're bypassing it:* Hand-declaring the fields of a frontend filter lens for an endpoint instead of deriving it from the OpenAPI operation. (catalog entry lensFromOperation)
-- **lensFromSchema** `packages/sdk/src/lenses/lensFromSchema.ts#lensFromSchema`: Prefer lensFromOperation(operationId), which resolves schema and name from the spec; use this only with a raw schema in hand.
-- **lensWhere** `apps/api/src/lib/prisma/lensWhere.ts#lensWhere`: fold lens narrowing clauses into a composed Prisma where across relations
+- **lensFromSchema** · primitive `packages/sdk/src/lenses/lensFromSchema.ts#lensFromSchema`: Prefer lensFromOperation(operationId), which resolves schema and name from the spec; use this only with a raw schema in hand.
+  - *Said as:* "a lens from a raw JSON schema", "I only have the schema, not the operation id", "build the client lens from a schema object"
+- **lensWhere** · primitive `apps/api/src/lib/prisma/lensWhere.ts#lensWhere` · in docs: docs/claude/API_ROUTES.md § Lens Wheres: fold lens narrowing clauses into a composed Prisma where across relations
+  - *Said as:* "fold the lens's relation wheres into the paginate where", "the relation clamps into some, every and is", "I'll AND the relation wheres in by hand", "count only live related rows in the lens query"
   - *Signs you're bypassing it:* Hand-ANDing a lens's relation wheres into the some / every / is branches of a composed Prisma where. (docs/claude/API_ROUTES.md § Lens Wheres › How pagination applies them)
-- **omitForeignKeys** `packages/db/src/lens/omitForeignKeys.ts#omitForeignKeys`: Hide FK ids from output (e.g. emailLens); to strip redacted/sensitive fields use redactLens instead.
+- **omitForeignKeys** · primitive `packages/db/src/lens/omitForeignKeys.ts#omitForeignKeys` · in docs: docs/claude/COMMUNICATIONS.md § Email › Rule References (the rows a rule names): Hide FK ids from output (e.g. emailLens); to strip redacted/sensitive fields use redactLens instead.
+  - *Said as:* "hide every foreign key id column", "no raw ids in the email variables", "I'll list the fk columns to omit per model", "drop the id columns from the lens output"
   - *Signs you're bypassing it:* Listing FK id columns in omits per model or per relation by hand to keep them out of a lens. (docs/claude/COMMUNICATIONS.md § Rule References (omitForeignKeys, same shape as redactLens))
-- **redactLens** `packages/db/src/lens/redactLens.ts#redactLens`: Strip redacted fields; to drop foreign key columns use omitForeignKeys instead.
+- **redactLens** · primitive `packages/db/src/lens/redactLens.ts#redactLens` · in docs: docs/claude/API_ROUTES.md § Lens Wheres; docs/claude/COMMUNICATIONS.md § Email › Rule References (the rows a rule names): Strip redacted fields; to drop foreign key columns use omitForeignKeys instead.
+  - *Said as:* "strip the sensitive fields wherever the model appears", "redact password hashes and tokens from the lens", "I'll add omits on every relation path to the user", "redacted fields hidden on every visit"
   - *Signs you're bypassing it:* Repeating redaction omits on every relation path that reaches a sensitive model instead of one mapDefaults wrapper. (docs/claude/API_ROUTES.md § Lens Wheres (mapDefaults "is the mechanism redactLens rides"))
-- **resolvedCustomerRefLens** `apps/api/src/modules/customerRef/lib/customerRefLens.ts#resolvedCustomerRefLens`: Use for segment/membership lens narrowing per provider; raw customerRefLens when binding sources yourself.
-- **ruleVocabularyIssues** `packages/shared/src/rules/withRule.ts#ruleVocabularyIssues`: Save-time or render-time lens validation only; full health including bindings and live refs: ruleIssues or withRule.
-- **scopeNarrowing** `apps/api/src/middleware/resources/scopeNarrowing.ts#scopeNarrowing`: static route-wide filters: root.where instead; loading a single :id row: resourceContextMiddleware
+- **resolvedCustomerRefLens** · primitive `apps/api/src/modules/customerRef/lib/customerRefLens.ts#resolvedCustomerRefLens` · in docs: docs/claude/SEGMENTS.md § Purpose and ownership: Use for segment/membership lens narrowing per provider; raw customerRefLens when binding sources yourself.
+  - *Said as:* "the segment lens narrowed per provider", "the membership lens with the provider resolved", "segment narrowing for a given provider"
+- **ruleVocabularyIssues** · primitive `packages/shared/src/rules/withRule.ts#ruleVocabularyIssues` · in docs: docs/claude/COMMUNICATIONS.md § Email › Rule References (the rows a rule names): Save-time or render-time lens validation only; full health including bindings and live refs: ruleIssues or withRule.
+  - *Said as:* "does the rule only use fields the lens allows", "lens-only validation at save or render", "a vocabulary check, not full health"
+- **scopeNarrowing** · primitive `apps/api/src/middleware/resources/scopeNarrowing.ts#scopeNarrowing` · in docs: docs/claude/API_ROUTES.md § Response Format › Dynamic per-request scope — `scopeNarrowing` middleware; docs/claude/API_ROUTES.md § Lens Wheres: static route-wide filters: root.where instead; loading a single :id row: resourceContextMiddleware
+  - *Said as:* "scope the list to the caller's org per request", "a tenant filter that depends on who's asking", "I'll add where org id to paginate in the controller", "the controller manually merges in tenancy scoping", "a context-dependent scope layer on the route"
   - *Signs you're bypassing it:* Hard-coding a tenant / owner id filter into paginate's where in the controller for a context-dependent scope instead of a scopeNarrowing middleware layer. (docs/claude/API_ROUTES.md § Dynamic per-request scope — scopeNarrowing middleware)
-- **sourceQueryValues** `packages/db/src/utils/sourceQueryValues.ts#sourceQueryValues`: Need only the where clause: sourceQueryWhere instead.
-- **sourceQueryWhere** `packages/db/src/utils/sourceQueryWhere.ts#sourceQueryWhere`: Need fetched values rather than a where: sourceQueryValues; unscoped compile: compiledSourceWhere.
-- **no-lens-spread** `scripts/ci/rules/no-lens-spread.sh`: CI check forbidding spreading lens objects
+- **sourceQueryValues** · primitive `packages/db/src/utils/sourceQueryValues.ts#sourceQueryValues` · in docs: docs/claude/COMMUNICATIONS.md § Email › The email lens: Need only the where clause: sourceQueryWhere instead.
+  - *Said as:* "fetch the picker's option values for a source", "the template's source values, fetched", "values for a sourced field from the database"
+- **sourceQueryWhere** · primitive `packages/db/src/utils/sourceQueryWhere.ts#sourceQueryWhere` · in docs: docs/claude/COMMUNICATIONS.md § Email › The email lens: Need fetched values rather than a where: sourceQueryValues; unscoped compile: compiledSourceWhere.
+  - *Said as:* "just the scoped where for a source query", "the where a source's options are filtered by", "no fetch, only the clause"
+- **no-lens-spread** · rule `scripts/ci/rules/no-lens-spread.sh`: CI check forbidding spreading lens objects
+  - *Said as:* "I'll spread the lens and add a where", "copy the lens object with an extra restriction", "CI fails on spreading a lens", "don't clone the lens by spreading it"
   - *Signs you're bypassing it:* Spreading lens objects (`{ ...lens, root: { ...lens.root, where } }`) to add a restriction or layer instead of clampLens / a narrowing layer / composeLens. (CI rule scripts/ci/rules/no-lens-spread.sh)
-- **Bridged source query flow** `@inixiative/json-rules/README.md — Sources across a bridge`: Cross-database sources; use Prisma form when sql.sql is null.
-- **Compile under a lens** `@inixiative/json-rules/README.md — Compiling under a lens`: When a lens scopes the rule; pass map/model directly only without a lens.
+- **Bridged source query flow** · pattern @inixiative/json-rules/README.md — Sources across a bridge: Cross-database sources; use Prisma form when sql.sql is null.
+  - *Said as:* "options for a field across the bridge", "a source whose where reads the other database", "picker values across two data sources", "fetch, load the far side, then recheck"
+- **Compile under a lens** · pattern @inixiative/json-rules/README.md — Compiling under a lens: When a lens scopes the rule; pass map/model directly only without a lens.
+  - *Said as:* "compile the rule with the lens so it's gated and narrowed", "I'll pass the map and model and narrow by hand", "one call that gates, narrows and compiles", "a scoped compile of a user rule"
   - *Signs you're bypassing it:* Passing map / model to toPrisma / toSql for a lens-scoped rule (which gates nothing) and applying narrowRule by hand, instead of { lens }, which gates, narrows and compiles in one call. (@inixiative/json-rules/README.md § Prisma Query Planning › Compiling under a lens)
-- **Embed foreign rows under bridge keys** `@inixiative/json-rules/README.md — Evaluating Across Bridges`: Bidirectional: add back-ref object properties; batch: map anchors then root-array arrayOperator any.
+- **Embed foreign rows under bridge keys** · pattern @inixiative/json-rules/README.md — Evaluating Across Bridges: Bidirectional: add back-ref object properties; batch: map anchors then root-array arrayOperator any.
+  - *Said as:* "put the foreign rows on the row before evaluating", "the evaluator doesn't fetch the far side", "I'll fetch the related rows during evaluation", "attach the bridged data under the bridge key"
   - *Signs you're bypassing it:* A custom evaluator that fetches or joins foreign rows during rule evaluation, instead of embedding them under bridge keys before check(). (@inixiative/json-rules/README.md › Evaluating Across Bridges ("check() itself is bridge-unaware"))
-- **Fetching option sources from the database** `@inixiative/json-rules/README.md > Option Sources`: database-backed options; materializeSources for rows already in hand
-- **Lens as authority spine** `@inixiative/json-rules/README.md What a lens is for`: any visibility/authority constraint; not a plain query filter
+- **Fetching option sources from the database** · pattern @inixiative/json-rules/README.md > Option Sources: database-backed options; materializeSources for rows already in hand
+  - *Said as:* "database-backed picker options", "distinct values for a field from the database", "options from a query rather than rows in hand"
+- **Lens as authority spine** · pattern @inixiative/json-rules/README.md What a lens is for: any visibility/authority constraint; not a plain query filter
+  - *Said as:* "the tenant check belongs in the lens, not around it", "I'll check the org id in application code around the rule", "the narrowing's where is the tenant or brand scope", "scope this query to a brand", "every posture enforces the clamp"
   - *Signs you're bypassing it:* A tenant or visibility check written as application code around a rule, instead of a where clamp in the lens that every posture enforces. (@inixiative/json-rules/README.md § Lens & Multi-Source Data › What a lens is for; docs/LENS.md §1)
-- **Lens narrowing with anchored where clauses** `@inixiative/json-rules/README.md`: Per-model clamps everywhere: mapDefaults; anchor-only: root.where; on descent: root.relations[R].where.
-- **Lens where placement** `docs/claude/API_ROUTES.md#Lens Wheres`: Root to restrict list membership; relation-node per edge; mapDefaults once per model (as redactLens does).
-- **Referenced model path source** `docs: email lens sources`: point a referenced model's path source at its own model source
-- **Send model projection, never raw lens, to client** `json-rules docs, Projected`: server→client builder surface; per-path projectLens for server checks.
+- **Lens narrowing with anchored where clauses** · pattern @inixiative/json-rules/README.md: Per-model clamps everywhere: mapDefaults; anchor-only: root.where; on descent: root.relations[R].where.
+  - *Said as:* "where should the tenant clamp go in the lens", "a clamp on every visit of the model", "restrict only the root rows, not the relations", "the where on descent into a relation"
+- **Lens where placement** · pattern docs/claude/API_ROUTES.md § Lens Wheres · code: `scopeNarrowing`, `User`, `redactLens`, `projectLens`: Root to restrict list membership; relation-node per edge; mapDefaults once per model (as redactLens does).
+  - *Said as:* "where does this where belong: root, relation or defaults", "restrict the list membership at the root", "a clamp per edge versus once per model"
+- **Referenced model path source** · pattern docs: email lens sources: point a referenced model's path source at its own model source
+  - *Said as:* "a referenced model's picker reads its own source", "point the path source at the referenced model", "options for a referenced row's field"
+- **Send model projection, never raw lens, to client** · pattern json-rules docs, Projected: server→client builder surface; per-path projectLens for server checks.
+  - *Said as:* "ship the builder a leak-safe surface", "I'll send the lens to the browser", "the where-stripped surface for the client", "the brand where never reaches the client"
   - *Signs you're bypassing it:* Shipping the server's lens or narrowing (with its where clamps) to a browser builder instead of the model-keyed projection. (@inixiative/json-rules/README.md § TypeScript Types (Projected); docs/LENS.md §10)
-- **assertValidFieldMaps** `@inixiative/json-rules`: Throwing variant; validateFieldMaps returns { ok, errors }.
+- **assertValidFieldMaps** · primitive @inixiative/json-rules: Throwing variant; validateFieldMaps returns { ok, errors }.
+  - *Said as:* "throw if the field map is malformed", "field names with dots or colons in them", "fail fast on a bad field map"
   - *Throws:* json-rules rule-shape Error (`rule-shape`, json-rules-engine, inferred)
-- **assertValidNarrowing** `@inixiative/json-rules`: Throwing variant; validateNarrowing to collect errors.
+- **assertValidNarrowing** · primitive @inixiative/json-rules: Throwing variant; validateNarrowing to collect errors.
+  - *Said as:* "throw if the narrowing is invalid", "fail at construction on a bad lens layer", "a throwing check for the narrowing chain"
   - *Throws:* json-rules rule-shape Error (`rule-shape`, json-rules-engine, inferred)
-- **defaultRecipientNarrowing** `apps/api/src/lib/email/emailLensFor.ts`: Default; a stored recipient lens enabling organizationUsers/spaceUsers widens within the organization.
-- **from: 'mapDefaults' source pointer** `@inixiative/json-rules/README.md — Sources (path source pointer)`: Names any eligible row; a plain path source offers only reachable linked rows. Scope tenancy via mapDefaults to keep unlinked rows.
-- **getLensRoot** `@inixiative/json-rules`: find the base lens a narrowing chain is rooted at
-- **LensNarrowing** `@inixiative/json-rules LensNarrowing`: recursively narrow a parent lens's schema, enums, relations and row where
-- **prune** `docs/claude/COMMUNICATIONS.md#Communications`: drop hidden list elements and null hidden relations or root per lens picks
-- **StoredLens** `@inixiative/json-rules StoredLens`: persistence form; evaluators take composed Lens/LensNarrowing instead.
-- **validateFieldMaps** `@inixiative/json-rules`: Non-throwing; assertValidFieldMaps to throw.
-- **Bind lens before compiling source queries** `@inixiative/json-rules/README.md > Option Sources`: Any toSourceQueries call on a narrowing with binds or relative dates
-- **Bridge fields addressed with fieldMap:Model** `@inixiative/json-rules/README.md FieldMap & FieldMapSet`: rules crossing sources
-- **Bridged sources need farSide** `sourceQueryValues / sourceQueryWhere`: Whenever a source crosses a bridge.
-- **Do not reshape paginated responses with lens projection** `docs/claude/COMMUNICATIONS.md#Communications`: Routes with filterLens and paginated responses; projection where clauses would drop rows.
+- **defaultRecipientNarrowing** · primitive apps/api/src/lib/email/emailLensFor.ts: Default; a stored recipient lens enabling organizationUsers/spaceUsers widens within the organization.
+  - *Said as:* "by default a sender sees its own level only", "the default recipient scope for email", "widen within the organization via a stored lens"
+- **from: 'mapDefaults' source pointer** · primitive @inixiative/json-rules/README.md — Sources (path source pointer): Names any eligible row; a plain path source offers only reachable linked rows. Scope tenancy via mapDefaults to keep unlinked rows.
+  - *Said as:* "offer every eligible row, not only the linked ones", "the picker should list rows not yet linked", "a source pointer naming any row of the model"
+- **getLensRoot** · primitive @inixiative/json-rules: find the base lens a narrowing chain is rooted at
+  - *Said as:* "which base lens is this narrowing built on", "find the root of the chain", "the lens at the bottom of the layers"
+- **LensNarrowing** · primitive @inixiative/json-rules LensNarrowing: recursively narrow a parent lens's schema, enums, relations and row where
+  - *Said as:* "a layer that narrows the parent lens", "restrict fields, enums, relations and rows", "the narrowing carries the row scope", "stack another restriction on the lens"
+- **prune** · primitive docs/claude/COMMUNICATIONS.md § Communications: drop hidden list elements and null hidden relations or root per lens picks
+  - *Said as:* "drop the hidden list elements from the rendered data", "null out the relations the lens hides", "apply picks and wheres to the data before render"
+- **StoredLens** · primitive @inixiative/json-rules StoredLens: persistence form; evaluators take composed Lens/LensNarrowing instead.
+  - *Said as:* "the persisted form of a lens", "one record per layer with its parents", "save the lens to the database", "evaluators don't take the stored shape"
+- **validateFieldMaps** · primitive @inixiative/json-rules: Non-throwing; assertValidFieldMaps to throw.
+  - *Said as:* "check the field map for bad names", "errors in the field map, returned not thrown", "a non-throwing field map check"
+- **Bind lens before compiling source queries** · rule @inixiative/json-rules/README.md > Option Sources: Any toSourceQueries call on a narrowing with binds or relative dates
+  - *Said as:* "bind the lens before asking for option queries", "source queries with unbound placeholders", "relative dates need now before the source compile"
+- **Bridge fields addressed with fieldMap:Model** · rule @inixiative/json-rules/README.md FieldMap & FieldMapSet: rules crossing sources
+  - *Said as:* "name a field on the other source", "address a column across the bridge", "rules that span two field maps"
+- **Bridged sources need farSide** · rule sourceQueryValues / sourceQueryWhere: Whenever a source crosses a bridge.
+  - *Said as:* "a source across a bridge needs the far side", "which side is the far side of this source", "crossing a bridge without naming the far side"
+- **Do not reshape paginated responses with lens projection** · rule docs/claude/COMMUNICATIONS.md § Communications: Routes with filterLens and paginated responses; projection where clauses would drop rows.
+  - *Said as:* "I'll run the projection over the paginated page", "the projection drops rows from the page", "shape the response with the schema, not the lens"
   - *Signs you're bypassing it:* Running a lens projection (projectRows, prune) over an already paginated page to shape the response instead of the route's responseSchema. (docs/claude/COMMUNICATIONS.md § The email lens (filterLens vs responseSchema))
-- **Email lens owner per site** `apps/api/src/lib/email/emailLensFor.ts`: When choosing which owner scopes an email lens.
-- **email paths and rules go through the lens** `docs/claude/COMMUNICATIONS.md > The email lens`: Any token, path or rule in an email template.
+- **Email lens owner per site** · rule apps/api/src/lib/email/emailLensFor.ts: When choosing which owner scopes an email lens.
+  - *Said as:* "which owner scopes the email lens", "the owner for the email lens on this site", "choose the owner that clamps the email data"
+- **email paths and rules go through the lens** · rule docs/claude/COMMUNICATIONS.md > The email lens: Any token, path or rule in an email template.
+  - *Said as:* "evaluate the email rule on the raw variables", "resolve the template token against raw data", "settle never checks a raw rule"
   - *Signs you're bypassing it:* Calling check(rule, variables) on a raw email rule at send, or resolving template token paths against raw variables, without the email lens. (docs/claude/COMMUNICATIONS.md § The email lens ("settle never checks a raw rule"))
-- **FieldMapSet requires mapName** `@inixiative/json-rules README > PostgreSQL SQL Generation`: whenever map is a FieldMapSet/lens rather than a single FieldMap
-- **Gate rules against the narrowing, not the projection** `json-rules docs, Projected`: Whenever a projected lens surface is sent to clients or used for rule building.
+- **FieldMapSet requires mapName** · rule @inixiative/json-rules README > PostgreSQL SQL Generation: whenever map is a FieldMapSet/lens rather than a single FieldMap
+  - *Said as:* "which map in the set is the root", "passing a set of maps to the SQL compiler", "SQL compile over a lens or a map set"
+- **Gate rules against the narrowing, not the projection** · rule json-rules docs, Projected: Whenever a projected lens surface is sent to clients or used for rule building.
+  - *Said as:* "validate the rule against the projected surface", "the shipped surface isn't a gate", "coerce against the model projection"
   - *Signs you're bypassing it:* Validating, coercing or describing a rule against projectLens(…, { by: 'model' }) output, which is a bare lens that refuses or skips every relation path. (@inixiative/json-rules/docs/LENS.md §10 ("A surface is not a gate"))
-- **Gate user rules with validateRuleInLens** `@inixiative/json-rules/README.md`: Any user-supplied rule evaluated against a lens.
-- **Later clamps read only parent-visible relations** `@inixiative/json-rules/README.md Relations`: writing where clamps in non-first narrowings
-- **Lenses only narrow** `@inixiative/json-rules/README.md Lens & Multi-Source Data`: every LensNarrowing in a delegation chain
-- **Memberships are the sender's** `apps/api/src/lib/email/emailLensFor.ts`: Every email send exposing membership rows.
+- **Gate user rules with validateRuleInLens** · rule @inixiative/json-rules/README.md: Any user-supplied rule evaluated against a lens.
+  - *Said as:* "a user-written rule must be gated before it runs", "I'll trust the rule the client sent", "check the rule's paths against the lens first"
+- **Later clamps read only parent-visible relations** · rule @inixiative/json-rules/README.md Relations: writing where clamps in non-first narrowings
+  - *Said as:* "my later clamp reads a hidden column and gets refused", "a where in a child layer on a relation the parent hides", "clamps in non-first layers see less"
+- **Lenses only narrow** · rule @inixiative/json-rules/README.md Lens & Multi-Source Data: every LensNarrowing in a delegation chain
+  - *Said as:* "a layer can't widen what its parent shows", "add a field back in a child layer", "each layer only removes"
+- **Memberships are the sender's** · rule apps/api/src/lib/email/emailLensFor.ts: Every email send exposing membership rows.
+  - *Said as:* "the send exposes membership rows outside the sender's org", "clamp membership rows to the sending organization", "org users visible to another org"
   - *Signs you're bypassing it:* a send that exposes OrganizationUser/SpaceUser rows without clamping them to the sending owner's organization tree (docs/claude/COMMUNICATIONS.md § The email lens (Memberships are the sender's))
-- **Merge scope into first narrowing** `apps/api/src/lib/email/emailLensFor.ts (clampLens)`: When clamps read columns the slot hides (json-rules 3.4 later-layer limits).
-- **Narrowing composition is intersection** `@inixiative/json-rules/README.md`: Whenever chaining LensNarrowing layers.
-- **Never return keepClampColumns output to viewers** `@inixiative/json-rules/README.md — projectRows`: Whenever projecting lens rows for any response.
+- **Merge scope into first narrowing** · rule apps/api/src/lib/email/emailLensFor.ts (clampLens): When clamps read columns the slot hides (json-rules 3.4 later-layer limits).
+  - *Said as:* "the clamp reads a column the slot hides", "put the scope in the first layer", "a later layer can't see the clamp column"
+- **Narrowing composition is intersection** · rule @inixiative/json-rules/README.md: Whenever chaining LensNarrowing layers.
+  - *Said as:* "stacking layers can only take away", "a child layer can't add a field back", "layers intersect, never union"
+- **Never return keepClampColumns output to viewers** · rule @inixiative/json-rules/README.md — projectRows: Whenever projecting lens rows for any response.
+  - *Said as:* "keep the hidden columns for the recheck but don't return them", "the recheck rows leak hidden values", "strip the clamp columns before responding"
   - *Signs you're bypassing it:* Returning projectRows(…, { keepClampColumns: true }) rows in an API response. (@inixiative/json-rules/README.md › Fetching Under a Lens)
-- **Never return keepClampColumns rows to viewers** `@inixiative/json-rules/README.md — Fetching Under a Lens`: When re-testing clamps in memory after a fetch.
+- **Never return keepClampColumns rows to viewers** · rule @inixiative/json-rules/README.md — Fetching Under a Lens: When re-testing clamps in memory after a fetch.
+  - *Said as:* "rows kept with their clamp columns go in the response", "re-test the clamps in memory, then project before returning", "hidden values ride along on the rechecked rows"
   - *Signs you're bypassing it:* Returning projectRows(…, { keepClampColumns: true }) rows in an API response. (@inixiative/json-rules/README.md › Fetching Under a Lens)
-- **No re-declared bind names across lens layers** `@inixiative/json-rules/README.md > Bindings in a Lens`: Whenever a LensNarrowing layer needs a bind its parent chain already declares
+- **No re-declared bind names across lens layers** · rule @inixiative/json-rules/README.md > Bindings in a Lens: Whenever a LensNarrowing layer needs a bind its parent chain already declares
+  - *Said as:* "the child layer needs the parent's org id", "I'll declare the same bind again in the child layer", "read the ancestor's bind instead of redeclaring it", "invalid binding from a repeated name"
   - *Signs you're bypassing it:* A child narrowing declaring its own { bind: 'orgId' } that an ancestor already declares, instead of reading it as parent:orgId. (@inixiative/json-rules/README.md › Bindings in a Lens (invalid_binding))
-- **opaque data loop restriction** `docs/claude/COMMUNICATIONS.md > The email lens`: Any rule inside {{#each}} over opaque data.
-- **Options respect lens narrowing** `@inixiative/json-rules/README.md > Option Sources`: Declaring any narrowing source
+- **opaque data loop restriction** · rule docs/claude/COMMUNICATIONS.md > The email lens: Any rule inside {{#each}} over opaque data.
+  - *Said as:* "a rule inside a loop over opaque data", "each over opaque data with a rule in it", "rules in loops over untyped data"
+- **Options respect lens narrowing** · rule @inixiative/json-rules/README.md > Option Sources: Declaring any narrowing source
+  - *Said as:* "the picker shows every tenant's rows", "options the lens wouldn't allow", "I'll query the model directly for picker options", "options never offer a disallowed value"
   - *Signs you're bypassing it:* Picker options from an unscoped query over the model (every tenant's rows) instead of the lens's declared sources, whose where is narrowed under the whole lens. (@inixiative/json-rules/README.md › Option Sources ("Options never offer a value the lens disallows"))
-- **Relations turned on via relation object only** `@inixiative/json-rules/README.md Relations`: exposing any relation or bridge in a lens
+- **Relations turned on via relation object only** · rule @inixiative/json-rules/README.md Relations: exposing any relation or bridge in a lens
+  - *Said as:* "turn the relation on in picks", "a relation listed as a field gives wrong kind", "enable the relation in the first layer"
   - *Signs you're bypassing it:* Relation names listed in picks (wrong_kind), or a later layer trying to turn a relation on, instead of relations on the first narrowing. (@inixiative/json-rules/README.md › Relations; docs/LENS.md §12 To 3.4)
-- **Rendering enforces lens projection** `docs/claude/COMMUNICATIONS.md#Communications`: Any email render using a lens-scoped variable set.
+- **Rendering enforces lens projection** · rule docs/claude/COMMUNICATIONS.md § Communications: Any email render using a lens-scoped variable set.
+  - *Said as:* "pass the full user row as template variables", "tokens read fields the lens hides", "render with projected data only"
   - *Signs you're bypassing it:* passing full Prisma user/organization rows as template variables so tokens can read fields or foreign tags the lens hides (docs/claude/COMMUNICATIONS.md § The email lens (Rendering enforces the projection too))
-- **Rule-tracked lens references by id** `packages/db/lens`: Any lens used by rules that track references.
+- **Rule-tracked lens references by id** · rule packages/db/lens: Any lens used by rules that track references.
+  - *Said as:* "name the tag by its fk column", "reference rows by id, never the fk", "one spelling per reference"
   - *Signs you're bypassing it:* A rule or lens naming a row through its FK column (tagId, spaceId) instead of the related model's id. (docs/claude/COMMUNICATIONS.md § Rule References ("one spelling per reference: the row's id, never an FK column"))
-- **Scope pointer tenancy through mapDefaults** `@inixiative/json-rules/README.md — Sources (path source pointer)`: Whenever a field uses from: 'mapDefaults' and must offer unlinked rows.
-- **Stored lens slot is a later layer** `apps/api/src/lib/email/emailLensFor.ts`: Whenever an email row or default-tier row stores lens slots.
-- **Treat recheck rows as candidates** `@inixiative/json-rules/README.md — Sources across a bridge`: Any source whose path, where, label or axis reads across a bridge.
+- **Scope pointer tenancy through mapDefaults** · rule @inixiative/json-rules/README.md — Sources (path source pointer): Whenever a field uses from: 'mapDefaults' and must offer unlinked rows.
+  - *Said as:* "scope the any-row picker to the tenant", "unlinked rows, but only this tenant's", "tenancy on a pointer source"
+- **Stored lens slot is a later layer** · rule apps/api/src/lib/email/emailLensFor.ts: Whenever an email row or default-tier row stores lens slots.
+  - *Said as:* "the stored lens slot stacks on top", "a stored slot as a later layer", "where the email row's lens slots sit"
+- **Treat recheck rows as candidates** · rule @inixiative/json-rules/README.md — Sources across a bridge: Any source whose path, where, label or axis reads across a bridge.
+  - *Said as:* "offer the bridged rows straight to the picker", "recheck the candidates after loading the far side", "the first query's rows aren't final"
   - *Signs you're bypassing it:* Offering a bridged source query's rows straight to a picker without loading the far side and re-checking them with materializeSourceQuery(query, rows, { lens }). (@inixiative/json-rules/README.md › Sources across a bridge)
-- **Use Prisma form when SQL is null** `@inixiative/json-rules/README.md — Sources across a bridge`: Bridged source queries whose recheck reads through a local relation.
+- **Use Prisma form when SQL is null** · rule @inixiative/json-rules/README.md — Sources across a bridge: Bridged source queries whose recheck reads through a local relation.
+  - *Said as:* "the recheck has no SQL form", "sql is null, so use the Prisma form", "a bridged recheck through a local relation"
 - *Also here, by name:* boundAndLive (`packages/db/src/lens/scopes.ts`); compiledSourceWhere (`packages/db/src/utils/sourceQueryValues.ts`); customerRefReachedModels (`apps/api/src/modules/customerRef/lib/customerRefLens.ts`); isPerCallerScope (`apps/api/src/middleware/resources/scopeNarrowing.ts`); live (`packages/db/src/lens/scopes.ts`); platformOrBound (`packages/db/src/lens/scopes.ts`); requireWhere (`packages/db/src/hydrate/requireWhere.ts`); resolveRef (`packages/sdk/src/lenses/resolveRef.ts`); through (`packages/db/src/lens/scopes.ts`); tokenPathKind (`packages/email/src/validations/validateTokens/tokenPathKind.ts`)
 
 ## 4. The specifics, in full

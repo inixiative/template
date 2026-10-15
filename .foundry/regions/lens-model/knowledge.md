@@ -107,11 +107,13 @@ Which question goes where across the eight rules and lens regions: the template'
 
 ## 3. Everything that exists here, by class
 
-Point at a class when that is as specific as the moment allows, or at a member. Where a class has siblings an agent could confuse, a table under the class header says which to use when. Each member: **name** `where`: choose this when … . Where the docs or code give material, a second line describes the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
+Point at a class when that is as specific as the moment allows, or at a member. Where a class has siblings an agent could confuse, a table under the class header says which to use when; its *Said as* line gives the plain words a user or agent uses for that job. Each member: **name** · kind `where` · the doc § that describes it (code members) or the code it is about (doc members): choose this when … . Quote the name and the where in a pointer ("look over here: createLock, packages/db/src/lock/createLock.ts, CONCURRENCY.md § Distributed Lock"). *Said as:* the ways a user or agent describes this job in a message or plan without knowing the name; match on these. *Signs you're bypassing it:* the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
 
 ### Class `lib-json-rules-lens`: The json-rules Lens model: why lenses exist, the two kinds of narrowing, anchor layers, the all filter-first trick, composition, defaults, enum narrowing, the type shape (LENS.md §1–8)
 
 **Job: define, store and reload a lens** (The three forms of a lens) — @inixiative/json-rules/README.md § TypeScript Types (A lens has three forms); docs/LENS.md §9 Storing a lens
+
+*Said as:* "define a lens, save it, load it back", "persist the lens", "which form of the lens do I pass"
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -123,6 +125,8 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 **Job: read one value or path through a lens** (Reading one thing through a lens) — @inixiative/json-rules/docs/VERBS.md § Public API (project, walk, read)
 
+*Said as:* "one value or path through the lens", "what does the lens show at this path", "read a single field as the lens allows"
+
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **lensVisit (lens-usage)** | one visit at a relation path, resolved on demand | the whole visible surface (projectLens) |
@@ -130,6 +134,8 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **walkLensPath (lens-usage)** | whether one dotted path resolves, hop by hop | reading data (readLensValue) |
 
 **Job: check a narrowing or rule against a lens and handle its refusal** (validateNarrowing vs LensRefusal vs validateRuleInLens) — @inixiative/json-rules/docs/LENS.md §2, §5; README § Error Handling
+
+*Said as:* "is this narrowing valid", "the lens refused, why", "check the rule or layer against the lens"
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -139,25 +145,35 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 **Job: pass bind values through a layered lens** (Binds across layers) — @inixiative/json-rules/README.md § Bindings in a Lens
 
+*Said as:* "pass the tenant id through the lens layers", "which binds does the lens chain need", "a child layer needs the parent's bind"
+
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **listLensBindings (json-rules-engine)** | the bind names a whole narrowing chain requires | one rule (listBindings); filling values (bindLens) |
 | **No re-declared bind names across lens layers** | a layer needs an ancestor's bind: read it as parent:name | re-declaring { bind } (invalid_binding) |
 | **bindLens (lens-usage)** | substituting values into the chain, in stages | a standalone rule (bindRule) |
 
-- **clampLens** `@inixiative/json-rules#clampLens`: Resolving bind tokens rather than adding restrictions: bindLens instead; restacking stored layers: composeLens.
+- **clampLens** · package `@inixiative/json-rules#clampLens` · in docs: @inixiative/json-rules/docs/LENS.md § 1. Why Lens exists; docs/claude/COMMUNICATIONS.md § Email › The email lens: Resolving bind tokens rather than adding restrictions: bindLens instead; restacking stored layers: composeLens.
+  - *Said as:* "add a restriction to the lens", "AND a where into the lens's first layer", "I'll spread the lens and add a where", "scope the lens to live rows", "merge the tenant clamp into the first narrowing"
   - *Signs you're bypassing it:* Stacking a new later narrowing layer whose clamp reads columns the slot hides (refused since json-rules 3.4), or spreading a where into a lens, instead of merging the scope into the first narrowing with clampLens. (@inixiative/json-rules/docs/LENS.md §1 (clampLens); docs/claude/COMMUNICATIONS.md § The email lens)
-- **LensRefusal** `@inixiative/json-rules#LensRefusal`: Lens shape faults; caller input faults throw UsageError. validateNarrowing reports the same refusal ahead of time.
+- **LensRefusal** · package `@inixiative/json-rules#LensRefusal` · in docs: @inixiative/json-rules/docs/LENS.md § 2. Two kinds of narrowing; @inixiative/json-rules/README.md § Error Handling: Lens shape faults; caller input faults throw UsageError. validateNarrowing reports the same refusal ahead of time.
+  - *Said as:* "the lens itself can't do this", "a clamp reads what its parent hides", "the error when the lens refuses, not the input", "fix the lens, not the caller"
   - *Error class:* `lens-refusal` (json-rules LensRefusal (with code): the lens itself cannot do it (a later clamp reads what its parent hides, a clamp or source a compile has no form for, a link a source path cannot carry). Fix the lens; validateNarrowing reports it ahead of time.); thrown by toPrisma, toSql, toSourceQueries, toLensSelect, projectLens, lensVisit, narrowRule, materializeSources
-- **validateNarrowing** `@inixiative/json-rules#validateNarrowing`: Checks the narrowing itself; to gate a rule against a lens use validateRuleInLens. assertValidNarrowing throws instead.
+- **validateNarrowing** · package `@inixiative/json-rules#validateNarrowing` · in docs: @inixiative/json-rules/docs/LENS.md § 2. Two kinds of narrowing; @inixiative/json-rules/docs/LENS.md § 5. Composition rules: Checks the narrowing itself; to gate a rule against a lens use validateRuleInLens. assertValidNarrowing throws instead.
+  - *Said as:* "check the lens layer when I build it", "is this narrowing valid against its parents", "I'll find the bad layer when the query comes back empty", "report each refusal as a code at construction"
   - *Signs you're bypassing it:* Finding a bad narrowing layer at query time through a silently empty result, instead of validateNarrowing / assertValidNarrowing when the layer is built. (@inixiative/json-rules/docs/LENS.md §5 ("find bad lens code at construction, not at query time"))
-- **Compile under a lens** `@inixiative/json-rules/README.md — Compiling under a lens`: When a lens scopes the rule; pass map/model directly only without a lens.
+- **Compile under a lens** · pattern @inixiative/json-rules/README.md — Compiling under a lens: When a lens scopes the rule; pass map/model directly only without a lens.
+  - *Said as:* "compile the rule with the lens so it's gated and narrowed", "I'll pass the map and model and narrow by hand", "one call that gates, narrows and compiles", "a scoped compile of a user rule"
   - *Signs you're bypassing it:* Passing map / model to toPrisma / toSql for a lens-scoped rule (which gates nothing) and applying narrowRule by hand, instead of { lens }, which gates, narrows and compiles in one call. (@inixiative/json-rules/README.md § Prisma Query Planning › Compiling under a lens)
-- **Lens as authority spine** `@inixiative/json-rules/README.md What a lens is for`: any visibility/authority constraint; not a plain query filter
+- **Lens as authority spine** · pattern @inixiative/json-rules/README.md What a lens is for: any visibility/authority constraint; not a plain query filter
+  - *Said as:* "the tenant check belongs in the lens, not around it", "I'll check the org id in application code around the rule", "the narrowing's where is the tenant or brand scope", "scope this query to a brand", "every posture enforces the clamp"
   - *Signs you're bypassing it:* A tenant or visibility check written as application code around a rule, instead of a where clamp in the lens that every posture enforces. (@inixiative/json-rules/README.md § Lens & Multi-Source Data › What a lens is for; docs/LENS.md §1)
-- **LensNarrowing** `@inixiative/json-rules LensNarrowing`: recursively narrow a parent lens's schema, enums, relations and row where
-- **StoredLens** `@inixiative/json-rules StoredLens`: persistence form; evaluators take composed Lens/LensNarrowing instead.
-- **No re-declared bind names across lens layers** `@inixiative/json-rules/README.md > Bindings in a Lens`: Whenever a LensNarrowing layer needs a bind its parent chain already declares
+- **LensNarrowing** · primitive @inixiative/json-rules LensNarrowing: recursively narrow a parent lens's schema, enums, relations and row where
+  - *Said as:* "a layer that narrows the parent lens", "restrict fields, enums, relations and rows", "the narrowing carries the row scope", "stack another restriction on the lens"
+- **StoredLens** · primitive @inixiative/json-rules StoredLens: persistence form; evaluators take composed Lens/LensNarrowing instead.
+  - *Said as:* "the persisted form of a lens", "one record per layer with its parents", "save the lens to the database", "evaluators don't take the stored shape"
+- **No re-declared bind names across lens layers** · rule @inixiative/json-rules/README.md > Bindings in a Lens: Whenever a LensNarrowing layer needs a bind its parent chain already declares
+  - *Said as:* "the child layer needs the parent's org id", "I'll declare the same bind again in the child layer", "read the ancestor's bind instead of redeclaring it", "invalid binding from a repeated name"
   - *Signs you're bypassing it:* A child narrowing declaring its own { bind: 'orgId' } that an ancestor already declares, instead of reading it as parent:orgId. (@inixiative/json-rules/README.md › Bindings in a Lens (invalid_binding))
 - *Also here, by name:* assertValidFieldMaps (`@inixiative/json-rules`); assertValidNarrowing (`@inixiative/json-rules`); getLensRoot (`@inixiative/json-rules`); validateFieldMaps (`@inixiative/json-rules`)
 

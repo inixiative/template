@@ -110,15 +110,17 @@ The shape of the template monorepo: which workspaces exist and what each owns, w
 
 `dependencies` is the inventory to check before adding a package: Hono with `@hono/zod-openapi`, Prisma with the pg adapter, `prisma-zod-generator` and `@inixiative/prisma-map`, ioredis and BullMQ (bull-board), better-auth, permix inside `@template/permissions`, zod and `@inixiative/json-rules`, consola with optional Sentry and OpenTelemetry, Resend and MJML, lodash-es, uuidv7, pluralize, React with TanStack Router/Query, Zustand, Vite, Tailwind and shadcn, Biome and faker; the 'Planned' table names where date-fns, stripe, the S3 client and sharp go when needed. FEATURES.md § Tech Stack lags on versions (package.json has TypeScript 6.0.3 and permix ^3.6.0); package.json wins. `architecture` is the system overview: clients → api middleware (auth, context) → OpenAPI routes → controllers → the mutation lifecycle (rules, immutable fields, cache and webhook hooks) → BullMQ jobs, Redis cache and Postgres via Prisma, with side effects after commit and reads skipping hooks. The load-bearing patterns AI/ENTRYPOINT.md lists (ReBAC, one rules AST with three targets, makeController, makeError, field encryption with rotation, tenancy through the query, permission and event layers) are already built: consult FEATURES.md and COMPARISONS.md before concluding something is missing.
 
-This region says where things are and how they connect; each subsystem's own region says how it works. See `dx-tools` for turbo.json tasks, codegen, the tsup/tsconfig presets and versions.json, and for the lint scripts that enforce the alias rules; `dx-setup` for running, env and worktrees; `database`, `mutation-hooks`, `permissions / tenancy`, `authentication / frontend-auth`, `request-context-errors / batch`, `jobs-cron`, `email-templates`, `frontend-state-api-client` and `ui-components-theme` for the subsystems the overview names; `engineering-process-docs` for pattern discovery before writing new code.
+This region says where things are and how they connect; each subsystem's own region says how it works. See `dx-tools` for turbo.json tasks, codegen, the tsup/tsconfig presets and versions.json, and for the lint scripts that enforce the alias rules; `dx-setup` for running, env and worktrees; `database-client / data-modeling`, `mutation-hooks`, `permissions / tenancy`, `authentication / frontend-auth`, `request-context-errors / batch`, `jobs-cron`, `email-templates`, `frontend-store / api-client` and `ui-components / theme-layout` for the subsystems the overview names; `engineering-process-docs` for pattern discovery before writing new code.
 
 ## 3. Everything that exists here, by class
 
-Point at a class when that is as specific as the moment allows, or at a member. Where a class has siblings an agent could confuse, a table under the class header says which to use when. Each member: **name** `where`: choose this when … . Where the docs or code give material, a second line describes the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
+Point at a class when that is as specific as the moment allows, or at a member. Where a class has siblings an agent could confuse, a table under the class header says which to use when; its *Said as* line gives the plain words a user or agent uses for that job. Each member: **name** · kind `where` · the doc § that describes it (code members) or the code it is about (doc members): choose this when … . Quote the name and the where in a pointer ("look over here: createLock, packages/db/src/lock/createLock.ts, CONCURRENCY.md § Distributed Lock"). *Said as:* the ways a user or agent describes this job in a message or plan without knowing the name; match on these. *Signs you're bypassing it:* the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
 
 ### Class `monorepo-layout`: Workspaces, packages, path aliases, import direction, where things live
 
 **Job: import code across the monorepo** (import alias rules) — docs/claude/MONOREPO.md § Path Aliases; § Avoid Barrel Files
+
+*Said as:* "which import path do I use", "relative or alias import", "can I add an index file here", "import from the package root or the subpath", "no relative imports"
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -131,6 +133,8 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 **Job: decide where new code goes in the monorepo** (where new code goes) — docs/claude/MONOREPO.md § Where to Find Things; § Package Descriptions; § Adding Dependencies
 
+*Said as:* "where does this file belong", "where do routes, hooks and jobs live", "where does a react component go", "where do e2e tests go", "where do I install this dependency"
+
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **Code location map** | placing routes, hooks, jobs, schema, context, factories | a new top-level folder for them |
@@ -141,92 +145,145 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 **Job: authenticate and gate a request in the middleware chain** (request-flow middleware named in ARCHITECTURE.md) — docs/claude/ARCHITECTURE.md § Request Flow
 
+*Said as:* "authenticate the caller on this route", "gate the route on a permission", "a session-only route", "api tokens shouldn't reach this"
+
 | Member | Use when | Not when (use instead) |
 |---|---|---|
-| **authMiddleware (authentication)** | session callers | API token callers (use tokenAuthMiddleware) |
-| **tokenAuthMiddleware (authentication)** | API token callers | session callers (use authMiddleware) |
+| **authMiddleware (auth-middleware-users)** | session callers | API token callers (use tokenAuthMiddleware) |
+| **tokenAuthMiddleware (auth-middleware-users)** | API token callers | session callers (use authMiddleware) |
 | **validatePermission** | permission gates on a route | rejecting token callers (use validateNotToken) |
-| **validateNotToken (authentication)** | session-only routes | permission checks (use validatePermission) |
+| **validateNotToken (auth-middleware-users)** | session-only routes | permission checks (use validatePermission) |
 
-- **Add dependencies per workspace** `docs/claude/MONOREPO.md › Adding Dependencies`: Use bun add -d for dev dependencies.
+- **Add dependencies per workspace** · pattern docs/claude/MONOREPO.md › Adding Dependencies: Use bun add -d for dev dependencies.
+  - *Said as:* "I'll bun add it at the root", "where do I install this package", "add the dependency to the workspace that imports it", "root is dev tooling only"
   - *Signs you're bypassing it:* `bun add <pkg>` at the repo root for a package one app or package imports, growing root dependencies (docs/claude/MONOREPO.md › Adding Dependencies; docs/claude/STYLE.md § Dependencies (Never install at root level))
-- **Bun workspaces layout** `package.json workspaces`: split code into deployable apps/* and shared packages/* Bun workspaces
-- **Code location map** `docs/claude/MONOREPO.md › Where to Find Things`: Deciding where new code lives.
+- **Bun workspaces layout** · pattern package.json workspaces: split code into deployable apps/* and shared packages/* Bun workspaces
+  - *Said as:* "how is the repo split into apps and packages", "which workspaces exist", "I'll add a new top-level folder for this"
+- **Code location map** · pattern docs/claude/MONOREPO.md › Where to Find Things: Deciding where new code lives.
+  - *Said as:* "where does a new route go", "where do hooks and jobs live", "I'll make a new folder for these", "which file holds the factories", "where do I find the middleware"
   - *Signs you're bypassing it:* a new top-level folder for routes, hooks or jobs instead of apps/api/src/modules/<model>/{routes,hooks,jobs} (docs/claude/MONOREPO.md § Where to Find Things; docs/claude/NAMING.md § Files & Directories)
-- **Cross-app tests in tests/** `tests/`: Cross-app E2E or load tests; unit/integration tests stay in their package.
-- **Docker Compose services** `FEATURES.md > Core Platform > Docker Compose`: Only databases are containerized; run apps via turbo watch local.
+- **Cross-app tests in tests/** · pattern tests/: Cross-app E2E or load tests; unit/integration tests stay in their package.
+  - *Said as:* "where do end-to-end tests go", "a load test across apps", "I'll put the e2e test in the api package", "tests spanning several apps"
+- **Docker Compose services** · pattern FEATURES.md > Core Platform > Docker Compose: Only databases are containerized; run apps via turbo watch local.
+  - *Said as:* "what runs in docker locally", "I'll add the api to docker compose", "only the databases are containers"
   - *Signs you're bypassing it:* a Dockerfile or compose service that runs the API, worker or frontends in containers for local dev (FEATURES.md › Docker Compose for Supporting Services (Bun servers run natively))
-- **Environments pr, staging, prod** `FEATURES.md > Core Platform > Multi-Environment Setup`: PR environments are ephemeral and auto-cleaned on merge.
-- **False polymorphism** `docs/claude/ARCHITECTURE.md#Why False Polymorphism?`: any polymorphic relation
-- **Modular Prisma schema** `packages/db/prisma/schema/`: split the Prisma schema across per-domain files
+- **Environments pr, staging, prod** · pattern FEATURES.md > Core Platform > Multi-Environment Setup: PR environments are ephemeral and auto-cleaned on merge.
+  - *Said as:* "what environments exist", "pr environments get cleaned up on merge", "I'll add a dev environment"
+- **False polymorphism** · pattern docs/claude/ARCHITECTURE.md § Key Patterns › Why False Polymorphism?: any polymorphic relation
+  - *Said as:* "a relation that can point at several models", "I'll use a generic id plus type column", "the owner can be a user, org or space"
+- **Modular Prisma schema** · pattern packages/db/prisma/schema/: split the Prisma schema across per-domain files
+  - *Said as:* "the schema is split per model", "where does a new model's file go", "I'll add it to an existing prisma file"
   - *Signs you're bypassing it:* several models added to one .prisma file, or a monolithic schema.prisma (docs/claude/MONOREPO.md § Where to Find Things; FEATURES.md › Dynamic Schema Generation)
-- **Monorepo app and package split** `FEATURES.md > Core Platform > Monorepo Architecture`: place code in apps web/admin/superadmin/api or shared packages db/ui/email/shared
-- **Temporary files in tmp/** `tmp/`: keep scratch output in a gitignored directory
+- **Monorepo app and package split** · pattern FEATURES.md > Core Platform > Monorepo Architecture: place code in apps web/admin/superadmin/api or shared packages db/ui/email/shared
+  - *Said as:* "which app or package does this belong in", "where do I put this code", "I'll put it in the api since that's where I am"
+- **Temporary files in tmp/** · pattern tmp/: keep scratch output in a gitignored directory
+  - *Said as:* "where do scratch files go", "I'll drop the output at the repo root", "throwaway scripts live in the gitignored tmp folder", "scratch notes go in the tmp workspace"
   - *Signs you're bypassing it:* scratch scripts or output files dropped at the repo root, in scripts/, or in /tmp (docs/claude/SCRIPTS.md § Writing New Scripts)
-- **@template/db-test** `packages/db/test`: Inside packages/db; factories live in packages/db/src/test/factories, api utils in apps/api/tests/utils.
-- **@template/sdk** `packages/sdk/`: Frontend API calls; use instead of hand-written fetches.
+- **@template/db-test** · primitive packages/db/test: Inside packages/db; factories live in packages/db/src/test/factories, api utils in apps/api/tests/utils.
+  - *Said as:* "where are the test factories", "the test utilities for the db package", "I'll create my own factory helpers"
+- **@template/sdk** · primitive packages/sdk/: Frontend API calls; use instead of hand-written fetches.
+  - *Said as:* "call the api from the frontend", "I'll write a fetch to the api", "the generated client for frontend calls"
   - *Signs you're bypassing it:* hand-written fetch('/api/...') calls and response types in frontend code instead of the generated SDK functions (docs/claude/MONOREPO.md › @template/sdk; catalog @template/sdk)
-- **Email client abstractions** `packages/email`: Console client for local/dev; Resend for real delivery.
-- **errors** `packages/shared/errors/`: supply shared isomorphic error types and utilities
-- **False polymorphism extension** `packages/db (Extensions)`: model polymorphic relations through a Prisma client extension
-- **Field encryption** `packages/db (Encryption)`: Use instead of ad-hoc credential storage.
-- **Init Script** `FEATURES.md > Core Platform > Init Script`: set up a new project: rename, secrets and cloud provisioning via TUI
-- **logger** `packages/shared/logger/`: Use instead of console output anywhere.
-- **MJML email rendering** `packages/email`: render versioned templates with variables and conditionals to HTML
-- **onCommit** `docs/claude/ARCHITECTURE.md#Write Path`: post-commit effects; in-transaction checks belong in before hooks
-- **Redis cache extension** `packages/db (Extensions)`: cache Prisma reads in Redis via a client extension
-- **Root workspace scripts** `FEATURES.md > Core Platform > Workspace Tooling`: lint, typecheck or test every package from the repo root
-- **setupOrgContext** `@template/permissions`: prepare organization context for permission checks
-- **tsconfig.frontend.json** `tsconfig.frontend.json`: Frontend apps; packages/ui and sdk extend react.json directly.
-- **turbo watch local** `FEATURES.md > Core Platform > Turborepo Orchestration`: Filter with #app to run one app; omit to run all.
-- **validatePermission** `docs/claude/ARCHITECTURE.md#Request Flow`: permission gates; validateNotToken to reject API-token callers
+- **Email client abstractions** · primitive packages/email: Console client for local/dev; Resend for real delivery.
+  - *Said as:* "send email locally without a provider", "which email client runs in dev", "I'll call the provider sdk directly"
+- **errors** · primitive packages/shared/errors/: supply shared isomorphic error types and utilities
+  - *Said as:* "the shared error types", "where do error utilities live", "I'll define my own error class"
+- **False polymorphism extension** · primitive packages/db (Extensions): model polymorphic relations through a Prisma client extension
+  - *Said as:* "how polymorphic relations are loaded", "the client extension behind owner relations", "I'll resolve the owner model by hand"
+- **Field encryption** · primitive packages/db (Encryption): Use instead of ad-hoc credential storage.
+  - *Said as:* "store a credential encrypted in the database", "I'll store the api key as plain text", "encrypt this column"
+- **Init Script** · primitive FEATURES.md > Core Platform > Init Script: set up a new project: rename, secrets and cloud provisioning via TUI
+  - *Said as:* "set up a brand new project from the template", "rename and provision a fork", "I'll copy the template and edit by hand"
+- **logger** · primitive packages/shared/logger/: Use instead of console output anywhere.
+  - *Said as:* "log something on the server", "I'll console log this", "the shared logging facade"
+- **MJML email rendering** · primitive packages/email: render versioned templates with variables and conditionals to HTML
+  - *Said as:* "render an email template to html", "templates with variables and conditionals", "I'll build the email html with string concatenation"
+- **onCommit** · primitive docs/claude/ARCHITECTURE.md § Data Flow › Write Path · code: `Flow`, `sendWebhook`: post-commit effects; in-transaction checks belong in before hooks
+  - *Said as:* "run this after the transaction commits", "the fact that this has to be manually deferred is the signal", "I'll fire the webhook inside the transaction"
+- **Redis cache extension** · primitive packages/db (Extensions): cache Prisma reads in Redis via a client extension
+  - *Said as:* "cache prisma reads in redis", "the client extension for cached reads", "I'll wrap the query in my own cache"
+- **Root workspace scripts** · primitive FEATURES.md > Core Platform > Workspace Tooling: lint, typecheck or test every package from the repo root
+  - *Said as:* "lint or test every package from the root", "one command across all packages", "I'll run the command in each package"
+- **setupOrgContext** · primitive @template/permissions: prepare organization context for permission checks
+  - *Said as:* "prepare org context before a permission check", "set up the org for the permission engine", "I'll pass the org id into the check manually"
+- **tsconfig.frontend.json** · primitive tsconfig.frontend.json: Frontend apps; packages/ui and sdk extend react.json directly.
+  - *Said as:* "the tsconfig for frontend apps", "which tsconfig does the web app extend", "I'll extend the react preset directly from the app"
+- **turbo watch local** · primitive FEATURES.md > Core Platform > Turborepo Orchestration: Filter with #app to run one app; omit to run all.
+  - *Said as:* "run all the apps with reload", "start the stack through turbo", "I'll start each app individually"
+- **validatePermission** · primitive docs/claude/ARCHITECTURE.md § Request Flow · code: `Flow`, `prepareRequest`, `authMiddleware`, `Session`: permission gates; validateNotToken to reject API-token callers
+  - *Said as:* "gate the route on a permission", "check the actor may do this action", "I'll load the resource and check permix in the handler", "throw 403 by hand in the route"
   - *Throws:* HTTPException (`caller-error`, request-context-errors, inferred); makeError 403 PERMISSION_DENIED (`permission-denied`, permissions)
   - *Signs you're bypassing it:* a handler that loads the resource itself and calls permix.check / throws 403 by hand on a route where resourceContextMiddleware + validatePermission(action) would do it (docs/claude/PERMISSIONS.md § Validation Middleware)
-- **with-env.sh** `with-env.sh`: Use instead of committed .env files; secrets come from Infisical per environment.
+- **with-env.sh** · primitive with-env.sh: Use instead of committed .env files; secrets come from Infisical per environment.
+  - *Said as:* "load env for a command", "I'll source the env file", "secrets come from the secret manager per environment", "run a command with the right environment"
   - *Signs you're bypassing it:* `source .env.local`, dotenv loading in a script, or `infisical run --env=prod -- ...` called directly instead of `bun run with` (docs/claude/ENVIRONMENTS.md § with-env Composition; FEATURES.md › Infisical Secrets Management)
-- **App imports use #/ alias** `docs/claude/MONOREPO.md › Path Aliases`: Within an app; cross-package imports use @template/ instead.
+- **App imports use #/ alias** · rule docs/claude/MONOREPO.md › Path Aliases: Within an app; cross-package imports use @template/ instead.
+  - *Said as:* "importing within an app, which prefix", "hash for apps inside themselves", "I'll use a relative path inside the api", "the in-app import alias", "dot-dot-slash imports inside an app"
   - *Signs you're bypassing it:* `../../lib/...` relative imports inside apps/api or a frontend app (docs/claude/MONOREPO.md › Path Aliases › App Imports)
-- **Barrels only for top-level package API** `docs/claude/MONOREPO.md › Avoid Barrel Files`: Any new index.ts or import; intermediate barrels are banned.
+- **Barrels only for top-level package API** · rule docs/claude/MONOREPO.md › Avoid Barrel Files: Any new index.ts or import; intermediate barrels are banned.
+  - *Said as:* "can I add an index file here", "I'll add an index file to re-export the folder", "no nested barrels", "import the source file, not the folder index"
   - *Signs you're bypassing it:* a new nested index.ts re-exporting siblings, or imports from '#/lib' instead of the source file (docs/claude/MONOREPO.md › Avoid Barrel Files)
-- **Bun runtime** `FEATURES.md > Core Platform > Bun Runtime`: All installs, scripts and test runs.
-- **Every package maps all packages** `docs/claude/MONOREPO.md › TypeScript Configuration`: Adding a package or seeing 'Cannot find module @template/x'.
+- **Bun runtime** · rule FEATURES.md > Core Platform > Bun Runtime: All installs, scripts and test runs.
+  - *Said as:* "install and run with bun", "I'll use npm or node here", "which runtime do we use"
+- **Every package maps all packages** · rule docs/claude/MONOREPO.md › TypeScript Configuration: Adding a package or seeing 'Cannot find module @template/x'.
+  - *Said as:* "cannot find module for a sibling package", "I'll work around the missing module with a relative import", "add the package mapping to the tsconfig paths"
   - *Signs you're bypassing it:* 'Cannot find module @template/x' worked around with a relative or deep path import instead of adding the @template/x/* mapping to that package's tsconfig (docs/claude/MONOREPO.md › TypeScript Configuration)
-- **Forbidden alias prefixes** `docs/claude/MONOREPO.md › Path Aliases › Rules`: Every import in apps and packages.
+- **Forbidden alias prefixes** · rule docs/claude/MONOREPO.md › Path Aliases › Rules: Every import in apps and packages.
+  - *Said as:* "I'll use double hash or tilde as the alias", "hash slash inside a package", "which alias prefixes are banned", "tilde imports anywhere"
   - *Signs you're bypassing it:* `##/` or `~/` imports anywhere, or `#/` used inside a package (docs/claude/MONOREPO.md › Path Aliases › Rules)
-- **Frontend code lives in @template/ui** `packages/ui/`: Any new frontend code; not @template/shared or per-app duplication.
+- **Frontend code lives in @template/ui** · rule packages/ui/: Any new frontend code; not @template/shared or per-app duplication.
+  - *Said as:* "where does a new react component go", "ui is everything react, shared is isomorphic", "I'll put the hook in shared so both apps can use it", "I'll duplicate the component in web and admin"
   - *Signs you're bypassing it:* React components, hooks or store slices added to packages/shared or duplicated inside web, admin and superadmin (docs/claude/MONOREPO.md › @template/ui)
-- **Generated files use .gen. naming** `docs/claude/MONOREPO.md › Generated file convention`: Template generators; Prisma outputs under packages/db/src/generated/** are exempt.
+- **Generated files use .gen. naming** · rule docs/claude/MONOREPO.md › Generated file convention: Template generators; Prisma outputs under packages/db/src/generated/** are exempt.
+  - *Said as:* "name the generated output so tooling can skip it", "I'll name the generated file like a normal source file", "the generated file marker"
   - *Signs you're bypassing it:* a new generator output named without `.gen.` so git, lint and search pick it up (docs/claude/MONOREPO.md › Generated file convention)
-- **No committed .env files** `FEATURES.md > Core Platform > Environment Composition`: Any command needing secrets or env config.
+- **No committed .env files** · rule FEATURES.md > Core Platform > Environment Composition: Any command needing secrets or env config.
+  - *Said as:* "I'll commit the staging env", "secrets written into a tracked config", "where do secrets go instead of env files"
   - *Signs you're bypassing it:* a committed .env.staging/.env.prod or secrets written into a tracked config file instead of Infisical (FEATURES.md › Environment Composition; docs/claude/ENVIRONMENTS.md § Infisical (Cloud Environments))
-- **No relative imports outside barrels** `docs/claude/MONOREPO.md › Path Aliases › Rules`: All source files; barrel index.ts files are the sole exception.
+- **No relative imports outside barrels** · rule docs/claude/MONOREPO.md › Path Aliases › Rules: All source files; barrel index.ts files are the sole exception.
+  - *Said as:* "no relative imports", "never use relative imports except in barrel files", "I'll import with dot slash here", "the dot-dot-slash import in a source file", "relative paths only in the top-level index"
   - *Signs you're bypassing it:* `./` or `../` imports in a source file that is not a top-level index.ts (docs/claude/MONOREPO.md › Path Aliases › Rules; scripts/lint/check-import-aliases.sh)
-- **Organize UI components by domain** `packages/ui/src/components/`: When placing a new shared UI component; shadcn primitives go in primitives/.
+- **Organize UI components by domain** · rule packages/ui/src/components/: When placing a new shared UI component; shadcn primitives go in primitives/.
+  - *Said as:* "where does this shared component go", "I'll make a modals folder for all the modals", "components grouped by domain, not by kind"
   - *Signs you're bypassing it:* new folders like components/modals/ or components/forms/, or components placed inside an app instead of packages/ui (docs/claude/FRONTEND/COMPONENTS.md § Package Organization (Rule: put components where they're used))
-- **Package build order** `FEATURES.md > Core Platform > Workspace Tooling`: When adding packages or task dependencies.
-- **Package dependency direction** `docs/claude/MONOREPO.md › Dependency Direction`: Adding any cross-workspace import.
+- **Package build order** · rule FEATURES.md > Core Platform > Workspace Tooling: When adding packages or task dependencies.
+  - *Said as:* "the packages build in dependency order", "I'll add a task without declaring its dependencies", "db then shared then ui then apps"
+- **Package dependency direction** · rule docs/claude/MONOREPO.md › Dependency Direction: Adding any cross-workspace import.
+  - *Said as:* "can the db package import from permissions", "I'll import the email package from shared", "which way may packages depend"
   - *Signs you're bypassing it:* @template/db or @template/shared importing from @template/permissions, @template/email or an app (docs/claude/MONOREPO.md › Dependency Direction)
-- **Package imports use @template/ alias** `docs/claude/MONOREPO.md › Path Aliases`: Any cross-package import or intra-package import; never '../../' paths.
+- **Package imports use @template/ alias** · rule docs/claude/MONOREPO.md › Path Aliases: Any cross-package import or intra-package import; never '../../' paths.
+  - *Said as:* "importing across packages, which prefix", "are we still using hash paths in packages", "I'll reach a sibling module with dot-dot inside the package", "the cross-package import alias", "inside a package, import by the package name"
   - *Signs you're bypassing it:* a file inside packages/shared or packages/db reaching a sibling module with ../ instead of @template/<pkg>/... (docs/claude/MONOREPO.md › Path Aliases; docs/claude/NAMING.md › Backend › Imports)
-- **Paths relative, no baseUrl** `docs/claude/MONOREPO.md › TypeScript Configuration`: Every tsconfig paths entry.
+- **Paths relative, no baseUrl** · rule docs/claude/MONOREPO.md › TypeScript Configuration: Every tsconfig paths entry.
+  - *Said as:* "I'll add a base url to the tsconfig", "tsconfig paths written against a base", "paths entries are relative"
   - *Signs you're bypassing it:* `baseUrl` added to a tsconfig, or paths written against it (docs/claude/MONOREPO.md › TypeScript Configuration (baseUrl deprecated in TS 6))
-- **Prefer package subpath imports** `docs/claude/MONOREPO.md › Path Aliases › Rules`: When a subpath export exists for the symbol.
+- **Prefer package subpath imports** · rule docs/claude/MONOREPO.md › Path Aliases › Rules: When a subpath export exists for the symbol.
+  - *Said as:* "import the logger from the package root or its subpath", "I'll import from the package root", "there's a subpath export for this, use it", "deep import versus root import"
   - *Signs you're bypassing it:* `import { log } from '@template/shared'` root imports where a subpath like `@template/shared/logger` exists (docs/claude/MONOREPO.md › Path Aliases › Rules)
-- **Reads skip hooks and transactions** `docs/claude/ARCHITECTURE.md#Read Path`: read queries
-- **Responses wrapped in data** `docs/claude/ARCHITECTURE.md#Request Flow`: every API response
-- **Shared isomorphic-only rule** `packages/shared/`: When deciding between @template/shared and @template/ui for new code.
+- **Reads skip hooks and transactions** · rule docs/claude/ARCHITECTURE.md § Data Flow › Read Path · code: `Flow`, `sendWebhook`: read queries
+  - *Said as:* "do reads run the hooks", "I'll wrap the read in a transaction", "read queries don't go through the mutation lifecycle"
+- **Responses wrapped in data** · rule docs/claude/ARCHITECTURE.md § Request Flow · code: `Flow`, `prepareRequest`, `authMiddleware`, `Session`: every API response
+  - *Said as:* "every response is wrapped in a data key", "I'll return the object directly from the route", "the api response envelope"
+- **Shared isomorphic-only rule** · rule packages/shared/: When deciding between @template/shared and @template/ui for new code.
+  - *Said as:* "can this go in shared", "I'll put node-only code in shared", "shared is only code that runs on server and client", "react code doesn't belong in shared"
   - *Signs you're bypassing it:* Node-only or React-only code placed in packages/shared (docs/claude/MONOREPO.md › @template/shared)
-- **Side effects after commit** `docs/claude/ARCHITECTURE.md#Why Mutation Lifecycle?`: any side effect triggered by a mutation
+- **Side effects after commit** · rule docs/claude/ARCHITECTURE.md § Key Patterns › Why Mutation Lifecycle?: any side effect triggered by a mutation
+  - *Said as:* "send the email after the transaction commits", "I'll fire the webhook inside the transaction", "the side effect ran even though the write rolled back"
   - *Signs you're bypassing it:* sending email/webhooks/WS pushes inside db.txn() or a before hook, so they fire even if the transaction rolls back (docs/claude/ARCHITECTURE.md § Why Mutation Lifecycle?; docs/claude/APP_EVENTS.md § Purpose and execution)
-- **Tsconfig extends shared @inixiative/config presets** `docs/claude/MONOREPO.md › TypeScript Configuration`: Backend workspaces base.json; ui/sdk react.json; frontend apps via tsconfig.frontend.json; init may add jsx.
+- **Tsconfig extends shared @inixiative/config presets** · rule docs/claude/MONOREPO.md › TypeScript Configuration: Backend workspaces base.json; ui/sdk react.json; frontend apps via tsconfig.frontend.json; init may add jsx.
+  - *Said as:* "I'll write compiler options in the workspace tsconfig", "which preset does this workspace extend", "tsconfigs hold only extends, paths and include"
   - *Signs you're bypassing it:* a workspace tsconfig.json with its own compilerOptions (strict, target, moduleResolution, lib) instead of extends + paths + include (docs/claude/MONOREPO.md › TypeScript Configuration)
-- **TypeScript strict, no any** `FEATURES.md > Core Platform > TypeScript Strict Mode`: All application code in every package.
+- **TypeScript strict, no any** · rule FEATURES.md > Core Platform > TypeScript Strict Mode: All application code in every package.
+  - *Said as:* "I'll cast to any to get past the compiler", "cast through unknown to silence the error", "strict types everywhere"
   - *Signs you're bypassing it:* `: any`, `as any`, or `as unknown as T` to silence the compiler (FEATURES.md › TypeScript Strict Mode; AI/ENTRYPOINT.md § 7)
-- **Workspace package naming** `docs/claude/MONOREPO.md > Package Names`: When adding a new workspace under packages/* or apps/*.
+- **Workspace package naming** · rule docs/claude/MONOREPO.md > Package Names: When adding a new workspace under packages/* or apps/*.
+  - *Said as:* "what do I name the new package", "the scope for workspace packages", "I'll name the app with the template scope"
 
 ### Class `dependencies`: Third-party dependency inventory and tech stack
 
 **Job: choose how a batch of API requests commits or fails** (transactionAll vs transactionPerRound) — FEATURES.md › Context Isolation in Batch API
+
+*Said as:* "should the batch be all or nothing", "commit each round separately", "roll back the whole batch on failure"
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -234,6 +291,8 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **transactionPerRound (batch)** | each round commits on its own | whole-batch atomicity (use transactionAll) |
 
 **Job: check what the stack already provides before adding a package** (stack pieces to check before adding a package) — docs/claude/DEPENDENCIES.md
+
+*Said as:* "do we already have something for this", "which id generator do we use", "which logger do we use", "a background job library", "we need a date library", "hand-write the schema or generate it"
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -246,33 +305,52 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 **Job: read or establish who the caller is on a request** (request identity) — FEATURES.md › Multi-Strategy Authentication; › Request Context Scoping
 
+*Said as:* "who is calling this request", "read the current user in a handler", "impersonate a user", "cookie or bearer token"
+
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **Multi-strategy authentication** | session cookie, Bearer token or URL token callers | impersonation (use x-spoof-user-email) |
 | **x-spoof-user-email** | superadmin impersonation only | normal callers |
 | **AppEnv request context** | reading user, org, db, requestId in a handler | module-level state or threading params (see No global request state) |
 
-- **BullMQ jobs and cron** `docs/claude/DEPENDENCIES.md#Cache & Queue`: run background jobs and cron scheduling on BullMQ over ioredis
-- **faker test data** `docs/claude/DEPENDENCIES.md#Dev Dependencies`: generate test data with @faker-js/faker
-- **Frontend class utils in shared** `packages/shared`: merge class names with clsx and tailwind-merge from packages/shared
-- **ioredis-mock in tests** `docs/claude/DEPENDENCIES.md#Cache & Queue`: use in-memory Redis mock in tests
-- **OpenAPI from Zod** `docs/claude/DEPENDENCIES.md#Core`: auto-generate OpenAPI spec from Zod route schemas with @hono/zod-openapi
-- **uuidv7 IDs** `docs/claude/DEPENDENCIES.md#Utilities`: generate time-sortable IDs with uuidv7
+- **BullMQ jobs and cron** · pattern docs/claude/DEPENDENCIES.md § Cache & Queue: run background jobs and cron scheduling on BullMQ over ioredis
+  - *Said as:* "run something in the background", "schedule a recurring job", "I'll use an interval timer for the periodic task", "I'll add a different queue library"
+- **faker test data** · pattern docs/claude/DEPENDENCIES.md § Dev Dependencies: generate test data with @faker-js/faker
+  - *Said as:* "generate fake names and emails for tests", "I'll hardcode test values", "random test data"
+- **Frontend class utils in shared** · pattern packages/shared: merge class names with clsx and tailwind-merge from packages/shared
+  - *Said as:* "merge tailwind class names", "I'll write my own classnames helper", "where is the class-merge helper"
+- **ioredis-mock in tests** · pattern docs/claude/DEPENDENCIES.md § Cache & Queue: use in-memory Redis mock in tests
+  - *Said as:* "redis in tests without a server", "I'll spin up a real redis for tests", "the in-memory redis mock"
+- **OpenAPI from Zod** · pattern docs/claude/DEPENDENCIES.md § Core: auto-generate OpenAPI spec from Zod route schemas with @hono/zod-openapi
+  - *Said as:* "generate the api spec from the route schemas", "I'll maintain the openapi file by hand", "where does the openapi spec come from", "spec from the route definitions"
+- **uuidv7 IDs** · pattern docs/claude/DEPENDENCIES.md § Utilities: generate time-sortable IDs with uuidv7
+  - *Said as:* "ids that sort by time", "I'll use random uuid v4 for ids", "we already always append id which is time-sortable", "which id generator do we use"
   - *Signs you're bypassing it:* crypto.randomUUID() or uuid v4 for record IDs instead of time-sortable uuidv7 (docs/claude/DEPENDENCIES.md § Utilities)
-- **Zod schemas from Prisma** `docs/claude/DEPENDENCIES.md#Database`: generate Zod schemas from Prisma models via prisma-zod-generator
-- **@inixiative/json-rules** `docs/claude/DEPENDENCIES.md#Validation`: declaratively validate data inside mutation hooks
-- **@template/email** `@template/email package`: send transactional email via Resend with MJML-rendered templates
-- **@template/permissions** `packages/permissions`: share RBAC/ReBAC checks between api and ui, built on permix
-- **prismaMap.gen.ts** `packages/db/prismaMap.gen.ts`: provide generated runtime model map instead of hand-maintained data model
-- **SENTRY_ENABLED / OTEL_ENABLED** `docs/claude/DEPENDENCIES.md#Optional Integration Setup`: toggle optional error tracking and tracing/metrics export
-- **Add planned deps to owning package** `docs/claude/DEPENDENCIES.md#Planned`: date formatting, payments, file storage, image processing
+- **Zod schemas from Prisma** · pattern docs/claude/DEPENDENCIES.md § Database: generate Zod schemas from Prisma models via prisma-zod-generator
+  - *Said as:* "why not just use the db generated one", "I'll hand-write a zod schema for the model", "schemas generated from the prisma models", "a validation schema for a model"
+- **@inixiative/json-rules** · primitive docs/claude/DEPENDENCIES.md § Validation: declaratively validate data inside mutation hooks
+  - *Said as:* "validate data declaratively in a hook", "the rules engine library", "I'll write the condition logic by hand"
+- **@template/email** · primitive @template/email package: send transactional email via Resend with MJML-rendered templates
+  - *Said as:* "send a transactional email", "the email package", "I'll call the email provider directly"
+- **@template/permissions** · primitive packages/permissions: share RBAC/ReBAC checks between api and ui, built on permix
+  - *Said as:* "share permission checks between api and ui", "the permissions package", "I'll write the check in both places"
+- **prismaMap.gen.ts** · primitive packages/db/prismaMap.gen.ts: provide generated runtime model map instead of hand-maintained data model
+  - *Said as:* "the runtime model map", "I'll hand-maintain a list of models and fields", "introspect the schema at runtime"
+- **SENTRY_ENABLED / OTEL_ENABLED** · primitive docs/claude/DEPENDENCIES.md § Logging & Telemetry › Optional Integration Setup · code: `Integration`: toggle optional error tracking and tracing/metrics export
+  - *Said as:* "turn on error tracking or tracing", "the toggles for sentry and telemetry", "I'll hardcode sentry on"
+- **Add planned deps to owning package** · rule docs/claude/DEPENDENCIES.md § Planned · code: `User`: date formatting, payments, file storage, image processing
+  - *Said as:* "we need a date library", "I'll add a different date formatting lib", "which package gets the stripe dependency", "the planned library for images or storage"
   - *Signs you're bypassing it:* a different date library or a hand-rolled relative-time formatter instead of adding the planned date-fns to packages/shared (docs/claude/DEPENDENCIES.md § Planned)
-- **biome lint/format** `docs/claude/DEPENDENCIES.md#Dev Dependencies`: Lint and format with biome.
-- **consola logger** `docs/claude/DEPENDENCIES.md#Logging & Telemetry`: all server logging
+- **biome lint/format** · rule docs/claude/DEPENDENCIES.md § Dev Dependencies: Lint and format with biome.
+  - *Said as:* "I'll add eslint and prettier", "what lints and formats here"
+- **consola logger** · rule docs/claude/DEPENDENCIES.md § Logging & Telemetry · code: `Integration`: all server logging
+  - *Said as:* "which logger do we use on the server", "I'll console log in the service", "a different logger for this module", "structured server logging"
 
 ### Class `architecture`: System overview: request and data flow, key architectural patterns
 
 **Job: give a handler or middleware access to the request's db, user, org, space and permissions** (Where request state lives) — FEATURES.md › Architectural Patterns › Request Context Scoping; Context Isolation in Batch API
+
+*Said as:* "get the current user and db in a handler", "pass the request context around", "a module variable for the current org", "batch operations share context"
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -282,12 +360,16 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 **Job: authenticate a caller (or impersonate one as superadmin)** (How a caller authenticates) — FEATURES.md › Architectural Patterns › Multi-Strategy Authentication
 
+*Said as:* "cookie, bearer or url token", "act as another user", "how does auth work on a request"
+
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **Multi-strategy authentication** | a normal caller: session cookie, Bearer token or URL token through the one middleware chain | impersonation |
 | **x-spoof-user-email** | a superadmin impersonates a user | any normal caller (use the chain above) |
 
 **Job: decide what a user may see or do, from inherited permissions** (Permissions resolved, not denormalized) — FEATURES.md › Architectural Patterns › Hierarchical Permission Inheritance; Permission-Based Menu Rendering
+
+*Said as:* "an org admin should see its spaces", "which nav items does this user get", "copy permissions onto space rows", "hide what they can't access"
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -297,6 +379,8 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 **Job: create records for a test and assert against API responses** (Test data) — FEATURES.md › Architectural Patterns › Factory Pattern for Test Data
 
+*Said as:* "make a user for this test", "seed rows for the test", "compare the record to the api response", "dates don't match in the assertion"
+
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **create*/build* factories** | any test needs records: override only the fields the test is about | hand-built fixtures or raw db.create |
@@ -304,28 +388,43 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 **Job: rotate an encryption key without breaking stored data** (Encryption key versions) — FEATURES.md › Architectural Patterns › Encryption Versioning
 
+*Said as:* "rotate the encryption key", "re-encrypt old rows", "bump the key version", "how many key versions can run at once"
+
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **Encryption versioning** | rotating a key: store the version per field and re-encrypt older rows in batches | decrypting and re-encrypting everything in one pass |
 | **No encryption version gaps** | any version change: bump by one only | jumping versions or running more than two at once |
 
-- **AppEnv request context** `FEATURES.md > Architectural Patterns > Request Context Scoping`: scope db, user, org, space and permissions to the current request via AsyncLocalStorage
+- **AppEnv request context** · pattern FEATURES.md > Architectural Patterns > Request Context Scoping: scope db, user, org, space and permissions to the current request via AsyncLocalStorage
+  - *Said as:* "get the current user and org in a handler", "we should pass context and get brand out of that", "I'll thread the user through every function", "I'll keep the current org in a module variable", "where do request facts live"
   - *Signs you're bypassing it:* module-level variables holding the current user/org, or user, db and requestId threaded through function parameters (FEATURES.md › Request Context Scoping)
-- **Batch context isolation** `FEATURES.md > Architectural Patterns > Context Isolation in Batch API`: give each batched request its own AppEnv so context never leaks between operations
-- **Encryption versioning** `FEATURES.md > Architectural Patterns > Encryption Versioning`: store key version per encrypted field and re-encrypt older versions in batches
-- **Hierarchical permission inheritance** `FEATURES.md > Architectural Patterns > Hierarchical Permission Inheritance`: cascade org permissions to spaces, resolved at check time without denormalization
+- **Batch context isolation** · pattern FEATURES.md > Architectural Patterns > Context Isolation in Batch API: give each batched request its own AppEnv so context never leaks between operations
+  - *Said as:* "each batched request needs its own context", "context leaks between batch operations", "I'll share one context across the batch", "a batched call sees another's user"
+- **Encryption versioning** · pattern FEATURES.md > Architectural Patterns > Encryption Versioning: store key version per encrypted field and re-encrypt older versions in batches
+  - *Said as:* "rotate the encryption key without breaking rows", "re-encrypt old rows in batches", "I'll decrypt and re-encrypt everything in one go", "store the key version per field"
+- **Hierarchical permission inheritance** · pattern FEATURES.md > Architectural Patterns > Hierarchical Permission Inheritance: cascade org permissions to spaces, resolved at check time without denormalization
+  - *Said as:* "an org admin should have access in its spaces", "I'll copy org owners onto the space rows", "resolve permissions at check time, not denormalized", "org permissions cascade to spaces"
   - *Signs you're bypassing it:* copying org owners into SpaceUser rows, or querying OrganizationUser beside SpaceUser in a space check, instead of letting space own delegate to organization own (FEATURES.md › Hierarchical Permission Inheritance ("without denormalization"); docs/claude/PERMISSIONS.md § Space Permissions)
-- **Multi-strategy authentication** `FEATURES.md > Architectural Patterns > Multi-Strategy Authentication`: authenticate via session cookie, Bearer token or URL token in one middleware chain
-- **Permission-based menu rendering** `FEATURES.md > Architectural Patterns > Permission-Based Menu Rendering`: hide nav items the user lacks permission for, re-evaluating on org/space switch
-- **create*/build* factories** `FEATURES.md > Architectural Patterns > Factory Pattern for Test Data`: use shared factories instead of hand-built fixtures; override only test-relevant fields
-- **entity.__serialize** `FEATURES.md > Architectural Patterns > Factory Pattern for Test Data`: when asserting against API responses rather than raw model values
+- **Multi-strategy authentication** · pattern FEATURES.md > Architectural Patterns > Multi-Strategy Authentication: authenticate via session cookie, Bearer token or URL token in one middleware chain
+  - *Said as:* "accept a session cookie or a bearer token", "how does a caller authenticate", "I'll write a separate middleware for token callers", "one chain for cookies, bearer and url tokens"
+- **Permission-based menu rendering** · pattern FEATURES.md > Architectural Patterns > Permission-Based Menu Rendering: hide nav items the user lacks permission for, re-evaluating on org/space switch
+  - *Said as:* "only show the nav items the user can use", "the menu re-evaluates when they switch org", "I'll render the menu and let the route 403", "navigation driven by permissions"
+- **create*/build* factories** · primitive FEATURES.md > Architectural Patterns > Factory Pattern for Test Data: use shared factories instead of hand-built fixtures; override only test-relevant fields
+  - *Said as:* "build a test user with sensible defaults", "seed a row for this test", "I'll call prisma create directly in the test", "use the factory instead of a hand-built fixture", "override only the fields the test cares about"
+- **entity.__serialize** · primitive FEATURES.md > Architectural Patterns > Factory Pattern for Test Data: when asserting against API responses rather than raw model values
+  - *Said as:* "compare the model against the api response", "I'll convert the dates to strings by hand", "the record shaped like the api returns it", "assert against the serialized form"
   - *Signs you're bypassing it:* mapping Date fields with toISOString() by hand, or casting entities as any, before asserting against API/SDK or store types (docs/claude/TESTING.md § Serialization for API/UI-Shaped Assertions)
-- **x-spoof-user-email** `FEATURES.md > Architectural Patterns > Multi-Strategy Authentication`: superadmin impersonation only; normal callers use session, Bearer or URL token
-- **Hide unauthorized nav items** `FEATURES.md > Architectural Patterns > Permission-Based Menu Rendering`: every navigation item
-- **No encryption version gaps** `FEATURES.md > Architectural Patterns > Encryption Versioning`: any encryption key version change
-- **No global request state** `FEATURES.md > Architectural Patterns > Request Context Scoping`: any handler or middleware needing request data
+- **x-spoof-user-email** · primitive FEATURES.md > Architectural Patterns > Multi-Strategy Authentication: superadmin impersonation only; normal callers use session, Bearer or URL token
+  - *Said as:* "act as another user as superadmin", "impersonate a user for testing", "I'll log in as the user to reproduce", "the impersonation header"
+- **Hide unauthorized nav items** · rule FEATURES.md > Architectural Patterns > Permission-Based Menu Rendering: every navigation item
+  - *Said as:* "don't show links they can't open", "I'll show the item disabled instead", "every nav item is permission gated"
+- **No encryption version gaps** · rule FEATURES.md > Architectural Patterns > Encryption Versioning: any encryption key version change
+  - *Said as:* "I'll jump the key version by two", "bump the version by one only", "running more than two key versions at once"
+- **No global request state** · rule FEATURES.md > Architectural Patterns > Request Context Scoping: any handler or middleware needing request data
+  - *Said as:* "I'll stash the current user on a module singleton", "pass user and db through every parameter", "module-level request state", "where should request data live instead"
   - *Signs you're bypassing it:* module-level variables holding the current user/org, or user, db and requestId threaded through function parameters (FEATURES.md › Request Context Scoping)
-- **One schema file per model** `prisma/schema/`: adding or changing any Prisma model
+- **One schema file per model** · rule prisma/schema/: adding or changing any Prisma model
+  - *Said as:* "I'll add the new model to the existing prisma file", "split these into one file per model", "a new model needs its own schema file"
   - *Signs you're bypassing it:* a new model appended to an existing model's .prisma file (FEATURES.md › Architectural Patterns › Dynamic Schema Generation)
 
 ## 4. The specifics, in full

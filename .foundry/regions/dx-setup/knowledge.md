@@ -97,15 +97,17 @@ How a developer or agent brings the template up on a machine and keeps it runnab
 
 `worktrees` is the slot system: `worktree:create/list/destroy` provision or tear down a whole slot (ports, per-slot Postgres databases, MinIO buckets, a Redis DB, env files, node_modules, generated artifacts, schema push); `--skip-db` is for docs-only work, and create reports ready or WITH GAPS. The `bashMainCheckoutGuard` hook denies raw `git worktree` commands and mutations that would land in the main checkout. Local ports come from the `@inixiative/config` `ports.json` registry (service default + 100 x the project's block), never hand-picked.
 
-Related regions: `environments-deploy` owns environments and env vars (`.env.*` files, `with-env.sh` / `bun run with`, Infisical, the env schema) and the gate and deploy path (`bun run check`, `deploy.sh`, what CI exists); this region only creates env files during setup. `dx-tools` explains what each package.json script, lint check and turbo task does; `init-script` owns the init TUI and its cut-over to `init:agent` sections; `database-tooling` owns what db:push, db:migrate, seeding, dump and clone do; `testing` owns running tests; `lib-config` holds the ports registry and `config` CLI in full; `monorepo-architecture` says where code lives.
+Related regions: `environments-deploy` owns environments and env vars (`.env.*` files, `with-env.sh` / `bun run with`, Infisical, the env schema) and the gate and deploy path (`bun run check`, `deploy.sh`, what CI exists); this region only creates env files during setup. `dx-tools` explains what each package.json script, lint check and turbo task does; `init-script` owns the init TUI and its cut-over to `init:agent` sections; `database-tooling` owns what db:push, db:migrate, seeding, dump and clone do; `test-harness / test-factories-rules` owns running tests; `lib-config` holds the ports registry and `config` CLI in full; `monorepo-architecture` says where code lives.
 
 ## 3. Everything that exists here, by class
 
-Point at a class when that is as specific as the moment allows, or at a member. Where a class has siblings an agent could confuse, a table under the class header says which to use when. Each member: **name** `where`: choose this when … . Where the docs or code give material, a second line describes the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
+Point at a class when that is as specific as the moment allows, or at a member. Where a class has siblings an agent could confuse, a table under the class header says which to use when; its *Said as* line gives the plain words a user or agent uses for that job. Each member: **name** · kind `where` · the doc § that describes it (code members) or the code it is about (doc members): choose this when … . Quote the name and the where in a pointer ("look over here: createLock, packages/db/src/lock/createLock.ts, CONCURRENCY.md § Distributed Lock"). *Said as:* the ways a user or agent describes this job in a message or plan without knowing the name; match on these. *Signs you're bypassing it:* the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
 
 ### Class `dev-setup`: Setup, local run, sanctioned scripts, Docker services, debugging
 
 **Job: set up a fresh clone or provision a new fork** (bun run setup vs init vs init:agent vs sync-env) — docs/claude/SETUP.md § Init vs Setup; § What Setup Does; docs/claude/DEVELOPER.md § Environment
+
+*Said as:* "get this repo running on my machine", "bring up a fresh clone", "provision a new project from the template", "my env is missing keys after a pull", "stop giving up and run the setup command"
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -116,6 +118,8 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 **Job: start, reset or seed the local database** (local:db vs reset:db vs db:seed) — docs/claude/DEVELOPER.md § Database; docs/claude/DOCKER.md § Commands
 
+*Said as:* "start the database containers", "wipe the local database and reseed", "add seed data without losing mine", "fresh schema and data"
+
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **bun run local:db** | start Postgres, Redis and MinIO containers (same as start:db) | you also need a fresh schema and seed (use bun run reset:db) |
@@ -123,6 +127,8 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **bun run db:seed (database-tooling)** | add seed data to the existing database | wipe and reseed (use bun run reset:db) |
 
 **Job: run the app locally (whole stack or one app)** (bun run local vs turbo watch local#<app> vs local:worker vs start) — docs/claude/DEVELOPER.md § Development; docs/claude/SCRIPTS.md § Development
+
+*Said as:* "start everything for local dev", "run just the api", "run only the worker", "my package change didn't reload"
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -133,90 +139,162 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 **Job: create local object-storage buckets** (minio-init.sh vs minio-provision.sh) — docs/claude/DOCKER.md § Storage buckets
 
+*Said as:* "set up the local storage buckets", "the worktree needs its own buckets", "bucket not found locally"
+
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **scripts/db/minio-init.sh** | main checkout buckets | a worktree slot's buckets (use scripts/db/minio-provision.sh) |
 | **scripts/db/minio-provision.sh** | per-slot worktree buckets | main checkout (use scripts/db/minio-init.sh) |
 
-- **bun run init** `package.json`: Interactive human setup; non-interactive agent runs use init:agent; dependency/machine setup uses setup.
-- **bun run init:agent** `package.json`: Agent or scripted init; humans use the interactive bun run init.
-- **bun run local** `package.json`: Main local run; worker-only local runs use local:worker.
+- **bun run init** · script `package.json` · in docs: docs/claude/SETUP.md § Init vs Setup; docs/claude/DOCKER.md § Services: Interactive human setup; non-interactive agent runs use init:agent; dependency/machine setup uses setup.
+  - *Said as:* "provision the cloud services for a new fork", "a human setting up secrets and hosting the first time", "run the interactive provisioning TUI", "I'll run the setup wizard by hand once"
+- **bun run init:agent** · script `package.json`: Agent or scripted init; humans use the interactive bun run init.
+  - *Said as:* "run init non-interactively, one section at a time", "an agent provisioning a section without the TUI", "script the provisioning with env vars instead of prompts", "I'll drive the interactive TUI from a script"
+- **bun run local** · script `package.json` · in docs: docs/claude/DATABASE.md § Local Setup; docs/claude/LOGGING.md § Inspect locally without any provider: Main local run; worker-only local runs use local:worker.
+  - *Said as:* "start the whole stack locally with hot reload", "run everything for local dev", "I'll cd into the api and run it with hot directly", "the package change didn't reload the app", "a root command to run everything locally"
   - *Signs you're bypassing it:* `cd apps/api && bun --hot src/index.ts` as the dev loop, which does not watch workspace package changes (docs/claude/SCRIPTS.md § Development (Direct execution note))
-- **bun run local:db** `package.json`: Same as start:db; use reset:db for a fresh schema and seed, stop:db to tear down.
-- **bun run setup** `package.json`: One-time machine/repo setup; project initialization uses init; env file refresh uses sync-env.
+- **bun run local:db** · script `package.json`: Same as start:db; use reset:db for a fresh schema and seed, stop:db to tear down.
+  - *Said as:* "just bring up postgres, redis and minio", "start the containers without touching the schema", "I'll docker compose up by hand", "boot the local services"
+- **bun run setup** · script `package.json` · in docs: docs/claude/SCRIPTS.md § Setup Scripts; docs/claude/SETUP.md § Init vs Setup: One-time machine/repo setup; project initialization uses init; env file refresh uses sync-env.
+  - *Said as:* "bring a fresh clone up on this machine", "stop giving up, run the setup command to start docker", "after a dependency change, re-run the machine setup", "I'll bun install, compose up, generate and push one by one", "get the repo running from scratch"
   - *Signs you're bypassing it:* a fresh clone brought up by hand: bun install, docker compose up, prisma generate, db push and seed typed one by one, or env files copied manually (docs/claude/SETUP.md § What Setup Does; § Quick Start)
-- **bun run worktree:create** `package.json`: Start an isolated workspace; worktree:list to inspect, worktree:destroy to remove.
+- **bun run worktree:create** · script `package.json`: Start an isolated workspace; worktree:list to inspect, worktree:destroy to remove.
+  - *Said as:* "start a branch in its own isolated workspace", "give this branch its own database and ports", "I'll git worktree add and copy the env files", "spin up an isolated copy to work in parallel", "make a new worktree for this feature"
   - *Signs you're bypassing it:* `git worktree add` by hand, then copying .env files, creating databases or running bun install in the new directory manually (AI/ENTRYPOINT.md § 0.0 Critical Guardrails; docs/claude/SCRIPTS.md § Worktrees; enforced by .claude/hooks/bashMainCheckoutGuard)
-- **bun run worktree:destroy** `package.json`: Tear down a worktree made by worktree:create; use worktree:list to find it first.
-- **bun run worktree:list** `package.json`: list existing git worktrees
-- **CI rule placement and fixtures** `scripts/ci/rules, scripts/ci/rule-violations`: add CI rules as scripts with pass/fail fixture cases
-- **Container init script bootstrap** `scripts/db/pg-init.sh, scripts/db/minio-init.sh`: bootstrap databases and buckets idempotently via mounted init scripts beside each other
-- **Daily workflow** `docs/claude/DEVELOPER.md#Daily Workflow`: pull, setup if deps changed, run local, change, test, then commit and push
-- **Prime development data** `docs/claude/DEVELOPER.md#Database`: org or space scope: local_orgUser_acme_main or local_spaceUser_acme_main tokens instead
-- **Redis CLI debugging** `docs/claude/DEVELOPER.md#Redis`: inspect local Redis keys and values through the container's redis-cli
-- **Script directory layout** `docs/claude/SCRIPTS.md — scripts/ Structure`: place shell scripts by concern: setup, db, deployment, worktree subfolders
-- **Worktree slots** `docs/claude/SCRIPTS.md#Worktrees`: isolate each worktree's ports, Postgres DBs, MinIO buckets and Redis DB per slot 1–9
+- **bun run worktree:destroy** · script `package.json`: Tear down a worktree made by worktree:create; use worktree:list to find it first.
+  - *Said as:* "tear down the worktree and its databases", "clean up the finished worktree", "I'll rm -rf the worktree folder", "remove the slot's databases and buckets"
+- **bun run worktree:list** · script `package.json`: list existing git worktrees
+  - *Said as:* "which worktrees exist and which slots they use", "show me the worktrees and their ports", "find the worktree before tearing it down"
+- **CI rule placement and fixtures** · pattern scripts/ci/rules, scripts/ci/rule-violations: add CI rules as scripts with pass/fail fixture cases
+  - *Said as:* "add a new CI rule with pass and fail examples", "where does a new repo-wide check go", "I'll add the check inline in the check script", "a rule needs fixture cases that prove it fires"
+- **Container init script bootstrap** · pattern scripts/db/pg-init.sh, scripts/db/minio-init.sh: bootstrap databases and buckets idempotently via mounted init scripts beside each other
+  - *Said as:* "create the test database when the container first starts", "bootstrap buckets and databases from mounted init scripts", "I'll create the database by hand after compose up", "idempotent container startup provisioning"
+- **Daily workflow** · pattern docs/claude/DEVELOPER.md § Daily Workflow: pull, setup if deps changed, run local, change, test, then commit and push
+  - *Said as:* "what's the normal loop: pull, run, change, test, push", "how do I work day to day in this repo", "when do I need to re-run setup", "the routine for a working session"
+- **Prime development data** · pattern docs/claude/DEVELOPER.md § Common Commands › Database · code: `Organization`, `Space`, `sync-env`: org or space scope: local_orgUser_acme_main or local_spaceUser_acme_main tokens instead
+  - *Said as:* "which users and tokens exist in the local seed", "a ready-made token for an org or space scope", "I'll create a test user by hand to log in locally", "the default accounts after seeding"
+- **Redis CLI debugging** · pattern docs/claude/DEVELOPER.md § Debugging › Redis: inspect local Redis keys and values through the container's redis-cli
+  - *Said as:* "inspect the redis keys locally", "see what's in the cache right now", "I'll write a script to dump redis", "poke at redis through the container"
+- **Script directory layout** · pattern docs/claude/SCRIPTS.md — scripts/ Structure: place shell scripts by concern: setup, db, deployment, worktree subfolders
+  - *Said as:* "where does a new shell script go", "scripts sorted by concern: setup, db, deployment, worktree", "I'll drop the script at the repo root", "which subfolder for a deploy helper"
+- **Worktree slots** · pattern docs/claude/SCRIPTS.md § Worktrees · code: `registry`: isolate each worktree's ports, Postgres DBs, MinIO buckets and Redis DB per slot 1–9
+  - *Said as:* "each worktree gets its own ports, databases and buckets", "two branches sharing one database clash", "I'll point the branch at the main database", "I'll pick a free port for this branch myself", "isolate parallel work so nothing collides"
   - *Signs you're bypassing it:* a parallel branch pointed at the main checkout's database, or a hand-picked database name, port or bucket for it (docs/claude/SCRIPTS.md § Worktrees)
-- **bashMainCheckoutGuard** `.claude/hooks/bashMainCheckoutGuard`: deny manual git worktree ops and mutating commands landing in main checkout
-- **BullBoard** `docs/claude/DEVELOPER.md#Network`: inspect background job queues and job states in a web UI
-- **bun run db:truncate:webhooks** `docs/claude/DEVELOPER.md#Database`: clear webhook subscriptions in local or test databases only
-- **bun run local:worker** `apps/api package.json scripts`: worker process; API: bun run local; production: bun run start:worker
-- **bun run start** `apps/api package.json scripts`: production; local dev: bun run local
-- **bun run start:<service>** `package.json`: Production runs; development uses bun run local or turbo watch.
-- **check-generated-files.sh** `scripts/lint/check-generated-files.sh`: fail when Prisma client or OpenAPI SDK are out of date
-- **config ports** `@inixiative/config/README.md#CLI`: print each project's assigned local ports from ports.json
-- **packages/db/prisma/seed.ts** `packages/db/prisma/seed.ts`: seed the database with UUID-validated data
-- **ports.json** `@inixiative/config/ports.json`: export collision-free local port assignments per project
-- **run-ci-rules.sh** `scripts/ci/run-ci-rules.sh`: --test to verify rules against pass/fail fixtures
-- **run-post-biome-checks.sh** `scripts/lint/run-post-biome-checks.sh`: run all; individual scripts for one check
-- **scripts/db/minio-init.sh** `scripts/db/minio-init.sh`: Main checkout buckets; worktree slot buckets use minio-provision.sh.
-- **scripts/db/minio-provision.sh** `scripts/db/minio-provision.sh`: Worktree slot buckets; main checkout uses minio-init.sh.
-- **scripts/db/minio-remove.sh** `scripts/db/minio-remove.sh`: remove MinIO buckets, reporting each, on worktree teardown
-- **scripts/db/pg-init.sh** `scripts/db/pg-init.sh`: create the template_test database on first container creation
-- **scripts/db/wait-postgres.sh** `scripts/db/wait-postgres.sh`: Redis readiness: wait-redis.sh; API readiness: wait-for-api.sh.
+- **bashMainCheckoutGuard** · primitive .claude/hooks/bashMainCheckoutGuard: deny manual git worktree ops and mutating commands landing in main checkout
+  - *Said as:* "the hook that blocks raw git worktree commands", "why was my command in the main checkout denied", "stop mutations landing in the main checkout", "the guard refused my git worktree add"
+- **BullBoard** · primitive docs/claude/DEVELOPER.md § Debugging › Network: inspect background job queues and job states in a web UI
+  - *Said as:* "see the job queues in a web UI", "inspect failed jobs and their state", "I'll query redis to see job status", "a dashboard for background jobs"
+- **bun run db:truncate:webhooks** · primitive docs/claude/DEVELOPER.md § Common Commands › Database · code: `Organization`, `Space`, `sync-env`: clear webhook subscriptions in local or test databases only
+  - *Said as:* "clear the webhook subscriptions locally", "wipe webhook rows in the test database", "I'll delete the subscriptions with a raw query"
+- **bun run local:worker** · primitive apps/api package.json scripts: worker process; API: bun run local; production: bun run start:worker
+  - *Said as:* "run only the job worker locally", "start the worker process in dev", "I'll run the api and worker in one process", "the worker alone, not the api"
+- **bun run start** · primitive apps/api package.json scripts: production; local dev: bun run local
+  - *Said as:* "run the api the way production does", "start the built api without watch", "I'll use the dev command in production", "a production run of the api"
+- **bun run start:<service>** · primitive package.json: Production runs; development uses bun run local or turbo watch.
+  - *Said as:* "run one service in production mode", "which start command runs the worker in prod", "I'll use the local command on the server"
+- **check-generated-files.sh** · primitive scripts/lint/check-generated-files.sh: fail when Prisma client or OpenAPI SDK are out of date
+  - *Said as:* "fail when the generated client is out of date", "the prisma client or sdk is stale", "I'll trust the generated files are current", "did someone forget to regenerate"
+  - *Signs you're bypassing it:* committing a schema or route change without regenerating, or hand-editing the Prisma client or OpenAPI SDK (scripts/lint/check-generated-files.sh; FEATURES.md › Custom Lint Checks)
+- **config ports** · primitive @inixiative/config/README.md § CLI · code: `typecheck`, `registry`: print each project's assigned local ports from ports.json
+  - *Said as:* "which ports does this project get", "print the registry ports for a project", "I'll pick 3001 for the new service", "look up our assigned local ports"
+- **packages/db/prisma/seed.ts** · primitive packages/db/prisma/seed.ts: seed the database with UUID-validated data
+  - *Said as:* "the seed script that loads base data", "where seed data is defined", "I'll insert the seed rows with a script of my own", "seed with uuid-checked data"
+- **ports.json** · primitive @inixiative/config/ports.json: export collision-free local port assignments per project
+  - *Said as:* "the registry of local ports per project", "where port assignments live", "nothing should use a default port", "I'll hardcode 5432 for postgres"
+- **run-ci-rules.sh** · primitive scripts/ci/run-ci-rules.sh: --test to verify rules against pass/fail fixtures
+  - *Said as:* "run the repo rules against the code", "check the ci rules fire on their fixtures", "I'll edit the fixture so the rule passes", "run every rule script in order"
+  - *Signs you're bypassing it:* a new rule script under scripts/ci/rules with no pass/fail cases in scripts/ci/rule-violations, or a fixture edited so a failing rule passes (docs/claude/SCRIPTS.md § CI Rule Scripts; AI/ENTRYPOINT.md § 0.0 Critical Guardrails)
+- **run-post-biome-checks.sh** · primitive scripts/lint/run-post-biome-checks.sh: run all; individual scripts for one check
+  - *Said as:* "run the custom lint scripts after biome", "the extra checks that biome doesn't cover", "I'll run each check script by hand", "all the post-lint scripts at once"
+- **scripts/db/minio-init.sh** · primitive scripts/db/minio-init.sh: Main checkout buckets; worktree slot buckets use minio-provision.sh.
+  - *Said as:* "create the buckets for the main checkout", "bootstrap storage buckets on first container start", "I'll make the buckets through the console", "the main stack's bucket setup"
+- **scripts/db/minio-provision.sh** · primitive scripts/db/minio-provision.sh: Worktree slot buckets; main checkout uses minio-init.sh.
+  - *Said as:* "create the buckets for a worktree slot", "per-slot storage buckets", "I'll reuse the main buckets in the worktree", "provision storage for a new slot"
+- **scripts/db/minio-remove.sh** · primitive scripts/db/minio-remove.sh: remove MinIO buckets, reporting each, on worktree teardown
+  - *Said as:* "delete the slot's buckets on teardown", "remove storage buckets for a worktree", "I'll leave the buckets around after destroy"
+- **scripts/db/pg-init.sh** · primitive scripts/db/pg-init.sh: create the template_test database on first container creation
+  - *Said as:* "create the test database when postgres first starts", "the container init that makes the test db", "I'll create the test database manually"
+- **scripts/db/wait-postgres.sh** · primitive scripts/db/wait-postgres.sh: Redis readiness: wait-redis.sh; API readiness: wait-for-api.sh.
+  - *Said as:* "wait until postgres is accepting connections", "the script runs before the database is up", "I'll sleep five seconds before using the database", "block until the database is ready"
   - *Signs you're bypassing it:* a sleep loop around pg_isready or a fixed `sleep 5` before using the database in a script or CI step (docs/claude/DOCKER.md § Database Operations › Wait Scripts)
-- **scripts/db/wait-redis.sh** `scripts/db/wait-redis.sh`: block until Redis is ready
-- **scripts/deployment/deploy.sh** `scripts/deployment/deploy.sh`: deploy to a target environment
-- **scripts/deployment/wait-for-api.sh** `scripts/deployment/wait-for-api.sh`: wait until the API health check passes
-- **scripts/setup/check-prereqs.sh** `scripts/setup/check-prereqs.sh`: verify bun, docker and other prerequisites are installed
-- **scripts/setup/setup.sh** `scripts/setup/setup.sh`: First-time setup; only check prerequisites: check-prereqs.sh; only sync env files: sync-env.sh.
-- **scripts/setup/sync-env.sh** `scripts/setup/sync-env.sh`: sync .env files from their example templates
-- **scripts/worktree/create.sh** `scripts/worktree/create.sh`: Refuses to run when docker or postgres is down; --skip-db is the explicit opt-out.
-- **scripts/worktree/destroy.sh** `scripts/worktree/destroy.sh`: remove a worktree slot's databases and buckets
-- **scripts/worktree/list.sh** `scripts/worktree/list.sh`: list worktrees with slot, branch and ports
-- **Storage buckets** `docs/claude/DOCKER.md#Storage buckets`: System for platform assets, user for tenant uploads; -test buckets in tests.
-- **truncateWebhookSubscriptions** `packages/db/prisma/truncateWebhookSubscriptions.ts`: Already run by clone.sh; use standalone only on local/test DBs.
-- **turbo watch local#<app>** `package.json`: One service only; all services: bun run local; worker: turbo watch local:worker#api.
-- **turbo watch local#api** `docs/claude/DEVELOPER.md#Development`: all services at once: bun run local instead
-- **turbo watch local#web** `docs/claude/DEVELOPER.md#Development`: all services at once: bun run local instead
-- **turbo watch local:worker#api** `docs/claude/DEVELOPER.md#Development`: all services at once: bun run local instead
-- **typedModelIds** `packages/db/src/typedModelIds.ts`: declare typed ID kinds for each Prisma model
-- **wait-postgres.sh / wait-redis.sh** `scripts/db/wait-postgres.sh, scripts/db/wait-redis.sh`: Scripts and CI; local:db already waits via --wait.
-- **Commit up-to-date generated files** `scripts/lint/check-generated-files.sh`: after schema or route changes
-- **Ephemeral local storage** `docs/claude/DOCKER.md#Storage buckets`: Local development with MinIO.
-- **Local env files are not committed** `docs/claude/SETUP.md > Environment Variables`: local development and test runner configuration
-- **No Jest** `scripts/ci/rules/no-jest.sh`: all source and tests
-- **No mutations in main checkout after entering a worktree** `.claude/hooks/bashMainCheckoutGuard`: Sessions that have worked inside a registered worktree of this repository.
+- **scripts/db/wait-redis.sh** · primitive scripts/db/wait-redis.sh: block until Redis is ready
+  - *Said as:* "wait until redis is up", "block until the cache is ready", "I'll add a sleep before connecting to redis"
+- **scripts/deployment/deploy.sh** · primitive scripts/deployment/deploy.sh: deploy to a target environment
+  - *Said as:* "the script that deploys to an environment", "ship this to staging", "I'll write my own deploy commands"
+- **scripts/deployment/wait-for-api.sh** · primitive scripts/deployment/wait-for-api.sh: wait until the API health check passes
+  - *Said as:* "wait for the api health check to pass", "block until the api is up", "I'll poll the health endpoint in a loop", "the api isn't ready yet after deploy"
+- **scripts/setup/check-prereqs.sh** · primitive scripts/setup/check-prereqs.sh: verify bun, docker and other prerequisites are installed
+  - *Said as:* "verify bun and docker are installed", "check the machine has what it needs", "I'll assume docker is running", "fail early when a prerequisite is missing"
+- **scripts/setup/setup.sh** · primitive scripts/setup/setup.sh: First-time setup; only check prerequisites: check-prereqs.sh; only sync env files: sync-env.sh.
+  - *Said as:* "the script behind first-time setup", "what setup actually does step by step", "I'll do the setup steps by hand", "only part of setup, like just the prereqs"
+- **scripts/setup/sync-env.sh** · primitive scripts/setup/sync-env.sh: sync .env files from their example templates
+  - *Said as:* "create the env files from the examples", "top up env files after a pull added keys", "I'll copy the example env file by hand", "my env file is missing new keys"
+- **scripts/worktree/create.sh** · primitive scripts/worktree/create.sh: Refuses to run when docker or postgres is down; --skip-db is the explicit opt-out.
+  - *Said as:* "the script behind creating a worktree slot", "it refuses to run because docker is down", "create a worktree without a database for docs work", "what does worktree create actually provision"
+- **scripts/worktree/destroy.sh** · primitive scripts/worktree/destroy.sh: remove a worktree slot's databases and buckets
+  - *Said as:* "remove the slot's databases and buckets", "the teardown behind worktree destroy", "I'll drop the databases myself"
+- **scripts/worktree/list.sh** · primitive scripts/worktree/list.sh: list worktrees with slot, branch and ports
+  - *Said as:* "list worktrees with slot, branch and ports", "the script behind worktree list", "see which slot each worktree holds"
+- **Storage buckets** · primitive docs/claude/DOCKER.md § Storage buckets: System for platform assets, user for tenant uploads; -test buckets in tests.
+  - *Said as:* "which bucket for platform assets versus user uploads", "the system and user buckets", "I'll make a new bucket for this feature", "test buckets end with dash test"
+- **truncateWebhookSubscriptions** · primitive packages/db/prisma/truncateWebhookSubscriptions.ts: Already run by clone.sh; use standalone only on local/test DBs.
+  - *Said as:* "clear webhook subscriptions after cloning a database", "wipe webhook rows so a clone doesn't deliver", "I'll delete subscriptions with raw sql"
+- **turbo watch local#<app>** · primitive package.json: One service only; all services: bun run local; worker: turbo watch local:worker#api.
+  - *Said as:* "run just one app with watch", "start only the web app", "I'll run everything when I only need the api", "one service in watch mode"
+- **turbo watch local#api** · primitive docs/claude/DEVELOPER.md § Development: all services at once: bun run local instead
+  - *Said as:* "run only the api in watch mode", "start just the backend", "I'll start the whole stack to work on the api"
+- **turbo watch local#web** · primitive docs/claude/DEVELOPER.md § Development: all services at once: bun run local instead
+  - *Said as:* "run only the web frontend", "start just the web app locally", "I'll bring up everything for a frontend change"
+- **turbo watch local:worker#api** · primitive docs/claude/DEVELOPER.md § Development: all services at once: bun run local instead
+  - *Said as:* "run only the job worker, watched", "start just the worker with reload", "I'll run the api when I only need the worker", "the worker alone in watch mode"
+- **typedModelIds** · primitive packages/db/src/typedModelIds.ts: declare typed ID kinds for each Prisma model
+  - *Said as:* "declare the typed id kind for a new model", "add the id type when adding a model", "I'll use a plain string for the new model's id"
+- **wait-postgres.sh / wait-redis.sh** · primitive scripts/db/wait-postgres.sh, scripts/db/wait-redis.sh: Scripts and CI; local:db already waits via --wait.
+  - *Said as:* "wait for the services before running the script", "don't sleep, wait for readiness", "I'll add a fixed sleep in the ci step", "block until postgres and redis answer"
+- **Commit up-to-date generated files** · rule scripts/lint/check-generated-files.sh: after schema or route changes
+  - *Said as:* "regenerate after changing the schema or routes", "the generated files are stale in the commit", "I'll commit the schema change without regenerating"
+- **Ephemeral local storage** · rule docs/claude/DOCKER.md § Storage buckets: Local development with MinIO.
+  - *Said as:* "local uploads disappear when the container restarts", "minio storage isn't persistent on purpose", "I'll add a volume so uploads survive"
+- **Local env files are not committed** · rule docs/claude/SETUP.md > Environment Variables: local development and test runner configuration
+  - *Said as:* "the local env file is gitignored", "I'll commit my env file so others get it", "where do local env values live"
+- **No Jest** · rule scripts/ci/rules/no-jest.sh: all source and tests
+  - *Said as:* "I'll add jest for these tests", "which test runner do we use"
+- **No mutations in main checkout after entering a worktree** · rule .claude/hooks/bashMainCheckoutGuard: Sessions that have worked inside a registered worktree of this repository.
+  - *Said as:* "I'm in a worktree, but I'll commit from the main checkout", "run the install in the worktree, not main", "the guard blocked my commit in the main checkout", "don't touch main once working in a worktree"
   - *Signs you're bypassing it:* a git commit, bun add or db:migrate run from the main checkout path after the session has been working in a worktree (docs/claude/SCRIPTS.md § Worktrees; .claude/hooks/bashMainCheckoutGuard)
-- **No raw git worktree commands** `.claude/hooks/bashMainCheckoutGuard`: Any worktree creation, removal or pruning.
+- **No raw git worktree commands** · rule .claude/hooks/bashMainCheckoutGuard: Any worktree creation, removal or pruning.
+  - *Said as:* "I'll git worktree add a branch", "I'll rm -rf the worktrees folder to clean up", "never create or remove worktrees with git directly", "prune the stale worktrees by hand", "use the repo's worktree commands, not git's"
   - *Signs you're bypassing it:* `git worktree add/remove/move/prune` or `rm -rf .worktrees/<name>` instead of worktree:create / worktree:destroy (AI/ENTRYPOINT.md § 0.0 Critical Guardrails; .claude/hooks/bashMainCheckoutGuard)
-- **No Vitest** `scripts/ci/rules/no-vitest.sh`: all source and tests
-- **Package scope naming on fork** `docs/claude/SETUP.md > Forking This Template`: when creating a new project from this template
-- **Pause for architectural review** `docs/claude/DEVELOPER.md#Architectural Reviews`: Before implementing new patterns or when in doubt about a design.
-- **Pinned compose project name** `docker-compose.yml`: Any compose change or worktree setup.
+- **No Vitest** · rule scripts/ci/rules/no-vitest.sh: all source and tests
+  - *Said as:* "I'll write these tests with vitest", "vitest isn't used here"
+- **Package scope naming on fork** · rule docs/claude/SETUP.md > Forking This Template: when creating a new project from this template
+  - *Said as:* "rename the package scope for the new project", "what do we call the packages after forking", "I'll keep the template scope in the fork"
+- **Pause for architectural review** · rule docs/claude/DEVELOPER.md § Architectural Reviews: Before implementing new patterns or when in doubt about a design.
+  - *Said as:* "check with Aron before introducing a new pattern", "when in doubt about a design, stop and ask", "I'll just go ahead with the new approach"
+- **Pinned compose project name** · rule docker-compose.yml: Any compose change or worktree setup.
+  - *Said as:* "every worktree shares one docker stack", "I'll start a second postgres for this branch", "why is the compose project name fixed", "don't give each worktree its own compose project"
   - *Signs you're bypassing it:* `docker compose -p <name>` per worktree, removing `name:` from docker-compose.yml, or a second Postgres/Redis container for a branch (docs/claude/DOCKER.md § Services (Why pin the compose project name?))
-- **Port block allocation** `@inixiative/config/README.md#CLI`: Adding a project or service needing local ports.
+- **Port block allocation** · rule @inixiative/config/README.md § CLI · code: `typecheck`, `registry`: Adding a project or service needing local ports.
+  - *Said as:* "a new service needs a local port", "I'll hardcode a port for the new service", "ports come from the registry, service default plus block", "never hand-pick a port"
   - *Signs you're bypassing it:* hard-coded or hand-picked local ports (5433, 3001, 8001) in compose, env examples or scripts (@inixiative/config/README.md#CLI (ports.json registry))
-- **Prisma schema location** `packages/db/prisma/schema/`: adding domain models when forking or extending the template
-- **Read init script patterns first** `CLAUDE.md §11 Quick Doc Routing`: Any change to init scripts.
-- **Temporary files go in tmp/** `docs/claude/SCRIPTS.md — Script Locations`: Any throwaway or experimental file; committed scripts go in scripts/ subfolders instead.
-- **UI tests serialize factories** `scripts/ci/rules/ui-serialized-factories.sh`: UI tests using db factories
-- **Update CLAUDE.md on fork** `docs/claude/SETUP.md > Forking This Template`: when creating a new project from this template
-- **Use Turborepo for workspace watching** `docs Commands`: when changes span workspace packages
+- **Prisma schema location** · rule packages/db/prisma/schema/: adding domain models when forking or extending the template
+  - *Said as:* "where do new models go", "I'll add the model to the main schema file", "the schema folder for domain models"
+- **Read init script patterns first** · rule CLAUDE.md §11 Quick Doc Routing: Any change to init scripts.
+  - *Said as:* "changing init, read the patterns doc first", "which doc before touching init", "I'll change the init flow without reading the doc"
+- **Temporary files go in tmp/** · rule docs/claude/SCRIPTS.md — Script Locations: Any throwaway or experimental file; committed scripts go in scripts/ subfolders instead.
+  - *Said as:* "where do scratch files go", "this is the type of stuff to write into the tmp workspace", "I'll drop a scratch script at the repo root", "throwaway output goes in the gitignored tmp folder"
+- **UI tests serialize factories** · rule scripts/ci/rules/ui-serialized-factories.sh: UI tests using db factories
+  - *Said as:* "ui tests using factories run one at a time", "the ui test suite races on the database", "I'll run ui factory tests in parallel"
+- **Update CLAUDE.md on fork** · rule docs/claude/SETUP.md > Forking This Template: when creating a new project from this template
+  - *Said as:* "update the agent instructions for the new project", "the fork still has the template's instructions"
+- **Use Turborepo for workspace watching** · rule docs Commands: when changes span workspace packages
+  - *Said as:* "a package change should reload the app", "I'll run the app directly so I lose package reloads", "watch across workspaces"
 
 ### Class `worktrees`: Worktree lifecycle through repo scripts (slots, per-slot DBs/ports)
 
 **Job: work on a branch in an isolated worktree** (worktree:create / destroy vs raw git worktree) — docs/claude/SCRIPTS.md § Worktrees; AI/ENTRYPOINT.md § 0.0 Critical Guardrails; .claude/hooks/bashMainCheckoutGuard
+
+*Said as:* "work on this branch in parallel without clashing", "give the branch its own database and ports", "I'll git worktree add it", "clean up the finished worktree", "the guard blocked my command in the main checkout"
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -228,15 +306,19 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 **Job: decide where scripts and scratch files go** (where scratch work goes) — docs/claude/SCRIPTS.md § Writing New Scripts; tmp/
 
+*Said as:* "where do I put this script", "scratch output for this task", "a throwaway helper script", "staging a larger change for review"
+
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **Script placement** | a new permanent script: scripts/<category>/ | throwaway work (use Temporary files in tmp/) |
 | **AI Workspace staging (engineering-process-docs)** | larger changes staged for review in tmp/AI_WORKSPACE | a script meant to stay (use Script placement) |
 | **Temporary files in tmp/ (monorepo-architecture)** | scratch output or experiments | anything committed (use Script placement) |
 
-- **Run commands through with-env** `docs/claude/SCRIPTS.md#Deployment Scripts`: Running any app command locally, in tests or in cloud envs.
+- **Run commands through with-env** · rule docs/claude/SCRIPTS.md § Deployment Scripts: Running any app command locally, in tests or in cloud envs.
+  - *Said as:* "load the env for the command the sanctioned way", "I'll export the env file into the shell first", "run it with the environment composed", "prefix the env vars inline on the command"
   - *Signs you're bypassing it:* `export $(cat .env.local | xargs) && bun run ...` or env vars prefixed inline on a dev, test or start command (docs/claude/ENVIRONMENTS.md § with-env Composition)
-- **Script placement** `docs/claude/SCRIPTS.md#Writing New Scripts`: Adding any new script; tmp/ for experimental or throwaway ones.
+- **Script placement** · rule docs/claude/SCRIPTS.md § Writing New Scripts: Adding any new script; tmp/ for experimental or throwaway ones.
+  - *Said as:* "a permanent script goes in a scripts subfolder", "where do I put a script that stays", "I'll leave the helper script in tmp", "committed scripts have a home by category"
 
 ## 4. The specifics, in full
 

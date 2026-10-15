@@ -113,15 +113,17 @@ Channels are the default. A channel family is registered in `WS_CHANNELS` (`LIVE
 
 Use a data stream only when data is incremental and high-frequency enough that a refetch per change is too costly: model output, an activity feed, a progress log. Each stream is declared once with `defineStream` in the shared `STREAM_DEFINITIONS`. Its family is the read route's operationId. Its kind is `list` (`upsert`/`remove`, rows keyed by id, `ordering` 'updatedAt' or 'arrival') or `log` (`append`). It also takes a params schema and a required `audience`. A `shared` stream must give every caller identical data, and `streamAudience.test.ts` with `expectStreamAudience` enforces that. A route with `scopeNarrowing` must be `perRecipient`, whose appends need `userIds`. `openDataStream` runs the route in-process with the socket's credential (`fetchStreamSnapshot`). A 2xx is both the grant and the snapshot, stamped with the seq read before the snapshot. Appends that arrive meanwhile are held, then sent. Appends are app-event output built only with `streamAppend`, which is branded, with upsert rows from `routeRow`. `deliverWSHandoffs` hands them to `appendToStream`, which serializes per stream and runs one Lua script that INCRs `ws:seq:{stream}` and PUBLISHes. The client drops seq ≤ last, applies last+1, and on a gap re-opens for a fresh snapshot (`websocket.resync`). There is no replay buffer, no queue, no acks, and no timeouts on stream Redis ops. `startStreamReauthorizeSweep` re-probes open streams every 45s through `x-auth-probe`. On the client, `useStream` returns the folded snapshot and `useStreamAction` listens to one op. `STREAM_FOLDS` folds by kind (`listStream`, `logStream`). Folds are idempotent, and custom folding means a new kind. The only stream, `organizationReadManyContacts`, is scaffolding to remove once a real stream lands.
 
-Related regions: the socket itself (authenticate frame, registry, frame limits, `sendFrame`, the cross-instance senders, `createApiWebsocket` reconnect) is the `ws-connections` region, and the two share many members. The app-event handler contract that returns `WSHandoff[]` (`emitAppEvent`, `makeAppEvent`) is `app-events-webhooks-adapters`. Read routes and their `responseSchema` are `api-routes-schemas`. Per-caller lens scope (`scopeNarrowing`) is `lenses`. Redis and its Lua conventions are `redis-caching-rate-limits`. The query cache the hooks feed is `frontend-state-api-client`. The segment events that publish refetches are `customers-segments`.
+Related regions: the socket itself (authenticate frame, registry, frame limits, `sendFrame`, the cross-instance senders, `createApiWebsocket` reconnect) is the `ws-connections` region, and the two share many members. The app-event handler contract that returns `WSHandoff[]` (`emitAppEvent`, `makeAppEvent`) is `app-events-webhooks / adapters-integrations`. Read routes and their `responseSchema` are `api-routes / api-schemas-openapi`. Per-caller lens scope (`scopeNarrowing`) is `lenses`. Redis and its Lua conventions are `redis-caching-rate-limits`. The query cache the hooks feed is `frontend-store / api-client`. The segment events that publish refetches are `customers-segments`.
 
 ## 3. Everything that exists here, by class
 
-Point at a class when that is as specific as the moment allows, or at a member. Where a class has siblings an agent could confuse, a table under the class header says which to use when. Each member: **name** `where`: choose this when … . Where the docs or code give material, a second line describes the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
+Point at a class when that is as specific as the moment allows, or at a member. Where a class has siblings an agent could confuse, a table under the class header says which to use when; its *Said as* line gives the plain words a user or agent uses for that job. Each member: **name** · kind `where` · the doc § that describes it (code members) or the code it is about (doc members): choose this when … . Quote the name and the where in a pointer ("look over here: createLock, packages/db/src/lock/createLock.ts, CONCURRENCY.md § Distributed Lock"). *Said as:* the ways a user or agent describes this job in a message or plan without knowing the name; match on these. *Signs you're bypassing it:* the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
 
 ### Class `ws-streams`: Refetch channels and data streams: registries, audience, re-authorization, seq
 
 **Job: produce a realtime update for clients** (refetch vs streamAppend vs routeRow vs appendToStream (producing a realtime update)) — docs/claude/WEBSOCKETS.md § Channels vs streams; § Data streams › Producing appends; docs/claude/APP_EVENTS.md § WebSocket handoffs
+
+*Said as:* "make the page update when this changes", "push the change to connected clients", "I need to notify the UI from the handler", "send the new data over the socket", "how do I publish a live update"
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -132,6 +134,8 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 **Job: register a realtime channel or stream** (WS_CHANNELS vs LIVE_QUERIES vs STREAM_DEFINITIONS vs defineStream vs channelKey) — docs/claude/WEBSOCKETS.md § Channel registry and authorization; § Data streams › Stream definitions
 
+*Said as:* "make this query live", "add a new live subscription", "where do I declare the stream", "register a channel for this view"
+
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **WS_CHANNELS** | register a query-channel family for refetch hints | a data stream (use defineStream in STREAM_DEFINITIONS) |
@@ -140,6 +144,8 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **channelKey** | build a channel name from { _id, path } | hand-built template strings; a family name (use WS_CHANNELS.x.name) |
 
 **Job: keep open streams authorized** (Stream (re-)authorization) — docs/claude/WEBSOCKETS.md § Data streams › Authorization and re-authorization
+
+*Said as:* "recheck permissions on open streams", "the user lost access but still receives updates", "drop subscriptions when access is revoked", "re-verify stream access periodically"
 
 | Member | Use when | Not when (use instead) |
 |---|---|---|
@@ -150,6 +156,8 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 **Job: consume a realtime stream in the client** (Client consumption) — docs/claude/WEBSOCKETS.md § Data streams › Frontend; § Contract
 
+*Said as:* "show live data in the component", "subscribe the UI to the stream", "react to stream updates on the frontend", "render the pushed rows"
+
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 | **useStream** | a stream's folded snapshot as a TanStack query result | fetched API reads (use useQuery); side effects (use useStreamAction) |
@@ -157,129 +165,226 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 | **listStream** | id-keyed rows that upsert/remove in place, one page | append-only entries (use logStream) |
 | **logStream** | append-only entries in arrival order (model output) | keyed rows (use listStream) |
 
-- **addStreamListener** `packages/ui/src/lib/ws/streamListeners.ts#addStreamListener`: Side reactions to stream events; for cached data state use stream folds instead.
-- **appendToStream** `apps/api/src/ws/pubsub.ts#appendToStream`: Use instead of sending socket messages directly; per-stream ordering via createSerializedQueue is built in.
+- **addStreamListener** · primitive `packages/ui/src/lib/ws/streamListeners.ts#addStreamListener`: Side reactions to stream events; for cached data state use stream folds instead.
+  - *Said as:* "hook a callback onto stream events outside React", "run side code when the stream changes, without touching cached state", "I'll register a listener on the socket for that stream's messages"
+- **appendToStream** · primitive `apps/api/src/ws/pubsub.ts#appendToStream` · in docs: docs/claude/WEBSOCKETS.md § Data streams › Ordering; docs/claude/WEBSOCKETS.md § Data streams › Sequence numbers: Use instead of sending socket messages directly; per-stream ordering via createSerializedQueue is built in.
+  - *Said as:* "number and publish the append so every instance delivers it", "I'll loop over the sockets holding the stream and send the frame", "keep a counter per stream so appends stay in order", "actually broadcast the stream update across instances"
   - *Signs you're bypassing it:* looping over sockets that hold a stream and sending append frames with a locally tracked counter (catalog appendToStream; docs/claude/WEBSOCKETS.md § Ordering)
-- **broadcast** `apps/api/src/ws/pubsub.ts#broadcast`: Everyone connected: broadcast; one user's sockets: sendToUser; subscribers of a topic: sendToChannel.
-- **broadcastLocal** `apps/api/src/ws/delivery.ts#broadcastLocal`: Instance-wide fan-out; openDataStream subscriptions for scoped streams, sendFrame for one socket.
-- **channelKey** `packages/shared/src/ws/channelKey.ts#channelKey`: Declaring a channel family: add to WS_CHANNELS; reversing a name: parseChannelKey.
+- **broadcast** · primitive `apps/api/src/ws/pubsub.ts#broadcast` · in docs: docs/claude/WEBSOCKETS.md § Frontend and horizontal scaling; docs/claude/REDIS.md § Built-In Uses: Everyone connected: broadcast; one user's sockets: sendToUser; subscribers of a topic: sendToChannel.
+  - *Said as:* "send this event to everyone connected, on every instance", "notify all clients at once", "I'll loop over all sockets and send the message"
+- **broadcastLocal** · primitive `apps/api/src/ws/delivery.ts#broadcastLocal`: Instance-wide fan-out; openDataStream subscriptions for scoped streams, sendFrame for one socket.
+  - *Said as:* "fan out to every socket on this instance only", "send to all local connections, not through Redis", "instance-wide send for an event everyone here should get"
+- **channelKey** · primitive `packages/shared/src/ws/channelKey.ts#channelKey` · in docs: docs/claude/WEBSOCKETS.md § Channel registry and authorization; docs/claude/ZUSTAND.md § 4. ClientSlice: Declaring a channel family: add to WS_CHANNELS; reversing a name: parseChannelKey.
+  - *Said as:* "build the channel name for this record", "I'll make the topic name with a template string", "the subscription key for one row's updates", "name the channel from the route and the id"
   - *Signs you're bypassing it:* template-string channel names like `inquiryRead:${id}` built by hand (docs/claude/WEBSOCKETS.md § Channel registry and authorization)
-- **closeDataStream** `apps/api/src/ws/dataStreams.ts#closeDataStream`: Pair with openDataStream; ends one stream, not the connection.
-- **createApiWebsocket** `packages/ui/src/lib/ws/createApiWebsocket.ts#createApiWebsocket`: Use instead of a raw WebSocket; it handles reconnect replay and seq tracking per stream.
+- **closeDataStream** · primitive `apps/api/src/ws/dataStreams.ts#closeDataStream`: Pair with openDataStream; ends one stream, not the connection.
+  - *Said as:* "end one stream subscription without dropping the connection", "stop sending this socket that stream", "unsubscribe a socket from a single stream"
+- **createApiWebsocket** · primitive `packages/ui/src/lib/ws/createApiWebsocket.ts#createApiWebsocket` · in docs: docs/claude/WEBSOCKETS.md § Data streams › Sequence numbers; docs/claude/WEBSOCKETS.md § Source and verification: Use instead of a raw WebSocket; it handles reconnect replay and seq tracking per stream.
+  - *Said as:* "open the socket client with reconnect and resubscribe built in", "I'll write a new WebSocket wrapper with backoff and retry", "the client-side connection manager that tracks each stream's position", "don't build any socket plumbing on the page"
   - *Signs you're bypassing it:* new WebSocket(url) with hand-written reconnect, backoff and resubscribe logic (catalog createApiWebsocket; docs/claude/WEBSOCKETS.md § Connection and recovery)
-- **dataStreamQueryKey** `packages/ui/src/lib/ws/dataStreamQueryKey.ts#dataStreamQueryKey`: Parsing a key back to a stream name: dataStreamOfQueryKey instead.
-- **defineStream** `packages/shared/src/ws/defineStream.ts#defineStream`: Query-backed live channels: WS_CHANNELS instead.
+- **dataStreamQueryKey** · primitive `packages/ui/src/lib/ws/dataStreamQueryKey.ts#dataStreamQueryKey`: Parsing a key back to a stream name: dataStreamOfQueryKey instead.
+  - *Said as:* "the cache key a stream's data lives under", "where in the query cache the stream snapshot is stored", "I'll make up a query key array for the stream"
+- **defineStream** · primitive `packages/shared/src/ws/defineStream.ts#defineStream` · in docs: docs/claude/WEBSOCKETS.md § Data streams › Stream definitions; FEATURES.md § Real-Time Communication: Query-backed live channels: WS_CHANNELS instead.
+  - *Said as:* "declare a new live stream for this route", "set up a stream: kind, params, and who may receive it", "I'll name the stream with a string constant and type the payload separately", "turn this read route into a live feed"
   - *Signs you're bypassing it:* stream names as string literals, or stream kind/params declared separately on server and client (docs/claude/WEBSOCKETS.md § Data streams › Stream definitions)
-- **dispatchMessage** `packages/ui/src/lib/ws/dispatch.ts#dispatchMessage`: Use as the single entry for inbound events rather than calling applyStreamAppend/applyStreamSnapshot directly.
+- **dispatchMessage** · primitive `packages/ui/src/lib/ws/dispatch.ts#dispatchMessage`: Use as the single entry for inbound events rather than calling applyStreamAppend/applyStreamSnapshot directly.
+  - *Said as:* "route an inbound socket message to the right handler", "I'll handle socket messages in the onmessage callback directly", "the single entry point for every frame the client receives"
   - *Signs you're bypassing it:* calling applyStreamAppend/applyStreamSnapshot directly from a socket onmessage handler (catalog dispatchMessage)
-- **fetchStreamSnapshot** `apps/api/src/ws/streamSnapshot.ts#fetchStreamSnapshot`: read a stream's initial snapshot in-process using the connection's credentials
-- **listStream** `packages/ui/src/lib/ws/listStream.ts#listStream`: Keyed rows that update in place; append-only entries in arrival order: logStream instead.
-- **LIVE_QUERIES** `packages/shared/src/ws/liveQueries.ts#LIVE_QUERIES`: Derived from WS_CHANNELS; add a family to WS_CHANNELS, not here. Streams use STREAM_DEFINITIONS instead.
-- **logStream** `packages/ui/src/lib/ws/logStream.ts#logStream`: Append-only feeds; rows that upsert or remove by key: listStream instead.
-- **openDataStream** `apps/api/src/ws/dataStreams.ts#openDataStream`: Per-socket stream subscription with seq tracking; broadcastLocal for fire-to-all events.
-- **reauthorizeOpenStreams** `apps/api/src/ws/streamReauthorizeSweep.ts#reauthorizeOpenStreams`: One-off sweep run; for the recurring boot-time sweep use startStreamReauthorizeSweep.
-- **reauthorizeStreams** `apps/api/src/ws/reauthorizeStreams.ts#reauthorizeStreams`: recheck a socket's stream subscriptions and drop ones it may no longer access
-- **refetch** `apps/api/src/appEvents/refetch.ts#refetch`: Use when clients should reload; to push a row use routeRow, to append to a stream use streamAppend.
+- **fetchStreamSnapshot** · primitive `apps/api/src/ws/streamSnapshot.ts#fetchStreamSnapshot` · in docs: docs/claude/WEBSOCKETS.md § Data streams › Authorization and re-authorization: read a stream's initial snapshot in-process using the connection's credentials
+  - *Said as:* "load the initial data for a stream using the socket's credentials", "run the read route in-process to get the starting state", "I'll fetch the first page over HTTP before opening the stream"
+- **listStream** · primitive `packages/ui/src/lib/ws/listStream.ts#listStream` · in docs: docs/claude/WEBSOCKETS.md § Data streams › Frontend; docs/claude/WEBSOCKETS.md § Source and verification: Keyed rows that update in place; append-only entries in arrival order: logStream instead.
+  - *Said as:* "rows keyed by id that update in place", "a live table where rows get replaced or removed", "fold upserts and removes into one page of rows", "the stream kind for a collection of records"
+- **LIVE_QUERIES** · primitive `packages/shared/src/ws/liveQueries.ts#LIVE_QUERIES` · in docs: docs/claude/WEBSOCKETS.md § Channel registry and authorization; docs/claude/WEBSOCKETS.md § Frontend and horizontal scaling: Derived from WS_CHANNELS; add a family to WS_CHANNELS, not here. Streams use STREAM_DEFINITIONS instead.
+  - *Said as:* "the set of query keys that go live over the socket", "make this board live-updating by adding its query keys", "which cached queries get refetched on a hint"
+- **logStream** · primitive `packages/ui/src/lib/ws/logStream.ts#logStream` · in docs: docs/claude/WEBSOCKETS.md § Data streams › Frontend; docs/claude/WEBSOCKETS.md § Source and verification: Append-only feeds; rows that upsert or remove by key: listStream instead.
+  - *Said as:* "append-only entries in the order they arrive", "stream model output token by token into a transcript", "a growing log where nothing is edited or removed", "the stream kind for progress lines or chat output"
+- **openDataStream** · primitive `apps/api/src/ws/dataStreams.ts#openDataStream` · in docs: docs/claude/WEBSOCKETS.md § Data streams › Authorization and re-authorization; docs/claude/WEBSOCKETS.md § Data streams › Sequence numbers: Per-socket stream subscription with seq tracking; broadcastLocal for fire-to-all events.
+  - *Said as:* "subscribe this socket to a stream and send it the snapshot", "start a stream for one connection with sequence tracking", "I'll send the initial data then add the socket to a set"
+- **reauthorizeOpenStreams** · primitive `apps/api/src/ws/streamReauthorizeSweep.ts#reauthorizeOpenStreams`: One-off sweep run; for the recurring boot-time sweep use startStreamReauthorizeSweep.
+  - *Said as:* "run one pass over every open stream and drop the unauthorized ones", "recheck all stream subscriptions right now, once", "do a single sweep of stream access across all sockets", "after a permission change, re-verify every open stream immediately"
+- **reauthorizeStreams** · primitive `apps/api/src/ws/reauthorizeStreams.ts#reauthorizeStreams`: recheck a socket's stream subscriptions and drop ones it may no longer access
+  - *Said as:* "recheck one socket's streams and drop the ones it lost access to", "after identity changes, prune a connection's stream subscriptions", "revalidate what this connection may still receive"
+- **refetch** · primitive `apps/api/src/appEvents/refetch.ts#refetch` · in docs: docs/claude/WEBSOCKETS.md § Publishing a refetch; docs/claude/WEBSOCKETS.md § Contract: Use when clients should reload; to push a row use routeRow, to append to a stream use streamAppend.
+  - *Said as:* "tell the client to reload that query", "just ping the UI to refresh after this change", "we push a hint and the client fetches again", "nudge the page to re-pull the list when a row changes", "I'll send the updated record down the socket so the list refreshes"
   - *Signs you're bypassing it:* hand-built { category: 'query', action: 'refetch', key } objects in handlers (catalog refetch; docs/claude/WEBSOCKETS.md § Publishing a refetch)
-- **refetchQuery** `packages/ui/src/lib/ws/refetchQuery.ts#refetchQuery`: Simple refetch-on-change; incremental pushed updates: listStream or logStream folds instead.
-- **rejectDataStream** `apps/api/src/ws/rejectDataStream.ts#rejectDataStream`: tell a socket its stream subscription was denied, with the access reason
-- **reprobeStreamAccess** `apps/api/src/ws/streamProbe.ts#reprobeStreamAccess`: status already known: routeAccessOf instead
-- **resolveOperationRoute** `apps/api/src/ws/operationRoute.ts#resolveOperationRoute`: Checking subscribe permission: canSubscribe instead, which calls this and authorizes.
-- **resolveStreamRoute** `apps/api/src/ws/streamRoute.ts#resolveStreamRoute`: map a stream name to its operation route, or null if unknown
-- **routeRow** `apps/api/src/appEvents/routeRow.ts#routeRow`: Required for row payloads; use refetch to just invalidate, streamAppend for stream handoffs.
+- **refetchQuery** · primitive `packages/ui/src/lib/ws/refetchQuery.ts#refetchQuery`: Simple refetch-on-change; incremental pushed updates: listStream or logStream folds instead.
+  - *Said as:* "invalidate and reload a query when the hint arrives", "client side: refresh the cached query on a socket message", "I'll call invalidateQueries from the socket handler"
+- **rejectDataStream** · primitive `apps/api/src/ws/rejectDataStream.ts#rejectDataStream`: tell a socket its stream subscription was denied, with the access reason
+  - *Said as:* "tell the client its stream subscription was denied and why", "send back a stream denial with the access reason", "I'll just close the socket if the stream isn't allowed"
+- **reprobeStreamAccess** · primitive `apps/api/src/ws/streamProbe.ts#reprobeStreamAccess`: status already known: routeAccessOf instead
+  - *Said as:* "check whether this socket may still read the stream", "ask the route again if these credentials still pass", "I'll re-run the permission check for this one subscription", "does this connection still have access to that feed"
+- **resolveOperationRoute** · primitive `apps/api/src/ws/operationRoute.ts#resolveOperationRoute` · in docs: docs/claude/WEBSOCKETS.md § Channel registry and authorization: Checking subscribe permission: canSubscribe instead, which calls this and authorizes.
+  - *Said as:* "find the HTTP route behind a channel name", "map a subscription back to its read route", "I'll keep a lookup table from channel names to permission checks"
+- **resolveStreamRoute** · primitive `apps/api/src/ws/streamRoute.ts#resolveStreamRoute` · in docs: docs/claude/WEBSOCKETS.md § Data streams › Authorization and re-authorization: map a stream name to its operation route, or null if unknown
+  - *Said as:* "find the read route a stream name belongs to", "which operation does this stream stand for", "look up the route for a stream, null if unknown"
+- **routeRow** · primitive `apps/api/src/appEvents/routeRow.ts#routeRow` · in docs: docs/claude/WEBSOCKETS.md § Data streams › Producing appends; docs/claude/APP_EVENTS.md § WebSocket handoffs: Required for row payloads; use refetch to just invalidate, streamAppend for stream handoffs.
+  - *Said as:* "shape the pushed row the same way the read route returns it", "I'll pass the raw database record as the stream payload", "make sure the live row matches the API response shape", "the row we push should go through the route's response schema"
   - *Signs you're bypassing it:* passing a raw Prisma row or hand-shaped object as an upsert payload instead of routeRow(route, value) (docs/claude/WEBSOCKETS.md § Data streams › Producing appends)
-- **sendFrame** `apps/api/src/ws/delivery.ts#sendFrame`: Always instead of raw ws.send; broadcastLocal for all sockets.
+- **sendFrame** · primitive `apps/api/src/ws/delivery.ts#sendFrame` · in docs: docs/claude/WEBSOCKETS.md § Data streams › Sequence numbers: Always instead of raw ws.send; broadcastLocal for all sockets.
+  - *Said as:* "send one frame to a socket and notice if it was dropped", "I'll call send on the socket with the JSON string", "the one way to write to a socket on the server"
   - *Signs you're bypassing it:* ws.send(JSON.stringify(...)) in server code, ignoring Bun's 0 return for dropped frames (docs/claude/WEBSOCKETS.md § Data streams › Sequence numbers; apps/api/src/ws/delivery.ts (Never call ws.send directly))
-- **sendTo** `apps/api/src/ws/delivery.ts#sendTo`: You already hold the socket; to reach all of a user's sockets use sendToUserLocal, for channel subscribers sendToChannelLocal.
-- **sendToChannel** `apps/api/src/ws/pubsub.ts#sendToChannel`: Topic subscribers: sendToChannel; a single user's sockets: sendToUser; ordered replayable data: appendToStream; everyone: broadcast.
+- **sendTo** · primitive `apps/api/src/ws/delivery.ts#sendTo`: You already hold the socket; to reach all of a user's sockets use sendToUserLocal, for channel subscribers sendToChannelLocal.
+  - *Said as:* "send to this exact socket I already have", "write to a single known connection", "I'll push a message to the connection object directly"
+- **sendToChannel** · primitive `apps/api/src/ws/pubsub.ts#sendToChannel` · in docs: docs/claude/WEBSOCKETS.md § Frontend and horizontal scaling; docs/claude/APP_EVENTS.md § WebSocket handoffs: Topic subscribers: sendToChannel; a single user's sockets: sendToUser; ordered replayable data: appendToStream; everyone: broadcast.
+  - *Said as:* "notify everyone subscribed to this topic, on every instance", "I'll iterate the connection registry and send to subscribers", "deliver to a channel's subscribers across the cluster"
   - *Signs you're bypassing it:* business code iterating the connection registry or calling sendToChannelLocal/sendToUserLocal directly, so other instances never deliver (docs/claude/WEBSOCKETS.md § Frontend and horizontal scaling)
-- **sendToChannelLocal** `apps/api/src/ws/delivery.ts#sendToChannelLocal`: Same event for all channel subscribers; per-socket payloads use sendToStreamLocal, one user's sockets use sendToUserLocal.
-- **sendToStreamLocal** `apps/api/src/ws/delivery.ts#sendToStreamLocal`: Payload varies per socket or some sockets are skipped (return null); identical payloads use sendToChannelLocal.
-- **sendToUser** `apps/api/src/ws/pubsub.ts#sendToUser`: One user's sockets: sendToUser; channel subscribers: sendToChannel; all clients: broadcast.
-- **sendToUserLocal** `apps/api/src/ws/delivery.ts#sendToUserLocal`: Target is a user, not a subscription; channel audiences use sendToChannelLocal, a single known socket uses sendTo.
-- **startStreamReauthorizeSweep** `apps/api/src/ws/streamReauthorizeSweep.ts#startStreamReauthorizeSweep`: Recurring sweep at boot; for a single immediate pass call reauthorizeOpenStreams.
-- **STREAM_DEFINITIONS** `packages/shared/src/ws/streamDefinitions.ts#STREAM_DEFINITIONS`: Push data streams here; mounted query subscriptions go through WS_CHANNELS/LIVE_QUERIES.
-- **streamAppend** `apps/api/src/appEvents/streamAppend.ts#streamAppend`: Stream handoffs are never hand-built; use refetch for query invalidation, routeRow for single rows. perRecipient streams need userIds.
+- **sendToChannelLocal** · primitive `apps/api/src/ws/delivery.ts#sendToChannelLocal`: Same event for all channel subscribers; per-socket payloads use sendToStreamLocal, one user's sockets use sendToUserLocal.
+  - *Said as:* "same payload to every local subscriber of a channel", "fan out to this instance's subscribers only", "send an identical event to local channel members"
+- **sendToStreamLocal** · primitive `apps/api/src/ws/delivery.ts#sendToStreamLocal`: Payload varies per socket or some sockets are skipped (return null); identical payloads use sendToChannelLocal.
+  - *Said as:* "a different payload per socket on the same stream", "skip some holders or tailor the frame per recipient", "send to local stream holders with per-socket shaping"
+- **sendToUser** · primitive `apps/api/src/ws/pubsub.ts#sendToUser` · in docs: docs/claude/WEBSOCKETS.md § Frontend and horizontal scaling; docs/claude/APP_EVENTS.md § WebSocket handoffs: One user's sockets: sendToUser; channel subscribers: sendToChannel; all clients: broadcast.
+  - *Said as:* "reach all of a user's open tabs and devices", "message one user wherever they are connected", "I'll find the user's sockets and send to each"
+- **sendToUserLocal** · primitive `apps/api/src/ws/delivery.ts#sendToUserLocal`: Target is a user, not a subscription; channel audiences use sendToChannelLocal, a single known socket uses sendTo.
+  - *Said as:* "send to one user's sockets on this instance", "local delivery to a user, not a subscription", "message a user's connections here without Redis"
+- **startStreamReauthorizeSweep** · primitive `apps/api/src/ws/streamReauthorizeSweep.ts#startStreamReauthorizeSweep` · in docs: docs/claude/WEBSOCKETS.md § Data streams › Authorization and re-authorization: Recurring sweep at boot; for a single immediate pass call reauthorizeOpenStreams.
+  - *Said as:* "periodically recheck that open streams are still allowed", "start the background loop that re-verifies stream access at boot", "I'll add a setInterval that re-checks permissions on open sockets", "kick off the recurring permission sweep for live streams"
+- **STREAM_DEFINITIONS** · primitive `packages/shared/src/ws/streamDefinitions.ts#STREAM_DEFINITIONS` · in docs: docs/claude/WEBSOCKETS.md § Data streams; docs/claude/WEBSOCKETS.md § Data streams › Stream definitions: Push data streams here; mounted query subscriptions go through WS_CHANNELS/LIVE_QUERIES.
+  - *Said as:* "where all the streams are declared", "the one list of streams both server and client read", "add the new stream to the shared registry", "I'll define the stream's shape on the server and mirror it on the client"
+- **streamAppend** · primitive `apps/api/src/appEvents/streamAppend.ts#streamAppend` · in docs: docs/claude/WEBSOCKETS.md § Data streams › Producing appends; docs/claude/WEBSOCKETS.md § Contract: Stream handoffs are never hand-built; use refetch for query invalidation, routeRow for single rows. perRecipient streams need userIds.
+  - *Said as:* "push this new entry onto the live feed", "add the event to the stream from the handler", "I'll build the stream message object by hand in the handler", "emit an upsert or remove for the live list", "the handler returns something the stream should receive"
   - *Signs you're bypassing it:* an object literal { kind: 'stream', target: { stream }, append: { type, payload } } in a handler (the handoff type is branded, so it won't typecheck) (docs/claude/WEBSOCKETS.md § Data streams › Producing appends; docs/claude/APP_EVENTS.md § WebSocket handoffs ("Stream handoffs are never built by hand"))
-- **streamAppendFrame** `apps/api/src/ws/dataFrame.ts#streamAppendFrame`: Incremental updates; streamSnapshotFrame for the initial full state.
-- **streamDefinitionFor** `packages/shared/src/ws/streamDefinitions.ts#streamDefinitionFor`: Have a full channel key instead of a family: streamDefinitionOf.
-- **streamDefinitionOf** `packages/shared/src/ws/streamDefinitions.ts#streamDefinitionOf`: Already have the bare family name: streamDefinitionFor.
-- **streamSeqKeyFor** `apps/api/src/ws/streamSeq.ts#streamSeqKeyFor`: Use over streamSeqKey so audience scoping is derived from the stream definition.
+- **streamAppendFrame** · primitive `apps/api/src/ws/dataFrame.ts#streamAppendFrame`: Incremental updates; streamSnapshotFrame for the initial full state.
+  - *Said as:* "build the wire frame for an incremental stream update", "the frame shape for one append on the socket", "I'll hand-assemble the JSON for the stream update message"
+- **streamDefinitionFor** · primitive `packages/shared/src/ws/streamDefinitions.ts#streamDefinitionFor`: Have a full channel key instead of a family: streamDefinitionOf.
+  - *Said as:* "look up a stream definition by its family name", "get the definition when I only have the bare stream name", "which definition does this family belong to"
+- **streamDefinitionOf** · primitive `packages/shared/src/ws/streamDefinitions.ts#streamDefinitionOf`: Already have the bare family name: streamDefinitionFor.
+  - *Said as:* "look up the stream definition from a full channel key", "I have the whole key, which stream is it", "parse the key and find its definition in one step"
+- **streamSeqKeyFor** · primitive `apps/api/src/ws/streamSeq.ts#streamSeqKeyFor` · in docs: docs/claude/WEBSOCKETS.md § Data streams › Sequence numbers: Use over streamSeqKey so audience scoping is derived from the stream definition.
+  - *Said as:* "the Redis key holding the stream's sequence counter", "I'll build the sequence key string by hand", "derive the seq key with audience scoping from the definition"
   - *Signs you're bypassing it:* hand-built `ws:seq:` keys or an INCR outside the publishStreamAppend Lua script (catalog streamSeqKeyFor; docs/claude/WEBSOCKETS.md § Sequence numbers)
-- **streamSnapshotFrame** `apps/api/src/ws/dataFrame.ts#streamSnapshotFrame`: Initial or reset state; streamAppendFrame for incremental changes.
-- **subscribeToChannel** `apps/api/src/ws/subscriptions.ts#subscribeToChannel`: channel broadcasts; for per-stream data feeds use subscribeToStream instead
-- **subscribeToStream** `apps/api/src/ws/streamSubscriptions.ts#subscribeToStream`: data streams; for named broadcast channels use subscribeToChannel instead
-- **unsubscribeFromChannel** `apps/api/src/ws/subscriptions.ts#unsubscribeFromChannel`: channels; for data streams use unsubscribeFromStream instead
-- **unsubscribeFromStream** `apps/api/src/ws/streamSubscriptions.ts#unsubscribeFromStream`: data streams; for channels use unsubscribeFromChannel instead
-- **useApiWebsocket** `packages/ui/src/hooks/useApiWebsocket.ts#useApiWebsocket`: Mount once per app; don't open sockets in components, subscriptions follow the query cache.
+- **streamSnapshotFrame** · primitive `apps/api/src/ws/dataFrame.ts#streamSnapshotFrame`: Initial or reset state; streamAppendFrame for incremental changes.
+  - *Said as:* "the frame carrying a stream's full initial state", "build the message that resets the client to a snapshot", "the first message a stream subscriber gets"
+- **subscribeToChannel** · primitive `apps/api/src/ws/subscriptions.ts#subscribeToChannel`: channel broadcasts; for per-stream data feeds use subscribeToStream instead
+  - *Said as:* "add this socket to a named channel", "register a subscription for refetch hints", "I'll push the socket into a set keyed by channel"
+- **subscribeToStream** · primitive `apps/api/src/ws/streamSubscriptions.ts#subscribeToStream`: data streams; for named broadcast channels use subscribeToChannel instead
+  - *Said as:* "add this socket as a holder of a data stream", "track that a connection is receiving this stream", "the subscription record for stream delivery"
+- **unsubscribeFromChannel** · primitive `apps/api/src/ws/subscriptions.ts#unsubscribeFromChannel`: channels; for data streams use unsubscribeFromStream instead
+  - *Said as:* "remove a socket from a channel", "stop sending this connection hints for that query", "drop the channel subscription on unsubscribe or close"
+- **unsubscribeFromStream** · primitive `apps/api/src/ws/streamSubscriptions.ts#unsubscribeFromStream`: data streams; for channels use unsubscribeFromChannel instead
+  - *Said as:* "remove a socket from a stream's holders", "stop delivering that stream to this connection", "clean up the stream subscription when the socket leaves"
+- **useApiWebsocket** · primitive `packages/ui/src/hooks/useApiWebsocket.ts#useApiWebsocket` · in docs: docs/claude/WEBSOCKETS.md § Frontend and horizontal scaling; docs/claude/FRONTEND/THEME_LAYOUT.md § Theme System: Mount once per app; don't open sockets in components, subscriptions follow the query cache.
+  - *Said as:* "connect the app to the socket once at the root", "I'll open a WebSocket inside this component's effect", "mount the realtime connection for the whole app"
   - *Signs you're bypassing it:* components opening their own sockets in useEffect (docs/claude/WEBSOCKETS.md § Frontend and horizontal scaling)
-- **useOrganizationContactsStream** `packages/ui/src/hooks/useOrganizationContactsStream.ts#useOrganizationContactsStream`: Template for typed per-stream hooks; other streams call useStream with their STREAM_DEFINITIONS name.
-- **useStream** `packages/ui/src/hooks/useStream.ts#useStream`: Fetched API reads: useQuery; this only reflects pushed stream data.
+- **useOrganizationContactsStream** · primitive `packages/ui/src/hooks/useOrganizationContactsStream.ts#useOrganizationContactsStream` · in docs: docs/claude/WEBSOCKETS.md § Data streams › Frontend; docs/claude/WEBSOCKETS.md § Data streams: Template for typed per-stream hooks; other streams call useStream with their STREAM_DEFINITIONS name.
+  - *Said as:* "the example typed hook for one stream", "copy this to make a typed hook for my stream", "the contacts live-list hook that shows the pattern"
+- **useStream** · primitive `packages/ui/src/hooks/useStream.ts#useStream` · in docs: docs/claude/WEBSOCKETS.md § Data streams › Frontend; docs/claude/WEBSOCKETS.md § Source and verification: Fetched API reads: useQuery; this only reflects pushed stream data.
+  - *Said as:* "show the live feed in the component", "read the stream's current state as a query result", "I'll keep socket messages in local state with a useEffect", "render the list that updates over the socket", "subscribe the component to pushed data"
   - *Signs you're bypassing it:* useEffect + useState holding socket messages for a stream instead of the query-cache-backed folded snapshot (docs/claude/WEBSOCKETS.md § Data streams › Frontend)
-- **useStreamAction** `packages/ui/src/hooks/useStreamAction.ts#useStreamAction`: Hears every append including stale ones; use for realtime stream events, not API reads via apiQuery.
-- **WS_CHANNELS** `packages/shared/src/ws/channels.ts#WS_CHANNELS`: Typed data streams: defineStream instead; raw names: channelKey.
+- **useStreamAction** · primitive `packages/ui/src/hooks/useStreamAction.ts#useStreamAction` · in docs: docs/claude/WEBSOCKETS.md § Data streams › Frontend; docs/claude/WEBSOCKETS.md § Data streams › Ordering: Hears every append including stale ones; use for realtime stream events, not API reads via apiQuery.
+  - *Said as:* "do something each time an append arrives", "react to a stream event with a side effect, not state", "play a sound or toast when a new entry lands", "I'll listen for one kind of stream message in the component"
+- **WS_CHANNELS** · primitive `packages/shared/src/ws/channels.ts#WS_CHANNELS` · in docs: docs/claude/WEBSOCKETS.md § Publishing a refetch; docs/claude/WEBSOCKETS.md § Channel registry and authorization: Typed data streams: defineStream instead; raw names: channelKey.
+  - *Said as:* "register a new live query so the page updates when it changes", "make this list refresh in real time", "add a channel clients can subscribe to for this query", "which queries are live updating", "I'll add a new subscription topic name for this view"
   - *Signs you're bypassing it:* subscribing to or publishing on channel names that are not a registered family (docs/claude/WEBSOCKETS.md § Channel registry and authorization; § Publishing a refetch)
-- **Channel subscribe authorization** `FEATURES.md — Authorized Query Channels`: authorize subscriptions by probing the matching HTTP route; drop on identity change
-- **Client stream reconnect with backoff** `docs/claude/WEBSOCKETS.md`: recover dropped streams keeping last snapshot, reopening with jittered exponential backoff
-- **Cross-instance delivery via Redis ws:broadcast** `apps/api/src/ws/`: fan out websocket publishes through Redis to each instance's local registry
-- **Data stream** `docs/claude/WEBSOCKETS.md#Contract`: token streaming, activity feeds, progress logs where refetch per change is too costly; else channels
-- **Live query recovery** `FEATURES.md — Refetch and Recovery`: Hints are not persisted; don't rely on delivery while disconnected.
-- **Owner-scoped email lenses** `docs/claude/COMMUNICATIONS.md`: govern tokens, rules, picker options and projection via sender/recipient/data/system lenses
-- **Per-key serialized publish queue** `apps/api/src/ws/streamPublishOrder.ts`: In-process ordering only; Redis orders across instances.
-- **Publishing a realtime refetch** `docs/claude/WEBSOCKETS.md — Publishing a refetch`: Channel subscribers: register family in WS_CHANNELS; per-user membership changes: target user IDs instead.
-- **Query-refetch hint** `docs/claude/WEBSOCKETS.md#Contract`: default; use a data stream only for incremental high-frequency data
-- **Redis pub/sub fan-out** `FEATURES.md — Redis Pub/Sub`: deliver channel and user-targeted messages across API instances, local fallback on failure
-- **Removal tombstones and revive** `docs/claude/WEBSOCKETS.md#ordering`: Use revive only for genuine restores of removed rows.
+- **Channel subscribe authorization** · pattern FEATURES.md — Authorized Query Channels: authorize subscriptions by probing the matching HTTP route; drop on identity change
+  - *Said as:* "check the user may read the route before letting them subscribe", "authorize a subscription by probing the HTTP endpoint", "I'll write a permission check for the channel", "drop subscriptions when the user changes"
+- **Client stream reconnect with backoff** · pattern docs/claude/WEBSOCKETS.md: recover dropped streams keeping last snapshot, reopening with jittered exponential backoff
+  - *Said as:* "reopen dropped streams with jittered backoff, keeping the last snapshot", "recover streams after the socket drops without blanking the UI", "I'll retry the connection every second until it works"
+- **Cross-instance delivery via Redis ws:broadcast** · pattern apps/api/src/ws/: fan out websocket publishes through Redis to each instance's local registry
+  - *Said as:* "make sure clients on other instances also get the message", "fan out socket publishes through Redis to each server", "I'll only send to sockets this process knows about"
+- **Data stream** · pattern docs/claude/WEBSOCKETS.md § Contract · code: `streamAppend`: token streaming, activity feeds, progress logs where refetch per change is too costly; else channels
+  - *Said as:* "token-by-token model output pushed live", "a progress log or activity feed that updates too often to refetch", "stream the data itself instead of telling the client to reload"
+- **Live query recovery** · pattern FEATURES.md — Refetch and Recovery: Hints are not persisted; don't rely on delivery while disconnected.
+  - *Said as:* "after reconnect, refetch the live queries rather than replaying missed hints", "hints missed while offline are not delivered later", "I'll queue hints while disconnected and send them on reconnect"
+- **Owner-scoped email lenses** · pattern docs/claude/COMMUNICATIONS.md: govern tokens, rules, picker options and projection via sender/recipient/data/system lenses
+  - *Said as:* "which email variables and rules this owner may use", "scope the template picker options to the sender and recipient", "limit email tokens to what the owner's lens allows"
+- **Per-key serialized publish queue** · pattern apps/api/src/ws/streamPublishOrder.ts: In-process ordering only; Redis orders across instances.
+  - *Said as:* "appends for one stream go out in order within this process", "I'll await each publish before the next so order holds", "run publishes for the same key one at a time"
+- **Publishing a realtime refetch** · pattern docs/claude/WEBSOCKETS.md — Publishing a refetch: Channel subscribers: register family in WS_CHANNELS; per-user membership changes: target user IDs instead.
+  - *Said as:* "make the list update when a row changes", "return a refetch hint from the app-event handler", "per-user membership changes: target the user ids instead of a channel"
+- **Query-refetch hint** · pattern docs/claude/WEBSOCKETS.md § Contract · code: `streamAppend`: default; use a data stream only for incremental high-frequency data
+  - *Said as:* "push a nudge, not the data", "push refetch hints, never payloads", "the socket just says what changed, the query is the source of truth"
+- **Redis pub/sub fan-out** · pattern FEATURES.md — Redis Pub/Sub: deliver channel and user-targeted messages across API instances, local fallback on failure
+  - *Said as:* "deliver channel and user messages across API instances", "publish through Redis so every instance's sockets hear it", "fall back to local delivery if Redis is down"
+- **Removal tombstones and revive** · pattern docs/claude/WEBSOCKETS.md § Data streams › Ordering › Ordering · code: `appendToStream`, `createSerializedQueue`, `streamAppend`, `useStreamAction`: Use revive only for genuine restores of removed rows.
+  - *Said as:* "a late upsert must not resurrect a removed row", "remember removed ids so stale updates don't bring them back", "I'll clear removed ids after a moment to save memory", "only mark revive on a genuine restore"
   - *Signs you're bypassing it:* setting revive on ordinary upserts, or client code that clears removed ids so late upserts resurrect rows (docs/claude/WEBSOCKETS.md § Data streams › Ordering)
-- **Seq gap triggers resync** `docs/claude/WEBSOCKETS.md#Sequence numbers`: drop stale appends, apply next seq, resync on a gap via websocket.resync
-- **Snapshot-then-held-appends ordering** `docs/claude/WEBSOCKETS.md#ordering`: subscribe before snapshot, hold appends, send after snapshot, drop by seq
-- **System probe secret rate-limit exemption** `docs/claude/WEBSOCKETS.md#authorization-and-re-authorization`: Only server-internal probes; client-driven opens and subscribes still count.
-- **Typed per-stream hook** `docs/claude/WEBSOCKETS.md#Frontend`: wrap useStream in a named hook that names the SDK response type
-- **db.parallel** `docs/claude/APP_EVENTS.md`: run tasks concurrently, optionally isolating failures with allSettled resolution
-  - *Throws:* db.parallel aggregated failure (`server-error`, app-events-webhooks-adapters)
-- **deliverWSHandoffs** `docs/claude/WEBSOCKETS.md#Producing appends`: deliver app-event WS handoffs, routing stream appends to appendToStream
-- **isPerCallerScope** `apps/api/src/ws/streamAudience.test.ts`: detect a route carrying per-request scopeNarrowing lens scope
-- **onCommit** `docs/claude/APP_EVENTS.md`: defer work until the surrounding transaction commits
-- **ordering** `packages/shared/src/ws/streamDefinitions.ts`: 'arrival' only for rows with no updatedAt version; otherwise keep default 'updatedAt'.
-- **Redis client waits through outages** `packages/db/src/redis/client.ts`: queue commands during a Redis outage instead of failing them
-- **setClient** `packages/ui/src/lib/ws/`: wire the QueryClient and reconnect recovery into the websocket client
-- **Stream kind and ops** `streamOps.ts`: list for id-keyed rows; log for append-only entries like model output.
-- **STREAM_FOLDS** `packages/ui/src/lib/ws/streamFolds.ts`: map each stream kind to its snapshot and op fold functions
-- **streamResync** `docs/claude/WEBSOCKETS.md#Sequence numbers`: tell holders on all instances to re-open a stream after a sequencing error
-- **streamSettleMs** `WebSocket docs, Connection and recovery`: debounce stream opens and closes 100 ms so holder churn sends no frames
-- **WSEvent** `docs/claude/WEBSOCKETS.md#Contract`: carry realtime events dispatched to frontend handlers by category and action
-- **x-auth-probe** `docs/claude/WEBSOCKETS.md#authorization-and-re-authorization`: Use for re-authorization; full in-process route run for the initial open snapshot.
-- **Build appends only with streamAppend** `apps/api/src/appEvents/streamAppend.ts`: any data pushed to a stream
-- **Channel registry for channel-targeted refetches** `docs/claude/WEBSOCKETS.md — Publishing a refetch`: Whenever publishing to channels rather than user sockets.
-- **Channels by default, streams only when refetch is unaffordable** `docs/claude/WEBSOCKETS.md#Channels vs streams`: Any new realtime update.
+- **Seq gap triggers resync** · pattern docs/claude/WEBSOCKETS.md § Data streams › Sequence numbers › Sequence numbers · code: `appendToStream`, `openDataStream`, `streamSeqKeyFor`, `createApiWebsocket`: drop stale appends, apply next seq, resync on a gap via websocket.resync
+  - *Said as:* "if a number is skipped, reopen the stream for a fresh snapshot", "detect a missed append and resync", "I'll ask the server to resend the missing appends"
+- **Snapshot-then-held-appends ordering** · pattern docs/claude/WEBSOCKETS.md § Data streams › Ordering › Ordering · code: `appendToStream`, `createSerializedQueue`, `streamAppend`, `useStreamAction`: subscribe before snapshot, hold appends, send after snapshot, drop by seq
+  - *Said as:* "hold appends while the snapshot loads, send them after", "subscribe first so nothing is lost between snapshot and live", "I'll fetch the snapshot first and then subscribe"
+- **System probe secret rate-limit exemption** · pattern docs/claude/WEBSOCKETS.md § Data streams › Authorization and re-authorization › Authorization and re-authorization · code: `openDataStream`, `resolveStreamRoute`, `fetchStreamSnapshot`, `routeAccessOf`: Only server-internal probes; client-driven opens and subscribes still count.
+  - *Said as:* "don't let the authorization sweep eat into rate limits", "server-internal probes bypass the rate limiter", "I'll raise the rate limit so the sweep stops getting 429s"
+- **Typed per-stream hook** · pattern docs/claude/WEBSOCKETS.md § Data streams › Frontend › Frontend · code: `useOrganizationContactsStream`, `useStream`, `useStreamAction`, `listStream`: wrap useStream in a named hook that names the SDK response type
+  - *Said as:* "wrap the generic stream hook in a named one with the response type", "give each stream its own hook so callers get types", "I'll call the generic stream hook with a string name everywhere"
+- **db.parallel** · primitive docs/claude/APP_EVENTS.md: run tasks concurrently, optionally isolating failures with allSettled resolution
+  - *Said as:* "run these tasks at the same time and isolate failures", "I'll use Promise.allSettled across the handoffs", "concurrent work where one failure must not sink the others"
+  - *Throws:* db.parallel aggregated failure (`server-error`, app-events-webhooks)
+- **deliverWSHandoffs** · primitive docs/claude/WEBSOCKETS.md § Data streams › Producing appends › Producing appends · code: `streamAppend`, `routeRow`, `typecheck`, `STREAM_DEFINITIONS`: deliver app-event WS handoffs, routing stream appends to appendToStream
+  - *Said as:* "take the handler's websocket outputs and actually deliver them", "route stream appends to the sequencer and hints to the publisher", "the step after the handler returns its socket work"
+- **isPerCallerScope** · primitive apps/api/src/ws/streamAudience.test.ts: detect a route carrying per-request scopeNarrowing lens scope
+  - *Said as:* "does this route return different rows per caller", "detect a per-request lens scope on the stream's route", "the check that forces a stream to be per-recipient"
+- **onCommit** · primitive docs/claude/APP_EVENTS.md: defer work until the surrounding transaction commits
+  - *Said as:* "only do this after the transaction commits", "I'll fire the socket message inside the transaction", "defer the side effect until the write is durable"
+- **ordering** · primitive packages/shared/src/ws/streamDefinitions.ts: 'arrival' only for rows with no updatedAt version; otherwise keep default 'updatedAt'.
+  - *Said as:* "sort stream rows by last update or by arrival", "which order the live rows keep", "I'll sort by createdAt in the fold"
+- **Redis client waits through outages** · primitive packages/db/src/redis/client.ts: queue commands during a Redis outage instead of failing them
+  - *Said as:* "queue Redis commands during an outage instead of failing", "I'll wrap every Redis call in try/catch for disconnects", "the client holds commands until Redis is back"
+- **setClient** · primitive packages/ui/src/lib/ws/: wire the QueryClient and reconnect recovery into the websocket client
+  - *Said as:* "wire the query cache into the socket client", "connect the realtime client to the query client and recovery", "I'll pass the query client into every socket handler"
+- **Stream kind and ops** · primitive streamOps.ts: list for id-keyed rows; log for append-only entries like model output.
+  - *Said as:* "is this a keyed list or an append-only log", "the op names a stream can carry: upsert, remove, append", "I'll invent my own event names for the stream"
+- **STREAM_FOLDS** · primitive packages/ui/src/lib/ws/streamFolds.ts: map each stream kind to its snapshot and op fold functions
+  - *Said as:* "how each stream kind applies an op to its snapshot", "the reducer table per stream kind", "I'll write a custom reducer for this one stream"
+- **streamResync** · primitive docs/claude/WEBSOCKETS.md § Data streams › Sequence numbers › Sequence numbers · code: `appendToStream`, `openDataStream`, `streamSeqKeyFor`, `createApiWebsocket`: tell holders on all instances to re-open a stream after a sequencing error
+  - *Said as:* "tell every instance's holders to reopen a stream after a sequencing error", "force clients to refresh a stream from a fresh snapshot", "I'll push the missing appends again from the server"
+- **streamSettleMs** · primitive WebSocket docs, Connection and recovery: debounce stream opens and closes 100 ms so holder churn sends no frames
+  - *Said as:* "debounce stream opens and closes so remounts send nothing", "don't open and close the stream on every rerender", "wait a moment before telling the server a stream has no holders"
+- **WSEvent** · primitive docs/claude/WEBSOCKETS.md § Contract · code: `streamAppend`: carry realtime events dispatched to frontend handlers by category and action
+  - *Said as:* "the shape of a realtime event the client dispatches by category and action", "the live-query event contract, push as a hint", "I'll define my own message type for the socket"
+- **x-auth-probe** · primitive docs/claude/WEBSOCKETS.md § Data streams › Authorization and re-authorization › Authorization and re-authorization · code: `openDataStream`, `resolveStreamRoute`, `fetchStreamSnapshot`, `routeAccessOf`: Use for re-authorization; full in-process route run for the initial open snapshot.
+  - *Said as:* "cheaply recheck permissions without running the whole route", "the header that turns a request into an access check", "I'll re-run the full read to verify access"
+- **Build appends only with streamAppend** · rule apps/api/src/appEvents/streamAppend.ts: any data pushed to a stream
+  - *Said as:* "every pushed stream entry goes through the one builder", "I'll construct the stream handoff object literal myself", "never hand-build what the stream receives"
+- **Channel registry for channel-targeted refetches** · rule docs/claude/WEBSOCKETS.md — Publishing a refetch: Whenever publishing to channels rather than user sockets.
+  - *Said as:* "a channel you publish to must be registered", "I'll publish on a channel name nobody registered", "hints to channels need a registered family"
+- **Channels by default, streams only when refetch is unaffordable** · rule docs/claude/WEBSOCKETS.md § Channels vs streams: Any new realtime update.
+  - *Said as:* "do I need a stream for this or just a refetch", "a refetch per change is fine here, don't add a stream", "I'll make a stream for status changes"
   - *Signs you're bypassing it:* a new data stream for low-frequency changes that a refetch hint would cover (docs/claude/WEBSOCKETS.md § Channels vs streams: when to use which)
-- **Channels carry hints, not data** `WebSocket docs, channel authorization`: designing any channel payload
+- **Channels carry hints, not data** · rule WebSocket docs, channel authorization: designing any channel payload
+  - *Said as:* "don't put the record in the socket message", "I'll include the updated fields in the channel event", "the channel says something changed, not what"
   - *Signs you're bypassing it:* pushing record data inside a channel or user message instead of a refetch hint (docs/claude/WEBSOCKETS.md § Channel registry and authorization and § Contract)
-- **Custom fold behavior means a new kind** `packages/ui/src/lib/ws/streamFolds.ts`: when a stream needs non-standard folding
+- **Custom fold behavior means a new kind** · rule packages/ui/src/lib/ws/streamFolds.ts: when a stream needs non-standard folding
+  - *Said as:* "this stream needs to merge updates differently", "I'll special-case the reducer for this stream", "nonstandard folding gets its own kind, not a patch"
   - *Signs you're bypassing it:* per-stream or per-caller custom reducers patched into STREAM_FOLDS for an existing kind (docs/claude/WEBSOCKETS.md § Data streams › Frontend)
-- **Declare streams only in the shared registry** `packages/shared/src/ws/streamDefinitions.ts`: Whenever adding a new realtime data stream.
+- **Declare streams only in the shared registry** · rule packages/shared/src/ws/streamDefinitions.ts: Whenever adding a new realtime data stream.
+  - *Said as:* "the stream definition must live in the shared package", "I'll define the stream next to the API handler", "one place for stream declarations, imported by both ends"
   - *Signs you're bypassing it:* a stream definition living in apps/api or packages/ui instead of packages/shared/src/ws/streamDefinitions.ts (docs/claude/WEBSOCKETS.md § Data streams › Stream definitions)
-- **Never call ws.send directly** `apps/api/src/ws/delivery.ts`: any server-side WebSocket send
+- **Never call ws.send directly** · rule apps/api/src/ws/delivery.ts: any server-side WebSocket send
+  - *Said as:* "I'll call send on the socket object directly", "always go through the delivery layer to write a frame", "raw socket writes ignore dropped frames"
   - *Signs you're bypassing it:* raw ws.send calls from handlers, sweeps or app-event code (apps/api/src/ws/delivery.ts)
-- **No new WS payload types without full support** `docs/claude/WEBSOCKETS.md#Contract`: When adding anything beyond message and stream handoffs.
-- **No replay; repair by snapshot** `docs/claude/WEBSOCKETS.md#data-streams`: Client handling of stream frames.
+- **No new WS payload types without full support** · rule docs/claude/WEBSOCKETS.md § Contract · code: `streamAppend`: When adding anything beyond message and stream handoffs.
+  - *Said as:* "add a third kind of socket message", "I'll introduce a new handoff type for this feature", "anything beyond messages and stream appends needs the whole stack"
+- **No replay; repair by snapshot** · rule docs/claude/WEBSOCKETS.md § Data streams · code: `STREAM_DEFINITIONS`, `useOrganizationContactsStream`: Client handling of stream frames.
+  - *Said as:* "the client missed some appends, resend them", "I'll buffer recent appends on the server for replay", "a gap means reopen for a fresh snapshot, not catch-up", "no acks, no queue, no resend of missed messages"
   - *Signs you're bypassing it:* a server-side replay buffer, outbound queue, acknowledgements, or resend-missed-appends logic (docs/claude/WEBSOCKETS.md § Data streams and § Sequence numbers ("no replay buffer, no queue and no acknowledgement"))
-- **No stream-specific wire schema** `docs/claude/WEBSOCKETS.md#stream-definitions`: When producing or consuming stream frames.
-- **No timeouts on stream Redis ops** `docs/claude/WEBSOCKETS.md#Sequence numbers`: stream sequencing and publishing
+- **No stream-specific wire schema** · rule docs/claude/WEBSOCKETS.md § Data streams › Stream definitions › Stream definitions · code: `defineStream`, `registry`, `STREAM_DEFINITIONS`: When producing or consuming stream frames.
+  - *Said as:* "I'll define a payload schema for this stream's frames", "the snapshot is just the route's response, appends carry route rows", "no per-stream message format"
+- **No timeouts on stream Redis ops** · rule docs/claude/WEBSOCKETS.md § Data streams › Sequence numbers › Sequence numbers · code: `appendToStream`, `openDataStream`, `streamSeqKeyFor`, `createApiWebsocket`: stream sequencing and publishing
+  - *Said as:* "I'll add a timeout around the sequence publish", "don't race the seq increment against a timer", "slow Redis must not drop or reorder appends"
   - *Signs you're bypassing it:* Promise.race timeouts or error-on-slow wrappers around the sequencing eval, seq read or publish (docs/claude/WEBSOCKETS.md § Data streams › Sequence numbers)
-- **perRecipient streams require userIds** `apps/api/src/appEvents/streamAppend.ts`: perRecipient stream definitions
-- **Pick the lane, not a delivery option** `docs/claude/WEBSOCKETS.md#Channels vs streams`: When deciding delivery guarantees for a realtime signal.
+- **perRecipient streams require userIds** · rule apps/api/src/appEvents/streamAppend.ts: perRecipient stream definitions
+  - *Said as:* "a per-user stream append needs to say which users", "I'll broadcast the append and let the client filter", "name the recipients when data differs per caller"
+- **Pick the lane, not a delivery option** · rule docs/claude/WEBSOCKETS.md § Channels vs streams: When deciding delivery guarantees for a realtime signal.
+  - *Said as:* "can I make this channel reliable with an ack", "I'll add a retry flag to the stream", "choose hint or stream, don't bolt on delivery guarantees"
   - *Signs you're bypassing it:* a per-stream reliability flag or an ack/retry option added to a channel or stream (docs/claude/WEBSOCKETS.md § Channels vs streams: when to use which)
-- **Reconnect replay ordering** `WebSocket docs, Connection and recovery`: client reconnect handling
-- **Remove contacts scaffolding stream** `docs/claude/WEBSOCKETS.md#data-streams`: When the first real stream (e.g. log stream) ships.
-- **Stream audience is required and enforced** `apps/api/src/ws/streamAudience.test.ts`: Use 'perRecipient' when the route has per-caller lens scope (scopeNarrowing).
+- **Reconnect replay ordering** · rule WebSocket docs, Connection and recovery: client reconnect handling
+  - *Said as:* "after reconnect, refetch only once subscriptions are re-granted", "the refetch has to wait for the subscribe re-grants", "I'll refetch immediately on reconnect then resubscribe"
+- **Remove contacts scaffolding stream** · rule docs/claude/WEBSOCKETS.md § Data streams · code: `STREAM_DEFINITIONS`, `useOrganizationContactsStream`: When the first real stream (e.g. log stream) ships.
+  - *Said as:* "the contacts stream is placeholder, delete it when a real stream ships", "the only stream today is scaffolding", "don't model new streams on the contacts one"
+- **Stream audience is required and enforced** · rule apps/api/src/ws/streamAudience.test.ts: Use 'perRecipient' when the route has per-caller lens scope (scopeNarrowing).
+  - *Said as:* "every stream must say whether it's shared or per-recipient", "a route with per-caller scope can't be a shared stream", "add a fixture to the audience test for the new stream", "I'll leave audience off and default to shared"
   - *Signs you're bypassing it:* a 'shared' stream over a route with scopeNarrowing (per-caller lens), or a stream without a fixture in streamAudience.test.ts (docs/claude/WEBSOCKETS.md § Data streams › Audience)
-- **Stream audience required** `FEATURES.md — WebSocket Data Streams`: Every defineStream declaration.
-- **Stream folds must be idempotent** `docs/claude/WEBSOCKETS.md#ordering`: When writing any stream fold.
+- **Stream audience required** · rule FEATURES.md — WebSocket Data Streams: Every defineStream declaration.
+  - *Said as:* "declare who may receive the stream", "shared or per recipient has to be stated", "I'll skip the audience field"
+- **Stream folds must be idempotent** · rule docs/claude/WEBSOCKETS.md § Data streams › Ordering › Ordering · code: `appendToStream`, `createSerializedQueue`, `streamAppend`, `useStreamAction`: When writing any stream fold.
+  - *Said as:* "applying the same upsert twice must not duplicate the row", "folds have to tolerate repeats", "I'll push every append onto the array"
   - *Signs you're bypassing it:* a fold that duplicates a row or entry when the same upsert arrives twice (docs/claude/WEBSOCKETS.md § Data streams › Ordering)
-- **Upsert rows must come from routeRow** `apps/api/src/appEvents/routeRow.ts`: every upsert append
-- **WebSocket message-based auth via /me** `FEATURES.md — Real-Time Communication`: All WebSocket connections, including spoofed identity.
-- **WS events are never persisted or replayed** `docs/claude/WEBSOCKETS.md#Contract`: Any realtime consumer of channels or streams.
+- **Upsert rows must come from routeRow** · rule apps/api/src/appEvents/routeRow.ts: every upsert append
+  - *Said as:* "every pushed row must be parsed by the route schema", "I'll pass the Prisma record straight into the upsert", "no hand-shaped rows in stream upserts"
+- **WebSocket message-based auth via /me** · rule FEATURES.md — Real-Time Communication: All WebSocket connections, including spoofed identity.
+  - *Said as:* "authenticate the socket by sending the me frame, not a URL token", "spoofed identity works on the socket the same way", "I'll put the token in the socket URL"
+- **WS events are never persisted or replayed** · rule docs/claude/WEBSOCKETS.md § Contract · code: `streamAppend`: Any realtime consumer of channels or streams.
+  - *Said as:* "don't store socket events for later", "I'll save missed events to the database", "if you weren't connected you didn't get it"
 - *Also here, by name:* STREAM_SEQ_TTL_MS (`apps/api/src/ws/streamSeq.ts`); WS_FRAME_LIMIT (`packages/shared/src/ws/frameLimits.ts`); applyStreamAppend (`packages/ui/src/lib/ws/applyStreamAppend.ts`); applyStreamSnapshot (`packages/ui/src/lib/ws/applyStreamSnapshot.ts`); dataStreamOfQueryKey (`packages/ui/src/lib/ws/dataStreamQueryKey.ts`); failDataStream (`packages/ui/src/lib/ws/failDataStream.ts`); frameError (`apps/api/src/ws/frameError.ts`); initWebSocketPubSub (`apps/api/src/ws/pubsub.ts`); isPubSubEnabled (`apps/api/src/ws/pubsub.ts`); notifyStreamListeners (`packages/ui/src/lib/ws/streamListeners.ts`); organizationContactRemove (`apps/api/src/appEvents/handlers/contact/organizationContactsStream.ts`); organizationContactUpsert (`apps/api/src/appEvents/handlers/contact/organizationContactsStream.ts`); parseChannelKey (`packages/shared/src/ws/channelKey.ts`); publishStreamAppend (`apps/api/src/ws/queries/publishStreamAppend.ts`); readStreamSeq (`apps/api/src/ws/queries/readStreamSeq.ts`); resyncStream (`packages/ui/src/lib/ws/resyncStream.ts`); streamFoldFor (`packages/ui/src/lib/ws/streamFolds.ts`); streamSeqKey (`apps/api/src/ws/streamSeq.ts`)
 
 ## 4. The specifics, in full
