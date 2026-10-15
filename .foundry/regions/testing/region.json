@@ -8,7 +8,7 @@
     "vcr",
     "test-rules"
   ],
-  "tokens": 16322,
+  "tokens": 16781,
   "tokenMethod": "chars/4",
   "runsAgreed": 3,
   "sources": {
@@ -46,10 +46,11 @@
       "roles-and-permissions",
       "route-templates-controllers",
       "testing-helpers",
-      "testing-rules"
+      "testing-rules",
+      "ui-components"
     ],
     "codeEntries": 123,
-    "docMembers": 62
+    "docMembers": 70
   },
   "bypassLines": 33,
   "glossaryTerms": 30

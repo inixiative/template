@@ -1,0 +1,35 @@
+{
+  "id": "lib-gloss",
+  "title": "Gloss library (margin comments)",
+  "routing": "Is this about the @inixiative/gloss library: keeping source comment-free except `// why:`, daggers (`// gloss`, `// gloss:file`) and machine directives; the mirrored .gloss/ sidecar (src/foo.ts -> .gloss/src/foo.ts.md, one `## <symbol>` section per symbol); or the gloss CLI (lint, check, fix, harvest --staged, watch, read, history, setup) and its package.json directives / exclude config?",
+  "concepts": [
+    "lib-gloss"
+  ],
+  "tokens": 5064,
+  "tokenMethod": "chars/4",
+  "runsAgreed": 0,
+  "sources": {
+    "docs": [
+      "@inixiative/gloss/README.md",
+      "@inixiative/gloss/snippets/CLAUDE.gloss.md"
+    ],
+    "docUnits": [
+      "doc:@inixiative/gloss/README.md#preface",
+      "doc:@inixiative/gloss/README.md#where-the-gloss-lives",
+      "doc:@inixiative/gloss/README.md#the-three-permitted-comment-forms",
+      "doc:@inixiative/gloss/README.md#the-sidecar",
+      "doc:@inixiative/gloss/README.md#the-harvester",
+      "doc:@inixiative/gloss/README.md#derived-staleness",
+      "doc:@inixiative/gloss/README.md#cli",
+      "doc:@inixiative/gloss/README.md#setup",
+      "doc:@inixiative/gloss/README.md#doctrine",
+      "doc:@inixiative/gloss/README.md#design",
+      "doc:@inixiative/gloss/snippets/CLAUDE.gloss.md#gloss-commentary-lives-in-the-margin-not-in-the-code"
+    ],
+    "catalogClusters": [],
+    "codeEntries": 0,
+    "docMembers": 0
+  },
+  "bypassLines": 0,
+  "glossaryTerms": 23
+}

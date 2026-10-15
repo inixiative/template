@@ -8,7 +8,7 @@
     "job-outbox",
     "cron"
   ],
-  "tokens": 20543,
+  "tokens": 20214,
   "tokenMethod": "chars/4",
   "runsAgreed": 3,
   "sources": {
@@ -56,7 +56,7 @@
       "testing-helpers"
     ],
     "codeEntries": 75,
-    "docMembers": 90
+    "docMembers": 83
   },
   "bypassLines": 24,
   "glossaryTerms": 28

@@ -191,8 +191,6 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **Handler validate hook** `docs/claude/INQUIRIES.md#validate — pre-create and pre-update checks`: Domain conflicts beyond uniqueness; use unique flag for one-open-inquiry constraints
   - *Signs you're bypassing it:* slug-collision or membership conflict checks written in the create or update controller instead of the handler's validate (docs/claude/INQUIRIES.md § Handler Architecture › validate)
 - **Inquiry handler per type** `docs/claude/INQUIRIES.md > Overview`: define source/target shape, content schema, validation and approval side effect per inquiry type
-- **Inquiry request/approval primitive** `FEATURES.md > Inquiry System`: invite, create space, transfer ownership, request access: Inquiry instead of bespoke endpoints
-  - *Signs you're bypassing it:* a bespoke Invitation, TransferRequest or AccessRequest model with its own status column and approve/deny endpoints (FEATURES.md › Inquiry System ("Instead of building ad-hoc handlers for every common org action"))
 - **Inquiry send permissions via ReBAC** `docs/claude/INQUIRIES.md#Current Handlers`: Use { rel: 'sourceSpace', action: 'own' } to allow delegation; dot-path when only org owners qualify
 - **Per-type inquiry UI registration** `packages/ui/src/lib/inquiries/registry.ts`: Adding UI for a new inquiry type instead of branching on type in pages or controls.
   - *Signs you're bypassing it:* a switch on inquiry.type inside a list page or the inquiry controls to choose components (docs/claude/INQUIRIES.md § Frontend › Per-type UI registry)
@@ -215,7 +213,6 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **Hide drafts from received lists** `docs/claude/INQUIRIES.md > List — sent and received`: Received inquiry lists never include drafts; sent lists include targets, received include sources.
 - **Inquiry expiry and sentAt** `docs/claude/INQUIRIES.md > Data Model`: sentAt set once on first send; expiresAt set on send, reset on changesRequested, cleared on terminal/draft.
 - **Inquiry ReBAC permissions** `docs/claude/INQUIRIES.md#Permissions (ReBAC)`: Any inquiry action authorization; superadmin bypasses only for admin targets
-- **Inquiry state machine** `FEATURES.md > Inquiry System > Status Tracking`: any inquiry status transition
 - **Inquiry status flow** `docs/claude/INQUIRIES.md > Status Flow`: any inquiry status change
 - **Inquiry types need a send permission rule** `packages/permissions/src/rebac/schema.ts`: Whenever a new InquiryType is added.
 - **Membership targets must exist** `docs/claude/INQUIRIES.md#Target`: When targeting a membership; User targets by email instead create a guest.
@@ -227,7 +224,6 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **Service-only inquiry parties** `docs/claude/INQUIRIES.md#Source & Target Resolution`: When creating inquiries whose source or target is a membership, integration or token.
 - **Side-matched inquiry relations** `docs/claude/INQUIRIES.md#Standardized includes`: Any inquiry endpoint or mutation choosing a Prisma include and response schema
   - *Signs you're bypassing it:* a hand-written include of all six source and target relations on a source-side or target-side mutation (docs/claude/INQUIRIES.md § Response Schemas › Standardized includes)
-- **Transactional inquiry resolution** `FEATURES.md > Inquiry System > Resolution Actions`: executing an approved inquiry's side effects
 - *Also here, by name:* INQUIRY_STATUS_COLORS (`packages/ui/src/lib/inquiries/queryKeys.ts`); INQUIRY_TERMINAL_STATUSES (`packages/ui/src/lib/inquiries/queryKeys.ts`); INQUIRY_TYPE_LABELS (`packages/ui/src/lib/inquiries/queryKeys.ts`); InquiryResourceModel (`packages/db/prisma/schema/inquiry.prisma`); InquiryType (`packages/db/prisma/schema/inquiry.prisma`); OrganizationIncomingTransfersPage (`packages/ui/src/pages/OrganizationIncomingTransfersPage.tsx`); OrganizationSentInvitationsPage (`packages/ui/src/pages/OrganizationSentInvitationsPage.tsx`); OrganizationSpaceApplicationsPage (`packages/ui/src/pages/OrganizationSpaceApplicationsPage.tsx`); UserReceivedInvitationsPage (`packages/ui/src/pages/UserReceivedInvitationsPage.tsx`); contentSchema (`apps/api/src/modules/inquiry/handlers/inviteOrganizationUser/schema.ts`); inquiryCreateSanitizeKeys (`apps/api/src/modules/inquiry/schemas/inquiryCreateBodySchema.ts`); inquiryPicks (`apps/api/src/modules/inquiry/schemas/inquiryPicks.ts`); inquiryResolutionStatusSchema (`apps/api/src/modules/inquiry/schemas/inquiryResolutionStatusSchema.ts`); inquiryResolved (`apps/api/src/appEvents/handlers/inquiry/inquiryResolved.ts`); inquirySent (`apps/api/src/appEvents/handlers/inquiry/inquirySent.ts`); inviteOrganizationUserAppEvents (`apps/api/src/modules/inquiry/handlers/inviteOrganizationUser/appEvents.ts`); mergeInquiryFilters (`packages/ui/src/lib/inquiries/queryKeys.ts`); resolveContent (`apps/api/src/modules/inquiry/services/resolveContent.ts`); useInquiryResolutionEffects (`packages/ui/src/hooks/inquiry/useInquiryResolutionEffects.ts`); useInquirySendEffects (`packages/ui/src/hooks/inquiry/useInquirySendEffects.ts`); validateInquiryIsCancelable (`apps/api/src/modules/inquiry/validations/validateInquiryStatus.ts`); validateInquiryIsEditable (`apps/api/src/modules/inquiry/validations/validateInquiryStatus.ts`); validateInquiryIsResolvable (`apps/api/src/modules/inquiry/validations/validateInquiryStatus.ts`); validateInquiryIsSendable (`apps/api/src/modules/inquiry/validations/validateInquiryStatus.ts`)
 
 ### Class `flows`: Guided in-app flows: registry, server-checked steps, FlowBanner client
@@ -249,8 +245,6 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **apps/api/src/modules/flow** `apps/api/src/modules/flow`: read and delete guided flows
 - **Add a flow as one registry file** `apps/api/src/modules/flow/registry/`: define a flow's bindingsSchema and steps in its own registry file
 - **Adding a flow** `docs/claude/FLOWS.md — Adding a flow`: register a new guided flow end to end with enum key, registry entry and test
-- **Flow recheck on read** `FEATURES.md > Flows > Rechecked on every read`: re-evaluate all steps from step 0 as the caller on every read
-  - *Signs you're bypassing it:* persisting completed-step flags or currentStep on the Flow row and advancing them from pages (docs/claude/FLOWS.md § Lifecycle (stepStates computed, not stored))
 - **Flow step rule over { data }** `docs/claude/FLOWS.md#registry`: list reads: notEmpty/atLeast/any; single reads: conditions on the record
 - **callerFor** `modules/flow/tests/flowRegistry.test.ts`: supply a factory-built caller so the registry test can run each flow
 - **flowDelete** `DELETE /api/v1/flow/:id`: end a flow explicitly
@@ -265,10 +259,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **Every flow must be covered by the registry test** `modules/flow/tests/flowRegistry.test.ts`: whenever a FlowKey is added
 - **Flow client code lives in packages/ui** `docs/claude/FLOWS.md#client`: building any page a flow visits
   - *Signs you're bypassing it:* flow-specific Continue buttons or flow checks added to individual app pages (docs/claude/FLOWS.md § Client ("pages need no flow code"))
-- **Flow client state** `FEATURES.md > Flows > Client`: frontend flow handling
-- **Flow step shape** `FEATURES.md > Flows > Registry`: defining flow steps
 - **Flow steps are immutable once stored** `docs/claude/FLOWS.md#lifecycle`: changing a flow definition
-- **Flows resolved at create** `FEATURES.md > Flows > Resolved at create`: starting any flow
 - **Leaving flow pages drops the flow** `docs/claude/FLOWS.md#client`: designing step to URLs
 - **Push predicates into readPath query** `docs/claude/FLOWS.md#registry`: defining a flow step's readPath and rule
   - *Signs you're bypassing it:* a step rule that filters a whole list in json-rules for conditions the route's searchFields could express in the readPath query (docs/claude/FLOWS.md § Registry › readPath)

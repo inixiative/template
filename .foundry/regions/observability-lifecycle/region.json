@@ -7,7 +7,7 @@
     "telemetry",
     "process-lifecycle"
   ],
-  "tokens": 15342,
+  "tokens": 12691,
   "tokenMethod": "chars/4",
   "runsAgreed": 3,
   "sources": {
@@ -24,39 +24,15 @@
       "doc:FEATURES.md#infrastructure-devops"
     ],
     "catalogClusters": [
-      "app-events-side-effects",
       "audit-logging",
-      "authentication-methods",
-      "batch-request-execution",
-      "caching-and-invalidation",
-      "cron-and-recurring-work",
-      "data-access-rules",
-      "data-models",
-      "database-scripts-migrations",
       "dev-setup-scripts",
       "environment-config",
-      "error-handling",
-      "filtering-search-ordering",
       "graceful-shutdown-lifecycle",
-      "job-overflow-outbox",
-      "lenses-multi-source",
-      "locks-and-serialization",
-      "module-layout-monorepo",
-      "mutation-hooks",
-      "naming-vocabulary",
       "observability-telemetry",
-      "pagination",
-      "redis-infrastructure",
-      "request-context-access",
-      "route-registration-openapi",
-      "rule-references-registry",
-      "structured-logging",
-      "supersede-lanes",
-      "testing-helpers",
-      "websocket-connection-management"
+      "structured-logging"
     ],
     "codeEntries": 60,
-    "docMembers": 82
+    "docMembers": 32
   },
   "bypassLines": 20,
   "glossaryTerms": 30

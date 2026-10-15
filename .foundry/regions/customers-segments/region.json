@@ -6,7 +6,7 @@
     "customers",
     "segments"
   ],
-  "tokens": 11090,
+  "tokens": 10835,
   "tokenMethod": "chars/4",
   "runsAgreed": 3,
   "sources": {
@@ -42,7 +42,7 @@
       "websocket-realtime-delivery"
     ],
     "codeEntries": 67,
-    "docMembers": 24
+    "docMembers": 20
   },
   "bypassLines": 17,
   "glossaryTerms": 26

@@ -1,0 +1,39 @@
+{
+  "id": "lib-prisma-map",
+  "title": "Prisma-map library (schema maps)",
+  "routing": "Is this about the @inixiative/prisma-map library: building a runtime PrismaMap from a generated Prisma client (buildPrismaMapV7 / buildPrismaMapV6, parseRuntimeDataModel, parseSchemaText, buildFromSchemaFile), reading model, field, enum and relation metadata (ScalarField / EnumField / RelationField, fromFields / toFields), listing relations with getRelations / relationForeignKey, resolving DB names with tableName / columnName / storedValue and the DbIdentifier / DbValue brands, or the /// @tagClass(key: value) annotation DSL (parseTagClasses, parseSchemaStructure)?",
+  "concepts": [
+    "lib-prisma-map"
+  ],
+  "tokens": 7363,
+  "tokenMethod": "chars/4",
+  "runsAgreed": 0,
+  "sources": {
+    "docs": [
+      "@inixiative/prisma-map/README.md"
+    ],
+    "docUnits": [
+      "doc:@inixiative/prisma-map/README.md#preface",
+      "doc:@inixiative/prisma-map/README.md#installation",
+      "doc:@inixiative/prisma-map/README.md#quick-start",
+      "doc:@inixiative/prisma-map/README.md#output-shape",
+      "doc:@inixiative/prisma-map/README.md#example-end-to-end",
+      "doc:@inixiative/prisma-map/README.md#api",
+      "doc:@inixiative/prisma-map/README.md#relation-traversal",
+      "doc:@inixiative/prisma-map/README.md#annotation-dsl-tagclass-key-value",
+      "doc:@inixiative/prisma-map/README.md#auto-detection-behavior",
+      "doc:@inixiative/prisma-map/README.md#practical-use-cases",
+      "doc:@inixiative/prisma-map/README.md#resolving-db-identifiers",
+      "doc:@inixiative/prisma-map/README.md#notes-and-limits",
+      "doc:@inixiative/prisma-map/README.md#development",
+      "doc:@inixiative/prisma-map/README.md#license"
+    ],
+    "catalogClusters": [
+      "prisma-schema-introspection"
+    ],
+    "codeEntries": 37,
+    "docMembers": 5
+  },
+  "bypassLines": 9,
+  "glossaryTerms": 27
+}

@@ -5,7 +5,7 @@
   "concepts": [
     "email-templates"
   ],
-  "tokens": 26289,
+  "tokens": 29073,
   "tokenMethod": "chars/4",
   "runsAgreed": 3,
   "sources": {
@@ -32,7 +32,6 @@
     "catalogClusters": [
       "audit-logging",
       "caching-and-invalidation",
-      "data-models",
       "email-composition-rendering",
       "email-delivery-senders",
       "error-handling",
@@ -53,7 +52,7 @@
       "soft-delete-cascade"
     ],
     "codeEntries": 233,
-    "docMembers": 54
+    "docMembers": 113
   },
   "bypassLines": 22,
   "glossaryTerms": 30

@@ -149,14 +149,14 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **apps/web/app/routes/_authenticated/organizations** `apps/web/app/routes/_authenticated/organizations`: Organization-level views go here; space-scoped pages belong in _authenticated/spaces, member lists in _authenticated/users.
 - **apps/web/app/routes/_authenticated/spaces** `apps/web/app/routes/_authenticated/spaces`: Space-scoped views here; organization-level views in _authenticated/organizations.
 - **apps/web/app/routes/_authenticated/users** `apps/web/app/routes/_authenticated/users`: Member and invitation lists here; organization invitations in _authenticated/organizations; own profile in settings.
-- **Space membership requires org membership** `FEATURES.md > Multi-Tenancy > Space Memberships`: Whenever granting space access or adding SpaceUser records.
-- **Tenant data isolation** `FEATURES.md > Multi-Tenancy > Organizations`: All tenant-owned reads and writes.
 
 ### Class `permissions`: Roles, actions, Permix, ReBAC walks, entitlements, row-level overrides, validatePermission
 
 - **Role** `packages/db/prisma/schema/user.prisma`: Tenant or token access level: Role; platform superadmin gate: PlatformRole instead.
 - **actionRuleSchema** `@inixiative/permissions/actionRuleSchema#actionRuleSchema`: Validating whole ActionRule overrides; for the abac condition alone use json-rules validateRule, which this delegates to.
+  - *Signs you're bypassing it:* persisting a tenant-authored permissionRules override unvalidated, or a hand-written zod union describing ActionRule (@inixiative/permissions/README.md § Writing a schema; § Also exported)
 - **createHydrator** `@inixiative/permissions#createHydrator`: Run before createRebacCheck; it dedupes loads per hydration and breaks cycles, but cross-call caching belongs in load.
+  - *Signs you're bypassing it:* a recursive hand-written loader that walks FK columns to fetch parent records, with its own seen-set to avoid cycles, before calling check (@inixiative/permissions/README.md § Hydration (Prisma example))
 - **createPermissions** `@inixiative/permissions#createPermissions`: Plain role/action checks: use this; relation-based or ABAC rules: createRebacCheck.
 - **createRebacCheck** `@inixiative/permissions#createRebacCheck`: Relation or rule-based access: use this; plain role checks: createPermissions. Hydrate records with createHydrator first.
 - **buildPermissionRulesSchema** `packages/permissions/src/rebac/permissionRulesSchema.ts#buildPermissionRulesSchema`: Use in route schemas accepting permissionRules instead of hand-writing action enums; derives keys from rebacSchema.
@@ -194,14 +194,13 @@ Point at a class when that is as specific as the moment allows, or at a member. 
   - *Signs you're bypassing it:* role: token.role as Role (a type assertion) when setting up permissions, instead of validating and failing closed to viewer (docs/claude/PERMISSIONS.md § Permission Setup › Role Validation)
 - **Action delegation chain** `docs/claude/PERMISSIONS.md#Schema`: tier actions so read inherits operate, operate manage, manage own; own terminal or delegated
 - **Bridges** `@inixiative/permissions README — Bridges (cross-source rel walks)`: Cross-source edges only; same-source FK walks use plain rel with the injected resolver.
+  - *Signs you're bypassing it:* fetching a record from another source (another fieldMap) and comparing join keys by hand before or after check, instead of declaring a bridge on the schema (@inixiative/permissions/README.md § Bridges (cross-source rel walks))
 - **Dot-path relation delegation** `docs/claude/PERMISSIONS.md#Dot-path vs. Single-hop Delegation`: Stricter ancestor-only check; single-hop { rel: 'sourceSpace', action: 'own' } instead when intermediate delegation should apply.
 - **Hydrate ownership closure before checking** `@inixiative/permissions/README.md#Hydration (Prisma example)`: Always for ReBAC checks; hand-attach extras only for self-references or polymorphic joins.
   - *Signs you're bypassing it:* ad-hoc include chains built per route to load parents before a ReBAC check, instead of createHydrator / the hydrate step (@inixiative/permissions README › Hydration)
 - **Inquiry send/resolve per type** `docs/claude/PERMISSIONS.md#Schema (inquiry)`: Adding a new inquiry type: add its send and resolve branches here.
   - *Signs you're bypassing it:* per-type role checks written in the create controller instead of a send branch in rebacSchema (docs/claude/INQUIRIES.md § Adding a New Handler step 11; Permissions (ReBAC))
-- **JSON-rules entitlements** `FEATURES.md > ABAC / JSON-Rules Integration`: Conditional attribute logic; roles suffice for fixed grants.
 - **Layered frontend permission checks** `docs/claude/PERMISSIONS.md#Frontend Checks`: pick the entry point matching the layer being gated
-- **Multi-level roles** `FEATURES.md > Multi-Level RBAC`: Simple role grants; use JSON-rules entitlements for attribute logic, ReBAC graph for inherited access.
 - **Owner-polymorphic permissions via ownerActions** `docs/claude/PERMISSIONS.md#Owner-Polymorphic Models`: Models with nullable FKs to multiple owners (Contact, WebhookSubscription); compose extra custom actions by spreading.
 - **Permission-gated UI** `docs/claude/ZUSTAND.md#PermissionsSlice`: hide or disable controls via Button show/disabled props from permission checks
 - **ReBAC permissions with Permix** `FEATURES.md > Unique Selling Points`: grant actions through relationship-based access checks evaluated by Permix
@@ -211,6 +210,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **Superadmin short-circuit** `packages/permissions/src/roles/organization.ts`: grant superadmins everything instead of computing role actions
 - **Three-layer permission model** `docs/claude/PERMISSIONS.md#Overview`: layer platform role, per-org RBAC role and JSON entitlements ABAC for authorization
 - **Typed resource union** `@inixiative/permissions README — The check engine`: Pass a resource union to createRebacCheck so schema and subjects typecheck without casts.
+  - *Signs you're bypassing it:* `as` casts on resource strings or an untyped createRebacCheck where a typo in a resource key passes the compiler (@inixiative/permissions/README.md § The check engine)
 - **ActionRule** `@inixiative/permissions ActionRule`: express a permission as delegation, relation walk, self match, abac predicate, or composition
 - **Button show/disabledText** `packages/ui Button`: permission-gated actions instead of wrapping in conditionals
   - *Signs you're bypassing it:* {canEdit && <Button>...</Button>} or ternaries wrapping buttons for permission gating instead of show / disabledText (docs/claude/FRONTEND/COMPONENTS.md § Standard Conditional Props)
@@ -223,6 +223,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **permissions.check** `packages/ui/src/store/slices/permissions.ts`: inside nav access callbacks; components prefer checkPermission
 - **permissions.setup** `packages/ui/src/store/slices/permissions.ts`: load user, organization and space permissions from /me into the frontend ReBAC engine
 - **permix.check** `@inixiative/permissions createPermissions`: Grant-only lookup; use the rebac check for relation/abac rules.
+  - *Signs you're bypassing it:* resolving record.organizationId by hand and calling permix.check('organization', action, id) where a { rel: 'organization', action } rule and check would walk it (@inixiative/permissions/README.md § The permix wrapper; § The check engine)
 - **permix.getJSON** `Permix`: export loaded permissions as resource-action boolean map
 - **permix.setSuperadmin** `packages/ui/src/store/slices/permissions.ts`: make every frontend permission check pass for a superadmin
 - **permix.setup** `@inixiative/permissions createPermissions`: load role-derived grants keyed by resource or resource:id
@@ -243,8 +244,6 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **Authenticate before authorizing** `docs/claude/PERMISSIONS.md#Via Validation Middleware`: Org/Space tokens carry no user and fail both gates; see AUTH.md to choose.
 - **Bridge far-field data** `@inixiative/permissions README — Bridges (cross-source rel walks)`: When a bridge hop ends in an abac or self rule rather than an rbac grant.
 - **Entitlements allow-override** `docs/claude/PERMISSIONS.md#How Entitlements Are Applied`: Whenever role permissions and entitlements are merged; the role is not a hard ceiling (deny override is not used).
-- **Fresh Permix client per request** `FEATURES.md > Per-Request Isolation`: All permission evaluation.
-  - *Signs you're bypassing it:* a module-level or cached permix instance reused across requests (FEATURES.md › Per-Request Isolation; docs/claude/PERMISSIONS.md § Permix)
 - **High-role assignment needs own** `docs/claude/PERMISSIONS.md#Schema`: Role assignment on organization or space and inviteOrganizationUser inquiries.
 - **Hydration stays in the app** `@inixiative/permissions README`: When wiring permissions into any app or extending the core.
 - **Inquiry permissions send/resolve/read** `docs/claude/INQUIRIES.md > Lifecycle`: Inquiry edit, send and cancel need send; resolve needs resolve; get needs read; lists need manage on parent.
@@ -254,9 +253,9 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **Row overrides limited to read** `docs/claude/PERMISSIONS.md#When to use it`: When adding permissionRules to a resource's route schemas.
 - **Row permission rules are additive only** `packages/permissions/src/rebac/check.ts`: Any resource with a permissionRules column.
 - **Row rules only widen** `@inixiative/permissions README — Writing a schema`: Whenever tenants author per-record permission overrides.
+  - *Signs you're bypassing it:* writing null or a narrower rule into a record's permissionRules expecting it to revoke access the schema grants (@inixiative/permissions/README.md § Writing a schema ("can widen but never revoke"))
 - **Secure defaults** `CLAUDE.md §7 Core Engineering Standards`: Enforce auth, permission and tenant boundary checks by default.
 - **Sensitive actions are session-only** `docs/claude/PERMISSIONS.md#validateNotToken`: Destructive or credential-minting routes.
-- **Space inherits org permissions** `FEATURES.md > Hierarchical Inheritance`: Any space-level permission check.
 - **SpaceUser requires OrganizationUser** `docs/claude/PERMISSIONS.md#Space Permissions`: Adding members to a space.
 - **Token cannot exceed user's role** `docs/claude/PERMISSIONS.md#Role Hierarchy`: whenever deriving token permissions
 - **Token creation checks assign on parent** `docs/claude/PERMISSIONS.md#Token Creation`: Every token creation endpoint, alongside validateNotToken.
@@ -280,10 +279,6 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **apps/superadmin/app/routes/_authenticated/dashboard** `apps/superadmin/app/routes/_authenticated/dashboard`: show the superadmin landing dashboard
 - **apps/superadmin/app/routes/_authenticated/settings** `apps/superadmin/app/routes/_authenticated/settings`: manage superadmin profile, tokens, integrations and webhooks settings
 - **apps/superadmin/app/routes/_authenticated/users** `apps/superadmin/app/routes/_authenticated/users`: superadmin pages for browsing and managing platform users
-- **adminAuthProviderReadMany** `apps/api/src/modules/authProvider/`: superadmin views only; public pages use authProviderReadMany.
-- **Spoof badge** `AppShell (FEATURES.md > Spoof Badge UI)`: show impersonation banner with a Clear Spoof action
-- **x-spoof-user-email** `spoof middleware (FEATURES.md > User Impersonation)`: Superadmin support only; responses echo x-spoofing-user-email and x-spoofed-user-email.
-- **Superadmin routes bypass org permissions** `FEATURES.md › Admin Operations`: platform-wide inquiry, webhook and organization oversight
 
 ## 4. The specifics, in full
 

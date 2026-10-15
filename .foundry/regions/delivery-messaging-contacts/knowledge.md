@@ -157,30 +157,6 @@ Point at a class when that is as specific as the moment allows, or at a member. 
   - *Signs you're bypassing it:* storing an unsubscribe token row in the database, or building the unsubscribe link by hand (docs/claude/COMMUNICATIONS.md § Communication Preferences (signed HMAC capability link, no DB token row))
 - **verifyUnsubscribe** `apps/api/src/lib/email/unsubscribe.ts#verifyUnsubscribe`: Counterpart to signUnsubscribe/unsubscribeUrl; use in the unsubscribe handler only.
 - **apps/api/src/routes/unsubscribe** `apps/api/src/routes/unsubscribe`: handle email unsubscribe link requests
-- **CommunicationLog find-or-create** `docs/claude/COMMUNICATIONS.md#Planner (sendEmail)`: dedupe per-recipient sends via queued log row keyed on idempotencyKey
-  - *Signs you're bypassing it:* relying on BullMQ job ids or an in-memory set to avoid duplicate sends, or creating a fresh log row per attempt (docs/claude/COMMUNICATIONS.md § Planner (sendEmail) step 3 (the at-most-once fence, durable beyond BullMQ retention))
-- **Email planner/deliver fan-out** `docs/claude/COMMUNICATIONS.md#Send Pipeline`: plan email once, then deliver per recipient as separate queued jobs
-- **Email send planner** `COMMUNICATIONS.md#planner-sendemail`: resolve ownership, hydrate recipients, create idempotent CommunicationLog per recipient, enqueue deliverEmail
-- **CommunicationLog.renderIssues** `CommunicationLog`: record render issues of a degraded send for later inspection
-- **deliverEmailHandoffs** `docs/claude/APP_EVENTS.md#Email pipeline`: enqueue sendEmail jobs for handoffs with deterministic planner job IDs
-- **email registry** `apps/api/src/lib/email/registry.ts`: define per-template entity lens, sender, recipient rules, data lens and render policy
-- **EmailClient.send** `packages/email/src/client/types.ts`: deliver one email with recipients, sender, subject, HTML, tags and metadata
-- **EmailEntry** `apps/api/src/lib/email/registry.ts`: declare per-template entity, sender, recipients, cc/bcc and data as lenses
-- **EmailHandoff** `docs/claude/APP_EVENTS.md#Handler and handoff contracts`: request a templated email with binding data from an event handler
-- **Email preference acceptance** `FEATURES.md — Preferences and Verification`: Every email send.
-- **Event-anchored idempotency keys** `docs/claude/COMMUNICATIONS.md`: Every email plan/deliver step; intentional resends emit a distinct event.
-  - *Signs you're bypassing it:* an idempotency key built from a timestamp or random id, or mutated to force a resend (docs/claude/COMMUNICATIONS.md § Deliver (intentional resends are distinct events, never key mutation))
-- **Event-driven email send** `docs/claude/COMMUNICATIONS.md#Send Pipeline`: Any outbound email from business logic.
-  - *Signs you're bypassing it:* an email sent inline in a route or service handler through a provider client (docs/claude/COMMUNICATIONS.md § Send Pipeline)
-- **List-Unsubscribe headers on non-system email** `Email docs § Deliver step 6`: All non-system sends.
-- **No addresses on the queue** `docs/claude/COMMUNICATIONS.md#Planner (sendEmail)`: Any per-recipient delivery job.
-  - *Signs you're bypassing it:* a job payload carrying the recipient's email address or hydrated user row instead of the recipient id plus the bound targeting where (docs/claude/COMMUNICATIONS.md § Planner (sendEmail) step 2)
-- **No caller-supplied recipients** `SendEmailPayload`: Any email send payload.
-- **No recipients on email handoffs** `docs/claude/APP_EVENTS.md#Handler and handoff contracts`: Any event that sends email.
-- **Only queued email logs are open** `lib/email/deliverEmailMessage.ts`: Every email delivery, retry, duplicate job or re-dispatch.
-  - *Signs you're bypassing it:* a retry or resend path that reopens a sending/failed row or sends without the queued → sending compare-and-set claim (docs/claude/COMMUNICATIONS.md § Deliver (only a queued row is open; every terminal write is CAS-guarded))
-- **Provider send idempotency and retry policy** `lib/email/deliverEmailMessage.ts`: Every provider email send; outcome failures are recorded, not thrown.
-- **Unsubscribe link mandatory** `docs/claude/COMMUNICATIONS.md#render-issues`: All non-system templates.
 - *Also here, by name:* CommunicationComponentVersion (`packages/db/prisma/schema/communicationLog.prisma`); CommunicationKind (`packages/db/prisma/schema/communication.prisma`); CommunicationReasonCode (`packages/db/prisma/schema/communicationLog.prisma`); CommunicationStatus (`packages/db/prisma/schema/communicationLog.prisma`); addressesThrough (`apps/api/src/lib/email/renderForRecipient.ts`); classifyResendError (`packages/email/src/client/classifyResendError.ts`); communicationReasonCodeFor (`apps/api/src/lib/email/communicationReasonCode.ts`); deliverJobId (`apps/api/src/lib/email/idempotency.ts`); plannerJobId (`apps/api/src/lib/email/idempotency.ts`); signUnsubscribe (`apps/api/src/lib/email/unsubscribe.ts`); unsubscribeLinkPresent (`packages/email/src/preflight/checks/unsubscribeLinkPresent.ts`)
 
 ### Class `messaging`: Non-email channels: per-ContactType message provider adapters
@@ -203,6 +179,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **Per-ContactType messaging via adapter lane** `docs/claude/COMMUNICATIONS.md#Overview`: direct SMS/push/chat: messaging lane; email has its own senders; outbound webhooks for HTTP callbacks
 - **Unsubscribe HMAC capability link** `apps/api/src/lib/email/unsubscribe.ts`: Unauthenticated one-click unsubscribe; better-auth for login links, Token model for API keys/scoped capabilities.
   - *Signs you're bypassing it:* using better-auth magic links or the Token model for unsubscribe (docs/claude/COMMUNICATIONS.md § Communication Preferences (Auth boundary))
+- **Webhooks enqueued on commit** `docs/claude/COMMUNICATIONS.md#Webhooks`: send outbound webhooks via sendWebhook job after transaction commits
 - **db.onCommit** `docs/claude/COMMUNICATIONS.md#Webhooks`: defer side effects until the surrounding transaction commits
   - *Signs you're bypassing it:* sending email, calling an external API or enqueuing a job directly inside db.txn (so it fires even if the transaction rolls back), or a hand-built after-commit callback list (docs/claude/DATABASE.md § Transactions › After Commit Callbacks; FEATURES.md § Post-Commit Callbacks)
 - **emailLensFor** `apps/api/src/lib/email`: build the sender-scoped lens used to resolve and render recipients
@@ -244,15 +221,17 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **Owner-scoped contact routes** `FEATURES.md › Contact System › Endpoints`: create/list under the owner route, read/update/delete by id, admin list separately
 - **Partial unique per polymorphic owner FK** `FEATURES.md › Contact System › Single Contact Model`: false-polymorphic owner FKs: one partial unique per FK instead of a single composite over all FKs
 - **Rate limiting windows** `FEATURES.md > General Security > Rate Limiting`: limit requests with atomic Redis fixed windows AND-checked per user, space, org
+- **Segment reconciliation** `docs/claude/SEGMENTS.md`: event-driven incremental reconciliation; nightly sweep is the full-recompute fallback
 - **Shadow-merge updates with previous** `FEATURES.md › Contact System › contactRules Hook`: validate partial updates against the merged previous-plus-new record in before-mutation hooks
 - **Singleton job locking** `FEATURES.md > Field-Level Encryption Engine > Singleton Job Locking`: cross-worker singleton jobs such as key rotation
+- **User redaction** `FEATURES.md > User Management > User Redaction / GDPR`: account deletion; never hard-delete users
 - **AuditLog** `AuditLog`: record create/update/delete diffs with full actor context and inquiry lineage
 - **buildPermissionRulesSchema** `FEATURES.md › Contact System › Row-Level Permission Overrides`: validate row-level permission overrides against actions allowed by the rebac schema
-  - *Signs you're bypassing it:* a hand-written zod schema enumerating permission action keys for a permissionRules body field (@template/permissions/rebac/permissionRulesSchema ("don't hand-write action-key zod schemas"))
 - **check** `FEATURES.md › Contact System › Row-Level Permission Overrides`: decide whether an actor may perform an action, OR-ing row and schema rules
-  - *Signs you're bypassing it:* if/else chains in a controller that look up an OrganizationUser or SpaceUser and compare its role, instead of declaring the rule in rebacSchema and calling check (catalog: packages/permissions/src/rebac/check.ts ("call check rather than hand-rolling permission logic"))
 - **contactRules** `apps/api/src/hooks/index.ts`: validate and canonicalize Contact rows per contact type
 - **ContactTypeDef** `packages/shared/src/contact/defs/<type>.ts`: declare input schema, parser, canonical schema, valueKey projection, subtype and uniqueness
+- **CustomerRef** `FEATURES.md › Customer Management`: model a customer/provider pair across User, Organization and Space branches
+  - *Signs you're bypassing it:* using OrganizationUser / SpaceUser or a new join table to model who is a customer of whom (catalog: CustomerRef (tenant membership belongs in OrganizationUser/SpaceUser instead))
 - **HOOK_IGNORE_FIELDS** `FEATURES.md › Contact System › Ordered List Hook`: mark ordering-only field changes as noise for audit, webhooks and no-op detection
 - **Ordered-list core algorithm** `apps/api/src/lib/prisma/orderedList.ts`: compute position shifts with one CTE UPDATE per scope
 - **orderedList hook** `apps/api/src/hooks/orderedList/`: keep dense 1..N position columns per scope across creates, updates, deletes and restores
@@ -263,21 +242,28 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **rateLimitMax** `rateLimitMax`: the single seam for limits; never hardcode limits elsewhere
   - *Signs you're bypassing it:* Hard-coded max numbers in rate-limit rules, or a rateLimit column on Token, Organization or Space. (docs/claude/REDIS.md § Rate Limiting ("never a column on Token, Organization or Space"); catalog note "never hardcode maxes in rules")
 - **RuleReference** `FEATURES.md › Segments › Reference Health`: track rule dependency edges for cycle, ownership and transitive degradation checks
-  - *Signs you're bypassing it:* Parsing conditions JSON across rows to find which rules depend on a Tag/Space/Segment before deleting it, instead of querying RuleReference by (targetModel, targetId). (catalog entry RuleReference; docs/claude/COMMUNICATIONS.md § Rule References)
 - **sanitizeKeys** `FEATURES.md › Contact System › Endpoints`: strip disallowed keys such as owner FKs from request bodies
   - *Signs you're bypassing it:* delete body.organizationId / destructuring client-unsettable keys out of c.req.valid('json') in the controller before Prisma (docs/claude/API_ROUTES.md § Route Templates, Template Args)
+- **Segment** `FEATURES.md › Segments`: hand-picked audiences: use a static ID rule rather than a separate mechanism
 - **User-scoped tokens** `FEATURES.md > User Management > User-Scoped Tokens`: API automation as a user; sessions for interactive use
 - **Add contact types via registry, not schema** `FEATURES.md › Contact System › Per-Type Registry`: whenever a new contact channel or handle type is needed
 - **CI encryption version validation** `FEATURES.md > Field-Level Encryption Engine > CI Version Validation`: every deploy
 - **Contact position via orderedList** `docs/claude/HOOKS.md > Contact Rules`: Any Contact create, move, soft delete or bulk write touching position.
+- **Degraded segments keep members** `FEATURES.md › Segments › Reference Health`: segments with broken rule references
+  - *Signs you're bypassing it:* clearing or recomputing membership of a segment whose rule is degraded (FEATURES.md § Segments › Reference Health)
+- **Every segment has a rule** `FEATURES.md › Segments`: creating any segment
 - **Expose only read for row sharing** `FEATURES.md › Contact System › Row-Level Permission Overrides`: routes accepting permissionRules
+- **Hide rules from membership reads** `FEATURES.md › Segments › Reference Health`: segment read endpoints
+  - *Signs you're bypassing it:* a customer-facing membership response that includes conditions or ruleIssues (docs/claude/SEGMENTS.md § Rule health and references)
 - **Inject owner FKs from auth context** `FEATURES.md › Contact System › Endpoints`: owner-scoped create/update routes
 - **Never store or log plaintext secrets** `FEATURES.md > General Security > Password Hashing / Token Hashing`: any credential persisted
+  - *Signs you're bypassing it:* a log line or error message that includes a token, password or decrypted credential (FEATURES.md § General Security › Password Hashing / Token Hashing)
 - **No bulk position writes** `apps/api/src/hooks/orderedList/`: updateManyAndReturn on ordered-list models
 - **No dangerouslySetInnerHTML** `FEATURES.md > General Security > XSS Prevention`: all frontend rendering
   - *Signs you're bypassing it:* rendering HTML strings via dangerouslySetInnerHTML (FEATURES.md § General Security › XSS Prevention)
 - **No raw SQL** `FEATURES.md > General Security > SQL Injection Prevention`: all database access
   - *Signs you're bypassing it:* `$queryRawUnsafe` / string-built SQL for ordinary reads and writes instead of the Prisma client (FEATURES.md § General Security › SQL Injection Prevention)
+- **Page enables only its own query** `FEATURES.md › Segments › Nested Navigation`: sibling pages under nested navigation
 - **Typed IDs** `FEATURES.md > User Management > User CRUD`: all model IDs
 - *Also here, by name:* CONTACT_CREATE_IMMUTABLE_FIELDS (`apps/api/src/modules/contact/schemas/contactSchemas.ts`); CONTACT_UPDATE_IMMUTABLE_FIELDS (`apps/api/src/modules/contact/schemas/contactSchemas.ts`); ContactOwnerModel (`packages/db/prisma/schema/contact.prisma`); ContactType (`packages/db/prisma/schema/contact.prisma`); DeliverabilityStatus (`packages/db/prisma/schema/contact.prisma`); EMAIL_SUBTYPES (`packages/shared/src/contact/constants/email.ts`); GITHUB_CLASSIFIERS (`packages/shared/src/contact/constants/github.ts`); LINKEDIN_CLASSIFIERS (`packages/shared/src/contact/constants/linkedin.ts`); PHONE_SUBTYPES (`packages/shared/src/contact/constants/phone.ts`); WEBSITE_SUBTYPES (`packages/shared/src/contact/constants/website.ts`); blueskyDef (`packages/shared/src/contact/defs/bluesky.ts`); contactCreateBodySchema (`apps/api/src/modules/contact/schemas/contactSchemas.ts`); contactPicks (`apps/api/src/modules/contact/schemas/contactPicks.ts`); contactReadResponseSchema (`apps/api/src/modules/contact/schemas/contactSchemas.ts`); contactUpdateBodySchema (`apps/api/src/modules/contact/schemas/contactSchemas.ts`); discordDef (`packages/shared/src/contact/defs/discord.ts`); emailDef (`packages/shared/src/contact/defs/email.ts`); facebookDef (`packages/shared/src/contact/defs/facebook.ts`); githubDef (`packages/shared/src/contact/defs/github.ts`); instagramDef (`packages/shared/src/contact/defs/instagram.ts`); lineDef (`packages/shared/src/contact/defs/line.ts`); linkedinDef (`packages/shared/src/contact/defs/linkedin.ts`); mastodonDef (`packages/shared/src/contact/defs/mastodon.ts`); parseBlueskyUrl (`packages/shared/src/contact/parsers/bluesky.ts`); parseFacebookUrl (`packages/shared/src/contact/parsers/facebook.ts`); parseGithubUrl (`packages/shared/src/contact/parsers/github.ts`); parseInstagramUrl (`packages/shared/src/contact/parsers/instagram.ts`); parseLinkedinUrl (`packages/shared/src/contact/parsers/linkedin.ts`); parseMastodonUrl (`packages/shared/src/contact/parsers/mastodon.ts`); parseRedditUrl (`packages/shared/src/contact/parsers/reddit.ts`); parseTelegramUrl (`packages/shared/src/contact/parsers/telegram.ts`); parseThreadsUrl (`packages/shared/src/contact/parsers/threads.ts`); parseTiktokUrl (`packages/shared/src/contact/parsers/tiktok.ts`); parseTwitterUrl (`packages/shared/src/contact/parsers/twitter.ts`); parseYoutubeUrl (`packages/shared/src/contact/parsers/youtube.ts`); phoneDef (`packages/shared/src/contact/defs/phone.ts`); redditDef (`packages/shared/src/contact/defs/reddit.ts`); signalDef (`packages/shared/src/contact/defs/signal.ts`); skypeDef (`packages/shared/src/contact/defs/skype.ts`); stripQueryAndFragment (`packages/shared/src/contact/parsers/url.ts`); stripWwwAndProtocol (`packages/shared/src/contact/parsers/url.ts`); telegramDef (`packages/shared/src/contact/defs/telegram.ts`); threadsDef (`packages/shared/src/contact/defs/threads.ts`); tiktokDef (`packages/shared/src/contact/defs/tiktok.ts`); trimSlashes (`packages/shared/src/contact/parsers/url.ts`); twitterDef (`packages/shared/src/contact/defs/twitter.ts`); viberDef (`packages/shared/src/contact/defs/viber.ts`); websiteDef (`packages/shared/src/contact/defs/website.ts`); wechatDef (`packages/shared/src/contact/defs/wechat.ts`); whatsappDef (`packages/shared/src/contact/defs/whatsapp.ts`); youtubeDef (`packages/shared/src/contact/defs/youtube.ts`)
 

@@ -1,0 +1,50 @@
+{
+  "id": "lens-usage",
+  "title": "Using a lens: build, gate, fetch",
+  "routing": "Is this about putting a json-rules lens to work in code \u2014 building one (FieldMap / FieldMapSet, createLens, stitchFieldMaps, bridges and fieldMap:Model keys, a tenant + soft-delete narrowing, storeLens / composeLens), running a user or AI rule through it (validateRuleInLens \u2192 narrowRule \u2192 toPrisma / toSql / check, or a { lens } compile; describeRule to pick an executor), fetching and cutting rows under it (toPrisma(true, { lens }) + toLensSelect + projectRows, keepClampColumns, readLensValue, walkLensPath, lensVisit, projectLens by path or by model), option sources for pickers (sources / SourceSpec, toSourceQueries, materializeSourceQuery, materializeSources, from: 'mapDefaults', recheck across a bridge), bindings in a lens (bindLens, listLensBindings, parent:name), evaluating across bridges (indexBridges), or migrating lens code between json-rules versions?",
+  "concepts": [
+    "lib-json-rules-lens-usage"
+  ],
+  "tokens": 20413,
+  "tokenMethod": "chars/4",
+  "runsAgreed": 0,
+  "sources": {
+    "docs": [
+      "@inixiative/json-rules/README.md",
+      "@inixiative/json-rules/docs/LENS.md"
+    ],
+    "docUnits": [
+      "doc:@inixiative/json-rules/README.md#lens-multi-source-data",
+      "doc:@inixiative/json-rules/README.md#lens-multi-source-data/what-a-lens-is-for",
+      "doc:@inixiative/json-rules/README.md#lens-multi-source-data/how-it-s-built",
+      "doc:@inixiative/json-rules/README.md#lens-multi-source-data/fieldmap-fieldmapset",
+      "doc:@inixiative/json-rules/README.md#lens-multi-source-data/lens",
+      "doc:@inixiative/json-rules/README.md#lens-multi-source-data/relations",
+      "doc:@inixiative/json-rules/README.md#lens-multi-source-data/lensnarrowing-where",
+      "doc:@inixiative/json-rules/README.md#lens-multi-source-data/lens-utilities",
+      "doc:@inixiative/json-rules/README.md#lens-multi-source-data/bindings-in-a-lens",
+      "doc:@inixiative/json-rules/README.md#lens-multi-source-data/option-sources",
+      "doc:@inixiative/json-rules/README.md#lens-multi-source-data/fetching-under-a-lens",
+      "doc:@inixiative/json-rules/README.md#lens-multi-source-data/evaluating-across-bridges",
+      "doc:@inixiative/json-rules/docs/LENS.md#9-building-a-lens",
+      "doc:@inixiative/json-rules/docs/LENS.md#10-using-the-lens",
+      "doc:@inixiative/json-rules/docs/LENS.md#10-using-the-lens/validateruleinlens-rule-lens-validate-at-the-api-boundary",
+      "doc:@inixiative/json-rules/docs/LENS.md#10-using-the-lens/narrowrule-rule-narrowing-compose-with-scope",
+      "doc:@inixiative/json-rules/docs/LENS.md#10-using-the-lens/fetching-rows-under-a-lens",
+      "doc:@inixiative/json-rules/docs/LENS.md#10-using-the-lens/projectlens-lens-path-keyed-projection",
+      "doc:@inixiative/json-rules/docs/LENS.md#10-using-the-lens/walklenspath-lens-path-one-path-verified-hop-by-hop",
+      "doc:@inixiative/json-rules/docs/LENS.md#10-using-the-lens/projectlens-lens-by-model-the-leak-safe-surface-as-a-lens",
+      "doc:@inixiative/json-rules/docs/LENS.md#11-describe-and-validate-vs-deny-at-execution",
+      "doc:@inixiative/json-rules/docs/LENS.md#12-migration",
+      "doc:@inixiative/json-rules/docs/LENS.md#13-end-to-end-worked-example"
+    ],
+    "catalogClusters": [
+      "json-rules-engine",
+      "lenses-multi-source"
+    ],
+    "codeEntries": 6,
+    "docMembers": 16
+  },
+  "bypassLines": 0,
+  "glossaryTerms": 28
+}

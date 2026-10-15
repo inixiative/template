@@ -6,7 +6,7 @@
     "inquiries",
     "flows"
   ],
-  "tokens": 21066,
+  "tokens": 20755,
   "tokenMethod": "chars/4",
   "runsAgreed": 3,
   "sources": {
@@ -46,7 +46,7 @@
       "testing-rules"
     ],
     "codeEntries": 88,
-    "docMembers": 58
+    "docMembers": 51
   },
   "bypassLines": 25,
   "glossaryTerms": 30

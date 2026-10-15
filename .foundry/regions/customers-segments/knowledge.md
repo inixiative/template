@@ -108,7 +108,7 @@ The provider–customer relationship (`CustomerRef`) and the audiences a provide
 
 A `Segment` is a named set of one provider's `CustomerRef` rows. Every segment has `conditions`; a hand-picked audience is a static rule over customer-ref ids, and there is no direct member add/remove. `SegmentMember` rows are written only by reconciliation: `reconcileSegment` recomputes a whole segment through `toPrisma` (`evaluateSegment` / `compileSegmentWhere`) and `applyMembershipDiff`; `reconcileCustomerRefSegments` re-evaluates one customer's refs against dynamic segments with `check()` in dependency order (`sortByDependency`); `sweepSegments` is the nightly 04:00 UTC backstop. Controllers emit business events and handlers enqueue these jobs (`RECONCILE_TRIGGERS`, `reconcileCustomerOf`); reconciliation is never a lookup inside a model write hook. `publishMembershipChanges` emits the `segment.membersAdded/Removed` and `customerRef.segmentsAdded/Removed` events. Save is gated by `segmentConditions` / `validateSegmentConditions`, `assertSegmentReferencesOwned` / `validateSegmentReferences` and `findReferenceCycle`; `estimateSegmentReach` previews a count with the same admission. Health derives from `RuleReference` edges and their dependency closure (`segmentRuleStates`, `withSegmentsRuleIssues`, `soundSegments`): a degraded segment keeps its members, is skipped by continuous reconciliation and sweep, and leaves email's live set (`withoutDegradedSegments`).
 
-Not here: the generic `RuleReference` / `withRule` / lens machinery is json-rules-lenses; tags are their own region; the email recipient lens that exposes `providerRefs.segmentMembers.segment` is email-templates; job queues, superseding lanes and cron are jobs and concurrency-locks.
+Not here: the generic `RuleReference` / `withRule` / lens machinery is in the json-rules and lenses regions; tags are their own region; the email recipient lens that exposes `providerRefs.segmentMembers.segment` is email-templates; job queues, superseding lanes and cron are jobs and concurrency-locks.
 
 ## 3. Everything that exists here, by class
 
@@ -175,25 +175,18 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **apps/web/app/routes/_authenticated/segments** `apps/web/app/routes/_authenticated/segments`: show segments the user owns and their segment memberships
 - **Segment membership diff events** `docs/claude/SEGMENTS.md#Events and email integration`: publish segment.membersAdded/Removed and customerRef.segmentsAdded/Removed from membership diffs, incl. deletion
 - **Segment membership realtime refetch** `docs/claude/SEGMENTS.md#Events and email integration`: refetch member-list channel for owners; meReadManySegmentMemberships refetch to user sockets
-- **Segment reconciliation** `docs/claude/SEGMENTS.md`: event-driven incremental reconciliation; nightly sweep is the full-recompute fallback
 - **Segments nav redirect** `apps/web/app/config/nav/features/segments.ts`: Nest Owned and Memberships under Segments; /segments redirects to Owned preserving org, space, spoof context.
 - **customerRefLens** `apps/api/src/modules/customerRef/lib/customerRefLens.ts`: Unscoped vocabulary/validation; use resolvedCustomerRefLens when evaluating within a provider scope.
 - **resolvedCustomerRefLens** `apps/api/src/modules/customerRef/lib/customerRefLens.ts`: Evaluating rules for a specific owner; customerRefLens for vocabulary only.
 - **RuleReference** `docs/claude/SEGMENTS.md#Rule health and references`: record segment-to-segment edges for health and dependency closure
-  - *Signs you're bypassing it:* Parsing conditions JSON across rows to find which rules depend on a Tag/Space/Segment before deleting it, instead of querying RuleReference by (targetModel, targetId). (catalog entry RuleReference; docs/claude/COMMUNICATIONS.md § Rule References)
 - **Segment reach endpoint** `docs/claude/SEGMENTS.md#API`: Previewing reach; create route to persist.
 - **segmentConditions** `apps/api/src/hooks/index.ts`: require, validate and normalize Segment conditions against the owner's lens
 - **SegmentsPage** `packages/ui/src/pages/SegmentsPage.tsx`: render owned or membership segment lists, enabling only selected query
 - **Degraded segment handling** `docs/claude/SEGMENTS.md#Rule health and references`: Selecting segments to reconcile or expose to email lens.
-- **Degraded segments keep members** `FEATURES.md › Segments › Reference Health`: segments with broken rule references
-  - *Signs you're bypassing it:* clearing or recomputing membership of a segment whose rule is degraded (FEATURES.md § Segments › Reference Health)
 - **Degraded segments never queued** `sweepSegments`: when enqueueing segment reconciliation
 - **Enqueue customer segment reconcile from business events** `reconcileCustomerRefSegments`: when wiring segment membership updates to data changes
   - *Signs you're bypassing it:* re-evaluating segment membership inside a Prisma write hook or synchronously in the controller after a customer change (docs/claude/SEGMENTS.md § Static and dynamic membership (controllers emit business events; event handlers enqueue reconciliation jobs; not a lookup inside a model's write hook))
-- **Every segment has a rule** `FEATURES.md › Segments`: creating any segment
 - **Hide rules from customer membership reads** `docs/claude/SEGMENTS.md#Rule health and references`: Customer-facing membership endpoints.
-- **Hide rules from membership reads** `FEATURES.md › Segments › Reference Health`: segment read endpoints
-  - *Signs you're bypassing it:* a customer-facing membership response that includes conditions or ruleIssues (docs/claude/SEGMENTS.md § Rule health and references)
 - **No direct segment member add/remove** `docs/claude/SEGMENTS.md#Static and dynamic membership`: Whenever building a fixed audience.
   - *Signs you're bypassing it:* a route or service that calls db.segmentMember.create / delete to hand-pick members (docs/claude/SEGMENTS.md § Static and dynamic membership (a hand-picked audience is a static rule over customer-reference IDs; no direct member add/remove API))
 - **Reconcile via events, not write hooks** `docs/claude/SEGMENTS.md#Static and dynamic membership`: Any write affecting segment-readable data.

@@ -164,33 +164,27 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **apps/api/src/modules/authProvider** `apps/api/src/modules/authProvider`: list, update and delete configured auth providers, including a superadmin listing
 - **apps/api/src/modules/token** `apps/api/src/modules/token`: Revoking tokens; creation lives on me, organization, space, organizationUser and spaceUser CreateToken endpoints.
 - **apps/web/app/routes/_public/auth** `apps/web/app/routes/_public/auth`: handle the auth provider callback page after sign-in
-- **Bearer token auth** `FEATURES.md > Token Authentication`: API access; use ?token=<key> only when headers can't be set.
 - **Bearer token in localStorage** `docs/claude/FRONTEND/AUTH.md → Architecture`: persist session token client-side and send it as Authorization Bearer on every API call
 - **BetterAuth sessions via secondaryStorage** `lib/auth.ts secondaryStorage`: store BetterAuth sessions in Redis under the session namespace
-- **BetterAuth stateless JWT sessions** `FEATURES.md > Session Authentication (BetterAuth)`: Browser email/password users; OAuth users get a localStorage Bearer token; API clients use personal access tokens.
-- **Hierarchical token scopes** `FEATURES.md > Hierarchical Token Scopes`: User for cross-org, Organization for all its spaces, Space for one space.
 - **OAuth redirect persistence** `docs/claude/FRONTEND/AUTH.md → Pages and Forms`: store redirectTo in localStorage.authRedirectTo before OAuth and consume it on callback
 - **Per-organization auth provider config** `FEATURES.md > Unique Selling Points`: configure OAuth or SAML providers per organization with secrets stored encrypted
 - **SPA bearer session auth** `docs/claude/AUTH.md#Session Storage Strategy`: SPA clients; cookie cache for cookie clients
 - **Token lookup cache** `apps/api/src/middleware/auth/tokenAuthMiddleware.ts`: cache active token lookups by keyHash for 10 minutes, so revocation lags
-- **URL token fallback** `FEATURES.md > URL Token Fallback`: WebSocket upgrades and email links only; otherwise Bearer header.
 - **URL token for header-less clients** `docs/claude/AUTH.md › Token Authentication`: WebSocket, email links, downloads; otherwise use the Authorization Bearer header.
+- **adminAuthProviderReadMany** `apps/api/src/modules/authProvider/`: superadmin views only; public pages use authProviderReadMany.
 - **AuthMethod** `packages/ui/src/lib/auth/types.ts`: describe email, OAuth or SAML credentials as one discriminated union for sign-in/up
 - **authProviderReadMany** `apps/api/src/modules/authProvider/`: platform-only list; organizationReadAuthProvider when org providers are needed.
 - **authProviderUpdate** `apps/api/src/modules/authProvider/`: edit a provider, locking org/type/provider and re-encrypting new secrets
-- **cookieCache.maxAge** `BetterAuth config (FEATURES.md > Stateless JWT)`: skip DB session validation for up to 5 minutes per JWT
 - **decryptField** `@template/db/lib/encryption/helpers`: recover plaintext of a registered encrypted field from its row
   - *Signs you're bypassing it:* reading encrypted columns and decrypting them with createEncryption and hand-picked env keys (catalog: decryptField (use over createEncryption for model fields; key name typos fail at compile time))
 - **encryptField** `@template/db/lib/encryption/helpers`: secrets the server must read back; API tokens are SHA-256 hashed instead.
   - *Signs you're bypassing it:* calling node crypto createCipheriv directly, base64-encoding a secret, or storing a provider credential in plain text or a plain Json column (catalog: encryptField (use instead of ad-hoc credential storage or calling createEncryption directly))
 - **organizationReadAuthProvider** `apps/api/src/modules/organization/`: login for an org; authProviderReadMany for platform-only providers; adminAuthProviderReadMany for superadmin.
-- **platformProviders** `FEATURES.md > OAuth Social Providers`: Platform-wide social login; per-org OAuth/SAML belongs in the AuthProvider model.
 - **SignUpResult** `packages/ui/src/lib/auth/types.ts`: tell the caller whether sign-up logged in, awaits email verification, or is redirecting
 - **API tokens stored as SHA-256 hash** `docs/claude/AUTH.md › Token Authentication`: Any credential the server only verifies, never replays.
   - *Signs you're bypassing it:* storing or comparing an API key in plaintext, or returning it after creation (docs/claude/AUTH.md § Token Authentication; FEATURES.md › Personal Access Tokens)
 - **Email verification required** `docs/claude/AUTH.md#Session Storage Strategy`: Email/password sign-up
 - **OAuth callback redirect URI** `docs/claude/AUTH.md#OAuth Flow`: Adding an OAuth provider
-- **Personal access tokens shown once** `FEATURES.md > Personal Access Tokens`: All personal access tokens.
 - **Provider credentials encrypted, never hashed** `docs/claude/AUTH.md › Encryption`: Any stored credential the server must later replay to a third party.
   - *Signs you're bypassing it:* hashing a provider secret that must be replayed to a third party (docs/claude/AUTH.md › Encryption)
 - **Session token never in URL** `docs/claude/AUTH.md#Bearer Token Handoff`: OAuth callbacks and redirects
@@ -228,6 +222,8 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **createPermissions** `prepareRequest`: create an empty per-request Permix permission checker
 - **getActor** `docs/claude/AUTH.md#validateActor`: Prefer over c.get('user') when token-scoped users must count as the actor.
   - *Signs you're bypassing it:* branching on c.get('token')?.ownerModel / organizationUser / spaceUser by hand to work out the acting user or organization (docs/claude/CONTEXT.md § Context Access, getActor)
+- **isSuperadmin** `apps/api/src/middleware/auth/spoofMiddleware.ts`: Inside middleware logic; gate routes with validateSuperadmin instead.
+  - *Signs you're bypassing it:* inline user.platformRole === 'superadmin' comparisons (catalog: packages/permissions/src/roles/shared.ts and apps/api/src/lib/context/isSuperadmin.ts)
 - **organizationCreateToken** `docs/claude/AUTH.md#Choosing Between validateUser and validateActor`: Org-level machine access; OrganizationUser tokens when acting as a person.
 - **permix.setup** `Permix`: called by setupOrgContext/setupUserContext; pass replace to overwrite
 - **prepareRequest** `apps/api/src/routes/api.ts`: initialize request context with null user, null token and empty permix
@@ -237,8 +233,12 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **setUserContext** `docs/claude/AUTH.md#Flow`: install a resolved user and its permissions into request context
 - **spaceCreateToken** `docs/claude/AUTH.md#Choosing Between validateUser and validateActor`: Space-level machine access; SpaceUser tokens when acting as a person.
 - **spoofedBy** `apps/api/src/middleware/auth/spoofMiddleware.ts`: record the original superadmin behind a spoofed request for audit
+- **spoofMiddleware** `apps/api/src/middleware/auth/spoofMiddleware.ts`: Runs last among auth so spoofing works with either token or session auth; records spoofedBy for audit.
+  - *Signs you're bypassing it:* a custom as-user query parameter or header that swaps the context user for support, outside the x-spoof-user-email path (docs/claude/AUTH.md § Spoof Middleware)
 - **validatePermission** `docs/claude/AUTH.md#Choosing Between validateUser and validateActor`: Org/Space token routes; validateUser/validateActor reject those tokens with 401.
   - *Signs you're bypassing it:* a handler that loads the resource itself and calls permix.check / throws 403 by hand on a route where resourceContextMiddleware + validatePermission(action) would do it (docs/claude/PERMISSIONS.md § Validation Middleware)
+- **validateSuperadmin** `#/middleware/validations/validateSuperadmin`: Platform-admin routes instead of ad-hoc isSuperadmin checks.
+  - *Signs you're bypassing it:* an admin handler that checks platformRole itself and throws 403, instead of mounting under the admin router with validateSuperadmin (catalog: apps/api/src/middleware/validations/validateSuperadmin.ts; docs/claude/AUTH.md § Validation Middleware)
 - **Auth middleware order** `apps/api/src/routes/api.ts`: When adding or reordering global middleware; public routes mount before tokenAuthMiddleware.
 - **Org and Space token routes skip user validators** `docs/claude/AUTH.md#Choosing Between validateUser and validateActor`: Routes callable by userless Organization/Space tokens (organizationCreateToken, spaceCreateToken).
 - **Validators run after auth** `docs/claude/AUTH.md#Validation Middleware`: Every route needing an authenticated caller, session-only, or superadmin access.
@@ -248,6 +248,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 - **LoginForm** `packages/ui/src/components/auth/LoginForm.tsx#LoginForm`: Full page with signup link: LoginPage; new accounts: SignupForm.
 - **SignupForm** `packages/ui/src/components/auth/SignupForm.tsx#SignupForm`: Full page with login link: SignupPage; existing accounts: LoginForm.
+- **Preserve redirectTo across login/signup** `docs/claude/FRONTEND/AUTH.md#Navigation Helpers`: guard sets redirectTo; login↔signup links preserve search so post-auth returns there
 - **Auth environment variables** `docs/claude/FRONTEND/AUTH.md#Security`: GitHub provider listed by platformProviders.ts only when set
 - **Auth UI components** `packages/ui/src/components/auth/`: render login, signup forms, divider and social provider buttons
 - **auth.initialize** `packages/ui/src/store/slices/auth.ts`: app boot only; refreshMe to re-hydrate later
@@ -261,6 +262,12 @@ Point at a class when that is as specific as the moment allows, or at a member. 
   - *Signs you're bypassing it:* a component calling client.signIn.email or lib/auth signIn, then fetching /me and setting store fields itself (docs/claude/FRONTEND/AUTH.md § Auth Slice; Unified Auth Method)
 - **auth.signUp** `packages/ui/src/store/slices/auth.ts`: from components instead of calling lib/auth/signUp directly
 - **authGuard** `packages/ui/src/guards/authGuard.ts`: appGuards for app-specific gating
+- **navigatePreserving** `packages/ui/src/store navigation.navigatePreserving`: in-app navigation; redirectPreservingContext inside beforeLoad guards
+- **navigateToLogin** `packages/ui/src/lib/routeRedirect.ts`: login↔signup links pass preserveSearch true to keep redirectTo
+  - *Signs you're bypassing it:* navigating to /login with a hand-built ?redirectTo= or dropping it when linking between login and signup (docs/claude/FRONTEND/AUTH.md § Navigation Helpers)
+- **navigateToSignup** `packages/ui/src/lib/routeRedirect.ts`: login↔signup links pass preserveSearch true to keep redirectTo
+- **redirectPreservingContext** `packages/ui/src/lib/routeRedirect.ts`: in route beforeLoad; navigatePreserving for imperative navigation
+  - *Signs you're bypassing it:* throw redirect({ to, search: { org, space, spoof } }) assembled by hand inside beforeLoad (docs/claude/FRONTEND/ROUTING_NAVIGATION.md § Guards)
 - **Run UI tests** `docs/claude/FRONTEND/AUTH.md#Testing`: run the packages/ui test suite including auth slice tests
 - **Spoof controls superadmin-only** `docs/claude/FRONTEND/AUTH.md#Security`: any UI exposing setSpoof
 - **Trusted origins from CORS allow-list** `docs/claude/FRONTEND/AUTH.md#Security`: configuring auth origins
@@ -289,7 +296,6 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **resolveUserByContact** `apps/api/src/lib/identity/resolveUserByContact.ts#resolveUserByContact`: find or create the user owning a contact type and value, returning user id
 - **apps/api/src/modules/me** `apps/api/src/modules/me`: Acting on the caller's own data; for org- or space-scoped resources use organization or space modules instead.
 - **apps/api/src/modules/user** `apps/api/src/modules/user`: Acting on another user by id; for the caller's own account use me module (meRedact).
-- **User redaction** `FEATURES.md > User Management > User Redaction / GDPR`: account deletion; never hard-delete users
 - *Also here, by name:* REDACTED (`packages/db/src/registries/redactFields.ts`); SENSITIVE_KEYS (`packages/db/src/registries/redactFields.ts`); assertUserEmailWritable (`apps/api/src/hooks/userEmail/hook.ts`); stubEmailDomain (`packages/shared/src/contact/stubEmail.ts`)
 
 ## 4. The specifics, in full

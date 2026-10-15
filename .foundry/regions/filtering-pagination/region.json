@@ -6,7 +6,7 @@
     "filtering-search",
     "pagination"
   ],
-  "tokens": 18865,
+  "tokens": 20202,
   "tokenMethod": "chars/4",
   "runsAgreed": 3,
   "sources": {
@@ -33,23 +33,29 @@
       "doc:docs/claude/FRONTEND/API_CLIENT.md#data-hooks"
     ],
     "catalogClusters": [
+      "app-events-side-effects",
+      "code-style-lint-checks",
+      "data-access-rules",
       "error-handling",
       "filtering-search-ordering",
       "frontend-navigation-context",
       "frontend-state-api-client",
       "json-rules-engine",
       "lenses-multi-source",
+      "locks-and-serialization",
       "naming-vocabulary",
       "pagination",
       "permission-rule-algebra",
       "request-context-access",
       "request-response-schemas",
+      "route-templates-controllers",
       "soft-delete-cascade",
       "superadmin-operations",
+      "testing-rules",
       "ui-components"
     ],
     "codeEntries": 72,
-    "docMembers": 40
+    "docMembers": 61
   },
   "bypassLines": 23,
   "glossaryTerms": 28

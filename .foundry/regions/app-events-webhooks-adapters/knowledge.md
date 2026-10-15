@@ -140,14 +140,18 @@ Point at a class when that is as specific as the moment allows, or at a member. 
   - *Signs you're bypassing it:* a controller or service calling the email sender, an SMS/analytics client, enqueue('sendEmail'), or sendToUser/sendToChannel directly after a write (docs/claude/APP_EVENTS.md § Purpose and execution; AI/ENTRYPOINT.md § 6 ("Business logic NEVER calls email, SMS, analytics, or notification services directly"))
 - **makeAppEvent** `apps/api/src/appEvents/makeAppEvent.ts#makeAppEvent`: Define handlers here; emit with emitAppEvent. Heavy or retryable work: enqueueJob from a cb instead of doing it inline.
   - *Signs you're bypassing it:* a hand-written handler that runs its side effects with a bare Promise.all (one failure cancels the rest) or does heavy/retryable work inline instead of enqueueing a job from a cb (docs/claude/APP_EVENTS.md § Purpose and execution; catalog makeAppEvent)
+- **Email send planner** `COMMUNICATIONS.md#planner-sendemail`: resolve ownership, hydrate recipients, create idempotent CommunicationLog per recipient, enqueue deliverEmail
 - **Inquiry event definitions per type** `apps/api/src/modules/inquiry/handlers/<type>/appEvents.ts`: inquiry-specific events; general business events go in apps/api/src/appEvents/handlers/ instead.
 - **Isolated settled side-effect tasks** `docs/claude/APP_EVENTS.md#Purpose and execution`: Independent side effects that may each open transactions or run inline jobs; sequential when ordering matters.
 - **Segment junction diff events** `reconcileSegment / reconcileCustomerRefSegments`: publish membership diffs as owner- and member-side events after reconcile
 - **App event channels** `apps/api/src/appEvents/channels/`: bridge app event handoffs to email and WebSocket delivery
 - **App event handler registry** `apps/api/src/appEvents/handlers/`: Registration alone doesn't prove a writer emits the event; verify an emit call exists.
+- **appendToStream** `APP_EVENTS.md#websocket-handoffs`: stream data, not messages; build handoffs with streamAppend
+  - *Signs you're bypassing it:* looping over sockets that hold a stream and sending append frames with a locally tracked counter (catalog appendToStream; docs/claude/WEBSOCKETS.md § Ordering)
 - **AppEventName** `apps/api/src/appEvents/handlers/index.ts`: enumerate valid event names typed against their payloads
 - **auditActorContext** `docs/claude/APP_EVENTS.md#Purpose and execution`: supply actor provenance stamped onto event envelopes
   - *Signs you're bypassing it:* threading the acting user id through function arguments so a write can be attributed, or setting the actor store directly (docs/claude/HOOKS.md § Audit Log › Actor Context)
+- **CommunicationLog** `COMMUNICATIONS.md#planner-sendemail`: record one idempotent delivery per recipient, reused across retries
 - **createSerializedQueue** `APP_EVENTS.md#websocket-handoffs`: in-process ordering; cross-process ownership needs a lock
   - *Signs you're bypassing it:* a module-level `let pending = Promise.resolve()` chain, a boolean busy flag, or an async-mutex dependency to order writes to one resource (docs/claude/CONCURRENCY.md § Serialized Queue (createSerializedQueue))
 - **db.onCommit** `docs/claude/APP_EVENTS.md#Purpose and execution`: Inside db.txn when work must only happen after commit; emitAppEvent uses it automatically.
@@ -156,17 +160,37 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **db.txn** `docs/claude/APP_EVENTS.md#Purpose and execution`: run writes in a transaction whose app events fire on commit
 - **deliverEmail** `apps/api/src/jobs/handlers/deliverEmail.ts`: actual delivery; planning belongs in sendEmail.
   - *Signs you're bypassing it:* enqueueJob('deliverEmail', …) from anywhere but the planner (catalog: deliverEmail (enqueued by sendEmail; do not enqueue 'deliverEmail' directly))
+- **email registry** `apps/api/src/lib/email/registry.ts`: define per-template entity lens, sender, recipient rules, data lens and render policy
+- **EmailHandoff** `docs/claude/APP_EVENTS.md#Handler and handoff contracts`: request a templated email with binding data from an event handler
 - **emit** `apps/api/src/appEvents/emit.ts`: emit typed app events with actor envelope, deferred until transaction commit
 - **observe** `apps/api/src/lib/observe.ts`: adapt app event outcomes into observation telemetry
 - **observeRegistry** `APP_EVENTS.md#observe-pipeline`: best-effort observation; not a durable retry queue (use jobs)
   - *Signs you're bypassing it:* writing AppEvent rows or event analytics logs by hand in a handler, or adding a per-handler observe selector (docs/claude/APP_EVENTS.md § Handler and handoff contracts ("no per-handler observe selector") and § Observe pipeline)
+- **refetch** `APP_EVENTS.md#websocket-handoffs`: invalidate a query; use streamAppend to push row-level changes
+  - *Signs you're bypassing it:* hand-built { category: 'query', action: 'refetch', key } objects in handlers (catalog refetch; docs/claude/WEBSOCKETS.md § Publishing a refetch)
+- **routeRow** `APP_EVENTS.md#websocket-handoffs`: parse an upsert row with the route's responseSchema exactly as its response
+  - *Signs you're bypassing it:* passing a raw Prisma row or hand-shaped object as an upsert payload instead of routeRow(route, value) (docs/claude/WEBSOCKETS.md § Data streams › Producing appends)
 - **sendEmail** `apps/api/src/jobs/handlers/sendEmail.ts`: planning recipients/template; actual provider send is deliverEmail.
   - *Signs you're bypassing it:* calling createResendClient(...).send / defaultEmailClient().send from business logic, or enqueuing sendEmail by hand with a recipient list, instead of emitting an app event with an EmailHandoff (docs/claude/COMMUNICATIONS.md § Send Pipeline (event-driven, two BullMQ jobs, never a direct client call; no caller-supplied recipients))
+- **sendToChannel** `APP_EVENTS.md#websocket-handoffs`: channel subscribers: sendToChannel; a specific user's sockets: sendToUser; data streams: appendToStream
+  - *Signs you're bypassing it:* business code iterating the connection registry or calling sendToChannelLocal/sendToUserLocal directly, so other instances never deliver (docs/claude/WEBSOCKETS.md § Frontend and horizontal scaling)
+- **sendToUser** `APP_EVENTS.md#websocket-handoffs`: per-user delivery; channel subscribers use sendToChannel
+- **STREAM_DEFINITIONS** `apps/api/src/appEvents/streamAppend.ts`: declare shared stream kinds (list/log), ops and audience
+- **streamAppend** `apps/api/src/appEvents/streamAppend.ts`: always for stream handoffs; refetch hints for query invalidation
+  - *Signs you're bypassing it:* an object literal { kind: 'stream', target: { stream }, append: { type, payload } } in a handler (the handoff type is branded, so it won't typecheck) (docs/claude/WEBSOCKETS.md § Data streams › Producing appends; docs/claude/APP_EVENTS.md § WebSocket handoffs ("Stream handoffs are never built by hand"))
+- **WS_CHANNELS** `APP_EVENTS.md#websocket-handoffs`: name websocket channels consistently for targeting and subscription
+  - *Signs you're bypassing it:* subscribing to or publishing on channel names that are not a registered family (docs/claude/WEBSOCKETS.md § Channel registry and authorization; § Publishing a refetch)
+- **WSHandoff** `docs/claude/APP_EVENTS.md#Handler and handoff contracts`: kind 'channels' for channel subscribers, 'users' for specific users, 'stream' to append to a data stream.
+  - *Signs you're bypassing it:* a hand-built { kind: 'stream', target, append } object in a handler instead of streamAppend(STREAM_DEFINITIONS.x, params, op, payload) (docs/claude/APP_EVENTS.md § WebSocket handoffs ("Stream handoffs are never built by hand"))
+- **Never hand-build stream handoffs** `APP_EVENTS.md#websocket-handoffs`: any app-event handoff to a data stream
+- **New payload kinds need consumer design** `APP_EVENTS.md#websocket-handoffs`: adding websocket payload kinds
+- **No recipients on email handoffs** `docs/claude/APP_EVENTS.md#Handler and handoff contracts`: Any event that sends email.
 - **No synchronous external calls in requests** `docs/claude/APP_EVENTS.md#Purpose and execution`: Any controller or write path that would otherwise call a provider inline.
   - *Signs you're bypassing it:* await fetch(providerUrl) or a provider SDK call inline in a controller or write path (docs/claude/APP_EVENTS.md § Purpose and execution ("Nothing synchronous hits an external service"))
 - **Observe registry receives every envelope** `docs/claude/APP_EVENTS.md#Handler and handoff contracts`: When adding analytics or observation of events.
 - **Register events in handlers index** `apps/api/src/appEvents/handlers/index.ts`: Whenever adding a new app event.
   - *Signs you're bypassing it:* emitting a free-form event string or payload type not declared in AppEventName and the handlers index (docs/claude/APP_EVENTS.md § Emitting and registering events)
+- **Shared stream appends match route response** `APP_EVENTS.md#websocket-handoffs`: shared stream definitions
 - **Side effects only through app events** `docs/claude/APP_EVENTS.md#Purpose and execution`: Any business write path that triggers email, SMS, analytics, notifications or WebSocket pushes.
 - **Side effects only via emitAppEvent** `CLAUDE.md §6 App Events & Side Effects`: Any business-logic side effect.
 - **Use shared handoff contracts for inquiry events** `docs/claude/APP_EVENTS.md#Inquiry events`: Any inquiry sent/resolved event definition.
@@ -190,15 +214,8 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **webhookUrlSchema** `apps/api/src/modules/webhookSubscription/schemas/webhookSubscriptionSchemas.ts#webhookUrlSchema`: Schema-level URL input checks; call validateWebhookUrl directly outside zod parsing.
   - *Signs you're bypassing it:* url: z.string().url() on a webhook subscription body (catalog webhookUrlSchema)
 - **apps/api/src/modules/webhookSubscription** `apps/api/src/modules/webhookSubscription`: Managing an existing subscription; creation goes through me/organization/space CreateWebhookSubscription endpoints.
-- **Webhook circuit breaker** `docs/claude/HOOKS.md > Webhooks > Circuit Breaker`: general delivery failures; repeated 400/422 for one record on integration subscriptions poisons the record instead
-  - *Signs you're bypassing it:* custom failure counters or flags that disable a subscription after repeated delivery failures (docs/claude/HOOKS.md § Webhooks, Circuit Breaker)
-- **Webhooks enqueued on commit** `docs/claude/COMMUNICATIONS.md#Webhooks`: send outbound webhooks via sendWebhook job after transaction commits
-- **Webhooks fire after commit via hooks** `FEATURES.md › Webhooks`: never send inline in the request or inside the transaction
-  - *Signs you're bypassing it:* sending a webhook inline in the request or inside the transaction (FEATURES.md › Webhooks (Event-Based Triggers))
 - **truncateWebhookSubscriptions** `packages/db/prisma/truncateWebhookSubscriptions.ts`: Already run by clone.sh; use standalone only on local/test DBs.
 - **webhooks** `apps/api/src/hooks/index.ts`: deliver outbound webhooks post-commit after mutations
-- **x-webhook-signature** `FEATURES.md › Webhooks`: sign timestamped webhook bodies with RSA-SHA256 for receiver verification
-  - *Signs you're bypassing it:* an HMAC with a per-subscription shared secret, or unsigned/untimestamped webhook bodies (FEATURES.md › Webhooks (RSA Signature Verification))
 - *Also here, by name:* WEBHOOK_NOOP_FIELDS (`packages/db/src/registries/redactFields.ts`); WebhookEventAction (`packages/db/prisma/schema/webhookEvent.prisma`); WebhookEventStatus (`packages/db/prisma/schema/webhookEvent.prisma`); WebhookModel (`packages/db/prisma/schema/webhookSubscription.prisma`); WebhookOwnerModel (`packages/db/prisma/schema/webhookSubscription.prisma`); WebhooksPage (`packages/ui/src/pages/WebhooksPage.tsx`); hostnameOf (`apps/api/src/lib/webhooks/validators/hostnameOf.ts`); isEnforcedEnvironment (`apps/api/src/lib/webhooks/validators/isEnforcedEnvironment.ts`); isPrivateAddress (`apps/api/src/lib/webhooks/validators/isPrivateAddress.ts`); webhookSubscriptionCreateBodySchema (`apps/api/src/modules/webhookSubscription/schemas/webhookSubscriptionSchemas.ts`); webhookSubscriptionReadResponseSchema (`apps/api/src/modules/webhookSubscription/schemas/webhookSubscriptionSchemas.ts`)
 
 ### Class `adapters`: Provider adapter modules: one interface over provider implementations (makeAdapterRouter/Registry)

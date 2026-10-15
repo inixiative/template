@@ -8,7 +8,7 @@
     "request-schemas",
     "api-modules"
   ],
-  "tokens": 14708,
+  "tokens": 14438,
   "tokenMethod": "chars/4",
   "runsAgreed": 2,
   "sources": {
@@ -51,7 +51,7 @@
       "testing-helpers"
     ],
     "codeEntries": 40,
-    "docMembers": 66
+    "docMembers": 61
   },
   "bypassLines": 24,
   "glossaryTerms": 28

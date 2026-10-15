@@ -115,7 +115,7 @@ A list route declares a filterLens: a LensNarrowing over lensFor(Model) whose pi
 
 Pick paginate() for numbered pages with totals (it appends an id desc tiebreaker), and cursorPaginate() with the keyset cursor helpers for large or live-changing lists and infinite scroll. On the frontend, makeDataConfig(operationId) reads searchable/orderable fields and enum filters from the OpenAPI spec (no hand-maintained field lists); useDataFilters holds the state; usePaginatedData drives page-numbered tables with Pagination, useInfiniteData with useInfiniteScrollTrigger drives load-more lists; buildFilterQuery and serializeBracketQuery produce the wire query.
 
-Not here: the lens engine itself and how non-root lens wheres fold into relations (json-rules-lenses: lensWhere, projectLens), soft-delete read scoping (the db client's extension in the database region), and the response envelope beyond pagination metadata (API routes). The rules-builder's useFilteredCollection is in-memory display filtering, not server filtering.
+Not here: the lens engine itself and how non-root lens wheres fold into relations (lenses / lens-usage: lensWhere, projectLens), soft-delete read scoping (the db client's extension in the database region), and the response envelope beyond pagination metadata (API routes). The rules-builder's useFilteredCollection is in-memory display filtering, not server filtering.
 
 ## 3. Everything that exists here, by class
 
@@ -161,16 +161,37 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **[:] literal segment** `docs/claude/API_ROUTES.md#Bracket Notation`: only null/true/false allowlisted; plain bracket values stay strings
 - **Admin bare lens** `docs/claude/API_ROUTES.md#Admin routes`: admin: true routes where superadmin skipFieldValidation bypasses picks
 - **Bracket searchFields filtering** `docs/claude/API_ROUTES.md#Search & Filtering`: Per-field filters; use search= for a broad term across searchable fields.
+- **Create-if-missing via fenced findForUpdate** `docs/claude/DATABASE.md#Row Locks and Create-If-Missing`: Any create-if-missing; never bare upsert or caught unique violation.
+  - *Signs you're bypassing it:* a bare prisma .upsert(, or find-then-create wrapped in try/catch on P2002 / a unique violation (docs/claude/DATABASE.md § Row Locks and Create-If-Missing; CI rule no-create-race-machinery)
+- **Lens where placement** `docs/claude/API_ROUTES.md#Lens Wheres`: Root to restrict list membership; relation-node per edge; mapDefaults once per model (as redactLens does).
+  - *Signs you're bypassing it:* A soft-delete or tenant scope put on root.where when it must hold wherever the model is reached (nested array rules then silently include out-of-scope rows), instead of a mapDefaults model where — or the reverse. (docs/claude/API_ROUTES.md § Lens Wheres; @inixiative/json-rules/docs/LENS.md §3, §12 ("silently producing wrong queries under nested array operators"))
 - **Lens-injected orderBy** `docs/claude/API_ROUTES.md > OrderBy`: Routes with filterLens; without a lens use orderByRequestSchema.
   - *Signs you're bypassing it:* Adding orderBy: orderByRequestSchema or a hand-written sortable-field enum to a route that already declares a filterLens. (docs/claude/API_ROUTES.md § OrderBy ("auto-injected... You don't add it manually"))
 - **Not-found via HTTPException** `docs/claude/API_ROUTES.md#Controllers`: throw HTTPException 404 in controllers when a record is missing
+- **Stable id tiebreaker ordering** `#/lib/prisma/paginate`: keep page results consistent by appending id desc to non-unique orderings
 - **admin** `#/lib/routeTemplates template args`: Superadmin-only endpoints, which also run soft-delete unscoped.
 - **c.get('bracketQuery')** `docs/claude/API_ROUTES.md > Bracket notation`: Use instead of re-parsing the URL in controllers or utilities.
   - *Signs you're bypassing it:* re-parsing c.req.url / URLSearchParams for filter[...] or sort[...] keys in a controller or utility (docs/claude/API_ROUTES.md > Bracket notation; docs/claude/CONTEXT.md § Context Access, bracketQuery)
+- **db.findForUpdate** `db.findForUpdate`: Row-level locking in a txn; pass upserting: true for create-if-missing; createLock alone for non-row critical sections.
+  - *Signs you're bypassing it:* a raw $queryRaw `SELECT … FOR UPDATE`, or a read-then-update in a transaction with no row lock (docs/claude/DATABASE.md § Row Locks and Create-If-Missing)
+- **db.onCommit** `db.onCommit`: Side effects that must only happen on success; db.onFinally for cleanup on commit or rollback.
+  - *Signs you're bypassing it:* sending email, calling an external API or enqueuing a job directly inside db.txn (so it fires even if the transaction rolls back), or a hand-built after-commit callback list (docs/claude/DATABASE.md § Transactions › After Commit Callbacks; FEATURES.md § Post-Commit Callbacks)
+- **db.onFinally** `db.onFinally`: Releasing resources regardless of outcome; db.onCommit for success-only side effects. Throws outside db.txn; nested txns register on outermost.
+- **db.txn** `db.txn`: Multi-write atomic units; single mutations are already auto-wrapped by mutationLifeCycle.
 - **filterLens** `#/lib/routeTemplates template args`: Controls filtering only; response shape is responseSchema.
+- **FindForUpdateLockTimeoutError** `db.findForUpdate`: signal the upsert fence lock was not acquired within waitMs, rolling back
 - **lensFor** `@template/db/lens`: anchor a filter lens to a Prisma model
-  - *Signs you're bypassing it:* Building a base lens or field list for a Prisma model by hand instead of lensFor('Model') narrowed with picks/relations. (catalog entry lensFor; docs/claude/API_ROUTES.md Route declaration (lens narrowing))
+- **lensWhere** `docs/claude/API_ROUTES.md#How pagination applies them`: Non-root clauses; root clauses use buildWhereClause.
+  - *Signs you're bypassing it:* Hand-ANDing a lens's relation wheres into the some / every / is branches of a composed Prisma where. (docs/claude/API_ROUTES.md § Lens Wheres › How pagination applies them)
+- **makeController** `makeController`: bind a handler to its route with a typed respond helper
+  - *Signs you're bypassing it:* plain async (c) => c.json(...) handlers registered on the router, with no responders and no response validation (docs/claude/API_ROUTES.md § Controllers; FEATURES.md § API Architecture & Routing (makeController))
 - **MAX_PATH_DEPTH** `apps/api/src/lib/prisma/pathNotation`: cap how many dot levels a field path may traverse (default 5)
+- **no-create-race-machinery** `no-create-race-machinery CI rule`: fail CI when a change adds bare upsert or unique-violation catches
+- **projectLens** `docs/claude/API_ROUTES.md#Lens Wheres`: merge node and mapDefaults wheres into per-path whereClauses before consumption
+- **readRoute** `readRoute`: declare a read/list route with model, pagination, schema and filters
+  - *Signs you're bypassing it:* a hand-built list route with its own page/pageSize/orderBy query schema, path string and response shape instead of readRoute({ many: true, paginate: true }) (docs/claude/API_ROUTES.md § Route Templates; catalog readRoute)
+- **redactLens** `docs/claude/API_ROUTES.md#Lens Wheres`: apply a model-wide condition wherever the model appears in a lens projection
+- **respond.ok** `docs/claude/API_ROUTES.md#Pagination`: send a success response wrapped in data, with optional metadata like pagination
 - **root.where** `filterLens.root.where`: route-wide filters; ctx-dependent filters use scopeNarrowing
 - **sanitizeKeys** `#/lib/routeTemplates template args`: Body contains fields clients must not set; immutable-on-update fields belong to immutable field enforcement.
   - *Signs you're bypassing it:* delete body.organizationId / destructuring client-unsettable keys out of c.req.valid('json') in the controller before Prisma (docs/claude/API_ROUTES.md § Route Templates, Template Args)
@@ -179,6 +200,8 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **searchPaths** `#/lib/prisma/paginate`: Lenses with to-many relation paths on large tables; empty array disables free-text search.
 - **skipFieldValidation** `buildWhereClause superadmin bypass`: let superadmins search any field, bypassing the lens whitelist
 - **toPrisma** `@inixiative/json-rules toPrisma`: translate lens Condition ASTs into Prisma where objects
+- **validateSuperadmin** `adminRouter`: superadmin endpoints only; other routes stay soft-delete scoped for every caller
+  - *Signs you're bypassing it:* an admin handler that checks platformRole itself and throws 403, instead of mounting under the admin router with validateSuperadmin (catalog: apps/api/src/middleware/validations/validateSuperadmin.ts; docs/claude/AUTH.md § Validation Middleware)
 - **WhereScope** `scopeNarrowing WhereScope type`: type the narrowing returned by scopeNarrowing callbacks
 - **enumOmits plus where** `docs/claude/API_ROUTES.md#Defense in depth`: whenever a route hides enum values from consumers
   - *Signs you're bypassing it:* Hiding enum values only in the SDK type (enumOmits) without a server root.where, or only server-side without the type narrowing. (docs/claude/API_ROUTES.md § Route declaration ("Defense in depth — enumOmits + where... Both are needed"))
@@ -189,6 +212,8 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **Indexed AND/OR groups for same-relation filters** `docs/claude/API_ROUTES.md#Search & Filtering`: Multiple conditions on the same relation; max 25 groups, max 10 nesting levels.
   - *Signs you're bypassing it:* Two un-indexed filters on the same relation (searchFields[posts][some][a]=..&searchFields[posts][some][b]=..) expecting two independent conditions; they merge into one. (docs/claude/API_ROUTES.md § Search & Filtering (Clause groups via AND / OR))
 - **Lens narrowing applies to superadmin** `docs/claude/API_ROUTES.md#How pagination applies them`: All paginated list queries using a lens.
+- **Mutations auto-wrapped in transactions** `mutationLifeCycle`: Always; use db.txn explicitly only when several writes must commit together.
+- **No bare upsert or unique-violation catch** `no-create-race-machinery CI rule`: Any create-if-missing logic; CI rule no-create-race-machinery enforces it.
 - **No hand-maintained filter field lists** `docs/claude/API_ROUTES.md#Data Config + Filters`: Any frontend list, table or filter UI.
   - *Signs you're bypassing it:* A frontend filter UI with a hard-coded array of filterable/sortable fields that drifts from the API. (docs/claude/API_ROUTES.md § Data Config + Filters)
 - **Reject non-whitelisted filter fields** `docs/claude/API_ROUTES.md > Relation Field Security`: All searchFields queries by non-superadmin users.
@@ -196,9 +221,17 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **Relations off unless enabled in filterLens** `docs/claude/API_ROUTES.md > Relation Field Security`: Every route that filters across relations.
 - **Relations only via relations** `docs/claude/API_ROUTES.md#Route declaration (lens narrowing)`: any route exposing relation filters; picks hold columns only
   - *Signs you're bypassing it:* Putting a relation name in filterLens picks, or adding relation filters ad hoc, instead of turning the relation on through relations. (docs/claude/API_ROUTES.md § Route declaration (lens narrowing) / Relation Field Security)
+- **Route operationId naming** `docs/claude/API_ROUTES.md#Naming Conventions`: Every API route operationId and controller name.
+  - *Signs you're bypassing it:* operationIds like `getUsers`, `createUserHandler` or `organizationReadManySpace` (singular ReadMany subresource) (docs/claude/API_ROUTES.md § Naming Conventions; docs/claude/NAMING.md › Backend › Files)
 - **searchPaths must subset the lens** `docs/claude/API_ROUTES.md#Search & Filtering`: Any route passing searchPaths to paginate().
 - **Soft-delete scope by endpoint** `docs/claude/API_ROUTES.md#How pagination applies them`: Any list or read query; admin router routes see deleted rows.
+- **Tests inspecting tombstones use db.withDeleted** `docs/claude/DATABASE.md > Soft-delete read scoping`: tests asserting tombstone state
+- **upserting where must be scalar equalities** `db.findForUpdate`: Whenever calling db.findForUpdate with upserting: true.
+  - *Signs you're bypassing it:* calling findForUpdate with upserting: true and an in / array / operator / null where (docs/claude/DATABASE.md § Row Locks and Create-If-Missing)
+- **Use paginate() for list endpoints** `docs/claude/API_ROUTES.md#paginate() Utility`: Every list endpoint; pass include for relations before reaching for explicit item types.
 - **Validate user-supplied field paths** `docs/claude/DATABASE.md > Path Notation Utilities`: dynamic orderBy, search fields or nested filters from query params
+- **Wrap responses in { data }** `docs/claude/API_ROUTES.md#Response Format`: All route responses; extra metadata goes in respond.ok's second argument.
+  - *Signs you're bypassing it:* controllers returning a bare object/array or a custom envelope ({ result }, { items, total }) (docs/claude/API_ROUTES.md § Response Format)
 - *Also here, by name:* ARRAY_FIELD_OPERATORS (`packages/shared/src/lib/bracketQuery/operators.ts`); BRACKET_NUMBER_SEGMENT (`packages/shared/src/lib/bracketQuery/symbols.ts`); BRACKET_SYMBOL_SEGMENT (`packages/shared/src/lib/bracketQuery/symbols.ts`); COMBINATOR_OPERATORS (`packages/shared/src/lib/bracketQuery/operators.ts`); JSON_FIELD_OPERATORS (`packages/shared/src/lib/bracketQuery/operators.ts`); RELATION_OPERATORS (`packages/shared/src/lib/bracketQuery/operators.ts`); SCALAR_FIELD_OPERATORS (`packages/shared/src/lib/bracketQuery/operators.ts`); bracketNumberToken (`packages/shared/src/lib/bracketQuery/symbols.ts`); bracketSymbolToken (`packages/shared/src/lib/bracketQuery/symbols.ts`); buildNestedPath (`apps/api/src/lib/prisma/pathNotation.ts`); buildSearchPath (`apps/api/src/lib/prisma/buildSearchPath.ts`); castBracketNumber (`packages/shared/src/lib/bracketQuery/symbols.ts`); castBracketSymbol (`packages/shared/src/lib/bracketQuery/symbols.ts`); dialect (`packages/db/src/lens/dialect.ts`); getDefaultOperator (`apps/api/src/lib/prisma/scalarOperators.ts`); isArrayFieldOperator (`packages/shared/src/lib/bracketQuery/operators.ts`); isBracketNumber (`packages/shared/src/lib/bracketQuery/symbols.ts`); isBracketSymbol (`packages/shared/src/lib/bracketQuery/symbols.ts`); isCombinator (`packages/shared/src/lib/bracketQuery/operators.ts`); isRelationOperator (`packages/shared/src/lib/bracketQuery/operators.ts`); jsonFilterSchema (`apps/api/src/lib/routeTemplates/filters/filterComponents.ts`); leafFilterSchema (`apps/api/src/lib/routeTemplates/filters/filterComponents.ts`); parseOrderByStrings (`packages/ui/src/lib/dataStatePersistence.ts`); simpleSearchSchema (`apps/api/src/lib/routeTemplates/searchSchema.ts`)
 
 ### Class `pagination`: Offset and cursor pagination: paginate(), response metadata, pagination hooks
@@ -226,7 +259,6 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **Data hooks layering** `docs/claude/FRONTEND/API_CLIENT.md#Architecture`: Any list, table, grid or feed of server data; hooks are renderer-agnostic.
 - **List state persistence** `docs/claude/FRONTEND/API_CLIENT.md#State Persistence`: Use shareableUrl only for linkable views; default history.state for back/forward.
   - *Signs you're bypassing it:* hand-written URLSearchParams/history.replaceState code to remember a list's filters, sort and page (docs/claude/FRONTEND/API_CLIENT.md § State Persistence; catalog entries readInitialState, writeToHistoryState, writeToHistoryStateAndUrl)
-- **Stable id tiebreaker ordering** `#/lib/prisma/paginate`: keep page results consistent by appending id desc to non-unique orderings
 - **Table** `packages/ui/src/components/primitives/Table.tsx`: Tabular data; pass pagination or infiniteScroll, never both.
 - **useScrollState** `packages/ui/src/hooks/useScrollState.ts`: Custom scroll containers; data hooks already apply it via sectionId.
 - **useSectionHash** `packages/ui/src/hooks/useSectionHash.ts`: sync URL hash with most visible data-section and scroll to deep links
@@ -234,7 +266,6 @@ Point at a class when that is as specific as the moment allows, or at a member. 
   - *Signs you're bypassing it:* useState for a modal or collapsible that should survive reload or be deep-linkable, or hand-writing window.location.hash (catalog entry useSectionOpen)
 - **camelCase section IDs** `docs/claude/FRONTEND/API_CLIENT.md#Section Hash — useSectionHash`: Every data-section or sectionId value.
 - **Mount useSectionHash once at app root** `docs/claude/FRONTEND/API_CLIENT.md#Section Hash — useSectionHash`: Any section-hash navigation.
-- **Use paginate() for list endpoints** `docs/claude/API_ROUTES.md#paginate() Utility`: Every list endpoint; pass include for relations before reaching for explicit item types.
 - *Also here, by name:* assertChainMatches (`apps/api/src/lib/prisma/keysetCursor.ts`); assertFilterMatches (`apps/api/src/lib/prisma/keysetCursor.ts`); buildPageRange (`packages/ui/src/components/primitives/Pagination.tsx`); cursorPaginateResponseSchema (`apps/api/src/lib/routeTemplates/paginationSchemas.ts`); hydrateCursorValues (`apps/api/src/lib/prisma/keysetCursor.ts`); locateItemInPages (`packages/ui/src/hooks/useInfiniteDataQuery.ts`); paginateResponseSchema (`apps/api/src/lib/routeTemplates/paginationSchemas.ts`); withTotalOrder (`apps/api/src/lib/prisma/paginate.ts`)
 
 ## 4. The specifics, in full

@@ -8,7 +8,7 @@
     "messaging",
     "contacts"
   ],
-  "tokens": 19386,
+  "tokens": 18730,
   "tokenMethod": "chars/4",
   "runsAgreed": 3,
   "sources": {
@@ -38,26 +38,31 @@
       "authentication-methods",
       "build-deploy-ci",
       "contact-channel-definitions",
+      "customers-providers",
       "data-access-rules",
       "data-models",
       "email-composition-rendering",
       "email-delivery-senders",
+      "frontend-state-api-client",
       "immutable-fields",
       "lenses-multi-source",
       "locks-and-serialization",
       "messaging-channels-adapters",
       "mutation-hooks",
       "ordered-lists",
+      "outbound-webhooks",
       "permission-rule-algebra",
       "rate-limiting",
       "request-response-schemas",
       "roles-and-permissions",
       "route-templates-controllers",
       "rule-references-registry",
-      "ui-components"
+      "segments-membership",
+      "ui-components",
+      "user-identity-management"
     ],
     "codeEntries": 98,
-    "docMembers": 70
+    "docMembers": 60
   },
   "bypassLines": 23,
   "glossaryTerms": 30

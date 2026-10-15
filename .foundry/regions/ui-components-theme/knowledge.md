@@ -209,8 +209,6 @@ Point at a class when that is as specific as the moment allows, or at a member. 
   - *Signs you're bypassing it:* conditional rendering wrappers around Card, Table, Avatar or EmptyState instead of their show prop (docs/claude/FRONTEND/COMPONENTS.md § Standard Conditional Props)
 - **Table + Pagination** `Table, Pagination`: Fixed pages via usePaginatedData; infinite scroll via useInfiniteData.
   - *Signs you're bypassing it:* a hand-built table with its own page-number buttons, IntersectionObserver load-more or page state (FEATURES.md § UI Components (Table + Pagination); docs/claude/FRONTEND/COMPONENTS.md § Table)
-- **useDebounce** `FEATURES.md › Frontend Hooks`: delay rapidly changing values to avoid excessive API calls
-  - *Signs you're bypassing it:* a setTimeout/clearTimeout pair in a useEffect to delay a search or fetch-triggering input (docs/claude/FRONTEND/API_CLIENT.md § Form Helpers (useDebounce))
 - **useInfiniteDataQuery** `IntegrationsPage`: Lists that overflow one page (e.g. 100-item buckets); useQuery for bounded lists.
 - **useInfiniteScrollTrigger** `IntegrationsPage`: load the next page when the list end scrolls into view
   - *Signs you're bypassing it:* A hand-written IntersectionObserver sentinel or scroll listener to trigger loading the next page. (docs/claude/FRONTEND/API_CLIENT.md § Infinite Scroll Trigger)

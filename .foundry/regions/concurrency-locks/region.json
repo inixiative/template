@@ -9,7 +9,7 @@
     "recurring-timers",
     "debounce"
   ],
-  "tokens": 9328,
+  "tokens": 9065,
   "tokenMethod": "chars/4",
   "runsAgreed": 2,
   "sources": {
@@ -40,7 +40,7 @@
       "websocket-realtime-delivery"
     ],
     "codeEntries": 37,
-    "docMembers": 21
+    "docMembers": 18
   },
   "bypassLines": 18,
   "glossaryTerms": 28

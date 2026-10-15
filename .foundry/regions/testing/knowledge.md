@@ -163,7 +163,6 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **bun run lint** `FEATURES.md > Linting & Formatting`: run Biome plus custom import, generated-file checks across all packages
 - **bun test** `docs Testing`: from apps/api it injects .env.test via with-env.sh; pass path for specific tests
 - **check-generated-files.sh** `FEATURES.md > Custom Lint Checks`: fail lint when Prisma or OpenAPI SDK outputs are stale
-  - *Signs you're bypassing it:* committing a schema or route change without regenerating, or hand-editing the Prisma client or OpenAPI SDK (scripts/lint/check-generated-files.sh; FEATURES.md › Custom Lint Checks)
 - **clearReceivedWebhooks** `FEATURES.md > Testing & Quality`: reset captured test webhook payloads between tests
 - **create*() / build*() factories** `FEATURES.md > Testing & Quality`: create* when the DB row is needed; build* for in-memory data only.
 - **db:generate** `FEATURES.md > Prisma + Zod Generation`: After schema changes; generate:sdk for route changes instead.
@@ -178,8 +177,9 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **readRoute / createRoute / updateRoute** `FEATURES.md > Route Templates`: Standard CRUD endpoints; hand-defined route only for custom actions.
 - **receivedWebhooks** `FEATURES.md > Testing & Quality (POST /test/webhook)`: capture webhook deliveries in tests to assert payload, headers and signatures
 - **requireAuth** `FEATURES.md > Route Guards`: redirect unauthenticated users while preserving navigation context
-  - *Signs you're bypassing it:* a route beforeLoad that checks the token itself and throws redirect('/login') (docs/claude/FRONTEND/AUTH.md § Guards)
 - **run-ci-rules.sh** `scripts/ci/run-ci-rules.sh`: execute CI rule scripts alphabetically, or self-test them against fixtures
+  - *Signs you're bypassing it:* a new rule script under scripts/ci/rules with no pass/fail cases in scripts/ci/rule-violations, or a fixture edited so a failing rule passes (docs/claude/SCRIPTS.md § CI Rule Scripts; AI/ENTRYPOINT.md § 0.0 Critical Guardrails)
+- **useAppEvents** `FEATURES.md › Frontend Hooks`: Generic event reactions; for query refetch on event use useEventRefetch.
 - **useAuthenticatedRouting** `FEATURES.md › Frontend Hooks`: Call once at root; per-component permission checks use usePermission instead.
   - *Signs you're bypassing it:* hand-parsing ?org= / ?space= search params in a page or layout and calling tenant setters from a useEffect (catalog entry useAuthenticatedRouting (don't hand-parse org/space search params); docs/claude/APPS.md § Context Switching)
 - **useAuthProviders** `FEATURES.md › Frontend Hooks`: Rendering OAuth/SSO/password options on login/signup; full flow handling uses useAuthStrategy.
@@ -187,20 +187,31 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **useAuthStrategy** `FEATURES.md › Frontend Hooks`: Managing the login flow; just fetching configured providers for buttons uses useAuthProviders.
 - **useBreadcrumbs** `FEATURES.md › Frontend Hooks`: build breadcrumb label/path trail from current route and navigation config
   - *Signs you're bypassing it:* a hand-built breadcrumb array per page instead of breadcrumbLabel on the NavItem (catalog entry useBreadcrumbs; docs/claude/FRONTEND/ROUTING_NAVIGATION.md § What the Nav Config Drives)
+- **useDarkMode** `FEATURES.md › Frontend Hooks`: Global theme mode; per-space theming via useSpaceTheme is mock-only.
+  - *Signs you're bypassing it:* toggling document.documentElement.classList 'dark' or reading prefers-color-scheme by hand (docs/claude/FRONTEND/THEME_LAYOUT.md § Hooks)
+- **useDebounce** `FEATURES.md › Frontend Hooks`: delay rapidly changing values to avoid excessive API calls
+- **useEventRefetch** `FEATURES.md › Frontend Hooks`: Cross-component invalidation without prop drilling; pair with useAppEvents emitters. Same-list mutations use useOptimisticMutation.
+  - *Signs you're bypassing it:* prop-drilled refetch callbacks or a shared flag in state to make another component's list refetch after a modal creates a record (FEATURES.md § Frontend Hooks (useEventRefetch, useAppEvents))
 - **useInfiniteData** `FEATURES.md > Data Config Builder`: Infinite scroll lists; usePaginatedData for paged tables.
   - *Signs you're bypassing it:* Wiring TanStack useInfiniteQuery plus filter state and scroll restore by hand for a load-more list. (docs/claude/FRONTEND/API_CLIENT.md § Data Hooks › useInfiniteData)
+- **useLanguage** `FEATURES.md › Frontend Hooks`: read and set current locale from the Zustand ui slice
+- **useMediaQuery** `FEATURES.md › Frontend Hooks`: return SSR-safe boolean for a media query match
+- **useOptimisticMutation** `FEATURES.md › Frontend Hooks`: List create/update/delete needing instant UI; cross-component refresh after unrelated actions uses useEventRefetch.
+  - *Signs you're bypassing it:* a raw useMutation with hand-written onMutate setQueryData, snapshot/rollback in onError and invalidateQueries in onSettled for a list (docs/claude/FRONTEND/API_CLIENT.md § Optimistic Mutations; catalog entry useOptimisticMutation)
 - **usePageMeta** `FEATURES.md › Frontend Hooks`: set document title and meta description for the current page
   - *Signs you're bypassing it:* setting document.title in a page useEffect instead of a title on the nav item (docs/claude/FRONTEND/ROUTING_NAVIGATION.md § What the Nav Config Drives (Page meta))
 - **usePaginatedData** `FEATURES.md > Data Config Builder`: Paged tables; useInfiniteData for infinite scroll lists.
   - *Signs you're bypassing it:* A table component managing page, pageSize, search and orderBy in local useState, syncing the URL and restoring scroll by hand. (docs/claude/FRONTEND/API_CLIENT.md § Data Hooks › usePaginatedData)
 - **usePermission** `FEATURES.md › Frontend Hooks`: return whether current user holds a permission in current org/space context
   - *Signs you're bypassing it:* a component that compares user.role or membership.role === 'owner' to show or disable a control (docs/claude/PERMISSIONS.md § Frontend Checks)
+- **useSpaceTheme** `FEATURES.md › Frontend Hooks`: Not wired to real data yet; use useDarkMode for working theme control.
+- **useValidateUniqueness** `FEATURES.md › Frontend Hooks`: debounce form input and check field uniqueness against the API
+  - *Signs you're bypassing it:* a hand-written SDK read or fetch in a form effect to check whether a slug or name is already taken (docs/claude/FRONTEND/API_CLIENT.md § Form Helpers (useValidateUniqueness); CreateOrganizationModal)
 - **Init task tests with VCR** `docs/claude/INIT_SCRIPT_PATTERNS.md > Current implementation notes`: Testing init tasks that call external providers.
 - **Never hand-write validation schemas** `FEATURES.md > Prisma + Zod Generation`: Any request input or model response schema.
 - **No Jest or Vitest** `scripts/ci/rules/no-jest.sh, no-vitest.sh`: All test files and package dependencies.
   - *Signs you're bypassing it:* importing from jest, vitest or @jest/globals, jest.fn(), vi.mock(), or adding them as dependencies (scripts/ci/rules/no-jest.sh, no-vitest.sh (CI rules))
 - **Path aliases over relative imports** `FEATURES.md > Development Workflow`: All imports in every package; enforced by check-import-aliases.sh.
-- **Run frontend UI tests** `docs/claude/FRONTEND/API_CLIENT.md#Testing`: Running frontend/UI hook and component tests.
 - **Strict TypeScript, no any** `FEATURES.md > Type Safety & Code Generation`: All application code across packages.
   - *Signs you're bypassing it:* `: any`, `as any`, or `as unknown as T` to silence the compiler (FEATURES.md › Type Safety & Code Generation; CLAUDE.md §7)
 - **UI tests use serialized factories** `scripts/ci/rules/ui-serialized-factories.sh`: Frontend/UI tests using factory data.

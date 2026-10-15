@@ -1,11 +1,11 @@
 {
   "id": "init-script",
-  "title": "Init provisioning TUI",
-  "routing": "Is this about the `bun run init` Ink TUI under init/: its views (ConfigProvider/useConfig, viewState, OrgSelector, prompt()), its task functions (markComplete, isProgressComplete, syncConfig callbacks), project.config.ts / getProjectConfig, provider clients in init/api (Infisical, Railway, PlanetScale, Vercel; execAsync, getSecret/setSecret, retryWithTimeout), idempotent provisioning and resume, or the init VCR resume tests?",
+  "title": "Init provisioning script",
+  "routing": "Is this about provisioning a forked project's cloud resources with the init script under init/: the interactive Ink TUI (`bun run init`, init/index.tsx: views, ConfigProvider/useConfig, viewState, OrgSelector, prompt()) or the headless section runner (`bun run init:agent`, init/agent.ts, `--section=project|infisical|planetscale|railway|monitoring`), task functions in init/tasks (markComplete / isComplete progress flags, syncConfig callbacks), project.config.ts / getProjectConfig, provider clients in init/api (Infisical, Railway, PlanetScale, Vercel, Resend, Cloudflare; execAsync, getSecretAsync/setSecretAsync, retryWithTimeout), idempotent provisioning and resume, or the init VCR resume tests?",
   "concepts": [
     "init-script"
   ],
-  "tokens": 15456,
+  "tokens": 17025,
   "tokenMethod": "chars/4",
   "runsAgreed": 3,
   "sources": {
@@ -50,6 +50,6 @@
     "codeEntries": 0,
     "docMembers": 63
   },
-  "bypassLines": 0,
-  "glossaryTerms": 25
+  "bypassLines": 21,
+  "glossaryTerms": 29
 }

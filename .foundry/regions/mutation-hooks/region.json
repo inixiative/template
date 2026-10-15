@@ -9,7 +9,7 @@
     "immutable-fields",
     "ordered-lists"
   ],
-  "tokens": 17014,
+  "tokens": 17321,
   "tokenMethod": "chars/4",
   "runsAgreed": 3,
   "sources": {
@@ -33,22 +33,19 @@
       "doc:docs/claude/HOOKS.md#ordered-list"
     ],
     "catalogClusters": [
-      "app-events-side-effects",
       "audit-logging",
       "caching-and-invalidation",
-      "code-style-lint-checks",
       "data-access-rules",
-      "error-handling",
+      "data-models",
       "immutable-fields",
       "mutation-hooks",
       "ordered-lists",
+      "outbound-webhooks",
       "rule-references-registry",
-      "soft-delete-cascade",
-      "superadmin-operations",
-      "testing-rules"
+      "soft-delete-cascade"
     ],
     "codeEntries": 86,
-    "docMembers": 52
+    "docMembers": 56
   },
   "bypassLines": 27,
   "glossaryTerms": 30

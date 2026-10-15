@@ -7,7 +7,7 @@
     "errors",
     "batch"
   ],
-  "tokens": 21480,
+  "tokens": 21581,
   "tokenMethod": "chars/4",
   "runsAgreed": 2,
   "sources": {
@@ -49,8 +49,10 @@
     "catalogClusters": [
       "auth-middleware-validation",
       "batch-request-execution",
+      "data-access-rules",
       "error-handling",
       "filtering-search-ordering",
+      "job-definition-and-enqueue",
       "lenses-multi-source",
       "module-layout-monorepo",
       "pagination",
@@ -64,7 +66,7 @@
       "user-identity-management"
     ],
     "codeEntries": 49,
-    "docMembers": 72
+    "docMembers": 74
   },
   "bypassLines": 26,
   "glossaryTerms": 30

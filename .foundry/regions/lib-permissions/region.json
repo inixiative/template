@@ -1,0 +1,39 @@
+{
+  "id": "lib-permissions",
+  "title": "Permissions library (ReBAC engine)",
+  "routing": "Is this about the @inixiative/permissions library itself: ActionRule algebra (string delegation, { rel, action } walks, { self }, abac { rule }, any/all, null), RebacSchema and bridges, createRebacCheck / check, createPermissions / permix (setup, setUserId, PermixLike), createHydrator and the injected relation resolver, permissionRules row overrides, or actionRuleSchema validation?",
+  "concepts": [
+    "lib-permissions"
+  ],
+  "tokens": 6578,
+  "tokenMethod": "chars/4",
+  "runsAgreed": 0,
+  "sources": {
+    "docs": [
+      "@inixiative/permissions/README.md"
+    ],
+    "docUnits": [
+      "doc:@inixiative/permissions/README.md#preface",
+      "doc:@inixiative/permissions/README.md#permission-algebra-actionrule",
+      "doc:@inixiative/permissions/README.md#writing-a-schema",
+      "doc:@inixiative/permissions/README.md#the-check-engine",
+      "doc:@inixiative/permissions/README.md#bridges-cross-source-rel-walks",
+      "doc:@inixiative/permissions/README.md#the-permix-wrapper",
+      "doc:@inixiative/permissions/README.md#hydration-prisma-example",
+      "doc:@inixiative/permissions/README.md#also-exported",
+      "doc:@inixiative/permissions/README.md#boundary",
+      "doc:@inixiative/permissions/README.md#license"
+    ],
+    "catalogClusters": [
+      "caching-and-invalidation",
+      "module-layout-monorepo",
+      "permission-rule-algebra",
+      "prisma-schema-introspection",
+      "roles-and-permissions"
+    ],
+    "codeEntries": 5,
+    "docMembers": 17
+  },
+  "bypassLines": 11,
+  "glossaryTerms": 27
+}

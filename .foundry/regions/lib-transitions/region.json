@@ -1,0 +1,32 @@
+{
+  "id": "lib-transitions",
+  "title": "Transitions library (lifecycle guards)",
+  "routing": "Is this about the @inixiative/transitions library: guarding a status or lifecycle change with checkTransition / checkPath, listing allowed actions with available, querying every eligible record with eligible + executePrismaPlan, an Action / Transition / Side with from/to predicates and per-side permission, createAuthorize, merge strategies (spread, deepMerge, append), Reason / describe, or validateTransition for tenant-configured lifecycles?",
+  "concepts": [
+    "lib-transitions"
+  ],
+  "tokens": 4722,
+  "tokenMethod": "chars/4",
+  "runsAgreed": 0,
+  "sources": {
+    "docs": [
+      "@inixiative/transitions/README.md"
+    ],
+    "docUnits": [
+      "doc:@inixiative/transitions/README.md#preface",
+      "doc:@inixiative/transitions/README.md#model",
+      "doc:@inixiative/transitions/README.md#check",
+      "doc:@inixiative/transitions/README.md#permissions-are-injected-the-seam",
+      "doc:@inixiative/transitions/README.md#affordance-set-query",
+      "doc:@inixiative/transitions/README.md#merge-strategies",
+      "doc:@inixiative/transitions/README.md#authoring-validation",
+      "doc:@inixiative/transitions/README.md#not-built-yet-designed-see-the-plan",
+      "doc:@inixiative/transitions/README.md#license"
+    ],
+    "catalogClusters": [],
+    "codeEntries": 0,
+    "docMembers": 0
+  },
+  "bypassLines": 0,
+  "glossaryTerms": 23
+}

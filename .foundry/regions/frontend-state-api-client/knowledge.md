@@ -219,32 +219,24 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **Derived debounced slug field** `CreateOrganizationModal`: Create forms with a user-editable slug derived from a name.
 - **Uniqueness check via lookup 404** `packages/ui/src/hooks/useValidateUniqueness.ts`: Validating unique slugs/names before create or edit; exclude the current record's id when editing.
 - **@template/sdk** `packages/sdk/src/`: Always over hand-written fetches to apps/api; usable by non-UI consumers without importing @template/ui.
+  - *Signs you're bypassing it:* hand-written fetch('/api/...') calls and response types in frontend code instead of the generated SDK functions (docs/claude/MONOREPO.md › @template/sdk; catalog @template/sdk)
 - **bracketQuery** `@template/shared/bracketQuery`: encode nested filter/query params into bracket notation for API requests
 - **fetchAndHydrateMe** `docs/claude/FRONTEND/AUTH.md → Architecture`: load user, orgs, spaces and memberships into the store, then set up permissions
   - *Signs you're bypassing it:* fetching /me and populating user, organizations, spaces and permissions manually (docs/claude/FRONTEND/AUTH.md § Architecture)
-- **Generated SDK** `FEATURES.md › Type-Safe SDK Generation`: all frontend API calls; never hand-write API clients
-  - *Signs you're bypassing it:* a hand-written API client module, typed fetch helpers or duplicated request/response types for apps/api endpoints (FEATURES.md › Type-Safe SDK Generation (never hand-write API clients); docs/claude/FRONTEND/API_CLIENT.md § Generated SDK)
 - **Generated SDK client** `packages/sdk/src/`: Calling the API from the frontend; prefer over hand-written fetches.
 - **serializeBracketQuery** `packages/ui/src/lib/apiFetchInternal.ts`: bracket-encode nested query params for API requests
   - *Signs you're bypassing it:* String-concatenating `searchFields[x][contains]=` query strings by hand. (catalog entry serializeBracketQuery)
 - **setFlowId** `packages/ui store navigation.flowId`: only the id in store; flow data via useActiveFlow
-- **useAppEvents** `FEATURES.md › Frontend Hooks`: Generic event reactions; for query refetch on event use useEventRefetch.
-- **useDarkMode** `FEATURES.md › Frontend Hooks`: Global theme mode; per-space theming via useSpaceTheme is mock-only.
-  - *Signs you're bypassing it:* toggling document.documentElement.classList 'dark' or reading prefers-color-scheme by hand (docs/claude/FRONTEND/THEME_LAYOUT.md § Hooks)
 - **useDebounce** `packages/ui/src/hooks/useDebounce.ts`: Debouncing a value; to debounce a function call use useDebouncedCallback instead.
   - *Signs you're bypassing it:* setTimeout/clearTimeout in a useEffect to delay a value, or a lodash debounce, before a network search; or debouncing in-memory filtering (docs/claude/FRONTEND/API_CLIENT.md § Form Helpers (useDebounce: debounce only backend-hitting inputs))
 - **useDebouncedCallback** `packages/ui/src/hooks/useDebounce.ts`: Debouncing an action or setter; to debounce a value use useDebounce instead.
   - *Signs you're bypassing it:* a useRef-held timer wrapping a setter or action to debounce it, with manual cancel on unmount (docs/claude/FRONTEND/API_CLIENT.md § Form Helpers (useDebounce))
-- **useEventRefetch** `FEATURES.md › Frontend Hooks`: Cross-component invalidation without prop drilling; pair with useAppEvents emitters. Same-list mutations use useOptimisticMutation.
-  - *Signs you're bypassing it:* prop-drilled refetch callbacks or a shared flag in state to make another component's list refetch after a modal creates a record (FEATURES.md § Frontend Hooks (useEventRefetch, useAppEvents))
-- **useLanguage** `FEATURES.md › Frontend Hooks`: read and set current locale from the Zustand ui slice
-- **useSpaceTheme** `FEATURES.md › Frontend Hooks`: Not wired to real data yet; use useDarkMode for working theme control.
 - **Context queries throw for missing contexts** `docs/claude/FRONTEND/API_CLIENT.md#Context Queries`: Any makeContextQueries map.
 - **Data hook tests colocated** `docs/claude/FRONTEND/API_CLIENT.md#Testing`: Adding or changing frontend data hooks or API client lib files.
 - **Debounce only backend-hitting inputs** `docs/claude/FRONTEND/API_CLIENT.md#useDebounce`: Network search or fetch-triggering fields; local filtering of loaded data stays undebounced.
   - *Signs you're bypassing it:* debouncing a local filter over an already-loaded list (docs/claude/FRONTEND/API_CLIENT.md § useDebounce)
-- **Page enables only its own query** `FEATURES.md › Segments › Nested Navigation`: sibling pages under nested navigation
 - **Pair apiQuery with the generated query key** `docs/claude/FRONTEND/API_CLIENT.md#apiQuery and apiMutation`: Every useQuery built with apiQuery.
+- **Run frontend UI tests** `docs/claude/FRONTEND/API_CLIENT.md#Testing`: Running frontend/UI hook and component tests.
 - **Use the generated SDK, not hand fetches** `docs/claude/FRONTEND/API_CLIENT.md#Generated SDK`: Any frontend or non-UI code calling apps/api.
 - *Also here, by name:* apiFetchInternal (`packages/ui/src/lib/apiFetchInternal.ts`); emailRuleSurfaceQueryKey (`packages/ui/src/hooks/email/useEmailRuleSurface.ts`); mutation (`packages/ui/src/lib/makeContextQueries.ts`); query (`packages/ui/src/lib/makeContextQueries.ts`); readStateFromUrl (`packages/ui/src/lib/dataStatePersistence.ts`); segmentContextQueries (`packages/ui/src/lib/segmentContextQueries.ts`); syncStateToUrl (`packages/ui/src/lib/dataStatePersistence.ts`); tokenContextQueries (`packages/ui/src/lib/tokenContextQueries.ts`); useThemePersistence (`packages/ui/src/hooks/useThemePersistence.ts`); webhookContextQueries (`packages/ui/src/lib/webhookContextQueries.ts`)
 

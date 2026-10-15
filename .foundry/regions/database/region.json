@@ -10,7 +10,7 @@
     "db-scripts",
     "seeding"
   ],
-  "tokens": 22906,
+  "tokens": 24224,
   "tokenMethod": "chars/4",
   "runsAgreed": 3,
   "sources": {
@@ -50,25 +50,30 @@
       "dev-setup-scripts",
       "documentation-process",
       "email-composition-rendering",
+      "encryption-key-rotation",
       "frontend-navigation-context",
       "frontend-state-api-client",
       "guided-flows",
       "integrations-records",
+      "job-definition-and-enqueue",
       "locks-and-serialization",
       "module-layout-monorepo",
+      "multi-tenancy-membership",
       "mutation-hooks",
       "naming-vocabulary",
       "outbound-webhooks",
+      "permission-rule-algebra",
       "prisma-schema-introspection",
       "request-context-access",
       "request-response-schemas",
+      "roles-and-permissions",
       "seeding-data",
       "segments-membership",
       "superadmin-operations",
       "testing-helpers"
     ],
     "codeEntries": 159,
-    "docMembers": 80
+    "docMembers": 100
   },
   "bypassLines": 30,
   "glossaryTerms": 30

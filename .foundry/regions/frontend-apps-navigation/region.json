@@ -6,7 +6,7 @@
     "frontend-routing",
     "navigation"
   ],
-  "tokens": 17596,
+  "tokens": 17603,
   "tokenMethod": "chars/4",
   "runsAgreed": 3,
   "sources": {
@@ -49,7 +49,7 @@
       "ui-components"
     ],
     "codeEntries": 102,
-    "docMembers": 56
+    "docMembers": 55
   },
   "bypassLines": 25,
   "glossaryTerms": 28

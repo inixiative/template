@@ -220,11 +220,9 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **Cross-instance delivery via Redis ws:broadcast** `apps/api/src/ws/`: fan out websocket publishes through Redis to each instance's local registry
 - **Cross-server WebSocket broadcast** `docs/claude/REDIS.md#WebSocket Pub/Sub`: fan out WS messages across servers via the ws:broadcast pub/sub channel
 - **Data stream** `docs/claude/WEBSOCKETS.md#Contract`: token streaming, activity feeds, progress logs where refetch per change is too costly; else channels
-- **Live query recovery** `FEATURES.md — Refetch and Recovery`: Hints are not persisted; don't rely on delivery while disconnected.
 - **Per-key serialized publish queue** `apps/api/src/ws/streamPublishOrder.ts`: In-process ordering only; Redis orders across instances.
 - **Publishing a realtime refetch** `docs/claude/WEBSOCKETS.md — Publishing a refetch`: Channel subscribers: register family in WS_CHANNELS; per-user membership changes: target user IDs instead.
 - **Query-refetch hint** `docs/claude/WEBSOCKETS.md#Contract`: default; use a data stream only for incremental high-frequency data
-- **Redis pub/sub fan-out** `FEATURES.md — Redis Pub/Sub`: deliver channel and user-targeted messages across API instances, local fallback on failure
 - **Removal tombstones and revive** `docs/claude/WEBSOCKETS.md#ordering`: Use revive only for genuine restores of removed rows.
   - *Signs you're bypassing it:* setting revive on ordinary upserts, or client code that clears removed ids so late upserts resurrect rows (docs/claude/WEBSOCKETS.md § Data streams › Ordering)
 - **Seq gap triggers resync** `docs/claude/WEBSOCKETS.md#Sequence numbers`: drop stale appends, apply next seq, resync on a gap via websocket.resync
@@ -232,7 +230,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **Snapshot-then-held-appends ordering** `docs/claude/WEBSOCKETS.md#ordering`: subscribe before snapshot, hold appends, send after snapshot, drop by seq
 - **System probe secret rate-limit exemption** `docs/claude/WEBSOCKETS.md#authorization-and-re-authorization`: Only server-internal probes; client-driven opens and subscribes still count.
 - **Typed per-stream hook** `docs/claude/WEBSOCKETS.md#Frontend`: wrap useStream in a named hook that names the SDK response type
-- **deliverWSHandoffs** `APP_EVENTS.md#websocket-handoffs`: dispatch app-event websocket handoffs to channels, users or streams
+- **deliverWSHandoffs** `docs/claude/WEBSOCKETS.md#Producing appends`: deliver app-event WS handoffs, routing stream appends to appendToStream
 - **expectStreamAudience** `apps/api/tests/expectStreamAudience.ts`: fail when differently privileged callers get differing snapshots of a shared stream
 - **inStreamOrder** `docs/claude/WEBSOCKETS.md#Sequence numbers`: queue a stream's appends behind a waiting one to keep order
 - **isPerCallerScope** `apps/api/src/ws/streamAudience.test.ts`: detect a route carrying per-request scopeNarrowing lens scope
@@ -245,7 +243,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **streamResync** `docs/claude/WEBSOCKETS.md#Sequence numbers`: tell holders on all instances to re-open a stream after a sequencing error
 - **streamSettleMs** `WebSocket docs, Connection and recovery`: debounce stream opens and closes 100 ms so holder churn sends no frames
 - **WSEvent** `docs/claude/WEBSOCKETS.md#Contract`: carry realtime events dispatched to frontend handlers by category and action
-- **WSHandoff** `docs/claude/APP_EVENTS.md#Handler and handoff contracts`: kind 'channels' for channel subscribers, 'users' for specific users, 'stream' to append to a data stream.
+- **WSHandoff** `docs/claude/WEBSOCKETS.md#Contract`: message handoff for hints; streamAppend handoff for data streams
   - *Signs you're bypassing it:* a hand-built { kind: 'stream', target, append } object in a handler instead of streamAppend(STREAM_DEFINITIONS.x, params, op, payload) (docs/claude/APP_EVENTS.md § WebSocket handoffs ("Stream handoffs are never built by hand"))
 - **x-auth-probe** `docs/claude/WEBSOCKETS.md#authorization-and-re-authorization`: Use for re-authorization; full in-process route run for the initial open snapshot.
 - **Build appends only with streamAppend** `apps/api/src/appEvents/streamAppend.ts`: any data pushed to a stream
@@ -260,8 +258,6 @@ Point at a class when that is as specific as the moment allows, or at a member. 
   - *Signs you're bypassing it:* a stream definition living in apps/api or packages/ui instead of packages/shared/src/ws/streamDefinitions.ts (docs/claude/WEBSOCKETS.md § Data streams › Stream definitions)
 - **Never call ws.send directly** `apps/api/src/ws/delivery.ts`: any server-side WebSocket send
   - *Signs you're bypassing it:* raw ws.send calls from handlers, sweeps or app-event code (apps/api/src/ws/delivery.ts)
-- **Never hand-build stream handoffs** `APP_EVENTS.md#websocket-handoffs`: any app-event handoff to a data stream
-- **New payload kinds need consumer design** `APP_EVENTS.md#websocket-handoffs`: adding websocket payload kinds
 - **No new WS payload types without full support** `docs/claude/WEBSOCKETS.md#Contract`: When adding anything beyond message and stream handoffs.
 - **No replay; repair by snapshot** `docs/claude/WEBSOCKETS.md#data-streams`: Client handling of stream frames.
   - *Signs you're bypassing it:* a server-side replay buffer, outbound queue, acknowledgements, or resend-missed-appends logic (docs/claude/WEBSOCKETS.md § Data streams and § Sequence numbers ("no replay buffer, no queue and no acknowledgement"))
@@ -273,10 +269,8 @@ Point at a class when that is as specific as the moment allows, or at a member. 
   - *Signs you're bypassing it:* a per-stream reliability flag or an ack/retry option added to a channel or stream (docs/claude/WEBSOCKETS.md § Channels vs streams: when to use which)
 - **Reconnect replay ordering** `WebSocket docs, Connection and recovery`: client reconnect handling
 - **Remove contacts scaffolding stream** `docs/claude/WEBSOCKETS.md#data-streams`: When the first real stream (e.g. log stream) ships.
-- **Shared stream appends match route response** `APP_EVENTS.md#websocket-handoffs`: shared stream definitions
 - **Stream audience is required and enforced** `apps/api/src/ws/streamAudience.test.ts`: Use 'perRecipient' when the route has per-caller lens scope (scopeNarrowing).
   - *Signs you're bypassing it:* a 'shared' stream over a route with scopeNarrowing (per-caller lens), or a stream without a fixture in streamAudience.test.ts (docs/claude/WEBSOCKETS.md § Data streams › Audience)
-- **Stream audience required** `FEATURES.md — WebSocket Data Streams`: Every defineStream declaration.
 - **Stream folds must be idempotent** `docs/claude/WEBSOCKETS.md#ordering`: When writing any stream fold.
   - *Signs you're bypassing it:* a fold that duplicates a row or entry when the same upsert arrives twice (docs/claude/WEBSOCKETS.md § Data streams › Ordering)
 - **Upsert rows must come from routeRow** `apps/api/src/appEvents/routeRow.ts`: every upsert append

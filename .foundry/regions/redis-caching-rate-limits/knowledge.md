@@ -149,6 +149,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **BullMQ queue mock** `tests/mocks/queue.ts`: Default in tests; use inline jobs helpers when job execution must be asserted.
 - **Cache graceful degradation** `docs/claude/REDIS.md#Cache Fallback`: treat Redis read errors as misses, log write errors without blocking
 - **Cache in hydrator load seam** `@inixiative/permissions/README.md#Hydration (Prisma example)`: Hydrator already de-dupes within one call; wrap load only for cross-call caching.
+  - *Signs you're bypassing it:* a memo map wrapped around the whole hydrator or check call, or caching added inside the engine, instead of wrapping the single read passed as load (@inixiative/permissions/README.md § Hydration ("load is the cache seam"))
 - **In-memory Redis mock in tests** `packages/db/src/redis/client.ts`: route all Redis connections to one shared RedisMock in test env
 - **flushRedis** `@template/db`: Tests only; throws outside test environment.
 - **validateKey** `packages/db/src/redis/cache.ts`: throw when a cache key contains 'undefined' to catch bugs early

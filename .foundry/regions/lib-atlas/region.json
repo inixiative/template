@@ -1,0 +1,47 @@
+{
+  "id": "lib-atlas",
+  "title": "Atlas library (code map)",
+  "routing": "Is this about the @inixiative/atlas library itself: the @atlas top-of-file block (@kind / @partOf / @uses / @constructs, @atlas pin, @uses none / @uses?), the .atlas/ folder (config.ts with defineConfig and partOfFor stamp rules, kinds.ts, concepts.ts concept registry), the atlas CLI (graph, check, coverage, generate, report, stamp), MAP.md, or rolling atlas check / coverage gates into CI?",
+  "concepts": [
+    "lib-atlas"
+  ],
+  "tokens": 7653,
+  "tokenMethod": "chars/4",
+  "runsAgreed": 0,
+  "sources": {
+    "docs": [
+      "@inixiative/atlas/README.md",
+      "@inixiative/atlas/examples/atlas-config/README.md",
+      "@inixiative/atlas/examples/ci/README.md"
+    ],
+    "docUnits": [
+      "doc:@inixiative/atlas/README.md#preface",
+      "doc:@inixiative/atlas/README.md#why",
+      "doc:@inixiative/atlas/README.md#install",
+      "doc:@inixiative/atlas/README.md#configure",
+      "doc:@inixiative/atlas/README.md#cli",
+      "doc:@inixiative/atlas/README.md#for-ai-agents",
+      "doc:@inixiative/atlas/README.md#visualize",
+      "doc:@inixiative/atlas/README.md#the-annotation-model",
+      "doc:@inixiative/atlas/README.md#the-patcher-atlas-stamp",
+      "doc:@inixiative/atlas/README.md#ci",
+      "doc:@inixiative/atlas/README.md#enforcement-existence-not-correctness",
+      "doc:@inixiative/atlas/README.md#license",
+      "doc:@inixiative/atlas/examples/atlas-config/README.md#preface",
+      "doc:@inixiative/atlas/examples/ci/README.md#preface",
+      "doc:@inixiative/atlas/examples/ci/README.md#rollout-dev-003-phase-4-warn-only-enforcing",
+      "doc:@inixiative/atlas/examples/ci/README.md#coverage-gate",
+      "doc:@inixiative/atlas/examples/ci/README.md#keep-map-md-honest",
+      "doc:@inixiative/atlas/examples/ci/README.md#package-json-scripts",
+      "doc:@inixiative/atlas/examples/ci/README.md#why-not-a-standalone-inixiative-atlas-ci-package"
+    ],
+    "catalogClusters": [
+      "build-deploy-ci",
+      "code-map-atlas"
+    ],
+    "codeEntries": 11,
+    "docMembers": 18
+  },
+  "bypassLines": 10,
+  "glossaryTerms": 26
+}

@@ -6,7 +6,7 @@
     "ui-components",
     "theme-layout"
   ],
-  "tokens": 16710,
+  "tokens": 16636,
   "tokenMethod": "chars/4",
   "runsAgreed": 3,
   "sources": {
@@ -41,7 +41,7 @@
       "ui-components"
     ],
     "codeEntries": 67,
-    "docMembers": 47
+    "docMembers": 46
   },
   "bypassLines": 32,
   "glossaryTerms": 28

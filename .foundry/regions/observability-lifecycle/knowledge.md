@@ -121,7 +121,7 @@ How the template's processes report what they do (structured, redacted logs; Ope
 
 `telemetry` is OpenTelemetry over fetch-based OTLP exporters: `initializeTelemetry(readTelemetryConfig(...))` once per process, `telemetryMiddleware` for route spans, `telemetryExtension` for Prisma, `instrumentRedis`, `traceJob` for jobs with the trace carrier persisted through BullMQ and the outbox (`captureTraceContext` / `withRemoteTrace`), and `withSpan`, `recordDuration` and `incrementCounter` for business operations. Metric labels stay bounded; IDs go in logs and spans; no SQL, args, keys or values in telemetry. The browser side (`initializeBrowserTelemetry`, `telemetryFetch`, `reportBrowserError`) posts to the rate-limited `/api/telemetry/browser` endpoint. Export is best-effort and non-blocking, failing with a `telemetry.export.failed` warning. Configuration is `OTEL_*` / `VITE_OTEL_*` set through `bun run init` → Monitoring. The Sentry/console error reporter is a separate adapter that error middleware uses for 5xx.
 
-`process-lifecycle` is `initGracefulShutdown` (called once) driving `onShutdown` handlers within a timeout: stop intake, drain work, then flush telemetry. Loops check `isShutdownInProgress` or wait with `sleepUnlessShuttingDown`, recurring in-process ticks use `makeUnrefInterval`, and the API answers `/health` (excluded from tracing). Not here: what the job, outbox, WebSocket and app-event subsystems drain or observe (`jobs-cron`, `websockets`, `app-events-webhooks-adapters`), slow-lane metric meaning (`jobs-cron`), and the env mechanics behind OTEL settings (`dev-environment-tooling`).
+`process-lifecycle` is `initGracefulShutdown` (called once) driving `onShutdown` handlers within a timeout: stop intake, drain work, then flush telemetry. Loops check `isShutdownInProgress` or wait with `sleepUnlessShuttingDown`, recurring in-process ticks use `makeUnrefInterval`, and the API answers `/health` (excluded from tracing). Not here: what the job, outbox, WebSocket and app-event subsystems drain or observe (`jobs-cron`, `websockets`, `app-events-webhooks-adapters`), slow-lane metric meaning (`jobs-cron`), and the env mechanics behind OTEL settings (`dx-setup`).
 
 ## 3. Everything that exists here, by class
 
@@ -186,84 +186,21 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **withRemoteTrace** `packages/shared/src/telemetry/operations.ts#withRemoteTrace`: Continue a trace across process boundaries (jobs, webhooks); local spans: withSpan instead.
 - **withSpan** `packages/shared/src/telemetry/operations.ts#withSpan`: Tracing a unit of work; metric-only timing: recordDuration; continuing an incoming trace: withRemoteTrace.
   - *Signs you're bypassing it:* `trace.getTracer(...).startActiveSpan` with manual `span.end()`, or Date.now() timing around an operation (catalog withSpan; docs/claude/LOGGING.md § Coverage and limits (Business row))
-- **AppEnv request context** `FEATURES.md › Request Context Scoping`: any handler needing identity or tenant scope; never thread these manually
-  - *Signs you're bypassing it:* module-level variables holding the current user/org, or user, db and requestId threaded through function parameters (FEATURES.md › Request Context Scoping)
-- **Cache TTLs** `FEATURES.md › Redis Use Cases`: cache sessions 5min, permission evaluations 10min and token hashes 10min in Redis
-- **Channel subscribe authorization** `FEATURES.md — Authorized Query Channels`: authorize subscriptions by probing the matching HTTP route; drop on identity change
 - **Cross-service incident tracing** `docs/claude/LOGGING.md#Following an incident across two services`: follow an incident from New Relic trace to Better Stack logs
-- **False polymorphism ownership** `FEATURES.md > Inquiry System > Polymorphic Ownership`: model polymorphic source and target via typed nullable FK columns
-- **Fast/slow job lanes** `FEATURES.md › Background Jobs & Cron`: large fan-outs use slow lane; fast lane for latency-sensitive work
 - **Job trace carrier propagation** `docs/claude/LOGGING.md#Coverage and limits`: persist trace context through BullMQ and outbox so job spans correlate
 - **Local OTLP collector smoke test** `scripts/monitoring/compose.yaml, scripts/monitoring/smoke.ts`: Local verification; clear hosted signal overrides first; expect password as [REDACTED].
 - **Monitoring setup via init** `docs/claude/LOGGING.md#Setup`: Use instead of hand-editing env files; MONITORING_MODE=off|otlp|split selects disabled, single or split providers.
 - **OTLP telemetry via fetch exporters** `docs/claude/LOGGING.md#Logging and monitoring`: Prefer existing instrumentation over adding new exporters or vendor agents.
   - *Signs you're bypassing it:* adding a vendor APM agent or a new exporter SDK alongside the existing OTLP pipeline (docs/claude/LOGGING.md § Logging and monitoring)
-- **Owner-scoped email lenses** `docs/claude/COMMUNICATIONS.md`: govern tokens, rules, picker options and projection via sender/recipient/data/system lenses
-- **Pseudo-GraphQL filtering** `FEATURES.md › Pseudo-GraphQL Filtering`: list filtering on URL-based endpoints instead of custom query params or GraphQL
-- **Redis namespaces** `FEATURES.md › Namespace Support`: prefix Redis keys per use case to avoid collisions and allow selective clearing
-- **Request ID correlation** `FEATURES.md › Logging & Observability`: follow one request through logs, queries and errors via a middleware-generated ID
-- **Separate Redis connections** `FEATURES.md › Multiple Redis Connections`: keep blocking pub/sub and BullMQ off the main client connection
 - **Shutdown drains then flushes telemetry** `docs/claude/LOGGING.md#Coverage and limits`: drain API/worker work then flush telemetry providers on graceful shutdown
-- **sourceInquiryId audit lineage** `FEATURES.md > Inquiry System > Audit Lineage`: link side-effect mutations back to the causal inquiry in audit logs
-- **Swappable providers via adapters** `FEATURES.md › Error Reporter Adapter`: wrap external providers in adapters so swapping them needs no application code changes
-- **WebhookSubscription ownership** `FEATURES.md › Webhooks`: own subscriptions by User, Organization or Space via false polymorphism
-- **Worker graceful shutdown** `FEATURES.md › Background Jobs & Cron`: close BullMQ cleanly on SIGTERM/SIGINT, letting in-progress jobs finish with timeout
 - **/api/telemetry/browser** `docs/claude/LOGGING.md#Browser setup`: Browser telemetry only; data is untrusted client evidence (telemetry.source=browser), not audit logging.
-- **apiPath** `FEATURES.md > Flows > Registry`: build an API read path from an operationId and params
-  - *Signs you're bypassing it:* string-concatenating API paths and filter[...] query strings by hand for an operation (catalog apiPath)
-- **Batch API** `docs/claude/BATCH.md`: transactionAll atomic; transactionPerRound per-round atomic; allowFailures bulk; failOnRound stop at first failing round
-  - *Signs you're bypassing it:* a bespoke bulk/multi-step endpoint, or a client firing sequential requests and threading ids between them, where one batch call with rounds and interpolation would do (docs/claude/BATCH.md § Overview; FEATURES.md § API Architecture & Routing (Batch API))
-- **cleanStaleData** `FEATURES.md > Flows > Transient`: delete transient flows idle for 15 minutes
-  - *Signs you're bypassing it:* a new bespoke cleanup job or cron that deletes rows older than N minutes, instead of a cron row pointing cleanStaleData at the model, field and retention (catalog cleanStaleData; cleanStaleFlows cron row)
-- **db.parallel** `docs/claude/APP_EVENTS.md`: run tasks concurrently, optionally isolating failures with allSettled resolution
-- **db:clone** `FEATURES.md › Database Utilities`: copying environments; truncation prevents duplicate external webhook deliveries
-- **db:dump** `FEATURES.md › Database Utilities`: backup; db:clone to duplicate directly
-- **db:migrate** `FEATURES.md › Migration Safety`: prod schema delivery; db:push for dev iteration
-- **db:push** `FEATURES.md › Migration Safety`: dev only; db:migrate for prod
-- **db:restore** `FEATURES.md › Database Utilities`: restore a database from a dump file
-- **docker compose up** `FEATURES.md › Docker Compose for Supporting Services`: services only; run Bun servers natively via Turborepo watch, not in containers
-  - *Signs you're bypassing it:* a Dockerfile or compose service that runs the API, worker or frontends in containers for local dev (FEATURES.md › Docker Compose for Supporting Services)
-- **emitAppEvent** `docs/claude/APP_EVENTS.md`: Domain side effects; email delivery itself runs via jobs from handlers.
-  - *Signs you're bypassing it:* a controller or service calling the email sender, an SMS/analytics client, enqueue('sendEmail'), or sendToUser/sendToChannel directly after a write (docs/claude/APP_EVENTS.md § Purpose and execution; AI/ENTRYPOINT.md § 6 ("Business logic NEVER calls email, SMS, analytics, or notification services directly"))
-- **errorReporter** `@template/shared/adapter`: Sentry when SENTRY_ENABLED=true and SENTRY_DSN set in prod/staging/pr; console otherwise
-- **falsePolymorphism hook** `FEATURES.md > Inquiry System > Polymorphic Ownership`: validate source/target polymorphic columns name exactly one User, Organization, Space or admin
-- **fetchAllPages** `FEATURES.md > Flows > Rechecked on every read`: read every page of a paginated endpoint
-  - *Signs you're bypassing it:* A while loop incrementing page until an empty or short page to collect every row of a paginated endpoint. (catalog entry fetchAllPages)
 - **frontendLogger** `@template/ui/lib/frontendLogger`: Frontend logs; errors reach providers automatically as trace exception events.
-- **getResource** `FEATURES.md › Resource Context Middleware`: routes with :id params instead of re-fetching the record in the controller
-  - *Signs you're bypassing it:* db.<model>.findUnique({ where: { id: c.req.param('id') } }) at the top of a controller whose route already has :id, plus a hand-written 404 (docs/claude/CONTEXT.md § Resource Context; FEATURES.md § Resource Context Middleware ("No more fetching the same record in middleware and controller"))
-- **HTTP_ERROR_MAP** `FEATURES.md › makeError()`: supply default message and user guidance per HTTP status code
-  - *Signs you're bypassing it:* hand-declared unions of status codes or error labels ('NOT_FOUND' | 'CONFLICT' …) and per-status default messages (catalog HTTP_ERROR_MAP; docs/claude/API_ROUTES.md § Error Responses ("derived from HTTP_ERROR_MAP to prevent drift"))
-- **Inquiry resource context middleware** `FEATURES.md > Inquiry System > Core API`: load inquiry with all includes in one DB round-trip for reads and mutations
-- **JobOutbox** `FEATURES.md › Background Jobs & Cron`: spill when queue depth budget exceeded; otherwise enqueue directly
-- **makeAdapterRegistry** `@template/shared/adapter`: pair with makeAdapterRouter when adding provider adapters
-- **makeAdapterRouter** `@template/shared/adapter`: base for any swappable provider (error reporter, storage, payments) instead of direct SDK calls
-  - *Signs you're bypassing it:* an adapter index.ts exporting a provider directly, or if (process.env.ENVIRONMENT === 'prod') provider switches in app code (docs/claude/ADAPTERS.md § Adapter primitives and § What NOT to do)
-- **makeAppEvent** `docs/claude/APP_EVENTS.md`: run observation, email/WebSocket handoffs and callbacks in isolated settled parallel
-  - *Signs you're bypassing it:* a hand-written handler that runs its side effects with a bare Promise.all (one failure cancels the rest) or does heavy/retryable work inline instead of enqueueing a job from a cb (docs/claude/APP_EVENTS.md § Purpose and execution; catalog makeAppEvent)
-- **makeError** `FEATURES.md › makeError()`: all API errors instead of constructing HTTPException or error bodies manually
-  - *Signs you're bypassing it:* throw new Error('Not found') in a controller or service on the request path (serializes as an opaque 500), or return c.json({ error: '…' }, 404) with a hand-built body (docs/claude/ERRORS.md § The rule; docs/claude/API_ROUTES.md § Error Responses)
-- **makeSingletonJob** `FEATURES.md › Background Jobs & Cron`: migrations, billing runs, key rotation; makeSupersedingJob when newer should cancel older
-  - *Signs you're bypassing it:* a job handler that takes its own Redis lock or checks a 'running' flag to avoid concurrent runs (catalog: makeSingletonJob (wrap a job handler so a Redis lock prevents concurrent runs))
-- **makeSupersedingJob** `FEATURES.md › Background Jobs & Cron`: search indexing, cache warming, reports; makeSingletonJob when every run must complete
-  - *Signs you're bypassing it:* BullMQ jobs removed or delayed by id to debounce, or a custom dedupe key check, so only the newest enqueue finishes (docs/claude/CONCURRENCY.md § Supersede Lanes (debounced/superseding jobs); docs/claude/JOBS.md § Superseding Job)
-- **Modules** `FEATURES.md › Modules Constant`: always instead of string literals like 'organizations'
-- **onCommit** `docs/claude/APP_EVENTS.md`: defer work until the surrounding transaction commits
 - **OTEL_BROWSER_ENABLED** `docs/claude/LOGGING.md#Browser setup`: Server side gate; pair with VITE_OTEL_ENABLED in each frontend.
 - **OTEL_ENABLED** `docs/claude/LOGGING.md#New Relic traces/metrics + Better Stack logs`: Required true for local/test; false disables export but keeps console logging. Decided by ENVIRONMENT, not NODE_ENV.
 - **OTEL_EXPORTER_OTLP_ENDPOINT** `FEATURES.md › OpenTelemetry Integration`: skipped in local/test; dynamic imports keep it zero-cost when unset
 - **OTEL_EXPORTER_OTLP_{SIGNAL}_ENDPOINT** `docs/claude/LOGGING.md#New Relic traces/metrics + Better Stack logs`: Split destinations only; one provider: leave unset and use OTEL_EXPORTER_OTLP_ENDPOINT base URL.
 - **OTEL_SERVICE_NAME** `docs/claude/LOGGING.md#New Relic traces/metrics + Better Stack logs`: Must be a base name, not template-api; OTEL_SERVICE_VERSION overrides Railway commit SHA.
-- **paginate** `FEATURES.md › Pagination System`: list endpoints not already paginated by a route template
-  - *Signs you're bypassing it:* A list controller with hand-written skip/take from page and pageSize, a separate count() call, a hand-built SORT_FIELD_MAP or in-memory sort, and its own pagination metadata instead of paginate(c, db.model, options). (docs/claude/API_ROUTES.md § paginate() Utility ("Use paginate() for list endpoints"))
-- **platformDefault** `FEATURES.md › Admin Operations`: make an auth provider available to all organizations
-- **POST /admin/cache/clear** `FEATURES.md › Admin Operations`: after role changes leave stale permission caches
-- **readAllAsCaller** `FEATURES.md > Flows > Rechecked on every read`: run batched read sub-requests with the caller's permissions
-  - *Signs you're bypassing it:* a hand-written page loop calling a list endpoint until hasMore is false (catalog readAllAsCaller)
-- **RuleReference** `docs/claude/COMMUNICATIONS.md`: track rule-to-segment reference edges maintained on save for rule health
-  - *Signs you're bypassing it:* Parsing conditions JSON across rows to find which rules depend on a Tag/Space/Segment before deleting it, instead of querying RuleReference by (targetModel, targetId). (catalog entry RuleReference; docs/claude/COMMUNICATIONS.md § Rule References)
 - **Sentry error-reporter adapter** `docs/claude/LOGGING.md#Following an incident across two services`: Error reporting to Sentry; tracing/metrics: OTel helpers instead
-- **sync-env.sh** `sync-env.sh`: after pulling code that adds env variables; with-env.sh for deployed environments
 - **telemetry.export.failed warning** `docs/claude/LOGGING.md#Coverage and limits`: Healthy app or endpoint does not prove ingestion; check this warning
 - **VITE_OTEL_ENABLED** `docs/claude/LOGGING.md#Browser setup`: Client capture; server ingestion separately requires OTEL_BROWSER_ENABLED. Changes need a rebuild.
 - **Best-effort non-blocking export** `docs/claude/LOGGING.md#Coverage and limits`: When configuring exporters or delivery guarantees
@@ -271,15 +208,11 @@ Point at a class when that is as specific as the moment allows, or at a member. 
   - *Signs you're bypassing it:* userId, jobId, email or raw URL used as a metric attribute (docs/claude/LOGGING.md § Coverage and limits)
 - **Browser telemetry is not audit** `docs/claude/LOGGING.md#Browser setup`: When deciding where to record evidence of user actions.
 - **Invalid enabled telemetry fails startup** `docs/claude/LOGGING.md#New Relic traces/metrics + Better Stack logs`: Any enabled OTEL configuration.
-- **Mock Redis in tests** `FEATURES.md › Redis with IORedis`: all tests touching Redis
 - **No double log ingestion** `docs/claude/LOGGING.md#Coverage and limits`: When setting up log shipping
 - **No SQL, args, keys or values in telemetry** `docs/claude/LOGGING.md#Coverage and limits`: When instrumenting Prisma or Redis calls
   - *Signs you're bypassing it:* span attributes carrying Prisma query args, SQL text, Redis keys or values (docs/claude/LOGGING.md § Coverage and limits)
 - **Provider credentials only in /api secrets** `docs/claude/LOGGING.md#Setup`: Any telemetry secret or browser build variable.
 - **Signal endpoint and header rules** `docs/claude/LOGGING.md#New Relic traces/metrics + Better Stack logs`: Whenever setting a signal-specific OTLP endpoint.
-- **Unified error contract** `FEATURES.md › Unified Error Contract`: every error response from the API
-- **Webhook event naming** `FEATURES.md › Webhooks`: naming any webhook event
-- **WebSocket message-based auth via /me** `FEATURES.md — Real-Time Communication`: All WebSocket connections, including spoofed identity.
 - *Also here, by name:* SpanKind (`packages/shared/src/telemetry/operations.ts`); SpanStatusCode (`packages/shared/src/telemetry/operations.ts`); browserTelemetryRouter (`apps/api/src/routes/browserTelemetry.ts`); context (`packages/shared/src/telemetry/operations.ts`); createFetchExporter (`packages/shared/src/telemetry/fetchExporter.ts`); instrumentRedis (`packages/db/src/redis/instrumentRedis.ts`); metrics (`packages/shared/src/telemetry/operations.ts`); parseOtlpHeaders (`packages/shared/src/telemetry/config.ts`); resolveOtlpEndpoint (`packages/shared/src/telemetry/config.ts`); signalExportOptions (`packages/shared/src/telemetry/config.ts`); trace (`packages/shared/src/telemetry/operations.ts`)
 
 ### Class `process-lifecycle`: Graceful shutdown handlers, health checks, connection draining, unref intervals

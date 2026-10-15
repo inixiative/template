@@ -170,10 +170,13 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **Layout route groups** `apps/web/app/routes/`: _fullscreen for invoices, previews, print, embeds, focused flows without AppShell; _public for no-auth pages
 - **Nav config per app** `docs/claude/FRONTEND/ROUTING_NAVIGATION.md`: drive sidebar, page access, titles and breadcrumbs from one config
 - **Nested sidebar sub-views** `docs/claude/FRONTEND/ROUTING_NAVIGATION.md#Segments navigation`: tabs-like views of one page in the sidebar; separate pages when content differs
+- **Per-app nav config** `apps/{app}/app/config/nav/`: define each app's routes and menus with access rules in its own nav config
 - **TanStack Query server state** `FEATURES.md > Frontend Architecture > Server State Caching`: Server state here; client-only state belongs in Zustand slices.
+- **Unauthorized context fallback** `docs/claude/APPS.md State Management`: fall back to an authorizing context when a route's nav access fails
 - **Zustand store slices** `FEATURES.md > Frontend Architecture > Zustand State Management`: Client state only; server data goes through TanStack Query via apiQuery/apiMutation.
   - *Signs you're bypassing it:* server records fetched with useEffect and stored in the Zustand store or useState instead of TanStack Query (FEATURES.md › Frontend Architecture (Zustand for client state, TanStack Query for server state))
 - **@template/sdk** `@template/sdk`: Use instead of hand-written fetch calls
+  - *Signs you're bypassing it:* hand-written fetch('/api/...') calls and response types in frontend code instead of the generated SDK functions (docs/claude/MONOREPO.md › @template/sdk; catalog @template/sdk)
 - **apiMutation** `apiMutation()`: Writes; use apiQuery for GET reads.
   - *Signs you're bypassing it:* a mutationFn that calls fetch or the SDK directly and attaches Authorization / x-spoof-user-email headers by hand (docs/claude/FRONTEND/API_CLIENT.md § apiQuery and apiMutation; FEATURES.md § Frontend Architecture (API Client Wrappers))
 - **apiQuery** `apiQuery()`: Reads; use apiMutation for writes needing full response or optimistic updates.
@@ -186,6 +189,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **makeDataConfig** `makeDataConfig`: Use instead of hand-declaring searchable/sortable fields for data hooks.
   - *Signs you're bypassing it:* Hand-declaring searchable/orderable field lists or enum filter options per table in the frontend. (docs/claude/API_ROUTES.md § Data Config + Filters ("no hand-maintained field lists"))
 - **nav config access** `apps/<app>/app/config/nav/`: Page-level gating; action-level gating uses permissions.check
+- **navigatePreserving** `docs/claude/APPS.md Navigation Behavior`: Use instead of plain navigate when current tenant context must persist
 - **permissions.check** `useAppStore permissions slice`: Gating actions in components; gate whole pages via nav config access instead. Platform superadmin bypasses.
 - **requireAuth** `@template/ui/guards`: Authenticated routes; requirePublic for logged-out-only pages
   - *Signs you're bypassing it:* checking isAuthenticated in a layout component and redirecting in a useEffect instead of beforeLoad: requireAuth (docs/claude/FRONTEND.md § Conventions (protect layouts with requireAuth/requirePublic); FEATURES.md § Route Guards)
@@ -199,6 +203,9 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **usePaginatedData** `usePaginatedData`: Page-numbered tables; useInfiniteData for infinite scroll.
   - *Signs you're bypassing it:* A table component managing page, pageSize, search and orderBy in local useState, syncing the URL and restoring scroll by hand. (docs/claude/FRONTEND/API_CLIENT.md § Data Hooks › usePaginatedData)
 - **useSpaceTheme** `@template/ui useSpaceTheme`: set per-space CSS variables for theming
+- **Context switch redirect** `docs/claude/APPS.md Navigation Behavior`: Context switching in web and admin
+- **Context-free paths** `docs/claude/APPS.md Navigation Behavior`: All frontend routes in web and admin
+  - *Signs you're bypassing it:* building context-specific URLs or separate routes per context instead of /settings plus preserved ?org=/?space= (docs/claude/APPS.md § Context Switching (Navigation Behavior))
 - **Context-preserving redirects** `docs/claude/FRONTEND/ROUTING_NAVIGATION.md#Guards`: every beforeLoad redirect
 - **Guards run in beforeLoad** `FEATURES.md > Frontend Architecture > Route Guards`: Any route that needs auth gating.
 - **No app component folders** `docs/claude/APPS.md Component Organization`: Adding any frontend component, hook or page
@@ -253,12 +260,8 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **useSectionOpen** `packages/ui/src/hooks/useSectionHash.ts#useSectionOpen`: Page-wide visible-section hash sync: useSectionHash instead.
   - *Signs you're bypassing it:* useState for a modal or collapsible that should survive reload or be deep-linkable, or hand-writing window.location.hash (catalog entry useSectionOpen)
 - **Nav config layout** `apps/*/app/config/nav/`: define nav as one NavItem per feature composed into per-context NavItem arrays
-- **Per-app nav config** `apps/{app}/app/config/nav/`: define each app's routes and menus with access rules in its own nav config
-- **Preserve redirectTo across login/signup** `docs/claude/FRONTEND/AUTH.md#Navigation Helpers`: guard sets redirectTo; login↔signup links preserve search so post-auth returns there
 - **Route layouts** `apps/{app}/app/routes/{__root,_authenticated,_fullscreen,_public}.tsx`: split pages into root, authenticated, fullscreen and public layout shells
-- **Unauthorized context fallback** `docs/claude/APPS.md State Management`: fall back to an authorizing context when a route's nav access fails
 - **NavConfig** `packages/ui/src/components/layout/navigationTypes.ts`: type mapping each context (user, organization, space, public) to its nav items
-- **navigatePreserving** `docs/claude/APPS.md Navigation Behavior`: Use instead of plain navigate when current tenant context must persist
 - **navigation.navigatePreserving** `packages/ui/src/store/slices/navigation.ts`: use instead of raw router navigate; 'context' keeps org/space, 'spoof' keeps spoof only, 'all' keeps every param
   - *Signs you're bypassing it:* the raw router navigate plus hand-copying org/space/spoof/flow search params onto the target, losing context on navigation (docs/claude/FRONTEND/ROUTING_NAVIGATION.md § Navigating; docs/claude/FRONTEND/AUTH.md § Navigation Helpers)
 - **NavItem** `packages/ui/src/components/layout/navigationTypes.ts`: alias: true for routable pages hidden from the sidebar
@@ -266,9 +269,6 @@ Point at a class when that is as specific as the moment allows, or at a member. 
   - *Signs you're bypassing it:* switching organization or space by editing URL params or calling router navigate with ?org= instead of tenant.setOrganization / setSpace (docs/claude/FRONTEND/ROUTING_NAVIGATION.md § Navigating (switch context through the tenant slice))
 - **Adding a nav item** `docs/claude/FRONTEND/ROUTING_NAVIGATION.md#Nav Config`: whenever a page should appear in the sidebar or be access-checked
   - *Signs you're bypassing it:* a new page route with no NavItem, or a hard-coded sidebar link, so it is not access-checked and has no title or breadcrumbs (docs/claude/FRONTEND/ROUTING_NAVIGATION.md § Nav Config (create or edit the feature file, add it to each context file))
-- **Context switch redirect** `docs/claude/APPS.md Navigation Behavior`: Context switching in web and admin
-- **Context-free paths** `docs/claude/APPS.md Navigation Behavior`: All frontend routes in web and admin
-  - *Signs you're bypassing it:* building context-specific URLs or separate routes per context instead of /settings plus preserved ?org=/?space= (docs/claude/APPS.md § Context Switching (Navigation Behavior))
 - **Nav config is source of truth for page access** `docs/claude/FRONTEND/ROUTING_NAVIGATION.md#What the Nav Config Drives`: gating who can view a frontend page; not ad-hoc checks in page components
   - *Signs you're bypassing it:* a page component that checks permissions or roles itself and renders Unauthorized or redirects, instead of an access rule on its NavItem (docs/claude/FRONTEND/ROUTING_NAVIGATION.md § What the Nav Config Drives)
 - *Also here, by name:* Breadcrumbs (`packages/ui/src/components/layout/Breadcrumbs.tsx`); applyAuthorizedContext (`packages/ui/src/hooks/useAuthenticatedRouting/contextAccess.ts`); buildSearchParamUpdates (`packages/ui/src/hooks/useAuthenticatedRouting/urlSync.ts`); communicationsItem (`apps/admin/app/config/nav/features/communications.ts`); communicationsItem (`apps/superadmin/app/config/nav/features/communications.ts`); communicationsItem (`apps/web/app/config/nav/features/communications.ts`); dashboardItem (`apps/admin/app/config/nav/features/dashboard.ts`); dashboardItem (`apps/superadmin/app/config/nav/features/dashboard.ts`); dashboardItem (`apps/web/app/config/nav/features/dashboard.ts`); hasContextChanged (`packages/ui/src/hooks/useAuthenticatedRouting/contextAccess.ts`); homeItem (`apps/web/app/config/nav/features/home.ts`); organizationsItem (`apps/admin/app/config/nav/features/organizations.ts`); organizationsItem (`apps/superadmin/app/config/nav/features/organizations.ts`); organizationsItem (`apps/web/app/config/nav/features/organizations.ts`); parseRoutingSearchParams (`packages/ui/src/hooks/useAuthenticatedRouting/querySync.ts`); publicContext (`apps/admin/app/config/nav/contexts/publicContext.ts`); publicContext (`apps/superadmin/app/config/nav/contexts/publicContext.ts`); replaceUrlSearchParams (`packages/ui/src/hooks/useAuthenticatedRouting/urlSync.ts`); resolveSectionTarget (`packages/ui/src/lib/resolveSectionTarget.ts`); segmentsItem (`apps/web/app/config/nav/features/segments.ts`); settingsItem (`apps/admin/app/config/nav/features/settings.ts`); settingsItem (`apps/superadmin/app/config/nav/features/settings.ts`); settingsItem (`apps/web/app/config/nav/features/settings.ts`); spacesItem (`apps/admin/app/config/nav/features/spaces.ts`); spacesItem (`apps/web/app/config/nav/features/spaces.ts`); syncStoreFromSearchParams (`packages/ui/src/hooks/useAuthenticatedRouting/querySync.ts`); usersItem (`apps/admin/app/config/nav/features/users.ts`); usersItem (`apps/superadmin/app/config/nav/features/users.ts`); usersItem (`apps/web/app/config/nav/features/users.ts`)

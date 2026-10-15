@@ -1,0 +1,34 @@
+{
+  "id": "lib-config",
+  "title": "Config package (toolchain, train)",
+  "routing": "Is this about the @inixiative/config package: the shared tsconfig / biome / tsup (node, react) / lefthook presets and their extends stubs, versions.json (the BOM: bun, toolchain pins, primitives and agentic lanes, consumers, candidates), the CLI (check, sync, scan, train, ports), ports.json local port blocks, the shared lib-ci.yml workflow, or releasing @inixiative/* packages through the train?",
+  "concepts": [
+    "lib-config"
+  ],
+  "tokens": 7763,
+  "tokenMethod": "chars/4",
+  "runsAgreed": 0,
+  "sources": {
+    "docs": [
+      "@inixiative/config/README.md"
+    ],
+    "docUnits": [
+      "doc:@inixiative/config/README.md#preface",
+      "doc:@inixiative/config/README.md#presets",
+      "doc:@inixiative/config/README.md#versions-json-the-bom",
+      "doc:@inixiative/config/README.md#cli",
+      "doc:@inixiative/config/README.md#ci",
+      "doc:@inixiative/config/README.md#release-flow"
+    ],
+    "catalogClusters": [
+      "build-config-presets",
+      "build-deploy-ci",
+      "code-style-lint-checks",
+      "dev-setup-scripts"
+    ],
+    "codeEntries": 2,
+    "docMembers": 39
+  },
+  "bypassLines": 12,
+  "glossaryTerms": 25
+}

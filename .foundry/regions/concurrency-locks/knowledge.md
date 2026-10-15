@@ -139,29 +139,23 @@ Point at a class when that is as specific as the moment allows, or at a member. 
   - *Signs you're bypassing it:* Promise.all(items.map(...)) over an unbounded list, hand-chunked batches, or passing already-started promises instead of thunks (docs/claude/CONCURRENCY.md § Bounded Batch (resolveAll) (pass thunks, not promises))
 - **withOwnerLock** `apps/api/src/lib/locks/withOwnerLock.ts#withOwnerLock`: Cross-row validation like segment cycle checks under one owner; not re-entrant, nested same-scope calls deadlock until timeout and return 409.
   - *Signs you're bypassing it:* a custom per-owner lock or advisory lock around cross-row validation such as segment cycle checks (catalog: withOwnerLock (serialize writes colliding across rows of one owner, before the transaction opens))
-- **Create-if-missing via fenced findForUpdate** `docs/claude/DATABASE.md#Row Locks and Create-If-Missing`: Any create-if-missing; never bare upsert or caught unique violation.
-  - *Signs you're bypassing it:* a bare prisma .upsert(, or find-then-create wrapped in try/catch on P2002 / a unique violation (docs/claude/DATABASE.md § Row Locks and Create-If-Missing; CI rule no-create-race-machinery)
 - **Idempotent version-precondition update** `docs/claude/ENCRYPTION.md#Idempotent Protection`: Optimistic per-row races; use createLock for cross-process critical sections instead.
-- **Lock plus serialized queue for owned resources** `docs/claude/CONCURRENCY.md#concurrency`: cross-process ownership plus in-process ordering; only one concern: use the single primitive
-  - *Signs you're bypassing it:* using only a Redis lock (or only an in-process queue) for a resource one instance owns and writes concurrently (docs/claude/CONCURRENCY.md (preface: the canonical pair))
 - **Train machine-wide lock** `~/.inixiative/train.lock`: allow one release train per machine via atomic pid/host/start-time lock
-- **db.findForUpdate** `db.findForUpdate`: Row-level locking in a txn; pass upserting: true for create-if-missing; createLock alone for non-row critical sections.
-  - *Signs you're bypassing it:* a raw $queryRaw `SELECT … FOR UPDATE`, or a read-then-update in a transaction with no row lock (docs/claude/DATABASE.md § Row Locks and Create-If-Missing)
 - **Outbox mutex** `apps/api/src/jobs/outbox/mutex.ts`: in-process outbox serialization only; cross-process needs a lock
-- **Serialized queue errors propagate uncaught** `docs/claude/CONCURRENCY.md#error-model`: any createSerializedQueue use
-  - *Signs you're bypassing it:* wrapping each queue.run body in a catch that swallows errors (docs/claude/CONCURRENCY.md § Serialized Queue › Error model)
-- **upserting where must be scalar equalities** `db.findForUpdate`: Whenever calling db.findForUpdate with upserting: true.
-  - *Signs you're bypassing it:* calling findForUpdate with upserting: true and an in / array / operator / null where (docs/claude/DATABASE.md § Row Locks and Create-If-Missing)
 - *Also here, by name:* ConcurrencyType (`packages/shared/src/utils/concurrency.ts`); FIND_FOR_UPDATE_LOCK_SERVICE (`packages/db/src/lock/acquireFindForUpdateLock.ts`); FIND_FOR_UPDATE_LOCK_WAIT_MS (`packages/db/src/lock/acquireFindForUpdateLock.ts`); FindForUpdateLockTimeoutError (`packages/db/src/lock/findForUpdateLockTimeoutError.ts`); OWNER_LOCK_WAIT_MS (`apps/api/src/lib/locks/withOwnerLock.ts`); claimOnce (`packages/db/src/lock/queries/claimOnce.ts`); concurrencyLimits (`packages/shared/src/utils/concurrency.ts`); createClaim (`packages/db/src/lock/createClaim.ts`); fencedDelete (`packages/db/src/lock/queries/fencedDelete.ts`); fencedRefresh (`packages/db/src/lock/queries/fencedRefresh.ts`); findForUpdateLockIdentifier (`packages/db/src/lock/findForUpdateLockIdentifier.ts`); findForUpdateLockIdentifiers (`packages/db/src/lock/findForUpdateLockIdentifier.ts`); maxSafeHeartbeatMs (`packages/db/src/lock/maxSafeHeartbeatMs.ts`); pendingStreamQueues (`apps/api/src/ws/streamPublishOrder.ts`)
 
 ### Class `concurrency-limits`: In-process coordination: serialized queues, getConcurrency caps, resolveAll bounded batches
 
+- **Lock plus serialized queue for owned resources** `docs/claude/CONCURRENCY.md#concurrency`: cross-process ownership plus in-process ordering; only one concern: use the single primitive
+  - *Signs you're bypassing it:* using only a Redis lock (or only an in-process queue) for a resource one instance owns and writes concurrently (docs/claude/CONCURRENCY.md (preface: the canonical pair))
 - **Per-stream-key publish queue** `apps/api/src/ws/streamPublishOrder.ts`: publish a stream's appends in emitted order, including local-delivery fallback
 - **claimLane / watchLane** `docs/claude/CONCURRENCY.md#concurrency`: newest-wins per key across processes; exclusive ownership regardless of age: createLock
 - **withLanePriority** `docs/claude/CONCURRENCY.md#concurrency`: prioritize within a shared queue; superseding older work: claimLane instead
   - *Signs you're bypassing it:* a second BullMQ queue or a reserved worker pool for background work, or ad-hoc numeric priorities, to keep bulk jobs from blocking foreground jobs (docs/claude/CONCURRENCY.md § Job Lanes; docs/claude/JOBS.md § Priority)
 - **Atlas mutex tag** `docs/claude/CONCURRENCY.md#concurrency`: adding or finding ordering/mutual-exclusion primitives
 - **Pass thunks to resolveAll** `docs/claude/CONCURRENCY.md#bounded-batch-resolveall`: every resolveAll call
+- **Serialized queue errors propagate uncaught** `docs/claude/CONCURRENCY.md#error-model`: any createSerializedQueue use
+  - *Signs you're bypassing it:* wrapping each queue.run body in a catch that swallows errors (docs/claude/CONCURRENCY.md § Serialized Queue › Error model)
 
 ### Class `supersede-lanes`: Newest work for a key wins: claimLane/watchLane batons, superseding jobs
 

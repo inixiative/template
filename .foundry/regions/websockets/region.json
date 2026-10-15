@@ -6,7 +6,7 @@
     "ws-connections",
     "ws-streams"
   ],
-  "tokens": 19943,
+  "tokens": 19750,
   "tokenMethod": "chars/4",
   "runsAgreed": 3,
   "sources": {
@@ -35,6 +35,7 @@
       "doc:FEATURES.md#real-time-communication"
     ],
     "catalogClusters": [
+      "app-events-side-effects",
       "auth-middleware-validation",
       "lenses-multi-source",
       "locks-and-serialization",
@@ -47,7 +48,7 @@
       "websocket-realtime-delivery"
     ],
     "codeEntries": 92,
-    "docMembers": 62
+    "docMembers": 56
   },
   "bypassLines": 27,
   "glossaryTerms": 30

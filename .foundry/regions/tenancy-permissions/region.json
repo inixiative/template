@@ -7,7 +7,7 @@
     "permissions",
     "superadmin"
   ],
-  "tokens": 22277,
+  "tokens": 22256,
   "tokenMethod": "chars/4",
   "runsAgreed": 3,
   "sources": {
@@ -50,7 +50,7 @@
       "ui-components"
     ],
     "codeEntries": 68,
-    "docMembers": 67
+    "docMembers": 57
   },
   "bypassLines": 21,
   "glossaryTerms": 30

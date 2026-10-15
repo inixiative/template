@@ -1,14 +1,13 @@
 {
   "id": "monorepo-architecture",
-  "title": "Monorepo layout and build",
-  "routing": "Is this about where code lives or how the workspace is wired: apps/* vs packages/* (@template/db, shared, ui, sdk, permissions, email), import aliases (#/, @template/<pkg>/*, barrels), dependency direction or where to add a dependency, the tech stack, the request/data-flow architecture, turbo.json tasks (dependsOn, inputs, caching, codegen chain, watch mode, hot reload), tsconfig/tsup presets, or @inixiative/config sync/check/versions.json?",
+  "title": "Monorepo layout and architecture",
+  "routing": "Is this about where code lives or how the workspaces relate rather than how one subsystem works: apps/* (api, web, admin, superadmin) vs packages/* (@template/db, shared, ui, sdk, permissions, email), the 'Where to Find Things' map (modules/<model>/routes, hooks, jobs, prisma/schema one file per model, tests/e2e), import aliases (#/ in apps, @template/<pkg>/* subpaths, relative only in top-level barrels, no ##/ or ~/), tsconfig paths mapping every package, dependency direction and which workspace gets a new dependency, the tech stack and dependency inventory (DEPENDENCIES.md), or the system overview (middleware \u2192 routes \u2192 controllers \u2192 mutation lifecycle \u2192 jobs/Redis/Postgres, ReBAC, request context, false polymorphism, what the repo already has per FEATURES.md / COMPARISONS.md)?",
   "concepts": [
     "monorepo-layout",
     "dependencies",
-    "architecture",
-    "build-tooling"
+    "architecture"
   ],
-  "tokens": 17908,
+  "tokens": 14002,
   "tokenMethod": "chars/4",
   "runsAgreed": 1,
   "sources": {
@@ -18,8 +17,7 @@
       "docs/claude/ARCHITECTURE.md",
       "docs/claude/DEPENDENCIES.md",
       "docs/claude/MONOREPO.md",
-      "docs/claude/STYLE.md",
-      "docs/claude/TURBOREPO.md"
+      "docs/claude/STYLE.md"
     ],
     "docUnits": [
       "doc:docs/claude/ARCHITECTURE.md#overview",
@@ -46,18 +44,7 @@
       "doc:docs/claude/STYLE.md#dependencies",
       "doc:FEATURES.md#tech-stack",
       "doc:AI/ENTRYPOINT.md#what-this-repository-is",
-      "doc:FEATURES.md#architectural-patterns",
-      "doc:docs/claude/TURBOREPO.md#task-naming-convention",
-      "doc:docs/claude/TURBOREPO.md#watch-mode",
-      "doc:docs/claude/TURBOREPO.md#task-dependencies",
-      "doc:docs/claude/TURBOREPO.md#loop-prevention",
-      "doc:docs/claude/TURBOREPO.md#caching",
-      "doc:docs/claude/TURBOREPO.md#task-types",
-      "doc:docs/claude/TURBOREPO.md#hot-reloading",
-      "doc:docs/claude/TURBOREPO.md#environment-composition-with-turbo",
-      "doc:docs/claude/TURBOREPO.md#filtering-tasks",
-      "doc:docs/claude/TURBOREPO.md#debugging",
-      "doc:FEATURES.md#developer-experience"
+      "doc:FEATURES.md#architectural-patterns"
     ],
     "catalogClusters": [
       "app-events-side-effects",
@@ -65,7 +52,6 @@
       "authentication-methods",
       "batch-request-execution",
       "build-config-presets",
-      "build-deploy-ci",
       "caching-and-invalidation",
       "code-style-lint-checks",
       "data-access-rules",
@@ -75,9 +61,7 @@
       "email-composition-rendering",
       "email-delivery-senders",
       "encryption-key-rotation",
-      "environment-config",
       "error-handling",
-      "frontend-app-shells-routes",
       "frontend-navigation-context",
       "frontend-state-api-client",
       "job-definition-and-enqueue",
@@ -95,9 +79,9 @@
       "testing-helpers",
       "ui-components"
     ],
-    "codeEntries": 2,
-    "docMembers": 110
+    "codeEntries": 0,
+    "docMembers": 81
   },
-  "bypassLines": 8,
-  "glossaryTerms": 26
+  "bypassLines": 21,
+  "glossaryTerms": 25
 }

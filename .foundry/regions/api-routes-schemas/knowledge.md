@@ -145,7 +145,6 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **Route-level middleware option** `docs/claude/API_ROUTES.md#Middleware`: attach validation middleware to a templated route declaratively
   - *Signs you're bypassing it:* permission or token checks done at the top of the controller or via router.use on a path, instead of middleware: [validatePermission('read')] on the route template (docs/claude/API_ROUTES.md § Middleware)
 - **check** `@template/permissions/rebac`: Use inside controllers for permission-aware filtering of results, rather than for gating the whole route.
-  - *Signs you're bypassing it:* if/else chains in a controller that look up an OrganizationUser or SpaceUser and compare its role, instead of declaring the rule in rebacSchema and calling check (catalog: packages/permissions/src/rebac/check.ts ("call check rather than hand-rolling permission logic"))
 - **encryptField** `@template/db/lib/encryption/helpers`: encrypt a model's secret field into encrypted columns before storage
   - *Signs you're bypassing it:* calling node crypto createCipheriv directly, base64-encoding a secret, or storing a provider credential in plain text or a plain Json column (catalog: encryptField (use instead of ad-hoc credential storage or calling createEncryption directly))
 - **getPlatformProviders** `#/lib/auth/platformProviders`: Platform providers (Google, GitHub); org-specific providers come from db.authProvider instead.
@@ -165,14 +164,10 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **validatePermission** `#/middleware/validations/validatePermission`: single-owner resource; polymorphic User/Organization owner: validateOwnerPermission instead
   - *Signs you're bypassing it:* a handler that loads the resource itself and calls permix.check / throws 403 by hand on a route where resourceContextMiddleware + validatePermission(action) would do it (docs/claude/PERMISSIONS.md § Validation Middleware)
 - **Always use route templates** `#/lib/routeTemplates`: Every new API route definition.
+- **API module folder layout** `docs/claude/API_ROUTES.md#File Organization`: Every API resource module; external services go in apps/api/src/integrations/
 - **Create returns 201 with sanitized record** `docs/claude/API_ROUTES.md — Example: Create Organization Provider`: Create controllers.
 - **Router export naming** `docs/claude/API_ROUTES.md#Router Exports`: Every API module
-- **Standardized response shape** `FEATURES.md › Standardized Response Shape`: all API responses
 - **Strip encrypted fields from responses** `docs/claude/API_ROUTES.md — AuthProvider Module`: Any endpoint returning a model with encrypted fields.
-  - *Signs you're bypassing it:* a response schema or select that returns encryptedSecrets / metadata / version columns (docs/claude/API_ROUTES.md — AuthProvider Module; CLAUDE.md §7 (secrets never returned))
-- **Use route templates** `FEATURES.md › Route Templates`: every API endpoint
-- **Wrap responses in { data }** `docs/claude/API_ROUTES.md#Response Format`: All route responses; extra metadata goes in respond.ok's second argument.
-  - *Signs you're bypassing it:* controllers returning a bare object/array or a custom envelope ({ result }, { items, total }) (docs/claude/API_ROUTES.md § Response Format)
 - *Also here, by name:* buildRequest (`apps/api/src/lib/routeTemplates/utils/buildRequest.ts`); buildResponses (`apps/api/src/lib/routeTemplates/utils/buildResponses.ts`); buildRoutePath (`apps/api/src/lib/routeTemplates/utils/buildRoutePath.ts`); hasIdParam (`apps/api/src/lib/routeTemplates/utils/hasIdParam.ts`); prepareMiddleware (`apps/api/src/lib/routeTemplates/utils/prepareMiddleware.ts`)
 
 ### Class `openapi`: Route auto-registration and OpenAPI spec generation
@@ -187,8 +182,6 @@ Point at a class when that is as specific as the moment allows, or at a member. 
   - *Signs you're bypassing it:* hand-written security: [{ bearerAuth: [] }] arrays in route configs (catalog securityRequirements)
 - **apps/api/src/routes/api** `apps/api/src/routes/api`: Public tenant endpoints; internal/ops calls go in routes/internal, liveness in routes/health.
 - **apps/api/src/routes/internal** `apps/api/src/routes/internal`: Non-public service calls; public endpoints belong in routes/api.
-- **OpenAPI spec and Scalar docs** `FEATURES.md › OpenAPI 3.1 Spec Generation`: generate OpenAPI 3.1 spec from route definitions and serve interactive docs
-- **File-based route registration** `FEATURES.md › API Architecture & Routing`: applies to all API endpoints in a module
 - *Also here, by name:* Tags (`apps/api/src/modules/tags.ts`); autoRegisterAdminRoutes (`apps/api/src/lib/utils/autoRegisterRoutes.ts`); autoRegisterInternalRoutes (`apps/api/src/lib/utils/autoRegisterRoutes.ts`); buildOperationId (`apps/api/src/lib/routeTemplates/utils/buildOperationId.ts`); buildTags (`apps/api/src/lib/routeTemplates/utils/buildTags.ts`); errorResponses (`apps/api/src/lib/routeTemplates/errorResponses.ts`); registerSecuritySchemes (`apps/api/src/lib/auth/securitySchemes.ts`); securityForRoute (`apps/api/src/lib/auth/routeSecurity.ts`); securitySchemes (`apps/api/src/lib/auth/securitySchemes.ts`); toOpenApi (`apps/api/src/lib/routeTemplates/utils/toOpenApi.ts`)
 
 ### Class `request-schemas`: Request/response zod schemas: generated Prisma zod, ScalarSchema, sanitizeRequestSchema
@@ -220,7 +213,6 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **Routes built with request-template factories** `docs/claude/MODULES.md#Core — routes/`: CRUD: the matching template; custom actions: actionRoute.
 - **<Model>ScalarSchema** `@template/db`: Prefer over hand-written Zod for any field on the Prisma model.
   - *Signs you're bypassing it:* a hand-written z.object({ id: z.string(), name: z.string(), createdAt: … }) that mirrors a Prisma model's fields (docs/claude/API_ROUTES.md § Schemas (Default: Use ScalarSchema); docs/claude/MODULES.md § Core — schemas/)
-- **API module folder layout** `docs/claude/API_ROUTES.md#File Organization`: Every API resource module; external services go in apps/api/src/integrations/
 - **Avoid signature churn** `CLAUDE.md §7 Core Engineering Standards`: Prefer additive optional fields over changing existing signatures.
 - **Build requested primitives complete** `CLAUDE.md §0.3 YAGNI — Scope Invention vs. Completion`: Foundations in packages/shared or template infra lean build-it-complete.
 - **Cross-module shared code location** `docs/claude/MODULES.md#Rules of thumb 1`: utils/ only for helpers scoped to one module.
@@ -245,6 +237,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **One file, one concern** `CLAUDE.md § 0. Purpose and Priority`: Whenever adding exports to an existing file serving other consumers.
 - **Package build order** `FEATURES.md > Core Platform > Workspace Tooling`: When adding packages or task dependencies.
 - **Permissions core owns only wrapping and checking** `@inixiative/permissions/README.md#Boundary`: When adding permission logic: app-specific pieces go in the app package, not the core.
+  - *Signs you're bypassing it:* adding role mappings, Prisma loading or app action names (ownerActions) inside the permissions core instead of the app package (@inixiative/permissions/README.md § Boundary)
 - **Prefer factories over fixtures** `docs/claude/MODULES.md#Less common — fixtures/`: Module fixtures/ only when factories cannot express the data.
 - **Reuse before introducing** `CLAUDE.md §7 Core Engineering Standards`: Reuse existing utilities and types; keep logic single-source and remove duplication.
 - **Reuse existing utilities, remove duplicates** `CLAUDE.md §13 Change Checklist`: Every code change.

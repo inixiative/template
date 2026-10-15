@@ -8,7 +8,7 @@
     "frontend-auth",
     "users"
   ],
-  "tokens": 20696,
+  "tokens": 20999,
   "tokenMethod": "chars/4",
   "runsAgreed": 2,
   "sources": {
@@ -50,6 +50,7 @@
       "encryption-key-rotation",
       "environment-config",
       "frontend-app-shells-routes",
+      "frontend-navigation-context",
       "frontend-state-api-client",
       "rate-limiting",
       "request-context-access",
@@ -61,7 +62,7 @@
       "user-identity-management"
     ],
     "codeEntries": 77,
-    "docMembers": 61
+    "docMembers": 62
   },
   "bypassLines": 21,
   "glossaryTerms": 30

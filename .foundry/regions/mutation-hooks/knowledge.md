@@ -124,7 +124,7 @@ Every `db.<model>` mutation runs through the `mutationLifeCycle` extension. It o
 
 The standing hooks each have a registry, so adding a model usually means one registry line, not new hook code. `RulesRegistry` holds declarative json-rules write validation that throws. `ImmutableFieldsOverrides` adjusts the default immutable set, which is `id`, `createdAt` and every FK; these are silently stripped, never rejected, so an inquiry handler that moves a resource between owners needs an `exclude`. `AUDIT_ENABLED_MODELS` turns on the audit log: before/after/diff after ignore and redact, actor from `auditActorContext`, and a soft delete recorded as `delete`. `orderedListRegistry` keeps dense `1..N` positions per scope, with negative sentinels for soft-deleted rows. Soft delete is separate from the hooks for reads. `softDeleteScopeExtension` injects `deletedAt: null` into every read and write `where` and nested include, so nobody hand-writes it, and `db.withDeleted` is the single bypass, chosen by the endpoint (the admin router), never by who the caller is. The `softDeleteCascade` hook tombstones owned children with a shared timestamp that `revive` matches, hard-deletes the `HARD_DELETE_ON_TOMBSTONE` models, skips `CASCADE_EXEMPT` relations, and rebuilds `REGENERATE_ON_REVIVE` rows. Choose a rule to reject a change, an immutable field to ignore one silently, and an audit entry to record one.
 
-Not here: the client, transactions, `db.onCommit` and schema conventions are in database. The domain hooks that ride on this machinery belong to their own regions: webhook delivery to app-events-webhooks-adapters, cache invalidation to redis-caching-rate-limits, email versioning to email-templates, contact rules and userEmailContact to delivery-messaging-contacts, RuleReference edges to json-rules-lenses, and cronJobSync to jobs-cron. Named business events (`emitAppEvent`) are app-events, not db hooks, and `buildWhereClause`/pagination are filtering-pagination.
+Not here: the client, transactions, `db.onCommit` and schema conventions are in database. The domain hooks that ride on this machinery belong to their own regions: webhook delivery to app-events-webhooks-adapters, cache invalidation to redis-caching-rate-limits, email versioning to email-templates, contact rules and userEmailContact to delivery-messaging-contacts, RuleReference edges to json-rules, and cronJobSync to jobs-cron. Named business events (`emitAppEvent`) are app-events, not db hooks, and `buildWhereClause`/pagination are filtering-pagination.
 
 ## 3. Everything that exists here, by class
 
@@ -161,8 +161,6 @@ Point at a class when that is as specific as the moment allows, or at a member. 
   - *Signs you're bypassing it:* a hook or service re-fetching the old row before an update, when hooks already receive `previous` (docs/claude/DATABASE.md § Delegate Typing › Mutation Lifecycle Pattern)
 - **registerHooks** `apps/api/src/hooks/index.ts`: install all application db hooks at process startup
 - **updateManyAndReturn** `docs/claude/HOOKS.md › Supported Operations`: Bulk updates instead of updateMany (throws); rules run after and roll back on failure; single row: update.
-- **webhookDelivery** `docs/claude/HOOKS.md > Webhooks > How It Works`: after commit, find active subscriptions and enqueue a sendWebhook job for each
-- **Don't re-list encrypted or ordered-list fields as ignored** `packages/db/src/registries/ignoreFields.ts`: when adding encrypted or ordered-list fields to a model
 - **Hooks instead of DB triggers** `docs/claude/ARCHITECTURE.md#Why Hooks Instead of Triggers?`: any reactive mutation logic
   - *Signs you're bypassing it:* `CREATE TRIGGER` / plpgsql functions in a migration for reactive logic (docs/claude/ARCHITECTURE.md § Why Hooks Instead of Triggers?)
 - **No createMany or updateMany** `docs/claude/HOOKS.md › Supported Operations`: Any bulk create or update through Prisma.
@@ -216,24 +214,16 @@ Point at a class when that is as specific as the moment allows, or at a member. 
   - *Signs you're bypassing it:* calling liveWhere/liveIncludes by hand in queries, or a middleware that adds deletedAt filters (docs/claude/DATABASE.md § Soft-delete read scoping)
 - **tombstoneChildren** `apps/api/src/hooks/softDeleteCascade/cascade.ts#tombstoneChildren`: Forward soft-delete cascade; reviveChildren reverses it; CASCADE_EXEMPT lists relations skipped.
   - *Signs you're bypassing it:* a service loop setting `deletedAt` on each child relation after deleting a parent (docs/claude/HOOKS.md § Application Hooks (softDeleteCascade))
-- **db.onCommit** `db.onCommit`: Side effects that must only happen on success; db.onFinally for cleanup on commit or rollback.
-  - *Signs you're bypassing it:* sending email, calling an external API or enqueuing a job directly inside db.txn (so it fires even if the transaction rolls back), or a hand-built after-commit callback list (docs/claude/DATABASE.md § Transactions › After Commit Callbacks; FEATURES.md § Post-Commit Callbacks)
 - **db.withDeleted** `packages/db/src/extensions/softDeleteScopeExtension.ts`: revive, redaction/GDPR, tombstone inspection and tests; explicit deletedAt in where also opts out per query
   - *Signs you're bypassing it:* a role check (`if (isSuperadmin) skip deletedAt filter`) or a manual `deletedAt: { not: null }` override to read tombstones, instead of the endpoint wrapping work in `await db.withDeleted(...)` (docs/claude/CONTEXT.md → Soft-Delete Invisibility; docs/claude/DATABASE.md § Soft-delete read scoping)
-- **FindForUpdateLockTimeoutError** `db.findForUpdate`: signal the upsert fence lock was not acquired within waitMs, rolling back
-- **no-create-race-machinery** `no-create-race-machinery CI rule`: fail CI when a change adds bare upsert or unique-violation catches
-  - *Signs you're bypassing it:* find-then-create guarded by a bare `.upsert(`, or a `try { create } catch (P2002) { re-read }` unique-violation catch, instead of `db.findForUpdate(model, where, { upserting: true })` inside db.txn (scripts/ci/rules/no-create-race-machinery.sh; docs/claude/DATABASE.md § Transactions › Row Locks and Create-If-Missing)
 - **preventHardDelete** `apps/api/src/hooks/index.ts`: block delete and deleteMany on soft-delete-only models
 - **softDeleteCascade** `apps/api/src/hooks/index.ts`: Ephemeral grants that must not revive belong in HARD_DELETE_ON_TOMBSTONE.
-- **validateSuperadmin** `adminRouter`: superadmin endpoints only; other routes stay soft-delete scoped for every caller
-  - *Signs you're bypassing it:* an admin handler that checks platformRole itself and throws 403, instead of mounting under the admin router with validateSuperadmin (catalog: apps/api/src/middleware/validations/validateSuperadmin.ts; docs/claude/AUTH.md § Validation Middleware)
 - **Await inside db.withDeleted** `docs/claude/DATABASE.md > Soft-delete read scoping`: every db.withDeleted use
   - *Signs you're bypassing it:* `db.withDeleted(() => db.x.findMany(...))` returning the lazy promise without awaiting it inside the callback, so the query runs scoped (docs/claude/DATABASE.md § Soft-delete read scoping)
 - **Endpoint decides tombstone visibility** `docs/claude/DATABASE.md > Soft-delete read scoping`: any route needing tombstones; superadmins on non-admin routes stay scoped
 - **No hand-written deletedAt: null** `docs/claude/DATABASE.md > Soft-delete read scoping`: any query on a model with a deletedAt column
   - *Signs you're bypassing it:* `where: { deletedAt: null, ... }` in services, paginate calls or lenses, or include trees filtered by hand (docs/claude/DATABASE.md § Soft-delete read scoping)
 - **Superadmins see soft-deleted rows only on admin routes** `docs/claude/PERMISSIONS.md#PlatformRole`: any superadmin read of soft-deleted data
-- **Tests inspecting tombstones use db.withDeleted** `docs/claude/DATABASE.md > Soft-delete read scoping`: tests asserting tombstone state
 - *Also here, by name:* HARD_DELETE_ON_TOMBSTONE_SET (`packages/db/src/registries/hardDeleteOnTombstone.ts`); SOFT_DELETE_MODELS (`packages/db/src/registries/softDeleteModels.ts`); SOFT_DELETE_MODEL_SET (`packages/db/src/registries/softDeleteModels.ts`); childRelations (`apps/api/src/hooks/softDeleteCascade/childRelations.ts`); deleteBehaviorViolations (`apps/api/src/hooks/softDeleteCascade/validateDeleteBehavior.ts`); validateDeleteBehavior (`apps/api/src/hooks/softDeleteCascade/validateDeleteBehavior.ts`)
 
 ### Class `immutable-fields`: Immutable field stripping on update
@@ -255,16 +245,34 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **orderedListRegistry** `packages/db/src/registries/orderedList.ts#orderedListRegistry`: Register here to get automatic position maintenance instead of hand-assigning sort values.
   - *Signs you're bypassing it:* service code computing `MAX(position) + 1`, shifting siblings with loops of updates, or renumbering after delete, instead of registering the field and its scope keys (docs/claude/HOOKS.md § Ordered List › Adding a Model)
 - **Concurrent same-scope insert race** `apps/api/src/lib/prisma/orderedList.ts (bottom)`: Need strict uniqueness: advisory lock as documented inline.
+- **False polymorphism** `docs/claude/HOOKS.md > False Polymorphism`: instead of a single polymorphic ownerId without FK constraints
 - **Ordered list hook** `apps/api/src/hooks/orderedList/`: Any sortable column on a model; never hand-roll position arithmetic in services.
 - **Soft-deleted rows get negative positions** `docs/claude/HOOKS.md#Soft-deleted rows`: park soft-deleted rows at distinct negative positions; restore appends to live tail
+- **Webhook circuit breaker** `docs/claude/HOOKS.md > Webhooks > Circuit Breaker`: general delivery failures; repeated 400/422 for one record on integration subscriptions poisons the record instead
+  - *Signs you're bypassing it:* custom failure counters or flags that disable a subscription after repeated delivery failures (docs/claude/HOOKS.md § Webhooks, Circuit Breaker)
 - **buildScope** `apps/api/src/hooks/orderedList/`: derive a row's list scope, throwing if any registered scope key is missing
 - **bulkAssignAppend** `apps/api/src/lib/prisma/orderedList.ts`: Restore path; bulkAssignNegatives for soft-delete.
 - **bulkAssignNegatives** `apps/api/src/lib/prisma/orderedList.ts`: Soft-delete path; reDensifyLive compacts live survivors, bulkAssignAppend handles restore.
+- **cacheKey** `hooks/cache/constants/cacheReference.ts`: build a cache key by model, value and field path, optionally wildcard
+  - *Signs you're bypassing it:* Template-string cache keys (`cache:user:${id}`) or differently cased domains, so the clear never meets the write. (docs/claude/REDIS.md § Invalidation conventions ("Always build keys with cacheKey, never hand-format"))
+- **cacheReference** `hooks/cache/constants/cacheReference.ts`: map a model record to the cache keys deleted on its mutation
+  - *Signs you're bypassing it:* Calling clearKey / redis.del in a service after an update instead of registering the model's keys in cacheReference so the after-commit hook clears them. (catalog entry cacheReference; docs/claude/HOOKS.md § Cache Invalidation)
 - **clearKey** `cache hook`: evict a single cache entry
+- **FalsePolymorphismRegistry** `packages/db/src/registries/falsePolymorphism.ts`: declare type field and required FKs per value; auto-generates validation and immutability
 - **fetchCacheKeys** `cache hook`: Use with clearKey when writes bypass the cache hook.
 - **HOOK_IGNORE_FIELDS** `packages/db/src/registries/`: mark fields whose changes cache, audit and webhook hooks treat as no-ops
 - **normalizeInputScope** `apps/api/src/hooks/orderedList/`: materialize absent scope keys as explicit null on create input rows
 - **orderedList** `apps/api/src/hooks/index.ts`: keep dense 1..N positions with soft-delete sentinels and bulk re-densify
+- **poisonIntegrationRecord** `sendWebhook.ts`: single record rejected on an integrationId subscription; other failures feed the circuit breaker instead
+  - *Signs you're bypassing it:* custom per-record rejection counting or skip lists for integration webhook deliveries (docs/claude/HOOKS.md § Webhooks, Poisoned Records)
+- **sendWebhook** `sendWebhook.ts`: sign payload with RSA-SHA256 and deliver it to a subscriber URL
+  - *Signs you're bypassing it:* fetch()/POST to subscriber URLs from a controller, hook or app-event cb, with signing and retry hand-rolled (catalog sendWebhook; docs/claude/HOOKS.md § Webhooks, How It Works)
+- **webhookDelivery** `docs/claude/HOOKS.md > Webhooks > How It Works`: after commit, find active subscriptions and enqueue a sendWebhook job for each
+- **webhookEnabledModels** `packages/db/src/registries/webhook/enabledModels.ts`: model's own mutations; for child models firing a parent's webhook use webhookRelatedModels
+  - *Signs you're bypassing it:* a custom after-mutation hook or app-event cb that looks up subscriptions and enqueues deliveries for a model, instead of adding the model to webhookEnabledModels (docs/claude/HOOKS.md § Webhooks, Enabling Webhooks for a Model)
+- **webhookRelatedModels** `packages/db/src/registries/webhook/relatedModels.ts`: child-to-parent triggering; a model's own deliveries use webhookEnabledModels
+  - *Signs you're bypassing it:* extra code that fires a parent's webhook when a child record changes (docs/claude/HOOKS.md § Webhooks, Related Models)
+- **Don't re-list encrypted or ordered-list fields as ignored** `packages/db/src/registries/ignoreFields.ts`: when adding encrypted or ordered-list fields to a model
 - **No ordered fields in updateManyAndReturn** `docs/claude/HOOKS.md#Limitations`: Any bulk update touching a registered position field.
   - *Signs you're bypassing it:* a bulk updateManyAndReturn that writes a position column (it throws), instead of single updates per row (docs/claude/HOOKS.md § Ordered List › What it covers)
 - **Raw SQL cascades invalidate cache explicitly** `docs/claude/HOOKS.md#Cache invalidation`: Any raw SQL write bypassing the mutation lifecycle extension.

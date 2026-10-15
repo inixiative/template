@@ -148,7 +148,6 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **Alternate resource lookup** `docs/claude/CONTEXT.md → Lookup Parameter`: only unique fields; non-unique matches return 409
 - **API middleware order** `apps/api/src/routes/api.ts`: run cors, prepare, session auth, spoof, token auth, resource load, validation, handler in order
 - **Batch request minimal context** `apps/api/src/middleware/prepareRequest.ts`: set only db for /api/batch; full context setup happens per sub-request
-- **Scoped request context** `docs/claude/ARCHITECTURE.md#Why Scoped Context?`: give each request its own db view, requestId-tagged logs and shared transaction
 - **AppEnv** `apps/api/src/types/appEnv.ts`: type the Hono context variables available to middleware and handlers
 - **auditActorContext.scope** `@template/db/lib/auditActorContext`: scope actor identity and soft-delete bypass in async-local storage per request
 - **authMiddleware** `apps/api/src/routes/api.ts`: session cookies; Bearer API tokens: tokenAuthMiddleware instead
@@ -162,6 +161,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **db.getScopeContext** `@template/db`: tell whether code runs in api, worker or no scope
 - **db.getScopeId** `@template/db`: read the current request UUID or job ID for correlation
   - *Signs you're bypassing it:* generating a separate correlation ID or passing requestId into db/log helpers by hand (docs/claude/CONTEXT.md § Database Scope)
+- **db.isInTxn** `@template/db`: detect whether the current call is inside a transaction
 - **db.scope** `apps/api/src/middleware/prepareRequest.ts`: run request work in a scope so db.getScopeId correlates logs
 - **db.withDeleted** `docs/claude/CONTEXT.md → Soft-Delete Invisibility`: superadmin endpoints only; ordinary routes keep default scoping
   - *Signs you're bypassing it:* a role check (`if (isSuperadmin) skip deletedAt filter`) or a manual `deletedAt: { not: null }` override to read tombstones, instead of the endpoint wrapping work in `await db.withDeleted(...)` (docs/claude/CONTEXT.md → Soft-Delete Invisibility; docs/claude/DATABASE.md § Soft-delete read scoping)
@@ -171,14 +171,13 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **isSuperadmin (context)** `apps/api/src/lib/context/isSuperadmin`: Have a context; with a User object use @template/permissions isSuperadmin.
 - **isSuperadmin (permissions)** `@template/permissions`: Have a User object; with a context use #/lib/context/isSuperadmin.
 - **logScope** `apps/api/src/middleware/prepareRequest.ts`: attach nested log context labels to everything run inside
+- **makeJob** `#/jobs/makeJob`: makeSupersedingJob when newer runs should abort older ones via ctx.signal
+  - *Signs you're bypassing it:* a fire-and-forget `void doWork()` / `setTimeout` in a request handler, or a raw `new Queue(...).add` with a hand-written Worker, instead of a makeJob handler registered in handlers/index.ts and enqueued with enqueueJob (docs/claude/JOBS.md § Creating Handlers)
 - **makeSupersedingJob** `docs/claude/CONTEXT.md → Handler Usage`: newer work obsoletes in-flight work; makeJob otherwise
   - *Signs you're bypassing it:* BullMQ jobs removed or delayed by id to debounce, or a custom dedupe key check, so only the newest enqueue finishes (docs/claude/CONCURRENCY.md § Supersede Lanes (debounced/superseding jobs); docs/claude/JOBS.md § Superseding Job)
 - **paginate** `docs/claude/CONTEXT.md > filterLens`: page a model query applying filterLens whitelist and scope via buildWhereClause
   - *Signs you're bypassing it:* A list controller with hand-written skip/take from page and pageSize, a separate count() call, a hand-built SORT_FIELD_MAP or in-memory sort, and its own pagination metadata instead of paginate(c, db.model, options). (docs/claude/API_ROUTES.md § paginate() Utility ("Use paginate() for list endpoints"))
-- **prepareRequest** `docs/claude/ARCHITECTURE.md#Request Flow`: initialize per-request context with db client, requestId and permix
-  - *Signs you're bypassing it:* Parsing searchFields[...] / nested query params by hand in a route or controller. (catalog entry prepareRequest; docs/claude/API_ROUTES.md § Bracket Notation Query Parsing)
 - **scopeNarrowing** `docs/claude/CONTEXT.md > filterLens`: Per-request row scope; static route filterLens for fixed picks and where.
-  - *Signs you're bypassing it:* Hard-coding a tenant/owner id filter into paginate's where in the controller for a context-dependent scope. (docs/claude/API_ROUTES.md § Dynamic per-request scope — scopeNarrowing middleware)
 - **spoofMiddleware** `apps/api/src/routes/api.ts`: let superadmins act as another user via spoof-user-email header
   - *Signs you're bypassing it:* a custom as-user query parameter or header that swaps the context user for support, outside the x-spoof-user-email path (docs/claude/AUTH.md § Spoof Middleware)
 - **tokenAuthMiddleware** `apps/api/src/routes/api.ts`: API tokens; session takes precedence, cookies use authMiddleware
@@ -186,6 +185,8 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **TokenWithRelations** `apps/api/src/lib/context/types.ts`: type a token loaded with all owner relations for permission setup
 - **validateSuperadmin** `docs/claude/CONTEXT.md → Soft-Delete Invisibility`: gate adminRouter endpoints to superadmins
   - *Signs you're bypassing it:* an admin handler that checks platformRole itself and throws 403, instead of mounting under the admin router with validateSuperadmin (catalog: apps/api/src/middleware/validations/validateSuperadmin.ts; docs/claude/AUTH.md § Validation Middleware)
+- **WorkerContext** `apps/api/src/jobs/types.ts`: give job handlers scoped db, queue, job, abort signal and log
+  - *Signs you're bypassing it:* importing `log` from @template/shared/logger inside a handler instead of `ctx.log`, so nothing reaches BullBoard (docs/claude/JOBS.md § Handler Patterns › ctx.log() - Dual-Write Logging)
 - **Add resource relations in resourceContextArgs** `apps/api/src/middleware/resources/resourceContextArgs.ts`: whenever a controller needs relations of the :id resource
   - *Signs you're bypassing it:* a second query in the controller to load relations of the :id resource (docs/claude/CONTEXT.md § Resource Context, Custom Inclusions ("add it here rather than re-fetching in the controller"))
 - **Bridge actor context across boundaries** `@template/db/lib/auditActorContext`: Crossing async or transaction boundaries.
@@ -224,10 +225,12 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **Boundary error translation** `apps/api/src/middleware/error/`: Errors from Zod, Prisma or packages; throw makeError directly only for API caller errors.
   - *Signs you're bypassing it:* packages/* code importing makeError or hono, or controllers translating P2002/P2025 into HTTP errors that the handler already maps (docs/claude/ERRORS.md § Shared packages can't use makeError)
 - **Classify json-rules errors by class** `@inixiative/json-rules/README.md#Error Handling`: catch UsageError for input, LensRefusal for lens, rethrow others as rule shape
+  - *Signs you're bypassing it:* Matching json-rules error message strings to decide whose fault an error is, instead of instanceof UsageError / LensRefusal. (@inixiative/json-rules/README.md § Error Handling)
 - **error handler middleware** `docs/claude/API_ROUTES.md#Error Responses`: normalize thrown, Zod and Prisma errors into the standard body with requestId
 - **HTTPException** `hono/http-exception`: makeError when guidance or fieldErrors are needed
 - **lensFor** `docs/claude/API_ROUTES.md#OpenAPI surface`: build the parent lens for a Prisma model used in a route filterLens
-  - *Signs you're bypassing it:* Building a base lens or field list for a Prisma model by hand instead of lensFor('Model') narrowed with picks/relations. (catalog entry lensFor; docs/claude/API_ROUTES.md Route declaration (lens narrowing))
+- **Batch operations return 200 with payload status** `docs/claude/API_ROUTES.md#Batch Operations`: Batch, bulk, multi-step ops; use 4xx/5xx for validation, auth, security and single-resource failures.
+  - *Signs you're bypassing it:* a batch or bulk endpoint answering 207/4xx for partial failure instead of 200 with summary.status (docs/claude/API_ROUTES.md § Complex Operations & HTTP Status)
 - **Caller errors on request path use makeError** `docs/claude/ERRORS.md#The rule`: Request-path 4xx caller errors; genuine server faults stay raw Error; off-path code uses plain Error.
 - **Do not pass requestId to makeError** `docs/claude/API_ROUTES.md#Error Responses`: Every makeError call.
   - *Signs you're bypassing it:* makeError({ status: 404, requestId: c.get('requestId') }) or adding requestId to an error body by hand (docs/claude/API_ROUTES.md § Error Responses; docs/claude/ERRORS.md § makeError / AppError)
@@ -263,12 +266,12 @@ Point at a class when that is as specific as the moment allows, or at a member. 
   - *Signs you're bypassing it:* a new batch strategy not added to BatchExecutionStrategies, or a hand-maintained strategy name union/enum (docs/claude/BATCH.md § Implementation Patterns)
 - **In-memory batch registry** `docs/claude/BATCH.md#Known Limitations`: Single-instance only; multi-instance deployments need a Redis-backed registry instead.
 - **POST /api/v1/batch/execute** `docs/claude/BATCH.md > Overview`: run many API requests in ordered rounds within one HTTP call
+- **prepareRequest** `apps/api/src/middleware/prepareRequest.ts`: inject batch context into sub-requests with isolated cloned state
+  - *Signs you're bypassing it:* Parsing searchFields[...] / nested query params by hand in a route or controller. (catalog entry prepareRequest; docs/claude/API_ROUTES.md § Bracket Notation Query Parsing)
 - **readAsCaller / readAllAsCaller** `batch module (registerBatch + executeRequest)`: readAllAsCaller for list reads; readAsCaller for single records
 - **StrategyExecutor** `apps/api/src/modules/batch`: define the signature every batch strategy implements, returning BatchResult
 - **summary.status** `docs/claude/BATCH.md > Status Tracking`: Overall outcome; inspect per-request result.error for which requests failed.
 - **Batch always returns 200** `docs/claude/BATCH.md > HTTP Status Code Semantics`: All batch responses; only 400 for invalid/nested batches and 500 for unexpected server errors.
-- **Batch operations return 200 with payload status** `docs/claude/API_ROUTES.md#Batch Operations`: Batch, bulk, multi-step ops; use 4xx/5xx for validation, auth, security and single-resource failures.
-  - *Signs you're bypassing it:* a batch or bulk endpoint answering 207/4xx for partial failure instead of 200 with summary.status (docs/claude/API_ROUTES.md § Complex Operations & HTTP Status)
 - **Batch rounds run sequentially** `docs/claude/BATCH.md#Known Limitations`: Any batch using interpolation between requests.
 - **Batch size limits** `docs/claude/BATCH.md > Security > Limits`: Every batch request.
 - **Deep clone mutable batch context** `apps/api/src/middleware/prepareRequest.ts`: When injecting batch context into sub-requests; share only read-only values like app.

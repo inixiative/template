@@ -127,7 +127,7 @@ Everything goes through `db` from `@template/db`. It is a Proxy over one Prisma 
 
 Schema lives one file per model in `packages/db/prisma/schema/`: `uuidv7()` primary keys, `@db.VarChar(36)` FKs, `createdAt`/`updatedAt`, and enums suffixed `FooModel` / `FooType` / `FooStatus`. A relation that can point at several kinds of row uses false polymorphism, meaning a discriminator enum (`ownerModel`, `sourceModel`/`targetModel`, `resourceModel`) plus one nullable typed FK per kind, never a `type` + `id` pair. The axis is declared once in `PolymorphismRegistry`, from which rules, immutable fields and constraints are generated. Branded IDs (`UserId`, `organizationId()`) go in function signatures. Code that needs model or field metadata reads it at runtime from the generated `prismaMap.gen.ts` (@inixiative/prisma-map) and the `@template/db` helpers (`ModelNames`/`AccessorNames`, `modelFields`/`lookupField`, `getModelRelations`, `hydrate`, `aliasColumns`, `tableName`/`columnName`/`storedValue`). It does not hand-declare models. Countries, currencies, languages and timezones come from `@shared/reference/*` with their zod schemas. Schema delivery and data movement are `bun run db:*` (generate, push, migrate/deploy, dump/restore/clone, seed). Seed data is `SeedFile`s with UUIDv7 ids, registered in FK order, with `prime: true` for dev-only rows, and the seed runs through the API seed script so hooks fire.
 
-Not here: what happens inside a write is in mutation-hooks (registerDbHook, audit log, soft delete and `db.withDeleted`, immutable fields, ordered lists). Row locks and Redis locks (`createLock`, the locking side of `db.findForUpdate`) are in concurrency-locks. List filtering and pagination (`buildWhereClause`, `paginate`) are in filtering-pagination, json-rules and lenses are in json-rules-lenses, and field encryption is in encryption. Test factories belong to testing.
+Not here: what happens inside a write is in mutation-hooks (registerDbHook, audit log, soft delete and `db.withDeleted`, immutable fields, ordered lists). Row locks and Redis locks (`createLock`, the locking side of `db.findForUpdate`) are in concurrency-locks. List filtering and pagination (`buildWhereClause`, `paginate`) are in filtering-pagination, json-rules and lenses are in the json-rules, lenses and lens-usage regions, and field encryption is in encryption. Test factories belong to testing.
 
 ## 3. Everything that exists here, by class
 
@@ -143,27 +143,40 @@ Point at a class when that is as specific as the moment allows, or at a member. 
   - *Signs you're bypassing it:* find-then-create guarded by a bare `.upsert(`, or a `try { create } catch (P2002) { re-read }` unique-violation catch, instead of `db.findForUpdate(model, where, { upserting: true })` inside db.txn (scripts/ci/rules/no-create-race-machinery.sh; docs/claude/DATABASE.md § Transactions › Row Locks and Create-If-Missing)
 - **no-raw-transaction** `scripts/ci/rules/no-raw-transaction.sh`: Never $transaction outside packages/db/src/client.ts; it breaks isInTxn and atomicity of hooks.
   - *Signs you're bypassing it:* `prisma.$transaction(...)` / `db.$transaction` anywhere outside packages/db/src/client.ts instead of `db.txn(async () => ...)` (scripts/ci/rules/no-raw-transaction.sh)
+- **Bearer token auth** `FEATURES.md > Token Authentication`: API access; use ?token=<key> only when headers can't be set.
+- **BetterAuth stateless JWT sessions** `FEATURES.md > Session Authentication (BetterAuth)`: Browser email/password users; OAuth users get a localStorage Bearer token; API clients use personal access tokens.
 - **Context-aware navigation** `FEATURES.md > Multi-Tenancy > Context-Aware Navigation`: show or hide nav items by current context and user permissions
+- **False polymorphism** `docs/claude/DATABASE.md`: Instead of type+id polymorphic associations.
 - **Four-context switching** `FEATURES.md > Multi-Tenancy > Context Switching`: switch frontend between User, Organization, Space and Public contexts with own nav and routes
-- **Hierarchical token scopes** `FEATURES.md > Multi-Tenancy > Hierarchical Tokens`: Pick the narrowest scope: Space for one space, Organization for all its spaces, User for cross-org.
+- **Hierarchical token scopes** `FEATURES.md > Hierarchical Token Scopes`: User for cross-org, Organization for all its spaces, Space for one space.
+- **JSON-rules entitlements** `FEATURES.md > ABAC / JSON-Rules Integration`: Conditional attribute logic; roles suffice for fixed grants.
+- **Multi-level roles** `FEATURES.md > Multi-Level RBAC`: Simple role grants; use JSON-rules entitlements for attribute logic, ReBAC graph for inherited access.
 - **Pass the delegate** `docs/claude/DATABASE.md > Delegate Typing > Pass the Delegate`: Caller knows the model; avoid db[toAccessor(model)] which yields an untyped delegate union.
   - *Signs you're bypassing it:* `db[toAccessor(model)].findMany(...)` with casts or `as any` to silence the delegate-union error, or `<User>` generic annotations on query helpers, instead of passing `db.user` to `query.*` (docs/claude/DATABASE.md § Delegate Typing)
 - **Per-request scoped db client** `FEATURES.md > Database & ORM > Request Scoping`: tag every query with the request ID for tracing and logging
 - **Permission result caching** `FEATURES.md > Redis Performance Caching`: cache permission evaluation results in Redis for 10 minutes
+- **Post-transaction job queue** `FEATURES.md > Database & ORM > Post-Transaction Queue`: Background jobs from within transactions; ad-hoc callbacks use db.onCommit.
+  - *Signs you're bypassing it:* enqueuing a job mid-transaction so it runs against rows that may roll back, instead of enqueuing after commit (FEATURES.md § Database & ORM › Post-Transaction Queue)
+- **Seed passwords as bcrypt hashes** `packages/db/prisma/seeds/account.seed.ts`: store seeded credential passwords pre-hashed with bcrypt on account records
+- **Seed pipeline: id upsert, tables sequential, records concurrent** `packages/db/prisma/seed.ts`: upsert by id, seeding tables in order and records via resolveAll concurrency 10
 - **Test transaction isolation** `FEATURES.md > Database & ORM`: run each test in a transaction rolled back afterwards
 - **URL context sync** `FEATURES.md > Multi-Tenancy > URL State Sync`: Persist tenant context in URL rather than only local state.
+- **URL token fallback** `FEATURES.md > URL Token Fallback`: WebSocket upgrades and email links only; otherwise Bearer header.
+- **AccessorNames / accessorNames / isAccessorName / toAccessor** `@template/db > Model Utilities > camelCase`: Delegate keys on db; for PascalCase model names use ModelNames/toModelName.
 - **addCheckConstraint** `FEATURES.md > Advanced Constraints`: Row-level value rules; uniqueness uses addUniqueWhereNotNull.
 - **addGistIndex** `FEATURES.md > Advanced Constraints`: Range/geometric or exclusion queries needing GIST.
 - **addUniqueWhereNotNull** `FEATURES.md > Advanced Constraints`: Nullable unique columns; CHECK rules use addCheckConstraint.
   - *Signs you're bypassing it:* a hand-written `CREATE UNIQUE INDEX ... WHERE col IS NOT NULL` in ad-hoc SQL, or a single composite unique over all nullable polymorphic FKs (FEATURES.md § Advanced Constraints; FEATURES.md › Contact System (Partial unique per polymorphic owner FK))
+- **AuthProvider** `AuthProvider model (FEATURES.md > Multi-Provider Auth)`: Per-org or centrally managed SSO; built-in social login uses platformProviders.
 - **beforeCreate / afterUpdate hooks** `docs/claude/HOOKS.md`: In-transaction logic; for external notifications after commit use db.onCommit instead.
+- **cookieCache.maxAge** `BetterAuth config (FEATURES.md > Stateless JWT)`: skip DB session validation for up to 5 minutes per JWT
 - **create* factories** `docs/claude/TESTING.md`: Test data setup; override only fields the test cares about.
 - **Database dump/restore/clone** `FEATURES.md > Database & ORM > Database Utilities`: copy database state between environments, truncating webhook subscriptions on clone
 - **db.findForUpdate** `@template/db > Client Methods`: In-txn row serialization; for cross-process non-row ownership use createLock.
   - *Signs you're bypassing it:* a raw $queryRaw `SELECT … FOR UPDATE`, or a read-then-update in a transaction with no row lock (docs/claude/DATABASE.md § Row Locks and Create-If-Missing)
 - **db.getScopeId** `@template/db > Client Methods`: read the current AsyncLocalStorage scope id
   - *Signs you're bypassing it:* generating a separate correlation ID or passing requestId into db/log helpers by hand (docs/claude/CONTEXT.md § Database Scope)
-- **db.isInTxn** `@template/db`: detect whether the current call is inside a transaction
+- **db.isInTxn** `@template/db > Client Methods`: check whether code is running inside a transaction
 - **db.onCommit** `@template/db > Client Methods`: Side effects only on success; db.onFinally to run on commit or rollback.
   - *Signs you're bypassing it:* sending email, calling an external API or enqueuing a job directly inside db.txn (so it fires even if the transaction rolls back), or a hand-built after-commit callback list (docs/claude/DATABASE.md § Transactions › After Commit Callbacks; FEATURES.md § Post-Commit Callbacks)
 - **db.onFinally** `@template/db > Client Methods`: Cleanup regardless of outcome; db.onCommit for success-only effects.
@@ -173,22 +186,46 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **generated zod schemas** `packages/db/src/generated/zod/`: use instead of hand-written request/response types for model shapes.
 - **isModelName / isAccessorName** `FEATURES.md > Model Name Utilities`: guard and convert between model names (User) and accessor names (user)
 - **local:db** `docs/claude/DATABASE.md > Local Setup`: first start only; to wipe and reseed use reset:db instead.
+- **ModelNames / modelNames / isModelName / toModelName** `@template/db > Model Utilities > PascalCase`: PascalCase model names; for camelCase delegate keys use AccessorNames/toAccessor.
 - **mutationLifeCycle** `@template/db > Delegate Typing > Mutation Lifecycle Pattern`: Hooks get previous automatically; don't refetch it yourself.
   - *Signs you're bypassing it:* a hook or service re-fetching the old row before an update, when hooks already receive `previous` (docs/claude/DATABASE.md § Delegate Typing › Mutation Lifecycle Pattern)
+- **Organization** `FEATURES.md > Multi-Tenancy > Organizations`: Top-level tenant; for sub-containers within an org use Space instead.
+- **OrganizationUser** `FEATURES.md > Multi-Tenancy > Organization Memberships`: Org-level membership; space-level access uses SpaceUser, which requires this first.
+- **platformProviders** `FEATURES.md > OAuth Social Providers`: Platform-wide social login; per-org OAuth/SAML belongs in the AuthProvider model.
+- **prismaMap.gen.ts** `packages/db/src/generated/prismaMap.gen.ts`: runtime model metadata instead of hand-declared model types.
 - **query.findMany** `FEATURES.md > Pass-the-Delegate Pattern`: Instead of generic-annotated query helpers.
+- **reset:db** `docs/claude/DATABASE.md > Local Setup`: clean slate locally; local:db just starts containers, db:push only syncs schema.
 - **Runtime schema introspection** `FEATURES.md > Database & ORM`: Over hand-declared model metadata.
+- **SeedFile** `packages/db/prisma/seed.ts`: declare a model's seed records, omitted update fields and create-only mode
+- **setToken** `/auth/callback (FEATURES.md > Session Authentication)`: OAuth callback only; email/password relies on the HTTP-only cookie instead.
+  - *Signs you're bypassing it:* localStorage.setItem('auth_token', …) or a cookie written by hand after sign-in (docs/claude/FRONTEND/AUTH.md § Architecture)
+- **Space** `FEATURES.md > Multi-Tenancy > Spaces`: Sub-container inside an org; use Organization for top-level tenancy.
+- **SpaceUser** `FEATURES.md > Multi-Tenancy > Space Memberships`: Space-scoped access; requires an existing OrganizationUser for the parent org.
+- **Spoof badge** `AppShell (FEATURES.md > Spoof Badge UI)`: show impersonation banner with a Clear Spoof action
 - **validateOwnerPermission** `permission middleware (FEATURES.md > Permission Middleware)`: Owner-only actions; otherwise validatePermission.
   - *Signs you're bypassing it:* a switch on resource.ownerModel calling permix.check('user' | 'organization', …) per branch inside a controller (docs/claude/PERMISSIONS.md § Validation Middleware › validateOwnerPermission)
 - **validatePermission** `permission middleware (FEATURES.md > Permission Middleware)`: General action checks; ownership-only actions use validateOwnerPermission.
   - *Signs you're bypassing it:* a handler that loads the resource itself and calls permix.check / throws 403 by hand on a route where resourceContextMiddleware + validatePermission(action) would do it (docs/claude/PERMISSIONS.md § Validation Middleware)
+- **x-spoof-user-email** `spoof middleware (FEATURES.md > User Impersonation)`: Superadmin support only; responses echo x-spoofing-user-email and x-spoofed-user-email.
 - **Access context through central store** `FEATURES.md > Multi-Tenancy > State Management`: Any component needing current tenant or user context.
+- **Encrypt OAuth client secrets** `FEATURES.md > Encrypted Secrets`: Any stored provider credential.
 - **Enum suffix naming** `docs/claude/DATABASE.md > Schema Conventions > Enum Naming`: Naming any new Prisma enum and its values.
-- **Mutations auto-wrapped in transactions** `mutationLifeCycle`: Always; use db.txn explicitly only when several writes must commit together.
+- **Fresh Permix client per request** `FEATURES.md > Per-Request Isolation`: All permission evaluation.
+  - *Signs you're bypassing it:* a module-level or cached permix instance reused across requests (FEATURES.md › Per-Request Isolation; docs/claude/PERMISSIONS.md § Permix)
 - **Never fire production webhooks locally** `docs/claude/DATABASE.md > Database Operations`: whenever loading remote data into local or test databases.
-- **No bare upsert or unique-violation catch** `no-create-race-machinery CI rule`: Any create-if-missing logic; CI rule no-create-race-machinery enforces it.
 - **No hook-skipping bulk writes** `FEATURES.md > Database & ORM > Transaction-Aware Hooks`: Any write through the Prisma client.
+- **Personal access tokens shown once** `FEATURES.md > Personal Access Tokens`: All personal access tokens.
+- **Prime flag for dev-only seed data** `packages/db/prisma/seeds/`: any record not safe for production; omit flag for production-safe data.
+- **Register seeds in FK-safe order** `packages/db/prisma/seeds/index.ts`: when adding a new seed file.
+  - *Signs you're bypassing it:* a seed file that isn't added to seeds/index.ts, or is added before the tables it references (docs/claude/DATABASE.md § Seeding › Adding Seed Data)
+- **Seed records use valid unique UUIDv7 ids** `packages/db/prisma/seeds/`: every seed record.
+  - *Signs you're bypassing it:* seed records with uuid v4, sequential or omitted ids (the seed upserts by id and validates v7) (docs/claude/DATABASE.md § Seeding › Seed Architecture)
+- **Space inherits org permissions** `FEATURES.md > Hierarchical Inheritance`: Any space-level permission check.
+- **Space membership requires org membership** `FEATURES.md > Multi-Tenancy > Space Memberships`: Whenever granting space access or adding SpaceUser records.
 - **Split Prisma schema, one file per model** `packages/db/prisma/schema/`: whenever adding or changing a model.
 - **Split schema per model** `packages/db/prisma/schema/`: Adding or editing any Prisma model.
+- **Tenant data isolation** `FEATURES.md > Multi-Tenancy > Organizations`: All tenant-owned reads and writes.
+- **UUID v7 IDs** `FEATURES.md > Database & ORM`: Every model primary key.
 - *Also here, by name:* claimPendingRegistration (`packages/db/src/extensions/transactionRegistry.ts`); closeTransactionRegistration (`packages/db/src/extensions/transactionRegistry.ts`); count (`packages/db/src/utils/delegates.ts`); create (`packages/db/src/utils/delegates.ts`); del (`packages/db/src/utils/delegates.ts`); findFirst (`packages/db/src/utils/delegates.ts`); findMany (`packages/db/src/utils/delegates.ts`); findUnique (`packages/db/src/utils/delegates.ts`); getCurrentTransaction (`packages/db/src/extensions/transactionRegistry.ts`); openTransactionRegistration (`packages/db/src/extensions/transactionRegistry.ts`); readPrismaTransaction (`packages/db/src/extensions/prismaTransaction.ts`); registrationProbe (`packages/db/src/extensions/transactionRegistry.ts`); update (`packages/db/src/utils/delegates.ts`)
 
 ### Class `data-modeling`: Schema conventions: split schema, UUIDv7/typed IDs, enum vs row, false polymorphism
@@ -201,7 +238,6 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **ModelIdType** `packages/db/src/typedModelIds.ts#ModelIdType`: enumerate model names that have branded id types
 - **PolymorphismRegistry** `packages/db/src/registries/falsePolymorphism.ts#PolymorphismRegistry`: Single source for polymorphic shape; read it via getPolymorphismConfig rather than importing the raw object.
 - **resolveFalsePolymorphismRef** `packages/db/src/registries/falsePolymorphism.ts#resolveFalsePolymorphismRef`: Guard with isFalsePolymorphismRef first; for raw config lookup use getPolymorphismConfig.
-- **False polymorphism** `docs/claude/HOOKS.md > False Polymorphism`: instead of a single polymorphic ownerId without FK constraints
 - **falsePolymorphism transformers** `apps/api/src/hooks/falsePolymorphism/`: Polymorphic owner constraints; not a runtime hook.
 - **Immutable seed-only defaults** `docs/claude/DATABASE.md#Special Owner Values (No FK)`: Resources that must never change after deployment; otherwise allow super admins to edit defaults.
 - **Owner resolution priority** `docs/claude/DATABASE.md#Special Owner Values (No FK)`: Resolving tenant-customizable resources such as email templates.
@@ -223,7 +259,6 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **Segment members written only by reconcile** `packages/db/prisma/schema/segmentMember.prisma`: Any change to segment membership.
   - *Signs you're bypassing it:* any SegmentMember write outside applyMembershipDiff / the reconcile jobs (docs/claude/SEGMENTS.md § Static and dynamic membership; catalog entry on segmentMember.prisma)
 - **Separate concerns by lifecycle and ownership** `CLAUDE.md §0.2 Decomposition by Default`: When tempted to 'just add a field', store a URL, or merge into one table.
-- **UUID v7 IDs** `FEATURES.md > Database & ORM`: Every model primary key.
 - **UUIDv7 primary keys** `docs/claude/DATABASE.md > Schema Conventions > ID Fields (UUIDv7)`: Every Prisma model's primary key.
   - *Signs you're bypassing it:* `@default(uuid())` / `cuid()` / autoincrement ids or `crypto.randomUUID()`, instead of `@default(dbgenerated("uuidv7()")) @db.VarChar(36)` (and `uuidv7()` in code) (docs/claude/DATABASE.md § Schema Conventions › ID Fields (UUIDv7))
 - *Also here, by name:* TagResource (`packages/db/prisma/schema/tagAttachment.prisma`); accountId (`packages/db/src/typedModelIds.ts`); appEventId (`packages/db/src/typedModelIds.ts`); auditLogId (`packages/db/src/typedModelIds.ts`); authProviderId (`packages/db/src/typedModelIds.ts`); contactId (`packages/db/src/typedModelIds.ts`); cronJobId (`packages/db/src/typedModelIds.ts`); customerRefId (`packages/db/src/typedModelIds.ts`); emailComponentId (`packages/db/src/typedModelIds.ts`); emailTemplateId (`packages/db/src/typedModelIds.ts`); inquiryId (`packages/db/src/typedModelIds.ts`); isFalsePolymorphismRef (`packages/db/src/registries/falsePolymorphism.ts`); organizationId (`packages/db/src/typedModelIds.ts`); organizationUserId (`packages/db/src/typedModelIds.ts`); sessionId (`packages/db/src/typedModelIds.ts`); spaceId (`packages/db/src/typedModelIds.ts`); spaceUserId (`packages/db/src/typedModelIds.ts`); tagAttachmentId (`packages/db/src/typedModelIds.ts`)
@@ -234,19 +269,24 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **buildPrismaMapV6** `@inixiative/prisma-map/v6#buildPrismaMapV6`: Prisma 6 clients; Prisma 7 clients use the v7 parsers like parseRuntimeDataModel.
 - **buildPrismaMapV6** `@inixiative/prisma-map#buildPrismaMapV6`: Prisma 6 clients; Prisma 7 clients: buildPrismaMapV7 instead.
 - **buildPrismaMapV7** `@inixiative/prisma-map/v7#buildPrismaMapV7`: build a PrismaMap for Prisma v7
+  - *Signs you're bypassing it:* regex-parsing schema.prisma or reading Prisma.dmmf by hand to learn models, fields and relations at runtime (@inixiative/prisma-map/README.md (preface); § Quick Start)
 - **buildPrismaMapV7** `@inixiative/prisma-map#buildPrismaMapV7`: Prisma 7 clients; Prisma 6 clients: buildPrismaMapV6 instead.
+  - *Signs you're bypassing it:* regex-parsing schema.prisma or reading Prisma.dmmf by hand to learn models, fields and relations at runtime (@inixiative/prisma-map/README.md (preface); § Quick Start)
 - **columnName** `@inixiative/prisma-map#columnName`: Use for raw SQL column names instead of the field name; tableName for tables, storedValue for enum values.
 - **DbIdentifier** `@inixiative/prisma-map#DbIdentifier`: Database names from resolvers; values use DbValue instead.
 - **getRelations** `@inixiative/prisma-map#getRelations`: Whole-model relation listing; relationForeignKey when you only need one relation's collapsed FK.
+  - *Signs you're bypassing it:* looping over a model's fields checking kind === 'object' and fromFields[0] by hand to list its relations and FKs (@inixiative/prisma-map/README.md § Relation Traversal)
 - **hasColumn** `@inixiative/prisma-map#hasColumn`: Any column-backed field; isScalarField or isEnumField when you need only one variant.
 - **parseRelationFks** `@inixiative/prisma-map/v7#parseRelationFks`: Only FK mappings; back-relations absent. For full model maps use buildFromSchemaFile or parseSchemaText.
 - **parseRuntimeDataModel** `@inixiative/prisma-map/v7#parseRuntimeDataModel`: Prisma 7 clients; for Prisma 6 use buildFromSchemaFile or buildPrismaMapV6.
 - **parseSchemaStructure** `@inixiative/prisma-map/v7#parseSchemaStructure`: Use when you need doc comments; for field types and relations use parseSchemaText or parseRuntimeDataModel.
 - **parseSchemaText** `@inixiative/prisma-map/v6#parseSchemaText`: Schema string in hand; from a client path use buildFromSchemaFile. FK-only needs: parseRelationFks.
 - **parseTagClasses** `@inixiative/prisma-map#parseTagClasses`: parse @tagClass(key: value) annotations from Prisma doc-comment text
+  - *Signs you're bypassing it:* a custom regex over Prisma /// comment text to pull out @name(key: value) metadata (@inixiative/prisma-map/README.md § Annotation DSL)
 - **PrismaMap** `@inixiative/prisma-map#PrismaMap`: Use instead of hand-declaring model or field types; resolve table/column names via tableName/columnName.
   - *Signs you're bypassing it:* hand-declared model or field type maps, or string lists of model fields kept in sync by hand, instead of the generated prismaMap.gen.ts (FEATURES.md § Runtime Schema Introspection; packages/db/src/generated/prismaMap.gen.ts)
 - **relationForeignKey** `@inixiative/prisma-map#relationForeignKey`: Single relation field; getRelations already includes the collapsed FK per relation.
+  - *Signs you're bypassing it:* hand-collapsing fromFields / toFields into a single FK name or a referenced-to-local map for one relation (@inixiative/prisma-map/README.md § Relation Traversal)
 - **storedValue** `@inixiative/prisma-map#storedValue`: Raw SQL enum comparisons; pair with tableName/columnName instead of hard-coding identifiers.
 - **tableName** `@inixiative/prisma-map#tableName`: Raw SQL table identifiers; columnName for fields, storedValue for enum values.
 - **AccessorNames** `packages/db/src/utils/modelNames.ts#AccessorNames`: Typed accessor constant: AccessorNames; iterate all: accessorNames; PascalCase model names: ModelNames.
@@ -271,12 +311,13 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **walkWhere** `packages/db/src/utils/whereWalker.ts#walkWhere`: traverse a Prisma where tree per model, visiting nodes with their scope
 - **withDiscriminatorDefaults** `packages/db/src/registries/discriminatorDefaults.ts#withDiscriminatorDefaults`: Filling a payload; for one field's default use discriminatorDefault.
 - **Prisma schema annotation DSL** `@inixiative/prisma-map/README.md — Annotation DSL`: Custom schema metadata Prisma attributes cannot express; consumer decides meaning.
-- **AccessorNames / accessorNames / isAccessorName / toAccessor** `@template/db > Model Utilities > camelCase`: Delegate keys on db; for PascalCase model names use ModelNames/toModelName.
+  - *Signs you're bypassing it:* a side config file or hard-coded list naming which relations or indexes need special handling (tree parents, fuzzy search) instead of a /// @tagClass(...) comment on the declaration (@inixiative/prisma-map/README.md § Annotation DSL)
 - **DbIdentifier / DbValue** `@inixiative/prisma-map`: Type raw SQL builder parameters with these instead of bare string.
-- **ModelNames / modelNames / isModelName / toModelName** `@template/db > Model Utilities > PascalCase`: PascalCase model names; for camelCase delegate keys use AccessorNames/toAccessor.
-- **prismaMap.gen.ts** `packages/db/src/generated/prismaMap.gen.ts`: runtime model metadata instead of hand-declared model types.
+  - *Signs you're bypassing it:* a raw SQL builder whose column and value parameters are typed as bare string, so a Prisma field name or enum member compiles and silently matches no rows (@inixiative/prisma-map/README.md § Resolving DB identifiers)
 - **Annotation comment binds to next declaration** `@inixiative/prisma-map/README.md — Annotation DSL`: Whenever annotating Prisma schema declarations with tag classes.
+  - *Signs you're bypassing it:* a /// annotation separated from its declaration by a blank line or a // comment, which silently drops the binding (@inixiative/prisma-map/README.md § Annotation DSL (Placement))
 - **Derive relation map from Prisma client** `@inixiative/permissions/README.md#Hydration (Prisma example)`: Whenever wiring a ReBAC resolver or hydrator to a Prisma schema.
+  - *Signs you're bypassing it:* a hand-maintained relationTargets object ({ membership: { organization: 'organization' } }) for the resolver, or a parents list kept separately from it, instead of deriving both from one buildPrismaMapV7() map (@inixiative/permissions/README.md § Hydration ("Don't hand-maintain the relation map"))
 - **Generated defaults never injected** `@inixiative/prisma-map/README.md — field default`: Whenever consuming field.default from the map.
 - **Resolve DB names via resolvers, never ?? fallback** `@inixiative/prisma-map/README.md › Notes and Limits`: Whenever building raw SQL or comparing against DB identifiers or enum stored values from the prisma map.
   - *Signs you're bypassing it:* raw SQL with hard-coded table/column names or `field.dbName ?? field.name` fallbacks, instead of tableName / columnName / storedValue from @inixiative/prisma-map (@inixiative/prisma-map/README.md › Notes and Limits)
@@ -323,7 +364,6 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **bun run db:push:force** `package.json`: Only when db:push refuses due to data loss; otherwise db:push.
 - **bun run db:restore** `package.json`: Restore a db:dump snapshot; for direct database copy use db:clone, for fixture data db:seed.
 - **bun run db:studio** `package.json`: open Prisma Studio to browse and edit database rows
-- **reset:db** `docs/claude/DATABASE.md > Local Setup`: clean slate locally; local:db just starts containers, db:push only syncs schema.
 - **scripts/db/clone.sh** `scripts/db/clone.sh`: Pulling remote data locally; use instead of dump.sh plus restore.sh to avoid live webhooks.
   - *Signs you're bypassing it:* copying a remote database with a hand-run pg_dump | pg_restore (or db:dump + db:restore), which leaves live webhook subscriptions in the local copy (docs/claude/DATABASE.md § Scripts › Database Operations)
 - **scripts/db/dump.sh** `scripts/db/dump.sh`: export the database to a dump
@@ -338,15 +378,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
   - *Signs you're bypassing it:* one-off fixture-insert scripts or hand-run `db.x.create` loops to populate a database, instead of SeedFiles run by the seed runner (use factories for test data) (docs/claude/DATABASE.md § Seeding; catalog seed)
 - **seedTable** `packages/db/prisma/seed.ts#seedTable`: One model's seed file only; run seed for the full dataset under the seed audit actor.
 - **bun run db:seed** `package.json`: Fresh fixture data; to copy real data use db:clone or db:restore instead.
-- **Seed passwords as bcrypt hashes** `packages/db/prisma/seeds/account.seed.ts`: store seeded credential passwords pre-hashed with bcrypt on account records
-- **Seed pipeline: id upsert, tables sequential, records concurrent** `packages/db/prisma/seed.ts`: upsert by id, seeding tables in order and records via resolveAll concurrency 10
 - **packages/db/prisma/seed.ts** `packages/db/prisma/seed.ts`: seed the database with UUID-validated data
-- **SeedFile** `packages/db/prisma/seed.ts`: declare a model's seed records, omitted update fields and create-only mode
-- **Prime flag for dev-only seed data** `packages/db/prisma/seeds/`: any record not safe for production; omit flag for production-safe data.
-- **Register seeds in FK-safe order** `packages/db/prisma/seeds/index.ts`: when adding a new seed file.
-  - *Signs you're bypassing it:* a seed file that isn't added to seeds/index.ts, or is added before the tables it references (docs/claude/DATABASE.md § Seeding › Adding Seed Data)
-- **Seed records use valid unique UUIDv7 ids** `packages/db/prisma/seeds/`: every seed record.
-  - *Signs you're bypassing it:* seed records with uuid v4, sequential or omitted ids (the seed upserts by id and validates v7) (docs/claude/DATABASE.md § Seeding › Seed Architecture)
 - *Also here, by name:* accountSeeds (`packages/db/prisma/seeds/account.seed.ts`); contactSeeds (`packages/db/prisma/seeds/contact.seed.ts`); cronJobSeeds (`packages/db/prisma/seeds/cronJob.seed.ts`); emailComponentSeeds (`packages/db/prisma/seeds/emailComponent.seed.ts`); emailSeedSavers (`apps/api/src/lib/email/emailSeedSavers.ts`); emailTemplateSeeds (`packages/db/prisma/seeds/emailTemplate.seed.ts`); organizationSeeds (`packages/db/prisma/seeds/organization.seed.ts`); organizationUserSeeds (`packages/db/prisma/seeds/organizationUser.seed.ts`); spaceSeeds (`packages/db/prisma/seeds/space.seed.ts`); spaceUserSeeds (`packages/db/prisma/seeds/spaceUser.seed.ts`); tokenSeeds (`packages/db/prisma/seeds/token.seed.ts`); userSeeds (`packages/db/prisma/seeds/user.seed.ts`)
 
 ## 4. The specifics, in full
