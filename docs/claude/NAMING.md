@@ -221,6 +221,11 @@ A polymorphic slot is named for the role the row plays, as `<side>Model` + typed
 
 Never `referenced*`.
 
+Each side gets its own enum, named for the question it answers, even when the two lists overlap:
+`TagOwnerModel` (who can own a tag: `Tag.ownerModel`, `TagCategory.ownerModel`) and `TagResource`
+(where a tag can be applied: `TagAttachment.resourceModel`, `Tag.resources`). A value that is only
+meaningful on one side (`platform`, an owner with no row) never appears in the other side's enum.
+
 The typed FKs and relations carry the side too, so both ends read the same way: `sourceSegmentId` /
 `sourceSegment`, `targetTagId` / `targetTag` (as `Inquiry.sourceUserId` / `targetUserId`). The
 back-relations do the same, side plus the full model name: `sourceRuleReferences` on a source model,
