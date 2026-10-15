@@ -3,7 +3,9 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { OpenAPIHono } from '@hono/zod-openapi';
+import { toOpenApi } from '#/lib/routeTemplates/utils';
 import { autoRegisterRoutes } from '#/lib/utils/autoRegisterRoutes';
+import { adminSpaceReadManyRoute } from '#/modules/space/routes/adminSpaceReadMany';
 import type { AppEnv } from '#/types/appEnv';
 
 const moduleDir = mkdtempSync(resolve(tmpdir(), 'route-order-'));
@@ -61,5 +63,25 @@ describe('autoRegisterRoutes', () => {
     const exactResponse = await router.request('/foo');
     expect(exactResponse.status).toBe(200);
     expect(await exactResponse.json()).toEqual({ route: 'zExact' });
+  });
+
+  it('skips a route already mounted by hand, so it registers once and the hand mount serves it', async () => {
+    const router = new OpenAPIHono<AppEnv>();
+    router.openapi(toOpenApi({ ...adminSpaceReadManyRoute, path: '/foo' }), (c) =>
+      c.json({ route: 'byHand' }),
+    );
+
+    await autoRegisterRoutes(router, moduleDir);
+
+    const registeredPaths = router.openAPIRegistry.definitions.flatMap((definition) =>
+      definition.type === 'route' ? [`${definition.route.method} ${definition.route.path}`] : [],
+    );
+    expect(registeredPaths.filter((key) => key === 'get /foo')).toHaveLength(1);
+    expect(router.routes.filter((route) => route.path === '/foo')).toHaveLength(
+      router.routes.filter((route) => route.path === '/dashboard').length,
+    );
+
+    const response = await router.request('/foo');
+    expect(await response.json()).toEqual({ route: 'byHand' });
   });
 });
