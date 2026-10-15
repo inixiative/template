@@ -6,7 +6,7 @@
     "frontend-routing",
     "navigation"
   ],
-  "tokens": 17603,
+  "tokens": 18134,
   "tokenMethod": "chars/4",
   "runsAgreed": 3,
   "sources": {
@@ -35,21 +35,19 @@
       "doc:docs/claude/FRONTEND/ROUTING_NAVIGATION.md#navigation"
     ],
     "catalogClusters": [
+      "auth-middleware-validation",
       "authentication-methods",
-      "filtering-search-ordering",
       "frontend-app-shells-routes",
       "frontend-navigation-context",
       "frontend-state-api-client",
       "module-layout-monorepo",
       "multi-tenancy-membership",
-      "pagination",
       "roles-and-permissions",
       "structured-logging",
-      "superadmin-operations",
-      "ui-components"
+      "superadmin-operations"
     ],
     "codeEntries": 102,
-    "docMembers": 55
+    "docMembers": 46
   },
   "bypassLines": 25,
   "glossaryTerms": 28

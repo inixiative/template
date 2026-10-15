@@ -6,7 +6,7 @@
     "ui-components",
     "theme-layout"
   ],
-  "tokens": 16636,
+  "tokens": 16552,
   "tokenMethod": "chars/4",
   "runsAgreed": 3,
   "sources": {
@@ -36,12 +36,10 @@
       "frontend-state-api-client",
       "integrations-records",
       "module-layout-monorepo",
-      "multi-tenancy-membership",
-      "pagination",
       "ui-components"
     ],
     "codeEntries": 67,
-    "docMembers": 46
+    "docMembers": 28
   },
   "bypassLines": 32,
   "glossaryTerms": 28

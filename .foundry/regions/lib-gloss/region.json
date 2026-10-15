@@ -1,11 +1,12 @@
 {
   "id": "lib-gloss",
-  "title": "Gloss library (margin comments)",
-  "routing": "Is this about the @inixiative/gloss library: keeping source comment-free except `// why:`, daggers (`// gloss`, `// gloss:file`) and machine directives; the mirrored .gloss/ sidecar (src/foo.ts -> .gloss/src/foo.ts.md, one `## <symbol>` section per symbol); or the gloss CLI (lint, check, fix, harvest --staged, watch, read, history, setup) and its package.json directives / exclude config?",
+  "title": "Gloss (margin comments)",
+  "routing": "Is this about @inixiative/gloss or writing / reading a gloss: keeping source comment-free except `// why:`, daggers (`// gloss`, `// gloss:file`) and machine directives; the mirrored .gloss/ sidecar (src/foo.ts -> .gloss/src/foo.ts.md, `# <path>` h1, one `## <symbol>` section per symbol); the CLAUDE.gloss.md agent guidance that gloss setup installs (the filing rule, never delete a section or dagger to green a check, run gloss fix); or the gloss CLI (lint, check, fix, harvest --staged, watch, read, history, setup) and its package.json directives / exclude config?",
   "concepts": [
-    "lib-gloss"
+    "lib-gloss",
+    "gloss"
   ],
-  "tokens": 5064,
+  "tokens": 5435,
   "tokenMethod": "chars/4",
   "runsAgreed": 0,
   "sources": {
@@ -31,5 +32,5 @@
     "docMembers": 0
   },
   "bypassLines": 0,
-  "glossaryTerms": 23
+  "glossaryTerms": 25
 }

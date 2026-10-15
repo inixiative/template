@@ -1,0 +1,48 @@
+{
+  "id": "authentication",
+  "title": "Authentication and Users",
+  "routing": "Is this about who the caller is on the server? The BetterAuth auth instance and Session, the OAuth one-time-token handoff (oauthHandoffPlugins, #ott), AuthProvider/Account/Verification, platform providers, API Token rows and TokenOwnerModel (User/Organization/OrganizationUser/Space/SpaceUser tokens, createToken, organizationCreateToken), the auth middleware chain (tokenAuthMiddleware, authMiddleware, spoofMiddleware, basicAuthMiddleware, auditActorMiddleware, authRateLimit), getActor and the validateUser/validateActor/validateNotToken gates, or User identity helpers (findUserByEmail, findUserWithRelations, findUserOrCreateGuest, normalizeEmail, redactUser, the me module)?",
+  "concepts": [
+    "authentication",
+    "auth-middleware",
+    "users"
+  ],
+  "tokens": 17873,
+  "tokenMethod": "chars/4",
+  "runsAgreed": 2,
+  "sources": {
+    "docs": [
+      "FEATURES.md",
+      "docs/claude/AUTH.md"
+    ],
+    "docUnits": [
+      "doc:docs/claude/AUTH.md#overview",
+      "doc:docs/claude/AUTH.md#betterauth-session",
+      "doc:docs/claude/AUTH.md#oauth-bearer-tokens",
+      "doc:docs/claude/AUTH.md#multi-provider-authentication-authprovider",
+      "doc:docs/claude/AUTH.md#token-authentication",
+      "doc:docs/claude/AUTH.md#token-types",
+      "doc:FEATURES.md#authentication-sessions",
+      "doc:docs/claude/AUTH.md#auth-middleware-chain",
+      "doc:docs/claude/AUTH.md#spoof-middleware",
+      "doc:docs/claude/AUTH.md#validation-middleware",
+      "doc:docs/claude/AUTH.md#choosing-between-validateuser-and-validateactor",
+      "doc:FEATURES.md#user-management"
+    ],
+    "catalogClusters": [
+      "auth-middleware-validation",
+      "authentication-methods",
+      "caching-and-invalidation",
+      "encryption-key-rotation",
+      "request-context-access",
+      "request-response-schemas",
+      "roles-and-permissions",
+      "superadmin-operations",
+      "user-identity-management"
+    ],
+    "codeEntries": 73,
+    "docMembers": 34
+  },
+  "bypassLines": 21,
+  "glossaryTerms": 27
+}

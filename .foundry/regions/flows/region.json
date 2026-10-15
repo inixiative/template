@@ -1,0 +1,40 @@
+{
+  "id": "flows",
+  "title": "Guided flows",
+  "routing": "Is this about a guided in-app walkthrough across a few pages (an onboarding or setup wizard with Continue/Finish): Flow, FlowKey, flowRegistry and its registry files, bindingsSchema, FlowStep (to, advance auto/confirm, readPath, rule), checkFlow/createFlow, meCreateFlow/flowRead/flowDelete, useStartFlow, useActiveFlow, FlowBanner, flowNext/followFlow/dropFlow, navigation.flowId and ?flow=, skipFlowInvalidate, cleanStaleFlows?",
+  "concepts": [
+    "flows"
+  ],
+  "tokens": 6808,
+  "tokenMethod": "chars/4",
+  "runsAgreed": 1,
+  "sources": {
+    "docs": [
+      "FEATURES.md",
+      "docs/claude/FLOWS.md"
+    ],
+    "docUnits": [
+      "doc:docs/claude/FLOWS.md#preface",
+      "doc:docs/claude/FLOWS.md#registry",
+      "doc:docs/claude/FLOWS.md#lifecycle",
+      "doc:docs/claude/FLOWS.md#routes",
+      "doc:docs/claude/FLOWS.md#client",
+      "doc:docs/claude/FLOWS.md#adding-a-flow",
+      "doc:FEATURES.md#flows"
+    ],
+    "catalogClusters": [
+      "batch-request-execution",
+      "cron-and-recurring-work",
+      "frontend-app-shells-routes",
+      "frontend-state-api-client",
+      "guided-flows",
+      "testing-helpers",
+      "testing-rules",
+      "ui-components"
+    ],
+    "codeEntries": 20,
+    "docMembers": 26
+  },
+  "bypassLines": 6,
+  "glossaryTerms": 20
+}

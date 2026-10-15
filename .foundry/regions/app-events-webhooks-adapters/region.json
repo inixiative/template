@@ -9,7 +9,7 @@
     "integrations",
     "object-storage"
   ],
-  "tokens": 15921,
+  "tokens": 16505,
   "tokenMethod": "chars/4",
   "runsAgreed": 1,
   "sources": {
@@ -50,20 +50,19 @@
       "error-handling",
       "immutable-fields",
       "integrations-records",
-      "locks-and-serialization",
       "messaging-channels-adapters",
       "module-layout-monorepo",
+      "mutation-hooks",
       "naming-vocabulary",
       "observability-telemetry",
       "outbound-webhooks",
-      "request-context-access",
       "request-response-schemas",
       "storage-clients",
       "testing-rules",
       "websocket-realtime-delivery"
     ],
     "codeEntries": 70,
-    "docMembers": 57
+    "docMembers": 40
   },
   "bypassLines": 22,
   "glossaryTerms": 30

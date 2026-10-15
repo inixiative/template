@@ -1,25 +1,21 @@
 {
   "id": "database",
   "title": "Database client and schema",
-  "routing": "Is this about reaching Postgres through Prisma or shaping the schema? Signals: importing or calling db / db.txn / db.onCommit / db.onFinally / db.raw / db.scope / $transaction / new PrismaClient, the query.* delegate helpers or db[toAccessor(model)], editing packages/db/prisma/schema/*.prisma (ids, FKs, enums, polymorphic ownerModel + typed FK columns, PolymorphismRegistry), typed model IDs (UserId, organizationId()), model-name or field metadata (ModelNames, toAccessor, modelFields, @inixiative/prisma-map, tableName/columnName, aliasColumns, hydrate), country/currency/language/timezone codes, bun run db:* scripts or migrations, and seed files or db:seed.",
+  "routing": "Is this about reaching Postgres through Prisma or shaping the schema? Signals: importing or calling db / db.txn / db.onCommit / db.onFinally / db.findForUpdate / db.raw / db.scope / db.isInTxn, `$transaction` or `new PrismaClient`, the query.* delegate helpers (passing `db.user` to a generic helper), editing packages/db/prisma/schema/*.prisma (UUIDv7 ids, VarChar(36) FKs, createdAt/updatedAt, enum suffixes, a polymorphic ownerModel / sourceModel / resourceModel plus typed FK columns, PolymorphismRegistry / getPolymorphismConfig), branded model IDs (UserId, organizationId()), partial-unique or CHECK constraints (addUniqueWhereNotNull, addCheckConstraint), and country / currency / language / timezone codes or their zod schemas.",
   "concepts": [
     "db-client",
     "data-modeling",
-    "schema-introspection",
-    "reference-data",
-    "db-scripts",
-    "seeding"
+    "reference-data"
   ],
-  "tokens": 24224,
+  "tokens": 15874,
   "tokenMethod": "chars/4",
-  "runsAgreed": 3,
+  "runsAgreed": 0,
   "sources": {
     "docs": [
       "FEATURES.md",
       "docs/claude/CONTEXT.md",
       "docs/claude/DATABASE.md",
-      "docs/claude/HOOKS.md",
-      "docs/claude/SCRIPTS.md"
+      "docs/claude/HOOKS.md"
     ],
     "docUnits": [
       "doc:docs/claude/CONTEXT.md#database-scope",
@@ -33,48 +29,32 @@
       "doc:docs/claude/DATABASE.md#false-polymorphism",
       "doc:docs/claude/DATABASE.md#registries",
       "doc:docs/claude/DATABASE.md#schema-reference",
-      "doc:docs/claude/HOOKS.md#false-polymorphism",
-      "doc:docs/claude/DATABASE.md#model-utilities",
-      "doc:docs/claude/DATABASE.md#scripts",
-      "doc:docs/claude/SCRIPTS.md#database",
-      "doc:docs/claude/DATABASE.md#seeding"
+      "doc:docs/claude/HOOKS.md#false-polymorphism"
     ],
     "catalogClusters": [
-      "auth-middleware-validation",
-      "authentication-methods",
-      "caching-and-invalidation",
       "contact-channel-definitions",
       "data-access-rules",
       "data-models",
       "database-scripts-migrations",
-      "dev-setup-scripts",
       "documentation-process",
       "email-composition-rendering",
-      "encryption-key-rotation",
-      "frontend-navigation-context",
-      "frontend-state-api-client",
-      "guided-flows",
+      "error-handling",
       "integrations-records",
       "job-definition-and-enqueue",
       "locks-and-serialization",
       "module-layout-monorepo",
-      "multi-tenancy-membership",
       "mutation-hooks",
       "naming-vocabulary",
-      "outbound-webhooks",
-      "permission-rule-algebra",
       "prisma-schema-introspection",
       "request-context-access",
       "request-response-schemas",
-      "roles-and-permissions",
-      "seeding-data",
       "segments-membership",
       "superadmin-operations",
       "testing-helpers"
     ],
-    "codeEntries": 159,
-    "docMembers": 100
+    "codeEntries": 67,
+    "docMembers": 45
   },
-  "bypassLines": 30,
-  "glossaryTerms": 30
+  "bypassLines": 21,
+  "glossaryTerms": 27
 }

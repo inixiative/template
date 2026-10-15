@@ -9,7 +9,7 @@
     "immutable-fields",
     "ordered-lists"
   ],
-  "tokens": 17321,
+  "tokens": 19160,
   "tokenMethod": "chars/4",
   "runsAgreed": 3,
   "sources": {
@@ -35,17 +35,21 @@
     "catalogClusters": [
       "audit-logging",
       "caching-and-invalidation",
+      "customers-providers",
       "data-access-rules",
       "data-models",
       "immutable-fields",
+      "lenses-multi-source",
       "mutation-hooks",
       "ordered-lists",
       "outbound-webhooks",
+      "request-context-access",
       "rule-references-registry",
+      "segments-membership",
       "soft-delete-cascade"
     ],
     "codeEntries": 86,
-    "docMembers": 56
+    "docMembers": 53
   },
   "bypassLines": 27,
   "glossaryTerms": 30

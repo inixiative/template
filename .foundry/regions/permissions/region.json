@@ -1,0 +1,50 @@
+{
+  "id": "permissions",
+  "title": "Permissions (authorization)",
+  "routing": "Is this about whether an authenticated caller may perform an action on a record? Role/StandardAction tiers, entitlements, permix (setup/check/setSuperadmin), the rebacSchema and ReBAC check(), ActionRule delegation ({ rel }, { self }, { rule }, any/all, dot-paths), ownerActions, permissionRules row overrides and buildPermissionRulesSchema, setupOrgPermissions/setupSpacePermissions/setupUserPermissions, lesserRole/intersectEntitlements for tokens, the assign/leave actions, the route validators validatePermission/validateOwnerPermission/validateNotToken, or frontend gates usePermission/checkPermission/NavItem.access/useInquiryPermission?",
+  "concepts": [
+    "permissions"
+  ],
+  "tokens": 18425,
+  "tokenMethod": "chars/4",
+  "runsAgreed": 2,
+  "sources": {
+    "docs": [
+      "FEATURES.md",
+      "docs/claude/PERMISSIONS.md"
+    ],
+    "docUnits": [
+      "doc:docs/claude/PERMISSIONS.md#overview",
+      "doc:docs/claude/PERMISSIONS.md#roles",
+      "doc:docs/claude/PERMISSIONS.md#actions",
+      "doc:docs/claude/PERMISSIONS.md#permix",
+      "doc:docs/claude/PERMISSIONS.md#permission-setup",
+      "doc:docs/claude/PERMISSIONS.md#permission-checks",
+      "doc:docs/claude/PERMISSIONS.md#entitlements",
+      "doc:docs/claude/PERMISSIONS.md#rebac",
+      "doc:docs/claude/PERMISSIONS.md#owner-polymorphic-models",
+      "doc:docs/claude/PERMISSIONS.md#row-level-overrides",
+      "doc:docs/claude/PERMISSIONS.md#space-permissions",
+      "doc:docs/claude/PERMISSIONS.md#validation-middleware",
+      "doc:docs/claude/PERMISSIONS.md#role-assignment",
+      "doc:docs/claude/PERMISSIONS.md#token-permissions",
+      "doc:docs/claude/PERMISSIONS.md#frontend-checks",
+      "doc:FEATURES.md#authorization-permissions"
+    ],
+    "catalogClusters": [
+      "auth-middleware-validation",
+      "frontend-navigation-context",
+      "inquiry-lifecycle",
+      "multi-tenancy-membership",
+      "permission-rule-algebra",
+      "request-response-schemas",
+      "roles-and-permissions",
+      "soft-delete-cascade",
+      "ui-components"
+    ],
+    "codeEntries": 40,
+    "docMembers": 56
+  },
+  "bypassLines": 24,
+  "glossaryTerms": 30
+}

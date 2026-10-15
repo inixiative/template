@@ -1,0 +1,34 @@
+{
+  "id": "lens-model",
+  "title": "The lens model",
+  "routing": "Is this about what a json-rules lens is and how its layers compose \u2014 a Lens anchored at mapName and model, LensNarrowing layers that only narrow, schema narrowing (picks / omits / enumPicks / enumOmits) vs data narrowing (where clamps), relations off until the first narrowing turns them on and the model-default tree, the three where anchors (root.where, a mapDefaults model where, a root.relations path where), the all filter-first trick, composition as intersection and validateNarrowing's codes, LensRefusal, binds across layers (parent:name), enum narrowing from five sources, the full type shape, or a lens's composed / stored / projected forms (storeLens / composeLens / StoredLens)?",
+  "concepts": [
+    "lib-json-rules-lens"
+  ],
+  "tokens": 12263,
+  "tokenMethod": "chars/4",
+  "runsAgreed": 0,
+  "sources": {
+    "docs": [
+      "@inixiative/json-rules/docs/LENS.md"
+    ],
+    "docUnits": [
+      "doc:@inixiative/json-rules/docs/LENS.md#preface",
+      "doc:@inixiative/json-rules/docs/LENS.md#1-why-lens-exists",
+      "doc:@inixiative/json-rules/docs/LENS.md#2-two-kinds-of-narrowing",
+      "doc:@inixiative/json-rules/docs/LENS.md#3-the-three-anchor-layers-for-where",
+      "doc:@inixiative/json-rules/docs/LENS.md#4-the-all-operator-filter-first-trick",
+      "doc:@inixiative/json-rules/docs/LENS.md#5-composition-rules",
+      "doc:@inixiative/json-rules/docs/LENS.md#6-defaults-vs-path-specific",
+      "doc:@inixiative/json-rules/docs/LENS.md#7-per-model-and-per-type-enum-narrowing",
+      "doc:@inixiative/json-rules/docs/LENS.md#8-the-complete-type-shape"
+    ],
+    "catalogClusters": [
+      "lenses-multi-source"
+    ],
+    "codeEntries": 7,
+    "docMembers": 5
+  },
+  "bypassLines": 6,
+  "glossaryTerms": 25
+}

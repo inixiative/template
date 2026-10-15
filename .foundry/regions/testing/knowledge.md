@@ -129,9 +129,33 @@ External services are never called: a provider client wraps each call in VCR fro
 
 ## 3. Everything that exists here, by class
 
-Point at a class when that is as specific as the moment allows, or at a member. Each member: **name** `where`: choose this when … . Where the docs or code give material, a second line describes the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
+Point at a class when that is as specific as the moment allows, or at a member. Where a class has siblings an agent could confuse, a table under the class header says which to use when. Each member: **name** `where`: choose this when … . Where the docs or code give material, a second line describes the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
 
 ### Class `test-harness`: Test structure: running tests, createTestApp, request helpers, frontend tests
+
+**Choosing among siblings: createTestApp vs createTestSocket vs createTestWorker** (docs/claude/TESTING.md § Test App; § Test Structure)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **createTestApp** | route/HTTP tests | WebSocket handlers (createTestSocket); job handlers (createTestWorker) |
+| **createTestSocket** | WebSocket handler tests | HTTP route tests (use createTestApp) |
+| **createTestWorker** | background job handler tests | HTTP route tests (use createTestApp) |
+
+**Choosing among siblings: setEnvOverride vs withEnv** (catalog setEnvOverride, withEnv; CI rule no-test-env-mutation)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **setEnvOverride** | overrides spanning several steps, cleared by resetEnvOverrides | one scoped override (use withEnv) |
+| **withEnv** | a scoped override within one test | overrides spanning several steps (use setEnvOverride) |
+
+**Choosing among siblings: Test commands** (package.json scripts; docs/claude/TESTING.md)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **bun run test** | whole-repo tests | one package (bun run --cwd <pkg> test) |
+| **bun run test:fe** | frontend and UI tests | init scripts (use bun run test:init) |
+| **bun run test:init** | init/ scripts only | frontend tests (use bun run test:fe) |
+| **bun test** | a specific path from apps/api; injects .env.test | whole-repo runs (use bun run test) |
 
 - **cleanupTestJobs** `apps/api/src/jobs/cleanupTestJobs.ts#cleanupTestJobs`: remove leftover jobs in every state from the queue after tests
 - **createBearerToken** `apps/api/tests/utils/createBearerToken.ts#createBearerToken`: mint a real bearer token for a test user to authenticate requests
@@ -160,64 +184,53 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **bun run test:init** `package.json`: Only for init/ scripts; frontend tests: test:fe instead.
 - **New CI rules need fixtures** `scripts/ci/rules, scripts/ci/rule-violations`: add CI rules as scripts with pass/fail fixtures verified by --test
   - *Signs you're bypassing it:* a new rule script under scripts/ci/rules with no pass/fail cases in scripts/ci/rule-violations (FEATURES.md § Custom CI Rules (--test runs rule self-tests against fixtures))
-- **bun run lint** `FEATURES.md > Linting & Formatting`: run Biome plus custom import, generated-file checks across all packages
+- **Run tests per package** `docs/claude/TESTING.md#Running Tests`: Root `bun test` for everything; --cwd form for a single package.
 - **bun test** `docs Testing`: from apps/api it injects .env.test via with-env.sh; pass path for specific tests
 - **check-generated-files.sh** `FEATURES.md > Custom Lint Checks`: fail lint when Prisma or OpenAPI SDK outputs are stale
 - **clearReceivedWebhooks** `FEATURES.md > Testing & Quality`: reset captured test webhook payloads between tests
 - **create*() / build*() factories** `FEATURES.md > Testing & Quality`: create* when the DB row is needed; build* for in-memory data only.
-- **db:generate** `FEATURES.md > Prisma + Zod Generation`: After schema changes; generate:sdk for route changes instead.
-- **generate:routes** `FEATURES.md > Route Tree Generation`: After adding frontend routes.
-- **generate:sdk** `FEATURES.md > Type Safety & Code Generation`: After route changes; db:generate for schema changes instead.
-- **makeController** `FEATURES.md > Boilerplate Reduction`: build type-safe responders from a route definition, skipping manual response construction
-  - *Signs you're bypassing it:* plain async (c) => c.json(...) handlers registered on the router, with no responders and no response validation (docs/claude/API_ROUTES.md § Controllers; FEATURES.md § API Architecture & Routing (makeController))
-- **makeDataConfig** `FEATURES.md > Data Config Builder`: derive searchable, orderable fields and enum filters from the OpenAPI spec
-  - *Signs you're bypassing it:* Hand-declaring searchable/orderable field lists or enum filter options per table in the frontend. (docs/claude/API_ROUTES.md § Data Config + Filters ("no hand-maintained field lists"))
-- **makeError** `FEATURES.md > Boilerplate Reduction`: Instead of constructing HTTPException manually.
-  - *Signs you're bypassing it:* throw new Error('Not found') in a controller or service on the request path (serializes as an opaque 500), or return c.json({ error: '…' }, 404) with a hand-built body (docs/claude/ERRORS.md § The rule; docs/claude/API_ROUTES.md § Error Responses)
 - **readRoute / createRoute / updateRoute** `FEATURES.md > Route Templates`: Standard CRUD endpoints; hand-defined route only for custom actions.
 - **receivedWebhooks** `FEATURES.md > Testing & Quality (POST /test/webhook)`: capture webhook deliveries in tests to assert payload, headers and signatures
-- **requireAuth** `FEATURES.md > Route Guards`: redirect unauthenticated users while preserving navigation context
 - **run-ci-rules.sh** `scripts/ci/run-ci-rules.sh`: execute CI rule scripts alphabetically, or self-test them against fixtures
-  - *Signs you're bypassing it:* a new rule script under scripts/ci/rules with no pass/fail cases in scripts/ci/rule-violations, or a fixture edited so a failing rule passes (docs/claude/SCRIPTS.md § CI Rule Scripts; AI/ENTRYPOINT.md § 0.0 Critical Guardrails)
-- **useAppEvents** `FEATURES.md › Frontend Hooks`: Generic event reactions; for query refetch on event use useEventRefetch.
-- **useAuthenticatedRouting** `FEATURES.md › Frontend Hooks`: Call once at root; per-component permission checks use usePermission instead.
-  - *Signs you're bypassing it:* hand-parsing ?org= / ?space= search params in a page or layout and calling tenant setters from a useEffect (catalog entry useAuthenticatedRouting (don't hand-parse org/space search params); docs/claude/APPS.md § Context Switching)
-- **useAuthProviders** `FEATURES.md › Frontend Hooks`: Rendering OAuth/SSO/password options on login/signup; full flow handling uses useAuthStrategy.
-  - *Signs you're bypassing it:* a login form calling authProviderReadMany or organizationReadAuthProvider directly and choosing between them on ?org= (docs/claude/FRONTEND/AUTH.md § useAuthProviders)
-- **useAuthStrategy** `FEATURES.md › Frontend Hooks`: Managing the login flow; just fetching configured providers for buttons uses useAuthProviders.
-- **useBreadcrumbs** `FEATURES.md › Frontend Hooks`: build breadcrumb label/path trail from current route and navigation config
-  - *Signs you're bypassing it:* a hand-built breadcrumb array per page instead of breadcrumbLabel on the NavItem (catalog entry useBreadcrumbs; docs/claude/FRONTEND/ROUTING_NAVIGATION.md § What the Nav Config Drives)
-- **useDarkMode** `FEATURES.md › Frontend Hooks`: Global theme mode; per-space theming via useSpaceTheme is mock-only.
-  - *Signs you're bypassing it:* toggling document.documentElement.classList 'dark' or reading prefers-color-scheme by hand (docs/claude/FRONTEND/THEME_LAYOUT.md § Hooks)
-- **useDebounce** `FEATURES.md › Frontend Hooks`: delay rapidly changing values to avoid excessive API calls
-- **useEventRefetch** `FEATURES.md › Frontend Hooks`: Cross-component invalidation without prop drilling; pair with useAppEvents emitters. Same-list mutations use useOptimisticMutation.
-  - *Signs you're bypassing it:* prop-drilled refetch callbacks or a shared flag in state to make another component's list refetch after a modal creates a record (FEATURES.md § Frontend Hooks (useEventRefetch, useAppEvents))
-- **useInfiniteData** `FEATURES.md > Data Config Builder`: Infinite scroll lists; usePaginatedData for paged tables.
-  - *Signs you're bypassing it:* Wiring TanStack useInfiniteQuery plus filter state and scroll restore by hand for a load-more list. (docs/claude/FRONTEND/API_CLIENT.md § Data Hooks › useInfiniteData)
-- **useLanguage** `FEATURES.md › Frontend Hooks`: read and set current locale from the Zustand ui slice
-- **useMediaQuery** `FEATURES.md › Frontend Hooks`: return SSR-safe boolean for a media query match
-- **useOptimisticMutation** `FEATURES.md › Frontend Hooks`: List create/update/delete needing instant UI; cross-component refresh after unrelated actions uses useEventRefetch.
-  - *Signs you're bypassing it:* a raw useMutation with hand-written onMutate setQueryData, snapshot/rollback in onError and invalidateQueries in onSettled for a list (docs/claude/FRONTEND/API_CLIENT.md § Optimistic Mutations; catalog entry useOptimisticMutation)
-- **usePageMeta** `FEATURES.md › Frontend Hooks`: set document title and meta description for the current page
-  - *Signs you're bypassing it:* setting document.title in a page useEffect instead of a title on the nav item (docs/claude/FRONTEND/ROUTING_NAVIGATION.md § What the Nav Config Drives (Page meta))
-- **usePaginatedData** `FEATURES.md > Data Config Builder`: Paged tables; useInfiniteData for infinite scroll lists.
-  - *Signs you're bypassing it:* A table component managing page, pageSize, search and orderBy in local useState, syncing the URL and restoring scroll by hand. (docs/claude/FRONTEND/API_CLIENT.md § Data Hooks › usePaginatedData)
-- **usePermission** `FEATURES.md › Frontend Hooks`: return whether current user holds a permission in current org/space context
-  - *Signs you're bypassing it:* a component that compares user.role or membership.role === 'owner' to show or disable a control (docs/claude/PERMISSIONS.md § Frontend Checks)
-- **useSpaceTheme** `FEATURES.md › Frontend Hooks`: Not wired to real data yet; use useDarkMode for working theme control.
-- **useValidateUniqueness** `FEATURES.md › Frontend Hooks`: debounce form input and check field uniqueness against the API
-  - *Signs you're bypassing it:* a hand-written SDK read or fetch in a form effect to check whether a slug or name is already taken (docs/claude/FRONTEND/API_CLIENT.md § Form Helpers (useValidateUniqueness); CreateOrganizationModal)
-- **Init task tests with VCR** `docs/claude/INIT_SCRIPT_PATTERNS.md > Current implementation notes`: Testing init tasks that call external providers.
+- **turbo watch local** `FEATURES.md > Development Workflow`: hot-reload all apps and their workspace dependencies with task caching
+- **DB-backed tests run serially** `docs/claude/TESTING.md#Concurrency`: Any package whose tests hit the database, including newly added packages.
+  - *Signs you're bypassing it:* a new package test script hitting the DB without --max-concurrency=1, producing flaky cross-file truncation (docs/claude/TESTING.md § Concurrency)
 - **Never hand-write validation schemas** `FEATURES.md > Prisma + Zod Generation`: Any request input or model response schema.
 - **No Jest or Vitest** `scripts/ci/rules/no-jest.sh, no-vitest.sh`: All test files and package dependencies.
   - *Signs you're bypassing it:* importing from jest, vitest or @jest/globals, jest.fn(), vi.mock(), or adding them as dependencies (scripts/ci/rules/no-jest.sh, no-vitest.sh (CI rules))
 - **Path aliases over relative imports** `FEATURES.md > Development Workflow`: All imports in every package; enforced by check-import-aliases.sh.
+- **Run frontend UI tests** `docs/claude/FRONTEND/API_CLIENT.md#Testing`: Running frontend/UI hook and component tests.
 - **Strict TypeScript, no any** `FEATURES.md > Type Safety & Code Generation`: All application code across packages.
   - *Signs you're bypassing it:* `: any`, `as any`, or `as unknown as T` to silence the compiler (FEATURES.md › Type Safety & Code Generation; CLAUDE.md §7)
+- **Test scripts compose env via with** `docs/claude/TESTING.md#Environment Composition`: When adding or editing a package test script, especially DB-backed ones.
+- **Tests live in module tests/ folder** `docs/claude/TESTING.md#Test Structure`: Module tests must live in a tests/ folder inside the module, one file per action.
 - **UI tests use serialized factories** `scripts/ci/rules/ui-serialized-factories.sh`: Frontend/UI tests using factory data.
 - *Also here, by name:* bun run pretest (`package.json`); contactStreamRow (`packages/ui/src/test/contactStreamRow.ts`); createMockJob (`apps/api/tests/createTestWorker.ts`); del (`apps/api/tests/utils/request.ts`); enumField (`apps/api/tests/utils/modelFields.ts`); get (`apps/api/tests/utils/request.ts`); handlers (`packages/ui/src/test/mocks/handlers.ts`); installEnvOverrideProxy (`packages/shared/src/utils/envOverrides.ts`); jsonError (`apps/api/tests/utils/request.ts`); patch (`apps/api/tests/utils/request.ts`); relationField (`apps/api/tests/utils/modelFields.ts`); resetEnvOverrides (`packages/shared/src/utils/envOverrides.ts`); scalarField (`apps/api/tests/utils/modelFields.ts`); testStore (`packages/ui/src/test/testStore.ts`)
 
 ### Class `test-factories`: build/create factories and test tracker cleanup
+
+**Choosing among siblings: buildX vs createX vs createFactory** (docs/claude/TESTING.md § Factories; § When to Create a New Factory)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **buildX** | in-memory data, no persistence | the record must exist in the DB (use createX) |
+| **createX** | the test needs a persisted row | fast in-memory unit tests (use buildX) |
+| **createFactory** | adding a factory for a new model | a model with an existing factory (use its createX/buildX) |
+
+**Choosing among siblings: Factory dependencies** (docs/claude/TESTING.md § Reusing Entities; § Triggering Optional Dependencies; § Test Data Patterns)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **Reuse entities via factory context** | several records share one user or organization | passing parent ids as overrides (never) |
+| **Trigger optional factory dependencies** | the test needs an optional FK: pass {} | required FKs, which are inferred (Don't declare auto-inferred factory dependencies) |
+| **Composite FK factory dependency** | several fields point to one dependency | a simple non-inferable FK (string foreignKey) |
+
+**Choosing among siblings: Cleanup: tracker vs hand cleanup** (docs/claude/TESTING.md § Cleanup; scripts/lint/check-test-*.sh)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **cleanupTouchedTables** | afterAll truncation of touched tables; needs --max-concurrency=1 | hand-listed tables or deleteMany in after hooks (check-test-hand-cleanup (testing)) |
+| **registerTestTracker** | registered by the db client | calling it in a test file (forbidden by check-test-tracker-registration (testing)) |
 
 - **cleanupTouchedTables** `packages/db/src/test/testTracker.ts#cleanupTouchedTables`: Pair with registerTestTracker; requires --max-concurrency=1 or files truncate each other's tables.
   - *Signs you're bypassing it:* hand-maintained lists of tables to truncate, or wiping the whole database between test files (docs/claude/TESTING.md § Cleanup; FEATURES.md § Automatic Test Cleanup)
@@ -259,12 +272,39 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `vcr`: VCR record/replay of external provider calls
 
+**Choosing among siblings: VCR vs emitFromCassette vs vcr.capture vs vcr.queue** (docs/claude/TESTING.md § VCR (external services))
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **VCR** | request/response replay for any client calling an external service | event-stream providers (use emitFromCassette) |
+| **emitFromCassette** | event-stream providers | request/response replay (use VCR) |
+| **vcr.capture (testing)** | wrapping one provider call in the client | choosing which cassette replays (use vcr.queue) |
+| **vcr.queue (testing)** | selecting the cassette the next captured call replays | wrapping the call itself (use vcr.capture) |
+
 - **emitFromCassette** `packages/shared/src/vcr/emitFromCassette.ts#emitFromCassette`: Request/response replay: VCR instead; use this for event-stream providers.
 - **VCR** `packages/shared/src/vcr/vcr.ts#VCR`: Event-stream providers: emitFromCassette; plain module stubs: mock.module. Any client calling an external service wraps calls in VCR.
   - *Signs you're bypassing it:* tests that hit a live provider, or nock/fetch stubs and mock.module around a provider client instead of vcr.capture with queued cassettes (docs/claude/TESTING.md § VCR (external services) (tests never call a live provider))
 - *Also here, by name:* cliVersion (`packages/shared/src/vcr/cliVersion.ts`); fetchVersion (`packages/shared/src/vcr/fetchVersion.ts`)
 
 ### Class `test-rules`: Rules for tests and their CI restrictions (no mocks, tracker registration, unhappy paths)
+
+**Choosing among siblings: Mocking and env rules** (scripts/ci/rules/*.sh)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **no-module-mocks** | replacing a module: refactor to a seam or VCR | globals (no-raw-global-assign-in-tests); env (no-test-env-mutation) |
+| **no-raw-global-assign-in-tests** | globals: use spyOn | env vars (no-test-env-mutation); whole modules (no-module-mocks) |
+| **no-test-env-mutation** | env vars: setEnvOverride/withEnv or .env.test | globals (no-raw-global-assign-in-tests) |
+| **spy-must-restore** | every spyOn needs mock.restore or mockRestore | env vars (no-test-env-mutation) |
+
+**Choosing among siblings: Test data and cleanup rules** (scripts/ci/rules; scripts/lint)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **no-direct-prisma-in-tests** | test rows come from @template/db/test factories | cleanup concerns (check-test-hand-cleanup) |
+| **check-test-hand-cleanup** | forbids deleteMany/truncate in after hooks | tracker registration (check-test-tracker-registration) |
+| **check-test-tracker-registration** | forbids calling registerTestTracker() yourself | manual row deletes (check-test-hand-cleanup) |
+| **ui-serialized-factories** | UI tests pass serialized factory entities | DB-row creation (no-direct-prisma-in-tests) |
 
 - **check-test-hand-cleanup** `scripts/lint/check-test-hand-cleanup.sh`: Paired with check-test-tracker-registration, which forbids calling registerTestTracker() yourself.
   - *Signs you're bypassing it:* afterEach/afterAll blocks that deleteMany rows or truncate tables by hand (scripts/lint/check-test-hand-cleanup.sh (lint rule))
@@ -284,20 +324,14 @@ Point at a class when that is as specific as the moment allows, or at a member. 
   - *Signs you're bypassing it:* spyOn(...) in a test file with no afterEach(() => mock.restore()) or mockRestore (scripts/ci/rules/spy-must-restore.sh (CI rule))
 - **ui-serialized-factories** `scripts/ci/rules/ui-serialized-factories.sh`: enforce serialized factories in UI tests
   - *Signs you're bypassing it:* UI tests passing raw factory entities, or __serialize() as any (scripts/ci/rules/ui-serialized-factories.sh (CI rule); FEATURES.md § Custom CI Rules)
-- **CI rule placement and fixtures** `scripts/ci/rules, scripts/ci/rule-violations`: add CI rules as scripts with pass/fail fixture cases
 - **Backend API fully covered by tests** `FEATURES.md > Unique Selling Points`: whenever a backend API endpoint is added or changed
-- **DB-backed tests run serially** `docs/claude/TESTING.md#Concurrency`: Any package whose tests hit the database, including newly added packages.
-  - *Signs you're bypassing it:* a new package test script hitting the DB without --max-concurrency=1, producing flaky cross-file truncation (docs/claude/TESTING.md § Concurrency)
 - **Exhaust validation before caveating** `CLAUDE.md §0.5 Verification Discipline`: Before reporting work as validated or adding a couldn't-run caveat.
 - **Focused checks then full sweep** `CLAUDE.md §10 Testing and Validation`: Every change before reporting it validated; subset only if the user narrowed validation.
   - *Signs you're bypassing it:* reporting work validated after only one workspace's tests, without bun run check (AI/ENTRYPOINT.md § 10. Testing and Validation)
 - **Never bypass CI rules** `scripts/ci/rules/**`: Whenever a CI rule fails.
   - *Signs you're bypassing it:* renaming files, adding ignore markers or restructuring code to dodge a failing CI rule instead of fixing the test (scripts/ci/rules/** (doc member Never bypass CI rules))
-- **No Jest** `scripts/ci/rules/no-jest.sh`: all source and tests
-- **No Vitest** `scripts/ci/rules/no-vitest.sh`: all source and tests
 - **Top-tier feature bar** `CLAUDE.md §7 Core Engineering Standards`: Auth, permissions, CRUD, nav, forms, notifications and settings features.
 - **Typecheck each affected workspace** `CLAUDE.md §10 Testing and Validation`: Changes that alter shared types or imports across packages.
-- **UI tests serialize factories** `scripts/ci/rules/ui-serialized-factories.sh`: UI tests using db factories
 - *Also here, by name:* expectBulkWriteRejected (`scripts/ci/rule-violations/no-direct-bulk-writes/pass/test-dir/packages/db/src/test/seedExample.ts`)
 
 ## 4. The specifics, in full

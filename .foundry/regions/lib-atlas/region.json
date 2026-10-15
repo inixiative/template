@@ -1,18 +1,21 @@
 {
   "id": "lib-atlas",
-  "title": "Atlas library (code map)",
-  "routing": "Is this about the @inixiative/atlas library itself: the @atlas top-of-file block (@kind / @partOf / @uses / @constructs, @atlas pin, @uses none / @uses?), the .atlas/ folder (config.ts with defineConfig and partOfFor stamp rules, kinds.ts, concepts.ts concept registry), the atlas CLI (graph, check, coverage, generate, report, stamp), MAP.md, or rolling atlas check / coverage gates into CI?",
+  "title": "Atlas code map (library + template usage)",
+  "routing": "Is this about Atlas, the code map: the @atlas top-of-file block in any template file (@kind / @partOf / @uses / @constructs, @atlas pin, @uses none / @uses?), keeping a file's block true when adding or moving it, the template's .atlas/ folder (config.ts stamp rules with defineConfig and partOfFor, kinds.ts KINDS, concepts.ts CONCEPTS with feature: / primitive: / infrastructure: / integration: / superadmin), navigating by concept with bunx atlas graph --json / bunx atlas query / MAP.md instead of grep, the atlas CLI (stamp, check, coverage, generate, report), or rolling atlas check / coverage gates into CI?",
   "concepts": [
-    "lib-atlas"
+    "lib-atlas",
+    "atlas"
   ],
-  "tokens": 7653,
+  "tokens": 12769,
   "tokenMethod": "chars/4",
   "runsAgreed": 0,
   "sources": {
     "docs": [
       "@inixiative/atlas/README.md",
       "@inixiative/atlas/examples/atlas-config/README.md",
-      "@inixiative/atlas/examples/ci/README.md"
+      "@inixiative/atlas/examples/ci/README.md",
+      "AI/ENTRYPOINT.md",
+      "docs/claude/ATLAS.md"
     ],
     "docUnits": [
       "doc:@inixiative/atlas/README.md#preface",
@@ -33,15 +36,24 @@
       "doc:@inixiative/atlas/examples/ci/README.md#coverage-gate",
       "doc:@inixiative/atlas/examples/ci/README.md#keep-map-md-honest",
       "doc:@inixiative/atlas/examples/ci/README.md#package-json-scripts",
-      "doc:@inixiative/atlas/examples/ci/README.md#why-not-a-standalone-inixiative-atlas-ci-package"
+      "doc:@inixiative/atlas/examples/ci/README.md#why-not-a-standalone-inixiative-atlas-ci-package",
+      "doc:docs/claude/ATLAS.md#what-atlas-is",
+      "doc:docs/claude/ATLAS.md#the-concept-vocabulary",
+      "doc:docs/claude/ATLAS.md#the-atlas-annotation-block",
+      "doc:docs/claude/ATLAS.md#navigating-by-concept",
+      "doc:docs/claude/ATLAS.md#authoring-annotations",
+      "doc:docs/claude/ATLAS.md#the-atlas-config",
+      "doc:docs/claude/ATLAS.md#enforcement",
+      "doc:docs/claude/ATLAS.md#cross-references",
+      "doc:AI/ENTRYPOINT.md#11-5-atlas-the-code-map"
     ],
     "catalogClusters": [
       "build-deploy-ci",
       "code-map-atlas"
     ],
     "codeEntries": 11,
-    "docMembers": 18
+    "docMembers": 44
   },
-  "bypassLines": 10,
-  "glossaryTerms": 26
+  "bypassLines": 15,
+  "glossaryTerms": 30
 }

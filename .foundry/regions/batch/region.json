@@ -1,0 +1,39 @@
+{
+  "id": "batch",
+  "title": "Batch API",
+  "routing": "Is this about running several API requests in one call or reading an API path in-process as the caller: POST /api/v1/batch/execute, rounds of sub-requests, the strategies transactionAll / transactionPerRound / allowFailures / failOnRound, <<round.request.path>> interpolation, summary.status success/partialSuccess/failed, X-Batch-Id, registerBatch/unregisterBatch, executeBatch/executeRequest, StrategyExecutor, BatchExecutionStrategies, or readAsCaller / readAllAsCaller?",
+  "concepts": [
+    "batch"
+  ],
+  "tokens": 8909,
+  "tokenMethod": "chars/4",
+  "runsAgreed": 0,
+  "sources": {
+    "docs": [
+      "docs/claude/API_ROUTES.md",
+      "docs/claude/BATCH.md"
+    ],
+    "docUnits": [
+      "doc:docs/claude/API_ROUTES.md#complex-operations-http-status",
+      "doc:docs/claude/BATCH.md#overview",
+      "doc:docs/claude/BATCH.md#basic-usage",
+      "doc:docs/claude/BATCH.md#execution-strategies",
+      "doc:docs/claude/BATCH.md#request-interpolation",
+      "doc:docs/claude/BATCH.md#status-tracking",
+      "doc:docs/claude/BATCH.md#security",
+      "doc:docs/claude/BATCH.md#implementation-patterns",
+      "doc:docs/claude/BATCH.md#testing",
+      "doc:docs/claude/BATCH.md#known-limitations"
+    ],
+    "catalogClusters": [
+      "auth-middleware-validation",
+      "batch-request-execution",
+      "request-context-access",
+      "request-response-schemas"
+    ],
+    "codeEntries": 19,
+    "docMembers": 20
+  },
+  "bypassLines": 6,
+  "glossaryTerms": 19
+}

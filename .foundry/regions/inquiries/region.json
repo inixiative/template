@@ -1,0 +1,45 @@
+{
+  "id": "inquiries",
+  "title": "Inquiries",
+  "routing": "Is this about a request one party makes of another that the other approves, denies or asks to change (an invitation, creating/updating/transferring a space, an access or pairing request), or any new request-like model? Signals: Inquiry, InquiryType/InquiryStatus/InquiryResourceModel, sourceModel/targetModel, inquiry handlers (contentSchema, resolutionInputSchema, resolutionSchema, validate, handleApprove, autoApprove, unique, defaultExpirationDays), createInquiry/sendInquiry/resolveInquiry, resolveInquirySource/resolveInquiryTarget, includeInquirySent/Received/Response, the send/resolve/read ReBAC actions, InquiriesPage, InquirySourceControls/InquiryTargetControls, registerInquiryType, sourceMutations/targetMutations, the use*InquiryMutation hooks.",
+  "concepts": [
+    "inquiries"
+  ],
+  "tokens": 17864,
+  "tokenMethod": "chars/4",
+  "runsAgreed": 3,
+  "sources": {
+    "docs": [
+      "FEATURES.md",
+      "docs/claude/INQUIRIES.md"
+    ],
+    "docUnits": [
+      "doc:docs/claude/INQUIRIES.md#overview",
+      "doc:docs/claude/INQUIRIES.md#data-model",
+      "doc:docs/claude/INQUIRIES.md#api-endpoints",
+      "doc:docs/claude/INQUIRIES.md#source-target-resolution",
+      "doc:docs/claude/INQUIRIES.md#handler-architecture",
+      "doc:docs/claude/INQUIRIES.md#response-schemas",
+      "doc:docs/claude/INQUIRIES.md#permissions-rebac",
+      "doc:docs/claude/INQUIRIES.md#adding-a-new-handler",
+      "doc:docs/claude/INQUIRIES.md#frontend",
+      "doc:FEATURES.md#inquiry-system"
+    ],
+    "catalogClusters": [
+      "audit-logging",
+      "caching-and-invalidation",
+      "data-models",
+      "filtering-search-ordering",
+      "inquiry-lifecycle",
+      "mutation-hooks",
+      "permission-rule-algebra",
+      "request-context-access",
+      "request-response-schemas",
+      "roles-and-permissions"
+    ],
+    "codeEntries": 68,
+    "docMembers": 43
+  },
+  "bypassLines": 19,
+  "glossaryTerms": 24
+}

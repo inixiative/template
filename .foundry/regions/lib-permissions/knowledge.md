@@ -109,13 +109,37 @@ Two pieces, picked by the question asked. createPermissions builds a permix that
 
 check never queries. Load the record's ownership closure first with createHydrator({ parents, load }); caching across calls belongs in load. Derive both the resolver and the hydrator's parents from one @inixiative/prisma-map map so they cannot drift (see the `lib-prisma-map` region). Bridges are not hydrated: pass far-side rows as subject.data only when a hop ends in an abac or self rule.
 
-The template depends on this package. The library owns wrapping and checking only; roles to grants, populating permix per request, the app's rebacSchema, ownerActions, validatePermission and the Organization / Space / OrganizationUser / SpaceUser model all live in the template's @template/permissions and are covered by the `tenancy-permissions` region. Condition syntax and operators are in the `json-rules` region; transition guards that delegate into this schema are in `lib-transitions`; the permission-rule editor (usePermissionBuilder) is in `rules-builder`.
+The template depends on this package. The library owns wrapping and checking only; roles to grants, populating permix per request, the app's rebacSchema, ownerActions, validatePermission and the Organization / Space / OrganizationUser / SpaceUser model all live in the template's @template/permissions and are covered by the `permissions / tenancy` region. Condition syntax and operators are in the `json-rules` region; transition guards that delegate into this schema are in `lib-transitions`; the permission-rule editor (usePermissionBuilder) is in `rules-builder`.
 
 ## 3. Everything that exists here, by class
 
-Point at a class when that is as specific as the moment allows, or at a member. Each member: **name** `where`: choose this when … . Where the docs or code give material, a second line describes the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
+Point at a class when that is as specific as the moment allows, or at a member. Where a class has siblings an agent could confuse, a table under the class header says which to use when. Each member: **name** `where`: choose this when … . Where the docs or code give material, a second line describes the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
 
 ### Class `lib-permissions`: The @inixiative/permissions library (README): the ReBAC engine template's permissions build on
+
+**Choosing among siblings: createPermissions vs createRebacCheck vs check vs permix.check** (@inixiative/permissions/README.md § The check engine, § The permix wrapper)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **createPermissions** | plain role/action grants (the permix wrapper) | relation or abac rules (createRebacCheck) |
+| **createRebacCheck** | build the relation-walking check with an injected resolver | plain role checks (createPermissions) |
+| **check (permissions)** | relations, self or abac rules matter | grant-only lookup (permix.check) |
+| **permix.check** | grant-only lookup of what permix.setup loaded | the access walks a relation (check) |
+
+**Choosing among siblings: Relation walks: rel vs Bridges, and hydration** (README § Bridges (cross-source rel walks), § Hydration (Prisma example))
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **Bridges** | a rel walk crosses to another source (fieldMap) | same-source FK walk (plain rel; Hydrate ownership closure before checking) |
+| **Hydrate ownership closure before checking** | before every ReBAC check (createHydrator) | cross-source data (Bridges) |
+| **Cache in hydrator load seam** | cross-call caching: wrap load | per-call dedupe (createHydrator already does it) |
+
+**Choosing among siblings: Row overrides** (README § Writing a schema)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **permissionRules** | per-record widening (OR with the schema rule) | restricting access (change the RebacSchema) |
+| **actionRuleSchema** | validate a whole ActionRule override before persisting | the abac condition alone (json-rules validateRule) |
 
 - **actionRuleSchema** `@inixiative/permissions/actionRuleSchema#actionRuleSchema`: Validating whole ActionRule overrides; for the abac condition alone use json-rules validateRule, which this delegates to.
   - *Signs you're bypassing it:* persisting a tenant-authored permissionRules override unvalidated, or a hand-written zod union describing ActionRule (@inixiative/permissions/README.md § Writing a schema; § Also exported)
@@ -132,15 +156,12 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **Typed resource union** `@inixiative/permissions README — The check engine`: Pass a resource union to createRebacCheck so schema and subjects typecheck without casts.
   - *Signs you're bypassing it:* `as` casts on resource strings or an untyped createRebacCheck where a typo in a resource key passes the compiler (@inixiative/permissions/README.md § The check engine)
 - **ActionRule** `@inixiative/permissions ActionRule`: express a permission as delegation, relation walk, self match, abac predicate, or composition
-- **check** `@inixiative/permissions createRebacCheck`: Use over permix.check whenever relations, self, or abac rules matter.
-  - *Signs you're bypassing it:* if/else chains in a controller that look up an OrganizationUser or SpaceUser and compare its role, instead of declaring the rule in rebacSchema and calling check (catalog: packages/permissions/src/rebac/check.ts ("call check rather than hand-rolling permission logic"))
 - **permissionRules** `@inixiative/permissions README — Writing a schema`: Per-record widening only; it cannot revoke, so change the schema to restrict.
 - **permix.check** `@inixiative/permissions createPermissions`: Grant-only lookup; use the rebac check for relation/abac rules.
   - *Signs you're bypassing it:* resolving record.organizationId by hand and calling permix.check('organization', action, id) where a { rel: 'organization', action } rule and check would walk it (@inixiative/permissions/README.md § The permix wrapper; § The check engine)
 - **permix.setup** `@inixiative/permissions createPermissions`: load role-derived grants keyed by resource or resource:id
 - **permix.setUserId** `@inixiative/permissions createPermissions`: set the actor id used by self rules
 - **PermixLike** `@inixiative/permissions PermixLike`: define the grant-reading slice the check engine consumes
-- **RebacSchema** `@inixiative/permissions RebacSchema`: map resources to action rules plus optional cross-source bridges
 - **Bridge far-field data** `@inixiative/permissions README — Bridges (cross-source rel walks)`: When a bridge hop ends in an abac or self rule rather than an rbac grant.
 - **Derive relation map from Prisma client** `@inixiative/permissions/README.md#Hydration (Prisma example)`: Whenever wiring a ReBAC resolver or hydrator to a Prisma schema.
   - *Signs you're bypassing it:* a hand-maintained relationTargets object ({ membership: { organization: 'organization' } }) for the resolver, or a parents list kept separately from it, instead of deriving both from one buildPrismaMapV7() map (@inixiative/permissions/README.md § Hydration ("Don't hand-maintain the relation map"))

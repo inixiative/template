@@ -7,7 +7,7 @@
     "dependencies",
     "architecture"
   ],
-  "tokens": 14002,
+  "tokens": 15548,
   "tokenMethod": "chars/4",
   "runsAgreed": 1,
   "sources": {
@@ -52,6 +52,7 @@
       "authentication-methods",
       "batch-request-execution",
       "build-config-presets",
+      "build-deploy-ci",
       "caching-and-invalidation",
       "code-style-lint-checks",
       "data-access-rules",
@@ -61,6 +62,7 @@
       "email-composition-rendering",
       "email-delivery-senders",
       "encryption-key-rotation",
+      "environment-config",
       "error-handling",
       "frontend-navigation-context",
       "frontend-state-api-client",
@@ -69,7 +71,6 @@
       "module-layout-monorepo",
       "naming-vocabulary",
       "observability-telemetry",
-      "outbound-webhooks",
       "prisma-schema-introspection",
       "request-context-access",
       "request-response-schemas",
@@ -80,7 +81,7 @@
       "ui-components"
     ],
     "codeEntries": 0,
-    "docMembers": 81
+    "docMembers": 77
   },
   "bypassLines": 21,
   "glossaryTerms": 25

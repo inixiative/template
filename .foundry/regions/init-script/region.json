@@ -5,7 +5,7 @@
   "concepts": [
     "init-script"
   ],
-  "tokens": 17025,
+  "tokens": 18077,
   "tokenMethod": "chars/4",
   "runsAgreed": 3,
   "sources": {
@@ -38,6 +38,7 @@
       "doc:docs/claude/INIT_SCRIPT_PATTERNS.md#key-takeaways"
     ],
     "catalogClusters": [
+      "build-deploy-ci",
       "code-style-lint-checks",
       "dev-setup-scripts",
       "environment-config",
@@ -48,7 +49,7 @@
       "testing-rules"
     ],
     "codeEntries": 0,
-    "docMembers": 63
+    "docMembers": 67
   },
   "bypassLines": 21,
   "glossaryTerms": 29

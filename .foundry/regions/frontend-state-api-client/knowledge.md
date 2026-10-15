@@ -120,13 +120,42 @@ Not here: what the routes and nav config mean, tenant URL sync and route guards 
 
 ## 3. Everything that exists here, by class
 
-Point at a class when that is as specific as the moment allows, or at a member. Each member: **name** `where`: choose this when … . Where the docs or code give material, a second line describes the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
+Point at a class when that is as specific as the moment allows, or at a member. Where a class has siblings an agent could confuse, a table under the class header says which to use when. Each member: **name** `where`: choose this when … . Where the docs or code give material, a second line describes the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
 
 ### Class `frontend-store`: Shared Zustand store: slices, access patterns, adding slices
+
+**Choosing among siblings: tenant.setOrganization vs setSpace vs setUser vs setPublic vs setPage** (docs/claude/ZUSTAND.md § 3. TenantSlice)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **tenant.setOrganization** | acting in an organization scope | a space is the scope (use tenant.setSpace) |
+| **tenant.setSpace** | acting in a space scope | org-only context (use tenant.setOrganization) |
+| **tenant.setUser** | personal scope, signed in | unauthenticated (use tenant.setPublic) |
+| **tenant.setPublic** | resetting context to public, e.g. on logout | a signed-in personal scope (use tenant.setUser) |
+| **tenant.setPage** | setting the page record for nav access checks | changing app-level context (use tenant.setOrganization / tenant.setSpace) |
+
+**Choosing among siblings: auth.initialize vs auth.refreshMe vs fetchAndHydrateMe; signIn vs signUp** (docs/claude/ZUSTAND.md § 1. AuthSlice; FRONTEND/AUTH.md § Auth Slice)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **auth.initialize** | first load; run once by requireAuth/requirePublic guards | re-fetching after a membership/profile change (use auth.refreshMe) |
+| **auth.refreshMe** | re-hydrating /me after a membership or profile change | first load (auth.initialize, via the guards) |
+| **fetchAndHydrateMe (authentication)** | internal: loads /me into the store and calls permissions.setup | calling it yourself after a change (use auth.refreshMe) |
+| **auth.signIn** | existing accounts | new accounts (use auth.signUp) |
+| **auth.signUp** | new accounts | existing accounts (use auth.signIn) |
+
+**Choosing among siblings: Reading and changing store state** (docs/claude/ZUSTAND.md § Access Patterns; Best Practices)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **Narrow selectors** | reading a single value in a component | selecting several values as an object (use useShallow for object selectors) |
+| **useShallow for object selectors** | selecting multiple values as one object | a single value (use Narrow selectors) |
+| **Store access outside React** | handlers and code outside components | inside render (use hooks with Narrow selectors) |
 
 - **Adding a store slice** `packages/ui/src/store/`: add new shared state as a typed slice composed into the shared store
 - **Cross-slice access via get()** `docs/claude/ZUSTAND.md Slice Dependencies`: call another slice's actions from inside a slice creator
 - **Live queries via query cache observers** `docs/claude/ZUSTAND.md §4 Live queries`: realtime query updates; reconnect invalidates live queries to recover missed changes
+- **Permission-gated UI** `docs/claude/ZUSTAND.md#PermissionsSlice`: hide or disable controls via Button show/disabled props from permission checks
 - **Removing a store slice** `packages/ui/src/store/`: retire shared state by unwiring the slice from store and type
 - **Slice composition** `packages/ui/src/store/slices/*`: add state by writing a slice creator spread into useAppStore with its type in AppStore
   - *Signs you're bypassing it:* a standalone store or module-level mutable state for new shared state instead of a typed slice creator spread into useAppStore and added to AppStore (docs/claude/ZUSTAND.md § Adding or Removing a Slice)
@@ -144,17 +173,13 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **auth.signUp** `packages/ui/src/store/slices/auth.ts`: New accounts; signIn for existing ones.
 - **AuthSlice** `packages/ui/src/store/slices/auth.ts`: hold the signed-in user and logout action
 - **ClientSlice** `packages/ui/src/store/slices/client.ts`: hold the TanStack QueryClient and API websocket reachable outside React
-- **ContextSelector** `packages/ui (docs/claude/ZUSTAND.md §3 TenantSlice)`: render the tenant context switcher reading tenant and auth from the store
-  - *Signs you're bypassing it:* a custom org/space dropdown, or passing tenant/auth to ContextSelector as props (docs/claude/ZUSTAND.md § 3. TenantSlice (ContextSelector reads tenant and auth itself); catalog entry ContextSelector)
-- **createApiWebsocket** `packages/ui/src/store/slices/client.ts`: build the API websocket from VITE_API_URL for live queries and data streams
-  - *Signs you're bypassing it:* new WebSocket(url) with hand-written reconnect, backoff and resubscribe logic (catalog createApiWebsocket; docs/claude/WEBSOCKETS.md § Connection and recovery)
-- **LIVE_QUERIES** `@template/shared/ws`: register which queries are live and their websocket channel keys
 - **navigatePreserving** `packages/ui/src/store/slices/navigation.ts`: keep org/space: 'context'; only spoof/flow: 'spoof'; everything: 'all'; plain navigate drops params
 - **NavigationSlice** `packages/ui/src/store/slices/navigation.ts`: hold router navigate, nav config, current route match and active flow
 - **permissions.check** `packages/ui/src/store/slices/permissions.ts`: Boolean checks; usePermission when you need show/disable/disabledText for a control.
 - **permissions.clear** `packages/ui/src/store/slices/permissions.ts`: reset Permix to a fresh instance
 - **permissions.setup** `packages/ui/src/store/slices/permissions.ts`: Not called directly; fetchAndHydrateMe invokes it.
 - **PermissionsSlice** `packages/ui/src/store/slices/permissions.ts`: hold client-side permission state in the shared store
+- **setFlowId** `packages/ui/src/store/slices/navigation.ts`: set the active guided flow carried as ?flow=
 - **SharedAppStore devtools** `packages/ui/src/store/index.ts`: expose shared store to Redux DevTools for inspection and time-travel
 - **tenant.setOrganization** `packages/ui/src/store/slices/tenant.ts`: organization scope; setSpace for a space, setUser for personal, setPublic for logged-out
 - **tenant.setPage** `packages/ui/src/store/slices/tenant.ts`: page subject for access checks; setOrganization/setSpace change app-level context instead
@@ -165,12 +190,7 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **ui.setLoading** `packages/ui/src/store/slices/ui.ts`: toggle the global loading flag
 - **ui.setTheme** `packages/ui/src/store/slices/ui.ts`: setTheme for UI toggles; updateTheme has no server persistence yet
 - **UISlice** `packages/ui/src/store/slices/ui.ts`: hold theme, global loading flag and app branding from VITE_ env
-- **useApiWebsocket** `docs/claude/WEBSOCKETS.md (referenced from ZUSTAND.md §4)`: drive connecting the store's API websocket
-  - *Signs you're bypassing it:* components opening their own sockets in useEffect (docs/claude/WEBSOCKETS.md § Frontend and horizontal scaling)
 - **useAppStore** `@template/ui/store`: access the app-wide Zustand store of slices
-- **useAuthenticatedRouting** `packages/ui (docs/claude/ZUSTAND.md §3 TenantSlice)`: sync tenant context with ?org=/?space= params and fall back to authorized context
-  - *Signs you're bypassing it:* hand-parsing ?org= / ?space= search params in a page or layout and calling tenant setters from a useEffect (catalog entry useAuthenticatedRouting (don't hand-parse org/space search params); docs/claude/APPS.md § Context Switching)
-- **useRegisterNavigation** `each app's __root.tsx`: wire router navigate and nav config into the store for non-component navigation
 - **Actions live in slices** `docs/claude/ZUSTAND.md — Best Practices: Actions`: Any store state change; never assign via useAppStore.getState().
   - *Signs you're bypassing it:* assigning into useAppStore.getState().auth.user = ... or calling set from a component instead of a slice action (docs/claude/ZUSTAND.md § Best Practices: Actions (never do this))
 - **Memberships as dictionaries** `packages/ui/src/store/types/auth.ts`: Any membership state held in the auth slice.
@@ -191,6 +211,31 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - *Also here, by name:* createAuthSlice (`packages/ui/src/store/slices/auth.ts`); createClientSlice (`packages/ui/src/store/slices/client.ts`); createNavigationSlice (`packages/ui/src/store/slices/navigation.ts`); createPermissionsSlice (`packages/ui/src/store/slices/permissions.ts`); createTenantSlice (`packages/ui/src/store/slices/tenant.ts`); createUISlice (`packages/ui/src/store/slices/ui.ts`)
 
 ### Class `api-client`: Generated SDK, apiQuery/apiMutation, optimistic mutations, data hooks, form helpers
+
+**Choosing among siblings: apiQuery vs apiMutation vs useQuery vs useMutation vs useOptimisticMutation** (docs/claude/FRONTEND/API_CLIENT.md § apiQuery and apiMutation; § Optimistic Mutations)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **apiQuery** | GET reads, paired with the SDK's generated query key | writes (use apiMutation) |
+| **apiMutation** | writes needing the full response, e.g. for optimistic updates | GET reads (use apiQuery, which unwraps data.data) |
+| **useQuery** | reads, imported from packages/ui | writes (use useMutation); importing from @tanstack directly |
+| **useMutation** | writes with no cached list to update, from packages/ui | list create/delete (use useOptimisticMutation) |
+| **useOptimisticMutation** | list create/delete with instant UI | no cached list needs updating (use useMutation) |
+| **createOptimisticListTarget** | the list target inside useOptimisticMutation | hand-written optimisticUpdate/reconcile (never) |
+
+**Choosing among siblings: useDebounce vs useDebouncedCallback** (docs/claude/FRONTEND/API_CLIENT.md § Form Helpers (useDebounce))
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **useDebounce (concurrency-locks)** | debouncing a value that hits the backend | debouncing an action or setter (use useDebouncedCallback); local filtering (don't debounce) |
+| **useDebouncedCallback (concurrency-locks)** | debouncing an action or setter | debouncing a value (use useDebounce) |
+
+**Choosing among siblings: writeToHistoryState vs writeToHistoryStateAndUrl** (packages/ui/src/lib/dataStatePersistence.ts)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **writeToHistoryState** | keeping the URL clean | a shareable URL is needed (use writeToHistoryStateAndUrl) |
+| **writeToHistoryStateAndUrl** | the state must be shareable via the URL | keeping the URL clean (use writeToHistoryState) |
 
 - **apiMutation** `packages/ui/src/lib/apiMutation.ts#apiMutation`: Writes needing full response for optimistic updates; GET reads use apiQuery, which unwraps data.data.
   - *Signs you're bypassing it:* a mutationFn that calls fetch or the SDK directly and attaches Authorization / x-spoof-user-email headers by hand (docs/claude/FRONTEND/API_CLIENT.md § apiQuery and apiMutation; FEATURES.md § Frontend Architecture (API Client Wrappers))
@@ -221,22 +266,16 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **@template/sdk** `packages/sdk/src/`: Always over hand-written fetches to apps/api; usable by non-UI consumers without importing @template/ui.
   - *Signs you're bypassing it:* hand-written fetch('/api/...') calls and response types in frontend code instead of the generated SDK functions (docs/claude/MONOREPO.md › @template/sdk; catalog @template/sdk)
 - **bracketQuery** `@template/shared/bracketQuery`: encode nested filter/query params into bracket notation for API requests
-- **fetchAndHydrateMe** `docs/claude/FRONTEND/AUTH.md → Architecture`: load user, orgs, spaces and memberships into the store, then set up permissions
-  - *Signs you're bypassing it:* fetching /me and populating user, organizations, spaces and permissions manually (docs/claude/FRONTEND/AUTH.md § Architecture)
 - **Generated SDK client** `packages/sdk/src/`: Calling the API from the frontend; prefer over hand-written fetches.
-- **serializeBracketQuery** `packages/ui/src/lib/apiFetchInternal.ts`: bracket-encode nested query params for API requests
-  - *Signs you're bypassing it:* String-concatenating `searchFields[x][contains]=` query strings by hand. (catalog entry serializeBracketQuery)
-- **setFlowId** `packages/ui store navigation.flowId`: only the id in store; flow data via useActiveFlow
-- **useDebounce** `packages/ui/src/hooks/useDebounce.ts`: Debouncing a value; to debounce a function call use useDebouncedCallback instead.
-  - *Signs you're bypassing it:* setTimeout/clearTimeout in a useEffect to delay a value, or a lodash debounce, before a network search; or debouncing in-memory filtering (docs/claude/FRONTEND/API_CLIENT.md § Form Helpers (useDebounce: debounce only backend-hitting inputs))
-- **useDebouncedCallback** `packages/ui/src/hooks/useDebounce.ts`: Debouncing an action or setter; to debounce a value use useDebounce instead.
-  - *Signs you're bypassing it:* a useRef-held timer wrapping a setter or action to debounce it, with manual cancel on unmount (docs/claude/FRONTEND/API_CLIENT.md § Form Helpers (useDebounce))
+- **useAppEvents** `FEATURES.md › Frontend Hooks`: Generic event reactions; for query refetch on event use useEventRefetch.
+- **useEventRefetch** `FEATURES.md › Frontend Hooks`: Cross-component invalidation without prop drilling; pair with useAppEvents emitters. Same-list mutations use useOptimisticMutation.
+  - *Signs you're bypassing it:* prop-drilled refetch callbacks or a shared flag in state to make another component's list refetch after a modal creates a record (FEATURES.md § Frontend Hooks (useEventRefetch, useAppEvents))
+- **useLanguage** `FEATURES.md › Frontend Hooks`: read and set current locale from the Zustand ui slice
 - **Context queries throw for missing contexts** `docs/claude/FRONTEND/API_CLIENT.md#Context Queries`: Any makeContextQueries map.
 - **Data hook tests colocated** `docs/claude/FRONTEND/API_CLIENT.md#Testing`: Adding or changing frontend data hooks or API client lib files.
 - **Debounce only backend-hitting inputs** `docs/claude/FRONTEND/API_CLIENT.md#useDebounce`: Network search or fetch-triggering fields; local filtering of loaded data stays undebounced.
   - *Signs you're bypassing it:* debouncing a local filter over an already-loaded list (docs/claude/FRONTEND/API_CLIENT.md § useDebounce)
 - **Pair apiQuery with the generated query key** `docs/claude/FRONTEND/API_CLIENT.md#apiQuery and apiMutation`: Every useQuery built with apiQuery.
-- **Run frontend UI tests** `docs/claude/FRONTEND/API_CLIENT.md#Testing`: Running frontend/UI hook and component tests.
 - **Use the generated SDK, not hand fetches** `docs/claude/FRONTEND/API_CLIENT.md#Generated SDK`: Any frontend or non-UI code calling apps/api.
 - *Also here, by name:* apiFetchInternal (`packages/ui/src/lib/apiFetchInternal.ts`); emailRuleSurfaceQueryKey (`packages/ui/src/hooks/email/useEmailRuleSurface.ts`); mutation (`packages/ui/src/lib/makeContextQueries.ts`); query (`packages/ui/src/lib/makeContextQueries.ts`); readStateFromUrl (`packages/ui/src/lib/dataStatePersistence.ts`); segmentContextQueries (`packages/ui/src/lib/segmentContextQueries.ts`); syncStateToUrl (`packages/ui/src/lib/dataStatePersistence.ts`); tokenContextQueries (`packages/ui/src/lib/tokenContextQueries.ts`); useThemePersistence (`packages/ui/src/hooks/useThemePersistence.ts`); webhookContextQueries (`packages/ui/src/lib/webhookContextQueries.ts`)
 

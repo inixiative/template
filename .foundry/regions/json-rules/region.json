@@ -1,66 +1,30 @@
 {
   "id": "json-rules",
-  "title": "json-rules engine and rule references",
-  "routing": "Is this about writing, validating, compiling or evaluating a json-rules Condition \u2014 check, toPrisma + executePrismaPlan, toSql, validateRule / assertValidRule / the template's validateRuleForLens, bindRule / bindOptional / listBindings, operators and rule shapes (field, date, array, aggregate, all/any, if/then/else), relative date expressions and the now / timeZone contract, NULL semantics, windowing, $ scope refs, orWhere / andWhere, engineGlobals, UsageError \u2014 or about the rows a stored rule names and whether it is still sound: RuleReference edges, ruleReferences / dynamicRuleReferences, syncRuleReferenceEdges / syncRuleReferences / syncSegmentEdges, the ruleReference:target hook, withRule / ruleIssues / RuleDegradedError, or the hooks RulesRegistry?",
+  "title": "Template rules and rule references",
+  "routing": "Is this about the template's own json-rules code \u2014 the shared rule gate validateRuleForLens, bindWhere, email rule scoping inside loops (scopedRule, narrowToElements, walkConditionTree, opaqueLoopIssue), RuleEvaluationError, the hooks RulesRegistry and shadowMerge \u2014 or about the rows a stored rule names and whether it is still sound: RuleReference edges and RULE_REFERENCEABLE_MODELS, ruleReferences / dynamicRuleReferences / RuleReferenceError, syncRuleReferenceEdges / syncRuleReferences / syncSegmentEdges, admitRuleReferences, lockedTargetStates, the ruleReference:target hook, ruleReferenceIssues / liveRuleReferences, withRule / ruleIssues / RuleDegradedError?",
   "concepts": [
     "json-rules",
-    "rule-references",
-    "lib-json-rules"
+    "rule-references"
   ],
-  "tokens": 29076,
+  "tokens": 12271,
   "tokenMethod": "chars/4",
   "runsAgreed": 0,
   "sources": {
     "docs": [
-      "@inixiative/json-rules/README.md",
-      "@inixiative/json-rules/docs/TIMEZONE.md",
-      "@inixiative/json-rules/docs/VERBS.md",
-      "@inixiative/json-rules/src/toSql/README.md",
       "docs/claude/COMMUNICATIONS.md",
       "docs/claude/HOOKS.md"
     ],
     "docUnits": [
       "doc:docs/claude/HOOKS.md#rules-registry",
-      "doc:docs/claude/COMMUNICATIONS.md#email/rule-references-the-rows-a-rule-names",
-      "doc:@inixiative/json-rules/README.md#preface",
-      "doc:@inixiative/json-rules/README.md#installation",
-      "doc:@inixiative/json-rules/README.md#quick-start",
-      "doc:@inixiative/json-rules/README.md#what-it-supports",
-      "doc:@inixiative/json-rules/README.md#operators",
-      "doc:@inixiative/json-rules/README.md#rule-shapes",
-      "doc:@inixiative/json-rules/README.md#path-semantics",
-      "doc:@inixiative/json-rules/README.md#rule-introspection",
-      "doc:@inixiative/json-rules/README.md#runtime-validation",
-      "doc:@inixiative/json-rules/README.md#prisma-query-planning",
-      "doc:@inixiative/json-rules/README.md#engine-globals",
-      "doc:@inixiative/json-rules/README.md#postgresql-sql-generation",
-      "doc:@inixiative/json-rules/README.md#backend-support-matrix",
-      "doc:@inixiative/json-rules/README.md#typescript-types",
-      "doc:@inixiative/json-rules/README.md#error-handling",
-      "doc:@inixiative/json-rules/README.md#root-array-rules-in-check",
-      "doc:@inixiative/json-rules/README.md#examples",
-      "doc:@inixiative/json-rules/README.md#license",
-      "doc:@inixiative/json-rules/docs/VERBS.md#preface",
-      "doc:@inixiative/json-rules/docs/VERBS.md#public-api",
-      "doc:@inixiative/json-rules/docs/VERBS.md#internal-verbs-and-their-owners",
-      "doc:@inixiative/json-rules/docs/TIMEZONE.md#preface",
-      "doc:@inixiative/json-rules/docs/TIMEZONE.md#the-policy",
-      "doc:@inixiative/json-rules/docs/TIMEZONE.md#resolving-the-zone-resolvedateconfig",
-      "doc:@inixiative/json-rules/docs/TIMEZONE.md#not-built-per-record-companion-column-zones",
-      "doc:@inixiative/json-rules/src/toSql/README.md#usage",
-      "doc:@inixiative/json-rules/src/toSql/README.md#supported-features",
-      "doc:@inixiative/json-rules/src/toSql/README.md#security"
+      "doc:docs/claude/COMMUNICATIONS.md#email/rule-references-the-rows-a-rule-names"
     ],
     "catalogClusters": [
-      "error-handling",
       "json-rules-engine",
-      "lenses-multi-source",
-      "rule-builder-ui-model",
       "rule-references-registry"
     ],
-    "codeEntries": 49,
-    "docMembers": 84
+    "codeEntries": 27,
+    "docMembers": 61
   },
-  "bypassLines": 30,
-  "glossaryTerms": 29
+  "bypassLines": 24,
+  "glossaryTerms": 28
 }

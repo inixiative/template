@@ -1,11 +1,11 @@
 {
   "id": "lens-usage",
   "title": "Using a lens: build, gate, fetch",
-  "routing": "Is this about putting a json-rules lens to work in code \u2014 building one (FieldMap / FieldMapSet, createLens, stitchFieldMaps, bridges and fieldMap:Model keys, a tenant + soft-delete narrowing, storeLens / composeLens), running a user or AI rule through it (validateRuleInLens \u2192 narrowRule \u2192 toPrisma / toSql / check, or a { lens } compile; describeRule to pick an executor), fetching and cutting rows under it (toPrisma(true, { lens }) + toLensSelect + projectRows, keepClampColumns, readLensValue, walkLensPath, lensVisit, projectLens by path or by model), option sources for pickers (sources / SourceSpec, toSourceQueries, materializeSourceQuery, materializeSources, from: 'mapDefaults', recheck across a bridge), bindings in a lens (bindLens, listLensBindings, parent:name), evaluating across bridges (indexBridges), or migrating lens code between json-rules versions?",
+  "routing": "Is this about putting a json-rules lens to work in code \u2014 building one (FieldMap / FieldMapSet, createLens, stitchFieldMaps, bridges and fieldMap:Model keys, assertValidFieldMaps, a tenant + soft-delete narrowing), binding it (bindLens, listLensBindings, parent:name), storing it (storeLens / composeLens), running a user or AI rule through it (validateRuleInLens \u2192 narrowRule \u2192 toPrisma / toSql / check, or a { lens } compile; coerceRule; describeRule to pick an executor), fetching and cutting rows under it (toPrisma(true, { lens }) + toLensSelect + projectRows, keepClampColumns), reading through it (readLensValue, walkLensPath, lensVisit, projectLens by path or by model), or migrating lens code between json-rules versions?",
   "concepts": [
     "lib-json-rules-lens-usage"
   ],
-  "tokens": 20413,
+  "tokens": 18132,
   "tokenMethod": "chars/4",
   "runsAgreed": 0,
   "sources": {
@@ -23,9 +23,7 @@
       "doc:@inixiative/json-rules/README.md#lens-multi-source-data/lensnarrowing-where",
       "doc:@inixiative/json-rules/README.md#lens-multi-source-data/lens-utilities",
       "doc:@inixiative/json-rules/README.md#lens-multi-source-data/bindings-in-a-lens",
-      "doc:@inixiative/json-rules/README.md#lens-multi-source-data/option-sources",
       "doc:@inixiative/json-rules/README.md#lens-multi-source-data/fetching-under-a-lens",
-      "doc:@inixiative/json-rules/README.md#lens-multi-source-data/evaluating-across-bridges",
       "doc:@inixiative/json-rules/docs/LENS.md#9-building-a-lens",
       "doc:@inixiative/json-rules/docs/LENS.md#10-using-the-lens",
       "doc:@inixiative/json-rules/docs/LENS.md#10-using-the-lens/validateruleinlens-rule-lens-validate-at-the-api-boundary",
@@ -39,12 +37,11 @@
       "doc:@inixiative/json-rules/docs/LENS.md#13-end-to-end-worked-example"
     ],
     "catalogClusters": [
-      "json-rules-engine",
       "lenses-multi-source"
     ],
-    "codeEntries": 6,
-    "docMembers": 16
+    "codeEntries": 14,
+    "docMembers": 2
   },
-  "bypassLines": 0,
-  "glossaryTerms": 28
+  "bypassLines": 11,
+  "glossaryTerms": 26
 }

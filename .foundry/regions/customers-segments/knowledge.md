@@ -112,9 +112,26 @@ Not here: the generic `RuleReference` / `withRule` / lens machinery is in the js
 
 ## 3. Everything that exists here, by class
 
-Point at a class when that is as specific as the moment allows, or at a member. Each member: **name** `where`: choose this when … . Where the docs or code give material, a second line describes the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
+Point at a class when that is as specific as the moment allows, or at a member. Where a class has siblings an agent could confuse, a table under the class header says which to use when. Each member: **name** `where`: choose this when … . Where the docs or code give material, a second line describes the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
 
 ### Class `customers`: CustomerRef customer/provider pairs, provider routes and lens
+
+**Choosing among siblings: Viewing a CustomerRef: includeCustomer vs includeProvider vs includeComplete; customerRefAsProviderSchema vs customerRefAsCustomerSchema** (catalog choose lines)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **includeCustomer** | provider viewing its customers | the customer's view (use includeProvider) |
+| **includeProvider** | customer viewing its providers | the provider's view (use includeCustomer) |
+| **includeComplete** | both sides needed | one side (use includeCustomer / includeProvider) |
+| **customerRefAsProviderSchema** | provider-facing listings | customer-facing (use customerRefAsCustomerSchema) |
+| **customerRefAsCustomerSchema** | customer-facing listings | provider-facing (use customerRefAsProviderSchema) |
+
+**Choosing among siblings: CustomerRef vs OrganizationUser** (catalog CustomerRef)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **CustomerRef** | who is a customer of which provider | tenant membership (use OrganizationUser (tenancy)) |
+| **OrganizationUser (tenancy)** | membership in an org | customer/provider relationships (use CustomerRef) |
 
 - **CustomerRef** `packages/db/prisma/schema/customerRef.prisma`: Use for customer-provider relationships; tenant membership belongs in OrganizationUser/SpaceUser instead.
   - *Signs you're bypassing it:* using OrganizationUser / SpaceUser or a new join table to model who is a customer of whom (catalog: CustomerRef (tenant membership belongs in OrganizationUser/SpaceUser instead))
@@ -125,10 +142,37 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **includeCustomer** `apps/api/src/modules/customerRef/queries/customerRefIncludes.ts#includeCustomer`: Provider viewing its customers; includeProvider for the other side, includeComplete for both.
   - *Signs you're bypassing it:* hand-written include objects for customerUser/customerOrganization/customerSpace on a CustomerRef query (catalog: includeCustomer / includeProvider / includeComplete)
 - **includeProvider** `apps/api/src/modules/customerRef/queries/customerRefIncludes.ts#includeProvider`: Customer viewing its providers; includeCustomer for the other side, includeComplete for both.
-- **segmentMemberOwner** `apps/api/src/hooks/index.ts`: ensure a SegmentMember's customer ref belongs to the segment owner as provider
 - *Also here, by name:* CustomerModel (`packages/db/prisma/schema/customerRef.prisma`); ProviderModel (`packages/db/prisma/schema/customerRef.prisma`); customerFilterSchema (`apps/api/src/modules/customerRef/schemas/customerRefQuerySchemas.ts`); customerRefCustomerFk (`apps/api/src/modules/segment/lib/segmentOwner.ts`); customerRefCustomerId (`apps/api/src/modules/segment/services/publishMembershipChanges.ts`); customerRefProviderFk (`apps/api/src/modules/segment/lib/segmentOwner.ts`); customerRefTags (`apps/api/src/modules/customerRef/schemas/customerRefSchemas.ts`); providerFilterSchema (`apps/api/src/modules/customerRef/schemas/customerRefQuerySchemas.ts`)
 
 ### Class `segments`: Segments: provider-owned audiences, static/dynamic membership reconciliation
+
+**Choosing among siblings: Reconcile: reconcileSegment vs reconcileCustomerRefSegments vs reconcileCustomerRef vs applyMembershipDiff vs publishMembershipChanges** (docs/claude/SEGMENTS.md § Static and dynamic membership; catalog)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **reconcileSegment** | a segment's rule changed: full recompute (job and service share the name) | one customer changed (use reconcileCustomerRefSegments) |
+| **reconcileCustomerRefSegments** | job: one customer changed, enqueued from business events | whole segment (use reconcileSegment) |
+| **reconcileCustomerRef** | service: incremental recompute for one customer | rule changes (use reconcileSegment) |
+| **applyMembershipDiff** | persisting computed membership changes (only writer of SegmentMember) | computing matches (use evaluateSegment) |
+| **publishMembershipChanges** | emitting membership events from diffs | unrelated events (use appEvents directly) |
+
+**Choosing among siblings: Evaluate: evaluateSegment vs estimateSegmentReach vs compileSegmentWhere** (catalog; docs/claude/SEGMENTS.md § API)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **evaluateSegment** | member ids of a saved segment | draft conditions (use estimateSegmentReach) |
+| **estimateSegmentReach** | preview counts for draft conditions | a saved segment's members (use evaluateSegment) |
+| **compileSegmentWhere** | the composable query filter itself | matched ids (use evaluateSegment) |
+
+**Choosing among siblings: Validate and health: validateSegmentConditions vs assertSegmentReferencesOwned vs findReferenceCycle vs soundSegments vs withSegmentsRuleIssues** (docs/claude/SEGMENTS.md § Rule health and references; catalog)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **validateSegmentConditions** | condition shape and fields | reference ownership (use assertSegmentReferencesOwned) |
+| **assertSegmentReferencesOwned** | references stay inside the owner's lens | shape checks (use validateSegmentConditions) |
+| **findReferenceCycle** | cycle check before saving references | finding dependents (use referencedBy) |
+| **soundSegments** | dropping degraded segments | keeping all with issues (use withSegmentsRuleIssues) |
+| **withSegmentsRuleIssues** | rows annotated with rule issues | a state map (use segmentRuleStates) |
 
 - **Segment** `packages/db/prisma/schema/segment.prisma`: Rule-defined audiences: dynamic Segment; arbitrary labels on resources: Tag instead.
 - **SegmentMember** `packages/db/prisma/schema/segmentMember.prisma`: link one customer ref into a segment, unique per pair
@@ -175,22 +219,19 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **apps/web/app/routes/_authenticated/segments** `apps/web/app/routes/_authenticated/segments`: show segments the user owns and their segment memberships
 - **Segment membership diff events** `docs/claude/SEGMENTS.md#Events and email integration`: publish segment.membersAdded/Removed and customerRef.segmentsAdded/Removed from membership diffs, incl. deletion
 - **Segment membership realtime refetch** `docs/claude/SEGMENTS.md#Events and email integration`: refetch member-list channel for owners; meReadManySegmentMemberships refetch to user sockets
+- **Segment reconciliation** `docs/claude/SEGMENTS.md`: event-driven incremental reconciliation; nightly sweep is the full-recompute fallback
 - **Segments nav redirect** `apps/web/app/config/nav/features/segments.ts`: Nest Owned and Memberships under Segments; /segments redirects to Owned preserving org, space, spoof context.
-- **customerRefLens** `apps/api/src/modules/customerRef/lib/customerRefLens.ts`: Unscoped vocabulary/validation; use resolvedCustomerRefLens when evaluating within a provider scope.
-- **resolvedCustomerRefLens** `apps/api/src/modules/customerRef/lib/customerRefLens.ts`: Evaluating rules for a specific owner; customerRefLens for vocabulary only.
-- **RuleReference** `docs/claude/SEGMENTS.md#Rule health and references`: record segment-to-segment edges for health and dependency closure
 - **Segment reach endpoint** `docs/claude/SEGMENTS.md#API`: Previewing reach; create route to persist.
-- **segmentConditions** `apps/api/src/hooks/index.ts`: require, validate and normalize Segment conditions against the owner's lens
-- **SegmentsPage** `packages/ui/src/pages/SegmentsPage.tsx`: render owned or membership segment lists, enabling only selected query
 - **Degraded segment handling** `docs/claude/SEGMENTS.md#Rule health and references`: Selecting segments to reconcile or expose to email lens.
-- **Degraded segments never queued** `sweepSegments`: when enqueueing segment reconciliation
-- **Enqueue customer segment reconcile from business events** `reconcileCustomerRefSegments`: when wiring segment membership updates to data changes
-  - *Signs you're bypassing it:* re-evaluating segment membership inside a Prisma write hook or synchronously in the controller after a customer change (docs/claude/SEGMENTS.md § Static and dynamic membership (controllers emit business events; event handlers enqueue reconciliation jobs; not a lookup inside a model's write hook))
+- **Degraded segments keep members** `FEATURES.md › Segments › Reference Health`: segments with broken rule references
+  - *Signs you're bypassing it:* clearing or recomputing membership of a segment whose rule is degraded (FEATURES.md § Segments › Reference Health)
+- **Every segment has a rule** `FEATURES.md › Segments`: creating any segment
 - **Hide rules from customer membership reads** `docs/claude/SEGMENTS.md#Rule health and references`: Customer-facing membership endpoints.
+- **Hide rules from membership reads** `FEATURES.md › Segments › Reference Health`: segment read endpoints
+  - *Signs you're bypassing it:* a customer-facing membership response that includes conditions or ruleIssues (docs/claude/SEGMENTS.md § Rule health and references)
 - **No direct segment member add/remove** `docs/claude/SEGMENTS.md#Static and dynamic membership`: Whenever building a fixed audience.
   - *Signs you're bypassing it:* a route or service that calls db.segmentMember.create / delete to hand-pick members (docs/claude/SEGMENTS.md § Static and dynamic membership (a hand-picked audience is a static rule over customer-reference IDs; no direct member add/remove API))
 - **Reconcile via events, not write hooks** `docs/claude/SEGMENTS.md#Static and dynamic membership`: Any write affecting segment-readable data.
-- **Segment condition references** `docs/claude/HOOKS.md#Application Hooks`: Writing Segment conditions.
 - **Segment membership is CustomerRef-scoped** `docs/claude/SEGMENTS.md#Purpose and ownership`: Any segment rule or membership write.
 - **Segment rule save gate** `docs/claude/SEGMENTS.md#Rule health and references`: Segment create, update and reach.
 - **Segment type switch semantics** `docs/claude/SEGMENTS.md#Static and dynamic membership`: Segment type updates.

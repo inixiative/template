@@ -7,7 +7,7 @@
     "caching",
     "rate-limiting"
   ],
-  "tokens": 9085,
+  "tokens": 10418,
   "tokenMethod": "chars/4",
   "runsAgreed": 2,
   "sources": {
@@ -25,14 +25,19 @@
       "doc:docs/claude/REDIS.md#cache-utilities"
     ],
     "catalogClusters": [
+      "authentication-methods",
       "caching-and-invalidation",
+      "cron-and-recurring-work",
+      "job-definition-and-enqueue",
+      "module-layout-monorepo",
       "rate-limiting",
       "redis-infrastructure",
       "testing-helpers",
-      "testing-rules"
+      "testing-rules",
+      "websocket-realtime-delivery"
     ],
     "codeEntries": 30,
-    "docMembers": 19
+    "docMembers": 23
   },
   "bypassLines": 17,
   "glossaryTerms": 26

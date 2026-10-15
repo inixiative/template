@@ -6,7 +6,7 @@
     "customers",
     "segments"
   ],
-  "tokens": 10835,
+  "tokens": 11534,
   "tokenMethod": "chars/4",
   "runsAgreed": 3,
   "sources": {
@@ -31,10 +31,8 @@
       "customers-providers",
       "error-handling",
       "filtering-search-ordering",
-      "frontend-app-shells-routes",
       "frontend-navigation-context",
       "immutable-fields",
-      "lenses-multi-source",
       "request-response-schemas",
       "route-registration-openapi",
       "rule-references-registry",
@@ -42,7 +40,7 @@
       "websocket-realtime-delivery"
     ],
     "codeEntries": 67,
-    "docMembers": 20
+    "docMembers": 15
   },
   "bypassLines": 17,
   "glossaryTerms": 26

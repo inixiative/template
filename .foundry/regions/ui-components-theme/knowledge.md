@@ -120,9 +120,48 @@ Not here: the shell's navigation behavior (AppShell, Sidebar, ContextSelector, n
 
 ## 3. Everything that exists here, by class
 
-Point at a class when that is as specific as the moment allows, or at a member. Each member: **name** `where`: choose this when … . Where the docs or code give material, a second line describes the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
+Point at a class when that is as specific as the moment allows, or at a member. Where a class has siblings an agent could confuse, a table under the class header says which to use when. Each member: **name** `where`: choose this when … . Where the docs or code give material, a second line describes the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
 
 ### Class `ui-components`: packages/ui primitives, settings pages, modals, standard conditional props
+
+**Choosing among siblings: Input vs PasswordInput vs SlugInput** (docs/claude/FRONTEND/COMPONENTS.md § Input & Label)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **Input** | plain text fields | secrets (PasswordInput); slugs (SlugInput) |
+| **PasswordInput** | secrets needing a reveal toggle | plain text (use Input) |
+| **SlugInput** | slug fields | plain text (Input); secrets (PasswordInput) |
+
+**Choosing among siblings: Select vs SearchableSelect** (docs/claude/FRONTEND/COMPONENTS.md § Select and SearchableSelect)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **Select** | short fixed option lists | typing to filter or remote search (use SearchableSelect) |
+| **SearchableSelect** | long or server-searched option lists | short fixed lists (use Select) |
+
+**Choosing among siblings: show prop vs disabledText prop** (docs/claude/FRONTEND/COMPONENTS.md § Standard Conditional Props)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **show prop** | hiding unauthorized UI entirely | keeping it visible but disabled (use disabledText prop) |
+| **disabledText prop** | showing why an action is unavailable | hiding it (use show prop) |
+
+**Choosing among siblings: NotFound vs RootNotFound vs Unauthorized** (catalog entries NotFound, RootNotFound, Unauthorized)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **NotFound** | missing route inside an app shell | outside any shell (RootNotFound); permission failure (Unauthorized) |
+| **RootNotFound** | root router fallback outside any shell | within app pages (use NotFound) |
+| **Unauthorized** | permission failure | a missing route (use NotFound / RootNotFound) |
+
+**Choosing among siblings: Small confusable pairs** (catalog entries)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **useBreakpoint** | named sm-2xl breakpoints | arbitrary media queries (use useMediaQuery) |
+| **useMediaQuery** | arbitrary media queries | named breakpoints (use useBreakpoint) |
+| **enumToSelectOptions** | building a select option list from an enum | only a label string (use formatEnumLabel) |
+| **formatEnumLabel** | a single enum label string | a whole option list (use enumToSelectOptions) |
 
 - **Avatar** `packages/ui/src/components/primitives/Avatar.tsx#Avatar`: frame a user picture with image and fallback, optionally hidden
 - **Badge** `packages/ui/src/components/primitives/Badge.tsx#Badge`: render a small rounded pill label with a styled variant
@@ -184,40 +223,19 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **IntegrationsPage provider buckets** `IntegrationsPage, lib/integrationProviders.ts`: list integrations per provider bucket plus Custom, status from bucket total
 - **List page shape** `packages/ui/src/pages/OrganizationsPage`: build list screens as Page with create action, Table, optimistic create/delete
   - *Signs you're bypassing it:* a list screen with its own header/layout markup, ad-hoc delete refetch and custom table instead of Page + Table + useOptimisticMutation (docs/claude/FRONTEND/COMPONENTS.md § Modals and Pages (list pages share one shape))
-- **Modal close continues flow** `packages/ui Modal`: turn an open modal's close button into the flow's next action
 - **Pages in packages/ui mounted by thin app routes** `packages/ui/src/pages/`: Page-level screens; app route files stay thin instead of holding page logic.
   - *Signs you're bypassing it:* page logic, queries and components written inside apps/*/app/routes files or an app-local components folder (docs/claude/FRONTEND.md § Conventions (shared UI and pages in @template/ui; app routes stay thin); docs/claude/APPS.md § Implementation Notes)
 - **Settings visibility via nav config** `docs/claude/FRONTEND/COMPONENTS.md#Settings`: Use instead of hiding entries inside pages.
   - *Signs you're bypassing it:* a settings page that hides its own entries or tabs based on permissions (docs/claude/FRONTEND/COMPONENTS.md § Settings)
 - **Shared pages in @template/ui/pages** `packages/ui/src/pages/`: keep app screens in the shared pages package, mounted by thin app routes
-- **apiMutation** `docs/claude/FRONTEND/COMPONENTS.md#Modals and Pages`: Writes; apiQuery for reads.
-  - *Signs you're bypassing it:* a mutationFn that calls fetch or the SDK directly and attaches Authorization / x-spoof-user-email headers by hand (docs/claude/FRONTEND/API_CLIENT.md § apiQuery and apiMutation; FEATURES.md § Frontend Architecture (API Client Wrappers))
-- **apiQuery** `docs/claude/FRONTEND/COMPONENTS.md#Modals and Pages`: Reads; apiMutation for writes.
-  - *Signs you're bypassing it:* a hand-written fetch/axios call or inline queryFn that builds headers and unwraps data.data itself, or a useQuery whose queryKey is a hand-made array instead of the SDK's generated query key (docs/claude/FRONTEND/API_CLIENT.md § apiQuery and apiMutation; catalog entry apiQuery)
 - **Core UI primitives** `packages/ui (Shadcn-based)`: Reuse before creating a new component.
   - *Signs you're bypassing it:* a new bespoke button, input, card, select or table component, or raw <button>/<input>/<table> markup with hand-written Tailwind, where a packages/ui primitive exists (FEATURES.md § UI Components; catalog/doc member Core UI primitives (reuse before creating))
-- **createOptimisticListTarget** `docs/claude/FRONTEND/COMPONENTS.md#Modals and Pages`: describe which cached list query an optimistic mutation updates and how
-  - *Signs you're bypassing it:* hand-written optimisticUpdate/reconcile functions that insert a placeholder row, filter by id or splice the response item into a cached list (docs/claude/FRONTEND/API_CLIENT.md § Optimistic Mutations)
-- **CreateOrganizationModal** `packages/ui/src/components/organizations/`: collect organization name and auto-derived, uniqueness-validated slug
 - **disabledText prop** `packages/ui/src/components/primitives/ (Button, Input, DropdownMenuItem)`: Show why an action is unavailable; use show to hide it instead.
   - *Signs you're bypassing it:* a disabled button with a separate tooltip or helper text explaining why, instead of disabledText (docs/claude/FRONTEND/COMPONENTS.md § Standard Conditional Props)
-- **ErrorBoundary** `packages/ui/src/components/utility/`: catch render errors and show a fallback
-- **Pagination** `packages/ui/src/components/primitives/`: Usually via Table's pagination prop rather than standalone.
-  - *Signs you're bypassing it:* rendering a separate Pagination under a Table instead of passing pagination props to Table (catalog/doc member Pagination (with Table pass paginationProps))
-- **ProfilePage** `packages/ui/src/pages/`: Mount in settings/profile; specific *ProfilePage only when context is fixed.
 - **show prop** `packages/ui/src/components/primitives/`: Hide unauthorized UI entirely; use disabledText to keep it visible but disabled.
   - *Signs you're bypassing it:* conditional rendering wrappers around Card, Table, Avatar or EmptyState instead of their show prop (docs/claude/FRONTEND/COMPONENTS.md § Standard Conditional Props)
 - **Table + Pagination** `Table, Pagination`: Fixed pages via usePaginatedData; infinite scroll via useInfiniteData.
   - *Signs you're bypassing it:* a hand-built table with its own page-number buttons, IntersectionObserver load-more or page state (FEATURES.md § UI Components (Table + Pagination); docs/claude/FRONTEND/COMPONENTS.md § Table)
-- **useInfiniteDataQuery** `IntegrationsPage`: Lists that overflow one page (e.g. 100-item buckets); useQuery for bounded lists.
-- **useInfiniteScrollTrigger** `IntegrationsPage`: load the next page when the list end scrolls into view
-  - *Signs you're bypassing it:* A hand-written IntersectionObserver sentinel or scroll listener to trigger loading the next page. (docs/claude/FRONTEND/API_CLIENT.md § Infinite Scroll Trigger)
-- **useOptimisticMutation** `docs/claude/FRONTEND/COMPONENTS.md#Modals and Pages`: List create/delete; plain useMutation when no cached list needs updating.
-  - *Signs you're bypassing it:* a raw useMutation with hand-written onMutate setQueryData, snapshot/rollback in onError and invalidateQueries in onSettled for a list (docs/claude/FRONTEND/API_CLIENT.md § Optimistic Mutations; catalog entry useOptimisticMutation)
-- **useSectionOpen** `packages/ui`: keep a modal's open state in the URL hash for deep links
-  - *Signs you're bypassing it:* useState for a modal or collapsible that should survive reload or be deep-linkable, or hand-writing window.location.hash (catalog entry useSectionOpen)
-- **useValidateUniqueness** `docs/claude/FRONTEND/API_CLIENT.md#form-helpers`: check a form field value is unique via the API
-  - *Signs you're bypassing it:* a hand-written SDK read or fetch in a form effect to check whether a slug or name is already taken (docs/claude/FRONTEND/API_CLIENT.md § Form Helpers (useValidateUniqueness); CreateOrganizationModal)
 - **All frontend code lives in @template/ui** `docs/claude/FRONTEND/COMPONENTS.md — Package Organization`: Deciding package for frontend code; API client goes in @template/sdk, isomorphic code in @template/shared.
 - **Organize components by domain** `docs/claude/FRONTEND/COMPONENTS.md — Package Organization`: Any new shared UI component in @template/ui.
 - **Settings are nested routes, not tabs** `apps/{web,admin}/app/routes/_authenticated/settings/`: Any new settings screen; SettingsLayout tabs are exported but unmounted.
@@ -225,6 +243,32 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - *Also here, by name:* AuthProviderModal (`packages/ui/src/components/settings/AuthProviderModal.tsx`); AvatarFallback (`packages/ui/src/components/primitives/Avatar.tsx`); AvatarImage (`packages/ui/src/components/primitives/Avatar.tsx`); BreadcrumbEllipsis (`packages/ui/src/components/primitives/Breadcrumb.tsx`); BreadcrumbItem (`packages/ui/src/components/primitives/Breadcrumb.tsx`); BreadcrumbLink (`packages/ui/src/components/primitives/Breadcrumb.tsx`); BreadcrumbList (`packages/ui/src/components/primitives/Breadcrumb.tsx`); BreadcrumbPage (`packages/ui/src/components/primitives/Breadcrumb.tsx`); BreadcrumbSeparator (`packages/ui/src/components/primitives/Breadcrumb.tsx`); CardContent (`packages/ui/src/components/primitives/Card.tsx`); CardDescription (`packages/ui/src/components/primitives/Card.tsx`); CardFooter (`packages/ui/src/components/primitives/Card.tsx`); CardHeader (`packages/ui/src/components/primitives/Card.tsx`); CardTitle (`packages/ui/src/components/primitives/Card.tsx`); CreateIntegrationModal (`packages/ui/src/components/settings/CreateIntegrationModal.tsx`); CreateTokenModal (`packages/ui/src/components/settings/CreateTokenModal.tsx`); CreateWebhookModal (`packages/ui/src/components/settings/CreateWebhookModal.tsx`); DropdownMenuContent (`packages/ui/src/components/primitives/DropdownMenu.tsx`); DropdownMenuItem (`packages/ui/src/components/primitives/DropdownMenu.tsx`); DropdownMenuLabel (`packages/ui/src/components/primitives/DropdownMenu.tsx`); DropdownMenuSeparator (`packages/ui/src/components/primitives/DropdownMenu.tsx`); DropdownMenuTrigger (`packages/ui/src/components/primitives/DropdownMenu.tsx`); UserProfileTab (`packages/ui/src/components/settings/UserProfileTab.tsx`); UserWebhooksTab (`packages/ui/src/components/settings/UserWebhooksTab.tsx`); badgeVariants (`packages/ui/src/components/primitives/Badge.tsx`)
 
 ### Class `theme-layout`: AppShell layout system and multi-tier theme
+
+**Choosing among siblings: Page vs MasterDetailLayout vs ResponsiveDrawer vs Modal** (docs/claude/FRONTEND/THEME_LAYOUT.md § Header and Page; § Overlays and Panels)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **Page** | standard body for every page, e.g. a list with a Table | split list/detail views (use MasterDetailLayout) |
+| **MasterDetailLayout** | side-by-side list and detail | an overlay detail view (use ResponsiveDrawer) |
+| **ResponsiveDrawer** | record detail, profile or settings as an overlay | confirmations and forms (use Modal) |
+| **Modal** | confirmations and forms in a plain dialog | detail views (use ResponsiveDrawer) |
+
+**Choosing among siblings: AppShell vs FullscreenLayout** (THEME_LAYOUT.md; ROUTING_NAVIGATION.md § File-Based Routes)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **AppShell (frontend-apps-navigation)** | every authenticated page | routes under _fullscreen (use FullscreenLayout) |
+| **FullscreenLayout (frontend-apps-navigation)** | routes under _fullscreen | normal pages with nav (use AppShell with Page) |
+
+**Choosing among siblings: Theme types and hooks** (docs/claude/FRONTEND/THEME_LAYOUT.md § Types; § Hooks)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **AppTheme** | the complete platform baseline theme | tenant overrides (use SpaceTheme) |
+| **SpaceTheme** | partial tenant overrides | the complete platform theme (use AppTheme) |
+| **useThemePersistence** | loading/saving the theme to localStorage | toggling the .dark class (use useDarkMode (ui-components-theme)) |
+| **useDarkMode (ui-components-theme)** | global light/dark/system mode | per-space colors (use useSpaceTheme (ui-components-theme)) |
+| **useSpaceTheme (ui-components-theme)** | a space's theme as --space-* CSS vars; not wired to real data yet | working theme control (use useDarkMode) |
 
 - **DetailPanel** `packages/ui/src/components/layout/DetailPanel.tsx#DetailPanel`: lay out a scrolling detail view with a fixed header and optional split
 - **MasterDetailLayout** `packages/ui/src/components/layout/MasterDetailLayout.tsx#MasterDetailLayout`: Side-by-side list and detail; for an overlay detail view use ResponsiveDrawer instead.
@@ -238,21 +282,14 @@ Point at a class when that is as specific as the moment allows, or at a member. 
   - *Signs you're bypassing it:* hand-defined light/dark shade variables for a color instead of the color-mix derived --*-1..4 (docs/claude/FRONTEND/THEME_LAYOUT.md § Theme System)
 - **Three-tier theme CSS variables** `packages/shared/styles/theme.css`: layer platform colors, tenant overrides and active tokens components reference
   - *Signs you're bypassing it:* hard-coded hex/Tailwind palette colors (bg-blue-600) in components instead of the active theme tokens (--primary and shades) (docs/claude/FRONTEND/THEME_LAYOUT.md § Theme System (Architecture))
-- **AppShell** `packages/ui/src/components/layout/`: Every authenticated page; superadmin locks context and hides spoof controls.
 - **AppTheme** `packages/ui/src/types/AppTheme.ts`: platform baseline; SpaceTheme for tenant overrides
-- **ContextSelector** `packages/ui/src/components/layout/`: switch active tenant between Personal, organizations and spaces
-  - *Signs you're bypassing it:* a custom org/space dropdown, or passing tenant/auth to ContextSelector as props (docs/claude/ZUSTAND.md § 3. TenantSlice (ContextSelector reads tenant and auth itself); catalog entry ContextSelector)
-- **FullscreenLayout** `packages/ui/src/components/layout/`: Routes under _fullscreen instead of AppShell/Page.
-  - *Signs you're bypassing it:* a page that hides AppShell chrome by hand or builds its own back button that drops org/space/spoof (docs/claude/FRONTEND/ROUTING_NAVIGATION.md § File-Based Routes (FullscreenLayout back button uses navigatePreserving))
 - **Header** `packages/ui/src/components/layout/`: show mobile menu button, breadcrumbs from nav chain and share button
 - **Layout components** `packages/ui/src/components/layout/`: provide shell, sidebar, header, page, modal, drawer and master-detail layouts
 - **navigatePreserving** `Sidebar navigation`: In-app navigation that must keep ?org=/?space=; plain navigate loses context.
-- **Sidebar** `packages/ui/src/components/layout/`: render context nav items, hiding failed-access and alias items
 - **SpaceTheme** `packages/ui/src/types/SpaceTheme.ts`: tenant partial overrides; AppTheme for the complete platform theme
 - **tenant.setOrganization** `tenant store`: Organization context; tenant.setSpace for a space.
 - **tenant.setSpace** `tenant store`: Space context; tenant.setOrganization for an organization.
 - **useLanguage** `packages/ui/src/hooks/useLanguage.ts`: set document lang attribute from the browser language
-- **UserMenu** `packages/ui/src/components/layout/`: show user identity with settings, logout and superadmin spoof controls
 - **useThemePersistence** `packages/ui/src/hooks/useThemePersistence.ts`: load localStorage theme into store on mount and save changes back
 - **Detail views use ResponsiveDrawer** `docs/claude/FRONTEND/THEME_LAYOUT.md#Overlays and Panels`: Showing a record detail, profile or settings panel as an overlay.
   - *Signs you're bypassing it:* a record detail or profile panel built as a centered Modal or a custom slide-over with its own breakpoint logic (docs/claude/FRONTEND/THEME_LAYOUT.md § Overlays and Panels (ResponsiveDrawer recommended for detail views))

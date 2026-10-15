@@ -106,15 +106,44 @@ The working method agents follow in the template (purpose first, decomposition, 
 
 `docs-process` is DOCUMENTATION.md plus §11–§12: read the routed doc before implementing (the Before Starting Work table and §11 Quick Doc Routing; a new package or dependency means DEPENDENCIES.md and MONOREPO.md), and update it when a pattern, helper, convention or contract changes. Every doc has one title, generated TOC markers (`bun run docs:toc`, scripts/docs/regenToc.ts), a one-line purpose and `---`-separated sections; incomplete docs use the stub format; code examples show a real call, not a signature; diagrams use Mermaid; docs describe what the code does and never present aspirational features as existing. Open questions and planned work go in `tickets/`; long analysis and larger reviewed changes go in the gitignored `tmp/AI_WORKSPACE/` (§12 writes `/tmp/AI_WORKSPACE/`; SCRIPTS.md's repo `tmp/` is the one the workflow describes). A doc alignment review spawns an agent per doc to find dead, orphaned, outdated, missing and unwired items, then fixes them one by one.
 
-Related regions: the Atlas code map that pattern discovery leans on (`@atlas` blocks, `bunx atlas query/graph`, MAP.md) is in `dx-tools`, with the library itself in `lib-atlas`; concrete naming, comment and style rules are in `dx-tools`; where code lives and the FEATURES.md overview of what exists are in `monorepo-architecture`; running and checking the repo is in `dx-setup`; each subsystem a doc describes has its own region.
+Related regions: the Atlas code map that pattern discovery leans on (`@atlas` blocks, `bunx atlas query/graph`, MAP.md) is in `lib-atlas`, together with the library itself; concrete naming, comment and style rules are in `conventions`; where code lives and the FEATURES.md overview of what exists are in `monorepo-architecture`; running and checking the repo is in `dx-setup`; each subsystem a doc describes has its own region.
 
 ## 3. Everything that exists here, by class
 
-Point at a class when that is as specific as the moment allows, or at a member. Each member: **name** `where`: choose this when … . Where the docs or code give material, a second line describes the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
+Point at a class when that is as specific as the moment allows, or at a member. Where a class has siblings an agent could confuse, a table under the class header says which to use when. Each member: **name** `where`: choose this when … . Where the docs or code give material, a second line describes the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
 
 ### Class `docs-process`: Docs workflow: read before, update after, doc structure and alignment review, doc routing
 
+**Choosing among siblings: Where unfinished or extra writing goes: tickets vs stub vs AI workspace vs doc update** (docs/claude/DOCUMENTATION.md § Workflow, § Stub Format, § Doc Maintenance; AI/ENTRYPOINT.md § 12)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **Open questions and planned work go in tickets** | unresolved questions and future work | an existing doc that is incomplete (Stub format for incomplete docs) |
+| **Stub format for incomplete docs** | doc content not yet written | planned work itself (Open questions and planned work go in tickets) |
+| **Deep analysis in AI workspace** | long analyses and reports: tmp/AI_WORKSPACE/<task>/ | pasted into chat or committed under docs/ |
+| **Update docs when behavior or contracts change** | a pattern, helper, convention or contract changed | aspirational features (Keep docs honest) |
+
+**Choosing among siblings: Intake vs execution contract vs circuit breaker vs interrogate** (AI/ENTRYPOINT.md § 0.3, § 0.4, § 1–3)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **Mandatory task intake** | every task, before edits: mode, scope, goal, non-goals, validation | shape-finding questions (Interrogate before proposing) |
+| **Execution contract** | doing the task: issue list, patch plan, smallest patch, report | blocked: stop and ask, don't redesign (Circuit breaker) |
+| **Circuit breaker** | scope grows, >3 files, >2 failed attempts, unrequested abstraction | a single scope call (Flag scope judgment calls) |
+| **Interrogate before proposing** | modeling, naming or taxonomy work: surface forks first | clear in-scope execution (Mandatory task intake) |
+| **Flag scope judgment calls** | a genuine add-or-trim scope decision | obvious completion of the asked feature |
+
+**Choosing among siblings: Finding what exists and checking claims** (AI/ENTRYPOINT.md § 0, § 0.5, § 4; DOCUMENTATION.md § Before Starting Work)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **Read the relevant doc before implementing** | every task: the routed docs/claude file first | concluding a capability is missing (Consult FEATURES/COMPARISONS before assuming missing) |
+| **Pattern discovery before implementation** | non-trivial new code: 2-3 similar modules first | concept lookup (Navigate by Atlas concept before grepping (lib-atlas)) |
+| **Verify before asserting** | claiming a bug or regression: reproduce first | reviewing a whole change (Run adversarial review after significant work) |
+| **Doc alignment review** | release, big refactor, onboarding, quarterly | a single change's docs (Update docs when behavior or contracts change) |
+
 - **bun run docs:toc** `package.json`: regenerate the docs table of contents
+- **AI Workspace staging** `tmp/AI_WORKSPACE/`: Larger changes or experiments needing review before commit; delete folder when done.
 - **Change checklist** `CLAUDE.md §13 Change Checklist`: Confirm nearby pattern, minimal fix with existing utilities, remove stale code, validate, summarize.
 - **Doc alignment review** `docs/claude/DOCUMENTATION.md#Doc Alignment Review`: Before major releases, after large refactors, onboarding, quarterly; delete dead code, wire or delete unwired code.
 - **Pattern discovery before implementation** `CLAUDE.md §4 Pattern Discovery Before Implementation`: Non-trivial new code; confirm choice with user when high-impact.

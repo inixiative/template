@@ -103,13 +103,40 @@ Presets are adopted through stub files that hold only `extends` plus minimal rev
 
 Pick the command by job. `check` is read-only and exits non-zero on drift; CI runs it after a --frozen-lockfile install through the two-line caller of lib-ci.yml. `sync` applies the fixes and re-locks (refuses a dirty tree without --force). `scan` runs check across every checkout under a root. `train` is the only release path: it walks each lane in dependency order from the default branch at origin, publishes, records candidates, opens adoption and consumer branches, ships config last, and pushes only with --push (--dry-run prints the plan; --lane=agentic leaves primitives alone). `ports` prints a project's ports from ports.json: the service's usual default plus 100 times the project's block, so nothing collides and nothing sits on a default. Renovate owns other dependency bumps and is fenced off the toolchain.
 
-The template depends on this package (root devDependency; tsconfig, biome.json and lefthook.yml extend it; it is a consumer of the primitives lane). How the template's own scripts, lint and CI rules and turbo build use it is covered by the `dx-tools` region; local ports in worktrees and env setup are in `dx-setup`; workspace layout is in `monorepo-architecture`. Sibling tools: `lib-atlas` and `lib-gloss`.
+The template depends on this package (root devDependency; tsconfig, biome.json and lefthook.yml extend it; it is a consumer of the primitives lane). How the template's own scripts, lint and CI rules and turbo build use it is covered by the `dx-tools` region; local ports in worktrees are in `dx-setup` and env setup in `environments-deploy`; workspace layout is in `monorepo-architecture`. Sibling tools: `lib-atlas` and `lib-gloss`.
 
 ## 3. Everything that exists here, by class
 
-Point at a class when that is as specific as the moment allows, or at a member. Each member: **name** `where`: choose this when … . Where the docs or code give material, a second line describes the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
+Point at a class when that is as specific as the moment allows, or at a member. Where a class has siblings an agent could confuse, a table under the class header says which to use when. Each member: **name** `where`: choose this when … . Where the docs or code give material, a second line describes the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
 
 ### Class `lib-config`: The @inixiative/config package (README): shared toolchain, sync/check/scan and the release train
+
+**Choosing among siblings: config check vs config sync vs config scan vs config train vs config ports** (@inixiative/config/README.md § CLI, § CI, § Release flow)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **config check** | read-only drift gate in CI, after a --frozen-lockfile install | fixing drift (config sync) |
+| **config sync** | applying versions.json pins and re-locking locally | verifying only (config check) or releasing (config train) |
+| **config scan** | auditing every checkout under a root | one repo (config check) or publishing (config train) |
+| **config train** | any @inixiative/* release, lanes in dependency order, config last | picking up toolchain changes without a release (config sync); never raw npm publish |
+| **config ports** | a project's local ports from ports.json | hand-picked or default ports (Port block allocation) |
+
+**Choosing among siblings: tsconfig base vs node vs react** (@inixiative/config/README.md § Presets)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **@inixiative/config/tsconfig/base.json** | pure bun libraries | node types needed (tsconfig/node.json) or DOM/JSX (tsconfig/react.json) |
+| **@inixiative/config/tsconfig/node.json** | packages needing node types | DOM/JSX packages (tsconfig/react.json) |
+| **@inixiative/config/tsconfig/react.json** | React/DOM packages | non-UI packages (base.json or node.json) |
+
+**Choosing among siblings: tsup node vs react; biome base vs react** (@inixiative/config/README.md § Presets; catalog @inixiative/config/tsup)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **node** | tsup for node/server packages: node({ entry }) | React/UI packages (react) |
+| **react** | tsup for React/UI packages: react({ entry }) | non-UI packages (node) |
+| **@inixiative/config/biome/base.json** | every repo | React code alone: add the react.json overlay on top |
+| **@inixiative/config/biome/react.json** | overlay for React packages | non-React code (biome/base.json alone) |
 
 - **node** `@inixiative/config/tsup#node`: Node/server packages; React UI packages: react preset instead. Extend rather than writing per-package tsup config.
   - *Signs you're bypassing it:* a per-package tsup.config.ts spelling out format, dts, target and externals instead of `export default node({ entry })` (@inixiative/config/tsup#node (catalog); @inixiative/config/README.md#Presets)
@@ -125,8 +152,6 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **@inixiative/config/tsconfig/base.json** `@inixiative/config/tsconfig/base.json`: bun libraries; node.json for node types, react.json for DOM/JSX packages.
 - **@inixiative/config/tsconfig/node.json** `@inixiative/config/tsconfig/node.json`: packages needing node types; base.json for pure bun, react.json for DOM/JSX.
 - **@inixiative/config/tsconfig/react.json** `@inixiative/config/tsconfig/react.json`: React/DOM packages; base.json or node.json otherwise.
-- **check** `@inixiative/config/README.md#versions.json (the BOM)`: verification/CI; sync to apply versions.
-  - *Signs you're bypassing it:* a hand-written CI step or script that diffs package.json versions, toolchain pins or bun.lock against expected values instead of running `bunx @inixiative/config check` (@inixiative/config/README.md § CLI; § CI)
 - **config check** `@inixiative/config/README.md#CLI`: read-only CI gate; use sync to apply fixes, scan for all checkouts
 - **config ports** `@inixiative/config/README.md#CLI`: print each project's assigned local ports from ports.json
 - **config scan** `@inixiative/config/README.md#CLI`: multi-repo audit; check for a single repo, train to actually release

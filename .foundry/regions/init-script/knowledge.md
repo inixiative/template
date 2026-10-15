@@ -115,19 +115,63 @@ Two front ends share one set of tasks. The interactive Ink TUI (`bun run init`, 
 
 The transition, from the code: init is being cut over from the TUI to headless section runs, and the cut-over is not finished. `init:agent` covers project, infisical, planetscale, railway and monitoring (monitoring runs only when selected, not in the full flow). Vercel, Resend, Cloudflare Pages, Railway buckets, Railway Postgres, bouncer and launch are still TUI-only. Aron: "they're supposed to be cut over; not all built yet; this will eventually do that." When adding or changing a provider step, keep the task function TUI-free and driven by config, progress flags and Infisical, so the headless runner can call it. INIT_SCRIPT_PATTERNS.md describes only the TUI today; a Direction section for it is coming in a doc PR, and this region will be rebuilt from it. Two names drift between the doc and the code: the doc's `isProgressComplete` is `isComplete` in `init/utils/progressTracking.ts`, and its `getSecret` / `setSecret` are `getSecretAsync` / `setSecretAsync` (`init/tasks/infisicalSetup.ts`) over `infisicalApi.getSecret`.
 
-Resume and idempotency are the core: one progress flag per externally verifiable provider fact, each step guarded by its flag, secrets re-fetched from Infisical and metadata re-read from config rather than passed between steps, create calls that return the existing resource on 'already exists' (catch-error, check-then-create, or both), `retryWithTimeout` with specific not-ready conditions for async provisioning, `execAsync` instead of `execSync`, Railway CLI for reads and GraphQL for mutations, and `{project}-{env}-{app}` resource names built from the config. Provider tasks are tested with bun:test resume tests that queue VCR cassettes on each init/api client (`bun run test:init`). Related regions: `dx-setup` owns `bun run setup`, local Docker, env files, with-env, worktrees and CI/deploy after launch; `encryption` owns Infisical as the secret store and the encryption keyrings that the Infisical section seeds for prod and staging; `testing` owns the shared VCR primitive (`@template/shared/vcr`); `observability-lifecycle` owns what the monitoring section's OTEL settings mean.
+Resume and idempotency are the core: one progress flag per externally verifiable provider fact, each step guarded by its flag, secrets re-fetched from Infisical and metadata re-read from config rather than passed between steps, create calls that return the existing resource on 'already exists' (catch-error, check-then-create, or both), `retryWithTimeout` with specific not-ready conditions for async provisioning, `execAsync` instead of `execSync`, Railway CLI for reads and GraphQL for mutations, and `{project}-{env}-{app}` resource names built from the config. Provider tasks are tested with bun:test resume tests that queue VCR cassettes on each init/api client (`bun run test:init`). Related regions: `dx-setup` owns `bun run setup`, local Docker and worktrees, and `environments-deploy` owns env files, with-env and CI/deploy after launch; `encryption` owns Infisical as the secret store and the encryption keyrings that the Infisical section seeds for prod and staging; `testing` owns the shared VCR primitive (`@template/shared/vcr`); `observability-lifecycle` owns what the monitoring section's OTEL settings mean.
 
 ## 3. Everything that exists here, by class
 
-Point at a class when that is as specific as the moment allows, or at a member. Each member: **name** `where`: choose this when … . Where the docs or code give material, a second line describes the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
+Point at a class when that is as specific as the moment allows, or at a member. Where a class has siblings an agent could confuse, a table under the class header says which to use when. Each member: **name** `where`: choose this when … . Where the docs or code give material, a second line describes the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
 
 ### Class `init-script`: The init provisioning TUI (Ink): resumable idempotent tasks, Infisical/Railway/PlanetScale provisioning
+
+**Choosing among siblings: getProjectConfig vs useConfig vs ConfigProvider vs getSecret** (docs/claude/INIT_SCRIPT_PATTERNS.md § 1, § 3, § 8, § Creating a New Task View)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **getProjectConfig** | reading project.config.ts fresh (cache-busted import) | inside a task function (Tasks receive config as parameter) or for secrets (getSecret) |
+| **useConfig** | an init view needs current config and the re-sync callback | task functions (Tasks receive config as parameter) |
+| **ConfigProvider** | wrapping the app once as the config root | drilling config props per view (useConfig) |
+| **Tasks receive config as parameter** | every task function: config comes from the view | a task calling getProjectConfig itself |
+| **getSecret** | connection strings, passwords, keys: re-fetch from Infisical each step | non-secret metadata (getProjectConfig); never pass secrets between steps |
+
+**Choosing among siblings: Idempotent calls vs progress flags; createRailwayConnection vs ensureRailwayConnection** (docs/claude/INIT_SCRIPT_PATTERNS.md § 13)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **Idempotent provider setup calls** | creates, config updates, secret storage | deletes or renames (Atomic progress flags) |
+| **Atomic progress flags** | one flag per remote write in a resumable step | an umbrella flag over several writes |
+| **markComplete / isComplete** | recording/checking a step's flag (init/utils/progressTracking.ts) | docs call isComplete isProgressComplete; same function |
+| **createRailwayConnection** | no efficient list endpoint: catch 'already exists', return existing | a list endpoint exists (ensureRailwayConnection); combine both for races |
+| **ensureRailwayConnection** | check-then-create via listRailwayConnections | no list endpoint (createRailwayConnection) |
+
+**Choosing among siblings: retryWithTimeout vs execAsync vs Railway CLI/GraphQL** (docs/claude/INIT_SCRIPT_PATTERNS.md § 9, § 10, § 11)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **retryWithTimeout** | waiting on DB, branch or role provisioning; retry not-ready errors only | 400/401/403/404/422 (never retry) |
+| **execAsync** | any pscale/railway/infisical CLI call in init/api | execSync, which freezes spinners |
+| **Railway CLI for reads, GraphQL for mutations** | CLI for simple reads, GraphQL API for creates and updates | shelling out to create resources or a token for read-only listing |
+
+**Choosing among siblings: Derived setupState vs viewState vs execution flags** (docs/claude/INIT_SCRIPT_PATTERNS.md § 4, § 16)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **Derived setupState** | new/stale/incomplete/complete, useMemo from config | which screen shows (viewState naming for UI navigation) |
+| **viewState naming for UI navigation** | which screen is shown | running/loading values (Execution flag naming) |
+| **Execution flag naming** | async/execution status booleans | screen changes (viewState naming for UI navigation) |
+
+**Choosing among siblings: Bun-native resume tests with VCR vs api.vcr.queue** (docs/claude/INIT_SCRIPT_PATTERNS.md § 17)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **Bun-native resume tests with VCR** | provider workflows in init tasks | pure helpers (unit test directly) |
+| **api.vcr.queue** | replaying cassettes for init/api clients that own a vcr | cloudflare and resend (mock.module) |
 
 - **Bun-native resume tests with VCR** `init/tasks/tests/*Resume.test.ts`: Provider workflows in init tasks; unit test pure helpers directly instead.
   - *Signs you're bypassing it:* Vitest, live provider calls, or hand-written fetch mocks in init tests instead of queued VCR cassettes (docs/claude/INIT_SCRIPT_PATTERNS.md § 17. Bun-Native Resume Tests with VCR Fixtures)
 - **Cache-bust dynamic config imports** `init/utils/getProjectConfig.ts`: get fresh module contents on repeated dynamic imports of a .ts config
 - **Clean status lists** `docs/claude/INIT_SCRIPT_PATTERNS.md > Clean Status Lists`: Init task progress display instead of streaming logs; resumable from config progress.
 - **Idempotent provider setup calls** `createRailwayConnection, createRailwaySync — docs/claude/INIT_SCRIPT_PATTERNS.md §13`: Creates, config updates, secret storage; destructive ops (deletes, renames) use progress flags instead.
+- **Init config state flow** `docs/claude/INIT_SCRIPT_PATTERNS.md > Architecture Overview`: Updating init TUI state; derive view labels instead of storing grouped state.
 - **Init file layout** `docs/claude/INIT_SCRIPT_PATTERNS.md — File Structure`: Adding a new init setup task; mirror InfisicalSetupView/infisicalSetup as reference.
 - **Init script task view** `docs/claude/INIT_SCRIPT_PATTERNS.md#Creating a New Task View`: add a TUI setup task as view, task function, and app wiring
 - **Interactive prompt for missing required input** `docs/claude/INIT_SCRIPT_PATTERNS.md — 15. Interactive User Prompts for Required Input`: Manual tokens or credentials or user decisions during setup, instead of failing with an error that requires a retry.
@@ -176,7 +220,10 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **Fetch from source of truth** `docs/claude/INIT_SCRIPT_PATTERNS.md#Key Takeaways`: Init script reads of secrets or project metadata.
 - **Fetch from source when resuming** `docs/claude/INIT_SCRIPT_PATTERNS.md > Always Fetch from Source, Never Trust Props`: Resuming any init step that depends on earlier secrets or config.
   - *Signs you're bypassing it:* a later step reading a connection string or password from a variable set by an earlier step (undefined on resume) (docs/claude/INIT_SCRIPT_PATTERNS.md § 8. Always Fetch from Source, Never Trust Props)
+- **Init source of truth** `docs/claude/INIT_SCRIPT_PATTERNS.md > Current implementation notes`: Any change to infrastructure provisioning init flow.
+- **Init task tests with VCR** `docs/claude/INIT_SCRIPT_PATTERNS.md > Current implementation notes`: Testing init tasks that call external providers.
 - **Init testing guidance** `docs/claude/INIT_SCRIPT_PATTERNS.md — Testing guidance`: Any test for init scripts; Vitest is not used.
+- **Launch preflight gate** `docs/claude/INIT_SCRIPT_PATTERNS.md > Current implementation notes`: Launching a provisioned project.
 - **Manual config sync, no polling** `docs/claude/INIT_SCRIPT_PATTERNS.md > Manual Sync Triggers`: Every init setup task that advances step progress.
 - **Manual sync, not polling** `docs/claude/INIT_SCRIPT_PATTERNS.md#Key Takeaways`: Init script views reflecting task progress.
 - **Mask sensitive setup inputs** `docs/claude/INIT_SCRIPT_PATTERNS.md — 15. Interactive User Prompts for Required Input`: Any init-script input that collects a token, password or credential.

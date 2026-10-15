@@ -6,7 +6,7 @@
     "engineering-process",
     "docs-process"
   ],
-  "tokens": 11144,
+  "tokens": 11864,
   "tokenMethod": "chars/4",
   "runsAgreed": 1,
   "sources": {
@@ -44,7 +44,7 @@
       "documentation-process"
     ],
     "codeEntries": 1,
-    "docMembers": 24
+    "docMembers": 25
   },
   "bypassLines": 19,
   "glossaryTerms": 25

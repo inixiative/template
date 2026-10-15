@@ -121,13 +121,37 @@ How the template's processes report what they do (structured, redacted logs; Ope
 
 `telemetry` is OpenTelemetry over fetch-based OTLP exporters: `initializeTelemetry(readTelemetryConfig(...))` once per process, `telemetryMiddleware` for route spans, `telemetryExtension` for Prisma, `instrumentRedis`, `traceJob` for jobs with the trace carrier persisted through BullMQ and the outbox (`captureTraceContext` / `withRemoteTrace`), and `withSpan`, `recordDuration` and `incrementCounter` for business operations. Metric labels stay bounded; IDs go in logs and spans; no SQL, args, keys or values in telemetry. The browser side (`initializeBrowserTelemetry`, `telemetryFetch`, `reportBrowserError`) posts to the rate-limited `/api/telemetry/browser` endpoint. Export is best-effort and non-blocking, failing with a `telemetry.export.failed` warning. Configuration is `OTEL_*` / `VITE_OTEL_*` set through `bun run init` → Monitoring. The Sentry/console error reporter is a separate adapter that error middleware uses for 5xx.
 
-`process-lifecycle` is `initGracefulShutdown` (called once) driving `onShutdown` handlers within a timeout: stop intake, drain work, then flush telemetry. Loops check `isShutdownInProgress` or wait with `sleepUnlessShuttingDown`, recurring in-process ticks use `makeUnrefInterval`, and the API answers `/health` (excluded from tracing). Not here: what the job, outbox, WebSocket and app-event subsystems drain or observe (`jobs-cron`, `websockets`, `app-events-webhooks-adapters`), slow-lane metric meaning (`jobs-cron`), and the env mechanics behind OTEL settings (`dx-setup`).
+`process-lifecycle` is `initGracefulShutdown` (called once) driving `onShutdown` handlers within a timeout: stop intake, drain work, then flush telemetry. Loops check `isShutdownInProgress` or wait with `sleepUnlessShuttingDown`, recurring in-process ticks use `makeUnrefInterval`, and the API answers `/health` (excluded from tracing). Not here: what the job, outbox, WebSocket and app-event subsystems drain or observe (`jobs-cron`, `ws-connections / ws-streams`, `app-events-webhooks-adapters`), slow-lane metric meaning (`jobs-cron`), and the env mechanics behind OTEL settings (`dx-setup`).
 
 ## 3. Everything that exists here, by class
 
-Point at a class when that is as specific as the moment allows, or at a member. Each member: **name** `where`: choose this when … . Where the docs or code give material, a second line describes the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
+Point at a class when that is as specific as the moment allows, or at a member. Where a class has siblings an agent could confuse, a table under the class header says which to use when. Each member: **name** `where`: choose this when … . Where the docs or code give material, a second line describes the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
 
 ### Class `logging`: Structured logging: shared log facade, withLogContext, scopes, redaction
+
+**Choosing among siblings: withLogContext vs logScope vs setLogService vs log.child** (docs/claude/LOGGING.md § Structured logging)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **withLogContext** | searchable per-request/per-job fields across async calls | display-only prefix (logScope); process-wide fields (setLogService) |
+| **logScope** | a display prefix only | searchable named fields (use withLogContext) |
+| **setLogService** | process-wide constant fields | per-request or per-job fields (use withLogContext) |
+| **log.child** | bindings tied to a component logger | fields spanning async call chains (use withLogContext) |
+
+**Choosing among siblings: Which logger** (docs/claude/LOGGING.md § Structured logging; § Browser setup)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **log** | API, worker and shared code via @template/shared | job handlers (ctx.log()); browser apps (createFrontendLogger) |
+| **createFrontendLogger** | browser apps instead of console.* | backend code (use log) |
+| **pinoLogger** | only SDKs that require a pino logger | app logging (use log) |
+
+**Choosing among siblings: redactLogValue vs stringifyLogValue** (catalog redactLogValue, stringifyLogValue)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **redactLogValue** | need the redacted structured value | need a string for output (use stringifyLogValue) |
+| **stringifyLogValue** | need a redacted string | need the structured value (use redactLogValue) |
 
 - **addLogBroadcast** `packages/shared/src/logger/scope.ts#addLogBroadcast`: register an extra log sink for logs emitted in the current async context
 - **createFrontendLogger** `packages/ui/src/lib/frontendLogger.ts#createFrontendLogger`: Use in browser apps instead of console.*; backend code uses the shared server logger.
@@ -148,10 +172,11 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **withLogContext** `packages/shared/src/logger/records.ts#withLogContext`: Searchable named fields; for display-only prefix scopes use logScope; for process-wide fields use setLogService.
   - *Signs you're bypassing it:* ids interpolated into message strings, or requestId/jobId passed by hand into every log call (docs/claude/LOGGING.md § Structured logging)
 - **Logger adapter boundary** `docs/claude/LOGGING.md#Logging and monitoring`: route logs to Pino JSON in hosted envs and Consola readable output locally
+- **OTLP telemetry via fetch exporters** `docs/claude/LOGGING.md#Logging and monitoring`: Prefer existing instrumentation over adding new exporters or vendor agents.
+  - *Signs you're bypassing it:* adding a vendor APM agent or a new exporter SDK alongside the existing OTLP pipeline (docs/claude/LOGGING.md § Logging and monitoring)
 - **log.child** `@template/shared/logger`: Bindings tied to a component logger; withLogContext for fields spanning async call chains.
 - **LOG_LEVEL** `docs/claude/LOGGING.md#Structured logging`: filter all logger facade outputs including OTLP and BullBoard broadcasts
 - **LogScope.worker** `@template/shared/logger`: append a worker scope when passed as logScope's last argument
-- **Job log scope format** `docs/claude/JOBS.md#Job IDs`: logging inside job handlers
 - **Never log sensitive content** `docs/claude/LOGGING.md#Structured logging`: Every log call, including error logs.
   - *Signs you're bypassing it:* logging request bodies, payloads, credentials, cookies or full URLs with query strings (docs/claude/LOGGING.md § Structured logging)
 - **Top-level searchable identifiers** `docs/claude/LOGGING.md#Structured logging`: Any log field queried in the backend, since OTLP serializes nested objects to JSON.
@@ -161,6 +186,34 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - *Also here, by name:* FrontendScope (`packages/ui/src/lib/frontendLogger.ts`); LogScope (`packages/shared/src/logger/scope.ts`); consolaAdapter (`packages/shared/src/logger/consolaAdapter.ts`); getLogBroadcasts (`packages/shared/src/logger/scope.ts`); getLogContext (`packages/shared/src/logger/records.ts`); getLogScopes (`packages/shared/src/logger/scope.ts`); pinoAdapter (`packages/shared/src/logger/pinoAdapter.ts`); publishLogRecord (`packages/shared/src/logger/records.ts`)
 
 ### Class `telemetry`: OpenTelemetry spans/metrics, browser telemetry, error reporter
+
+**Choosing among siblings: withSpan vs withRemoteTrace vs recordDuration vs incrementCounter vs traceJob** (catalog telemetry operations; docs/claude/LOGGING.md § Coverage and limits)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **withSpan** | tracing a local unit of work | metric-only timing (recordDuration); incoming trace (withRemoteTrace) |
+| **withRemoteTrace** | continuing a trace across processes (jobs, webhooks) | local spans (use withSpan) |
+| **captureTraceContext** | handing work to jobs or other processes | hand-copying trace ids into payloads (never) |
+| **traceJob** | job handlers | hand-opening spans around a handler (use traceJob, not withSpan) |
+| **recordDuration** | latency metrics without a span | need a span too (withSpan); counts (incrementCounter) |
+| **incrementCounter** | counts of events | durations (recordDuration); timed spans (withSpan) |
+
+**Choosing among siblings: createSentryReporter vs createConsoleReporter** (FEATURES.md › Error Reporter Adapter)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **createSentryReporter** | a Sentry DSN is configured | local/dev or no DSN (use createConsoleReporter) |
+| **createConsoleReporter** | local/dev or no DSN | production with a DSN (use createSentryReporter) |
+
+**Choosing among siblings: OTEL enable flags** (docs/claude/LOGGING.md § Browser setup; § New Relic traces/metrics + Better Stack logs)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **OTEL_ENABLED** | server export on/off; required true for local/test | browser ingestion (OTEL_BROWSER_ENABLED) |
+| **OTEL_BROWSER_ENABLED** | server-side gate for browser telemetry | client capture (pair with VITE_OTEL_ENABLED) |
+| **VITE_OTEL_ENABLED** | client capture in each frontend; needs a rebuild | server ingestion (OTEL_BROWSER_ENABLED) |
+| **OTEL_EXPORTER_OTLP_ENDPOINT** | one provider: the base URL | split destinations (OTEL_EXPORTER_OTLP_{SIGNAL}_ENDPOINT) |
+| **OTEL_EXPORTER_OTLP_{SIGNAL}_ENDPOINT** | split destinations only | a single provider (use OTEL_EXPORTER_OTLP_ENDPOINT) |
 
 - **browserTelemetrySchema** `packages/shared/src/telemetry/browserSchema.ts#browserTelemetrySchema`: validate browser telemetry payloads of spans from web, admin or superadmin apps
 - **captureTraceContext** `packages/shared/src/telemetry/operations.ts#captureTraceContext`: Use when handing work to jobs or other processes so traces stay linked.
@@ -190,8 +243,6 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **Job trace carrier propagation** `docs/claude/LOGGING.md#Coverage and limits`: persist trace context through BullMQ and outbox so job spans correlate
 - **Local OTLP collector smoke test** `scripts/monitoring/compose.yaml, scripts/monitoring/smoke.ts`: Local verification; clear hosted signal overrides first; expect password as [REDACTED].
 - **Monitoring setup via init** `docs/claude/LOGGING.md#Setup`: Use instead of hand-editing env files; MONITORING_MODE=off|otlp|split selects disabled, single or split providers.
-- **OTLP telemetry via fetch exporters** `docs/claude/LOGGING.md#Logging and monitoring`: Prefer existing instrumentation over adding new exporters or vendor agents.
-  - *Signs you're bypassing it:* adding a vendor APM agent or a new exporter SDK alongside the existing OTLP pipeline (docs/claude/LOGGING.md § Logging and monitoring)
 - **Shutdown drains then flushes telemetry** `docs/claude/LOGGING.md#Coverage and limits`: drain API/worker work then flush telemetry providers on graceful shutdown
 - **/api/telemetry/browser** `docs/claude/LOGGING.md#Browser setup`: Browser telemetry only; data is untrusted client evidence (telemetry.source=browser), not audit logging.
 - **frontendLogger** `@template/ui/lib/frontendLogger`: Frontend logs; errors reach providers automatically as trace exception events.
@@ -216,6 +267,23 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - *Also here, by name:* SpanKind (`packages/shared/src/telemetry/operations.ts`); SpanStatusCode (`packages/shared/src/telemetry/operations.ts`); browserTelemetryRouter (`apps/api/src/routes/browserTelemetry.ts`); context (`packages/shared/src/telemetry/operations.ts`); createFetchExporter (`packages/shared/src/telemetry/fetchExporter.ts`); instrumentRedis (`packages/db/src/redis/instrumentRedis.ts`); metrics (`packages/shared/src/telemetry/operations.ts`); parseOtlpHeaders (`packages/shared/src/telemetry/config.ts`); resolveOtlpEndpoint (`packages/shared/src/telemetry/config.ts`); signalExportOptions (`packages/shared/src/telemetry/config.ts`); trace (`packages/shared/src/telemetry/operations.ts`)
 
 ### Class `process-lifecycle`: Graceful shutdown handlers, health checks, connection draining, unref intervals
+
+**Choosing among siblings: Shutdown-aware helpers** (apps/api/src/lib/shutdown.ts; catalog makeUnrefInterval)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **initGracefulShutdown** | once at process start | registering cleanup (use onShutdown) |
+| **onShutdown** | registering cleanup run at shutdown | process.on('SIGTERM') listeners (never) |
+| **isShutdownInProgress** | a plain one-off check | loops that wait between iterations (use sleepUnlessShuttingDown) |
+| **sleepUnlessShuttingDown** | polling or backoff loops | a one-off check (use isShutdownInProgress) |
+| **makeUnrefInterval** | in-process loops instead of setInterval | scheduled cross-process work (cron jobs) |
+
+**Choosing among siblings: drainConnections vs cleanupStaleConnections** (apps/api/src/ws/lifecycle.ts)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **drainConnections** | closing sockets at shutdown | idle/dead sockets during normal run (use cleanupStaleConnections (ws-connections)) |
+| **cleanupStaleConnections (ws-connections)** | idle/dead sockets during normal run | shutdown (use drainConnections) |
 
 - **drainConnections** `apps/api/src/ws/lifecycle.ts#drainConnections`: Idle/dead sockets during normal run: cleanupStaleConnections instead.
 - **flushOutbox** `apps/api/src/jobs/outbox/accumulator.ts#flushOutbox`: drain buffered outbox rows to the database with retry at shutdown

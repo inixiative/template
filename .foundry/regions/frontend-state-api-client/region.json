@@ -6,7 +6,7 @@
     "frontend-store",
     "api-client"
   ],
-  "tokens": 15890,
+  "tokens": 16352,
   "tokenMethod": "chars/4",
   "runsAgreed": 3,
   "sources": {
@@ -44,15 +44,14 @@
       "filtering-search-ordering",
       "frontend-navigation-context",
       "frontend-state-api-client",
+      "guided-flows",
       "roles-and-permissions",
       "superadmin-operations",
-      "testing-helpers",
       "testing-rules",
-      "websocket-connection-management",
       "websocket-realtime-delivery"
     ],
     "codeEntries": 30,
-    "docMembers": 65
+    "docMembers": 58
   },
   "bypassLines": 27,
   "glossaryTerms": 28

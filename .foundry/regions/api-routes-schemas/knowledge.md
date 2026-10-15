@@ -117,13 +117,41 @@ Every endpoint is a pair of files in a module: a route in routes/ built from a t
 
 Schemas come from the database, not by hand: responses default to the generated <Model>ScalarSchema from @template/db (narrowed with .omit), inputs from the generated CreateInput/UpdateInput zod schemas, and server-managed keys are stripped with sanitizeKeys / sanitizeRequestSchema. Schemas are colocated in the route file unless several routes share them. .refine() is never put on a route schema because ZodEffects breaks hono-zod-openapi; cross-field checks live in validations/ and are parsed in the controller. Small shared zod helpers (uuidV7Schema, appPathSchema) live in @template/shared.
 
-Module anatomy follows docs/claude/MODULES.md: routes/, controllers/, schemas/, services/, tests/ at the core; handlers/, queries/, validations/, transformers/ (or mappers/, not both) for richer domains; no empty or speculative folders, no cross-module schema imports, cross-module helpers in apps/api/src/lib or packages/shared. Not here: request context, resource loading, makeError and the batch API (request-context-errors-batch); filter/search/pagination semantics behind paginate and filterLens (filtering-pagination); permission middlewares such as validatePermission (tenancy-permissions / auth-middleware); adapter modules (app-events-webhooks-adapters); WebSocket frames (websockets).
+Module anatomy follows docs/claude/MODULES.md: routes/, controllers/, schemas/, services/, tests/ at the core; handlers/, queries/, validations/, transformers/ (or mappers/, not both) for richer domains; no empty or speculative folders, no cross-module schema imports, cross-module helpers in apps/api/src/lib or packages/shared. Not here: request context, resource loading, makeError and the batch API (request-context-errors / batch); filter/search/pagination semantics behind paginate and filterLens (filtering-pagination); permission middlewares such as validatePermission (permissions / tenancy / auth-middleware); adapter modules (app-events-webhooks-adapters); WebSocket frames (ws-connections / ws-streams).
 
 ## 3. Everything that exists here, by class
 
-Point at a class when that is as specific as the moment allows, or at a member. Each member: **name** `where`: choose this when … . Where the docs or code give material, a second line describes the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
+Point at a class when that is as specific as the moment allows, or at a member. Where a class has siblings an agent could confuse, a table under the class header says which to use when. Each member: **name** `where`: choose this when … . Where the docs or code give material, a second line describes the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
 
 ### Class `route-templates`: Route templates (readRoute/createRoute/…) and makeController responders
+
+**Choosing among siblings: readRoute vs createRoute vs updateRoute vs deleteRoute vs actionRoute** (docs/claude/API_ROUTES.md § Route Templates)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **readRoute** | reads and lists (many: true, paginate: true) | writes (use createRoute / updateRoute / deleteRoute) |
+| **createRoute** | inserting a model record; import from #/lib/routeTemplates | custom operations (use actionRoute); never raw @hono/zod-openapi createRoute |
+| **updateRoute** | mutating an existing record | a custom verb behind a mode flag (use actionRoute) |
+| **deleteRoute** | removing a model record | archive/restore-style custom verbs (use actionRoute) |
+| **actionRoute** | custom verbs beyond CRUD, e.g. /:id/activate | plain create/update/delete (use createRoute / updateRoute / deleteRoute) |
+
+**Choosing among siblings: respond.ok vs respond.created vs respond.noContent (makeController)** (docs/claude/API_ROUTES.md § Controllers, Respond Types)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **makeController** | every controller; exposes only the responders the route declares and validates the response | never a plain async (c) => c.json(...) handler |
+| **respond.ok** | reads and updates (200); metadata in the second argument | creates (use respond.created) or deletes (use respond.noContent) |
+| **respond.created** | create endpoints (201) | anything else (use respond.ok) |
+| **respond.noContent** | delete endpoints (204) | returning a body (use respond.ok) |
+
+**Choosing among siblings: Route permission gates: validatePermission vs validateOwnerPermission vs validateNotToken vs check** (docs/claude/PERMISSIONS.md § Validation Middleware; docs/claude/API_ROUTES.md § Middleware)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **validatePermission** | route middleware gating a single-owner resource | a polymorphic User/Organization owner (use validateOwnerPermission) |
+| **validateOwnerPermission (permissions)** | resources with a polymorphic owner | a direct resource check (use validatePermission) |
+| **validateNotToken (authentication)** | session-only routes, e.g. creating tokens | role/action gating (use validatePermission) |
+| **check (permissions)** | permission-aware filtering of results inside a controller | gating the whole route (use validatePermission via Route-level middleware option) |
 
 - **actionRoute** `apps/api/src/lib/routeTemplates/action.ts#actionRoute`: custom verbs beyond CRUD; for plain create/update/delete use createRoute, updateRoute or deleteRoute instead
   - *Signs you're bypassing it:* a custom verb squeezed into updateRoute with a mode flag in the body, or a raw route with a hand-written '/:id/activate' path (docs/claude/API_ROUTES.md § Route Templates (Action examples))
@@ -136,41 +164,69 @@ Point at a class when that is as specific as the moment allows, or at a member. 
   - *Signs you're bypassing it:* a hand-built list route with its own page/pageSize/orderBy query schema, path string and response shape instead of readRoute({ many: true, paginate: true }) (docs/claude/API_ROUTES.md § Route Templates; catalog readRoute)
 - **updateRoute** `apps/api/src/lib/routeTemplates/update.ts#updateRoute`: Mutating an existing record; createRoute for inserts, actionRoute for custom non-CRUD operations.
 - **API module layout** `apps/api/src/modules/authProvider/`: Modules hold controllers/, routes/, schemas/, tests/ and an index.ts exporting routers.
+- **AppEnv request context** `FEATURES.md › Request Context Scoping`: any handler needing identity or tenant scope; never thread these manually
+  - *Signs you're bypassing it:* module-level variables holding the current user/org, or user, db and requestId threaded through function parameters (FEATURES.md › Request Context Scoping)
 - **Encrypt secrets before storage** `docs/claude/API_ROUTES.md — Example: Create Organization Provider`: Extract secrets from the body, encrypt them with encryptField, then create the row.
   - *Signs you're bypassing it:* creating the row with the secret from the request body and encrypting afterwards, or not at all (docs/claude/API_ROUTES.md — Example: Create Organization Provider)
 - **Mount routes in module index** `docs/claude/API_ROUTES.md#Router Exports`: register each route with its controller on the module router in index.ts
+- **Not-found via HTTPException** `docs/claude/API_ROUTES.md#Controllers`: throw HTTPException 404 in controllers when a record is missing
 - **Permission-aware read filtering** `docs/claude/API_ROUTES.md — Example: Read Organization Providers`: When a public route returns more data to privileged actors instead of splitting routes.
 - **Platform vs organization auth providers** `docs/claude/API_ROUTES.md — Platform vs Organization Providers`: Platform providers are static env config; org providers are DB rows with encrypted secrets owned by org owners.
+- **Pseudo-GraphQL filtering** `FEATURES.md › Pseudo-GraphQL Filtering`: list filtering on URL-based endpoints instead of custom query params or GraphQL
 - **Route templates with automatic OpenAPI** `FEATURES.md > Unique Selling Points`: build endpoints from shared templates so they get consistent shape and OpenAPI docs
 - **Route-level middleware option** `docs/claude/API_ROUTES.md#Middleware`: attach validation middleware to a templated route declaratively
   - *Signs you're bypassing it:* permission or token checks done at the top of the controller or via router.use on a path, instead of middleware: [validatePermission('read')] on the route template (docs/claude/API_ROUTES.md § Middleware)
-- **check** `@template/permissions/rebac`: Use inside controllers for permission-aware filtering of results, rather than for gating the whole route.
-- **encryptField** `@template/db/lib/encryption/helpers`: encrypt a model's secret field into encrypted columns before storage
-  - *Signs you're bypassing it:* calling node crypto createCipheriv directly, base64-encoding a secret, or storing a provider credential in plain text or a plain Json column (catalog: encryptField (use instead of ad-hoc credential storage or calling createEncryption directly))
-- **getPlatformProviders** `#/lib/auth/platformProviders`: Platform providers (Google, GitHub); org-specific providers come from db.authProvider instead.
-- **getResource** `#/lib/context/getResource`: read the route's loaded resource from request context
-  - *Signs you're bypassing it:* db.<model>.findUnique({ where: { id: c.req.param('id') } }) at the top of a controller whose route already has :id, plus a hand-written 404 (docs/claude/CONTEXT.md § Resource Context; FEATURES.md § Resource Context Middleware ("No more fetching the same record in middleware and controller"))
+- **admin** `#/lib/routeTemplates template args`: Superadmin-only endpoints, which also run soft-delete unscoped.
+- **Batch API** `docs/claude/BATCH.md`: transactionAll atomic; transactionPerRound per-round atomic; allowFailures bulk; failOnRound stop at first failing round
+  - *Signs you're bypassing it:* a bespoke bulk/multi-step endpoint, or a client firing sequential requests and threading ids between them, where one batch call with rounds and interpolation would do (docs/claude/BATCH.md § Overview; FEATURES.md § API Architecture & Routing (Batch API))
+- **filterLens** `#/lib/routeTemplates template args`: Controls filtering only; response shape is responseSchema.
+- **Generated SDK** `FEATURES.md › Type-Safe SDK Generation`: all frontend API calls; never hand-write API clients
+  - *Signs you're bypassing it:* a hand-written API client module, typed fetch helpers or duplicated request/response types for apps/api endpoints (FEATURES.md › Type-Safe SDK Generation (never hand-write API clients); docs/claude/FRONTEND/API_CLIENT.md § Generated SDK)
 - **respond.created** `#/lib/utils/makeController`: Create endpoints; otherwise respond.ok.
   - *Signs you're bypassing it:* return c.json({ data }, 201) inside a create controller (docs/claude/API_ROUTES.md § Controllers, Respond Types)
 - **respond.noContent** `#/lib/utils/makeController`: Delete endpoints.
   - *Signs you're bypassing it:* return c.body(null, 204) or returning { data: null } from a delete controller (docs/claude/API_ROUTES.md § Controllers, Respond Types)
 - **respond.ok** `#/lib/utils/makeController`: Reads/updates; creates use respond.created, deletes respond.noContent.
-- **useAuthProviders** `packages/ui/src/hooks/useAuthProviders.ts`: fetch platform and organization auth providers for frontend login UI
-  - *Signs you're bypassing it:* a login form calling authProviderReadMany or organizationReadAuthProvider directly and choosing between them on ?org= (docs/claude/FRONTEND/AUTH.md § useAuthProviders)
-- **validateNotToken** `#/middleware/validations/validateNotToken`: routes that must be session-only, e.g. creating tokens
-  - *Signs you're bypassing it:* if (c.get('token')) throw 403 written inside a handler for a session-only action (docs/claude/PERMISSIONS.md § Validation Middleware › validateNotToken)
-- **validateOwnerPermission** `#/middleware/validations/validateOwnerPermission`: resources with polymorphic owner; direct resource checks: validatePermission instead
-  - *Signs you're bypassing it:* a switch on resource.ownerModel calling permix.check('user' | 'organization', …) per branch inside a controller (docs/claude/PERMISSIONS.md § Validation Middleware › validateOwnerPermission)
+- **sanitizeKeys** `#/lib/routeTemplates template args`: Body contains fields clients must not set; immutable-on-update fields belong to immutable field enforcement.
+  - *Signs you're bypassing it:* delete body.organizationId / destructuring client-unsettable keys out of c.req.valid('json') in the controller before Prisma (docs/claude/API_ROUTES.md § Route Templates, Template Args)
 - **validatePermission** `#/middleware/validations/validatePermission`: single-owner resource; polymorphic User/Organization owner: validateOwnerPermission instead
   - *Signs you're bypassing it:* a handler that loads the resource itself and calls permix.check / throws 403 by hand on a route where resourceContextMiddleware + validatePermission(action) would do it (docs/claude/PERMISSIONS.md § Validation Middleware)
 - **Always use route templates** `#/lib/routeTemplates`: Every new API route definition.
-- **API module folder layout** `docs/claude/API_ROUTES.md#File Organization`: Every API resource module; external services go in apps/api/src/integrations/
 - **Create returns 201 with sanitized record** `docs/claude/API_ROUTES.md — Example: Create Organization Provider`: Create controllers.
+- **Lens narrowing applies to superadmin** `docs/claude/API_ROUTES.md#How pagination applies them`: All paginated list queries using a lens.
 - **Router export naming** `docs/claude/API_ROUTES.md#Router Exports`: Every API module
+- **Soft-delete scope by endpoint** `docs/claude/API_ROUTES.md#How pagination applies them`: Any list or read query; admin router routes see deleted rows.
+- **Standardized response shape** `FEATURES.md › Standardized Response Shape`: all API responses
 - **Strip encrypted fields from responses** `docs/claude/API_ROUTES.md — AuthProvider Module`: Any endpoint returning a model with encrypted fields.
+- **Unified error contract** `FEATURES.md › Unified Error Contract`: every error response from the API
+- **Use route templates** `FEATURES.md › Route Templates`: every API endpoint
+- **Wrap responses in { data }** `docs/claude/API_ROUTES.md#Response Format`: All route responses; extra metadata goes in respond.ok's second argument.
+  - *Signs you're bypassing it:* controllers returning a bare object/array or a custom envelope ({ result }, { items, total }) (docs/claude/API_ROUTES.md § Response Format)
 - *Also here, by name:* buildRequest (`apps/api/src/lib/routeTemplates/utils/buildRequest.ts`); buildResponses (`apps/api/src/lib/routeTemplates/utils/buildResponses.ts`); buildRoutePath (`apps/api/src/lib/routeTemplates/utils/buildRoutePath.ts`); hasIdParam (`apps/api/src/lib/routeTemplates/utils/hasIdParam.ts`); prepareMiddleware (`apps/api/src/lib/routeTemplates/utils/prepareMiddleware.ts`)
 
 ### Class `openapi`: Route auto-registration and OpenAPI spec generation
+
+**Choosing among siblings: autoRegisterRoutes vs Mount routes in module index** (FEATURES.md § API Architecture & Routing (File-Based Route Auto-Registration); docs/claude/API_ROUTES.md § Router Exports)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **autoRegisterRoutes** | default for module routes: drop files in routes/ and controllers/; admin/internal variants wrap it | docs don't distinguish when hand mounting is still right; see API_ROUTES.md § Router Exports |
+| **Mount routes in module index** | the module index.ts exports the router that routes are registered on | importing every route and controller by hand (use autoRegisterRoutes) |
+
+**Choosing among siblings: apiPath vs resolveOperation vs serializeBracketQuery** (catalog apiPath / resolveOperation; docs/claude/FLOWS.md § Registry › readPath)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **apiPath** | a full path-plus-query string for an operationId (e.g. a flow readPath) | you need the operation metadata itself (use resolveOperation) |
+| **resolveOperation** | resolved operation details in-process (e.g. websockets) | you want a ready path string (use apiPath) |
+| **serializeBracketQuery (filtering-pagination)** | serializing a bracket query object on its own | building an API read path (apiPath calls it for you) |
+
+**Choosing among siblings: apps/api/src/routes/api vs apps/api/src/routes/internal** (catalog routes/api, routes/internal)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **apps/api/src/routes/api** | public tenant endpoints | internal/ops calls (use apps/api/src/routes/internal); liveness goes in routes/health |
+| **apps/api/src/routes/internal** | non-public service calls | public endpoints (use apps/api/src/routes/api) |
 
 - **apiPath** `apps/api/src/lib/openapi/apiPath.ts#apiPath`: Need a full path string with query (e.g. flow readPath); for the operation metadata itself use resolveOperation.
   - *Signs you're bypassing it:* string-concatenating API paths and filter[...] query strings by hand for an operation (catalog apiPath)
@@ -182,9 +238,36 @@ Point at a class when that is as specific as the moment allows, or at a member. 
   - *Signs you're bypassing it:* hand-written security: [{ bearerAuth: [] }] arrays in route configs (catalog securityRequirements)
 - **apps/api/src/routes/api** `apps/api/src/routes/api`: Public tenant endpoints; internal/ops calls go in routes/internal, liveness in routes/health.
 - **apps/api/src/routes/internal** `apps/api/src/routes/internal`: Non-public service calls; public endpoints belong in routes/api.
+- **OpenAPI spec and Scalar docs** `FEATURES.md › OpenAPI 3.1 Spec Generation`: generate OpenAPI 3.1 spec from route definitions and serve interactive docs
+- **File-based route registration** `FEATURES.md › API Architecture & Routing`: applies to all API endpoints in a module
 - *Also here, by name:* Tags (`apps/api/src/modules/tags.ts`); autoRegisterAdminRoutes (`apps/api/src/lib/utils/autoRegisterRoutes.ts`); autoRegisterInternalRoutes (`apps/api/src/lib/utils/autoRegisterRoutes.ts`); buildOperationId (`apps/api/src/lib/routeTemplates/utils/buildOperationId.ts`); buildTags (`apps/api/src/lib/routeTemplates/utils/buildTags.ts`); errorResponses (`apps/api/src/lib/routeTemplates/errorResponses.ts`); registerSecuritySchemes (`apps/api/src/lib/auth/securitySchemes.ts`); securityForRoute (`apps/api/src/lib/auth/routeSecurity.ts`); securitySchemes (`apps/api/src/lib/auth/securitySchemes.ts`); toOpenApi (`apps/api/src/lib/routeTemplates/utils/toOpenApi.ts`)
 
 ### Class `request-schemas`: Request/response zod schemas: generated Prisma zod, ScalarSchema, sanitizeRequestSchema
+
+**Choosing among siblings: Where a route schema comes from: <Model>ScalarSchema vs Inputs from generated zod vs sanitizeRequestSchema vs UserWithRelationsSchema** (docs/claude/API_ROUTES.md § Schemas; catalog sanitizeRequestSchema, UserWithRelationsSchema)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **<Model>ScalarSchema** | response (or any) schema describing a model's fields, narrowed with .omit | body inputs (use Inputs from generated zod) |
+| **Inputs from generated zod** | body schemas mirroring Prisma create/update inputs | response shapes (use <Model>ScalarSchema) |
+| **sanitizeRequestSchema** | removing client-unsettable keys from a generated schema | a hand-written reduced copy or long .omit chains |
+| **UserWithRelationsSchema** | a user plus memberships | plain user fields (use <Model>ScalarSchema) |
+
+**Choosing among siblings: Zod field vs boolean check: uuidV7Schema / isUuidV7, appPathSchema / isAppPath** (catalog packages/shared/src/utils/isUuidV7.ts, isAppPath.ts)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **uuidV7Schema** | id fields inside a zod schema | imperative checks (use isUuidV7) |
+| **isUuidV7** | imperative boolean checks | zod schemas (use uuidV7Schema) |
+| **appPathSchema** | zod fields like a flow returnUrl | plain boolean checks (use isAppPath) |
+| **isAppPath** | imperative checks | zod schemas (use appPathSchema) |
+
+**Choosing among siblings: No .refine() on route schemas vs Cross-field validation in controller** (docs/claude/API_ROUTES.md § Cross-Field Validations)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **No .refine() on route schemas** | single-field constraints stay in the route schema; no .refine (ZodEffects breaks hono-zod-openapi) | cross-field rules (use Cross-field validation in controller) |
+| **Cross-field validation in controller** | cross-field constraints: a validations/ file parsed in the controller | single-field constraints (keep in the route schema) |
 
 - **appPathSchema** `packages/shared/src/utils/isAppPath.ts#appPathSchema`: Zod fields like flow returnUrl; plain boolean checks: isAppPath instead.
   - *Signs you're bypassing it:* hand-rolled returnUrl checks (startsWith('/') && !startsWith('//'), length caps) in a zod schema (catalog appPathSchema)
@@ -196,8 +279,6 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **uuidV7Schema** `packages/shared/src/utils/isUuidV7.ts#uuidV7Schema`: Schema fields; boolean checks outside zod: isUuidV7.
   - *Signs you're bypassing it:* z.string().uuid() or a hand-written uuidv7 regex on id fields (catalog uuidV7Schema)
 - **Cross-field validation in controller** `docs/claude/API_ROUTES.md#Cross-Field Validations`: cross-field constraints; single-field constraints stay in the route schema
-- **Zod enum from const object** `apps/api/src/modules/batch/constants.ts`: Schemas validating values of a const-object enum.
-- **inquirySentResponseSchema** `inquirySentResponseSchema`: shape the create-inquiry response including target user, organization and space
 - **Colocate route schemas** `docs/claude/API_ROUTES.md#Colocation Rule`: Every route schema; separate file only when reused by several routes
 - **Default to ScalarSchema for responses** `docs/claude/API_ROUTES.md#Schemas`: Any route schema describing a model's fields
 - **Inputs from generated zod** `docs/claude/API_ROUTES.md#Schemas`: Body schemas mirroring Prisma create/update inputs
@@ -208,11 +289,23 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `api-modules`: API module folder anatomy: routes/controllers/services/handlers
 
+**Choosing among siblings: Where module code goes: services/ vs handlers/ vs utils/ vs shared locations** (docs/claude/MODULES.md § Core, § Domain logic, § Rules of thumb)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **Services hold business logic and DB access** | the controller grows hard to read | a trivial single Prisma call (keep inline; Don't split for splitting's sake) |
+| **Don't split for splitting's sake** | deciding against a services/ file for a trivial controller | logic that makes the controller hard to read (use Services hold business logic and DB access) |
+| **Non-HTTP entry points in handlers/** | non-HTTP entry points into the domain | HTTP handlers (controllers/) |
+| **Cross-module shared code location** | helpers used by several modules: apps/api/src/lib or packages/shared | helpers scoped to one module (module utils/) |
+| **No cross-module schema imports** | a schema needed by more than one module | importing from a sibling module's schemas/ (move it per Cross-module shared code location) |
+| **transformers/ or mappers/, not both** | adding shape conversion code | a module that already has the other folder |
+| **Module folder allowlist** | creating any new folder in an API module | helpers/, lib/, common/ (not on the MODULES.md list) |
+
 - **Module folder layout** `docs/claude/MODULES.md#Core`: Add handlers/, queries/, validations/, transformers/ only for richer domain logic.
-- **Monorepo app and package split** `FEATURES.md > Core Platform > Monorepo Architecture`: place code in apps web/admin/superadmin/api or shared packages db/ui/email/shared
 - **Routes built with request-template factories** `docs/claude/MODULES.md#Core — routes/`: CRUD: the matching template; custom actions: actionRoute.
 - **<Model>ScalarSchema** `@template/db`: Prefer over hand-written Zod for any field on the Prisma model.
   - *Signs you're bypassing it:* a hand-written z.object({ id: z.string(), name: z.string(), createdAt: … }) that mirrors a Prisma model's fields (docs/claude/API_ROUTES.md § Schemas (Default: Use ScalarSchema); docs/claude/MODULES.md § Core — schemas/)
+- **API module folder layout** `docs/claude/API_ROUTES.md#File Organization`: Every API resource module; external services go in apps/api/src/integrations/
 - **Avoid signature churn** `CLAUDE.md §7 Core Engineering Standards`: Prefer additive optional fields over changing existing signatures.
 - **Build requested primitives complete** `CLAUDE.md §0.3 YAGNI — Scope Invention vs. Completion`: Foundations in packages/shared or template infra lean build-it-complete.
 - **Cross-module shared code location** `docs/claude/MODULES.md#Rules of thumb 1`: utils/ only for helpers scoped to one module.
@@ -221,8 +314,6 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **Derive schemas from generated ScalarSchema** `docs/claude/MODULES.md#Core — schemas/`: Hand-write only fields not present on the Prisma model.
 - **Don't split for splitting's sake** `docs/claude/MODULES.md#Rules of thumb 5`: When deciding whether to create a services/ file.
   - *Signs you're bypassing it:* a services/ file that wraps a single Prisma call for a trivial controller (docs/claude/MODULES.md § Rules of thumb 5)
-- **Init source of truth** `docs/claude/INIT_SCRIPT_PATTERNS.md > Current implementation notes`: Any change to infrastructure provisioning init flow.
-- **Lua scripts live in queries/** `docs/claude/REDIS.md#Rate Limiting`: Writing any Redis Lua script; enforced by lua-in-queries CI rule.
 - **Migrations are centralized** `docs/claude/MODULES.md#Less common — migrations/`: Module-level only when the module owns a distinct migration pattern.
 - **Module folder allowlist** `docs/claude/MODULES.md`: Whenever creating a new folder inside an API module.
   - *Signs you're bypassing it:* new folders inside an API module (helpers/, lib/, common/) that are not on the MODULES.md list (docs/claude/MODULES.md § Rules of thumb 4)
@@ -235,15 +326,12 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **No empty or speculative folders** `docs/claude/MODULES.md#Rules of thumb 2`: Always when scaffolding a module.
 - **Non-HTTP entry points in handlers/** `docs/claude/MODULES.md#Domain logic — handlers/`: Non-HTTP entry points; HTTP handlers go in controllers/.
 - **One file, one concern** `CLAUDE.md § 0. Purpose and Priority`: Whenever adding exports to an existing file serving other consumers.
-- **Package build order** `FEATURES.md > Core Platform > Workspace Tooling`: When adding packages or task dependencies.
 - **Permissions core owns only wrapping and checking** `@inixiative/permissions/README.md#Boundary`: When adding permission logic: app-specific pieces go in the app package, not the core.
   - *Signs you're bypassing it:* adding role mappings, Prisma loading or app action names (ownerActions) inside the permissions core instead of the app package (@inixiative/permissions/README.md § Boundary)
 - **Prefer factories over fixtures** `docs/claude/MODULES.md#Less common — fixtures/`: Module fixtures/ only when factories cannot express the data.
 - **Reuse before introducing** `CLAUDE.md §7 Core Engineering Standards`: Reuse existing utilities and types; keep logic single-source and remove duplication.
 - **Reuse existing utilities, remove duplicates** `CLAUDE.md §13 Change Checklist`: Every code change.
 - **Services hold business logic and DB access** `docs/claude/MODULES.md#Core — services/`: Once the controller grows hard to read; trivial single Prisma calls stay inline.
-- **Temporary files go in tmp/** `docs/claude/SCRIPTS.md — Script Locations`: Any throwaway or experimental file; committed scripts go in scripts/ subfolders instead.
-- **Tests live in module tests/ folder** `docs/claude/TESTING.md#Test Structure`: Module tests must live in a tests/ folder inside the module, one file per action.
 - **transformers/ or mappers/, not both** `docs/claude/MODULES.md#Domain logic — mappers/`: When adding shape conversion code to a module.
 - *Also here, by name:* Modules (`apps/api/src/modules/modules.ts`); containsAny (`packages/shared/src/utils/containsAny.ts`)
 

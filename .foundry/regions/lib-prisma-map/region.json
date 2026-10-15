@@ -1,16 +1,18 @@
 {
   "id": "lib-prisma-map",
-  "title": "Prisma-map library (schema maps)",
-  "routing": "Is this about the @inixiative/prisma-map library: building a runtime PrismaMap from a generated Prisma client (buildPrismaMapV7 / buildPrismaMapV6, parseRuntimeDataModel, parseSchemaText, buildFromSchemaFile), reading model, field, enum and relation metadata (ScalarField / EnumField / RelationField, fromFields / toFields), listing relations with getRelations / relationForeignKey, resolving DB names with tableName / columnName / storedValue and the DbIdentifier / DbValue brands, or the /// @tagClass(key: value) annotation DSL (parseTagClasses, parseSchemaStructure)?",
+  "title": "Prisma-map and schema introspection",
+  "routing": "Is this about reading the Prisma schema at runtime instead of hand-declaring it? Signals: the @inixiative/prisma-map library (buildPrismaMapV7 / buildPrismaMapV6, parseRuntimeDataModel, parseSchemaText, buildFromSchemaFile, ScalarField / EnumField / RelationField, fromFields / toFields, getRelations / relationForeignKey, tableName / columnName / storedValue and the DbIdentifier / DbValue brands, the /// @tagClass(key: value) DSL and parseTagClasses), or the template's use of it: prismaMap.gen.ts, ModelNames / AccessorNames / toAccessor / toModelName / isModelName, modelFields / lookupField, getModelRelations / getAccessorRelations, hydrate, aliasColumns in raw SQL, polymorphicTarget / polymorphicKeyColumn, withDiscriminatorDefaults, walkWhere.",
   "concepts": [
-    "lib-prisma-map"
+    "lib-prisma-map",
+    "schema-introspection"
   ],
-  "tokens": 7363,
+  "tokens": 10918,
   "tokenMethod": "chars/4",
   "runsAgreed": 0,
   "sources": {
     "docs": [
-      "@inixiative/prisma-map/README.md"
+      "@inixiative/prisma-map/README.md",
+      "docs/claude/DATABASE.md"
     ],
     "docUnits": [
       "doc:@inixiative/prisma-map/README.md#preface",
@@ -26,14 +28,15 @@
       "doc:@inixiative/prisma-map/README.md#resolving-db-identifiers",
       "doc:@inixiative/prisma-map/README.md#notes-and-limits",
       "doc:@inixiative/prisma-map/README.md#development",
-      "doc:@inixiative/prisma-map/README.md#license"
+      "doc:@inixiative/prisma-map/README.md#license",
+      "doc:docs/claude/DATABASE.md#model-utilities"
     ],
     "catalogClusters": [
       "prisma-schema-introspection"
     ],
-    "codeEntries": 37,
-    "docMembers": 5
+    "codeEntries": 66,
+    "docMembers": 8
   },
-  "bypassLines": 9,
-  "glossaryTerms": 27
+  "bypassLines": 15,
+  "glossaryTerms": 30
 }

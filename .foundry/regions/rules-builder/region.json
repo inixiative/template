@@ -6,7 +6,7 @@
     "rules-builder",
     "lib-rules-builder"
   ],
-  "tokens": 18526,
+  "tokens": 19679,
   "tokenMethod": "chars/4",
   "runsAgreed": 0,
   "sources": {
@@ -33,7 +33,7 @@
       "rule-builder-ui-model",
       "rule-references-registry"
     ],
-    "codeEntries": 166,
+    "codeEntries": 163,
     "docMembers": 29
   },
   "bypassLines": 19,

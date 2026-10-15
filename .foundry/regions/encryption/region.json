@@ -6,7 +6,7 @@
     "encryption",
     "secrets"
   ],
-  "tokens": 15692,
+  "tokens": 16686,
   "tokenMethod": "chars/4",
   "runsAgreed": 0,
   "sources": {
@@ -41,19 +41,22 @@
     "catalogClusters": [
       "auth-middleware-validation",
       "authentication-methods",
-      "batch-request-execution",
+      "build-deploy-ci",
       "data-access-rules",
+      "data-models",
       "dev-setup-scripts",
       "encryption-key-rotation",
       "environment-config",
+      "job-definition-and-enqueue",
       "locks-and-serialization",
       "prisma-schema-introspection",
       "rate-limiting",
+      "route-templates-controllers",
       "ui-components",
       "websocket-connection-management"
     ],
     "codeEntries": 14,
-    "docMembers": 35
+    "docMembers": 42
   },
   "bypassLines": 25,
   "glossaryTerms": 30

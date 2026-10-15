@@ -127,64 +127,56 @@ App events are the only way business logic triggers a side effect. A write path 
 
 Webhooks are driven by the mutation hook system, not by app events: a commit on a model in webhookEnabledModels (or a child listed in webhookRelatedModels) makes the webhook hook enqueue one sendWebhook job per active WebhookSubscription, which signs the timestamped body with RSA-SHA256 (x-webhook-signature, public key at /webhookSubscription/info), delivers it, records a WebhookEvent, retries with backoff, auto-disables a subscription after 5 consecutive failures, and on integration subscriptions poisons an IntegrationRecord the receiver keeps rejecting with 400/422. Who may subscribe to what is declared in webhookOwnerAllowedModels; target URLs pass validateWebhookUrl/webhookUrlSchema (SSRF: private addresses refused). Integration is a provider connection owned by a user, organization, membership or space, IntegrationRecord links it to a synced CustomerRef; load integrations through findOwnedIntegration.
 
-Adapters: an adapter module is types.ts (role interface such as StorageClient), client/<provider>.ts (create<Provider><Role> factories taking typed config, no env reads) and index.ts (env reads + wrapping). Choose makeAdapterRouter for one provider per ENVIRONMENT (the default, even with a single provider), makeBroadcastRegistry for fan-out to every provider (messaging; never storage), makeAdapterRegistry when the caller picks by name; email's per-tenant direct factory is the documented exception. No noop providers in the registry, no auth logic in adapters, and app code never imports a provider SDK. Object storage is the storage adapter over createS3Client (MinIO locally). Not here: the email planner, templates and delivery rules (email regions), WebSocket connection and stream machinery itself (websockets), the db hook registry and onCommit internals (mutation-hooks / database), job queues (jobs).
+Adapters: an adapter module is types.ts (role interface such as StorageClient), client/<provider>.ts (create<Provider><Role> factories taking typed config, no env reads) and index.ts (env reads + wrapping). Choose makeAdapterRouter for one provider per ENVIRONMENT (the default, even with a single provider), makeBroadcastRegistry for fan-out to every provider (messaging; never storage), makeAdapterRegistry when the caller picks by name; email's per-tenant direct factory is the documented exception. No noop providers in the registry, no auth logic in adapters, and app code never imports a provider SDK. Object storage is the storage adapter over createS3Client (MinIO locally). Not here: the email planner and delivery rules (email-delivery) and templates (email-templates), WebSocket connection and stream machinery itself (ws-connections, ws-streams), the db hook registry and onCommit internals (mutation-hooks / database), job queues (jobs-cron, job-lanes-outbox).
 
 ## 3. Everything that exists here, by class
 
-Point at a class when that is as specific as the moment allows, or at a member. Each member: **name** `where`: choose this when … . Where the docs or code give material, a second line describes the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
+Point at a class when that is as specific as the moment allows, or at a member. Where a class has siblings an agent could confuse, a table under the class header says which to use when. Each member: **name** `where`: choose this when … . Where the docs or code give material, a second line describes the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
 
 ### Class `app-events`: emitAppEvent side-effect bus: handlers, handoffs to email/ws/observe, commit deferral
+
+**Choosing among siblings: Triggering side effects: emitAppEvent vs db.onCommit vs enqueueJob vs direct sends** (docs/claude/APP_EVENTS.md § Purpose and execution, § Handler and handoff contracts; COMMUNICATIONS.md § Send Pipeline)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **emitAppEvent** | any email, SMS, analytics, notification or WebSocket push from business logic; deferred to commit | never call those services directly |
+| **makeAppEvent** | define an event's handler (cbs + handoffs), registered in the handlers index | emitting (use emitAppEvent) |
+| **db.onCommit** | other work that must run only after the txn commits | side effects of a business write (use emitAppEvent, which defers itself) |
+| **enqueueJob (jobs-cron)** | heavy or retryable work, enqueued from an event cb | inline in the event handler |
+| **sendEmail (email-delivery)** | plans recipients from an EmailHandoff, then enqueues deliverEmail | never enqueue by hand with recipients (emit with an EmailHandoff) |
+| **deliverEmail (email-delivery)** | the per-recipient provider send | never enqueue directly (sendEmail does) |
+| **AppEvent** | the stored event stream for side effects | before/after mutation diffs (AuditLog) |
+
+**Choosing among siblings: WebSocket handoffs: sendToChannel vs sendToUser vs streamAppend vs refetch** (docs/claude/APP_EVENTS.md § WebSocket handoffs; WEBSOCKETS.md § Publishing a refetch, § Data streams)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **sendToChannel (ws-streams)** | deliver to a channel's subscribers | a specific user's sockets (use sendToUser); data streams (use streamAppend) |
+| **sendToUser (ws-streams)** | deliver to one user's sockets | channel subscribers (use sendToChannel) |
+| **streamAppend (ws-streams)** | every stream handoff (branded; built from STREAM_DEFINITIONS) | query invalidation (use refetch); never a hand-built { kind: 'stream' } |
+| **refetch (ws-streams)** | tell clients to invalidate a query | row-level changes (use streamAppend) |
+| **routeRow (ws-streams)** | shape an upsert payload by the route's responseSchema | never pass a raw Prisma row |
 
 - **AppEvent** `packages/db/prisma/schema/appEvent.prisma`: Event stream for side effects; for before/after mutation diffs use AuditLog instead.
 - **emitAppEvent** `apps/api/src/appEvents/emit.ts#emitAppEvent`: Always for email, SMS, analytics, notifications or WebSocket pushes from business logic; never call those services directly.
   - *Signs you're bypassing it:* a controller or service calling the email sender, an SMS/analytics client, enqueue('sendEmail'), or sendToUser/sendToChannel directly after a write (docs/claude/APP_EVENTS.md § Purpose and execution; AI/ENTRYPOINT.md § 6 ("Business logic NEVER calls email, SMS, analytics, or notification services directly"))
 - **makeAppEvent** `apps/api/src/appEvents/makeAppEvent.ts#makeAppEvent`: Define handlers here; emit with emitAppEvent. Heavy or retryable work: enqueueJob from a cb instead of doing it inline.
   - *Signs you're bypassing it:* a hand-written handler that runs its side effects with a bare Promise.all (one failure cancels the rest) or does heavy/retryable work inline instead of enqueueing a job from a cb (docs/claude/APP_EVENTS.md § Purpose and execution; catalog makeAppEvent)
-- **Email send planner** `COMMUNICATIONS.md#planner-sendemail`: resolve ownership, hydrate recipients, create idempotent CommunicationLog per recipient, enqueue deliverEmail
 - **Inquiry event definitions per type** `apps/api/src/modules/inquiry/handlers/<type>/appEvents.ts`: inquiry-specific events; general business events go in apps/api/src/appEvents/handlers/ instead.
 - **Isolated settled side-effect tasks** `docs/claude/APP_EVENTS.md#Purpose and execution`: Independent side effects that may each open transactions or run inline jobs; sequential when ordering matters.
-- **Segment junction diff events** `reconcileSegment / reconcileCustomerRefSegments`: publish membership diffs as owner- and member-side events after reconcile
 - **App event channels** `apps/api/src/appEvents/channels/`: bridge app event handoffs to email and WebSocket delivery
 - **App event handler registry** `apps/api/src/appEvents/handlers/`: Registration alone doesn't prove a writer emits the event; verify an emit call exists.
-- **appendToStream** `APP_EVENTS.md#websocket-handoffs`: stream data, not messages; build handoffs with streamAppend
-  - *Signs you're bypassing it:* looping over sockets that hold a stream and sending append frames with a locally tracked counter (catalog appendToStream; docs/claude/WEBSOCKETS.md § Ordering)
 - **AppEventName** `apps/api/src/appEvents/handlers/index.ts`: enumerate valid event names typed against their payloads
-- **auditActorContext** `docs/claude/APP_EVENTS.md#Purpose and execution`: supply actor provenance stamped onto event envelopes
-  - *Signs you're bypassing it:* threading the acting user id through function arguments so a write can be attributed, or setting the actor store directly (docs/claude/HOOKS.md § Audit Log › Actor Context)
-- **CommunicationLog** `COMMUNICATIONS.md#planner-sendemail`: record one idempotent delivery per recipient, reused across retries
-- **createSerializedQueue** `APP_EVENTS.md#websocket-handoffs`: in-process ordering; cross-process ownership needs a lock
-  - *Signs you're bypassing it:* a module-level `let pending = Promise.resolve()` chain, a boolean busy flag, or an async-mutex dependency to order writes to one resource (docs/claude/CONCURRENCY.md § Serialized Queue (createSerializedQueue))
 - **db.onCommit** `docs/claude/APP_EVENTS.md#Purpose and execution`: Inside db.txn when work must only happen after commit; emitAppEvent uses it automatically.
   - *Signs you're bypassing it:* sending email, calling an external API or enqueuing a job directly inside db.txn (so it fires even if the transaction rolls back), or a hand-built after-commit callback list (docs/claude/DATABASE.md § Transactions › After Commit Callbacks; FEATURES.md § Post-Commit Callbacks)
 - **db.parallel** `docs/claude/APP_EVENTS.md#Purpose and execution`: Use allSettled so one failed task doesn't block siblings; failures thrown after settlement.
 - **db.txn** `docs/claude/APP_EVENTS.md#Purpose and execution`: run writes in a transaction whose app events fire on commit
-- **deliverEmail** `apps/api/src/jobs/handlers/deliverEmail.ts`: actual delivery; planning belongs in sendEmail.
-  - *Signs you're bypassing it:* enqueueJob('deliverEmail', …) from anywhere but the planner (catalog: deliverEmail (enqueued by sendEmail; do not enqueue 'deliverEmail' directly))
-- **email registry** `apps/api/src/lib/email/registry.ts`: define per-template entity lens, sender, recipient rules, data lens and render policy
-- **EmailHandoff** `docs/claude/APP_EVENTS.md#Handler and handoff contracts`: request a templated email with binding data from an event handler
 - **emit** `apps/api/src/appEvents/emit.ts`: emit typed app events with actor envelope, deferred until transaction commit
 - **observe** `apps/api/src/lib/observe.ts`: adapt app event outcomes into observation telemetry
-- **observeRegistry** `APP_EVENTS.md#observe-pipeline`: best-effort observation; not a durable retry queue (use jobs)
-  - *Signs you're bypassing it:* writing AppEvent rows or event analytics logs by hand in a handler, or adding a per-handler observe selector (docs/claude/APP_EVENTS.md § Handler and handoff contracts ("no per-handler observe selector") and § Observe pipeline)
-- **refetch** `APP_EVENTS.md#websocket-handoffs`: invalidate a query; use streamAppend to push row-level changes
-  - *Signs you're bypassing it:* hand-built { category: 'query', action: 'refetch', key } objects in handlers (catalog refetch; docs/claude/WEBSOCKETS.md § Publishing a refetch)
-- **routeRow** `APP_EVENTS.md#websocket-handoffs`: parse an upsert row with the route's responseSchema exactly as its response
-  - *Signs you're bypassing it:* passing a raw Prisma row or hand-shaped object as an upsert payload instead of routeRow(route, value) (docs/claude/WEBSOCKETS.md § Data streams › Producing appends)
-- **sendEmail** `apps/api/src/jobs/handlers/sendEmail.ts`: planning recipients/template; actual provider send is deliverEmail.
-  - *Signs you're bypassing it:* calling createResendClient(...).send / defaultEmailClient().send from business logic, or enqueuing sendEmail by hand with a recipient list, instead of emitting an app event with an EmailHandoff (docs/claude/COMMUNICATIONS.md § Send Pipeline (event-driven, two BullMQ jobs, never a direct client call; no caller-supplied recipients))
-- **sendToChannel** `APP_EVENTS.md#websocket-handoffs`: channel subscribers: sendToChannel; a specific user's sockets: sendToUser; data streams: appendToStream
-  - *Signs you're bypassing it:* business code iterating the connection registry or calling sendToChannelLocal/sendToUserLocal directly, so other instances never deliver (docs/claude/WEBSOCKETS.md § Frontend and horizontal scaling)
-- **sendToUser** `APP_EVENTS.md#websocket-handoffs`: per-user delivery; channel subscribers use sendToChannel
-- **STREAM_DEFINITIONS** `apps/api/src/appEvents/streamAppend.ts`: declare shared stream kinds (list/log), ops and audience
-- **streamAppend** `apps/api/src/appEvents/streamAppend.ts`: always for stream handoffs; refetch hints for query invalidation
-  - *Signs you're bypassing it:* an object literal { kind: 'stream', target: { stream }, append: { type, payload } } in a handler (the handoff type is branded, so it won't typecheck) (docs/claude/WEBSOCKETS.md § Data streams › Producing appends; docs/claude/APP_EVENTS.md § WebSocket handoffs ("Stream handoffs are never built by hand"))
-- **WS_CHANNELS** `APP_EVENTS.md#websocket-handoffs`: name websocket channels consistently for targeting and subscription
-  - *Signs you're bypassing it:* subscribing to or publishing on channel names that are not a registered family (docs/claude/WEBSOCKETS.md § Channel registry and authorization; § Publishing a refetch)
 - **WSHandoff** `docs/claude/APP_EVENTS.md#Handler and handoff contracts`: kind 'channels' for channel subscribers, 'users' for specific users, 'stream' to append to a data stream.
   - *Signs you're bypassing it:* a hand-built { kind: 'stream', target, append } object in a handler instead of streamAppend(STREAM_DEFINITIONS.x, params, op, payload) (docs/claude/APP_EVENTS.md § WebSocket handoffs ("Stream handoffs are never built by hand"))
 - **Never hand-build stream handoffs** `APP_EVENTS.md#websocket-handoffs`: any app-event handoff to a data stream
 - **New payload kinds need consumer design** `APP_EVENTS.md#websocket-handoffs`: adding websocket payload kinds
-- **No recipients on email handoffs** `docs/claude/APP_EVENTS.md#Handler and handoff contracts`: Any event that sends email.
 - **No synchronous external calls in requests** `docs/claude/APP_EVENTS.md#Purpose and execution`: Any controller or write path that would otherwise call a provider inline.
   - *Signs you're bypassing it:* await fetch(providerUrl) or a provider SDK call inline in a controller or write path (docs/claude/APP_EVENTS.md § Purpose and execution ("Nothing synchronous hits an external service"))
 - **Observe registry receives every envelope** `docs/claude/APP_EVENTS.md#Handler and handoff contracts`: When adding analytics or observation of events.
@@ -197,6 +189,25 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - *Also here, by name:* communicationSettled (`apps/api/src/appEvents/handlers/communication/communicationSettled.ts`); contactCreated (`apps/api/src/appEvents/handlers/contact/contactCreated.ts`); contactDeleted (`apps/api/src/appEvents/handlers/contact/contactDeleted.ts`); contactUpdated (`apps/api/src/appEvents/handlers/contact/contactUpdated.ts`); customerRefCreated (`apps/api/src/appEvents/handlers/customerRef/customerRefCreated.ts`); customerRefSegmentsAdded (`apps/api/src/appEvents/handlers/customerRef/customerRefSegmentsAdded.ts`); customerRefSegmentsRemoved (`apps/api/src/appEvents/handlers/customerRef/customerRefSegmentsRemoved.ts`); deliverEmailHandoffs (`apps/api/src/appEvents/channels/email.ts`); deliverWSHandoffs (`apps/api/src/appEvents/channels/websocket.ts`); organizationDeleted (`apps/api/src/appEvents/handlers/organization/organizationDeleted.ts`); organizationUpdated (`apps/api/src/appEvents/handlers/organization/organizationUpdated.ts`); segmentDeleted (`apps/api/src/appEvents/handlers/segment/segmentDeleted.ts`); segmentMembersAdded (`apps/api/src/appEvents/handlers/segment/segmentMembersAdded.ts`); segmentMembersRemoved (`apps/api/src/appEvents/handlers/segment/segmentMembersRemoved.ts`); segmentUpdated (`apps/api/src/appEvents/handlers/segment/segmentUpdated.ts`); spaceDeleted (`apps/api/src/appEvents/handlers/space/spaceDeleted.ts`); spaceUpdated (`apps/api/src/appEvents/handlers/space/spaceUpdated.ts`); tagAttachmentCreated (`apps/api/src/appEvents/handlers/tagAttachment/tagAttachmentCreated.ts`); tagAttachmentDeleted (`apps/api/src/appEvents/handlers/tagAttachment/tagAttachmentDeleted.ts`); tagDeleted (`apps/api/src/appEvents/handlers/tag/tagDeleted.ts`); userCreated (`apps/api/src/appEvents/handlers/user/userCreated.ts`); userRedacted (`apps/api/src/appEvents/handlers/user/userRedacted.ts`); userUpdated (`apps/api/src/appEvents/handlers/user/userUpdated.ts`); userVerificationRequested (`apps/api/src/appEvents/handlers/user/userVerificationRequested.ts`)
 
 ### Class `webhooks`: Outbound webhooks: subscriptions, signing, delivery jobs, SSRF-safe fetch
+
+**Choosing among siblings: Webhook registries: webhookEnabledModels vs webhookOwnerAllowedModels vs webhookModelSubscribers vs webhookRelatedModels** (docs/claude/HOOKS.md § Webhooks (Enabling Webhooks for a Model, Related Models); catalog registries/webhook)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **webhookEnabledModels** | make a model's mutations emit webhooks (add it here) | never a custom hook or event cb that enqueues deliveries |
+| **webhookOwnerAllowedModels** | allow an owner to subscribe to a model (edit here) | starting from the changed model (use webhookModelSubscribers) |
+| **webhookModelSubscribers** | inverse lookup: from a changed model to owners | permitting subscriptions (use webhookOwnerAllowedModels) |
+| **webhookRelatedModels** | a child change fires the parent's webhook | never extra code to fire the parent |
+
+**Choosing among siblings: Delivery and URL safety: sendWebhook vs validateWebhookUrl vs webhookUrlSchema** (catalog sendWebhook, validateWebhookUrl, webhookUrlSchema; HOOKS.md § Webhooks)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **sendWebhook** | the delivery job, enqueued per subscription by the webhook hook | never fetch subscriber URLs from a controller, hook or event cb |
+| **validateWebhookUrl** | any user-supplied target URL outside zod | request bodies (use webhookUrlSchema) |
+| **webhookUrlSchema** | schema-level URL check on subscription bodies | outside zod parsing (use validateWebhookUrl) |
+| **WebhookSubscription** | the subscriber endpoint config (polymorphic owner) | delivery history (use WebhookEvent) |
+| **WebhookEvent** | delivery history per subscription | endpoint config (use WebhookSubscription) |
 
 - **WebhookEvent** `packages/db/prisma/schema/webhookEvent.prisma`: Delivery history per subscription: use this; subscriber endpoint config: WebhookSubscription instead.
 - **WebhookSubscription** `packages/db/prisma/schema/webhookSubscription.prisma`: Owner is polymorphic via ownerModel plus one of userId/organizationId/spaceId; unique per owner, model and url.
@@ -214,11 +225,29 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **webhookUrlSchema** `apps/api/src/modules/webhookSubscription/schemas/webhookSubscriptionSchemas.ts#webhookUrlSchema`: Schema-level URL input checks; call validateWebhookUrl directly outside zod parsing.
   - *Signs you're bypassing it:* url: z.string().url() on a webhook subscription body (catalog webhookUrlSchema)
 - **apps/api/src/modules/webhookSubscription** `apps/api/src/modules/webhookSubscription`: Managing an existing subscription; creation goes through me/organization/space CreateWebhookSubscription endpoints.
-- **truncateWebhookSubscriptions** `packages/db/prisma/truncateWebhookSubscriptions.ts`: Already run by clone.sh; use standalone only on local/test DBs.
-- **webhooks** `apps/api/src/hooks/index.ts`: deliver outbound webhooks post-commit after mutations
+- **Webhook circuit breaker** `docs/claude/HOOKS.md > Webhooks > Circuit Breaker`: general delivery failures; repeated 400/422 for one record on integration subscriptions poisons the record instead
+  - *Signs you're bypassing it:* custom failure counters or flags that disable a subscription after repeated delivery failures (docs/claude/HOOKS.md § Webhooks, Circuit Breaker)
+- **Webhooks enqueued on commit** `docs/claude/COMMUNICATIONS.md#Webhooks`: send outbound webhooks via sendWebhook job after transaction commits
+- **Webhooks fire after commit via hooks** `FEATURES.md › Webhooks`: never send inline in the request or inside the transaction
+  - *Signs you're bypassing it:* sending a webhook inline in the request or inside the transaction (FEATURES.md › Webhooks (Event-Based Triggers))
+- **HOOK_IGNORE_FIELDS** `packages/db/src/registries/ignoreFields.ts`: list fields excluded from webhook payloads, audit diffs and no-op detection
+- **webhookDelivery** `docs/claude/HOOKS.md > Webhooks > How It Works`: after commit, find active subscriptions and enqueue a sendWebhook job for each
+- **x-webhook-signature** `FEATURES.md › Webhooks`: sign timestamped webhook bodies with RSA-SHA256 for receiver verification
+  - *Signs you're bypassing it:* an HMAC with a per-subscription shared secret, or unsigned/untimestamped webhook bodies (FEATURES.md › Webhooks (RSA Signature Verification))
+- **Don't re-list encrypted or ordered-list fields as ignored** `packages/db/src/registries/ignoreFields.ts`: when adding encrypted or ordered-list fields to a model
 - *Also here, by name:* WEBHOOK_NOOP_FIELDS (`packages/db/src/registries/redactFields.ts`); WebhookEventAction (`packages/db/prisma/schema/webhookEvent.prisma`); WebhookEventStatus (`packages/db/prisma/schema/webhookEvent.prisma`); WebhookModel (`packages/db/prisma/schema/webhookSubscription.prisma`); WebhookOwnerModel (`packages/db/prisma/schema/webhookSubscription.prisma`); WebhooksPage (`packages/ui/src/pages/WebhooksPage.tsx`); hostnameOf (`apps/api/src/lib/webhooks/validators/hostnameOf.ts`); isEnforcedEnvironment (`apps/api/src/lib/webhooks/validators/isEnforcedEnvironment.ts`); isPrivateAddress (`apps/api/src/lib/webhooks/validators/isPrivateAddress.ts`); webhookSubscriptionCreateBodySchema (`apps/api/src/modules/webhookSubscription/schemas/webhookSubscriptionSchemas.ts`); webhookSubscriptionReadResponseSchema (`apps/api/src/modules/webhookSubscription/schemas/webhookSubscriptionSchemas.ts`)
 
 ### Class `adapters`: Provider adapter modules: one interface over provider implementations (makeAdapterRouter/Registry)
+
+**Choosing among siblings: makeAdapterRouter vs makeAdapterRegistry vs makeBroadcastRegistry vs direct factory** (docs/claude/ADAPTERS.md § Adapter primitives, § What NOT to do; catalog)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **makeAdapterRouter** | pick the provider by ENVIRONMENT, even with one provider; wraps every index.ts export | keyed lookup (use makeAdapterRegistry); fan-out (use makeBroadcastRegistry) |
+| **makeAdapterRegistry** | select one adapter by key | fan-out to all (use makeBroadcastRegistry); per-environment (use makeAdapterRouter) |
+| **makeBroadcastRegistry** | send to several providers at once (messageProviderRegistry) | one provider (makeAdapterRegistry); never for storage |
+| **Direct factory for per-tenant email client** | provider chosen per call or tenant (email); the documented exception | chosen once per environment (use makeAdapterRouter) |
+| **Adapter module for external services** | external service, env-divergent impl, test mocking, or plausible second provider | otherwise import the library directly |
 
 - **makeAdapterRegistry** `packages/shared/src/adapter/registry.ts#makeAdapterRegistry`: Selecting one adapter by key; fan-out to all: makeBroadcastRegistry; selecting by ENVIRONMENT: makeAdapterRouter.
 - **makeAdapterRouter** `packages/shared/src/adapter/router.ts#makeAdapterRouter`: Per-environment provider selection, even with one provider; keyed lookup: makeAdapterRegistry; fan-out: makeBroadcastRegistry.
@@ -228,8 +257,6 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **Adapter module for external services** `docs/claude/ADAPTERS.md#What an adapter module is`: Wrap when external service, env-divergent impl, clean test mocking, or plausible second provider; otherwise import the library directly.
 - **Direct factory for per-tenant email client** `packages/email/src/client/`: Provider chosen per call/tenant; makeAdapterRouter when chosen once per environment.
 - **errorReporter** `apps/api/src/lib/errorReporter/`: report errors via console or Sentry selected per environment
-- **messageProviderRegistry** `apps/api/src/lib/messaging/providers.ts`: broadcast a message across all registered communication channel providers
-  - *Signs you're bypassing it:* a switch on contact.type that calls Twilio or another SDK inline for SMS/push (docs/claude/COMMUNICATIONS.md § Messaging › Provider Registry and § SMS (register a MessageProviderAdapter under the ContactType))
 - **storage** `apps/api/src/lib/storage/`: provide the env-routed S3 object storage client to application code
   - *Signs you're bypassing it:* importing @aws-sdk/* or presigning URLs by hand in a module instead of calling the storage adapter (docs/claude/ADAPTERS.md § What an adapter module is and § Existing examples)
 - **Adapter client singleton shape** `docs/claude/ADAPTERS.md#What NOT to do`: Map<config, client> only for per-tenant configs like email resend.
@@ -243,6 +270,16 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **No noop registered adapters** `docs/claude/ADAPTERS.md#What NOT to do`: Testing code that uses an adapter.
 
 ### Class `integrations`: Owner integrations and their synced records
+
+**Choosing among siblings: Integration vs IntegrationRecord, and the poison pair** (catalog integration.prisma, integrationRecord.prisma, findOwnedIntegration; HOOKS.md § Webhooks, Poisoned Records)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **Integration** | the owner's connection to a provider | synced external items (use IntegrationRecord) |
+| **IntegrationRecord** | a synced external item under an integration | the connection itself (use Integration); external identity (CustomerRef) |
+| **findOwnedIntegration** | load an integration with ownership scope enforced | never raw findUnique by id |
+| **poisonIntegrationRecord** | mark a record poisoned | checking (use isIntegrationRecordPoisoned) |
+| **isIntegrationRecordPoisoned** | check before delivery | marking (use poisonIntegrationRecord) |
 
 - **Integration** `packages/db/prisma/schema/integration.prisma`: synced external items: IntegrationRecord instead; credentials live on Token
 - **IntegrationRecord** `packages/db/prisma/schema/integrationRecord.prisma`: the connection itself: Integration instead; external identity relation: CustomerRef
@@ -259,10 +296,17 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 
 ### Class `object-storage`: Object storage client (S3) behind the adapter
 
+**Choosing among siblings: storage vs createS3Client vs MinIO scripts** (docs/claude/ADAPTERS.md § What an adapter module is, § Existing examples; catalog createS3Client; scripts/db)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **storage** | application code reading or writing objects (env-routed adapter) | never @aws-sdk/* or hand presigning in a module |
+| **createS3Client** | inside the storage adapter, building the S3 client | app code (use storage); never new S3Client directly |
+| **scripts/db/minio-provision.sh (dx-setup)** | provision local MinIO buckets | removing buckets (use scripts/db/minio-remove.sh) |
+| **scripts/db/minio-remove.sh (dx-setup)** | remove MinIO buckets on worktree teardown | creating them (use scripts/db/minio-provision.sh) |
+
 - **createS3Client** `apps/api/src/lib/storage/client/s3.ts#createS3Client`: Use instead of instantiating S3Client from the AWS SDK directly.
   - *Signs you're bypassing it:* new S3Client(...) from @aws-sdk/client-s3 instantiated in application code (catalog createS3Client; docs/claude/ADAPTERS.md § What an adapter module is ("never a provider SDK directly"))
-- **scripts/db/minio-provision.sh** `scripts/db/minio-provision.sh`: Removing buckets: minio-remove.sh.
-- **scripts/db/minio-remove.sh** `scripts/db/minio-remove.sh`: remove MinIO buckets, reporting each, on worktree teardown
 
 ## 4. The specifics, in full
 

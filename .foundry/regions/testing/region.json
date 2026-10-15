@@ -8,7 +8,7 @@
     "vcr",
     "test-rules"
   ],
-  "tokens": 16781,
+  "tokens": 16477,
   "tokenMethod": "chars/4",
   "runsAgreed": 3,
   "sources": {
@@ -33,24 +33,17 @@
       "doc:docs/claude/TESTING.md#vcr-external-services"
     ],
     "catalogClusters": [
-      "authentication-methods",
       "code-style-lint-checks",
-      "database-scripts-migrations",
-      "error-handling",
-      "filtering-search-ordering",
-      "frontend-app-shells-routes",
-      "frontend-navigation-context",
-      "frontend-state-api-client",
-      "pagination",
+      "dev-setup-scripts",
+      "environment-config",
+      "module-layout-monorepo",
       "request-response-schemas",
-      "roles-and-permissions",
       "route-templates-controllers",
       "testing-helpers",
-      "testing-rules",
-      "ui-components"
+      "testing-rules"
     ],
     "codeEntries": 123,
-    "docMembers": 70
+    "docMembers": 45
   },
   "bypassLines": 33,
   "glossaryTerms": 30

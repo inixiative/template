@@ -5,7 +5,7 @@
   "concepts": [
     "lib-permissions"
   ],
-  "tokens": 6578,
+  "tokens": 6885,
   "tokenMethod": "chars/4",
   "runsAgreed": 0,
   "sources": {
@@ -32,7 +32,7 @@
       "roles-and-permissions"
     ],
     "codeEntries": 5,
-    "docMembers": 17
+    "docMembers": 15
   },
   "bypassLines": 11,
   "glossaryTerms": 27

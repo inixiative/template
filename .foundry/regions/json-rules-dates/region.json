@@ -1,0 +1,33 @@
+{
+  "id": "json-rules-dates",
+  "title": "json-rules dates, windows and verbs",
+  "routing": "Is this about how json-rules treats time or names its operations: a relative date expression (`now`, `this month`, `ago`, rolling windows), the `now` option a relative rule needs, a naive vs zoned datetime, `dayIn` / `dayNotIn` weekdays, the evaluation timezone (`config.timeZone`, `resolveDateConfig`, UTC default), negated date operators and NULL rows, or which public verb (check / toSql / toPrisma / narrowRule / projectLens / bindRule / describeRule \u2026) names an operation of the engine?",
+  "concepts": [
+    "lib-json-rules-dates"
+  ],
+  "tokens": 4931,
+  "tokenMethod": "chars/4",
+  "runsAgreed": 0,
+  "sources": {
+    "docs": [
+      "@inixiative/json-rules/docs/TIMEZONE.md",
+      "@inixiative/json-rules/docs/VERBS.md"
+    ],
+    "docUnits": [
+      "doc:@inixiative/json-rules/docs/VERBS.md#preface",
+      "doc:@inixiative/json-rules/docs/VERBS.md#public-api",
+      "doc:@inixiative/json-rules/docs/VERBS.md#internal-verbs-and-their-owners",
+      "doc:@inixiative/json-rules/docs/TIMEZONE.md#preface",
+      "doc:@inixiative/json-rules/docs/TIMEZONE.md#the-policy",
+      "doc:@inixiative/json-rules/docs/TIMEZONE.md#resolving-the-zone-resolvedateconfig",
+      "doc:@inixiative/json-rules/docs/TIMEZONE.md#not-built-per-record-companion-column-zones"
+    ],
+    "catalogClusters": [
+      "json-rules-engine"
+    ],
+    "codeEntries": 1,
+    "docMembers": 0
+  },
+  "bypassLines": 0,
+  "glossaryTerms": 20
+}

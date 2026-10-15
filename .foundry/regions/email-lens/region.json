@@ -1,0 +1,33 @@
+{
+  "id": "email-lens",
+  "title": "The email lens",
+  "routing": "Is this about what an email template may read or test: the four-root email lens (EmailLens: sender, recipient, data, system), building it for a slug and owner (emailLensFor, scopeEmailLens, DEFAULT_RECIPIENT_NARROWING, senderLensOwner, targetedBySender, stored lens slots), walking token paths (walkEmailLensPath, emailTokenPathKind), checking or evaluating email rules (emailRuleViolations, emailRuleReferences, applyEmailLens, scopedRule, evaluateScopedRule, opaqueLoopIssue, withRule), the rule-builder surface (emailSurface, composeNarrowed, emailSurfaceSourceValues, useEmailRuleSurface, useEmailVariableScope), component expectation warnings, or projecting variables at render (narrowVariables, prune)?",
+  "concepts": [
+    "email-lens"
+  ],
+  "tokens": 10149,
+  "tokenMethod": "chars/4",
+  "runsAgreed": 0,
+  "sources": {
+    "docs": [
+      "docs/claude/COMMUNICATIONS.md"
+    ],
+    "docUnits": [
+      "doc:docs/claude/COMMUNICATIONS.md#email/the-email-lens"
+    ],
+    "catalogClusters": [
+      "email-composition-rendering",
+      "email-delivery-senders",
+      "frontend-state-api-client",
+      "json-rules-engine",
+      "lenses-multi-source",
+      "messaging-channels-adapters",
+      "rule-builder-ui-model",
+      "rule-references-registry"
+    ],
+    "codeEntries": 74,
+    "docMembers": 3
+  },
+  "bypassLines": 10,
+  "glossaryTerms": 26
+}

@@ -1,39 +1,28 @@
 {
   "id": "lenses",
-  "title": "Lenses and narrowings",
-  "routing": "Is this about what a lens is and what a narrowing lets a rule, filter or render see \u2014 LensNarrowing layers (picks / omits / enumPicks / enumOmits, relations turned on, root.where vs root.relations.<rel>.where vs mapDefaults model wheres), composition and clamps (layers only narrow, clampLens, validateNarrowing, LensRefusal, narrowRule's filter-first injection under all, storeLens / composeLens, projectLens surfaces) \u2014 or about the template's lenses: lensFor, a route's filterLens, scopeNarrowing, lensWhere, redactLens, omitForeignKeys, lensFromOperation, the email lens (emailLensFor / emailLensAt, scopeEmailLens, senderLensOwner, targetedBySender, narrowVariables / prune) and customerRefLens, or the no-lens-spread CI rule?",
+  "title": "Template lenses",
+  "routing": "Is this about the template's own lenses and where it wires them in \u2014 lensFor as a Prisma model's base lens, a route's filterLens and the scopeNarrowing middleware, lensWhere folding lens clauses into paginate's where, the redactLens / omitForeignKeys mapDefaults wrappers, fetchLens, sourceQueryValues / sourceQueryWhere, lensFromOperation / lensFromSchema for frontend filter lenses, customerRefLens / resolvedCustomerRefLens and segmentLensFor, the template's walkLensPath / lensPathFields helpers, or the no-lens-spread CI rule?",
   "concepts": [
-    "lenses",
-    "lib-json-rules-lens"
+    "lenses"
   ],
-  "tokens": 19900,
+  "tokens": 10774,
   "tokenMethod": "chars/4",
   "runsAgreed": 0,
   "sources": {
     "docs": [
-      "@inixiative/json-rules/docs/LENS.md",
       "docs/claude/API_ROUTES.md",
       "docs/claude/COMMUNICATIONS.md"
     ],
     "docUnits": [
       "doc:docs/claude/API_ROUTES.md#lens-wheres",
-      "doc:docs/claude/COMMUNICATIONS.md#email/the-email-lens",
-      "doc:@inixiative/json-rules/docs/LENS.md#preface",
-      "doc:@inixiative/json-rules/docs/LENS.md#1-why-lens-exists",
-      "doc:@inixiative/json-rules/docs/LENS.md#2-two-kinds-of-narrowing",
-      "doc:@inixiative/json-rules/docs/LENS.md#3-the-three-anchor-layers-for-where",
-      "doc:@inixiative/json-rules/docs/LENS.md#4-the-all-operator-filter-first-trick",
-      "doc:@inixiative/json-rules/docs/LENS.md#5-composition-rules",
-      "doc:@inixiative/json-rules/docs/LENS.md#6-defaults-vs-path-specific",
-      "doc:@inixiative/json-rules/docs/LENS.md#7-per-model-and-per-type-enum-narrowing",
-      "doc:@inixiative/json-rules/docs/LENS.md#8-the-complete-type-shape"
+      "doc:docs/claude/COMMUNICATIONS.md#email/the-email-lens"
     ],
     "catalogClusters": [
       "lenses-multi-source"
     ],
-    "codeEntries": 58,
-    "docMembers": 28
+    "codeEntries": 26,
+    "docMembers": 44
   },
-  "bypassLines": 30,
-  "glossaryTerms": 29
+  "bypassLines": 23,
+  "glossaryTerms": 21
 }

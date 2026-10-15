@@ -109,13 +109,23 @@ All Redis access comes from packages/db/src/redis: getRedisClient for every regu
 
 Caching is read-through: cache(cacheKey(...), fn, ttl) returns a hit or computes, single-flights misses and negatively caches null for a minute; upsertCache writes a value you already hold; clearKey deletes exact keys or SCAN patterns. Keys are built only with cacheKey, which normalizes the domain so writes and clears meet. Invalidation is automatic: the cacheReference map lists, per model, every key a record is read under, and an after-commit hook clears keys from both the previous and the result row. Read failures degrade to a miss. Do not cache reads whose invalidation needs a graph walk; raw SQL writes that bypass the mutation lifecycle must clear explicitly; each cached entity needs a read-after-write test.
 
-Rate limits are identity limits: rateLimit(rules) ANDs fixed-window buckets (one atomic Lua INCR + PEXPIRE per rule, incrementFixedWindows), returns 429 with Retry-After, and fails open when Redis is down. apiRateLimit covers the API keyed by principal, space and organization; authRateLimit covers /api/auth/* per IP. Identities come from getActor or clientIp (IPv6 bucketed to /64), and maxes come only from rateLimitMax. Batch sub-requests are not counted; cost limits on spend are a separate detector. Not here: BullMQ jobs and cron (jobs-cron), distributed locks and supersede lanes (their own primitives, though they use the lock/lane namespaces), WebSocket pub/sub and stream seq (websockets), and the frontend's TanStack query-key invalidation.
+Rate limits are identity limits: rateLimit(rules) ANDs fixed-window buckets (one atomic Lua INCR + PEXPIRE per rule, incrementFixedWindows), returns 429 with Retry-After, and fails open when Redis is down. apiRateLimit covers the API keyed by principal, space and organization; authRateLimit covers /api/auth/* per IP. Identities come from getActor or clientIp (IPv6 bucketed to /64), and maxes come only from rateLimitMax. Batch sub-requests are not counted; cost limits on spend are a separate detector. Not here: BullMQ jobs and cron (jobs-cron), distributed locks and supersede lanes (concurrency-locks, though they use the lock/lane namespaces), the job overflow flags and depth probe (job-lanes-outbox), WebSocket pub/sub (ws-connections) and stream seq (ws-streams), and the frontend's TanStack query-key invalidation.
 
 ## 3. Everything that exists here, by class
 
-Point at a class when that is as specific as the moment allows, or at a member. Each member: **name** `where`: choose this when … . Where the docs or code give material, a second line describes the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
+Point at a class when that is as specific as the moment allows, or at a member. Where a class has siblings an agent could confuse, a table under the class header says which to use when. Each member: **name** `where`: choose this when … . Where the docs or code give material, a second line describes the hand-rolled code an agent writes when it rebuilds the primitive instead of using it. Code members come from the catalog, described from the code. Doc members are named in the doc sections in part 4. *Also here, by name* lists the parts of a larger system.
 
 ### Class `redis`: Redis connections, key namespaces, built-in key uses
+
+**Choosing among siblings: getRedisClient vs getRedisSub vs getRedisPub vs createRedisConnection** (docs/claude/REDIS.md § Connection Strategy, § Why Separate Connections?; JOBS.md § Worker Configuration)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **getRedisClient** | every regular command: cache, rate limits, sessions, OTP | SUBSCRIBE (use getRedisSub); BullMQ/blocking (use createRedisConnection) |
+| **getRedisSub** | subscribing; SUBSCRIBE puts the connection in pub/sub mode | publishing (use getRedisPub) or plain commands (use getRedisClient) |
+| **getRedisPub** | publishing only | subscribing (use getRedisSub) |
+| **createRedisConnection** | a dedicated connection: BullMQ, blocking commands | ordinary commands (use getRedisClient) |
+| **Separate worker Redis connection (jobs-cron)** | BullMQ worker setup (its own connection; REDIS_BULLMQ_URL may isolate it) | app-side cache or limits (use getRedisClient) |
 
 - **createRedisConnection** `packages/db/src/redis/client.ts#createRedisConnection`: Only for dedicated connections (BullMQ, blocking); getRedisClient for regular operations.
 - **getRedisClient** `packages/db/src/redis/client.ts#getRedisClient`: Default for cache, rate limits, sessions, OTP; createRedisConnection only for dedicated connections.
@@ -127,13 +137,37 @@ Point at a class when that is as specific as the moment allows, or at a member. 
   - *Signs you're bypassing it:* Hard-coded key prefix strings like `cache:User:${id}` or `lock:${x}` instead of `${redisNamespace.cache}:...`. (docs/claude/REDIS.md § Namespaces ("Bad - hardcoded prefixes"))
 - **lua-in-queries** `scripts/ci/rules/lua-in-queries.sh`: keep each Redis Lua script with its eval function in the module's queries/ folder
   - *Signs you're bypassing it:* An inline Lua string passed to redis.eval inside a service, middleware or handler rather than a queries/ file with its eval function. (CI rule scripts/ci/rules/lua-in-queries.sh; docs/claude/REDIS.md § Rate Limiting)
+- **BetterAuth sessions via secondaryStorage** `lib/auth.ts secondaryStorage`: store BetterAuth sessions in Redis under the session namespace
+- **Cross-server WebSocket broadcast** `docs/claude/REDIS.md#WebSocket Pub/Sub`: fan out WS messages across servers via the ws:broadcast pub/sub channel
 - **Redis connection event logging** `docs/claude/REDIS.md#Connection Errors`: log Redis connect and error events through the shared logger
+- **Shared stream sequence via Lua** `docs/claude/REDIS.md#WebSocket Pub/Sub`: publish stream appends while INCRing ws:seq:{stream} for one shared sequence
+- **Singleton job lock** `docs/claude/REDIS.md#Job Coordination`: Cron run-once; general distributed locks use createLock.
+- **BullMQ jobs queue** `docs/claude/REDIS.md#BullMQ`: hold background jobs in BullMQ-managed bull:jobs:* keys
+- **Lua scripts live in queries/** `docs/claude/REDIS.md#Rate Limiting`: Writing any Redis Lua script; enforced by lua-in-queries CI rule.
 - **Redis keys must use namespaces** `packages/db/src/redis/namespaces.ts`: Any Redis key construction.
 - **Separate Redis connections by role** `docs/claude/REDIS.md#Connection Strategy`: Any code opening or using a Redis connection.
-- **Separate worker Redis connection** `docs/claude/JOBS.md#Worker Configuration`: any BullMQ worker setup
 - *Also here, by name:* resolveBullmqRedisUrl (`apps/api/src/jobs/bullmqRedisUrl.ts`); resolveRedisUrl (`packages/db/src/redis/client.ts`); slowDeferredKey (`apps/api/src/jobs/slowLaneSignals.ts`); slowLastFinishedKey (`apps/api/src/jobs/slowLaneSignals.ts`)
 
 ### Class `caching`: Read-through cache(): cache keys, TTLs, single-flight, mutation-driven invalidation
+
+**Choosing among siblings: Reading and writing the cache: cache vs upsertCache vs fetchOne vs hydrator load seam** (docs/claude/REDIS.md § cache() Get-or-Set; catalog fetchOne, upsertCache; @inixiative/permissions README § Hydration)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **cache** | read-through: return a hit or compute on miss (single-flight, negative-caches null) | you already hold the value (use upsertCache) |
+| **upsertCache** | write a value you already have | it must be computed on miss (use cache) |
+| **fetchOne** | one record by key | you have the record and need relations (hydrate); rows from a lens (fetchLens) |
+| **Cache in hydrator load seam** | cross-call caching for permission hydration: wrap the single load read | within one call; the hydrator already de-dupes |
+
+**Choosing among siblings: Invalidation: cacheReference vs clearKey vs automatic invalidation** (docs/claude/REDIS.md § Automatic Invalidation, § Invalidation conventions; HOOKS.md § Cache Invalidation)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **cacheReference** | register every key a model's record is read under; the after-commit hook clears previous ∪ result | a one-off ad-hoc clear (use clearKey) |
+| **Automatic cache invalidation via reference map** | mutation-driven invalidation through the lifecycle | raw SQL writes that bypass the lifecycle (clear explicitly with clearKey) |
+| **clearKey** | exact keys or SCAN patterns outside the mutation hooks | after a normal update in a service (register in cacheReference) |
+| **cacheKey** | building every cache key, so writes and clears meet | never hand-format a key |
+| **Don't cache graph-walk reads** | invalidation would need a relationship walk: don't cache | keys reachable from the row (use cacheReference) |
 
 - **cache** `packages/db/src/redis/cache.ts#cache`: Read-through caching; upsertCache to write a known value, clearKey to invalidate.
   - *Signs you're bypassing it:* A hand-written `const hit = await redis.get(key); if (hit) return JSON.parse(hit); const v = await fn(); await redis.set(key, JSON.stringify(v), 'EX', ttl)` get-or-set without single-flight, negative caching or graceful degradation. (docs/claude/REDIS.md § cache() Get-or-Set; § Cache Fallback)
@@ -151,7 +185,6 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - **Cache in hydrator load seam** `@inixiative/permissions/README.md#Hydration (Prisma example)`: Hydrator already de-dupes within one call; wrap load only for cross-call caching.
   - *Signs you're bypassing it:* a memo map wrapped around the whole hydrator or check call, or caching added inside the engine, instead of wrapping the single read passed as load (@inixiative/permissions/README.md § Hydration ("load is the cache seam"))
 - **In-memory Redis mock in tests** `packages/db/src/redis/client.ts`: route all Redis connections to one shared RedisMock in test env
-- **flushRedis** `@template/db`: Tests only; throws outside test environment.
 - **validateKey** `packages/db/src/redis/cache.ts`: throw when a cache key contains 'undefined' to catch bugs early
 - **Build cache keys only with cacheKey** `docs/claude/REDIS.md#Invalidation conventions`: Every cache read, write and invalidation.
   - *Signs you're bypassing it:* Any hand-formatted key in a cache read, write or clear. (docs/claude/REDIS.md § Invalidation conventions)
@@ -164,6 +197,27 @@ Point at a class when that is as specific as the moment allows, or at a member. 
 - *Also here, by name:* fetchCacheKeys (`apps/api/src/hooks/cache/constants/cacheReference.ts`); registerClearCacheHook (`apps/api/src/hooks/cache/hook.ts`)
 
 ### Class `rate-limiting`: Fixed-window rate limits keyed by user/space/org/IP; 429 + Retry-After
+
+**Choosing among siblings: rateLimit vs apiRateLimit vs authRateLimit vs batch/spend limits** (docs/claude/REDIS.md § Rate Limiting; catalog rateLimit, rateLimitMax)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **rateLimit** | build a middleware from fixed-window rules (ANDed, 429 + Retry-After, fails open) | the API or auth already covered (use apiRateLimit / authRateLimit) |
+| **apiRateLimit** | general API, keyed by principal, space and organization | /api/auth/* (use authRateLimit) |
+| **authRateLimit** | /api/auth/*, per IP for unauthenticated BetterAuth calls | general API routes (use apiRateLimit) |
+| **rateLimitMax** | the one place limit values are set | never hardcode maxes or add a limit column |
+| **Batch sub-requests skip identity limits** | sub-requests are not counted by identity limits | spend/cost caps: a separate detector, not an apiRateLimit rule |
+
+**Choosing among siblings: Identities: userIdentity vs principalIdentity vs ipIdentity vs spaceIdentity vs organizationIdentity** (catalog rateLimit/identities.ts; docs/claude/REDIS.md § Rate Limiting)
+
+| Member | Use when | Not when (use instead) |
+|---|---|---|
+| **userIdentity** | authenticated per-user caps | anonymous callers too (use principalIdentity) |
+| **principalIdentity** | routes hit by signed-in and anonymous callers | anonymous only (use ipIdentity) |
+| **ipIdentity** | unauthenticated routes like /api/auth/* | authenticated callers (use userIdentity or principalIdentity) |
+| **spaceIdentity** | per-space caps | org-wide (use organizationIdentity) |
+| **organizationIdentity** | org-wide caps | per-space (use spaceIdentity) |
+| **clientIp** | the IP key: trusted hop, IPv6 bucketed to /64 | raw nullable address (use clientAddress) |
 
 - **apiRateLimit** `apps/api/src/middleware/rateLimit/apiRateLimit.ts#apiRateLimit`: Auth endpoints: authRateLimit instead. Detectors that must run inside batches are separate, not apiRateLimit rules.
 - **authRateLimit** `apps/api/src/middleware/rateLimit/authRateLimit.ts#authRateLimit`: General API routes: apiRateLimit instead; this keys by IP for unauthenticated BetterAuth calls.

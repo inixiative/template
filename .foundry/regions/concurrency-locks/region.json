@@ -9,14 +9,15 @@
     "recurring-timers",
     "debounce"
   ],
-  "tokens": 9065,
+  "tokens": 12385,
   "tokenMethod": "chars/4",
   "runsAgreed": 2,
   "sources": {
     "docs": [
       "docs/claude/CONCURRENCY.md",
       "docs/claude/DATABASE.md",
-      "docs/claude/FRONTEND/API_CLIENT.md"
+      "docs/claude/FRONTEND/API_CLIENT.md",
+      "docs/claude/JOBS.md"
     ],
     "docUnits": [
       "doc:docs/claude/CONCURRENCY.md#distributed-lock-createlock",
@@ -26,6 +27,7 @@
       "doc:docs/claude/CONCURRENCY.md#concurrency-limits-getconcurrency",
       "doc:docs/claude/CONCURRENCY.md#bounded-batch-resolveall",
       "doc:docs/claude/CONCURRENCY.md#supersede-lanes-claimlane-watchlane",
+      "doc:docs/claude/JOBS.md#handler-patterns",
       "doc:docs/claude/CONCURRENCY.md#recurring-beat-heartbeat",
       "doc:docs/claude/FRONTEND/API_CLIENT.md#form-helpers"
     ],
@@ -40,7 +42,7 @@
       "websocket-realtime-delivery"
     ],
     "codeEntries": 37,
-    "docMembers": 18
+    "docMembers": 17
   },
   "bypassLines": 18,
   "glossaryTerms": 28

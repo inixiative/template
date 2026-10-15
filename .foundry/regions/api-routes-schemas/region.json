@@ -8,7 +8,7 @@
     "request-schemas",
     "api-modules"
   ],
-  "tokens": 14438,
+  "tokens": 16312,
   "tokenMethod": "chars/4",
   "runsAgreed": 2,
   "sources": {
@@ -37,21 +37,27 @@
     "catalogClusters": [
       "auth-middleware-validation",
       "authentication-methods",
+      "batch-request-execution",
       "database-scripts-migrations",
       "encryption-key-rotation",
+      "error-handling",
+      "filtering-search-ordering",
       "frontend-state-api-client",
       "job-definition-and-enqueue",
       "module-layout-monorepo",
       "naming-vocabulary",
+      "permission-rule-algebra",
       "request-context-access",
       "request-response-schemas",
       "roles-and-permissions",
       "route-registration-openapi",
       "route-templates-controllers",
+      "soft-delete-cascade",
+      "superadmin-operations",
       "testing-helpers"
     ],
     "codeEntries": 40,
-    "docMembers": 61
+    "docMembers": 62
   },
   "bypassLines": 24,
   "glossaryTerms": 28

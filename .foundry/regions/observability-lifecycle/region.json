@@ -7,7 +7,7 @@
     "telemetry",
     "process-lifecycle"
   ],
-  "tokens": 12691,
+  "tokens": 13881,
   "tokenMethod": "chars/4",
   "runsAgreed": 3,
   "sources": {
@@ -32,7 +32,7 @@
       "structured-logging"
     ],
     "codeEntries": 60,
-    "docMembers": 32
+    "docMembers": 31
   },
   "bypassLines": 20,
   "glossaryTerms": 30
