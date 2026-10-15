@@ -80,7 +80,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 - ✅ **Environment Composition** - `with-env.sh` injects secrets at runtime: `bun run with prod api turbo watch local#api` runs local code against production secrets. No committed `.env` files
 - ✅ **Docker Compose** - PostgreSQL 18 (alpine) and Redis 7 (alpine) for local dev. Persistent volumes, health checks, auto-restart. Bun servers run natively via Turborepo, not containerized
 - ✅ **TypeScript Strict Mode** - `strict: true` + additional checks across all packages. `any` avoided in application code (rare casts only at framework/type boundaries), enforced null checks, proper error handling. Catches entire classes of bugs at compile time
-- 🟡 **Init Script** - React Ink TUI for automated project setup (rename, secrets, cloud provisioning). Core flow complete; PlanetScale, Infisical, Railway integrations working. Additional provider integrations in progress
+- 🟡 **Init Script** - React Ink TUI for automated project setup (rename, secrets, cloud provisioning). Moving from a fixed stack to provider-selected setup: Infisical, PlanetScale or Railway Postgres, Railway (API, worker, Redis, buckets), Vercel or Cloudflare Pages, Resend, Bouncer and monitoring work; other providers, DNS, GitHub Actions and a provider-aware headless mode are not built. [Direction](docs/claude/INIT_SCRIPT_PATTERNS.md#direction-fixed-stack--provider-selected-setup-in-progress)
 
 ---
 
@@ -88,7 +88,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 **Modern RESTful API with GraphQL-style querying** - Built on Hono with full OpenAPI 3.1 spec generation, type-safe routing, and pseudo-GraphQL filtering that gives you the flexibility of GraphQL queries without the complexity. Every endpoint is documented, validated, and generates type-safe client code automatically.
 
-- ✅ **File-Based Route Auto-Registration** - Drop route file in `routes/` and matching controller in `controllers/` - automatically registered on startup. `autoRegisterRoutes()` scans module directory, imports route+controller pairs, and registers them with router. No manual imports needed. Prefix-based filtering separates admin routes from public routes. Similar to Next.js/TanStack file-based routing but for backend APIs
+- ✅ **File-Based Route Auto-Registration** - Drop route file in `routes/` and matching controller in `controllers/` - automatically registered on startup. `autoRegisterRoutes()` scans module directory, imports route+controller pairs, and registers them with router. No manual imports needed. Prefix-based filtering separates admin routes from public routes. Static paths register before parameterized ones; a route mounted by hand first (for ordering) is skipped, never registered twice. Similar to Next.js/TanStack file-based routing but for backend APIs
 
 - ✅ **Route Templates** - Pre-built route creators (readRoute, createRoute, updateRoute, deleteRoute, actionRoute) that generate consistent OpenAPI 3.1 definitions with proper schemas, error handling, and type safety. Eliminates ~70% of API boilerplate while enforcing consistent patterns across all endpoints. One file per endpoint for clean organization. [Learn more: API_ROUTES.md](docs/claude/API_ROUTES.md)
 
@@ -124,13 +124,13 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 ### Session Authentication (BetterAuth)
 
-- ✅ **BetterAuth Integration** - JWT and token auth via BetterAuth ^1.5. Handles email/password, OAuth, verification flows, and session lifecycle out of the box
-- ✅ **Email/Password Auth** - bcrypt password hashing. On sign-in, BetterAuth issues a **stateless JWT stored in an HTTP-only cookie**. No server-side session — the JWT is the session. CSRF protection via BetterAuth's double-submit cookie pattern
-- ✅ **OAuth Flow → Bearer Token** - OAuth callback (`/auth/callback`) extracts the returned JWT from the URL param and stores it in **localStorage** via `setToken()`. All subsequent API requests send it as `Authorization: Bearer <token>`. No cookie involved for OAuth users
-- ✅ **Stateless JWT** - No server-side session storage. Both email/password (cookie) and OAuth (localStorage Bearer) use the same JWT format. `cookieCache.maxAge: 300` means BetterAuth skips DB validation for up to 5 minutes per JWT
-- ✅ **Redis Secondary Storage** - Frequently-accessed data (permission caches, org lists) cached in Redis. Not the primary auth store — JWTs are self-contained
+- ✅ **BetterAuth Integration** - Session auth via BetterAuth ^1.6. Handles email/password, OAuth, verification flows, and session lifecycle out of the box
+- ✅ **Email/Password Auth** - Password hashing via BetterAuth. Sign-in returns a session token; the SPAs store it in localStorage via `setToken()` and send it as `Authorization: Bearer <token>`. Email verification is required before sign-in
+- ✅ **OAuth Flow → Bearer Token** - The provider redirects to the API, which appends a single-use one-time token to `/auth/callback#ott=…` (fragment, never logged). The callback page exchanges it for the session token and stores it via `setToken()`. The session token never appears in a URL
+- ✅ **Redis-Backed Sessions** - The session token is an opaque id, not a JWT; its record lives in Redis (`secondaryStorage`, TTL = 7-day sliding expiry), so deleting the key revokes the session at once. Every bearer request resolves the session from Redis. The one JWT is BetterAuth's encrypted (JWE) cookie cache, which lets cookie clients skip Redis for up to 7 days. Details: [AUTH.md](docs/claude/AUTH.md#session-storage-strategy)
+- ✅ **Redis Secondary Storage** - BetterAuth's `secondaryStorage` is Redis: session records, each user's active-session list, and the OAuth one-time tokens (consumed atomically with `GETDEL`)
 - ✅ **OAuth Social Providers** - Google wired via BetterAuth social plugin (callback handling, account linking, token issuance). Microsoft/GitHub are scaffolded in `platformProviders` but not yet configured in the BetterAuth client — adding them is config, not code
-- ✅ **BetterAuth Models** - Session (persisted for revocation), Verification (email verification tokens), Account (OAuth provider linkage) models in Prisma
+- ✅ **BetterAuth Models** - Verification (email verification tokens) and Account (OAuth provider linkage) models in Prisma. The `Session` model exists for BetterAuth's schema, but sessions are stored in Redis, not in it
 
 ### Multi-Provider Auth (AuthProvider)
 
@@ -245,7 +245,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **Request Scoping** - Database client scoped per-request for tracing and logging. All queries tagged with request ID for debugging
 
-- ✅ **Transaction Isolation in Tests** - Each test runs in isolated transaction, rolled back after test completes. Ensures tests don't interfere with each other
+- ✅ **DB-Backed Test Isolation** - Tests write real rows through the real client (factories), with no per-test transaction rollback. The db client registers a test tracker in every test process; `cleanupTouchedTables()` empties the tables a file wrote. Files run one at a time (`--max-concurrency=1`). [Learn more: TESTING.md](docs/claude/TESTING.md#cleanup)
 
 - ✅ **23 Database Models** - user, account, session, verification, authProvider, organization, organizationUser, space, spaceUser, token, webhookSubscription, webhookEvent, inquiry, customerRef, cronJob, emailTemplate, emailComponent, auditLog, contact, appEvent, tag, tagAttachment, tagCategory
 
@@ -379,11 +379,11 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 ### General Security
 
-- ✅ **HTTP-Only Cookie (email/password)** - Email/password auth issues a stateless JWT in an HTTP-only, Secure, SameSite=Lax cookie. Not accessible from JavaScript. CSRF protection via BetterAuth double-submit cookie pattern
-- ✅ **Bearer Token (OAuth)** - OAuth flow stores the JWT in localStorage and sends it as `Authorization: Bearer <token>`. No cookie — CSRF is not a risk for Bearer tokens, but XSS is (localStorage is JS-accessible). Trade-off accepted for OAuth compatibility
+- ✅ **HTTP-Only Session Cookies** - BetterAuth also sets HTTP-only cookies on the API origin (a signed session-token cookie and the encrypted JWE cookie cache). The SPAs don't rely on them; they authenticate with the bearer token
+- ✅ **Bearer Session Token** - Both email/password and OAuth sign-ins store the opaque session token in localStorage and send it as `Authorization: Bearer <token>`. No cookie, so CSRF is not a risk, but XSS is (localStorage is JS-accessible). Trade-off accepted for cross-origin SPAs
 - ✅ **SQL Injection Prevention** - Prisma uses parameterized queries exclusively. No string interpolation in queries. Raw SQL escape hatches disabled by convention
 - ✅ **XSS Prevention** - React escapes all interpolated values by default. No `dangerouslySetInnerHTML` usage. Content Security Policy headers configurable via Hono middleware
-- ✅ **Password Hashing** - bcrypt via BetterAuth with configurable cost factor. Passwords never stored or logged in plaintext
+- ✅ **Password Hashing** - scrypt via BetterAuth (`node:crypto`). Passwords never stored or logged in plaintext
 - ✅ **Token Hashing** - API tokens stored as SHA-256 hashes. Raw token shown once at creation, never retrievable. Token comparison done on hash
 - ✅ **Rate Limiting** - Atomic Redis fixed windows, AND-checked per user / space / organization plus an IP window on `/api/auth/*`; 429 with `Retry-After`, fail-open on a Redis outage. Limits resolve through one seam (`rateLimitMax`) awaiting subscriptions / feature flags (INFRA-027)
 - ✅ **Audit Logs** - `AuditLog` model with full actor context (user, spoof user, token, job, inquiry). Automatic hook captures create/update/delete for 10 enabled models. Soft-delete detection, empty-diff guard, sensitive field redaction, and inquiry lineage via `sourceInquiryId`. Retention job and admin API shipped (FEAT-005 Complete); explorer UI deferred to FEAT-017
@@ -593,7 +593,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **Mock Webhook Receiver** - Test module mounts a `POST /test/webhook` endpoint in test environment only. Stores received webhook payloads in-memory (`receivedWebhooks[]`) so tests can assert on delivery, headers, and RSA-SHA256 signatures. `clearReceivedWebhooks()` resets between tests. Enables real end-to-end webhook delivery tests without external services
 
-- ✅ **Automatic Test Cleanup** - Database hooks track which tables were touched during tests. `cleanupTouchedTables()` utility truncates only modified tables after test suite completes. Temporarily disables FK constraints, uses TRUNCATE CASCADE for efficiency. Prevents test data buildup without manual cleanup
+- ✅ **Automatic Test Cleanup** - The db client registers the test tracker in every test process (no per-file opt-in), and a database hook records each table a test writes. `cleanupTouchedTables()` empties only those tables, per file. Lint rules forbid calling `registerTestTracker()` in a test and deleting rows by hand in after hooks (DB-004)
 
 - ✅ **React Testing Library** - Component tests follow best practices (test behavior, not implementation). User-centric queries (getByRole, getByLabelText). Async utilities for loading states
 
@@ -663,9 +663,9 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **Redis with IORedis** - Distributed caching layer (Redis 7 alpine). Singleton connections with automatic reconnection, error handling, and connection pooling. Mock Redis in tests for isolation
 
-- ✅ **Redis Use Cases** - Session cache (5min cookieCache TTL), permission evaluation cache (10min), token hash cache (10min), BullMQ job queue persistence, WebSocket pub/sub for multi-server broadcasting
+- ✅ **Redis Use Cases** - Session store (BetterAuth `secondaryStorage`, 7-day sliding TTL), cached reads via `cache()` (API tokens 10min, user lookups, permission hydration), BullMQ job queue persistence, WebSocket pub/sub for multi-server broadcasting, rate-limit windows, locks
 
-- ✅ **Namespace Support** - Redis keys auto-prefixed by use case (session:, perm:, token:, job:) preventing collisions and enabling selective cache clearing
+- ✅ **Namespace Support** - Redis keys prefixed by use case (`redisNamespace`: bull, cache, job, ws, otp, session, limit, lock, lane) preventing collisions and enabling selective cache clearing
 
 - ✅ **Multiple Redis Connections** - Main client (general operations), dedicated subscriber (pub/sub is blocking), separate BullMQ connections per queue/worker. Prevents blocking operations from interfering
 

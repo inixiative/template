@@ -836,10 +836,12 @@ middleware: [validateOwnerPermission({ action: 'read' })]
 Blocks token-based auth for sensitive operations. Session-only.
 
 ```typescript
-// Tokens cannot: create other tokens, delete orgs, delete themselves
+// Tokens cannot: create other tokens, delete orgs, delete themselves (a superadmin's token can)
 export const validateNotToken = async (c, next) => {
   if (!c.get('user')) throw makeError({ status: 401, message: 'Authentication required' });
-  if (c.get('token')) throw makeError({ status: 403, message: 'Tokens cannot perform this action' });
+  if (c.get('token') && !isSuperadmin(c)) {
+    throw makeError({ status: 403, message: 'Tokens cannot perform this action' });
+  }
   await next();
 };
 ```

@@ -165,9 +165,10 @@ model EmailTemplate {
   componentRefs    String[]            // Pre-computed slugs
 
   // Ownership (false polymorphism)
-  ownerModel       EmailOwnerModel     // default|admin|Organization|Space
+  ownerModel       EmailOwnerModel     // see Enums: platform, tenant and user tiers
   organizationId   String?
   spaceId          String?
+  userId           String?
   inheritToSpaces  Boolean             // Allow Space to use Org template
 }
 ```
@@ -188,6 +189,7 @@ model EmailComponent {
   ownerModel       EmailOwnerModel
   organizationId   String?
   spaceId          String?
+  userId           String?
   inheritToSpaces  Boolean
 }
 ```
@@ -243,10 +245,13 @@ enum CommunicationStatus {
 }
 
 enum EmailOwnerModel {
-  default       // Base templates - read: all, write: super admin
-  admin         // Platform internal - super admin only
-  Organization  // Tenant-branded
-  Space         // Space-specific overrides
+  default           // Base templates - read: all, write: super admin
+  admin             // Platform internal - super admin only
+  Organization      // Tenant-branded - org admins
+  Space             // Space-specific overrides
+  User              // User chain floor - a user's personal template/component
+  OrganizationUser  // User-owned within an org
+  SpaceUser         // User-owned within a space
 }
 
 ```

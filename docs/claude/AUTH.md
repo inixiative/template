@@ -102,10 +102,21 @@ export const auth = betterAuth({
 
 ### Session Storage Strategy
 
-- **Sessions live in Redis** via `secondaryStorage` (keys under `redisNamespace.session`). `getAndDelete` (Redis `GETDEL`) makes one-time-token verification atomic.
-- **Bearer for the SPAs.** The `bearer()` plugin accepts the session token as `Authorization: Bearer <token>`; the frontends store it in localStorage (see [FRONTEND/AUTH.md](./FRONTEND/AUTH.md)).
-- **Cookie cache.** Cookie clients get an encrypted (`jwe`) session cookie cache, valid up to the 7-day session lifetime.
+What is JWT and what is Redis:
+
+| Piece | What it is | Where it lives |
+|-------|-----------|----------------|
+| **Session token** | An opaque random id (32 chars), **not a JWT**. As a cookie it's HMAC-signed with `BETTER_AUTH_SECRET`; the SPAs send the bare token as `Authorization: Bearer <token>` (the `bearer()` plugin accepts either). | Client: localStorage (`setToken()`, see [FRONTEND/AUTH.md](./FRONTEND/AUTH.md)) or the API-origin cookie |
+| **Session record** | `{ session, user }` JSON for that token, TTL = session expiry. A second key, `active-sessions-<userId>`, lists a user's live tokens. | **Redis** (`secondaryStorage`, keys under `redisNamespace.session`). Not written to Postgres: `storeSessionInDatabase` is off, so the Prisma `Session` table stays empty |
+| **Cookie cache** | The only JWT: an encrypted JWE (`strategy: 'jwe'`) `session_data` cookie carrying the session + user, valid up to `maxAge` (7 days). | Browser cookie on the API origin. Requests that carry it skip the Redis lookup |
+| **OAuth one-time token** | Single-use, 1 minute, stored hashed; consumed with Redis `GETDEL` (`getAndDelete`). | Redis |
+
+- **Every bearer request reads Redis.** `authMiddleware` → `auth.api.getSession` resolves the token through Redis; the SPAs send no cookie, so the JWE cache doesn't apply to them. Deleting the Redis key ends the session at once (that's how sign-out and revocation work).
+- **Lifetime.** `expiresIn` is 7 days, sliding: a session used more than a day (`updateAge`, default) after its last refresh is extended.
+- **Cookie clients.** A client that keeps the API's cookies gets the JWE cache, so it can authenticate without Redis for up to `maxAge`, and a revoked session stays valid there until the cookie cache expires.
 - **Email verification is required** for email/password sign-up; the verification email goes out through the `user.verificationRequested` app event.
+
+API tokens are a different mechanism: SHA-256-hashed `Token` rows in Postgres, cached in Redis for 10 minutes ([Token Authentication](#token-authentication)).
 
 ### Auth Routes
 

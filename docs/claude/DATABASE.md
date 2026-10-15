@@ -10,8 +10,8 @@
   - [Schema Location](#schema-location)
   - [Generator Output](#generator-output)
 - [Scripts](#scripts)
+  - [Schema Changes: Push Before Launch, Migrations After](#schema-changes-push-before-launch-migrations-after)
   - [Development Workflow](#development-workflow)
-  - [Production Workflow](#production-workflow)
   - [Database Operations](#database-operations)
 - [Seeding](#seeding)
   - [Prime Development Data](#prime-development-data)
@@ -117,28 +117,31 @@ Run from repo root or `packages/db`:
 | Script | Command | Purpose |
 |--------|---------|---------|
 | Generate | `bun run db:generate` | Generate Prisma client + Zod schemas |
-| Push | `bun run db:push` | Push schema to DB (dev only, no migration) |
-| Migrate | `bun run db:migrate` | Create migration file |
-| Deploy | `bun run db:deploy` | Run migrations (CI/production) |
+| Push | `bun run db:push` | Push schema to DB, no migration (`db:push:dev` = worktree-aware local + test push) |
+| Migrate | `bun run db:migrate` | Create a migration file (`prisma migrate dev`) — only once the project is launched |
+| Deploy | `bun run db:deploy` | Apply migrations (`prisma migrate deploy`) — only once the project is launched |
 | Studio | `bun run db:studio` | Open Prisma Studio GUI |
 | Seed | `bun run db:seed` | Run seed script |
+
+### Schema Changes: Push Before Launch, Migrations After
+
+The template ships with **no migrations** (`packages/db/prisma/` has no `migrations/` folder). How schema reaches a deployed database is gated on `launched` in `project.config.ts` (set by the init script's Launch step):
+
+| `launched` | Release step (`scripts/db/release.sh`) | Day to day |
+|------------|----------------------------------------|------------|
+| `false` (pre-launch, the default) | `prisma db push --accept-data-loss`, then the non-prime seed | Change the schema, `bun run db:generate && bun run db:push`. No migration files |
+| `true` | `prisma migrate deploy`, then the non-prime seed | `bun run db:migrate` to create a migration, review it, commit it |
+
+`scripts/checkLaunched.ts` reads the flag; `setup.sh` also skips `db:push`/`db:seed` once launched.
+
+Not built yet: nothing invokes `scripts/db/release.sh` — the Railway services init creates run only `db:generate` at build and start the API/worker, and `scripts/deployment/deploy.sh` is a stub calling `db:deploy` — and no step creates the baseline migration when `launched` flips. Until those exist, a deployed database is updated by running the release step by hand.
 
 ### Development Workflow
 
 ```bash
-# After schema changes
+# After schema changes (pre-launch)
 bun run db:generate   # Regenerate client
-bun run db:push       # Push to local DB (fast, no migration)
-
-# When ready to commit
-bun run db:migrate    # Create migration file
-# Review migration, commit
-```
-
-### Production Workflow
-
-```bash
-bun run db:deploy     # Run pending migrations
+bun run db:push       # Push to local DB (in a worktree: bun run db:push:dev)
 ```
 
 ### Database Operations

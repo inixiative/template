@@ -4,6 +4,7 @@
 
 ## Contents
 
+- [Direction: fixed stack → provider-selected setup (in progress)](#direction-fixed-stack--provider-selected-setup-in-progress)
 - [Architecture Overview](#architecture-overview)
 - [Core Patterns](#core-patterns)
   - [1. Root-Level Config State (Context Provider)](#1-root-level-config-state-context-provider)
@@ -48,6 +49,26 @@ Automated infrastructure provisioning via Terminal UI (Ink). Full implementation
 - Views may group atomic flags into friendlier UI labels like `Bootstrap ready (4/6)`
 - Task coverage uses Bun-native tests plus fixture-backed VCR helpers under `init/tests/`
 - Launch is part of the init flow: preflight checks gate flipping `launched = true`
+
+## Direction: fixed stack → provider-selected setup (in progress)
+
+**From:** the INFRA-001 flow — one hard-wired stack (Infisical → PlanetScale → compute → Vercel → Resend), stepped through in a fixed order, with `scripts/setup/init.sh` as the shell stub it replaced.
+
+**To:** the user picks a provider per slot (Settings: frontend, database, backend, Redis, email, plus the staging toggle; `init/providers.ts`), and init shows and runs only the selected providers' tasks, then Launch flips `launched` and schema changes switch from `db push` to migrations ([DATABASE.md](DATABASE.md#schema-changes-push-before-launch-migrations-after)).
+
+| Piece | Status |
+|-------|--------|
+| Ink TUI (`bun run init`) with provider-aware menu | Built |
+| Provider options marked `implemented: true` — Vercel, Cloudflare Pages, PlanetScale, Railway Postgres, Railway (API + worker), Railway Redis, Resend, none (email) | Built |
+| Tasks every project runs — project config, Infisical, Railway Buckets, Bouncer, monitoring (OTel + logs) | Built |
+| Netlify, Neon, Supabase, Fly.io, Render, Upstash, Postmark, SES | Listed, `implemented: false` (can't be selected) |
+| Optional integrations, DNS, database seeding, GitHub Actions, documentation generation | Menu items marked "coming soon", no task |
+| Launch | `LaunchView` runs preflight checks and flips `launched`; the menu still labels it "coming soon" |
+| Headless mode (`bun run init:agent`) | Covers only project, Infisical, PlanetScale, Railway (+ `--section=monitoring`); not provider-aware yet |
+| Release step after launch (`scripts/db/release.sh`) | Written, not wired into any deploy; no baseline migration is created at launch |
+| `scripts/setup/init.sh` | Stub of TODOs, superseded by `init/`; not run by anything |
+
+New provider work goes through the provider-selected path: add the option to `init/providers.ts`, a `*Setup.ts`/`*Steps.ts` task pair and a view, and gate its menu item on the selected provider.
 
 ---
 
