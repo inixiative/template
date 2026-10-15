@@ -50,6 +50,8 @@
 | Caching | REDIS.md |
 | New package/dep | DEPENDENCIES.md, MONOREPO.md |
 
+Writing a doc that names a primitive, pattern, rule or system: follow [DOMAIN-DOCS.md](DOMAIN-DOCS.md) (the Problem | Use | Read | Signs row, plain-language phrasings, exact identifiers); the Warden region builder reads docs in that shape.
+
 The docs contain patterns, conventions, and decisions. Reading them prevents:
 - Reinventing existing utilities
 - Breaking established patterns
