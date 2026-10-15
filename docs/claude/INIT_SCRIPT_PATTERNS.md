@@ -4,7 +4,7 @@
 
 ## Contents
 
-- [Direction: fixed stack → provider-selected setup (in progress)](#direction-fixed-stack--provider-selected-setup-in-progress)
+- [Direction: pre-launch → launched (in progress)](#direction-pre-launch--launched-in-progress)
 - [Architecture Overview](#architecture-overview)
 - [Core Patterns](#core-patterns)
   - [1. Root-Level Config State (Context Provider)](#1-root-level-config-state-context-provider)
@@ -50,27 +50,26 @@ Automated infrastructure provisioning via Terminal UI (Ink). Full implementation
 - Task coverage uses Bun-native tests plus fixture-backed VCR helpers under `init/tests/`
 - Launch is part of the init flow: preflight checks gate flipping `launched = true`
 
-## Direction: fixed stack → provider-selected setup (in progress)
+## Direction: pre-launch → launched (in progress)
 
-**From:** the INFRA-001 flow — one hard-wired stack (Infisical → PlanetScale → compute → Vercel → Resend), stepped through in a fixed order, with `scripts/setup/init.sh` as the shell stub it replaced.
+Init provisions a project in two phases, and Launch is the cut-over between them.
 
-**To:** the user picks a provider per slot (Settings: frontend, database, backend, Redis, email, plus the staging toggle; `init/providers.ts`), and init shows and runs only the selected providers' tasks, then Launch flips `launched` and schema changes switch from `db push` to migrations ([DATABASE.md](DATABASE.md#schema-changes-push-before-launch-migrations-after)).
+**Pre-launch:** every deployed database is disposable. Releases push the schema (`prisma db push --accept-data-loss`), `setup.sh` pushes and seeds, and a provider task may be re-run or reset. The TUI (`bun run init`) and the headless `init:agent` both work here.
+
+**Launched:** nothing may clobber a database again. Releases apply committed migrations only (`prisma migrate deploy`), schema changes go through `db:migrate`, and `setup.sh` skips push and seed. Details: [DATABASE.md](DATABASE.md#schema-changes-push-before-launch-migrations-after).
+
+**Launch** (`init/tasks/launch.ts`, `LaunchView`) runs preflight checks over the required sections, creates the baseline migration (`prisma/migrations/0_init`), checks each deployed database matches the schema and records the baseline as applied there, then flips `launched = true` in `project.config.ts` (the baseline steps land with [#197](https://github.com/inixiative/template/pull/197)).
 
 | Piece | Status |
 |-------|--------|
-| Ink TUI (`bun run init`) with provider-aware menu | Built |
-| Provider options marked `implemented: true` — Vercel, Cloudflare Pages, PlanetScale, Railway Postgres, Railway (API + worker), Railway Redis, Resend, none (email) | Built |
-| Tasks every project runs — project config, Infisical, Railway Buckets, Bouncer, monitoring (OTel + logs) | Built |
-| Netlify, Neon, Supabase, Fly.io, Render, Upstash, Postmark, SES | Listed, `implemented: false` (can't be selected) |
-| Optional integrations, DNS, database seeding, GitHub Actions, documentation generation | Menu items marked "coming soon", no task |
-| Launch | `LaunchView` runs preflight checks and flips `launched`; the menu still labels it "coming soon" |
-| Headless mode (`bun run init:agent`) | Covers only project, Infisical, PlanetScale, Railway (+ `--section=monitoring`); not provider-aware yet |
-| Release step after launch (`scripts/db/release.sh`) | Written, not wired into any deploy; no baseline migration is created at launch |
-| `scripts/setup/init.sh` | Stub of TODOs, superseded by `init/`; not run by anything |
+| Launch preflight + flag, `setup.sh` guard, `release.sh` branch on the flag | Built |
+| Baseline migration created and recorded on deployed databases at launch | [#197](https://github.com/inixiative/template/pull/197) |
+| A deploy hook that runs `scripts/db/release.sh` (Railway pre-deploy) | Not built: deployed schema is released by hand |
+| Launch from the headless `init:agent` | Not built (`init:agent` covers project, Infisical, PlanetScale, Railway, `--section=monitoring`) |
+| Post-launch Vercel preview deploys per PR | Not built (`LaunchView` lists it as a post-launch TODO) |
+| `scripts/setup/init.sh` | TODO stub, superseded by `init/`; not run by anything |
 
-New provider work goes through the provider-selected path: add the option to `init/providers.ts`, a `*Setup.ts`/`*Steps.ts` task pair and a view, and gate its menu item on the selected provider.
-
----
+Provider coverage today: options marked `implemented: true` in `init/providers.ts` (Vercel, Cloudflare Pages, PlanetScale, Railway Postgres, Railway API/worker/Redis, Resend, no email) plus the tasks every project runs (project config, Infisical, Railway Buckets, Bouncer, monitoring). Netlify, Neon, Supabase, Fly.io, Render, Upstash, Postmark and SES are listed but cannot be selected; Optional Integrations, DNS, Database Seeding, GitHub Actions and Documentation Generation are menu items with no task.
 
 ## Architecture Overview
 

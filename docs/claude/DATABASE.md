@@ -118,30 +118,36 @@ Run from repo root or `packages/db`:
 |--------|---------|---------|
 | Generate | `bun run db:generate` | Generate Prisma client + Zod schemas |
 | Push | `bun run db:push` | Push schema to DB, no migration (`db:push:dev` = worktree-aware local + test push) |
-| Migrate | `bun run db:migrate` | Create a migration file (`prisma migrate dev`) — only once the project is launched |
-| Deploy | `bun run db:deploy` | Apply migrations (`prisma migrate deploy`) — only once the project is launched |
+| Migrate | `bun run db:migrate` | Create a migration file (`prisma migrate dev`) — after launch |
+| Deploy | `bun run db:deploy` | Apply migrations (`prisma migrate deploy`) — after launch |
+| Baseline | `bun run db:baseline` | Create `prisma/migrations/0_init` from the schema; the Launch step runs it |
 | Studio | `bun run db:studio` | Open Prisma Studio GUI |
 | Seed | `bun run db:seed` | Run seed script |
 
 ### Schema Changes: Push Before Launch, Migrations After
 
-The template ships with **no migrations** (`packages/db/prisma/` has no `migrations/` folder). How schema reaches a deployed database is gated on `launched` in `project.config.ts` (set by the init script's Launch step):
+The cut-over is `launched` in `project.config.ts`, flipped by the init script's Launch step. **Before launch a deployed database is disposable:** schema reaches it by `prisma db push --accept-data-loss`, which drops whatever no longer fits. **After launch nothing may clobber a database:** schema reaches it only through committed migrations, applied by `prisma migrate deploy`, and the push paths close.
 
-| `launched` | Release step (`scripts/db/release.sh`) | Day to day |
-|------------|----------------------------------------|------------|
-| `false` (pre-launch, the default) | `prisma db push --accept-data-loss`, then the non-prime seed | Change the schema, `bun run db:generate && bun run db:push`. No migration files |
-| `true` | `prisma migrate deploy`, then the non-prime seed | `bun run db:migrate` to create a migration, review it, commit it |
+| | Pre-launch (`launched: false`, the default) | Launched |
+|---|---|---|
+| Release step (`scripts/db/release.sh`) | `prisma db push --accept-data-loss`, then the non-prime seed | `prisma migrate deploy`, then the non-prime seed |
+| Changing the schema | edit `prisma/schema/`, `bun run db:generate && bun run db:push` (`db:push:dev` in a worktree) | `bun run db:migrate` creates a migration under `packages/db/prisma/migrations/`; review and commit it |
+| `setup.sh` | pushes and seeds the local database | skips push and seed |
+| Migration files | none | start at `0_init`, created by Launch |
 
-`scripts/checkLaunched.ts` reads the flag; `setup.sh` also skips `db:push`/`db:seed` once launched.
+`scripts/checkLaunched.ts` reads the flag for the shell scripts. Guards that hold either way: `db:push:force` refuses outside `test`/`local`, and `push-dev.sh` refuses a non-local `DATABASE_URL`.
 
-Not built yet: nothing invokes `scripts/db/release.sh` — the Railway services init creates run only `db:generate` at build and start the API/worker, and `scripts/deployment/deploy.sh` is a stub calling `db:deploy` — and no step creates the baseline migration when `launched` flips. Until those exist, a deployed database is updated by running the release step by hand.
+**What Launch does** (init → Launch, [#197](https://github.com/inixiative/template/pull/197)): `bun run db:baseline` writes `prisma/migrations/0_init` as the diff from an empty database to `prisma/schema` (once); for prod, and staging when enabled, it checks the deployed database matches `prisma/schema` and otherwise blocks launch ("deploy the current schema there, then launch"); it records `0_init` as applied on each (`prisma migrate resolve --applied 0_init`); then it sets `launched = true`. Commit `prisma/migrations` and `project.config.ts` together.
+
+**Not built:** nothing invokes `scripts/db/release.sh`. The Railway services the init creates run only `db:generate` at build and start the API/worker, and `scripts/deployment/deploy.sh` is a stub. Until a deploy hook runs it, the release step is run by hand against the target database.
 
 ### Development Workflow
 
 ```bash
-# After schema changes (pre-launch)
+# After schema changes
 bun run db:generate   # Regenerate client
-bun run db:push       # Push to local DB (in a worktree: bun run db:push:dev)
+bun run db:push       # Pre-launch: push to the local DB (in a worktree: bun run db:push:dev)
+bun run db:migrate    # Launched: create a migration, review it, commit it
 ```
 
 ### Database Operations

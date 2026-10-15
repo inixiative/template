@@ -80,7 +80,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 - ✅ **Environment Composition** - `with-env.sh` injects secrets at runtime: `bun run with prod api turbo watch local#api` runs local code against production secrets. No committed `.env` files
 - ✅ **Docker Compose** - PostgreSQL 18 (alpine) and Redis 7 (alpine) for local dev. Persistent volumes, health checks, auto-restart. Bun servers run natively via Turborepo, not containerized
 - ✅ **TypeScript Strict Mode** - `strict: true` + additional checks across all packages. `any` avoided in application code (rare casts only at framework/type boundaries), enforced null checks, proper error handling. Catches entire classes of bugs at compile time
-- 🟡 **Init Script** - React Ink TUI for automated project setup (rename, secrets, cloud provisioning). Moving from a fixed stack to provider-selected setup: Infisical, PlanetScale or Railway Postgres, Railway (API, worker, Redis, buckets), Vercel or Cloudflare Pages, Resend, Bouncer and monitoring work; other providers, DNS, GitHub Actions and a provider-aware headless mode are not built. [Direction](docs/claude/INIT_SCRIPT_PATTERNS.md#direction-fixed-stack--provider-selected-setup-in-progress)
+- 🟡 **Init Script** - React Ink TUI for automated project setup (rename, secrets, cloud provisioning): Infisical, PlanetScale or Railway Postgres, Railway (API, worker, Redis, buckets), Vercel or Cloudflare Pages, Resend, Bouncer, monitoring. Launch is the cut-over from disposable databases (`db push`) to migrations only; the baseline migration lands with #197. Other providers, DNS, GitHub Actions and headless launch are not built. [Direction](docs/claude/INIT_SCRIPT_PATTERNS.md#direction-pre-launch--launched-in-progress)
 
 ---
 
