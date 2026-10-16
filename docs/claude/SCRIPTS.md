@@ -259,6 +259,12 @@ Each `pass`/`fail` folder can contain one or more case subfolders (run alphabeti
 - Fails on Vitest dependencies in `package.json`
 - Fails on Vitest imports in source and tests
 
+**doc-freshness.sh:**
+- Fails when `docs/claude/**`, `AI/ENTRYPOINT.md`, `FEATURES.md` or `apps/*/CLAUDE.md` names a repo path that doesn't exist, a `path:line` / `path#La-Lb` past the end of the file, a `<doc>.md#<heading>` with no such heading, or a backticked camelCase/PascalCase name that appears nowhere in the code (comments don't count)
+- Skips fenced code and sections headed "Under construction" or "Migrations in progress"
+- External or illustrative names: `scripts/ci/doc-freshness/allow.txt` (`<doc>\t<value>` scopes one to a doc). References that were stale before the rule: `scripts/ci/doc-freshness/baseline.txt`, reported but not failed; an entry that stops occurring fails until its line is deleted
+- Warns, never fails, when the branch changes code whose `@atlas` `@partOf` concept lists docs in `.atlas/concepts.ts` and touches none of them
+
 **ui-serialized-factories.sh:**
 - For UI tests importing `@template/db/test`, requires `__serialize()` usage
 - Fails on `__serialize() as any` casts

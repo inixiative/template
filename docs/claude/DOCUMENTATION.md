@@ -146,6 +146,7 @@ Update docs when you:
 - Remove outdated information
 - Mark incomplete sections as stubs
 - Don't document aspirational features as if they exist
+- The `doc-freshness` CI rule fails a doc that names a path, line, heading or symbol the repo no longer has (see [SCRIPTS.md](SCRIPTS.md#ci-rule-scripts)). Planned work goes under an "Under construction" or "Migrations in progress" heading, which the rule skips
 
 ---
 
