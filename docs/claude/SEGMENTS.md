@@ -67,6 +67,13 @@ Paths below are relative to `/api/v1`:
 | Create a segment | `/me/segments`, `/organization/:id/segments`, `/space/:id/segments` |
 | Estimate rule reach without saving | `POST /me/segments/reach`, `/organization/:id/segments/reach`, `/space/:id/segments/reach` |
 
+`GET /segment/info` (public) describes what `conditions` may say: the json-rules node kinds, the
+operators each field kind takes on the `toPrisma` target with the operand shape each expects, and
+every field `customerRefLens` exposes (dotted path from `CustomerRef`, kind, enum values, list
+relations, and `sourced` fields that take the id of a row the owner may name). It is built from the
+json-rules operator catalog (`ruleGrammar`) and `projectLens` (`lensFields`), both in
+`@template/shared/rules`, and its `examples` pass the save gate.
+
 Reach accepts `{ conditions }` and returns `{ count }`, using the same rule and reference
 admission checks as saving. Existing route permissions govern each owner context.
 

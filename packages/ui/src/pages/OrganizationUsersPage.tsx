@@ -139,7 +139,7 @@ export const OrganizationUsersPage = ({ organizationId }: OrganizationUsersPageP
       body: {
         type: 'inviteOrganizationUser',
         status: 'sent',
-        content: { email, role },
+        content: { role },
         targetModel: 'User',
         targetEmail: email,
       },

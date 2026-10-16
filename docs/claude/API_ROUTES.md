@@ -1166,6 +1166,19 @@ adminUserRouter.openapi(adminUserReadManyRoute, adminUserReadManyController);
 export { userRouter, adminUserRouter };
 ```
 
+### Info routes
+
+A body field stored in a Prisma `Json` column (inquiry `content`, contact `value`, segment `conditions`) reaches the OpenAPI spec as a generic JSON value, because its shape depends on another field. Request bodies stay plain (no discriminated unions); validation stays where it is. A public `GET /api/v1/<module>/info` route lists every type and its shape instead, generated from the registry that validates it, never hand-listed:
+
+| Route | Generated from | Lists |
+|-------|---------------|-------|
+| `/webhookSubscription/info` | `webhookOwnerAllowedModels` | models per owner, signing key |
+| `/inquiry/info` | `inquiryHandlers` | per type: `sources`, `targets`, `content` / `resolutionInput` / `resolution` JSON Schema, `unique`, `defaultExpirationDays` |
+| `/contact/info` | `ContactRegistry` | per type: `input` and stored `value` JSON Schema, `subtype` rule, `uniqueness`, label and icon |
+| `/segment/info` | json-rules operator catalog + `customerRefLens` | node kinds, operators per field kind, operand shapes, every readable field with its kind, examples |
+
+An info route is a `readRoute({ action: 'info', skipId: true })` mounted by hand before `validateActor` (see `modules/inquiry/index.ts`), so it answers without a session. Zod schemas become JSON Schema through `toJsonSchema` (`lib/jsonSchema/toJsonSchema.ts`, zod 4 `z.toJSONSchema`): `input` for what a caller sends, `output` for what is stored. The body field points at its route with `z.unknown().describe('… see GET /api/v1/<module>/info')`; `transformJsonFields` keeps that description on the JSON value it substitutes.
+
 ---
 
 ## File Organization
