@@ -4,11 +4,11 @@
  * @partOf feature:inquiry
  * @uses none
  */
-import { Role } from '@template/db/generated/client/enums';
+import { ROLES } from '@template/shared/auth/roles';
 import { z } from 'zod';
 
 export const inviteOrganizationUserContentSchema = z.object({
-  role: z.nativeEnum(Role).default('member'),
+  role: z.enum(ROLES).default('member'),
 });
 
 export type InviteOrganizationUserContent = z.infer<typeof inviteOrganizationUserContentSchema>;
