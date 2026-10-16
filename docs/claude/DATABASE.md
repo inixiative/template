@@ -23,7 +23,6 @@
   - [ID Fields (UUIDv7)](#id-fields-uuidv7)
   - [Foreign Keys](#foreign-keys)
   - [DateTime Fields](#datetime-fields)
-  - [Defaults Live in the Schema](#defaults-live-in-the-schema)
   - [Enum Naming](#enum-naming)
 - [Typed Model IDs](#typed-model-ids)
   - [Usage](#usage)
@@ -37,7 +36,6 @@
   - [Pass the Delegate (Type-Safe)](#pass-the-delegate-type-safe)
   - [Mutation Lifecycle Pattern](#mutation-lifecycle-pattern)
 - [Client Methods](#client-methods)
-  - [Query Once](#query-once)
 - [Transactions](#transactions)
   - [Manual Transaction](#manual-transaction)
   - [After Commit Callbacks](#after-commit-callbacks)
@@ -342,26 +340,6 @@ createdAt DateTime @default(now())
 updatedAt DateTime @updatedAt
 ```
 
-### Defaults Live in the Schema
-
-A column's default is declared once, as `@default(...)` in the schema. Create inputs, Zod bodies,
-function parameters and factories don't restate it, and an update passes only what the caller sent
-(`data: { ...body }`), so a field left `undefined` stays untouched. — fb: 2026-01-25, 2026-02-01, 2026-10-15
-
-```typescript
-// Good — inheritToSpaces Boolean @default(true) in emailTemplate.prisma
-await db.emailTemplate.create({ data: { ...body, ownerModel, organizationId } });
-await db.emailTemplate.update({ where: { id }, data: { ...body } });
-
-// Bad — restates the default, and the update turns the flag back on whenever it's omitted
-const { inheritToSpaces = true, ...rest } = body;
-await db.emailTemplate.update({ where: { id }, data: { ...rest, inheritToSpaces } });
-```
-
-Signs you're bypassing it: `= false` / `= true` / `?? false` on a field the schema defaults;
-`.default(...)` on a Zod body field that mirrors `@default`; a partial update that writes a field the
-request didn't send.
-
 ### Enum Naming
 
 | Suffix | Values | Example |
@@ -560,19 +538,6 @@ db.findForUpdate(model, where, opts?) // SELECT ... FOR UPDATE; { upserting: tru
 db.getScopeId()         // Get current scope ID
 db.isInTxn()            // Check if in transaction
 ```
-
-### Query Once
-
-Read a set with one query, and read what you already hold before querying at all. — fb: 2026-01-29, 2026-02-01
-
-- Several rows by key → one `findMany({ where: { id: { in: ids } } })` (or `slug: { in }`), never
-  `Promise.all` over per-row `findUnique`.
-- Data already loaded on the request (the token's `organizationUser` and `user`, the resource from
-  `getResource`) is used as loaded, not fetched again by id.
-- Related rows come through `include` / `select` on the first query, not a second round trip.
-
-Signs you're bypassing it: `Promise.all(ids.map((id) => db.x.findUnique(...)))`; a
-`db.user.findUnique({ where: { id: token.userId } })` when the token already carries its user.
 
 ---
 

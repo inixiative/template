@@ -78,10 +78,6 @@ Pattern: `resourceActionSubresource`
 - Resources are **singular**: `user`, `organization`, `inquiry`
 - ReadMany subresources use **plural** form: `Spaces`, `Tokens`, `WebhookSubscriptions`
 - Single operations use **singular**: `Space`, `Token`
-- A row is read, updated and deleted at its own path, `/<model>/:id` (`tokenDelete` → `DELETE /api/v1/token/:id`, `authProviderUpdate` → `PATCH /api/v1/authProvider/:id`). The parent appears in the path only to create under it or list from it (`organizationCreateAuthProvider`, `organizationReadManyTokens`), never as `/organization/:id/token/:tokenId`. The row's own `:id` resolves it through `resourceContextMiddleware`, and its permission rules reach the parent from there. — fb: 2026-01-25
-- Paths and tags are camelCase ([NAMING.md](NAMING.md#files--directories)).
-
-**Tags.** `buildTags` (`apps/api/src/lib/routeTemplates/utils/buildTags.ts`) sorts a route's tags alphabetically (`admin` / `internal` first), so the OpenAPI spec and SDK group the same way everywhere. Tags are values from `Tags` (`apps/api/src/modules/tags.ts`), never string literals. A route that spans models passes one tag per model it touches (`tags: [Tags.organization, Tags.inquiry]`); a module whose routes all span the same models exports one alphabetised list from its schema file (`customerRefTags` in `customerRefSchemas.ts`). — fb: 2026-02-01, 2026-10-15
 
 ---
 
