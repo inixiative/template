@@ -71,6 +71,8 @@ export const actorPrincipalRole = (actor: ArtifactActor) => {
         const role = await roleOn('organization', first);
         return role && MANAGER_ROLES.includes(role) ? role : null;
       }
+      case 'OrganizationOwner':
+        return (await roleOn('organization', first)) === 'owner' ? 'owner' : null;
       case 'SpaceManager': {
         const role = await roleOn('space', first);
         return role && MANAGER_ROLES.includes(role) ? role : null;

@@ -5,7 +5,7 @@
  * @uses infrastructure:prisma
  */
 import type { Role } from '@template/db/generated/client/enums';
-import { lesserRole } from '@template/permissions';
+import { artifactKindDef } from '@template/shared/artifact';
 import {
   type ArtifactPrincipal,
   granteePrincipal,
@@ -18,7 +18,7 @@ import {
   loadArtifactGraph,
 } from '#/modules/artifact/services/loadArtifactGraph';
 
-export type ArtifactGrant = { principal: ArtifactPrincipal; role: Role; ownership: boolean };
+export type ArtifactGrant = { principal: ArtifactPrincipal; role: Role };
 
 export type ArtifactAccessResolution = {
   artifactId: string;
@@ -28,20 +28,35 @@ export type ArtifactAccessResolution = {
 
 type Effective = { public: boolean; grants: Map<string, ArtifactGrant> };
 
-const INHERITED_OWNERSHIP_CAP: Role = 'admin';
-
 const addGrant = (grants: Map<string, ArtifactGrant>, grant: ArtifactGrant): void => {
   const key = principalKey(grant.principal);
   const held = grants.get(key);
   grants.set(key, {
     principal: grant.principal,
     role: strongerRole(held?.role ?? null, grant.role)!,
-    ownership: (held?.ownership ?? false) || grant.ownership,
   });
+};
+
+const ownersOnlyReach = (graph: ArtifactGraph) => {
+  const memo = new Map<string, boolean>();
+  const reach = (artifactId: string, walking: Set<string>): boolean => {
+    const cached = memo.get(artifactId);
+    if (cached !== undefined) return cached;
+    const node = graph.get(artifactId);
+    if (!node || walking.has(artifactId)) return false;
+    const path = new Set(walking).add(artifactId);
+    const ownersOnly =
+      artifactKindDef(node.kind)?.ownerReach === 'owners' ||
+      node.containerArtifactIds.some((containerArtifactId) => reach(containerArtifactId, path));
+    memo.set(artifactId, ownersOnly);
+    return ownersOnly;
+  };
+  return (artifactId: string) => reach(artifactId, new Set());
 };
 
 const effectiveAccess = (graph: ArtifactGraph, now: Date) => {
   const memo = new Map<string, Effective>();
+  const isOwnersOnly = ownersOnlyReach(graph);
   const resolve = (artifactId: string, walking: Set<string>): Effective => {
     const cached = memo.get(artifactId);
     if (cached) return cached;
@@ -49,13 +64,15 @@ const effectiveAccess = (graph: ArtifactGraph, now: Date) => {
     if (!node || walking.has(artifactId)) return { public: false, grants: new Map() };
 
     const grants = new Map<string, ArtifactGrant>();
-    addGrant(grants, { principal: ownerPrincipal(node), role: 'owner', ownership: true });
+    addGrant(grants, {
+      principal: ownerPrincipal(node, isOwnersOnly(artifactId)),
+      role: 'owner',
+    });
     for (const permission of node.permissions) {
       if (permission.expiresAt && permission.expiresAt <= now) continue;
       addGrant(grants, {
         principal: granteePrincipal(permission),
         role: permission.role,
-        ownership: false,
       });
     }
 
@@ -65,13 +82,7 @@ const effectiveAccess = (graph: ArtifactGraph, now: Date) => {
       for (const containerArtifactId of node.containerArtifactIds) {
         const container = resolve(containerArtifactId, path);
         inheritedPublic ||= container.public;
-        for (const grant of container.grants.values()) {
-          addGrant(grants, {
-            ...grant,
-            role: grant.ownership ? lesserRole(grant.role, INHERITED_OWNERSHIP_CAP) : grant.role,
-            ownership: false,
-          });
-        }
+        for (const grant of container.grants.values()) addGrant(grants, grant);
       }
     }
 

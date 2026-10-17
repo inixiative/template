@@ -5,7 +5,7 @@
  * @uses none
  */
 import type { Artifact } from '@template/db/generated/client/client';
-import { artifactKindDef, canContain } from '@template/shared/artifact';
+import { canContain } from '@template/shared/artifact';
 import { makeError } from '#/lib/errors';
 
 type Placed = Pick<
@@ -29,10 +29,10 @@ export const assertContainable = (container: Placed, member: Placed): void => {
       message: `A ${container.kind} cannot contain a ${member.kind}`,
     });
   }
-  if (!sameOwner(container, member) && artifactKindDef(member.kind)?.crossOwner !== 'edge') {
+  if (!sameOwner(container, member)) {
     throw makeError({
       status: 422,
-      message: `A ${member.kind} cannot sit in another owner's container; copy it instead`,
+      message: "An artifact cannot sit in another owner's container; copy it instead",
     });
   }
 };

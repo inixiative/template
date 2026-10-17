@@ -79,10 +79,12 @@ export const registerArtifactAccessHook = () => {
     'artifactAccess:lastContainer',
     'ArtifactContainer',
     HookTiming.after,
-    [DbAction.delete, DbAction.deleteMany],
-    async ({ result }: HookOptions) => {
-      const edges = castArray(result ?? []) as { artifactId: string }[];
-      await settleOrphanedInherit(edges.map((edge) => edge.artifactId));
+    [DbAction.update, DbAction.updateManyAndReturn, DbAction.delete, DbAction.deleteMany],
+    async ({ action, result }: HookOptions) => {
+      const edges = castArray(result ?? []) as { artifactId: string; deletedAt: Date | null }[];
+      const hardDelete = action === DbAction.delete || action === DbAction.deleteMany;
+      const removed = edges.filter((edge) => hardDelete || edge.deletedAt !== null);
+      await settleOrphanedInherit(removed.map((edge) => edge.artifactId));
     },
   );
 };

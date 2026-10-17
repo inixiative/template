@@ -82,6 +82,18 @@ describe('artifactAccess hook', () => {
     expect(await access(member.id)).toBe('private');
   });
 
+  it('resolves inherit to private when the last edge is soft-deleted', async () => {
+    const container = await folder('public');
+    const member = await folder();
+    const { entity: edge } = await createArtifactContainer({
+      artifactId: member.id,
+      containerArtifactId: container.id,
+    });
+    await db.artifact.update({ where: { id: member.id }, data: { access: 'inherit' } });
+    await db.artifactContainer.update({ where: { id: edge.id }, data: { deletedAt: new Date() } });
+    expect(await access(member.id)).toBe('private');
+  });
+
   it('settles orphans set to inherit by a bulk update', async () => {
     const orphan = await folder('public');
     await db.artifact.updateManyAndReturn({

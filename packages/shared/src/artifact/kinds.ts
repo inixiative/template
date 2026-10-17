@@ -8,8 +8,9 @@ export type ArtifactKindDef = {
   contains: readonly string[];
   defaultAccess: 'public' | 'private';
   holder: 'local' | 'integration';
-  crossOwner: 'edge' | 'copy';
   contentModel?: 'File';
+  systemOnly?: true;
+  ownerReach?: 'owners';
   lazyCopy?: true;
 };
 
@@ -18,7 +19,6 @@ export const ArtifactKinds = {
     contains: [],
     defaultAccess: 'private',
     holder: 'local',
-    crossOwner: 'copy',
     contentModel: 'File',
     lazyCopy: true,
   },
@@ -26,7 +26,13 @@ export const ArtifactKinds = {
     contains: ['file', 'folder'],
     defaultAccess: 'private',
     holder: 'local',
-    crossOwner: 'copy',
+  },
+  organizationUserFolder: {
+    contains: ['file', 'folder'],
+    defaultAccess: 'private',
+    holder: 'local',
+    systemOnly: true,
+    ownerReach: 'owners',
   },
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific kinds below
@@ -45,7 +51,7 @@ export const isContainerKind = (kind: string): boolean =>
   (artifactKindDef(kind)?.contains.length ?? 0) > 0;
 
 export const plainArtifactKinds = (Object.keys(kindDefs) as ArtifactKind[]).filter(
-  (kind) => !kindDefs[kind]!.contentModel,
+  (kind) => !kindDefs[kind]!.contentModel && !kindDefs[kind]!.systemOnly,
 );
 
 export const canContain = (containerKind: string, memberKind: string): boolean =>

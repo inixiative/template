@@ -86,24 +86,26 @@ model Artifact {
 
 ```ts
 export const ArtifactKinds = {
-  file:   { contains: [],                 defaultAccess: 'private', holder: 'local', crossOwner: 'copy', contentModel: 'File', lazyCopy: true },
-  folder: { contains: ['file', 'folder'], defaultAccess: 'private', holder: 'local', crossOwner: 'copy' },
-  // forks add kinds below (the Artifactory: post, channel — crossOwner: 'edge', defaultAccess: 'public')
+  file:   { contains: [],                 defaultAccess: 'private', holder: 'local', contentModel: 'File', lazyCopy: true },
+  folder: { contains: ['file', 'folder'], defaultAccess: 'private', holder: 'local' },
+  organizationUserFolder: { contains: ['file', 'folder'], defaultAccess: 'private', holder: 'local', systemOnly: true, ownerReach: 'owners' },
+  // forks add kinds below
 };
 ```
 
 - `contains` — what a container kind may hold; a kind with an empty list is not a container.
 - `defaultAccess` — stamped at creation when the artifact is created outside a container (§6).
-- `crossOwner` — `copy` keeps "cross-owner is always copy" (§6, ownership = billing boundary); `edge` lets a kind sit in another owner's container (crossposting).
+- `systemOnly` — created by its system (the org_user folder), never by the plain create route.
+- `ownerReach: 'owners'` — the owning org's owners reach it and what sits under it implicitly; its admins do not (§10).
 - `contentModel` — a kind with its own content table is created by its own flow (upload, §7), never by the plain create route.
 
 ### 3.3 ArtifactContainer (the edge)
 
-`{ containerArtifactId, artifactId }`, unique per pair. The member side cascades; the container side is `Restrict`, so a container is hard-deleted only after its edges are removed and a delete never changes a member's access silently. Containers nest at most 10 deep, and loops are refused (§5).
+`{ containerArtifactId, artifactId }`, one live edge per pair. Any artifact, containers included, may sit in several containers ("compliance" under both "legal" and "operations"), but **every edge stays within one owner**; grouping across owners is a separate concept for later. Containers nest at most 10 deep, and loops are refused (§5). Edges are soft-deleted and audit-enabled; soft-deleting either end tombstones the edge.
 
 ### 3.4 ArtifactPermission (Access Layer — ABAC)
 
-A grant of a `role` (`Role`: viewer / member / admin / owner) on an artifact, and through `inherit` on everything inside it. The grantee is false-polymorphic with real FKs: `User`, `Organization`, `Space`, `OrganizationUser` (`granteeOrganizationId + granteeUserId`), `SpaceUser` (`granteeOrganizationId + granteeSpaceId + granteeUserId`), `CustomerRef`, `Integration`. Membership grantees cascade with the membership: a grant dies when the member leaves, the content does not. Fields carried over from FilePermission: `expiresAt`, `fromVersion`, `preserveOnRevoke`. One grant per artifact × grantee (partial uniques). **Revoke = delete the row.**
+A grant of a `role` (`Role`: viewer / member / admin / owner) on an artifact, and through `inherit` on everything inside it. The grantee is false-polymorphic with real FKs: `User`, `Organization`, `Space`, `OrganizationUser` (`granteeOrganizationId + granteeUserId`), `SpaceUser` (`granteeOrganizationId + granteeSpaceId + granteeUserId`), `CustomerRef`, `Integration`. Membership grantees cascade with the membership: a grant dies when the member leaves, the content does not. Fields carried over from FilePermission: `expiresAt`, `fromVersion`, `preserveOnRevoke`. One live grant per artifact × grantee (partial uniques over live rows). **Revoke = soft delete**: ArtifactPermission is audit-enabled, so who granted and revoked is in the audit log.
 
 An `Integration` grantee is not reachable by any presenting path in template yet: it is meant for an integration's own server credential, never for a user token bound to that integration.
 
@@ -246,7 +248,7 @@ Containment is a graph of `ArtifactContainer` edges, not a materialized path: an
 | `artifactAncestorDepth(id)` | same | how deep a container already sits, for the depth cap |
 | `findReferenceCycle(map, start)` | `packages/shared/src/graph/` | the loop an edge would close (moved from the segment reference graph; segments use it too) |
 
-**Writes are serialized for container kinds.** Placing a container inside another checks for a loop and then adds the edge, so it holds `withOwnerLock(platform, 'containers')`. The lock is platform-wide because containers of different owners may nest (an `edge` kind). Placing a non-container (a file) can't close a loop and takes no lock.
+**Writes are serialized for container kinds.** Placing a container inside another checks for a loop and then adds the edge, so it holds `withOwnerLock(owner, 'containers')`; containers never nest across owners, so one owner's lock suffices. Placing a non-container (a file) can't close a loop and takes no lock.
 
 **Breadcrumbs** are the ancestor walk; with several containers an artifact has several paths, and the UI shows the one it was opened from.
 
@@ -264,9 +266,9 @@ Implemented in `apps/api/src/modules/artifact/services/` — `resolveArtifactAcc
 |---|---|---|
 | `inherit` | if **any** container resolves public | yes, from every container (the union) |
 | `public` | yes | yes (public only widens) |
-| `private` | no | **no** — an explicit private overrides; you can be private inside a public group |
+| `private` | no | **no** — the artifact has only its own permissions; you can keep your own things in a public folder. Most should inherit |
 
-**Grants an artifact carries:** its own `ArtifactPermission` rows (expired ones dropped), plus an implicit owner grant — the owning user, or `OrganizationManager`/`SpaceManager` for org/space-owned (owners and admins of the owner, at their role; FEAT-009's ReBAC inheritance). Through a non-private node, each container's grants pass down at their role; a container's implicit ownership passes down capped at `admin`, which only matters across owners.
+**Grants an artifact carries:** its own live `ArtifactPermission` rows (expired ones dropped), plus an implicit owner grant — the owning user, or `OrganizationManager`/`SpaceManager` for org/space-owned (owners and admins of the owner, at their role; FEAT-009's ReBAC inheritance), or `OrganizationOwner` for org-user content (§10). Through a non-private node, each container's grants pass down at their role.
 
 **This replaces "most specific wins".** The earlier design resolved one grant by path specificity (`ORDER BY specificity DESC LIMIT 1`), so a file could be narrower than its folder. Under the union, nothing beneath a container is narrower than it through inheritance. The only ways to narrow are an explicit `private` (which takes nothing from containers) or removing the edge. There is no public grant and no `publicUntil`, so time-limited *public* links are gone (time-limited shares to a grantee stay, via `expiresAt`).
 
@@ -286,9 +288,11 @@ Roles map to actions as everywhere else: viewer → read, member → operate, ad
 **Inherit needs a container.** "You can't have inherit unless you're held by at least one thing." The `artifactAccess` hook (`apps/api/src/hooks/artifactAccess/`) enforces it:
 - **At creation**, an artifact created with `inherit` (or no access) gets its kind's `defaultAccess` — files and folders private. Creating *inside* a container is create → edge → `inherit` in one `db.txn` (nested writes are refused, so the edge is a second write); `createArtifact` does it.
 - **Setting `inherit`** on an artifact that sits in no container resolves it to `private`.
-- **Removing the last edge** of an `inherit` artifact resolves it to `private` in the same transaction — a post does not go public because its private channel went away. A soft-deleted container still counts until its edge is removed.
+- **Removing the last edge** (or soft-deleting it, as deleting its container does) of an `inherit` artifact resolves it to `private` in the same transaction — nothing goes public because its private container went away.
 
-**Edge writes need control over both ends** — guarded once, in `addArtifactToContainer` / `removeArtifactFromContainer`: `manage` on the artifact (an edge publishes it to the container's whole audience) and `operate` on the container (`ARTIFACT_EDGE_AUTHORITY`). The kinds must fit (`contains`), the owners must match unless the member's kind is `crossOwner: 'edge'`, and the edge may not close a loop or pass depth 10.
+**Edge writes need control over both ends** — guarded once, in `addArtifactToContainer` / `removeArtifactFromContainer`: `manage` on the artifact (an edge publishes it to the container's whole audience) and `operate` on the container (`ARTIFACT_EDGE_AUTHORITY`). This is the Google Drive shape (owner-level control of the item, editor on the destination). The kinds must fit (`contains`), the owners must match, and the edge may not close a loop or pass depth 10.
+
+**Deleting.** Deleting a container deletes the container, never its contents: its edges are tombstoned with it, the contents stay, and anything left in no container becomes private. Deleting the contents is a separate action: `GET /artifact/:id/exclusiveContents` lists what sits only in that container, and the deletes go through `/v1/batch` (`transactionAll`, one transaction). An artifact in more than one container needs `own` to delete; in one, `manage`. Deleted bytes are reclaimed by the orphan sweeper (§16).
 
 **Grants can't exceed the granter.** Creating or raising a grant needs `manage` on the artifact and a role no higher than the granter's own.
 
@@ -316,7 +320,7 @@ Roles map to actions as everywhere else: viewer → read, member → operate, ad
 | Org/space adopts a submission | no | copy bytes → new File (new owner, new key); original stays |
 | Share org folder with a space | same org | ArtifactPermission grant; no copy |
 
-Cross-owner is always copy, never move: ownership = billing boundary, and the original stays for audit/rollback. For `file` and `folder` this is enforced on the edge: a `crossOwner: 'copy'` kind can't sit in another owner's container.
+Cross-owner is always copy, never move: ownership = billing boundary, and the original stays for audit/rollback. It is enforced on the edge: no artifact sits in another owner's container.
 
 **Space transfer** (§15), **user leaves org**, **space soft-delete**: ownership FKs never change; grants are re-issued or deleted per the transfer disposition; org-scoped files stay with the org; the user's own (`ownerModel: User`) files are untouched. Soft-delete sets `Artifact.deletedAt`; S3 bytes wait for the retention sweeper (§16).
 
@@ -437,7 +441,7 @@ Hooks auto-create `system` folders (undeletable, unrenameable) as scopes come in
 | User created | user root | User | private | — |
 | First lazy copy in a scope | `__preserved/` | scope owner | private | — |
 
-**One visibility system (Aron, 2026-10-17).** There is no separate listing flag: the earlier `FolderVisibility.private` ("hidden from admins in normal browse") is gone. Privacy is ownership + `access` + grants. Work you want kept apart from what you share with your organization is made as an org user: the `org_user` folder is owned by the Org (bytes stay with the org when the user leaves), private, and granted to the member. The org's owners and admins reach it only through their governance authority over the org's content (`OrganizationManager`, §6), which is the audited path. Other `__` system folder names remain TBD.
+**One visibility system (Aron, 2026-10-17).** There is no separate listing flag: the earlier `FolderVisibility.private` ("hidden from admins in normal browse") is gone. Privacy is ownership + `access` + grants. Work you want kept apart from what you share with your organization is made as an org user: the `org_user` folder is an `organizationUserFolder` artifact, owned by the Org (bytes stay with the org when the user leaves), private, and granted to the member. **Org admins do not reach it; org owners do** (`ownerReach: 'owners'` → the `OrganizationOwner` principal) as deliberate governance access, with tooling to come. An explicit grant always works. Filing something into a team folder shares it with that folder's audience. Auto-creating the folder on membership is part of the system-folder hooks below. Other `__` system folder names remain TBD.
 
 ## 11. Infrastructure
 
@@ -902,9 +906,13 @@ Artifact is a webhook model. A change to an `ArtifactPermission` or `ArtifactCon
 
 An edge has no access of its own in this cut. A per-edge setting (the same post public in one channel, private in another) is the noted extension; it would be a column on `ArtifactContainer` read by `resolveArtifactAccess` where it walks a container.
 
-### Grant and edge audit (open)
+### Org subscriptions hearing their spaces (follow-up)
 
-Artifact is audit-enabled. ArtifactPermission and ArtifactContainer are hard-deleted (revoke = delete), so they are not audit-enabled (audit-enabled implies soft delete); who granted, revoked or moved what is not yet in the audit log.
+An organization-level webhook subscription should be able to hear its spaces' artifacts: all spaces, a list, or none — a setting on the webhook subscription. Today a space-owned artifact reaches only the space's (and grantees') subscriptions. Owners-only content (org-user folders) reaches no org-level subscription.
+
+### Integration grantee presenting path (later)
+
+`Integration` grantees exist in the schema but no request presents as one yet.
 
 ### Quota & Accounting
 

@@ -4,7 +4,7 @@
  * @partOf feature:files
  * @uses infrastructure:prisma, mutex
  */
-import { db } from '@template/db';
+import { db, polymorphicTarget } from '@template/db';
 import type { ArtifactContainer } from '@template/db/generated/client/client';
 import { isContainerKind } from '@template/shared/artifact';
 import { makeError } from '#/lib/errors';
@@ -15,8 +15,6 @@ import { assertArtifactAction } from '#/modules/artifact/lib/assertArtifactActio
 import { assertContainable } from '#/modules/artifact/lib/assertContainable';
 import { assertNoContainerCycle } from '#/modules/artifact/services/assertNoContainerCycle';
 import { checkArtifactAccess } from '#/modules/artifact/services/checkArtifactAccess';
-
-export const CONTAINER_GRAPH_OWNER = { ownerModel: 'platform', ownerId: 'artifact' } as const;
 
 export type AddArtifactToContainerInput = {
   artifactId: string;
@@ -65,12 +63,12 @@ export const writeArtifactContainer = async ({
 export const placeArtifactInContainer = async (
   input: AddArtifactToContainerInput,
 ): Promise<ArtifactContainer> => {
-  const member = await db.artifact.findUnique({
-    where: { id: input.artifactId },
-    select: { kind: true },
-  });
-  if (!member || !isContainerKind(member.kind)) return writeArtifactContainer(input);
-  return withOwnerLock(CONTAINER_GRAPH_OWNER, 'containers', () => writeArtifactContainer(input));
+  const member = await db.artifact.findUnique({ where: { id: input.artifactId } });
+  const owner = member && polymorphicTarget(member, 'Artifact', 'ownerModel');
+  if (!member || !owner || !isContainerKind(member.kind)) return writeArtifactContainer(input);
+  return withOwnerLock({ ownerModel: owner.kind, ownerId: owner.id }, 'containers', () =>
+    writeArtifactContainer(input),
+  );
 };
 
 export const addArtifactToContainer = async (

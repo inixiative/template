@@ -116,7 +116,10 @@ describe('webhook hook: Artifact audience', () => {
       role: 'viewer',
     });
     enqueueSpy.mockClear();
-    await db.artifactPermission.delete({ where: { id: permission.id } });
+    await db.artifactPermission.update({
+      where: { id: permission.id },
+      data: { deletedAt: new Date() },
+    });
     expect(heardBy(granteeSub.id)).toEqual([artifact.id]);
     expect(heardBy(organizationSub.id)).toEqual([artifact.id]);
   });

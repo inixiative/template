@@ -157,23 +157,4 @@ describe('resolveArtifactAccess', () => {
     });
     expect(await roleOf(folder, `User:${reader.id}`)).toBeUndefined();
   });
-
-  it('a soft-deleted container still counts until its edge is removed', async () => {
-    const shared = await folderOf(organization, 'public');
-    const file = await folderOf(organization);
-    await place(file, shared);
-    await db.artifact.update({ where: { id: shared.id }, data: { deletedAt: new Date() } });
-    expect((await resolve(file)).public).toBe(true);
-  });
-
-  it("another owner's container passes its ownership down capped at admin", async () => {
-    const otherOrganization = (await createOrganization()).entity;
-    const channel = await folderOf(otherOrganization);
-    const post = await folderOf(organization);
-    await createArtifactContainer({ artifactId: post.id, containerArtifactId: channel.id });
-    await db.artifact.update({ where: { id: post.id }, data: { access: 'inherit' } });
-
-    expect(await roleOf(post, `OrganizationManager:${otherOrganization.id}`)).toBe('admin');
-    expect(await roleOf(post, `OrganizationManager:${organization.id}`)).toBe('owner');
-  });
 });

@@ -14,5 +14,5 @@ export const removeArtifactFromContainer = async (
   edge: ArtifactContainer,
 ): Promise<void> => {
   await assertEdgeAuthority(actor, edge.artifactId, edge.containerArtifactId);
-  await db.artifactContainer.delete({ where: { id: edge.id } });
+  await db.artifactContainer.update({ where: { id: edge.id }, data: { deletedAt: new Date() } });
 };

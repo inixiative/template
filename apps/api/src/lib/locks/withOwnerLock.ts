@@ -10,7 +10,7 @@ import { makeError } from '#/lib/errors';
 // One scope per owner-wide invariant that row locks cannot protect. `rules` is the first: an
 // owner's rule graph, where segment A may name segment B and B may name A, and a save of either
 // validates against the graph and then writes into it; `containers` is the artifact container
-// graph, held on the platform owner. A new owner-wide, cross-row invariant adds a scope here
+// tree, held on the owner (containers never nest across owners). A new owner-wide, cross-row invariant adds a scope here
 // rather than a second lock helper.
 export type OwnerLockScope = 'rules' | 'containers';
 

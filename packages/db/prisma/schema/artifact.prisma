@@ -56,28 +56,33 @@ model Artifact {
   @@index([integrationId])
 }
 
-// The container side has no cascade: a container is hard-deleted only after its
-// edges are removed, so a delete never changes a member's access silently.
+// Soft-deleted and audit-enabled. Soft-deleting either end tombstones the edge
+// (softDeleteCascade); the container side has no FK cascade.
 model ArtifactContainer {
-  id        String   @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   containerArtifactId String   @db.VarChar(36)
   artifactId          String   @db.VarChar(36)
   containerArtifact   Artifact @relation("ArtifactContainerContainer", fields: [containerArtifactId], references: [id], onDelete: Restrict)
   artifact            Artifact @relation("ArtifactContainerArtifact", fields: [artifactId], references: [id], onDelete: Cascade)
 
-  @@unique([containerArtifactId, artifactId])
+  auditLogs AuditLog[]
+
+  @@unique([containerArtifactId, artifactId], where: raw("\"deletedAt\" IS NULL"), map: "ArtifactContainer_edge_key")
+  @@index([containerArtifactId])
   @@index([artifactId])
 }
 
 // A grant of `role` on an artifact (and, through `inherit`, on everything inside it).
-// Revoke = delete the row. One grant per artifact × grantee (partial uniques below).
+// Revoke = soft delete (audit-enabled). One live grant per artifact × grantee.
 model ArtifactPermission {
-  id        String   @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   artifactId String   @db.VarChar(36)
   artifact   Artifact @relation(fields: [artifactId], references: [id], onDelete: Cascade)
@@ -102,17 +107,19 @@ model ArtifactPermission {
   fromVersion      Int       @default(1)
   preserveOnRevoke Boolean   @default(false)
 
+  auditLogs AuditLog[]
+
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
   // ==========================================================================
 
-  @@unique([artifactId, granteeUserId], where: raw("\"granteeModel\" = 'User'"), map: "ArtifactPermission_user_key")
-  @@unique([artifactId, granteeOrganizationId], where: raw("\"granteeModel\" = 'Organization'"), map: "ArtifactPermission_organization_key")
-  @@unique([artifactId, granteeSpaceId], where: raw("\"granteeModel\" = 'Space'"), map: "ArtifactPermission_space_key")
-  @@unique([artifactId, granteeOrganizationId, granteeUserId], where: raw("\"granteeModel\" = 'OrganizationUser'"), map: "ArtifactPermission_organization_user_key")
-  @@unique([artifactId, granteeSpaceId, granteeUserId], where: raw("\"granteeModel\" = 'SpaceUser'"), map: "ArtifactPermission_space_user_key")
-  @@unique([artifactId, granteeCustomerRefId], where: raw("\"granteeModel\" = 'CustomerRef'"), map: "ArtifactPermission_customer_ref_key")
-  @@unique([artifactId, granteeIntegrationId], where: raw("\"granteeModel\" = 'Integration'"), map: "ArtifactPermission_integration_key")
+  @@unique([artifactId, granteeUserId], where: raw("\"granteeModel\" = 'User' AND \"deletedAt\" IS NULL"), map: "ArtifactPermission_user_key")
+  @@unique([artifactId, granteeOrganizationId], where: raw("\"granteeModel\" = 'Organization' AND \"deletedAt\" IS NULL"), map: "ArtifactPermission_organization_key")
+  @@unique([artifactId, granteeSpaceId], where: raw("\"granteeModel\" = 'Space' AND \"deletedAt\" IS NULL"), map: "ArtifactPermission_space_key")
+  @@unique([artifactId, granteeOrganizationId, granteeUserId], where: raw("\"granteeModel\" = 'OrganizationUser' AND \"deletedAt\" IS NULL"), map: "ArtifactPermission_organization_user_key")
+  @@unique([artifactId, granteeSpaceId, granteeUserId], where: raw("\"granteeModel\" = 'SpaceUser' AND \"deletedAt\" IS NULL"), map: "ArtifactPermission_space_user_key")
+  @@unique([artifactId, granteeCustomerRefId], where: raw("\"granteeModel\" = 'CustomerRef' AND \"deletedAt\" IS NULL"), map: "ArtifactPermission_customer_ref_key")
+  @@unique([artifactId, granteeIntegrationId], where: raw("\"granteeModel\" = 'Integration' AND \"deletedAt\" IS NULL"), map: "ArtifactPermission_integration_key")
   @@index([artifactId])
   @@index([granteeModel, granteeUserId])
   @@index([granteeModel, granteeOrganizationId])

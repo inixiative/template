@@ -309,6 +309,8 @@ export const PolymorphismRegistry = {
           Integration: ['subjectIntegrationId'],
           Segment: ['subjectSegmentId'],
           Artifact: ['subjectArtifactId'],
+          ArtifactContainer: ['subjectArtifactContainerId'],
+          ArtifactPermission: ['subjectArtifactPermissionId'],
         },
       },
     ],

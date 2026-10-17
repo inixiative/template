@@ -22,7 +22,10 @@ export const artifactPermissionDeleteController = makeController(
       'manage',
     );
     assertGrantableRole(verdicts.get(permission.artifactId), permission.role);
-    await db.artifactPermission.delete({ where: { id: permission.id } });
+    await db.artifactPermission.update({
+      where: { id: permission.id },
+      data: { deletedAt: new Date() },
+    });
     return respond.noContent();
   },
 );
