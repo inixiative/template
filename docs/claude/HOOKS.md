@@ -19,6 +19,7 @@
 - [Webhooks](#webhooks)
   - [Enabling Webhooks for a Model](#enabling-webhooks-for-a-model)
   - [How It Works](#how-it-works)
+  - [Tenancy (AUTH-006 stopgap)](#tenancy-auth-006-stopgap)
   - [Webhook Payload](#webhook-payload)
   - [Circuit Breaker](#circuit-breaker)
   - [Poisoned Records](#poisoned-records)
@@ -41,6 +42,7 @@
   - [What it covers](#what-it-covers)
   - [Soft-deleted rows](#soft-deleted-rows)
   - [Bulk-friendly by construction](#bulk-friendly-by-construction)
+  - [Cache invalidation](#cache-invalidation)
   - [Scope strictness](#scope-strictness)
   - [Adding a Model](#adding-a-model)
   - [Limitations](#limitations)
@@ -49,7 +51,6 @@
   - [**FK fields are automatically immutable**](#fk-fields-are-automatically-immutable)
   - [Why Strip Instead of Throw?](#why-strip-instead-of-throw)
 - [Supported Operations](#supported-operations)
-  - [Slow Mutation Logging](#slow-mutation-logging)
 - [Limitations](#limitations)
   - [Rules: Nested Updates Skip Validation](#rules-nested-updates-skip-validation)
   - [Rules: updateManyAndReturn Validates After](#rules-updatemanyandreturn-validates-after)
@@ -107,6 +108,8 @@ Registered in `apps/api/src/hooks/index.ts` via `registerHooks()` from both API 
 
 | Hook | Purpose |
 |------|---------|
+| `artifactAccess` | An Artifact's `access` at creation is its kind's default when it is `inherit` or unset; refuses a kind the catalog does not know ([ARTIFACTS.md](ARTIFACTS.md)) |
+| `artifactOwnerRoot` | Creates the `ownerRoot` container of every new User, Organization and Space (`ensureOwnerRoot`) |
 | `auditLog` | Immutable audit trail of all mutations on enabled models |
 | `cache` | Cache invalidation on mutations (post-commit) |
 | `contactRules` | Per-type Contact validation + canonicalization (registry-driven) |
@@ -212,15 +215,20 @@ Automatic webhook delivery on database mutations.
 // packages/db/src/registries/webhook/enabledModels.ts
 export const webhookEnabledModels: WebhookModel[] = [
   WebhookModel.CustomerRef,
+  WebhookModel.Artifact,
 ];
 ```
 
 ### How It Works
 
-1. DB mutation triggers `webhookDelivery` hook (after commit)
-2. Hook finds active subscriptions for the model
-3. Enqueues `sendWebhook` job for each subscription
-4. Job signs payload with RSA-SHA256 and delivers
+1. A mutation of a webhook-enabled model runs the `webhookDelivery` hook (after the write; jobs are scheduled with `db.onCommit`)
+2. The hook reads each changed record's parties from `webhookAudienceAxes` (CustomerRef: its customer and its provider; Artifact: none), plus, for a model listed in `webhookGrantedAudiences` (`apps/api/src/hooks/webhooks/audiences.ts`), every party with access to the record (Artifact: its owner and its grantees, through its containers; owners-only org-user content reaches no org-level subscription)
+3. It loads only the active subscriptions owned by those parties, and enqueues one `sendWebhook` job per (subscription, record), skipping the write's origin integration and no-op updates
+4. The job signs the payload with RSA-SHA256 and delivers it
+
+### Tenancy (AUTH-006 stopgap)
+
+A subscription receives a record only when its owner (User, Organization or Space) is one of that record's parties. For a CustomerRef that is its customer or its provider. A row change of a party (User, Organization, Space) emits nothing: the hook reads only the direct-model refs in `webhookRelatedModels` ([Related Models](#related-models)), not the CustomerRef party refs, until AUTH-006 defines per-CustomerRef party events. An organization does not yet hear about the CustomerRefs of its spaces (no inheritance), and `sendWebhook` does not re-check the relationship at delivery time. Both are part of `tickets/AUTH-006-webhook-tenant-isolation.md`.
 
 ### Webhook Payload
 
@@ -294,14 +302,20 @@ Use cases:
 
 ### Related Models
 
-Child models can trigger parent webhooks:
+A child model's change fires its parent's webhook: the event is the **parent** record, not the child row.
 
 ```typescript
 // packages/db/src/registries/webhook/relatedModels.ts
 export const webhookRelatedModels: Record<string, FlexibleRef[]> = {
-  User: [{ model: 'CustomerRef', axis: 'customerModel', value: 'User' }],
+  ArtifactPermission: ['Artifact'],
+  ArtifactContainer: ['Artifact'],
+  // ...party refs (User → CustomerRef) are not read until AUTH-006
 };
 ```
+
+- Only **direct model refs** (`'Artifact'`) are read. The hook follows the child's foreign keys to that model (an `ArtifactContainer` has two, so both ends fire), loads the parents and delivers an `update` of each parent to the parent's audience. False-polymorphism refs (the User/Organization/Space → CustomerRef party entries) stay unread until AUTH-006 defines per-CustomerRef party events.
+- `webhookRelatedRowAudiences` adds the parties a child row names that the parent's audience may no longer hold: a deleted `ArtifactPermission`'s grantee still hears its revocation.
+- The event names the node that changed. A receiver that needs a container's members fans out itself.
 
 ---
 

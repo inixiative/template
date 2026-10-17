@@ -237,6 +237,7 @@ Read docs based on task type:
 
 - API/routes/controllers: `docs/claude/API_ROUTES.md`
 - DB/schema/hooks: `docs/claude/DATABASE.md`, `docs/claude/HOOKS.md`
+- Files, folders, sharing (artifacts, containers, grants, access): `docs/claude/ARTIFACTS.md`
 - Authentication: `docs/claude/AUTH.md`; authorization: `docs/claude/PERMISSIONS.md`
 - Frontend: `docs/claude/FRONTEND.md` (index of `docs/claude/FRONTEND/*`), `docs/claude/ZUSTAND.md`
 - Flows (short-lived guided walks through app pages, server-checked steps): `docs/claude/FLOWS.md`

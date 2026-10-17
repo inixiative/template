@@ -1,0 +1,68 @@
+/**
+ * @atlas
+ * @kind registry
+ * @partOf feature:files
+ * @uses none
+ */
+export type ArtifactKindDef = {
+  contains: readonly string[];
+  defaultAccess: 'public' | 'private';
+  holder: 'local' | 'integration';
+  contentModel?: 'File';
+  systemOnly?: true;
+  ownerRoot?: true;
+  ownerReach?: 'owners';
+  lazyCopy?: true;
+};
+
+export const ArtifactKinds = {
+  ownerRoot: {
+    contains: ['file', 'folder', 'organizationUserFolder'],
+    defaultAccess: 'private',
+    holder: 'local',
+    systemOnly: true,
+    ownerRoot: true,
+  },
+  file: {
+    contains: [],
+    defaultAccess: 'private',
+    holder: 'local',
+    contentModel: 'File',
+    lazyCopy: true,
+  },
+  folder: {
+    contains: ['file', 'folder'],
+    defaultAccess: 'private',
+    holder: 'local',
+  },
+  organizationUserFolder: {
+    contains: ['file', 'folder'],
+    defaultAccess: 'private',
+    holder: 'local',
+    systemOnly: true,
+    ownerReach: 'owners',
+  },
+  // ==========================================================================
+  // TEMPLATE ABOVE — Add app-specific kinds below
+  // ==========================================================================
+} satisfies Record<string, ArtifactKindDef>;
+
+export type ArtifactKind = keyof typeof ArtifactKinds;
+
+const kindDefs: Record<string, ArtifactKindDef> = ArtifactKinds;
+
+export const isArtifactKind = (kind: string): kind is ArtifactKind => kind in kindDefs;
+
+export const artifactKindDef = (kind: string): ArtifactKindDef | null => kindDefs[kind] ?? null;
+
+export const isContainerKind = (kind: string): boolean =>
+  (artifactKindDef(kind)?.contains.length ?? 0) > 0;
+
+export const plainArtifactKinds = (Object.keys(kindDefs) as ArtifactKind[]).filter(
+  (kind) => !kindDefs[kind]!.contentModel && !kindDefs[kind]!.systemOnly,
+);
+
+export const isOwnerRootKind = (kind: string): boolean => artifactKindDef(kind)?.ownerRoot === true;
+
+export const canContain = (containerKind: string, memberKind: string): boolean =>
+  artifactKindDef(containerKind)?.contains.includes(memberKind) ?? false;

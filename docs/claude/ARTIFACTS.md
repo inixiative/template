@@ -1,0 +1,179 @@
+# Artifacts
+
+<!-- toc:start -->
+
+## Contents
+
+- [What an artifact is](#what-an-artifact-is)
+- [Kinds](#kinds)
+- [Placements and the owner root](#placements-and-the-owner-root)
+- [Access](#access)
+- [Deleting](#deleting)
+- [Navigating](#navigating)
+- [Webhooks](#webhooks)
+- [Source map](#source-map)
+
+<!-- toc:end -->
+
+---
+
+## What an artifact is
+
+An **artifact** is anything that is owned, placed in containers, shared and made public: a file, a folder, and in forks other kinds. There is one node model, `Artifact`, with a `kind`. A container is just an artifact whose kind may hold others, so there is no separate folder table. A kind with content of its own keeps its own tables (`file` → `File`, `FileVersion`).
+
+Why one node: a grant then has a single target, "who may hold what" is a fact in the code catalog rather than a table per kind, and the same access rules serve files, folders and anything a fork adds. The file system's wider design (upload, versions, bindings, lazy copy) is `tickets/FEAT-009-file-management.md`.
+
+| Problem | Use | Read | Signs you're bypassing it |
+|---|---|---|---|
+| A thing users own and share: "a file", "a folder", "a document", "something inside a workspace", "an item people can be given access to" | **`Artifact`** · model `packages/db/prisma/schema/artifact.prisma` — one row per thing, `kind` from the catalog; its own content tables only when the kind has content | § Kinds; FEAT-009 § 3 | a new folder or document table with its own owner columns and its own permission table |
+| What a kind may contain and its access default: "can a folder hold a folder", "files start private" | **`ArtifactKinds`** · registry `packages/shared/src/artifact/kinds.ts` — `contains`, `defaultAccess`, `contentModel`, `systemOnly`, `ownerReach` | § Kinds | `if (artifact.kind === 'folder')` checks spread through services |
+| Put something in a folder, file it in two places, move it, list what is inside: "nest folders", "add to a collection", "show my file in their channel" | **`ArtifactContainer`** · model (a placement) — written only through **`placeArtifact`** / **`createArtifact`** / **`removeArtifactFromContainer`** · services `apps/api/src/modules/artifact/services/` | § Placements and the owner root | a `parentId` or materialized `path` column; `db.artifactContainer.create` from a controller |
+| Share with a person, an org, a space, a member or a customer; time-limited share: "give Bob edit access", "share this folder with the design space" | **`ArtifactPermission`** · model — a role on an artifact, inherited by `inherit` artifacts inside it | § Access | a per-feature share table; a shared-with JSON column |
+| Can this caller read / edit / manage this artifact: "who can see this file", "is it public" | **`checkArtifactAccess`** · service, **`validateArtifactAccess(action)`** · middleware `apps/api/src/middleware/validations/` | § Access | `validatePermission` on an artifact route (it skips grants); reading `artifact.access` alone to decide public |
+| Everyone with access to an artifact, without an actor: "build the reader set for an index", "who should hear about this change" | **`resolveArtifactAccess`** · service — public flag + grants with roles, through containers | § Access | re-walking containers by hand to collect grants |
+| Show where something sits and what is above it: "breadcrumbs", "which folders is this in", "browse from the top" | **`artifactReadParents`**, **`artifactReadAncestors`**, **`{owner}ReadManyArtifacts`** (roots) · routes | § Navigating | a primary-parent column; walking edges client-side one request per level |
+| Delete a folder, or delete a folder and what is in it: "empty this folder", "remove the folder but keep the files" | **`deleteArtifact`** · service (`DELETE /artifact/:id`), **`artifactReadExclusiveContents`** · route, **`/v1/batch`** | § Deleting | a delete that walks a container's members and removes them; a bespoke delete-many endpoint |
+
+---
+
+## Kinds
+
+```ts
+// packages/shared/src/artifact/kinds.ts
+file:   { contains: [], defaultAccess: 'private', holder: 'local', contentModel: 'File', lazyCopy: true },
+folder: { contains: ['file', 'folder'], defaultAccess: 'private', holder: 'local' },
+organizationUserFolder: { contains: ['file', 'folder'], defaultAccess: 'private', holder: 'local', systemOnly: true, ownerReach: 'owners' },
+ownerRoot: { contains: ['file', 'folder', 'organizationUserFolder'], defaultAccess: 'private', holder: 'local', systemOnly: true, ownerRoot: true },
+```
+
+A fork adds kinds below the template marker. `kind` is immutable after creation, and the `artifactAccess` hook refuses a kind the catalog does not know. The plain create routes (`meCreateArtifact`, `organizationCreateArtifact`, `spaceCreateArtifact`) only create kinds without a `contentModel` and that are not `systemOnly`; a file is created by its upload flow, a system container by the system that owns it.
+
+`integrationId` names the app that holds the artifact's content: null for this app, set when an integration keeps the content and keys it by `Artifact.id`.
+
+---
+
+## Placements and the owner root
+
+Three things, kept apart:
+- **The thing** is the `Artifact`.
+- **Where it exists** is an `ArtifactContainer` row, a placement: "this artifact is in that container". Containment organises; it holds no permissions of its own.
+- **Where it is used** (logo, avatar, attachment) is a `ResourceBinding` whose source is the artifact.
+
+Permissions are separate (`ArtifactPermission`). `GET /artifact/:id/uses` (`listArtifactUses`) returns an artifact's placements and bindings together.
+
+**Every owner has a root container**, an `ownerRoot` artifact. It is created automatically when the user, organization or space is created (the `artifactOwnerRoot` hook, through `ensureOwnerRoot`), and it is undeletable and unchangeable. **Every artifact is placed in its owner's root, and that placement stays while the artifact lives.** Consequences:
+- there is no orphan state;
+- removing an artifact's last other placement just shows it at the root again;
+- deleting an artifact removes all its placements.
+
+The root confers nothing. It carries no grants and never passes access down, so it can't widen anything beyond what the owner already holds. It doesn't count towards an artifact's containers anywhere else either: org-user reach, `exclusiveContents`, or the first-container `inherit` rule.
+
+**The root view is a filter, not a table:** the artifacts in the owner's root with no other placement in their own owner.
+
+**Other placements.** An artifact may sit in many containers, and so may a container ("compliance" under both "legal" and "operations"). A placement is refused when:
+- the container's kind does not list the artifact's kind (`contains`);
+- the container is an `ownerRoot` (everything is already there);
+- **the artifact is itself a container and the container belongs to another owner**: containers nest only within one owner;
+- the artifact is org-user content and the container belongs to another owner;
+- it would close a loop (`findReferenceCycle`, `packages/shared/src/graph/`) or nest deeper than 10.
+
+**Across owners**, a non-container (a file) may be placed in another owner's container. This is a use, not a copy: the bytes stay the placer's, billed to its owner. What the container's audience inherits from that container is capped at `read`, public included, and never `manage` or `own`. The cap is one constant, `CROSS_OWNER_INHERITED_ROLE` in `apps/api/src/modules/artifact/lib/crossOwnerInheritance.ts`; changing it to `member` or `admin` is a one-line edit.
+
+**Control.**
+
+| Action | Needs |
+|---|---|
+| Placing | `manage` on the artifact and `operate` on the container (`ARTIFACT_EDGE_AUTHORITY`) — the Google Drive shape |
+| Removing a same-owner placement | both, as placing |
+| Removing a placement in another owner's container | either `operate` on the container (the container keeps its powers over what is placed in it, so it can evict a foreign item) or `manage` on the artifact (withdraw it) |
+
+The checks live once, in `placeArtifact` / `removeArtifactFromContainer`.
+
+**Locking.** Every placement write holds `withOwnerLock(artifact's owner, 'containers')` before its transaction opens: the loop check, the placement and the org-user reach check read and then write the owner's placements. Creating an artifact holds the same lock.
+
+Placements are soft-deleted and audit-enabled.
+
+---
+
+## Access
+
+`Artifact.access` is `inherit`, `public` or `private`:
+
+| `access` | Public? | Takes its containers' grants? |
+|---|---|---|
+| `inherit` | if any container resolves public | yes, from every container |
+| `public` | yes | yes |
+| `private` | no | no |
+
+**Private means the artifact has only its own permissions.** It takes nothing from its containers, neither their grants nor their public state. You can keep your own things in a public folder. Most artifacts should inherit.
+
+The grants an artifact carries are:
+- its own live `ArtifactPermission` rows, with soft-deleted and expired ones dropped;
+- the implicit owner grant: the owning user, or `OrganizationManager` / `SpaceManager` (owners and admins of the owning org or space);
+- for `inherit` and `public` artifacts, every container's grants (except the root's), capped at `CROSS_OWNER_INHERITED_ROLE` when the container belongs to another owner.
+
+**A member's org-user content.** Content a member makes "as an org user" lives in their `organizationUserFolder`. The folder is owned by the org (the bytes stay with the org), private, and granted to the member. For that folder and everything under it (`ownerReach: 'owners'`), the implicit owner grant is `OrganizationOwner`: org owners reach it, as deliberate governance access, but org admins do not. An explicit grant always works ("if I give you the file, you can access it"). Content is owners-only while **every** container it sits in is: a member who also files something into a team folder has shared it, and the team folder's audience, its admins included, reaches it; a team artifact a member files into their own folder stays visible to admins through the team folder. Only containers of the same owner, other than the root, count here. Org-user content must keep a container of its owner: removing its last such placement, or deleting a member-scoped folder that still holds it, is refused, since at the bare root it would be ordinary org content. Place it elsewhere first, or delete it. It can never sit in another owner's container, whatever the order: placing it abroad is refused, and so is any later write that would make something already placed abroad org-user content. That covers filing it, or its parent folder, into a member folder, removing its last shared folder, and deleting that folder.
+
+**Creation and the kind default.** The `artifactAccess` hook stamps the kind's `defaultAccess` on an artifact created with `inherit` or no access, so a new file is private. An artifact whose only placement is its root takes nothing from it, so `inherit` there is effectively private. To create, use **`createArtifact`**: it places the artifact in its owner's root and, if asked, in a container (with `inherit`), in one locked `db.txn`. Placing an artifact that already sits in one of its owner's containers keeps its explicit access. Placing with `inherit: false` keeps it private: an artifact sitting only at its root is first set to its kind's default access.
+
+**An actor's role** is the strongest grant it holds. Each grant is capped by what the actor holds on its grantee:
+
+| Grantee | Cap |
+|---|---|
+| `User` | its own role, capped by a User token; scoped tokens never reach their user's personal grants |
+| `Organization` / `Space` | its membership role there |
+| `OrganizationManager` / `SpaceManager` | admin or owner there |
+| `OrganizationOwner` | owner of the org |
+| `OrganizationUser` / `SpaceUser` | the token's role |
+| `Integration` | no presenting path yet |
+
+Without read the caller gets 404; with read but not the action, 403. A grant can't be created, changed or revoked by someone whose role is below it.
+
+Not in this cut: access per edge. Access is the node's column plus its containers'.
+
+---
+
+## Deleting
+
+- **Deleting a container deletes the container, never its contents.** Its placements are soft-deleted with it (`softDeleteCascade`); the contents stay, still in their owner's root, and anything that was only there shows at the root again.
+- **Deleting the contents as well is a separate action.** `GET /artifact/:id/exclusiveContents` lists the artifacts of the container's owner that sit directly in it and in no other container of their owner (the root doesn't count), among those the caller can read. To delete them, send their `DELETE /api/v1/artifact/:id` requests through `POST /api/v1/batch/execute` with `strategy: 'transactionAll'` (one transaction, all or nothing), contents in the first round and the container, if it goes too, in a later round: a caller whose access to the contents comes through the container loses it once the container is gone. A UI may offer the two together; the API keeps them apart.
+- **Deleting an artifact always needs `own` on it**, wherever it sits, so a container's manager can't delete something they don't own. Removing it from a container is different (§ Placements and the owner root).
+- System artifacts cannot be deleted. Deleted artifacts' bytes are reclaimed by the orphan sweeper (FEAT-009 § 16).
+
+---
+
+## Navigating
+
+There is no "primary parent": with several parents, a browser shows two link lists for an item, **above** (its direct parents) and **below** (its direct children), plus a hover or expanded view of the whole graph above it. The API serves each cheaply, filtered to what the caller can read:
+
+| View | Route |
+|---|---|
+| Top of the browser: the root view (in the owner's root and nowhere else in the owner) | `GET /me/artifacts`, `/organization/:id/artifacts`, `/space/:id/artifacts` |
+| Below: direct children | `GET /artifact/:id/artifacts` |
+| Above: direct parents | `GET /artifact/:id/parents` |
+| The full graph above, to the owner root | `GET /artifact/:id/ancestors` → `{ artifacts, edges }`, each shared ancestor once, depth-capped like the access walk |
+| Everything it is in and used by | `GET /artifact/:id/uses` → `{ placements, bindings }` |
+
+The owner root shows only as the top: above an item it appears only when the item has no other parent in its owner.
+
+No frontend is built yet.
+
+---
+
+## Webhooks
+
+`Artifact` is a webhook model. Grant and edge changes fire an `Artifact` update for the parent through `webhookRelatedModels`. The audience is the owner and every party with access, through containers, plus a just-revoked grantee. Owners-only content (`OrganizationOwner`) reaches no org-level subscription. See [HOOKS.md](HOOKS.md#related-models).
+
+---
+
+## Source map
+
+| Concern | Path |
+|---|---|
+| Schema | `packages/db/prisma/schema/artifact.prisma`, `file.prisma` |
+| Kind catalog | `packages/shared/src/artifact/kinds.ts` |
+| Access resolution | `apps/api/src/modules/artifact/services/resolveArtifactAccess.ts`, `checkArtifactAccess.ts`, `actorPrincipalRole.ts` |
+| Placements | `apps/api/src/modules/artifact/services/placeArtifact.ts`, `removeArtifactFromContainer.ts`, `ensureOwnerRoot.ts`, `assertNoContainerCycle.ts`, `listArtifactUses.ts` |
+| Deleting | `apps/api/src/modules/artifact/services/deleteArtifact.ts`, `listExclusiveContents.ts` |
+| Hooks | `apps/api/src/hooks/artifactAccess/hook.ts` (kind default), `apps/api/src/hooks/artifactOwnerRoot/hook.ts` (owner roots) |
+| Routes | `apps/api/src/modules/{artifact,artifactContainer,artifactPermission}/`, `{me,organization,space}CreateArtifact` |

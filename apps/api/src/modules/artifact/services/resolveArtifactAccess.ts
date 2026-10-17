@@ -1,0 +1,143 @@
+/**
+ * @atlas
+ * @kind service
+ * @partOf feature:files
+ * @uses infrastructure:prisma
+ */
+import type { Role } from '@template/db/generated/client/enums';
+import { lesserRole } from '@template/permissions';
+import { artifactKindDef, isOwnerRootKind } from '@template/shared/artifact';
+import { sameArtifactOwner } from '#/modules/artifact/lib/artifactOwner';
+import {
+  type ArtifactPrincipal,
+  granteePrincipal,
+  ownerPrincipal,
+  principalKey,
+} from '#/modules/artifact/lib/artifactPrincipal';
+import { strongerRole } from '#/modules/artifact/lib/artifactRoles';
+import { CROSS_OWNER_INHERITED_ROLE } from '#/modules/artifact/lib/crossOwnerInheritance';
+import {
+  type ArtifactGraph,
+  loadArtifactGraph,
+} from '#/modules/artifact/services/loadArtifactGraph';
+
+export type ArtifactGrant = { principal: ArtifactPrincipal; role: Role };
+
+export type ArtifactAccessResolution = {
+  artifactId: string;
+  public: boolean;
+  ownersOnly: boolean;
+  grants: ArtifactGrant[];
+};
+
+type Effective = { public: boolean; grants: Map<string, ArtifactGrant> };
+
+const addGrant = (grants: Map<string, ArtifactGrant>, grant: ArtifactGrant): void => {
+  const key = principalKey(grant.principal);
+  const held = grants.get(key);
+  grants.set(key, {
+    principal: grant.principal,
+    role: strongerRole(held?.role ?? null, grant.role)!,
+  });
+};
+
+const ownersOnlyReach = (graph: ArtifactGraph) => {
+  const memo = new Map<string, boolean>();
+  const reach = (artifactId: string, walking: Set<string>): boolean => {
+    const cached = memo.get(artifactId);
+    if (cached !== undefined) return cached;
+    const node = graph.get(artifactId);
+    if (!node || walking.has(artifactId)) return false;
+    const path = new Set(walking).add(artifactId);
+    const ownContainers = node.containerArtifactIds.filter((containerArtifactId) => {
+      const container = graph.get(containerArtifactId);
+      return (
+        container !== undefined &&
+        !isOwnerRootKind(container.kind) &&
+        sameArtifactOwner(container, node)
+      );
+    });
+    const ownersOnly =
+      artifactKindDef(node.kind)?.ownerReach === 'owners' ||
+      (ownContainers.length > 0 &&
+        ownContainers.every((containerArtifactId) => reach(containerArtifactId, path)));
+    memo.set(artifactId, ownersOnly);
+    return ownersOnly;
+  };
+  return (artifactId: string) => reach(artifactId, new Set());
+};
+
+const effectiveAccess = (
+  graph: ArtifactGraph,
+  now: Date,
+  isOwnersOnly: (artifactId: string) => boolean,
+) => {
+  const memo = new Map<string, Effective>();
+  const resolve = (artifactId: string, walking: Set<string>): Effective => {
+    const cached = memo.get(artifactId);
+    if (cached) return cached;
+    const node = graph.get(artifactId);
+    if (!node || walking.has(artifactId)) return { public: false, grants: new Map() };
+
+    const grants = new Map<string, ArtifactGrant>();
+    addGrant(grants, {
+      principal: ownerPrincipal(node, isOwnersOnly(artifactId)),
+      role: 'owner',
+    });
+    for (const permission of node.permissions) {
+      if (permission.expiresAt && permission.expiresAt <= now) continue;
+      addGrant(grants, {
+        principal: granteePrincipal(permission),
+        role: permission.role,
+      });
+    }
+
+    let inheritedPublic = false;
+    if (node.access !== 'private') {
+      const path = new Set(walking).add(artifactId);
+      for (const containerArtifactId of node.containerArtifactIds) {
+        const container = resolve(containerArtifactId, path);
+        const containerNode = graph.get(containerArtifactId);
+        if (!containerNode || isOwnerRootKind(containerNode.kind)) continue;
+        const foreign = !!containerNode && !sameArtifactOwner(containerNode, node);
+        inheritedPublic ||= container.public;
+        for (const grant of container.grants.values()) {
+          addGrant(
+            grants,
+            foreign
+              ? { ...grant, role: lesserRole(grant.role, CROSS_OWNER_INHERITED_ROLE) }
+              : grant,
+          );
+        }
+      }
+    }
+
+    const effective = {
+      public: node.access === 'public' || (node.access === 'inherit' && inheritedPublic),
+      grants,
+    };
+    memo.set(artifactId, effective);
+    return effective;
+  };
+  return (artifactId: string) => resolve(artifactId, new Set());
+};
+
+export const resolveArtifactAccess = async (
+  artifactIds: string[],
+): Promise<Map<string, ArtifactAccessResolution>> => {
+  const graph = await loadArtifactGraph(artifactIds);
+  const isOwnersOnly = ownersOnlyReach(graph);
+  const resolve = effectiveAccess(graph, new Date(), isOwnersOnly);
+  const resolutions = new Map<string, ArtifactAccessResolution>();
+  for (const artifactId of artifactIds) {
+    if (!graph.has(artifactId)) continue;
+    const effective = resolve(artifactId);
+    resolutions.set(artifactId, {
+      artifactId,
+      public: effective.public,
+      ownersOnly: isOwnersOnly(artifactId),
+      grants: [...effective.grants.values()],
+    });
+  }
+  return resolutions;
+};

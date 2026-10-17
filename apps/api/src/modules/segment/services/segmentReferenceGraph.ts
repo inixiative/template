@@ -7,9 +7,8 @@
 import type { Condition } from '@inixiative/json-rules';
 import { ruleReferences } from '@template/db';
 import type { Segment } from '@template/db/generated/client/client';
+import type { ReferenceMap } from '@template/shared/graph';
 import { customerRefLens } from '#/modules/customerRef/lib/customerRefLens';
-
-export type ReferenceMap = Map<string, Set<string>>;
 
 export const buildReferenceMap = (segments: Segment[]): ReferenceMap => {
   const map: ReferenceMap = new Map();
@@ -28,21 +27,6 @@ export const buildReferenceMap = (segments: Segment[]): ReferenceMap => {
     );
   }
   return map;
-};
-
-export const findReferenceCycle = (references: ReferenceMap, start: string): string[] | null => {
-  const settled = new Set<string>();
-  const walk = (id: string, path: string[]): string[] | null => {
-    if (settled.has(id) || path.includes(id)) return null;
-    for (const next of references.get(id) ?? []) {
-      if (next === start) return [...path, id, start];
-      const found = walk(next, [...path, id]);
-      if (found) return found;
-    }
-    settled.add(id);
-    return null;
-  };
-  return walk(start, []);
 };
 
 export const sortByDependency = <T extends { id: string }>(
