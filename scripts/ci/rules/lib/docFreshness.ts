@@ -116,6 +116,8 @@ const knownNames = (): Set<string> => {
       isDoc(file) ||
       !CODE_EXT.test(file) ||
       file.startsWith(FIXTURE_DIR) ||
+      // Generated Warden knowledge (`.foundry/regions/**`) repeats the docs' names; it is not code.
+      file.startsWith('.foundry/') ||
       !existsSync(join(ROOT, file))
     )
       continue;
