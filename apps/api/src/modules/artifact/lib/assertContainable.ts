@@ -5,19 +5,14 @@
  * @uses none
  */
 import type { Artifact } from '@template/db/generated/client/client';
-import { canContain } from '@template/shared/artifact';
+import { canContain, isContainerKind } from '@template/shared/artifact';
 import { makeError } from '#/lib/errors';
+import { sameArtifactOwner } from '#/modules/artifact/lib/artifactOwner';
 
 type Placed = Pick<
   Artifact,
   'id' | 'kind' | 'ownerModel' | 'userId' | 'organizationId' | 'spaceId'
 >;
-
-const sameOwner = (a: Placed, b: Placed) =>
-  a.ownerModel === b.ownerModel &&
-  a.userId === b.userId &&
-  a.organizationId === b.organizationId &&
-  a.spaceId === b.spaceId;
 
 export const assertContainable = (container: Placed, member: Placed): void => {
   if (container.id === member.id) {
@@ -29,10 +24,11 @@ export const assertContainable = (container: Placed, member: Placed): void => {
       message: `A ${container.kind} cannot contain a ${member.kind}`,
     });
   }
-  if (!sameOwner(container, member)) {
+  if (!sameArtifactOwner(container, member) && isContainerKind(member.kind)) {
     throw makeError({
       status: 422,
-      message: "An artifact cannot sit in another owner's container; copy it instead",
+      message:
+        "Containers nest only within one owner; a container can't sit in another owner's container",
     });
   }
 };

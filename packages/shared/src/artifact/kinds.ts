@@ -10,11 +10,19 @@ export type ArtifactKindDef = {
   holder: 'local' | 'integration';
   contentModel?: 'File';
   systemOnly?: true;
+  ownerRoot?: true;
   ownerReach?: 'owners';
   lazyCopy?: true;
 };
 
 export const ArtifactKinds = {
+  ownerRoot: {
+    contains: ['file', 'folder', 'organizationUserFolder'],
+    defaultAccess: 'private',
+    holder: 'local',
+    systemOnly: true,
+    ownerRoot: true,
+  },
   file: {
     contains: [],
     defaultAccess: 'private',
@@ -53,6 +61,8 @@ export const isContainerKind = (kind: string): boolean =>
 export const plainArtifactKinds = (Object.keys(kindDefs) as ArtifactKind[]).filter(
   (kind) => !kindDefs[kind]!.contentModel && !kindDefs[kind]!.systemOnly,
 );
+
+export const isOwnerRootKind = (kind: string): boolean => artifactKindDef(kind)?.ownerRoot === true;
 
 export const canContain = (containerKind: string, memberKind: string): boolean =>
   artifactKindDef(containerKind)?.contains.includes(memberKind) ?? false;

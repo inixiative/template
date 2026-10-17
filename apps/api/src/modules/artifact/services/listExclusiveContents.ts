@@ -6,14 +6,9 @@
  */
 import { db } from '@template/db';
 import type { Artifact } from '@template/db/generated/client/client';
+import { listSoleMembers } from '#/modules/artifact/services/listSoleMembers';
 
-export const listExclusiveContents = (containerArtifactId: string): Promise<Artifact[]> =>
-  db.artifact.findMany({
-    where: {
-      containers: {
-        some: { containerArtifactId },
-        none: { containerArtifactId: { not: containerArtifactId } },
-      },
-    },
-    orderBy: { name: 'asc' },
-  });
+export const listExclusiveContents = async (containerArtifactId: string): Promise<Artifact[]> => {
+  const container = await db.artifact.findUniqueOrThrow({ where: { id: containerArtifactId } });
+  return listSoleMembers(container);
+};

@@ -11,7 +11,7 @@ const resourceBindingFactory = createFactory('ResourceBinding', {
     bindingType: 'logo',
   }),
   dependencies: {
-    file: { modelName: 'File', foreignKey: { id: 'fileId' }, required: false },
+    artifact: { modelName: 'Artifact', foreignKey: { id: 'artifactId' }, required: false },
     organization: {
       modelName: 'Organization',
       foreignKey: { id: 'organizationId' },

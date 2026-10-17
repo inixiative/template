@@ -484,7 +484,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **One Node, Many Kinds** — `Artifact` (file, folder, fork kinds) with a code catalog of kinds; a container is an artifact, and an artifact may sit in many containers (`ArtifactContainer`).
 - ✅ **Access as a Union** — `inherit | public | private`: inherit takes every container's audience, private overrides, and inherit without a container resolves to private. Grants (`ArtifactPermission`) reach users, orgs, spaces, members and customers, with expiry; roles cap by membership and token.
-- ✅ **Guarded Edges** — control over both ends, kind containment, same-owner edges only (crossing owners is a copy), loop and depth refusal under the owner's `containers` lock.
+- ✅ **Placements and Roots** — every owner has a root container and every artifact stays placed in it; placements need control over both ends; containers nest within one owner, files may be placed across owners as a read-capped use; loop and depth refusal under the owner's `containers` lock; `uses` lists placements and bindings.
 - ✅ **Deleting and Governance** — deleting a container keeps its contents (listed separately, deleted through batch); deleting needs `own`; grants and edges are soft-deleted and audited; org-user content is reachable by org owners, not admins.
 - ✅ **Artifact Webhooks** — grant and edge changes fire the parent Artifact to its owner and grantees only.
 - 🟡 **Remaining Work** — upload/download/public serving, system folders, bindings enforcement (`requiresPublic`), lazy copy, sweeper (FEAT-009).

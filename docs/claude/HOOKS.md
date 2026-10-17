@@ -108,7 +108,8 @@ Registered in `apps/api/src/hooks/index.ts` via `registerHooks()` from both API 
 
 | Hook | Purpose |
 |------|---------|
-| `artifactAccess` | An Artifact's `access` at creation is its kind's default when it is `inherit` or unset; `inherit` on an artifact in no container resolves to `private`, on update and when its last `ArtifactContainer` edge is removed or soft-deleted; refuses a kind the catalog does not know ([ARTIFACTS.md](ARTIFACTS.md)) |
+| `artifactAccess` | An Artifact's `access` at creation is its kind's default when it is `inherit` or unset; refuses a kind the catalog does not know ([ARTIFACTS.md](ARTIFACTS.md)) |
+| `artifactOwnerRoot` | Creates the `ownerRoot` container of every new User, Organization and Space (`ensureOwnerRoot`) |
 | `auditLog` | Immutable audit trail of all mutations on enabled models |
 | `cache` | Cache invalidation on mutations (post-commit) |
 | `contactRules` | Per-type Contact validation + canonicalization (registry-driven) |

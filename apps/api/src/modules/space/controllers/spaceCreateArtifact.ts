@@ -7,7 +7,7 @@
 import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
 import { artifactActorFromContext } from '#/modules/artifact/lib/artifactActor';
-import { createArtifact } from '#/modules/artifact/services/createArtifact';
+import { createArtifact } from '#/modules/artifact/services/placeArtifact';
 import { spaceCreateArtifactRoute } from '#/modules/space/routes/spaceCreateArtifact';
 
 export const spaceCreateArtifactController = makeController(

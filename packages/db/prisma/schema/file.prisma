@@ -11,7 +11,6 @@ model File {
   copies       File[]  @relation("FileLazyCopy")
 
   versions FileVersion[]
-  bindings ResourceBinding[]
 
   @@index([sourceFileId])
 }
@@ -42,8 +41,8 @@ model ResourceBinding {
   updatedAt DateTime @updatedAt
 
   sourceModel ResourceBindingSourceModel
-  fileId      String?                    @db.VarChar(36)
-  file        File?                      @relation(fields: [fileId], references: [id])
+  artifactId  String?                    @db.VarChar(36)
+  artifact    Artifact?                  @relation(fields: [artifactId], references: [id])
   url         String?
 
   resourceModel  ResourceBindingResourceModel
@@ -66,7 +65,7 @@ model ResourceBinding {
   @@index([resourceModel, spaceId, bindingType])
   @@index([resourceModel, userId, bindingType])
   @@index([resourceModel, customerRefId, bindingType])
-  @@index([fileId])
+  @@index([artifactId])
 }
 
 enum FileVersionStatus {
@@ -78,7 +77,7 @@ enum FileVersionStatus {
 }
 
 enum ResourceBindingSourceModel {
-  File
+  Artifact
   url
 }
 

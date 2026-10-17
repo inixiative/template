@@ -5,8 +5,13 @@
  * @uses infrastructure:prisma, primitive:authz
  */
 import type { Artifact } from '@template/db/generated/client/client';
+import { isOwnerRootKind } from '@template/shared/artifact';
 import type { ArtifactActor } from '#/modules/artifact/lib/artifactActor';
-import { loadArtifactGraph } from '#/modules/artifact/services/loadArtifactGraph';
+import { parentsWithRootAsTop } from '#/modules/artifact/lib/rootAsTop';
+import {
+  type ArtifactNode,
+  loadArtifactGraph,
+} from '#/modules/artifact/services/loadArtifactGraph';
 import { readableArtifacts } from '#/modules/artifact/services/readableArtifacts';
 
 export type ArtifactAncestry = {
@@ -14,26 +19,44 @@ export type ArtifactAncestry = {
   edges: { artifactId: string; containerArtifactId: string }[];
 };
 
+const asArtifact = ({
+  permissions: _p,
+  containerArtifactIds: _c,
+  ...artifact
+}: ArtifactNode): Artifact => artifact;
+
 export const readArtifactAncestors = async (
   actor: ArtifactActor,
   artifactId: string,
 ): Promise<ArtifactAncestry> => {
   const graph = await loadArtifactGraph([artifactId]);
-  const ancestors = [...graph.values()].filter(
-    (node) => node.id !== artifactId && node.deletedAt === null,
+  const live = [...graph.values()].filter((node) => node.deletedAt === null);
+  const readable = new Set(
+    (
+      await readableArtifacts(
+        actor,
+        live.filter((node) => !isOwnerRootKind(node.kind)),
+      )
+    ).map((node) => node.id),
   );
-  const visible = new Set((await readableArtifacts(actor, ancestors)).map((node) => node.id));
-  const edges = [...graph.values()].flatMap((node) =>
-    node.containerArtifactIds
-      .filter((containerArtifactId) => visible.has(containerArtifactId))
-      .filter(() => node.id === artifactId || visible.has(node.id))
-      .map((containerArtifactId) => ({ artifactId: node.id, containerArtifactId })),
-  );
-  const artifacts = ancestors
-    .filter((node) => visible.has(node.id))
-    .map(
-      ({ permissions: _permissions, containerArtifactIds: _containerArtifactIds, ...artifact }) =>
-        artifact,
-    );
-  return { artifacts, edges };
+
+  const reached = new Set<string>();
+  const edges: ArtifactAncestry['edges'] = [];
+  const visit = (node: ArtifactNode) => {
+    const parents = node.containerArtifactIds.flatMap((id) => {
+      const parent = graph.get(id);
+      return parent && parent.deletedAt === null ? [parent] : [];
+    });
+    for (const parent of parentsWithRootAsTop(node, parents)) {
+      if (!isOwnerRootKind(parent.kind) && !readable.has(parent.id)) continue;
+      edges.push({ artifactId: node.id, containerArtifactId: parent.id });
+      if (reached.has(parent.id)) continue;
+      reached.add(parent.id);
+      visit(parent);
+    }
+  };
+  const start = graph.get(artifactId);
+  if (start) visit(start);
+
+  return { artifacts: [...reached].map((id) => asArtifact(graph.get(id)!)), edges };
 };

@@ -288,12 +288,14 @@ describe('artifact routes', () => {
     );
   });
 
-  it('removing the last edge needs both sides and resolves inherit to private', async () => {
+  it('removing its last folder needs both sides; it then shows at its owner root', async () => {
     const stranger = (await createUser()).entity;
     const strangerFetch = createTestApp({ mockUser: stranger, mount }).fetch;
     expect((await strangerFetch(del(`/api/v1/artifactContainer/${edge.id}`))).status).toBe(404);
     expect((await memberFetch(del(`/api/v1/artifactContainer/${edge.id}`))).status).toBe(204);
-    const removed = await db.artifact.findUniqueOrThrow({ where: { id: drafts.id } });
-    expect(removed.access).toBe('private');
+    const roots = await json<Artifact[]>(
+      await memberFetch(get(`/api/v1/organization/${organization.id}/artifacts`)),
+    );
+    expect(roots.data.map((artifact) => artifact.id)).toContain(drafts.id);
   });
 });

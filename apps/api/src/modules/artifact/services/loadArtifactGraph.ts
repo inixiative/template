@@ -26,7 +26,9 @@ export const loadArtifactGraph = async (artifactIds: string[]): Promise<Artifact
     });
     const next = new Set<string>();
     for (const { containers, ...artifact } of artifacts) {
-      const containerArtifactIds = containers.map((edge) => edge.containerArtifactId);
+      const containerArtifactIds = containers.flatMap((edge) =>
+        edge.containerArtifactId ? [edge.containerArtifactId] : [],
+      );
       graph.set(artifact.id, { ...artifact, containerArtifactIds });
       for (const id of containerArtifactIds) if (!graph.has(id)) next.add(id);
     }

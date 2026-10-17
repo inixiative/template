@@ -22,6 +22,7 @@ model Artifact {
   space        Space?        @relation("ArtifactOwnerSpace", fields: [spaceId], references: [id], onDelete: Cascade)
 
   file        File?
+  bindings    ResourceBinding[]
   permissions ArtifactPermission[]
   containers  ArtifactContainer[] @relation("ArtifactContainerArtifact")
   members     ArtifactContainer[] @relation("ArtifactContainerContainer")
@@ -33,6 +34,9 @@ model Artifact {
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
   // ==========================================================================
 
+  @@unique([userId], where: raw("\"kind\" = 'ownerRoot' AND \"ownerModel\" = 'User' AND \"deletedAt\" IS NULL"), map: "Artifact_user_root_key")
+  @@unique([organizationId], where: raw("\"kind\" = 'ownerRoot' AND \"ownerModel\" = 'Organization' AND \"deletedAt\" IS NULL"), map: "Artifact_organization_root_key")
+  @@unique([spaceId], where: raw("\"kind\" = 'ownerRoot' AND \"ownerModel\" = 'Space' AND \"deletedAt\" IS NULL"), map: "Artifact_space_root_key")
   @@index([ownerModel])
   @@index([userId])
   @@index([organizationId])

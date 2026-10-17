@@ -20,6 +20,9 @@ export const deleteArtifact = async (actor: ArtifactActor, artifact: Artifact): 
   const verdicts = await checkArtifactAccess(actor, [artifact.id], 'own');
   assertArtifactAction(verdicts.get(artifact.id), 'own');
   const exclusive = await listExclusiveContents(artifact.id);
-  await assertKeepsOwnersOnlyReach(exclusive.map((content) => content.id));
+  await assertKeepsOwnersOnlyReach(
+    exclusive.map((content) => content.id),
+    artifact.id,
+  );
   await db.artifact.update({ where: { id: artifact.id }, data: { deletedAt: new Date() } });
 };

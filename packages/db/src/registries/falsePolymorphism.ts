@@ -357,7 +357,7 @@ export const PolymorphismRegistry = {
 
   ResourceBinding: {
     axes: [
-      { field: 'sourceModel', fkMap: { File: ['fileId'], url: [] } },
+      { field: 'sourceModel', fkMap: { Artifact: ['artifactId'], url: [] } },
       {
         field: 'resourceModel',
         fkMap: {

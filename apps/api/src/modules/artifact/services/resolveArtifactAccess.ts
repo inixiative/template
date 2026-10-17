@@ -5,7 +5,9 @@
  * @uses infrastructure:prisma
  */
 import type { Role } from '@template/db/generated/client/enums';
-import { artifactKindDef } from '@template/shared/artifact';
+import { lesserRole } from '@template/permissions';
+import { artifactKindDef, isOwnerRootKind } from '@template/shared/artifact';
+import { sameArtifactOwner } from '#/modules/artifact/lib/artifactOwner';
 import {
   type ArtifactPrincipal,
   granteePrincipal,
@@ -13,6 +15,7 @@ import {
   principalKey,
 } from '#/modules/artifact/lib/artifactPrincipal';
 import { strongerRole } from '#/modules/artifact/lib/artifactRoles';
+import { CROSS_OWNER_INHERITED_ROLE } from '#/modules/artifact/lib/crossOwnerInheritance';
 import {
   type ArtifactGraph,
   loadArtifactGraph,
@@ -46,10 +49,18 @@ const ownersOnlyReach = (graph: ArtifactGraph) => {
     const node = graph.get(artifactId);
     if (!node || walking.has(artifactId)) return false;
     const path = new Set(walking).add(artifactId);
+    const ownContainers = node.containerArtifactIds.filter((containerArtifactId) => {
+      const container = graph.get(containerArtifactId);
+      return (
+        container !== undefined &&
+        !isOwnerRootKind(container.kind) &&
+        sameArtifactOwner(container, node)
+      );
+    });
     const ownersOnly =
       artifactKindDef(node.kind)?.ownerReach === 'owners' ||
-      (node.containerArtifactIds.length > 0 &&
-        node.containerArtifactIds.every((containerArtifactId) => reach(containerArtifactId, path)));
+      (ownContainers.length > 0 &&
+        ownContainers.every((containerArtifactId) => reach(containerArtifactId, path)));
     memo.set(artifactId, ownersOnly);
     return ownersOnly;
   };
@@ -86,8 +97,18 @@ const effectiveAccess = (
       const path = new Set(walking).add(artifactId);
       for (const containerArtifactId of node.containerArtifactIds) {
         const container = resolve(containerArtifactId, path);
+        const containerNode = graph.get(containerArtifactId);
+        if (!containerNode || isOwnerRootKind(containerNode.kind)) continue;
+        const foreign = !!containerNode && !sameArtifactOwner(containerNode, node);
         inheritedPublic ||= container.public;
-        for (const grant of container.grants.values()) addGrant(grants, grant);
+        for (const grant of container.grants.values()) {
+          addGrant(
+            grants,
+            foreign
+              ? { ...grant, role: lesserRole(grant.role, CROSS_OWNER_INHERITED_ROLE) }
+              : grant,
+          );
+        }
       }
     }
 
