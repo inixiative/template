@@ -1,0 +1,72 @@
+# Names and paths that are real but live outside this repo's code, or that a doc uses as an
+# illustration. A bare line allows the value in every doc; `<doc>\t<value>` allows it in that doc only.
+# Stale references do not belong here: fix the doc.
+
+# libraries and tools
+ZodEffects
+c.json
+dangerouslySetInnerHTML
+retryJobs
+storeSessionInDatabase
+updateAge
+sequenceDiagram
+erDiagram
+classDiagram
+
+# illustrations, counter-examples and absences the doc states
+AI/ENTRYPOINT.md	Mode
+AI/ENTRYPOINT.md	Goal
+AI/ENTRYPOINT.md	Abstractions
+apps/api/CLAUDE.md	ownerEmail
+apps/api/CLAUDE.md	organization.route.ts
+apps/api/CLAUDE.md	adminOrganizationsCreate
+apps/api/CLAUDE.md	inquiriesRead
+docs/claude/ADAPTERS.md	email/client/
+docs/claude/API_ROUTES.md	resourceActionSubresource
+docs/claude/API_ROUTES.md	userCreate
+docs/claude/API_ROUTES.md	userCreateMany
+docs/claude/API_ROUTES.md	userReadMany
+docs/claude/API_ROUTES.md	organizationCreateSpace
+docs/claude/API_ROUTES.md	userActivate
+docs/claude/API_ROUTES.md	WebhookSubscriptions
+docs/claude/API_ROUTES.md	transformers/
+docs/claude/ATLAS.md	generated/
+docs/claude/DATABASE.md	FooModel
+docs/claude/DATABASE.md	FooType
+docs/claude/DATABASE.md	memberInvitation
+docs/claude/DATABASE.md	packages/db/prisma/migrations/
+docs/claude/DOCUMENTATION.md	entitlements.ts
+docs/claude/DOMAIN-DOCS.md	docs/primitives/README.md
+docs/claude/DOMAIN-DOCS.md	buildX
+docs/claude/DOMAIN-DOCS.md	createX
+docs/claude/ENCRYPTION.md	.github/workflows
+docs/claude/ENVIRONMENTS.md	.infisical.json
+docs/claude/FRONTEND/COMPONENTS.md	components/modals/CreateTokenModal.tsx
+docs/claude/FRONTEND/ROUTING_NAVIGATION.md	bots.tsx
+docs/claude/FRONTEND/ROUTING_NAVIGATION.md	bots.$id.tsx
+docs/claude/FRONTEND/ROUTING_NAVIGATION.md	bots.index.tsx
+docs/claude/MODULES.md	transformers/
+docs/claude/MODULES.md	mappers/
+docs/claude/MODULES.md	migrations/
+docs/claude/NAMING.md	aToB
+docs/claude/NAMING.md	stripeToUser
+docs/claude/NAMING.md	userCreate.ts
+docs/claude/NAMING.md	userAfterCreate.ts
+docs/claude/NAMING.md	processInquiry.ts
+docs/claude/NAMING.md	meReadManyOrganization.ts
+docs/claude/NAMING.md	organizationReadManySpace.ts
+docs/claude/NAMING.md	organizationCreateSpace.ts
+docs/claude/NAMING.md	UserProfile.tsx
+docs/claude/NAMING.md	useAuth.ts
+docs/claude/NAMING.md	AuthContext.tsx
+docs/claude/NAMING.md	userCreate
+docs/claude/NAMING.md	organizationReadMany
+docs/claude/NAMING.md	moduleKeys
+docs/claude/NAMING.md	modules/auth-provider/
+docs/claude/NAMING.md	modules/webhook-subscription/
+docs/claude/NAMING.md	auth-provider-read-many.ts
+docs/claude/SCRIPTS.md	files/
+docs/claude/TESTING.md	CreatedBy
+docs/claude/TESTING.md	Subscription
+docs/claude/ZUSTAND.md	hydrateTheme
+docs/claude/ZUSTAND.md	hydrateSettings

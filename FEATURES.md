@@ -80,7 +80,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 - ✅ **Environment Composition** - `with-env.sh` injects secrets at runtime: `bun run with prod api turbo watch local#api` runs local code against production secrets. No committed `.env` files
 - ✅ **Docker Compose** - PostgreSQL 18 (alpine) and Redis 7 (alpine) for local dev. Persistent volumes, health checks, auto-restart. Bun servers run natively via Turborepo, not containerized
 - ✅ **TypeScript Strict Mode** - `strict: true` + additional checks across all packages. `any` avoided in application code (rare casts only at framework/type boundaries), enforced null checks, proper error handling. Catches entire classes of bugs at compile time
-- 🟡 **Init Script** - React Ink TUI for automated project setup (rename, secrets, cloud provisioning). Core flow complete; PlanetScale, Infisical, Railway integrations working. Additional provider integrations in progress
+- 🟡 **Init Script** - React Ink TUI for automated project setup (rename, secrets, cloud provisioning): Infisical, PlanetScale or Railway Postgres, Railway (API, worker, Redis, buckets), Vercel or Cloudflare Pages, Resend, Bouncer, monitoring. Launch is the cut-over from disposable databases (`db push`) to migrations only; the baseline migration lands with #197. Other providers, DNS, GitHub Actions and headless launch are not built. [Direction](docs/claude/INIT_SCRIPT_PATTERNS.md#direction-pre-launch--launched-in-progress)
 
 ---
 
@@ -88,7 +88,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 **Modern RESTful API with GraphQL-style querying** - Built on Hono with full OpenAPI 3.1 spec generation, type-safe routing, and pseudo-GraphQL filtering that gives you the flexibility of GraphQL queries without the complexity. Every endpoint is documented, validated, and generates type-safe client code automatically.
 
-- ✅ **File-Based Route Auto-Registration** - Drop route file in `routes/` and matching controller in `controllers/` - automatically registered on startup. `autoRegisterRoutes()` scans module directory, imports route+controller pairs, and registers them with router. No manual imports needed. Prefix-based filtering separates admin routes from public routes. Similar to Next.js/TanStack file-based routing but for backend APIs
+- ✅ **File-Based Route Auto-Registration** - Drop route file in `routes/` and matching controller in `controllers/` - automatically registered on startup. `autoRegisterRoutes()` scans module directory, imports route+controller pairs, and registers them with router. No manual imports needed. Prefix-based filtering separates admin routes from public routes. Static paths register before parameterized ones; a route mounted by hand first (for ordering) is skipped, never registered twice. Similar to Next.js/TanStack file-based routing but for backend APIs
 
 - ✅ **Route Templates** - Pre-built route creators (readRoute, createRoute, updateRoute, deleteRoute, actionRoute) that generate consistent OpenAPI 3.1 definitions with proper schemas, error handling, and type safety. Eliminates ~70% of API boilerplate while enforcing consistent patterns across all endpoints. One file per endpoint for clean organization. [Learn more: API_ROUTES.md](docs/claude/API_ROUTES.md)
 
@@ -124,13 +124,13 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 ### Session Authentication (BetterAuth)
 
-- ✅ **BetterAuth Integration** - JWT and token auth via BetterAuth ^1.5. Handles email/password, OAuth, verification flows, and session lifecycle out of the box
-- ✅ **Email/Password Auth** - bcrypt password hashing. On sign-in, BetterAuth issues a **stateless JWT stored in an HTTP-only cookie**. No server-side session — the JWT is the session. CSRF protection via BetterAuth's double-submit cookie pattern
-- ✅ **OAuth Flow → Bearer Token** - OAuth callback (`/auth/callback`) extracts the returned JWT from the URL param and stores it in **localStorage** via `setToken()`. All subsequent API requests send it as `Authorization: Bearer <token>`. No cookie involved for OAuth users
-- ✅ **Stateless JWT** - No server-side session storage. Both email/password (cookie) and OAuth (localStorage Bearer) use the same JWT format. `cookieCache.maxAge: 300` means BetterAuth skips DB validation for up to 5 minutes per JWT
-- ✅ **Redis Secondary Storage** - Frequently-accessed data (permission caches, org lists) cached in Redis. Not the primary auth store — JWTs are self-contained
+- ✅ **BetterAuth Integration** - Session auth via BetterAuth ^1.6. Handles email/password, OAuth, verification flows, and session lifecycle out of the box
+- ✅ **Email/Password Auth** - Password hashing via BetterAuth. Sign-in returns a session token; the SPAs store it in localStorage via `setToken()` and send it as `Authorization: Bearer <token>`. Email verification is required before sign-in
+- ✅ **OAuth Flow → Bearer Token** - The provider redirects to the API, which appends a single-use one-time token to `/auth/callback#ott=…` (fragment, never logged). The callback page exchanges it for the session token and stores it via `setToken()`. The session token never appears in a URL
+- ✅ **Redis-Backed Bearer Sessions** - The web apps send BetterAuth's session token as `Authorization: Bearer` (`apiFetchInternal`). It is an opaque token, not a JWT (only the `bearer()` plugin, no `jwt()`); its record lives in Redis (`secondaryStorage`, 7-day sliding TTL), so deleting the key revokes the session at once. BetterAuth's encrypted (JWE) cookie cache applies only to cookie-based clients. Details: [AUTH.md](docs/claude/AUTH.md#session-storage-strategy)
+- ✅ **Redis Secondary Storage** - BetterAuth's `secondaryStorage` is Redis: session records, each user's active-session list, and the OAuth one-time tokens (consumed atomically with `GETDEL`)
 - ✅ **OAuth Social Providers** - Google wired via BetterAuth social plugin (callback handling, account linking, token issuance). Microsoft/GitHub are scaffolded in `platformProviders` but not yet configured in the BetterAuth client — adding them is config, not code
-- ✅ **BetterAuth Models** - Session (persisted for revocation), Verification (email verification tokens), Account (OAuth provider linkage) models in Prisma
+- ✅ **BetterAuth Models** - Verification (email verification tokens) and Account (OAuth provider linkage) models in Prisma. `Session` is BetterAuth's default model and is unused: sessions live in Redis
 
 ### Multi-Provider Auth (AuthProvider)
 
@@ -144,7 +144,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 - ✅ **Bearer Token Auth** - `Authorization: Bearer <key>` header for API access. SHA-256 hashed at rest. 10-minute Redis cache for frequently-used tokens avoids DB lookup per request
 - ✅ **URL Token Fallback** - `?token=<key>` query param for contexts that can't set headers (WebSocket upgrades, email links). Same validation pipeline as Bearer tokens
 - ✅ **Hierarchical Token Scopes** - Tokens scoped to User (cross-org), Organization (all spaces in org), or Space (single space only). Scope determines which resources the token can access
-- ✅ **Personal Access Tokens** - Users create named tokens with optional expiry dates. Token value shown once at creation, only hash stored. Usage tracking updates `lastUsedAt` on every request
+- ✅ **Personal Access Tokens** - Users create named tokens with optional expiry dates. Token value shown once at creation, only hash stored. `lastUsedAt` is touched on token-cache misses only (about every 10 minutes per token), keeping a write off every request
 - ✅ **Token CRUD** - Full lifecycle management. List tokens (with last-used metadata), create with name+expiry, delete by ID. Tokens scoped to the owning User/Org/Space
 
 ### User Impersonation
@@ -245,7 +245,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **Request Scoping** - Database client scoped per-request for tracing and logging. All queries tagged with request ID for debugging
 
-- ✅ **Transaction Isolation in Tests** - Each test runs in isolated transaction, rolled back after test completes. Ensures tests don't interfere with each other
+- ✅ **DB-Backed Test Isolation** - Tests write real rows through the real client (factories). The db client registers a test tracker in every test process; `cleanupTouchedTables()` empties the tables a file wrote. Files run one at a time (`--max-concurrency=1`). [Learn more: TESTING.md](docs/claude/TESTING.md#cleanup)
 
 - ✅ **23 Database Models** - user, account, session, verification, authProvider, organization, organizationUser, space, spaceUser, token, webhookSubscription, webhookEvent, inquiry, customerRef, cronJob, emailTemplate, emailComponent, auditLog, contact, appEvent, tag, tagAttachment, tagCategory
 
@@ -287,13 +287,17 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **makeJob()** - Basic job constructor providing type-safe handler wrapper. Use for standard async operations (send email, process upload, generate report). Jobs run independently, multiple instances can execute concurrently
 
-- ✅ **makeSingletonJob()** - Ensures only one instance runs at a time across all workers using Redis locks with heartbeat. Prevents duplicate execution of sensitive operations (database migrations, billing runs, encryption key rotation). Lock TTL is 5 minutes with a 1-minute heartbeat; refresh/release are token-fenced and lock loss is reported without cancelling the running handler
+- ✅ **makeSingletonJob()** - Ensures only one instance runs at a time across all workers using Redis locks with heartbeat. Prevents duplicate execution of sensitive operations (database migrations, billing runs, encryption key rotation). Keyed per payload with `lockKey`, otherwise per cron row. A busy key skips — collision policy is binary (singleton skips, superseding takes over, nothing parks; the `no-job-parking` CI rule enforces it). Keyed runs are also deduplicated at enqueue (BullMQ `deduplication`), so the skip holds while a staged singleton waits on its children. Lock TTL is 5 minutes with a 1-minute heartbeat; refresh/release are token-fenced and lock loss is reported without cancelling the running handler
 
-- ✅ **makeSupersedingJob()** - Allows newer jobs to cancel/supersede older jobs with same dedupeKey. Long-running jobs poll Redis every 500ms for supersession signal and abort gracefully. Perfect for search indexing, cache warming, or report generation where only latest matters
+- ✅ **makeSupersedingJob()** - Allows newer jobs to cancel/supersede older jobs with same dedupeKey. Long-running jobs poll Redis every 500ms for supersession signal and abort gracefully. Perfect for search indexing, cache warming, or report generation where only latest matters. A superseding job's children honour its tombstone, at start and on every poll, at any depth
+
+- ✅ **Staged jobs (fan out and wait)** - Every constructor takes `{ stages, finish }` in place of a handler: each stage adds children with `ctx.enqueueChildJob`, the job parks in BullMQ's `waiting-children` (holding no worker slot) until they report, and `finish` runs once after the last stage. The stage index lives on the job, so a resumed run never repeats a stage. Children keep their retries and then count as done (`ignoreDependencyOnFailure`). The `no-hand-rolled-flows` CI rule keeps the flow machinery in the primitive; `apps/api/scripts/jobFlowCheck.ts` proves it against real Redis
+
+- ✅ **Rolling caches** - `makeRollingCache({ name, intervalSeconds, key, compute, targets })` keeps a computed value warm on a timer with no invalidation to write. Targets are a model plus its own Prisma `findMany` args. One seeded cron root (`coordinateRollingCaches`, every minute) enqueues a staged singleton branch per due cache, which fans out a superseding slow-lane leaf per target under a per-attempt timeout (`rollingCache.leafStuck` app event when it runs over). Entries outlive every retry, so a read always hits; the `rolling-cache-registered` CI rule keeps every definition imported by the worker
 
 - ✅ **BullMQ Integration** - Redis-backed persistent queue with automatic retries (3 attempts, exponential backoff 5s base). Jobs survive server restarts. One `jobs` queue serves registered handlers; `REDIS_BULLMQ_URL` can isolate it from cache Redis (fallback: `REDIS_URL`)
 
-- ✅ **Cron Jobs** - Scheduled recurring tasks registered at startup. CronJob model persists schedule, last run, next run. Admin endpoints for manual triggering, enabling/disabling schedules
+- ✅ **Cron Jobs** - Scheduled recurring tasks registered at startup. CronJob model persists schedule, last run, next run. Admin endpoints for manual triggering, enabling/disabling schedules. A tick never runs its handler: it enqueues the real run (`enqueueCronRun`), so a scheduled run and a manual trigger collide like any two enqueues
 
 - ✅ **Job Handlers** - Type-safe handlers with full context (db, queue, logger). Registered handlers include email planning/delivery, webhooks, stale-data cleanup, key rotation and segment reconciliation/sweep. Add new handlers by creating file in `handlers/` directory and exporting from index
 
@@ -379,11 +383,11 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 ### General Security
 
-- ✅ **HTTP-Only Cookie (email/password)** - Email/password auth issues a stateless JWT in an HTTP-only, Secure, SameSite=Lax cookie. Not accessible from JavaScript. CSRF protection via BetterAuth double-submit cookie pattern
-- ✅ **Bearer Token (OAuth)** - OAuth flow stores the JWT in localStorage and sends it as `Authorization: Bearer <token>`. No cookie — CSRF is not a risk for Bearer tokens, but XSS is (localStorage is JS-accessible). Trade-off accepted for OAuth compatibility
+- ✅ **HTTP-Only Session Cookies** - BetterAuth also sets HTTP-only cookies on the API origin (a signed session-token cookie and the encrypted JWE cookie cache). The SPAs don't rely on them; they authenticate with the bearer token
+- ✅ **Bearer Session Token** - Both email/password and OAuth sign-ins store the opaque session token in localStorage and send it as `Authorization: Bearer <token>`. No cookie, so CSRF is not a risk, but XSS is (localStorage is JS-accessible). Trade-off accepted for cross-origin SPAs
 - ✅ **SQL Injection Prevention** - Prisma uses parameterized queries exclusively. No string interpolation in queries. Raw SQL escape hatches disabled by convention
 - ✅ **XSS Prevention** - React escapes all interpolated values by default. No `dangerouslySetInnerHTML` usage. Content Security Policy headers configurable via Hono middleware
-- ✅ **Password Hashing** - bcrypt via BetterAuth with configurable cost factor. Passwords never stored or logged in plaintext
+- ✅ **Password Hashing** - scrypt via BetterAuth (`node:crypto`). Passwords never stored or logged in plaintext
 - ✅ **Token Hashing** - API tokens stored as SHA-256 hashes. Raw token shown once at creation, never retrievable. Token comparison done on hash
 - ✅ **Rate Limiting** - Atomic Redis fixed windows, AND-checked per user / space / organization plus an IP window on `/api/auth/*`; 429 with `Retry-After`, fail-open on a Redis outage. Limits resolve through one seam (`rateLimitMax`) awaiting subscriptions / feature flags (INFRA-027)
 - ✅ **Audit Logs** - `AuditLog` model with full actor context (user, spoof user, token, job, inquiry). Automatic hook captures create/update/delete for 10 enabled models. Soft-delete detection, empty-diff guard, sensitive field redaction, and inquiry lineage via `sourceInquiryId`. Retention job and admin API shipped (FEAT-005 Complete); explorer UI deferred to FEAT-017
@@ -593,7 +597,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **Mock Webhook Receiver** - Test module mounts a `POST /test/webhook` endpoint in test environment only. Stores received webhook payloads in-memory (`receivedWebhooks[]`) so tests can assert on delivery, headers, and RSA-SHA256 signatures. `clearReceivedWebhooks()` resets between tests. Enables real end-to-end webhook delivery tests without external services
 
-- ✅ **Automatic Test Cleanup** - Database hooks track which tables were touched during tests. `cleanupTouchedTables()` utility truncates only modified tables after test suite completes. Temporarily disables FK constraints, uses TRUNCATE CASCADE for efficiency. Prevents test data buildup without manual cleanup
+- ✅ **Automatic Test Cleanup** - The db client registers the test tracker in every test process (no per-file opt-in), and a database hook records each table a test writes. `cleanupTouchedTables()` empties only those tables, per file. Lint rules forbid calling `registerTestTracker()` in a test and deleting rows by hand in after hooks (DB-004)
 
 - ✅ **React Testing Library** - Component tests follow best practices (test behavior, not implementation). User-centric queries (getByRole, getByLabelText). Async utilities for loading states
 
@@ -661,11 +665,11 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 ### Caching & Performance
 
-- ✅ **Redis with IORedis** - Distributed caching layer (Redis 7 alpine). Singleton connections with automatic reconnection, error handling, and connection pooling. Mock Redis in tests for isolation
+- ✅ **Redis with IORedis** - Distributed caching layer (Redis 7 alpine). Singleton connections with automatic reconnection, error handling, and connection pooling. Tests get one shared in-memory `ioredis-mock` client (`createRedisConnection` in test); a test that needs real Redis (BullMQ repeatables) opens its own connection
 
-- ✅ **Redis Use Cases** - Session cache (5min cookieCache TTL), permission evaluation cache (10min), token hash cache (10min), BullMQ job queue persistence, WebSocket pub/sub for multi-server broadcasting
+- ✅ **Redis Use Cases** - Session store (BetterAuth `secondaryStorage`, 7-day sliding TTL), cached reads via `cache()` (API tokens 10min, user lookups, permission hydration), BullMQ job queue persistence, WebSocket pub/sub for multi-server broadcasting, rate-limit windows, locks
 
-- ✅ **Namespace Support** - Redis keys auto-prefixed by use case (session:, perm:, token:, job:) preventing collisions and enabling selective cache clearing
+- ✅ **Namespace Support** - Redis keys prefixed by use case (`redisNamespace`: bull, cache, job, ws, otp, session, limit, lock, lane) preventing collisions and enabling selective cache clearing
 
 - ✅ **Multiple Redis Connections** - Main client (general operations), dedicated subscriber (pub/sub is blocking), separate BullMQ connections per queue/worker. Prevents blocking operations from interfering
 
@@ -758,34 +762,34 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 ## Tech Stack
 
 **Backend:**
-- Bun 1.3.10 (runtime & package manager)
-- Hono ^4.11 (web framework)
-- Prisma ^7.2 (ORM)
+- Bun 1.4.2 (runtime & package manager; `.bun-version`)
+- Hono ^4.12 (web framework)
+- Prisma ^7.4 (ORM)
 - PostgreSQL 18 (alpine)
 - Redis 7 (alpine)
-- BetterAuth ^1.5 (authentication)
-- Permix ^0.5 (ReBAC authorization)
-- BullMQ ^5.67 (job queue)
-- IORedis ^5.9 (Redis client)
+- BetterAuth ^1.6 (authentication)
+- Permix ^3.6 (ReBAC authorization)
+- BullMQ ^5.70 (job queue)
+- IORedis ^5.10 (Redis client)
 
 **Frontend:**
 - React ^19.2 (with React DOM ^19.2)
-- TypeScript ^5.9
-- TanStack Router ^1.159 (file-based routing)
+- TypeScript 6.0.3 (pinned by the shared `@inixiative/config` toolchain)
+- TanStack Router ^1.166 (file-based routing)
 - TanStack Query ^5.90 (server state)
 - Zustand ^5.0 (client state)
 - Vite ^7.3 (build tool)
-- Tailwind CSS ^4.1 (styling)
+- Tailwind CSS ^4.2 (styling)
 - Shadcn UI + React Aria Components (accessible components)
-- Lucide React ^0.525 (icons)
+- Iconify React ^6 (icons)
 
 **Developer Tools:**
-- Turborepo ^2.8 canary (monorepo orchestration)
+- Turborepo ^2.8 (monorepo orchestration)
 - Bun native test runner (testing)
-- Biome ^2.3 (linting/formatting)
+- Biome 2.5.2 (linting/formatting)
 - Docker Compose (local services)
 - Infisical (secrets management)
-- OpenAPI-TS ^0.86 + Scalar (API docs)
+- OpenAPI-TS ^0.97 + Scalar (API docs)
 - @hey-api/client-fetch ^0.13 (SDK generation)
 
 ---

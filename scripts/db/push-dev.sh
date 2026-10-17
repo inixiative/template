@@ -61,4 +61,7 @@ if [ "$ANY_RAN" -eq 0 ] && [ "$ANY_FAIL" -eq 0 ]; then
   echo "no DATABASE_URLs found via with-env composition for local or test"
   exit 1
 fi
-[ "$ANY_FAIL" -eq 0 ]
+[ "$ANY_FAIL" -eq 0 ] || exit 1
+
+echo "── prisma client"
+bun run db:generate

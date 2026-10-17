@@ -1,0 +1,23 @@
+# Stale doc references that predate the doc-freshness rule: reported, not failed.
+# One per line: <doc>\t<kind>\t<value>. Fix the doc and delete its line; never add lines by hand.
+# Regenerate: bun scripts/ci/rules/lib/docFreshness.ts --write-baseline
+FEATURES.md	name	addCheckConstraint
+FEATURES.md	name	addGistIndex
+FEATURES.md	name	addUniqueWhereNotNull
+FEATURES.md	name	useEventRefetch
+docs/claude/API_ROUTES.md	path	apps/api/src/integrations/
+docs/claude/API_ROUTES.md	path	apps/api/src/lib/prisma/dialect.ts
+docs/claude/BATCH.md	name	bodyPath
+docs/claude/COMMUNICATIONS.md	name	mapRefs
+docs/claude/COMMUNICATIONS.md	path	packages/db/lens
+docs/claude/CONCURRENCY.md	anchor	./REDIS.md#distributed-locks
+docs/claude/CONTEXT.md	name	OrganizationUserWithSpaceUsers
+docs/claude/CONTEXT.md	name	getRequestId
+docs/claude/CONTEXT.md	name	getUser
+docs/claude/DATABASE.md	name	FalsePolymorphismRegistry
+docs/claude/DOMAIN-DOCS.md	path	.foundry/regions/
+docs/claude/HOOKS.md	anchor	#slow-mutation-logging
+docs/claude/HOOKS.md	name	segmentLensFor
+docs/claude/INIT_SCRIPT_PATTERNS.md	name	setStoringToken
+docs/claude/INIT_SCRIPT_PATTERNS.md	name	storingToken
+docs/claude/SEGMENTS.md	name	lastActiveAt

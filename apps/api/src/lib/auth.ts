@@ -43,11 +43,11 @@ export const auth = betterAuth({
 
   session: {
     expiresIn: 7 * 24 * 60 * 60,
-    // Stateless JWT sessions - no DB session lookups
+    // Bearer clients: opaque session token looked up in Redis. JWE cache: cookie clients only.
     cookieCache: {
       enabled: true,
       maxAge: 7 * 24 * 60 * 60,
-      strategy: 'jwe', // Encrypted JWT - use 'jwt' if you need external verification
+      strategy: 'jwe',
     },
   },
 

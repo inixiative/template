@@ -5,6 +5,7 @@
  * @uses primitive:routeTemplates
  */
 import {
+  andWhere,
   bindLens,
   getLensRoot,
   type LensNarrowing,
@@ -141,9 +142,10 @@ const composeScopedFindMany = async <T extends AnyDelegate>(
   });
 
   // Lens relation wheres are authorization scope — they apply on superadmin endpoints too.
-  const composed = await lensWhere(filterLens, {
-    AND: [baseWhere, searchWhere as Record<string, unknown>],
-  });
+  const composed = await lensWhere(
+    filterLens,
+    andWhere([baseWhere, searchWhere as Record<string, unknown>]),
+  );
   const where = composed as FindManyWhere<T>;
 
   return { where, model, findManyOptions, callerOrderByOption };
@@ -265,9 +267,10 @@ export const cursorPaginate = async <
     const decoded = decodeCursor(cursor);
     assertChainMatches(decoded.k, chain);
     assertFilterMatches(decoded.f, filterHash);
-    scopedWhere = {
-      AND: [where, buildKeysetWhere(chain, hydrateCursorValues(model, chain, decoded.p))],
-    };
+    scopedWhere = andWhere([
+      where as Record<string, unknown>,
+      buildKeysetWhere(chain, hydrateCursorValues(model, chain, decoded.p)),
+    ]);
   }
 
   const rows = (await delegate.findMany({

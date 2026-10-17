@@ -4,7 +4,7 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
-import type { SourceQuery } from '@inixiative/json-rules';
+import { andWhere, type SourceQuery } from '@inixiative/json-rules';
 import {
   compiledSourceWhere,
   type SourceQueryScope,
@@ -22,5 +22,5 @@ export const sourceQueryWhere = async (
       `Source ${query.model}.${query.field} reads across a bridge; only an id source pins its re-checked rows as a where`,
     );
   const { options } = await sourceQueryValues(query, scope);
-  return { AND: [where, { [query.field]: { in: options.map((option) => option.value) } }] };
+  return andWhere([where, { [query.field]: { in: options.map((option) => option.value) } }]);
 };

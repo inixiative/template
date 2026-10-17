@@ -50,6 +50,8 @@
 | Caching | REDIS.md |
 | New package/dep | DEPENDENCIES.md, MONOREPO.md |
 
+Writing a doc that names a primitive, pattern, rule or system: follow [DOMAIN-DOCS.md](DOMAIN-DOCS.md) (the Problem | Use | Read | Signs row, plain-language phrasings, exact identifiers); the Warden region builder reads docs in that shape.
+
 The docs contain patterns, conventions, and decisions. Reading them prevents:
 - Reinventing existing utilities
 - Breaking established patterns
@@ -144,6 +146,7 @@ Update docs when you:
 - Remove outdated information
 - Mark incomplete sections as stubs
 - Don't document aspirational features as if they exist
+- The `doc-freshness` CI rule fails a doc that names a path, line, heading or symbol the repo no longer has (see [SCRIPTS.md](SCRIPTS.md#ci-rule-scripts)). Planned work goes under an "Under construction" or "Migrations in progress" heading, which the rule skips
 
 ---
 

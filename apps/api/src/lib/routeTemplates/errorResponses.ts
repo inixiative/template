@@ -2,9 +2,14 @@
  * @atlas
  * @kind constant
  * @partOf primitive:routeTemplates
- * @uses none
+ * @uses primitive:shared
  */
 import { type RouteConfig, z } from '@hono/zod-openapi';
+import { type ErrorLabel, type Guidance, HTTP_ERROR_MAP } from '@template/shared/errors';
+
+const errorMetas = Object.values(HTTP_ERROR_MAP);
+const errorLabels: ErrorLabel[] = [...new Set(errorMetas.map((meta) => meta.label))];
+const guidances: Guidance[] = [...new Set(errorMetas.map((meta) => meta.guidance))];
 
 const errorDescriptions: { code: string; description: string }[] = [
   { code: '400', description: 'Bad Request' },
@@ -26,9 +31,9 @@ const errorDescriptions: { code: string; description: string }[] = [
 
 export const errorSchema = z
   .object({
-    error: z.string(),
+    error: z.enum(errorLabels),
     message: z.string(),
-    guidance: z.string(),
+    guidance: z.enum(guidances),
     fieldErrors: z.record(z.string(), z.array(z.string())).optional(),
     requestId: z.string(),
   })

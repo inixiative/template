@@ -2,6 +2,7 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { clearHookRegistry, db } from '@template/db';
 import {
   ContactType,
+  TagOwnerModel,
   TagResource,
   WebhookModel,
   WebhookOwnerModel,
@@ -95,9 +96,9 @@ describe('partial unique constraints', () => {
   describe('TagAttachment: per-(userId, tagId)', () => {
     it('blocks two attachments of the same tag to the same user', async () => {
       const { entity: user } = await createUser();
-      const cat = await createTagCategory({ ownerModel: TagResource.platform });
+      const cat = await createTagCategory({ ownerModel: TagOwnerModel.platform });
       const tag = await createTag(
-        { name: seq('attach'), ownerModel: TagResource.platform, resources: [] },
+        { name: seq('attach'), ownerModel: TagOwnerModel.platform, resources: [] },
         { tagCategory: cat.entity },
       );
       await createTagAttachment({ resourceModel: TagResource.User }, { user, tag: tag.entity });
@@ -111,15 +112,16 @@ describe('partial unique constraints', () => {
     it('blocks two user-scoped categories with the same name on the same user', async () => {
       const { entity: user } = await createUser();
       const name = seq('audience');
-      await createTagCategory({ name, ownerModel: TagResource.User }, { user });
-      const dupe = async () => createTagCategory({ name, ownerModel: TagResource.User }, { user });
+      await createTagCategory({ name, ownerModel: TagOwnerModel.User }, { user });
+      const dupe = async () =>
+        createTagCategory({ name, ownerModel: TagOwnerModel.User }, { user });
       await expect(dupe()).rejects.toThrow();
     });
 
     it('blocks two platform categories with the same name', async () => {
       const name = seq('global-cat');
-      await createTagCategory({ name, ownerModel: TagResource.platform });
-      const dupe = async () => createTagCategory({ name, ownerModel: TagResource.platform });
+      await createTagCategory({ name, ownerModel: TagOwnerModel.platform });
+      const dupe = async () => createTagCategory({ name, ownerModel: TagOwnerModel.platform });
       await expect(dupe()).rejects.toThrow();
     });
 
@@ -127,8 +129,8 @@ describe('partial unique constraints', () => {
       const { entity: a } = await createUser();
       const { entity: b } = await createUser();
       const name = seq('audience-cross');
-      await createTagCategory({ name, ownerModel: TagResource.User }, { user: a });
-      const second = await createTagCategory({ name, ownerModel: TagResource.User }, { user: b });
+      await createTagCategory({ name, ownerModel: TagOwnerModel.User }, { user: a });
+      const second = await createTagCategory({ name, ownerModel: TagOwnerModel.User }, { user: b });
       expect(second.entity.userId).toBe(b.id);
     });
   });
@@ -136,15 +138,15 @@ describe('partial unique constraints', () => {
   describe('Tag: per-(userId, tagCategoryId, name)', () => {
     it('blocks two tags with the same name in the same category for the same user', async () => {
       const { entity: user } = await createUser();
-      const cat = await createTagCategory({ ownerModel: TagResource.User }, { user });
+      const cat = await createTagCategory({ ownerModel: TagOwnerModel.User }, { user });
       const name = seq('dup-tag');
       await createTag(
-        { name, ownerModel: TagResource.User, resources: [] },
+        { name, ownerModel: TagOwnerModel.User, resources: [] },
         { user, tagCategory: cat.entity },
       );
       const dupe = async () =>
         createTag(
-          { name, ownerModel: TagResource.User, resources: [] },
+          { name, ownerModel: TagOwnerModel.User, resources: [] },
           { user, tagCategory: cat.entity },
         );
       await expect(dupe()).rejects.toThrow();

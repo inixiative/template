@@ -6,39 +6,35 @@
 - Examples: `bun install`, `bun run dev`, `bun add <package>`
 
 ## Code Style
-- Do not add comments to code unless specifically requested
+- No comments (the repo-wide rule in `AI/ENTRYPOINT.md` §0): only the `@atlas` block, and rarely one short *why* line
 - Keep code clean and self-documenting
 - Use single-line if statements without braces for simple conditions
-- Use absolute path imports starting with `src/` instead of relative imports
+- Imports inside the app use the `#/` alias (`#/modules/...`), never `src/...` or `../`; shared packages use `@template/<pkg>/*`
 - Use single quotes for imports and strings
 - Use camelCase for variable and function names (not CAPS_CASE)
 
 ## Naming Conventions
-- Controllers: `<resource><Action>` (e.g., `usersCurrent`, `productsCreate`)
-- Middleware folders: singular names (e.g., `user`, `resource`, not `users`)
-- Schema files: `<model>Schema.ts` (e.g., `userSchema.ts`)
-- Route files: `<resource>Routes.ts` (e.g., `userRoutes.ts`)
+- Route and controller files share one name: `<admin?><model><Action>.ts` (e.g. `organizationRead.ts`, `adminUserRedact.ts`), one endpoint per file, under `modules/<model>/routes` and `modules/<model>/controllers`
+- Middleware folders: singular names (e.g., `auth`, `resources`, `validations`)
+- Full naming rules: `docs/claude/NAMING.md`
 
-## Docker Commands
-- Always use the `scripts` container to execute commands, not `api`
-- Use `docker-compose exec scripts` for all command execution
-- Use `bun run docker:bun` for package management
+## Local Services
+- Postgres, Redis and MinIO run in Docker Compose (`bun run local:db`); the API and worker run natively with Bun (`bun run local`)
+- In a worktree use the repo scripts (`bun run worktree:create`, `bun run db:push:dev`); see `docs/claude/DOCKER.md`
 
 ## Prisma Schema Conventions
-- Put `@@map()` at the top of model definitions
-- Place timestamps (createdAt, updatedAt) immediately after id
-- Use `@default(uuid())` for id fields
+- One file per model in `packages/db/prisma/schema/`; no `@@map()` (tables keep the model name)
+- Place timestamps (createdAt, updatedAt, deletedAt) immediately after id
+- Ids: `@id @default(dbgenerated("uuidv7()")) @db.VarChar(36)`
 
 ## Testing
-- Run tests with `bun run test`
-- Watch mode: `bun run test:watch`
-- Place test files next to their source files (e.g., `userContext.test.ts` next to `userContext.ts`)
-- Use `describe`, `it`, `expect` from `bun:test`
+- Run tests with `bun run test` (DB-backed, one file at a time; see `docs/claude/TESTING.md`)
+- Tests live next to their source or in a module's `tests/` folder
+- Use `describe`, `it`, `expect` from `bun:test`; build data with the factories in `@template/db/test`
 
 ## API Documentation
 - OpenAPI 3.1 spec served as JSON at `/openapi/docs` (via `app.doc31`)
-- Use request schema templates from `src/app/core/requestSchemas`
-- Always include proper types and documentation
+- Build routes with the route templates in `#/lib/routeTemplates`; the spec and SDK are generated from them
 
 ---
 
@@ -69,7 +65,7 @@
 - **Pass body directly to Prisma** - don't destructure unless needed
 - Use `getResource(c)` for routes with `:id` - don't refetch
 - Use `paginate()` utility for list endpoints
-- Single-line throws: `if (!x) throw new HTTPException(404, { message: '...' })`
+- Single-line throws: `if (!x) throw makeError({ status: 404, message: '...' })` (`#/lib/errors`); never `new HTTPException`
 
 ### File naming
 - Pattern: `<admin?><model><action>` (e.g., `adminOrganizationsCreate`, `inquiriesRead`)

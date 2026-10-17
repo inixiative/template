@@ -102,10 +102,21 @@ export const auth = betterAuth({
 
 ### Session Storage Strategy
 
-- **Sessions live in Redis** via `secondaryStorage` (keys under `redisNamespace.session`). `getAndDelete` (Redis `GETDEL`) makes one-time-token verification atomic.
-- **Bearer for the SPAs.** The `bearer()` plugin accepts the session token as `Authorization: Bearer <token>`; the frontends store it in localStorage (see [FRONTEND/AUTH.md](./FRONTEND/AUTH.md)).
-- **Cookie cache.** Cookie clients get an encrypted (`jwe`) session cookie cache, valid up to the 7-day session lifetime.
+What is JWT and what is Redis:
+
+| Piece | What it is | Where it lives |
+|-------|-----------|----------------|
+| **Session token** | BetterAuth's session token: an opaque random id (32 chars), **not a JWT**. There is no `jwt()` plugin, only `bearer()`. As a cookie it's HMAC-signed with `BETTER_AUTH_SECRET`; `bearer()` accepts it signed or bare. | Web apps: localStorage. Sign-in returns it (`data.token` for email, `data.session.token` after the OAuth one-time-token exchange), `packages/ui/src/lib/auth/token.ts` stores it, and `packages/ui/src/lib/apiFetchInternal.ts` sends `Authorization: Bearer <token>` on every call |
+| **Session record** | `{ session, user }` JSON for that token, TTL = session expiry. A second key, `active-sessions-<userId>`, lists a user's live tokens. | **Redis** (`secondaryStorage`, keys under `redisNamespace.session`). Not written to Postgres: `storeSessionInDatabase` is off. The Prisma `Session` model is BetterAuth's default schema and is unused |
+| **Cookie cache** | The only JWT-format piece: an encrypted JWE (`strategy: 'jwe'`) `session_data` cookie carrying the session + user, valid up to `maxAge` (7 days). Applies only to cookie-based clients; the web apps don't use it. | Browser cookie on the API origin. Requests that carry it skip the Redis lookup |
+| **OAuth one-time token** | Single-use, 1 minute, stored hashed; consumed with Redis `GETDEL` (`getAndDelete`). | Redis |
+
+- **The web apps are bearer clients, and every bearer request reads Redis.** `authMiddleware` → `auth.api.getSession` resolves the token through Redis; the web apps send no cookie, so the JWE cache doesn't apply to them. Deleting the Redis key ends the session at once (that's how sign-out and revocation work).
+- **Lifetime.** `expiresIn` is 7 days, sliding: a session used more than a day (`updateAge`, default) after its last refresh is extended.
+- **Cookie clients.** A client that keeps the API's cookies gets the JWE cache, so it can authenticate without Redis for up to `maxAge`, and a revoked session stays valid there until the cookie cache expires.
 - **Email verification is required** for email/password sign-up; the verification email goes out through the `user.verificationRequested` app event.
+
+API tokens are a different mechanism: SHA-256-hashed `Token` rows in Postgres, cached in Redis for 10 minutes ([Token Authentication](#token-authentication)).
 
 ### Auth Routes
 

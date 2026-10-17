@@ -5,6 +5,7 @@
  * @uses none
  */
 import {
+  andWhere,
   executePrismaPlan,
   type Lens,
   type LensNarrowing,
@@ -33,7 +34,7 @@ export const sourceQueryValues = async (
 ): Promise<SourceValues> => {
   const { select, distinct } = query.prisma;
   const candidates = (await db.delegate(query.model).findMany({
-    where: { AND: [await compiledSourceWhere(query), where] },
+    where: andWhere([await compiledSourceWhere(query), where]),
     select,
     ...(distinct ? { distinct } : {}),
   })) as SourceRow[];

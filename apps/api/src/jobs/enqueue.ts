@@ -12,6 +12,7 @@ import type { Job } from 'bullmq';
 import { buildJobData } from '#/jobs/buildJobData';
 import { enqueueOrSpill } from '#/jobs/enqueueOrSpill';
 import type { JobPayloads } from '#/jobs/handlers';
+import type { SingletonJobHandler } from '#/jobs/makeSingletonJob';
 import type { SupersedingJobHandler } from '#/jobs/makeSupersedingJob';
 import { queue } from '#/jobs/queue';
 import { type JobLane, type JobOptions, JobType, type WorkerContext } from '#/jobs/types';
@@ -42,7 +43,8 @@ export const enqueueJob = async <K extends keyof JobPayloads>(
   const { type = JobType.adhoc, id, lane, bypass = false, ...jobOptions } = options || {};
   validateJobId(jobOptions.jobId);
 
-  const handler = jobHandlers[handlerName] as SupersedingJobHandler<JobPayloads[K]>;
+  const handler = jobHandlers[handlerName] as SupersedingJobHandler<JobPayloads[K]> &
+    SingletonJobHandler<JobPayloads[K]>;
   const dedupeKey = handler.dedupeKeyFn ? handler.dedupeKeyFn(payload) : undefined;
 
   // In test, skip BullMQ entirely — just run the handler. Cascading effects
@@ -63,7 +65,7 @@ export const enqueueJob = async <K extends keyof JobPayloads>(
     const ctx: WorkerContext = {
       db,
       queue,
-      job: { id: jobId, name: handlerName, data } as Job,
+      job: { id: jobId, name: handlerName, data, attemptsMade: 0 } as Job,
     };
     await (handler as (workerCtx: WorkerContext, p?: unknown) => Promise<void>)(ctx, payload);
     return { jobId, name: handlerName };
@@ -80,6 +82,7 @@ export const enqueueJob = async <K extends keyof JobPayloads>(
     data,
     options: jobOptions,
     bypass,
+    singletonKey: handler.singletonKey?.(payload, data),
   });
   return { ...placed, name: handlerName };
 };

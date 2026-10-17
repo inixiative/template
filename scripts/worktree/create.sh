@@ -348,8 +348,20 @@ case "$DB_PKG_REAL" in
 Run 'bun install --force' in $WORKTREE_DIR and check 'readlink apps/api/node_modules/@template/db'." ;;
 esac
 
+if [ "$DB_AVAILABLE" -eq 1 ]; then
+  run_step "Pushing Prisma schema to $DB_LOCAL and $DB_TEST, then generating the Prisma client, prismaMap, and zod schemas" bun run db:push:dev \
+    || GAPS="${GAPS}  - schema not pushed to $DB_LOCAL / $DB_TEST — rerun in the worktree: bun run db:push:dev\n"
+
+  if [ "$("${PSQL[@]}" -d "$DB_LOCAL" -c "SELECT 1;" 2>/dev/null || true)" = "1" ]; then
+    ok "DB reachable: $DB_LOCAL"
+  else
+    GAPS="${GAPS}  - $DB_LOCAL does not answer — check DATABASE_URL in $WORKTREE_DIR/apps/api/.env.local\n"
+  fi
+else
+  run_step "Generating Prisma client, prismaMap, and zod schemas" bun run db:generate || true
+fi
+
 run_step "Generating route trees" bun run generate:routes || true
-run_step "Generating Prisma client, prismaMap, and zod schemas" bun run db:generate || true
 run_step "Generating OpenAPI spec, SDK, and MSW handlers" bun run generate:sdk || true
 
 require_artifact apps/web/app/routeTree.gen.ts "bun run generate:routes"
@@ -360,17 +372,6 @@ require_artifact packages/db/src/generated/prismaMap.gen.ts "bun run db:generate
 require_artifact packages/db/src/generated/zod "bun run db:generate"
 require_artifact packages/sdk/src/generated/sdk.gen.ts "bun run generate:sdk"
 require_artifact packages/ui/src/test/mocks/handlers.gen.ts "bun run generate:sdk"
-
-if [ "$DB_AVAILABLE" -eq 1 ]; then
-  run_step "Pushing Prisma schema to $DB_LOCAL and $DB_TEST" bun run db:push:dev \
-    || GAPS="${GAPS}  - schema not pushed to $DB_LOCAL / $DB_TEST — rerun in the worktree: bun run db:push:dev\n"
-
-  if [ "$("${PSQL[@]}" -d "$DB_LOCAL" -c "SELECT 1;" 2>/dev/null || true)" = "1" ]; then
-    ok "DB reachable: $DB_LOCAL"
-  else
-    GAPS="${GAPS}  - $DB_LOCAL does not answer — check DATABASE_URL in $WORKTREE_DIR/apps/api/.env.local\n"
-  fi
-fi
 
 FINISHED=1
 echo

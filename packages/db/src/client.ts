@@ -238,10 +238,10 @@ const dbMethods = {
   },
 
   withDeleted: <T>(fn: () => T | Promise<T>): Promise<Awaited<T>> =>
-    auditActorContext.withSoftDeleteBypass(fn),
+    auditActorContext.withDeleted(fn),
 
-  withSoftDeleteScope: <T>(fn: () => T | Promise<T>): Promise<Awaited<T>> =>
-    auditActorContext.withSoftDeleteScope(fn),
+  withoutDeleted: <T>(fn: () => T | Promise<T>): Promise<Awaited<T>> =>
+    auditActorContext.withoutDeleted(fn),
 
   getScopeId: (): string | null => store.getStore()?.scopeId ?? null,
 

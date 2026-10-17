@@ -38,10 +38,11 @@ kanban
     INFRA-001-init-script
     INFRA-011-railway-buckets
   Review
-    DB-003-endpoint-decides-soft-delete-visibility
     INFRA-030-reference-registry
     FEAT-021-segments
   Done
+    DB-006-compiled-wheres-compose-through-the-fold
+    DB-003-endpoint-decides-soft-delete-visibility
     INFRA-031-jobs-lane-and-lock-port-from-zealot
     DEV-003-code-annotations-and-sitemap
     FE-002-navigation-refactoring
@@ -101,11 +102,12 @@ See [Backlog Board](./kanban-backlog.md) for future enhancements (localization, 
 - [INFRA-011: Railway Buckets](./INFRA-011-railway-buckets.md) - MinIO local + s3 adapter + bucket provisioning built
 
 ### 👀 Review
-- [DB-003: The endpoint decides soft-delete visibility](./DB-003-endpoint-decides-soft-delete-visibility.md) - Declared superadmin endpoints (the admin router) run unscoped; every other endpoint is live-scoped for every actor, superadmin included (ZLT-5486)
 - [INFRA-030: Reference Registry](./INFRA-030-reference-registry.md) - The rows a rule names, as edges: false-polymorphic `RuleReference` both ends + save-path edge writer in `packages/db` + staleness re-resolve; `withRule` asks two questions (bindings supplied, rule still valid: lens admits it, named rows live) — ruling 2026-09-10 retired the dynamic arm; email conditionals are the first surface, segments the second; json-rules 2.22.0 `bindOptional`
 - [FEAT-021: Segments](./FEAT-021-segments.md) - Zealot's Groups ported onto CustomerRef, stacked on INFRA-030: owner = `ProviderModel`, every segment is a rule (static = computed at save, dynamic = continuous, hand-picked = `id in [...]`), lens-driven validation + set/entity reconcile jobs through `withRule` (degraded, not paused; `ruleIssues` on the owner's reads), Segment → Segment edges, business-event triggers handled by jobs, four membership events (owner + member side), read-many pair on me/user/organization/space, nested Owned/Memberships pages in all three contexts
 
 ### ✅ Done
+- [DB-006: A rule that matches nobody matches nobody wherever it is composed](./DB-006-compiled-wheres-compose-through-the-fold.md) - compiled wheres compose through json-rules' `andWhere` / `orWhere`; a segment whose rule matched nobody had admitted every customer (Zealot ZLT-5489)
+- [DB-003: The endpoint decides soft-delete visibility](./DB-003-endpoint-decides-soft-delete-visibility.md) - Declared superadmin endpoints (the admin router) run unscoped; every other endpoint is live-scoped for every actor, superadmin included (ZLT-5486)
 - [INFRA-031: Jobs lane + lock port from Zealot](./archived/INFRA-031-jobs-lane-and-lock-port-from-zealot.md) - createLock refresh hardening (#104), slow lane as lowest priority + per-worker slot share + per-lane depth budget (matches Zealot #2438), row-state delivery claim
 - [DEV-003: Code Annotations & Sitemap](./archived/DEV-003-code-annotations-and-sitemap.md) - atlas code-map (`@atlas` + `MAP.md`) shipped (#50)
 - [FEAT-001: Inquiry System](./archived/FEAT-001-inquiry-system.md) - Generic workflow engine for multi-party approval flows
