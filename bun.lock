@@ -16,8 +16,8 @@
       },
       "devDependencies": {
         "@biomejs/biome": "2.5.2",
-        "@inixiative/atlas": "^0.2.0",
-        "@inixiative/config": "^0.5.76",
+        "@inixiative/atlas": "^0.3.0",
+        "@inixiative/config": "^0.5.102",
         "@lightpanda/browser": "^1.2.0",
         "@mendable/firecrawl-js": "^4.18.1",
         "@tanstack/react-router": "^1.166.2",
@@ -621,9 +621,9 @@
 
     "@img/sharp-win32-x64": ["@img/sharp-win32-x64@0.33.5", "", { "os": "win32", "cpu": "x64" }, "sha512-MpY/o8/8kj+EcnxwvrP4aTJSWw/aZ7JIGR4aBeZkZw5B7/Jn+tY9/VNwtcoGmdT7GfggGIU4kygOMSbYnOrAbg=="],
 
-    "@inixiative/atlas": ["@inixiative/atlas@0.2.0", "", { "dependencies": { "@inixiative/json-rules": "^3.3.1" }, "bin": { "atlas": "bin/atlas.ts" } }, "sha512-Lko2EMwJu64I+6minHob8+vsjZVLHX84nrR3lVZqAAw1jn/gAfrenVMpHkPzLAjyAgPk5LQ4o+5cvrdY1uXpAw=="],
+    "@inixiative/atlas": ["@inixiative/atlas@0.3.0", "", { "dependencies": { "@inixiative/json-rules": "^3.5.4" }, "bin": { "atlas": "bin/atlas.ts" } }, "sha512-FX3NzaPBq7HwPKEnXfwsBgkwg0SqD0lkmgYNfKhvLMBx7q29jW9cmCiyd46RPocmzbH71fbKBx7J4fUGRmdpMw=="],
 
-    "@inixiative/config": ["@inixiative/config@0.5.76", "", { "peerDependencies": { "@biomejs/biome": ">=2.5.0", "tsup": ">=8.5.0", "typescript": ">=6.0.0" }, "optionalPeers": ["@biomejs/biome", "tsup", "typescript"], "bin": { "inixiative-config": "dist/cli.js" } }, "sha512-uH5vRRu1EN2t6G2JMqTU3LfErnGagP5J8CxBXKGYF3LNsww48FLvEtzCVcSlUe1u5ReKUFt0ieYq01wgWqzKAg=="],
+    "@inixiative/config": ["@inixiative/config@0.5.102", "", { "peerDependencies": { "@biomejs/biome": ">=2.5.0", "tsup": ">=8.5.0", "typescript": ">=6.0.0" }, "optionalPeers": ["@biomejs/biome", "tsup", "typescript"], "bin": { "inixiative-config": "dist/cli.js" } }, "sha512-PhGxJ2151v0KDr8gXQIWgA5scVWxzI4TivsvMWQ767mT4N1QAkvmU86npc1EruTZolRTOYMWaZQP5WruZmEELQ=="],
 
     "@inixiative/json-rules": ["@inixiative/json-rules@3.5.4", "", { "dependencies": { "dayjs": "^1.11.13", "fastest-levenshtein": "^1.0.16", "re2js": "^2.8.6" }, "peerDependencies": { "@prisma/client": ">=6.0.0", "typescript": ">=6.0.0" }, "optionalPeers": ["@prisma/client", "typescript"] }, "sha512-Ow/M74grWwSStHizn34BZjdsN14aK6zf1NpHlwhMlwc+CtS53yT+aLRI/T0B5vX7lm/DVcD+ddIfEEQMkn1qYA=="],
 
