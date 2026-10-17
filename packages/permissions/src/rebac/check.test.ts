@@ -480,7 +480,12 @@ describe('rebac check', () => {
         'db:organizationUser': {
           actions: {
             // Can read your own membership, or if you have org read permission
-            read: { any: [{ self: 'userId' }, { rel: 'organization', action: 'read' }] },
+            read: {
+              any: [
+                { self: 'userId', action: 'read' },
+                { rel: 'organization', action: 'read' },
+              ],
+            },
             // Can only manage via org permission
             manage: { rel: 'organization', action: 'manage' },
           },
@@ -491,15 +496,16 @@ describe('rebac check', () => {
         'db:session': {
           actions: {
             // Can only access your own sessions
-            read: { self: 'userId' },
-            delete: { self: 'userId' },
+            read: { self: 'userId', action: 'read' },
+            delete: { self: 'userId', action: 'operate' },
           },
         },
       },
     };
 
-    it('grants access when userId matches current user', () => {
+    it('grants access when userId matches current user and it may read itself', async () => {
       permix.setUserId('user-123' as UserId);
+      await permix.setup({ resource: 'db:user', id: 'user-123', actions: { read: true } });
       const record = { id: 'ou-1', userId: 'user-123' };
       expect(check(permix, schema, 'organizationUser', record, 'read')).toBe(true);
     });
@@ -528,8 +534,17 @@ describe('rebac check', () => {
       expect(check(permix, schema, 'organizationUser', record, 'read')).toBe(true);
     });
 
-    it('self check uses specified field', () => {
+    it('denies a matching id that lacks the action on itself', async () => {
       permix.setUserId('user-123' as UserId);
+      await permix.setup({ resource: 'db:user', id: 'user-123', actions: { read: true } });
+      expect(check(permix, schema, 'session', { id: 's-1', userId: 'user-123' }, 'delete')).toBe(
+        false,
+      );
+    });
+
+    it('self check uses specified field', async () => {
+      permix.setUserId('user-123' as UserId);
+      await permix.setup({ resource: 'db:user', id: 'user-123', actions: { operate: true } });
       const sessionRecord = { id: 's-1', userId: 'user-123' };
       const otherRecord = { id: 's-2', userId: 'other-user' };
       expect(check(permix, schema, 'session', sessionRecord, 'delete')).toBe(true);
@@ -814,14 +829,13 @@ describe('rebac check', () => {
       expect(check(permix, schema, 'contact', record, 'read')).toBe(false);
     });
 
-    it('grants access via row rule that schema would deny', () => {
-      // Schema requires own → no direct permission means denied. Row rule
-      // grants any authenticated check via tautology rule.
+    it('grants access via row rule that schema would deny', async () => {
       permix.setUserId('user-1' as UserId);
+      await permix.setup({ resource: 'db:user', id: 'user-1', actions: { read: true } });
       const record = {
         id: 'c-1',
         userId: 'user-1',
-        permissionRules: { read: { self: 'userId' } },
+        permissionRules: { read: { self: 'userId', action: 'read' } },
       };
       expect(check(permix, schema, 'contact', record, 'read')).toBe(true);
     });
@@ -834,7 +848,7 @@ describe('rebac check', () => {
       const record = {
         id: 'c-1',
         userId: 'user-1',
-        permissionRules: { read: { self: 'userId' } },
+        permissionRules: { read: { self: 'userId', action: 'read' } },
       };
       expect(check(permix, schema, 'contact', record, 'read')).toBe(true);
     });
@@ -845,7 +859,7 @@ describe('rebac check', () => {
       const record = {
         id: 'c-1',
         userId: 'user-1',
-        permissionRules: { read: { self: 'userId' } },
+        permissionRules: { read: { self: 'userId', action: 'read' } },
       };
       expect(check(permix, schema, 'contact', record, 'read')).toBe(true);
     });
@@ -855,7 +869,7 @@ describe('rebac check', () => {
       const record = {
         id: 'c-1',
         userId: 'user-1',
-        permissionRules: { read: { self: 'userId' } },
+        permissionRules: { read: { self: 'userId', action: 'read' } },
       };
       expect(check(permix, schema, 'contact', record, 'read')).toBe(false);
     });
@@ -873,8 +887,9 @@ describe('rebac check', () => {
       expect(check(permix, schema, 'contact', record, 'read')).toBe(true);
     });
 
-    it('row rule with composed any/all works via additive merge', () => {
+    it('row rule with composed any/all works via additive merge', async () => {
       permix.setUserId('user-1' as UserId);
+      await permix.setup({ resource: 'db:user', id: 'user-1', actions: { read: true } });
       const record = {
         id: 'c-1',
         userId: 'user-1',
@@ -882,7 +897,7 @@ describe('rebac check', () => {
         permissionRules: {
           read: {
             any: [
-              { self: 'userId' },
+              { self: 'userId', action: 'read' },
               { rule: { field: 'shareToken', operator: Operator.equals, value: 'public' } },
             ],
           },
@@ -912,7 +927,7 @@ describe('rebac check', () => {
       const record = {
         id: 'c-1',
         userId: 'user-1',
-        permissionRules: { read: { self: 'userId' } },
+        permissionRules: { read: { self: 'userId', action: 'read' } },
       };
       expect(check(permix, schema, 'contact', record, 'read')).toBe(true);
     });

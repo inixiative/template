@@ -96,8 +96,13 @@ export const rebacSchema: RebacSchema = {
 
     'db:organizationUser': {
       actions: {
-        read: { any: [{ self: 'userId' }, { rel: 'organization', action: 'read' }] },
-        leave: { self: 'userId' },
+        read: {
+          any: [
+            { self: 'userId', action: 'read' },
+            { rel: 'organization', action: 'read' },
+          ],
+        },
+        leave: { self: 'userId', action: 'operate' },
         manage: { rel: 'organization', action: 'manage' },
         own: { rel: 'organization', action: 'own' },
         'membership.own': null,
@@ -109,8 +114,13 @@ export const rebacSchema: RebacSchema = {
 
     'db:spaceUser': {
       actions: {
-        read: { any: [{ self: 'userId' }, { rel: 'space', action: 'read' }] },
-        leave: { self: 'userId' },
+        read: {
+          any: [
+            { self: 'userId', action: 'read' },
+            { rel: 'space', action: 'read' },
+          ],
+        },
+        leave: { self: 'userId', action: 'operate' },
         manage: { rel: 'space', action: 'manage' },
         own: { rel: 'space', action: 'own' },
         'membership.own': null,
@@ -127,7 +137,7 @@ export const rebacSchema: RebacSchema = {
     'db:token': {
       actions: {
         // Self-delete for tokens with a userId (User, OrgUser, SpaceUser).
-        leave: { self: 'userId' },
+        leave: { self: 'userId', action: 'operate' },
         // Owner-side assign, role-aware.
         assign: {
           any: [
@@ -169,10 +179,10 @@ export const rebacSchema: RebacSchema = {
         // Read: source or target can read their own inquiry
         read: {
           any: [
-            { self: 'sourceUserId' },
+            { self: 'sourceUserId', action: 'read' },
             { rel: 'sourceOrganization', action: 'manage' },
             { rel: 'sourceSpace', action: 'manage' },
-            { self: 'targetUserId' },
+            { self: 'targetUserId', action: 'read' },
             { rel: 'targetOrganization', action: 'manage' },
             { rel: 'targetSpace', action: 'manage' },
           ],
@@ -186,7 +196,7 @@ export const rebacSchema: RebacSchema = {
             {
               all: [
                 { rule: { field: 'type', operator: Operator.in, value: [] } },
-                { self: 'sourceUserId' },
+                { self: 'sourceUserId', action: 'operate' },
               ],
             },
             // inviteOrganizationUser: high roles (owner/admin) require own
@@ -237,7 +247,10 @@ export const rebacSchema: RebacSchema = {
                   rule: { field: 'type', operator: Operator.in, value: ['grantUserEntitlements'] },
                 },
                 {
-                  any: [{ self: 'sourceUserId' }, { rel: 'sourceIntegration', action: 'manage' }],
+                  any: [
+                    { self: 'sourceUserId', action: 'operate' },
+                    { rel: 'sourceIntegration', action: 'manage' },
+                  ],
                 },
               ],
             },
@@ -258,7 +271,7 @@ export const rebacSchema: RebacSchema = {
                     value: ['grantUserEntitlements'],
                   },
                 },
-                { self: 'targetUserId' },
+                { self: 'targetUserId', action: 'operate' },
               ],
             },
             {
@@ -266,7 +279,7 @@ export const rebacSchema: RebacSchema = {
                 {
                   rule: { field: 'type', operator: Operator.in, value: ['grantUserEntitlements'] },
                 },
-                { self: 'targetUserId' },
+                { self: 'targetUserId', action: 'operate' },
                 { rel: 'targetUser', action: 'token.create' },
               ],
             },
@@ -298,8 +311,8 @@ export const rebacSchema: RebacSchema = {
             { rule: { field: 'type', operator: Operator.in, value: ['grantUserEntitlements'] } },
             {
               any: [
-                { self: 'sourceUserId' },
-                { self: 'targetUserId' },
+                { self: 'sourceUserId', action: 'operate' },
+                { self: 'targetUserId', action: 'operate' },
                 { rel: 'sourceIntegration', action: 'manage' },
                 { rel: 'targetOrganization', action: 'manage' },
                 { rel: 'targetSpace', action: 'manage' },

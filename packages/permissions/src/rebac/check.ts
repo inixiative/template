@@ -25,7 +25,7 @@ const resolveRelation: ResolveRelation = (resource, relationName) => {
   return `db:${lowerFirst(field.type)}`;
 };
 
-const rebacCheck = createRebacCheck(resolveRelation);
+const rebacCheck = createRebacCheck(resolveRelation, { selfResource: 'db:user' });
 
 export const check = (
   permix: Permix,
