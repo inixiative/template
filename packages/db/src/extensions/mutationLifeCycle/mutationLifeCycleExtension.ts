@@ -5,15 +5,13 @@
  * @uses none
  */
 import { DbAction } from '@template/db/extensions/hookRegistry';
-import { intercept, type MutationArgs } from '@template/db/extensions/mutationLifeCycle/intercept';
+import { intercept } from '@template/db/extensions/mutationLifeCycle/intercept';
 import {
   fetchExistingRecord,
   fetchExistingRecords,
 } from '@template/db/extensions/mutationLifeCycle/loadPrevious';
 import { claimPendingRegistration } from '@template/db/extensions/transactionRegistry';
 import { Prisma } from '@template/db/generated/client/client';
-
-const dataOf = (args: MutationArgs) => args.data;
 
 export const mutationLifeCycleExtension = Prisma.defineExtension({
   name: 'mutationLifeCycle',
@@ -24,7 +22,7 @@ export const mutationLifeCycleExtension = Prisma.defineExtension({
         return params.query(params.args);
       },
 
-      create: intercept(DbAction.create, { invariantData: dataOf }),
+      create: intercept(DbAction.create),
 
       async createMany({ model }) {
         throw new Error(
@@ -33,10 +31,9 @@ export const mutationLifeCycleExtension = Prisma.defineExtension({
         );
       },
 
-      createManyAndReturn: intercept(DbAction.createManyAndReturn, { invariantData: dataOf }),
+      createManyAndReturn: intercept(DbAction.createManyAndReturn),
 
       update: intercept(DbAction.update, {
-        invariantData: dataOf,
         loadPrevious: fetchExistingRecord,
       }),
 
@@ -48,12 +45,10 @@ export const mutationLifeCycleExtension = Prisma.defineExtension({
       },
 
       updateManyAndReturn: intercept(DbAction.updateManyAndReturn, {
-        invariantData: dataOf,
         loadPrevious: fetchExistingRecords,
       }),
 
       upsert: intercept(DbAction.upsert, {
-        invariantData: ({ create, update }) => [create, update],
         loadPrevious: fetchExistingRecord,
       }),
 

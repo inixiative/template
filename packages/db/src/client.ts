@@ -33,6 +33,7 @@ import { Prisma, PrismaClient } from '@template/db/generated/client/client';
 import { prismaMap } from '@template/db/generated/prismaMap';
 import { auditActorContext } from '@template/db/lib/auditActorContext';
 import { acquireFindForUpdateLock } from '@template/db/lock/acquireFindForUpdateLock';
+import { registerTestTracker } from '@template/db/test/testTracker';
 import type { RuntimeDelegate } from '@template/db/utils/delegates';
 import {
   type AccessorName,
@@ -239,6 +240,9 @@ const dbMethods = {
   withDeleted: <T>(fn: () => T | Promise<T>): Promise<Awaited<T>> =>
     auditActorContext.withSoftDeleteBypass(fn),
 
+  withSoftDeleteScope: <T>(fn: () => T | Promise<T>): Promise<Awaited<T>> =>
+    auditActorContext.withSoftDeleteScope(fn),
+
   getScopeId: (): string | null => store.getStore()?.scopeId ?? null,
 
   getScope: (): ScopeContext | null => store.getStore()?.scopeContext ?? null,
@@ -359,3 +363,7 @@ export const db: Db = new Proxy({} as Db, {
     return bareDelegate(prop);
   },
 });
+
+// Every process that loads the client in a test environment tracks the tables it writes, so a test
+// never registers the tracker itself and can't forget to. Outside test this is a no-op.
+registerTestTracker();

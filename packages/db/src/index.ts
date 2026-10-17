@@ -5,19 +5,14 @@ export type { Db, FinallyFn, FindForUpdateOptions } from './clientTypes';
 export {
   clearHookRegistry,
   DbAction,
-  type DbInvariant,
-  type DbInvariantAction,
-  type DbInvariantOptions,
   executeHooks,
   type HookFunction,
   type HookOptions,
   HookTiming,
   type ManyAction,
   registerDbHook,
-  registerDbInvariant,
   type SingleAction,
   unregisterDbHook,
-  unregisterDbInvariant,
 } from './extensions/hookRegistry';
 // Prisma namespace for advanced types (Prisma.UserWhereInput, etc.)
 export { Prisma } from './generated/client/client';
@@ -113,7 +108,7 @@ export {
   type RuntimeDelegate,
   update,
 } from './utils/delegates';
-export { hasDeletedAt, lookupField, modelFields } from './utils/fieldMetadata';
+export { hasDeletedAt, lookupField, modelFields, SOFT_DELETE_MODELS } from './utils/fieldMetadata';
 // Prisma error narrowing
 export { isUniqueConstraintError } from './utils/isUniqueConstraintError';
 export { isWriteConflictError } from './utils/isWriteConflictError';

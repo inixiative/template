@@ -8,7 +8,7 @@ import { SLOW_LANE_PRIORITY } from '#/jobs/lanePriority';
 import { flagKey } from '#/jobs/outbox/config';
 import { queue } from '#/jobs/queue';
 import { readSlowDeferred } from '#/jobs/slowLaneSignals';
-import { type JobData, JobLane, JobType } from '#/jobs/types';
+import { type JobData, JobLane, type JobOptions, JobType } from '#/jobs/types';
 
 const envelope = (lane: JobLane): JobData => ({ type: JobType.adhoc, lane, payload: { lane } });
 
@@ -47,7 +47,7 @@ describe('enqueueOrSpill', () => {
     added.length = 0;
     Object.assign(counts, { waiting: 0, prioritized: 0, active: 0 });
     await queue.redis.flushdb();
-    await db.jobOutbox.deleteMany({});
+    await cleanupTouchedTables(db);
   });
 
   afterAll(async () => {
@@ -58,7 +58,7 @@ describe('enqueueOrSpill', () => {
   const place = (
     lane: JobLane,
     jobId: string,
-    options: { priority?: number; delay?: number } = {},
+    options: Pick<JobOptions, 'priority' | 'delay' | 'parent'> = {},
   ) =>
     enqueueOrSpill({
       handlerName: 'sendWebhook',
@@ -112,6 +112,18 @@ describe('enqueueOrSpill', () => {
     const [row] = await db.jobOutbox.findMany();
     expect(row).toMatchObject({ jobId: 'slow-spilled', lane: JobLane.slow });
     expect((row?.options as { priority?: number }).priority).toBe(SLOW_LANE_PRIORITY);
+  });
+
+  it('adds a flow child straight to the queue even when its lane is over pressure', async () => {
+    await queue.redis.set(flagKey(JobLane.fast), String(Date.now()));
+
+    const result = await place(JobLane.fast, 'flow-child', {
+      parent: { id: 'parent-job', queue: 'bull:jobs' },
+    });
+
+    expect(result).toEqual({ jobId: 'flow-child' });
+    expect(added.map((a) => a.jobId)).toEqual(['flow-child']);
+    expect(await db.jobOutbox.findMany()).toHaveLength(0);
   });
 
   it('spills both lanes when the whole budget is over pressure', async () => {

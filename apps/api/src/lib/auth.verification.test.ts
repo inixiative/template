@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, expect, spyOn, test } from 'bun:test';
 import { db } from '@template/db';
-import { cleanupTouchedTables, createEmailTemplate, registerTestTracker } from '@template/db/test';
+import { cleanupTouchedTables, createEmailTemplate } from '@template/db/test';
 import type { SendEmailOptions } from '@template/email/client/types';
 import { appEventHandlers } from '#/appEvents/handlers';
 import type { UserVerificationRequestedPayload } from '#/appEvents/handlers/user/userVerificationRequested';
@@ -16,7 +16,6 @@ const verifier = spyOn(emailVerifier, 'verify').mockImplementation(async (email)
 }));
 
 beforeAll(() => {
-  registerTestTracker();
   for (const { name } of adapters) emailRegistry.unregister(name);
   emailRegistry.register('signup-recorder', {
     send: async (options) => {

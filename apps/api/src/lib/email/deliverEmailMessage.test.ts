@@ -13,15 +13,12 @@ import {
   createTagAttachment,
   createTagCategory,
   createUser,
-  registerTestTracker,
 } from '@template/db/test';
 import type { EmailClient, SendEmailOptions, SendEmailResult } from '@template/email/client/types';
 import { EmailProviderError } from '@template/email/errors/EmailProviderError';
 import { saveEmailTemplate } from '@template/email/render';
 import { emailRegistry, emailVerifier } from '#/lib/email';
 import { type DeliverEmailPayload, deliverEmailMessage } from '#/lib/email/deliverEmailMessage';
-
-registerTestTracker();
 
 const ADAPTER = 'claim-policy-recorder';
 const TEMPLATE = 'claim-policy-template';

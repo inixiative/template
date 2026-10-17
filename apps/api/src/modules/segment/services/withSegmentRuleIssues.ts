@@ -27,7 +27,7 @@ export const withSegmentsRuleIssues = async (
     ? await segmentRuleStates(closing)
     : new Map();
   return segments.map((segment) => ({
-    ...omit(segment, 'ruleReferences'),
+    ...omit(segment, 'sourceRuleReferences'),
     ruleIssues: direct.get(segment.id) ?? states.get(segment.id)?.issues ?? [],
   }));
 };

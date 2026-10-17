@@ -133,6 +133,84 @@ describe('makeSingletonJob', () => {
     );
   });
 
+  describe('with lockKey', () => {
+    type ChannelPayload = { sourceId: string; mode: string };
+    const channelKey = ({ sourceId, mode }: ChannelPayload) => `${sourceId}:${mode}`;
+    const keyedLock = (payload: ChannelPayload) =>
+      `${redisNamespace.lock}:job-singleton:singleton-job:${channelKey(payload)}`;
+    const ADP_FULL = { sourceId: 'adp', mode: 'full' };
+    const ADP_DELTA = { sourceId: 'adp', mode: 'delta' };
+
+    afterEach(async () => {
+      await ctx.queue.redis.del(keyedLock(ADP_FULL), keyedLock(ADP_DELTA));
+    });
+
+    test('skips a second run with the same key while the first holds it', async () => {
+      const started = deferred();
+      const gate = deferred();
+      const firstRun = makeSingletonJob<ChannelPayload>(
+        async () => {
+          started.resolve();
+          await gate.promise;
+        },
+        { lockKey: channelKey },
+      )(ctx, ADP_FULL);
+      await started.promise;
+
+      const secondHandler = mock(async () => {});
+      await makeSingletonJob<ChannelPayload>(secondHandler, { lockKey: channelKey })(
+        singletonContext('second-job'),
+        ADP_FULL,
+      );
+
+      expect(secondHandler).not.toHaveBeenCalled();
+      gate.resolve();
+      await firstRun;
+      expect(await ctx.queue.redis.get(keyedLock(ADP_FULL))).toBeNull();
+    });
+
+    test('runs two different keys of the same handler at the same time', async () => {
+      const started = deferred();
+      const gate = deferred();
+      const firstRun = makeSingletonJob<ChannelPayload>(
+        async () => {
+          started.resolve();
+          await gate.promise;
+        },
+        { lockKey: channelKey },
+      )(ctx, ADP_FULL);
+      await started.promise;
+
+      const secondHandler = mock(async () => {});
+      await makeSingletonJob<ChannelPayload>(secondHandler, { lockKey: channelKey })(
+        singletonContext('second-job'),
+        ADP_DELTA,
+      );
+
+      expect(secondHandler).toHaveBeenCalledTimes(1);
+      gate.resolve();
+      await firstRun;
+    });
+
+    test('does not take the data.id lane', async () => {
+      const started = deferred();
+      const gate = deferred();
+      const firstRun = makeSingletonJob<ChannelPayload>(
+        async () => {
+          started.resolve();
+          await gate.promise;
+        },
+        { lockKey: channelKey },
+      )(ctx, ADP_FULL);
+      await started.promise;
+
+      expect(await ctx.queue.redis.get(LOCK_KEY)).toBeNull();
+      expect(await ctx.queue.redis.get(keyedLock(ADP_FULL))).toHaveLength(36);
+      gate.resolve();
+      await firstRun;
+    });
+  });
+
   test('warns without reporting lock loss when the release cannot be confirmed', async () => {
     const backingRedis = ctx.queue.redis;
     let hasThrown = false;

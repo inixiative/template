@@ -44,6 +44,7 @@ export type DbMethods = {
     ): Promise<PromiseSettledResult<T>[]>;
   };
   withDeleted: <T>(fn: () => T | Promise<T>) => Promise<Awaited<T>>;
+  withSoftDeleteScope: <T>(fn: () => T | Promise<T>) => Promise<Awaited<T>>;
   getScopeId: () => string | null;
   getScope: () => ScopeContext | null;
   isInTxn: () => boolean;

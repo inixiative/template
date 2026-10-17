@@ -2,7 +2,6 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { clearHookRegistry, DbAction, db, HookTiming, registerDbHook } from '@template/db';
 import { cleanupTouchedTables } from '@template/db/test';
-import { registerTestTracker } from '@template/db/test/testTracker';
 import { saveEmailTemplate } from '@template/email/render';
 
 // saveEmailTemplate is the deterministic case in this repo where async-local storage does not
@@ -45,8 +44,6 @@ const observe = (hook: string, model: string) => {
     isInTxn: db.isInTxn(),
   });
 };
-
-registerTestTracker();
 
 // Declared across two hooks with an overlapping subset: beta is named twice, and the stores are a
 // single union applied to every hook, so hookA observes gamma even though hookB declared it.

@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
 import { type Condition, Operator } from '@inixiative/json-rules';
 import { clearHookRegistry, db, ruleReferences, syncRuleReferenceEdges } from '@template/db';
 import type { Space } from '@template/db/generated/client/client';
@@ -77,6 +77,9 @@ describe('ruleReference — edges under concurrency and repair', () => {
     registerSegmentRuleReferencesHook();
     registerRuleReferenceTargetHook();
     registerSoftDeleteCascadeHook();
+  });
+
+  beforeEach(async () => {
     const { context } = await createOrganizationUser({ role: 'admin' });
     space = (await createSpace({}, { organization: context.organization })).entity;
     owner = { ownerModel: 'Space', ownerId: space.id };
@@ -88,7 +91,7 @@ describe('ruleReference — edges under concurrency and repair', () => {
   });
 
   afterEach(async () => {
-    await db.ruleReference.deleteMany({});
+    await cleanupTouchedTables(db);
   });
 
   describe('a save racing the delete of the row it names', () => {

@@ -77,7 +77,7 @@ const bridgedStores = new Set<AsyncLocalStorage<unknown>>();
 
 export const registerDbHook = <T = Record<string, unknown>>(
   name: string,
-  model: string | string[] | '*',
+  model: string | readonly string[] | '*',
   timing: HookTiming,
   actions: DbAction[],
   hook: HookFunction<T>,
@@ -94,7 +94,7 @@ export const registerDbHook = <T = Record<string, unknown>>(
 
   hookRegistry.add(name);
   hookRegistrations.set(name, {
-    targets: castArray(model),
+    targets: [...castArray(model)],
     timing,
     actions,
     hook: hook as HookFunction,
@@ -167,70 +167,13 @@ export const runInBridgedContext = <TResult>(
   return enter(0);
 };
 
+// The test tracker belongs to the test process, not to any one test: the db client registers it
+// once, so clearing a test's hooks must not take it with them or every later file stops tracking.
+const PROCESS_HOOKS = new Set(['testTracker']);
+
 export const clearHookRegistry = () => {
-  hookRegistry.clear();
-  hookRegistrations.clear();
+  for (const name of [...hookRegistry]) {
+    if (!PROCESS_HOOKS.has(name)) unregisterDbHook(name);
+  }
   bridgedStores.clear();
-  for (const model of Object.keys(registeredHooks)) {
-    delete registeredHooks[model];
-  }
-};
-
-export type DbInvariantAction = Exclude<DbAction, DbAction.delete | DbAction.deleteMany>;
-
-export type DbInvariantOptions = {
-  model: ModelName;
-  action: DbInvariantAction;
-  data: unknown;
-};
-
-export type DbInvariant = (options: DbInvariantOptions) => void | Promise<void>;
-
-type DbInvariantRegistration = { targets: string[]; invariant: DbInvariant };
-
-const registeredInvariants: Record<string, DbInvariantRegistration[]> = {};
-
-const invariantRegistrations = new Map<string, DbInvariantRegistration>();
-
-export const registerDbInvariant = (
-  name: string,
-  model: string | string[] | '*',
-  invariant: DbInvariant,
-) => {
-  if (invariantRegistrations.has(name)) {
-    log.warn(`Invariant '${name}' already registered - skipping duplicate`, LogScope.hook);
-    return;
-  }
-
-  const registration: DbInvariantRegistration = { targets: castArray(model), invariant };
-  invariantRegistrations.set(name, registration);
-  for (const target of registration.targets) {
-    registeredInvariants[target] ??= [];
-    registeredInvariants[target].push(registration);
-  }
-};
-
-export const unregisterDbInvariant = (name: string) => {
-  const registration = invariantRegistrations.get(name);
-  if (!registration) return;
-  for (const target of registration.targets) {
-    registeredInvariants[target] = (registeredInvariants[target] ?? []).filter(
-      (candidate) => candidate !== registration,
-    );
-  }
-  invariantRegistrations.delete(name);
-};
-
-export const runInvariants = async (
-  model: ModelName,
-  action: DbInvariantAction,
-  data: unknown,
-): Promise<void> => {
-  const registrations = new Set([
-    ...(registeredInvariants[model] ?? []),
-    ...(registeredInvariants['*'] ?? []),
-  ]);
-  for (const { invariant } of registrations) {
-    await invariant({ model, action, data });
-  }
 };

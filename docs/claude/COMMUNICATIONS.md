@@ -777,7 +777,7 @@ edges are persisted so that "who references X" is an index and a stale rule is n
   axis therefore carries true polymorphism beside the false — the FK is the relation and may go
   null, `targetId` is the name and never changes, and the sync writes both from one value.
   `ruleReferenceIssues(edges)` reads both from the edge rows alone, so consumers
-  write `include: { ruleReferences: true }` and never grow that include as models become
+  write `include: { sourceRuleReferences: true }` and never grow that include as models become
   referenceable. At render, `composeTemplate` reads the template's edges plus those of the
   components the cascade resolved into one live set, and every branch goes through **`withRule`**
   (`@template/shared/rules`) — the one fork a stored rule is evaluated through anywhere.

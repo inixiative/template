@@ -39,7 +39,11 @@ export const enqueueOrSpill = async ({
   const baton = data.dedupeKey ? laneKey(handlerName, data.dedupeKey) : undefined;
   const lane = outboxLaneOf({ data });
   const jobOptions = withLanePriority(data, options);
-  const overflowing = data.type === JobType.adhoc && !bypass && (await isLaneOverflowing(lane));
+  // A flow child (`parent` set by a stage's enqueueChildJob) never spills: the drain's re-add would
+  // lose its parent link, and the parent would wait on a child BullMQ never heard of.
+  const isFlowChild = options.parent !== undefined;
+  const overflowing =
+    data.type === JobType.adhoc && !bypass && !isFlowChild && (await isLaneOverflowing(lane));
 
   if (shouldSpill(data.type, bypass, overflowing)) {
     // Claim at SPILL time too, not just at drain: the newest enqueue must hold the baton even while

@@ -1,12 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import { getNextSeq } from '@template/db/test/factory';
-import { cleanupTouchedTables, registerTestTracker } from '@template/db/test/testTracker';
+import { cleanupTouchedTables } from '@template/db/test/testTracker';
 
 describe('db.onFinally', () => {
-  beforeEach(() => {
-    registerTestTracker();
-  });
+  beforeEach(() => {});
 
   afterEach(async () => {
     await cleanupTouchedTables(db);

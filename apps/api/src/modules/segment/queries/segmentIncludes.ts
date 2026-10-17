@@ -19,5 +19,5 @@ export const includeSegmentForCustomer = {
 } as const satisfies Prisma.SegmentMemberInclude;
 
 export const includeSegmentRuleReferences = {
-  ruleReferences: true,
+  sourceRuleReferences: true,
 } as const satisfies Prisma.SegmentInclude;

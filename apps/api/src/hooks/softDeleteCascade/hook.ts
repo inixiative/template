@@ -8,9 +8,8 @@ import {
   DbAction,
   type HookOptions,
   HookTiming,
-  hasDeletedAt,
-  modelNames,
   registerDbHook,
+  SOFT_DELETE_MODELS,
 } from '@template/db';
 import { castArray } from 'lodash-es';
 import { reviveChildren, tombstoneChildren } from '#/hooks/softDeleteCascade/cascade';
@@ -33,7 +32,7 @@ export const registerSoftDeleteCascadeHook = () => {
   validateDeleteBehavior();
   registerDbHook(
     'softDeleteCascade',
-    modelNames.filter(hasDeletedAt),
+    SOFT_DELETE_MODELS,
     HookTiming.after,
     [DbAction.update, DbAction.updateManyAndReturn, DbAction.upsert],
     async ({ model, action, args, result, previous }: HookOptions) => {

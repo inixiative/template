@@ -8,7 +8,6 @@ import {
   createOrganization,
   createSpace,
   createUser,
-  registerTestTracker,
 } from '@template/db/test';
 import type { EmailClient, SendEmailOptions } from '@template/email/client/types';
 import { saveEmailTemplate } from '@template/email/render';
@@ -16,8 +15,6 @@ import { registerAuditLogHook } from '#/hooks/auditLog/hook';
 import { registerEmailVersioningHook } from '#/hooks/emailVersioning/hook';
 import { type DeliverEmailPayload, deliverEmail } from '#/jobs/handlers/deliverEmail';
 import { emailRegistry } from '#/lib/email';
-
-registerTestTracker();
 
 const ADAPTER = 'closure-recorder';
 

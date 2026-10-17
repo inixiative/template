@@ -67,11 +67,7 @@ describe('ruleReference — the save path writes edges, the target side stamps t
   });
 
   afterEach(async () => {
-    await db.ruleReference.deleteMany({});
-    await db.withDeleted(async () => {
-      await db.$executeRaw`DELETE FROM "EmailTemplate"`;
-      await db.$executeRaw`DELETE FROM "EmailComponent"`;
-    });
+    await cleanupTouchedTables(db);
   });
 
   it('a template naming a tag in its body gets one typed edge to that tag', async () => {

@@ -18,11 +18,15 @@
   - [ctx.log() - Dual-Write Logging](#ctxlog---dual-write-logging)
   - [Singleton Job](#singleton-job)
   - [Superseding Job](#superseding-job)
+  - [Staged Job (Fan Out and Wait)](#staged-job-fan-out-and-wait)
 - [Enqueuing Jobs](#enqueuing-jobs)
 - [Fast and Slow Lanes](#fast-and-slow-lanes)
   - [Choosing a Lane](#choosing-a-lane)
   - [Priority: Fast Work Is Always Picked First](#priority-fast-work-is-always-picked-first)
+  - [Slots: Slow Work Uses at Most Its Share](#slots-slow-work-uses-at-most-its-share)
   - [Pressure: One Budget, Divided by Lane](#pressure-one-budget-divided-by-lane)
+    - [The Deferral List](#the-deferral-list)
+    - [Slow-Lane Signals](#slow-lane-signals)
   - [Lane Configuration](#lane-configuration)
   - [Validating Against Real Infrastructure](#validating-against-real-infrastructure)
 - [Overflow Buffer](#overflow-buffer)
@@ -267,6 +271,33 @@ How it works:
 2. The running job's `watchLane` polls its lane (~500ms); a different holder means it was usurped
 3. Usurped jobs abort via `ctx.signal` and exit gracefully
 
+**Superseding does not kill.** `makeSupersedingJob` stops *waiting* for the old run; it does not stop it. Workers run handlers in-process, so the superseded handler's promise keeps running to the end. The signal is cooperative: `fetch`, timers and your own loops can honour it, Prisma queries cannot. A superseded run must therefore never write: check `ctx.signal.aborted` before every write, or fence the write against the lane.
+
+### Staged Job (Fan Out and Wait)
+
+When a job fans out work and must not finish (or run again) until every piece is done, give `makeJob` stages instead of a handler. Never hand-roll the waiting: no pending hash in Redis, no polling loop, no "refire whatever is still pending".
+
+```typescript
+export const refreshThings = makeJob<RefreshThingsPayload>({
+  stages: [
+    async (ctx, payload) => {
+      for (const thing of await listThings(payload)) {
+        await ctx.enqueueChildJob('refreshThing', { thingId: thing.id });
+      }
+    },
+    // a second stage runs only after every child of the first has reported
+  ],
+  finish: async (ctx, payload) => { /* runs once, after the last stage's children */ },
+});
+```
+
+- **Stages run in order; each waits for the children it added.** The job is a BullMQ flow parent run as a step job (`runJobStages`). The next stage is stored on the job envelope (`data.stage`), so a resumed run starts there and an earlier stage never runs twice. After a stage that added children the job parks in `waiting-children`, holding no worker slot, and BullMQ runs it again once the last child has reported. A stage that added none runs straight into the next.
+- **`ctx.enqueueChildJob` exists only inside a stage**, so only a job can have children. It adds the child with the running job as its `parent` and `ignoreDependencyOnFailure`: a child keeps the queue's retries, and only after its last attempt fails does it count as done, so a dead child never holds its parent open. Never pass `parent` to `enqueueJob` yourself.
+- **A flow child never spills to the outbox** (see [Spill Routing](#spill-routing)): the drained re-add would lose its parent link.
+- **One open parent at a time:** add the parent under a fixed `jobId` with `removeOnComplete`/`removeOnFail` set. BullMQ refuses a second job with an id still in the queue, and the id frees the moment the parent finishes. Whatever adds the parent (a cron root, say) just adds it and finishes: it is not itself a parent.
+- **Tests:** an inline run has no worker token, so children run inline as they are added, the stages and `finish` run in order within one call, and a child that throws is logged and swallowed, as `ignoreDependencyOnFailure` does under a worker.
+- A worker that dies mid-stage reruns that stage and may add its children twice. Children must be idempotent.
+
 ---
 
 ## Enqueuing Jobs
@@ -391,7 +422,7 @@ A durable buffer in front of BullMQ. When queue depth crosses a cap, an overflow
 
 ### Spill Routing
 
-`shouldSpill(type, bypass, overflowing)` is a pure predicate: spill only when `type === 'adhoc' && !bypass && overflowing`. Cron and cronTrigger jobs always go direct — only `adhoc` jobs are ever buffered. On a direct `adhoc` add, `tripIfFull()` flips the flag if that add crossed the cap (fresh, uncached probe to avoid overshoot on a ramp).
+`shouldSpill(type, bypass, overflowing)` is a pure predicate: spill only when `type === 'adhoc' && !bypass && overflowing`. A flow child (an enqueue carrying `parent`, added by a staged job's `enqueueChildJob`) never counts as overflowing and always goes direct: the drain's re-add would lose its parent link. Cron and cronTrigger jobs always go direct — only `adhoc` jobs are ever buffered. On a direct `adhoc` add, `tripIfFull()` flips the flag if that add crossed the cap (fresh, uncached probe to avoid overshoot on a ramp).
 
 ### Accumulator
 
