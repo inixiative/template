@@ -201,7 +201,7 @@ import { authMiddleware } from '#/middleware/auth/authMiddleware';
 // Cross-package (from anywhere)
 import { db } from '@template/db';
 import { log } from '@template/shared/logger';
-import { setupOrgContext } from '@template/permissions';
+import { capSlice } from '@template/permissions';
 
 // Within a shared package - ALSO use @template/
 // packages/db/src/extensions/mutationLifeCycle/mutationLifeCycleExtension.ts

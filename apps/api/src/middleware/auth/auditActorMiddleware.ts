@@ -13,7 +13,7 @@ import { findOwnedIntegration } from '#/modules/integration/services/findOwnedIn
 import type { AppEnv } from '#/types/appEnv';
 
 const resolveOriginIntegrationId = async (c: Context<AppEnv>): Promise<string | null> => {
-  const boundIntegrationId = c.get('token')?.integrationId ?? null;
+  const boundIntegrationId = c.get('token')?.integrationId ?? c.get('slice')?.integrationId ?? null;
   if (boundIntegrationId) return boundIntegrationId;
 
   const asserted = c.req.header('x-integration-id');

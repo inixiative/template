@@ -5,36 +5,32 @@
  * @uses infrastructure:prisma
  */
 import type { UserId } from '@template/db';
-import { type Entitlements, getUserPermissions } from '@template/permissions';
+import { capSlice, getUserPermissions, UserAction, userLoginGrant } from '@template/permissions';
 import type { Context } from 'hono';
-import { validateRole } from '#/lib/permissions/validateRole';
+import { getPrincipalSlice } from '#/lib/permissions/getPrincipalSlice';
 import type { AppEnv } from '#/types/appEnv';
+
+const membershipTokenModels = ['OrganizationUser', 'SpaceUser'];
 
 export const setupUserPermissions = async (c: Context<AppEnv>) => {
   const permix = c.get('permix');
   const user = c.get('user');
-  const token = c.get('token');
-
-  // No user → no user permissions
   if (!user) return;
 
-  // Org or OrgUser tokens are org-scoped, don't get user permissions
-  if (token?.ownerModel === 'Organization' || token?.ownerModel === 'OrganizationUser') {
-    return;
-  }
-
-  // User token → restricted by token role
-  if (token?.ownerModel === 'User') {
+  const token = c.get('token');
+  if (token && membershipTokenModels.includes(token.ownerModel)) {
     await permix.setup(
-      getUserPermissions(
-        user.id as UserId,
-        validateRole(token.role),
-        token.entitlements as Entitlements,
-      ),
+      getUserPermissions(user.id as UserId, 'viewer', { [UserAction.identify]: true }, true),
     );
     return;
   }
 
-  // Session auth → owner (full permissions)
-  await permix.setup(getUserPermissions(user.id as UserId));
+  const slice = getPrincipalSlice(c);
+  const grant = slice
+    ? capSlice('db:user', userLoginGrant, slice)
+    : { ...userLoginGrant, entitlementsOnly: false };
+
+  await permix.setup(
+    getUserPermissions(user.id as UserId, grant.role, grant.entitlements, grant.entitlementsOnly),
+  );
 };

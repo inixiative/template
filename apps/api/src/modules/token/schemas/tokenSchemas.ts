@@ -11,6 +11,8 @@ import { Role } from '@template/db/generated/client/enums';
 export const tokenCreateBodySchema = z.object({
   name: z.string().min(1).max(100),
   role: z.nativeEnum(Role),
+  entitlements: z.record(z.string(), z.boolean()).nullable().optional(),
+  entitlementsOnly: z.boolean().optional(),
   expiresAt: z.coerce.date().optional(),
 });
 

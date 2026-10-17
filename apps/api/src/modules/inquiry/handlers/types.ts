@@ -49,6 +49,7 @@ export type InquiryHandler<
   validate?(db: Db, inquiry: Partial<Inquiry>, content: TContent): Promise<void>;
   autoApprove(db: Db, inquiry: Inquiry): Promise<boolean>;
   unique?: 'targeted' | 'untargeted';
+  revocable?: boolean;
   defaultExpirationDays?: number;
   appEvents?: InquiryAppEvents;
   // Optional: when redactUser scrubs a user's source/target on an inquiry,

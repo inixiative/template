@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import {
   greaterRole,
-  intersectEntitlements,
   isSuperadmin,
   lesserRole,
   roleHierarchy,
@@ -77,40 +76,5 @@ describe('greaterRole', () => {
     for (const role of roleHierarchy) {
       expect(greaterRole(role, role)).toBe(role);
     }
-  });
-});
-
-describe('intersectEntitlements', () => {
-  it('returns null when all null/undefined', () => {
-    expect(intersectEntitlements(null, null)).toBe(null);
-    expect(intersectEntitlements(undefined, undefined)).toBe(null);
-    expect(intersectEntitlements()).toBe(null);
-  });
-
-  it('returns the defined entitlements when others are null', () => {
-    const ent = { canExport: true };
-    expect(intersectEntitlements(ent, null)).toEqual(ent);
-    expect(intersectEntitlements(null, ent)).toEqual(ent);
-    expect(intersectEntitlements(null, ent, undefined)).toEqual(ent);
-  });
-
-  it('returns intersection of N entitlements', () => {
-    const a = { canExport: true, canImport: true };
-    const b = { canExport: true, canDelete: true };
-    const c = { canExport: true, canView: true };
-    expect(intersectEntitlements(a, b)).toEqual({ canExport: true });
-    expect(intersectEntitlements(a, b, c)).toEqual({ canExport: true });
-  });
-
-  it('returns null when no overlap', () => {
-    const a = { canExport: true };
-    const b = { canImport: true };
-    expect(intersectEntitlements(a, b)).toBe(null);
-  });
-
-  it('ignores false values', () => {
-    const a = { canExport: true, canImport: false };
-    const b = { canExport: true, canImport: true };
-    expect(intersectEntitlements(a, b)).toEqual({ canExport: true });
   });
 });

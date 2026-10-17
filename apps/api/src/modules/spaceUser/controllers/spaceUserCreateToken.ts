@@ -9,6 +9,7 @@ import { roleToStandardAction } from '@template/permissions';
 import { check, rebacSchema } from '@template/permissions/rebac';
 import { getResource } from '#/lib/context/getResource';
 import { makeError } from '#/lib/errors';
+import { validateHeldActions } from '#/lib/permissions/validateHeldActions';
 import { makeController } from '#/lib/utils/makeController';
 import { createToken } from '#/modules/me/services/createToken';
 import { spaceUserCreateTokenRoute } from '#/modules/spaceUser/routes/spaceUserCreateToken';
@@ -30,6 +31,8 @@ export const spaceUserCreateTokenController = makeController(
     if (!checkLeave || !checkSpace)
       throw makeError({ status: 403, message: `Cannot create ${body.role} token` });
 
+    validateHeldActions(permix, [{ model: 'space', record: space }], body.entitlements);
+
     const token = await createToken(c, {
       name: body.name,
       ownerModel: 'SpaceUser',
@@ -37,6 +40,8 @@ export const spaceUserCreateTokenController = makeController(
       organizationId: spaceUser.organizationId,
       spaceId: spaceUser.spaceId,
       role: body.role,
+      entitlements: body.entitlements,
+      entitlementsOnly: body.entitlementsOnly,
       expiresAt: body.expiresAt,
     });
 

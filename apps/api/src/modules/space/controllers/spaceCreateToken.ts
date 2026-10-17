@@ -8,6 +8,7 @@ import { hydrate } from '@template/db';
 import { check, rebacSchema } from '@template/permissions/rebac';
 import { getResource } from '#/lib/context/getResource';
 import { makeError } from '#/lib/errors';
+import { validateHeldActions } from '#/lib/permissions/validateHeldActions';
 import { makeController } from '#/lib/utils/makeController';
 import { createToken } from '#/modules/me/services/createToken';
 import { spaceCreateTokenRoute } from '#/modules/space/routes/spaceCreateToken';
@@ -25,12 +26,16 @@ export const spaceCreateTokenController = makeController(
       throw makeError({ status: 403, message: `Cannot create ${body.role} token` });
     }
 
+    validateHeldActions(permix, [{ model: 'space', record: hydrated }], body.entitlements);
+
     const token = await createToken(c, {
       name: body.name,
       ownerModel: 'Space',
       organizationId: space.organizationId,
       spaceId: space.id,
       role: body.role,
+      entitlements: body.entitlements,
+      entitlementsOnly: body.entitlementsOnly,
       expiresAt: body.expiresAt,
     });
 

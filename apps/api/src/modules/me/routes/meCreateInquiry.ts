@@ -5,6 +5,7 @@
  * @uses primitive:routeTemplates, feature:inquiry
  */
 import { createRoute } from '#/lib/routeTemplates';
+import { validateSelfPermission } from '#/middleware/validations/validateSelfPermission';
 import {
   inquiryCreateBodySchema,
   inquiryCreateSanitizeKeys,
@@ -20,5 +21,6 @@ export const meCreateInquiryRoute = createRoute({
   bodySchema: inquiryCreateBodySchema,
   responseSchema: inquirySentResponseSchema,
   sanitizeKeys: inquiryCreateSanitizeKeys,
+  middleware: [validateSelfPermission('operate')],
   tags: [Tags.me, Tags.inquiry],
 });

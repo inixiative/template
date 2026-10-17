@@ -3,12 +3,14 @@ export { Role } from '@template/db/generated/client/enums';
 export {
   type Action,
   type ActionState,
+  type CustomAction,
   createPermissions,
   type Entitlements,
   InquiryAction,
   OrganizationAction,
   type PermissionEntry,
   type Permix,
+  SessionAction,
   SpaceAction,
   StandardAction,
   UserAction,
@@ -28,8 +30,8 @@ export { getOrgPermissions, organizationRoles } from './roles/organization';
 // Shared role utilities
 export {
   allTrue,
+  grantActions,
   greaterRole,
-  intersectEntitlements,
   isSuperadmin,
   lesserRole,
   roleHierarchy,
@@ -40,4 +42,13 @@ export {
 export { getSpacePermissions, spaceRoles } from './roles/space';
 // User permissions
 export { getUserPermissions, userRoles } from './roles/user';
+// Slices
+export {
+  capSlice,
+  type Grant,
+  type GrantResource,
+  grantReaches,
+  type Slice,
+  userLoginGrant,
+} from './slice';
 export type { PermissionsCheck } from './types';

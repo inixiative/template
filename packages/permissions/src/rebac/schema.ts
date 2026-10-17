@@ -19,6 +19,8 @@ export const rebacSchema: RebacSchema = {
         manage: 'own',
         operate: 'manage',
         read: 'operate',
+        'user.identify': 'read',
+        'organization.create': 'operate',
       },
     },
 
@@ -220,6 +222,23 @@ export const rebacSchema: RebacSchema = {
                 { rel: 'sourceSpace.organization', action: 'own' },
               ],
             },
+            // grantUserSlice — asking for a slice mints a credential, so a user source needs token.create
+            {
+              all: [
+                { rule: { field: 'type', operator: Operator.in, value: ['grantUserSlice'] } },
+                {
+                  any: [
+                    {
+                      all: [
+                        { self: 'sourceUserId' },
+                        { rel: 'sourceUser', action: 'token.create' },
+                      ],
+                    },
+                    { rel: 'sourceIntegration', action: 'manage' },
+                  ],
+                },
+              ],
+            },
           ],
         },
 
@@ -228,7 +247,19 @@ export const rebacSchema: RebacSchema = {
         // self check fails for regular users — superadmin bypass handles it.
         resolve: {
           any: [
-            { self: 'targetUserId' },
+            {
+              all: [
+                { rule: { field: 'type', operator: Operator.notIn, value: ['grantUserSlice'] } },
+                { self: 'targetUserId' },
+              ],
+            },
+            {
+              all: [
+                { rule: { field: 'type', operator: Operator.in, value: ['grantUserSlice'] } },
+                { self: 'targetUserId' },
+                { rel: 'targetUser', action: 'token.create' },
+              ],
+            },
             {
               any: [
                 // transferSpace — target org owner only
@@ -248,6 +279,20 @@ export const rebacSchema: RebacSchema = {
               ],
             },
             { rel: 'targetSpace', action: 'manage' },
+          ],
+        },
+
+        // Revoke: either party withdraws a standing grant
+        revoke: {
+          all: [
+            { rule: { field: 'type', operator: Operator.in, value: ['grantUserSlice'] } },
+            {
+              any: [
+                { self: 'sourceUserId' },
+                { self: 'targetUserId' },
+                { rel: 'sourceIntegration', action: 'manage' },
+              ],
+            },
           ],
         },
       },

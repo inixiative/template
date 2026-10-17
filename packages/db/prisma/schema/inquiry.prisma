@@ -75,6 +75,7 @@ enum InquiryType {
   createSpace
   updateSpace
   transferSpace
+  grantUserSlice
 }
 
 enum InquiryStatus {
@@ -84,6 +85,7 @@ enum InquiryStatus {
   approved
   denied
   canceled
+  revoked
 }
 
 enum InquiryResourceModel {

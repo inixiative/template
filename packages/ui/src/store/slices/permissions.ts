@@ -13,6 +13,7 @@ import { getOrgPermissions } from '@template/permissions/roles/organization';
 import { isSuperadmin } from '@template/permissions/roles/shared';
 import { getSpacePermissions } from '@template/permissions/roles/space';
 import { getUserPermissions } from '@template/permissions/roles/user';
+import { userLoginGrant } from '@template/permissions/slice';
 import type { MeReadResponses } from '@template/sdk';
 import type { AppStore } from '@template/ui/store/types';
 import type { PermissionsSlice } from '@template/ui/store/types/permissions';
@@ -49,8 +50,9 @@ export const createPermissionsSlice: StateCreator<AppStore, [], [], PermissionsS
           return;
         }
 
-        // Set up user permissions (user is always owner of themselves)
-        await permix.setup(getUserPermissions(me.id as UserId));
+        await permix.setup(
+          getUserPermissions(me.id as UserId, userLoginGrant.role, userLoginGrant.entitlements),
+        );
 
         // Set up org permissions (matches backend setupOrgPermissions)
         if (me.organizationUsers) {

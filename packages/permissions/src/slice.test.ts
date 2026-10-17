@@ -1,0 +1,141 @@
+import { describe, expect, it } from 'bun:test';
+import { SessionAction } from '@template/permissions/client';
+import { capSlice, grantReaches, userLoginGrant } from '@template/permissions/slice';
+
+describe('grantReaches', () => {
+  it('follows the role chain on the same resource', () => {
+    const admin = { role: 'admin' as const, entitlements: null };
+    expect(grantReaches('db:organization', admin, 'manage')).toBe(true);
+    expect(grantReaches('db:organization', admin, 'read')).toBe(true);
+    expect(grantReaches('db:organization', admin, 'own')).toBe(false);
+  });
+
+  it('an entitlement reaches the actions below it', () => {
+    const viewer = { role: 'viewer' as const, entitlements: { manage: true } };
+    expect(grantReaches('db:organization', viewer, 'operate')).toBe(true);
+    expect(grantReaches('db:organization', viewer, 'own')).toBe(false);
+  });
+
+  it('a catalog action reaches through the role it maps to', () => {
+    expect(
+      grantReaches('db:user', { role: 'member', entitlements: null }, 'organization.create'),
+    ).toBe(true);
+    expect(
+      grantReaches('db:user', { role: 'viewer', entitlements: null }, 'organization.create'),
+    ).toBe(false);
+  });
+
+  it('a session action is held by the login only, never implied by a role', () => {
+    expect(grantReaches('db:user', userLoginGrant, SessionAction.createToken)).toBe(true);
+    expect(
+      grantReaches('db:user', { role: 'owner', entitlements: null }, SessionAction.createToken),
+    ).toBe(false);
+  });
+
+  it('a rule-gated action is never reached through its rule', () => {
+    expect(grantReaches('db:organization', { role: 'admin', entitlements: null }, 'assign')).toBe(
+      false,
+    );
+  });
+
+  it('an undeclared custom action is reached only when granted', () => {
+    const owner = { role: 'owner' as const, entitlements: null };
+    expect(grantReaches('db:organization', owner, 'artifact.create')).toBe(false);
+    expect(
+      grantReaches(
+        'db:organization',
+        { ...owner, entitlements: { 'artifact.create': true } },
+        'artifact.create',
+      ),
+    ).toBe(true);
+  });
+
+  it('entitlement-only drops the role base', () => {
+    const grant = { role: 'owner' as const, entitlements: { read: true }, entitlementsOnly: true };
+    expect(grantReaches('db:organization', grant, 'read')).toBe(true);
+    expect(grantReaches('db:organization', grant, 'operate')).toBe(false);
+  });
+});
+
+describe('capSlice', () => {
+  const viewer = { role: 'viewer' as const, entitlements: null };
+  const owner = { role: 'owner' as const, entitlements: null };
+
+  it('default mode: lesser role, entitlements kept only where the owner reaches them', () => {
+    expect(
+      capSlice('db:organization', viewer, {
+        role: 'owner',
+        entitlements: { manage: true },
+        entitlementsOnly: false,
+      }),
+    ).toEqual({ role: 'viewer', entitlements: null, entitlementsOnly: false });
+    expect(
+      capSlice('db:organization', owner, {
+        role: 'viewer',
+        entitlements: { manage: true },
+        entitlementsOnly: false,
+      }),
+    ).toEqual({ role: 'viewer', entitlements: { manage: true }, entitlementsOnly: false });
+  });
+
+  it('default mode does not inherit the owner entitlements', () => {
+    expect(
+      capSlice(
+        'db:organization',
+        { role: 'member', entitlements: { canExport: true } },
+        { role: 'member', entitlements: null, entitlementsOnly: false },
+      ),
+    ).toEqual({ role: 'member', entitlements: null, entitlementsOnly: false });
+  });
+
+  it('keeps an owner custom entitlement the slice names', () => {
+    expect(
+      capSlice(
+        'db:organization',
+        { role: 'member', entitlements: { canExport: true } },
+        {
+          role: 'member',
+          entitlements: { canExport: true, canDelete: true },
+          entitlementsOnly: false,
+        },
+      ).entitlements,
+    ).toEqual({ canExport: true });
+  });
+
+  it('entitlement-only keeps only what the owner reaches', () => {
+    expect(
+      capSlice('db:space', viewer, {
+        role: 'owner',
+        entitlements: { read: true, manage: true, own: true },
+        entitlementsOnly: true,
+      }),
+    ).toEqual({ role: 'viewer', entitlements: { read: true }, entitlementsOnly: true });
+  });
+
+  it('false entitlements are dropped', () => {
+    expect(
+      capSlice('db:organization', owner, {
+        role: 'owner',
+        entitlements: { manage: false },
+        entitlementsOnly: true,
+      }).entitlements,
+    ).toBeNull();
+  });
+
+  it('a slice on the user holds a session action only when it names it', () => {
+    expect(
+      capSlice('db:user', userLoginGrant, {
+        role: 'owner',
+        entitlements: null,
+        entitlementsOnly: false,
+      }).entitlements,
+    ).toBeNull();
+    expect(
+      capSlice('db:user', userLoginGrant, {
+        role: 'viewer',
+        entitlements: { [SessionAction.createToken]: true },
+        entitlementsOnly: false,
+      }).entitlements,
+    ).toEqual({ [SessionAction.createToken]: true });
+  });
+});

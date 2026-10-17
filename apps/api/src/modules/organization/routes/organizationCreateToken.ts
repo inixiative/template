@@ -4,9 +4,10 @@
  * @partOf feature:tenancy
  * @uses primitive:routeTemplates, feature:auth
  */
+import { SessionAction } from '@template/permissions/client';
 import { createRoute } from '#/lib/routeTemplates';
-import { validateNotToken } from '#/middleware/validations/validateNotToken';
 import { validatePermission } from '#/middleware/validations/validatePermission';
+import { validateSelfPermission } from '#/middleware/validations/validateSelfPermission';
 import { Modules } from '#/modules/modules';
 import {
   tokenCreateBodySchema,
@@ -18,5 +19,5 @@ export const organizationCreateTokenRoute = createRoute({
   submodel: Modules.token,
   bodySchema: tokenCreateBodySchema,
   responseSchema: tokenCreateResponseSchema,
-  middleware: [validatePermission('operate'), validateNotToken],
+  middleware: [validateSelfPermission(SessionAction.createToken), validatePermission('operate')],
 });

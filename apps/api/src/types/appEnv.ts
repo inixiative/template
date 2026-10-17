@@ -16,7 +16,7 @@ import type {
 } from '@template/db/generated/client/client';
 import type { Permix } from '@template/permissions';
 import type { Hono } from 'hono';
-import type { TokenWithRelations } from '#/lib/context/types';
+import type { SliceGrant, TokenWithRelations } from '#/lib/context/types';
 import type { BracketQueryRecord } from '#/lib/utils/parseBracketNotation';
 
 export type AppVars = {
@@ -30,6 +30,7 @@ export type AppVars = {
   spaces: Space[] | null;
   session: Session | null;
   token: TokenWithRelations | null;
+  slice: SliceGrant | null;
   spoofedBy: User | null;
   permix: Permix;
   requestId: string;

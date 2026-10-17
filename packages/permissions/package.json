@@ -10,6 +10,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./client": "./src/client.ts",
+    "./slice": "./src/slice.ts",
     "./types": "./src/types.ts",
     "./rebac/*": "./src/rebac/*",
     "./roles/*": "./src/roles/*"

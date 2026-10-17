@@ -7,6 +7,7 @@ import { OpenAPIHono } from '@hono/zod-openapi';
 import { auth } from '#/lib/auth';
 import { auditActorMiddleware } from '#/middleware/auth/auditActorMiddleware';
 import { authMiddleware } from '#/middleware/auth/authMiddleware';
+import { jwtAuthMiddleware } from '#/middleware/auth/jwtAuthMiddleware';
 import { spoofMiddleware } from '#/middleware/auth/spoofMiddleware';
 import { tokenAuthMiddleware } from '#/middleware/auth/tokenAuthMiddleware';
 import { corsMiddleware } from '#/middleware/corsMiddleware';
@@ -53,9 +54,10 @@ apiRouter.all('/auth/*', (c) => auth.handler(c.req.raw));
 // One-click unsubscribe — public (no session/token); authorized by its own signed link.
 apiRouter.route('/unsubscribe', unsubscribeRouter);
 
-// Token first so an Authorization header always wins over a session cookie when
-// both are present (e.g. SDK xhr from a browser). Spoof runs last so it applies
+// Bearer credentials first (issuer JWT, then API token) so an Authorization header always wins
+// over a session cookie (e.g. SDK xhr from a browser). Spoof runs last so it applies
 // regardless of which auth path resolved the user.
+apiRouter.use('*', jwtAuthMiddleware);
 apiRouter.use('*', tokenAuthMiddleware);
 apiRouter.use('*', authMiddleware);
 apiRouter.use('*', spoofMiddleware);

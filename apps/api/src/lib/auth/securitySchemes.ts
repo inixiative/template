@@ -21,8 +21,18 @@ export const securitySchemes = {
     scheme: 'bearer',
     description:
       'API token minted at a token create endpoint, sent as `Authorization: Bearer <key>`. The token carries ' +
-      'its owner, so it acts as that user, organization user or space user. Operations that publish only ' +
-      '`sessionToken` refuse it.',
+      'its owner, so it acts as that user, organization user or space user, with a role and entitlements ' +
+      'capped by what the owner holds. An operation refuses it when the token lacks the action the ' +
+      'operation checks.',
+  },
+  userJwt: {
+    type: 'http',
+    scheme: 'bearer',
+    bearerFormat: 'JWT',
+    description:
+      'JWT signed by the configured issuer (`AUTH_ISSUER`, keys at `AUTH_JWKS_URL`). It is the user: with no ' +
+      '`grant` claim it carries the full user, as a session does; with a `grant` claim it carries the slice ' +
+      'that approved `grantUserSlice` inquiry holds, capped by what the user holds.',
   },
   internalSecret: {
     type: 'apiKey',

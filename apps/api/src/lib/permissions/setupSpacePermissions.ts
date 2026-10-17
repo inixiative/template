@@ -5,67 +5,51 @@
  * @uses infrastructure:prisma
  */
 import type { SpaceId } from '@template/db';
-import {
-  type Entitlements,
-  getSpacePermissions,
-  intersectEntitlements,
-  lesserRole,
-} from '@template/permissions';
+import { capSlice, type Entitlements, getSpacePermissions } from '@template/permissions';
 import type { Context } from 'hono';
+import { getPrincipalSlice } from '#/lib/permissions/getPrincipalSlice';
+import { membershipGrant } from '#/lib/permissions/membershipGrant';
 import { validateRole } from '#/lib/permissions/validateRole';
 import type { AppEnv } from '#/types/appEnv';
 
 export const setupSpacePermissions = async (c: Context<AppEnv>) => {
   const permix = c.get('permix');
   const token = c.get('token');
-  const spaceUsers = c.get('spaceUsers');
 
-  // Space token → single space, token permissions only
   if (token?.ownerModel === 'Space' && token.spaceId) {
     await permix.setup(
       getSpacePermissions(
         validateRole(token.role),
         token.spaceId as SpaceId,
         token.entitlements as Entitlements,
+        token.entitlementsOnly,
       ),
     );
     return;
   }
 
-  // SpaceUser token → single space, lesser of spaceUser + token
-  if (token?.ownerModel === 'SpaceUser' && token.spaceId) {
-    const spaceUser = spaceUsers?.find((su) => su.spaceId === token.spaceId);
-    if (spaceUser) {
-      await permix.setup(
-        getSpacePermissions(
-          lesserRole(validateRole(spaceUser.role), validateRole(token.role)),
-          token.spaceId as SpaceId,
-          intersectEntitlements(
-            spaceUser.entitlements as Entitlements,
-            token.entitlements as Entitlements,
-          ),
-        ),
-      );
-    }
-    return;
-  }
+  if (token?.ownerModel === 'Organization') return;
 
-  // No space memberships → nothing to set up
-  if (!spaceUsers?.length) return;
+  const spaceUsers =
+    token?.ownerModel === 'SpaceUser'
+      ? (c.get('spaceUsers') ?? []).filter((su) => su.spaceId === token.spaceId)
+      : token?.ownerModel === 'OrganizationUser'
+        ? []
+        : (c.get('spaceUsers') ?? []);
+  const slice = getPrincipalSlice(c);
 
-  // User token or session → all spaces (with token restrictions if present)
   for (const spaceUser of spaceUsers) {
-    const spaceId = spaceUser.spaceId as SpaceId;
-    const role = token
-      ? lesserRole(validateRole(spaceUser.role), validateRole(token.role))
-      : validateRole(spaceUser.role);
-    const entitlements = token
-      ? intersectEntitlements(
-          spaceUser.entitlements as Entitlements,
-          token.entitlements as Entitlements,
-        )
-      : (spaceUser.entitlements as Entitlements);
-
-    await permix.setup(getSpacePermissions(role, spaceId, entitlements));
+    const membership = membershipGrant(spaceUser);
+    const grant = slice
+      ? capSlice('db:space', membership, slice)
+      : { ...membership, entitlementsOnly: false };
+    await permix.setup(
+      getSpacePermissions(
+        grant.role,
+        spaceUser.spaceId as SpaceId,
+        grant.entitlements,
+        grant.entitlementsOnly,
+      ),
+    );
   }
 };
