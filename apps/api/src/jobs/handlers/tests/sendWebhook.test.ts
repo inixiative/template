@@ -614,12 +614,20 @@ describe('sendWebhook handler', () => {
       db.integrationRecord.findFirst({ where: { integrationId, customerRefId } });
 
     const at = (ms: number) => new Date(Date.UTC(2026, 0, 1) + ms);
+    // The delivery's id comes from Postgres uuidv7(); a host uuidv7 from "now" can sort either side of it.
+    const past = (createdAtMs: number, idMs = createdAtMs) => ({
+      id: Bun.randomUUIDv7('hex', at(idMs)),
+      createdAt: at(createdAtMs),
+    });
 
     it('poisons the record on the second touch once another record delivered since its first rejection', async () => {
       const { sub, context, integration, customerRef } = await createRecordSubscription();
-      await createWebhookEvent(rejection(customerRef.id), context);
-      await createWebhookEvent(rejection(customerRef.id), context);
-      await createWebhookEvent({ status: 'success', resourceId: crypto.randomUUID() }, context);
+      await createWebhookEvent({ ...rejection(customerRef.id), ...past(1) }, context);
+      await createWebhookEvent({ ...rejection(customerRef.id), ...past(2) }, context);
+      await createWebhookEvent(
+        { status: 'success', resourceId: crypto.randomUUID(), ...past(3) },
+        context,
+      );
       rejectDeliveries();
 
       await deliver(sub.id, customerRef.id);
@@ -637,9 +645,12 @@ describe('sendWebhook handler', () => {
 
     it('never counts a rate-limited (429) delivery toward the streak', async () => {
       const { sub, context, integration, customerRef } = await createRecordSubscription();
-      await createWebhookEvent(rejection(customerRef.id, 429), context);
-      await createWebhookEvent(rejection(customerRef.id, 429), context);
-      await createWebhookEvent({ status: 'success', resourceId: crypto.randomUUID() }, context);
+      await createWebhookEvent({ ...rejection(customerRef.id, 429), ...past(1) }, context);
+      await createWebhookEvent({ ...rejection(customerRef.id, 429), ...past(2) }, context);
+      await createWebhookEvent(
+        { status: 'success', resourceId: crypto.randomUUID(), ...past(3) },
+        context,
+      );
       rejectDeliveries();
 
       await deliver(sub.id, customerRef.id);
@@ -649,10 +660,13 @@ describe('sendWebhook handler', () => {
 
     it('does not poison on a rate-limited (429) touch, even after enough rejections', async () => {
       const { sub, context, integration, customerRef } = await createRecordSubscription();
-      await createWebhookEvent(rejection(customerRef.id), context);
-      await createWebhookEvent(rejection(customerRef.id), context);
-      await createWebhookEvent(rejection(customerRef.id), context);
-      await createWebhookEvent({ status: 'success', resourceId: crypto.randomUUID() }, context);
+      await createWebhookEvent({ ...rejection(customerRef.id), ...past(1) }, context);
+      await createWebhookEvent({ ...rejection(customerRef.id), ...past(2) }, context);
+      await createWebhookEvent({ ...rejection(customerRef.id), ...past(3) }, context);
+      await createWebhookEvent(
+        { status: 'success', resourceId: crypto.randomUUID(), ...past(4) },
+        context,
+      );
       respondWith(429, 'Too Many Requests');
 
       await deliver(sub.id, customerRef.id);
@@ -662,9 +676,12 @@ describe('sendWebhook handler', () => {
 
     it('does not poison when the other record delivered before the streak began', async () => {
       const { sub, context, integration, customerRef } = await createRecordSubscription();
-      await createWebhookEvent({ status: 'success', resourceId: crypto.randomUUID() }, context);
-      await createWebhookEvent(rejection(customerRef.id), context);
-      await createWebhookEvent(rejection(customerRef.id), context);
+      await createWebhookEvent(
+        { status: 'success', resourceId: crypto.randomUUID(), ...past(1) },
+        context,
+      );
+      await createWebhookEvent({ ...rejection(customerRef.id), ...past(2) }, context);
+      await createWebhookEvent({ ...rejection(customerRef.id), ...past(3) }, context);
       rejectDeliveries();
 
       await deliver(sub.id, customerRef.id);
@@ -674,8 +691,8 @@ describe('sendWebhook handler', () => {
 
     it('does not poison when nothing else delivered — that is the subscription circuit, not a dead record', async () => {
       const { sub, context, integration, customerRef } = await createRecordSubscription();
-      await createWebhookEvent(rejection(customerRef.id), context);
-      await createWebhookEvent(rejection(customerRef.id), context);
+      await createWebhookEvent({ ...rejection(customerRef.id), ...past(1) }, context);
+      await createWebhookEvent({ ...rejection(customerRef.id), ...past(2) }, context);
       rejectDeliveries();
 
       await deliver(sub.id, customerRef.id);
@@ -685,12 +702,15 @@ describe('sendWebhook handler', () => {
 
     it('never counts unreachable events, and an unreachable blip mid-streak does not reset it', async () => {
       const { sub, context, integration, customerRef } = await createRecordSubscription();
-      await createWebhookEvent(rejection(customerRef.id), context);
+      await createWebhookEvent({ ...rejection(customerRef.id), ...past(1) }, context);
       await createWebhookEvent(
-        { status: 'unreachable', resourceId: customerRef.id, error: 'HTTP 503' },
+        { status: 'unreachable', resourceId: customerRef.id, error: 'HTTP 503', ...past(2) },
         context,
       );
-      await createWebhookEvent({ status: 'success', resourceId: crypto.randomUUID() }, context);
+      await createWebhookEvent(
+        { status: 'success', resourceId: crypto.randomUUID(), ...past(3) },
+        context,
+      );
       rejectDeliveries();
 
       await deliver(sub.id, customerRef.id);
@@ -702,10 +722,16 @@ describe('sendWebhook handler', () => {
 
     it("resets the streak on the record's own success", async () => {
       const { sub, context, integration, customerRef } = await createRecordSubscription();
-      await createWebhookEvent(rejection(customerRef.id), context);
-      await createWebhookEvent(rejection(customerRef.id), context);
-      await createWebhookEvent({ status: 'success', resourceId: customerRef.id }, context);
-      await createWebhookEvent({ status: 'success', resourceId: crypto.randomUUID() }, context);
+      await createWebhookEvent({ ...rejection(customerRef.id), ...past(1) }, context);
+      await createWebhookEvent({ ...rejection(customerRef.id), ...past(2) }, context);
+      await createWebhookEvent(
+        { status: 'success', resourceId: customerRef.id, ...past(3) },
+        context,
+      );
+      await createWebhookEvent(
+        { status: 'success', resourceId: crypto.randomUUID(), ...past(4) },
+        context,
+      );
       rejectDeliveries();
 
       await deliver(sub.id, customerRef.id);
@@ -715,14 +741,14 @@ describe('sendWebhook handler', () => {
 
     it("orders by id: a rejection in the same millisecond but before the record's success does not count", async () => {
       const { sub, context, integration, customerRef } = await createRecordSubscription();
-      await createWebhookEvent({ ...rejection(customerRef.id), createdAt: at(1_000) }, context);
+      await createWebhookEvent({ ...rejection(customerRef.id), ...past(1_000) }, context);
       await createWebhookEvent(
-        { status: 'success', resourceId: customerRef.id, createdAt: at(1_000) },
+        { status: 'success', resourceId: customerRef.id, ...past(1_000, 1_001) },
         context,
       );
-      await createWebhookEvent({ ...rejection(customerRef.id), createdAt: at(2_000) }, context);
+      await createWebhookEvent({ ...rejection(customerRef.id), ...past(2_000) }, context);
       await createWebhookEvent(
-        { status: 'success', resourceId: crypto.randomUUID(), createdAt: at(3_000) },
+        { status: 'success', resourceId: crypto.randomUUID(), ...past(3_000) },
         context,
       );
       rejectDeliveries();
@@ -735,13 +761,13 @@ describe('sendWebhook handler', () => {
     it("orders by id: a rejection in the same millisecond but after the record's success counts", async () => {
       const { sub, context, integration, customerRef } = await createRecordSubscription();
       await createWebhookEvent(
-        { status: 'success', resourceId: customerRef.id, createdAt: at(1_000) },
+        { status: 'success', resourceId: customerRef.id, ...past(1_000) },
         context,
       );
-      await createWebhookEvent({ ...rejection(customerRef.id), createdAt: at(1_000) }, context);
-      await createWebhookEvent({ ...rejection(customerRef.id), createdAt: at(2_000) }, context);
+      await createWebhookEvent({ ...rejection(customerRef.id), ...past(1_000, 1_001) }, context);
+      await createWebhookEvent({ ...rejection(customerRef.id), ...past(2_000) }, context);
       await createWebhookEvent(
-        { status: 'success', resourceId: crypto.randomUUID(), createdAt: at(3_000) },
+        { status: 'success', resourceId: crypto.randomUUID(), ...past(3_000) },
         context,
       );
       rejectDeliveries();
@@ -779,9 +805,12 @@ describe('sendWebhook handler', () => {
       const { sub, context, customerRef } = await createRecordSubscription({
         withIntegration: false,
       });
-      await createWebhookEvent(rejection(customerRef.id), context);
-      await createWebhookEvent(rejection(customerRef.id), context);
-      await createWebhookEvent({ status: 'success', resourceId: crypto.randomUUID() }, context);
+      await createWebhookEvent({ ...rejection(customerRef.id), ...past(1) }, context);
+      await createWebhookEvent({ ...rejection(customerRef.id), ...past(2) }, context);
+      await createWebhookEvent(
+        { status: 'success', resourceId: crypto.randomUUID(), ...past(3) },
+        context,
+      );
       rejectDeliveries();
 
       await deliver(sub.id, customerRef.id);
@@ -793,8 +822,11 @@ describe('sendWebhook handler', () => {
 
     it('a record rejected five times in a row no longer disables a subscription that delivers other records', async () => {
       const { sub, context, integration, customerRef } = await createRecordSubscription();
-      await createWebhookEvent(rejection(customerRef.id), context);
-      await createWebhookEvent({ status: 'success', resourceId: crypto.randomUUID() }, context);
+      await createWebhookEvent({ ...rejection(customerRef.id), ...past(1) }, context);
+      await createWebhookEvent(
+        { status: 'success', resourceId: crypto.randomUUID(), ...past(2) },
+        context,
+      );
       rejectDeliveries();
 
       for (let i = 0; i < 5; i++) await deliver(sub.id, customerRef.id);
