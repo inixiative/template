@@ -1,6 +1,7 @@
 /**
  * @atlas
  * @kind constructor
+ * @constructs rollingCache
  * @partOf primitive:caching, infrastructure:redis
  * @uses infrastructure:prisma, infrastructure:observability
  */

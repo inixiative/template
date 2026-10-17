@@ -1,8 +1,9 @@
 /**
  * @atlas
- * @kind service
+ * @kind constructor, service
  * @partOf primitive:jobs
  * @uses infrastructure:redis
+ * @constructs childJobEnqueuer
  */
 import { enqueueJob } from '#/jobs/enqueue';
 import type { EnqueueChildJob, WorkerContext } from '#/jobs/types';

@@ -1,6 +1,7 @@
 /**
  * @atlas
- * @partOf infrastructure:prisma
+ * @kind utils
+ * @partOf infrastructure:prisma, primitive:testFactories
  * @uses none
  */
 import type { Db } from '@template/db/clientTypes';
