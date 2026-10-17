@@ -4,13 +4,14 @@
  * @partOf feature:inquiry, primitive:authz
  * @uses infrastructure:prisma
  */
+
 import { type Db, type HydratedRecord, hydrate, type Prisma, type UserId } from '@template/db';
 import { InquiryResourceModel, Role } from '@template/db/generated/client/enums';
 import { type Entitlements, SessionAction } from '@template/permissions';
+import { canAssign } from '@template/permissions/assign';
 import { check, rebacSchema } from '@template/permissions/rebac';
 import { z } from 'zod';
 import { makeError } from '#/lib/errors';
-import { assignLevel } from '#/lib/permissions/assignLevel';
 import { findActionsUserLacks } from '#/lib/permissions/findActionsUserLacks';
 import { findUnheldGrant } from '#/lib/permissions/findUnheldGrant';
 import { autoApproveOwnRequest } from '#/modules/inquiry/handlers/autoApproveOwnRequest';
@@ -120,23 +121,17 @@ export const grantUserEntitlementsHandler: InquiryHandler<
 
   canApprove: async (c, inquiry, content) => {
     const permix = c.get('permix');
-    if (inquiry.targetModel === InquiryResourceModel.Organization)
-      return check(
-        permix,
-        rebacSchema,
-        'organization',
-        { id: inquiry.targetOrganizationId!, role: assignLevel(null, content.entitlements) },
-        'assign',
-      );
+    if (inquiry.targetModel === InquiryResourceModel.Organization) {
+      const owner = {
+        model: 'organization' as const,
+        record: { id: inquiry.targetOrganizationId! },
+      };
+      return canAssign(permix, owner, owner, null, content.entitlements);
+    }
     if (inquiry.targetModel === InquiryResourceModel.Space) {
       const space = await hydrate('space', { id: inquiry.targetSpaceId! } as HydratedRecord);
-      return check(
-        permix,
-        rebacSchema,
-        'space',
-        { ...space, role: assignLevel(null, content.entitlements, 'db:space') },
-        'assign',
-      );
+      const owner = { model: 'space' as const, record: space };
+      return canAssign(permix, owner, owner, null, content.entitlements);
     }
     const user = c.get('user');
     return (
