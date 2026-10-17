@@ -86,15 +86,16 @@ export {
   polymorphicKeyColumn,
   polymorphicTarget,
 } from './registries/polymorphicIs';
-export {
-  type PolymorphicAxisField,
-  type PolymorphicAxisValue,
-  type PolymorphicFkColumn,
-  type PolymorphicModel,
-  type PolymorphicSchema,
-  type PolymorphicTarget,
-  polymorphicSchema,
-} from './registries/polymorphicSchema';
+export { polymorphicSchema } from './registries/polymorphicSchema';
+export type {
+  PolymorphicAxisField,
+  PolymorphicAxisValue,
+  PolymorphicFkColumn,
+  PolymorphicModel,
+  PolymorphicSchema,
+  PolymorphicSchemaOptions,
+  PolymorphicTarget,
+} from './registries/polymorphicSchemaTypes';
 // User with relations type and schema
 export type { UserWithRelations } from './types/userWithRelations';
 export { UserWithRelationsSchema } from './types/userWithRelations';

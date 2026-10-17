@@ -368,18 +368,86 @@ The registry auto-generates:
 
 ### Request Validation
 
-`polymorphicSchema(model, axisField, { only?, omit?, extend? })` (`@template/db`) is the request-boundary twin of the write rule: a `z.discriminatedUnion` with one strict arm per axis value, each carrying exactly that value's FKs as `uuidV7Schema`. A missing FK, an FK from another arm, or an omitted column is a 422.
+Use `polymorphicSchema` (`@template/db`) wherever a request names a false-polymorphic target, such
+as a flow's bindings. It builds the Zod schema from the same registry the write rule
+reads, so the request check and the database check cannot drift. Never hand-write
+`z.object({ ownerModel, organizationId?, ... }).refine(...)` for a registered axis.
+
+**What it produces.** A `z.discriminatedUnion` on the axis field with one strict arm per value.
+Each arm carries exactly that value's FKs as `uuidV7Schema`:
 
 ```typescript
-polymorphicSchema('Integration', 'ownerModel', {
-  only: ['User', 'Organization', 'Space'],   // keep these values (default: every value)
-  omit: ['userId'],                          // the server fills it (the caller); sending it is a 422
-  extend: { returnUrl: appPathSchema.optional() },  // fields shared by every arm
-});
-// { ownerModel: 'User' } | { ownerModel: 'Organization', organizationId } | { ownerModel: 'Space', organizationId, spaceId }
+const integrationOwner = polymorphicSchema('Integration', 'ownerModel');
+// { ownerModel: 'User', userId }
+// | { ownerModel: 'OrganizationUser', organizationId, userId }
+// | { ownerModel: 'Organization', organizationId }
+// | { ownerModel: 'Space', organizationId, spaceId }
+// | { ownerModel: 'SpaceUser', organizationId, spaceId, userId }
 ```
 
-It throws at build time on an unknown model, axis or `only` value. Values with no FKs (`platform`, `admin`) get a discriminator-only arm. Arms are strict, so put every other field in `extend` rather than intersecting; `extend` may not redefine the discriminator or an axis FK. Strict is a little tighter than the write rule: an explicit `null` on a foreign FK passes `isEmpty` but is an unknown key here. One call covers one axis; `toRules.test.ts` checks every single-axis model against the write rule.
+A missing FK, an FK from another arm, or an unknown key is a 422.
+
+**Options.** Each one is checked against the registry at the type level and again when the schema
+is built:
+
+| Option | Does | Example |
+|--------|------|---------|
+| `only` | Keeps these values; the default is every value | `only: ['User', 'Organization', 'Space']` |
+| `omit` | Drops a column from every arm, for one the server fills; sending it is a 422 | `omit: ['userId']` |
+| `extend` | Adds fields shared by every arm; it may not redefine the discriminator or an axis FK | `extend: { returnUrl: appPathSchema.optional() }` |
+
+**Not a route body.** Route templates take a `ZodObject` `bodySchema`, and this returns a
+union, so passing it to `createRoute` / `actionRoute` is a type error.
+
+**In flow bindings.** Bindings never carry the caller (see [FLOWS.md](FLOWS.md)), so omit
+`userId` and take it from `steps`' context:
+
+```typescript
+const bindingsSchema = polymorphicSchema('Integration', 'ownerModel', {
+  only: ['User', 'Organization', 'Space'],
+  omit: ['userId'],
+  extend: { returnUrl: appPathSchema.optional() },
+});
+// { ownerModel: 'User', returnUrl? }
+// | { ownerModel: 'Organization', organizationId, returnUrl? }
+// | { ownerModel: 'Space', organizationId, spaceId, returnUrl? }
+
+steps: async (owner, { userId }) => {
+  const target = owner.ownerModel === 'User' ? { ...owner, userId } : owner;
+  // ...
+};
+```
+
+An omitted column is gone from **every** arm, and nothing puts it back. Before writing, add the
+caller to each arm whose registry entry needs that column. Otherwise the write rule rejects the row.
+
+**Reading the parsed value.** Narrow on the discriminator; TypeScript knows each arm's FKs:
+
+```typescript
+if (owner.ownerModel === 'Space') owner.spaceId;
+```
+
+**Types.** The type helpers live in `packages/db/src/registries/polymorphicSchemaTypes.ts`, next to
+the builder. You rarely name them, because inference gives the result type:
+
+| Type | Is |
+|------|----|
+| `PolymorphicModel` | A model with a registered axis |
+| `PolymorphicAxisField<Model>` | That model's axis fields (`'ownerModel'`) |
+| `PolymorphicAxisValue<Model, Field>` | The allowed values on that axis |
+| `PolymorphicFkColumn<Model, Field>` | Every FK column any value on the axis needs |
+| `PolymorphicTarget<Model, Field, Value, Omitted>` | The union of arms, before `extend` |
+| `PolymorphicSchema<...>` | The Zod type `polymorphicSchema` returns |
+| `PolymorphicSchemaOptions<...>` | The `{ only, omit, extend }` argument |
+
+**Edges:**
+
+- Values with no FKs (`platform`, `admin`) get an arm that carries only the discriminator.
+- Arms are strict, so put every other field in `extend` rather than intersecting the schema.
+- Strict is a little tighter than the write rule: an explicit `null` on a foreign FK passes the
+  rule's `isEmpty` check but is an unknown key here.
+- One call covers one axis.
+- `toRules.test.ts` checks the schema against the write rule for every model with a single axis.
 
 ### Validation Errors
 
