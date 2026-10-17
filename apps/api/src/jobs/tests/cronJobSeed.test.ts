@@ -38,13 +38,12 @@ describe('cron job seeds sync system rows', () => {
   afterEach(async () => {
     added.length = 0;
     removed.length = 0;
-    await db.cronJob.deleteMany({});
+    await cleanupTouchedTables(db);
   });
 
-  afterAll(async () => {
+  afterAll(() => {
     restore();
     clearHookRegistry();
-    await cleanupTouchedTables(db);
   });
 
   it('renames a system row on re-seed and moves its repeatable', async () => {
