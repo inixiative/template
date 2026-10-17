@@ -9,13 +9,10 @@ import {
   createSession,
   createToken,
   createUser,
-  registerTestTracker,
 } from '@template/db/test';
 
 describe('hydrate', () => {
-  beforeEach(() => {
-    registerTestTracker();
-  });
+  beforeEach(() => {});
 
   afterEach(async () => {
     await cleanupTouchedTables(db);
@@ -101,9 +98,7 @@ describe('hydrate', () => {
 });
 
 describe('fetchOne', () => {
-  beforeEach(() => {
-    registerTestTracker();
-  });
+  beforeEach(() => {});
 
   afterEach(async () => {
     await cleanupTouchedTables(db);

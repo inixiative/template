@@ -5,19 +5,14 @@ export type { Db, FinallyFn, FindForUpdateOptions } from './clientTypes';
 export {
   clearHookRegistry,
   DbAction,
-  type DbInvariant,
-  type DbInvariantAction,
-  type DbInvariantOptions,
   executeHooks,
   type HookFunction,
   type HookOptions,
   HookTiming,
   type ManyAction,
   registerDbHook,
-  registerDbInvariant,
   type SingleAction,
   unregisterDbHook,
-  unregisterDbInvariant,
 } from './extensions/hookRegistry';
 // Prisma namespace for advanced types (Prisma.UserWhereInput, etc.)
 export { Prisma } from './generated/client/client';
@@ -32,10 +27,12 @@ export { fetchOne, hydrate } from './hydrate';
 export {
   claimLane,
   getJobSupersededBy,
+  holdLaneWhileParked,
   laneKey,
   reclaimLane,
   releaseLane,
   supersededKey,
+  tombstoneJob,
   watchLane,
 } from './lanes';
 // Distributed lock
@@ -60,9 +57,23 @@ export {
   getRedisClient,
   getRedisPub,
   getRedisSub,
+  getRollingCache,
+  listRollingCaches,
+  MAX_ROLLING_CACHE_TARGETS,
+  MIN_ROLLING_CACHE_INTERVAL_SECONDS,
+  makeRollingCache,
   type RedisEval,
   type RedisNamespace,
+  type RegisteredRollingCache,
+  ROLLING_CACHE_LEAF_ATTEMPTS,
+  ROLLING_CACHE_TICK_SECONDS,
+  type RollingCache,
+  type RollingCacheConfig,
+  type RollingCacheFindManyArgs,
+  type RollingCacheTarget,
+  type RollingCacheTargets,
   redisNamespace,
+  unregisterRollingCache,
   upsertCache,
 } from './redis';
 // Registries (schema-level configuration)
@@ -113,7 +124,7 @@ export {
   type RuntimeDelegate,
   update,
 } from './utils/delegates';
-export { hasDeletedAt, lookupField, modelFields } from './utils/fieldMetadata';
+export { hasDeletedAt, lookupField, modelFields, SOFT_DELETE_MODELS } from './utils/fieldMetadata';
 // Prisma error narrowing
 export { isUniqueConstraintError } from './utils/isUniqueConstraintError';
 export { isWriteConflictError } from './utils/isWriteConflictError';

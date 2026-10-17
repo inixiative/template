@@ -28,4 +28,5 @@ export type RouteArgs = Omit<RouteConfig, 'path' | 'method' | 'responses' | 'req
   admin?: boolean;
   internal?: boolean;
   filterLens?: LensNarrowing;
+  includeDeleted?: boolean;
 };

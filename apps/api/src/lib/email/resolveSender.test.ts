@@ -4,14 +4,11 @@ import {
   cleanupTouchedTables,
   createOrganization,
   createOrganizationUser,
-  registerTestTracker,
 } from '@template/db/test';
 import { resolveSender } from '#/lib/email/resolveSender';
 
 describe('resolveSender', () => {
-  beforeEach(() => {
-    registerTestTracker();
-  });
+  beforeEach(() => {});
 
   afterEach(async () => {
     await cleanupTouchedTables(db);

@@ -116,7 +116,7 @@ alive and diverge precisely at the moment worth detecting, so the divergence is 
 
 That is also what makes the *read* flat. `ruleReferenceIssues(edges)` — a pure function in
 `@template/db`, no relations — answers "which of these no longer resolve" from the edge rows
-alone, so a consumer writes `include: { ruleReferences: true }` and never has to grow that include
+alone, so a consumer writes `include: { sourceRuleReferences: true }` and never has to grow that include
 when a model becomes referenceable. `composeTemplate` reads the template's edges and those of the
 components the cascade actually resolved (`expand` now returns their ids), and hands
 `interpolate({ liveRefs })` the keys that survive. What the renderer does with that set is the next

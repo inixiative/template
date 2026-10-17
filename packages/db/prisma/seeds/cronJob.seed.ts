@@ -69,5 +69,19 @@ export const cronJobSeeds: SeedFile<CronJob> = {
       maxAttempts: 3,
       backoffMs: 5000,
     },
+    {
+      id: '01900000-0000-7000-8000-000000000005',
+      name: 'coordinateRollingCaches',
+      jobId: 'coordinateRollingCaches',
+      description:
+        'Rolling-cache root: enqueues the refresh branch of every cache whose timer is about to run out.',
+      // Every minute: must match ROLLING_CACHE_TICK_SECONDS (packages/db/src/redis/rollingCacheTypes.ts).
+      pattern: '* * * * *',
+      enabled: true,
+      handler: 'coordinateRollingCaches',
+      payload: null,
+      maxAttempts: 3,
+      backoffMs: 5000,
+    },
   ],
 };

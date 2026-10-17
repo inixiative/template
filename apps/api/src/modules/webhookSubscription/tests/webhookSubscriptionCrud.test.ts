@@ -153,7 +153,7 @@ describe('WebhookSubscription CRUD', () => {
         patch(`/api/v1/webhookSubscription/${sub.id}`, { url: 'https://10.0.0.1/hook' }),
       );
 
-      expect(response.status).toBe(400);
+      expect(response.status).toBe(422);
     });
 
     it('keeps inactive when explicitly set', async () => {

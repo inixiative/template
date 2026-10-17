@@ -1,0 +1,30 @@
+{
+  "id": "test-factories-rules",
+  "title": "Test factories, cleanup and test rules",
+  "routing": "Is this about test data or test rules: building or persisting a row for a test (createX / buildX, \"seed a user\", \"create a test org\", \"the record has to exist in the database\"), a factory for a new model (createFactory, the builder, generics), factories creating their own dependencies (\"you don't need to make the org before the org user\", \"get the user and org off the context\", optional parents with {}), unique values (getNextSeq), __serialize for UI assertions, cleanup after tests (cleanupTouchedTables, the test tracker, \"deleteMany in afterEach\"), or a test that mocks a module, fakes a store or client, spies on enqueueJob, writes rows with prisma directly, mutates env, or uses jest / vitest (no-module-mocks, no-direct-prisma-in-tests, no-test-env-mutation, spy-must-restore, no-jest, no-vitest)?",
+  "concepts": ["test-factories", "test-rules"],
+  "tokens": 10979,
+  "tokenMethod": "chars/4",
+  "files": {
+    "recognise": {
+      "path": "recognise.md",
+      "tokens": 2497,
+      "experimental": true,
+      "note": "recognise/pick split under test (model round); not the standard"
+    },
+    "knowledge": {
+      "path": "knowledge.md",
+      "tokens": 10979
+    }
+  },
+  "runsAgreed": 0,
+  "sources": {
+    "docs": ["docs/claude/TESTING.md"],
+    "docUnits": ["doc:docs/claude/TESTING.md#factories"],
+    "catalogClusters": ["testing-helpers", "testing-rules"],
+    "codeEntries": 87,
+    "docMembers": 26
+  },
+  "bypassLines": 33,
+  "glossaryTerms": 16
+}

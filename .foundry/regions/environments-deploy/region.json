@@ -1,0 +1,60 @@
+{
+  "id": "environments-deploy",
+  "title": "Environments, env vars and deploy",
+  "routing": "Is this about which environment code runs in or how env vars reach a process, or about the gate and deploy path: the five environment names (local, test, pr, staging, prod) and isLocal/isTest/isPR/isStaging/isProd, ENVIRONMENT, .env.local/.env.test and their .example files, root-then-app env inheritance, sync-env, with-env.sh / bun run with <env> <app> <cmd>, Infisical (.infisical.json, pr/staging/prod secrets), the app zod env schema and no-inline-env-coercion, adding an env var, common variables (REDIS_BULLMQ_URL, LOG_LEVEL, SENTRY_ENABLED, OTEL_ENABLED), or bun run check / build / typecheck before pushing, check-generated-files.sh, deploy.sh and wait-for-api.sh, start:<service> production runs, branch \u2192 pr \u2192 staging \u2192 prod promotion, what CI exists (INFRA-003, lib-ci.yml), and releasing @inixiative packages with config train?",
+  "concepts": ["env-config", "ci-deploy"],
+  "tokens": 12822,
+  "tokenMethod": "chars/4",
+  "files": {
+    "recognise": {
+      "path": "recognise.md",
+      "tokens": 2330,
+      "experimental": true,
+      "note": "recognise/pick split under test (model round); not the standard"
+    },
+    "knowledge": {
+      "path": "knowledge.md",
+      "tokens": 12822
+    }
+  },
+  "runsAgreed": 0,
+  "sources": {
+    "docs": [
+      "FEATURES.md",
+      "docs/claude/CICD.md",
+      "docs/claude/ENVIRONMENTS.md",
+      "docs/claude/SCRIPTS.md"
+    ],
+    "docUnits": [
+      "doc:docs/claude/ENVIRONMENTS.md#environment-names",
+      "doc:docs/claude/ENVIRONMENTS.md#environment-detection",
+      "doc:docs/claude/ENVIRONMENTS.md#file-based-environments",
+      "doc:docs/claude/ENVIRONMENTS.md#infisical-cloud-environments",
+      "doc:docs/claude/ENVIRONMENTS.md#with-env-composition",
+      "doc:docs/claude/ENVIRONMENTS.md#adding-environment-variables",
+      "doc:docs/claude/ENVIRONMENTS.md#common-variables",
+      "doc:FEATURES.md#infrastructure-devops",
+      "doc:docs/claude/CICD.md#overview",
+      "doc:docs/claude/CICD.md#github-actions",
+      "doc:docs/claude/CICD.md#deployment-environments",
+      "doc:docs/claude/CICD.md#database-migrations",
+      "doc:docs/claude/SCRIPTS.md#deployment-scripts"
+    ],
+    "catalogClusters": [
+      "build-deploy-ci",
+      "caching-and-invalidation",
+      "dev-setup-scripts",
+      "environment-config",
+      "error-handling",
+      "module-layout-monorepo",
+      "redis-infrastructure",
+      "request-context-access",
+      "structured-logging",
+      "testing-helpers"
+    ],
+    "codeEntries": 15,
+    "docMembers": 41
+  },
+  "bypassLines": 21,
+  "glossaryTerms": 22
+}

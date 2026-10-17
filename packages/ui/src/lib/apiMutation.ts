@@ -1,6 +1,7 @@
 /**
  * @atlas
- * @kind factory
+ * @kind constructor
+ * @constructs mutationFn
  * @partOf primitive:ui
  * @uses none
  */

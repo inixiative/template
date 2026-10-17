@@ -1,12 +1,12 @@
 import { afterAll, describe, expect, it } from 'bun:test';
-import { db, Prisma, unregisterDbInvariant } from '@template/db';
+import { db, Prisma, unregisterDbHook } from '@template/db';
 import { cleanupTouchedTables, createUser } from '@template/db/test';
 import { registerUserEmailInvariantHook } from '#/hooks/userEmail/hook';
 
 registerUserEmailInvariantHook();
 
 afterAll(async () => {
-  unregisterDbInvariant('userEmail');
+  unregisterDbHook('userEmail');
   await cleanupTouchedTables(db);
 });
 

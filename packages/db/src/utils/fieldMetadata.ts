@@ -6,6 +6,7 @@
  */
 import type { ModelField, PrismaMap } from '@inixiative/prisma-map';
 import { prismaMap } from '@template/db/generated/prismaMap';
+import { type ModelName, modelNames } from '@template/db/utils/modelNames';
 
 // The generated map is declared `as const` (readonly literal arrays); cast once to the lib's
 // structural PrismaMap shape, as prismaMapRelations does.
@@ -19,6 +20,10 @@ export const modelFields = (modelName: string): Record<string, ModelField> | und
 
 export const hasDeletedAt = (modelName: string): boolean =>
   getField(modelName, 'deletedAt') !== undefined;
+
+// Every model carrying a deletedAt column: what the softDeleteScope extension scopes and the
+// soft-delete cascade registers on. Compose other registries from this set.
+export const SOFT_DELETE_MODELS: readonly ModelName[] = modelNames.filter(hasDeletedAt);
 
 export const lookupField = (modelName: string, path: string): ModelField | undefined => {
   const segments = path.split('.');

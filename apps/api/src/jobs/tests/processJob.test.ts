@@ -1,10 +1,11 @@
-import { afterEach, describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it, spyOn } from 'bun:test';
 import { type AuditActor, auditActorContext } from '@template/db/lib/auditActorContext';
+import { jobHandlers } from '#/jobs/handlers';
 import { processJob } from '#/jobs/processJob';
 import { queue } from '#/jobs/queue';
 import { slowLastFinishedKey } from '#/jobs/slowLaneSignals';
 import { createSlowSlotPool } from '#/jobs/slowSlotPool';
-import { type JobData, JobLane, JobType } from '#/jobs/types';
+import { type JobData, JobLane, JobType, type WorkerContext } from '#/jobs/types';
 import { createMockJob } from '#tests/createTestWorker';
 
 const jobWith = (id: string, data: Partial<JobData> & { lane?: JobLane }) =>
@@ -76,6 +77,40 @@ describe('processJob', () => {
 
     expect(actors.map((actor) => actor?.actorJobName)).toEqual(['sendWebhook', 'sendWebhook']);
     expect(actors.map((actor) => actor?.integrationId)).toEqual(['integration-1', null]);
+  });
+
+  it('a cron tick does not run its handler: it enqueues the real run, marked with the cron row', async () => {
+    const ranDirectly: unknown[] = [];
+    const enqueuedRuns: unknown[] = [];
+    const realRun = spyOn(jobHandlers, 'sweepSegments').mockImplementation(
+      async (ctx: WorkerContext) => {
+        enqueuedRuns.push(ctx.job.data);
+      },
+    );
+
+    try {
+      await processJob(
+        createMockJob({
+          id: 'tick-job',
+          name: 'sweepSegments',
+          data: { type: JobType.cron, id: 'cron-row-id', lane: JobLane.slow, payload: null },
+        }),
+        {
+          handlers: {
+            sweepSegments: async () => {
+              ranDirectly.push('tick');
+            },
+          } as never,
+        },
+      );
+    } finally {
+      realRun.mockRestore();
+    }
+
+    expect(ranDirectly).toEqual([]);
+    expect(enqueuedRuns).toMatchObject([
+      { type: JobType.cronTrigger, id: 'cron-row-id', lane: JobLane.slow },
+    ]);
   });
 
   it('rejects an unknown handler', async () => {

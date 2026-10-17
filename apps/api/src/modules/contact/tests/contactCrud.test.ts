@@ -139,7 +139,7 @@ describe('Contact CRUD', () => {
           permissionRules: { delete: { all: [] } },
         }),
       );
-      expect(response.status).toBe(400);
+      expect(response.status).toBe(422);
     });
 
     it('rejects malformed permissionRules shape', async () => {
@@ -151,7 +151,7 @@ describe('Contact CRUD', () => {
           permissionRules: { read: { foo: 'bar' } },
         }),
       );
-      expect(response.status).toBe(400);
+      expect(response.status).toBe(422);
     });
 
     // Note: same-owner duplicate detection via @@unique is currently a NO-OP

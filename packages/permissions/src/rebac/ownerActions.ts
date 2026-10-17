@@ -1,6 +1,7 @@
 /**
  * @atlas
- * @kind factory
+ * @kind constructor
+ * @constructs rebacActions
  * @partOf primitive:authz
  * @uses none
  */

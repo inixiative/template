@@ -1,0 +1,33 @@
+{
+  "id": "json-rules",
+  "title": "Template rules and rule references",
+  "routing": "Is this about the template's own json-rules code \u2014 the shared rule gate validateRuleForLens, bindWhere, email rule scoping inside loops (scopedRule, narrowToElements, walkConditionTree, opaqueLoopIssue), RuleEvaluationError, the hooks RulesRegistry and shadowMerge \u2014 or about the rows a stored rule names and whether it is still sound: RuleReference edges and RULE_REFERENCEABLE_MODELS, ruleReferences / dynamicRuleReferences / RuleReferenceError, syncRuleReferenceEdges / syncRuleReferences / syncSegmentEdges, admitRuleReferences, lockedTargetStates, the ruleReference:target hook, ruleReferenceIssues / liveRuleReferences, withRule / ruleIssues / RuleDegradedError?",
+  "concepts": ["json-rules", "rule-references"],
+  "tokens": 15634,
+  "tokenMethod": "chars/4",
+  "files": {
+    "recognise": {
+      "path": "recognise.md",
+      "tokens": 3675,
+      "experimental": true,
+      "note": "recognise/pick split under test (model round); not the standard"
+    },
+    "knowledge": {
+      "path": "knowledge.md",
+      "tokens": 15634
+    }
+  },
+  "runsAgreed": 0,
+  "sources": {
+    "docs": ["docs/claude/COMMUNICATIONS.md", "docs/claude/HOOKS.md"],
+    "docUnits": [
+      "doc:docs/claude/HOOKS.md#rules-registry",
+      "doc:docs/claude/COMMUNICATIONS.md#email/rule-references-the-rows-a-rule-names"
+    ],
+    "catalogClusters": ["json-rules-engine", "rule-references-registry"],
+    "codeEntries": 27,
+    "docMembers": 61
+  },
+  "bypassLines": 24,
+  "glossaryTerms": 28
+}

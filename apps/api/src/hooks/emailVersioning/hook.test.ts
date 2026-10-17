@@ -5,7 +5,6 @@ import {
   cleanupTouchedTables,
   createEmailComponent,
   createEmailTemplate,
-  registerTestTracker,
 } from '@template/db/test';
 import { expand, saveEmailTemplate } from '@template/email/render';
 import { registerAuditLogHook } from '#/hooks/auditLog/hook';
@@ -13,8 +12,6 @@ import { registerEmailVersioningHook } from '#/hooks/emailVersioning/hook';
 import * as enqueueModule from '#/jobs/enqueue';
 import { recomposeSnapshot } from '#/lib/email/recompose';
 import { createTestWorker } from '#tests/createTestWorker';
-
-registerTestTracker();
 
 const mjml = (content: string) =>
   `<mjml><mj-body><mj-section><mj-column>${content}</mj-column></mj-section></mj-body></mjml>`;

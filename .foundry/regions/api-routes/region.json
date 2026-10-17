@@ -1,0 +1,66 @@
+{
+  "id": "api-routes",
+  "title": "API routes, controllers and modules",
+  "routing": "Is this about adding or shaping an endpoint: route templates (readRoute, createRoute, updateRoute, deleteRoute, actionRoute) and their args (model, submodel, action, many, paginate, admin, sanitizeKeys, filterLens, middleware), makeController and respond.ok / respond.created / respond.noContent, the { data } envelope, operationId naming, router exports and mounting, or where code goes inside an API module (routes/, controllers/, services/, handlers/, permissions-roles / permissions-rebac/, validations/, MODULES.md)?",
+  "concepts": ["route-templates", "api-modules"],
+  "tokens": 15577,
+  "tokenMethod": "chars/4",
+  "files": {
+    "recognise": {
+      "path": "recognise.md",
+      "tokens": 3232,
+      "experimental": true,
+      "note": "recognise/pick split under test (model round); not the standard"
+    },
+    "knowledge": {
+      "path": "knowledge.md",
+      "tokens": 15577
+    }
+  },
+  "runsAgreed": 1,
+  "sources": {
+    "docs": ["FEATURES.md", "docs/claude/API_ROUTES.md", "docs/claude/MODULES.md"],
+    "docUnits": [
+      "doc:docs/claude/API_ROUTES.md#naming-conventions",
+      "doc:docs/claude/API_ROUTES.md#route-templates",
+      "doc:docs/claude/API_ROUTES.md#controllers",
+      "doc:docs/claude/API_ROUTES.md#module-examples",
+      "doc:docs/claude/API_ROUTES.md#response-format",
+      "doc:docs/claude/API_ROUTES.md#middleware",
+      "doc:docs/claude/API_ROUTES.md#router-exports",
+      "doc:FEATURES.md#api-architecture-routing",
+      "doc:docs/claude/API_ROUTES.md#file-organization",
+      "doc:docs/claude/MODULES.md#core-most-modules-will-have-these",
+      "doc:docs/claude/MODULES.md#domain-logic-richer-modules",
+      "doc:docs/claude/MODULES.md#shared-internals-scoped-to-one-module",
+      "doc:docs/claude/MODULES.md#less-common-but-legitimate",
+      "doc:docs/claude/MODULES.md#rules-of-thumb"
+    ],
+    "catalogClusters": [
+      "auth-middleware-validation",
+      "authentication-methods",
+      "batch-request-execution",
+      "database-scripts-migrations",
+      "encryption-key-rotation",
+      "error-handling",
+      "filtering-search-ordering",
+      "frontend-state-api-client",
+      "job-definition-and-enqueue",
+      "module-layout-monorepo",
+      "naming-vocabulary",
+      "permission-rule-algebra",
+      "request-context-access",
+      "request-response-schemas",
+      "roles-and-permissions",
+      "route-registration-openapi",
+      "route-templates-controllers",
+      "soft-delete-cascade",
+      "superadmin-operations",
+      "testing-helpers"
+    ],
+    "codeEntries": 13,
+    "docMembers": 57
+  },
+  "bypassLines": 24,
+  "glossaryTerms": 19
+}

@@ -68,7 +68,7 @@ export const readRoute = <const T extends RouteArgs>(args: T) => {
       (many
         ? `Retrieves a list of ${resourceName}${parentContext}.`
         : `Retrieves an existing ${resourceName}${parentContext}.`),
-    middleware: prepareMiddleware(middleware, skipResource, filterLens),
+    middleware: prepareMiddleware(middleware, skipResource, filterLens, args.includeDeleted),
     request: buildRequest(args),
     responses: buildResponses(args, 200),
   });

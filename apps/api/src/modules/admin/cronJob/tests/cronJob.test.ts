@@ -156,7 +156,7 @@ describe('admin/cronJob', () => {
       ).toBe(204);
       expect(
         (await fetch(post(`/api/admin/cronJob/${cronJob.id}/trigger`, { lane: 'medium' }))).status,
-      ).toBe(400);
+      ).toBe(422);
     });
   });
 });

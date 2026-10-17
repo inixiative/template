@@ -114,6 +114,7 @@ export const buildRequest = <const T extends RouteArgs>(
     many = false,
     admin = false,
     filterLens,
+    includeDeleted = false,
   } = args;
 
   // projectLens silently drops unresolved paths, so validate the authored narrowing up front.
@@ -131,6 +132,13 @@ export const buildRequest = <const T extends RouteArgs>(
   // Add lookup parameter for routes with id params
   if (needsId) {
     querySchema = querySchema.merge(z.object({ lookup: z.string().optional() }));
+  }
+
+  // The route may serve soft-deleted rows; the caller still has to ask, per request.
+  if (includeDeleted) {
+    querySchema = querySchema.merge(
+      z.object({ includeDeleted: z.enum(['true', 'false']).optional() }),
+    );
   }
 
   if (many && paginate)

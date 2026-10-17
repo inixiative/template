@@ -42,7 +42,7 @@ export const updateRoute = <const T extends RouteArgs>(args: T) => {
     tags: routeTags,
     security: securityForRoute(args),
     description: description ?? `Updates an existing ${resourceName}.`,
-    middleware: prepareMiddleware(middleware, skipId),
+    middleware: prepareMiddleware(middleware, skipId, undefined, args.includeDeleted),
     request: buildRequest(args),
     responses: buildResponses(args, 200),
   });

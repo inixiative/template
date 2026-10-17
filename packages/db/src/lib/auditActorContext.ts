@@ -46,10 +46,18 @@ export const auditActorContext = {
     if (current) Object.assign(current, partial);
   },
   isSoftDeleteBypassed: (): boolean => auditActorStore.getStore()?.bypassSoftDeleteScope ?? false,
-  withSoftDeleteBypass: <T>(fn: () => T | Promise<T>): Promise<Awaited<T>> => {
+  withDeleted: <T>(fn: () => T | Promise<T>): Promise<Awaited<T>> => {
     const current = auditActorStore.getStore() ?? nullAuditActor;
     return auditActorStore.run(
       { ...current, bypassSoftDeleteScope: true },
+      async (): Promise<Awaited<T>> => await fn(),
+    );
+  },
+  // Inside a withDeleted block, restores the live-row scope for one read that must not see tombstones.
+  withoutDeleted: <T>(fn: () => T | Promise<T>): Promise<Awaited<T>> => {
+    const current = auditActorStore.getStore() ?? nullAuditActor;
+    return auditActorStore.run(
+      { ...current, bypassSoftDeleteScope: false },
       async (): Promise<Awaited<T>> => await fn(),
     );
   },

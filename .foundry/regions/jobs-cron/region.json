@@ -1,0 +1,58 @@
+{
+  "id": "jobs-cron",
+  "title": "Background jobs and cron",
+  "routing": "Is this about running work outside the request: defining, registering, enqueuing or scheduling a background job? Signals: makeJob / makeSingletonJob / makeSupersedingJob, enqueueJob, ctx.enqueueChildJob or job stages, handlers/index.ts registration, WorkerContext / ctx.log, job ids, the BullMQ queue / Worker / processJob, BullBoard, CronJob rows, cron patterns, registerCronJobs / cronJobSync / removeRepeatable, admin job or cron trigger routes, cleanStaleData / archiveStaleRecords, or a fire-and-forget promise, setTimeout or node-cron schedule standing in for a job. (Fast/slow lanes and the JobOutbox overflow buffer are job-lanes-outbox.)",
+  "concepts": ["jobs", "cron"],
+  "tokens": 15399,
+  "tokenMethod": "chars/4",
+  "files": {
+    "recognise": {
+      "path": "recognise.md",
+      "tokens": 2903,
+      "experimental": true,
+      "note": "recognise/pick split under test (model round); not the standard"
+    },
+    "knowledge": {
+      "path": "knowledge.md",
+      "tokens": 15399
+    }
+  },
+  "runsAgreed": 0,
+  "sources": {
+    "docs": ["FEATURES.md", "docs/claude/CONTEXT.md", "docs/claude/JOBS.md"],
+    "docUnits": [
+      "doc:docs/claude/CONTEXT.md#job-context",
+      "doc:docs/claude/JOBS.md#job-system",
+      "doc:docs/claude/JOBS.md#built-in-handlers",
+      "doc:docs/claude/JOBS.md#creating-handlers",
+      "doc:docs/claude/JOBS.md#handler-patterns",
+      "doc:docs/claude/JOBS.md#enqueuing-jobs",
+      "doc:docs/claude/JOBS.md#bullboard",
+      "doc:FEATURES.md#background-jobs-cron",
+      "doc:docs/claude/JOBS.md#cron-jobs"
+    ],
+    "catalogClusters": [
+      "app-events-side-effects",
+      "auth-middleware-validation",
+      "authentication-methods",
+      "caching-and-invalidation",
+      "cron-and-recurring-work",
+      "data-models",
+      "environment-config",
+      "graceful-shutdown-lifecycle",
+      "job-definition-and-enqueue",
+      "job-overflow-outbox",
+      "naming-vocabulary",
+      "observability-telemetry",
+      "redis-infrastructure",
+      "segments-membership",
+      "structured-logging",
+      "supersede-lanes",
+      "testing-helpers"
+    ],
+    "codeEntries": 21,
+    "docMembers": 50
+  },
+  "bypassLines": 14,
+  "glossaryTerms": 26
+}

@@ -8,11 +8,9 @@ import type { OpenTransaction } from '@template/db/clientTypes';
 import { assertNoNestedWrites } from '@template/db/extensions/assertNoNestedWrites';
 import {
   DbAction,
-  type DbInvariantAction,
   executeHooks,
   type HookOptions,
   HookTiming,
-  runInvariants,
 } from '@template/db/extensions/hookRegistry';
 import { getCurrentTransaction } from '@template/db/extensions/transactionRegistry';
 import type { Prisma } from '@template/db/generated/client/client';
@@ -44,7 +42,6 @@ type MutationParams = {
 };
 
 type Interception = {
-  invariantData?: (args: MutationArgs) => unknown;
   loadPrevious?: (
     openTransaction: OpenTransaction,
     model: Prisma.ModelName,
@@ -53,11 +50,10 @@ type Interception = {
 };
 
 export const intercept =
-  (action: DbAction, { invariantData, loadPrevious }: Interception = {}) =>
+  (action: DbAction, { loadPrevious }: Interception = {}) =>
   async (params: MutationParams) => {
     const { model, operation, args, query } = params;
     const openTransaction = getCurrentTransaction(model, operation, params);
-    if (invariantData) await runInvariants(model, action as DbInvariantAction, invariantData(args));
     if (!openTransaction) return query(args);
     assertNoNestedWrites(model, args);
     const hookOptions = { model, operation, action, args } as HookOptions;

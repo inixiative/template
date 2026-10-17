@@ -1,0 +1,42 @@
+{
+  "id": "json-rules-runtime",
+  "title": "Running, validating and typing rules",
+  "routing": "Is this about executing or checking a rule rather than writing one: check vs toPrisma vs executePrismaPlan and where the rails differ, root-array rules being check-only, validateRule / assertValidRule / validateFieldMaps / assertValidNarrowing / validateRuleInLens before saving or running external rules, describeRule and getOperatorsForKind (introspection stays in the engine), bindRule and listLensBindings for { bind } tokens, readScopeRef, orWhere, orderRecords, materializeSourceQuery, indexBridges, getLensRoot, engineGlobals (with / reset, string.fuzzy, prismaOptions.datasource.provider, anyNull), the TypeScript types (Condition, one public name per operation), or the error classes UsageError and LensRefusal?",
+  "concepts": ["json-rules-runtime"],
+  "tokens": 10506,
+  "tokenMethod": "chars/4",
+  "files": {
+    "recognise": {
+      "path": "recognise.md",
+      "tokens": 1486,
+      "experimental": true,
+      "note": "recognise/pick split under test (model round); not the standard"
+    },
+    "knowledge": {
+      "path": "knowledge.md",
+      "tokens": 10506
+    }
+  },
+  "runsAgreed": 0,
+  "sources": {
+    "docs": ["@inixiative/json-rules/README.md"],
+    "docUnits": [
+      "doc:@inixiative/json-rules/README.md#rule-introspection",
+      "doc:@inixiative/json-rules/README.md#runtime-validation",
+      "doc:@inixiative/json-rules/README.md#engine-globals",
+      "doc:@inixiative/json-rules/README.md#typescript-types",
+      "doc:@inixiative/json-rules/README.md#error-handling",
+      "doc:@inixiative/json-rules/README.md#root-array-rules-in-check"
+    ],
+    "catalogClusters": [
+      "error-handling",
+      "json-rules-engine",
+      "lenses-multi-source",
+      "rule-builder-ui-model"
+    ],
+    "codeEntries": 27,
+    "docMembers": 18
+  },
+  "bypassLines": 15,
+  "glossaryTerms": 12
+}

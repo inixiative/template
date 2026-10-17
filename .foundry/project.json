@@ -1,0 +1,4 @@
+{
+  "$comment": "Template's shared Foundry settings (read by Foundry after the 2026-10-17 roster retirement; personal projects[id] settings in your Foundry's settings.json win key by key). The chorus is on: .foundry/regions holds 70 generated region Wardens, the only Wardens Foundry runs. To turn it off for yourself, set projects[<template id>].chorus.enabled = false in your Foundry settings.",
+  "chorus": { "enabled": true }
+}

@@ -3,14 +3,13 @@ import { clearHookRegistry, DbAction, db, HookTiming, registerDbHook } from '@te
 import { readPrismaTransaction } from '@template/db/extensions/prismaTransaction';
 import { Prisma } from '@template/db/generated/client/client';
 import { getNextSeq } from '@template/db/test/factory';
-import { cleanupTouchedTables, registerTestTracker } from '@template/db/test/testTracker';
+import { cleanupTouchedTables } from '@template/db/test/testTracker';
 
 const nextEmail = (label: string) => `${label}-${getNextSeq()}-${Date.now()}@test.com`;
 
 describe('managed transactions', () => {
   beforeEach(() => {
     clearHookRegistry();
-    registerTestTracker();
   });
 
   afterEach(async () => {
@@ -117,7 +116,6 @@ describe('managed transactions', () => {
       const user = await db.user.create({ data: { email, name: 'Hookless Plain' } });
       expect(user.email).toBe(email);
 
-      registerTestTracker();
       await db.user.deleteMany({ where: { id: user.id } });
     });
 

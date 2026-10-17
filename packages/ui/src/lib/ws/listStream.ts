@@ -8,7 +8,7 @@ import type { PaginateResponse } from '@template/sdk';
 import type { StreamRow } from '@template/shared/ws';
 import type { FoldContext } from '@template/ui/lib/ws/streamFolds';
 
-const MAX_TOMBSTONES = 500;
+const MAX_REMOVED_IDS = 500;
 
 export type ListStreamState<R extends StreamRow = StreamRow> = {
   data: R[];
@@ -75,7 +75,7 @@ const upsert = <S extends ListStreamState<R>, R extends StreamRow>(
 
 const remove = <S extends ListStreamState>(state: S, { id }: StreamRow): S => {
   if (state.__removed?.includes(id)) return state;
-  const __removed = [...(state.__removed ?? []), id].slice(-MAX_TOMBSTONES);
+  const __removed = [...(state.__removed ?? []), id].slice(-MAX_REMOVED_IDS);
   const held = state.data.some((row) => row.id === id);
   if (!held && !isBeyondLoadedRows(state, id)) return { ...state, __removed };
   return {

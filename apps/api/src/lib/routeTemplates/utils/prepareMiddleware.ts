@@ -6,6 +6,7 @@
  */
 import type { LensNarrowing } from '@inixiative/json-rules';
 import type { MiddlewareHandler } from 'hono';
+import { includeDeletedMiddleware } from '#/middleware/resources/includeDeletedMiddleware';
 import { resourceContextMiddleware } from '#/middleware/resources/resourceContextMiddleware';
 
 const filterLensSetter =
@@ -19,10 +20,17 @@ export const prepareMiddleware = (
   middleware: MiddlewareHandler | MiddlewareHandler[] | undefined,
   skipId = true,
   filterLens?: LensNarrowing,
+  includeDeleted = false,
 ): MiddlewareHandler[] | undefined => {
   const middlewareArray = Array.isArray(middleware) ? middleware : middleware ? [middleware] : [];
   const resourceMiddleware = skipId ? [] : [resourceContextMiddleware()];
   const filterMiddleware = filterLens ? [filterLensSetter(filterLens)] : [];
-  const result = [...resourceMiddleware, ...filterMiddleware, ...middlewareArray];
+  const deletedMiddleware = includeDeleted ? [includeDeletedMiddleware()] : [];
+  const result = [
+    ...deletedMiddleware,
+    ...resourceMiddleware,
+    ...filterMiddleware,
+    ...middlewareArray,
+  ];
   return result.length ? result : undefined;
 };

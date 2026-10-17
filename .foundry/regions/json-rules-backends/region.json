@@ -1,0 +1,37 @@
+{
+  "id": "json-rules-backends",
+  "title": "Compiling rules to Prisma and SQL",
+  "routing": "Is this about turning a json-rules Condition into a database-client / data-modeling query \u2014 a toPrisma plan with groupBy steps and { __field } references read through executePrismaPlan, toSql's parameterized WHERE plus LEFT JOINs ({ map, model, alias }, mapName for a FieldMapSet), compiling with { lens }, Json null checks and Prisma's AnyNull, the Backend Support Matrix of what check / toPrisma / toSql each run, the compilers' NULL arms and isRequired licensing, Prisma and SQL limitations, or where the rails differ (case mapping, collation, non-array Json)?",
+  "concepts": ["lib-json-rules-backends"],
+  "tokens": 7684,
+  "tokenMethod": "chars/4",
+  "files": {
+    "recognise": {
+      "path": "recognise.md",
+      "tokens": 631,
+      "experimental": true,
+      "note": "recognise/pick split under test (model round); not the standard"
+    },
+    "knowledge": {
+      "path": "knowledge.md",
+      "tokens": 7684
+    }
+  },
+  "runsAgreed": 0,
+  "sources": {
+    "docs": ["@inixiative/json-rules/README.md", "@inixiative/json-rules/src/toSql/README.md"],
+    "docUnits": [
+      "doc:@inixiative/json-rules/README.md#prisma-query-planning",
+      "doc:@inixiative/json-rules/README.md#postgresql-sql-generation",
+      "doc:@inixiative/json-rules/README.md#backend-support-matrix",
+      "doc:@inixiative/json-rules/src/toSql/README.md#usage",
+      "doc:@inixiative/json-rules/src/toSql/README.md#supported-features",
+      "doc:@inixiative/json-rules/src/toSql/README.md#security"
+    ],
+    "catalogClusters": ["json-rules-engine", "lenses-multi-source"],
+    "codeEntries": 3,
+    "docMembers": 1
+  },
+  "bypassLines": 3,
+  "glossaryTerms": 18
+}

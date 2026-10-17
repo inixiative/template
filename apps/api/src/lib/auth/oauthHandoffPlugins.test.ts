@@ -1,6 +1,6 @@
 import { afterAll, afterEach, describe, expect, mock, spyOn, test } from 'bun:test';
 import { db } from '@template/db';
-import { cleanupTouchedTables, registerTestTracker } from '@template/db/test';
+import { cleanupTouchedTables } from '@template/db/test';
 import { betterAuth } from 'better-auth';
 import { memoryAdapter } from 'better-auth/adapters/memory';
 import { bearer } from 'better-auth/plugins';
@@ -136,7 +136,6 @@ describe('auth one-time token wiring', () => {
   });
 
   test('a new session gets a one-time token that exchanges for a working bearer token', async () => {
-    registerTestTracker();
     const { auth } = await import('#/lib/auth');
     const email = `ott-${Bun.randomUUIDv7()}@example.com`;
     const password = 'synthetic-ott-password';

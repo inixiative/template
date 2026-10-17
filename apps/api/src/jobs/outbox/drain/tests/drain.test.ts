@@ -101,7 +101,7 @@ describe('jobs overflow buffer (spill + drain)', () => {
   afterEach(async () => {
     queued.clear();
     poison.clear();
-    await ctx.db.jobOutbox.deleteMany({});
+    await cleanupTouchedTables(ctx.db);
     await ctx.queue.redis.flushdb(); // clears the flag
   });
 

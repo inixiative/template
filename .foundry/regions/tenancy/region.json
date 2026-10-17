@@ -1,0 +1,40 @@
+{
+  "id": "tenancy",
+  "title": "Tenancy and Superadmin",
+  "routing": "Is this about the tenant structure or the platform admin? Organization, Space, OrganizationUser and SpaceUser rows and their API modules (organization, organizationUser, space, spaceUser), the User/Organization/Space/Public contexts and ?org= / ?space= URL state, tenant pages (OrganizationProfilePage, OrganizationSpacesPage, CreateOrganizationModal), validateNotLastOwner, or the superadmin side: PlatformRole, isSuperadmin, validateSuperadmin, the admin router and admin module, spoofMiddleware / x-spoof-user-email, and the superadmin app?",
+  "concepts": ["tenancy", "superadmin"],
+  "tokens": 9279,
+  "tokenMethod": "chars/4",
+  "files": {
+    "recognise": {
+      "path": "recognise.md",
+      "tokens": 2079,
+      "experimental": true,
+      "note": "recognise/pick split under test (model round); not the standard"
+    },
+    "knowledge": {
+      "path": "knowledge.md",
+      "tokens": 9279
+    }
+  },
+  "runsAgreed": 0,
+  "sources": {
+    "docs": ["FEATURES.md", "docs/claude/AUTH.md"],
+    "docUnits": [
+      "doc:FEATURES.md#multi-tenancy",
+      "doc:docs/claude/AUTH.md#spoof-middleware",
+      "doc:FEATURES.md#admin-operations"
+    ],
+    "catalogClusters": [
+      "authentication-methods",
+      "frontend-navigation-context",
+      "frontend-state-api-client",
+      "multi-tenancy-membership",
+      "superadmin-operations"
+    ],
+    "codeEntries": 28,
+    "docMembers": 8
+  },
+  "bypassLines": 5,
+  "glossaryTerms": 21
+}

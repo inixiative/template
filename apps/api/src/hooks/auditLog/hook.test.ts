@@ -15,14 +15,12 @@ import {
   createToken,
   createUser,
 } from '@template/db/test';
-import { registerTestTracker } from '@template/db/test/testTracker';
 import { saveEmailTemplate } from '@template/email/render';
 import { registerAuditLogHook } from '#/hooks/auditLog/hook';
 import type { TokenWithRelations } from '#/lib/context/types';
 import { auditActorMiddleware } from '#/middleware/auth/auditActorMiddleware';
 import { createTestApp } from '#tests/createTestApp';
 
-registerTestTracker();
 registerAuditLogHook();
 
 afterAll(async () => {

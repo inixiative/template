@@ -4,6 +4,7 @@
 
 ## Contents
 
+- [Direction: pre-launch → launched (in progress)](#direction-pre-launch--launched-in-progress)
 - [Architecture Overview](#architecture-overview)
 - [Core Patterns](#core-patterns)
   - [1. Root-Level Config State (Context Provider)](#1-root-level-config-state-context-provider)
@@ -49,7 +50,26 @@ Automated infrastructure provisioning via Terminal UI (Ink). Full implementation
 - Task coverage uses Bun-native tests plus fixture-backed VCR helpers under `init/tests/`
 - Launch is part of the init flow: preflight checks gate flipping `launched = true`
 
----
+## Direction: pre-launch → launched (in progress)
+
+Init provisions a project in two phases, and Launch is the cut-over between them.
+
+**Pre-launch:** every deployed database is disposable. Releases push the schema (`prisma db push --accept-data-loss`), `setup.sh` pushes and seeds, and a provider task may be re-run or reset. The TUI (`bun run init`) and the headless `init:agent` both work here.
+
+**Launched:** nothing may clobber a database again. Releases apply committed migrations only (`prisma migrate deploy`), schema changes go through `db:migrate`, and `setup.sh` skips push and seed. Details: [DATABASE.md](DATABASE.md#schema-changes-push-before-launch-migrations-after).
+
+**Launch** (`init/tasks/launch.ts`, `LaunchView`) runs preflight checks over the required sections, creates the baseline migration (`prisma/migrations/0_init`), checks each deployed database matches the schema and records the baseline as applied there, then flips `launched = true` in `project.config.ts` (the baseline steps land with [#197](https://github.com/inixiative/template/pull/197)).
+
+| Piece | Status |
+|-------|--------|
+| Launch preflight + flag, `setup.sh` guard, `release.sh` branch on the flag | Built |
+| Baseline migration created and recorded on deployed databases at launch | [#197](https://github.com/inixiative/template/pull/197) |
+| A deploy hook that runs `scripts/db/release.sh` (Railway pre-deploy) | Not built: deployed schema is released by hand |
+| Launch from the headless `init:agent` | Not built (`init:agent` covers project, Infisical, PlanetScale, Railway, `--section=monitoring`) |
+| Post-launch Vercel preview deploys per PR | Not built (`LaunchView` lists it as a post-launch TODO) |
+| `scripts/setup/init.sh` | TODO stub, superseded by `init/`; not run by anything |
+
+Provider coverage today: options marked `implemented: true` in `init/providers.ts` (Vercel, Cloudflare Pages, PlanetScale, Railway Postgres, Railway API/worker/Redis, Resend, no email) plus the tasks every project runs (project config, Infisical, Railway Buckets, Bouncer, monitoring). Netlify, Neon, Supabase, Fly.io, Render, Upstash, Postmark and SES are listed but cannot be selected; Optional Integrations, DNS, Database Seeding, GitHub Actions and Documentation Generation are menu items with no task.
 
 ## Architecture Overview
 
@@ -341,14 +361,14 @@ await onStepComplete?.(); // View updates via config sync
 **Implementation:**
 ```typescript
 // ❌ Bad: Rely on password object from previous step
-if (!(await isProgressComplete('planetscale', 'initProdMigrationTable'))) {
+if (!(await isComplete('planetscale', 'initProdMigrationTable'))) {
   const prodConnectionString = productionPassword.connection_strings.general; // undefined if resuming!
   await initPrismaMigrationTable(prodConnectionString);
 }
 
 // ✅ Good: Fetch from Infisical (where step 8 stored it)
-if (!(await isProgressComplete('planetscale', 'initProdMigrationTable'))) {
-  const prodConnectionString = getSecret('DATABASE_URL', {
+if (!(await isComplete('planetscale', 'initProdMigrationTable'))) {
+  const prodConnectionString = await getSecretAsync('DATABASE_URL', {
     projectId: infisicalProjectId,
     environment: 'prod',
     path: '/api',
@@ -357,7 +377,7 @@ if (!(await isProgressComplete('planetscale', 'initProdMigrationTable'))) {
 }
 
 // ✅ Good: Re-read from config (don't trust local variables)
-if (!(await isProgressComplete('planetscale', 'configureDB'))) {
+if (!(await isComplete('planetscale', 'configureDB'))) {
   const latestConfig = await getProjectConfig();
   const orgName = latestConfig.planetscale.organization;
   const dbName = latestConfig.planetscale.database;
@@ -366,7 +386,7 @@ if (!(await isProgressComplete('planetscale', 'configureDB'))) {
 ```
 
 **Rule of thumb:**
-- Secrets → Always fetch from Infisical with `getSecret()`
+- Secrets → Always fetch from Infisical with `getSecretAsync()`
 - Config metadata → Always re-read from config with `getProjectConfig()`
 - Never pass connection strings, passwords, or API keys between steps
 
@@ -553,7 +573,7 @@ const handleTokenSubmit = async () => {
 
   try {
     // Store token in Infisical
-    await setSecret(projectId, 'root', 'RAILWAY_TOKEN', workspaceToken.trim());
+    await setSecretAsync(projectId, 'root', 'RAILWAY_TOKEN', workspaceToken.trim());
 
     setStoringToken(false);  // Hide storing spinner
 
@@ -805,7 +825,7 @@ const runSetup = async (workspaceId: string) => {
   // Check if token exists in Infisical
   let hasToken = false;
   try {
-    const token = getSecret('RAILWAY_WORKSPACE_TOKEN', {
+    const token = await getSecretAsync('RAILWAY_WORKSPACE_TOKEN', {
       projectId: infisicalProjectId,
       environment: 'root',
     });
@@ -861,7 +881,7 @@ const handleTokenSubmit = async () => {
   if (!workspaceToken.trim()) return;
 
   // Store in Infisical
-  setSecret(infisicalProjectId, 'root', 'RAILWAY_WORKSPACE_TOKEN', workspaceToken.trim());
+  await setSecretAsync(infisicalProjectId, 'root', 'RAILWAY_WORKSPACE_TOKEN', workspaceToken.trim());
 
   // Continue with setup
   await runSetup(workspaceId);

@@ -1,6 +1,7 @@
 /**
  * @atlas
- * @partOf infrastructure:prisma
+ * @kind type
+ * @partOf infrastructure:prisma, primitive:testFactories
  * @uses none
  */
 import type * as runtime from '@prisma/client/runtime/client';
