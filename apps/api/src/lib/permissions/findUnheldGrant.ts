@@ -9,8 +9,8 @@ import { type EntitlementGrant, lesserRole, roleToStandardAction } from '@templa
 import { check, rebacSchema } from '@template/permissions/rebac';
 import type { Context } from 'hono';
 import { findUnheldActions } from '#/lib/permissions/findUnheldActions';
-import { getPrincipalGrant } from '#/lib/permissions/getPrincipalGrant';
 import { userHeldOn } from '#/lib/permissions/userHeldOn';
+import { issuesFullFromNarrowed } from '#/lib/permissions/validateFullGrantIssuer';
 import { validateRole } from '#/lib/permissions/validateRole';
 import type { AppEnv } from '#/types/appEnv';
 
@@ -41,14 +41,11 @@ const findUnheldRole = async (c: Context<AppEnv>, grant: EntitlementGrant): Prom
   return unheld;
 };
 
-const isFull = (grant: EntitlementGrant | null) =>
-  !grant || (!grant.entitlementsOnly && (grant.entitlements ?? null) === null);
-
 export const findUnheldGrant = async (
   c: Context<AppEnv>,
   grant: EntitlementGrant,
 ): Promise<string[]> => [
-  ...(isFull(grant) && !isFull(getPrincipalGrant(c)) ? ['full grant from a narrowed issuer'] : []),
+  ...(issuesFullFromNarrowed(c, grant) ? ['full grant from a narrowed issuer'] : []),
   ...(grant.entitlementsOnly ? [] : await findUnheldRole(c, grant)),
   ...findUnheldActions(c.get('permix'), await userHeldOn(c), grant.entitlements),
 ];

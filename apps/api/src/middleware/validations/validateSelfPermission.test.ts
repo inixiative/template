@@ -20,6 +20,8 @@ import type { Entitlements } from '@template/permissions/client';
 import { tokenAuthMiddleware } from '#/middleware/auth/tokenAuthMiddleware';
 import { meRouter } from '#/modules/me';
 import { organizationRouter } from '#/modules/organization';
+import { organizationUserRouter } from '#/modules/organizationUser';
+import { tokenRouter } from '#/modules/token';
 import { createTestApp } from '#tests/createTestApp';
 
 describe('actions on the user itself', () => {
@@ -34,6 +36,8 @@ describe('actions on the user itself', () => {
         app.use('*', tokenAuthMiddleware);
         app.route('/api/v1/me', meRouter);
         app.route('/api/v1/organization', organizationRouter);
+        app.route('/api/v1/organizationUser', organizationUserRouter);
+        app.route('/api/v1/token', tokenRouter);
       },
     ],
   });
@@ -232,6 +236,34 @@ describe('actions on the user itself', () => {
       { organization: spaceContext.organization, space: spaceContext.space },
     );
     expect((await call(spaceKey, 'GET', '/me')).status).toBe(401);
+  });
+
+  it('a narrowed issuer cannot mint or make a full membership token', async () => {
+    const issuer = (await createUser()).entity;
+    const { entity: issuerMembership, context } = await createOrganizationUser(
+      { role: 'owner', entitlements: { 'billing.export': true } },
+      { user: issuer },
+    );
+    const key = await mint(issuer, 'owner', { 'token.create': true, manage: true });
+    const path = `/organizationUser/${issuerMembership.id}/tokens`;
+    expect((await call(key, 'POST', path, { name: 't', role: 'member' })).status).toBe(403);
+    expect(
+      (await call(key, 'POST', path, { name: 't', role: 'member', entitlements: { read: true } }))
+        .status,
+    ).toBe(201);
+
+    const { entity: narrowedToken } = await createToken(
+      {
+        ownerModel: 'OrganizationUser',
+        role: 'member',
+        entitlements: { read: true },
+        keyHash: createHash('sha256').update(randomUUID()).digest('hex'),
+      },
+      { ...context, organizationUser: issuerMembership },
+    );
+    expect(
+      (await call(key, 'PATCH', `/token/${narrowedToken.id}`, { entitlements: null })).status,
+    ).toBe(403);
   });
 
   it('a minter cannot grant an action it does not hold', async () => {
