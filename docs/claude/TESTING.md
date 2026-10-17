@@ -97,7 +97,9 @@ describe('userRead', () => {
 
 Located in `packages/db/src/test/factories/`.
 
-Use a factory whenever one exists; never hand-build a DB record a factory covers.
+**Every model has a factory, and every test row is made with one.** A model gets its factory when the model is added; if you find one without, adding it is part of your change. `everyFactory.test.ts` fails while any model lacks one. A test never writes a row through the client (`db.<model>.create`); `scripts/ci/rules/no-direct-prisma-in-tests.sh` fails a changed test file that does.
+
+Why: the dependency inference depends on it. A factory infers a dependency from every foreign-key relation on its model and builds it from the target model's factory, so a model without a factory breaks every factory that points at it (see [FK Auto-Inference](#fk-auto-inference)). The factories are also the one place that knows how to make a valid row: they reuse what the context already holds and record the touched tables for cleanup, which a raw create skips.
 
 ### build vs create
 
@@ -177,6 +179,8 @@ context.organizationUser  // Now exists
 context.user              // Also created
 context.organization      // Also created
 ```
+
+An optional relation is not built by default, but its target model's factory is still required: the engine resolves it for every relation before deciding whether to build it.
 
 ### Context Keys
 
@@ -345,13 +349,11 @@ const authProviderFactory = createFactory('AuthProvider', {
 });
 ```
 
-**When to Create a New Factory:**
+**Adding a Factory:**
 
-Before writing test data manually:
-1. Check if factory exists: `/packages/db/src/test/factories/`
-2. If not, create factory following existing patterns
-3. Export from `/packages/db/src/test/factories/index.ts`
-4. Use in tests with minimal overrides
+1. Add `<model>Factory.ts` in `packages/db/src/test/factories/` with `createFactory`, following the pattern below.
+2. Export it from `packages/db/src/test/factories/index.ts`.
+3. Use it in tests with minimal overrides.
 
 **Factory Creation Pattern:**
 
