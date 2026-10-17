@@ -415,6 +415,10 @@ is unavailable during the outage; stream appends cannot be sequenced, so local h
 - `apps/api/src/ws/streamAudience.test.ts`: the audience enforcement.
 - `apps/api/src/ws/pubsub.test.ts`: per-stream publish order, a shared counter across instances,
   an unsequenced append, a subscriber reconnect, and per-recipient delivery.
+- `apps/api/src/ws/multiInstance.test.ts`: two API instances and a publish-only worker, each its
+  own process (`apps/api/tests/wsInstance/`) against a throwaway Redis container: one gap-free seq
+  order on every instance, per-user counters, a dropped subscriber resyncing only its own holders,
+  and an unsequenced append resyncing every instance. It needs Docker.
 - `apps/api/src/ws/queries/streamSeq.test.ts`: snapshot stamp vs next seq, a read that writes
   nothing, the claim, TTL refresh, re-seed after expiry.
 - `apps/api/src/appEvents/handlers/contact/organizationContactsStream.test.ts`: app event →
