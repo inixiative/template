@@ -61,7 +61,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - the config command rejected my flag
 - audit every checkout for toolchain drift
 - release the inixiative packages
-- bump the ecosystem versions in a consumer repo
 - start only the supporting services in containers
 - the type for an environment name
 - where do errors get reported
@@ -96,7 +95,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - actually push the release commits
 - I'll release from my feature branch
 - the script that composes env for a command
-- publish a workspace package with real versions
 - apply runtime overrides when env is read
 - read the env var through the schema
 - I'll just read the new var in code
@@ -114,7 +112,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - I'll pass an extra flag through
 - which repos are out of date
 - publish a new version of a library
-- land the version bumps through a reviewed branch
 - I'll dockerize the api for local dev
 - which names are valid environments
 - send errors to sentry in cloud envs
@@ -148,7 +145,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - the release printed the push commands but didn't push
 - release from main as it is on origin
 - how does the env get loaded for a command
-- the workspace ranges get rewritten on publish
 - wrap env so overrides are parsed on read
 - where does code read env vars
 - the four places a new variable goes
@@ -164,7 +160,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - which environment names are allowed
 - I'll run the check in each repo by hand
 - I'll npm publish by hand
-- I'll publish from the consumer repo
 - bun servers run natively, databases in docker
 - I'll type it as a plain string
 - I'll call sentry directly
@@ -195,7 +190,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - I'll just run the release and see
 - my checkout is behind, can I release
 - I'll source the env file in my script
-- I'll publish with the workspace protocol in place
 - I'll mutate the env object for the override
 - I'll read the env directly in the module
 - a new secret for staging and prod too

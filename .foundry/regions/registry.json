@@ -6,14 +6,14 @@
     "catalog": ".foundry/catalog/catalog.json (feat/warden-catalog)",
     "atlas": ".atlas/concepts.ts",
     "libraries": {
-      "json-rules": "ee4753e",
-      "rules-builder": "b67a6b6",
-      "permissions": "27c0279",
-      "transitions": "2e07525",
-      "prisma-map": "ac14fa0",
-      "atlas": "a967444",
-      "gloss": "1208b1c",
-      "config": "cfb5213"
+      "json-rules": "551f31f",
+      "rules-builder": "8bb1067",
+      "permissions": "9ac9747",
+      "transitions": "5102db8",
+      "prisma-map": "5a65004",
+      "atlas": "93f5b14",
+      "gloss": "c98ac89",
+      "config": "2e93179"
     },
     "method": "three independent LLM proposals, item-level majority vote (~/.foundry/evals/warden-regions)"
   },
@@ -724,8 +724,8 @@
   "regions": [
     {
       "id": "concurrency-locks",
-      "tokens": 14608,
-      "recogniseTokens": 2747,
+      "tokens": 13678,
+      "recogniseTokens": 2461,
       "concepts": [
         "locks",
         "concurrency-limits",
@@ -737,85 +737,85 @@
     },
     {
       "id": "redis-caching-rate-limits",
-      "tokens": 12360,
+      "tokens": 15504,
       "recogniseTokens": 2217,
       "concepts": ["redis", "caching", "rate-limiting"],
       "runsAgreed": 2
     },
     {
       "id": "jobs-cron",
-      "tokens": 15399,
-      "recogniseTokens": 2903,
+      "tokens": 19154,
+      "recogniseTokens": 2400,
       "concepts": ["jobs", "cron"],
       "runsAgreed": 0
     },
     {
       "id": "job-lanes-outbox",
-      "tokens": 14363,
-      "recogniseTokens": 2443,
+      "tokens": 14889,
+      "recogniseTokens": 2349,
       "concepts": ["job-lanes", "job-outbox"],
       "runsAgreed": 0
     },
     {
       "id": "app-events-webhooks",
-      "tokens": 14421,
-      "recogniseTokens": 2827,
+      "tokens": 15766,
+      "recogniseTokens": 2783,
       "concepts": ["app-events", "webhooks"],
       "runsAgreed": 1
     },
     {
       "id": "adapters-integrations",
-      "tokens": 8184,
+      "tokens": 8153,
       "recogniseTokens": 1744,
       "concepts": ["adapters", "integrations", "object-storage"],
       "runsAgreed": 0
     },
     {
       "id": "ws-connections",
-      "tokens": 6503,
+      "tokens": 6633,
       "recogniseTokens": 1419,
       "concepts": ["ws-connections"],
       "runsAgreed": 0
     },
     {
       "id": "ws-channels",
-      "tokens": 10002,
-      "recogniseTokens": 2174,
+      "tokens": 9364,
+      "recogniseTokens": 1792,
       "concepts": ["ws-channels"],
       "runsAgreed": 0
     },
     {
       "id": "ws-data-streams",
-      "tokens": 14592,
-      "recogniseTokens": 2948,
+      "tokens": 14564,
+      "recogniseTokens": 2687,
       "concepts": ["ws-data-streams"],
       "runsAgreed": 0
     },
     {
       "id": "email-templates",
-      "tokens": 8772,
-      "recogniseTokens": 1638,
+      "tokens": 8083,
+      "recogniseTokens": 1308,
       "concepts": ["email-templates"],
       "runsAgreed": 0
     },
     {
       "id": "email-render",
-      "tokens": 17076,
-      "recogniseTokens": 3346,
+      "tokens": 16679,
+      "recogniseTokens": 3180,
       "concepts": ["email-render"],
       "runsAgreed": 0
     },
     {
       "id": "email-lens",
-      "tokens": 12436,
-      "recogniseTokens": 2446,
+      "tokens": 12205,
+      "recogniseTokens": 2329,
       "concepts": ["email-lens"],
       "runsAgreed": 0
     },
     {
       "id": "email-delivery",
-      "tokens": 13800,
-      "recogniseTokens": 2170,
+      "tokens": 14980,
+      "recogniseTokens": 1787,
       "concepts": ["email-delivery", "communication-preferences"],
       "runsAgreed": 0
     },
@@ -828,8 +828,8 @@
     },
     {
       "id": "json-rules",
-      "tokens": 15634,
-      "recogniseTokens": 3675,
+      "tokens": 15472,
+      "recogniseTokens": 3681,
       "concepts": ["json-rules", "rule-references"],
       "runsAgreed": 0
     },
@@ -842,7 +842,7 @@
     },
     {
       "id": "json-rules-runtime",
-      "tokens": 10506,
+      "tokens": 10508,
       "recogniseTokens": 1486,
       "concepts": ["json-rules-runtime"],
       "runsAgreed": 0
@@ -863,14 +863,14 @@
     },
     {
       "id": "lenses",
-      "tokens": 13026,
-      "recogniseTokens": 2746,
+      "tokens": 12288,
+      "recogniseTokens": 2490,
       "concepts": ["lenses"],
       "runsAgreed": 0
     },
     {
       "id": "lens-model",
-      "tokens": 12614,
+      "tokens": 12612,
       "recogniseTokens": 900,
       "concepts": ["lib-json-rules-lens"],
       "runsAgreed": 0
@@ -905,36 +905,36 @@
     },
     {
       "id": "permissions-roles",
-      "tokens": 14252,
+      "tokens": 14168,
       "recogniseTokens": 2257,
       "concepts": ["permissions-roles"],
       "runsAgreed": 0
     },
     {
       "id": "permissions-rebac",
-      "tokens": 10124,
+      "tokens": 10130,
       "recogniseTokens": 1681,
       "concepts": ["permissions-rebac"],
       "runsAgreed": 0
     },
     {
       "id": "tenancy",
-      "tokens": 9279,
+      "tokens": 9265,
       "recogniseTokens": 2079,
       "concepts": ["tenancy", "superadmin"],
       "runsAgreed": 0
     },
     {
       "id": "authentication",
-      "tokens": 13844,
-      "recogniseTokens": 2770,
+      "tokens": 14816,
+      "recogniseTokens": 2733,
       "concepts": ["authentication"],
       "runsAgreed": 0
     },
     {
       "id": "auth-middleware-users",
-      "tokens": 10413,
-      "recogniseTokens": 2373,
+      "tokens": 10274,
+      "recogniseTokens": 2337,
       "concepts": ["auth-middleware", "users"],
       "runsAgreed": 0
     },
@@ -947,64 +947,64 @@
     },
     {
       "id": "api-routes",
-      "tokens": 15577,
-      "recogniseTokens": 3232,
+      "tokens": 16246,
+      "recogniseTokens": 3194,
       "concepts": ["route-templates", "api-modules"],
       "runsAgreed": 1
     },
     {
       "id": "api-schemas-openapi",
-      "tokens": 5733,
-      "recogniseTokens": 1404,
+      "tokens": 5188,
+      "recogniseTokens": 1227,
       "concepts": ["openapi", "request-schemas"],
       "runsAgreed": 0
     },
     {
       "id": "request-context-errors",
-      "tokens": 18091,
-      "recogniseTokens": 3151,
+      "tokens": 19431,
+      "recogniseTokens": 3073,
       "concepts": ["request-context", "errors"],
       "runsAgreed": 0
     },
     {
       "id": "batch",
-      "tokens": 10213,
-      "recogniseTokens": 1544,
+      "tokens": 10083,
+      "recogniseTokens": 1518,
       "concepts": ["batch"],
       "runsAgreed": 0
     },
     {
       "id": "filtering-search",
-      "tokens": 17705,
+      "tokens": 17699,
       "recogniseTokens": 2602,
       "concepts": ["filtering-search"],
       "runsAgreed": 2
     },
     {
       "id": "pagination",
-      "tokens": 8780,
+      "tokens": 8797,
       "recogniseTokens": 1309,
       "concepts": ["pagination"],
       "runsAgreed": 0
     },
     {
       "id": "database-client",
-      "tokens": 9553,
-      "recogniseTokens": 1997,
+      "tokens": 9969,
+      "recogniseTokens": 1945,
       "concepts": ["db-client"],
       "runsAgreed": 0
     },
     {
       "id": "data-modeling",
-      "tokens": 12128,
-      "recogniseTokens": 2078,
+      "tokens": 11844,
+      "recogniseTokens": 1960,
       "concepts": ["data-modeling", "reference-data"],
       "runsAgreed": 0
     },
     {
       "id": "database-tooling",
-      "tokens": 7291,
-      "recogniseTokens": 1496,
+      "tokens": 8076,
+      "recogniseTokens": 1198,
       "concepts": ["db-scripts", "seeding"],
       "runsAgreed": 0
     },
@@ -1017,28 +1017,28 @@
     },
     {
       "id": "audit-soft-delete",
-      "tokens": 9839,
+      "tokens": 9844,
       "recogniseTokens": 1887,
       "concepts": ["audit-log", "soft-delete"],
       "runsAgreed": 0
     },
     {
       "id": "encryption",
-      "tokens": 18675,
+      "tokens": 18930,
       "recogniseTokens": 2362,
       "concepts": ["encryption", "secrets"],
       "runsAgreed": 0
     },
     {
       "id": "inquiry-handlers",
-      "tokens": 12329,
+      "tokens": 12327,
       "recogniseTokens": 2338,
       "concepts": ["inquiry-handlers"],
       "runsAgreed": 0
     },
     {
       "id": "inquiry-routes-ui",
-      "tokens": 11901,
+      "tokens": 11904,
       "recogniseTokens": 2182,
       "concepts": ["inquiry-routes-ui"],
       "runsAgreed": 0
@@ -1059,7 +1059,7 @@
     },
     {
       "id": "observability-lifecycle",
-      "tokens": 16663,
+      "tokens": 16905,
       "recogniseTokens": 3105,
       "concepts": ["logging", "telemetry", "process-lifecycle"],
       "runsAgreed": 3
@@ -1073,7 +1073,7 @@
     },
     {
       "id": "api-client",
-      "tokens": 8998,
+      "tokens": 9177,
       "recogniseTokens": 1616,
       "concepts": ["api-client"],
       "runsAgreed": 0
@@ -1108,71 +1108,71 @@
     },
     {
       "id": "test-harness",
-      "tokens": 11068,
-      "recogniseTokens": 2068,
+      "tokens": 10965,
+      "recogniseTokens": 2038,
       "concepts": ["test-harness", "vcr"],
       "runsAgreed": 0
     },
     {
       "id": "test-factories-rules",
-      "tokens": 10979,
-      "recogniseTokens": 2497,
+      "tokens": 12196,
+      "recogniseTokens": 2449,
       "concepts": ["test-factories", "test-rules"],
       "runsAgreed": 0
     },
     {
       "id": "dx-setup",
-      "tokens": 13969,
-      "recogniseTokens": 3203,
+      "tokens": 12028,
+      "recogniseTokens": 2283,
       "concepts": ["dev-setup", "worktrees"],
       "runsAgreed": 0
     },
     {
       "id": "environments-deploy",
-      "tokens": 12822,
-      "recogniseTokens": 2330,
+      "tokens": 12715,
+      "recogniseTokens": 2258,
       "concepts": ["env-config", "ci-deploy"],
       "runsAgreed": 0
     },
     {
       "id": "dx-tools",
-      "tokens": 12266,
-      "recogniseTokens": 2603,
+      "tokens": 13611,
+      "recogniseTokens": 2542,
       "concepts": ["scripts", "lint-rules", "build-tooling"],
       "runsAgreed": 0
     },
     {
       "id": "conventions",
-      "tokens": 9844,
+      "tokens": 10082,
       "recogniseTokens": 2077,
       "concepts": ["naming", "code-style"],
       "runsAgreed": 1
     },
     {
       "id": "monorepo-architecture",
-      "tokens": 18015,
+      "tokens": 18151,
       "recogniseTokens": 3487,
       "concepts": ["monorepo-layout", "dependencies", "architecture"],
       "runsAgreed": 1
     },
     {
       "id": "init-architecture",
-      "tokens": 11363,
+      "tokens": 12102,
       "recogniseTokens": 2310,
       "concepts": ["init-architecture"],
       "runsAgreed": 0
     },
     {
       "id": "init-tasks",
-      "tokens": 12742,
-      "recogniseTokens": 1890,
+      "tokens": 13037,
+      "recogniseTokens": 1851,
       "concepts": ["init-tasks"],
       "runsAgreed": 0
     },
     {
       "id": "engineering-process-docs",
-      "tokens": 13221,
-      "recogniseTokens": 2035,
+      "tokens": 13471,
+      "recogniseTokens": 1989,
       "concepts": ["engineering-process", "docs-process"],
       "runsAgreed": 1
     },
@@ -1192,28 +1192,28 @@
     },
     {
       "id": "lib-prisma-map",
-      "tokens": 13910,
-      "recogniseTokens": 2946,
+      "tokens": 13707,
+      "recogniseTokens": 2849,
       "concepts": ["lib-prisma-map", "schema-introspection"],
       "runsAgreed": 0
     },
     {
       "id": "lib-atlas",
-      "tokens": 15305,
+      "tokens": 18919,
       "recogniseTokens": 3130,
       "concepts": ["lib-atlas", "atlas"],
       "runsAgreed": 0
     },
     {
       "id": "lib-gloss",
-      "tokens": 5523,
+      "tokens": 6760,
       "recogniseTokens": 358,
       "concepts": ["lib-gloss", "gloss"],
       "runsAgreed": 0
     },
     {
       "id": "lib-config",
-      "tokens": 10495,
+      "tokens": 10865,
       "recogniseTokens": 2638,
       "concepts": ["lib-config"],
       "runsAgreed": 0
@@ -1228,6 +1228,17 @@
     "doc:FEATURES.md#how-to-read-this": "legend/navigation for the feature list",
     "doc:FEATURES.md#coming-soon-ticketed-roadmap": "ticket roadmap; tickets are not corpus",
     "doc:FEATURES.md#statistics": "codebase statistics",
-    "doc:FEATURES.md#unique-selling-points": "marketing summary that repeats other sections"
+    "doc:FEATURES.md#unique-selling-points": "marketing summary that repeats other sections",
+    "doc:docs/claude/DOMAIN-DOCS.md#what-this-is-for": "explicit: new doc about writing Warden docs, not about template; it quotes corrections and eval moments (overfitting check, PROSPECTOR-ACTIONS)",
+    "doc:docs/claude/DOMAIN-DOCS.md#the-row-problem-use-read-signs": "explicit: new doc about writing Warden docs, not about template; it quotes corrections and eval moments (overfitting check, PROSPECTOR-ACTIONS)",
+    "doc:docs/claude/DOMAIN-DOCS.md#said-as-phrasings": "explicit: new doc about writing Warden docs, not about template; it quotes corrections and eval moments (overfitting check, PROSPECTOR-ACTIONS)",
+    "doc:docs/claude/DOMAIN-DOCS.md#sibling-tables": "explicit: new doc about writing Warden docs, not about template; it quotes corrections and eval moments (overfitting check, PROSPECTOR-ACTIONS)",
+    "doc:docs/claude/DOMAIN-DOCS.md#errors-two-sided": "explicit: new doc about writing Warden docs, not about template; it quotes corrections and eval moments (overfitting check, PROSPECTOR-ACTIONS)",
+    "doc:docs/claude/DOMAIN-DOCS.md#migrations-in-progress": "explicit: new doc about writing Warden docs, not about template; it quotes corrections and eval moments (overfitting check, PROSPECTOR-ACTIONS)",
+    "doc:docs/claude/DOMAIN-DOCS.md#under-construction": "explicit: new doc about writing Warden docs, not about template; it quotes corrections and eval moments (overfitting check, PROSPECTOR-ACTIONS)",
+    "doc:docs/claude/DOMAIN-DOCS.md#when-this-is-not-your-domain": "explicit: new doc about writing Warden docs, not about template; it quotes corrections and eval moments (overfitting check, PROSPECTOR-ACTIONS)",
+    "doc:docs/claude/DOMAIN-DOCS.md#when-the-warden-misses-its-own-moments": "explicit: new doc about writing Warden docs, not about template; it quotes corrections and eval moments (overfitting check, PROSPECTOR-ACTIONS)",
+    "doc:docs/claude/DOMAIN-DOCS.md#what-not-to-write": "explicit: new doc about writing Warden docs, not about template; it quotes corrections and eval moments (overfitting check, PROSPECTOR-ACTIONS)",
+    "doc:docs/claude/DOMAIN-DOCS.md#how-the-region-builder-uses-this": "explicit: new doc about writing Warden docs, not about template; it quotes corrections and eval moments (overfitting check, PROSPECTOR-ACTIONS)"
   }
 }

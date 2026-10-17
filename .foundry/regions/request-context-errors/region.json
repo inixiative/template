@@ -3,18 +3,18 @@
   "title": "Request context and errors",
   "routing": "Is this about what a live API request carries or how it fails: reading identity, tenant, resource or validated input from the Hono context (AppEnv, c.get('user'|'db'|'requestId'|'bracketQuery'), getActor, getResource, getValidatedBody/getValidatedQuery, setUserContext, refreshUserContext, resourceContextMiddleware, resourceContextArgs, ?lookup=, prepareRequest, db.scope / db.getScopeId, clientIp/clientAddress), or throwing and mapping an API error (makeError, AppError, errorHandlerMiddleware, HTTP_ERROR_MAP, guidance, fieldErrors, status codes, Prisma P2002/P2025/P2034, isUniqueConstraintError, isWriteConflictError, raw Error vs makeError, frontend describeError/handleApiError/RouteError)?",
   "concepts": ["request-context", "errors"],
-  "tokens": 18091,
+  "tokens": 19431,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
       "path": "recognise.md",
-      "tokens": 3151,
+      "tokens": 3073,
       "experimental": true,
       "note": "recognise/pick split under test (model round); not the standard"
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 18091
+      "tokens": 19431
     }
   },
   "runsAgreed": 0,
@@ -41,23 +41,28 @@
       "doc:docs/claude/ERRORS.md#the-rule",
       "doc:docs/claude/ERRORS.md#makeerror-apperror",
       "doc:docs/claude/ERRORS.md#the-global-handler",
+      "doc:docs/claude/ERRORS.md#request-validation",
       "doc:docs/claude/ERRORS.md#status-conventions",
       "doc:docs/claude/ERRORS.md#shared-packages-can-t-use-makeerror"
     ],
     "catalogClusters": [
       "auth-middleware-validation",
       "batch-request-execution",
+      "data-access-rules",
       "error-handling",
       "filtering-search-ordering",
-      "module-layout-monorepo",
+      "json-rules-engine",
+      "locks-and-serialization",
+      "observability-telemetry",
       "request-context-access",
+      "request-response-schemas",
       "roles-and-permissions",
       "soft-delete-cascade",
       "structured-logging",
       "superadmin-operations"
     ],
-    "codeEntries": 30,
-    "docMembers": 35
+    "codeEntries": 36,
+    "docMembers": 44
   },
   "bypassLines": 22,
   "glossaryTerms": 25

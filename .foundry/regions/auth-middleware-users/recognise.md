@@ -55,7 +55,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - which fields count as sensitive for this model
 - is this request a health check at all
 - is this the system's own probe with the right secret
-- type a middleware factory that takes options
 - lowercase and trim the address before comparing
 - why does an org key get 401 on this route
 - issue a key that belongs to the org itself, no user
@@ -92,7 +91,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - just the names, don't mask anything
 - any probe header present, whatever the secret
 - the probe secret has to match
-- write a middleware that accepts configuration
 - two spellings of the same email should match
 - routes that userless keys must be able to call
 - machine access for an organization
@@ -128,7 +126,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - I'll keep a list of secret field names in this file
 - I'll look for the probe header before logging
 - I'll compare the probe header to the env secret inline
-- I'll hand-type the Hono middleware signature
 - I'll inline a toLowerCase and trim here
 - I'll add the user validator to the org key route
 - a key for the org rather than for a member

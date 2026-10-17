@@ -3,18 +3,18 @@
   "title": "Database client and transactions",
   "routing": "Is this about using the db client from @template/db: db.<model> calls, db.txn, db.onCommit, db.onFinally, db.raw, db.scope / db.getScopeId / db.isInTxn, runInTransactionContext, db.findForUpdate (and FindForUpdateLockTimeoutError, upserting: true), mutations auto-wrapped in transactions by mutationLifeCycle, passing the delegate (query.findMany(db.user, \u2026)), Prisma delegate typing, no-raw-transaction / no-create-race-machinery, the post-transaction job queue, test transaction isolation, or the constraint helpers addUniqueWhereNotNull / addCheckConstraint / addGistIndex?",
   "concepts": ["db-client"],
-  "tokens": 9553,
+  "tokens": 9969,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
       "path": "recognise.md",
-      "tokens": 1997,
+      "tokens": 1945,
       "experimental": true,
       "note": "recognise/pick split under test (model round); not the standard"
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 9553
+      "tokens": 9969
     }
   },
   "runsAgreed": 0,
@@ -28,6 +28,7 @@
       "doc:FEATURES.md#database-orm"
     ],
     "catalogClusters": [
+      "app-events-side-effects",
       "data-access-rules",
       "database-scripts-migrations",
       "error-handling",
@@ -35,14 +36,13 @@
       "locks-and-serialization",
       "module-layout-monorepo",
       "mutation-hooks",
-      "naming-vocabulary",
+      "observability-telemetry",
       "prisma-schema-introspection",
-      "request-context-access",
       "request-response-schemas",
       "testing-helpers"
     ],
     "codeEntries": 18,
-    "docMembers": 29
+    "docMembers": 32
   },
   "bypassLines": 21,
   "glossaryTerms": 18

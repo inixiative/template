@@ -3,18 +3,18 @@
   "title": "Email delivery and preferences",
   "routing": "Is this about getting a templated email out: an email handoff on an app event, deliverEmailHandoffs, the sendEmail planner or deliverEmail / deliverEmailMessage job, the registry's EmailEntry (entity, sender, recipients, cc/bcc, data), CommunicationLog rows, statuses, reason codes and idempotency keys, sender identity (SenderType, resolveSender, resolveFromAddress), provider clients (createResendClient, createConsoleClient, emailRegistry, defaultEmailClient), address verification (emailVerifier, Bouncer, Contact.deliverability), the slow lane for wide fan-outs, or communication preferences and unsubscribe (CommunicationKind, acceptedKinds, canDeliver, unsubscribeUrl, List-Unsubscribe, the POST-only unsubscribe route)?",
   "concepts": ["email-delivery", "communication-preferences"],
-  "tokens": 13800,
+  "tokens": 14980,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
       "path": "recognise.md",
-      "tokens": 2170,
+      "tokens": 1787,
       "experimental": true,
       "note": "recognise/pick split under test (model round); not the standard"
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 13800
+      "tokens": 14980
     }
   },
   "runsAgreed": 0,
@@ -28,9 +28,19 @@
       "doc:FEATURES.md#email-system",
       "doc:docs/claude/COMMUNICATIONS.md#communication-preferences"
     ],
-    "catalogClusters": ["email-delivery-senders", "messaging-channels-adapters"],
+    "catalogClusters": [
+      "audit-logging",
+      "email-composition-rendering",
+      "email-delivery-senders",
+      "lenses-multi-source",
+      "locks-and-serialization",
+      "messaging-channels-adapters",
+      "multi-tenancy-membership",
+      "mutation-hooks",
+      "seeding-data"
+    ],
     "codeEntries": 32,
-    "docMembers": 19
+    "docMembers": 42
   },
   "bypassLines": 13,
   "glossaryTerms": 25

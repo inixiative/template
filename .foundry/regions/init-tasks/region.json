@@ -3,18 +3,18 @@
   "title": "Writing an init task",
   "routing": "Is this about the behaviour of one provider setup step: composable prompts (prompt, prompts; never hardcode prompt text), clean status lists shown upfront, no console.log in tasks, fetching from the source of truth instead of props, retrying async provisioning on specific conditions, async exec for smooth animations, Railway CLI for reads vs GraphQL for mutations (createRailwayConnection, ensureRailwayConnection, listRailwayConnections, createRailwaySync), the token input flow and loading-state sequencing, atomic progress flags with idempotent API calls (isProgressComplete, one flag per remote write), OrgSelector requiring onCancel, interactive prompts for missing required input (getSecret / setSecret into Infisical), masking sensitive inputs, or Bun-native resume tests with VCR fixtures?",
   "concepts": ["init-tasks"],
-  "tokens": 12742,
+  "tokens": 13037,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
       "path": "recognise.md",
-      "tokens": 1890,
+      "tokens": 1851,
       "experimental": true,
       "note": "recognise/pick split under test (model round); not the standard"
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 12742
+      "tokens": 13037
     }
   },
   "runsAgreed": 0,
@@ -35,15 +35,16 @@
       "doc:docs/claude/INIT_SCRIPT_PATTERNS.md#core-patterns/17-bun-native-resume-tests-with-vcr-fixtures"
     ],
     "catalogClusters": [
-      "code-style-lint-checks",
       "dev-setup-scripts",
-      "environment-config",
+      "encryption-key-rotation",
       "guided-flows",
+      "integrations-records",
       "naming-vocabulary",
-      "testing-helpers"
+      "testing-helpers",
+      "ui-components"
     ],
     "codeEntries": 0,
-    "docMembers": 33
+    "docMembers": 36
   },
   "bypassLines": 21,
   "glossaryTerms": 12

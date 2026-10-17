@@ -3,7 +3,7 @@
   "title": "Audit log and soft delete",
   "routing": "Is this about recording who changed what, or about rows that are deleted but kept: AuditLog, AUDIT_ENABLED_MODELS / isAuditEnabled, auditActorContext / auditActorMiddleware / jobAuditActor, computeDiff, processAuditData, redactChangeDiff, the ignoreFields and redactFields registries, soft delete (SOFT_DELETE_MODELS, isSoftDeleteModel, hasDeletedAt, deletedAt, softDeleteScopeExtension, liveWhere / liveIncludes), db.withDeleted and includeDeletedMiddleware, tombstones and cascade (registerSoftDeleteCascadeHook, tombstoneChildren, CASCADE_EXEMPT, HARD_DELETE_ON_TOMBSTONE), or revive / reviveChildren / REGENERATE_ON_REVIVE?",
   "concepts": ["audit-log", "soft-delete"],
-  "tokens": 9839,
+  "tokens": 9844,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
@@ -14,7 +14,7 @@
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 9839
+      "tokens": 9844
     }
   },
   "runsAgreed": 0,

@@ -3,7 +3,7 @@
   "title": "Naming and code style",
   "routing": "Is this about what to name something or how code should read: operationId and route file names (resourceActionSubresource, plural ReadMany subresources), hook/job/middleware file names, util vs helper, services vs handlers, make*/validate*/get*/is* prefixes, txn, <Model>Id, SCREAMING_SNAKE vs PascalCase const objects with keyof typeof, Prisma model/field/relation casing and no @map, polymorphic side names (owner, source/target, resource, subject, actor; never referenced*) and side-prefixed FKs, _ vs __ prefixes, or style rules (no comments, one export per file, named exports, type over interface, no TS enum, inferred types, single-line early exits, minimal index files, #/ and @template/ imports, quiet logging, no root-level dependencies)?",
   "concepts": ["naming", "code-style"],
-  "tokens": 9844,
+  "tokens": 10082,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
@@ -14,7 +14,7 @@
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 9844
+      "tokens": 10082
     }
   },
   "runsAgreed": 1,
@@ -47,7 +47,7 @@
       "structured-logging"
     ],
     "codeEntries": 1,
-    "docMembers": 33
+    "docMembers": 34
   },
   "bypassLines": 19,
   "glossaryTerms": 15

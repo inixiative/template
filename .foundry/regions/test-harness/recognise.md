@@ -48,7 +48,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - spin up the API in a test and hit a route
 - a fresh store for this UI test with custom initial state
 - run a job handler in a test
-- make a user for this test
 - tests truncating each other's tables, flaky
 - replay a recorded event stream in the test
 - assert who can and cannot receive this stream
@@ -88,7 +87,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - open a fake socket connection in a test and send frames
 - I'll make a Zustand store inline in the test
 - is there a test helper for jobs like the one for the app
-- seed a test user with defaults
 - the new package's DB tests need max concurrency one
 - replay recorded events for a streaming provider
 - prove the shared stream gives every caller the same rows
@@ -126,7 +124,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - check what a subscriber receives when the event fires
 - isolate store state between frontend tests
 - get some basic tests on this job
-- I'll insert the user with a raw prisma create in the test
 - I'll run the files in parallel for speed
 - the provider emits events, not a single response
 - add the audience fixture for the new stream

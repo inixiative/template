@@ -3,18 +3,18 @@
   "title": "Job lanes and overflow outbox",
   "routing": "Is this about how background jobs share the queue under load: fast vs slow lanes (JobData.lane, a handler's lane default, lane on an enqueue, fanOutLane), job priority (withLanePriority, SLOW_LANE_PRIORITY), slow slot shares (SlowSlotPool, claimSlotOrRequeue, parking), the queue depth budget (JOBS_MAX_QUEUE_DEPTH, queueDepths), overflow flags, spilling to and draining the JobOutbox (shouldSpill, spillToOutbox, runDrainOutboxPass, runOnOutboxQueue), slow-lane gauges (jobs.slow.*), or slowLaneCheck.ts? Not the supersede lanes (claimLane / watchLane), which are concurrency-locks.",
   "concepts": ["job-lanes", "job-outbox"],
-  "tokens": 14363,
+  "tokens": 14889,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
       "path": "recognise.md",
-      "tokens": 2443,
+      "tokens": 2349,
       "experimental": true,
       "note": "recognise/pick split under test (model round); not the standard"
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 14363
+      "tokens": 14889
     }
   },
   "runsAgreed": 0,
@@ -46,7 +46,7 @@
       "testing-helpers"
     ],
     "codeEntries": 54,
-    "docMembers": 43
+    "docMembers": 45
   },
   "bypassLines": 11,
   "glossaryTerms": 27

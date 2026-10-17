@@ -56,11 +56,8 @@ A moment that says any of these, or something close, is this region's. Both voic
 - tag any new locking or ordering helper so the code map finds it
 - start the run and take the baton, last claim wins
 - the newest one should win and the older run should stop
-- find it or create it without a race
 - only one process should own this at a time
 - run these one at a time in this process
-- the job should stop when a newer one takes over
-- read the row, then update it, without a race
 - big fan-outs shouldn't delay the latency-sensitive jobs
 - how many of these can be in flight at once
 - run this every few seconds in process without overlapping itself
@@ -76,11 +73,9 @@ A moment that says any of these, or something close, is this region's. Both voic
 - let go of the lane when the job finishes
 - run this list of async calls with bounded parallelism, results in order
 - an error in one queued run should reach the caller, not be swallowed
-- a job that lost the lane must not keep writing
 - the job got replaced by a newer one, don't count it as a failure
 - debounced jobs where only the newest enqueue finishes
 - only one release train should run on this machine
-- create-if-missing keyed on an in list or an operator
 - don't use a bare interval for an async recurring task
 - wait until the user stops typing before hitting the search
 - debounce the handler function, not the value
@@ -90,11 +85,8 @@ A moment that says any of these, or something close, is this region's. Both voic
 - where do I find all the mutual-exclusion primitives in the code map
 - mark this job as the current holder for the key
 - only the most recent enqueue for this key should finish
-- two requests both try to create the same row
 - the first one to get it keeps it
 - several async callers read-modify-write the same in-memory thing
-- check inside the loop whether I've been superseded
-- lock the row while I update it
 - mark this job as background so foreground work goes first
 - cap the parallelism on this batch of DB calls
 - a recurring poll that can be stopped
@@ -110,11 +102,9 @@ A moment that says any of these, or something close, is this region's. Both voic
 - release only if I'm still the holder
 - promise all over a huge list will blow up
 - I'll wrap each queued step in a try/catch so the queue keeps going
-- check the signal before every write in a superseding job
 - a superseded run should exit cleanly, not show as failed
 - the mechanism behind newest-wins jobs
 - stop a second release from starting while one is running
-- the find-or-create key has to be plain field equals value
 - a slow run overlapped the next tick of the interval
 - delay the changing value before it triggers the request
 - a debounced function with a way to cancel it
@@ -123,11 +113,8 @@ A moment that says any of these, or something close, is this region's. Both voic
 - I'll take a short redis lock around the insert myself
 - a newer enqueue for the same key should evict the older one
 - cancel the older job when a newer one with the same key arrives
-- I'll catch the unique violation and re-read
 - stop two instances from both running the drain
 - I'll chain promises on a module-level variable so writes don't overlap
-- abort the work cooperatively once the lane changes hands
-- select for update inside the transaction
 - the lane label on the job data, fast or slow
 - I'll just hardcode five at a time
 - I'll use an interval with an async callback
@@ -140,10 +127,8 @@ A moment that says any of these, or something close, is this region's. Both voic
 - an aged-out claim should be takeable without evicting a live one
 - I'll delete the lane key at the end of the job
 - I'll chunk the array by hand and loop over the chunks
-- the old run kept writing after the newer one started
 - I'll just return early when the signal fires
 - collapse repeated triggers for one key into the latest run
-- the upserting mode only takes a single-row equality predicate
 - I'll set up an interval that calls the async function
 - I'll add a timeout and clear it in an effect
 - I'll keep a timer in a ref and reset it on every call
@@ -152,11 +137,8 @@ A moment that says any of these, or something close, is this region's. Both voic
 - the lock behind the upserting mode, reached through the row lock helper
 - I'll write my job id to redis so later jobs know I'm newest
 - I'll store the latest job id in redis and compare inside the job
-- I'll just upsert on the slug
 - I'll do a set-if-not-exists in redis with an expiry and renew it
 - add a busy flag so the second call waits
-- I'll add a boolean the watcher flips so the loop exits
-- why isn't this just open a transaction, lock the row, update, commit
 - this is about ordering, not a lock
 - the concurrency limit should depend on what resource it hits
 - renew the lease periodically while the work runs
@@ -176,10 +158,8 @@ A moment that says any of these, or something close, is this region's. Both voic
 - I'll add an advisory lock per owner around the validation
 - re-claim the lane when draining a spilled superseding job
 - take the baton and bow out when someone newer takes it
-- the create race hand-rolled at every call site
 - a distributed lock with a heartbeat and a safe release
 - an in-process mutex, no other process touches this
-- I'll write a raw select for update query
 - the tick shouldn't start again if the last one is still running
 - wrong job primitive, every run has to finish, not just the newest
 - re-index after save, but newer saves cancel the older indexing
@@ -187,9 +167,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - this is the third debounce copy in the app, use the shared hook
 - don't debounce filtering of a list already in memory
 - a momentary redis blip shouldn't make the job think it lost
-- return the existing row if someone else created it first
 - the lock needs an owner check so nobody else can delete it
-- concurrent accepts read-modify-write one json blob and clobber each other
 - keyed per source so each source only runs its newest sync
 
 ## When this is not your domain

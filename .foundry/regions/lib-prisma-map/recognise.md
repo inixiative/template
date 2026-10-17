@@ -39,7 +39,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - I'll regex the schema file for the models
 - I'll read the dmmf by hand
 - the constant for the client key of a model
-- the camelCase side of model naming
 - select every column of the model with aliases
 - the annotation didn't apply to the field
 - build the map from the path to the schema
@@ -61,7 +60,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - all the fields of a model with their types
 - loop over every model in the schema
 - the constant for a model's PascalCase name
-- the PascalCase side of model naming
 - just the foreign keys per model from the schema text
 - read the data model out of the generated prisma 7 client
 - collect the doc comments on each model, field and index
@@ -80,7 +78,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - visit every node of a prisma where tree
 - fill in the type field when the payload leaves it out
 - the lowercase key you call on the db client
-- the client key family: constant, list, guard, conversion
 - I'll list the columns by hand in the raw select
 - a blank line between the comment and the field drops it
 - point it at the schema file instead of the client
@@ -100,7 +97,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - find one field across relations by path
 - the runtime list of all model names
 - I'll type the model name as a string literal
-- the model name family: constant, list, guard, conversion
 - which fields reference which model, nothing else
 - load the schema from the client instead of the schema file
 - I need the triple-slash comments, not the types
@@ -119,7 +115,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - walk the where clause with the model at each step
 - default the discriminator from the schema
 - I'll write the accessor as a string literal
-- I'll build my own helpers for the lowercase names
 - build the select list for a model from the schema
 - I'll put the annotation comment a line above with a gap
 - I'll read the schema file and parse it myself
@@ -141,7 +136,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - I'll keep a list of the model's field names
 - I'll hardcode the list of models to iterate
 - a typed list of every model name
-- I'll write my own helpers for the capitalized names
 - I'll extract the relation attributes with a regex
 - I'll import the client's internal dmmf object
 - I'll regex the comments above each declaration
@@ -160,7 +154,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - I'll recurse through the where object by hand
 - I'll set the kind column manually before creating
 - a typed constant for db dot user
-- everything about the key you call on the db
 - the aliased column list for a raw query
 - keep the triple-slash comment directly above the declaration
 - load the schema map from a file path
@@ -179,7 +172,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - I'll split the path on dots and walk the relations myself
 - a map of field name to field definition for one model
 - the capitalized model name, not the client key
-- everything about the capitalized model name
 - the owning side's key fields and references only
 - the prisma 7 runtime data model as input to the map
 - which declaration does this doc comment belong to

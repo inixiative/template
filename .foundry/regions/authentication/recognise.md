@@ -51,7 +51,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - email users get a cookie, social users a bearer
 - forget the saved key when the user signs out
 - swap the one-time code in the URL for a real session
-- how long a session is trusted before hitting the database
 - make a new API key for the signed-in user
 - work out the sign-in mode outside a component
 - confirm the address before an email signup can log in
@@ -105,7 +104,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - how browser sessions are issued and carried
 - wipe the stored credential on logout
 - finish the redirect handshake on the callback page
-- skip session validation for a few minutes
 - let the user generate a personal access key
 - am I running inside an iframe or on my own
 - sign-up should wait for the verification link
@@ -159,7 +157,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - I'll roll my own JWT for the web app
 - I'll remove the login item from local storage myself
 - I'll call the verify endpoint and save the token by hand
-- I'll validate the session on every request
 - I'll insert a key row and return the secret
 - compute embedded versus standalone before React mounts
 - I'll fetch the profile endpoint and set the store fields myself

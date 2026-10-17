@@ -54,7 +54,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - the real tag and segment options for the picker
 - the shape the rule builder sees
 - evaluate a rule inside an each loop against the current element
-- the fallback template uses the original template's lens
 - run the lookups in order and stop at the first hit
 - does the delivery rail fill this system field in
 - which field does each segment of the path land on
@@ -68,10 +67,8 @@ A moment that says any of these, or something close, is this region's. Both voic
 - limit tags and segments to what the owner can see
 - record which rows the template's rules reference on save
 - an org sender should only reach its own members
-- a rule can't reach a relation the lens didn't declare
 - the frontend hook for the template's rule surface
 - which variables are in scope for this rule source
-- validate the fully assembled email, not just the template text
 - visit every node of the rule tree
 - follow a token path through the email lens
 - the generic path walk the render uses
@@ -96,7 +93,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - load the dropdown values for each slot
 - compose the four slots under one root for the UI
 - the rule on a loop item, not the whole message
-- a substitute still renders with the primary's permissions
 - take the first tier that has a row
 - I'll check the hard-coded list of rail fields
 - just the field entries along a dotted path
@@ -110,10 +106,8 @@ A moment that says any of these, or something close, is this region's. Both voic
 - bound the lens's link rows to the row owner
 - keep the reference edges in sync with the content
 - clamp who the message rule can target to the sender's people
-- refuse to save a rule reading an undeclared relation
 - load what the rule builder may reference, client side
 - the hook for variables available inside a loop binding
-- a component must meet the lens of the template that embeds it
 - I'll write a recursive walk over the condition myself
 - does this dotted path resolve under the lens
 - verify a path hop by hop through any lens
@@ -151,10 +145,8 @@ A moment that says any of these, or something close, is this region's. Both voic
 - narrow the lens by owner and sender
 - I'll pre-filter so we only sync when something changed
 - I'll query users by the rule without checking the sender's reach
-- why was my relation path rejected at save
 - fetch the rule vocabulary in the editor
 - what can I reference here in the editor
-- check after resolving the components, so an override is judged too
 - traverse the rule with a context
 - traverse recipient.organization.name hop by hop
 - the json-rules traversal, not the email-specific one

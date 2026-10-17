@@ -3,18 +3,18 @@
   "title": "Authentication: sessions, providers, tokens",
   "routing": "Is this about how a caller proves who it is: BetterAuth sessions and the auth instance (apps/api/src/lib/auth.ts), email/password or Google sign-in, OAuth callback and the one-time token (/auth/callback#ott=), AuthProvider rows per organization vs platform providers (getPlatformProviders), Account, Session, Verification, API keys as Token rows (createToken, SHA-256 keyHash, TokenOwnerModel, token scopes, TokensPage), or the frontend auth strategy (detectAuthStrategy, setToken/getToken, fetchAndHydrateMe)?",
   "concepts": ["authentication"],
-  "tokens": 13844,
+  "tokens": 14816,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
       "path": "recognise.md",
-      "tokens": 2770,
+      "tokens": 2733,
       "experimental": true,
       "note": "recognise/pick split under test (model round); not the standard"
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 13844
+      "tokens": 14816
     }
   },
   "runsAgreed": 0,
@@ -34,11 +34,12 @@
       "authentication-methods",
       "caching-and-invalidation",
       "encryption-key-rotation",
+      "frontend-app-shells-routes",
       "request-response-schemas",
       "superadmin-operations"
     ],
     "codeEntries": 40,
-    "docMembers": 26
+    "docMembers": 33
   },
   "bypassLines": 21,
   "glossaryTerms": 16

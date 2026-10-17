@@ -3,7 +3,7 @@
   "title": "Config package (toolchain, train)",
   "routing": "Is this about the @inixiative/config package: the shared tsconfig / biome / tsup (node, react) / lefthook presets and their extends stubs, versions.json (the BOM: bun, toolchain pins, primitives and agentic lanes, consumers, candidates), the CLI (check, sync, scan, train, ports), ports.json local port blocks, the shared lib-ci.yml workflow, or releasing @inixiative/* packages through the train?",
   "concepts": ["lib-config"],
-  "tokens": 10495,
+  "tokens": 10865,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
@@ -14,7 +14,7 @@
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 10495
+      "tokens": 10865
     }
   },
   "runsAgreed": 0,
@@ -35,7 +35,7 @@
       "dev-setup-scripts"
     ],
     "codeEntries": 2,
-    "docMembers": 38
+    "docMembers": 45
   },
   "bypassLines": 12,
   "glossaryTerms": 25

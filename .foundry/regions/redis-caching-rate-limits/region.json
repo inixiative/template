@@ -3,7 +3,7 @@
   "title": "Redis, caching and rate limits",
   "routing": "Is this about Redis \u2014 a connection (getRedisClient, getRedisPub/getRedisSub, createRedisConnection), a key and its prefix (redisNamespace), Lua scripts \u2014 or about caching a read (cache, cacheKey, upsertCache, clearKey, cacheReference, fetchOne, TTLs, invalidation on mutation), or about request rate limits (rateLimit, apiRateLimit, authRateLimit, identities, rateLimitMax, 429 / Retry-After)?",
   "concepts": ["redis", "caching", "rate-limiting"],
-  "tokens": 12360,
+  "tokens": 15504,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
@@ -14,12 +14,12 @@
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 12360
+      "tokens": 15504
     }
   },
   "runsAgreed": 2,
   "sources": {
-    "docs": ["docs/claude/HOOKS.md", "docs/claude/REDIS.md"],
+    "docs": ["docs/claude/HOOKS.md", "docs/claude/JOBS.md", "docs/claude/REDIS.md"],
     "docUnits": [
       "doc:docs/claude/REDIS.md#connection-management",
       "doc:docs/claude/REDIS.md#namespaces",
@@ -27,13 +27,14 @@
       "doc:docs/claude/REDIS.md#testing",
       "doc:docs/claude/REDIS.md#error-handling",
       "doc:docs/claude/HOOKS.md#cache-invalidation",
+      "doc:docs/claude/JOBS.md#handler-patterns/rolling-caches-root-branch-leaf",
       "doc:docs/claude/REDIS.md#cache-utilities"
     ],
     "catalogClusters": [
       "authentication-methods",
       "caching-and-invalidation",
-      "cron-and-recurring-work",
       "job-definition-and-enqueue",
+      "locks-and-serialization",
       "module-layout-monorepo",
       "rate-limiting",
       "redis-infrastructure",
@@ -41,8 +42,8 @@
       "testing-rules",
       "websocket-realtime-delivery"
     ],
-    "codeEntries": 30,
-    "docMembers": 23
+    "codeEntries": 45,
+    "docMembers": 31
   },
   "bypassLines": 17,
   "glossaryTerms": 26

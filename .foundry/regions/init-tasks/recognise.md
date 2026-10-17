@@ -20,7 +20,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - running the create twice should not fail
 - how do we test init tasks that call providers
 - always prompt for the GitHub connection in the Railway setup
-- check whether this step already finished
 - fetch the existing connections for this project
 - hide the token as they type it
 - don't hand-write the press enter text
@@ -53,7 +52,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - make the setup call safe to run again
 - test a provisioning task with recorded responses
 - the setup should ask for the missing value instead of failing
-- skip the step if it's already done
 - see what's already connected in the project
 - the password shows in plain text in the terminal
 - the keyboard hint strings are hardcoded in the view
@@ -86,7 +84,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - if the resource already exists, just use it
 - I'll hit the real provider in the test
 - if the user needs to do something, prompt them and wait
-- resume where setup left off
 - find an existing connection by name
 - mask the input field for credentials
 - compose the hint instead of a literal string
@@ -116,7 +113,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - never trust a connection string passed from the last step
 - I'll guard the create with a did-it-already flag only
 - ask for the token in the UI instead of failing
-- I'll re-run every step and rely on idempotency
 - we have a helper for this stuff
 - I need an API token just to list workspaces
 - don't mark the step complete until it actually succeeded

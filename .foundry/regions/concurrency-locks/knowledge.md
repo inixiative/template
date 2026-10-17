@@ -20,7 +20,7 @@
   - [4a. Doc sections](#4a-doc-sections)
     - `docs/claude/CONCURRENCY.md`: Distributed Lock (`createLock`); (preface); Serialized Queue (`createSerializedQueue`); Concurrency Limits (`getConcurrency`); Bounded Batch (`resolveAll`); Supersede Lanes (`claimLane` / `watchLane`); Recurring Beat (`heartbeat`)
     - `docs/claude/DATABASE.md`: Transactions
-    - `docs/claude/JOBS.md`: Handler Patterns
+    - `docs/claude/JOBS.md`: Handler Patterns; Handler Patterns › Superseding Job
     - `docs/claude/FRONTEND/API_CLIENT.md`: Form Helpers
   - [4b. Code entries](#4b-code-entries)
 
@@ -154,16 +154,13 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 
 | Problem | Use | Read | Signs you're bypassing it |
 |---|---|---|---|
-| the fence that stops two inserts creating the same row; what actually guards create-if-missing under the hood; I'll take a short redis lock around the insert myself; the lock behind the upserting mode, reached through the row lock helper | **acquireFindForUpdateLock** · primitive `packages/db/src/lock/acquireFindForUpdateLock.ts#acquireFindForUpdateLock` — Row-level fencing inside a DB transaction; whole-resource ownership across processes: createLock instead. | — | throws FindForUpdateLockTimeoutError (`conflict`, database-client) |
+| the fence that stops two inserts creating the same row; what actually guards create-if-missing under the hood; I'll take a short redis lock around the insert myself; the lock behind the upserting mode, reached through the row lock helper | **acquireFindForUpdateLock** · primitive `packages/db/src/lock/acquireFindForUpdateLock.ts#acquireFindForUpdateLock` — Usually call db.findForUpdate; use this lower-level helper only when you already hold an open transaction handle. | docs/claude/DOMAIN-DOCS.md § Errors, two-sided | throws FindForUpdateLockTimeoutError (`conflict`, database-client) |
 | only one process should own this at a time; the first one to get it keeps it; stop two instances from both running the drain; I'll do a set-if-not-exists in redis with an expiry and renew it; a distributed lock with a heartbeat and a safe release; the lock needs an owner check so nobody else can delete it | **createLock** · primitive `packages/db/src/lock/createLock.ts#createLock` — Cross-process ownership; in-process write ordering: createSerializedQueue; superseding lane work: claimLane/watchLane; row fencing in a transaction: acquireFindForUpdateLock. | docs/claude/CONCURRENCY.md § Distributed Lock (`createLock`); docs/claude/CONCURRENCY.md § (preface) | a hand-rolled Redis SET NX PX lock with setInterval renewal, or an in-memory flag to stop two instances owning the same resource (docs/claude/CONCURRENCY.md § Distributed Lock (createLock)) |
-| only one run of this job at a time across workers; make sure this job doesn't run twice at once; the cron tick should skip if the last run is still going; I'll add a running flag so overlapping runs bail out; wrong job primitive, every run has to finish, not just the newest | **makeSingletonJob** · primitive `apps/api/src/jobs/makeSingletonJob.ts#makeSingletonJob` — Only one run at a time: this; newer run should replace older: makeSupersedingJob; plain job: makeJob. | docs/claude/JOBS.md § Handler Patterns; docs/claude/ENCRYPTION.md § Implementation Details | a job handler that takes its own Redis lock or checks a 'running' flag to avoid concurrent runs (catalog: makeSingletonJob (wrap a job handler so a Redis lock prevents concurrent runs)) |
+| only one run of this job at a time across workers; make sure this job doesn't run twice at once; the cron tick should skip if the last run is still going; I'll add a running flag so overlapping runs bail out; wrong job primitive, every run has to finish, not just the newest | **makeSingletonJob** · primitive `apps/api/src/jobs/makeSingletonJob.ts#makeSingletonJob` — Cron jobs, queue draining, one open fan-out per key; every run must happen: makeJob; newest should replace older: makeSupersedingJob. | docs/claude/JOBS.md § Handler Patterns; docs/claude/ENCRYPTION.md § Implementation Details | a job handler that takes its own Redis lock or checks a 'running' flag to avoid concurrent runs (catalog: makeSingletonJob (wrap a job handler so a Redis lock prevents concurrent runs)) |
 | lock everything belonging to this owner while I validate across rows; two writes to different rows of one org collide on a cycle check; hold the whole owner before opening the transaction; I'll add an advisory lock per owner around the validation | **withOwnerLock** · primitive `apps/api/src/lib/locks/withOwnerLock.ts#withOwnerLock` — Cross-row validation like segment cycle checks under one owner; not re-entrant, nested same-scope calls deadlock until timeout and return 409. | — | a custom per-owner lock or advisory lock around cross-row validation such as segment cycle checks (catalog: withOwnerLock (serialize writes colliding across rows of one owner, before the transaction opens)). throws makeError 409 CONFLICT (`conflict`, request-context-errors) |
-| find it or create it without a race; two requests both try to create the same row; I'll catch the unique violation and re-read; I'll just upsert on the slug; the create race hand-rolled at every call site; return the existing row if someone else created it first | **Create-if-missing via fenced findForUpdate** · pattern docs/claude/DATABASE.md § Transactions › Row Locks and Create-If-Missing — Any create-if-missing; never bare upsert or caught unique violation. | code `User`, `sendEmail`, `createLock`, `no-create-race-machinery` | a bare prisma .upsert(, or find-then-create wrapped in try/catch on P2002 / a unique violation (docs/claude/DATABASE.md § Row Locks and Create-If-Missing; CI rule no-create-race-machinery) |
 | one instance owns it and also writes to it from several places; cross-process ownership plus in-process ordering for the same thing; I'll just take the redis lock, the writes inside can interleave; owning the resource and ordering its writes are two different jobs | **Lock plus serialized queue for owned resources** · pattern docs/claude/CONCURRENCY.md § (preface) › Concurrency — cross-process ownership plus in-process ordering; only one concern: use the single primitive | code `createSerializedQueue`, `createLock`, `claimLane`, `watchLane` | using only a Redis lock (or only an in-process queue) for a resource one instance owns and writes concurrently (docs/claude/CONCURRENCY.md (preface: the canonical pair)) |
-| only one release train should run on this machine; stop a second release from starting while one is running | **Train machine-wide lock** · pattern ~/.inixiative/train.lock — allow one release train per machine via atomic pid/host/start-time lock | part 4 | — |
-| read the row, then update it, without a race; lock the row while I update it; select for update inside the transaction; why isn't this just open a transaction, lock the row, update, commit; I'll write a raw select for update query; concurrent accepts read-modify-write one json blob and clobber each other | **db.findForUpdate** · primitive db.findForUpdate — Row-level locking in a txn; pass upserting: true for create-if-missing; createLock alone for non-row critical sections. | part 4 | a raw $queryRaw `SELECT … FOR UPDATE`, or a read-then-update in a transaction with no row lock (docs/claude/DATABASE.md § Row Locks and Create-If-Missing). throws FindForUpdateLockTimeoutError (`conflict`, database-client) |
+| only one release train should run on this machine; stop a second release from starting while one is running | **Train machine-wide lock** · pattern ~/.inixiative/train.lock — --dry-run takes no lock; stale local locks are taken over automatically | part 4 | — |
 | an error in one queued run should reach the caller, not be swallowed; I'll wrap each queued step in a try/catch so the queue keeps going | **Serialized queue errors propagate uncaught** · rule docs/claude/CONCURRENCY.md § Serialized Queue (`createSerializedQueue`) › Error model — any createSerializedQueue use | code `createSerializedQueue`, `getConcurrency`, `createLock` | wrapping each queue.run body in a catch that swallows errors (docs/claude/CONCURRENCY.md § Serialized Queue › Error model) |
-| create-if-missing keyed on an in list or an operator; the find-or-create key has to be plain field equals value; the upserting mode only takes a single-row equality predicate | **upserting where must be scalar equalities** · rule db.findForUpdate — Whenever calling db.findForUpdate with upserting: true. | part 4 | calling findForUpdate with upserting: true and an in / array / operator / null where (docs/claude/DATABASE.md § Row Locks and Create-If-Missing) |
 
 - *Also here, by name:* FIND_FOR_UPDATE_LOCK_SERVICE (`packages/db/src/lock/acquireFindForUpdateLock.ts`); FIND_FOR_UPDATE_LOCK_WAIT_MS (`packages/db/src/lock/acquireFindForUpdateLock.ts`); FindForUpdateLockTimeoutError (`packages/db/src/lock/findForUpdateLockTimeoutError.ts`); OWNER_LOCK_WAIT_MS (`apps/api/src/lib/locks/withOwnerLock.ts`); claimOnce (`packages/db/src/lock/queries/claimOnce.ts`); concurrencyLimits (`packages/shared/src/utils/concurrency.ts`); createClaim (`packages/db/src/lock/createClaim.ts`); fencedDelete (`packages/db/src/lock/queries/fencedDelete.ts`); fencedRefresh (`packages/db/src/lock/queries/fencedRefresh.ts`); findForUpdateLockIdentifier (`packages/db/src/lock/findForUpdateLockIdentifier.ts`); findForUpdateLockIdentifiers (`packages/db/src/lock/findForUpdateLockIdentifier.ts`); maxSafeHeartbeatMs (`packages/db/src/lock/maxSafeHeartbeatMs.ts`); pendingStreamQueues (`apps/api/src/ws/streamPublishOrder.ts`)
 
@@ -216,20 +213,19 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 | Problem | Use | Read | Signs you're bypassing it |
 |---|---|---|---|
 | start the run and take the baton, last claim wins; mark this job as the current holder for the key; a newer enqueue for the same key should evict the older one; I'll write my job id to redis so later jobs know I'm newest; re-claim the lane when draining a spilled superseding job | **claimLane** · primitive `packages/db/src/lanes/lanes.ts#claimLane` — Newest-wins across processes: claimLane/watchLane; exclusive critical section: createLock; in-process ordering: createSerializedQueue. | docs/claude/CONCURRENCY.md § Supersede Lanes (`claimLane` / `watchLane`); docs/claude/CONCURRENCY.md § (preface) | storing a 'latest job id' in Redis by hand and comparing it inside the job to decide whether to stop (docs/claude/CONCURRENCY.md § Supersede Lanes (claimLane / watchLane)) |
-| a burst of edits should collapse into one run; only the latest run for this key matters, older ones should stop; debounce this job so repeated triggers don't all run; I'll remove the pending job by id and re-add it to debounce; re-index after save, but newer saves cancel the older indexing; keyed per source so each source only runs its newest sync | **makeSupersedingJob** · primitive `apps/api/src/jobs/makeSupersedingJob.ts#makeSupersedingJob` — Latest-wins work: this (old run keeps executing, signal is cooperative); mutual exclusion: makeSingletonJob; no dedupe: makeJob. | docs/claude/JOBS.md § Handler Patterns; docs/claude/CONTEXT.md § Job Context | BullMQ jobs removed or delayed by id to debounce, or a custom dedupe key check, so only the newest enqueue finishes (docs/claude/CONCURRENCY.md § Supersede Lanes (debounced/superseding jobs); docs/claude/JOBS.md § Superseding Job) |
+| a burst of edits should collapse into one run; only the latest run for this key matters, older ones should stop; debounce this job so repeated triggers don't all run; I'll remove the pending job by id and re-add it to debounce; re-index after save, but newer saves cancel the older indexing; keyed per source so each source only runs its newest sync | **makeSupersedingJob** · primitive `apps/api/src/jobs/makeSupersedingJob.ts#makeSupersedingJob` — Recomputations where only latest result matters; old run keeps executing cooperatively. Skip duplicates: makeSingletonJob; all runs matter: makeJob. | docs/claude/JOBS.md § Handler Patterns › Superseding Job; docs/claude/JOBS.md § Handler Patterns | BullMQ jobs removed or delayed by id to debounce, or a custom dedupe key check, so only the newest enqueue finishes (docs/claude/CONCURRENCY.md § Supersede Lanes (debounced/superseding jobs); docs/claude/JOBS.md § Superseding Job) |
 | take the lane back after the current holder has gone stale; the holder died, let someone else pick up the key; an aged-out claim should be takeable without evicting a live one; I'll check the TTL myself and overwrite the holder if it's old | **reclaimLane** · primitive `packages/db/src/lanes/lanes.ts#reclaimLane` — Stale-holder takeover; use claimLane to start fresh and evict older jobs. | — | — |
 | let go of the lane when the job finishes; release only if I'm still the holder; I'll delete the lane key at the end of the job; end the hold without stomping a newer claimant | **releaseLane** · primitive `packages/db/src/lanes/lanes.ts#releaseLane` — Ends a claimLane/reclaimLane hold; for one-off critical sections use createLock instead. | — | — |
 | the job got replaced by a newer one, don't count it as a failure; a superseded run should exit cleanly, not show as failed; I'll just return early when the signal fires; throw something that marks the run as superseded, not errored | **SupersededError** · primitive `apps/api/src/jobs/types.ts#SupersededError` — Job superseded by newer lane work: throw this rather than a generic Error so it isn't treated as failure. | — | a superseded job throwing a generic Error or returning silently mid-way (catalog: SupersededError (throw this rather than a generic Error so it isn't treated as failure)). error class `off-request-path` (Raised where no live HTTP request is being served (job workers, app bootstrap, scripts, tests, frontend): plain Error is fine and nothing maps it to a status.) |
-| while working, notice if a newer job took over and stop; poll for a different holder and bow out; I'll check redis every few seconds inside the loop to see if I'm still newest; detect that this run was usurped mid-way; a momentary redis blip shouldn't make the job think it lost | **watchLane** · primitive `packages/db/src/lanes/lanes.ts#watchLane` — Newest-wins across processes; exclusive non-superseding sections: createLock; in-process ordering: createSerializedQueue. | docs/claude/CONCURRENCY.md § Supersede Lanes (`claimLane` / `watchLane`); docs/claude/CONCURRENCY.md § (preface) | — |
+| while working, notice if a newer job took over and stop; poll for a different holder and bow out; I'll check redis every few seconds inside the loop to see if I'm still newest; detect that this run was usurped mid-way; a momentary redis blip shouldn't make the job think it lost | **watchLane** · primitive `packages/db/src/lanes/lanes.ts#watchLane` — Newest-wins across processes: claimLane/watchLane; mutual exclusion: createLock; in-process ordering: createSerializedQueue. | docs/claude/CONCURRENCY.md § Supersede Lanes (`claimLane` / `watchLane`); docs/claude/CONCURRENCY.md § (preface) | — |
+| forbid requeueing jobs with moveToDelayed or DelayedError to handle collisions | **no-job-parking** · rule `scripts/ci/rules/no-job-parking.sh` — Collisions: singleton or superseding job. Slow-lane capacity waits: claimSlotOrRequeue.ts, the only sanctioned parking. | docs/claude/JOBS.md § Handler Patterns; FEATURES.md § Background Jobs & Cron | — |
 | big fan-outs shouldn't delay the latency-sensitive jobs; mark this job as background so foreground work goes first; the lane label on the job data, fast or slow; this is about ordering, not a lock | **Fast/slow job lanes** · pattern docs/claude/CONCURRENCY.md § Job Lanes — prioritizing foreground over background; not a lock or semaphore | part 4 | — |
 | debounced jobs where only the newest enqueue finishes; the mechanism behind newest-wins jobs; collapse repeated triggers for one key into the latest run; not first-holder-keeps-it, the newest holder wins | **Superseding jobs via lanes** · pattern docs/claude/CONCURRENCY.md § Supersede Lanes — debounced/superseding jobs; first-holder exclusion: createLock; job ordering: withLanePriority | part 4 | — |
-| the job should stop when a newer one takes over; check inside the loop whether I've been superseded; abort the work cooperatively once the lane changes hands; I'll add a boolean the watcher flips so the loop exits | **ctx.signal** · primitive docs/claude/JOBS.md § Handler Patterns › Superseding Job — cooperatively signal a superseded job to stop work | code `makeJob`, `makeSupersedingJob`, `redisNamespace`, `makeSingletonJob` | — |
 | how often the running job checks whether it was replaced; the polling interval for lane watching | **LANE_POLL_MS** · primitive packages/db/src/lanes/lanes.ts — set how often watchLane checks for a newer holder | part 4 | — |
 | how long a lane claim lives in redis; the claim expiry on a supersede lane | **LANE_TTL_SEC** · primitive packages/db/src/lanes/lanes.ts — set how long a lane claim persists in Redis | part 4 | — |
-| a job that lost the lane must not keep writing; check the signal before every write in a superseding job; the old run kept writing after the newer one started | **Superseded runs never write** · rule docs/claude/JOBS.md § Handler Patterns › Superseding Job — every write inside a makeSupersedingJob handler | code `makeJob`, `makeSupersedingJob`, `redisNamespace`, `makeSingletonJob` | a superseding job that keeps writing after ctx.signal aborts (docs/claude/JOBS.md § Superseding Job) |
 | don't use a bare interval for an async recurring task; a slow run overlapped the next tick of the interval; I'll set up an interval that calls the async function | **Use heartbeat over setInterval** · rule docs/claude/CONCURRENCY.md § Recurring Beat — any in-process recurring or polling task | part 4 | — |
 
-- *Also here, by name:* ageGatedReclaim (`packages/db/src/lanes/queries/ageGatedReclaim.ts`); evictingClaim (`packages/db/src/lanes/queries/evictingClaim.ts`); fencedRelease (`packages/db/src/lanes/queries/fencedRelease.ts`); getJobSupersededBy (`packages/db/src/lanes/lanes.ts`); laneKey (`packages/db/src/lanes/lanes.ts`); supersededKey (`packages/db/src/lanes/lanes.ts`)
+- *Also here, by name:* ageGatedReclaim (`packages/db/src/lanes/queries/ageGatedReclaim.ts`); evictingClaim (`packages/db/src/lanes/queries/evictingClaim.ts`); fencedRelease (`packages/db/src/lanes/queries/fencedRelease.ts`); getJobSupersededBy (`packages/db/src/lanes/lanes.ts`); holdLaneWhileParked (`packages/db/src/lanes/lanes.ts`); laneKey (`packages/db/src/lanes/lanes.ts`); supersededKey (`packages/db/src/lanes/lanes.ts`); tombstoneJob (`packages/db/src/lanes/lanes.ts`)
 
 ### Class `recurring-timers`: Non-overlapping in-process recurring work: heartbeat, unref intervals
 
@@ -510,39 +506,24 @@ try {
 
 | Pattern | Use Case |
 |---------|----------|
-| `makeJob` | Basic job wrapper |
-| `makeSingletonJob` | Redis lock prevents concurrent runs |
-| `makeSupersedingJob` | Newer job cancels older with same key |
+| `makeJob` | Parallel work; every run happens (emails, webhooks, fire-and-forget side effects) |
+| `makeSingletonJob` | At most one run per key; a busy key skips (cron jobs, draining a queue, one open fan-out per key) |
+| `makeSupersedingJob` | Newer job cancels older with same key (recomputations where only the latest matters) |
+| `{ stages, finish }` | Any of the three, when the job fans out children and waits for them (see [Staged Job](#staged-job-fan-out-and-wait)) |
 
-##### ctx.log() - Dual-Write Logging
+**Collision policy is binary: a singleton skips the new run, superseding takes over. Nothing parks.**
+No job is ever put back with `moveToDelayed` + `DelayedError` to "try again in a moment" because a key
+is busy: that quietly serializes a plain job, every run queues behind the slowest, and a hung holder
+parks the rest forever. The only sanctioned park is the slow-lane capacity gate (`claimSlotOrRequeue`),
+which is admission control. The `no-job-parking` CI rule enforces it.
 
-Job handlers have access to `ctx.log()` which writes to **both** stdout AND BullBoard:
+A delivery (a webhook, a message) is a plain job, never a singleton: a skip would drop it. If a
+receiver needs ordering or refuses a concurrent write, make the receiving side idempotent (an upsert,
+newest-wins on `updatedAt`) and retry the refusal like any failure. Never serialize deliveries with a
+lock. `sendWebhook` is a plain job.
 
-```typescript
-export const myJob = makeJob<MyPayload>(async (ctx, payload) => {
-  ctx.log('Starting processing');  // → stdout + BullBoard job logs
-
-  // ... process ...
-
-  ctx.log(`Processed ${count} items`);
-  ctx.log('Completed successfully');
-});
-```
-
-Benefits:
-- **Console visibility**: Standard stdout for local development and log aggregation
-- **BullBoard history**: Stored with job in Redis, viewable in BullBoard UI
-- **Correlation**: Both outputs share the same scope ID (`[worker][jobName:jobId]`)
-
-**Note**: Use `ctx.log()` in job handlers instead of importing `log` directly from `@template/shared/logger`.
-
-##### Singleton Job
-
-```typescript
-export const dailyCleanup = makeSingletonJob(async (ctx, payload) => {
-  // Only one instance runs at a time
-});
-```
+<!-- unit doc:docs/claude/JOBS.md#handler-patterns/superseding-job -->
+**Source:** `docs/claude/JOBS.md` § Handler Patterns › Superseding Job (in "Jobs")
 
 ##### Superseding Job
 
@@ -566,34 +547,11 @@ How it works:
 2. The running job's `watchLane` polls its lane (~500ms); a different holder means it was usurped
 3. Usurped jobs abort via `ctx.signal` and exit gracefully
 
+4. A staged superseding job's children listen to their parent too: a tombstone on the parent stops them
+   at start or on their next poll, and they tombstone themselves so their own children stop (see
+   [Staged Job](#staged-job-fan-out-and-wait)).
+
 **Superseding does not kill.** `makeSupersedingJob` stops *waiting* for the old run; it does not stop it. Workers run handlers in-process, so the superseded handler's promise keeps running to the end. The signal is cooperative: `fetch`, timers and your own loops can honour it, Prisma queries cannot. A superseded run must therefore never write: check `ctx.signal.aborted` before every write, or fence the write against the lane.
-
-##### Staged Job (Fan Out and Wait)
-
-When a job fans out work and must not finish (or run again) until every piece is done, give `makeJob` stages instead of a handler. Never hand-roll the waiting: no pending hash in Redis, no polling loop, no "refire whatever is still pending".
-
-```typescript
-export const refreshThings = makeJob<RefreshThingsPayload>({
-  stages: [
-    async (ctx, payload) => {
-      for (const thing of await listThings(payload)) {
-        await ctx.enqueueChildJob('refreshThing', { thingId: thing.id });
-      }
-    },
-    // a second stage runs only after every child of the first has reported
-  ],
-  finish: async (ctx, payload) => { /* runs once, after the last stage's children */ },
-});
-```
-
-- **Stages run in order; each waits for the children it added.** The job is a BullMQ flow parent run as a step job (`runJobStages`). The next stage is stored on the job envelope (`data.stage`), so a resumed run starts there and an earlier stage never runs twice. After a stage that added children the job parks in `waiting-children`, holding no worker slot, and BullMQ runs it again once the last child has reported. A stage that added none runs straight into the next.
-- **`ctx.enqueueChildJob` exists only inside a stage**, so only a job can have children. It adds the child with the running job as its `parent` and `ignoreDependencyOnFailure`: a child keeps the queue's retries, and only after its last attempt fails does it count as done, so a dead child never holds its parent open. Never pass `parent` to `enqueueJob` yourself.
-- **A flow child never spills to the outbox** (see [Spill Routing](#spill-routing)): the drained re-add would lose its parent link.
-- **One open parent at a time:** add the parent under a fixed `jobId` with `removeOnComplete`/`removeOnFail` set. BullMQ refuses a second job with an id still in the queue, and the id frees the moment the parent finishes. Whatever adds the parent (a cron root, say) just adds it and finishes: it is not itself a parent.
-- **Tests:** an inline run has no worker token, so children run inline as they are added, the stages and `finish` run in order within one call, and a child that throws is logged and swallowed, as `ignoreDependencyOnFailure` does under a worker.
-- A worker that dies mid-stage reruns that stage and may add its children twice. Children must be idempotent.
-
----
 
 <!-- unit doc:docs/claude/CONCURRENCY.md#recurring-beat-heartbeat -->
 **Source:** `docs/claude/CONCURRENCY.md` § Recurring Beat (`heartbeat`) (in "Concurrency")
@@ -653,9 +611,9 @@ const { isAvailable, isChecking } = useValidateUniqueness('organization', 'slug'
 From the catalog (`.foundry/catalog/catalog.json`, extracted from the code). Each line: **name** `where` [kind] the job it does. Use: canonical usage.
 
 #### Class `locks`
-- **acquireFindForUpdateLock** `packages/db/src/lock/acquireFindForUpdateLock.ts#acquireFindForUpdateLock` [primitive] fence the rows a transaction will read-then-update so concurrent transactions wait Use: await acquireFindForUpdateLock(openTransaction, 'model', where)
+- **acquireFindForUpdateLock** `packages/db/src/lock/acquireFindForUpdateLock.ts#acquireFindForUpdateLock` [primitive] lock a row inside an open transaction, throwing a conflict on timeout Use: await acquireFindForUpdateLock(openTransaction, 'Model', { id })
 - **createLock** `packages/db/src/lock/createLock.ts#createLock` [primitive] ensure only one process across instances owns a resource, via Redis Use: const lock = createLock({ ...claimOptions })
-- **makeSingletonJob** `apps/api/src/jobs/makeSingletonJob.ts#makeSingletonJob` [primitive] wrap a job handler so a Redis lock prevents concurrent runs Use: export const myJob = makeSingletonJob(handler, { lockKey: (payload) => key });
+- **makeSingletonJob** `apps/api/src/jobs/makeSingletonJob.ts#makeSingletonJob` [primitive] define a job allowing at most one run per key; busy keys skip Use: export const drain = makeSingletonJob<Payload>(handler, { lockKey: (p) => p.id })
 - **withOwnerLock** `apps/api/src/lib/locks/withOwnerLock.ts#withOwnerLock` [primitive] serialize writes colliding across rows of one owner, before the transaction opens Use: await withOwnerLock(ownerScope, async () => db.txn(...))
 
 #### Class `concurrency-limits`
@@ -666,11 +624,12 @@ From the catalog (`.foundry/catalog/catalog.json`, extracted from the code). Eac
 
 #### Class `supersede-lanes`
 - **claimLane** `packages/db/src/lanes/lanes.ts#claimLane` [primitive] claim a Redis lane for a job so the newest job for a key wins Use: const prev = await claimLane(lane, jobId, delayMs)
-- **makeSupersedingJob** `apps/api/src/jobs/makeSupersedingJob.ts#makeSupersedingJob` [primitive] let a newer job with the same dedupe key supersede older pending runs Use: export const myJob = makeSupersedingJob(handler, (payload) => `key:${payload.id}`);
+- **makeSupersedingJob** `apps/api/src/jobs/makeSupersedingJob.ts#makeSupersedingJob` [primitive] define a job where a newer run with the same key replaces older waiting Use: export const recompute = makeSupersedingJob<Payload>(handler, (p) => p.id)
 - **reclaimLane** `packages/db/src/lanes/lanes.ts#reclaimLane` [primitive] take back a lane for a job once the current holder has aged out Use: await reclaimLane(lane, jobId);
 - **releaseLane** `packages/db/src/lanes/lanes.ts#releaseLane` [primitive] release a lane only if this job still holds it Use: await releaseLane(lane, jobId, previousHolder);
 - **SupersededError** `apps/api/src/jobs/types.ts#SupersededError` [primitive] signal that a running job was replaced by newer work and should stop Use: throw new SupersededError(job.id)
-- **watchLane** `packages/db/src/lanes/lanes.ts#watchLane` [primitive] heartbeat a held lane and call back when a newer job usurps it Use: const stop = watchLane(lane, jobId, () => abort());
+- **watchLane** `packages/db/src/lanes/lanes.ts#watchLane` [primitive] notify a running job when a newer job claims its lane across processes Use: watchLane(lane, jobId, () => abort())
+- **no-job-parking** `scripts/ci/rules/no-job-parking.sh` [rule] forbid requeueing jobs with moveToDelayed or DelayedError to handle collisions Use: On collision, use a singleton job (skip the new run) or makeSupersedingJob (take over); never park
 
 #### Class `recurring-timers`
 - **heartbeat** `packages/shared/src/utils/heartbeat.ts#heartbeat` [primitive] run a recurring in-process beat on an interval without overlapping itself Use: const stop = heartbeat(async () => poll(), 5000, { onError })

@@ -3,7 +3,7 @@
   "title": "Running, validating and typing rules",
   "routing": "Is this about executing or checking a rule rather than writing one: check vs toPrisma vs executePrismaPlan and where the rails differ, root-array rules being check-only, validateRule / assertValidRule / validateFieldMaps / assertValidNarrowing / validateRuleInLens before saving or running external rules, describeRule and getOperatorsForKind (introspection stays in the engine), bindRule and listLensBindings for { bind } tokens, readScopeRef, orWhere, orderRecords, materializeSourceQuery, indexBridges, getLensRoot, engineGlobals (with / reset, string.fuzzy, prismaOptions.datasource.provider, anyNull), the TypeScript types (Condition, one public name per operation), or the error classes UsageError and LensRefusal?",
   "concepts": ["json-rules-runtime"],
-  "tokens": 10506,
+  "tokens": 10508,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
@@ -14,7 +14,7 @@
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 10506
+      "tokens": 10508
     }
   },
   "runsAgreed": 0,

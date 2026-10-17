@@ -65,9 +65,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - one depth budget shared, slow gets a share
 - map the slow lane to the lowest priority number
 - cron, cron trigger and flow children always enqueue direct
-- where buffer caps, linger and TTLs come from
-- the per-worker loop that re-admits spilled rows
-- the in-process lock around buffer writes
 - what happens when the queue is overloaded
 - a new buffer tuning knob goes in the env schema
 - a per-lane redis flag set once, renewed by the drain
@@ -121,9 +118,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - spill fast when the whole budget is full, slow when its share is
 - the priority value slow jobs get
 - I'll buffer everything when overflowing
-- the buffer settings read from env
-- how buffered jobs get back to the queue
-- ordering buffer writes in this process only
 - only ad-hoc jobs spill, cron and children go direct
 - don't hardcode buffer limits
 - self-clearing if the drain dies
@@ -154,8 +148,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - depth alone can't tell a hang from normal draining
 - I'll cap slow jobs by slot count instead
 - drain fast rows first, then slow
-- I'll re-enqueue the buffered rows from a scheduled job
-- cross-process needs a real lock, this is in-process
 - I'll drop jobs when the queue is too deep
 - I'll throttle big sends with a delay
 - I'll count the queue myself in the producer

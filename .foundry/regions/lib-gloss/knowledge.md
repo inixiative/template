@@ -12,7 +12,7 @@
 - [3. Everything that exists here, by class](#3-everything-that-exists-here-by-class)
 - [4. The specifics, in full](#4-the-specifics-in-full)
   - [4a. Doc sections](#4a-doc-sections)
-    - `@inixiative/gloss/README.md`: (preface); Where the gloss lives; The three permitted comment forms; The sidecar; The harvester; Derived staleness; CLI; Setup; Doctrine; Design
+    - `@inixiative/gloss/README.md`: (preface); Where the gloss lives; The comment rule; The sidecar; The harvester; Derived staleness; CLI; Setup; Agent hooks; Doctrine; Design
     - `@inixiative/gloss/snippets/CLAUDE.gloss.md`: Gloss — commentary lives in the margin, not in the code
   - [4b. Code entries](#4b-code-entries)
 
@@ -124,7 +124,7 @@ Each unit is the doc section verbatim, with its headings shifted down two levels
 
 **This is about decluttering.** Comments interrupt code; reading a file should be reading the code.
 A gloss is a margin: you read the source, and only if you are confused do you read the note beside
-it. `@inixiative/gloss` keeps source files comment-free except for the three forms that have to be
+it. `@inixiative/gloss` keeps source files comment-free except for the forms that have to be
 inline, and moves everything else into a mirrored sidecar — `src/foo.ts` → `.gloss/src/foo.ts.md`.
 Clean source is the primary win; gloss content is upside for whoever reads the file next. An empty
 gloss is acceptable, not failure.
@@ -151,22 +151,19 @@ tree is walked.
 `.gloss/.events.jsonl` (machine-local harvester state), which setup gitignores. A gloss file exists
 only when a source file has something in its margin; comment-free files get no mirror.
 
-<!-- unit doc:@inixiative/gloss/README.md#the-three-permitted-comment-forms -->
-**Source:** `@inixiative/gloss/README.md` § The three permitted comment forms (in "@inixiative/gloss")
+<!-- unit doc:@inixiative/gloss/README.md#the-comment-rule -->
+**Source:** `@inixiative/gloss/README.md` § The comment rule (in "@inixiative/gloss")
 
-#### The three permitted comment forms
+#### The comment rule
+
+The rule agents follow lives in one place: [`snippets/CLAUDE.gloss.md`](snippets/CLAUDE.gloss.md),
+which `gloss setup` installs into `CLAUDE.md`. In short: comments are almost never needed; source
+keeps daggers, machine directives and the rare one-line `// why:`; everything else goes in the gloss
+section of its symbol. This section describes what the tooling recognises.
 
 Everything else in a source file is harvestable, including JSDoc.
 
-**1. `// why:`** — a load-bearing constraint the code can't show. Must-read-now, stays inline,
-interrupts on purpose.
-
-```ts
-// why: Stripe replays webhooks for up to 3 days; the ledger insert must stay idempotent on eventId.
-await ledger.upsert({ where: { eventId }, create: entry, update: {} });
-```
-
-**2. Daggers** — content-free existence markers. Fixed strings; any trailing content is a lint
+**Daggers** — content-free existence markers. Fixed strings; any trailing content is a lint
 error. `// gloss:file` at the top of a file says a file-level preamble exists; `// gloss` on its own
 line immediately above a declaration says that symbol has a gloss section.
 
@@ -177,13 +174,25 @@ line immediately above a declaration says that symbol has a gloss section.
 export const resolveMarkerTarget = (source: ParsedSource, line: number) => { ... };
 ```
 
-**3. Machine directives** — recognized by pattern, extensible per repo: `eslint-disable*`,
+**Machine directives** — recognized by pattern, extensible per repo: `eslint-disable*`,
 `biome-ignore`, `@ts-expect-error` / `@ts-ignore` / `@ts-nocheck`, `prettier-ignore`,
 `/// <reference`, shebangs, license headers, `#__PURE__`, webpack/vite magic comments, istanbul/c8,
 `@vitest-environment`, `sourceMappingURL`.
 
 ```ts
 // biome-ignore lint/suspicious/noExplicitAny: the resolver hands back an untyped AST node
+```
+
+**`// why:`** — a comment whose text starts `why:` in any form (`//`, `///`, `/* */`, own-line or
+trailing). Lint allows one short line and warns about the rest (`longWhy`, reported as a warning that never fails the run): a `why:` spanning more than one
+line (consecutive `why:` lines or a multi-line block), or one longer than 120 characters, measured
+over the whole comment. A plain comment on the line directly under an own-line `why:` is reported
+(`longWhy`) as its overflow. The harvester never moves a `why:`; it sweeps only the plain overflow,
+like any other comment, so dropping the `why:` label from extra lines and running `gloss harvest`
+moves them into the gloss. The limit is per repo:
+
+```json
+{ "gloss": { "whyMaxLength": 100 } }
 ```
 
 Repos with their own machine-read comment forms extend the recognized set in `package.json` —
@@ -222,8 +231,7 @@ one `## <symbol>` section per symbol. Class members key as `Class.method`; `expo
 An entry that fits on one line is one bullet; anything longer is a paragraph. The `## <symbol>`
 heading is the entry's only binding — it is the one link the checker can verify (dagger ↔ section).
 A quoted code line or a line number would answer "where does this apply" with a syntactic proxy
-that rots silently; prose that needs finer-than-symbol placement is load-bearing by definition and
-belongs inline as `// why:`.
+that rots silently, so a section names what inside its symbol it means in words, never by line.
 
 ```md
 # src/resolver.ts
@@ -236,7 +244,7 @@ lint-passes/CI-fails split-brain.
 
 - a decorator is part of the declaration it decorates
 
-Skips blank lines and `// why:` lines between the dagger and the declaration. Rejects
+Skips blank lines and other comments between the dagger and the declaration. Rejects
 multi-declarator `const a = 1, b = 2` rather than guessing which half was meant. See
 [ZLT-1204](https://linear.app/...).
 
@@ -251,10 +259,10 @@ whose dagger was deleted.
 
 #### The harvester
 
-The write path is mechanical, not instructional. Comment the way you are trained to; the harvester
-sweeps every non-directive, non-`why:`, non-dagger comment out of the source into the enclosing
-symbol's gloss section and plants the dagger. Nothing depends on an agent remembering a CLAUDE.md line through a long session, and nothing
-is deleted to satisfy lint: the spillway fills by machine.
+The write path is mechanical, not instructional. A comment an agent writes out of habit doesn't stay
+in the source: the harvester sweeps every comment that isn't a dagger, a directive or a `// why:`
+into the enclosing symbol's gloss section and plants the dagger, and nothing is
+deleted to satisfy lint: the spillway fills by machine.
 
 The calm default is harvest-at-commit (`gloss harvest --staged` in pre-commit). `gloss watch` is
 opt-in per dev process and heavily debounced — it must never rewrite a file mid-edit, which is the
@@ -291,14 +299,15 @@ Run as `bunx gloss <cmd>`, or `bun src/cli.ts <cmd>` in this repo.
 
 | Command | |
 | --- | --- |
-| `gloss lint [paths]` | Flag source comments that are not `// why:`, a dagger, or a machine directive. |
+| `gloss lint [paths]` | Flag source comments that belong in the gloss: anything but a dagger, a machine directive or a one-line `// why:` within the limit. |
 | `gloss check` | Bidirectional dagger ⇔ section audit, both directions. Blocking in CI; also the rename/move/orphan detector. |
 | `gloss fix` | Repair what `check` found: re-pair renamed symbols, move mirrors after a `git mv`, rewrite header paths. |
 | `gloss harvest [paths]` | Sweep harvestable comments into the gloss and plant daggers. `--staged` for the pre-commit path. |
 | `gloss watch` | Harvest on save, debounced. Opt-in per dev process. |
 | `gloss read <file> [symbol]` | Print the gloss with the derived staleness header per section. |
 | `gloss history <file> [symbol]` | Per-section changelog — `git log -p` scoped to one section. |
-| `gloss setup [root]` | Create `.gloss/`, install the CLAUDE.md block. Idempotent; upgrades an existing block in place. |
+| `gloss setup [--hooks \| --no-hooks] [--update-block]` | Create `.gloss/`, install the CLAUDE.md block, offer the Claude Code hooks (`--hooks` / `--no-hooks` to decide without a prompt). Idempotent; never overwrites a customised block unless confirmed or `--update-block` is passed. |
+| `gloss hook <read\|grep>` | Claude Code `PostToolUse` hook: reads the hook JSON on stdin, prints the gloss context as `additionalContext`. |
 
 <!-- unit doc:@inixiative/gloss/README.md#setup -->
 **Source:** `@inixiative/gloss/README.md` § Setup (in "@inixiative/gloss")
@@ -312,10 +321,19 @@ bunx gloss setup
 
 `setup` creates `.gloss/` with a header README and appends the agent instructions from
 `snippets/CLAUDE.gloss.md` to your `CLAUDE.md`, between `<!-- gloss:begin -->` / `<!-- gloss:end -->`
-markers. Re-running it replaces the block between those markers with the current snippet, so an
-upgrade is `bunx gloss setup`.
+markers. With no block it appends one; with a block identical to the snippet it does nothing.
 
-It deliberately does not touch git config, `lefthook.yml`, or your `package.json`. Wire the hooks
+A block that differs from the shipped snippet (an upgrade, or a repo's own ruling) is never
+overwritten silently. Setup prints the difference (`-` the repo's lines, `+` the shipped ones) and
+then, on a TTY, asks whether to replace it (default no); without a TTY it keeps the block and says
+so. `bunx gloss setup --update-block` replaces it without asking, which is how an upgrade lands.
+Line endings are compared as `\n`, so a CRLF copy of the snippet counts as identical. A begin
+marker with no end marker is never replaced, flag or not, because the block would run to the end
+of the file; setup says so and leaves it for you to close. An existing `.gloss/README.md` is never
+rewritten.
+
+It deliberately does not touch git config, `lefthook.yml`, or your `package.json`; the only other file
+it may write is `.claude/settings.json`, and only for the [agent hooks](#agent-hooks) you accept. Wire the hooks
 yourself from `snippets/lefthook.gloss.yml`:
 
 ```yaml
@@ -335,23 +353,83 @@ pre-push:
 If the repo publishes to npm, add `.gloss` to `package.json` `files` — our own agents read published
 source in `node_modules`, and daggers must not dangle downstream.
 
+<!-- unit doc:@inixiative/gloss/README.md#agent-hooks -->
+**Source:** `@inixiative/gloss/README.md` § Agent hooks (in "@inixiative/gloss")
+
+#### Agent hooks
+
+The margin is worth most at the moment an agent reads the file, so gloss ships it as a Claude Code
+hook rather than waiting for the agent to run `gloss read`:
+
+- **Read** of a file with a margin → the rendered gloss (with staleness), as if `gloss read <file>` ran.
+- **Grep** for an identifier → the gloss sections whose symbol contains the pattern's longest
+  identifier run (four characters or more), each with its first line, at most eight.
+
+`gloss setup` asks whether to add them; `gloss setup --hooks` adds them without asking and
+`--no-hooks` skips them silently (declined, or without a TTY and without a flag, setup skips and
+prints the suggestion).
+It merges into `.claude/settings.json`: an existing `Read` or `Grep` matcher group gets the entry
+appended, other hooks and keys are left as they are, an entry already present (any command that runs
+`gloss hook read` / `gloss hook grep` under a matcher covering that tool) is never duplicated, and a file it cannot parse is left
+untouched with the entries printed to add by hand. The result:
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "test -x \"$CLAUDE_PROJECT_DIR/node_modules/.bin/gloss\" && \"$CLAUDE_PROJECT_DIR/node_modules/.bin/gloss\" hook read || true",
+            "timeout": 20,
+            "statusMessage": "gloss: margin for this file"
+          }
+        ]
+      },
+      {
+        "matcher": "Grep",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "test -x \"$CLAUDE_PROJECT_DIR/node_modules/.bin/gloss\" && \"$CLAUDE_PROJECT_DIR/node_modules/.bin/gloss\" hook grep || true",
+            "timeout": 20,
+            "statusMessage": "gloss: sections for this pattern"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+The command runs the repo's installed bin, not `bunx gloss`: without `node_modules`, `bunx` would
+fetch the unrelated unscoped `gloss` package on every Read. A checkout that has not run the install
+gets no context and no error.
+
+The hook fails silently: bad input, a file outside a glossed tree, or no margin prints nothing and
+exits 0, because a hook that errors interrupts the agent on every Read. `GLOSS_HOOK_DEBUG=1` prints
+the swallowed error to stderr. Output is capped at 8,000 characters.
+
+The core is harness-neutral: `glossContextForRead(repoRoot, relPath)` and
+`glossContextForGrep(repoRoot, pattern)` return the context text, and `src/claudeCode.ts` is the
+Claude Code adapter (stdin JSON in, `hookSpecificOutput.additionalContext` out, settings merge).
+Another harness gets its own adapter over the same two functions.
+
 <!-- unit doc:@inixiative/gloss/README.md#doctrine -->
 **Source:** `@inixiative/gloss/README.md` § Doctrine (in "@inixiative/gloss")
 
 #### Doctrine
 
 **The gloss is advisory.** It is past-session commentary. It may be stale, it may have been wrong
-when written. Trust the code and its `// why:` lines over it. This is not a new cost: truth was never
+when written. Trust the code over it. This is not a new cost: truth was never
 enforceable for comments either, and comments carried no staleness signal at all. The gloss is held
 to the standard comments always actually had, plus a derived freshness header they never had.
 
 **Reading it is a second action**, like `git log` or `git blame` — triggered by a visible dagger and
 felt confusion, not performed on every read. A gloss consulted 10% of the time still beats a comment
 taxing 100% of reads.
-
-**The filing rule.** If deleting a gloss entry could change what correct behavior looks like, it was
-misfiled — it belongs in `// why:`. A misfile is recoverable (the content is in the gloss rather than
-nowhere, and review can promote it); a `// why:` that was never written is not.
 
 **Never delete a gloss section or a dagger to green a failing check.** Run `gloss fix`. A check that
 trains deletion gives the corpus a negative half-life — on every red rename, deleting the pair is the
@@ -372,29 +450,38 @@ accepted with eyes open.
 
 #### Gloss — commentary lives in the margin, not in the code
 
-Source files carry exactly three comment forms. Everything else belongs in the gloss.
+**Comments are almost never needed.** Name things so the code explains itself. When something must
+be said, it goes in the gloss section of the symbol it concerns, not in the source.
 
-1. `// why:` — a load-bearing constraint the code can't show. Must-read-now, stays inline.
-   Filing rule: **if deleting a gloss entry could change what correct behavior looks like, it was
-   misfiled — it belongs in `// why:`.**
-2. Daggers — content-free existence markers, exact strings, trailing content is a lint error.
+Source files carry only these comment forms:
+
+1. Daggers — content-free existence markers, exact strings, trailing content is a lint error.
    `// gloss` on its own line above a declaration = that symbol has a gloss section.
    `// gloss:file` at the top of a file = a file-level preamble exists.
-3. Machine directives — `eslint-disable*`, `biome-ignore`, `@ts-expect-error`/`@ts-ignore`/
+2. Machine directives — `eslint-disable*`, `biome-ignore`, `@ts-expect-error`/`@ts-ignore`/
    `@ts-nocheck`, `prettier-ignore`, `/// <reference`, shebangs, license headers, `#__PURE__`,
    bundler magic comments, istanbul/c8, `@vitest-environment`, `sourceMappingURL`.
+3. `// why:` — the rare exception, strongly discouraged: ONE short line (120 characters by default),
+   only where the code can't make a constraint clear on its own. Aim for about 1% of comments. Never a
+   narrative: anything longer goes in the symbol's gloss section. `gloss lint` warns about a `why:` that
+   runs past one line or the limit (a warning, never a failure); the harvester never touches one.
 
-**Writing.** Comment as you normally would — the harvester sweeps non-`why:` comments out of the
-source into the gloss and plants the dagger. Or write the section yourself: `src/foo.ts` glosses to
-`.gloss/src/foo.ts.md`, with an `# src/foo.ts` h1, an optional preamble, and one `## <symbol>`
-section per symbol (`Class.method` for members, `default` for `export default`).
+**Writing.** Write the section yourself: `src/foo.ts` glosses to `.gloss/src/foo.ts.md`, with an
+`# src/foo.ts` h1, an optional preamble, and one `## <symbol>` section per symbol (`Class.method` for
+members, `default` for `export default`), and put the `// gloss` dagger above the declaration. A
+plain comment left in the source is swept by the harvester into its enclosing symbol's section, with
+the dagger planted.
 
 **Reading.** A `// gloss` dagger means margin commentary exists for that symbol. Reading it is a
 second action, like `git log`: do it when a dagger is present and the code doesn't self-explain.
 `gloss read <file> [symbol]`.
 
+In Claude Code the second action is done for you: `gloss hook read` (installed by
+`gloss setup --hooks`) appends the file's gloss to every `Read`, and `gloss hook grep` lists gloss
+sections whose symbol matches a `Grep` pattern. Treat what they print with the epistemics below.
+
 **Epistemics.** The gloss is advisory past-session commentary. It may be stale or wrong. Trust the
-code and `// why:` lines over it.
+code over it.
 
 **NEVER delete a gloss section or a dagger to green a failing check.** Run `gloss fix`.
 <!-- gloss:end -->

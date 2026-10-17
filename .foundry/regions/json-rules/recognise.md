@@ -102,13 +102,11 @@ A moment that says any of these, or something close, is this region's. Both voic
 - compile for a database that isn't Postgres
 - in-memory and database give the same answer
 - spread the plan's where into findMany
-- the models rules can name come from the registry
 - rebuild the reference edges by hand
 - thirty days ago
 - evaluate the rule against a list of rows
 - a custom message when the rule fails
 - walk the rule tree to find the bind names
-- store what each rule references
 - write the edges where the rule is saved
 - the stored rule can't be trusted right now
 - the rule blew up while running
@@ -182,13 +180,11 @@ A moment that says any of these, or something close, is this region's. Both voic
 - set the provider for one compile call
 - where do the evaluator and the compilers disagree
 - use the compiled where directly
-- register the target model, don't hard-code a list
 - recompute edges outside the save hook
 - within the last week
 - a rule over the whole array in memory
 - tell the user why the rule rejected them
 - I'll write a recursive helper over all and any
-- an edge row per referenced row
 - the save path records references
 - a missing binding or dead row, not a crash
 - evaluation itself failed, not a bad rule
@@ -261,13 +257,11 @@ A moment that says any of these, or something close, is this region's. Both voic
 - the default provider for every compile
 - same rule, same result on both rails
 - the where has placeholders Prisma rejects
-- which models are referenceable
 - a manual rebuild of the references
 - the start of this month
 - the data is an array, not a row
 - must be 18 or older as the failure text
 - read what a stored rule names
-- persist the rule's references
 - no hook for the edges
 - the error for a rule in a degraded state
 - what do I throw when running the rule crashes
@@ -324,6 +318,12 @@ A moment that says any of these, or something close, is this region's. Both voic
 - wrap the failure from evaluating a stored rule
 - bindings, lens and dead references in one list
 - the liveness shadow of stored rules
+- the rows a saved rule references, through its lens
+- how deep does the dollar prefix go
+- a rule type that rejects a mismatched operand
+- fuzzy only in memory
+- I'll add a mutation hook to create the edges
+- where do the week boundaries fall for last week
 
 ## When this is not your domain
 
