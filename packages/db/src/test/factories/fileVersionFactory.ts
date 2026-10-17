@@ -17,7 +17,7 @@ const fileVersionFactory = createFactory('FileVersion', {
     status: FileVersionStatus.active,
   }),
   dependencies: {
-    file: { modelName: 'File', foreignKey: { id: 'fileId' }, required: false },
+    file: { modelName: 'File', foreignKey: { id: 'fileId' } },
   },
 });
 

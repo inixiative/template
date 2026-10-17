@@ -75,6 +75,7 @@ describe('resolveArtifactAccess', () => {
     const shared = await folderOf(organization, 'public');
     await createArtifactPermission({
       artifactId: shared.id,
+      granteeModel: 'User',
       granteeUserId: reader.id,
       role: 'viewer',
     });
@@ -92,6 +93,7 @@ describe('resolveArtifactAccess', () => {
     const team = await folderOf(organization);
     await createArtifactPermission({
       artifactId: team.id,
+      granteeModel: 'User',
       granteeUserId: reader.id,
       role: 'admin',
     });
@@ -105,7 +107,12 @@ describe('resolveArtifactAccess', () => {
 
   it('grants pass down through inherit levels and stop at a private one', async () => {
     const root = await folderOf(organization);
-    await createArtifactPermission({ artifactId: root.id, granteeUserId: reader.id, role: 'viewer' });
+    await createArtifactPermission({
+      artifactId: root.id,
+      granteeModel: 'User',
+      granteeUserId: reader.id,
+      role: 'viewer',
+    });
     const middle = await folderOf(organization);
     await place(middle, root);
     const leaf = await folderOf(organization);
@@ -116,10 +123,34 @@ describe('resolveArtifactAccess', () => {
     expect(await roleOf(leaf, `User:${reader.id}`)).toBeUndefined();
   });
 
+  it('a file at the bottom of the deepest folder chain still takes its root grant', async () => {
+    const root = await folderOf(organization);
+    await createArtifactPermission({
+      artifactId: root.id,
+      granteeModel: 'User',
+      granteeUserId: reader.id,
+      role: 'viewer',
+    });
+    let parent = root;
+    for (let level = 0; level < 10; level++) {
+      const child = await folderOf(organization);
+      await place(child, parent);
+      parent = child;
+    }
+    const { entity: file } = await createArtifact({
+      kind: 'file',
+      ownerModel: 'Organization',
+      organizationId: organization.id,
+    });
+    const leaf = await place(file, parent);
+    expect(await roleOf(leaf, `User:${reader.id}`)).toBe('viewer');
+  });
+
   it('an expired grant gives nothing', async () => {
     const folder = await folderOf(organization);
     await createArtifactPermission({
       artifactId: folder.id,
+      granteeModel: 'User',
       granteeUserId: reader.id,
       role: 'viewer',
       expiresAt: new Date(Date.now() - 1_000),

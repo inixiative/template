@@ -30,6 +30,7 @@
 - [Contact System](#contact-system)
 - [Customer Management](#customer-management)
 - [Segments](#segments)
+- [Artifacts and Files](#artifacts-and-files)
 - [Frontend Apps](#frontend-apps)
 - [Frontend Architecture](#frontend-architecture)
 - [UI Components](#ui-components)
@@ -476,6 +477,18 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 - 🟡 **Remaining Work** — Segment rule editor, production emitters for five registered reconciliation events, and narrower change-driven evaluation. Feature flags remain unimplemented.
 
 [Learn more: SEGMENTS.md](docs/claude/SEGMENTS.md)
+
+---
+
+## Artifacts and Files
+
+- ✅ **One Node, Many Kinds** — `Artifact` (file, folder, fork kinds) with a code catalog of kinds; a container is an artifact, and an artifact may sit in many containers (`ArtifactContainer`).
+- ✅ **Access as a Union** — `inherit | public | private`: inherit takes every container's audience, private overrides, and inherit without a container resolves to private. Grants (`ArtifactPermission`) reach users, orgs, spaces, members and customers, with expiry; roles cap by membership and token.
+- ✅ **Guarded Edges** — control over both ends, kind containment, cross-owner copy for files, loop and depth refusal under the platform `containers` lock.
+- ✅ **Artifact Webhooks** — grant and edge changes fire the parent Artifact to its owner and grantees only.
+- 🟡 **Remaining Work** — upload/download/public serving, system folders, bindings enforcement (`requiresPublic`), lazy copy, sweeper (FEAT-009).
+
+[Learn more: ARTIFACTS.md](docs/claude/ARTIFACTS.md)
 
 ---
 

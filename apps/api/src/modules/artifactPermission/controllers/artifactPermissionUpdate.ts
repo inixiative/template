@@ -17,14 +17,16 @@ export const artifactPermissionUpdateController = makeController(
     const db = c.get('db');
     const permission = getResource<'artifactPermission'>(c);
     const body = c.req.valid('json');
-    if (body.role) {
-      const verdicts = await checkArtifactAccess(
-        artifactActorFromContext(c),
-        [permission.artifactId],
-        'manage',
-      );
-      assertGrantableRole(verdicts.get(permission.artifactId), body.role);
-    }
+    const verdicts = await checkArtifactAccess(
+      artifactActorFromContext(c),
+      [permission.artifactId],
+      'manage',
+    );
+    assertGrantableRole(
+      verdicts.get(permission.artifactId),
+      permission.role,
+      ...(body.role ? [body.role] : []),
+    );
     const updated = await db.artifactPermission.update({
       where: { id: permission.id },
       data: body,

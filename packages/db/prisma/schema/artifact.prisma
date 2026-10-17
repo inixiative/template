@@ -113,6 +113,7 @@ model ArtifactPermission {
   @@unique([artifactId, granteeSpaceId, granteeUserId], where: raw("\"granteeModel\" = 'SpaceUser'"), map: "ArtifactPermission_space_user_key")
   @@unique([artifactId, granteeCustomerRefId], where: raw("\"granteeModel\" = 'CustomerRef'"), map: "ArtifactPermission_customer_ref_key")
   @@unique([artifactId, granteeIntegrationId], where: raw("\"granteeModel\" = 'Integration'"), map: "ArtifactPermission_integration_key")
+  @@index([artifactId])
   @@index([granteeModel, granteeUserId])
   @@index([granteeModel, granteeOrganizationId])
   @@index([granteeModel, granteeSpaceId])

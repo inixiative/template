@@ -19,7 +19,7 @@ export type ArtifactGraph = Map<string, ArtifactNode>;
 export const loadArtifactGraph = async (artifactIds: string[]): Promise<ArtifactGraph> => {
   const graph: ArtifactGraph = new Map();
   let frontier = [...new Set(artifactIds)];
-  for (let depth = 0; frontier.length > 0 && depth <= ARTIFACT_MAX_DEPTH; depth++) {
+  for (let depth = 0; frontier.length > 0 && depth <= ARTIFACT_MAX_DEPTH + 1; depth++) {
     const artifacts = await db.artifact.findMany({
       where: { id: { in: frontier }, deletedAt: undefined },
       include: { permissions: true, containers: { select: { containerArtifactId: true } } },

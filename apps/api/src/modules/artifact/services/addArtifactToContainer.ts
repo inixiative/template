@@ -40,7 +40,7 @@ export const assertEdgeAuthority = async (
 export const writeArtifactContainer = async ({
   artifactId,
   containerArtifactId,
-  inherit = true,
+  inherit,
 }: AddArtifactToContainerInput): Promise<ArtifactContainer> => {
   const [member, container] = await Promise.all([
     db.artifact.findUnique({ where: { id: artifactId } }),
@@ -50,9 +50,12 @@ export const writeArtifactContainer = async ({
   assertContainable(container, member);
   if (isContainerKind(member.kind)) await assertNoContainerCycle(containerArtifactId, artifactId);
 
+  const firstContainer = (await db.artifactContainer.count({ where: { artifactId } })) === 0;
+  const takeInherit = inherit ?? firstContainer;
+
   return db.txn(async () => {
     const edge = await db.artifactContainer.create({ data: { containerArtifactId, artifactId } });
-    if (inherit && member.access !== 'inherit') {
+    if (takeInherit && member.access !== 'inherit') {
       await db.artifact.update({ where: { id: artifactId }, data: { access: 'inherit' } });
     }
     return edge;

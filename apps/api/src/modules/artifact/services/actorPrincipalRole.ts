@@ -61,7 +61,8 @@ export const actorPrincipalRole = (actor: ArtifactActor) => {
     const [first, second, third] = ids as [string, string?, string?];
     switch (kind) {
       case 'User':
-        return isSelf(first) ? effectiveRole(actor, 'user', { id: first }) : null;
+        if (!isSelf(first) || (actor.token && actor.token.ownerModel !== 'User')) return null;
+        return effectiveRole(actor, 'user', { id: first });
       case 'Organization':
         return roleOn('organization', first);
       case 'Space':

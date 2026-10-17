@@ -4,12 +4,11 @@
  * @partOf infrastructure:prisma, primitive:testFactories
  * @uses none
  */
-import { ArtifactPermissionGranteeModel, Role } from '@template/db/generated/client/enums';
+import { Role } from '@template/db/generated/client/enums';
 import { createFactory } from '@template/db/test/factory';
 
 const artifactPermissionFactory = createFactory('ArtifactPermission', {
   defaults: () => ({
-    granteeModel: ArtifactPermissionGranteeModel.User,
     role: Role.viewer,
   }),
   dependencies: {

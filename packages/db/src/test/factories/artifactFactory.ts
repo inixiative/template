@@ -5,14 +5,12 @@
  * @uses none
  */
 import { faker } from '@faker-js/faker';
-import { ArtifactOwnerModel } from '@template/db/generated/client/enums';
 import { createFactory } from '@template/db/test/factory';
 
 const artifactFactory = createFactory('Artifact', {
   defaults: () => ({
-    kind: 'folder',
+    kind: 'file',
     name: faker.word.noun(),
-    ownerModel: ArtifactOwnerModel.User,
   }),
   dependencies: {
     user: { modelName: 'User', foreignKey: { id: 'userId' }, required: false },

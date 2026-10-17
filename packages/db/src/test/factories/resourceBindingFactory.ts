@@ -4,16 +4,10 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
-import {
-  ResourceBindingResourceModel,
-  ResourceBindingSourceModel,
-} from '@template/db/generated/client/enums';
 import { createFactory } from '@template/db/test/factory';
 
 const resourceBindingFactory = createFactory('ResourceBinding', {
   defaults: () => ({
-    sourceModel: ResourceBindingSourceModel.File,
-    resourceModel: ResourceBindingResourceModel.Organization,
     bindingType: 'logo',
   }),
   dependencies: {

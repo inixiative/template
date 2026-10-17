@@ -1,9 +1,9 @@
 # FEAT-009: File Management System
 
-**Status**: In Progress — schema + resourceBinding registry + factories landed (PR #72)
+**Status**: In Progress — artifact abstraction (Artifact / ArtifactContainer / ArtifactPermission, access resolution, edge guard, webhooks) + file schema + resourceBinding registry + factories (PR #72)
 **Priority**: High
 **Created**: 2026-02-06
-**Updated**: 2026-07-02 (reconciled §3.5–§18 to the §3 model — flat immutable keys, FileVersion lifecycle, no FileJob; §18 retired)
+**Updated**: 2026-10-17 (files and folders become kinds of one `Artifact` node: container edges replace the folder tree and materialized paths, access is the `access` column + `ArtifactPermission` resolved as a union over containers; `FolderVisibility` and the `public` grant are gone)
 **Dependencies**: Railway Buckets, Space Transfer (inquiry system)
 
 ---
@@ -16,13 +16,13 @@ File upload, storage, access control, sharing, and resource binding for the temp
 - **This is not a filesystem.** It's usage tooling + permission boundaries for SaaS workflows. Upload, bind, share, serve — the storage mechanics should stay out of the way.
 - Usage layer (ResourceBinding) and permission boundaries (scope/share model) are the SaaS core. Everything else should feel effortless.
 - Users are first-class owners alongside orgs and spaces — personal files exist independent of any org
-- Three-layer separation: storage (File/Folder) → access (FilePermission) → usage (ResourceBinding)
+- Three-layer separation: storage (Artifact + File/FileVersion) → access (`Artifact.access` + ArtifactPermission) → usage (ResourceBinding)
 - Two kinds of ownership: storage (immutable, who pays) vs access (mutable, who manages)
-- Materialized paths for hierarchy — no recursive queries
-- Within-scope = move (same File, update `path` only — keys never change); cross-scope = copy (new File, new owner)
+- Containment is an edge (`ArtifactContainer`), not a path: an artifact may sit in many containers, and containers are artifacts
+- Within-scope = move (same File, rewrite its container edges only — keys never change); cross-scope = copy (new File, new owner)
 - Org/space owners and admins get implicit broad access via ReBAC; everyone else needs explicit ABAC
-- Access is mutable (permission records with roles, expiry, inheritance via path)
-- Public read is the `public` grant on FilePermission (access layer), inherited via folders like any permission
+- Access is mutable (permission records with roles and expiry, inherited through containers)
+- Public read is the artifact's `access` column (`public`, or `inherit` from any public container); there is no public grant
 - System folders provide scaffolding; user folders provide flexibility
 - De-emphasize elaborate folder features and power-user file browser UX in favor of strong workflow integration
 
@@ -35,8 +35,8 @@ File upload, storage, access control, sharing, and resource binding for the temp
 
 | Layer | Concern | Model(s) | Answers |
 |-------|---------|----------|---------|
-| **Storage** | What's in the bucket | `File`, `FileVersion`, `Folder` | Where is it? Which version is current? Who owns it? |
-| **Access** | Who can see/download/manage (internal) | `FilePermission` | Who has what role? When does it expire? Does it inherit? |
+| **Storage** | What it is, who owns it, where it sits | `Artifact` (+ `ArtifactContainer` edges), and for files `File`, `FileVersion` | Who owns it? Which containers hold it? Which version is current? |
+| **Access** | Who can see/download/manage (internal) | `Artifact.access`, `ArtifactPermission` | Is it public? Who has what role? When does it expire? |
 | **Usage** | What role a file plays on a resource | `ResourceBinding` | What role does this file play, and how is it rendered? |
 
 Why three layers:
@@ -44,7 +44,9 @@ Why three layers:
 - **Two models** (file + permission) breaks when the same file is used as a logo AND an attachment — usage varies per binding, independent of the file
 - **Three models** keeps each concern clean and independently queryable
 
-**Public is a file-level grant, like Google Drive:** "public" is the `public` viewer permission on the file (§3.3), inherited via folders — not a per-usage property. A file's bytes have one access state; bindings only describe *where* it is used.
+**Why one node, not File + Folder.** A folder and a file are both things that get owned, shared and made public, and the Artifactory's posts and channels are the same again. One `Artifact` with a `kind` gives a grant a single target, makes a container just another artifact, and turns "what may hold what" into a fact in the code catalog (`packages/shared/src/artifact/kinds.ts`) rather than a table per kind. A kind that has content of its own keeps its own tables: `File`/`FileVersion` for `file`.
+
+**Public is an artifact-level state, like Google Drive:** "public" is the artifact's `access` (§6), inherited through containers — not a per-usage property. A file's bytes have one access state; bindings only describe *where* it is used.
 
 **Intent — bidirectional visibility is the whole point:**
 
@@ -58,39 +60,65 @@ This system is designed so that **every file knows what it's doing, and every us
 
 ## 3. Data Model
 
-### 3.1 File (container)
+Schema: `packages/db/prisma/schema/artifact.prisma` and `file.prisma`. Ownership and grantees are false polymorphism, registered in `packages/db/src/registries/falsePolymorphism.ts`.
 
-File holds identity, ownership, folder position, and name. The bytes live on FileVersion.
-
-Ownership is false polymorphism (§18.1): `ownerModel` names the owner, with exactly one FK set.
+### 3.1 Artifact (the node)
 
 ```prisma
-model File {
-  id             String @id @default(uuid())
-
-  ownerModel     FileOwnerModel        // User | Organization | Space
-  userId         String? @db.VarChar(36)
-  organizationId String? @db.VarChar(36)
-  spaceId        String? @db.VarChar(36)
-
-  folderId       String?
-  path           String
-
-  filename       String
-
-  sourceFileId   String?               // set when this File is a lazy-copy snapshot
-
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  deletedAt      DateTime?
-
-  versions       FileVersion[]
-  permissions    FilePermission[]
-  bindings       ResourceBinding[]
+model Artifact {
+  id, createdAt, updatedAt, deletedAt
+  kind   String           // key into the kind catalog (§3.2)
+  name   String
+  access ArtifactAccess   // inherit | public | private
+  system Boolean          // auto-created scaffolding, undeletable
+  integrationId String?   // the app holding the content: null = this app (a File); set = that integration
+  ownerModel ArtifactOwnerModel  // User | Organization | Space — one FK set, never changes
+  userId?, organizationId?, spaceId?
+  file File?; permissions ArtifactPermission[]
+  containers ArtifactContainer[]  // edges where this artifact is the member
+  members    ArtifactContainer[]  // edges where this artifact is the container
 }
 ```
 
-### 3.1.1 FileVersion (content)
+`kind` is immutable (the immutableFields registry) and validated against the catalog by the `artifactAccess` hook. Artifact is audit-enabled, so it is soft-deleted.
+
+### 3.2 Kind catalog (code)
+
+```ts
+export const ArtifactKinds = {
+  file:   { contains: [],                 defaultAccess: 'private', holder: 'local', crossOwner: 'copy', contentModel: 'File', lazyCopy: true },
+  folder: { contains: ['file', 'folder'], defaultAccess: 'private', holder: 'local', crossOwner: 'copy' },
+  // forks add kinds below (the Artifactory: post, channel — crossOwner: 'edge', defaultAccess: 'public')
+};
+```
+
+- `contains` — what a container kind may hold; a kind with an empty list is not a container.
+- `defaultAccess` — stamped at creation when the artifact is created outside a container (§6).
+- `crossOwner` — `copy` keeps "cross-owner is always copy" (§6, ownership = billing boundary); `edge` lets a kind sit in another owner's container (crossposting).
+- `contentModel` — a kind with its own content table is created by its own flow (upload, §7), never by the plain create route.
+
+### 3.3 ArtifactContainer (the edge)
+
+`{ containerArtifactId, artifactId }`, unique per pair. The member side cascades; the container side is `Restrict`, so a container is hard-deleted only after its edges are removed and a delete never changes a member's access silently. Containers nest at most 10 deep, and loops are refused (§5).
+
+### 3.4 ArtifactPermission (Access Layer — ABAC)
+
+A grant of a `role` (`Role`: viewer / member / admin / owner) on an artifact, and through `inherit` on everything inside it. The grantee is false-polymorphic with real FKs: `User`, `Organization`, `Space`, `OrganizationUser` (`granteeOrganizationId + granteeUserId`), `SpaceUser` (`granteeOrganizationId + granteeSpaceId + granteeUserId`), `CustomerRef`, `Integration`. Membership grantees cascade with the membership: a grant dies when the member leaves, the content does not. Fields carried over from FilePermission: `expiresAt`, `fromVersion`, `preserveOnRevoke`. One grant per artifact × grantee (partial uniques). **Revoke = delete the row.**
+
+An `Integration` grantee is not reachable by any presenting path in template yet: it is meant for an integration's own server credential, never for a user token bound to that integration.
+
+### 3.5 File (the file kind's own table)
+
+```prisma
+model File {
+  id, createdAt, updatedAt
+  artifactId   String @unique   // identity, owner, name, access and placement live on the Artifact
+  sourceFileId String?          // set when this File is a lazy-copy snapshot
+  versions FileVersion[]; bindings ResourceBinding[]
+}
+```
+
+### 3.5.1 FileVersion (content)
 
 One row per uploaded version. Current version = highest active (`WHERE status = 'active' ORDER BY version DESC LIMIT 1`). Revert = a new row at `max + 1` reusing the prior version's `key` (no byte copy); the key is refcounted before purge. The File tombstones once all its versions reach `purged`.
 
@@ -114,76 +142,9 @@ model FileVersion {
 }
 ```
 
-### 3.2 Folder (Storage Layer)
+### 3.6 ResourceBinding (Usage Layer)
 
-A folder is a tree node; ownership is false polymorphism (§18.1), same as File.
-
-`path` is the materialized ancestor chain, and it exists **for permission checks**: a FilePermission on a folder applies to everything beneath it, so resolving access on a file walks `[file] + the folders in its path` up to the scope root in one query (`WHERE (targetId, targetModel) IN (...) ORDER BY specificity DESC LIMIT 1`, most-specific wins). File carries the same denormalized `path`, so the check is join-free. Moving a folder rewrites its descendants' paths — a DB update, no S3.
-
-`visibility: "private"` is the owner-only scope: listed only for the owning member, hidden from admins in normal browse. Admins still resolve access via ReBAC, through a deliberate, audited governance view.
-
-```prisma
-model Folder {
-  id             String @id @default(uuid())
-
-  ownerModel     FileOwnerModel        // User | Organization | Space
-  userId         String? @db.VarChar(36)
-  organizationId String? @db.VarChar(36)
-  spaceId        String? @db.VarChar(36)
-
-  parentId       String?
-  path           String
-  name           String
-
-  system         Boolean @default(false)      // auto-created scaffolding, undeletable
-  visibility     String  @default("visible")  // visible | private
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  deletedAt      DateTime?
-
-  parent         Folder?  @relation("FolderTree", fields: [parentId], references: [id])
-  children       Folder[] @relation("FolderTree")
-  files          File[]
-  permissions    FilePermission[]
-}
-```
-
-### 3.3 FilePermission (Access Layer — ABAC)
-
-An explicit grant of a `role` on a File or Folder to a principal. Two false-poly axes, both real FKs (§18.1): the **target** (File | Folder) and the **grantee** (User | Organization | Space | OrgUser | SpaceUser | CustomerRef — models, PascalCase — plus the lowercase `public` sentinel: no FK, capped at `viewer`). A grant on a **Folder** inherits to everything beneath it, resolved by the path-ancestor walk (§3.2). `role = owner` here is *access* ownership (mutable management authority), distinct from `File.ownerModel` (immutable storage ownership).
-
-```prisma
-model FilePermission {
-  id               String @id @default(uuid())
-
-  targetModel      FilePermissionTarget     // File | Folder
-  fileId           String? @db.VarChar(36)
-  folderId         String? @db.VarChar(36)
-
-  granteeModel     FilePermissionGrantee    // User | Organization | Space | OrgUser | SpaceUser | CustomerRef | public
-  userId           String? @db.VarChar(36)
-  organizationId   String? @db.VarChar(36)
-  spaceId          String? @db.VarChar(36)
-  orgUserId        String? @db.VarChar(36)
-  spaceUserId      String? @db.VarChar(36)
-  customerRefId    String? @db.VarChar(36)
-
-  role             Role
-  fromVersion      Int      @default(1)      // floor: this version and every later one
-  preserveOnRevoke Boolean  @default(false)  // opt-in copy-on-revoke; an active binding forces it regardless
-
-  expiresAt        DateTime?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-}
-```
-
-Uniqueness (one grant per target × grantee) rides the Contact partial-index false-poly pattern. **Revoke = delete the row** — expiry (`expiresAt`) and revocation both just remove access; who/when is the audit log's job, so there is no `revokedAt`/`revokedBy`. On revoke, lazy copy fires when the grantee has an active ResourceBinding **or** `preserveOnRevoke = true`, duplicating every version `>= fromVersion`.
-
-### 3.4 ResourceBinding (Usage Layer)
-
-What role a File — or an external URL — plays on a resource (logo, avatar, …). Two false-poly axes: the **source** (`File | url`; `File` is a real FK, `url` a sentinel) and the **resource** it is bound to (real FK per arm, fork-extensible — the email builder adds `EmailTemplate`/`EmailComponent`, inixiative adds `Event`). `bindingType` is a registry key, not a DB enum, so types extend per fork. No access lives here — public read is the `public` grant (§3.3); a `requiresPublic` type presupposes it (enforced, below).
+What role a File — or an external URL — plays on a resource (logo, avatar, …). Two false-poly axes: the **source** (`File | url`; `File` is a real FK, `url` a sentinel) and the **resource** it is bound to (real FK per arm, fork-extensible — the email builder adds `EmailTemplate`/`EmailComponent`, inixiative adds `Event`). `bindingType` is a registry key, not a DB enum, so types extend per fork. No access lives here — public read is the file's `access` (§6); a `requiresPublic` type presupposes it (enforced, below).
 
 ```prisma
 model ResourceBinding {
@@ -226,18 +187,18 @@ model ResourceBinding {
 }
 ```
 
-**`requiresPublic` is a validated invariant** (a `requiresPublic` binding implies its file carries the `public` grant), checked both ways: creating such a binding **requires** the `public` grant already exists; removing the `public` grant is **blocked** while any `requiresPublic` binding references the file. A **`removeAllBindings(file)`** call clears the dependencies so `public` can then be revoked.
+**`requiresPublic` is a validated invariant** (a `requiresPublic` binding pins its file's own `access = public` — the file's own column, not an inherited state, so the guard reads one column rather than a subtree), checked both ways: creating such a binding **requires** the file's `access` is `public`; changing it away from `public` is **blocked** while any `requiresPublic` binding references the file. A **`removeAllBindings(file)`** call clears the dependencies so the file can then go private.
 
-**`follow` (future binding type, not yet specified):** individual opt-in to preservation on a *public* file. Public consumers ride the shared `public` grant, so they have no permission row to carry `preserveOnRevoke` — instead, following is a **binding** (a declared dependency with no render slot) on the follower's own resource (User first). The existing trigger path then covers it: revoke `public` → dependent bindings snapshot into the follower's `__preserved/`. Details (empty-slot semantics, which resources may follow) deliberately unresolved.
+**Follow / track (deferred, not built):** a party wants to track an artifact — and keep it if it is withdrawn — even while it is public. Public readers ride the artifact's `access`, so they hold no permission row to carry `preserveOnRevoke`. Following is therefore a **binding** (a declared dependency with no render slot) from the follower's own resource (User first) to the artifact. It sits on the artifact model unchanged: the binding targets the `File` today and generalises to any `Artifact` (`sourceModel: Artifact`) when a non-file kind needs it. The existing trigger path covers it: the artifact leaves `public` (its own column, or its last public container goes) → the access diff of §6 finds the follower's binding → lazy copy into the follower's `__preserved/` for kinds with `lazyCopy`, a notification otherwise. Follow-up, with empty-slot semantics and which resources may follow still open.
 
 **Upload limits:** none enforced server-side on pure files. The UI validates size/type for files with a planned purpose (it knows the intended binding). The one server invariant is `accepts`, checked at *bind* time.
 
-### 3.5 How the layers interact
+### 3.7 How the layers interact
 
-- **Upload** — create File + FileVersion(`pending`), presign POST, client uploads, confirm HEAD-verifies, FileVersion → `active`. Uploading into a space/org folder adds a Space/Org `viewer` grant; ReBAC covers owners/admins.
-- **Download** — resolve access (ReBAC membership chain → FilePermission ABAC, §6), presign GET the current version's key.
-- **Bind** — create a ResourceBinding (§3.4); a `requiresPublic` type presupposes the file's `public` grant.
-- **Public serve** — a `public` viewer grant on the file, directly or via a folder ancestor, serves through the CDN proxy with no auth (§8).
+- **Upload** — create the `file` Artifact + File + FileVersion(`pending`), presign POST, client uploads, confirm HEAD-verifies, FileVersion → `active`. Uploading into a folder places the artifact in it with `access: inherit`, so it takes the folder's audience; the uploading member gets an owner grant on what they created.
+- **Download** — resolve access (`checkArtifactAccess`, §6), presign GET the current version's key.
+- **Bind** — create a ResourceBinding (§3.6); a `requiresPublic` type presupposes the file's own `access = public`.
+- **Public serve** — a file whose access resolves public (its own column, or `inherit` under a public container) serves through the CDN proxy with no auth (§8).
 - **Lazy copy** — an active binding or `preserveOnRevoke = true` snapshots the File into the owner's `__preserved/` folder when access is lost (§6); no job table — the snapshot's versions sit `pending` and serve from the source key until the sweeper copies bytes.
 
 ---
@@ -253,7 +214,7 @@ model ResourceBinding {
 
 Railway auto-provisions per environment: 2 buckets × N environments.
 
-**Keys are immutable and flat.** A `user`-bucket key is `{fileVersionId}-{filename}` at the bucket root — no owner/space/folder prefix. The folder tree and ownership live only in Postgres (`Folder` + `File.path` + `File.ownerModel`). Moves and renames are pure DB row updates; nothing ever re-keys S3. One version = one key; a revert reuses a prior version's key (§3.1.1). Cross-owner adoption stays copy → new File → new FileVersion → new key.
+**Keys are immutable and flat.** A `user`-bucket key is `{fileVersionId}-{filename}` at the bucket root — no owner/space/folder prefix. Containment and ownership live only in Postgres (`ArtifactContainer` edges + `Artifact.ownerModel`). Moves and renames are pure DB row updates; nothing ever re-keys S3. One version = one key; a revert reuses a prior version's key (§3.5.1). Cross-owner adoption stays copy → new File → new FileVersion → new key.
 
 **System bucket** — no org scoping, pure platform assets:
 ```
@@ -274,107 +235,110 @@ Org-specific "system" assets (e.g. a white-label email header) are `user`-bucket
 
 ---
 
-## 5. Materialized Path & Traversal
+## 5. Container Graph & Traversal
 
-`File.path` / `Folder.path` are the materialized folder-ancestor chain (§3.2) — a DB concern only; the S3 key carries no path. They drive permission inheritance and subtree listing without recursion.
+Containment is a graph of `ArtifactContainer` edges, not a materialized path: an artifact may sit in several containers. Every walk is level by level with Prisma `findMany` (no raw SQL, no recursive CTE), keeps a visited set, and stops at depth 10.
 
-### Path queries
+| Helper | Where | Does |
+|---|---|---|
+| `loadArtifactGraph(ids)` | `modules/artifact/services/` | the artifacts and every ancestor container, with their grants (soft-deleted containers included) |
+| `listArtifactDescendants(id)` | same | the subtree below a container: subtree listing, the "N dependents" view for a move |
+| `artifactAncestorDepth(id)` | same | how deep a container already sits, for the depth cap |
+| `findReferenceCycle(map, start)` | `packages/shared/src/graph/` | the loop an edge would close (moved from the segment reference graph; segments use it too) |
 
-```sql
--- Subtree (recursive descendants)
-WHERE path LIKE '{folderPath}/%'
--- Direct children only
-WHERE path LIKE '{folderPath}/%' AND depth = {n}
--- Move a folder: pure DB rewrite of descendant paths, no S3
-UPDATE "Folder" SET path = REPLACE(path, '{oldPath}', '{newPath}') WHERE path LIKE '{oldPath}%';
-UPDATE "File"   SET path = REPLACE(path, '{oldPath}', '{newPath}') WHERE path LIKE '{oldPath}%';
-```
+**Writes are serialized for container kinds.** Placing a container inside another checks for a loop and then adds the edge, so it holds `withOwnerLock(platform, 'containers')`. The lock is platform-wide because containers of different owners may nest (an `edge` kind). Placing a non-container (a file) can't close a loop and takes no lock.
 
-### Traversal helpers
-
-```typescript
-getAncestors(path)                   // split path into ancestor segments
-getDescendantsQuery(path)            // LIKE prefix query
-getBreadcrumb(path)                  // parse path + batch lookup
-moveFolder(folderId, newParentId)    // rewrite path + descendants (DB only)
-validateNoCircular(folderId, targetId)
-```
+**Breadcrumbs** are the ancestor walk; with several containers an artifact has several paths, and the UI shows the one it was opened from.
 
 ---
 
 ## 6. Access Control
 
-### Resolution (internal)
+### Resolution
 
-```
-Can user X do action A on file Y?
+Implemented in `apps/api/src/modules/artifact/services/` — `resolveArtifactAccess` (actor-free) and `checkArtifactAccess` (for an actor).
 
-1. Relationship (else 404 — prevents id probing):
-   - X resolves to the file's owner (ownerModel), or
-   - X is a member of the owning Organization/Space, or
-   - X (or an org/space/orgUser/... it maps to) has a FilePermission on Y
-     or an ancestor folder.
-2. Authorization (first match):
-   a. ReBAC — X is owner/admin of the owning org or space → broad manage access.
-   b. ABAC — a FilePermission on Y or an ancestor folder (§3.2 path walk)
-      grants a role sufficient for A.
-```
+**The node's own `access`:**
 
-A direct FilePermission share passes the boundary *and* authorizes in one check — no membership required.
+| `access` | Public? | Takes its containers' grants? |
+|---|---|---|
+| `inherit` | if **any** container resolves public | yes, from every container (the union) |
+| `public` | yes | yes (public only widens) |
+| `private` | no | **no** — an explicit private overrides; you can be private inside a public group |
 
-**ReBAC inheritance:** org/space `owner`/`admin` get implicit broad access to every file their org/space owns — no FilePermission row. Regular `member`/`viewer` see only what a FilePermission grants (directly or by folder inheritance) — this prevents the over-grant where every member can reach every file.
+**Grants an artifact carries:** its own `ArtifactPermission` rows (expired ones dropped), plus an implicit owner grant — the owning user, or `OrganizationManager`/`SpaceManager` for org/space-owned (owners and admins of the owner, at their role; FEAT-009's ReBAC inheritance). Through a non-private node, each container's grants pass down at their role; a container's implicit ownership passes down capped at `admin`, which only matters across owners.
 
-**Sharing is explicit.** Org-owned files are not auto-visible to a space; grant a FilePermission on the org folder (`granteeModel: Space`, `folderId` set) and it inherits to descendants. Same mechanism for user→user, org→user, space→user.
+**This replaces "most specific wins".** The earlier design resolved one grant by path specificity (`ORDER BY specificity DESC LIMIT 1`), so a file could be narrower than its folder. Under the union, nothing beneath a container is narrower than it through inheritance. The only ways to narrow are an explicit `private` (which takes nothing from containers) or removing the edge. There is no public grant and no `publicUntil`, so time-limited *public* links are gone (time-limited shares to a grantee stay, via `expiresAt`).
 
-### Public
+**An actor's role on an artifact** is the strongest grant it holds, each capped by what the actor holds on the grantee:
 
-A file is public iff it carries a `public` viewer grant (§3.3), directly or via a folder ancestor. Public serving (§8) checks only for that grant — never a ResourceBinding. FilePermission is the sole access layer; `public` is just its open sentinel, capped at `viewer`.
+| Grantee | The actor holds it when | Cap |
+|---|---|---|
+| `User` U | the actor is U | its own role on U (session: owner; User token: the token's role) |
+| `Organization` / `Space` | it is a member | its effective role there (membership ∧ token) |
+| `OrganizationManager` / `SpaceManager` | its effective role there is admin or owner | that role |
+| `OrganizationUser` / `SpaceUser` | it is that user, acting as a member | the token's role, if any |
+| `CustomerRef` | it holds the CustomerRef's customer party | as above for that party |
+| `Integration` | never yet (§3.4) | — |
+
+Roles map to actions as everywhere else: viewer → read, member → operate, admin → manage, owner → own. A superadmin holds everything. A caller with no read gets **404** (no id probing); read but not the action gets 403.
+
+**Inherit needs a container.** "You can't have inherit unless you're held by at least one thing." The `artifactAccess` hook (`apps/api/src/hooks/artifactAccess/`) enforces it:
+- **At creation**, an artifact created with `inherit` (or no access) gets its kind's `defaultAccess` — files and folders private. Creating *inside* a container is create → edge → `inherit` in one `db.txn` (nested writes are refused, so the edge is a second write); `createArtifact` does it.
+- **Setting `inherit`** on an artifact that sits in no container resolves it to `private`.
+- **Removing the last edge** of an `inherit` artifact resolves it to `private` in the same transaction — a post does not go public because its private channel went away. A soft-deleted container still counts until its edge is removed.
+
+**Edge writes need control over both ends** — guarded once, in `addArtifactToContainer` / `removeArtifactFromContainer`: `manage` on the artifact (an edge publishes it to the container's whole audience) and `operate` on the container (`ARTIFACT_EDGE_AUTHORITY`). The kinds must fit (`contains`), the owners must match unless the member's kind is `crossOwner: 'edge'`, and the edge may not close a loop or pass depth 10.
+
+**Grants can't exceed the granter.** Creating or raising a grant needs `manage` on the artifact and a role no higher than the granter's own.
+
+**Not in this cut: edge-level access.** An edge carries no access of its own; access is the node's column plus the container's. A per-edge setting (in this channel public, in that one private) is a noted extension.
 
 ### Access scenarios
 
-| Scenario | FilePermission | ResourceBinding |
-|----------|----------------|-----------------|
-| User uploads to Space | User (owner) + Space (viewer) | — |
-| User uploads personal file | User (owner) | — |
-| Customer submits to Space | CustomerRef (viewer) | attachment |
-| Set as org logo | `public` (viewer) grant | logo |
-| Set as internal attachment | — | attachment |
-| Admin shares org folder to Space | Space grant on folder | — |
-| Admin shares to specific User | User grant on file/folder | — |
-| Time-limited share link | grant with `expiresAt` | — |
-
-Org/space owners/admins need no FilePermission row (ReBAC). Only regular members and cross-scope sharing do.
+| Scenario | How |
+|----------|-----|
+| User uploads personal file | user-owned, private |
+| Member uploads into a space folder | space-owned, `inherit`; the member gets an owner grant (SpaceUser) |
+| Customer submits to Space | CustomerRef `viewer` grant + attachment binding |
+| Set as org logo | the file's own `access = public` + logo binding |
+| Admin shares an org folder with a Space | Space grant on the folder; `inherit` members take it |
+| Admin shares with a specific User | User grant on the file or folder |
+| Time-limited share | grant with `expiresAt` |
+| Keep one file private inside a shared folder | the file's `access = private` |
 
 ### Boundary crossing — within-scope = move, cross-scope = copy
 
 | Operation | Same owner? | Effect |
 |-----------|-------------|--------|
-| Move between folders in one scope | yes | DB `path` update; no S3 |
-| Submit personal file to org/space | no | temporary FilePermission grant; no copy |
+| Move between folders in one scope | yes | rewrite container edges; no S3 |
+| Submit personal file to org/space | no | temporary ArtifactPermission grant; no copy |
 | Org/space adopts a submission | no | copy bytes → new File (new owner, new key); original stays |
-| Share org folder with a space | same org | FilePermission grant; no copy |
+| Share org folder with a space | same org | ArtifactPermission grant; no copy |
 
-Cross-owner is always copy, never move: ownership = billing boundary, and the original stays for audit/rollback.
+Cross-owner is always copy, never move: ownership = billing boundary, and the original stays for audit/rollback. For `file` and `folder` this is enforced on the edge: a `crossOwner: 'copy'` kind can't sit in another owner's container.
 
-**Space transfer** (§15), **user leaves org**, **space soft-delete**: ownership FKs never change; grants are re-issued or deleted per the transfer disposition; org-scoped files stay with the org; the user's own (`ownerModel: User`) files are untouched. Soft-delete sets `File.deletedAt`; S3 bytes wait for the retention sweeper (§16).
+**Space transfer** (§15), **user leaves org**, **space soft-delete**: ownership FKs never change; grants are re-issued or deleted per the transfer disposition; org-scoped files stay with the org; the user's own (`ownerModel: User`) files are untouched. Soft-delete sets `Artifact.deletedAt`; S3 bytes wait for the retention sweeper (§16).
 
 ### Lazy copy (copy-on-revoke)
 
 Grantees can build on a file they don't own (bind it, depend on it). Revoking access shouldn't silently break those dependents — so when access is lost, they get a frozen snapshot.
 
-**Fires** when a FilePermission is revoked or expired, or the source File is soft-deleted, *and* the grantee is a dependent:
+**Fires** when a dependent loses access to the source file, or the source is soft-deleted, *and* the grantee is a dependent:
 - an **active ResourceBinding** points at the file (automatic), or
-- the grantee's FilePermission has **`preserveOnRevoke = true`** (opt-in).
+- the grantee's ArtifactPermission has **`preserveOnRevoke = true`** (opt-in).
+
+Under the union, access to a bound file can be lost several ways: a grant on it or any ancestor is deleted or expires, an edge is removed, or a container's `access` changes. Each such write diffs the resolved access of the bound files under the changed node before and after; that one diff fires lazy copy and the `Cache-Tag` purge (§8).
 
 **The snapshot** is a new File owned by the dependent, in their `__preserved/` folder, `sourceFileId` set for provenance. It copies every version `>= fromVersion`; those FileVersions start `pending` and serve from the source key until the sweeper (§16) copies bytes, then go `active`. No job table. The dependent's bindings repoint to the snapshot. Who triggered it is the audit log's job — no snapshot actor fields on File.
 
-**`__preserved/`** is a per-scope `system` folder (`visibility: visible`) — a landing zone, not a jail; users can move copies out.
+**`__preserved/`** is a per-scope `system` folder — a landing zone, not a jail; users can move copies out.
 
 **No auto-heal.** If access is later re-granted, the user keeps both the snapshot and renewed live access; manual reconnect is a deferred follow-up (§17).
 
 ### "Shared with me" virtual view
 
-A query over FilePermission where the user is grantee (active, unexpired): shared folders browse naturally; individually-shared files show as a flat list. Items are role-limited by the grant. `__preserved/` copies are real owned files and also appear in normal browsing.
+A query over ArtifactPermission where one of the user's principals is grantee (active, unexpired): shared folders browse naturally; individually-shared files show as a flat list. Items are role-limited by the grant. `__preserved/` copies are real owned files and also appear in normal browsing.
 
 ---
 
@@ -387,17 +351,17 @@ A query over FilePermission where the user is grantee (active, unexpired): share
 ### Sequence
 
 ```
-1. Client → POST /files/presign { filename, contentType, folderId? }
-   permix check for upload in the target scope.
-2. API creates File + FileVersion(status: "pending", key = {fileVersionId}-{filename}),
-   a FilePermission(owner) for the uploader, and — into a space/org folder —
-   a Space/Org viewer grant.
+1. Client → POST /files/presign { filename, contentType, containerArtifactId? }
+   permix check for upload in the target scope; operate on the container.
+2. API creates the `file` Artifact + File + FileVersion(status: "pending",
+   key = {fileVersionId}-{filename}) through `createArtifact`: inside a container
+   it is `inherit`, and the uploading member gets an owner grant.
 3. API returns a presigned POST (short TTL) with exact-key + content-type conditions.
 4. Client → Bucket: POST directly.
 5. Client → POST /files/:id/confirm → API HEADs the object, FileVersion → "active".
 ```
 
-Status lives on FileVersion; the File is current at its highest `active` version. No server-side size/type limit on pure files (§3.4) — the UI validates for planned-purpose uploads, and `accepts` is enforced at bind time. Who uploaded it is the audit log's job — no uploader field, no S3 user metadata. Stale `pending` and failed versions are reconciled by the sweeper (§16).
+Status lives on FileVersion; the File is current at its highest `active` version. No server-side size/type limit on pure files (§3.6) — the UI validates for planned-purpose uploads, and `accepts` is enforced at bind time. Who uploaded it is the audit log's job — no uploader field, no S3 user metadata. Stale `pending` and failed versions are reconciled by the sweeper (§16).
 
 ---
 
@@ -408,59 +372,56 @@ Status lives on FileVersion; the File is current at its highest `active` version
 ```
 GET /files/:id/download
 1. Load File → resolve the current version's key.
-2. Check access (ReBAC → ABAC, §6).
+2. Check access (`checkArtifactAccess`, §6).
 3. Presign GET (TTL ~15 min) → 302 or { url, expiresAt }.
 ```
 
 ### Public serving via Cloudflare
 
-A file is publicly served iff it carries a `public` viewer grant (§6), directly or via a folder ancestor — never via a ResourceBinding.
+A file is publicly served iff its access resolves public (§6): its own `access = public`, or `inherit` under a public container — never via a ResourceBinding.
 
 ```
 Client → yourapp.com/public/files/:id
   → Cloudflare CDN (cache hit → serve)
-  → miss: API confirms the `public` grant → presign GET → stream with cache headers
+  → miss: API confirms the file resolves public → presign GET → stream with cache headers
 
 Cache-Control: public, max-age=86400
 Cache-Tag: file-{fileId}
 ETag: from bucket response
 ```
 
-Stable URLs that don't expire; global edge cache; purge by `Cache-Tag` when the grant is removed or the current version changes. No auth check — the `public` grant is the authorization.
+Stable URLs that don't expire; global edge cache; purge by `Cache-Tag` when the file stops resolving public (§6's access diff) or the current version changes. No auth check — public access is the authorization.
 
 ---
 
 ## 9. Permission Model (permix integration)
 
-### New permix resource
+### Artifact actions
 
-```typescript
-const FileAction = { ...StandardAction } as const;
-// Inherits: read, operate, manage, own
-```
+Artifacts use the standard actions (read, operate, manage, own) and are checked by `validateArtifactAccess(action)` (`apps/api/src/middleware/validations/`), which runs `checkArtifactAccess` — the grants leg is resolved from the database, so artifacts are not a ReBAC schema entry.
 
 | Org/Space Role | read | operate (upload) | manage | own |
 |----------------|------|-----------------|--------|-----|
-| viewer | via FilePermission | no | no | no |
-| member | via FilePermission | yes | own files | no |
+| viewer | via ArtifactPermission | no | no | no |
+| member | via ArtifactPermission | yes | what they created (owner grant) | no |
 | admin | all in org/space | yes | all in scope | no |
 | owner | all | yes | all | yes |
 
-### FilePermission roles (ABAC layer)
+### ArtifactPermission roles (ABAC layer)
 
-| FilePermission role | Allows |
+| ArtifactPermission role | Allows |
 |---------------------|--------|
 | `viewer` | See metadata, download content |
-| `member` | Viewer + upload into folder, basic operations |
-| `admin` | Member + rename, move, delete, share, manage permissions |
+| `member` | Viewer + place things into it (operate), basic operations |
+| `admin` | Member + rename, move it, delete, share, manage permissions |
 | `owner` | Admin + grant/revoke access ownership, permanent delete |
 
-This is the existing `Role` enum — one vocabulary across the system. The `public` grantee sentinel (§3.3) is capped at `viewer`.
+This is the existing `Role` enum — one vocabulary across the system. Public read is not a grant; it is the artifact's `access` (§6).
 
-**Org/space owners/admins don't need FilePermission records** — they get implicit
-broad access via ReBAC inheritance (§6). A FilePermission `role = owner` is
-*access* ownership (management authority) on a specific file/folder, distinct from
-`File.ownerModel` storage ownership.
+**Org/space owners/admins don't need ArtifactPermission records** — they get implicit
+broad access as `OrganizationManager`/`SpaceManager` (§6). An ArtifactPermission `role = owner` is
+*access* ownership (management authority) on a specific artifact, distinct from
+`Artifact.ownerModel` storage ownership.
 
 ---
 
@@ -468,17 +429,15 @@ broad access via ReBAC inheritance (§6). A FilePermission `role = owner` is
 
 Hooks auto-create `system` folders (undeletable, unrenameable) as scopes come into being:
 
-| Event | Folder | Owner | visibility | Grant |
-|-------|--------|-------|------------|-------|
-| Organization created | org root | Organization | visible | — |
-| Space created | space root | Space | visible | — |
-| OrgUser created | `org_user` | Organization | **private** | membership-scoped grant to the user |
-| User created | user root | User | visible | — |
-| First lazy copy in a scope | `__preserved/` | scope owner | visible | — |
+| Event | Folder | Owner | access | Grant |
+|-------|--------|-------|--------|-------|
+| Organization created | org root | Organization | private | — |
+| Space created | space root | Space | private | — |
+| OrgUser created | `org_user` | Organization | private | owner grant to that OrganizationUser |
+| User created | user root | User | private | — |
+| First lazy copy in a scope | `__preserved/` | scope owner | private | — |
 
-The `org_user` folder is owned by the Org (bytes stay with the org when the user leaves) but scoped private to the member: `visibility: private` lists it only for that member and hides it from admins in normal browse — admins still reach it via ReBAC through a deliberate, audited governance view (§3.2). Other `__` system folder names remain TBD.
-
----
+**One visibility system (Aron, 2026-10-17).** There is no separate listing flag: the earlier `FolderVisibility.private` ("hidden from admins in normal browse") is gone. Privacy is ownership + `access` + grants. Work you want kept apart from what you share with your organization is made as an org user: the `org_user` folder is owned by the Org (bytes stay with the org when the user leaves), private, and granted to the member. The org's owners and admins reach it only through their governance authority over the org's content (`OrganizationManager`, §6), which is the audited path. Other `__` system folder names remain TBD.
 
 ## 11. Infrastructure
 
@@ -510,31 +469,27 @@ apps/api/src/modules/file/
 │   ├── fileDownload.ts             — GET /files/:id/download
 │   ├── fileUpdate.ts               — PATCH /files/:id
 │   ├── fileDelete.ts               — DELETE /files/:id
-│   ├── filePermissionCreate.ts     — POST /files/:id/permissions
-│   ├── filePermissionDelete.ts     — DELETE /files/:id/permissions/:permId
 │   └── filePublicDownload.ts       — GET /public/files/:id (served on the `public` grant, §8)
 ├── controllers/
 ├── validations/
 ├── services/
 │   ├── s3Client.ts                 — configured S3 clients (system + user buckets)
 │   ├── presign.ts                  — presigned POST URL generation
-│   ├── accessCheck.ts              — ABAC permission resolution + path inheritance
-│   └── pathBuilder.ts              — materialized path computation + traversal
+│   └── (access, containment and traversal come from modules/artifact)
 └── tests/
 
-apps/api/src/modules/folder/
-├── routes/
-│   ├── folderCreate.ts             — POST /folders
-│   ├── folderRead.ts               — GET /folders/:id
-│   ├── folderReadMany.ts           — GET /folders
-│   ├── folderUpdate.ts             — PATCH /folders/:id (rename, system=false only)
-│   ├── folderMove.ts               — POST /folders/:id/move (reparent + path update)
-│   └── folderDelete.ts             — DELETE /folders/:id (system=false only)
-├── controllers/
-├── validations/
-├── services/
-│   └── folderTree.ts               — traversal helpers, cycle detection, system folder creation
+apps/api/src/modules/artifact/              — built (PR #72): the node, its edges and grants
+├── routes/  artifactRead, artifactReadAccess, artifactUpdate, artifactDelete,
+│            artifactReadManyArtifacts (members), artifactReadManyArtifactContainers,
+│            artifactCreateArtifactContainer, artifactCreateArtifactPermission,
+│            artifactReadManyArtifactPermissions
+├── services/ resolveArtifactAccess, checkArtifactAccess, actorPrincipalRole, loadArtifactGraph,
+│            listArtifactDescendants, createArtifact, addArtifactToContainer,
+│            removeArtifactFromContainer, assertNoContainerCycle, artifactWebhookAudience
 └── tests/
+apps/api/src/modules/artifactContainer/     — artifactContainerDelete
+apps/api/src/modules/artifactPermission/    — artifactPermissionUpdate, artifactPermissionDelete
+me / organization / space                   — {owner}CreateArtifact (plain kinds: folder)
 ```
 
 ### NoopStorageClient (dev/testing)
@@ -553,7 +508,7 @@ From Zealot's `NoopAssetsClient` pattern:
 - [ ] **Soft delete retention** — how long before purge? 30d? 90d?
 - [ ] **Virus scanning** — scan on confirm? Skip for v1?
 - [ ] **Image processing** — thumbnails on upload? Defer?
-- [ ] **Max folder depth** — unbounded? Or cap at N levels?
+- [x] **Max folder depth** — containers nest at most 10 deep, refused on the edge write.
 - [ ] **System folder names** — what `__` system folders does each scope actually need?
 - [ ] **Cloudflare setup** — part of init script? Or manual DNS setup?
 - [ ] **Lazy copy quota** — do preserved copies count toward the recipient's quota? (Probably — they own the bytes now)
@@ -608,20 +563,22 @@ Uses the existing split-detail pane component from the template.
 
 Build the whole graph at once — versioning and bindings are core, not follow-ups.
 
-- [ ] Prisma models (File, FileVersion, Folder, FilePermission, ResourceBinding)
+- [x] Prisma models (Artifact, ArtifactContainer, ArtifactPermission, File, FileVersion, ResourceBinding)
+- [x] Kind catalog; access resolution (union over containers, private override, inherit → private without a container); edge guard (both ends), loop and depth refusal; grant ceiling
+- [x] Artifact webhooks: grant and edge changes fire the parent Artifact to its owner + grantees (§17 Webhooks)
 - [ ] Storage adapter wiring (system + user buckets, flat keys) + NoopStorageClient via `makeAdapterRouter`
 - [ ] FileVersion lifecycle: `pending → active → purging → purged | failed`; current = highest `active`; revert = new version reusing a prior key (refcounted)
-- [ ] Materialized path builder + traversal helpers (DB-only moves)
-- [ ] System folder auto-creation hooks (org, space, org_user private, user, `__preserved/`)
+- [x] Container traversal helpers (DB-only moves, §5)
+- [ ] System folder auto-creation hooks (org, space, org_user, user, `__preserved/`)
 - [ ] Presigned POST upload + confirm (HEAD-verify) flow
-- [ ] Download + access resolution (ReBAC → ABAC via path walk)
-- [ ] FilePermission (false-poly grantee incl. `public` sentinel; `Role` enum; `fromVersion`, `preserveOnRevoke` default false)
-- [ ] File + Folder module routes; permix `FileAction`
+- [ ] Download (access resolution is built: `checkArtifactAccess`)
+- [x] ArtifactPermission (false-poly grantee; `Role` enum; `fromVersion`, `preserveOnRevoke` default false)
+- [ ] File module routes (upload, confirm, download); the artifact routes are built
 - [ ] Init script: Railway Bucket setup (2 buckets)
-- [ ] Cross-owner copy vs within-scope move (move = DB `path` update; cross = copy → new File → new key)
+- [ ] Cross-owner copy vs within-scope move (move = edge rewrite; cross = copy → new File → new key; the edge already refuses cross-owner files)
 - [ ] Duplicate/collision handling (policy: allow same name, ids are canonical)
 - [ ] ResourceBinding + binding registry (logo/avatar); `requiresPublic` invariant + `removeAllBindings`
-- [ ] Public serving via the `public` grant (Cloudflare proxy + Cache-Tag purge)
+- [ ] Public serving via resolved public access (Cloudflare proxy + Cache-Tag purge)
 - [ ] Delete lifecycle: soft-delete `deletedAt` → retention → purge (no dependents + refcount 0) → tombstone
 - [ ] Single `FileVersion.status` sweeper (upload completion + lazy copy + purge, §16)
 - [ ] Lazy copy as a pending-snapshot File (trigger: active binding or `preserveOnRevoke`; copies versions `>= fromVersion`; repoints bindings)
@@ -643,10 +600,10 @@ Wire the file graph into app workflows — the SaaS differentiator.
 Make it easy to find, share, and manage files at scale.
 
 - [ ] Search & filtering (filename/title/description, type, owner, scope)
-- [ ] Time-limited share links (FilePermission with expiresAt)
+- [ ] Time-limited shares (ArtifactPermission with expiresAt)
 - [ ] Explicit org→space folder sharing UI
 - [ ] Permission management UI (who has access, revoke)
-- [ ] Version history UI (browse/restore previous versions — mechanism is core, §3.1.1)
+- [ ] Version history UI (browse/restore previous versions — mechanism is core, §3.5.1)
 - [ ] Metadata extraction pipeline (dimensions, duration, page count)
 - [ ] Thumbnail/preview generation (derivatives as sibling files)
 
@@ -660,7 +617,7 @@ Product surface that matters once there are many files and users.
 - [ ] Multipart/resumable uploads (large files)
 - [ ] Bulk operations (multi-select, bulk move/delete)
 - [ ] Notifications (shared with you, submission accepted, quota warning)
-- [ ] Folder move with full descendant path update + permission recalculation
+- [ ] Folder move with permission-change preview (the access diff of §6)
 
 ---
 
@@ -708,7 +665,8 @@ Current handler (`apps/api/src/modules/inquiry/handlers/transferSpace/index.ts`)
 |-------|--------|-----------|
 | **Space** | Update `organizationId` | Already done |
 | **SpaceUser** | Update `organizationId` | Composite key includes orgId |
-| **FilePermission** | Grant new org on the space folder; delete old org's | New org admins manage; old org loses authority |
+| **ArtifactPermission** (SpaceUser grantees) | Update `granteeOrganizationId` | The SpaceUser composite FK includes orgId |
+| **ArtifactPermission** | Grant new org on the space root; delete old org's | New org admins manage; old org loses authority |
 | **Token** (space-scoped) | Revoke | Old org's tokens shouldn't reach the new org's space |
 
 ### Must audit
@@ -724,7 +682,7 @@ Current handler (`apps/api/src/modules/inquiry/handlers/transferSpace/index.ts`)
 | Model | Rationale |
 |-------|-----------|
 | **AuditLog** | Historical — must reflect state at time of action |
-| **File owner FK** | Storage ownership is immutable — the original owner pays |
+| **Artifact owner FK** | Storage ownership is immutable — the original owner pays |
 
 ### Grant disposition — bindings follow the asset, permissions follow the authority
 
@@ -752,23 +710,25 @@ handleApprove: async (db, inquiry) => {
     await tx.spaceUser.updateMany({ where: { spaceId }, data: { organizationId: newOrgId } });
     await tx.token.updateMany({ where: { spaceId, isActive: true }, data: { isActive: false } });
 
-    const spaceFolder = await tx.folder.findFirst({
-      where: { system: true, ownerModel: 'Space', spaceId },
+    await tx.artifactPermission.updateMany({
+      where: { granteeModel: 'SpaceUser', granteeSpaceId: spaceId },
+      data: { granteeOrganizationId: newOrgId },
     });
-    if (spaceFolder) {
-      // One folder-level grant inherits to all descendants
-      await tx.filePermission.create({
+    const spaceRoot = await tx.artifact.findFirst({
+      where: { system: true, kind: 'folder', ownerModel: 'Space', spaceId },
+    });
+    if (spaceRoot) {
+      await tx.artifactPermission.create({
         data: {
-          targetModel: 'Folder', folderId: spaceFolder.id,
-          granteeModel: 'Organization', organizationId: newOrgId,
+          artifactId: spaceRoot.id,
+          granteeModel: 'Organization', granteeOrganizationId: newOrgId,
           role: 'viewer',
         },
       });
-      // Revoke = delete the old org's grant (audit records who/when)
-      await tx.filePermission.deleteMany({
+      await tx.artifactPermission.deleteMany({
         where: {
-          targetModel: 'Folder', folderId: spaceFolder.id,
-          granteeModel: 'Organization', organizationId: oldOrgId,
+          artifactId: spaceRoot.id,
+          granteeModel: 'Organization', granteeOrganizationId: oldOrgId,
         },
       });
     }
@@ -790,7 +750,7 @@ One idempotent sweeper reconciles the whole `FileVersion.status` pipeline agains
 | **Lazy-copy snapshot** | pending version on a File with `sourceFileId` | copy bytes from the source key → `active` |
 | **Failed** | `status = failed`, older than 24h | if key refcount 0, delete object → tombstone version |
 | **Purging** | `status = purging` | delete object (refcount 0) → HEAD-confirm gone → `purged` |
-| **Soft-deleted past retention** | `File.deletedAt` older than retention, no dependents | mark active versions `purging` → sweep → tombstone the File |
+| **Soft-deleted past retention** | the file's `Artifact.deletedAt` older than retention, no dependents | mark active versions `purging` → sweep → tombstone the File |
 | **No-DB-record object** | bucket scan: parse `fileVersionId` from key, no match | quarantine (tag) → delete after grace |
 
 Deletion is always: delete object → HEAD-confirm gone → mark `purged`, idempotent on retry. Tombstoned File/FileVersion rows are kept, not hard-deleted; a far-future, refcount-gated GC reaps ancient tombstones. Right-to-be-forgotten uses the existing `redact` mechanism.
@@ -843,7 +803,7 @@ No automatic heal. When a snapshot in `__preserved/` has a `sourceFileId` the us
 
 ### Reference-Safe Delete
 
-A file with active ResourceBindings or FilePermission shares should not be hard-deletable without explicit override. Options:
+A file with active ResourceBindings or ArtifactPermission shares should not be hard-deletable without explicit override. Options:
 - **Block delete** — "This file is used as a logo on 2 resources and shared with 3 users. Remove bindings first."
 - **Cascade warning** — show what breaks, require confirmation
 - **Soft delete only** — hard delete is always deferred to orphan sweeper after bindings are cleaned up
@@ -894,16 +854,14 @@ Recommendation: allow in v1 (filenames are display-only, ids are canonical), add
 
 ### Folder Move Constraints
 
-Beyond cycle prevention (already in traversal helpers):
-- **Max depth** — enforce a cap (e.g., 10 levels) to prevent pathological nesting
-- **Permission recalculation** — moving a folder into a shared parent may grant new users access; moving out may revoke. UI should warn about permission changes on move.
-- **Move into shared folder** — if dest folder has Space/User FilePermissions, do moved files inherit? Yes (by path inheritance), but the UI should surface this.
+Cycle prevention and the depth cap (10) are built (§5). Still open:
+- **Permission recalculation** — moving into a shared container grants its audience to every `inherit` artifact below; moving out may revoke. The UI should show the access diff (§6) before a move.
 
 ### Search & Indexing
 
 Filename/title/description full-text search via Postgres `tsvector`:
 - Filter by content type, uploader, date range, scope (org/space/personal)
-- Path-based scoping (search within a folder subtree)
+- Container scoping (search within a container's subtree, `listArtifactDescendants`)
 - Results respect access control (only return files the user can see)
 - Consider: should search hit S3 metadata or just DB fields?
 
@@ -930,11 +888,23 @@ File-specific event types for the existing AuditLog system:
 
 ### Public URL Invalidation
 
-When the `public` grant is removed from a file:
+When a file stops resolving public (its own `access` changes, or its last public container goes):
 - Cloudflare Cache-Tag purge on `file-{fileId}` — immediate (< 300ms global propagation)
 - Presigned GET URLs expire naturally (15 min TTL)
-- The stable public URL (`/public/files/:id`) starts returning 404 immediately after the grant is revoked
+- The stable public URL (`/public/files/:id`) starts returning 404 immediately after access changes
 - Edge case: if Cloudflare hasn't purged yet, stale content may be served briefly. Acceptable for most cases; for sensitive content, consider `Cache-Control: no-store`.
+
+### Webhooks (built)
+
+Artifact is a webhook model. A change to an `ArtifactPermission` or `ArtifactContainer` row fires an **Artifact** `update` event for the parent artifact — the grant's artifact, and both ends of an edge — through `webhookRelatedModels` (direct-model refs; the CustomerRef party refs stay unread until AUTH-006). The audience is the artifact's owner and every party granted access to it, through containers too (`artifactWebhookAudience`), plus the grantee named by a changed grant, so a revoked grantee hears its revocation. Nobody else. The event names the node; receivers fan out to its descendants themselves (a container's change reaches its `inherit` members only through that fan-out). Delivery is lossy (no retry, auto-disable after 5 failures, poisoning on repeated 400/422), so a receiver that indexes artifacts also reconciles. Builds on the AUTH-006 stopgap (template #201).
+
+### Edge-level access (deferred)
+
+An edge has no access of its own in this cut. A per-edge setting (the same post public in one channel, private in another) is the noted extension; it would be a column on `ArtifactContainer` read by `resolveArtifactAccess` where it walks a container.
+
+### Grant and edge audit (open)
+
+Artifact is audit-enabled. ArtifactPermission and ArtifactContainer are hard-deleted (revoke = delete), so they are not audit-enabled (audit-enabled implies soft delete); who granted, revoked or moved what is not yet in the audit log.
 
 ### Quota & Accounting
 
@@ -949,7 +919,7 @@ Storage billing questions that need answers before pricing:
 
 ## 18. Design Review Addendum
 
-Fully absorbed into §3 and its ripples: false-poly ownership (§3.1), flat immutable keys (§4), the FileVersion lifecycle and single sweeper (§3.1.1, §16), the binding registry and UI upload limits (§3.4, §7), transfer disposition (§15), and BigInt/storage-adapter notes (§11). Section retired.
+Fully absorbed into §3 and its ripples: false-poly ownership (§3.1), flat immutable keys (§4), the FileVersion lifecycle and single sweeper (§3.5.1, §16), the binding registry and UI upload limits (§3.6, §7), transfer disposition (§15), and BigInt/storage-adapter notes (§11). Section retired.
 
 ---
 
