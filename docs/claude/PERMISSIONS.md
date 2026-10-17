@@ -475,11 +475,13 @@ export const rebacSchema: RebacSchema = {
 |------|---------|---------|
 | `string` | Inherit action from same resource | `manage: 'own'` → check `own` on same resource |
 | `{ rel, action }` | Delegate to related resource (supports dot-path) | `{ rel: 'organization', action: 'own' }` |
-| `{ self: field }` | Current user owns the record | `{ self: 'userId' }` → user.id === record.userId |
+| `{ self: field, action }` | Current user owns the record **and** holds `action` on its own `db:user` entry | `{ self: 'userId', action: 'operate' }` → user.id === record.userId and the principal may `operate` as itself |
 | `{ rule: Condition }` | JSON rule condition | `{ rule: { field: 'role', operator: 'in', value: ['owner'] } }` |
-| `{ any: ActionRule[] }` | At least one must pass | `{ any: [{ self: 'userId' }, 'read'] }` |
+| `{ any: ActionRule[] }` | At least one must pass | `{ any: [{ self: 'userId', action: 'read' }, 'read'] }` |
 | `{ all: ActionRule[] }` | All must pass | `{ all: [{ rule: ... }, 'own'] }` |
 | `null` | Always false (terminal) | `own: null` |
+
+**A self arm names an action.** `self` used to pass on identity alone, so a narrowed grant could still leave an org, delete a token or accept an invite. Now `{ self: 'userId', action: 'operate' }` also requires the principal to hold `operate` on `db:user:<its id>` (`createRebacCheck(resolveRelation, { selfResource: 'db:user' })` in `rebac/check.ts`). Full principals hold `own` on themselves, so nothing changes for them. Read arms use `read`; leave, resolve, send and token self-delete use `operate`; any user action, custom ones included, may be named. A bare `{ self }` throws.
 
 ### How It Works
 
@@ -783,7 +785,7 @@ The ReBAC schema allows users to delete their own tokens via `leave`:
 ```typescript
 token: {
   actions: {
-    leave: { self: 'userId' },  // User can delete if token.userId === user.id
+    leave: { self: 'userId', action: 'operate' },  // token.userId === user.id, and the principal may operate as itself
   },
 },
 ```
