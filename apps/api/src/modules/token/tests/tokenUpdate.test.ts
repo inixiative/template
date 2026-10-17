@@ -151,14 +151,34 @@ describe('PATCH /token/:id — a token is full or narrowed, and either can chang
     const orgToken = async () =>
       (await createToken({ ownerModel: 'Organization', role: 'member' }, { organization })).entity;
 
-    it('an admin grants a member-level entitlement', async () => {
+    it('an admin cannot assign a custom key it does not hold itself', async () => {
       const token = await orgToken();
       const response = await asSession(admin, [adminMembership])(
+        patch(`/api/v1/token/${token.id}`, { entitlements: { 'report.export': true } }),
+      );
+      expect(response.status).toBe(403);
+    });
+
+    it('an admin holding the key assigns it, or less', async () => {
+      const holder = (await createUser()).entity;
+      const { entity: holderMembership } = await createOrganizationUser(
+        { role: 'admin', entitlements: { 'report.export': true } },
+        { user: holder, organization },
+      );
+      const token = await orgToken();
+      const response = await asSession(holder, [holderMembership])(
         patch(`/api/v1/token/${token.id}`, { entitlements: { 'report.export': true } }),
       );
       expect(response.status).toBe(200);
       const saved = await db.token.findUniqueOrThrow({ where: { id: token.id } });
       expect(saved.entitlements).toEqual({ 'report.export': true });
+      expect(
+        (
+          await asSession(holder, [holderMembership])(
+            patch(`/api/v1/token/${token.id}`, { entitlements: { read: true } }),
+          )
+        ).status,
+      ).toBe(200);
     });
 
     it('an admin cannot raise it to owner or grant own', async () => {

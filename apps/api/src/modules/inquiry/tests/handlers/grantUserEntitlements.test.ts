@@ -24,6 +24,13 @@ import { meRouter } from '#/modules/me';
 import { createTestApp } from '#tests/createTestApp';
 import { json, post } from '#tests/utils/request';
 
+const heldByAdmin = {
+  'artifact.create': true,
+  'billing.view': true,
+  'billing.edit': true,
+  'audit.read': true,
+};
+
 type InquiryBody = { id: string; status: string; updatedAt: string };
 
 describe('handler: grantUserEntitlements', () => {
@@ -94,7 +101,10 @@ describe('handler: grantUserEntitlements', () => {
       .entity;
     for (const role of ['owner', 'admin', 'member', 'viewer'] as const) {
       const user = (await createUser()).entity;
-      const { entity } = await createOrganizationUser({ role }, { user, organization });
+      const { entity } = await createOrganizationUser(
+        { role, entitlements: role === 'admin' ? heldByAdmin : undefined },
+        { user, organization },
+      );
       members[role] = { user, membership: entity };
     }
     const spaceAdminUser = (await createUser()).entity;
@@ -122,6 +132,12 @@ describe('handler: grantUserEntitlements', () => {
       const inquiry = await requestFromOrganization({ 'artifact.create': true });
       expect((await approveAs('admin', inquiry.id)).status).toBe(200);
       expect(await membershipEntitlements()).toMatchObject({ 'artifact.create': true });
+    });
+
+    it('a manager cannot approve a key it does not hold itself; neither can the owner', async () => {
+      const inquiry = await requestFromOrganization({ 'report.export': true });
+      expect((await approveAs('admin', inquiry.id)).status).toBe(403);
+      expect((await approveAs('owner', inquiry.id)).status).toBe(403);
     });
 
     it('a viewer cannot approve', async () => {

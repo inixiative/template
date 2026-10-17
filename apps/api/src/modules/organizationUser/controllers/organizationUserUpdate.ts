@@ -4,13 +4,13 @@
  * @partOf feature:tenancy
  * @uses primitive:authz, primitive:routeTemplates, infrastructure:prisma
  */
+
 import type { OrganizationId } from '@template/db';
 import { Role } from '@template/db/generated/client/enums';
 import { type Entitlements, greaterRole } from '@template/permissions';
-import { check, rebacSchema } from '@template/permissions/rebac';
+import { canAssign } from '@template/permissions/assign';
 import { getResource } from '#/lib/context/getResource';
 import { makeError } from '#/lib/errors';
-import { assignLevel } from '#/lib/permissions/assignLevel';
 import { makeController } from '#/lib/utils/makeController';
 import { validateNotLastOwner } from '#/modules/organization/validations/validateNotLastOwner';
 import { organizationUserUpdateRoute } from '#/modules/organizationUser/routes/organizationUserUpdate';
@@ -23,17 +23,14 @@ export const organizationUserUpdateController = makeController(
     const body = c.req.valid('json');
     const permix = c.get('permix');
 
-    const role = assignLevel(
-      greaterRole(orgUser.role, body.role),
-      (body.entitlements ?? null) as Entitlements,
-    );
+    const owner = { model: 'organization' as const, record: { id: orgUser.organizationId } };
     if (
-      !check(
+      !canAssign(
         permix,
-        rebacSchema,
-        'organization',
-        { id: orgUser.organizationId as OrganizationId, role },
-        'assign',
+        owner,
+        owner,
+        greaterRole(orgUser.role, body.role),
+        (body.entitlements ?? null) as Entitlements,
       )
     )
       throw makeError({ status: 403, message: 'Access denied' });

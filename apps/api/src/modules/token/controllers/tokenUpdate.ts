@@ -4,12 +4,13 @@
  * @partOf feature:auth
  * @uses primitive:authz, infrastructure:prisma
  */
+
 import { type HydratedRecord, hydrate, Prisma } from '@template/db';
 import type { Entitlements } from '@template/permissions';
+import { canAssign } from '@template/permissions/assign';
 import { check, rebacSchema } from '@template/permissions/rebac';
 import { getResource } from '#/lib/context/getResource';
 import { makeError } from '#/lib/errors';
-import { assignLevel } from '#/lib/permissions/assignLevel';
 import { validateFullGrantIssuer } from '#/lib/permissions/validateFullGrantIssuer';
 import { validateHeldGrant } from '#/lib/permissions/validateHeldGrant';
 import { validateRole } from '#/lib/permissions/validateRole';
@@ -35,20 +36,16 @@ export const tokenUpdateController = makeController(tokenUpdateRoute, async (c, 
   };
 
   const hydrated = await hydrate('token', token as HydratedRecord);
-  const assigns = check(
-    permix,
-    rebacSchema,
-    'token',
-    {
-      ...hydrated,
-      role: assignLevel(
-        next.role,
-        next.entitlements,
-        token.spaceId ? 'db:space' : 'db:organization',
-      ),
-    },
-    'assign',
-  );
+  const ownerRecord = (hydrated.space ?? hydrated.organization) as HydratedRecord | undefined;
+  const assigns =
+    !!ownerRecord &&
+    canAssign(
+      permix,
+      { model: 'token', record: hydrated },
+      { model: hydrated.space ? 'space' : 'organization', record: ownerRecord },
+      next.role,
+      next.entitlements,
+    );
 
   validateFullGrantIssuer(c, next);
 

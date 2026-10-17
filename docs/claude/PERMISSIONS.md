@@ -399,7 +399,9 @@ Before `capGrant`, the token cap intersected entitlements and treated a `null` m
 
 The request-time cap stops a grant exceeding the *user*; it does not stop a narrow credential minting a wider one. So whoever mints or self-approves a user grant must hold all of it: `validateHeldGrant` (`findUnheldGrant`) requires the issuing principal to hold the role on every entry the new grant reaches (`lesserRole(membership, role)`, as `capGrant` gives it) and every named entitlement, and refuses a **full** grant from a narrowed issuer (a full grant inherits what the issuer may not hold). It runs on `/me/tokens`, on `PATCH /token/:id` when the editor is the token's own user, and on the handshake approval of a `grantUserEntitlements` inquiry targeting a user. The full-from-narrowed refusal (`validateFullGrantIssuer`) also runs on the OrganizationUser and SpaceUser token create routes and on every `PATCH /token/:id`, since a full membership token inherits the membership's entitlements.
 
-Organization and space tokens are different: there the editor needs **authority to assign**, not to hold. `assignLevel(role, entitlements, resource)` turns the request into a role: each named action takes the lowest role that reaches it through the schema (`read` → viewer, `operate` → member, `manage` → admin, `own` → owner, `'organization.create'` → member); an action with a non-chain rule (`assign`) counts as **owner**, because a direct grant short-circuits its role-aware rule; an unmapped custom key counts as member. The `assign` rule then decides: owner/admin levels need `own` on the org or space, the rest `manage`. The same check guards `PATCH /organizationUser/:id` when it writes entitlements.
+Organization and space tokens are different: there the editor needs **authority to assign**, which includes holding what it assigns. `assignLevel(role, entitlements, resource)` turns the request into a role: each named action takes the lowest role that reaches it through the schema (`read` → viewer, `operate` → member, `manage` → admin, `own` → owner, `'organization.create'` → member); an action with a non-chain rule (`assign`) counts as **owner**, because a direct grant short-circuits its role-aware rule; an unmapped custom key counts as member. The `assign` rule then decides: owner/admin levels need `own` on the org or space, the rest `manage`.
+
+**Never more than you hold, possibly less.** `canAssign(permix, target, owner, role, entitlements)` (`packages/permissions/src/assign.ts`) is the one place this is checked. It needs the `assign` rule at that level, **and** the assigner holding the level's own standard action on the owner, **and** every named action there. So an admin can't hand out a custom key it doesn't hold (not even the owner can, unless it holds it), and a membership holding `{ assign: true }` still can't make an owner. It backs organization/space token create, `PATCH /token/:id`, `PATCH /organizationUser/:id` (role and entitlements), and `grantUserEntitlements` approval for org and space targets. A custom key becomes assignable by role once the schema maps it (e.g. `'report.export': 'operate'`); until then only someone already holding it can pass it on.
 
 ### Granting User Entitlements
 
@@ -407,7 +409,7 @@ An Inquiry of type `grantUserEntitlements` (handler: `apps/api/src/modules/inqui
 
 | Target | Who asks | Who approves | Approval writes |
 |---|---|---|---|
-| `Organization` | a member (`POST /me/inquiries`) | someone with `assign` on the org at `assignLevel(entitlements)` (an admin for member-level, the owner for `own`/`manage`) | the entitlements onto the requester's `OrganizationUser` |
+| `Organization` | a member (`POST /me/inquiries`) | someone who can assign it there (`canAssign`: an admin for member-level keys it holds, the owner for `own`/`manage`) | the entitlements onto the requester's `OrganizationUser` |
 | `Space` | a space member | `assign` on the space at that level | onto the requester's `SpaceUser` |
 | `User` | the user (handshake) or an integration (`POST /integration/:id/inquiries`, needs `manage` on it) | the user, holding `token.create` and the whole grant | `resolution.grant` (`role`, `entitlements`, `entitlementsOnly`) for a JWT `grant` claim |
 
@@ -760,14 +762,14 @@ Tokens use the `leave` action for self-deletion and the `assign` action (via par
 ### Token Creation
 
 Token creation needs `token.create` on the minter (`validateSelfPermission`), then the route's check on the owner:
-- Organization and Space tokens: `assign` on the owner at `assignLevel(role, entitlements)` (owner/admin levels need `own`, others `manage`)
+- Organization and Space tokens: `canAssign` on the owner (the `assign` rule at `assignLevel(role, entitlements)`, and the minter holds the level and every named action)
 - OrganizationUser and SpaceUser tokens: `leave` on the membership, the role's standard action on the org or space, and `validateHeldActions` for the named entitlements
 - User tokens (`/me/tokens`): `validateHeldGrant`, see [Issuing Is Capped by the Issuer](#issuing-is-capped-by-the-issuer)
 
 `entitlements` and `entitlementsOnly` are accepted: `entitlements: null` mints a **full** token, a list mints a **narrowed** one.
 
 ```typescript
-check(permix, rebacSchema, 'organization', { id: orgId, role: assignLevel(role, entitlements) }, 'assign');
+canAssign(permix, owner, owner, role, entitlements); // owner = { model: 'organization', record: { id: orgId } }
 ```
 
 ### Token Editing
