@@ -23,6 +23,7 @@ import {
   createWebhookSubscription,
 } from '@template/db/test';
 import { registerArtifactAccessHook } from '#/hooks/artifactAccess/hook';
+import { registerSoftDeleteCascadeHook } from '#/hooks/softDeleteCascade/hook';
 import { registerWebhookHook } from '#/hooks/webhooks/hook';
 import * as enqueueModule from '#/jobs/enqueue';
 
@@ -68,6 +69,7 @@ describe('webhook hook: Artifact audience', () => {
 
   beforeAll(async () => {
     registerArtifactAccessHook();
+    registerSoftDeleteCascadeHook();
     registerWebhookHook();
     organization = (await createOrganization()).entity;
     outsiderOrganization = (await createOrganization()).entity;
@@ -153,5 +155,36 @@ describe('webhook hook: Artifact audience', () => {
     enqueueSpy.mockClear();
     await db.artifact.update({ where: { id: member.id }, data: { access: 'inherit' } });
     expect(heardBy(granteeSub.id)).toEqual([member.id]);
+  });
+  it('org-user content reaches no org-level subscription', async () => {
+    const memberFolder = (
+      await createArtifact({
+        kind: 'organizationUserFolder',
+        ownerModel: 'Organization',
+        organizationId: organization.id,
+        system: true,
+      })
+    ).entity;
+    const note = await folder();
+    await createArtifactContainer({ artifactId: note.id, containerArtifactId: memberFolder.id });
+    enqueueSpy.mockClear();
+    await db.artifact.update({
+      where: { id: note.id },
+      data: { name: 'renamed', access: 'inherit' },
+    });
+    expect(heardBy(organizationSub.id)).toEqual([]);
+  });
+
+  it('deleting a shared artifact still reaches its grantees', async () => {
+    const artifact = await folder();
+    await createArtifactPermission({
+      artifactId: artifact.id,
+      granteeModel: 'User',
+      granteeUserId: grantee.id,
+      role: 'viewer',
+    });
+    enqueueSpy.mockClear();
+    await db.artifact.update({ where: { id: artifact.id }, data: { deletedAt: new Date() } });
+    expect(heardBy(granteeSub.id)).toContain(artifact.id);
   });
 });

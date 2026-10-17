@@ -221,13 +221,13 @@ export const webhookEnabledModels: WebhookModel[] = [
 ### How It Works
 
 1. A mutation of a webhook-enabled model runs the `webhookDelivery` hook (after the write; jobs are scheduled with `db.onCommit`)
-2. The hook reads each changed record's parties from `webhookAudienceAxes` (CustomerRef: its customer and its provider; Artifact: its owner), plus, for a model listed in `webhookGrantedAudiences` (`apps/api/src/hooks/webhooks/audiences.ts`), every party granted access to the record (Artifact: its grantees, through its containers)
+2. The hook reads each changed record's parties from `webhookAudienceAxes` (CustomerRef: its customer and its provider; Artifact: none), plus, for a model listed in `webhookGrantedAudiences` (`apps/api/src/hooks/webhooks/audiences.ts`), every party with access to the record (Artifact: its owner and its grantees, through its containers; owners-only org-user content reaches no org-level subscription)
 3. It loads only the active subscriptions owned by those parties, and enqueues one `sendWebhook` job per (subscription, record), skipping the write's origin integration and no-op updates
 4. The job signs the payload with RSA-SHA256 and delivers it
 
 ### Tenancy (AUTH-006 stopgap)
 
-A subscription receives a record only when its owner (User, Organization or Space) is one of that record's parties. For a CustomerRef that is its customer or its provider. A row change of a party (User, Organization, Space) emits nothing: `webhookRelatedModels` is not read by the hook until AUTH-006 defines per-CustomerRef party events. An organization does not yet hear about the CustomerRefs of its spaces (no inheritance), and `sendWebhook` does not re-check the relationship at delivery time. Both are part of `tickets/AUTH-006-webhook-tenant-isolation.md`.
+A subscription receives a record only when its owner (User, Organization or Space) is one of that record's parties. For a CustomerRef that is its customer or its provider. A row change of a party (User, Organization, Space) emits nothing: the hook reads only the direct-model refs in `webhookRelatedModels` ([Related Models](#related-models)), not the CustomerRef party refs, until AUTH-006 defines per-CustomerRef party events. An organization does not yet hear about the CustomerRefs of its spaces (no inheritance), and `sendWebhook` does not re-check the relationship at delivery time. Both are part of `tickets/AUTH-006-webhook-tenant-isolation.md`.
 
 ### Webhook Payload
 

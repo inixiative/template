@@ -17,6 +17,7 @@ import { registerArtifactAccessHook } from '#/hooks/artifactAccess/hook';
 import { registerAuditLogHook } from '#/hooks/auditLog/hook';
 import { registerSoftDeleteCascadeHook } from '#/hooks/softDeleteCascade/hook';
 import { artifactRouter } from '#/modules/artifact';
+import { artifactContainerRouter } from '#/modules/artifactContainer';
 import { artifactPermissionRouter } from '#/modules/artifactPermission';
 import { batchRouter } from '#/modules/batch';
 import { organizationRouter } from '#/modules/organization';
@@ -26,6 +27,7 @@ import { del, get, json, post } from '#tests/utils/request';
 const mount: MountFn[] = [
   (app) => {
     app.route('/api/v1/artifact', artifactRouter);
+    app.route('/api/v1/artifactContainer', artifactContainerRouter);
     app.route('/api/v1/artifactPermission', artifactPermissionRouter);
     app.route('/api/v1/batch', batchRouter);
     app.route('/api/v1/organization', organizationRouter);
@@ -137,6 +139,37 @@ describe('artifact lifecycle', () => {
         role: 'viewer',
       });
       expect(await status(adminFetch, note)).toBe(200);
+    });
+
+    it('cannot be left in no container; shared first, the edge can go and admins then see it', async () => {
+      const draft = await orgArtifact('folder');
+      await placeInside(draft, memberFolder);
+      const [edge] = await db.artifactContainer.findMany({ where: { artifactId: draft.id } });
+      expect((await memberFetch(del(`/api/v1/artifactContainer/${edge!.id}`))).status).toBe(422);
+      expect(await status(adminFetch, draft)).toBe(404);
+
+      const team = await orgArtifact('folder');
+      await createArtifactPermission({
+        artifactId: team.id,
+        granteeModel: 'OrganizationUser',
+        granteeOrganizationId: organization.id,
+        granteeUserId: member.id,
+        role: 'member',
+      });
+      const placed = await memberFetch(
+        post(`/api/v1/artifact/${draft.id}/artifactContainers`, { containerArtifactId: team.id }),
+      );
+      expect(placed.status).toBe(201);
+      expect(await status(adminFetch, draft)).toBe(200);
+      expect((await memberFetch(del(`/api/v1/artifactContainer/${edge!.id}`))).status).toBe(204);
+    });
+
+    it('a team artifact a member also files into their folder stays visible to admins', async () => {
+      const team = await orgArtifact('folder');
+      const plan = await orgArtifact('folder');
+      await placeInside(plan, team);
+      await createArtifactContainer({ artifactId: plan.id, containerArtifactId: memberFolder.id });
+      expect(await status(adminFetch, plan)).toBe(200);
     });
 
     it('is a system kind the plain create route refuses', async () => {

@@ -2,9 +2,9 @@
 // ARTIFACT - One node for every ownable, shareable thing (file, folder, ...)
 // ============================================================================
 // `kind` keys the code catalog (packages/shared/src/artifact/kinds.ts): what a
-// kind may contain, its access default at creation, and whether it may sit in
-// another owner's container. A container is itself an artifact; ArtifactContainer
-// is the edge, and an artifact may sit in many containers.
+// kind may contain and its access default at creation. A container is itself an
+// artifact; ArtifactContainer is the edge, and an artifact may sit in many
+// containers of its own owner.
 //
 // `access` is the node's own setting. `inherit` takes everything its containers
 // give (any public container makes it public, a grant on any container is a

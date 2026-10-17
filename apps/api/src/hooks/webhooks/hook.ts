@@ -5,6 +5,7 @@ import {
   filterFields,
   getModelRelations,
   HookTiming,
+  hasDeletedAt,
   isFalsePolymorphismRef,
   isNoOpUpdate,
   polymorphicTarget,
@@ -120,9 +121,12 @@ const relatedDeliveries = async (model: string, rows: WebhookRow[]): Promise<Del
     );
     if (parentIds.length === 0) continue;
 
-    const parents = (await db
-      .delegate(toAccessor(parentModel))
-      .findMany({ where: { id: { in: parentIds } } })) as WebhookRow[];
+    const parents = (await db.delegate(toAccessor(parentModel)).findMany({
+      where: {
+        id: { in: parentIds },
+        ...(hasDeletedAt(parentModel) ? { deletedAt: undefined } : {}),
+      },
+    })) as WebhookRow[];
     if (parents.length === 0) continue;
 
     const audiences = await recordAudiences(parentModel, parents);

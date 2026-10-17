@@ -23,6 +23,7 @@ export type ArtifactGrant = { principal: ArtifactPrincipal; role: Role };
 export type ArtifactAccessResolution = {
   artifactId: string;
   public: boolean;
+  ownersOnly: boolean;
   grants: ArtifactGrant[];
 };
 
@@ -47,16 +48,20 @@ const ownersOnlyReach = (graph: ArtifactGraph) => {
     const path = new Set(walking).add(artifactId);
     const ownersOnly =
       artifactKindDef(node.kind)?.ownerReach === 'owners' ||
-      node.containerArtifactIds.some((containerArtifactId) => reach(containerArtifactId, path));
+      (node.containerArtifactIds.length > 0 &&
+        node.containerArtifactIds.every((containerArtifactId) => reach(containerArtifactId, path)));
     memo.set(artifactId, ownersOnly);
     return ownersOnly;
   };
   return (artifactId: string) => reach(artifactId, new Set());
 };
 
-const effectiveAccess = (graph: ArtifactGraph, now: Date) => {
+const effectiveAccess = (
+  graph: ArtifactGraph,
+  now: Date,
+  isOwnersOnly: (artifactId: string) => boolean,
+) => {
   const memo = new Map<string, Effective>();
-  const isOwnersOnly = ownersOnlyReach(graph);
   const resolve = (artifactId: string, walking: Set<string>): Effective => {
     const cached = memo.get(artifactId);
     if (cached) return cached;
@@ -100,7 +105,8 @@ export const resolveArtifactAccess = async (
   artifactIds: string[],
 ): Promise<Map<string, ArtifactAccessResolution>> => {
   const graph = await loadArtifactGraph(artifactIds);
-  const resolve = effectiveAccess(graph, new Date());
+  const isOwnersOnly = ownersOnlyReach(graph);
+  const resolve = effectiveAccess(graph, new Date(), isOwnersOnly);
   const resolutions = new Map<string, ArtifactAccessResolution>();
   for (const artifactId of artifactIds) {
     if (!graph.has(artifactId)) continue;
@@ -108,6 +114,7 @@ export const resolveArtifactAccess = async (
     resolutions.set(artifactId, {
       artifactId,
       public: effective.public,
+      ownersOnly: isOwnersOnly(artifactId),
       grants: [...effective.grants.values()],
     });
   }
