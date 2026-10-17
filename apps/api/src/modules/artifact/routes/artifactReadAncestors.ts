@@ -14,7 +14,7 @@ export const artifactReadAncestorsRoute = readRoute({
   model: Modules.artifact,
   action: 'ancestors',
   description:
-    'Returns the containers above an artifact up to its roots, as a graph: each shared ancestor once, the edges between them, depth-capped like the access walk, and only containers the caller can read.',
+    'Returns the containers above an artifact up to its roots, as a graph: each shared ancestor once, the edges between them, depth-capped like the access walk, only containers the caller can read, and the owner root as the top.',
   responseSchema: z.object({
     artifacts: z.array(artifactReadResponseSchema),
     edges: z.array(z.object({ artifactId: z.string(), containerArtifactId: z.string() })),

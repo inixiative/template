@@ -523,4 +523,102 @@ describe('artifact lifecycle', () => {
       expect(response.status).toBe(422);
     });
   });
+  describe('org-user content never ends up abroad, whatever the order', () => {
+    let memberFolder: Artifact;
+    let abroad: Artifact;
+
+    const grant = (artifact: Artifact, role: 'member' | 'admin' | 'owner') =>
+      createArtifactPermission({
+        artifactId: artifact.id,
+        granteeModel: 'User',
+        granteeUserId: member.id,
+        role,
+      });
+
+    const placeAs = (artifact: Artifact, container: Artifact) =>
+      memberFetch(
+        post(`/api/v1/artifact/${artifact.id}/artifactContainers`, {
+          containerArtifactId: container.id,
+        }),
+      );
+
+    const sharedFile = async () => {
+      const file = await orgArtifact('file');
+      await grant(file, 'admin');
+      return file;
+    };
+
+    beforeAll(async () => {
+      memberFolder = await orgArtifact('organizationUserFolder', { system: true });
+      await grant(memberFolder, 'owner');
+      abroad = await inRoot(
+        (await createArtifact({ kind: 'folder', ownerModel: 'User', userId: member.id })).entity,
+      );
+    });
+
+    it('placing abroad content into the member folder is refused', async () => {
+      const file = await sharedFile();
+      expect((await placeAs(file, abroad)).status).toBe(201);
+      expect((await placeAs(file, memberFolder)).status).toBe(422);
+    });
+
+    it('removing the last shared folder of abroad content is refused', async () => {
+      const team = await orgArtifact('folder');
+      await grant(team, 'admin');
+      const file = await sharedFile();
+      expect((await placeAs(file, team)).status).toBe(201);
+      expect((await placeAs(file, memberFolder)).status).toBe(201);
+      expect((await placeAs(file, abroad)).status).toBe(201);
+      const edge = await db.artifactContainer.findFirstOrThrow({
+        where: { artifactId: file.id, containerArtifactId: team.id },
+      });
+      expect((await memberFetch(del(`/api/v1/artifactContainer/${edge.id}`))).status).toBe(422);
+    });
+
+    it("placing an abroad item's parent folder into the member folder is refused", async () => {
+      const parent = await orgArtifact('folder');
+      await grant(parent, 'admin');
+      const file = await sharedFile();
+      expect((await placeAs(file, parent)).status).toBe(201);
+      expect((await placeAs(file, abroad)).status).toBe(201);
+      expect((await placeAs(parent, memberFolder)).status).toBe(422);
+    });
+
+    it('deleting the shared folder that keeps abroad content shareable is refused', async () => {
+      const team = await orgArtifact('folder');
+      await grant(team, 'admin');
+      const file = await sharedFile();
+      expect((await placeAs(file, team)).status).toBe(201);
+      expect((await placeAs(file, memberFolder)).status).toBe(201);
+      expect((await placeAs(file, abroad)).status).toBe(201);
+      expect((await ownerFetch(del(`/api/v1/artifact/${team.id}`))).status).toBe(422);
+    });
+  });
+
+  it('inherit: false keeps an artifact that left its folders private', async () => {
+    const outsider = (await createOrganizationUser({}, {})).context.user;
+    const outsiderFetch = createTestApp({ mockUser: outsider, mount }).fetch;
+    const box = await orgArtifact('folder');
+    const lobby = await orgArtifact('folder', { access: 'public' });
+    const file = await orgArtifact('file');
+    expect(
+      (
+        await ownerFetch(
+          post(`/api/v1/artifact/${file.id}/artifactContainers`, { containerArtifactId: box.id }),
+        )
+      ).status,
+    ).toBe(201);
+    const edge = await db.artifactContainer.findFirstOrThrow({
+      where: { artifactId: file.id, containerArtifactId: box.id },
+    });
+    expect((await ownerFetch(del(`/api/v1/artifactContainer/${edge.id}`))).status).toBe(204);
+    const placed = await ownerFetch(
+      post(`/api/v1/artifact/${file.id}/artifactContainers`, {
+        containerArtifactId: lobby.id,
+        inherit: false,
+      }),
+    );
+    expect(placed.status).toBe(201);
+    expect((await outsiderFetch(get(`/api/v1/artifact/${file.id}/access`))).status).toBe(404);
+  });
 });

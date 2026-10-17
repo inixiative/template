@@ -15,6 +15,7 @@ import { artifactOwner, sameArtifactOwner } from '#/modules/artifact/lib/artifac
 import { assertArtifactAction } from '#/modules/artifact/lib/assertArtifactAction';
 import { assertEdgeAuthority } from '#/modules/artifact/lib/assertEdgeAuthority';
 import { assertKeepsOwnersOnlyReach } from '#/modules/artifact/services/assertKeepsOwnersOnlyReach';
+import { assertOwnersOnlyStaysHome } from '#/modules/artifact/services/assertOwnersOnlyStaysHome';
 import { checkArtifactAccess } from '#/modules/artifact/services/checkArtifactAccess';
 
 const assertForeignRemoval = async (actor: ArtifactActor, edge: ArtifactContainer) => {
@@ -54,6 +55,7 @@ export const removeArtifactFromContainer = async (
         where: { id: edge.id },
         data: { deletedAt: new Date() },
       });
+      await assertOwnersOnlyStaysHome([edge.artifactId]);
     }),
   );
 };

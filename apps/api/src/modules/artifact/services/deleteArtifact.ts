@@ -10,6 +10,7 @@ import { makeError } from '#/lib/errors';
 import type { ArtifactActor } from '#/modules/artifact/lib/artifactActor';
 import { assertArtifactAction } from '#/modules/artifact/lib/assertArtifactAction';
 import { assertKeepsOwnersOnlyReach } from '#/modules/artifact/services/assertKeepsOwnersOnlyReach';
+import { assertOwnersOnlyStaysHome } from '#/modules/artifact/services/assertOwnersOnlyStaysHome';
 import { checkArtifactAccess } from '#/modules/artifact/services/checkArtifactAccess';
 import { listExclusiveContents } from '#/modules/artifact/services/listExclusiveContents';
 
@@ -24,5 +25,12 @@ export const deleteArtifact = async (actor: ArtifactActor, artifact: Artifact): 
     exclusive.map((content) => content.id),
     artifact.id,
   );
-  await db.artifact.update({ where: { id: artifact.id }, data: { deletedAt: new Date() } });
+  const members = await db.artifactContainer.findMany({
+    where: { containerArtifactId: artifact.id },
+    select: { artifactId: true },
+  });
+  await db.txn(async () => {
+    await db.artifact.update({ where: { id: artifact.id }, data: { deletedAt: new Date() } });
+    await assertOwnersOnlyStaysHome(members.map((member) => member.artifactId));
+  });
 };

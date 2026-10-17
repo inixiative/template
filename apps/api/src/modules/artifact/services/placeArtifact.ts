@@ -7,15 +7,20 @@
 import { db, type Prisma } from '@template/db';
 import type { Artifact, ArtifactContainer } from '@template/db/generated/client/client';
 import type { ArtifactAccess } from '@template/db/generated/client/enums';
-import { isContainerKind, isOwnerRootKind } from '@template/shared/artifact';
+import { artifactKindDef, isContainerKind, isOwnerRootKind } from '@template/shared/artifact';
 import { makeError } from '#/lib/errors';
 import { withOwnerLock } from '#/lib/locks/withOwnerLock';
 import type { ArtifactActor } from '#/modules/artifact/lib/artifactActor';
 import { ARTIFACT_EDGE_AUTHORITY } from '#/modules/artifact/lib/artifactEdgeAuthority';
-import { artifactOwner, sameArtifactOwner } from '#/modules/artifact/lib/artifactOwner';
+import {
+  artifactOwner,
+  ownerColumns,
+  sameArtifactOwner,
+} from '#/modules/artifact/lib/artifactOwner';
 import { assertArtifactAction } from '#/modules/artifact/lib/assertArtifactAction';
 import { assertContainable } from '#/modules/artifact/lib/assertContainable';
 import { assertNoContainerCycle } from '#/modules/artifact/services/assertNoContainerCycle';
+import { assertOwnersOnlyStaysHome } from '#/modules/artifact/services/assertOwnersOnlyStaysHome';
 import { checkArtifactAccess } from '#/modules/artifact/services/checkArtifactAccess';
 import { ensureOwnerRoot } from '#/modules/artifact/services/ensureOwnerRoot';
 import { listOwnContainerPlacements } from '#/modules/artifact/services/listOwnPlacements';
@@ -66,6 +71,11 @@ const loadContainer = async (member: Artifact, containerArtifactId: string) => {
   return container;
 };
 
+const hasNonRootPlacement = async (member: Artifact): Promise<boolean> =>
+  (await db.artifactContainer.count({
+    where: { artifactId: member.id, containerArtifact: { kind: { not: 'ownerRoot' } } },
+  })) > 0;
+
 const writeRootPlacement = async (member: Artifact): Promise<void> => {
   const root = await ensureOwnerRoot(member);
   await db.artifactContainer.create({
@@ -80,12 +90,19 @@ const writePlacement = async (
 ): Promise<ArtifactContainer> => {
   if (isContainerKind(member.kind)) await assertNoContainerCycle(container.id, member.id);
   const takeInherit = inherit ?? (await listOwnContainerPlacements(member)).length === 0;
+  if (inherit === false && member.access === 'inherit' && !(await hasNonRootPlacement(member))) {
+    await db.artifact.update({
+      where: { id: member.id },
+      data: { access: artifactKindDef(member.kind)?.defaultAccess ?? 'private' },
+    });
+  }
   const edge = await db.artifactContainer.create({
     data: { artifactId: member.id, containerArtifactId: container.id },
   });
   if (takeInherit && member.access !== 'inherit') {
     await db.artifact.update({ where: { id: member.id }, data: { access: 'inherit' } });
   }
+  if (sameArtifactOwner(member, container)) await assertOwnersOnlyStaysHome([member.id]);
   return edge;
 };
 
@@ -113,7 +130,7 @@ export const createArtifact = async (
   if (containerArtifactId)
     await assertAction(actor, containerArtifactId, ARTIFACT_EDGE_AUTHORITY.container);
 
-  return withOwnerLock(artifactOwner(data as Artifact), 'containers', () =>
+  return withOwnerLock(artifactOwner(ownerColumns(data)), 'containers', () =>
     db.txn(async () => {
       const artifact = await db.artifact.create({
         data: { ...data, ...(access && access !== 'inherit' ? { access } : {}) },
