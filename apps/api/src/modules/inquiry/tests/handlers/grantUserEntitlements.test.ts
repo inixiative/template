@@ -145,6 +145,32 @@ describe('handler: grantUserEntitlements', () => {
       expect((await approveAs('admin', inquiry.id)).status).toBe(403);
     });
 
+    it('an admin cannot approve { assign } (it would open owner-level assigns); the owner can', async () => {
+      const inquiry = await requestFromOrganization({ assign: true });
+      expect((await approveAs('admin', inquiry.id)).status).toBe(403);
+      expect((await approveAs('owner', inquiry.id)).status).toBe(200);
+      await db.organizationUser.update({
+        where: { id: requesterMembership.id },
+        data: { entitlements: {} },
+      });
+    });
+
+    it('revoking keeps an entitlement the member already held before the grant', async () => {
+      await db.organizationUser.update({
+        where: { id: requesterMembership.id },
+        data: { entitlements: { 'billing.view': true } },
+      });
+      const inquiry = await requestFromOrganization({ 'billing.view': true, 'billing.edit': true });
+      expect((await approveAs('admin', inquiry.id)).status).toBe(200);
+      const revoked = await appFor(members.admin.user, [members.admin.membership]).fetch(
+        post(`/api/v1/inquiry/${inquiry.id}/revoke`, {
+          expectedUpdatedAt: await currentVersion(inquiry.id),
+        }),
+      );
+      expect(revoked.status).toBe(204);
+      expect(await membershipEntitlements()).toEqual({ 'billing.view': true });
+    });
+
     it('revoking takes the entitlements back off the membership', async () => {
       const inquiry = await requestFromOrganization({ 'audit.read': true });
       expect((await approveAs('admin', inquiry.id)).status).toBe(200);

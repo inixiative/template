@@ -399,7 +399,7 @@ Before `capGrant`, the token cap intersected entitlements and treated a `null` m
 
 The request-time cap stops a grant exceeding the *user*; it does not stop a narrow credential minting a wider one. So whoever mints or self-approves a user grant must hold all of it: `validateHeldGrant` (`findUnheldGrant`) requires the issuing principal to hold the role on every entry the new grant reaches (`lesserRole(membership, role)`, as `capGrant` gives it) and every named entitlement, and refuses a **full** grant from a narrowed issuer (a full grant inherits what the issuer may not hold). It runs on `/me/tokens`, on `PATCH /token/:id` when the editor is the token's own user, and on the handshake approval of a `grantUserEntitlements` inquiry targeting a user.
 
-Organization and space tokens are different: there the editor needs **authority to assign**, not to hold. `assignLevel(role, entitlements)` turns the request into a role (standard entitlements map to their role: `own` → owner, `manage` → admin, `operate` → member, `read` → viewer; a custom key → member), and the `assign` rule decides: owner/admin levels need `own` on the org or space, the rest `manage`.
+Organization and space tokens are different: there the editor needs **authority to assign**, not to hold. `assignLevel(role, entitlements, resource)` turns the request into a role: each named action takes the lowest role that reaches it through the schema (`read` → viewer, `operate` → member, `manage` → admin, `own` → owner, `'organization.create'` → member); an action with a non-chain rule (`assign`) counts as **owner**, because a direct grant short-circuits its role-aware rule; an unmapped custom key counts as member. The `assign` rule then decides: owner/admin levels need `own` on the org or space, the rest `manage`. The same check guards `PATCH /organizationUser/:id` when it writes entitlements.
 
 ### Granting User Entitlements
 
@@ -417,7 +417,7 @@ An Inquiry of type `grantUserEntitlements` (handler: `apps/api/src/modules/inqui
 ```
 
 - **Auto-approval is off** except for the handshake: the user asks for their own grant and could approve it themselves (`autoApproveOwnRequest`, `apps/api/src/modules/inquiry/handlers/autoApproveOwnRequest.ts`; still gated by the handler's `canApprove`). To turn it on for another type, give that handler `autoApprove: autoApproveOwnRequest` or its own rule.
-- **Revoke:** `POST /inquiry/:id/revoke` (either party, or a manager of the target) sets `revoked`; a membership grant takes its entitlements back off the membership, a JWT grant stops on its next request (the JWT step reads the live inquiry every time).
+- **Revoke:** `POST /inquiry/:id/revoke` (either party, or a manager of the target) sets `revoked`; a membership grant takes back the entitlements it added (`resolution.addedEntitlements`; ones the member already held stay), a JWT grant stops on its next request (the JWT step reads the live inquiry every time).
 - Whatever is granted is still capped at request time by what the user's memberships reach.
 
 ---

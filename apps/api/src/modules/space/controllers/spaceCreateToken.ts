@@ -27,7 +27,7 @@ export const spaceCreateTokenController = makeController(
         permix,
         rebacSchema,
         'space',
-        { ...hydrated, role: assignLevel(body.role, body.entitlements ?? null) },
+        { ...hydrated, role: assignLevel(body.role, body.entitlements ?? null, 'db:space') },
         'assign',
       )
     ) {

@@ -49,4 +49,28 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
     expect(response.status).toBe(200);
     expect(data.role).toBe('viewer');
   });
+
+  it('an admin grants a member-level entitlement', async () => {
+    const { entity: member } = await createOrganizationUser(
+      { role: 'member' },
+      { organization: org },
+    );
+    const response = await fetch(
+      patch(`/api/v1/organizationUser/${member.id}`, { entitlements: { 'report.export': true } }),
+    );
+    expect(response.status).toBe(200);
+  });
+
+  it('an admin cannot write owner- or admin-level entitlements, or assign itself', async () => {
+    const { entity: member } = await createOrganizationUser(
+      { role: 'member' },
+      { organization: org },
+    );
+    for (const entitlements of [{ own: true }, { manage: true }, { assign: true }]) {
+      const response = await fetch(
+        patch(`/api/v1/organizationUser/${member.id}`, { entitlements }),
+      );
+      expect(response.status).toBe(403);
+    }
+  });
 });

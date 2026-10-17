@@ -38,7 +38,14 @@ export const tokenUpdateController = makeController(tokenUpdateRoute, async (c, 
     permix,
     rebacSchema,
     'token',
-    { ...hydrated, role: assignLevel(next.role, next.entitlements) },
+    {
+      ...hydrated,
+      role: assignLevel(
+        next.role,
+        next.entitlements,
+        token.spaceId ? 'db:space' : 'db:organization',
+      ),
+    },
     'assign',
   );
 
