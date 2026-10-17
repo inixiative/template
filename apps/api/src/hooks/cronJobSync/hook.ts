@@ -8,6 +8,7 @@ import type { HookOptions } from '@template/db';
 import { DbAction, db, HookTiming, registerDbHook } from '@template/db';
 import type { CronJob } from '@template/db/generated/client/client';
 import { ConcurrencyType } from '@template/shared/utils';
+import { isEqual, pick } from 'lodash-es';
 import { buildJobData } from '#/jobs/buildJobData';
 import { withLanePriority } from '#/jobs/lanePriority';
 import { queue } from '#/jobs/queue';
@@ -17,7 +18,18 @@ import { JobType } from '#/jobs/types';
 // restart. Runs after commit via db.onCommit — if BullMQ work fails, the DB
 // write isn't poisoned (per webhooks / cache hook convention).
 
+const repeatableFields = [
+  'handler',
+  'jobId',
+  'pattern',
+  'enabled',
+  'payload',
+  'maxAttempts',
+  'backoffMs',
+] as const;
+
 const syncToBullMQ = (prev: CronJob | null, curr: CronJob | null) => async () => {
+  if (prev && curr && isEqual(pick(prev, repeatableFields), pick(curr, repeatableFields))) return;
   if (prev) await queue.removeRepeatable(prev.handler, { pattern: prev.pattern }, prev.jobId);
   if (curr?.enabled) {
     // Lazy: the handler registry imports handlers that emit through hooks — a static import cycles.
@@ -42,7 +54,7 @@ export const registerCronJobSyncHook = () => {
     'cronJobSync',
     'CronJob',
     HookTiming.after,
-    [DbAction.create, DbAction.update, DbAction.delete],
+    [DbAction.create, DbAction.update, DbAction.upsert, DbAction.delete],
     async (options: HookOptions) => {
       const prev = (options.previous ?? null) as CronJob | null;
       const curr =
