@@ -325,7 +325,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **Async Delivery via Jobs** - Webhooks enqueued as BullMQ jobs on the shared `jobs` queue. Never blocks request processing. Transient failures (network, timeout, 5xx, 404, 429) retry automatically (3 attempts, exponential backoff); the circuit breaker counts a retry cycle once. Webhook jobs run outside transaction to avoid timeouts
 
-- ✅ **Delivery Tracking** - WebhookEvent model records every delivery attempt with status (`pending` while it will be retried, then `success`, `error` or `unreachable`), response code and error message. Superadmins can inspect delivery history and debug integration issues
+- ✅ **Delivery Tracking** - WebhookEvent model records every delivery attempt with status (`retrying` while it will be retried, then `success`, `error` or `unreachable`), response code and error message. Superadmins can inspect delivery history and debug integration issues
 
 - ✅ **Automatic Cleanup** - Cron job removes old webhook events (90+ days) to prevent unbounded table growth. Configurable retention period
 

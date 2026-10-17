@@ -139,7 +139,7 @@ await enqueueJob('sendWebhook', {
 | Retries | Network error, timeout, 5xx, 404 and 429 rethrow so the job retries (queue default 3 attempts, exponential backoff); the last attempt (`isFinalAttempt`) settles the delivery. 400/422, 401/403 and redirects settle on the first attempt |
 | Circuit breaker | Disables after 5 consecutive failed deliveries; a retry cycle counts once |
 | Poisoned records | Integration-owned subscriptions skip a record after 3 rejections (HTTP 400/422) while other records deliver |
-| Logging | Creates a `WebhookEvent` per attempt: `pending` for an attempt that will be retried, the settled status for the last |
+| Logging | Creates a `WebhookEvent` per attempt: `retrying` for an attempt that will be retried, the settled status for the last |
 
 ### reconcileSegment / reconcileCustomerRefSegments / sweepSegments
 

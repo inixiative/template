@@ -95,7 +95,7 @@ export const sendWebhook: JobHandler<SendWebhookPayload> = async (ctx, payload) 
 
   await db.webhookEvent.create({
     data: {
-      status: settled ? status : 'pending',
+      status: settled ? status : 'retrying',
       action,
       resourceId,
       error,
@@ -136,7 +136,7 @@ export const sendWebhook: JobHandler<SendWebhookPayload> = async (ctx, payload) 
   // Circuit breaker: disable subscription if last N deliveries all failed
   const FAILURE_THRESHOLD = 5;
   const recentEvents = await db.webhookEvent.findMany({
-    where: { webhookSubscriptionId: subscriptionId, status: { not: 'pending' } },
+    where: { webhookSubscriptionId: subscriptionId, status: { not: 'retrying' } },
     orderBy: { createdAt: 'desc' },
     take: FAILURE_THRESHOLD,
     select: { status: true },

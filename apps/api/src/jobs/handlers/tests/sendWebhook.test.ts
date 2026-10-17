@@ -337,7 +337,7 @@ describe('sendWebhook handler', () => {
       [500, 'Internal Server Error'],
       [404, 'Not Found'],
       [429, 'Too Many Requests'],
-    ])('throws on HTTP %d before the last attempt, so the job retries, and records the attempt as pending', async (status, statusText) => {
+    ])('throws on HTTP %d before the last attempt, so the job retries, and records the attempt as retrying', async (status, statusText) => {
       respondWith(status, statusText);
       const sub = await createSubscription();
 
@@ -345,7 +345,7 @@ describe('sendWebhook handler', () => {
 
       const events = await eventsOf(sub.id);
       expect(events.map((event) => [event.status, event.httpStatus])).toEqual([
-        ['pending', status],
+        ['retrying', status],
       ]);
       expect(events[0]?.error).toBe(`HTTP ${status}: ${statusText}`);
     });
@@ -357,7 +357,7 @@ describe('sendWebhook handler', () => {
       await expect(deliver(attempt(2), sub.id)).rejects.toThrow('Connection refused');
 
       const events = await eventsOf(sub.id);
-      expect(events.map((event) => [event.status, event.httpStatus])).toEqual([['pending', null]]);
+      expect(events.map((event) => [event.status, event.httpStatus])).toEqual([['retrying', null]]);
     });
 
     it('settles the delivery on the last attempt: records it unreachable and completes', async () => {
@@ -395,7 +395,10 @@ describe('sendWebhook handler', () => {
 
       await deliver(attempt(2), sub.id);
 
-      expect((await eventsOf(sub.id)).map((event) => event.status)).toEqual(['pending', 'success']);
+      expect((await eventsOf(sub.id)).map((event) => event.status)).toEqual([
+        'retrying',
+        'success',
+      ]);
       expect(await isActive(sub.id)).toBe(true);
     });
 
