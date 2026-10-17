@@ -75,4 +75,40 @@ describe('PATCH /api/v1/spaceUser/:id', () => {
     const { data } = await json<SpaceUser>(response);
     expect(data.role).toBe('viewer');
   });
+
+  it('a space admin holding { assign } still cannot make someone a space owner', async () => {
+    const { entity: adminOrgUser, context: adminCtx } = await createOrganizationUser(
+      { role: 'member' },
+      { organization: org },
+    );
+    const adminSpaceUser = await db.spaceUser.create({
+      data: {
+        role: 'admin',
+        entitlements: { assign: true },
+        organizationId: org.id,
+        spaceId: space.id,
+        userId: adminCtx.user.id,
+      },
+    });
+    const { context: memberCtx } = await createOrganizationUser(
+      { role: 'member' },
+      { organization: org },
+    );
+    const member = await db.spaceUser.create({
+      data: {
+        role: 'member',
+        organizationId: org.id,
+        spaceId: space.id,
+        userId: memberCtx.user.id,
+      },
+    });
+    const adminFetch = createTestApp({
+      mockUser: adminCtx.user,
+      mockOrganizationUsers: [adminOrgUser],
+      mockSpaceUsers: [adminSpaceUser],
+      mount: [(app) => app.route('/api/v1/spaceUser', spaceUserRouter)],
+    }).fetch;
+    const response = await adminFetch(patch(`/api/v1/spaceUser/${member.id}`, { role: 'owner' }));
+    expect(response.status).toBe(403);
+  });
 });
