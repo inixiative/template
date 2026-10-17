@@ -1,24 +1,15 @@
 /**
  * @atlas
  * @kind factory
- * @partOf infrastructure:prisma
+ * @partOf infrastructure:prisma, primitive:testFactories
  * @uses none
  */
-import { faker } from '@faker-js/faker';
-import { FileOwnerModel } from '@template/db/generated/client/enums';
 import { createFactory } from '@template/db/test/factory';
 
 const fileFactory = createFactory('File', {
-  defaults: () => ({
-    ownerModel: FileOwnerModel.User,
-    path: '/',
-    filename: faker.system.fileName(),
-  }),
+  defaults: () => ({}),
   dependencies: {
-    user: { modelName: 'User', foreignKey: { id: 'userId' }, required: false },
-    organization: { modelName: 'Organization', foreignKey: { id: 'organizationId' }, required: false },
-    space: { modelName: 'Space', foreignKey: { id: 'spaceId' }, required: false },
-    folder: { modelName: 'Folder', foreignKey: { id: 'folderId' }, required: false },
+    artifact: { modelName: 'Artifact', foreignKey: { id: 'artifactId' } },
   },
 });
 

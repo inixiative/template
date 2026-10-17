@@ -39,8 +39,7 @@ model Organization {
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
   // ==========================================================================
 
-  ownedFiles       File[]            @relation("FileOwnerOrganization")
-  ownedFolders     Folder[]          @relation("FolderOwnerOrganization")
-  fileGrants       FilePermission[]  @relation("FilePermissionGranteeOrganization")
+  ownedArtifacts   Artifact[]           @relation("ArtifactOwnerOrganization")
+  artifactGrants   ArtifactPermission[] @relation("ArtifactPermissionGranteeOrganization")
   resourceBindings ResourceBinding[] @relation("ResourceBindingOrganization")
 }

@@ -1,0 +1,143 @@
+// ============================================================================
+// ARTIFACT - One node for every ownable, shareable thing (file, folder, ...)
+// ============================================================================
+// `kind` keys the code catalog (packages/shared/src/artifact/kinds.ts): what a
+// kind may contain, its access default at creation, and whether it may sit in
+// another owner's container. A container is itself an artifact; ArtifactContainer
+// is the edge, and an artifact may sit in many containers.
+//
+// `access` is the node's own setting. `inherit` takes everything its containers
+// give (any public container makes it public, a grant on any container is a
+// grant on it); `public` adds public read on top of that; `private` takes nothing
+// from its containers. An `inherit` artifact with no container is coerced to
+// `private` by the artifactAccess hook.
+
+model Artifact {
+  id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  kind   String
+  name   String
+  access ArtifactAccess @default(inherit)
+  system Boolean        @default(false)
+
+  // The app holding this artifact's content: null = this app (a File), set = that integration.
+  integrationId String?      @db.VarChar(36)
+  integration   Integration? @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  ownerModel     ArtifactOwnerModel
+  userId         String?            @db.VarChar(36)
+  organizationId String?            @db.VarChar(36)
+  spaceId        String?            @db.VarChar(36)
+
+  user         User?         @relation("ArtifactOwnerUser", fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization? @relation("ArtifactOwnerOrganization", fields: [organizationId], references: [id], onDelete: Cascade)
+  space        Space?        @relation("ArtifactOwnerSpace", fields: [spaceId], references: [id], onDelete: Cascade)
+
+  file        File?
+  permissions ArtifactPermission[]
+  containers  ArtifactContainer[] @relation("ArtifactContainerArtifact")
+  members     ArtifactContainer[] @relation("ArtifactContainerContainer")
+  auditLogs   AuditLog[]
+
+  integrationRecords IntegrationRecord[]
+
+  // ==========================================================================
+  // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
+  // ==========================================================================
+
+  @@index([ownerModel])
+  @@index([userId])
+  @@index([organizationId])
+  @@index([spaceId])
+  @@index([kind])
+  @@index([integrationId])
+}
+
+// The container side has no cascade: a container is hard-deleted only after its
+// edges are removed, so a delete never changes a member's access silently.
+model ArtifactContainer {
+  id        String   @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  containerArtifactId String   @db.VarChar(36)
+  artifactId          String   @db.VarChar(36)
+  containerArtifact   Artifact @relation("ArtifactContainerContainer", fields: [containerArtifactId], references: [id], onDelete: Restrict)
+  artifact            Artifact @relation("ArtifactContainerArtifact", fields: [artifactId], references: [id], onDelete: Cascade)
+
+  @@unique([containerArtifactId, artifactId])
+  @@index([artifactId])
+}
+
+// A grant of `role` on an artifact (and, through `inherit`, on everything inside it).
+// Revoke = delete the row. One grant per artifact × grantee (partial uniques below).
+model ArtifactPermission {
+  id        String   @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  artifactId String   @db.VarChar(36)
+  artifact   Artifact @relation(fields: [artifactId], references: [id], onDelete: Cascade)
+
+  granteeModel          ArtifactPermissionGranteeModel
+  granteeUserId         String?                        @db.VarChar(36)
+  granteeOrganizationId String?                        @db.VarChar(36)
+  granteeSpaceId        String?                        @db.VarChar(36)
+  granteeCustomerRefId  String?                        @db.VarChar(36)
+  granteeIntegrationId  String?                        @db.VarChar(36)
+
+  granteeUser             User?             @relation("ArtifactPermissionGranteeUser", fields: [granteeUserId], references: [id], onDelete: Cascade)
+  granteeOrganization     Organization?     @relation("ArtifactPermissionGranteeOrganization", fields: [granteeOrganizationId], references: [id], onDelete: Cascade)
+  granteeSpace            Space?            @relation("ArtifactPermissionGranteeSpace", fields: [granteeSpaceId], references: [id], onDelete: Cascade)
+  granteeOrganizationUser OrganizationUser? @relation("ArtifactPermissionGranteeOrganizationUser", fields: [granteeOrganizationId, granteeUserId], references: [organizationId, userId], onDelete: Cascade)
+  granteeSpaceUser        SpaceUser?        @relation("ArtifactPermissionGranteeSpaceUser", fields: [granteeOrganizationId, granteeSpaceId, granteeUserId], references: [organizationId, spaceId, userId], onDelete: Cascade)
+  granteeCustomerRef      CustomerRef?      @relation("ArtifactPermissionGranteeCustomerRef", fields: [granteeCustomerRefId], references: [id], onDelete: Cascade)
+  granteeIntegration      Integration?      @relation("ArtifactPermissionGranteeIntegration", fields: [granteeIntegrationId], references: [id], onDelete: Cascade)
+
+  role             Role
+  expiresAt        DateTime?
+  fromVersion      Int       @default(1)
+  preserveOnRevoke Boolean   @default(false)
+
+  // ==========================================================================
+  // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
+  // ==========================================================================
+
+  @@unique([artifactId, granteeUserId], where: raw("\"granteeModel\" = 'User'"), map: "ArtifactPermission_user_key")
+  @@unique([artifactId, granteeOrganizationId], where: raw("\"granteeModel\" = 'Organization'"), map: "ArtifactPermission_organization_key")
+  @@unique([artifactId, granteeSpaceId], where: raw("\"granteeModel\" = 'Space'"), map: "ArtifactPermission_space_key")
+  @@unique([artifactId, granteeOrganizationId, granteeUserId], where: raw("\"granteeModel\" = 'OrganizationUser'"), map: "ArtifactPermission_organization_user_key")
+  @@unique([artifactId, granteeSpaceId, granteeUserId], where: raw("\"granteeModel\" = 'SpaceUser'"), map: "ArtifactPermission_space_user_key")
+  @@unique([artifactId, granteeCustomerRefId], where: raw("\"granteeModel\" = 'CustomerRef'"), map: "ArtifactPermission_customer_ref_key")
+  @@unique([artifactId, granteeIntegrationId], where: raw("\"granteeModel\" = 'Integration'"), map: "ArtifactPermission_integration_key")
+  @@index([granteeModel, granteeUserId])
+  @@index([granteeModel, granteeOrganizationId])
+  @@index([granteeModel, granteeSpaceId])
+  @@index([granteeModel, granteeCustomerRefId])
+  @@index([granteeModel, granteeIntegrationId])
+}
+
+enum ArtifactAccess {
+  inherit
+  public
+  private
+}
+
+enum ArtifactOwnerModel {
+  User
+  Organization
+  Space
+}
+
+enum ArtifactPermissionGranteeModel {
+  User
+  Organization
+  Space
+  OrganizationUser
+  SpaceUser
+  CustomerRef
+  Integration
+}

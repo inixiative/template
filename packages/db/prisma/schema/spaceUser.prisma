@@ -29,6 +29,7 @@ model SpaceUser {
   tokens             Token[]
   integrations       Integration[]
   auditLogsAsSubject AuditLog[]       @relation("AuditLogSubjectSpaceUser")
+  artifactGrants     ArtifactPermission[] @relation("ArtifactPermissionGranteeSpaceUser")
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below

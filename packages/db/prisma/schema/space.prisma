@@ -48,9 +48,8 @@ model Space {
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
   // ==========================================================================
 
-  ownedFiles       File[]            @relation("FileOwnerSpace")
-  ownedFolders     Folder[]          @relation("FolderOwnerSpace")
-  fileGrants       FilePermission[]  @relation("FilePermissionGranteeSpace")
+  ownedArtifacts   Artifact[]           @relation("ArtifactOwnerSpace")
+  artifactGrants   ArtifactPermission[] @relation("ArtifactPermissionGranteeSpace")
   resourceBindings ResourceBinding[] @relation("ResourceBindingSpace")
 
   @@unique([organizationId, slug])

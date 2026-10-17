@@ -1,3 +1,4 @@
+import { registerArtifactAccessHook } from '#/hooks/artifactAccess/hook';
 import { registerAuditLogHook } from '#/hooks/auditLog/hook';
 import { registerClearCacheHook } from '#/hooks/cache/hook';
 import { registerContactRulesHook } from '#/hooks/contactRules/hook';
@@ -22,6 +23,7 @@ import { registerWebhookHook } from '#/hooks/webhooks/hook';
 
 export const registerHooks = () => {
   registerRulesHook();
+  registerArtifactAccessHook();
   registerAuditLogHook();
   registerEmailVersioningHook();
   registerEmailTemplateSlugReservationHook();

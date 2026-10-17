@@ -18,7 +18,11 @@ const resourceBindingFactory = createFactory('ResourceBinding', {
   }),
   dependencies: {
     file: { modelName: 'File', foreignKey: { id: 'fileId' }, required: false },
-    organization: { modelName: 'Organization', foreignKey: { id: 'organizationId' }, required: false },
+    organization: {
+      modelName: 'Organization',
+      foreignKey: { id: 'organizationId' },
+      required: false,
+    },
     space: { modelName: 'Space', foreignKey: { id: 'spaceId' }, required: false },
     user: { modelName: 'User', foreignKey: { id: 'userId' }, required: false },
     customerRef: { modelName: 'CustomerRef', foreignKey: { id: 'customerRefId' }, required: false },
