@@ -63,8 +63,8 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.2",
-    "@inixiative/atlas": "^0.2.0",
-    "@inixiative/config": "^0.5.76",
+    "@inixiative/atlas": "^0.3.0",
+    "@inixiative/config": "^0.5.103",
     "@lightpanda/browser": "^1.2.0",
     "@mendable/firecrawl-js": "^4.18.1",
     "@tanstack/react-router": "^1.166.2",
