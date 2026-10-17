@@ -60,7 +60,7 @@ const autoApprove = async (db: Db, inquiry: Inquiry): Promise<boolean> => {
   const integration = await db.integration.findUnique({
     where: { id: inquiry.sourceIntegrationId },
   });
-  return !!integration?.userId && integration.userId === inquiry.targetUserId;
+  return integration?.ownerModel === 'User' && integration.userId === inquiry.targetUserId;
 };
 
 export const grantUserSliceHandler: InquiryHandler<
@@ -79,6 +79,7 @@ export const grantUserSliceHandler: InquiryHandler<
   validate,
   autoApprove,
   revocable: true,
+  grantOf: ({ role, entitlements, entitlementsOnly }) => ({ role, entitlements, entitlementsOnly }),
 
   handleApprove: async (db, inquiry, content) => {
     await validate(db, inquiry, content);

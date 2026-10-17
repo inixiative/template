@@ -5,6 +5,7 @@
  * @uses infrastructure:prisma, primitive:authz, primitive:errors
  */
 import type { Context, Next } from 'hono';
+import { errors, type JWTPayload } from 'jose';
 import { isIssuerJwtEnabled, verifyIssuerJwt } from '#/lib/auth/verifyIssuerJwt';
 import { setUserContext } from '#/lib/context/setUserContext';
 import { makeError } from '#/lib/errors';
@@ -23,7 +24,14 @@ export const jwtAuthMiddleware = async (c: Context<AppEnv>, next: Next) => {
   const bearer = authorization?.startsWith('Bearer ') ? authorization.slice(7) : null;
   if (!bearer || !jwtShape.test(bearer)) return next();
 
-  const claims = await verifyIssuerJwt(bearer).catch(() => null);
+  const claims = await verifyIssuerJwt(bearer).catch((err: unknown): JWTPayload | null => {
+    const keysUnavailable =
+      err instanceof errors.JWKSTimeout ||
+      err instanceof errors.JWKSInvalid ||
+      (err instanceof errors.JOSEError && err.code === 'ERR_JOSE_GENERIC');
+    if (err instanceof errors.JOSEError && !keysUnavailable) return null;
+    throw makeError({ status: 503, message: 'JWT issuer keys are unreachable; retry' });
+  });
   if (!claims?.sub) throw unauthorized();
 
   const db = c.get('db');

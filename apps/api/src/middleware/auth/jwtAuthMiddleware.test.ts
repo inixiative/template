@@ -176,6 +176,14 @@ describe('issuer JWT principal', () => {
       expect((await call(await sign({ sub: randomUUID() }), 'GET', '/me')).status).toBe(401);
     });
 
+    it('answers 503 when the issuer keys are unreachable', async () => {
+      const closed = Bun.serve({ port: 0, fetch: () => new Response('') });
+      const port = closed.port;
+      closed.stop(true);
+      setEnvOverride('AUTH_JWKS_URL', `http://localhost:${port}/jwks`);
+      expect((await call(await sign({}), 'GET', '/me')).status).toBe(503);
+    });
+
     it('is ignored when no issuer is configured', async () => {
       setEnvOverride('AUTH_ISSUER', undefined);
       expect((await call(await sign({}), 'GET', '/me')).status).toBe(401);
@@ -280,6 +288,72 @@ describe('issuer JWT principal', () => {
       expect(
         (await call(await sign({ sub: otherUser.id, grant: inquiryId }), 'GET', '/me')).status,
       ).toBe(401);
+    });
+  });
+
+  describe('issuing is capped by the principal that issues', () => {
+    it('a { member, token.create } slice asking for an owner slice waits for the user', async () => {
+      const { jwt } = await sliceJwt({ role: 'member', entitlements: { 'token.create': true } });
+      const response = await requestSlice(jwt, {
+        role: 'owner',
+        entitlements: { 'token.create': true, 'user.redact': true },
+      });
+      expect(response.status).toBe(201);
+      const { data } = (await response.json()) as { data: { id: string; status: string } };
+      expect(data.status).toBe('sent');
+      expect(
+        (await call(jwt, 'POST', `/inquiry/${data.id}/resolve`, { status: 'approved' })).status,
+      ).toBe(403);
+      expect(
+        (await call(await sign({}), 'POST', `/inquiry/${data.id}/resolve`, { status: 'approved' }))
+          .status,
+      ).toBe(200);
+    });
+
+    it('a token holding no session action cannot self-approve them through its own integration', async () => {
+      const { entity: integration } = await createIntegration({ ownerModel: 'User' }, { user });
+      const { jwt } = await sliceJwt({ role: 'admin' });
+      const response = await call(jwt, 'POST', `/integration/${integration.id}/inquiries`, {
+        type: 'grantUserSlice',
+        targetModel: 'User',
+        targetUserId: user.id,
+        status: 'sent',
+        content: { purpose: 'escalate', role: 'owner', entitlements: { 'token.create': true } },
+      });
+      expect(response.status).toBe(201);
+      const { data } = (await response.json()) as { data: { status: string } };
+      expect(data.status).toBe('sent');
+    });
+
+    it('an org admin cannot auto-approve a slice through a member-owned integration', async () => {
+      const admin = (await createUser()).entity;
+      const { entity: adminMembership } = await createOrganizationUser(
+        { role: 'admin' },
+        { user: admin, organization: viewedOrganization },
+      );
+      void adminMembership;
+      const memberMembership = await db.organizationUser.findFirstOrThrow({
+        where: { userId: user.id, organizationId: viewedOrganization.id },
+      });
+      const { entity: integration } = await createIntegration(
+        { ownerModel: 'OrganizationUser' },
+        { user, organization: viewedOrganization, organizationUser: memberMembership },
+      );
+      const response = await call(
+        await sign({ sub: admin.id }),
+        'POST',
+        `/integration/${integration.id}/inquiries`,
+        {
+          type: 'grantUserSlice',
+          targetModel: 'User',
+          targetUserId: user.id,
+          status: 'sent',
+          content: { purpose: 'takeover', role: 'owner', entitlements: { 'token.create': true } },
+        },
+      );
+      expect(response.status).toBe(201);
+      const { data } = (await response.json()) as { data: { status: string } };
+      expect(data.status).toBe('sent');
     });
   });
 

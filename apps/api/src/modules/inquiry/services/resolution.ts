@@ -9,6 +9,7 @@ import { InquiryStatus } from '@template/db/generated/client/enums';
 import { auditActorContext } from '@template/db/lib/auditActorContext';
 import type { Context } from 'hono';
 import { emitAppEvent } from '#/appEvents/emit';
+import { validateHeldGrant } from '#/lib/permissions/validateHeldGrant';
 import { inquiryHandlers } from '#/modules/inquiry/handlers';
 import type { Inquiry } from '#/modules/inquiry/handlers/types';
 import { includeInquiryReceived } from '#/modules/inquiry/queries/inquiryIncludes';
@@ -40,6 +41,7 @@ export const resolveInquiry = async (
         const handler = inquiryHandlers[fresh.type];
         const content = handler.contentSchema.parse(fresh.content);
         const merged = resolveContent(content, resolutionData, handler.resolutionInputSchema);
+        if (handler.grantOf) await validateHeldGrant(c, handler.grantOf(merged));
         approvalOutput = (await handler.handleApprove(db, fresh, merged)) ?? {};
       }
 

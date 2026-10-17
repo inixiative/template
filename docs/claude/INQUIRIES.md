@@ -230,6 +230,7 @@ type InquiryHandler<TContent, TResolution, TResolutionInput = TResolution> = {
   handleApprove(db, inquiry, resolvedContent: TContent): Promise<Partial<TResolution> | undefined | void>;
   autoApprove(db, inquiry): Promise<boolean>;    // called after send; return true to skip human review
   revocable?: boolean;               // an approved inquiry holds a standing grant either party can revoke
+  grantOf?(content): Slice;          // the grant approval issues; sender and approver must hold it
   unique?: 'targeted' | 'untargeted'; // enforces one open inquiry per source+target+type ('targeted') or per source+type regardless of target ('untargeted')
   defaultExpirationDays?: number;     // drives computeExpiresAt on send and changesRequested; undefined = no expiry
   appEvents?: InquiryAppEvents;       // per-status app event handlers: sent, approved, denied, changesRequested, resolved
@@ -304,7 +305,7 @@ const { role } = resolvedContent; // always from original inquiry.content
 | `transferSpace` | Space | Organization | `untargeted` | 30 days | Sets `Space.organizationId` to target org |
 | `grantUserSlice` | User (self), Integration | User | — | 7 days | Writes `resolution.slice`; revocable ([PERMISSIONS.md](./PERMISSIONS.md#granting-a-slice)) |
 
-`grantUserSlice` auto-approves when the user asked for themselves or the source integration belongs to the user; the other four return `autoApprove: async () => false`.
+`grantUserSlice` auto-approves when the user asked for themselves or the source integration is User-owned by them, and only if the sending principal holds the whole slice; the other four return `autoApprove: async () => false`. A handler with `grantOf(content)` declares the grant it issues: `sendInquiry` skips auto-approval when the sender doesn't hold it, and `resolveInquiry` refuses (403) an approval by a principal that doesn't.
 
 **Send permissions by type:**
 

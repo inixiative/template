@@ -51,6 +51,7 @@ describe('actions on the user itself', () => {
     role: Role,
     entitlements: Entitlements = null,
     ownerModel: TokenOwnerModel = 'User',
+    entitlementsOnly = false,
   ) => {
     const key = randomUUID();
     await createToken(
@@ -58,6 +59,7 @@ describe('actions on the user itself', () => {
         ownerModel,
         role,
         entitlements: entitlements ?? undefined,
+        entitlementsOnly,
         keyHash: createHash('sha256').update(key).digest('hex'),
       },
       ownerModel === 'OrganizationUser'
@@ -148,6 +150,28 @@ describe('actions on the user itself', () => {
     expect((await call(key, 'GET', '/me')).status).toBe(200);
     expect((await call(key, 'GET', '/me/contacts')).status).toBe(403);
     expect((await call(key, 'POST', '/me/tokens', { name: 't', role: 'viewer' })).status).toBe(403);
+  });
+
+  it('a minter cannot mint a role above its own: { token.create } only cannot mint an owner token', async () => {
+    const key = await mint(user, 'owner', { 'token.create': true }, 'User', true);
+    expect((await call(key, 'POST', '/me/tokens', { name: 't', role: 'owner' })).status).toBe(403);
+  });
+
+  it('the role is capped on every membership, not only on the user', async () => {
+    const issuer = (await createUser()).entity;
+    const memberOrganization = (await createOrganization()).entity;
+    await createOrganizationUser(
+      { role: 'member' },
+      { user: issuer, organization: memberOrganization },
+    );
+    const key = await mint(issuer, 'viewer', { own: true, 'token.create': true });
+    expect((await call(key, 'GET', `/organization/${memberOrganization.id}/users`)).status).toBe(
+      200,
+    );
+    expect((await call(key, 'GET', `/organization/${memberOrganization.id}/tokens`)).status).toBe(
+      403,
+    );
+    expect((await call(key, 'POST', '/me/tokens', { name: 't', role: 'owner' })).status).toBe(403);
   });
 
   it('a minter cannot grant an action it does not hold', async () => {

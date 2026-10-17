@@ -447,7 +447,7 @@ Off unless `AUTH_ISSUER`, `AUTH_JWKS_URL` and `AUTH_AUDIENCE` are all set. When 
 - `algorithms: ['ES256']` only, so `alg: none` and HS256 are refused;
 - `issuer`, `audience`, `exp` and `sub` required; 30 s clock tolerance.
 
-A JWT-shaped bearer that fails is a **401**, never a fall-through to API-token hashing. `sub` must be a local `User` id.
+A JWT-shaped bearer that fails is a **401**, never a fall-through to API-token hashing; unreachable issuer keys are a **503** (retryable, so a WebSocket keeps its identity). `sub` must be a local `User` id.
 
 ### Claims
 

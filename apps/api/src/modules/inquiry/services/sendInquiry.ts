@@ -13,6 +13,7 @@ import type { Inquiry } from '#/modules/inquiry/handlers/types';
 import { includeInquirySent } from '#/modules/inquiry/queries/inquiryIncludes';
 import { computeExpiresAt } from '#/modules/inquiry/services/computeExpiresAt';
 import { resolveInquiry } from '#/modules/inquiry/services/resolution';
+import { senderHoldsGrant } from '#/modules/inquiry/services/senderHoldsGrant';
 import { validateInquiryIsSendable } from '#/modules/inquiry/validations/validateInquiryStatus';
 import type { AppEnv } from '#/types/appEnv';
 
@@ -38,7 +39,8 @@ export const sendInquiry = async (c: Context<AppEnv>, inquiry: Inquiry) => {
   });
 
   const handler = inquiryHandlers[inquiry.type];
-  const autoApproved = await handler.autoApprove(db, sent);
+  const autoApproved =
+    (await handler.autoApprove(db, sent)) && (await senderHoldsGrant(c, handler, sent));
 
   if (autoApproved) {
     await resolveInquiry(c, sent, InquiryStatus.approved, {});

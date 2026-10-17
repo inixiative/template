@@ -161,9 +161,10 @@ describe('a token never exceeds its user', () => {
       );
     });
 
-    it('with no entitlements it can do nothing, not even read itself', async () => {
+    it('with no entitlements it can do nothing but know who it is', async () => {
       const key = await mint('owner', null, true);
-      expect((await call(key, 'GET', '/me')).status).toBe(403);
+      expect((await call(key, 'GET', '/me')).status).toBe(200);
+      expect((await call(key, 'GET', '/me/contacts')).status).toBe(403);
       expect((await call(key, 'GET', `/organization/${ownedOrganization.id}/users`)).status).toBe(
         403,
       );

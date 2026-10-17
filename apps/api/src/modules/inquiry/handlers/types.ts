@@ -6,6 +6,7 @@
  */
 import type { Db, Prisma, PrismaBaseArgs } from '@template/db';
 import type { InquiryResourceModel } from '@template/db/generated/client/enums';
+import type { Slice } from '@template/permissions';
 import type { z } from 'zod';
 import type { AppEventHandlerDefinition } from '#/appEvents/types';
 import type { BaseResolution } from '#/modules/inquiry/handlers/schemas';
@@ -50,6 +51,7 @@ export type InquiryHandler<
   autoApprove(db: Db, inquiry: Inquiry): Promise<boolean>;
   unique?: 'targeted' | 'untargeted';
   revocable?: boolean;
+  grantOf?(content: TContent): Slice;
   defaultExpirationDays?: number;
   appEvents?: InquiryAppEvents;
   // Optional: when redactUser scrubs a user's source/target on an inquiry,

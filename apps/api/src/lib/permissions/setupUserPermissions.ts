@@ -31,6 +31,11 @@ export const setupUserPermissions = async (c: Context<AppEnv>) => {
     : { ...userLoginGrant, entitlementsOnly: false };
 
   await permix.setup(
-    getUserPermissions(user.id as UserId, grant.role, grant.entitlements, grant.entitlementsOnly),
+    getUserPermissions(
+      user.id as UserId,
+      grant.role,
+      { ...grant.entitlements, [UserAction.identify]: true },
+      grant.entitlementsOnly,
+    ),
   );
 };

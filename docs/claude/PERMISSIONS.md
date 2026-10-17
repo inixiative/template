@@ -389,14 +389,14 @@ Before `capSlice`, the token cap intersected entitlements and treated a `null` m
 | default (`entitlementsOnly: false`) | `lesserRole(owner.role, slice.role)` | named ones the owner reaches |
 | entitlement-only (`entitlementsOnly: true`) | none | named ones the owner reaches, and nothing else |
 
-An entitlement-only slice with no entitlements can do nothing, not even `GET /me`.
+An entitlement-only slice with no entitlements can do nothing except `user.identify` (`GET /me`), which every user-bound principal holds.
 
 ```typescript
 // owner of org A, viewer of org B, slice { role: 'owner', entitlements: { manage: true }, entitlementsOnly: true }
 // org A: { manage: true }   org B: nothing   user: { manage: true }
 ```
 
-Token creation takes `entitlements` and `entitlementsOnly`; `validateHeldActions` refuses (403) any entitlement the minter does not hold on the token's owner, and the request-time cap applies regardless.
+**Issuing is capped by the issuer.** The request-time cap stops a slice exceeding the *user*; it does not stop a narrow credential minting a wider one. So whoever issues a grant must hold all of it: `validateHeldGrant` (`findUnheldGrant`) requires the issuing principal to hold the role's standard action on itself (skipped for entitlement-only) and every named entitlement somewhere it reaches. It runs on `/me/tokens`; the other token create routes check the role against the owner (`assign`, or the role's action) and the entitlements with `validateHeldActions`.
 
 ### Granting a Slice
 
@@ -411,7 +411,8 @@ POST /api/v1/integration/:id/inquiries        // an integration asks (needs mana
 
 - **Send:** a user source must hold `token.create` (asking for a slice mints a credential), and may only ask for a slice of themselves.
 - **Validate:** `findActionsUserLacks` refuses (422) any entitlement the target user holds nowhere: not on the login grant, not on any membership.
-- **Auto-approve:** when the user asked for themselves, or the integration belongs to the user. Otherwise the user resolves it, which needs `token.create` too.
+- **Auto-approve:** when the user asked for themselves, or the source integration is User-owned by them, **and** the principal that sent it holds the whole slice (`senderHoldsGrant`). Otherwise it waits for the user.
+- **Resolve:** approving needs `token.create` on the target user and, like any issuing, the approving principal must hold the whole slice (`validateHeldGrant` in `resolveInquiry`, for any handler with `grantOf`).
 - **Approve:** writes `resolution.slice` (`role`, `entitlements`, `entitlementsOnly`).
 - **Revoke:** `POST /inquiry/:id/revoke` (either party) sets status `revoked`; the JWT stops working on its next request, because the JWT step reads the live inquiry every time (`findLiveSliceGrant`).
 
