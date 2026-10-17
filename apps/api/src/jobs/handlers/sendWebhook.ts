@@ -12,6 +12,7 @@ import type {
   WebhookEventStatus,
 } from '@template/db/generated/client/client';
 import { log } from '@template/shared/logger';
+import { isFinalAttempt } from '#/jobs/isFinalAttempt';
 import type { JobHandler } from '#/jobs/types';
 import { isIntegrationRecordPoisoned } from '#/modules/integration/services/isIntegrationRecordPoisoned';
 import { poisonIntegrationRecord } from '#/modules/integration/services/poisonIntegrationRecord';
@@ -61,6 +62,7 @@ export const sendWebhook: JobHandler<SendWebhookPayload> = async (ctx, payload) 
   let status: WebhookEventStatus = 'success';
   let error: string | undefined;
   let httpStatus: number | undefined;
+  let cause: unknown;
 
   try {
     const response = await fetch(subscription.url, {
@@ -83,13 +85,17 @@ export const sendWebhook: JobHandler<SendWebhookPayload> = async (ctx, payload) 
       status = response.status >= 500 || response.status === 404 ? 'unreachable' : 'error';
     }
   } catch (e) {
+    cause = e;
     error = e instanceof Error ? e.message : String(e);
     status = 'unreachable';
   }
 
+  const settled =
+    status === 'success' || !isRetryable({ status, httpStatus }) || isFinalAttempt(ctx.job);
+
   await db.webhookEvent.create({
     data: {
-      status,
+      status: settled ? status : 'pending',
       action,
       resourceId,
       error,
@@ -102,6 +108,13 @@ export const sendWebhook: JobHandler<SendWebhookPayload> = async (ctx, payload) 
   if (status === 'success') {
     log.info(`Webhook delivered to ${subscription.url}`);
     return;
+  }
+
+  if (!settled) {
+    throw new Error(
+      `Webhook delivery to subscription ${subscriptionId} failed on attempt ${ctx.job.attemptsMade + 1}, retrying: ${error}`,
+      { cause },
+    );
   }
 
   log.info(`Webhook delivery failed: ${error}`);
@@ -123,7 +136,7 @@ export const sendWebhook: JobHandler<SendWebhookPayload> = async (ctx, payload) 
   // Circuit breaker: disable subscription if last N deliveries all failed
   const FAILURE_THRESHOLD = 5;
   const recentEvents = await db.webhookEvent.findMany({
-    where: { webhookSubscriptionId: subscriptionId },
+    where: { webhookSubscriptionId: subscriptionId, status: { not: 'pending' } },
     orderBy: { createdAt: 'desc' },
     take: FAILURE_THRESHOLD,
     select: { status: true },
@@ -142,6 +155,9 @@ export const sendWebhook: JobHandler<SendWebhookPayload> = async (ctx, payload) 
     );
   }
 };
+
+const isRetryable = (event: { status: WebhookEventStatus; httpStatus?: number }): boolean =>
+  event.status === 'unreachable' || event.httpStatus === 429;
 
 const RECORD_FAILURE_THRESHOLD = 3;
 

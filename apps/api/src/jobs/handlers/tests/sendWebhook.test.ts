@@ -286,6 +286,153 @@ describe('sendWebhook handler', () => {
     });
   });
 
+  describe('retries', () => {
+    const attempt = (attemptNumber: number, attempts = 3) =>
+      createTestWorker({ attemptsMade: attemptNumber - 1, opts: { attempts } });
+
+    const respondWith = (status: number, statusText = '') =>
+      spyOn(globalThis, 'fetch').mockImplementation(
+        Object.assign(() => Promise.resolve(new Response(statusText, { status, statusText })), {
+          preconnect: fetch.preconnect,
+        }),
+      );
+
+    const refuseConnection = () =>
+      spyOn(globalThis, 'fetch').mockImplementation(
+        Object.assign(() => Promise.reject(new Error('Connection refused')), {
+          preconnect: fetch.preconnect,
+        }),
+      );
+
+    const createSubscription = async () => {
+      const { entity: sub } = await createWebhookSubscription({
+        ownerModel: 'User',
+        userId: user.id,
+        url: getUniqueUrl('/retries'),
+        model: 'CustomerRef',
+      });
+      return sub;
+    };
+
+    const deliver = (ctx: ReturnType<typeof createTestWorker>, subscriptionId: string) =>
+      sendWebhook(ctx, {
+        subscriptionId,
+        action: 'update',
+        resourceId: user.id,
+        data: { id: user.id },
+        timestamp: eventTimestamp,
+      });
+
+    const eventsOf = (subscriptionId: string) =>
+      db.webhookEvent.findMany({
+        where: { webhookSubscriptionId: subscriptionId },
+        orderBy: { id: 'asc' },
+      });
+
+    const isActive = async (subscriptionId: string) =>
+      (await db.webhookSubscription.findUnique({ where: { id: subscriptionId } }))?.isActive;
+
+    it.each([
+      [503, 'Service Unavailable'],
+      [500, 'Internal Server Error'],
+      [404, 'Not Found'],
+      [429, 'Too Many Requests'],
+    ])('throws on HTTP %d before the last attempt, so the job retries, and records the attempt as pending', async (status, statusText) => {
+      respondWith(status, statusText);
+      const sub = await createSubscription();
+
+      await expect(deliver(attempt(1), sub.id)).rejects.toThrow('retrying');
+
+      const events = await eventsOf(sub.id);
+      expect(events.map((event) => [event.status, event.httpStatus])).toEqual([
+        ['pending', status],
+      ]);
+      expect(events[0]?.error).toBe(`HTTP ${status}: ${statusText}`);
+    });
+
+    it('throws on a network failure before the last attempt', async () => {
+      refuseConnection();
+      const sub = await createSubscription();
+
+      await expect(deliver(attempt(2), sub.id)).rejects.toThrow('Connection refused');
+
+      const events = await eventsOf(sub.id);
+      expect(events.map((event) => [event.status, event.httpStatus])).toEqual([['pending', null]]);
+    });
+
+    it('settles the delivery on the last attempt: records it unreachable and completes', async () => {
+      respondWith(503, 'Service Unavailable');
+      const sub = await createSubscription();
+
+      await deliver(attempt(3), sub.id);
+
+      expect((await eventsOf(sub.id)).map((event) => event.status)).toEqual(['unreachable']);
+    });
+
+    it.each([
+      [400, 'Bad Request'],
+      [422, 'Unprocessable Entity'],
+      [401, 'Unauthorized'],
+      [302, 'Found'],
+    ])('does not retry HTTP %d: the first attempt settles the delivery as an error', async (status, statusText) => {
+      respondWith(status, statusText);
+      const sub = await createSubscription();
+
+      await deliver(attempt(1), sub.id);
+
+      const events = await eventsOf(sub.id);
+      expect(events.map((event) => [event.status, event.httpStatus])).toEqual([['error', status]]);
+      expect(receivedWebhooks.length).toBe(0);
+    });
+
+    it('delivers on a retry after a failed attempt', async () => {
+      const sub = await createSubscription();
+      respondWith(503, 'Service Unavailable');
+      await expect(deliver(attempt(1), sub.id)).rejects.toThrow('retrying');
+      mock.restore();
+      setEnvOverride('WEBHOOK_SIGNING_PRIVATE_KEY', privateKey);
+      respondWith(200, 'OK');
+
+      await deliver(attempt(2), sub.id);
+
+      expect((await eventsOf(sub.id)).map((event) => event.status)).toEqual(['pending', 'success']);
+      expect(await isActive(sub.id)).toBe(true);
+    });
+
+    it('counts a whole retry cycle as one failure toward the circuit breaker', async () => {
+      refuseConnection();
+      const sub = await createSubscription();
+      const failDelivery = async () => {
+        await expect(deliver(attempt(1), sub.id)).rejects.toThrow('retrying');
+        await expect(deliver(attempt(2), sub.id)).rejects.toThrow('retrying');
+        await deliver(attempt(3), sub.id);
+      };
+
+      for (let i = 0; i < 4; i++) await failDelivery();
+
+      expect(await db.webhookEvent.count({ where: { webhookSubscriptionId: sub.id } })).toBe(12);
+      expect(await isActive(sub.id)).toBe(true);
+
+      await expect(deliver(attempt(1), sub.id)).rejects.toThrow('retrying');
+      await expect(deliver(attempt(2), sub.id)).rejects.toThrow('retrying');
+      expect(await isActive(sub.id)).toBe(true);
+
+      await deliver(attempt(3), sub.id);
+      expect(await isActive(sub.id)).toBe(false);
+    });
+
+    it('never trips the circuit breaker on attempts that will be retried', async () => {
+      refuseConnection();
+      const sub = await createSubscription();
+
+      for (let i = 0; i < 6; i++) {
+        await expect(deliver(attempt(1), sub.id)).rejects.toThrow('retrying');
+      }
+
+      expect(await isActive(sub.id)).toBe(true);
+    });
+  });
+
   describe('circuit breaker', () => {
     it('disables subscription after 5 consecutive failures', async () => {
       spyOn(globalThis, 'fetch').mockImplementation(

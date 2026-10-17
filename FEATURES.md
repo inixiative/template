@@ -323,9 +323,9 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **RSA Signature Verification** - Each webhook includes `x-webhook-signature` header with an RSA-SHA256 signature (base64). Signed with a server-held private key; receivers verify with the public key exposed at `/webhookSubscription/info`. Asymmetric — no shared secret to leak. Signed body includes a unix `timestamp` so receivers can reject replays. Prevents webhook spoofing and tampering
 
-- ✅ **Async Delivery via Jobs** - Webhooks enqueued as BullMQ jobs on the shared `jobs` queue. Never blocks request processing. Failed deliveries retry automatically (3 attempts, exponential backoff). Webhook jobs run outside transaction to avoid timeouts
+- ✅ **Async Delivery via Jobs** - Webhooks enqueued as BullMQ jobs on the shared `jobs` queue. Never blocks request processing. Transient failures (network, timeout, 5xx, 404, 429) retry automatically (3 attempts, exponential backoff); the circuit breaker counts a retry cycle once. Webhook jobs run outside transaction to avoid timeouts
 
-- ✅ **Delivery Tracking** - WebhookEvent model records every delivery attempt with status (pending, sent, failed), response code, response body, error message. Superadmins can inspect delivery history and debug integration issues
+- ✅ **Delivery Tracking** - WebhookEvent model records every delivery attempt with status (`pending` while it will be retried, then `success`, `error` or `unreachable`), response code and error message. Superadmins can inspect delivery history and debug integration issues
 
 - ✅ **Automatic Cleanup** - Cron job removes old webhook events (90+ days) to prevent unbounded table growth. Configurable retention period
 
