@@ -13,4 +13,6 @@ export const webhookRelatedModels: Record<string, FlexibleRef[]> = {
     { model: 'CustomerRef', axis: 'customerModel', value: 'Space' },
     { model: 'CustomerRef', axis: 'providerModel', value: 'Space' },
   ],
+  ArtifactPermission: ['Artifact'],
+  ArtifactContainer: ['Artifact'],
 };

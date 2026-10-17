@@ -9,6 +9,7 @@ export type ArtifactKindDef = {
   defaultAccess: 'public' | 'private';
   holder: 'local' | 'integration';
   crossOwner: 'edge' | 'copy';
+  contentModel?: 'File';
   lazyCopy?: true;
 };
 
@@ -18,6 +19,7 @@ export const ArtifactKinds = {
     defaultAccess: 'private',
     holder: 'local',
     crossOwner: 'copy',
+    contentModel: 'File',
     lazyCopy: true,
   },
   folder: {
@@ -41,6 +43,10 @@ export const artifactKindDef = (kind: string): ArtifactKindDef | null => kindDef
 
 export const isContainerKind = (kind: string): boolean =>
   (artifactKindDef(kind)?.contains.length ?? 0) > 0;
+
+export const plainArtifactKinds = (Object.keys(kindDefs) as ArtifactKind[]).filter(
+  (kind) => !kindDefs[kind]!.contentModel,
+);
 
 export const canContain = (containerKind: string, memberKind: string): boolean =>
   artifactKindDef(containerKind)?.contains.includes(memberKind) ?? false;

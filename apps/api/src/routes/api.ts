@@ -13,6 +13,9 @@ import { corsMiddleware } from '#/middleware/corsMiddleware';
 import { prepareRequest } from '#/middleware/prepareRequest';
 import { apiRateLimit } from '#/middleware/rateLimit/apiRateLimit';
 import { authRateLimit } from '#/middleware/rateLimit/authRateLimit';
+import { artifactRouter } from '#/modules/artifact';
+import { artifactContainerRouter } from '#/modules/artifactContainer';
+import { artifactPermissionRouter } from '#/modules/artifactPermission';
 import { authProviderRouter } from '#/modules/authProvider';
 import { batchRouter } from '#/modules/batch';
 import { contactRouter } from '#/modules/contact';
@@ -66,6 +69,9 @@ apiRouter.use('*', apiRateLimit);
 apiRouter.route('/admin', adminRouter);
 
 // v1 Routes
+apiRouter.route('/v1/artifact', artifactRouter);
+apiRouter.route('/v1/artifactContainer', artifactContainerRouter);
+apiRouter.route('/v1/artifactPermission', artifactPermissionRouter);
 apiRouter.route('/v1/authProvider', authProviderRouter);
 apiRouter.route('/v1/batch', batchRouter);
 apiRouter.route('/v1/contact', contactRouter);

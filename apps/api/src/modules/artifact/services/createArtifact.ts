@@ -13,14 +13,20 @@ import { assertArtifactAction } from '#/modules/artifact/lib/assertArtifactActio
 import { writeArtifactContainer } from '#/modules/artifact/services/addArtifactToContainer';
 import { checkArtifactAccess } from '#/modules/artifact/services/checkArtifactAccess';
 
+export type CreatorGrant = Omit<
+  Prisma.ArtifactPermissionUncheckedCreateInput,
+  'artifactId' | 'role'
+>;
+
 export type CreateArtifactInput = Omit<Prisma.ArtifactUncheckedCreateInput, 'access'> & {
   access?: ArtifactAccess;
   containerArtifactId?: string;
+  creatorGrant?: CreatorGrant;
 };
 
 export const createArtifact = async (
   actor: ArtifactActor,
-  { containerArtifactId, access, ...data }: CreateArtifactInput,
+  { containerArtifactId, access, creatorGrant, ...data }: CreateArtifactInput,
 ): Promise<Artifact> => {
   if (containerArtifactId) {
     const verdicts = await checkArtifactAccess(
@@ -35,6 +41,11 @@ export const createArtifact = async (
     const artifact = await db.artifact.create({
       data: { ...data, ...(access && access !== 'inherit' ? { access } : {}) },
     });
+    if (creatorGrant) {
+      await db.artifactPermission.create({
+        data: { ...creatorGrant, artifactId: artifact.id, role: 'owner' },
+      });
+    }
     if (!containerArtifactId) return artifact;
     await writeArtifactContainer({
       artifactId: artifact.id,
