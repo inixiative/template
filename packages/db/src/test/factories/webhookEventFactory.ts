@@ -10,7 +10,7 @@ import { createFactory } from '@template/db/test/factory';
 
 const webhookEventFactory = createFactory('WebhookEvent', {
   defaults: () => ({
-    status: WebhookEventStatus.pending,
+    status: WebhookEventStatus.success,
     action: WebhookEventAction.create,
     payload: { test: true },
     error: null,

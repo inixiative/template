@@ -237,21 +237,29 @@ export const webhookEnabledModels: WebhookModel[] = [
 
 Headers: `Content-Type: application/json`, `X-Webhook-Signature: <base64>`
 
+### Retries
+
+A delivery is one `sendWebhook` job, and its BullMQ attempts (the queue default: 3, exponential
+backoff from 5 s) are its retry cycle. A failure that says the receiver could not take it right now —
+a network error or timeout, any 5xx, 404 or 429 — is recorded as a `retrying` event and rethrown, so
+BullMQ retries the job. The last attempt (`isFinalAttempt(ctx.job)` in `jobs/`) settles the delivery
+as `unreachable` (or `error` for a 429) and the job completes. Every other failure settles on its
+first attempt and is not retried: a blocked redirect, 401 and 403 are configuration the receiver has
+to change, and 400 / 422 are about the record's content, so resending the same bytes gets the same
+answer (see [Poisoned Records](#poisoned-records)).
+
 ### Circuit Breaker
 
-After 5 consecutive failures, subscription auto-disables:
-
-```typescript
-const FAILURE_THRESHOLD = 5;
-// If last 5 events all failed → isActive = false
-```
+After 5 consecutive failed deliveries, the subscription auto-disables (`isActive = false`). Only
+settled events count: `retrying` attempts are left out, so a retry cycle counts once, as its outcome.
 
 ### Poisoned Records
 
 On a subscription with an `integrationId`, one record the receiver keeps rejecting is poisoned
 instead of tripping the circuit. A rejection is an `error` event with `httpStatus` 400 or 422
-(`RECORD_REJECTION` in `sendWebhook.ts`). Other terminal failures such as redirects, 401, 403 or 429
-do not count, and neither does `unreachable`. When a record has 3 rejections since its own last
+(`RECORD_REJECTION` in `sendWebhook.ts`); rejections are never retried, so each one is a delivery.
+Other failures such as redirects, 401, 403 or 429 do not count, and neither do `unreachable` or
+`retrying`. When a record has 3 rejections since its own last
 success, and some other record has delivered since the first of them, `poisonIntegrationRecord`
 stamps `IntegrationRecord.poisonedAt`. Later deliveries of that record are skipped before signing,
 with no `WebhookEvent` and nothing fed to the circuit. Nothing clears the stamp yet. See
