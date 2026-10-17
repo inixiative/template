@@ -164,6 +164,81 @@ describe('artifact lifecycle', () => {
     }
   });
 
+  describe('navigating a diamond: compliance under legal and operations, both under one root', () => {
+    let root: Artifact;
+    let legal: Artifact;
+    let operations: Artifact;
+    let compliance: Artifact;
+    type Ancestry = {
+      artifacts: Artifact[];
+      edges: { artifactId: string; containerArtifactId: string }[];
+    };
+
+    beforeAll(async () => {
+      root = await orgArtifact('folder', { name: 'root' });
+      legal = await orgArtifact('folder', { name: 'legal' });
+      operations = await orgArtifact('folder', { name: 'operations' });
+      compliance = await orgArtifact('folder', { name: 'compliance' });
+      await placeInside(legal, root);
+      await placeInside(operations, root);
+      await placeInside(compliance, legal);
+      await placeInside(compliance, operations);
+    });
+
+    it('parents lists both direct containers', async () => {
+      const { data } = await json<Artifact[]>(
+        await ownerFetch(get(`/api/v1/artifact/${compliance.id}/parents`)),
+      );
+      expect(data.map((artifact) => artifact.id).sort()).toEqual([legal.id, operations.id].sort());
+    });
+
+    it('ancestors returns the upward graph with the shared root once', async () => {
+      const { data } = await json<Ancestry>(
+        await ownerFetch(get(`/api/v1/artifact/${compliance.id}/ancestors`)),
+      );
+      expect(data.artifacts.map((artifact) => artifact.id).sort()).toEqual(
+        [root.id, legal.id, operations.id].sort(),
+      );
+      const edgeKeys = data.edges.map((edge) => `${edge.artifactId}>${edge.containerArtifactId}`);
+      expect(edgeKeys.sort()).toEqual(
+        [
+          `${compliance.id}>${legal.id}`,
+          `${compliance.id}>${operations.id}`,
+          `${legal.id}>${root.id}`,
+          `${operations.id}>${root.id}`,
+        ].sort(),
+      );
+    });
+
+    it('ancestors and parents only show containers the caller can read', async () => {
+      await db.artifact.update({ where: { id: compliance.id }, data: { access: 'private' } });
+      await createArtifactPermission({
+        artifactId: compliance.id,
+        granteeModel: 'User',
+        granteeUserId: member.id,
+        role: 'viewer',
+      });
+      const ancestry = await json<Ancestry>(
+        await memberFetch(get(`/api/v1/artifact/${compliance.id}/ancestors`)),
+      );
+      expect(ancestry.data).toEqual({ artifacts: [], edges: [] });
+      const parents = await json<Artifact[]>(
+        await memberFetch(get(`/api/v1/artifact/${compliance.id}/parents`)),
+      );
+      expect(parents.data).toEqual([]);
+    });
+
+    it("the owner's root listing holds artifacts in no container", async () => {
+      const { data } = await json<Artifact[]>(
+        await ownerFetch(get(`/api/v1/organization/${organization.id}/artifacts`)),
+      );
+      const ids = data.map((artifact) => artifact.id);
+      expect(ids).toContain(root.id);
+      expect(ids).not.toContain(legal.id);
+      expect(ids).not.toContain(compliance.id);
+    });
+  });
+
   describe('deleting', () => {
     let shared: Artifact;
     let other: Artifact;

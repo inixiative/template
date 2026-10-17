@@ -250,7 +250,7 @@ Containment is a graph of `ArtifactContainer` edges, not a materialized path: an
 
 **Writes are serialized for container kinds.** Placing a container inside another checks for a loop and then adds the edge, so it holds `withOwnerLock(owner, 'containers')`; containers never nest across owners, so one owner's lock suffices. Placing a non-container (a file) can't close a loop and takes no lock.
 
-**Breadcrumbs** are the ancestor walk; with several containers an artifact has several paths, and the UI shows the one it was opened from.
+**Navigation** has no primary parent: an item shows its direct parents ("above") and children ("below"), and an expanded view of the whole graph above it (`GET /artifact/:id/ancestors`, each shared ancestor once). The top of the browser is the owner's root artifacts (in no container). See ARTIFACTS.md § Navigating.
 
 ---
 

@@ -9,6 +9,7 @@
 - [Containers](#containers)
 - [Access](#access)
 - [Deleting](#deleting)
+- [Navigating](#navigating)
 - [Webhooks](#webhooks)
 - [Source map](#source-map)
 
@@ -30,6 +31,7 @@ Why one node: a grant then has a single target, "who may hold what" is a fact in
 | Share with a person, an org, a space, a member or a customer; time-limited share: "give Bob edit access", "share this folder with the design space" | **`ArtifactPermission`** · model — a role on an artifact, inherited by `inherit` artifacts inside it | § Access | a per-feature share table; a shared-with JSON column |
 | Can this caller read / edit / manage this artifact: "who can see this file", "is it public" | **`checkArtifactAccess`** · service, **`validateArtifactAccess(action)`** · middleware `apps/api/src/middleware/validations/` | § Access | `validatePermission` on an artifact route (it skips grants); reading `artifact.access` alone to decide public |
 | Everyone with access to an artifact, without an actor: "build the reader set for an index", "who should hear about this change" | **`resolveArtifactAccess`** · service — public flag + grants with roles, through containers | § Access | re-walking containers by hand to collect grants |
+| Show where something sits and what is above it: "breadcrumbs", "which folders is this in", "browse from the top" | **`artifactReadParents`**, **`artifactReadAncestors`**, **`{owner}ReadManyArtifacts`** (roots) · routes | § Navigating | a primary-parent column; walking edges client-side one request per level |
 | Delete a folder, or delete a folder and what is in it: "empty this folder", "remove the folder but keep the files" | **`deleteArtifact`** · service (`DELETE /artifact/:id`), **`artifactReadExclusiveContents`** · route, **`/v1/batch`** | § Deleting | a delete that walks a container's members and removes them; a bespoke delete-many endpoint |
 
 ---
@@ -115,6 +117,21 @@ Not in this cut: access per edge. Access is the node's column plus its container
 - **Deleting the contents as well is a separate action.** `GET /artifact/:id/exclusiveContents` lists the artifacts that sit directly in this container and in no other container, among those the caller can read. To delete them, send one round of `DELETE /api/v1/artifact/:id` requests through `POST /api/v1/batch/execute` with `strategy: 'transactionAll'`: one transaction, all or nothing. A UI may offer the two together; the API keeps them apart.
 - **An artifact in more than one container needs `own` to delete**, so one container's manager can't delete something other containers rely on. An artifact in one container needs `manage`. Removing an edge is unchanged (§ Containers).
 - System artifacts cannot be deleted. Deleted artifacts' bytes are reclaimed by the orphan sweeper (FEAT-009 § 16).
+
+---
+
+## Navigating
+
+There is no "primary parent": with several parents, a browser shows two link lists for an item, **above** (its direct parents) and **below** (its direct children), plus a hover or expanded view of the whole graph above it. The API serves each cheaply, filtered to what the caller can read:
+
+| View | Route |
+|---|---|
+| Top of the browser: the owner's artifacts in no container | `GET /me/artifacts`, `/organization/:id/artifacts`, `/space/:id/artifacts` |
+| Below: direct children | `GET /artifact/:id/artifacts` |
+| Above: direct parents | `GET /artifact/:id/parents` |
+| The full graph above, to the roots | `GET /artifact/:id/ancestors` → `{ artifacts, edges }`, each shared ancestor once, depth-capped like the access walk |
+
+No frontend is built yet.
 
 ---
 
