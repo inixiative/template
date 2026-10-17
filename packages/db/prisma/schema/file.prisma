@@ -1,16 +1,3 @@
-// ============================================================================
-// FILE MANAGEMENT - FEAT-009
-// ============================================================================
-// A file is an Artifact of kind `file` (artifact.prisma); folders are Artifacts of
-// kind `folder`, and access is ArtifactPermission plus the artifact's `access`.
-// Content: File + FileVersion. Usage: ResourceBinding.
-//
-// False-poly axes are registered in packages/db/src/registries/falsePolymorphism.ts.
-// See tickets/FEAT-009-file-management.md.
-
-// The file kind's own tables. Identity, owner, name, access and placement live on
-// the file's Artifact; File carries what only a file has: its versions, its
-// bindings and the lazy-copy lineage.
 model File {
   id        String   @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
   createdAt DateTime @default(now())
@@ -54,13 +41,11 @@ model ResourceBinding {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Source - false polymorphism. `url` is a sentinel (no FK).
   sourceModel ResourceBindingSourceModel
   fileId      String?                    @db.VarChar(36)
   file        File?                      @relation(fields: [fileId], references: [id])
   url         String?
 
-  // Resource - false polymorphism (Organization | Space | User | CustomerRef)
   resourceModel  ResourceBindingResourceModel
   organizationId String?                      @db.VarChar(36)
   spaceId        String?                      @db.VarChar(36)

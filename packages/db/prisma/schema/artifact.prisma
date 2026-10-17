@@ -1,17 +1,3 @@
-// ============================================================================
-// ARTIFACT - One node for every ownable, shareable thing (file, folder, ...)
-// ============================================================================
-// `kind` keys the code catalog (packages/shared/src/artifact/kinds.ts): what a
-// kind may contain and its access default at creation. A container is itself an
-// artifact; ArtifactContainer is the edge, and an artifact may sit in many
-// containers of its own owner.
-//
-// `access` is the node's own setting. `inherit` takes everything its containers
-// give (any public container makes it public, a grant on any container is a
-// grant on it); `public` adds public read on top of that; `private` takes nothing
-// from its containers. An `inherit` artifact with no container is coerced to
-// `private` by the artifactAccess hook.
-
 model Artifact {
   id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
   createdAt DateTime  @default(now())
@@ -23,7 +9,6 @@ model Artifact {
   access ArtifactAccess @default(inherit)
   system Boolean        @default(false)
 
-  // The app holding this artifact's content: null = this app (a File), set = that integration.
   integrationId String?      @db.VarChar(36)
   integration   Integration? @relation(fields: [integrationId], references: [id], onDelete: Cascade)
 
@@ -56,8 +41,6 @@ model Artifact {
   @@index([integrationId])
 }
 
-// Soft-deleted and audit-enabled. Soft-deleting either end tombstones the edge
-// (softDeleteCascade); the container side has no FK cascade.
 model ArtifactContainer {
   id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
   createdAt DateTime  @default(now())
@@ -76,8 +59,6 @@ model ArtifactContainer {
   @@index([artifactId])
 }
 
-// A grant of `role` on an artifact (and, through `inherit`, on everything inside it).
-// Revoke = soft delete (audit-enabled). One live grant per artifact × grantee.
 model ArtifactPermission {
   id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
   createdAt DateTime  @default(now())

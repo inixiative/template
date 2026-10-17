@@ -115,7 +115,7 @@ Not in this cut: access per edge. Access is the node's column plus its container
 
 - **Deleting a container deletes the container, never its contents.** Its edges are soft-deleted with it (`softDeleteCascade`), the contents stay, and anything left in no container becomes private (and stays private if the container is ever restored).
 - **Deleting the contents as well is a separate action.** `GET /artifact/:id/exclusiveContents` lists the artifacts that sit directly in this container and in no other container, among those the caller can read. To delete them, send their `DELETE /api/v1/artifact/:id` requests through `POST /api/v1/batch/execute` with `strategy: 'transactionAll'` (one transaction, all or nothing), contents in the first round and the container, if it goes too, in a later round: a caller whose access to the contents comes through the container loses it once the container is gone. A UI may offer the two together; the API keeps them apart.
-- **An artifact in more than one container needs `own` to delete**; in one, `manage`. This is friction, not a guarantee: someone with `manage` on it and `operate` on one of its containers can remove that edge (unchanged, § Containers) and then delete it from where it remains.
+- **Deleting an artifact always needs `own` on it**, wherever it sits, so a container's manager can't delete something they don't own. Removing it from a container is different and unchanged: `manage` on it plus `operate` on that container (§ Containers).
 - System artifacts cannot be deleted. Deleted artifacts' bytes are reclaimed by the orphan sweeper (FEAT-009 § 16).
 
 ---

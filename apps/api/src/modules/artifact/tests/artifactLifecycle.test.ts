@@ -281,7 +281,7 @@ describe('artifact lifecycle', () => {
       other = await orgArtifact('folder');
     });
 
-    it('an artifact in more than one container needs own; in one, manage is enough', async () => {
+    it('deleting always needs own: an admin grant is not enough, wherever the artifact sits', async () => {
       const inBoth = await orgArtifact('folder');
       await placeInside(inBoth, shared);
       await placeInside(inBoth, other);
@@ -296,8 +296,33 @@ describe('artifact lifecycle', () => {
         });
       }
       expect((await memberFetch(del(`/api/v1/artifact/${inBoth.id}`))).status).toBe(403);
-      expect((await memberFetch(del(`/api/v1/artifact/${inOne.id}`))).status).toBe(204);
+      expect((await memberFetch(del(`/api/v1/artifact/${inOne.id}`))).status).toBe(403);
+      expect((await adminFetch(del(`/api/v1/artifact/${inOne.id}`))).status).toBe(403);
       expect((await ownerFetch(del(`/api/v1/artifact/${inBoth.id}`))).status).toBe(204);
+      expect((await ownerFetch(del(`/api/v1/artifact/${inOne.id}`))).status).toBe(204);
+    });
+
+    it('removing it from a container still needs only manage on it and operate on the container', async () => {
+      const shelf = await orgArtifact('folder');
+      const item = await orgArtifact('folder');
+      await placeInside(item, shelf);
+      await placeInside(item, other);
+      await createArtifactPermission({
+        artifactId: item.id,
+        granteeModel: 'User',
+        granteeUserId: member.id,
+        role: 'admin',
+      });
+      await createArtifactPermission({
+        artifactId: shelf.id,
+        granteeModel: 'User',
+        granteeUserId: member.id,
+        role: 'member',
+      });
+      const [edge] = await db.artifactContainer.findMany({
+        where: { artifactId: item.id, containerArtifactId: shelf.id },
+      });
+      expect((await memberFetch(del(`/api/v1/artifactContainer/${edge!.id}`))).status).toBe(204);
     });
 
     it('deleting a container keeps its contents; contents only there are listed and deleted through batch', async () => {

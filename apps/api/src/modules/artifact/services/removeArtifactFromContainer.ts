@@ -7,7 +7,7 @@
 import { db } from '@template/db';
 import type { ArtifactContainer } from '@template/db/generated/client/client';
 import type { ArtifactActor } from '#/modules/artifact/lib/artifactActor';
-import { assertEdgeAuthority } from '#/modules/artifact/services/addArtifactToContainer';
+import { assertEdgeAuthority } from '#/modules/artifact/lib/assertEdgeAuthority';
 import { assertKeepsOwnersOnlyReach } from '#/modules/artifact/services/assertKeepsOwnersOnlyReach';
 
 export const removeArtifactFromContainer = async (

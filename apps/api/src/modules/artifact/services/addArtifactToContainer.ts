@@ -10,11 +10,9 @@ import { isContainerKind } from '@template/shared/artifact';
 import { makeError } from '#/lib/errors';
 import { withOwnerLock } from '#/lib/locks/withOwnerLock';
 import type { ArtifactActor } from '#/modules/artifact/lib/artifactActor';
-import { ARTIFACT_EDGE_AUTHORITY } from '#/modules/artifact/lib/artifactEdgeAuthority';
-import { assertArtifactAction } from '#/modules/artifact/lib/assertArtifactAction';
 import { assertContainable } from '#/modules/artifact/lib/assertContainable';
+import { assertEdgeAuthority } from '#/modules/artifact/lib/assertEdgeAuthority';
 import { assertNoContainerCycle } from '#/modules/artifact/services/assertNoContainerCycle';
-import { checkArtifactAccess } from '#/modules/artifact/services/checkArtifactAccess';
 
 export type AddArtifactToContainerInput = {
   artifactId: string;
@@ -22,20 +20,7 @@ export type AddArtifactToContainerInput = {
   inherit?: boolean;
 };
 
-export const assertEdgeAuthority = async (
-  actor: ArtifactActor,
-  artifactId: string,
-  containerArtifactId: string,
-): Promise<void> => {
-  const [member, container] = await Promise.all([
-    checkArtifactAccess(actor, [artifactId], ARTIFACT_EDGE_AUTHORITY.member),
-    checkArtifactAccess(actor, [containerArtifactId], ARTIFACT_EDGE_AUTHORITY.container),
-  ]);
-  assertArtifactAction(member.get(artifactId), ARTIFACT_EDGE_AUTHORITY.member);
-  assertArtifactAction(container.get(containerArtifactId), ARTIFACT_EDGE_AUTHORITY.container);
-};
-
-export const writeArtifactContainer = async ({
+const writeEdge = async ({
   artifactId,
   containerArtifactId,
   inherit,
@@ -60,21 +45,15 @@ export const writeArtifactContainer = async ({
   });
 };
 
-export const placeArtifactInContainer = async (
-  input: AddArtifactToContainerInput,
-): Promise<ArtifactContainer> => {
-  const member = await db.artifact.findUnique({ where: { id: input.artifactId } });
-  const owner = member && polymorphicTarget(member, 'Artifact', 'ownerModel');
-  if (!member || !owner || !isContainerKind(member.kind)) return writeArtifactContainer(input);
-  return withOwnerLock({ ownerModel: owner.kind, ownerId: owner.id }, 'containers', () =>
-    writeArtifactContainer(input),
-  );
-};
-
 export const addArtifactToContainer = async (
   actor: ArtifactActor,
   input: AddArtifactToContainerInput,
 ): Promise<ArtifactContainer> => {
   await assertEdgeAuthority(actor, input.artifactId, input.containerArtifactId);
-  return placeArtifactInContainer(input);
+  const member = await db.artifact.findUnique({ where: { id: input.artifactId } });
+  const owner = member && polymorphicTarget(member, 'Artifact', 'ownerModel');
+  if (!member || !owner || !isContainerKind(member.kind)) return writeEdge(input);
+  return withOwnerLock({ ownerModel: owner.kind, ownerId: owner.id }, 'containers', () =>
+    writeEdge(input),
+  );
 };

@@ -292,7 +292,7 @@ Roles map to actions as everywhere else: viewer → read, member → operate, ad
 
 **Edge writes need control over both ends** — guarded once, in `addArtifactToContainer` / `removeArtifactFromContainer`: `manage` on the artifact (an edge publishes it to the container's whole audience) and `operate` on the container (`ARTIFACT_EDGE_AUTHORITY`). This is the Google Drive shape (owner-level control of the item, editor on the destination). The kinds must fit (`contains`), the owners must match, and the edge may not close a loop or pass depth 10.
 
-**Deleting.** Deleting a container deletes the container, never its contents: its edges are tombstoned with it, the contents stay, and anything left in no container becomes private. Deleting the contents is a separate action: `GET /artifact/:id/exclusiveContents` lists what sits only in that container, and the deletes go through `/v1/batch` (`transactionAll`, one transaction). An artifact in more than one container needs `own` to delete; in one, `manage`. Deleted bytes are reclaimed by the orphan sweeper (§16).
+**Deleting.** Deleting a container deletes the container, never its contents: its edges are tombstoned with it, the contents stay, and anything left in no container becomes private. Deleting the contents is a separate action: `GET /artifact/:id/exclusiveContents` lists what sits only in that container, and the deletes go through `/v1/batch` (`transactionAll`, one transaction). Deleting an artifact always needs `own`; removing it from a container needs `manage` on it and `operate` on the container. Deleted bytes are reclaimed by the orphan sweeper (§16).
 
 **Grants can't exceed the granter.** Creating or raising a grant needs `manage` on the artifact and a role no higher than the granter's own.
 
