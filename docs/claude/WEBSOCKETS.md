@@ -249,12 +249,12 @@ key (`apps/api/src/ws/streamPublishOrder.ts`): a stream's appends go out in the 
 emitted them. Across instances, Redis is the ordering boundary: two instances publishing to the
 same stream are delivered in seq order, which need not be the order their writes committed.
 
-A removal is final. The list fold keeps a bounded set of tombstones (`__removed`, last 500 ids)
+A removal is final. The list fold keeps a bounded set of removed ids (`__removed`, the last 500)
 and ignores any later `upsert` for a removed id, so a late update from another instance cannot
-resurrect a row. Only an upsert flagged `revive` clears a tombstone: the flag rides on the append
+resurrect a row. Only an upsert flagged `revive` clears a removed id: the flag rides on the append
 frame (`{ type: 'upsert', payload, revive: true }`), outside the route-shaped row, set with
 `streamAppend(definition, params, 'upsert', row, { revive: true })`. A fresh snapshot (resync, retry or
-reconnect) keeps the tombstones, dropping only those whose row the snapshot shows alive. Among
+reconnect) keeps the removed ids, dropping only those whose row the snapshot shows alive. Among
 upserts of a live row, the definition's `ordering` decides: by default an update older than the
 held row (by `updatedAt`) is ignored, so the folded state only moves forward. Action listeners
 (`useStreamAction`) still hear every append, stale ones included.

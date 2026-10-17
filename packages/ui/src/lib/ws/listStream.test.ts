@@ -114,7 +114,7 @@ describe('listStream', () => {
     expect(state.pagination?.total).toBe(6);
   });
 
-  it('caps its tombstones', () => {
+  it('caps its removed ids', () => {
     let state = page([row('9999')], 1, 10);
     for (let i = 0; i < 600; i++) state = remove(state, { id: `gone-${i}` });
 
@@ -123,7 +123,7 @@ describe('listStream', () => {
     expect(state.__removed).not.toContain('gone-0');
   });
 
-  it('keeps tombstones across a fresh snapshot, except for rows the snapshot shows alive', () => {
+  it('keeps removed ids across a fresh snapshot, except for rows the snapshot shows alive', () => {
     const removed = remove(remove(page([row('0003'), row('0002'), row('0001')]), { id: '0003' }), {
       id: '0002',
     });
