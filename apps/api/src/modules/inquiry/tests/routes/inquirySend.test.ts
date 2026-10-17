@@ -314,9 +314,7 @@ describe('POST /api/v1/inquiry/:id/send — autoApprove', () => {
     });
 
     const response = await fetch(post(`/api/v1/inquiry/${inquiry.id}/send`));
-    const { data } = await json<Record<string, unknown> & { auditLogsAsSubject?: unknown[] }>(
-      response,
-    );
+    const { data } = await json<Record<string, unknown>>(response);
 
     const record = await db.inquiry.findUniqueOrThrow({
       where: { id: inquiry.id },
@@ -324,14 +322,13 @@ describe('POST /api/v1/inquiry/:id/send — autoApprove', () => {
         targetUser: true,
         targetOrganization: true,
         targetSpace: true,
-        auditLogsAsSubject: true,
       },
     });
 
     expect(response.status).toBe(200);
     expect(data.status).toBe(record.status);
     expect(data.updatedAt).toBe(record.updatedAt.toISOString());
-    expect(data.auditLogsAsSubject?.length).toBe(record.auditLogsAsSubject.length);
+    expect(data).not.toHaveProperty('auditLogsAsSubject');
     expect(data.targetUser).toBeDefined();
   });
 });

@@ -460,6 +460,93 @@ describe('auditLog hook', () => {
     expect(after).toBe(before);
   });
 
+  describe('writes that include relations', () => {
+    const includeHistory = {
+      sourceOrganization: true,
+      auditLogsAsSubject: { include: { actorToken: true } },
+    } as const;
+
+    const asTokenActor = (tokenId: string, write: () => Promise<unknown>) =>
+      db.scope(
+        'test-worker:test',
+        () => auditActorContext.scope({ ...nullAuditActor, actorTokenId: tokenId }, write),
+        'worker',
+      );
+
+    const createInquiryWithHistory = async () => {
+      const { entity: organization } = await createOrganization();
+      const { entity: targetUser } = await createUser();
+      const { entity: token } = await createToken({
+        ownerModel: 'User',
+        userId: targetUser.id,
+      });
+      const { entity: inquiry } = await createInquiry({
+        sourceModel: 'Organization',
+        targetModel: 'User',
+        sourceOrganizationId: organization.id,
+        targetUserId: targetUser.id,
+      });
+      for (const round of [1, 2]) {
+        await asTokenActor(token.id, () =>
+          db.inquiry.update({
+            where: { id: inquiry.id },
+            data: { content: { round } },
+            include: includeHistory,
+          }),
+        );
+      }
+      return { inquiry, token };
+    };
+
+    const latestInquiryLog = (inquiryId: string) =>
+      db.auditLog.findFirstOrThrow({
+        where: { subjectInquiryId: inquiryId, action: AuditAction.update },
+        orderBy: { id: 'desc' },
+      });
+
+    it('stores only the record columns, never relations or earlier audit rows', async () => {
+      const { inquiry, token } = await createInquiryWithHistory();
+
+      const log = await latestInquiryLog(inquiry.id);
+      const after = log.after as Record<string, unknown>;
+      const before = log.before as Record<string, unknown>;
+
+      expect(after.content).toEqual({ round: 2 });
+      expect(before.content).toEqual({ round: 1 });
+      for (const snapshot of [after, before]) {
+        expect(snapshot).not.toHaveProperty('auditLogsAsSubject');
+        expect(snapshot).not.toHaveProperty('sourceOrganization');
+      }
+      const stored = JSON.stringify(log);
+      expect(stored).not.toContain('keyHash');
+      expect(stored).not.toContain(token.keyHash);
+    });
+
+    it('diffs only the changed columns', async () => {
+      const { inquiry } = await createInquiryWithHistory();
+
+      const log = await latestInquiryLog(inquiry.id);
+
+      expect(Object.keys(log.changes as Record<string, unknown>)).toEqual(['content']);
+    });
+
+    it('skips the audit row when only ignored columns changed', async () => {
+      const { inquiry, token } = await createInquiryWithHistory();
+      const before = await db.auditLog.count({ where: { subjectInquiryId: inquiry.id } });
+
+      await asTokenActor(token.id, () =>
+        db.inquiry.update({
+          where: { id: inquiry.id },
+          data: { updatedAt: new Date() },
+          include: includeHistory,
+        }),
+      );
+
+      const after = await db.auditLog.count({ where: { subjectInquiryId: inquiry.id } });
+      expect(after).toBe(before);
+    });
+  });
+
   // saveEmailTemplate is the deterministic case in this repo where async-local storage does not
   // survive into the mutation extension's continuation, so it is what pins the actor across that
   // hop: before the bridge the hook read a null actor here and attributed every row to nobody.
