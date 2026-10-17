@@ -761,14 +761,20 @@ Schema-level configuration in `packages/db/src/registries/`:
 
 | Registry | Purpose | Used By |
 |----------|---------|---------|
-| `FalsePolymorphismRegistry` | Type field → FK mappings | Constraints, validation hooks, immutable fields |
+| `PolymorphismRegistry` | Axis value → required FK columns | Constraints, validation hooks, immutable fields, the helpers below |
+
+| Helper (`@template/db`) | Derives |
+|---|---|
+| `polymorphicAxis(model, axisField)` | The axis config; throws on an unknown model or axis |
+| `polymorphicKeyColumn` / `polymorphicTarget` | The key column for a value; the `{ kind, id }` a row points at |
+| `polymorphicIs(model, axisField)` | json-rules condition "this row's axis points at the bound row" |
+| `polymorphicSchema(model, axisField, { only?, omit?, extend? })` | Request-body Zod schema, one strict arm per value ([HOOKS.md](HOOKS.md#request-validation)) |
 
 ```typescript
 import { PolymorphismRegistry, getPolymorphismConfig } from '@template/db';
 
-// Get config for a model
 const config = getPolymorphismConfig('Token');
-// { typeField: 'ownerModel', fkMap: { User: ['userId'], ... } } | null
+// { axes: [{ field: 'ownerModel', fkMap: { User: ['userId'], ... } }] } | null
 ```
 
 See [HOOKS.md](HOOKS.md#false-polymorphism) for how hooks use this registry.

@@ -22,14 +22,14 @@ export type PolymorphicValue = ModelName | SpecialOwner;
 
 export type PolymorphicAxis = {
   field: string; // e.g., 'customerModel', 'ownerModel'
-  fkMap: Partial<Record<PolymorphicValue, string[]>>; // typeValue → required FK fields
+  fkMap: Partial<Record<PolymorphicValue, readonly string[]>>; // typeValue → required FK fields
 };
 
 export type PolymorphicConfig = {
-  axes: PolymorphicAxis[];
+  axes: readonly PolymorphicAxis[];
   // If multiple axes, which combinations are valid (axis0Value → allowed axis1Values)
   // Only needed when there are restrictions
-  allowedCombinations?: Partial<Record<PolymorphicValue, PolymorphicValue[]>>;
+  allowedCombinations?: Partial<Record<PolymorphicValue, readonly PolymorphicValue[]>>;
 };
 
 // ============================================================================
@@ -58,7 +58,7 @@ export const resolveFalsePolymorphismRef = (ref: FalsePolymorphismRef): string |
   const axis = config.axes.find((a) => a.field === ref.axis);
   if (!axis) return null;
 
-  const fkFields = (axis.fkMap as Partial<Record<string, string[]>>)[ref.value];
+  const fkFields = (axis.fkMap as Partial<Record<string, readonly string[]>>)[ref.value];
   // Return the first FK field (usually there's just one per type)
   return fkFields?.[0] ?? null;
 };
@@ -353,10 +353,18 @@ export const PolymorphismRegistry = {
       },
     ],
   },
-} satisfies Partial<Record<ModelName, PolymorphicConfig>>;
+} as const satisfies Partial<Record<ModelName, PolymorphicConfig>>;
 
 const polymorphicConfigs: Partial<Record<ModelName, PolymorphicConfig>> = PolymorphismRegistry;
 
 // Helper to get config for a model
 export const getPolymorphismConfig = (model: ModelName): PolymorphicConfig | null =>
   polymorphicConfigs[model] ?? null;
+
+export const polymorphicAxis = (model: ModelName, axisField: string): PolymorphicAxis => {
+  const axis = getPolymorphismConfig(model)?.axes.find(
+    (candidate) => candidate.field === axisField,
+  );
+  if (!axis) throw new Error(`${model} has no false-polymorphic axis ${axisField}`);
+  return axis;
+};
