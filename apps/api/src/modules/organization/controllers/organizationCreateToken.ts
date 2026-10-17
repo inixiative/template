@@ -7,7 +7,7 @@
 import { check, rebacSchema } from '@template/permissions/rebac';
 import { getResource } from '#/lib/context/getResource';
 import { makeError } from '#/lib/errors';
-import { validateHeldActions } from '#/lib/permissions/validateHeldActions';
+import { assignLevel } from '#/lib/permissions/assignLevel';
 import { makeController } from '#/lib/utils/makeController';
 import { createToken } from '#/modules/me/services/createToken';
 import { organizationCreateTokenRoute } from '#/modules/organization/routes/organizationCreateToken';
@@ -19,11 +19,17 @@ export const organizationCreateTokenController = makeController(
     const org = getResource<'organization'>(c);
     const body = c.req.valid('json');
 
-    if (!check(permix, rebacSchema, 'organization', { ...org, role: body.role }, 'assign')) {
+    if (
+      !check(
+        permix,
+        rebacSchema,
+        'organization',
+        { ...org, role: assignLevel(body.role, body.entitlements ?? null) },
+        'assign',
+      )
+    ) {
       throw makeError({ status: 403, message: `Cannot create ${body.role} token` });
     }
-
-    validateHeldActions(permix, [{ model: 'organization', record: org }], body.entitlements);
 
     const token = await createToken(c, {
       name: body.name,

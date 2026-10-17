@@ -12,50 +12,60 @@ import { inquiryHandlers } from '#/modules/inquiry/handlers';
 import type { Inquiry } from '#/modules/inquiry/handlers/types';
 import { includeInquirySent } from '#/modules/inquiry/queries/inquiryIncludes';
 import { computeExpiresAt } from '#/modules/inquiry/services/computeExpiresAt';
+import { lockInquiryAtVersion } from '#/modules/inquiry/services/lockInquiryAtVersion';
 import { resolveInquiry } from '#/modules/inquiry/services/resolution';
-import { senderHoldsGrant } from '#/modules/inquiry/services/senderHoldsGrant';
 import { validateInquiryIsSendable } from '#/modules/inquiry/validations/validateInquiryStatus';
 import type { AppEnv } from '#/types/appEnv';
 
-export const sendInquiry = async (c: Context<AppEnv>, inquiry: Inquiry) => {
+export const sendInquiry = async (
+  c: Context<AppEnv>,
+  inquiry: Inquiry,
+  expectedUpdatedAt?: Date,
+) => {
   const db = c.get('db');
 
-  if (inquiry.status === InquiryStatus.sent)
-    return db.inquiry.findUniqueOrThrow({ where: { id: inquiry.id }, include: includeInquirySent });
+  return db.txn(async () => {
+    const fresh = await lockInquiryAtVersion(db, inquiry.id, expectedUpdatedAt);
 
-  validateInquiryIsSendable(inquiry);
+    if (fresh.status === InquiryStatus.sent)
+      return db.inquiry.findUniqueOrThrow({ where: { id: fresh.id }, include: includeInquirySent });
 
-  if (!inquiry.targetModel)
-    throw makeError({ status: 400, message: 'Target must be set before sending' });
+    validateInquiryIsSendable(fresh);
 
-  const sent = await db.inquiry.update({
-    where: { id: inquiry.id },
-    data: {
-      status: InquiryStatus.sent,
-      sentAt: inquiry.sentAt ?? new Date(),
-      expiresAt: computeExpiresAt(inquiry.type),
-    },
-    include: includeInquirySent,
-  });
+    if (!fresh.targetModel)
+      throw makeError({ status: 400, message: 'Target must be set before sending' });
 
-  const handler = inquiryHandlers[inquiry.type];
-  const autoApproved =
-    (await handler.autoApprove(db, sent)) && (await senderHoldsGrant(c, handler, sent));
-
-  if (autoApproved) {
-    await resolveInquiry(c, sent, InquiryStatus.approved, {});
-
-    const approved = await db.inquiry.findUniqueOrThrow({
-      where: { id: sent.id },
+    const sent = await db.inquiry.update({
+      where: { id: fresh.id },
+      data: {
+        status: InquiryStatus.sent,
+        sentAt: fresh.sentAt ?? new Date(),
+        expiresAt: computeExpiresAt(fresh.type),
+      },
       include: includeInquirySent,
     });
 
-    await emitAppEvent('inquiry.sent', approved);
+    const handler = inquiryHandlers[fresh.type];
+    const autoApproved =
+      (await handler.autoApprove(db, sent)) &&
+      (!handler.canApprove ||
+        (await handler.canApprove(c, sent, handler.contentSchema.parse(sent.content))));
 
-    return approved;
-  }
+    if (autoApproved) {
+      await resolveInquiry(c, sent, InquiryStatus.approved, {}, sent.updatedAt);
 
-  await emitAppEvent('inquiry.sent', sent);
+      const approved = await db.inquiry.findUniqueOrThrow({
+        where: { id: sent.id },
+        include: includeInquirySent,
+      });
 
-  return sent;
+      await emitAppEvent('inquiry.sent', approved);
+
+      return approved;
+    }
+
+    await emitAppEvent('inquiry.sent', sent);
+
+    return sent;
+  });
 };

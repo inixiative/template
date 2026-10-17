@@ -9,7 +9,7 @@ import { errors, type JWTPayload } from 'jose';
 import { isIssuerJwtEnabled, verifyIssuerJwt } from '#/lib/auth/verifyIssuerJwt';
 import { setUserContext } from '#/lib/context/setUserContext';
 import { makeError } from '#/lib/errors';
-import { findLiveSliceGrant } from '#/modules/inquiry/services/findLiveSliceGrant';
+import { findLiveEntitlementGrant } from '#/modules/inquiry/services/findLiveEntitlementGrant';
 import { findUserWithRelations } from '#/modules/user/services/find';
 import type { AppEnv } from '#/types/appEnv';
 
@@ -40,9 +40,9 @@ export const jwtAuthMiddleware = async (c: Context<AppEnv>, next: Next) => {
 
   if (claims.grant !== undefined) {
     if (typeof claims.grant !== 'string') throw unauthorized();
-    const sliceGrant = await findLiveSliceGrant(db, claims.grant, user.id);
-    if (!sliceGrant) throw unauthorized();
-    c.set('slice', sliceGrant);
+    const grantedEntitlements = await findLiveEntitlementGrant(db, claims.grant, user.id);
+    if (!grantedEntitlements) throw unauthorized();
+    c.set('entitlementGrant', grantedEntitlements);
   }
 
   await setUserContext(c, user);

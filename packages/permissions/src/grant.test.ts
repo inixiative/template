@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { SessionAction } from '@template/permissions/client';
-import { capSlice, grantReaches, userLoginGrant } from '@template/permissions/slice';
+import { capGrant, grantReaches, userLoginGrant } from '@template/permissions/grant';
 
 describe('grantReaches', () => {
   it('follows the role chain on the same resource', () => {
@@ -57,20 +57,20 @@ describe('grantReaches', () => {
   });
 });
 
-describe('capSlice', () => {
+describe('capGrant', () => {
   const viewer = { role: 'viewer' as const, entitlements: null };
   const owner = { role: 'owner' as const, entitlements: null };
 
   it('default mode: lesser role, entitlements kept only where the owner reaches them', () => {
     expect(
-      capSlice('db:organization', viewer, {
+      capGrant('db:organization', viewer, {
         role: 'owner',
         entitlements: { manage: true },
         entitlementsOnly: false,
       }),
     ).toEqual({ role: 'viewer', entitlements: null, entitlementsOnly: false });
     expect(
-      capSlice('db:organization', owner, {
+      capGrant('db:organization', owner, {
         role: 'viewer',
         entitlements: { manage: true },
         entitlementsOnly: false,
@@ -78,19 +78,29 @@ describe('capSlice', () => {
     ).toEqual({ role: 'viewer', entitlements: { manage: true }, entitlementsOnly: false });
   });
 
-  it('default mode does not inherit the owner entitlements', () => {
+  it('a full grant (entitlements null) inherits the owner entitlements', () => {
     expect(
-      capSlice(
+      capGrant(
         'db:organization',
         { role: 'member', entitlements: { canExport: true } },
         { role: 'member', entitlements: null, entitlementsOnly: false },
       ),
-    ).toEqual({ role: 'member', entitlements: null, entitlementsOnly: false });
+    ).toEqual({ role: 'member', entitlements: { canExport: true }, entitlementsOnly: false });
   });
 
-  it('keeps an owner custom entitlement the slice names', () => {
+  it('a full grant on the user does not inherit the session actions', () => {
     expect(
-      capSlice(
+      capGrant('db:user', userLoginGrant, {
+        role: 'owner',
+        entitlements: null,
+        entitlementsOnly: false,
+      }).entitlements,
+    ).toBeNull();
+  });
+
+  it('keeps an owner custom entitlement a narrowed grant names', () => {
+    expect(
+      capGrant(
         'db:organization',
         { role: 'member', entitlements: { canExport: true } },
         {
@@ -104,7 +114,7 @@ describe('capSlice', () => {
 
   it('entitlement-only keeps only what the owner reaches', () => {
     expect(
-      capSlice('db:space', viewer, {
+      capGrant('db:space', viewer, {
         role: 'owner',
         entitlements: { read: true, manage: true, own: true },
         entitlementsOnly: true,
@@ -114,7 +124,7 @@ describe('capSlice', () => {
 
   it('false entitlements are dropped', () => {
     expect(
-      capSlice('db:organization', owner, {
+      capGrant('db:organization', owner, {
         role: 'owner',
         entitlements: { manage: false },
         entitlementsOnly: true,
@@ -122,16 +132,16 @@ describe('capSlice', () => {
     ).toBeNull();
   });
 
-  it('a slice on the user holds a session action only when it names it', () => {
+  it('a grant on the user holds a session action only when it names it', () => {
     expect(
-      capSlice('db:user', userLoginGrant, {
+      capGrant('db:user', userLoginGrant, {
         role: 'owner',
         entitlements: null,
         entitlementsOnly: false,
       }).entitlements,
     ).toBeNull();
     expect(
-      capSlice('db:user', userLoginGrant, {
+      capGrant('db:user', userLoginGrant, {
         role: 'viewer',
         entitlements: { [SessionAction.createToken]: true },
         entitlementsOnly: false,

@@ -14,7 +14,7 @@ import { userRoles } from '@template/permissions/roles/user';
 
 export type Grant = { role: Role; entitlements: Entitlements };
 
-export type Slice = Grant & { entitlementsOnly: boolean };
+export type EntitlementGrant = Grant & { entitlementsOnly: boolean };
 
 export type GrantResource = 'db:user' | 'db:organization' | 'db:space';
 
@@ -57,11 +57,29 @@ export const grantReaches = (
     new Set(),
   );
 
-export const capSlice = (resource: GrantResource, owner: Grant, slice: Slice): Slice => {
-  const kept = Object.keys(slice.entitlements ?? {}).filter(
-    (action) => slice.entitlements?.[action] === true && grantReaches(resource, owner, action),
+const sessionActions = new Set<string>(Object.values(SessionAction));
+
+const inheritable = (entitlements: Entitlements): Entitlements =>
+  grantAll(
+    Object.keys(entitlements ?? {}).filter(
+      (action) => entitlements?.[action] === true && !sessionActions.has(action),
+    ),
   );
-  const entitlements = grantAll(kept);
-  if (slice.entitlementsOnly) return { role: owner.role, entitlements, entitlementsOnly: true };
-  return { role: lesserRole(owner.role, slice.role), entitlements, entitlementsOnly: false };
+
+export const capGrant = (
+  resource: GrantResource,
+  owner: Grant,
+  grant: EntitlementGrant,
+): EntitlementGrant => {
+  const named = Object.keys(grant.entitlements ?? {}).filter(
+    (action) => grant.entitlements?.[action] === true && grantReaches(resource, owner, action),
+  );
+  if (grant.entitlementsOnly)
+    return { role: owner.role, entitlements: grantAll(named), entitlementsOnly: true };
+  return {
+    role: lesserRole(owner.role, grant.role),
+    entitlements:
+      (grant.entitlements ?? null) === null ? inheritable(owner.entitlements) : grantAll(named),
+    entitlementsOnly: false,
+  };
 };

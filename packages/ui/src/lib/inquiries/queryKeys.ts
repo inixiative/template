@@ -23,7 +23,7 @@ export const INQUIRY_TYPE_LABELS: Record<InquiryType, string> = {
   createSpace: 'Space Request',
   updateSpace: 'Space Update',
   transferSpace: 'Space Transfer',
-  grantUserSlice: 'Access Grant',
+  grantUserEntitlements: 'Access Grant',
 };
 
 export const INQUIRY_STATUS_COLORS: Record<InquiryStatus | 'expired', string> = {
@@ -115,6 +115,7 @@ export const inquiryFiltersToSearchFields = (
 
 export type InquiryMeta = {
   id: string;
+  updatedAt: string;
   type: InquiryType;
   sourceOrganizationId: string | null;
   sourceSpaceId: string | null;
@@ -131,7 +132,7 @@ export const sourceMutations: Record<InquiryType, (inq: InquiryMeta) => QueryKey
   ],
   updateSpace: (inq) => [spaceSentManyInquiriesQueryKey({ path: { id: inq.sourceSpaceId! } })],
   transferSpace: (inq) => [spaceSentManyInquiriesQueryKey({ path: { id: inq.sourceSpaceId! } })],
-  grantUserSlice: (_inq) => [meSentManyInquiriesQueryKey()],
+  grantUserEntitlements: (_inq) => [meSentManyInquiriesQueryKey()],
 };
 
 // Query keys affected when the TARGET side mutates (resolve/approve/deny)
@@ -142,5 +143,5 @@ export const targetMutations: Record<InquiryType, (inq: InquiryMeta) => QueryKey
   transferSpace: (inq) => [
     organizationReceivedManyInquiriesQueryKey({ path: { id: inq.targetOrganizationId! } }),
   ],
-  grantUserSlice: (_inq) => [meReceivedManyInquiriesQueryKey()],
+  grantUserEntitlements: (_inq) => [meReceivedManyInquiriesQueryKey()],
 };

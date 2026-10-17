@@ -45,7 +45,7 @@ export const prepareRequest = async (c: Context<AppEnv>, next: Next) => {
       'spaceUsers',
       'spaces',
       'token',
-      'slice',
+      'entitlementGrant',
       'spoofedBy',
     ] as const;
     for (const key of keysToClone) {
@@ -71,7 +71,7 @@ export const prepareRequest = async (c: Context<AppEnv>, next: Next) => {
     c.set('spaceUsers', null);
     c.set('spaces', null);
     c.set('token', null);
-    c.set('slice', null);
+    c.set('entitlementGrant', null);
     c.set('spoofedBy', null);
   }
 

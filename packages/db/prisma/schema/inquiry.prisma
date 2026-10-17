@@ -75,7 +75,7 @@ enum InquiryType {
   createSpace
   updateSpace
   transferSpace
-  grantUserSlice
+  grantUserEntitlements
 }
 
 enum InquiryStatus {

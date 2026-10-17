@@ -26,10 +26,11 @@
     - [Resource Lookup Runs Before Authorization](#resource-lookup-runs-before-authorization)
 - [Entitlements](#entitlements)
   - [How Entitlements Are Applied](#how-entitlements-are-applied)
-- [Slices](#slices)
-  - [capSlice](#capslice)
-  - [Default and Entitlement-Only Modes](#default-and-entitlement-only-modes)
-  - [Granting a Slice](#granting-a-slice)
+- [Grants](#grants)
+  - [Full or Narrowed](#full-or-narrowed)
+  - [capGrant](#capgrant)
+  - [Issuing Is Capped by the Issuer](#issuing-is-capped-by-the-issuer)
+  - [Granting User Entitlements](#granting-user-entitlements)
 - [REBAC](#rebac)
   - [Schema](#schema)
   - [ActionRule Types](#actionrule-types)
@@ -55,6 +56,7 @@
   - [Role Assignment Rules](#role-assignment-rules)
 - [Token Permissions](#token-permissions)
   - [Token Creation](#token-creation)
+  - [Token Editing](#token-editing)
   - [Token Deletion](#token-deletion)
 - [Frontend Checks](#frontend-checks)
 - [Future Work](#future-work)
@@ -73,7 +75,7 @@ Three-layer permission system:
 |-------|-------|---------|---------|
 | PlatformRole | System-wide | `User.platformRole` | superadmin bypasses all |
 | Role | Per-org RBAC | `OrganizationUser.role` | owner, admin, member, viewer |
-| Entitlements | Custom ABAC | JSON on OrganizationUser / SpaceUser / Token, or a JWT slice | `{ "artifact.create": true }` |
+| Entitlements | Custom ABAC | JSON on OrganizationUser / SpaceUser / Token, or a JWT grant | `{ "artifact.create": true }` |
 
 ---
 
@@ -133,9 +135,9 @@ Every route checks an action: on the resource it loads, or on the user itself (`
 export const StandardAction = { read, operate, manage, own };
 
 // Held by the login (session, or a JWT with no grant). A role never implies one;
-// a token or slice holds one only when its entitlements name it.
+// a token or grant holds one only when its entitlements name it.
 export const SessionAction = {
-  createToken: 'token.create',        // every token create route, and asking for a slice
+  createToken: 'token.create',        // every token create and token edit route
   deleteToken: 'token.delete',        // tokenDelete
   redactUser: 'user.redact',          // meRedact
   deleteOrganization: 'organization.delete', // organizationDelete (plus `own` on the org)
@@ -148,7 +150,7 @@ export type CustomAction = `${string}.${string}`; // e.g. 'artifact.create'
 export type Action = UserAction | OrganizationAction | SpaceAction | InquiryAction | CustomAction;
 ```
 
-An action maps to a role through the rebac schema: `'organization.create': 'operate'` on `db:user` means every principal holding `operate` on itself holds it. A custom key is a real action only once the schema maps it (`'artifact.create': 'operate'` on `db:organization`); an unmapped key is held only by a principal whose entitlements grant it, so a session never holds it and a slice cannot be capped to it. Any action can also be granted directly through entitlements.
+An action maps to a role through the rebac schema: `'organization.create': 'operate'` on `db:user` means every principal holding `operate` on itself holds it. A custom key is a real action only once the schema maps it (`'artifact.create': 'operate'` on `db:organization`); an unmapped key is held only by a principal whose entitlements grant it, so a session never holds it and a grant cannot be capped to it. Any action can also be granted directly through entitlements.
 
 Which routes check what:
 
@@ -238,14 +240,14 @@ permix.check('organization', 'own', 'any_org');  // Always true
 
 ## Permission Setup
 
-`setUserContext` (`apps/api/src/lib/context/setUserContext.ts`) sets the user, then runs `setupUserPermissions`, `setupOrgPermissions` and `setupSpacePermissions` (`apps/api/src/lib/permissions/`). Each writes one entry per resource: `db:user:<id>`, `db:organization:<id>`, `db:space:<id>`. A principal that narrows the user (a user-bound token or a JWT slice, read by `getPrincipalSlice`) goes through [`capSlice`](#capslice) against the owner's grant for that entry.
+`setUserContext` (`apps/api/src/lib/context/setUserContext.ts`) sets the user, then runs `setupUserPermissions`, `setupOrgPermissions` and `setupSpacePermissions` (`apps/api/src/lib/permissions/`). Each writes one entry per resource: `db:user:<id>`, `db:organization:<id>`, `db:space:<id>`. A principal that narrows the user (a user-bound token or a JWT grant, read by `getPrincipalGrant`) goes through [`capGrant`](#capgrant) against the owner's grant for that entry.
 
 ### Who Gets Which Entries
 
 | Principal | `db:user:<self>` | `db:organization:*` | `db:space:*` |
 |---|---|---|---|
 | Session, or JWT with no grant | the login grant: `own` + every `SessionAction` | each membership's role + entitlements | each membership's role + entitlements |
-| User token, or JWT with a grant | the slice, capped by the login grant | the slice, capped by each membership | the slice, capped by each membership |
+| User token, or JWT with a grant | the grant, capped by the login grant | the grant, capped by each membership | the grant, capped by each membership |
 | OrganizationUser token | none | its organization only, capped by that membership | none |
 | SpaceUser token | none | none | its space only, capped by that membership |
 | Organization token | none (no user) | its organization: token role + entitlements | none |
@@ -337,7 +339,7 @@ write a custom middleware that returns 404 when the permission check fails.
 
 ## Entitlements
 
-Custom grants beyond the role, stored as JSON on OrganizationUser, SpaceUser and Token, and carried by a JWT slice.
+Custom grants beyond the role, stored as JSON on OrganizationUser, SpaceUser and Token, and carried by a JWT grant.
 
 ```typescript
 type Entitlements = Record<string, boolean> | null;
@@ -355,68 +357,68 @@ export const grantActions = (baseActions, entitlements, entitlementsOnly = false
   entitlementsOnly ? { ...entitlements } : { ...baseActions, ...entitlements };
 ```
 
-On a token or a JWT slice they never add past the owner: see [Slices](#slices).
+On a token or a JWT grant they never add past the owner: see [Grants](#grants).
 
 ---
 
-## Slices
+## Grants
 
-A slice is a narrower version of the same principal: a User token, an OrganizationUser or SpaceUser token, or a JWT carrying a grant. It has the same shape as a membership plus one flag:
+A grant is what a credential carries: a User token, an OrganizationUser or SpaceUser token, or a JWT whose `grant` claim names an approved `grantUserEntitlements` inquiry. It has the shape of a membership plus one flag:
 
 ```typescript
-// packages/permissions/src/slice.ts
+// packages/permissions/src/grant.ts
 type Grant = { role: Role; entitlements: Entitlements };
-type Slice = Grant & { entitlementsOnly: boolean };
+type EntitlementGrant = Grant & { entitlementsOnly: boolean };
 ```
 
-**A slice never exceeds its owner.** For the `db:user` entry the owner is the login grant (`userLoginGrant`); for an organization or space entry it is the user's membership there. A User token's entitlements apply to the user itself; on an organization or space they can only keep what the membership already reaches.
+**A grant never exceeds its owner.** For the `db:user` entry the owner is the login grant (`userLoginGrant`); for an organization or space entry it is the user's membership there. A User token's entitlements apply to the user itself; on an organization or space they can only keep what the membership already reaches.
 
-### capSlice
+### Full or Narrowed
 
-```typescript
-capSlice(resource: 'db:user' | 'db:organization' | 'db:space', owner: Grant, slice: Slice): Slice
-```
+Every token and grant is one of two kinds, and either can be changed later (see [Token Permissions](#token-permissions)):
 
-- An entitlement survives only when `grantReaches(resource, owner, action)`: the owner holds it directly, or reaches it through a string delegation in the rebac schema (`read → operate → manage → own`, `'organization.create' → 'operate'`). Rule-gated actions (`assign`) are never reached this way, so a slice can't be granted them past its owner.
-- The owner's own entitlements are not inherited; the slice keeps only what it names.
-
-Before `capSlice`, the token cap intersected entitlements and treated a `null` membership value as "no limit", returning the token's entitlements whole: a viewer member holding a User token with `{ manage: true }` could update the organization and its spaces. `apps/api/src/lib/permissions/sliceCap.test.ts` keeps that case.
-
-### Default and Entitlement-Only Modes
-
-| Mode | Base actions | Entitlements |
+| Kind | Stored as | On each entry |
 |---|---|---|
-| default (`entitlementsOnly: false`) | `lesserRole(owner.role, slice.role)` | named ones the owner reaches |
-| entitlement-only (`entitlementsOnly: true`) | none | named ones the owner reaches, and nothing else |
+| **full** | `entitlements: null`, `entitlementsOnly: false` | `lesserRole(owner.role, grant.role)` + **everything the owner holds there**, read live (a membership's custom entitlements included). Never the login-only `SessionAction`s. |
+| **narrowed** | an explicit `entitlements` list | default mode: `lesserRole(owner.role, grant.role)` + the named entitlements the owner reaches; entitlement-only (`entitlementsOnly: true`): the named entitlements the owner reaches and nothing else |
 
-An entitlement-only slice with no entitlements can do nothing except `user.identify` (`GET /me`), which every user-bound principal holds.
+An entitlement-only grant with no entitlements can do nothing except `user.identify` (`GET /me`), which every user-bound principal holds.
 
-```typescript
-// owner of org A, viewer of org B, slice { role: 'owner', entitlements: { manage: true }, entitlementsOnly: true }
-// org A: { manage: true }   org B: nothing   user: { manage: true }
-```
-
-**Issuing is capped by the issuer.** The request-time cap stops a slice exceeding the *user*; it does not stop a narrow credential minting a wider one. So whoever issues a grant must hold all of it: `validateHeldGrant` (`findUnheldGrant`) requires the issuing principal to hold the role's standard action on itself (skipped for entitlement-only) and every named entitlement somewhere it reaches. It runs on `/me/tokens`; the other token create routes check the role against the owner (`assign`, or the role's action) and the entitlements with `validateHeldActions`.
-
-### Granting a Slice
-
-A slice for a JWT is an Inquiry of type `grantUserSlice` (handler: `apps/api/src/modules/inquiry/handlers/grantUserSlice`). The requester says what it is for and which slice it wants:
+### capGrant
 
 ```typescript
-POST /api/v1/me/inquiries                     // the user asks for a slice of themselves
-POST /api/v1/integration/:id/inquiries        // an integration asks (needs manage on it)
-{ type: 'grantUserSlice', targetModel: 'User', targetUserId, status: 'sent',
-  content: { purpose: 'Artifactory', role: 'viewer', entitlements: { read: true }, entitlementsOnly: true } }
+capGrant(resource: 'db:user' | 'db:organization' | 'db:space', owner: Grant, grant: EntitlementGrant): EntitlementGrant
 ```
 
-- **Send:** a user source must hold `token.create` (asking for a slice mints a credential), and may only ask for a slice of themselves.
-- **Validate:** `findActionsUserLacks` refuses (422) any entitlement the target user holds nowhere: not on the login grant, not on any membership.
-- **Auto-approve:** when the user asked for themselves, or the source integration is User-owned by them, **and** the principal that sent it holds the whole slice (`senderHoldsGrant`). Otherwise it waits for the user.
-- **Resolve:** approving needs `token.create` on the target user and, like any issuing, the approving principal must hold the whole slice (`validateHeldGrant` in `resolveInquiry`, for any handler with `grantOf`).
-- **Approve:** writes `resolution.slice` (`role`, `entitlements`, `entitlementsOnly`).
-- **Revoke:** `POST /inquiry/:id/revoke` (either party) sets status `revoked`; the JWT stops working on its next request, because the JWT step reads the live inquiry every time (`findLiveSliceGrant`).
+- A named entitlement survives only when `grantReaches(resource, owner, action)`: the owner holds it directly, or reaches it through a string delegation in the rebac schema (`read → operate → manage → own`, `'organization.create' → 'operate'`). Rule-gated actions (`assign`) are never reached this way.
+- A full grant inherits `owner.entitlements` minus the session actions.
 
-The JWT carries the inquiry id as `grant`; see [AUTH.md](./AUTH.md#issuer-jwt).
+Before `capGrant`, the token cap intersected entitlements and treated a `null` membership value as "no limit", returning the token's entitlements whole: a viewer member holding a User token with `{ manage: true }` could update the organization and its spaces. `apps/api/src/lib/permissions/grantCap.test.ts` keeps that case.
+
+### Issuing Is Capped by the Issuer
+
+The request-time cap stops a grant exceeding the *user*; it does not stop a narrow credential minting a wider one. So whoever mints or self-approves a user grant must hold all of it: `validateHeldGrant` (`findUnheldGrant`) requires the issuing principal to hold the role on every entry the new grant reaches (`lesserRole(membership, role)`, as `capGrant` gives it) and every named entitlement, and refuses a **full** grant from a narrowed issuer (a full grant inherits what the issuer may not hold). It runs on `/me/tokens`, on `PATCH /token/:id` when the editor is the token's own user, and on the handshake approval of a `grantUserEntitlements` inquiry targeting a user.
+
+Organization and space tokens are different: there the editor needs **authority to assign**, not to hold. `assignLevel(role, entitlements)` turns the request into a role (standard entitlements map to their role: `own` → owner, `manage` → admin, `operate` → member, `read` → viewer; a custom key → member), and the `assign` rule decides: owner/admin levels need `own` on the org or space, the rest `manage`.
+
+### Granting User Entitlements
+
+An Inquiry of type `grantUserEntitlements` (handler: `apps/api/src/modules/inquiry/handlers/grantUserEntitlements`). **The requester does not need to hold what it asks for; the approver must have authority to assign it.** Three shapes, by target:
+
+| Target | Who asks | Who approves | Approval writes |
+|---|---|---|---|
+| `Organization` | a member (`POST /me/inquiries`) | someone with `assign` on the org at `assignLevel(entitlements)` (an admin for member-level, the owner for `own`/`manage`) | the entitlements onto the requester's `OrganizationUser` |
+| `Space` | a space member | `assign` on the space at that level | onto the requester's `SpaceUser` |
+| `User` | the user (handshake) or an integration (`POST /integration/:id/inquiries`, needs `manage` on it) | the user, holding `token.create` and the whole grant | `resolution.grant` (`role`, `entitlements`, `entitlementsOnly`) for a JWT `grant` claim |
+
+```typescript
+{ type: 'grantUserEntitlements', targetModel: 'Organization', targetOrganizationId, status: 'sent',
+  content: { purpose: 'export reports', entitlements: { 'report.export': true }, entitlementsOnly: true } }
+```
+
+- **Auto-approval is off** except for the handshake: the user asks for their own grant and could approve it themselves (`autoApproveOwnRequest`, `apps/api/src/modules/inquiry/handlers/autoApproveOwnRequest.ts`; still gated by the handler's `canApprove`). To turn it on for another type, give that handler `autoApprove: autoApproveOwnRequest` or its own rule.
+- **Revoke:** `POST /inquiry/:id/revoke` (either party, or a manager of the target) sets `revoked`; a membership grant takes its entitlements back off the membership, a JWT grant stops on its next request (the JWT step reads the live inquiry every time).
+- Whatever is granted is still capped at request time by what the user's memberships reach.
 
 ---
 
@@ -454,9 +456,9 @@ export const rebacSchema: RebacSchema = {
     'db:inquiry': {
       actions: {
         read: { any: [/* source or target */] },
-        send: { any: [/* one arm per type; grantUserSlice: self + sourceUser token.create, or manage on sourceIntegration */] },
-        resolve: { any: [/* grantUserSlice also needs targetUser token.create */] },
-        revoke: { all: [/* grantUserSlice */, { any: [{ self: 'sourceUserId' }, { self: 'targetUserId' }, { rel: 'sourceIntegration', action: 'manage' }] }] },
+        send: { any: [/* one arm per type; grantUserEntitlements: self + sourceUser token.create, or manage on sourceIntegration */] },
+        resolve: { any: [/* grantUserEntitlements also needs targetUser token.create */] },
+        revoke: { all: [/* grantUserEntitlements */, { any: [{ self: 'sourceUserId' }, { self: 'targetUserId' }, { rel: 'sourceIntegration', action: 'manage' }] }] },
       },
     },
     // plus contact, webhookSubscription, segment, integration, flow (ownerActions),
@@ -717,7 +719,7 @@ middleware: [validateSelfPermission(SessionAction.createToken)]       // meCreat
 middleware: [validateSelfPermission(SessionAction.deleteOrganization), validatePermission('own')] // organizationDelete
 ```
 
-401 without a user, 403 when the user entry lacks the action. It replaces the old session-only guard: "a token can't do this" is now "this principal doesn't hold the action". A session holds every `SessionAction`; a token or slice holds one only when its entitlements name it; Organization, OrganizationUser, SpaceUser and Space tokens hold no user entry, so they never do. A superadmin passes, through any principal.
+401 without a user, 403 when the user entry lacks the action. It replaces the old session-only guard: "a token can't do this" is now "this principal doesn't hold the action". A session holds every `SessionAction`; a token or grant holds one only when its entitlements name it; Organization, OrganizationUser, SpaceUser and Space tokens hold no user entry, so they never do. A superadmin passes, through any principal.
 
 ---
 
@@ -756,15 +758,21 @@ Tokens use the `leave` action for self-deletion and the `assign` action (via par
 ### Token Creation
 
 Token creation needs `token.create` on the minter (`validateSelfPermission`), then the route's check on the owner:
-- Organization and Space tokens: `assign` on the owner (owner/admin roles need `own`, others `manage`)
-- OrganizationUser and SpaceUser tokens: `leave` on the membership and the role's standard action on the org or space
+- Organization and Space tokens: `assign` on the owner at `assignLevel(role, entitlements)` (owner/admin levels need `own`, others `manage`)
+- OrganizationUser and SpaceUser tokens: `leave` on the membership, the role's standard action on the org or space, and `validateHeldActions` for the named entitlements
+- User tokens (`/me/tokens`): `validateHeldGrant`, see [Issuing Is Capped by the Issuer](#issuing-is-capped-by-the-issuer)
 
-`entitlements` and `entitlementsOnly` are accepted; `validateHeldActions` refuses an entitlement the minter does not hold on the owner.
+`entitlements` and `entitlementsOnly` are accepted: `entitlements: null` mints a **full** token, a list mints a **narrowed** one.
 
 ```typescript
-// Check via parent resource (orgUser, spaceUser, etc.)
-check(permix, rebacSchema, 'organization', { id: orgId, role: tokenRole }, 'assign');
+check(permix, rebacSchema, 'organization', { id: orgId, role: assignLevel(role, entitlements) }, 'assign');
 ```
+
+### Token Editing
+
+`PATCH /api/v1/token/:id` (`tokenUpdate`) changes `name`, `role`, `entitlements` and `entitlementsOnly`, so a token can move between full and narrowed. It needs `token.create` on the editor, and a token can never change itself. Then either:
+- `assign` on the token at the new `assignLevel` (an org or space manager; organization, space and membership tokens), or
+- `leave` on it (its own user), plus `validateHeldGrant` for the new grant.
 
 ### Token Deletion
 

@@ -5,15 +5,16 @@
  * @uses infrastructure:prisma
  */
 import { type HydratedRecord, hydrate } from '@template/db';
-import { lesserRole, roleToStandardAction, type Slice } from '@template/permissions';
+import { type EntitlementGrant, lesserRole, roleToStandardAction } from '@template/permissions';
 import { check, rebacSchema } from '@template/permissions/rebac';
 import type { Context } from 'hono';
 import { findUnheldActions } from '#/lib/permissions/findUnheldActions';
+import { getPrincipalGrant } from '#/lib/permissions/getPrincipalGrant';
 import { userHeldOn } from '#/lib/permissions/userHeldOn';
 import { validateRole } from '#/lib/permissions/validateRole';
 import type { AppEnv } from '#/types/appEnv';
 
-const findUnheldRole = async (c: Context<AppEnv>, grant: Slice): Promise<string[]> => {
+const findUnheldRole = async (c: Context<AppEnv>, grant: EntitlementGrant): Promise<string[]> => {
   const user = c.get('user');
   if (!user) return ['user'];
   const permix = c.get('permix');
@@ -40,7 +41,14 @@ const findUnheldRole = async (c: Context<AppEnv>, grant: Slice): Promise<string[
   return unheld;
 };
 
-export const findUnheldGrant = async (c: Context<AppEnv>, grant: Slice): Promise<string[]> => [
+const isFull = (grant: EntitlementGrant | null) =>
+  !grant || (!grant.entitlementsOnly && (grant.entitlements ?? null) === null);
+
+export const findUnheldGrant = async (
+  c: Context<AppEnv>,
+  grant: EntitlementGrant,
+): Promise<string[]> => [
+  ...(isFull(grant) && !isFull(getPrincipalGrant(c)) ? ['full grant from a narrowed issuer'] : []),
   ...(grant.entitlementsOnly ? [] : await findUnheldRole(c, grant)),
   ...findUnheldActions(c.get('permix'), await userHeldOn(c), grant.entitlements),
 ];

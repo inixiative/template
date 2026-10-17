@@ -15,6 +15,15 @@ export {
   StandardAction,
   UserAction,
 } from './client';
+// Grants
+export {
+  capGrant,
+  type EntitlementGrant,
+  type Grant,
+  type GrantResource,
+  grantReaches,
+  userLoginGrant,
+} from './grant';
 // ReBAC
 export { check as rebacCheck } from './rebac/check';
 export { rebacSchema } from './rebac/schema';
@@ -42,13 +51,4 @@ export {
 export { getSpacePermissions, spaceRoles } from './roles/space';
 // User permissions
 export { getUserPermissions, userRoles } from './roles/user';
-// Slices
-export {
-  capSlice,
-  type Grant,
-  type GrantResource,
-  grantReaches,
-  type Slice,
-  userLoginGrant,
-} from './slice';
 export type { PermissionsCheck } from './types';

@@ -49,7 +49,7 @@ const RESOLUTION_EFFECTS: Record<
       queryKey: organizationReadManySpacesQueryKey({ path: { id: inq.targetOrganizationId! } }),
     });
   },
-  grantUserSlice: async () => {},
+  grantUserEntitlements: async () => {},
 };
 
 export const useInquiryResolutionEffects = () => {

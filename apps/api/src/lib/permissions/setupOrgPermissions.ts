@@ -5,9 +5,9 @@
  * @uses infrastructure:prisma
  */
 import type { OrganizationId } from '@template/db';
-import { capSlice, type Entitlements, getOrgPermissions } from '@template/permissions';
+import { capGrant, type Entitlements, getOrgPermissions } from '@template/permissions';
 import type { Context } from 'hono';
-import { getPrincipalSlice } from '#/lib/permissions/getPrincipalSlice';
+import { getPrincipalGrant } from '#/lib/permissions/getPrincipalGrant';
 import { membershipGrant } from '#/lib/permissions/membershipGrant';
 import { validateRole } from '#/lib/permissions/validateRole';
 import type { AppEnv } from '#/types/appEnv';
@@ -36,12 +36,12 @@ export const setupOrgPermissions = async (c: Context<AppEnv>) => {
           (ou) => ou.organizationId === token.organizationId,
         )
       : (c.get('organizationUsers') ?? []);
-  const slice = getPrincipalSlice(c);
+  const principalGrant = getPrincipalGrant(c);
 
   for (const orgUser of orgUsers) {
     const membership = membershipGrant(orgUser);
-    const grant = slice
-      ? capSlice('db:organization', membership, slice)
+    const grant = principalGrant
+      ? capGrant('db:organization', membership, principalGrant)
       : { ...membership, entitlementsOnly: false };
     await permix.setup(
       getOrgPermissions(

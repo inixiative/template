@@ -222,20 +222,14 @@ export const rebacSchema: RebacSchema = {
                 { rel: 'sourceSpace.organization', action: 'own' },
               ],
             },
-            // grantUserSlice — asking for a slice mints a credential, so a user source needs token.create
+            // grantUserEntitlements — asking needs nothing; the approver needs authority to assign it
             {
               all: [
-                { rule: { field: 'type', operator: Operator.in, value: ['grantUserSlice'] } },
                 {
-                  any: [
-                    {
-                      all: [
-                        { self: 'sourceUserId' },
-                        { rel: 'sourceUser', action: 'token.create' },
-                      ],
-                    },
-                    { rel: 'sourceIntegration', action: 'manage' },
-                  ],
+                  rule: { field: 'type', operator: Operator.in, value: ['grantUserEntitlements'] },
+                },
+                {
+                  any: [{ self: 'sourceUserId' }, { rel: 'sourceIntegration', action: 'manage' }],
                 },
               ],
             },
@@ -249,13 +243,21 @@ export const rebacSchema: RebacSchema = {
           any: [
             {
               all: [
-                { rule: { field: 'type', operator: Operator.notIn, value: ['grantUserSlice'] } },
+                {
+                  rule: {
+                    field: 'type',
+                    operator: Operator.notIn,
+                    value: ['grantUserEntitlements'],
+                  },
+                },
                 { self: 'targetUserId' },
               ],
             },
             {
               all: [
-                { rule: { field: 'type', operator: Operator.in, value: ['grantUserSlice'] } },
+                {
+                  rule: { field: 'type', operator: Operator.in, value: ['grantUserEntitlements'] },
+                },
                 { self: 'targetUserId' },
                 { rel: 'targetUser', action: 'token.create' },
               ],
@@ -285,12 +287,14 @@ export const rebacSchema: RebacSchema = {
         // Revoke: either party withdraws a standing grant
         revoke: {
           all: [
-            { rule: { field: 'type', operator: Operator.in, value: ['grantUserSlice'] } },
+            { rule: { field: 'type', operator: Operator.in, value: ['grantUserEntitlements'] } },
             {
               any: [
                 { self: 'sourceUserId' },
                 { self: 'targetUserId' },
                 { rel: 'sourceIntegration', action: 'manage' },
+                { rel: 'targetOrganization', action: 'manage' },
+                { rel: 'targetSpace', action: 'manage' },
               ],
             },
           ],

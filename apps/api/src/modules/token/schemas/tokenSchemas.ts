@@ -16,6 +16,8 @@ export const tokenCreateBodySchema = z.object({
   expiresAt: z.coerce.date().optional(),
 });
 
+export const tokenUpdateBodySchema = tokenCreateBodySchema.omit({ expiresAt: true }).partial();
+
 export const tokenCreateResponseSchema = TokenScalarSchema.omit({ keyHash: true }).extend({
   key: z.string(),
 });

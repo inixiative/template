@@ -12,6 +12,7 @@ import {
   cleanupTouchedTables,
   createOrganization,
   createOrganizationUser,
+  createSpaceUser,
   createToken,
   createUser,
 } from '@template/db/test';
@@ -111,8 +112,16 @@ describe('actions on the user itself', () => {
   });
 
   it('a token holds a session action its entitlements name, and nothing else', async () => {
-    const key = await mint(user, 'viewer', { 'token.create': true });
-    expect((await call(key, 'POST', '/me/tokens', { name: 't', role: 'viewer' })).status).toBe(201);
+    const key = await mint(user, 'viewer', { 'token.create': true, read: true });
+    expect(
+      (
+        await call(key, 'POST', '/me/tokens', {
+          name: 't',
+          role: 'viewer',
+          entitlements: { read: true },
+        })
+      ).status,
+    ).toBe(201);
     expect((await call(key, 'POST', '/me/redact')).status).toBe(403);
   });
 
@@ -174,6 +183,57 @@ describe('actions on the user itself', () => {
     expect((await call(key, 'POST', '/me/tokens', { name: 't', role: 'owner' })).status).toBe(403);
   });
 
+  it('a narrowed issuer cannot mint a full token', async () => {
+    const key = await mint(user, 'owner', { 'token.create': true, own: true });
+    expect((await call(key, 'POST', '/me/tokens', { name: 't', role: 'viewer' })).status).toBe(403);
+    expect(
+      (
+        await call(key, 'POST', '/me/tokens', {
+          name: 't',
+          role: 'viewer',
+          entitlements: { read: true },
+        })
+      ).status,
+    ).toBe(201);
+  });
+
+  it('a SpaceUser token knows who it is and holds nothing else on the user; a Space token holds nothing', async () => {
+    const spaceOwner = (await createUser()).entity;
+    const { context } = await createOrganizationUser({ role: 'owner' }, { user: spaceOwner });
+    const { entity: spaceUser, context: spaceContext } = await createSpaceUser(
+      { role: 'owner' },
+      context,
+    );
+    const spaceUserKey = randomUUID();
+    await createToken(
+      {
+        ownerModel: 'SpaceUser',
+        role: 'owner',
+        keyHash: createHash('sha256').update(spaceUserKey).digest('hex'),
+      },
+      { ...spaceContext, spaceUser },
+    );
+    expect((await call(spaceUserKey, 'GET', '/me')).status).toBe(200);
+    expect((await call(spaceUserKey, 'GET', '/me/contacts')).status).toBe(403);
+    expect(
+      (await call(spaceUserKey, 'POST', '/me/tokens', { name: 't', role: 'viewer' })).status,
+    ).toBe(403);
+    expect(
+      (await call(spaceUserKey, 'POST', '/organization', { name: 'n', slug: randomUUID() })).status,
+    ).toBe(403);
+
+    const spaceKey = randomUUID();
+    await createToken(
+      {
+        ownerModel: 'Space',
+        role: 'owner',
+        keyHash: createHash('sha256').update(spaceKey).digest('hex'),
+      },
+      { organization: spaceContext.organization, space: spaceContext.space },
+    );
+    expect((await call(spaceKey, 'GET', '/me')).status).toBe(401);
+  });
+
   it('a minter cannot grant an action it does not hold', async () => {
     const key = await mint(user, 'viewer', { 'token.create': true });
     const response = await call(key, 'POST', '/me/tokens', {
@@ -187,7 +247,7 @@ describe('actions on the user itself', () => {
   it('a session mints an entitlement-only token that holds only what it names', async () => {
     const response = await session(user).fetch(
       post('/me/tokens', {
-        name: 'slice',
+        name: 'entitlementGrant',
         role: 'owner',
         entitlements: { read: true },
         entitlementsOnly: true,

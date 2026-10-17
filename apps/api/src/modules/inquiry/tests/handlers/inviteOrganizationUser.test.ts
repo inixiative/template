@@ -49,7 +49,10 @@ describe('handler: inviteOrganizationUser', () => {
 
     const targetFetch = createTestApp({ mockUser: invitee, mount }).fetch;
     const response = await targetFetch(
-      post(`/api/v1/inquiry/${inquiry.id}/resolve`, { status: 'approved' }),
+      post(`/api/v1/inquiry/${inquiry.id}/resolve`, {
+        expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
+        status: 'approved',
+      }),
     );
     const { data } = await json<Inquiry>(response);
 
@@ -76,7 +79,12 @@ describe('handler: inviteOrganizationUser', () => {
     });
 
     const targetFetch = createTestApp({ mockUser: invitee, mount }).fetch;
-    await targetFetch(post(`/api/v1/inquiry/${inquiry.id}/resolve`, { status: 'denied' }));
+    await targetFetch(
+      post(`/api/v1/inquiry/${inquiry.id}/resolve`, {
+        expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
+        status: 'denied',
+      }),
+    );
 
     const membership = await db.organizationUser.findUnique({
       where: { organizationId_userId: { organizationId: org.id, userId: invitee.id } },
@@ -99,7 +107,11 @@ describe('handler: inviteOrganizationUser', () => {
     const targetFetch = createTestApp({ mockUser: invitee, mount }).fetch;
     // Attempt to escalate to 'admin' via resolution payload
     await targetFetch(
-      post(`/api/v1/inquiry/${inquiry.id}/resolve`, { status: 'approved', role: 'admin' }),
+      post(`/api/v1/inquiry/${inquiry.id}/resolve`, {
+        expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
+        status: 'approved',
+        role: 'admin',
+      }),
     );
 
     const membership = await db.organizationUser.findUnique({

@@ -31,8 +31,8 @@ export const securitySchemes = {
     bearerFormat: 'JWT',
     description:
       'JWT signed by the configured issuer (`AUTH_ISSUER`, keys at `AUTH_JWKS_URL`). It is the user: with no ' +
-      '`grant` claim it carries the full user, as a session does; with a `grant` claim it carries the slice ' +
-      'that approved `grantUserSlice` inquiry holds, capped by what the user holds.',
+      '`grant` claim it carries the full user, as a session does; with a `grant` claim it carries the entitlements ' +
+      'an approved `grantUserEntitlements` inquiry granted, capped by what the user holds.',
   },
   internalSecret: {
     type: 'apiKey',

@@ -5,9 +5,9 @@
  * @uses infrastructure:prisma
  */
 import type { UserId } from '@template/db';
-import { capSlice, getUserPermissions, UserAction, userLoginGrant } from '@template/permissions';
+import { capGrant, getUserPermissions, UserAction, userLoginGrant } from '@template/permissions';
 import type { Context } from 'hono';
-import { getPrincipalSlice } from '#/lib/permissions/getPrincipalSlice';
+import { getPrincipalGrant } from '#/lib/permissions/getPrincipalGrant';
 import type { AppEnv } from '#/types/appEnv';
 
 const membershipTokenModels = ['OrganizationUser', 'SpaceUser'];
@@ -25,9 +25,9 @@ export const setupUserPermissions = async (c: Context<AppEnv>) => {
     return;
   }
 
-  const slice = getPrincipalSlice(c);
-  const grant = slice
-    ? capSlice('db:user', userLoginGrant, slice)
+  const principalGrant = getPrincipalGrant(c);
+  const grant = principalGrant
+    ? capGrant('db:user', userLoginGrant, principalGrant)
     : { ...userLoginGrant, entitlementsOnly: false };
 
   await permix.setup(

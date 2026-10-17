@@ -79,25 +79,28 @@ describe('issuer JWT principal', () => {
       }),
     );
 
+  const currentVersion = async (inquiryId: string) =>
+    (await db.inquiry.findUniqueOrThrow({ where: { id: inquiryId } })).updatedAt.toISOString();
+
   const rename = (jwt: string, organization: Organization) =>
     call(jwt, 'PATCH', `/organization/${organization.id}`, {
       name: `renamed-${randomUUID().slice(0, 6)}`,
     });
 
-  const requestSlice = async (
+  const requestGrant = async (
     jwt: string,
     content: { role?: string; entitlements?: Entitlements; entitlementsOnly?: boolean },
   ) =>
     call(jwt, 'POST', '/me/inquiries', {
-      type: 'grantUserSlice',
+      type: 'grantUserEntitlements',
       targetModel: 'User',
       targetUserId: user.id,
       status: 'sent',
       content: { purpose: 'artifactory', ...content },
     });
 
-  const sliceJwt = async (content: Parameters<typeof requestSlice>[1]) => {
-    const response = await requestSlice(await sign({}), content);
+  const grantJwt = async (content: Parameters<typeof requestGrant>[1]) => {
+    const response = await requestGrant(await sign({}), content);
     expect(response.status).toBe(201);
     const { data } = (await response.json()) as { data: { id: string; status: string } };
     expect(data.status).toBe('approved');
@@ -220,9 +223,9 @@ describe('issuer JWT principal', () => {
     });
   });
 
-  describe('a scoped JWT carries an approved slice', () => {
+  describe('a scoped JWT carries approved entitlements', () => {
     it('entitlement-only { read }: reads, writes nothing, mints nothing', async () => {
-      const { jwt } = await sliceJwt({ entitlements: { read: true }, entitlementsOnly: true });
+      const { jwt } = await grantJwt({ entitlements: { read: true }, entitlementsOnly: true });
       expect((await call(jwt, 'GET', '/me')).status).toBe(200);
       expect((await call(jwt, 'GET', `/organization/${ownedOrganization.id}/users`)).status).toBe(
         200,
@@ -241,29 +244,35 @@ describe('issuer JWT principal', () => {
       ).toBe(403);
     });
 
-    it('a read-only slice cannot ask for a wider slice', async () => {
-      const { jwt } = await sliceJwt({ entitlements: { read: true }, entitlementsOnly: true });
-      expect((await requestSlice(jwt, { role: 'owner' })).status).toBe(403);
+    it('a read-only grant cannot ask for a wider one', async () => {
+      const { jwt } = await grantJwt({ entitlements: { read: true }, entitlementsOnly: true });
+      expect((await requestGrant(jwt, { role: 'owner' })).status).toBe(403);
     });
 
     it('default mode viewer + { manage }: capped by each membership', async () => {
-      const { jwt } = await sliceJwt({ role: 'viewer', entitlements: { manage: true } });
+      const { jwt } = await grantJwt({ role: 'viewer', entitlements: { manage: true } });
       expect((await rename(jwt, ownedOrganization)).status).toBe(200);
       expect((await rename(jwt, viewedOrganization)).status).toBe(403);
     });
 
-    it('a slice holding token.create may mint, capped by the user', async () => {
-      const { jwt } = await sliceJwt({
+    it('a grant holding token.create may mint, capped by the user', async () => {
+      const { jwt } = await grantJwt({
         entitlements: { read: true, 'token.create': true },
         entitlementsOnly: true,
       });
-      expect((await call(jwt, 'POST', '/me/tokens', { name: 'm', role: 'viewer' })).status).toBe(
-        201,
-      );
+      expect(
+        (
+          await call(jwt, 'POST', '/me/tokens', {
+            name: 'm',
+            role: 'viewer',
+            entitlements: { read: true },
+          })
+        ).status,
+      ).toBe(201);
     });
 
     it('the user cannot be asked for an action they do not hold', async () => {
-      const response = await requestSlice(await sign({}), {
+      const response = await requestGrant(await sign({}), {
         entitlements: { 'artifact.create': true },
         entitlementsOnly: true,
       });
@@ -271,17 +280,23 @@ describe('issuer JWT principal', () => {
     });
 
     it('revoking the inquiry kills the JWT', async () => {
-      const { jwt, inquiryId } = await sliceJwt({
+      const { jwt, inquiryId } = await grantJwt({
         entitlements: { read: true },
         entitlementsOnly: true,
       });
       expect((await call(jwt, 'GET', '/me')).status).toBe(200);
-      expect((await call(await sign({}), 'POST', `/inquiry/${inquiryId}/revoke`)).status).toBe(204);
+      expect(
+        (
+          await call(await sign({}), 'POST', `/inquiry/${inquiryId}/revoke`, {
+            expectedUpdatedAt: await currentVersion(inquiryId),
+          })
+        ).status,
+      ).toBe(204);
       expect((await call(jwt, 'GET', '/me')).status).toBe(401);
     });
 
     it('a grant for another user does not apply', async () => {
-      const { inquiryId } = await sliceJwt({
+      const { inquiryId } = await grantJwt({
         entitlements: { read: true },
         entitlementsOnly: true,
       });
@@ -292,9 +307,9 @@ describe('issuer JWT principal', () => {
   });
 
   describe('issuing is capped by the principal that issues', () => {
-    it('a { member, token.create } slice asking for an owner slice waits for the user', async () => {
-      const { jwt } = await sliceJwt({ role: 'member', entitlements: { 'token.create': true } });
-      const response = await requestSlice(jwt, {
+    it('a { member, token.create } grant asking for an owner grant waits for the user', async () => {
+      const { jwt } = await grantJwt({ role: 'member', entitlements: { 'token.create': true } });
+      const response = await requestGrant(jwt, {
         role: 'owner',
         entitlements: { 'token.create': true, 'user.redact': true },
       });
@@ -302,19 +317,28 @@ describe('issuer JWT principal', () => {
       const { data } = (await response.json()) as { data: { id: string; status: string } };
       expect(data.status).toBe('sent');
       expect(
-        (await call(jwt, 'POST', `/inquiry/${data.id}/resolve`, { status: 'approved' })).status,
+        (
+          await call(jwt, 'POST', `/inquiry/${data.id}/resolve`, {
+            status: 'approved',
+            expectedUpdatedAt: await currentVersion(data.id),
+          })
+        ).status,
       ).toBe(403);
       expect(
-        (await call(await sign({}), 'POST', `/inquiry/${data.id}/resolve`, { status: 'approved' }))
-          .status,
+        (
+          await call(await sign({}), 'POST', `/inquiry/${data.id}/resolve`, {
+            status: 'approved',
+            expectedUpdatedAt: await currentVersion(data.id),
+          })
+        ).status,
       ).toBe(200);
     });
 
     it('a token holding no session action cannot self-approve them through its own integration', async () => {
       const { entity: integration } = await createIntegration({ ownerModel: 'User' }, { user });
-      const { jwt } = await sliceJwt({ role: 'admin' });
+      const { jwt } = await grantJwt({ role: 'admin' });
       const response = await call(jwt, 'POST', `/integration/${integration.id}/inquiries`, {
-        type: 'grantUserSlice',
+        type: 'grantUserEntitlements',
         targetModel: 'User',
         targetUserId: user.id,
         status: 'sent',
@@ -325,7 +349,7 @@ describe('issuer JWT principal', () => {
       expect(data.status).toBe('sent');
     });
 
-    it('an org admin cannot auto-approve a slice through a member-owned integration', async () => {
+    it('an org admin cannot auto-approve a grant through a member-owned integration', async () => {
       const admin = (await createUser()).entity;
       const { entity: adminMembership } = await createOrganizationUser(
         { role: 'admin' },
@@ -344,7 +368,7 @@ describe('issuer JWT principal', () => {
         'POST',
         `/integration/${integration.id}/inquiries`,
         {
-          type: 'grantUserSlice',
+          type: 'grantUserEntitlements',
           targetModel: 'User',
           targetUserId: user.id,
           status: 'sent',
@@ -357,7 +381,7 @@ describe('issuer JWT principal', () => {
     });
   });
 
-  describe('an integration asks for a slice', () => {
+  describe('an integration asks for entitlements', () => {
     it('waits for the user when the integration is not theirs, and applies once approved', async () => {
       const { entity: integration, context } = await createIntegration(
         { ownerModel: 'User' },
@@ -370,7 +394,7 @@ describe('issuer JWT principal', () => {
         'POST',
         `/integration/${integration.id}/inquiries`,
         {
-          type: 'grantUserSlice',
+          type: 'grantUserEntitlements',
           targetModel: 'User',
           targetUserId: user.id,
           status: 'sent',
@@ -381,24 +405,25 @@ describe('issuer JWT principal', () => {
       const { data } = (await response.json()) as { data: { id: string; status: string } };
       expect(data.status).toBe('sent');
 
-      const sliceJwtBefore = await sign({ grant: data.id });
-      expect((await call(sliceJwtBefore, 'GET', '/me')).status).toBe(401);
+      const grantJwtBefore = await sign({ grant: data.id });
+      expect((await call(grantJwtBefore, 'GET', '/me')).status).toBe(401);
 
       const resolved = await call(await sign({}), 'POST', `/inquiry/${data.id}/resolve`, {
+        expectedUpdatedAt: await currentVersion(data.id),
         status: 'approved',
       });
       expect(resolved.status).toBe(200);
-      expect((await call(sliceJwtBefore, 'GET', '/me')).status).toBe(200);
+      expect((await call(grantJwtBefore, 'GET', '/me')).status).toBe(200);
     });
 
-    it('auto-approves when the integration belongs to the user', async () => {
+    it('does not auto-approve, even for an integration the user owns', async () => {
       const { entity: integration } = await createIntegration({ ownerModel: 'User' }, { user });
       const response = await call(
         await sign({}),
         'POST',
         `/integration/${integration.id}/inquiries`,
         {
-          type: 'grantUserSlice',
+          type: 'grantUserEntitlements',
           targetModel: 'User',
           targetUserId: user.id,
           status: 'sent',
@@ -406,7 +431,7 @@ describe('issuer JWT principal', () => {
         },
       );
       const { data } = (await response.json()) as { data: { status: string } };
-      expect(data.status).toBe('approved');
+      expect(data.status).toBe('sent');
     });
   });
 });

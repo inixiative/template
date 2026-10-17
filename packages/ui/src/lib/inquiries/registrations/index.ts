@@ -1,5 +1,5 @@
 import './createSpace';
-import './grantUserSlice';
+import './grantUserEntitlements';
 import './inviteOrganizationUser';
 import './transferSpace';
 import './updateSpace';

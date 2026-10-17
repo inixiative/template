@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { createHash, randomUUID } from 'node:crypto';
-import { db } from '@template/db';
+import { clearHookRegistry, db } from '@template/db';
 import type {
   Organization,
   OrganizationUser,
@@ -19,11 +19,14 @@ import {
   createUser,
 } from '@template/db/test';
 import type { Entitlements } from '@template/permissions/client';
+import { registerClearCacheHook } from '#/hooks/cache/hook';
 import { tokenAuthMiddleware } from '#/middleware/auth/tokenAuthMiddleware';
 import { meRouter } from '#/modules/me';
 import { organizationRouter } from '#/modules/organization';
 import { spaceRouter } from '#/modules/space';
 import { createTestApp } from '#tests/createTestApp';
+
+registerClearCacheHook();
 
 describe('a token never exceeds its user', () => {
   let user: User;
@@ -101,6 +104,7 @@ describe('a token never exceeds its user', () => {
 
   afterAll(async () => {
     await cleanupTouchedTables(db);
+    clearHookRegistry();
   });
 
   describe('default mode', () => {
@@ -135,6 +139,39 @@ describe('a token never exceeds its user', () => {
       expect((await rename(key, `/organization/${ownedOrganization.id}`)).status).toBe(403);
       expect((await call(key, 'GET', `/organization/${ownedOrganization.id}/users`)).status).toBe(
         200,
+      );
+    });
+  });
+
+  describe('full grant (entitlements null)', () => {
+    it('inherits the membership entitlements, live', async () => {
+      const fullUser = (await createUser()).entity;
+      const organization = (await createOrganization()).entity;
+      const { entity: membership } = await createOrganizationUser(
+        { role: 'viewer', entitlements: { manage: true } },
+        { user: fullUser, organization },
+      );
+      const key = randomUUID();
+      await createToken(
+        {
+          ownerModel: 'User',
+          role: 'owner',
+          keyHash: createHash('sha256').update(key).digest('hex'),
+        },
+        { user: fullUser },
+      );
+      expect((await rename(key, `/organization/${organization.id}`)).status).toBe(200);
+      await db.organizationUser.update({
+        where: { id: membership.id },
+        data: { entitlements: {} },
+      });
+      expect((await rename(key, `/organization/${organization.id}`)).status).toBe(403);
+    });
+
+    it('does not inherit the login-only session actions', async () => {
+      const key = await mint('owner', null);
+      expect((await call(key, 'POST', '/me/tokens', { name: 't', role: 'viewer' })).status).toBe(
+        403,
       );
     });
   });

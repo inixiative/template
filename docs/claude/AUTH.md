@@ -327,7 +327,7 @@ organizationId: null
 ```
 
 - Tied to a specific user
-- Reaches the user and every org and space they belong to, each capped by the user's own grant there ([Slices](./PERMISSIONS.md#slices))
+- Reaches the user and every org and space they belong to, each capped by the user's own grant there ([Grants](./PERMISSIONS.md#grants))
 - Used for personal API access
 
 ### Organization Token
@@ -353,7 +353,7 @@ organizationId: set
 
 - Tied to a user's membership in a specific org
 - Has access only to that org: no user entry, no spaces
-- Permissions are the token's slice capped by the membership
+- Permissions are the token's grant capped by the membership
 - Used for scoped access to a single org
 
 ### Space Token
@@ -381,7 +381,7 @@ spaceId: set
 
 - Tied to a user's membership in a specific space
 - Has access only to that space: no user entry, no organization entry
-- Permissions are the token's slice capped by the space membership
+- Permissions are the token's grant capped by the space membership
 - Used for scoped access to a single space
 
 ### Token Schema
@@ -406,7 +406,7 @@ model Token {
   space            Space?
   spaceUser        SpaceUser?
 
-  // Permissions: a slice, capped per request by the owner's grant
+  // Permissions: full (entitlements null) or narrowed, capped per request by the owner's grant
   role             Role    @default(member)
   entitlements     Json?
   entitlementsOnly Boolean @default(false)
@@ -435,7 +435,7 @@ enum TokenOwnerModel {
 
 ## Issuer JWT
 
-A JWT from a configured issuer is **the user, not a token**. With no `grant` claim it carries the full user, exactly as a session does ("the most access you can have"). With a `grant` claim it carries a narrower slice of the same user: the one an approved `grantUserSlice` inquiry holds ([Granting a Slice](./PERMISSIONS.md#granting-a-slice)). No Token row exists for it.
+A JWT from a configured issuer is **the user, not a token**. With no `grant` claim it carries the full user, exactly as a session does ("the most access you can have"). With a `grant` claim it carries the narrower grant of the same user that an approved `grantUserEntitlements` inquiry holds ([Granting User Entitlements](./PERMISSIONS.md#granting-user-entitlements)). No Token row exists for it.
 
 Located in `apps/api/src/middleware/auth/jwtAuthMiddleware.ts`; verifier in `apps/api/src/lib/auth/verifyIssuerJwt.ts`.
 
@@ -454,18 +454,18 @@ A JWT-shaped bearer that fails is a **401**, never a fall-through to API-token h
 | Claim | Meaning |
 |---|---|
 | `sub` | `User.id` |
-| `grant` (optional) | id of an approved `grantUserSlice` inquiry targeting `sub`; read live on every request, so revoking it locks the JWT out at once |
+| `grant` (optional) | id of an approved `grantUserEntitlements` inquiry targeting `sub`; read live on every request, so revoking it locks the JWT out at once |
 | `iss`, `aud`, `exp`, `iat` | standard |
 
-The step sets `c.get('slice')` (the slice, its inquiry id and the requesting integration) before `setUserContext`, so the setup functions cap by it. Downstream:
+The step sets `c.get('entitlementGrant')` (the grant, its inquiry id and the requesting integration) before `setUserContext`, so the setup functions cap by it. Downstream:
 
 - **Audit:** the actor is the user (`actorUserId`), `actorTokenId` stays null; the requesting integration, if any, is the audit `integrationId`.
-- **Batch:** `slice` is cloned into sub-requests with the user.
+- **Batch:** `entitlementGrant` is cloned into sub-requests with the user.
 - **Superadmin:** a superadmin's JWT is superadmin, spoofing included.
 
 ### What Kingdom Adds
 
-Template verifies; Kingdom issues. Left for the Kingdom change: Better Auth `jwt()` with ES256 keys and a JWKS model, the embed login that mints the JWT (AUTH-008), a session-id check against the live session, and Kingdom's owner-authority code that still assumes a Token row (owner routes that re-hash the bearer, the actor-authority loader, and the org/space manage checks that cap memberships by hand and must move to `capSlice`).
+Template verifies; Kingdom issues. Left for the Kingdom change: Better Auth `jwt()` with ES256 keys and a JWKS model, the embed login that mints the JWT (AUTH-008), a session-id check against the live session, and Kingdom's owner-authority code that still assumes a Token row (owner routes that re-hash the bearer, the actor-authority loader, and the org/space manage checks that cap memberships by hand and must move to `capGrant`).
 
 ---
 
@@ -499,10 +499,10 @@ Spoof runs last so a superadmin can spoof via either auth path.
 Request
   ↓
 prepareRequest
-  - user: null, token: null, slice: null, permix: empty
+  - user: null, token: null, entitlementGrant: null, permix: empty
   ↓
 jwtAuthMiddleware
-  - If issuer configured + JWT-shaped bearer → verify, load slice from grant, setUserContext()
+  - If issuer configured + JWT-shaped bearer → verify, load the grant, setUserContext()
   - Invalid JWT → 401
   ↓
 tokenAuthMiddleware
@@ -592,7 +592,7 @@ router.get('/resource', validateActor, handler);  // 401 if no user from getActo
 
 ### Session-Only Actions
 
-There is no "tokens forbidden" guard. Token minting, token deletion, account redaction and organization deletion are `SessionAction`s, checked with `validateSelfPermission` ([PERMISSIONS.md](./PERMISSIONS.md#validateselfpermission)). A session (or a JWT with no grant) holds them all; a token or slice holds one only when its entitlements name it.
+There is no "tokens forbidden" guard. Token minting, token deletion, account redaction and organization deletion are `SessionAction`s, checked with `validateSelfPermission` ([PERMISSIONS.md](./PERMISSIONS.md#validateselfpermission)). A session (or a JWT with no grant) holds them all; a token or grant holds one only when its entitlements name it.
 
 ```typescript
 middleware: [validateSelfPermission(SessionAction.createToken)]

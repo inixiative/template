@@ -12,7 +12,7 @@ import type {
   Token,
   User,
 } from '@template/db/generated/client/client';
-import type { Slice } from '@template/permissions';
+import type { EntitlementGrant } from '@template/permissions';
 
 export type TokenWithRelations = Token & {
   user: User | null;
@@ -29,4 +29,7 @@ export type TokenWithRelations = Token & {
     | null;
 };
 
-export type SliceGrant = Slice & { inquiryId: string; integrationId: string | null };
+export type GrantedEntitlements = EntitlementGrant & {
+  inquiryId: string;
+  integrationId: string | null;
+};
