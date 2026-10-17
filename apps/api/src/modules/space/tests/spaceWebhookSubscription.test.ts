@@ -1,10 +1,28 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
-import type { Organization, OrganizationUser, Space, SpaceUser, User, WebhookSubscription } from '@template/db';
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  mock,
+  spyOn,
+} from 'bun:test';
 import { db } from '@template/db';
+import type {
+  Organization,
+  OrganizationUser,
+  Space,
+  SpaceUser,
+  User,
+  WebhookSubscription,
+} from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
   createOrganizationUser,
   createSpace,
+  createSpaceUser,
   createWebhookSubscription,
   getNextSeq,
 } from '@template/db/test';
@@ -30,14 +48,14 @@ describe('space/webhookSubscriptions', () => {
     const { entity: s } = await createSpace({}, { organization: org });
     space = s;
 
-    spaceUser = await db.spaceUser.create({
-      data: {
+    spaceUser = (
+      await createSpaceUser({
         role: 'admin',
         organizationId: org.id,
         spaceId: space.id,
         userId: user.id,
-      },
-    });
+      })
+    ).entity;
 
     const harness = createTestApp({
       mockUser: user,
@@ -50,8 +68,14 @@ describe('space/webhookSubscriptions', () => {
   });
 
   beforeEach(() => {
-    spyOn(globalThis, 'fetch').mockImplementation((() =>
-      Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 200 }))) as typeof fetch);
+    spyOn(globalThis, 'fetch').mockImplementation(
+      Object.assign(
+        () => Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 200 })),
+        {
+          preconnect: globalThis.fetch.preconnect,
+        },
+      ),
+    );
   });
 
   afterEach(() => {
@@ -84,14 +108,14 @@ describe('space/webhookSubscriptions', () => {
         { role: 'member' },
         { organization: org },
       );
-      const memberSpaceUser = await db.spaceUser.create({
-        data: {
+      const memberSpaceUser = (
+        await createSpaceUser({
           role: 'member',
           organizationId: org.id,
           spaceId: space.id,
           userId: memberContext.user.id,
-        },
-      });
+        })
+      ).entity;
 
       const memberHarness = createTestApp({
         mockUser: memberContext.user,
@@ -120,6 +144,7 @@ describe('space/webhookSubscriptions', () => {
     it('returns space webhooks', async () => {
       const seq = getNextSeq();
       await createWebhookSubscription({
+        model: 'CustomerRef',
         ownerModel: 'Space',
         spaceId: space.id,
         url: `https://example.com/space-list-${seq}`,
@@ -138,6 +163,7 @@ describe('space/webhookSubscriptions', () => {
       const { entity: otherSpace } = await createSpace({}, { organization: org });
       const seq = getNextSeq();
       await createWebhookSubscription({
+        model: 'CustomerRef',
         ownerModel: 'Space',
         spaceId: otherSpace.id,
         url: `https://example.com/other-space-${seq}`,

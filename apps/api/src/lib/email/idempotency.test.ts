@@ -14,7 +14,9 @@ describe('email idempotency keys', () => {
     });
 
     it('changes when the refs change', () => {
-      expect(plannerJobId('e', 't', { inquiryId: '1' })).not.toBe(plannerJobId('e', 't', { inquiryId: '2' }));
+      expect(plannerJobId('e', 't', { inquiryId: '1' })).not.toBe(
+        plannerJobId('e', 't', { inquiryId: '2' }),
+      );
     });
   });
 
@@ -49,15 +51,25 @@ describe('email idempotency keys', () => {
     });
 
     it('differs per sender', () => {
-      expect(deliverJobId('e', 't', { type: 'Organization', organizationId: 'org-1' }, 'bob@x.com', { x: 1 })).not.toBe(
-        deliverJobId('e', 't', { type: 'Space', spaceId: 'space-1', organizationId: 'org-1' }, 'bob@x.com', { x: 1 }),
+      expect(
+        deliverJobId('e', 't', { type: 'Organization', organizationId: 'org-1' }, 'bob@x.com', {
+          x: 1,
+        }),
+      ).not.toBe(
+        deliverJobId(
+          'e',
+          't',
+          { type: 'Space', spaceId: 'space-1', organizationId: 'org-1' },
+          'bob@x.com',
+          { x: 1 },
+        ),
       );
     });
 
     it('differs when the rendered contents change (allows a legitimate resend)', () => {
-      expect(deliverJobId('e', 't', { type: 'platform' }, 'bob@x.com', { role: 'member' })).not.toBe(
-        deliverJobId('e', 't', { type: 'platform' }, 'bob@x.com', { role: 'admin' }),
-      );
+      expect(
+        deliverJobId('e', 't', { type: 'platform' }, 'bob@x.com', { role: 'member' }),
+      ).not.toBe(deliverJobId('e', 't', { type: 'platform' }, 'bob@x.com', { role: 'admin' }));
     });
   });
 });

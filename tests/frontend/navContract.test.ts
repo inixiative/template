@@ -42,8 +42,14 @@ const normalizeNavPath = (path: string): string => {
 
 describe('frontend nav contract', () => {
   it('web nav paths resolve to generated route targets', () => {
-    const routeTargets = getRouteTargetsFromRouteTree(resolve(process.cwd(), 'apps/web/app/routeTree.gen.ts'));
-    const navPaths = flattenNavPaths([...webNavConfig.user, ...webNavConfig.organization, ...webNavConfig.space]);
+    const routeTargets = getRouteTargetsFromRouteTree(
+      resolve(process.cwd(), 'apps/web/app/routeTree.gen.ts'),
+    );
+    const navPaths = flattenNavPaths([
+      ...webNavConfig.user,
+      ...webNavConfig.organization,
+      ...webNavConfig.space,
+    ]);
 
     // Deduplicate paths (same path can appear in multiple contexts)
     const uniquePaths = [...new Set(navPaths)];
@@ -52,8 +58,14 @@ describe('frontend nav contract', () => {
   });
 
   it('admin nav paths resolve to generated route targets', () => {
-    const routeTargets = getRouteTargetsFromRouteTree(resolve(process.cwd(), 'apps/admin/app/routeTree.gen.ts'));
-    const navPaths = flattenNavPaths([...adminNavConfig.user, ...adminNavConfig.organization, ...adminNavConfig.space]);
+    const routeTargets = getRouteTargetsFromRouteTree(
+      resolve(process.cwd(), 'apps/admin/app/routeTree.gen.ts'),
+    );
+    const navPaths = flattenNavPaths([
+      ...adminNavConfig.user,
+      ...adminNavConfig.organization,
+      ...adminNavConfig.space,
+    ]);
 
     // Deduplicate paths (same path can appear in multiple contexts)
     const uniquePaths = [...new Set(navPaths)];

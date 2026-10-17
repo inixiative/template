@@ -1,114 +1,407 @@
-# WebSockets — realtime query refetch
+# WebSockets — realtime query refetch and data streams
 
-Server-driven cache invalidation: when something changes on the backend, connected clients
-**refetch the affected query through its normal authorized route**. The socket never carries
-domain data — only "this query is stale, refetch it." That's the whole security model: a client
-can only see what its own authorized route returns, so a refetch signal can't leak anything.
+<!-- toc:start -->
 
-This is the realtime layer behind app events' `websocket` reach (see [APP_EVENTS.md](./APP_EVENTS.md)).
+## Contents
 
----
+- [Contract](#contract)
+- [Channels vs streams: when to use which](#channels-vs-streams-when-to-use-which)
+- [Channel registry and authorization](#channel-registry-and-authorization)
+- [Connection and recovery](#connection-and-recovery)
+- [Publishing a refetch](#publishing-a-refetch)
+- [Data streams](#data-streams)
+  - [Stream definitions](#stream-definitions)
+  - [Audience](#audience)
+  - [Authorization and re-authorization](#authorization-and-re-authorization)
+  - [Ordering](#ordering)
+  - [Sequence numbers](#sequence-numbers)
+  - [Producing appends](#producing-appends)
+  - [Frontend](#frontend)
+- [Frontend and horizontal scaling](#frontend-and-horizontal-scaling)
+- [Source and verification](#source-and-verification)
 
-## The shared contract (`@template/shared/ws`)
+<!-- toc:end -->
 
-Both ends type against one source of truth so they can't drift.
+## Contract
 
-```ts
-// channelKey.ts — a query's routing key. Keeps the route identity (_id) + path scope; drops
-// query/headers/body. Same serialization as cacheKey (sorted, colon-joined): "adminBotRead:id:b1".
-channelKey({ _id, path }) → string
+The frontend consumes two event classes (`WSEvent`, dispatched as `handlers[category][action]`):
 
-// events.ts — server → client events, discriminated by category + action.
-type WSEvent = { category: 'query'; action: 'refetch'; key: ChannelKeyInput };
+- **Query-refetch hints** — `{ category: 'query', action: 'refetch', key: { _id, path? } }`. The
+  client invalidates that TanStack Query key and fetches data through the normal authorized HTTP
+  route. Reconnect recovery refetches registered live queries.
+- **Data streams** — `{ category: 'data', action: 'snapshot', stream, seq, payload }` once per
+  open, then `{ category: 'data', action: 'append', stream, seq, type, payload }` for each change. The socket
+  carries the data itself: the snapshot is the route's response and each append is a row shaped by
+  the route's `responseSchema`, folded by the stream's kind. See [Data streams](#data-streams).
 
-// liveQueries.ts — the registry: operationIds (queryKey[0]._id) that have a BE producer.
-// The FE pipes every query through subscribe, gated by this set, so we never subscribe to
-// channels the server can't emit to.
-LIVE_QUERIES: Set<string>
+Neither class is persisted or replayed. Every consumer owns a recovery path that does not depend
+on the push: query channels refetch on reconnect, and data streams re-open for a fresh snapshot.
+Data streams carry a per-stream `seq` so the client can *detect* a lost append and resync; nothing
+is ever re-sent (see [Sequence numbers](#sequence-numbers)).
+
+An app-event handler returns `WSHandoff[]`: a message handoff (`{ channels }` or `{ userIds }`
+target plus `message.data`) or a stream handoff built by `streamAppend`. Any further payload type
+needs its own authorization, frontend handling and recovery behavior.
+
+## Channels vs streams: when to use which
+
+**Channels are the default.** A channel carries only a hint ("this query changed"); the client
+refetches through the ordinary HTTP route, so authorization, filtering, pagination and response
+shaping all stay where they already are, and per-caller differences cost nothing. A missed hint
+is repaired by the reconnect refetch.
+
+Reach for a **stream** only when the data is genuinely incremental and high-frequency, so that
+refetching the whole resource on every change would be wasteful or too slow: streaming model
+output token by token, a live activity feed, a progress log. A stream carries the rows
+themselves, which makes the server responsible for everything a refetch gets for free: each
+append is authorized for every holder, shaped exactly like the route's response, ordered against
+other writers, and folded on the client by its kind. If a refetch per change is affordable, use a
+channel.
+
+Ephemeral signals (presence, typing) use user/channel events, which are lossy by design; data
+streams are the reliable lane (seq + resync). The two lanes are the choice between "drop it if
+missed" and "detect the loss and repair it": pick the lane, not a per-stream delivery option.
+
+## Channel registry and authorization
+
+`packages/shared/src/ws/channels.ts` exports `WS_CHANNELS`, the query-channel registry;
+`LIVE_QUERIES` is derived from its keys. Registered query families are `inquiryRead` and
+`segmentReadManySegmentMembers`. Stream families are not channels; they live in the stream
+registry (see [Stream definitions](#stream-definitions)).
+
+`channelKey({ _id, path })` retains operation identity and path parameters, dropping query,
+headers and body. A list channel therefore covers all query-filter variants of that path.
+
+A subscription is authorized by the underlying HTTP route. `canSubscribe` in
+`apps/api/src/ws/probe.ts` resolves the name with `resolveOperationRoute`
+(`apps/api/src/ws/operationRoute.ts`), which requires a canonical name
+(`channelKey(parseChannelKey(name)) === name`) and hands its operationId and path parameters to
+`resolveOperation` (`apps/api/src/lib/openapi/resolveOperation.ts`, shared by any in-process caller
+of a route). That fills the path parameters from the app's OpenAPI doc and rejects `.` and `..`
+values so a name can never normalize onto a different route. It then probes the
+route with the socket's sanitized credentials. Only a 2xx grants the subscription. The server
+sends `subscribed` or `subscribeRejected`; the frontend removes rejected channels from its
+desired set.
+
+Channels are authorized on subscribe and dropped whenever the connection's user or credential
+changes. They carry hints, not data, so they are not re-authorized per message.
+
+## Connection and recovery
+
+The WebSocket upgrade starts anonymous; credentials are sent in an `authenticate` frame, not a
+token query parameter. Only `authorization` and `x-spoof-user-email` headers cross into the
+identity probe. `/api/v1/me` resolves the effective identity through normal auth/spoof
+middleware. Spoof and unspoof are frontend operations that send new authenticate frames; `logout`
+clears identity and credentials. A 429 or 5xx from `/me` is not treated as "no user": the server
+keeps the current identity and grants and answers `{ type: 'error', action: 'authenticate',
+retryable: true }`, and the client re-sends its identity with exponential backoff. Changing the user **or** the credential (for the same user, say
+a narrower token) drops every channel and stream on the connection; re-sending the identical
+credential keeps them.
+
+Frames are serialized per connection. The server bounds the pending queue
+(`WS_MAX_PENDING_FRAMES`) and the frame rate (`WS_FRAME_LIMIT` per `WS_FRAME_WINDOW_MS`, shared
+constants in `packages/shared/src/ws/frameLimits.ts`). A frame arriving while the queue is full is
+not dropped silently: the server answers
+`{ type: 'error', action, stream?, channel?, retryable: true }`. The frontend sends a heartbeat
+every 30 seconds and reconnects if pong does not arrive within 5 seconds. `ping` is answered
+before the per-connection queue, so a slow snapshot read or the re-authorization sweep never
+delays `pong` into a spurious reconnect. The server sweeps connections idle for more than 5
+minutes.
+
+On reconnect, `createApiWebsocket` sends identity first, then replays subscribes, then opens. A
+replay that overruns the server's pending-frame cap or the HTTP rate limit (snapshot reads and
+subscribe probes count against it) gets retryable errors, and the client re-sends with backoff. It
+waits for subscription acknowledgements (or the bounded
+acknowledgement timeout) before calling the reconnect callback that invalidates live queries. A
+close or unsubscribe goes out only when its open or subscribe actually reached the server, and
+one the server drops for load is re-sent while the stream or channel stays released.
+
+Stream opens and closes settle for `streamSettleMs` (100 ms, a `lodash-es` `debounce` per stream)
+before the client reconciles held against sent, so holder
+churn nets out: a stream opened and released inside the window (a row scrolled past) sends
+nothing, and a stream released and re-held inside it (a remount) stays open without a new
+snapshot. Without it, fast churn across many streams exceeds `WS_FRAME_LIMIT` and the server
+closes the socket.
+
+## Publishing a refetch
+
+Register a channel family in `WS_CHANNELS` and return a handoff from a business-event handler:
+
+```typescript
+websocket: (data) => [{
+  target: { channels: [WS_CHANNELS.segmentReadManySegmentMembers.name(data.segmentId)] },
+  message: { data: refetch({ _id: 'segmentReadManySegmentMembers', path: { id: data.segmentId } }) },
+}],
 ```
 
-`key` is the query identity `{ _id, path? }`. `channelKey(key)` routes the emit; the FE invalidates
-`[key]` (react-query prefix-matches, so a key with no `path` invalidates every variant).
+`makeAppEvent` calls `deliverWSHandoffs`, which publishes to channels or user IDs. User-targeted
+membership changes instead send `meReadManySegmentMemberships` refetches to the affected User's
+sockets; those sends do not require adding that operation to the channel registry.
 
----
+## Data streams
 
-## End-to-end flow
-
-```
-BE: appEvent.websocket(data) → [{ category:'query', action:'refetch', key:{ _id, path } }]
-      → makeAppEvent → sendToChannel(channelKey(key), event)
-      → Redis pub/sub (ws:broadcast)  ──► every API instance
-      → sendToChannelLocal: deliver event to local connections subscribed to that channel
-FE: createApiWebsocket.onMessage → dispatchMessage → handlers.query.refetch
-      → queryClient.invalidateQueries({ queryKey: [event.key] }) → refetch via authorized route
-```
-
----
-
-## Making a query live (two steps)
-
-1. **Register the operationId** in `packages/shared/src/ws/liveQueries.ts` `LIVE_QUERIES`.
-2. **Emit a refetch** from the relevant app event's `websocket` reach:
-   ```ts
-   websocket: (bot) => [{ category: 'query', action: 'refetch', key: { _id: 'adminBotRead', path: { id: bot.id } } }],
-   ```
-That's it. The FE auto-subscribes any mounted query whose `_id` is in `LIVE_QUERIES` and refetches
-it when the event arrives.
-
----
-
-## Frontend
-
-- **`packages/shared/src/ws/createWebSocketClient.ts`** — generic browser transport: connect,
-  auto-reconnect, send-queue, `reconnect()` (force-drop a half-open socket).
-- **`packages/ui/src/lib/ws/createApiWebsocket.ts`** — the API adapter. Owns the **channel
-  refcount Map** (single source of truth, replayed on every reopen), wires inbound → `dispatchMessage`,
-  and runs the **bidirectional heartbeat** (ping → expect pong within 5s, else `reconnect()`).
-- **`packages/ui/src/lib/ws/dispatch.ts`** — `handlers[category][action]` map; `query.refetch` →
-  `invalidateQueries([event.key])`. Reads the client off the store.
-- **client slice (`store/slices/client.ts`)** — the pipe: a `queryCache` subscriber turns
-  `observerAdded`/`observerRemoved` into `websocket.subscribe`/`unsubscribe`, gated by `LIVE_QUERIES`.
-  `setClient` (called from each app's `main.tsx`) wires this and, on reconnect, invalidates live
-  queries to recover anything missed while offline.
-- **`useApiWebsocket()`** — mount once at the app root; connects on load.
-
-The QueryClient is created at the app root (`createAppQueryClient` in `main.tsx`, beside the router)
-and registered into the store via `setClient` — so the store never *constructs* the client (no import
-cycle); its error handlers read the store.
-
----
-
-## Connection lifecycle (backend `apps/api/src/ws/`)
-
-- **Identity** is set by message, gated by token: `authenticate` / `spoof` (by email, superadmin-only)
-  / `unspoof` / `logout`. A connection's `userId` is only ever set from a verified token.
-- **Subscriptions** are exact-match channels (`byChannel` index). List surfaces collapse onto one
-  channel because `channelKey` drops query params.
-- **Heartbeat (both directions):** FE pings; BE `pong`s + refreshes `lastPing`. The stale-sweep
-  (`cleanupStaleConnections`) closes connections idle past `STALE_TIMEOUT_MS`. FE arms a pong-timeout
-  and force-reconnects if the server goes silent (half-open detection).
-- **Reconnect recovery:** transport auto-reconnects → `createApiWebsocket` replays its channel set
-  → slice invalidates live queries. So any drop (network, server restart, sweep) self-heals.
-
----
-
-## Horizontal scaling
-
-`sendToChannel`/`sendToUser`/`broadcast` publish to a single Redis channel `ws:broadcast`; every API
-instance subscribes (`initWebSocketPubSub()` at boot) and delivers to its **local** connections.
-So an event emitted on instance A reaches subscribers on B and C. If Redis is down, delivery falls
-back to local-only (single-instance). Every instance sees every event and filters by its local
-registry — simple and correct; shard the Redis channel only if event volume demands it.
-
----
-
-## File map
+A data stream is a live view of one route's default response. Its name is the channel key of
+that route (`STREAM_DEFINITIONS.organizationReadManyContacts.name({ id })` →
+`organizationReadManyContacts:id:<organizationId>`), so the route it stands for is explicit.
 
 ```
-packages/shared/src/ws/    channelKey.ts, events.ts (WSEvent), liveQueries.ts, createWebSocketClient.ts
-packages/ui/src/lib/ws/    createApiWebsocket.ts (refcount + heartbeat), dispatch.ts
-packages/ui/src/store/slices/client.ts   setClient + the queryCache→subscribe pipe
-packages/ui/src/hooks/useApiWebsocket.ts mount at app root
-apps/api/src/ws/           registry, identity, subscriptions, delivery, lifecycle, handler, pubsub, auth
-apps/api/src/appEvents/makeAppEvent.ts    websocket reach → sendToChannel(channelKey(key), event)
+client → { action: 'open', stream }        server → { type: 'opened', stream }
+server → { category: 'data', action: 'snapshot', stream, seq, payload }
+server → { category: 'data', action: 'append', stream, seq, type, payload } …
+client → { action: 'close', stream }       server → { type: 'closed', stream }
+unauthorized (401/403/404/400…) → { type: 'openRejected', stream }
+transient (429/5xx), full queue, exception → { type: 'error', action: 'open', stream, retryable: true }
 ```
+
+Closing the socket or changing the user or credential closes every stream on it. There is no
+replay: a lost append is detected by its `seq` and repaired by a fresh snapshot.
+
+**The contacts stream is scaffolding.** `organizationReadManyContacts` exists to exercise the
+primitive end to end and is the only registered stream. Remove it (definition, producers in the
+contact handlers, `useOrganizationContactsStream`, and their tests) once a real stream consumer
+lands. Streaming model output (a `log` stream) is the canonical first real use.
+
+### Stream definitions
+
+A stream is declared once, in the shared registry both ends import
+(`packages/shared/src/ws/streamDefinitions.ts`), with `defineStream`:
+
+```typescript
+export const STREAM_DEFINITIONS = {
+  organizationReadManyContacts: defineStream('organizationReadManyContacts', {
+    kind: 'list',
+    audience: 'shared',
+    params: z.object({ id: z.string() }),
+  }),
+} as const;
+```
+
+- `family` is the route's operationId.
+- `kind` fixes how the client folds the stream, and which ops it accepts (`streamOps.ts`):
+  - `list`: `upsert` (a row), `remove` (`{ id }`). Rows are keyed by `id`.
+  - `log`: `append` (an entry).
+- `ordering` (list streams) decides which of two upserts of a live row wins. The default,
+  `'updatedAt'`, keeps the newer `updatedAt`, and its rows must carry one. `'arrival'` lets the
+  last update to arrive win, for rows with no version.
+- `params` is the zod schema of the route's path parameters; `name(params)` builds the stream name.
+- `audience` is required: `'shared'` or `'perRecipient'` (see [Audience](#audience)).
+
+There is no stream-specific wire schema. The snapshot is the route's JSON response, and an append
+row is parsed with the same route's `responseSchema` and serialized by the same `JSON.stringify`
+that `c.json` uses, so both reach the client as the SDK's response type
+(`OrganizationReadManyContactsResponse`). The client trusts server frames the way it trusts an
+HTTP response and does not re-validate them.
+
+### Audience
+
+A `'shared'` stream promises that every authorized caller gets identical data, because its
+appends fan out to every holder without regard to who they are. The promise is enforced, not
+just documented:
+
+- `apps/api/src/ws/streamAudience.test.ts` iterates `STREAM_DEFINITIONS`. For each family it
+  fails if a `'shared'` stream's route carries a per-request lens scope (`scopeNarrowing`
+  middleware, detected with `isPerCallerScope`), and it runs `expectStreamAudience`
+  (`apps/api/tests/expectStreamAudience.ts`) with a fixture of differently privileged callers
+  (owner, admin, member, viewer for contacts), failing if their snapshots differ. The fixture map
+  is typed over every family, so registering a stream without a fixture is a type error.
+- The same test proves the check bites: a `'shared'` definition over the per-caller
+  `meReadManyContacts` route fails, and passes once declared `'perRecipient'`.
+
+A `'perRecipient'` stream opts out: `streamAppend` then requires the recipient `userIds`, and
+delivery skips every holder whose user is not listed (anonymous holders included). Superadmin and
+spoofed callers remain the one deliberate exception to "identical data": superadmin list reads
+include soft-deleted rows.
+
+### Authorization and re-authorization
+
+`openDataStream` (`apps/api/src/ws/dataStreams.ts`) resolves the name with `resolveStreamRoute`,
+which requires a registered stream family and a `GET` operation, and requests that route
+in-process with the connection's credential (`fetchStreamSnapshot`). This is not a probe: the
+route runs, and a 2xx response both grants the open and becomes the snapshot (the route's
+response body with no query string, so a paginated route snapshots its first page at the
+default page size). `routeAccessOf` classifies every other status: 429 and 5xx are
+**retryable** and answer `error` with `retryable: true`; anything else is a **rejection** and
+answers `openRejected`.
+
+Open streams are re-authorized. `startStreamReauthorizeSweep` (started at API boot) re-probes
+every open stream every 45 seconds through the cheap `x-auth-probe` path (middleware runs, the
+controller does not) with the connection's credential. A rejection closes the stream with
+`openRejected`; a retryable status closes it with a retryable `error`. The sweep runs on each
+connection's serialized queue and never queues a second recheck behind an unfinished one. Its
+probes carry a server-only system probe secret that the API rate limiter exempts, so the sweep
+spends no caller's or organization's HTTP budget; client-driven opens and subscribes still count.
+A probe that throws closes its stream as retryable and the sweep continues with the rest.
+
+Revocation is therefore bounded by the sweep interval (plus the HTTP layer's own caches: the
+route answers 403 only once the membership/token cache is cleared). Closing streams immediately
+on membership, role or token removal through an app event is a planned follow-up.
+
+### Ordering
+
+The connection subscribes to the stream before the snapshot request. Appends that arrive during
+the request are held (`heldAppends`) and sent after the snapshot, so a client never sees an append
+before its snapshot. Held appends the snapshot already contains are dropped by their `seq` (below);
+one published during the read can still repeat a change the read saw, so every fold must be
+idempotent.
+
+Within one API instance, `appendToStream` publishes through a `createSerializedQueue` per stream
+key (`apps/api/src/ws/streamPublishOrder.ts`): a stream's appends go out in the order the instance
+emitted them. Across instances, Redis is the ordering boundary: two instances publishing to the
+same stream are delivered in seq order, which need not be the order their writes committed.
+
+A removal is final. The list fold keeps a bounded set of removed ids (`__removed`, the last 500)
+and ignores any later `upsert` for a removed id, so a late update from another instance cannot
+resurrect a row. Only an upsert flagged `revive` clears a removed id: the flag rides on the append
+frame (`{ type: 'upsert', payload, revive: true }`), outside the route-shaped row, set with
+`streamAppend(definition, params, 'upsert', row, { revive: true })`. A fresh snapshot (resync, retry or
+reconnect) keeps the removed ids, dropping only those whose row the snapshot shows alive. Among
+upserts of a live row, the definition's `ordering` decides: by default an update older than the
+held row (by `updatedAt`) is ignored, so the folded state only moves forward. Action listeners
+(`useStreamAction`) still hear every append, stale ones included.
+
+### Sequence numbers
+
+Every stream has a counter in Redis, shared by every instance and the worker: `ws:seq:{<stream>}`
+for a `'shared'` stream, and one per user (`ws:seq:{<stream>}:user:<userId>`) for a `'perRecipient'`
+stream, so an append addressed to one user is never a gap for another. `appendToStream` runs one
+Lua script (`apps/api/src/ws/queries/publishStreamAppend.ts`) that `INCR`s the counter (each
+recipient's, for a per-recipient append) and `PUBLISH`es the append with those seqs, so publish
+order is seq order and two instances publishing one stream never produce a false gap. Each
+instance hands every holder the seq of its own counter. `openDataStream` reads the caller's counter
+(`queries/readStreamSeq.ts`, key from `streamSeqKeyFor`) **before** the snapshot read starts and
+stamps the snapshot with it: appends are published after their transaction commits, so every
+append at or below the stamp is already in the snapshot.
+
+The client (`createApiWebsocket`) keeps the last seq per open stream:
+
+- a snapshot sets it, replacing the stream's state;
+- an append at or below it is dropped (a held append the snapshot already holds, or a stale one
+  after a resync);
+- an append exactly one past it is applied;
+- an append further past it is a gap: the client forgets the last seq, drops appends until the
+  next snapshot, and re-sends `open` (`websocket.resync`) for a fresh one.
+
+The counter's TTL (one day) is refreshed by every append and every open, so only an idle stream's
+counter expires. A counter is seeded inside the script from Redis `TIME` in microseconds, one clock
+for every instance, so one re-created after expiry or a flush starts above any seq it gave out
+before and holders resync instead of ignoring every append. An instance whose own clock lags
+cannot seed it low.
+
+The server never drifts silently. Bun's `ws.send` returns `0` when it drops a frame (closed, or over
+its backpressure limit); `sendFrame` (`apps/api/src/ws/delivery.ts`), behind every send, then closes
+the connection (`1013 frame dropped`), and the client reconnects and re-opens its streams.
+
+A Redis outage does not fail a publish. The client is created with `maxRetriesPerRequest: null`
+and ioredis's offline queue on (`packages/db/src/redis/client.ts`), so a sequencing `eval`, a seq
+read for an open, and every channel or user `publish` wait through the outage and run once Redis is
+back. A stream's appends queue behind its waiting one (`inStreamOrder`), and opens hang rather than
+answer `error`. Nothing adds a timeout: the seq already covers what an outage loses. The subscriber
+connection is down too, so appends published while it reconnects never reach this instance's
+holders, and their next append arrives past a gap and triggers a resync.
+
+When Redis answers a sequencing `eval` with an error, its local holders get a retryable `error` for
+the stream and re-open with backoff, and the instance keeps re-publishing a `streamResync` for that
+stream (once a second, one per stream) until Redis takes it, so holders on every other instance
+re-open too. A stream queued while that publisher is running goes out in the same run. There is no
+replay buffer, no queue and no acknowledgement.
+
+The seq cannot deduplicate a change that lands both in a snapshot read and in an append published
+after its stamp; list folds absorb that (upserts are idempotent), but a `log` fold appends the entry
+twice.
+
+### Producing appends
+
+Appends are app-event output, like refetch hints, built only with `streamAppend`. The handoff
+type is branded (`ValidatedStreamAppend`), so a hand-built stream handoff does not typecheck, and
+message handoffs are typed as `WSQueryEvent`, so a data frame cannot be smuggled through a
+`{ userIds }` or `{ channels }` message. In `streamAppend` (`apps/api/src/appEvents/streamAppend.ts`)
+the op is checked against the definition's kind and the payload is typed by the op. An upsert
+row must come from `routeRow(route, value)` (`apps/api/src/appEvents/routeRow.ts`), which parses
+it with the route's `responseSchema` and brands it, so a raw model or hand-built object does not
+typecheck. The options argument carries `revive` (upserts only) and `userIds`, which a
+`perRecipient` definition requires both in its type and at runtime:
+
+```typescript
+websocket: ({ contact }) => organizationContactUpsert(contact),
+
+// organizationContactUpsert:
+streamAppend(STREAM_DEFINITIONS.organizationReadManyContacts, { id: contact.organizationId }, 'upsert',
+  routeRow(organizationReadManyContactsRoute, contact));
+```
+
+`deliverWSHandoffs` calls `appendToStream`, which sequences the action and publishes it through
+Redis; each instance wraps it in the append frame on delivery.
+
+### Frontend
+
+```typescript
+const contacts = useOrganizationContactsStream(organizationId);
+// = useStream<OrganizationContactsStream>(STREAM_DEFINITIONS.organizationReadManyContacts.name({ id }))
+useStreamAction<{ id: string }>(stream, 'remove', (removal) => toast(removal.id));
+```
+
+- `useStream<TSnapshot>(stream)` returns a TanStack query result holding the folded snapshot. A
+  typed per-stream hook names the SDK response type, as `useOrganizationContactsStream` does.
+- `useStreamAction<TPayload>(stream, op, listener)` registers a side-effect listener for one op;
+  any number may be mounted.
+- Folding is by kind, not per caller: `STREAM_FOLDS` (`packages/ui/src/lib/ws/streamFolds.ts`) maps
+  each kind to its `snapshot` and `ops` folds, typed so every op of a kind has one. Custom
+  behavior means a new kind.
+- Holders and listeners share one open stream through the existing holder refcounting: the
+  query-cache observer and each listener hold the stream, and it closes when the last one
+  releases it.
+- `listStream` (`packages/ui/src/lib/ws/listStream.ts`) keeps rows in the list routes' default
+  `id desc` order. An upsert replaces a held row (unless `ordering` finds it older), inserts a row that belongs among the loaded rows,
+  and ignores one beyond the loaded page. A remove drops a held row, or, for an off-page row, only
+  decrements `pagination.total` (once). Inserts beyond `pageSize` evict the oldest held row, so a
+  long-lived stream stays one page. `logStream` appends entries in arrival order.
+
+An append whose op the stream's kind does not define is dropped and the client re-opens the
+stream for a fresh snapshot (`websocket.resync`).
+
+`openRejected` puts the query in the error state and wipes its data; the stream stays held (the
+holder count is kept) but is not replayed until a new holder mounts or the identity changes. A
+retryable `error` puts the query in the error state but keeps the last snapshot, and the client
+re-opens with exponential backoff (1s doubling to 30s, jittered), resetting once an open
+succeeds. An open that gets no answer within 10 seconds is treated the same way. Each open is
+counted until its answer arrives, so an answer to an open that a later open superseded is
+ignored. Data frames are routed by `category` before any control-frame handling, and frames for a
+stream the client has not opened, has closed, or that was rejected, are ignored.
+
+## Frontend and horizontal scaling
+
+`useApiWebsocket()` is mounted at each app root. The client slice's query-cache listener subscribes
+and unsubscribes mounted queries gated by `LIVE_QUERIES`, and opens and closes streams for
+mounted stream queries; `setClient` wires the QueryClient and reconnect recovery.
+
+`sendToChannel`, `sendToUser`, `appendToStream` and `broadcast` publish through Redis
+`ws:broadcast`. Each API instance delivers to its local registry. Stream snapshots are served by
+whichever instance holds the socket; appends reach streams open on any instance. Redis failure
+falls back to local delivery for channel, user and broadcast messages, so cross-instance delivery
+is unavailable during the outage; stream appends cannot be sequenced, so local holders resync.
+
+## Source and verification
+
+- `packages/shared/src/ws/`: events, channel keys, channel and stream registries, stream kinds and
+  ops, frame limits and browser transport.
+- `packages/ui/src/lib/ws/`: API socket, acknowledgement/retry and settle handling, dispatch,
+  kind folds (`listStream`, `logStream`) and the listener registry.
+- `packages/ui/src/hooks/useStream.ts`, `useStreamAction.ts`: consumer hooks.
+- `apps/api/src/ws/`: handler, identity, route resolution, stream access and re-authorization,
+  registries, delivery, ordering and Redis pub/sub.
+- `apps/api/src/ws/probe.test.ts`: real-route authorization, unknown channels, dot segments,
+  missing credentials and spoof authority.
+- `apps/api/src/ws/dataStreams.test.ts`: open/snapshot/held appends, snapshot seq stamps, a
+  dropped frame closing the socket, transient vs rejected statuses, the pending-frame cap, credential swaps and re-authorization after revocation.
+- `apps/api/src/ws/streamAudience.test.ts`: the audience enforcement.
+- `apps/api/src/ws/pubsub.test.ts`: per-stream publish order, a shared counter across instances,
+  an unsequenced append, and per-recipient delivery.
+- `apps/api/src/ws/queries/streamSeq.test.ts`: snapshot stamp vs next seq, TTL refresh, re-seed
+  after expiry.
+- `apps/api/src/appEvents/handlers/contact/organizationContactsStream.test.ts`: app event →
+  Redis → open socket, with append rows matching the route snapshot.
+- `packages/ui/src/lib/ws/createApiWebsocket.test.ts`,
+  `listStream.test.ts`, `dispatch.test.ts`, `packages/ui/src/hooks/useStream.test.tsx`:
+  client protocol, retries, settling, seq gaps and resync, folds and hooks.
+
+See [APP_EVENTS.md](APP_EVENTS.md) and [Segments](SEGMENTS.md#events-and-email-integration).

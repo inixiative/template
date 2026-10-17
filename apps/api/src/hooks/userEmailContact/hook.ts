@@ -14,7 +14,11 @@ export const registerUserEmailContactHook = () => {
       for (const user of castArray(result) as CreatedUser[]) {
         await db.contact.upsert({
           where: {
-            userId_type_valueKey: { userId: user.id, type: ContactType.email, valueKey: user.email.toLowerCase() },
+            userId_type_valueKey: {
+              userId: user.id,
+              type: ContactType.email,
+              valueKey: user.email.toLowerCase(),
+            },
           },
           create: {
             ownerModel: ContactOwnerModel.User,

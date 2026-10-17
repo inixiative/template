@@ -5,15 +5,18 @@
  * @uses infrastructure:prisma
  */
 import { z } from '@hono/zod-openapi';
-import { type FieldMapEntry, type LensNarrowing, projectByPath } from '@inixiative/json-rules';
+import {
+  getLensRoot,
+  type LensNarrowing,
+  type PathProjection,
+  projectLens,
+} from '@inixiative/json-rules';
 import { redactLens } from '@template/db/lens/redactLens';
 import { leafFilterSchema } from '#/lib/routeTemplates/filters/filterComponents';
 
-type Visit = { fields: Record<string, FieldMapEntry> };
-
-const buildNodeShape = (byPath: Map<string, Visit>, nodePath: string): Record<string, z.ZodTypeAny> => {
+const buildNodeShape = (byPath: PathProjection, nodePath: string): Record<string, z.ZodTypeAny> => {
   const shape: Record<string, z.ZodTypeAny> = {};
-  const visit = byPath.get(nodePath);
+  const visit = byPath[nodePath];
   if (!visit) return shape;
 
   for (const [field, entry] of Object.entries(visit.fields)) {
@@ -24,7 +27,9 @@ const buildNodeShape = (byPath: Map<string, Visit>, nodePath: string): Record<st
       // to-many → Prisma relation operators; to-one → nest directly.
       shape[field] = (
         entry.isList
-          ? z.object({ some: child.optional(), every: child.optional(), none: child.optional() }).strict()
+          ? z
+              .object({ some: child.optional(), every: child.optional(), none: child.optional() })
+              .strict()
           : child
       ).optional();
       continue;
@@ -40,13 +45,16 @@ const buildNodeShape = (byPath: Map<string, Visit>, nodePath: string): Record<st
 // of per-kind filter leaves (to-one nested directly, to-many under some/every/none),
 // scoped to the lens's redacted+narrowed searchable fields.
 export const buildSearchFieldsSchema = (filterLens: LensNarrowing): z.ZodTypeAny | undefined => {
-  const byPath = projectByPath(redactLens(filterLens)) as Map<string, Visit>;
-  const rootKey = byPath.keys().next().value;
-  if (!rootKey) return undefined;
-  const shape = buildNodeShape(byPath, rootKey);
+  const byPath = projectLens(redactLens(filterLens));
+  const shape = buildNodeShape(byPath, getLensRoot(filterLens).model);
   if (Object.keys(shape).length === 0) return undefined;
+  // Combinators are advertised exactly one level deep: their children are plain nodes carrying
+  // no combinator of their own. The wire accepts a combinator at any node, but a recursive
+  // schema cannot be serialized into the OpenAPI doc, so the advertised surface is the bounded
+  // unroll. Each extra level multiplies the inlined shape across every read route's doc.
+  const node = z.object(shape).strict();
   return z
-    .object(shape)
+    .object({ ...shape, AND: z.array(node).optional(), OR: z.array(node).optional() })
     .strict()
     .optional()
     .openapi({ param: { in: 'query' } });

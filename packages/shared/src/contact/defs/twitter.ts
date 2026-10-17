@@ -11,7 +11,10 @@ import { z } from 'zod';
 const twitterStored = z.object({ handle: z.string().min(1) });
 
 type TwitterInput = TwitterValue | { url: string };
-const twitterInput: z.ZodType<TwitterInput> = z.union([z.object({ url: z.string().url() }), twitterStored]);
+const twitterInput: z.ZodType<TwitterInput> = z.union([
+  z.object({ url: z.string().url() }),
+  twitterStored,
+]);
 
 export const twitterDef: ContactTypeDef<TwitterInput, TwitterValue> = {
   inputSchema: twitterInput,

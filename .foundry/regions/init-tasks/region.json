@@ -1,0 +1,50 @@
+{
+  "id": "init-tasks",
+  "title": "Writing an init task",
+  "routing": "Is this about the behaviour of one provider setup step: composable prompts (prompt, prompts; never hardcode prompt text), clean status lists shown upfront, no console.log in tasks, fetching from the source of truth instead of props, retrying async provisioning on specific conditions, async exec for smooth animations, Railway CLI for reads vs GraphQL for mutations (createRailwayConnection, ensureRailwayConnection, listRailwayConnections, createRailwaySync), the token input flow and loading-state sequencing, atomic progress flags with idempotent API calls (isProgressComplete, one flag per remote write), OrgSelector requiring onCancel, interactive prompts for missing required input (getSecret / setSecret into Infisical), masking sensitive inputs, or Bun-native resume tests with VCR fixtures?",
+  "concepts": ["init-tasks"],
+  "tokens": 12742,
+  "tokenMethod": "chars/4",
+  "files": {
+    "recognise": {
+      "path": "recognise.md",
+      "tokens": 1890,
+      "experimental": true,
+      "note": "recognise/pick split under test (model round); not the standard"
+    },
+    "knowledge": {
+      "path": "knowledge.md",
+      "tokens": 12742
+    }
+  },
+  "runsAgreed": 0,
+  "sources": {
+    "docs": ["docs/claude/INIT_SCRIPT_PATTERNS.md"],
+    "docUnits": [
+      "doc:docs/claude/INIT_SCRIPT_PATTERNS.md#core-patterns/5-composable-prompts-always-use-this",
+      "doc:docs/claude/INIT_SCRIPT_PATTERNS.md#core-patterns/6-clean-status-lists",
+      "doc:docs/claude/INIT_SCRIPT_PATTERNS.md#core-patterns/7-suppress-console-logs-in-tasks",
+      "doc:docs/claude/INIT_SCRIPT_PATTERNS.md#core-patterns/8-always-fetch-from-source-never-trust-props",
+      "doc:docs/claude/INIT_SCRIPT_PATTERNS.md#core-patterns/9-retry-logic-for-async-initialization",
+      "doc:docs/claude/INIT_SCRIPT_PATTERNS.md#core-patterns/10-async-exec-for-smooth-animations",
+      "doc:docs/claude/INIT_SCRIPT_PATTERNS.md#core-patterns/11-railway-cli-vs-graphql-api",
+      "doc:docs/claude/INIT_SCRIPT_PATTERNS.md#core-patterns/12-token-input-flow-with-proper-state-management",
+      "doc:docs/claude/INIT_SCRIPT_PATTERNS.md#core-patterns/13-atomic-progress-flags-idempotent-api-calls",
+      "doc:docs/claude/INIT_SCRIPT_PATTERNS.md#core-patterns/14-orgselector-always-requires-oncancel",
+      "doc:docs/claude/INIT_SCRIPT_PATTERNS.md#core-patterns/15-interactive-user-prompts-for-required-input",
+      "doc:docs/claude/INIT_SCRIPT_PATTERNS.md#core-patterns/17-bun-native-resume-tests-with-vcr-fixtures"
+    ],
+    "catalogClusters": [
+      "code-style-lint-checks",
+      "dev-setup-scripts",
+      "environment-config",
+      "guided-flows",
+      "naming-vocabulary",
+      "testing-helpers"
+    ],
+    "codeEntries": 0,
+    "docMembers": 33
+  },
+  "bypassLines": 21,
+  "glossaryTerms": 12
+}

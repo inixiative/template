@@ -30,8 +30,10 @@ const registry: Partial<Record<InquiryType, InquiryInterfaceEntry>> = {};
 
 export const registerInquiryType = (type: InquiryType, entry: InquiryInterfaceEntry): void => {
   const existing = registry[type];
-  const mergedSource = existing?.source || entry.source ? { ...existing?.source, ...entry.source } : undefined;
-  const mergedTarget = existing?.target || entry.target ? { ...existing?.target, ...entry.target } : undefined;
+  const mergedSource =
+    existing?.source || entry.source ? { ...existing?.source, ...entry.source } : undefined;
+  const mergedTarget =
+    existing?.target || entry.target ? { ...existing?.target, ...entry.target } : undefined;
   registry[type] = {
     ...existing,
     ...entry,
@@ -42,4 +44,5 @@ export const registerInquiryType = (type: InquiryType, entry: InquiryInterfaceEn
   };
 };
 
-export const getInquiryInterface = (type: InquiryType): InquiryInterfaceEntry | undefined => registry[type];
+export const getInquiryInterface = (type: InquiryType): InquiryInterfaceEntry | undefined =>
+  registry[type];

@@ -15,7 +15,13 @@ export const meReadManyInquiriesReceivedController = makeController(
     const db = c.get('db');
     const { data, pagination } = await paginate(c, db.inquiry, {
       where: {
-        targetModel: InquiryResourceModel.User,
+        targetModel: {
+          in: [
+            InquiryResourceModel.User,
+            InquiryResourceModel.OrganizationUser,
+            InquiryResourceModel.SpaceUser,
+          ],
+        },
         targetUserId: c.get('user')!.id,
         status: { notIn: [InquiryStatus.draft, InquiryStatus.canceled] },
       },

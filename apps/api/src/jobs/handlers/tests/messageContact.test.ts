@@ -2,8 +2,13 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import { ContactType } from '@template/db/generated/client/enums';
 import { cleanupTouchedTables, createContact, createUser } from '@template/db/test';
 import { messageContact } from '#/jobs/handlers/messageContact';
-import { type MessageContent, type MessageDispatchOptions, messageProviderRegistry } from '#/lib/messaging/providers';
+import {
+  type MessageContent,
+  type MessageDispatchOptions,
+  messageProviderRegistry,
+} from '#/lib/messaging/providers';
 import { createTestApp } from '#tests/createTestApp';
+import { createTestWorker } from '#tests/createTestWorker';
 
 type DispatchedCall = {
   contactId: string;
@@ -15,7 +20,7 @@ type DispatchedCall = {
 describe('messageContact handler', () => {
   let testDb: ReturnType<typeof createTestApp>['db'];
   const dispatched: DispatchedCall[] = [];
-  const mockLog = () => {};
+  const worker = createTestWorker();
 
   beforeAll(() => {
     const harness = createTestApp({});
@@ -23,9 +28,12 @@ describe('messageContact handler', () => {
 
     // Register a real adapter for whatsapp that records every call.
     // No mocks, no fetch spy — the registry is the real wire.
-    messageProviderRegistry.register(ContactType.whatsapp, async (contact, content, _kind, options) => {
-      dispatched.push({ contactId: contact.id, contactType: contact.type, content, options });
-    });
+    messageProviderRegistry.register(
+      ContactType.whatsapp,
+      async (contact, content, _kind, options) => {
+        dispatched.push({ contactId: contact.id, contactType: contact.type, content, options });
+      },
+    );
   });
 
   afterAll(async () => {
@@ -44,14 +52,20 @@ describe('messageContact handler', () => {
   it('dispatches via the adapter when contact accepts the kind', async () => {
     const { entity: user } = await createUser();
     const { entity: contact } = await createContact(
-      { ownerModel: 'User', type: ContactType.whatsapp, value: { jid: '111' }, acceptedKinds: ['platform'] },
+      {
+        ownerModel: 'User',
+        type: ContactType.whatsapp,
+        value: { jid: '111' },
+        acceptedKinds: ['platform'],
+      },
       { user },
     );
 
-    await messageContact(
-      { db: testDb, log: mockLog },
-      { contactId: contact.id, kind: 'platform', content: { text: 'hi' } },
-    );
+    await messageContact(worker, {
+      contactId: contact.id,
+      kind: 'platform',
+      content: { text: 'hi' },
+    });
 
     expect(dispatched).toHaveLength(1);
     expect(dispatched[0].contactId).toBe(contact.id);
@@ -61,14 +75,20 @@ describe('messageContact handler', () => {
   it('skips silently when contact does not accept the kind', async () => {
     const { entity: user } = await createUser();
     const { entity: contact } = await createContact(
-      { ownerModel: 'User', type: ContactType.whatsapp, value: { jid: '222' }, acceptedKinds: ['platform'] },
+      {
+        ownerModel: 'User',
+        type: ContactType.whatsapp,
+        value: { jid: '222' },
+        acceptedKinds: ['platform'],
+      },
       { user },
     );
 
-    await messageContact(
-      { db: testDb, log: mockLog },
-      { contactId: contact.id, kind: 'marketing', content: { text: 'promo' } },
-    );
+    await messageContact(worker, {
+      contactId: contact.id,
+      kind: 'marketing',
+      content: { text: 'promo' },
+    });
 
     expect(dispatched).toHaveLength(0);
   });
@@ -80,10 +100,11 @@ describe('messageContact handler', () => {
       { user },
     );
 
-    await messageContact(
-      { db: testDb, log: mockLog },
-      { contactId: contact.id, kind: 'system', content: { text: 'ack' } },
-    );
+    await messageContact(worker, {
+      contactId: contact.id,
+      kind: 'system',
+      content: { text: 'ack' },
+    });
 
     expect(dispatched).toHaveLength(1);
   });
@@ -91,19 +112,21 @@ describe('messageContact handler', () => {
   it('passes replyTo through to the adapter', async () => {
     const { entity: user } = await createUser();
     const { entity: contact } = await createContact(
-      { ownerModel: 'User', type: ContactType.whatsapp, value: { jid: '444' }, acceptedKinds: ['platform'] },
+      {
+        ownerModel: 'User',
+        type: ContactType.whatsapp,
+        value: { jid: '444' },
+        acceptedKinds: ['platform'],
+      },
       { user },
     );
 
-    await messageContact(
-      { db: testDb, log: mockLog },
-      {
-        contactId: contact.id,
-        kind: 'platform',
-        content: { text: 'thread reply' },
-        replyTo: { chatMessageId: 'msg-123' },
-      },
-    );
+    await messageContact(worker, {
+      contactId: contact.id,
+      kind: 'platform',
+      content: { text: 'thread reply' },
+      replyTo: { chatMessageId: 'msg-123' },
+    });
 
     expect(dispatched[0].options.replyTo).toEqual({ chatMessageId: 'msg-123' });
   });
@@ -111,24 +134,27 @@ describe('messageContact handler', () => {
   it('throws when no adapter is registered for contact.type', async () => {
     const { entity: user } = await createUser();
     const { entity: contact } = await createContact(
-      { ownerModel: 'User', type: ContactType.signal, value: { handle: '+1555' }, acceptedKinds: ['platform'] },
+      {
+        ownerModel: 'User',
+        type: ContactType.signal,
+        value: { handle: '+1555' },
+        acceptedKinds: ['platform'],
+      },
       { user },
     );
 
     expect(
-      messageContact(
-        { db: testDb, log: mockLog },
-        { contactId: contact.id, kind: 'platform', content: { text: 'hi' } },
-      ),
+      messageContact(worker, { contactId: contact.id, kind: 'platform', content: { text: 'hi' } }),
     ).rejects.toThrow(/No message provider adapter for contact.type=signal/);
   });
 
   it('throws when contact does not exist', async () => {
     expect(
-      messageContact(
-        { db: testDb, log: mockLog },
-        { contactId: '00000000-0000-0000-0000-000000000000', kind: 'platform', content: { text: 'hi' } },
-      ),
+      messageContact(worker, {
+        contactId: '00000000-0000-0000-0000-000000000000',
+        kind: 'platform',
+        content: { text: 'hi' },
+      }),
     ).rejects.toThrow();
   });
 });

@@ -6,6 +6,7 @@
  */
 import { channelKey, LIVE_QUERIES } from '@template/shared/ws';
 import { createApiWebsocket } from '@template/ui/lib/ws/createApiWebsocket';
+import { dataStreamOfQueryKey } from '@template/ui/lib/ws/dataStreamQueryKey';
 import type { AppStore } from '@template/ui/store/types';
 import type { ClientSlice } from '@template/ui/store/types/client';
 import type { StateCreator } from 'zustand';
@@ -27,13 +28,21 @@ export const createClientSlice: StateCreator<AppStore, [], [], ClientSlice> = (s
     client: null, // set at the app root via setClient (see main.tsx)
     // On reconnect, refetch live queries to recover any invalidations missed while disconnected.
     websocket: createApiWebsocket(wsUrl, () => {
-      get().client?.invalidateQueries({ predicate: (query) => liveChannel(query.queryKey) !== null });
+      get().client?.invalidateQueries({
+        predicate: (query) => liveChannel(query.queryKey) !== null,
+      });
     }),
 
     setClient: (client) => {
       set({ client });
-      // Pipe live queries to channel subscriptions; the websocket owns the channels + replay.
+      // Pipe live queries to channel subscriptions and stream queries to open streams; the websocket owns replay.
       client.getQueryCache().subscribe((event) => {
+        const stream = dataStreamOfQueryKey(event.query.queryKey);
+        if (stream) {
+          if (event.type === 'observerAdded') get().websocket.open(stream);
+          else if (event.type === 'observerRemoved') get().websocket.close(stream);
+          return;
+        }
         const channel = liveChannel(event.query.queryKey);
         if (!channel) return;
         if (event.type === 'observerAdded') get().websocket.subscribe(channel);

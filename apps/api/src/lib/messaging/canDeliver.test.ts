@@ -35,11 +35,15 @@ describe('canDeliver', () => {
     });
 
     it('refuses when contact accepts but customerRef does not', () => {
-      expect(canDeliver('marketing', contact(['platform', 'marketing']), ref(['platform']))).toBe(false);
+      expect(canDeliver('marketing', contact(['platform', 'marketing']), ref(['platform']))).toBe(
+        false,
+      );
     });
 
     it('refuses when customerRef accepts but contact does not', () => {
-      expect(canDeliver('marketing', contact(['platform']), ref(['platform', 'marketing']))).toBe(false);
+      expect(canDeliver('marketing', contact(['platform']), ref(['platform', 'marketing']))).toBe(
+        false,
+      );
     });
 
     it('skips the customerRef gate when not provided', () => {

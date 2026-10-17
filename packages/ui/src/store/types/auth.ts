@@ -5,7 +5,7 @@
  * @uses primitive:sdk
  */
 import type { MeReadResponses } from '@template/sdk';
-import type { AuthMethod } from '@template/ui/lib/auth/types';
+import type { AuthMethod, SignUpResult } from '@template/ui/lib/auth/types';
 import type { createAuthClient } from 'better-auth/client';
 
 type BetterAuthClient = ReturnType<typeof createAuthClient>;
@@ -37,7 +37,7 @@ export type AuthSlice = {
     initialize: () => Promise<void>;
     refreshMe: () => Promise<void>;
     signIn: (method: AuthMethod) => Promise<void>;
-    signUp: (method: AuthMethod) => Promise<void>;
+    signUp: (method: AuthMethod) => Promise<SignUpResult>;
     setStrategy: (strategy: AuthStrategy) => void;
     setSpoof: (email: string | null) => Promise<void>;
     logout: () => Promise<void>;

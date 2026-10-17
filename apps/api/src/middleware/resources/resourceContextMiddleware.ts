@@ -4,7 +4,7 @@
  * @partOf primitive:requestContext
  * @uses infrastructure:prisma, primitive:shared, primitive:errors
  */
-import { type AccessorName, type Db, toModelName } from '@template/db';
+import { type AccessorName, type Db, isAccessorName } from '@template/db';
 import { isUuidV7 } from '@template/shared/utils';
 import type { MiddlewareHandler } from 'hono';
 import { makeError } from '#/lib/errors';
@@ -30,10 +30,10 @@ export const resourceContextMiddleware = (): MiddlewareHandler => async (c, next
 
   // Get accessor from route path (e.g., /api/v1/organization/:id → 'organization')
   const pathParts = c.req.path.split('/');
-  const accessor = pathParts[3] as AccessorName | undefined;
-  if (!accessor || !toModelName(accessor)) return next();
+  const accessor = pathParts[3];
+  if (!accessor || !isAccessorName(accessor)) return next();
 
-  const resources = await findResources(db, accessor, lookup, id);
+  const resources = await findResources(db, accessor, { [lookup]: id });
 
   if (!resources.length) throw makeError({ status: 404, message: 'Resource not found' });
   if (resources.length > 1) throw makeError({ status: 409, message: 'Multiple resources found' });
@@ -44,12 +44,11 @@ export const resourceContextMiddleware = (): MiddlewareHandler => async (c, next
   return next();
 };
 
-const findResources = async (db: Db, accessor: AccessorName, lookup: string, id: string) => {
-  const delegate = db[accessor] as { findMany: (...args: unknown[]) => Promise<unknown[]> } | undefined;
+const findResources = async (db: Db, accessor: AccessorName, where: Record<string, unknown>) => {
+  const delegate = db[accessor] as
+    | { findMany: (...args: unknown[]) => Promise<unknown[]> }
+    | undefined;
   if (!delegate?.findMany) return [];
 
-  return delegate.findMany({
-    where: { [lookup]: id },
-    ...resourceContextArgs[accessor],
-  });
+  return delegate.findMany({ where, ...resourceContextArgs[accessor] });
 };

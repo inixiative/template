@@ -1,6 +1,7 @@
 /**
  * @atlas
- * @partOf infrastructure:prisma
+ * @kind utils
+ * @partOf infrastructure:prisma, primitive:testFactories
  * @uses none
  */
 import * as zodSchemasNs from '@template/db/generated/zod/schemas/objects';
@@ -8,9 +9,14 @@ import type { DependencyConfig, ModelName } from '@template/db/test/factoryTypes
 import { getModelRelations } from '@template/db/utils/prismaMapRelations';
 import type { ZodObject, ZodTypeAny } from 'zod';
 
-const zodSchemas = zodSchemasNs as unknown as Record<string, ZodObject<Record<string, ZodTypeAny>> | undefined>;
+const zodSchemas = zodSchemasNs as unknown as Record<
+  string,
+  ZodObject<Record<string, ZodTypeAny>> | undefined
+>;
 
-const getCreateInputSchema = (modelName: ModelName): ZodObject<Record<string, ZodTypeAny>> | null =>
+export const getCreateInputSchema = (
+  modelName: ModelName,
+): ZodObject<Record<string, ZodTypeAny>> | null =>
   zodSchemas[`${modelName}CreateInputObjectSchema`] ?? null;
 
 export const inferDependencies = (modelName: ModelName): Record<string, DependencyConfig> => {
@@ -27,7 +33,7 @@ export const inferDependencies = (modelName: ModelName): Record<string, Dependen
 
     // Include all relations - required ones auto-create, optional ones use context if provided
     deps[rel.relationName] = {
-      modelName: rel.targetModel as ModelName,
+      modelName: rel.targetModel,
       foreignKey: rel.foreignKey,
       required: isRequired,
     };
@@ -57,7 +63,9 @@ export const mergeDependencies = (
       };
     } else {
       if (!manualDep.modelName || !manualDep.foreignKey) {
-        throw new Error(`Manual dependency ${key} in ${modelName} must specify modelName and foreignKey`);
+        throw new Error(
+          `Manual dependency ${key} in ${modelName} must specify modelName and foreignKey`,
+        );
       }
       merged[key] = {
         modelName: manualDep.modelName,

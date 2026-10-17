@@ -126,12 +126,17 @@ describe('searchablePaths', () => {
           },
         },
       });
-      expect(paths.sort()).toEqual(['sourceOrganization.slug', 'sourceUser.name', 'status', 'type']);
+      expect(paths.sort()).toEqual([
+        'sourceOrganization.slug',
+        'sourceUser.name',
+        'status',
+        'type',
+      ]);
     });
 
     it('multiple relations targeting SAME model — picks stay PATH-SCOPED (no sibling leak)', () => {
       // sourceUser:User picks ['name'] and targetUser:User picks ['email'] both target User.
-      // projectByPath keeps each visit's picks isolated to its own path, so the
+      // projectLens keeps each visit's picks isolated to its own path, so the
       // sibling field never leaks across paths.
       const paths = searchablePaths({
         parent: inquiryLens,
@@ -183,7 +188,9 @@ describe('searchablePaths', () => {
       expect(paths).toContain('sourceUser.name');
       expect(paths).toContain('sourceUser.organizationUsers.role');
       // organizationUsers picks: ['role'] → no descent into .user back-ref or .organization
-      expect(paths.some((p) => p.startsWith('sourceUser.organizationUsers.') && p.split('.').length > 3)).toBe(false);
+      expect(
+        paths.some((p) => p.startsWith('sourceUser.organizationUsers.') && p.split('.').length > 3),
+      ).toBe(false);
     });
   });
 

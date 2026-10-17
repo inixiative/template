@@ -261,7 +261,12 @@ export const RailwaySetupView: React.FC<RailwaySetupViewProps> = ({ onComplete, 
     const actionError = await tokenAction.run('Storing token and continuing setup...', async () => {
       // Store token in Infisical
       const infisicalProjectId = config.infisical.projectId;
-      await setSecretAsync(infisicalProjectId, 'root', 'RAILWAY_WORKSPACE_TOKEN', workspaceToken.trim());
+      await setSecretAsync(
+        infisicalProjectId,
+        'root',
+        'RAILWAY_WORKSPACE_TOKEN',
+        workspaceToken.trim(),
+      );
 
       // Continue with setup
       const existingWorkspace = config.railway?.workspaceId;
@@ -321,7 +326,8 @@ export const RailwaySetupView: React.FC<RailwaySetupViewProps> = ({ onComplete, 
 
         <Box marginTop={1}>
           <Text>
-            Create a workspace token at: <Text color="cyan">https://railway.com/account/tokens</Text>
+            Create a workspace token at:{' '}
+            <Text color="cyan">https://railway.com/account/tokens</Text>
           </Text>
         </Box>
 
@@ -335,7 +341,12 @@ export const RailwaySetupView: React.FC<RailwaySetupViewProps> = ({ onComplete, 
           <>
             <Box marginTop={1}>
               <Text>Token: </Text>
-              <TextInput value={workspaceToken} onChange={setWorkspaceToken} onSubmit={handleTokenSubmit} mask="*" />
+              <TextInput
+                value={workspaceToken}
+                onChange={setWorkspaceToken}
+                onSubmit={handleTokenSubmit}
+                mask="*"
+              />
             </Box>
 
             <Box marginTop={1}>
@@ -390,7 +401,8 @@ export const RailwaySetupView: React.FC<RailwaySetupViewProps> = ({ onComplete, 
             <Box flexDirection="column" marginTop={1} marginLeft={2}>
               <Text bold>B. Install the Railway GitHub App on your repo's owner</Text>
               <Text>
-                {'   '}1. Open <Text color="cyan">https://github.com/apps/railway-app/installations/new</Text>
+                {'   '}1. Open{' '}
+                <Text color="cyan">https://github.com/apps/railway-app/installations/new</Text>
               </Text>
               <Text>
                 {'   '}2. Pick the account/org that owns the repo:{' '}
@@ -409,10 +421,15 @@ export const RailwaySetupView: React.FC<RailwaySetupViewProps> = ({ onComplete, 
             </Box>
 
             <Box flexDirection="column" marginTop={1} marginLeft={2}>
-              <Text dimColor>Note: A only links your GitHub identity to Railway. B is what actually grants</Text>
-              <Text dimColor>Railway permission to read the repo and deploy. Both are required.</Text>
               <Text dimColor>
-                Already installed? Verify at https://github.com/organizations/{config?.project.organization}
+                Note: A only links your GitHub identity to Railway. B is what actually grants
+              </Text>
+              <Text dimColor>
+                Railway permission to read the repo and deploy. Both are required.
+              </Text>
+              <Text dimColor>
+                Already installed? Verify at https://github.com/organizations/
+                {config?.project.organization}
                 /settings/installations
               </Text>
             </Box>
@@ -463,8 +480,12 @@ export const RailwaySetupView: React.FC<RailwaySetupViewProps> = ({ onComplete, 
       {!running && (
         <Box marginTop={1}>
           {setupState === 'new' && <Text color="cyan">⚡ Ready to provision Railway services</Text>}
-          {setupState === 'stale' && <Text color="yellow">⚠ Project name changed - setup needs to be restarted</Text>}
-          {setupState === 'incomplete' && <Text color="yellow">⋯ Setup in progress - continue where you left off</Text>}
+          {setupState === 'stale' && (
+            <Text color="yellow">⚠ Project name changed - setup needs to be restarted</Text>
+          )}
+          {setupState === 'incomplete' && (
+            <Text color="yellow">⋯ Setup in progress - continue where you left off</Text>
+          )}
           {setupState === 'complete' && <Text color="green">✓ Railway setup complete</Text>}
         </Box>
       )}

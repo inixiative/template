@@ -119,12 +119,24 @@ describe('Infisical Resume Scenario', () => {
     // createFolder not called — if it were, VCR would throw (no cassette queued)
 
     expect(config.mocks.markComplete).toHaveBeenCalledWith('infisical', 'renameEnv');
-    expect(config.mocks.markComplete).toHaveBeenCalledWith('infisical', 'createStagingAdminEnvImport');
-    expect(config.mocks.markComplete).not.toHaveBeenCalledWith('infisical', 'ensureProdApiAuthSecret');
-    expect(config.mocks.markComplete).not.toHaveBeenCalledWith('infisical', 'ensureStagingApiAuthSecret');
+    expect(config.mocks.markComplete).toHaveBeenCalledWith(
+      'infisical',
+      'createStagingAdminEnvImport',
+    );
+    expect(config.mocks.markComplete).not.toHaveBeenCalledWith(
+      'infisical',
+      'ensureProdApiAuthSecret',
+    );
+    expect(config.mocks.markComplete).not.toHaveBeenCalledWith(
+      'infisical',
+      'ensureStagingApiAuthSecret',
+    );
     // Encryption-keys step re-runs and re-marks complete (idempotent) — existing keys detected, no writes.
     expect(config.mocks.markComplete).toHaveBeenCalledWith('infisical', 'ensureProdEncryptionKeys');
-    expect(config.mocks.markComplete).toHaveBeenCalledWith('infisical', 'ensureStagingEncryptionKeys');
+    expect(config.mocks.markComplete).toHaveBeenCalledWith(
+      'infisical',
+      'ensureStagingEncryptionKeys',
+    );
 
     // All VCR cassettes consumed — no extra setSecret/getSecret calls happened
     expect(infisicalApi.vcr.isEmpty()).toBe(true);

@@ -30,7 +30,9 @@ describe('useSpaceTheme', () => {
     }
 
     expect(document.documentElement.style.getPropertyValue('--space-primary')).toBe('262 80% 46%');
-    expect(document.documentElement.style.getPropertyValue('--space-secondary')).toBe('142 76% 46%');
+    expect(document.documentElement.style.getPropertyValue('--space-secondary')).toBe(
+      '142 76% 46%',
+    );
     expect(document.documentElement.style.getPropertyValue('--space-accent')).toBe('38 92% 50%');
   });
 
@@ -52,7 +54,9 @@ describe('useSpaceTheme', () => {
       });
     }
 
-    expect(document.documentElement.style.getPropertyValue('--space-logo')).toBe('url(https://example.com/logo.png)');
+    expect(document.documentElement.style.getPropertyValue('--space-logo')).toBe(
+      'url(https://example.com/logo.png)',
+    );
     expect(document.documentElement.style.getPropertyValue('--space-logoDark')).toBe(
       'url(https://example.com/logo-dark.png)',
     );
@@ -126,7 +130,9 @@ describe('useSpaceTheme', () => {
     }
 
     expect(document.documentElement.style.getPropertyValue('--space-primary')).toBe('262 80% 46%');
-    expect(document.documentElement.style.getPropertyValue('--space-secondary')).toBe('142 76% 46%');
+    expect(document.documentElement.style.getPropertyValue('--space-secondary')).toBe(
+      '142 76% 46%',
+    );
 
     // Clear all previous variables
     const allKeys1 = theme1 ? Object.keys(theme1) : [];
@@ -170,7 +176,9 @@ describe('useSpaceTheme', () => {
 
     // Verify theme1 applied
     expect(document.documentElement.style.getPropertyValue('--space-primary')).toBe('262 80% 46%');
-    expect(document.documentElement.style.getPropertyValue('--space-secondary')).toBe('142 76% 46%');
+    expect(document.documentElement.style.getPropertyValue('--space-secondary')).toBe(
+      '142 76% 46%',
+    );
     expect(document.documentElement.style.getPropertyValue('--space-tertiary')).toBe('174 72% 56%');
 
     // Apply theme2 with clearing logic aligned to hook behavior (remove previously set keys)
@@ -216,6 +224,8 @@ describe('useSpaceTheme', () => {
     expect(document.documentElement.style.getPropertyValue('--space-primary2')).toBe('262 80% 70%');
     expect(document.documentElement.style.getPropertyValue('--space-primary3')).toBe('262 80% 50%');
     expect(document.documentElement.style.getPropertyValue('--space-primary4')).toBe('262 80% 30%');
-    expect(document.documentElement.style.getPropertyValue('--space-primaryForeground')).toBe('0 0% 100%');
+    expect(document.documentElement.style.getPropertyValue('--space-primaryForeground')).toBe(
+      '0 0% 100%',
+    );
   });
 });

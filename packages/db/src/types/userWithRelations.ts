@@ -4,7 +4,13 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
-import type { Organization, OrganizationUser, Space, SpaceUser, User } from '@template/db/generated/client/client';
+import type {
+  Organization,
+  OrganizationUser,
+  Space,
+  SpaceUser,
+  User,
+} from '@template/db/generated/client/client';
 import {
   OrganizationScalarSchema,
   OrganizationUserScalarSchema,

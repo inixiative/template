@@ -18,6 +18,7 @@
   - [Styles](#styles)
 - [Database](#database)
   - [Prisma Schema](#prisma-schema)
+  - [Polymorphic Sides](#polymorphic-sides)
   - [IDs](#ids)
 - [Files & Directories](#files--directories)
   - [Backend Structure](#backend-structure)
@@ -63,9 +64,11 @@
 | Type | Convention | Example |
 |------|------------|---------|
 | Route handler | `<model><Action>` | `userCreate`, `organizationReadMany` |
-| Getter | `get<Thing>` | `getUser`, `getOrganization` |
+| Getter | `get<Thing>` | `getActor`, `getResource` |
 | Boolean getter | `is<Condition>` | `isAuthenticated`, `isSuperadmin` |
-| Factory | `create<Thing>` | `createUser`, `createOrganization` |
+| Constructor / factory | `make<Thing>` | `makeError`, `makeJob`, `makeController` |
+
+`create<Thing>` is reserved for writing a record (`createInquiry`, the DB test factories `createUser` / `createSpace` in `packages/db/src/test/factories`), not for constructing a value.
 
 ### Variables
 
@@ -101,7 +104,7 @@ Two distinct meanings — **don't mix them**:
 
 | Context | Alias | Example |
 |---------|-------|---------|
-| Within an app | `#/` | `import { getUser } from '#/lib/context/getUser'` |
+| Within an app | `#/` | `import { getActor } from '#/lib/context/getActor'` |
 | Shared packages | `@template/` | `import { db } from '@template/db'` |
 | Within a shared package | `@template/` | `import { log } from '@template/shared/logger'` |
 | Top-level barrel exports | Relative | `export { foo } from './foo'` |
@@ -110,7 +113,7 @@ Two distinct meanings — **don't mix them**:
 // apps/api/src/modules/user/routes/userCreate.ts
 import { db } from '@template/db';                    // Shared package
 import { log } from '@template/shared/logger';        // Shared package
-import { getUser } from '#/lib/context/getUser';      // Internal to app
+import { getActor } from '#/lib/context/getActor';    // Internal to app
 
 // packages/shared/src/logger/index.ts (top-level barrel)
 export { log } from './logger';                       // Relative OK here
@@ -205,6 +208,30 @@ TODO: Tailwind conventions
 | Field | camelCase | `firstName`, `organizationId` |
 | Enum | PascalCase | `Role`, `PlatformRole` |
 | Relation | camelCase, descriptive | `organization`, `members`, `createdBy` |
+
+### Polymorphic Sides
+
+A polymorphic slot is named for the role the row plays, as `<side>Model` + typed FKs.
+
+| Side | Meaning | Example |
+|------|---------|---------|
+| `owner` | Tenancy only — who the row belongs to | `Contact.ownerModel` |
+| `source` / `target` | The two ends of a directed edge | `Inquiry`, `RuleReference` `sourceModel` / `targetModel` |
+| `resource` | A one-sided slot | `TagAttachment.resourceModel` |
+| `subject` | The row a record is about | `AuditLog.subjectModel` |
+| `actor` | Who acted | `AuditLog.actorUserId` |
+
+Never `referenced*`.
+
+Each side gets its own enum, named for the question it answers, even when the two lists overlap:
+`TagOwnerModel` (who can own a tag: `Tag.ownerModel`, `TagCategory.ownerModel`) and `TagResource`
+(where a tag can be applied: `TagAttachment.resourceModel`, `Tag.resources`). A value that is only
+meaningful on one side (`platform`, an owner with no row) never appears in the other side's enum.
+
+The typed FKs and relations carry the side too, so both ends read the same way: `sourceSegmentId` /
+`sourceSegment`, `targetTagId` / `targetTag` (as `Inquiry.sourceUserId` / `targetUserId`). The
+back-relations do the same, side plus the full model name: `sourceRuleReferences` on a source model,
+`targetRuleReferences` on a target model, both on a model that is both (`Segment`).
 
 ### IDs
 

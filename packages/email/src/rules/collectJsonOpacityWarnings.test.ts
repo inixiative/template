@@ -1,0 +1,74 @@
+import { describe, expect, it } from 'bun:test';
+import { createLens, type LensNarrowing, validateRuleInLens } from '@inixiative/json-rules';
+import { collectJsonOpacityWarnings } from '@template/email/rules/collectJsonOpacityWarnings';
+import type { EmailLens } from '@template/email/rules/emailLens';
+
+const recipientBase = createLens({
+  mapName: 'test',
+  model: 'Recipient',
+  maps: {
+    test: {
+      models: {
+        Recipient: {
+          fields: {
+            firstName: { kind: 'scalar', type: 'String' },
+            enrichments: { kind: 'object', type: 'Enrichment', isList: true },
+            partners: { kind: 'bridge', type: 'test:Partner' },
+          },
+        },
+        Enrichment: {
+          fields: { valueMeta: { kind: 'scalar', type: 'Json' } },
+        },
+        Partner: {
+          fields: { meta: { kind: 'scalar', type: 'Json' } },
+        },
+      },
+    },
+  },
+});
+
+const recipient: LensNarrowing = {
+  parent: recipientBase,
+  root: { relations: { enrichments: {}, partners: {} } },
+};
+
+const testLens: EmailLens = { recipient };
+
+describe('collectJsonOpacityWarnings', () => {
+  it('confirms the hole: validateRuleInLens does NOT catch a typo under a Json field', () => {
+    const rule = { field: 'enrichments.valueMeta.tYpo', operator: 'notEmpty' } as const;
+    expect(validateRuleInLens(rule, recipient).ok).toBe(true);
+  });
+
+  it('warns when a collected path descends beneath a Json field', () => {
+    const warnings = collectJsonOpacityWarnings(['recipient.enrichments.valueMeta.tYpo'], testLens);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain('recipient.enrichments.valueMeta.tYpo');
+  });
+
+  it('does not warn for a path that stops AT the Json field (no sub-path)', () => {
+    expect(collectJsonOpacityWarnings(['recipient.enrichments.valueMeta'], testLens)).toEqual([]);
+  });
+
+  it('does not warn for an ordinary scalar path', () => {
+    expect(collectJsonOpacityWarnings(['recipient.firstName'], testLens)).toEqual([]);
+  });
+
+  it('warns for a Json column reached THROUGH a bridge relation (bridge hop is followed)', () => {
+    const warnings = collectJsonOpacityWarnings(['recipient.partners.meta.tYpo'], testLens);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain('recipient.partners.meta.tYpo');
+  });
+
+  it("does not warn for an unknown/unmodeled path (a different check's job)", () => {
+    expect(collectJsonOpacityWarnings(['recipient.bogus.field'], testLens)).toEqual([]);
+  });
+
+  it('filters a mixed list down to only the paths that actually descend beneath a Json field', () => {
+    const warnings = collectJsonOpacityWarnings(
+      ['recipient.firstName', 'recipient.enrichments.valueMeta.tYpo', 'recipient.enrichments'],
+      testLens,
+    );
+    expect(warnings).toHaveLength(1);
+  });
+});

@@ -1,7 +1,19 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import type { User } from '@template/db';
-import { InquiryResourceModel, InquiryStatus, InquiryType, PlatformRole } from '@template/db/generated/client/enums';
-import { cleanupTouchedTables, createInquiry, createOrganization, createUser } from '@template/db/test';
+import type { User } from '@template/db/generated/client/client';
+import {
+  AuditSubjectModel,
+  InquiryResourceModel,
+  InquiryStatus,
+  InquiryType,
+  PlatformRole,
+} from '@template/db/generated/client/enums';
+import {
+  cleanupTouchedTables,
+  createAuditLog,
+  createInquiry,
+  createOrganization,
+  createUser,
+} from '@template/db/test';
 import { adminInquiryRouter } from '#/modules/inquiry';
 import { createTestApp } from '#tests/createTestApp';
 import { get, json } from '#tests/utils/request';
@@ -74,7 +86,9 @@ describe('GET /api/admin/inquiry', () => {
     });
 
     const response = await fetch(
-      get(`/api/admin/inquiry?searchFields[expiresAt][gte]=${encodeURIComponent(now.toISOString())}`),
+      get(
+        `/api/admin/inquiry?searchFields[expiresAt][gte]=${encodeURIComponent(now.toISOString())}`,
+      ),
     );
     const { data } = await json<ReadManyResponse['data']>(response);
 
@@ -82,5 +96,26 @@ describe('GET /api/admin/inquiry', () => {
     expect(data.map((inq) => inq.id)).toContain(futureInquiry.id);
     expect(data.map((inq) => inq.id)).not.toContain(pastInquiry.id);
     expect(data.map((inq) => inq.id)).toContain(noExpiryInquiry.id);
+  });
+
+  it('reads an inquiry whose audit trail carries every audit column', async () => {
+    const { entity: sourceOrganization } = await createOrganization();
+    const { entity: targetUser } = await createUser();
+    const { entity: inquiry } = await createInquiry({
+      type: InquiryType.inviteOrganizationUser,
+      status: InquiryStatus.sent,
+      sourceModel: InquiryResourceModel.Organization,
+      sourceOrganizationId: sourceOrganization.id,
+      targetModel: InquiryResourceModel.User,
+      targetUserId: targetUser.id,
+      content: { organizationId: sourceOrganization.id, role: 'member' },
+    });
+    await createAuditLog({
+      subjectModel: AuditSubjectModel.Inquiry,
+      subjectInquiryId: inquiry.id,
+      componentVersions: {},
+    });
+    const response = await fetch(get('/api/admin/inquiry'));
+    expect(response.status).toBe(200);
   });
 });

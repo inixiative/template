@@ -1,7 +1,7 @@
 /**
  * @atlas
  * @kind factory
- * @partOf infrastructure:prisma
+ * @partOf infrastructure:prisma, primitive:testFactories
  * @uses none
  */
 import { createFactory } from '@template/db/test/factory';
@@ -22,6 +22,16 @@ const customerRefFactory = createFactory('CustomerRef', {
     customerSpace: {
       modelName: 'Space',
       foreignKey: { id: 'customerSpaceId' },
+      required: false,
+    },
+    providerUser: {
+      modelName: 'User',
+      foreignKey: { id: 'providerUserId' },
+      required: false,
+    },
+    providerOrganization: {
+      modelName: 'Organization',
+      foreignKey: { id: 'providerOrganizationId' },
       required: false,
     },
     providerSpace: {

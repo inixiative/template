@@ -11,9 +11,6 @@ export const settingsItem: NavItem = {
   label: 'Settings',
   path: '/settings',
   icon: 'lucide:settings',
-  // Parent gate matches the loosest child (`Profile` is `read`) — without
-  // this, read-only users can't see the Settings menu and can't navigate
-  // to Profile. Each child still has its own per-action gate below.
   access: (permissions, context) => permissions.check(...getContextParams(context), 'read'),
   items: [
     {
@@ -35,6 +32,12 @@ export const settingsItem: NavItem = {
       access: (permissions, context) => permissions.check(...getContextParams(context), 'operate'),
     },
     {
+      label: 'Integrations',
+      path: '/integrations',
+      icon: 'lucide:plug',
+      access: (permissions, context) => permissions.check(...getContextParams(context), 'read'),
+    },
+    {
       label: 'Auth Providers',
       path: '/authProviders',
       icon: 'lucide:shield-check',
@@ -45,7 +48,8 @@ export const settingsItem: NavItem = {
       label: 'Update',
       path: '/update',
       icon: 'lucide:refresh-cw',
-      access: (permissions, context) => !!context.space && permissions.check(...getContextParams(context), 'manage'),
+      access: (permissions, context) =>
+        !!context.space && permissions.check(...getContextParams(context), 'manage'),
     },
     {
       label: 'Transfer',
@@ -54,7 +58,10 @@ export const settingsItem: NavItem = {
       access: (permissions, context) =>
         !!context.space &&
         !!context.organization &&
-        permissions.check(...getContextParams({ type: 'organization', organization: context.organization }), 'own'),
+        permissions.check(
+          ...getContextParams({ type: 'organization', organization: context.organization }),
+          'own',
+        ),
     },
   ],
 };

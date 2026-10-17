@@ -14,7 +14,8 @@ export const ENCRYPTED_MODELS = {
     keys: {
       secrets: {
         envPrefix: 'AUTH_PROVIDER_SECRETS',
-        buildAAD: (r: Pick<AuthProvider, 'id' | 'organizationId'>) => `authProvider:${r.id}:${r.organizationId}`,
+        buildAAD: (r: Pick<AuthProvider, 'id' | 'organizationId'>) =>
+          `authProvider:${r.id}:${r.organizationId}`,
       },
     },
   } satisfies EncryptedModelConfig<'authProvider'>,

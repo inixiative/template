@@ -40,3 +40,37 @@ export const paginateResponseSchema = z
   .openapi('PaginateResponse');
 
 export type PaginationMetadata = z.infer<typeof paginateResponseSchema>;
+
+// Cursor mode trades random access for stability: no page number, no total, no totalPages, and
+// no count() on the read path. Jump-to-end is served by flipping the sort direction.
+export const cursorPaginateRequestSchema = z
+  .object({
+    pageSize: z.coerce
+      .number()
+      .min(1)
+      .max(10_000)
+      .default(100)
+      .openapi({
+        param: { in: 'query' },
+        example: 100,
+      }),
+    cursor: z
+      .string()
+      .optional()
+      .openapi({
+        param: { in: 'query' },
+        example: 'eyJ2IjoxLCJrIjpbWyJpZCIsImFzYyJdXSwicCI6WyIuLi4iXX0',
+      }),
+    orderBy: orderByRequestSchema,
+  })
+  .openapi('CursorPaginateRequest');
+
+export const cursorPaginateResponseSchema = z
+  .object({
+    pageSize: z.number().min(1).max(10_000).openapi({ example: 100 }),
+    hasMore: z.boolean().openapi({ example: true }),
+    nextCursor: z.string().nullable().openapi({ example: null }),
+  })
+  .openapi('CursorPaginateResponse');
+
+export type CursorPaginationMetadata = z.infer<typeof cursorPaginateResponseSchema>;

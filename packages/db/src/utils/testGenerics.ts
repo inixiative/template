@@ -14,10 +14,16 @@ type Operation = 'findMany' | 'findFirst' | 'findUnique' | 'create' | 'update' |
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Type-level mapping: Model + Operation → Args
-type Args<M extends ModelName, Op extends Operation> = Prisma.TypeMap['model'][M]['operations'][Op]['args'];
+type Args<
+  M extends ModelName,
+  Op extends Operation,
+> = Prisma.TypeMap['model'][M]['operations'][Op]['args'];
 
 // Type-level mapping: Model + Operation → Result
-type Result<M extends ModelName, Op extends Operation> = Prisma.TypeMap['model'][M]['operations'][Op]['result'];
+type Result<
+  M extends ModelName,
+  Op extends Operation,
+> = Prisma.TypeMap['model'][M]['operations'][Op]['result'];
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Test 1: Literal types resolve correctly

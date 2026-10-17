@@ -1,4 +1,4 @@
-import { join } from 'path';
+import { join } from 'node:path';
 import { cliVersion, VCR } from '../../packages/shared/src/vcr';
 import { execAsync } from '../utils/exec';
 
@@ -26,7 +26,10 @@ class VercelApi {
   ): Promise<Record<string, unknown>> {
     const token = await this.getVercelToken();
     const url = `https://api.vercel.com${endpoint}`;
-    const headers = [`-H "Authorization: Bearer ${token}"`, `-H "Content-Type: application/json"`].join(' ');
+    const headers = [
+      `-H "Authorization: Bearer ${token}"`,
+      `-H "Content-Type: application/json"`,
+    ].join(' ');
     const cmd = body
       ? `curl -s -X ${method} "${url}" ${headers} -d '${JSON.stringify(body)}'`
       : `curl -s "${url}" ${headers}`;
@@ -39,11 +42,13 @@ class VercelApi {
       try {
         const result = await this.vercelAPI('/v2/teams', 'GET');
         if (result.error) return [];
-        return ((result.teams ?? []) as Array<{ id: string; name: string; slug: string }>).map((team) => ({
-          id: team.id,
-          name: team.name,
-          slug: team.slug,
-        }));
+        return ((result.teams ?? []) as Array<{ id: string; name: string; slug: string }>).map(
+          (team) => ({
+            id: team.id,
+            name: team.name,
+            slug: team.slug,
+          }),
+        );
       } catch (_error) {
         return [];
       }
@@ -54,9 +59,12 @@ class VercelApi {
     return this.vcr.capture('getProject', async () => {
       try {
         const teamFlag = teamId ? `--scope ${teamId}` : '';
-        const { stdout, stderr } = await execAsync(`vercel project inspect ${projectName} ${teamFlag}`, {
-          encoding: 'utf-8',
-        });
+        const { stdout, stderr } = await execAsync(
+          `vercel project inspect ${projectName} ${teamFlag}`,
+          {
+            encoding: 'utf-8',
+          },
+        );
         const output = stdout + stderr;
         const idMatch = output.match(/ID\s+([a-zA-Z0-9_]+)/);
         const nameMatch = output.match(/Name\s+([^\s]+)/);
@@ -77,7 +85,8 @@ class VercelApi {
         if (!projectInfo) throw new Error('Project created but could not retrieve project info');
         return projectInfo;
       } catch (error) {
-        if (error instanceof Error) throw new Error(`Failed to create Vercel project: ${error.message}`);
+        if (error instanceof Error)
+          throw new Error(`Failed to create Vercel project: ${error.message}`);
         throw error;
       }
     });
@@ -114,13 +123,18 @@ class VercelApi {
     return this.vcr.capture('linkGitHub', async () => {
       try {
         const teamFlag = teamId ? `--scope ${teamId}` : '';
-        await execAsync(`vercel link --project ${projectId} ${teamFlag} --yes`, { encoding: 'utf-8' });
-        const gitUrl = `https://github.com/${org}/${repo}`;
-        const { stdout, stderr } = await execAsync(`echo y | vercel git connect ${gitUrl} ${teamFlag}`, {
+        await execAsync(`vercel link --project ${projectId} ${teamFlag} --yes`, {
           encoding: 'utf-8',
-          timeout: 30000,
-          shell: '/bin/bash',
         });
+        const gitUrl = `https://github.com/${org}/${repo}`;
+        const { stdout, stderr } = await execAsync(
+          `echo y | vercel git connect ${gitUrl} ${teamFlag}`,
+          {
+            encoding: 'utf-8',
+            timeout: 30000,
+            shell: '/bin/bash',
+          },
+        );
         const output = stdout + stderr;
         if (output.toLowerCase().includes('error:') || stderr.toLowerCase().includes('error:')) {
           throw new Error(output || 'Failed to connect GitHub repository');
@@ -128,7 +142,8 @@ class VercelApi {
       } catch (error) {
         if (error instanceof Error) {
           const msg = error.message.toLowerCase();
-          if (msg.includes('install') || msg.includes('integration')) throw new Error('GITHUB_NOT_INSTALLED');
+          if (msg.includes('install') || msg.includes('integration'))
+            throw new Error('GITHUB_NOT_INSTALLED');
           if (msg.includes('login connection')) throw new Error('GITHUB_LOGIN_CONNECTION_REQUIRED');
           throw error;
         }
@@ -153,7 +168,8 @@ class VercelApi {
           { encoding: 'utf-8' },
         );
       } catch (error) {
-        if (error instanceof Error) throw new Error(`Failed to add environment variable ${key}: ${error.message}`);
+        if (error instanceof Error)
+          throw new Error(`Failed to add environment variable ${key}: ${error.message}`);
         throw error;
       }
     });
@@ -170,7 +186,11 @@ class VercelApi {
     },
   ): Promise<void> {
     return this.vcr.capture('updateProjectSettings', async () => {
-      const result = await this.vercelAPI(`/v10/projects/${projectId}?teamId=${teamId}`, 'PATCH', settings);
+      const result = await this.vercelAPI(
+        `/v10/projects/${projectId}?teamId=${teamId}`,
+        'PATCH',
+        settings,
+      );
       if (result.error) {
         const err = result.error as Record<string, unknown>;
         const msg = err.message ?? err.code ?? JSON.stringify(result.error);
@@ -186,11 +206,15 @@ class VercelApi {
     trackedBranch: string,
   ): Promise<string> {
     return this.vcr.capture('createCustomEnvironment', async () => {
-      const result = await this.vercelAPI(`/v9/projects/${projectId}/custom-environments?teamId=${teamId}`, 'POST', {
-        slug: environmentName.toLowerCase(),
-        description: `${environmentName} environment`,
-        branchMatcher: { type: 'equals', pattern: trackedBranch },
-      });
+      const result = await this.vercelAPI(
+        `/v9/projects/${projectId}/custom-environments?teamId=${teamId}`,
+        'POST',
+        {
+          slug: environmentName.toLowerCase(),
+          description: `${environmentName} environment`,
+          branchMatcher: { type: 'equals', pattern: trackedBranch },
+        },
+      );
       if (result.error) {
         const err = result.error as Record<string, unknown>;
         const msg = err.message ?? err.code ?? JSON.stringify(result.error);
@@ -209,9 +233,12 @@ class VercelApi {
       try {
         const teamFlag = teamId ? `--scope ${teamId}` : '';
         const prodFlag = production ? '--prod' : '';
-        const { stdout } = await execAsync(`vercel deploy ${projectPath} ${prodFlag} ${teamFlag} --json`, {
-          encoding: 'utf-8',
-        });
+        const { stdout } = await execAsync(
+          `vercel deploy ${projectPath} ${prodFlag} ${teamFlag} --json`,
+          {
+            encoding: 'utf-8',
+          },
+        );
         const data = JSON.parse(stdout.trim());
         return { url: data.url, deploymentId: data.id };
       } catch (error) {

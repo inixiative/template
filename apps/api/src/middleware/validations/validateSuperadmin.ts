@@ -2,8 +2,9 @@
  * @atlas
  * @kind validator, middleware
  * @partOf superadmin
- * @uses primitive:errors
+ * @uses primitive:errors, infrastructure:prisma
  */
+import { db } from '@template/db';
 import type { Context, Next } from 'hono';
 import { makeError } from '#/lib/errors';
 
@@ -13,5 +14,5 @@ export const validateSuperadmin = async (c: Context<AppEnv>, next: Next) => {
   if (c.get('user')?.platformRole !== 'superadmin') {
     throw makeError({ status: 403, message: 'Superadmin access required' });
   }
-  await next();
+  return db.withDeleted(() => next());
 };

@@ -5,6 +5,9 @@
  * @uses none
  */
 
+import type { AsyncLocalStorage } from 'node:async_hooks';
+import type { BridgedContext } from '@template/db/clientTypes';
+import type { ModelName } from '@template/db/utils/modelNames';
 import { LogScope, log } from '@template/shared/logger';
 import { castArray } from 'lodash-es';
 
@@ -24,10 +27,13 @@ export enum HookTiming {
 }
 
 export type SingleAction = DbAction.create | DbAction.update | DbAction.delete | DbAction.upsert;
-export type ManyAction = DbAction.createManyAndReturn | DbAction.updateManyAndReturn | DbAction.deleteMany;
+export type ManyAction =
+  | DbAction.createManyAndReturn
+  | DbAction.updateManyAndReturn
+  | DbAction.deleteMany;
 
 type HookOptionsBase = {
-  model: string;
+  model: ModelName;
   operation: string;
   args: unknown;
 };
@@ -61,12 +67,21 @@ const registeredHooks: {
 
 const hookRegistry = new Set<string>();
 
+const hookRegistrations = new Map<
+  string,
+  { targets: string[]; timing: HookTiming; actions: DbAction[]; hook: HookFunction }
+>();
+// Hooks run on a Prisma continuation where the caller's async-local storage has not survived. A hook
+// that reads an ambient context declares its store here and db.txn carries the value across.
+const bridgedStores = new Set<AsyncLocalStorage<unknown>>();
+
 export const registerDbHook = <T = Record<string, unknown>>(
   name: string,
-  model: string | string[] | '*',
+  model: string | readonly string[] | '*',
   timing: HookTiming,
   actions: DbAction[],
   hook: HookFunction<T>,
+  bridges: AsyncLocalStorage<unknown>[] = [],
 ) => {
   if (hookRegistry.has(name)) {
     log.warn(`Hook '${name}' already registered - skipping duplicate`, LogScope.hook);
@@ -78,6 +93,13 @@ export const registerDbHook = <T = Record<string, unknown>>(
   }
 
   hookRegistry.add(name);
+  hookRegistrations.set(name, {
+    targets: [...castArray(model)],
+    timing,
+    actions,
+    hook: hook as HookFunction,
+  });
+  for (const store of bridges) bridgedStores.add(store);
 
   for (const target of castArray(model)) {
     registeredHooks[target] ??= {
@@ -92,11 +114,32 @@ export const registerDbHook = <T = Record<string, unknown>>(
   }
 };
 
+export const unregisterDbHook = (name: string) => {
+  const registration = hookRegistrations.get(name);
+  if (!registration) return;
+
+  for (const target of registration.targets) {
+    const timingHooks = registeredHooks[target]?.[registration.timing];
+    if (!timingHooks) continue;
+
+    for (const action of registration.actions) {
+      const hooks = timingHooks[action];
+      if (hooks) timingHooks[action] = hooks.filter((hook) => hook !== registration.hook);
+    }
+  }
+
+  hookRegistry.delete(name);
+  hookRegistrations.delete(name);
+};
+
 // Order is implicit: model hooks before global ('*'), each in registration order — so a hook that
 // must run AFTER another (e.g. emailVersioning augments the snapshot auditLog writes, so it must
 // follow auditLog) relies on registration order, which per-model re-registration can silently break.
 // TODO (not urgent, mechanism TBD): a way for a hook to require running after another, with a cycle
 // check over the declared orderings.
+export const hasHooksFor = (model: string): boolean =>
+  '*' in registeredHooks || model in registeredHooks;
+
 export const executeHooks = async (timing: HookTiming, options: HookOptions) => {
   const modelHooks = registeredHooks[options.model]?.[timing]?.[options.action] || [];
   const globalHooks = registeredHooks['*']?.[timing]?.[options.action] || [];
@@ -106,9 +149,31 @@ export const executeHooks = async (timing: HookTiming, options: HookOptions) => 
   }
 };
 
+// Read in the caller frame at db.txn() open, where storage is still reliable. Values are carried by
+// reference, so a hook mutating one is mutating the caller's object.
+export const captureBridgedContext = (): BridgedContext =>
+  [...bridgedStores].map((store) => [store, store.getStore()]);
+
+export const runInBridgedContext = <TResult>(
+  bridgedContext: BridgedContext,
+  fn: () => TResult,
+): TResult => {
+  const enter = (index: number): TResult => {
+    if (index === bridgedContext.length) return fn();
+    const [store, value] = bridgedContext[index]!;
+    // A store the caller had not entered must stay unentered, not entered with undefined.
+    return value === undefined ? enter(index + 1) : store.run(value, () => enter(index + 1));
+  };
+  return enter(0);
+};
+
+// The test tracker belongs to the test process, not to any one test: the db client registers it
+// once, so clearing a test's hooks must not take it with them or every later file stops tracking.
+const PROCESS_HOOKS = new Set(['testTracker']);
+
 export const clearHookRegistry = () => {
-  hookRegistry.clear();
-  for (const model of Object.keys(registeredHooks)) {
-    delete registeredHooks[model];
+  for (const name of [...hookRegistry]) {
+    if (!PROCESS_HOOKS.has(name)) unregisterDbHook(name);
   }
+  bridgedStores.clear();
 };

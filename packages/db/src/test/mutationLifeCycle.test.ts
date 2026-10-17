@@ -5,7 +5,8 @@ import {
   type HookOptions,
   HookTiming,
   registerDbHook,
-} from '@template/db/extensions/mutationLifeCycle';
+  unregisterDbHook,
+} from '@template/db/extensions/hookRegistry';
 
 describe('mutationLifeCycle', () => {
   describe('registerDbHook', () => {
@@ -30,7 +31,13 @@ describe('mutationLifeCycle', () => {
     it('registers a hook for multiple actions', async () => {
       const hookFn = mock(() => Promise.resolve());
 
-      registerDbHook('test-hook-2', 'User', HookTiming.before, [DbAction.create, DbAction.update], hookFn);
+      registerDbHook(
+        'test-hook-2',
+        'User',
+        HookTiming.before,
+        [DbAction.create, DbAction.update],
+        hookFn,
+      );
 
       await executeHooks(HookTiming.before, {
         model: 'User',
@@ -74,10 +81,21 @@ describe('mutationLifeCycle', () => {
     it('registers a hook for an array of models', async () => {
       const hookFn = mock(() => Promise.resolve());
 
-      registerDbHook('test-hook-array', ['User', 'Session'], HookTiming.before, [DbAction.create], hookFn);
+      registerDbHook(
+        'test-hook-array',
+        ['User', 'Session'],
+        HookTiming.before,
+        [DbAction.create],
+        hookFn,
+      );
 
-      for (const model of ['User', 'Session', 'Account']) {
-        await executeHooks(HookTiming.before, { model, operation: 'create', action: DbAction.create, args: {} });
+      for (const model of ['User', 'Session', 'Account'] as const) {
+        await executeHooks(HookTiming.before, {
+          model,
+          operation: 'create',
+          action: DbAction.create,
+          args: {},
+        });
       }
 
       // Fires for each listed model, not for the unlisted one.
@@ -106,6 +124,60 @@ describe('mutationLifeCycle', () => {
       expect(() => {
         registerDbHook('test-hook-empty', 'User', HookTiming.before, [], async () => {});
       }).toThrow('Hook registration requires at least one action');
+    });
+
+    it('unregisters a hook by name without touching other registrations', async () => {
+      const removed = mock(() => Promise.resolve());
+      const kept = mock(() => Promise.resolve());
+
+      registerDbHook(
+        'test-hook-removed',
+        ['User', 'Session'],
+        HookTiming.before,
+        [DbAction.create],
+        removed,
+      );
+      registerDbHook('test-hook-kept', 'User', HookTiming.before, [DbAction.create], kept);
+      unregisterDbHook('test-hook-removed');
+
+      await executeHooks(HookTiming.before, {
+        model: 'User',
+        operation: 'create',
+        action: DbAction.create,
+        args: {},
+      });
+      await executeHooks(HookTiming.before, {
+        model: 'Session',
+        operation: 'create',
+        action: DbAction.create,
+        args: {},
+      });
+
+      expect(removed).not.toHaveBeenCalled();
+      expect(kept).toHaveBeenCalledTimes(1);
+    });
+
+    it('frees the name for re-registration after unregistering', async () => {
+      const first = mock(() => Promise.resolve());
+      const second = mock(() => Promise.resolve());
+
+      registerDbHook('test-hook-reused', 'User', HookTiming.before, [DbAction.create], first);
+      unregisterDbHook('test-hook-reused');
+      registerDbHook('test-hook-reused', 'User', HookTiming.before, [DbAction.create], second);
+
+      await executeHooks(HookTiming.before, {
+        model: 'User',
+        operation: 'create',
+        action: DbAction.create,
+        args: {},
+      });
+
+      expect(first).not.toHaveBeenCalled();
+      expect(second).toHaveBeenCalledTimes(1);
+    });
+
+    it('ignores unregistering a name that was never registered', () => {
+      expect(() => unregisterDbHook('test-hook-never-registered')).not.toThrow();
     });
 
     it('allows after hooks on all Many operations', () => {
@@ -149,13 +221,25 @@ describe('mutationLifeCycle', () => {
     it('executes model-specific hooks before global hooks', async () => {
       const callOrder: string[] = [];
 
-      registerDbHook('test-hook-global-order', '*', HookTiming.before, [DbAction.update], async () => {
-        callOrder.push('global');
-      });
+      registerDbHook(
+        'test-hook-global-order',
+        '*',
+        HookTiming.before,
+        [DbAction.update],
+        async () => {
+          callOrder.push('global');
+        },
+      );
 
-      registerDbHook('test-hook-model-order', 'User', HookTiming.before, [DbAction.update], async () => {
-        callOrder.push('model');
-      });
+      registerDbHook(
+        'test-hook-model-order',
+        'User',
+        HookTiming.before,
+        [DbAction.update],
+        async () => {
+          callOrder.push('model');
+        },
+      );
 
       await executeHooks(HookTiming.before, {
         model: 'User',
@@ -170,7 +254,13 @@ describe('mutationLifeCycle', () => {
     it('does not execute hooks for different models', async () => {
       const hookFn = mock(() => Promise.resolve());
 
-      registerDbHook('test-hook-different-model', 'Session', HookTiming.before, [DbAction.create], hookFn);
+      registerDbHook(
+        'test-hook-different-model',
+        'Session',
+        HookTiming.before,
+        [DbAction.create],
+        hookFn,
+      );
 
       await executeHooks(HookTiming.before, {
         model: 'User',
@@ -185,7 +275,13 @@ describe('mutationLifeCycle', () => {
     it('does not execute hooks for different actions', async () => {
       const hookFn = mock(() => Promise.resolve());
 
-      registerDbHook('test-hook-different-action', 'User', HookTiming.before, [DbAction.delete], hookFn);
+      registerDbHook(
+        'test-hook-different-action',
+        'User',
+        HookTiming.before,
+        [DbAction.delete],
+        hookFn,
+      );
 
       await executeHooks(HookTiming.before, {
         model: 'User',
@@ -200,7 +296,13 @@ describe('mutationLifeCycle', () => {
     it('does not execute hooks for different timing', async () => {
       const hookFn = mock(() => Promise.resolve());
 
-      registerDbHook('test-hook-different-timing', 'User', HookTiming.after, [DbAction.create], hookFn);
+      registerDbHook(
+        'test-hook-different-timing',
+        'User',
+        HookTiming.after,
+        [DbAction.create],
+        hookFn,
+      );
 
       await executeHooks(HookTiming.before, {
         model: 'User',
@@ -233,14 +335,26 @@ describe('mutationLifeCycle', () => {
     it('executes hooks sequentially', async () => {
       const callOrder: number[] = [];
 
-      registerDbHook('test-hook-sequential-1', 'Organization', HookTiming.before, [DbAction.create], async () => {
-        await new Promise((r) => setTimeout(r, 10));
-        callOrder.push(1);
-      });
+      registerDbHook(
+        'test-hook-sequential-1',
+        'Organization',
+        HookTiming.before,
+        [DbAction.create],
+        async () => {
+          await new Promise((r) => setTimeout(r, 10));
+          callOrder.push(1);
+        },
+      );
 
-      registerDbHook('test-hook-sequential-2', 'Organization', HookTiming.before, [DbAction.create], async () => {
-        callOrder.push(2);
-      });
+      registerDbHook(
+        'test-hook-sequential-2',
+        'Organization',
+        HookTiming.before,
+        [DbAction.create],
+        async () => {
+          callOrder.push(2);
+        },
+      );
 
       await executeHooks(HookTiming.before, {
         model: 'Organization',
@@ -253,9 +367,15 @@ describe('mutationLifeCycle', () => {
     });
 
     it('handles hooks that throw errors', async () => {
-      registerDbHook('test-hook-error', 'Account', HookTiming.before, [DbAction.create], async () => {
-        throw new Error('Hook error');
-      });
+      registerDbHook(
+        'test-hook-error',
+        'Account',
+        HookTiming.before,
+        [DbAction.create],
+        async () => {
+          throw new Error('Hook error');
+        },
+      );
 
       await expect(
         executeHooks(HookTiming.before, {
@@ -270,7 +390,7 @@ describe('mutationLifeCycle', () => {
     it('handles no registered hooks gracefully', async () => {
       await expect(
         executeHooks(HookTiming.before, {
-          model: 'NonExistentModel',
+          model: 'CronJob',
           operation: 'create',
           action: DbAction.create,
           args: {},

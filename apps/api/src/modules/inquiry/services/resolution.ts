@@ -12,17 +12,16 @@ import { emitAppEvent } from '#/appEvents/emit';
 import { inquiryHandlers } from '#/modules/inquiry/handlers';
 import type { Inquiry } from '#/modules/inquiry/handlers/types';
 import { includeInquiryReceived } from '#/modules/inquiry/queries/inquiryIncludes';
+import type { InquiryResolutionStatus } from '#/modules/inquiry/schemas/inquiryResolutionStatusSchema';
 import { computeExpiresAt } from '#/modules/inquiry/services/computeExpiresAt';
 import { resolveContent } from '#/modules/inquiry/services/resolveContent';
 import { validateInquiryIsResolvable } from '#/modules/inquiry/validations/validateInquiryStatus';
 import type { AppEnv } from '#/types/appEnv';
 
-type ResolutionStatus = 'approved' | 'denied' | 'changesRequested';
-
 export const resolveInquiry = async (
   c: Context<AppEnv>,
   inquiry: Inquiry,
-  status: ResolutionStatus,
+  status: InquiryResolutionStatus,
   resolutionData: Record<string, unknown>,
 ): Promise<Inquiry> => {
   const db = c.get('db');
@@ -44,7 +43,8 @@ export const resolveInquiry = async (
         approvalOutput = (await handler.handleApprove(db, fresh, merged)) ?? {};
       }
 
-      const expiresAt = status === InquiryStatus.changesRequested ? computeExpiresAt(fresh.type) : null;
+      const expiresAt =
+        status === InquiryStatus.changesRequested ? computeExpiresAt(fresh.type) : null;
 
       const updated = await db.inquiry.update({
         where: { id: fresh.id },
@@ -56,7 +56,7 @@ export const resolveInquiry = async (
         include: includeInquiryReceived,
       });
 
-      await emitAppEvent('inquiry.resolved', { ...updated, _resolution: status });
+      await emitAppEvent('inquiry.resolved', updated);
 
       return updated;
     });

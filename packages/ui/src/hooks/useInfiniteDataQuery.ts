@@ -29,6 +29,7 @@ export type UseInfiniteDataQueryResult<TItem> = {
   data: TItem[];
   pageCount: number;
   isLoading: boolean;
+  isError: boolean;
   isFetchingNextPage: boolean;
   hasNextPage: boolean;
   fetchNextPage: () => void;
@@ -56,7 +57,10 @@ export function useInfiniteDataQuery<TItem>(
     enabled,
   });
 
-  const data = React.useMemo(() => query.data?.pages.flatMap((page) => page.data) ?? [], [query.data]);
+  const data = React.useMemo(
+    () => query.data?.pages.flatMap((page) => page.data) ?? [],
+    [query.data],
+  );
 
   const pageCount = query.data?.pages.length ?? 0;
 
@@ -70,7 +74,8 @@ export function useInfiniteDataQuery<TItem>(
   }, [query.data]);
 
   const locateItem = React.useCallback(
-    (flatIndex: number): InfiniteDataPageLocation | null => locateItemInPages(query.data?.pages ?? [], flatIndex),
+    (flatIndex: number): InfiniteDataPageLocation | null =>
+      locateItemInPages(query.data?.pages ?? [], flatIndex),
     [query.data],
   );
 
@@ -78,6 +83,7 @@ export function useInfiniteDataQuery<TItem>(
     data,
     pageCount,
     isLoading: query.isLoading,
+    isError: query.isError,
     isFetchingNextPage: query.isFetchingNextPage,
     hasNextPage: query.hasNextPage,
     fetchNextPage: () => query.fetchNextPage(),

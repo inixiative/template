@@ -8,7 +8,10 @@ type BouncerProgressGroup = {
   getLabel: (config: ProjectConfig, completedCount: number, totalCount: number) => string;
 };
 
-const countCompletedActions = (progress: BouncerProgress, actions: readonly BouncerAction[]): number => {
+const countCompletedActions = (
+  progress: BouncerProgress,
+  actions: readonly BouncerAction[],
+): number => {
   return actions.filter((action) => progress[action]).length;
 };
 
@@ -39,7 +42,9 @@ export const getBouncerProgressSummaries = (config: ProjectConfig): BouncerProgr
   });
 };
 
-export const getBouncerProgressItems = (config: ProjectConfig): Array<{ label: string; completed: boolean }> => {
+export const getBouncerProgressItems = (
+  config: ProjectConfig,
+): Array<{ label: string; completed: boolean }> => {
   return getBouncerProgressSummaries(config).map((summary) => ({
     label: summary.label,
     completed: summary.completed,

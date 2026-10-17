@@ -1,0 +1,93 @@
+/**
+ * @atlas
+ * @kind helper
+ * @partOf infrastructure:prisma
+ * @uses none
+ */
+
+import type { Condition } from '@inixiative/json-rules';
+import { resolveFalsePolymorphismRef } from '@template/db/registries/falsePolymorphism';
+import type { ModelName } from '@template/db/utils/modelNames';
+import { ruleReferences } from '@template/db/utils/ruleReferences';
+import {
+  type RuleHealth,
+  type RuleLens,
+  type RuleReference,
+  referenceKey,
+} from '@template/shared/rules';
+
+/** The shape a rule-reference edge has to arrive in for its health to be readable. No relations. */
+export type RuleReferenceRow = {
+  targetModel: string;
+  targetId: string;
+  targetDeletedAt?: Date | null;
+} & Record<string, unknown>;
+
+export type RuleReferenceIssue = {
+  key: string;
+  targetModel: string;
+  targetId: string;
+  reason: 'deleted' | 'purged';
+};
+
+const purged = (edge: RuleReferenceRow): boolean => {
+  const column = resolveFalsePolymorphismRef({
+    model: 'RuleReference',
+    axis: 'targetModel',
+    value: edge.targetModel as ModelName,
+  });
+  // why: an unregistered targetModel cannot be checked, and reading it as healthy is the
+  // why: vacuous-`none` outcome this table exists to prevent - so it counts as gone.
+  return !column || edge[column] == null;
+};
+
+/**
+ * Which of these edges no longer resolve, read from the edge rows alone.
+ *
+ * Two signals, because a target leaves in two ways: soft delete is copied onto the edge as
+ * `targetDeletedAt`, and a purge nulls the typed FK while `targetId` keeps the name.
+ */
+export const ruleReferenceIssues = (edges: RuleReferenceRow[]): RuleReferenceIssue[] =>
+  edges.flatMap((edge) => {
+    const reason = edge.targetDeletedAt != null ? 'deleted' : purged(edge) ? 'purged' : null;
+    if (!reason) return [];
+    const { targetModel, targetId } = edge;
+    return [
+      {
+        key: referenceKey({ model: targetModel, id: targetId }),
+        targetModel,
+        targetId,
+        reason,
+      },
+    ];
+  });
+
+/** The references these edges name that are still usable — absence is the answer, so callers fail closed. */
+export const liveRuleReferences = (edges: RuleReferenceRow[]): RuleReference[] => {
+  const broken = new Set(ruleReferenceIssues(edges).map((issue) => issue.key));
+  const seen = new Set<string>();
+  const live: RuleReference[] = [];
+  for (const edge of edges) {
+    const reference = { model: edge.targetModel, id: edge.targetId };
+    const key = referenceKey(reference);
+    if (broken.has(key) || seen.has(key)) continue;
+    seen.add(key);
+    live.push(reference);
+  }
+  return live;
+};
+
+export const liveRuleReferenceKeys = (edges: RuleReferenceRow[]): Set<string> =>
+  new Set(liveRuleReferences(edges).map(referenceKey));
+
+/** A rule's health as its own edges tell it: the rows it names, and which of them still resolve. */
+export const ruleHealthFromEdges = (
+  lens: RuleLens,
+  rule: Condition,
+  edges: RuleReferenceRow[],
+): RuleHealth & { live: Set<string> } => ({
+  lens,
+  rule,
+  references: ruleReferences(lens, rule),
+  live: liveRuleReferenceKeys(edges),
+});

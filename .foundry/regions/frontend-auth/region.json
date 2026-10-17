@@ -1,0 +1,52 @@
+{
+  "id": "frontend-auth",
+  "title": "Frontend Authentication",
+  "routing": "Is this about signing in or out in the browser apps? The store's auth slice (auth.initialize, auth.signIn, auth.signUp, auth.refreshMe, auth.logout, auth.setSpoof, auth.setStrategy), fetchAndHydrateMe, LoginForm/SignupForm and the login/signup pages, useAuthProviders and social buttons, the OAuth callback page, requireAuth/requirePublic/authGuard route guards, redirectTo handling (navigateToLogin, navigateToSignup, navigatePreserving, redirectPreservingContext), or the embed auth strategy (useAuthStrategy)?",
+  "concepts": ["frontend-auth"],
+  "tokens": 8018,
+  "tokenMethod": "chars/4",
+  "files": {
+    "recognise": {
+      "path": "recognise.md",
+      "tokens": 1672,
+      "experimental": true,
+      "note": "recognise/pick split under test (model round); not the standard"
+    },
+    "knowledge": {
+      "path": "knowledge.md",
+      "tokens": 8018
+    }
+  },
+  "runsAgreed": 0,
+  "sources": {
+    "docs": ["docs/claude/FRONTEND/AUTH.md"],
+    "docUnits": [
+      "doc:docs/claude/FRONTEND/AUTH.md#architecture",
+      "doc:docs/claude/FRONTEND/AUTH.md#unified-auth-method",
+      "doc:docs/claude/FRONTEND/AUTH.md#pages-and-forms",
+      "doc:docs/claude/FRONTEND/AUTH.md#useauthproviders",
+      "doc:docs/claude/FRONTEND/AUTH.md#oauth-callback",
+      "doc:docs/claude/FRONTEND/AUTH.md#guards",
+      "doc:docs/claude/FRONTEND/AUTH.md#auth-slice",
+      "doc:docs/claude/FRONTEND/AUTH.md#navigation-helpers",
+      "doc:docs/claude/FRONTEND/AUTH.md#security",
+      "doc:docs/claude/FRONTEND/AUTH.md#testing",
+      "doc:docs/claude/FRONTEND/AUTH.md#key-files"
+    ],
+    "catalogClusters": [
+      "authentication-methods",
+      "environment-config",
+      "error-handling",
+      "frontend-app-shells-routes",
+      "frontend-navigation-context",
+      "frontend-state-api-client",
+      "superadmin-operations",
+      "testing-helpers",
+      "ui-components"
+    ],
+    "codeEntries": 4,
+    "docMembers": 24
+  },
+  "bypassLines": 7,
+  "glossaryTerms": 23
+}

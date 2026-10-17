@@ -1,6 +1,21 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  mock,
+  spyOn,
+} from 'bun:test';
 import type { User, WebhookSubscription } from '@template/db/generated/client/client';
-import { cleanupTouchedTables, createUser, createWebhookSubscription, getNextSeq } from '@template/db/test';
+import {
+  cleanupTouchedTables,
+  createUser,
+  createWebhookSubscription,
+  getNextSeq,
+} from '@template/db/test';
 import { meRouter } from '#/modules/me';
 import { createTestApp } from '#tests/createTestApp';
 import { get, json, post } from '#tests/utils/request';
@@ -23,8 +38,14 @@ describe('me/webhookSubscriptions', () => {
   });
 
   beforeEach(() => {
-    spyOn(globalThis, 'fetch').mockImplementation((() =>
-      Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 200 }))) as typeof fetch);
+    spyOn(globalThis, 'fetch').mockImplementation(
+      Object.assign(
+        () => Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 200 })),
+        {
+          preconnect: globalThis.fetch.preconnect,
+        },
+      ),
+    );
   });
 
   afterEach(() => {
@@ -58,7 +79,9 @@ describe('me/webhookSubscriptions', () => {
       const url = `https://example.com/duplicate-${seq}`;
       await fetch(post('/api/v1/me/webhookSubscriptions', { model: 'CustomerRef', url }));
 
-      const response = await fetch(post('/api/v1/me/webhookSubscriptions', { model: 'CustomerRef', url }));
+      const response = await fetch(
+        post('/api/v1/me/webhookSubscriptions', { model: 'CustomerRef', url }),
+      );
       expect(response.status).toBe(409);
     });
   });
@@ -67,6 +90,7 @@ describe('me/webhookSubscriptions', () => {
     it('returns user webhooks', async () => {
       const seq = getNextSeq();
       await createWebhookSubscription({
+        model: 'CustomerRef',
         ownerModel: 'User',
         userId: user.id,
         url: `https://example.com/list-${seq}`,
@@ -84,6 +108,7 @@ describe('me/webhookSubscriptions', () => {
       const { entity: otherUser } = await createUser();
       const seq = getNextSeq();
       await createWebhookSubscription({
+        model: 'CustomerRef',
         ownerModel: 'User',
         userId: otherUser.id,
         url: `https://example.com/other-${seq}`,

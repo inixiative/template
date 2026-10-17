@@ -1,7 +1,7 @@
 /**
  * @atlas
  * @kind route
- * @uses feature:auth, feature:contact, feature:inquiry, feature:tenancy, feature:users, feature:webhooks, primitive:batch
+ * @uses feature:auth, feature:contact, feature:inquiry, feature:segment, feature:tenancy, feature:users, feature:webhooks, primitive:batch, primitive:flows
  */
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { auth } from '#/lib/auth';
@@ -11,18 +11,25 @@ import { spoofMiddleware } from '#/middleware/auth/spoofMiddleware';
 import { tokenAuthMiddleware } from '#/middleware/auth/tokenAuthMiddleware';
 import { corsMiddleware } from '#/middleware/corsMiddleware';
 import { prepareRequest } from '#/middleware/prepareRequest';
+import { apiRateLimit } from '#/middleware/rateLimit/apiRateLimit';
+import { authRateLimit } from '#/middleware/rateLimit/authRateLimit';
 import { authProviderRouter } from '#/modules/authProvider';
 import { batchRouter } from '#/modules/batch';
 import { contactRouter } from '#/modules/contact';
+import { flowRouter } from '#/modules/flow';
 import { inquiryRouter } from '#/modules/inquiry';
+import { integrationRouter } from '#/modules/integration';
 import { meRouter } from '#/modules/me';
 import { organizationRouter } from '#/modules/organization';
 import { organizationUserRouter } from '#/modules/organizationUser';
+import { segmentRouter } from '#/modules/segment';
 import { spaceRouter } from '#/modules/space';
 import { spaceUserRouter } from '#/modules/spaceUser';
 import { tokenRouter } from '#/modules/token';
+import { userRouter } from '#/modules/user';
 import { webhookSubscriptionRouter } from '#/modules/webhookSubscription';
 import { adminRouter } from '#/routes/admin';
+import { browserTelemetryRouter } from '#/routes/browserTelemetry';
 import { internalRouter } from '#/routes/internal';
 import { unsubscribeRouter } from '#/routes/unsubscribe';
 import type { AppEnv } from '#/types/appEnv';
@@ -32,6 +39,7 @@ export const apiRouter = new OpenAPIHono<AppEnv>();
 // Middleware (order matters)
 apiRouter.use('*', corsMiddleware);
 apiRouter.use('*', prepareRequest);
+apiRouter.route('/telemetry/browser', browserTelemetryRouter);
 
 // Internal service-to-service routes (shared-secret auth). Mounted BEFORE
 // the better-auth middlewares so the secret check in internalRouter is the
@@ -39,6 +47,7 @@ apiRouter.use('*', prepareRequest);
 apiRouter.route('/internal', internalRouter);
 
 // Auth routes (better-auth handles its own auth, returns early)
+apiRouter.use('/auth/*', authRateLimit);
 apiRouter.all('/auth/*', (c) => auth.handler(c.req.raw));
 
 // One-click unsubscribe — public (no session/token); authorized by its own signed link.
@@ -51,6 +60,7 @@ apiRouter.use('*', tokenAuthMiddleware);
 apiRouter.use('*', authMiddleware);
 apiRouter.use('*', spoofMiddleware);
 apiRouter.use('*', auditActorMiddleware);
+apiRouter.use('*', apiRateLimit);
 
 // Admin Routes (superadmin only - see routes/admin.ts)
 apiRouter.route('/admin', adminRouter);
@@ -59,11 +69,15 @@ apiRouter.route('/admin', adminRouter);
 apiRouter.route('/v1/authProvider', authProviderRouter);
 apiRouter.route('/v1/batch', batchRouter);
 apiRouter.route('/v1/contact', contactRouter);
+apiRouter.route('/v1/flow', flowRouter);
+apiRouter.route('/v1/integration', integrationRouter);
 apiRouter.route('/v1/me', meRouter);
 apiRouter.route('/v1/organization', organizationRouter);
 apiRouter.route('/v1/organizationUser', organizationUserRouter);
+apiRouter.route('/v1/segment', segmentRouter);
 apiRouter.route('/v1/space', spaceRouter);
 apiRouter.route('/v1/spaceUser', spaceUserRouter);
 apiRouter.route('/v1/token', tokenRouter);
+apiRouter.route('/v1/user', userRouter);
 apiRouter.route('/v1/inquiry', inquiryRouter);
 apiRouter.route('/v1/webhookSubscription', webhookSubscriptionRouter);

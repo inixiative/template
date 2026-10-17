@@ -4,6 +4,9 @@
  * @partOf primitive:appEvents
  * @uses feature:email, primitive:shared
  */
+import type { WSQueryEvent } from '@template/shared/ws';
+import type { ValidatedStreamAppend } from '#/appEvents/validatedStreamAppend';
+
 export type AppEventActor = {
   actorUserId: string | null;
   actorSpoofUserId: string | null;
@@ -12,13 +15,14 @@ export type AppEventActor = {
   ipAddress: string | null;
   userAgent: string | null;
   sourceInquiryId: string | null;
+  integrationId: string | null;
 };
 
 export type AppEventPayload<T = Record<string, unknown>> = {
+  id: string;
   name: string;
   actor: AppEventActor;
   data: T;
-  timestamp: string;
 };
 
 export type EmailHandoff = {
@@ -26,26 +30,33 @@ export type EmailHandoff = {
   data: Record<string, unknown>;
 };
 
-// Generic websocket envelope: target a set of channels OR a set of users, with an
-// arbitrary message payload. A declarative query-refetch (WSEvent) is just one kind
-// of `message.data` — the producer computes the channel(s) (e.g. channelKey(queryKey))
-// and wraps the event. Broader than refetch-only: also serves user-targeted pushes,
-// presence, toasts, etc.
-export type WSHandoff = {
-  target: { channels: string[] } | { userIds: string[] };
-  message: { data: Record<string, unknown> };
+export type WSChannelsHandoff = {
+  kind: 'channels';
+  target: { channels: string[] };
+  message: { data: WSQueryEvent };
 };
 
-export type ObserveData = Record<string, unknown>;
+export type WSUsersHandoff = {
+  kind: 'users';
+  target: { userIds: string[] };
+  message: { data: WSQueryEvent };
+};
+
+export type WSStreamAppendHandoff = {
+  kind: 'stream';
+  target: { stream: string; userIds?: string[] };
+  append: ValidatedStreamAppend;
+};
+
+export type WSHandoff = WSChannelsHandoff | WSUsersHandoff | WSStreamAppendHandoff;
 
 export type ObserveAdapter = {
-  record: (event: AppEventPayload, data: ObserveData) => Promise<void>;
+  record: (event: AppEventPayload) => Promise<void>;
 };
 
 export type AppEventHandlerDefinition<T = unknown> = {
   email?: (data: T) => EmailHandoff[] | null;
   websocket?: (data: T) => WSHandoff[] | null;
-  observe?: (data: T) => ObserveData | null;
 
   cb?: Array<(data: T) => Promise<void> | void>;
 };

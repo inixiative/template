@@ -38,7 +38,10 @@ export const executeBatch = async (c: Context<AppEnv>): Promise<BatchResult> => 
     strategy: string;
     headers?: Record<string, string>;
   }>(c);
-  const totalRequests = rounds.reduce((sum: number, round: BatchRequest[]) => sum + round.length, 0);
+  const totalRequests = rounds.reduce(
+    (sum: number, round: BatchRequest[]) => sum + round.length,
+    0,
+  );
   const timeout = calculateTimeout(totalRequests);
 
   const app = c.get('app');

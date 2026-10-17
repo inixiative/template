@@ -164,7 +164,6 @@ describe('createFactory', () => {
           name: 'Test Token',
           keyHash: faker.string.alphanumeric(64),
           keyPrefix: faker.string.alphanumeric(16),
-          ownerModel: 'OrganizationUser' as const,
           role: Role.member,
           isActive: true,
         }),
@@ -181,6 +180,7 @@ describe('createFactory', () => {
 
       // Pass organizationUser: {} to trigger creation
       const { entity: token, context } = await tokenFactory.build({
+        ownerModel: 'OrganizationUser',
         organizationUser: {},
       });
 

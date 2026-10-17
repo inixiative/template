@@ -73,7 +73,11 @@ const formatLabel = <T extends string>(opt: ProviderOption<T>) => {
   return opt.note ? `${opt.label}${tag} — ${opt.note}` : `${opt.label}${tag}`;
 };
 
-const renderProviderRow = <T extends string>(label: string, options: ProviderOption<T>[], current: T) => {
+const renderProviderRow = <T extends string>(
+  label: string,
+  options: ProviderOption<T>[],
+  current: T,
+) => {
   const opt = options.find((o) => o.value === current);
   const status = opt?.implemented ? '' : ' (coming soon)';
   return `${label.padEnd(16)} ${opt?.label ?? current}${status}`;
@@ -99,8 +103,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onComplete, onCancel
       return { title: 'Database', options: DATABASE_PROVIDERS, kind: 'database' as const };
     if (screen.kind === 'backend')
       return { title: 'Backend host', options: BACKEND_PROVIDERS, kind: 'backend' as const };
-    if (screen.kind === 'redis') return { title: 'Redis', options: REDIS_PROVIDERS, kind: 'redis' as const };
-    if (screen.kind === 'email') return { title: 'Email provider', options: EMAIL_PROVIDERS, kind: 'email' as const };
+    if (screen.kind === 'redis')
+      return { title: 'Redis', options: REDIS_PROVIDERS, kind: 'redis' as const };
+    if (screen.kind === 'email')
+      return { title: 'Email provider', options: EMAIL_PROVIDERS, kind: 'email' as const };
     return null;
   }, [screen]);
 
@@ -168,11 +174,26 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onComplete, onCancel
         label: `Frontend app — superadmin: ${onOff(config.features.apps.superadmin.enabled)}`,
         value: 'app-superadmin',
       },
-      { label: renderProviderRow('Frontend:', FRONTEND_PROVIDERS, config.providers.frontend), value: 'frontend' },
-      { label: renderProviderRow('Database:', DATABASE_PROVIDERS, config.providers.database), value: 'database' },
-      { label: renderProviderRow('Backend:', BACKEND_PROVIDERS, config.providers.backend), value: 'backend' },
-      { label: renderProviderRow('Redis:', REDIS_PROVIDERS, config.providers.redis), value: 'redis' },
-      { label: renderProviderRow('Email:', EMAIL_PROVIDERS, config.providers.email), value: 'email' },
+      {
+        label: renderProviderRow('Frontend:', FRONTEND_PROVIDERS, config.providers.frontend),
+        value: 'frontend',
+      },
+      {
+        label: renderProviderRow('Database:', DATABASE_PROVIDERS, config.providers.database),
+        value: 'database',
+      },
+      {
+        label: renderProviderRow('Backend:', BACKEND_PROVIDERS, config.providers.backend),
+        value: 'backend',
+      },
+      {
+        label: renderProviderRow('Redis:', REDIS_PROVIDERS, config.providers.redis),
+        value: 'redis',
+      },
+      {
+        label: renderProviderRow('Email:', EMAIL_PROVIDERS, config.providers.email),
+        value: 'email',
+      },
       { label: 'Done — back to main menu', value: 'done' },
     ];
     return (
@@ -183,7 +204,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onComplete, onCancel
           </Text>
         </Box>
         <Box marginBottom={1}>
-          <Text dimColor>Toggle features and pick providers. Choices marked "coming soon" can't be selected yet.</Text>
+          <Text dimColor>
+            Toggle features and pick providers. Choices marked "coming soon" can't be selected yet.
+          </Text>
         </Box>
         {warning && (
           <Box marginBottom={1}>
@@ -212,11 +235,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onComplete, onCancel
         </Box>
         <Box marginBottom={1}>
           <Text dimColor>
-            On = Railway provisions a staging env + services + Redis volume; Infisical creates Staging folders.
+            On = Railway provisions a staging env + services + Redis volume; Infisical creates
+            Staging folders.
           </Text>
         </Box>
         <Box marginBottom={1}>
-          <Text dimColor>Off = single production environment only. Recommended for solo / nonprofit projects.</Text>
+          <Text dimColor>
+            Off = single production environment only. Recommended for solo / nonprofit projects.
+          </Text>
         </Box>
         <SelectInput
           items={[
@@ -252,14 +278,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onComplete, onCancel
         </Box>
         <Box marginBottom={1}>
           <Text dimColor>
-            On = the {appKey} app is provisioned by the frontend provider (Vercel project, CF Pages project, etc.) and
-            gets prod + staging env vars in Infisical.
+            On = the {appKey} app is provisioned by the frontend provider (Vercel project, CF Pages
+            project, etc.) and gets prod + staging env vars in Infisical.
           </Text>
         </Box>
         <Box marginBottom={1}>
           <Text dimColor>
-            Off = no provisioning, no env vars. The app source stays in the repo so you can flip it back on later.
-            Useful when you don't need that app in this project.
+            Off = no provisioning, no env vars. The app source stays in the repo so you can flip it
+            back on later. Useful when you don't need that app in this project.
           </Text>
         </Box>
         <SelectInput

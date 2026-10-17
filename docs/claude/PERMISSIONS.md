@@ -25,6 +25,7 @@
 - [Permission Checks](#permission-checks)
   - [In Controllers](#in-controllers)
   - [Via Validation Middleware](#via-validation-middleware)
+    - [Resource Lookup Runs Before Authorization](#resource-lookup-runs-before-authorization)
 - [Entitlements](#entitlements)
   - [How Entitlements Are Applied](#how-entitlements-are-applied)
   - [Intersecting Entitlements](#intersecting-entitlements)
@@ -54,6 +55,7 @@
 - [Token Permissions](#token-permissions)
   - [Token Creation](#token-creation)
   - [Token Deletion](#token-deletion)
+- [Frontend Checks](#frontend-checks)
 - [Future Work](#future-work)
   - [Groups](#groups)
 
@@ -89,7 +91,7 @@ enum PlatformRole {
 
 Superadmins:
 - Skip all `permix.check()` calls (always return true)
-- Can access admin routes
+- Can access admin routes — and only there see soft-deleted rows (the admin router runs inside `db.withDeleted`); on ordinary routes tombstones stay invisible to them too
 - Can spoof other users
 
 ### Role
@@ -337,17 +339,21 @@ All permission setup functions validate role values before use to prevent permis
 
 ```typescript
 import { Role } from '@template/db/generated/client/enums';
+import { makeError } from '#/lib/errors';
 
 export const validateRole = (value: unknown): Role => {
   if (typeof value === 'string' && Object.values(Role).includes(value as Role)) {
     return value as Role;
   }
-  return Role.viewer; // Fail closed (most restrictive)
+  throw makeError({
+    status: 500,
+    message: `Invalid role value: ${JSON.stringify(value)}. Expected one of: ${Object.values(Role).join(', ')}`,
+  });
 };
 ```
 
 **Security principles:**
-- **Fail closed**: Invalid roles default to `viewer` (most restrictive), not `owner`
+- **Fail loud**: an invalid role is a 500 that names the bad value, not a silent downgrade to `viewer`; a corrupted row stops the request instead of running with a guessed role
 - **Runtime validation**: Type assertions alone don't protect against corrupted DB values
 - **Defense in depth**: Extra safety layer even though API validation should prevent invalid data
 
@@ -372,11 +378,13 @@ This prevents scenarios where database corruption or bugs could result in invali
 const permix = c.get('permix');
 
 if (!permix.check('organization', 'manage', orgId)) {
-  throw new HTTPException(403, { message: 'Access denied' });
+  throw makeError({ status: 403, message: 'Access denied' });
 }
 ```
 
 ### Via Validation Middleware
+
+Authentication gates run first: `validateUser` (needs `c.get('user')`) or `validateActor` (needs `getActor(c).user`; Organization and Space tokens carry no user and fail both). Which to pick: [AUTH.md](./AUTH.md#choosing-between-validateuser-and-validateactor).
 
 The template uses a unified `validatePermission` middleware that leverages ReBAC for permission checks:
 
@@ -813,7 +821,7 @@ export const validateOwnerPermission = makeMiddleware<Options>((options) => asyn
     if (orgId && permix.check('organization', action, orgId)) return next();
   }
 
-  throw new HTTPException(403, { message: 'Access denied' });
+  throw makeError({ status: 403, message: 'Access denied' });
 });
 ```
 
@@ -832,10 +840,12 @@ middleware: [validateOwnerPermission({ action: 'read' })]
 Blocks token-based auth for sensitive operations. Session-only.
 
 ```typescript
-// Tokens cannot: create other tokens, delete orgs, delete themselves
+// Tokens cannot: create other tokens, delete orgs, delete themselves (a superadmin's token can)
 export const validateNotToken = async (c, next) => {
-  if (!c.get('user')) throw new HTTPException(401, { message: 'Authentication required' });
-  if (c.get('token')) throw new HTTPException(403, { message: 'Tokens cannot perform this action' });
+  if (!c.get('user')) throw makeError({ status: 401, message: 'Authentication required' });
+  if (c.get('token') && !isSuperadmin(c)) {
+    throw makeError({ status: 403, message: 'Tokens cannot perform this action' });
+  }
   await next();
 };
 ```
@@ -868,7 +878,7 @@ check(permix, rebacSchema, 'organization', { id: orgId, role: targetRole }, 'ass
 // Or inline in controller:
 const action = ['owner', 'admin'].includes(targetRole) ? 'own' : 'manage';
 if (!permix.check('organization', action, orgId)) {
-  throw new HTTPException(403, { message: `Cannot assign ${targetRole} role` });
+  throw makeError({ status: 403, message: `Cannot assign ${targetRole} role` });
 }
 ```
 
@@ -913,6 +923,63 @@ token: {
 Additionally, org/space admins can delete tokens within their scope via delegation:
 - Org admins can delete OrgUser tokens (via `manage` on organization)
 - Space admins can delete SpaceUser tokens (via `manage` on space)
+
+---
+
+## Frontend Checks
+
+The frontend runs the same ReBAC engine. `permissions.setup(me)` (`packages/ui/src/store/slices/permissions.ts`) loads the user's own, organization and space permissions from `/me`, mirroring the backend setup. A superadmin gets `permix.setSuperadmin(true)` and every check passes.
+
+| Layer | Entry point |
+|-------|-------------|
+| Route | `validateUser` / `validateActor`, then `validatePermission` ([Validation Middleware](#validation-middleware)) |
+| Page | `_authenticated.tsx` → `useAuthenticatedRouting` → `checkContextPermission`: the nav item's `access` decides "can view"; on failure it falls back to the org (from a space), then user, then public context, else renders `Unauthorized` |
+| Nav item | `access(permissions, context, page?)` on `NavItem`; the Sidebar hides items that fail it |
+| Component | `checkPermission(permissions, model, record, action)` / `permissions.check(model, record, action)` |
+
+**Check:**
+
+```typescript
+import { checkPermission } from '@template/ui/hooks/usePermission';
+
+const permissions = useAppStore((state) => state.permissions);
+const canDelete = checkPermission(permissions, 'organization', org, 'own');  // false when record is missing
+```
+
+**Visibility.** `Button` takes `show?: boolean | (() => boolean)` and `disabledText` (setting it disables the button and replaces its text):
+
+```typescript
+<Button show={checkPermission(permissions, 'organization', org, 'own')}>Delete</Button>
+```
+
+**Nav access** (`apps/*/app/config/nav/features/*.ts`):
+
+```typescript
+export const settingsItem: NavItem = {
+  label: 'Settings',
+  path: '/settings',
+  access: (permissions, context) => permissions.check(...getContextParams(context), 'read'),
+  items: [
+    {
+      label: 'Auth Providers',
+      path: '/authProviders',
+      access: (permissions, context) =>
+        !!context.organization && permissions.check(...getContextParams(context), 'own'),
+    },
+  ],
+};
+```
+
+`getContextParams(context)` returns `[model, record]` for the current tenant context (organization, space, or the user).
+
+**usePermission** (`packages/ui/src/hooks/usePermission.ts`) wraps the check into `{ show, disable, disabledText? }`:
+
+```typescript
+const deleteAction = usePermission({ permissions, model: 'organization', record: org, action: 'own' });
+// params: disabledText? (default "You do not have permission to perform this action"), requireRecord? (default true)
+```
+
+**useInquiryPermission(inquiry, action, side)** fills the current context into the inquiry's source or target side, then checks `inquiry`.
 
 ---
 

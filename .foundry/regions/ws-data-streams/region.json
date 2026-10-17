@@ -1,0 +1,47 @@
+{
+  "id": "ws-data-streams",
+  "title": "WebSocket data streams",
+  "routing": "Is this about pushing incremental data (not a hint) over the socket: defineStream and STREAM_DEFINITIONS (streamDefinitionFor / streamDefinitionOf), stream kind list vs log and ordering, the required audience (shared vs perRecipient, expectStreamAudience, isPerCallerScope), openDataStream / closeDataStream / rejectDataStream and the snapshot (fetchStreamSnapshot, resolveStreamRoute), re-authorization sweeps (startStreamReauthorizeSweep, reauthorizeOpenStreams, reprobeStreamAccess, x-auth-probe), ordering and sequence numbers (streamSeqKeyFor, seq gap \u2192 streamResync, no replay), producing appends (streamAppend, routeRow, appendToStream, deliverWSHandoffs, sendToStreamLocal), the frames (streamSnapshotFrame, streamAppendFrame), or the frontend (useStream, useStreamAction, STREAM_FOLDS, listStream / logStream, dataStreamQueryKey, addStreamListener)?",
+  "concepts": ["ws-data-streams"],
+  "tokens": 14592,
+  "tokenMethod": "chars/4",
+  "files": {
+    "recognise": {
+      "path": "recognise.md",
+      "tokens": 2948,
+      "experimental": true,
+      "note": "recognise/pick split under test (model round); not the standard"
+    },
+    "knowledge": {
+      "path": "knowledge.md",
+      "tokens": 14592
+    }
+  },
+  "runsAgreed": 0,
+  "sources": {
+    "docs": ["docs/claude/WEBSOCKETS.md"],
+    "docUnits": [
+      "doc:docs/claude/WEBSOCKETS.md#data-streams",
+      "doc:docs/claude/WEBSOCKETS.md#data-streams/stream-definitions",
+      "doc:docs/claude/WEBSOCKETS.md#data-streams/audience",
+      "doc:docs/claude/WEBSOCKETS.md#data-streams/authorization-and-re-authorization",
+      "doc:docs/claude/WEBSOCKETS.md#data-streams/ordering",
+      "doc:docs/claude/WEBSOCKETS.md#data-streams/sequence-numbers",
+      "doc:docs/claude/WEBSOCKETS.md#data-streams/producing-appends",
+      "doc:docs/claude/WEBSOCKETS.md#data-streams/frontend"
+    ],
+    "catalogClusters": [
+      "auth-middleware-validation",
+      "lenses-multi-source",
+      "locks-and-serialization",
+      "rate-limiting",
+      "request-response-schemas",
+      "websocket-connection-management",
+      "websocket-realtime-delivery"
+    ],
+    "codeEntries": 42,
+    "docMembers": 29
+  },
+  "bypassLines": 21,
+  "glossaryTerms": 22
+}

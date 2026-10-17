@@ -35,7 +35,7 @@ export const createToken = async (c: Context<AppEnv>, params: CreateTokenParams)
   const keyHash = createHash('sha256').update(rawKey).digest('hex');
   const keyPrefix = `${process.env.ENVIRONMENT}_${modelPrefix}_${hex.slice(0, 6)}`;
 
-  const token = await db.token.create({
+  const { keyHash: _keyHash, ...token } = await db.token.create({
     data: {
       name: params.name,
       keyHash,
@@ -47,7 +47,6 @@ export const createToken = async (c: Context<AppEnv>, params: CreateTokenParams)
       role: params.role,
       expiresAt: params.expiresAt,
     },
-    omit: { keyHash: true },
   });
 
   return { ...token, key: rawKey };

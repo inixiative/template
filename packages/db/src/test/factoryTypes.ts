@@ -1,6 +1,7 @@
 /**
  * @atlas
- * @partOf infrastructure:prisma
+ * @kind type
+ * @partOf infrastructure:prisma, primitive:testFactories
  * @uses none
  */
 import type * as runtime from '@prisma/client/runtime/client';
@@ -9,11 +10,15 @@ import type { Prisma } from '@template/db/generated/client/client';
 export type ModelName = Prisma.ModelName;
 
 // DefaultSelection gives full model with required scalars (like User, Organization exports)
-export type ModelOf<K extends ModelName> = runtime.Types.Result.DefaultSelection<Prisma.TypeMap['model'][K]['payload']>;
+export type ModelOf<K extends ModelName> = runtime.Types.Result.DefaultSelection<
+  Prisma.TypeMap['model'][K]['payload']
+>;
 
-export type CreateInputOf<K extends ModelName> = Prisma.TypeMap['model'][K]['operations']['create']['args']['data'];
+export type CreateInputOf<K extends ModelName> =
+  Prisma.TypeMap['model'][K]['operations']['create']['args']['data'];
 
-export type WhereUniqueOf<K extends ModelName> = Prisma.TypeMap['model'][K]['operations']['upsert']['args']['where'];
+export type WhereUniqueOf<K extends ModelName> =
+  Prisma.TypeMap['model'][K]['operations']['upsert']['args']['where'];
 
 export type Serialized<T> = T extends Date
   ? string
@@ -46,7 +51,10 @@ export type BuildContext = {
   [K in ModelName as Uncapitalize<K>]?: ModelOf<K>;
 };
 
-export type BuildResult<K extends ModelName, O extends Partial<CreateInputOf<K>> | undefined = undefined> = {
+export type BuildResult<
+  K extends ModelName,
+  O extends Partial<CreateInputOf<K>> | undefined = undefined,
+> = {
   entity: ModelWithOverrides<K, O> & {
     __serialize(): Serialized<ModelWithOverrides<K, O>>;
   };
@@ -62,7 +70,7 @@ export type TypedBuildResult<
   entity: ModelWithOverrides<K, O> & {
     __serialize(): Serialized<ModelWithOverrides<K, O>>;
   };
-  context: BuildContext & { [D in Deps[number]]: ModelOf<D> };
+  context: BuildContext & { [D in Deps[number] as Uncapitalize<D>]: ModelOf<D> };
 };
 
 import type { Identifier } from '@template/db/utils/prismaMapRelations';
@@ -83,7 +91,10 @@ export type Factory<K extends ModelName> = {
     overrides?: O,
     context?: BuildContext,
   ) => Promise<BuildResult<K, O>>;
-  create: (overrides?: Partial<CreateInputOf<K>>, context?: BuildContext) => Promise<BuildResult<K>>;
+  create: (
+    overrides?: Partial<CreateInputOf<K>>,
+    context?: BuildContext,
+  ) => Promise<BuildResult<K>>;
   upsert: (
     where: WhereUniqueOf<K>,
     overrides?: Partial<CreateInputOf<K>>,

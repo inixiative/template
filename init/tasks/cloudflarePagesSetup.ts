@@ -36,14 +36,17 @@ export const setupCloudflarePages = async (
     const infisicalProjectId = config.infisical.projectId;
     const stagingEnabled = config.features.staging.enabled;
 
-    if (!githubOwner) throw new Error('project.organization missing — run Project Configuration first.');
-    if (!infisicalProjectId) throw new Error('Infisical not configured. Run Infisical Setup first.');
+    if (!githubOwner)
+      throw new Error('project.organization missing — run Project Configuration first.');
+    if (!infisicalProjectId)
+      throw new Error('Infisical not configured. Run Infisical Setup first.');
 
     // Step 1: store account selection
     if (!(await isComplete('cloudflarePages', 'selectAccount'))) {
       const accounts = await cloudflareApi.listAccounts();
       const selected = accounts.find((a) => a.id === selectedAccountId);
-      if (!selected) throw new Error(`Account ${selectedAccountId} not found in token's allowed accounts`);
+      if (!selected)
+        throw new Error(`Account ${selectedAccountId} not found in token's allowed accounts`);
       await updateConfigField('cloudflarePages', 'accountId', selected.id);
       await updateConfigField('cloudflarePages', 'accountName', selected.name);
       await updateConfigField('cloudflarePages', 'configProjectName', project);

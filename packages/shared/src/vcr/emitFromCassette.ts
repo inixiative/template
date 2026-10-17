@@ -11,7 +11,11 @@ import type { Fixture } from '@template/shared/vcr/vcr';
 // would be discarded and tests would assert before handlers settle.
 type EmitterLike = { listeners: (eventName: string) => Array<(payload: unknown) => unknown> };
 
-export const emitFromCassette = async (ev: EmitterLike, eventName: string, cassettePath: string): Promise<void> => {
+export const emitFromCassette = async (
+  ev: EmitterLike,
+  eventName: string,
+  cassettePath: string,
+): Promise<void> => {
   const fixture = JSON.parse(readFileSync(cassettePath, 'utf-8')) as Fixture;
   await Promise.all(ev.listeners(eventName).map((fn) => fn(fixture.body)));
 };

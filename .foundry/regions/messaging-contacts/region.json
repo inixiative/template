@@ -1,0 +1,52 @@
+{
+  "id": "messaging-contacts",
+  "title": "Messaging and contacts",
+  "routing": "Is this about reaching a person outside templated email, or about where their addresses live: the messaging lane (messageUser, messageContact, MessageContent, messageProviderRegistry, getMessageProviderAdapter, MessageProviderAdapter per ContactType, resolveUsers, targetedBySender, SMS/push/chat), or the Contact model (ContactType, ContactRegistry, ContactTypeDef, valueKey, contactRules, emailAddressSchema, canonicalUrl / splitUrl / parseSimpleHandleUrl and the per-network parseXUrl parsers, contact routes, acceptedKinds and deliverability on a Contact)?",
+  "concepts": ["messaging", "contacts"],
+  "tokens": 12345,
+  "tokenMethod": "chars/4",
+  "files": {
+    "recognise": {
+      "path": "recognise.md",
+      "tokens": 2353,
+      "experimental": true,
+      "note": "recognise/pick split under test (model round); not the standard"
+    },
+    "knowledge": {
+      "path": "knowledge.md",
+      "tokens": 12345
+    }
+  },
+  "runsAgreed": 0,
+  "sources": {
+    "docs": ["FEATURES.md", "docs/claude/COMMUNICATIONS.md", "docs/claude/HOOKS.md"],
+    "docUnits": [
+      "doc:docs/claude/COMMUNICATIONS.md#overview",
+      "doc:docs/claude/COMMUNICATIONS.md#messaging-non-email-channels",
+      "doc:docs/claude/COMMUNICATIONS.md#notifications",
+      "doc:docs/claude/COMMUNICATIONS.md#sms",
+      "doc:docs/claude/HOOKS.md#contact-rules",
+      "doc:FEATURES.md#contact-system"
+    ],
+    "catalogClusters": [
+      "app-events-side-effects",
+      "authentication-methods",
+      "contact-channel-definitions",
+      "data-models",
+      "email-composition-rendering",
+      "email-delivery-senders",
+      "frontend-state-api-client",
+      "immutable-fields",
+      "messaging-channels-adapters",
+      "mutation-hooks",
+      "ordered-lists",
+      "permission-rule-algebra",
+      "request-response-schemas",
+      "route-templates-controllers"
+    ],
+    "codeEntries": 66,
+    "docMembers": 31
+  },
+  "bypassLines": 11,
+  "glossaryTerms": 25
+}

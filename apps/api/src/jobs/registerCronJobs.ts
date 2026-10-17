@@ -6,7 +6,9 @@
  */
 import { db } from '@template/db';
 import { LogScope, log } from '@template/shared/logger';
-import { isValidHandlerName } from '#/jobs/handlers';
+import { buildJobData } from '#/jobs/buildJobData';
+import { isValidHandlerName, jobHandlers } from '#/jobs/handlers';
+import { withLanePriority } from '#/jobs/lanePriority';
 import { queue as defaultQueue } from '#/jobs/queue';
 import { type JobsQueue, JobType } from '#/jobs/types';
 
@@ -15,36 +17,60 @@ export const registerCronJobs = async (queue: JobsQueue = defaultQueue): Promise
     where: { enabled: true },
   });
 
-  if (cronJobs.length === 0) {
-    log.info('No enabled cron jobs to register', LogScope.job);
-    return;
-  }
-
   log.info(`Registering ${cronJobs.length} enabled cron jobs...`, LogScope.job);
+
+  const registeredKeys = new Set<string>();
+  let failed = false;
 
   for (const cronJob of cronJobs) {
     if (!isValidHandlerName(cronJob.handler)) {
-      log.warn(`Cron job "${cronJob.name}" has unknown handler: ${cronJob.handler} - skipping`, LogScope.job);
+      log.warn(
+        `Cron job "${cronJob.name}" has unknown handler: ${cronJob.handler} - skipping`,
+        LogScope.job,
+      );
       continue;
     }
 
     try {
-      await queue.add(
+      const data = buildJobData(jobHandlers[cronJob.handler], {
+        id: cronJob.id,
+        type: JobType.cron,
+        payload: cronJob.payload,
+      });
+      const job = await queue.add(
         cronJob.handler,
-        {
-          id: cronJob.id,
-          type: JobType.cron,
-          payload: cronJob.payload,
-        },
-        {
+        data,
+        withLanePriority(data, {
           repeat: { pattern: cronJob.pattern, jobId: cronJob.jobId },
           attempts: cronJob.maxAttempts,
           backoff: { type: 'exponential', delay: cronJob.backoffMs },
-        },
+        }),
       );
-      log.info(`Registered cron: ${cronJob.name} (${cronJob.handler}) - ${cronJob.pattern}`, LogScope.job);
+      if (job?.repeatJobKey) registeredKeys.add(job.repeatJobKey);
+      log.info(
+        `Registered cron: ${cronJob.name} (${cronJob.handler}) - ${cronJob.pattern}`,
+        LogScope.job,
+      );
     } catch (error) {
+      failed = true;
       log.error(`Failed to register cron "${cronJob.name}": ${error}`, LogScope.job);
     }
+  }
+
+  if (failed) return;
+  await removeOrphanedRepeatables(queue, registeredKeys);
+};
+
+const removeOrphanedRepeatables = async (
+  queue: JobsQueue,
+  registeredKeys: Set<string>,
+): Promise<void> => {
+  for (const repeatable of await queue.getRepeatableJobs()) {
+    if (registeredKeys.has(repeatable.key)) continue;
+    await queue.removeRepeatableByKey(repeatable.key);
+    log.info(
+      `Removed orphaned cron repeatable: ${repeatable.name} - ${repeatable.pattern}`,
+      LogScope.job,
+    );
   }
 };

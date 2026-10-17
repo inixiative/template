@@ -25,6 +25,11 @@ export type SamlAuthMethod = {
 
 export type AuthMethod = EmailAuthMethod | OAuthAuthMethod | SamlAuthMethod;
 
+export type SignUpResult =
+  | { status: 'authenticated' }
+  | { status: 'verification-pending'; email: string }
+  | { status: 'redirecting' };
+
 export type AuthSession = {
   user: {
     id: string;

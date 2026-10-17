@@ -4,55 +4,106 @@
  * @partOf feature:email
  * @uses infrastructure:prisma
  */
-import type { Condition, LensNarrowing } from '@inixiative/json-rules';
-import type { Inquiry, User } from '@template/db/generated/client/client';
+import {
+  type Condition,
+  clampLens,
+  type LensNarrowing,
+  type ModelNarrowing,
+} from '@inixiative/json-rules';
 import { lensFor } from '@template/db/lens';
+import { fieldsLens, OPAQUE_SLOT, type SlotLens } from '@template/email/rules';
+import type { RuleLens } from '@template/shared/rules';
 import type { Sender } from '#/lib/email/sender';
 
-const eq = (field: string, value: unknown): Condition => ({ field, operator: 'equals', value }) as unknown as Condition;
+export type RecipientTarget = { where: Condition };
 
-type Row = Record<string, unknown>;
+export type RenderIssuePolicy = 'platform' | 'fail' | 'degrade';
 
-export type EmailEntry<E = Row> = {
-  entity: (data: Record<string, unknown>) => LensNarrowing;
-  sender: (entity: E) => Sender;
-  recipients: (entity: E, sender: Sender) => LensNarrowing;
-  cc?: (recipient: Row, sender: Sender) => LensNarrowing;
-  bcc?: (recipient: Row, sender: Sender) => LensNarrowing;
-  data?: (entity: E, handoff: Record<string, unknown>) => Record<string, unknown>;
+export type RenderSpec = {
+  onIssue?: RenderIssuePolicy;
+  substitute?: string;
 };
 
-const defineEntry = <E>(entry: EmailEntry<E>): EmailEntry => entry as EmailEntry;
+export type EmailEntry = {
+  entity: LensNarrowing;
+  sender: Sender;
+  recipients: RecipientTarget;
+  cc?: RecipientTarget;
+  bcc?: RecipientTarget;
+  data: RuleLens;
+  render?: RenderSpec;
+};
 
-const userById = (id: unknown): LensNarrowing => ({
+export const slotRowsLens = (slot: SlotLens | undefined, where: Condition): LensNarrowing => {
+  if (!slot || slot === OPAQUE_SLOT) throw new Error('Email slot lens is not a model lens');
+  return clampLens(slot, { root: { where } });
+};
+
+const user: ModelNarrowing = { picks: ['id', 'name', 'email'] };
+
+const userEntity = (bind: string): LensNarrowing => ({
   parent: lensFor('User'),
-  root: { where: eq('id', id), picks: ['id', 'name', 'email'] },
+  root: { where: { field: 'id', operator: 'equals', bind }, ...user },
 });
 
-export const registry: Record<string, EmailEntry> = {
-  'inquiry-invite-organization-user': defineEntry<Inquiry & { sourceOrganizationId: string }>({
-    entity: (data) => ({
-      parent: lensFor('Inquiry'),
-      root: {
-        where: eq('id', data.inquiryId),
-        picks: ['id', 'content', 'sourceOrganization'],
-        relations: { sourceOrganization: { picks: ['name'] } },
-      },
-    }),
-    sender: (inquiry) => ({ type: 'Organization', organizationId: inquiry.sourceOrganizationId }),
-    recipients: (inquiry) => userById(inquiry.targetUserId),
-  }),
+const userData: LensNarrowing = { parent: lensFor('User'), root: user };
 
-  welcome: defineEntry<User>({
-    entity: (data) => userById(data.userId),
-    sender: () => ({ type: 'platform' }),
-    recipients: (user) => userById(user.id),
-  }),
-
-  'email-verification': defineEntry<User>({
-    entity: (data) => userById(data.userId),
-    sender: () => ({ type: 'platform' }),
-    recipients: (user) => userById(user.id),
-    data: (_user, handoff) => ({ verificationUrl: handoff.verificationUrl }),
-  }),
+const inquiryInvite: ModelNarrowing = {
+  picks: ['id', 'content', 'sourceOrganizationId', 'targetUserId'],
+  relations: { sourceOrganization: { picks: ['name'] } },
 };
+
+const userRecipient = (bind: string): RecipientTarget => ({
+  where: { field: 'id', operator: 'equals', bind },
+});
+
+const assertSubstitutes = (entries: Record<string, EmailEntry>): Record<string, EmailEntry> => {
+  for (const [slug, entry] of Object.entries(entries)) {
+    const substitute = entry.render?.substitute;
+    if (substitute === undefined) continue;
+    if (substitute === slug)
+      throw new Error(`Email registry: "${slug}" names itself as its substitute`);
+    const target = entries[substitute];
+    if (!target)
+      throw new Error(`Email registry: "${slug}" names an unregistered substitute "${substitute}"`);
+    if (target.render?.substitute !== undefined) {
+      throw new Error(
+        `Email registry: substitute "${substitute}" of "${slug}" may not itself declare a substitute`,
+      );
+    }
+  }
+  return entries;
+};
+
+export const registry: Record<string, EmailEntry> = assertSubstitutes({
+  'inquiry-invite-organization-user': {
+    entity: {
+      parent: lensFor('Inquiry'),
+      root: { where: { field: 'id', operator: 'equals', bind: 'inquiryId' }, ...inquiryInvite },
+    },
+    data: { parent: lensFor('Inquiry'), root: inquiryInvite },
+    sender: { type: 'Organization', organizationId: 'sourceOrganizationId' },
+    recipients: userRecipient('targetUserId'),
+  },
+
+  welcome: {
+    entity: userEntity('userId'),
+    data: userData,
+    sender: { type: 'platform' },
+    recipients: userRecipient('id'),
+  },
+
+  'email-verification': {
+    entity: userEntity('userId'),
+    sender: { type: 'platform' },
+    recipients: userRecipient('id'),
+    data: fieldsLens({ verificationUrl: 'String' }),
+  },
+});
+
+export const renderPolicyFor = (
+  slug: string,
+): Required<Pick<RenderSpec, 'onIssue'>> & Pick<RenderSpec, 'substitute'> => ({
+  onIssue: registry[slug]?.render?.onIssue ?? 'platform',
+  substitute: registry[slug]?.render?.substitute,
+});

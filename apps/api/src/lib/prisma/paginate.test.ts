@@ -1,0 +1,184 @@
+import { describe, expect, it } from 'bun:test';
+import { type LensNarrowing, matchNothing } from '@inixiative/json-rules';
+import type { AnyDelegate } from '@template/db';
+import { lensFor } from '@template/db/lens';
+import { AppError } from '#/lib/errors';
+import { cursorPaginate, paginate } from '#/lib/prisma/paginate';
+
+type Captured = { findManyArgs?: Record<string, unknown> };
+
+const makeDelegate = (captured: Captured): AnyDelegate =>
+  ({
+    findMany: async (args: Record<string, unknown>) => {
+      captured.findManyArgs = args;
+      return [];
+    },
+    count: async () => 0,
+  }) as unknown as AnyDelegate;
+
+const makeContext = (
+  filterLens: LensNarrowing,
+  query: Record<string, unknown> = {},
+  user: Record<string, unknown> | undefined = undefined,
+) => {
+  const vars: Record<string, unknown> = { filterLens, bracketQuery: {}, user };
+  return {
+    get: (key: string) => vars[key],
+    req: { valid: () => query },
+  } as unknown as Parameters<typeof paginate>[0];
+};
+
+describe('paginate — lens bindings', () => {
+  it('resolves `{ bind }` tokens into the lens before building the where', async () => {
+    const captured: Captured = {};
+    const lens: LensNarrowing = {
+      parent: lensFor('User'),
+      root: { picks: [], where: { field: 'name', operator: 'equals', bind: 'who' } },
+    };
+
+    await paginate(makeContext(lens), makeDelegate(captured), { bindings: { who: 'aron' } });
+
+    expect(captured.findManyArgs?.where).toEqual({ name: { equals: 'aron' } });
+  });
+
+  it('throws 500 when the lens requires a binding that was not provided', async () => {
+    const lens: LensNarrowing = {
+      parent: lensFor('User'),
+      root: { picks: [], where: { field: 'name', operator: 'equals', bind: 'who' } },
+    };
+
+    expect(paginate(makeContext(lens), makeDelegate({}))).rejects.toThrow(
+      /lens requires bindings not provided: who/,
+    );
+  });
+
+  it('passes a bind-free lens through untouched, no bindings needed', async () => {
+    const captured: Captured = {};
+    const lens: LensNarrowing = { parent: lensFor('User'), root: { picks: ['name'] } };
+
+    const result = await paginate(makeContext(lens), makeDelegate(captured));
+
+    expect(captured.findManyArgs?.where).toEqual({});
+    expect(result.pagination).toEqual({ page: 1, pageSize: 20, total: 0, totalPages: 0 });
+  });
+});
+
+type Row = { id: string };
+
+// A delegate that honours the keyset: it reads the `id > cursor` seek out of the composed where
+// and returns rows strictly after it, so a walk observes real page boundaries.
+const makeSeekDelegate = (rows: Row[]): AnyDelegate =>
+  ({
+    findMany: async (args: Record<string, unknown>) => {
+      type Seek = { OR?: { id?: { gt?: string } }[] };
+      const where = args.where as Seek & { AND?: [unknown, Seek] };
+      const keyset = (where.OR ?? where.AND?.[1]?.OR)?.[0]?.id?.gt;
+      const after = keyset ? rows.filter((row) => row.id > keyset) : rows;
+      return after.slice(0, args.take as number);
+    },
+    count: async () => rows.length,
+  }) as unknown as AnyDelegate;
+
+const cursorContext = (filterLens: LensNarrowing, query: Record<string, unknown>) =>
+  makeContext(filterLens, query) as unknown as Parameters<typeof cursorPaginate>[0];
+
+describe('cursorPaginate — filter binding', () => {
+  const userLens: LensNarrowing = { parent: lensFor('User'), root: { picks: ['name'] } };
+  const rows: Row[] = ['u-1', 'u-2', 'u-3', 'u-4', 'u-5'].map((id) => ({ id }));
+
+  it('walks page two with a cursor minted under the same filter', async () => {
+    const first = await cursorPaginate<AnyDelegate, Row>(
+      cursorContext(userLens, { pageSize: 2 }),
+      makeSeekDelegate(rows),
+      {
+        where: { name: 'aron' },
+      },
+    );
+    expect(first.data).toEqual([{ id: 'u-1' }, { id: 'u-2' }]);
+    expect(first.pagination.hasMore).toBe(true);
+
+    const second = await cursorPaginate<AnyDelegate, Row>(
+      cursorContext(userLens, { pageSize: 2, cursor: first.pagination.nextCursor }),
+      makeSeekDelegate(rows),
+      { where: { name: 'aron' } },
+    );
+    expect(second.data).toEqual([{ id: 'u-3' }, { id: 'u-4' }]);
+  });
+
+  it('a where that matches nothing still matches nothing on page two', async () => {
+    const first = await cursorPaginate<AnyDelegate, Row>(
+      cursorContext(userLens, { pageSize: 2 }),
+      makeSeekDelegate(rows),
+      { where: matchNothing() },
+    );
+    const captured: Captured = {};
+    await cursorPaginate(
+      cursorContext(userLens, { pageSize: 2, cursor: first.pagination.nextCursor }),
+      makeDelegate(captured),
+      { where: matchNothing() },
+    );
+    expect(captured.findManyArgs?.where).toEqual(matchNothing());
+  });
+
+  // why: the cursor is only meaningful inside the sequence it was minted from. Replaying it
+  // why: under a different filter seeks into a different sequence and silently skips rows.
+  it('rejects a cursor minted under a different filter with a 400', async () => {
+    const first = await cursorPaginate<AnyDelegate, Row>(
+      cursorContext(userLens, { pageSize: 2 }),
+      makeSeekDelegate(rows),
+      {
+        where: { name: 'aron' },
+      },
+    );
+
+    const replay = cursorPaginate(
+      cursorContext(userLens, { pageSize: 2, cursor: first.pagination.nextCursor }),
+      makeSeekDelegate(rows),
+      { where: { name: 'sam' } },
+    );
+    await expect(replay).rejects.toThrow(AppError);
+    await expect(replay).rejects.toThrow('Pagination cursor does not match the requested filter');
+  });
+
+  it('a search term is part of the filter the cursor is bound to', async () => {
+    const first = await cursorPaginate(
+      cursorContext(userLens, { pageSize: 2, search: 'acme' }),
+      makeSeekDelegate(rows),
+    );
+
+    await expect(
+      cursorPaginate(
+        cursorContext(userLens, { pageSize: 2, cursor: first.pagination.nextCursor }),
+        makeSeekDelegate(rows),
+      ),
+    ).rejects.toThrow('Pagination cursor does not match the requested filter');
+  });
+});
+
+describe('paginate — searchPaths', () => {
+  const lens: LensNarrowing = {
+    parent: lensFor('User'),
+    root: { picks: ['name', 'email'], relations: { tokens: { picks: ['name'] } } },
+  };
+
+  it('narrows the global search fan-out to the route-authored subset', async () => {
+    const captured: Captured = {};
+    await paginate(makeContext(lens, { search: 'acme' }), makeDelegate(captured), {
+      searchPaths: ['name'],
+    });
+
+    expect(JSON.stringify(captured.findManyArgs?.where)).toContain(
+      '"OR":[{"name":{"contains":"acme"',
+    );
+    expect(JSON.stringify(captured.findManyArgs?.where)).not.toContain('tokens');
+  });
+
+  it('does not leak searchPaths into the Prisma findMany args', async () => {
+    const captured: Captured = {};
+    await paginate(makeContext(lens, { search: 'acme' }), makeDelegate(captured), {
+      searchPaths: ['name'],
+    });
+
+    expect(captured.findManyArgs).not.toHaveProperty('searchPaths');
+  });
+});

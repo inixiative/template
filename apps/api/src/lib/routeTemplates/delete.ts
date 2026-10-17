@@ -6,9 +6,15 @@
  * @constructs route
  */
 import { createRoute } from '@hono/zod-openapi';
+import { securityForRoute } from '#/lib/auth/routeSecurity';
 import { errorResponses } from '#/lib/routeTemplates/errorResponses';
 import type { RouteArgs } from '#/lib/routeTemplates/types';
-import { buildOperationId, buildRequest, buildTags, prepareMiddleware } from '#/lib/routeTemplates/utils';
+import {
+  buildOperationId,
+  buildRequest,
+  buildTags,
+  prepareMiddleware,
+} from '#/lib/routeTemplates/utils';
 
 export const deleteRoute = <const T extends RouteArgs>(args: T) => {
   const {
@@ -34,8 +40,9 @@ export const deleteRoute = <const T extends RouteArgs>(args: T) => {
     method: 'delete',
     path: routePath,
     tags: routeTags,
+    security: securityForRoute(args),
     description: description ?? `Deletes an existing ${resourceName}.`,
-    middleware: prepareMiddleware(middleware, skipId),
+    middleware: prepareMiddleware(middleware, skipId, undefined, args.includeDeleted),
     request: buildRequest(args),
     responses: {
       204: { description: 'Success' },

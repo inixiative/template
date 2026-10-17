@@ -16,6 +16,7 @@ type OptimisticSnapshot = {
 export type OptimisticTarget<TVariables> = {
   queryKey: QueryKey;
   optimisticUpdate: (currentData: unknown, variables: TVariables) => unknown;
+  reconcile?: (currentData: unknown, response: unknown, variables: TVariables) => unknown;
   invalidateOnSettled?: boolean;
 };
 
@@ -46,7 +47,8 @@ export const useOptimisticMutation = <TData, TError = Error, TVariables = void>(
   >;
 }) => {
   const queryClient = useQueryClient();
-  const { mutationFn, targets, mutationOptions } = options;
+  const { mutationFn, targets } = options;
+  const { onSuccess, ...mutationOptions } = options.mutationOptions ?? {};
 
   return useMutation<TData, TError, TVariables, OptimisticContext<TVariables>>({
     mutationFn,
@@ -69,6 +71,17 @@ export const useOptimisticMutation = <TData, TError = Error, TVariables = void>(
       return { snapshots, resolvedTargets };
     },
 
+    onSuccess: (response, variables, context, mutationContext) => {
+      for (const target of context?.resolvedTargets ?? []) {
+        const { reconcile } = target;
+        if (!reconcile) continue;
+        queryClient.setQueryData(target.queryKey, (current: unknown) =>
+          reconcile(current, response, variables),
+        );
+      }
+      return onSuccess?.(response, variables, context, mutationContext);
+    },
+
     onError: (_error, _variables, context) => {
       for (const snapshot of context?.snapshots ?? []) {
         queryClient.setQueryData(snapshot.queryKey, snapshot.previousData);
@@ -86,19 +99,47 @@ export const useOptimisticMutation = <TData, TError = Error, TVariables = void>(
   });
 };
 
-export const createOptimisticListTarget = <TItem extends { id: string }, TVariables = unknown>(options: {
+const OPTIMISTIC_ID = '__optimistic__';
+
+const isWrappedList = (currentData: unknown): currentData is { data: unknown[] } =>
+  currentData !== undefined && !Array.isArray(currentData) && 'data' in (currentData as object);
+
+const readList = <TItem>(currentData: unknown): TItem[] =>
+  ((isWrappedList(currentData) ? currentData.data : currentData) as TItem[] | undefined) ?? [];
+
+const writeList = <TItem>(currentData: unknown, updated: TItem[]): unknown =>
+  isWrappedList(currentData) ? { ...currentData, data: updated } : updated;
+
+export const createOptimisticListTarget = <
+  TItem extends { id: string },
+  TVariables = unknown,
+  TResponse = { data: TItem },
+>(options: {
   queryKey: QueryKey;
   operation: OptimisticListOperation;
   optimisticExtras?: Partial<TItem>;
+  itemFromResponse?: (response: TResponse) => TItem;
 }) => {
   const { operation, optimisticExtras, queryKey } = options;
+  const itemFromResponse =
+    options.itemFromResponse ?? ((response: TResponse) => (response as { data: TItem }).data);
 
   return {
     queryKey,
+    reconcile:
+      operation === 'create'
+        ? (currentData: unknown, response: unknown) => {
+            const created = itemFromResponse(response as TResponse);
+            return writeList(
+              currentData,
+              readList<TItem>(currentData).flatMap((item) =>
+                item.id !== OPTIMISTIC_ID ? [item] : created ? [created] : [],
+              ),
+            );
+          }
+        : undefined,
     optimisticUpdate: (currentData, variables) => {
-      const isWrapped = currentData !== undefined && !Array.isArray(currentData) && 'data' in (currentData as object);
-      const list: TItem[] =
-        (isWrapped ? (currentData as { data: TItem[] }).data : (currentData as TItem[] | undefined)) ?? [];
+      const list = readList<TItem>(currentData);
 
       const vars = variables as Record<string, unknown>;
       const path = vars.path as Record<string, string> | undefined;
@@ -108,7 +149,7 @@ export const createOptimisticListTarget = <TItem extends { id: string }, TVariab
       let updated: TItem[];
       switch (operation) {
         case 'create':
-          updated = [...list, { ...body, ...optimisticExtras, id: '__optimistic__' } as TItem];
+          updated = [...list, { ...body, ...optimisticExtras, id: OPTIMISTIC_ID } as TItem];
           break;
         case 'update':
           updated = !id ? list : list.map((item) => (item.id === id ? { ...item, ...body } : item));
@@ -120,7 +161,7 @@ export const createOptimisticListTarget = <TItem extends { id: string }, TVariab
           updated = list;
       }
 
-      return isWrapped ? { ...(currentData as object), data: updated } : updated;
+      return writeList(currentData, updated);
     },
   } satisfies OptimisticTarget<TVariables>;
 };

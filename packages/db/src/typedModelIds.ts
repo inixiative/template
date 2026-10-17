@@ -145,7 +145,8 @@ export const emailTemplateId = (id: string): EmailTemplateId => id as EmailTempl
 export const emailComponentId = (id: string): EmailComponentId => id as EmailComponentId;
 
 // Webhooks
-export const webhookSubscriptionId = (id: string): WebhookSubscriptionId => id as WebhookSubscriptionId;
+export const webhookSubscriptionId = (id: string): WebhookSubscriptionId =>
+  id as WebhookSubscriptionId;
 export const webhookEventId = (id: string): WebhookEventId => id as WebhookEventId;
 
 // Jobs

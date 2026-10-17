@@ -6,54 +6,58 @@
  */
 import { LogScope, log } from '@template/shared/logger';
 import { createSerializedQueue } from '@template/shared/utils';
+import { WS_MAX_PENDING_FRAMES } from '@template/shared/ws';
 import type { Server } from 'bun';
-import { authenticateToken, resolveSpoofTarget } from '#/ws/auth';
+import { makeUnrefInterval } from '#/lib/utils/makeUnrefInterval';
+import { normalizeEmail } from '#/modules/user/utils/normalizeEmail';
+import { closeDataStream, openDataStream } from '#/ws/dataStreams';
+import { sendTo } from '#/ws/delivery';
+import { frameError } from '#/ws/frameError';
+import { overFrameLimit } from '#/ws/frameRateLimit';
 import { setIdentity } from '#/ws/identity';
 import { cleanupStaleConnections, updateLastPing } from '#/ws/lifecycle';
-import { addConnection, removeConnection } from '#/ws/registry';
+import { canSubscribe, resolveIdentity, sanitizeWSHeaders } from '#/ws/probe';
+import { addConnection, byId, removeConnection } from '#/ws/registry';
 import { subscribeToChannel, unsubscribeFromChannel } from '#/ws/subscriptions';
 import type { WSData, WSMessage, WSSocket } from '#/ws/types';
 
 type WSServer = Server<WSData>;
 
-// Periodic stale-connection sweep. Started explicitly from server startup (not a
-// module-load side effect, so importing the handler in tests doesn't spin a timer).
-let staleSweep: ReturnType<typeof setInterval> | null = null;
-export const startStaleSweep = (): void => {
-  if (staleSweep) return;
-  staleSweep = setInterval(() => {
+const staleSweep = makeUnrefInterval({
+  intervalMs: 60_000,
+  tick: () => {
     const cleaned = cleanupStaleConnections();
     if (cleaned > 0) log.info(`Cleaned up ${cleaned} stale WebSocket connections`, LogScope.ws);
-  }, 60_000);
-};
+  },
+});
+export const startStaleSweep = staleSweep.start;
+export const stopStaleSweep = staleSweep.stop;
 
-// Promote an HTTP request to a WebSocket. Anonymous by default — identity is set
-// later by the authenticate message, never at the handshake. server.upgrade
-// returns true when Bun took over the connection (return undefined); false means
-// we must return a Response ourselves.
 export const acceptWebSocket = (req: Request, server: WSServer): Response | undefined => {
   const now = Date.now();
   const data: WSData = {
     connectionId: crypto.randomUUID(),
     userId: null,
+    headers: {},
     channels: new Set(),
+    streams: new Set(),
+    heldAppends: new Map(),
     connectedAt: now,
     lastPing: now,
     queue: createSerializedQueue(),
   };
-  return server.upgrade(req, { data }) ? undefined : new Response('Upgrade failed', { status: 426 });
+  return server.upgrade(req, { data })
+    ? undefined
+    : new Response('Upgrade failed', { status: 426 });
 };
 
-const send = (ws: WSSocket, payload: Record<string, unknown>): void => {
-  ws.send(JSON.stringify(payload));
-};
-
-// Parse an untrusted client frame. Malformed JSON → null (dropped). This is the
-// one network-boundary parse that legitimately guards against a throw; the caller
-// then guards on null.
 const parseFrame = (raw: string | Buffer): WSMessage | null => {
   try {
-    return JSON.parse(raw.toString()) as WSMessage;
+    const parsed: unknown = JSON.parse(raw.toString());
+    if (typeof parsed !== 'object' || parsed === null) return null;
+    return typeof (parsed as { action?: unknown }).action === 'string'
+      ? (parsed as WSMessage)
+      : null;
   } catch {
     return null;
   }
@@ -61,41 +65,52 @@ const parseFrame = (raw: string | Buffer): WSMessage | null => {
 
 const dispatch = async (ws: WSSocket, msg: WSMessage): Promise<void> => {
   switch (msg.action) {
-    case 'authenticate':
-    case 'unspoof': {
-      const userId = await authenticateToken(msg.token);
-      setIdentity(ws, userId);
-      send(ws, { type: 'identity', userId });
-      return;
-    }
-    case 'spoof': {
-      const userId = await resolveSpoofTarget(msg.token, msg.email);
-      if (!userId) {
-        send(ws, { type: 'spoofRejected' });
+    case 'authenticate': {
+      const headers = sanitizeWSHeaders(msg.headers);
+      const identity = await resolveIdentity(headers);
+      if (!byId.has(ws.data.connectionId)) return;
+      if (identity.status === 'retryable') {
+        sendTo(ws, frameError(msg));
         return;
       }
-      setIdentity(ws, userId);
-      send(ws, { type: 'identity', userId });
+      const me = identity.status === 'resolved' ? identity : null;
+      // A spoof header /me doesn't honor (non-superadmin) is a rejection, not a silent keep.
+      const spoofEmail = headers['x-spoof-user-email'];
+      if (spoofEmail && (!me || normalizeEmail(me.email) !== normalizeEmail(spoofEmail))) {
+        sendTo(ws, { type: 'spoofRejected' });
+        return;
+      }
+      setIdentity(ws, me?.id ?? null, me ? headers : {});
+      sendTo(ws, { type: 'identity', userId: me?.id ?? null });
       return;
     }
     case 'logout': {
-      setIdentity(ws, null);
-      send(ws, { type: 'identity', userId: null });
+      setIdentity(ws, null, {});
+      sendTo(ws, { type: 'identity', userId: null });
       return;
     }
     case 'subscribe': {
+      const granted = await canSubscribe(ws.data.headers, msg.channel);
+      if (!byId.has(ws.data.connectionId)) return;
+      if (!granted) {
+        sendTo(ws, { type: 'subscribeRejected', channel: msg.channel });
+        return;
+      }
       subscribeToChannel(ws, msg.channel);
-      send(ws, { type: 'subscribed', channel: msg.channel });
+      sendTo(ws, { type: 'subscribed', channel: msg.channel });
       return;
     }
     case 'unsubscribe': {
       unsubscribeFromChannel(ws, msg.channel);
-      send(ws, { type: 'unsubscribed', channel: msg.channel });
+      sendTo(ws, { type: 'unsubscribed', channel: msg.channel });
       return;
     }
-    case 'ping': {
-      updateLastPing(ws);
-      send(ws, { type: 'pong' });
+    case 'open': {
+      await openDataStream(ws, msg.stream);
+      return;
+    }
+    case 'close': {
+      closeDataStream(ws, msg.stream);
       return;
     }
   }
@@ -104,16 +119,37 @@ const dispatch = async (ws: WSSocket, msg: WSMessage): Promise<void> => {
 export const websocketHandler = {
   open(ws: WSSocket) {
     addConnection(ws);
-    send(ws, { type: 'connected', connectionId: ws.data.connectionId });
+    sendTo(ws, { type: 'connected', connectionId: ws.data.connectionId });
   },
   close(ws: WSSocket) {
     removeConnection(ws);
   },
-  // Returns the dispatch promise (Bun ignores it; tests await it). Per-connection
-  // serializedQueue keeps async identity actions from interleaving.
+  // Returns the dispatch promise: Bun ignores it, tests await it.
   message(ws: WSSocket, raw: string | Buffer) {
+    if (overFrameLimit(ws)) {
+      ws.close(1008, 'rate limit exceeded');
+      return;
+    }
     const msg = parseFrame(raw);
     if (!msg) return;
-    return ws.data.queue.run(() => dispatch(ws, msg));
+    // Liveness must not wait behind queued snapshot reads or the re-authorization sweep.
+    if (msg.action === 'ping') {
+      updateLastPing(ws);
+      sendTo(ws, { type: 'pong' });
+      return;
+    }
+    if (ws.data.queue.size() >= WS_MAX_PENDING_FRAMES) {
+      sendTo(ws, frameError(msg));
+      return;
+    }
+    return ws.data.queue
+      .run(() => dispatch(ws, msg))
+      .catch((err) => {
+        log.error(
+          `ws dispatch failed (${msg.action}): ${err instanceof Error ? err.message : String(err)}`,
+          LogScope.ws,
+        );
+        sendTo(ws, frameError(msg));
+      });
   },
 };

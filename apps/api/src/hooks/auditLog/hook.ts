@@ -1,11 +1,29 @@
 import type { HookOptions, ManyAction, SingleAction } from '@template/db';
-import { DbAction, db, HookTiming, isAuditEnabled, Prisma, registerDbHook } from '@template/db';
+import {
+  AUDIT_ENABLED_MODELS,
+  DbAction,
+  db,
+  HookTiming,
+  Prisma,
+  redactChangeDiff,
+  redactSensitiveFields,
+  registerDbHook,
+} from '@template/db';
 import { AuditAction, type AuditSubjectModel } from '@template/db/generated/client/enums';
-import { auditActorContext } from '@template/db/lib/auditActorContext';
-import { buildContextFkFields, buildSubjectFkFields, computeDiff, processAuditData } from '#/hooks/auditLog/utils';
+import { auditActorContext, auditActorStore } from '@template/db/lib/auditActorContext';
+import { keyBy } from 'lodash-es';
+import {
+  buildContextFkFields,
+  buildSubjectFkFields,
+  computeDiff,
+  filterForAudit,
+} from '#/hooks/auditLog/utils';
+import { isManyAction } from '#/hooks/shared/hookRows';
 
-const isSoftDeleteTransition = (previous?: Record<string, unknown>, record?: Record<string, unknown>): boolean =>
-  previous?.deletedAt == null && record?.deletedAt != null;
+const isSoftDeleteTransition = (
+  previous?: Record<string, unknown>,
+  record?: Record<string, unknown>,
+): boolean => previous?.deletedAt == null && record?.deletedAt != null;
 
 const dbActionToAuditAction = (
   dbAction: DbAction,
@@ -24,9 +42,6 @@ const dbActionToAuditAction = (
   if (dbAction === DbAction.deleteMany) return AuditAction.delete;
   return AuditAction.delete;
 };
-
-const isManyAction = (action: DbAction): action is ManyAction =>
-  action === DbAction.createManyAndReturn || action === DbAction.updateManyAndReturn || action === DbAction.deleteMany;
 
 const isDeleteAction = (action: DbAction): action is DbAction.delete | DbAction.deleteMany =>
   action === DbAction.delete || action === DbAction.deleteMany;
@@ -52,29 +67,38 @@ const buildAuditEntry = (
 ): Prisma.AuditLogCreateManyInput | null => {
   const actor = auditActorContext.getScope();
 
-  const processedAfter = action !== AuditAction.delete ? processAuditData(model, record) : undefined;
-  const processedBefore = previous ? processAuditData(model, previous) : undefined;
+  // Filter noop fields, then diff on the UNREDACTED result so a change to a sensitive field is still
+  // detected — redacting first would mask both sides to the same token and the change would vanish
+  // under the empty-diff guard. Redact the stored snapshots and the changed values afterward.
+  const filteredAfter = action !== AuditAction.delete ? filterForAudit(model, record) : undefined;
+  const filteredBefore = previous ? filterForAudit(model, previous) : undefined;
   const changes =
-    action === AuditAction.update && processedBefore && processedAfter
-      ? computeDiff(processedBefore, processedAfter)
+    action === AuditAction.update && filteredBefore && filteredAfter
+      ? computeDiff(filteredBefore, filteredAfter)
       : undefined;
 
   if (action === AuditAction.update && changes && Object.keys(changes).length === 0) return null;
+
+  const processedAfter = filteredAfter ? redactSensitiveFields(model, filteredAfter) : undefined;
+  const processedBefore = filteredBefore ? redactSensitiveFields(model, filteredBefore) : undefined;
+  const processedChanges = changes ? redactChangeDiff(model, changes) : undefined;
 
   return {
     action,
     subjectModel: model,
     before: (processedBefore as Prisma.InputJsonValue) ?? Prisma.JsonNull,
     after: (processedAfter as Prisma.InputJsonValue) ?? Prisma.JsonNull,
-    changes: (changes as Prisma.InputJsonValue) ?? Prisma.JsonNull,
+    changes: (processedChanges as Prisma.InputJsonValue) ?? Prisma.JsonNull,
     actorUserId: actor?.actorUserId ?? null,
     actorSpoofUserId: actor?.actorSpoofUserId ?? null,
     actorTokenId: actor?.actorTokenId ?? null,
+    actorTokenName: actor?.actorTokenName ?? null,
+    actorTokenKeyPrefix: actor?.actorTokenKeyPrefix ?? null,
     actorJobName: actor?.actorJobName ?? null,
     ipAddress: actor?.ipAddress ?? null,
     userAgent: actor?.userAgent ?? null,
     sourceInquiryId: actor?.sourceInquiryId ?? null,
-    originIntegration: actor?.originIntegration ?? null,
+    integrationId: actor?.integrationId ?? null,
     ...(withContextFkFields ? buildContextFkFields(model, record) : {}),
     ...(withSubjectFkFields ? buildSubjectFkFields(model, record) : {}),
   };
@@ -98,7 +122,9 @@ const buildEntries = (model: AuditSubjectModel, options: HookOptions) => {
         }
       }
     } else {
-      const record = (options as HookOptions & { action: SingleAction }).result as Record<string, unknown> | undefined;
+      const record = (options as HookOptions & { action: SingleAction }).result as
+        | Record<string, unknown>
+        | undefined;
       if (!record) return entries;
       const entry = buildAuditEntry(model, AuditAction.delete, record, record, false, false);
       if (entry) {
@@ -112,12 +138,16 @@ const buildEntries = (model: AuditSubjectModel, options: HookOptions) => {
   if (isManyAction(dbAction)) {
     const { result, previous } = options as HookOptions & { action: ManyAction };
     const results = (result ?? []) as (Record<string, unknown> & { id: string })[];
-    const previouses = (previous ?? []) as Record<string, unknown>[];
-    const previousById = new Map(previouses.map((p) => [p.id as string, p]));
+    const previousById = keyBy(previous, 'id');
 
     for (const record of results) {
-      const prev = previousById.get(record.id);
-      const entry = buildAuditEntry(model, dbActionToAuditAction(dbAction, record, prev), record, prev);
+      const prev = previousById[record.id];
+      const entry = buildAuditEntry(
+        model,
+        dbActionToAuditAction(dbAction, record, prev),
+        record,
+        prev,
+      );
       if (entry) entries.push(entry);
     }
 
@@ -146,13 +176,17 @@ export const registerAuditLogHook = () => {
     DbAction.deleteMany,
   ];
 
-  registerDbHook('auditLog', '*', HookTiming.after, actions, async (options: HookOptions) => {
-    if (options.model === 'AuditLog') return;
-    if (!isAuditEnabled(options.model)) return;
+  registerDbHook(
+    'auditLog',
+    AUDIT_ENABLED_MODELS,
+    HookTiming.after,
+    actions,
+    async (options: HookOptions) => {
+      const entries = buildEntries(options.model as AuditSubjectModel, options);
+      if (entries.length === 0) return;
 
-    const entries = buildEntries(options.model as AuditSubjectModel, options);
-    if (entries.length === 0) return;
-
-    await db.auditLog.createManyAndReturn({ data: entries });
-  });
+      await db.auditLog.createManyAndReturn({ data: entries });
+    },
+    [auditActorStore],
+  );
 };

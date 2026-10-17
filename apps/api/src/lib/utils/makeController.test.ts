@@ -3,13 +3,15 @@ import { OpenAPIHono, z } from '@hono/zod-openapi';
 import { readRoute } from '#/lib/routeTemplates';
 import { makeController } from '#/lib/utils/makeController';
 import { Modules } from '#/modules/modules';
+import type { AppEnv } from '#/types/appEnv';
+import { json } from '#tests/utils/request';
 
 describe('makeController', () => {
   describe('response validation', () => {
-    let app: OpenAPIHono;
+    let app: OpenAPIHono<AppEnv>;
 
     beforeEach(() => {
-      app = new OpenAPIHono();
+      app = new OpenAPIHono<AppEnv>();
     });
 
     it('strips extra fields not in response schema', async () => {
@@ -34,12 +36,12 @@ describe('makeController', () => {
       app.openapi(testRoute, controller);
 
       const response = await app.request('/', { method: 'GET' });
-      const body = await response.json();
+      const { data } = await json<Record<string, unknown>>(response);
 
       expect(response.status).toBe(200);
-      expect(body.data).toEqual({ id: 'user-123', name: 'Test User' });
-      expect(body.data.email).toBeUndefined();
-      expect(body.data.secret).toBeUndefined();
+      expect(data).toEqual({ id: 'user-123', name: 'Test User' });
+      expect(data.email).toBeUndefined();
+      expect(data.secret).toBeUndefined();
     });
 
     it('strips extra fields from array responses', async () => {
@@ -63,13 +65,13 @@ describe('makeController', () => {
       app.openapi(testRoute, controller);
 
       const response = await app.request('/', { method: 'GET' });
-      const body = await response.json();
+      const { data } = await json<Record<string, unknown>[]>(response);
 
       expect(response.status).toBe(200);
-      expect(body.data).toHaveLength(2);
-      expect(body.data[0]).toEqual({ id: '1', name: 'User 1' });
-      expect(body.data[1]).toEqual({ id: '2', name: 'User 2' });
-      expect(body.data[0].secret).toBeUndefined();
+      expect(data).toHaveLength(2);
+      expect(data[0]).toEqual({ id: '1', name: 'User 1' });
+      expect(data[1]).toEqual({ id: '2', name: 'User 2' });
+      expect(data[0].secret).toBeUndefined();
     });
 
     it('strips nested extra fields', async () => {
@@ -97,11 +99,11 @@ describe('makeController', () => {
       app.openapi(testRoute, controller);
 
       const response = await app.request('/', { method: 'GET' });
-      const body = await response.json();
+      const { data } = await json<{ id: string; profile: Record<string, unknown> }>(response);
 
       expect(response.status).toBe(200);
-      expect(body.data.profile).toEqual({ displayName: 'Test' });
-      expect(body.data.profile.privateData).toBeUndefined();
+      expect(data.profile).toEqual({ displayName: 'Test' });
+      expect(data.profile.privateData).toBeUndefined();
     });
   });
 });

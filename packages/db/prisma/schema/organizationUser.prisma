@@ -3,6 +3,8 @@
 // ============================================================================
 
 model OrganizationUser {
+  inquiriesSent          Inquiry[]             @relation("InquirySource")
+  inquiriesReceived      Inquiry[]             @relation("InquiryTarget")
   id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -18,6 +20,7 @@ model OrganizationUser {
   user               User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   spaceUsers         SpaceUser[]
   tokens             Token[]
+  integrations       Integration[]
   auditLogsAsSubject AuditLog[]   @relation("AuditLogSubjectOrganizationUser")
 
   // ==========================================================================

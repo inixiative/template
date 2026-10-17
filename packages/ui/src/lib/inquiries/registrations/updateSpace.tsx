@@ -9,7 +9,10 @@ import { registerInquiryType } from '@template/ui/lib/inquiries/registry';
 
 const UpdateSpaceSourceSummary = ({ inquiry }: { inquiry: InquirySentItem }) => {
   const content = inquiry.content as { name?: string; slug?: string } | null | undefined;
-  const changes = [content?.name && `name -> ${content.name}`, content?.slug && `slug -> ${content.slug}`]
+  const changes = [
+    content?.name && `name -> ${content.name}`,
+    content?.slug && `slug -> ${content.slug}`,
+  ]
     .filter(Boolean)
     .join(', ');
   return <span>{changes || 'Space update request'}</span>;

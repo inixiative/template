@@ -3,12 +3,14 @@ import { Operator } from '@inixiative/json-rules';
 import { db } from '@template/db';
 import { cleanupTouchedTables, createUser, getNextSeq } from '@template/db/test';
 import { registerRulesHook } from '#/hooks/rules/hook';
-import { clearRulesCache, setRulesCache } from '#/hooks/rules/registry';
+import { clearRulesCache, RulesRegistry, setRulesCache } from '#/hooks/rules/registry';
 
+RulesRegistry.User = true;
 registerRulesHook();
 
 afterAll(async () => {
   await cleanupTouchedTables(db);
+  delete RulesRegistry.User;
 });
 
 afterEach(() => {
@@ -18,30 +20,43 @@ afterEach(() => {
 describe('rules hook', () => {
   describe('create validation', () => {
     it('pass: valid data passes rule', async () => {
-      setRulesCache('User', { field: 'name', operator: Operator.notEmpty, value: true, error: 'name required' });
+      setRulesCache('User', {
+        field: 'name',
+        operator: Operator.notEmpty,
+        value: true,
+        error: 'name required',
+      });
 
       const seq = getNextSeq();
-      const user = await db.user.create({
-        data: { email: `test${seq}@example.com`, name: 'Test User' },
+      const { entity: user } = await createUser({
+        email: `test${seq}@example.com`,
+        name: 'Test User',
       });
 
       expect(user.name).toBe('Test User');
     });
 
     it('fail: invalid data fails rule', async () => {
-      setRulesCache('User', { field: 'name', operator: Operator.notEmpty, value: true, error: 'name required' });
+      setRulesCache('User', {
+        field: 'name',
+        operator: Operator.notEmpty,
+        value: true,
+        error: 'name required',
+      });
 
       const seq = getNextSeq();
-      const promise = async () =>
-        db.user.create({
-          data: { email: `test${seq}@example.com`, name: '' },
-        });
+      const promise = async () => createUser({ email: `test${seq}@example.com`, name: '' });
 
       await expect(promise).toThrow('name required');
     });
 
     it('fail: createManyAndReturn with invalid item', async () => {
-      setRulesCache('User', { field: 'name', operator: Operator.notEmpty, value: true, error: 'name required' });
+      setRulesCache('User', {
+        field: 'name',
+        operator: Operator.notEmpty,
+        value: true,
+        error: 'name required',
+      });
 
       const seq1 = getNextSeq();
       const seq2 = getNextSeq();
@@ -61,12 +76,20 @@ describe('rules hook', () => {
     let userId: string;
 
     beforeAll(async () => {
-      const { entity: user } = await createUser({ name: 'Original', email: `merge${getNextSeq()}@example.com` });
+      const { entity: user } = await createUser({
+        name: 'Original',
+        email: `merge${getNextSeq()}@example.com`,
+      });
       userId = user.id;
     });
 
     it('pass: merged data passes rule', async () => {
-      setRulesCache('User', { field: 'name', operator: Operator.notEmpty, value: true, error: 'name required' });
+      setRulesCache('User', {
+        field: 'name',
+        operator: Operator.notEmpty,
+        value: true,
+        error: 'name required',
+      });
 
       const result = await db.user.update({
         where: { id: userId },
@@ -77,7 +100,12 @@ describe('rules hook', () => {
     });
 
     it('fail: merged data fails rule when update breaks invariant', async () => {
-      setRulesCache('User', { field: 'name', operator: Operator.notEmpty, value: true, error: 'name required' });
+      setRulesCache('User', {
+        field: 'name',
+        operator: Operator.notEmpty,
+        value: true,
+        error: 'name required',
+      });
 
       const promise = async () =>
         db.user.update({
@@ -91,8 +119,12 @@ describe('rules hook', () => {
     it('pass: cross-field rule validated against merged state', async () => {
       setRulesCache('User', {
         if: { field: 'emailVerified', operator: Operator.equals, value: true },
-        // biome-ignore lint/suspicious/noThenProperty: rule DSL object, not a Promise
-        then: { field: 'name', operator: Operator.notEmpty, value: true, error: 'verified users need name' },
+        then: {
+          field: 'name',
+          operator: Operator.notEmpty,
+          value: true,
+          error: 'verified users need name',
+        },
       });
 
       const result = await db.user.update({
@@ -106,7 +138,12 @@ describe('rules hook', () => {
 
   describe('upsert validation', () => {
     it('pass: upsert create path validated', async () => {
-      setRulesCache('User', { field: 'name', operator: Operator.notEmpty, value: true, error: 'name required' });
+      setRulesCache('User', {
+        field: 'name',
+        operator: Operator.notEmpty,
+        value: true,
+        error: 'name required',
+      });
 
       const seq = getNextSeq();
       const result = await db.user.upsert({
@@ -119,7 +156,12 @@ describe('rules hook', () => {
     });
 
     it('fail: upsert create path invalid', async () => {
-      setRulesCache('User', { field: 'name', operator: Operator.notEmpty, value: true, error: 'name required' });
+      setRulesCache('User', {
+        field: 'name',
+        operator: Operator.notEmpty,
+        value: true,
+        error: 'name required',
+      });
 
       const seq = getNextSeq();
       const promise = async () =>
@@ -134,7 +176,12 @@ describe('rules hook', () => {
 
     it('pass: upsert update path merges with previous', async () => {
       const { entity: user } = await createUser({ name: 'Existing' });
-      setRulesCache('User', { field: 'name', operator: Operator.notEmpty, value: true, error: 'name required' });
+      setRulesCache('User', {
+        field: 'name',
+        operator: Operator.notEmpty,
+        value: true,
+        error: 'name required',
+      });
 
       const result = await db.user.upsert({
         where: { id: user.id },
@@ -151,9 +198,7 @@ describe('rules hook', () => {
       setRulesCache('User', true);
 
       const seq = getNextSeq();
-      const user = await db.user.create({
-        data: { email: `bool${seq}@example.com`, name: 'Test' },
-      });
+      const { entity: user } = await createUser({ email: `bool${seq}@example.com`, name: 'Test' });
 
       expect(user).toBeDefined();
     });
@@ -162,31 +207,36 @@ describe('rules hook', () => {
       setRulesCache('User', false);
 
       const seq = getNextSeq();
-      const promise = async () =>
-        db.user.create({
-          data: { email: `bool${seq}@example.com`, name: 'Test' },
-        });
+      const promise = async () => createUser({ email: `bool${seq}@example.com`, name: 'Test' });
 
       await expect(promise).toThrow();
     });
   });
 
   describe('updateManyAndReturn', () => {
-    it('logs warning but allows operation (cannot validate without fetching each record)', async () => {
+    it('validates every returned record after the write, so a breaking update fails', async () => {
       const { entity: user1 } = await createUser({ name: 'User1' });
       const { entity: user2 } = await createUser({ name: 'User2' });
 
-      setRulesCache('User', { field: 'name', operator: Operator.notEmpty, value: true, error: 'name required' });
+      setRulesCache('User', {
+        field: 'name',
+        operator: Operator.notEmpty,
+        value: true,
+        error: 'name required',
+      });
 
-      // updateManyAndReturn should succeed even though we're setting name to empty
-      // because we can't merge with previous for each record
       const results = await db.user.updateManyAndReturn({
         where: { id: { in: [user1.id, user2.id] } },
         data: { emailVerified: true },
       });
-
-      expect(results).toHaveLength(2);
       expect(results.every((r) => r.emailVerified)).toBe(true);
+
+      await expect(
+        db.user.updateManyAndReturn({
+          where: { id: { in: [user1.id, user2.id] } },
+          data: { name: '' },
+        }),
+      ).rejects.toThrow('name required');
     });
   });
 
@@ -200,9 +250,7 @@ describe('rules hook', () => {
       });
 
       const seq = getNextSeq();
-      const user = await db.user.create({
-        data: { email: `test${seq}@example.com`, name: 'Test' },
-      });
+      const { entity: user } = await createUser({ email: `test${seq}@example.com`, name: 'Test' });
 
       expect(user).toBeDefined();
     });
@@ -217,9 +265,7 @@ describe('rules hook', () => {
       });
 
       const seq = getNextSeq();
-      const user = await db.user.create({
-        data: { email: `test${seq}@example.com`, name: 'Admin' },
-      });
+      const { entity: user } = await createUser({ email: `test${seq}@example.com`, name: 'Admin' });
 
       expect(user.name).toBe('Admin');
     });

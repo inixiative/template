@@ -9,7 +9,7 @@ import type { SeedFile } from '../seed';
 
 export const emailComponentSeeds: SeedFile<EmailComponent> = {
   model: 'emailComponent',
-  updateOmitFields: ['createdAt'],
+  savedByApp: true,
   records: [
     {
       id: '01936d42-ec00-7000-8000-000000000001',
@@ -22,7 +22,7 @@ export const emailComponentSeeds: SeedFile<EmailComponent> = {
         '<mj-section padding="20px 0">',
         '  <mj-column>',
         '    <mj-text align="center" font-size="24px" font-weight="bold" color="#111827">',
-        '      {{sender.platformName}}',
+        '      {{system.platformName}}',
         '    </mj-text>',
         '  </mj-column>',
         '</mj-section>',
@@ -41,7 +41,7 @@ export const emailComponentSeeds: SeedFile<EmailComponent> = {
         '<mj-section padding="20px 0">',
         '  <mj-column>',
         '    <mj-text align="center" font-size="12px" color="#6b7280">',
-        '      {{sender.platformName}}',
+        '      {{system.platformName}}',
         '    </mj-text>',
         '  </mj-column>',
         '</mj-section>',

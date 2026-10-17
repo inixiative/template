@@ -2,7 +2,7 @@
  * @atlas
  * @kind route
  * @partOf superadmin
- * @uses feature:auditLogs, primitive:caching, feature:auth, feature:contact, feature:inquiry, feature:tenancy, feature:webhooks
+ * @uses feature:auditLogs, primitive:caching, feature:auth, feature:contact, feature:email, feature:inquiry, feature:tenancy, feature:webhooks
  */
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { validateSuperadmin } from '#/middleware/validations/validateSuperadmin';
@@ -12,9 +12,12 @@ import { adminCronJobRouter } from '#/modules/admin/cronJob';
 import { adminJobRouter } from '#/modules/admin/job';
 import { adminAuthProviderRouter } from '#/modules/authProvider';
 import { adminContactRouter } from '#/modules/contact';
+import { adminEmailTemplateRouter } from '#/modules/emailTemplate';
 import { adminInquiryRouter } from '#/modules/inquiry';
+import { adminIntegrationRouter } from '#/modules/integration';
 import { adminOrganizationRouter } from '#/modules/organization';
 import { adminSpaceRouter } from '#/modules/space';
+import { adminUserRouter } from '#/modules/user';
 import { adminWebhookSubscriptionRouter } from '#/modules/webhookSubscription';
 import type { AppEnv } from '#/types/appEnv';
 
@@ -27,8 +30,11 @@ adminRouter.route('/authProvider', adminAuthProviderRouter);
 adminRouter.route('/cache', adminCacheRouter);
 adminRouter.route('/contact', adminContactRouter);
 adminRouter.route('/cronJob', adminCronJobRouter);
+adminRouter.route('/emailTemplate', adminEmailTemplateRouter);
 adminRouter.route('/job', adminJobRouter);
 adminRouter.route('/inquiry', adminInquiryRouter);
+adminRouter.route('/integration', adminIntegrationRouter);
 adminRouter.route('/organization', adminOrganizationRouter);
 adminRouter.route('/space', adminSpaceRouter);
+adminRouter.route('/user', adminUserRouter);
 adminRouter.route('/webhookSubscription', adminWebhookSubscriptionRouter);

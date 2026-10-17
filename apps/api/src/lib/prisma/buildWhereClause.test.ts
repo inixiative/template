@@ -7,10 +7,7 @@ describe('buildWhereClause', () => {
   describe('global search (single term, fan-out across fields)', () => {
     it('emits a case-insensitive OR across String fields', () => {
       const result = buildWhereClause({
-        filterLens: {
-          parent: lensFor('User'),
-          root: { picks: ['name', 'email'] },
-        },
+        filterLens: { parent: lensFor('User'), root: { picks: ['name', 'email'] } },
         search: 'aron',
       });
       expect(result).toEqual({
@@ -25,7 +22,50 @@ describe('buildWhereClause', () => {
       });
     });
 
-    it('walks relation paths', () => {
+    it('splits a multi-word search into per-token OR groups that AND together', () => {
+      const result = buildWhereClause({
+        filterLens: { parent: lensFor('User'), root: { picks: ['name', 'email'] } },
+        search: 'aron smith',
+      });
+      expect(result).toEqual({
+        AND: [
+          {
+            OR: [
+              { email: { contains: 'aron', mode: 'insensitive' } },
+              { name: { contains: 'aron', mode: 'insensitive' } },
+            ],
+          },
+          {
+            OR: [
+              { email: { contains: 'smith', mode: 'insensitive' } },
+              { name: { contains: 'smith', mode: 'insensitive' } },
+            ],
+          },
+        ],
+      });
+    });
+
+    it('collapses extra whitespace and ignores a blank search', () => {
+      expect(
+        buildWhereClause({
+          filterLens: { parent: lensFor('User'), root: { picks: ['name'] } },
+          search: '   ',
+        }),
+      ).toEqual({});
+      expect(
+        buildWhereClause({
+          filterLens: { parent: lensFor('User'), root: { picks: ['name'] } },
+          search: '  aron   smith  ',
+        }),
+      ).toEqual({
+        AND: [
+          { OR: [{ name: { contains: 'aron', mode: 'insensitive' } }] },
+          { OR: [{ name: { contains: 'smith', mode: 'insensitive' } }] },
+        ],
+      });
+    });
+
+    it('walks a to-one relation path as plain nesting', () => {
       const result = buildWhereClause({
         filterLens: {
           parent: lensFor('Inquiry'),
@@ -45,6 +85,26 @@ describe('buildWhereClause', () => {
       });
     });
 
+    it('wraps a to-many relation path in `some`', () => {
+      const result = buildWhereClause({
+        filterLens: {
+          parent: lensFor('User'),
+          root: { picks: ['name'], relations: { tokens: { picks: ['name'] } } },
+        },
+        search: 'prod',
+      });
+      expect(result).toEqual({
+        AND: [
+          {
+            OR: [
+              { name: { contains: 'prod', mode: 'insensitive' } },
+              { tokens: { some: { name: { contains: 'prod', mode: 'insensitive' } } } },
+            ],
+          },
+        ],
+      });
+    });
+
     it('drops non-String paths (contains is meaningless for enums / DateTime / Boolean)', () => {
       const result = buildWhereClause({
         filterLens: {
@@ -58,12 +118,19 @@ describe('buildWhereClause', () => {
       });
     });
 
+    it('escapes LIKE metacharacters in the free-text term', () => {
+      const result = buildWhereClause({
+        filterLens: { parent: lensFor('User'), root: { picks: ['name'] } },
+        search: '50%_',
+      });
+      expect(result).toEqual({
+        AND: [{ OR: [{ name: { contains: '50\\%\\_', mode: 'insensitive' } }] }],
+      });
+    });
+
     it('emits no OR when every searchable field is non-String', () => {
       const result = buildWhereClause({
-        filterLens: {
-          parent: lensFor('User'),
-          root: { picks: ['platformRole', 'createdAt'] },
-        },
+        filterLens: { parent: lensFor('User'), root: { picks: ['platformRole', 'createdAt'] } },
         search: 'foo',
       });
       expect(result).toEqual({});
@@ -71,35 +138,26 @@ describe('buildWhereClause', () => {
 
     it('returns empty when there is no search term and no searchFields', () => {
       const result = buildWhereClause({
-        filterLens: {
-          parent: lensFor('User'),
-          root: { picks: ['name'] },
-        },
+        filterLens: { parent: lensFor('User'), root: { picks: ['name'] } },
       });
       expect(result).toEqual({});
     });
   });
 
   describe('searchFields — bare value applies the kind default operator', () => {
-    it('String → contains + insensitive mode', () => {
+    it('String → contains, case-sensitive', () => {
       const result = buildWhereClause({
-        filterLens: {
-          parent: lensFor('User'),
-          root: { picks: ['name'] },
-        },
+        filterLens: { parent: lensFor('User'), root: { picks: ['name'] } },
         searchFields: { name: 'aron' },
       });
       expect(result).toEqual({
-        AND: [{ name: { contains: 'aron', mode: 'insensitive' } }],
+        AND: [{ name: { contains: 'aron' } }],
       });
     });
 
     it('enum → equals (no contains, no mode)', () => {
       const result = buildWhereClause({
-        filterLens: {
-          parent: lensFor('User'),
-          root: { picks: ['platformRole'] },
-        },
+        filterLens: { parent: lensFor('User'), root: { picks: ['platformRole'] } },
         searchFields: { platformRole: 'superadmin' },
       });
       expect(result).toEqual({
@@ -109,10 +167,7 @@ describe('buildWhereClause', () => {
 
     it('Int → equals, with string coercion to number', () => {
       const result = buildWhereClause({
-        filterLens: {
-          parent: lensFor('CronJob'),
-          root: { picks: ['maxAttempts'] },
-        },
+        filterLens: { parent: lensFor('CronJob'), root: { picks: ['maxAttempts'] } },
         searchFields: { maxAttempts: '3' },
       });
       expect(result).toEqual({ AND: [{ maxAttempts: { equals: 3 } }] });
@@ -120,10 +175,7 @@ describe('buildWhereClause', () => {
 
     it('Boolean → equals, coercing "true" / "false" strings', () => {
       const result = buildWhereClause({
-        filterLens: {
-          parent: lensFor('User'),
-          root: { picks: ['emailVerified'] },
-        },
+        filterLens: { parent: lensFor('User'), root: { picks: ['emailVerified'] } },
         searchFields: { emailVerified: 'true' },
       });
       expect(result).toEqual({ AND: [{ emailVerified: { equals: true } }] });
@@ -131,10 +183,7 @@ describe('buildWhereClause', () => {
 
     it('DateTime → equals with Date coercion from ISO string', () => {
       const result = buildWhereClause({
-        filterLens: {
-          parent: lensFor('User'),
-          root: { picks: ['createdAt'] },
-        },
+        filterLens: { parent: lensFor('User'), root: { picks: ['createdAt'] } },
         searchFields: { createdAt: '2026-05-10T12:00:00Z' },
       });
       const inner = (result as { AND: Array<{ createdAt: { equals: Date } }> }).AND[0].createdAt;
@@ -144,10 +193,7 @@ describe('buildWhereClause', () => {
 
     it('DateTime → equals with Date coercion from ms-timestamp string', () => {
       const result = buildWhereClause({
-        filterLens: {
-          parent: lensFor('User'),
-          root: { picks: ['createdAt'] },
-        },
+        filterLens: { parent: lensFor('User'), root: { picks: ['createdAt'] } },
         searchFields: { createdAt: '1715353200000' },
       });
       const inner = (result as { AND: Array<{ createdAt: { equals: Date } }> }).AND[0].createdAt;
@@ -206,25 +252,66 @@ describe('buildWhereClause', () => {
   });
 
   describe('searchFields — explicit operators', () => {
-    it("auto-adds mode: 'insensitive' for String + mode-capable ops", () => {
+    it('String operators are case-sensitive unless the caller opts in', () => {
       const result = buildWhereClause({
-        filterLens: {
-          parent: lensFor('User'),
-          root: { picks: ['name'] },
-        },
+        filterLens: { parent: lensFor('User'), root: { picks: ['name'] } },
         searchFields: { name: { startsWith: 'A' } },
+      });
+      expect(result).toEqual({
+        AND: [{ name: { startsWith: 'A' } }],
+      });
+    });
+
+    it("keeps an explicit mode: 'insensitive' opt-in", () => {
+      const result = buildWhereClause({
+        filterLens: { parent: lensFor('User'), root: { picks: ['name'] } },
+        searchFields: { name: { startsWith: 'A', mode: 'insensitive' } },
       });
       expect(result).toEqual({
         AND: [{ name: { startsWith: 'A', mode: 'insensitive' } }],
       });
     });
 
+    it('escapes LIKE metacharacters so a pattern operator matches its value literally', () => {
+      const result = buildWhereClause({
+        filterLens: { parent: lensFor('User'), root: { picks: ['name', 'email'] } },
+        searchFields: {
+          name: { contains: '50%_off', endsWith: 'a\\b' },
+          email: { startsWith: 'x_y' },
+        },
+      });
+      expect(result).toEqual({
+        AND: [
+          { name: { contains: '50\\%\\_off', endsWith: 'a\\\\b' } },
+          { email: { startsWith: 'x\\_y' } },
+        ],
+      });
+    });
+
+    it('escapes an insensitive equality (Prisma compiles it to ILIKE) but not a sensitive one', () => {
+      const lens = { parent: lensFor('User'), root: { picks: ['name'] } };
+      expect(
+        buildWhereClause({
+          filterLens: lens,
+          searchFields: { name: { equals: '50%', mode: 'insensitive' } },
+        }),
+      ).toEqual({ AND: [{ name: { equals: '50\\%', mode: 'insensitive' } }] });
+      expect(
+        buildWhereClause({ filterLens: lens, searchFields: { name: { equals: '50%' } } }),
+      ).toEqual({ AND: [{ name: { equals: '50%' } }] });
+    });
+
+    it('escapes a bare String value, which defaults to contains', () => {
+      const result = buildWhereClause({
+        filterLens: { parent: lensFor('User'), root: { picks: ['name'] } },
+        searchFields: { name: '50%' },
+      });
+      expect(result).toEqual({ AND: [{ name: { contains: '50\\%' } }] });
+    });
+
     it("doesn't add mode when caller explicitly passes mode", () => {
       const result = buildWhereClause({
-        filterLens: {
-          parent: lensFor('User'),
-          root: { picks: ['name'] },
-        },
+        filterLens: { parent: lensFor('User'), root: { picks: ['name'] } },
         searchFields: { name: { contains: 'A', mode: 'default' } },
       });
       expect(result).toEqual({
@@ -234,10 +321,7 @@ describe('buildWhereClause', () => {
 
     it("doesn't add mode for String in/notIn (Prisma doesn't support mode on those)", () => {
       const result = buildWhereClause({
-        filterLens: {
-          parent: lensFor('User'),
-          root: { picks: ['email'] },
-        },
+        filterLens: { parent: lensFor('User'), root: { picks: ['email'] } },
         searchFields: { email: { in: ['a@x.com', 'b@x.com'] } },
       });
       expect(result).toEqual({
@@ -247,10 +331,7 @@ describe('buildWhereClause', () => {
 
     it("doesn't add mode for enum equals (mode is a String-only Prisma concept)", () => {
       const result = buildWhereClause({
-        filterLens: {
-          parent: lensFor('User'),
-          root: { picks: ['platformRole'] },
-        },
+        filterLens: { parent: lensFor('User'), root: { picks: ['platformRole'] } },
         searchFields: { platformRole: { equals: 'superadmin' } },
       });
       expect(result).toEqual({
@@ -260,10 +341,7 @@ describe('buildWhereClause', () => {
 
     it('coerces Int operator values', () => {
       const result = buildWhereClause({
-        filterLens: {
-          parent: lensFor('CronJob'),
-          root: { picks: ['maxAttempts'] },
-        },
+        filterLens: { parent: lensFor('CronJob'), root: { picks: ['maxAttempts'] } },
         searchFields: { maxAttempts: { gte: '5', lt: '10' } },
       });
       expect(result).toEqual({ AND: [{ maxAttempts: { gte: 5, lt: 10 } }] });
@@ -271,13 +349,11 @@ describe('buildWhereClause', () => {
 
     it('coerces DateTime operator values (ISO string and ms-timestamp)', () => {
       const result = buildWhereClause({
-        filterLens: {
-          parent: lensFor('User'),
-          root: { picks: ['createdAt'] },
-        },
+        filterLens: { parent: lensFor('User'), root: { picks: ['createdAt'] } },
         searchFields: { createdAt: { gte: '2026-01-01T00:00:00Z', lt: '1735689600000' } },
       });
-      const clause = (result as { AND: Array<{ createdAt: { gte: Date; lt: Date } }> }).AND[0].createdAt;
+      const clause = (result as { AND: Array<{ createdAt: { gte: Date; lt: Date } }> }).AND[0]
+        .createdAt;
       expect(clause.gte).toBeInstanceOf(Date);
       expect(clause.gte.toISOString()).toBe('2026-01-01T00:00:00.000Z');
       expect(clause.lt.getTime()).toBe(1735689600000);
@@ -285,14 +361,21 @@ describe('buildWhereClause', () => {
 
     it('normalises singleton in value to an array', () => {
       const result = buildWhereClause({
-        filterLens: {
-          parent: lensFor('User'),
-          root: { picks: ['platformRole'] },
-        },
+        filterLens: { parent: lensFor('User'), root: { picks: ['platformRole'] } },
         searchFields: { platformRole: { in: 'superadmin' } },
       });
       expect(result).toEqual({
         AND: [{ platformRole: { in: ['superadmin'] } }],
+      });
+    });
+
+    it('pulls a NULL member out of `in` and ORs it back (Prisma rejects NULL inside in)', () => {
+      const result = buildWhereClause({
+        filterLens: { parent: lensFor('User'), root: { picks: ['platformRole'] } },
+        searchFields: { platformRole: { in: ['superadmin', null] } },
+      });
+      expect(result).toEqual({
+        AND: [{ OR: [{ platformRole: { in: ['superadmin'] } }, { platformRole: null }] }],
       });
     });
   });
@@ -301,10 +384,7 @@ describe('buildWhereClause', () => {
     it("rejects 'contains' on enum field", () => {
       expect(() =>
         buildWhereClause({
-          filterLens: {
-            parent: lensFor('User'),
-            root: { picks: ['platformRole'] },
-          },
+          filterLens: { parent: lensFor('User'), root: { picks: ['platformRole'] } },
           searchFields: { platformRole: { contains: 'super' } },
         }),
       ).toThrow(/Operator 'contains' is not valid for field 'platformRole' \(enum\)/);
@@ -313,10 +393,7 @@ describe('buildWhereClause', () => {
     it("rejects 'gt' on String field", () => {
       expect(() =>
         buildWhereClause({
-          filterLens: {
-            parent: lensFor('User'),
-            root: { picks: ['name'] },
-          },
+          filterLens: { parent: lensFor('User'), root: { picks: ['name'] } },
           searchFields: { name: { gt: 'a' } },
         }),
       ).toThrow(/Operator 'gt' is not valid for field 'name' \(String\)/);
@@ -325,10 +402,7 @@ describe('buildWhereClause', () => {
     it("rejects 'in' on DateTime field", () => {
       expect(() =>
         buildWhereClause({
-          filterLens: {
-            parent: lensFor('User'),
-            root: { picks: ['createdAt'] },
-          },
+          filterLens: { parent: lensFor('User'), root: { picks: ['createdAt'] } },
           searchFields: { createdAt: { in: ['2026-01-01'] } },
         }),
       ).toThrow(/Operator 'in' is not valid for field 'createdAt' \(DateTime\)/);
@@ -337,10 +411,7 @@ describe('buildWhereClause', () => {
     it("rejects 'contains' on Boolean field", () => {
       expect(() =>
         buildWhereClause({
-          filterLens: {
-            parent: lensFor('User'),
-            root: { picks: ['emailVerified'] },
-          },
+          filterLens: { parent: lensFor('User'), root: { picks: ['emailVerified'] } },
           searchFields: { emailVerified: { contains: 'tr' } },
         }),
       ).toThrow(/not valid for field 'emailVerified' \(Boolean\)/);
@@ -351,10 +422,7 @@ describe('buildWhereClause', () => {
     it('throws on non-numeric Int input', () => {
       expect(() =>
         buildWhereClause({
-          filterLens: {
-            parent: lensFor('CronJob'),
-            root: { picks: ['maxAttempts'] },
-          },
+          filterLens: { parent: lensFor('CronJob'), root: { picks: ['maxAttempts'] } },
           searchFields: { maxAttempts: 'abc' },
         }),
       ).toThrow(/Cannot coerce/);
@@ -363,10 +431,7 @@ describe('buildWhereClause', () => {
     it("throws on Boolean inputs that aren't true/false strings", () => {
       expect(() =>
         buildWhereClause({
-          filterLens: {
-            parent: lensFor('User'),
-            root: { picks: ['emailVerified'] },
-          },
+          filterLens: { parent: lensFor('User'), root: { picks: ['emailVerified'] } },
           searchFields: { emailVerified: 'yes' },
         }),
       ).toThrow(/Cannot coerce/);
@@ -375,10 +440,7 @@ describe('buildWhereClause', () => {
     it('throws on garbage DateTime input', () => {
       expect(() =>
         buildWhereClause({
-          filterLens: {
-            parent: lensFor('User'),
-            root: { picks: ['createdAt'] },
-          },
+          filterLens: { parent: lensFor('User'), root: { picks: ['createdAt'] } },
           searchFields: { createdAt: 'not-a-date' },
         }),
       ).toThrow(/Cannot coerce/);
@@ -389,10 +451,7 @@ describe('buildWhereClause', () => {
     it('throws when a field is not in picks', () => {
       expect(() =>
         buildWhereClause({
-          filterLens: {
-            parent: lensFor('User'),
-            root: { picks: ['name'] },
-          },
+          filterLens: { parent: lensFor('User'), root: { picks: ['name'] } },
           searchFields: { name: 'aron', password: 'secret' },
         }),
       ).toThrow(/'password' is not searchable/);
@@ -401,11 +460,7 @@ describe('buildWhereClause', () => {
     it('throws on invalid path notation', () => {
       expect(() =>
         buildWhereClause({
-          filterLens: {
-            parent: lensFor('User'),
-            // Picks accepts only valid field names — invalid notation rejected via incoming searchFields path
-            root: { picks: ['name'] },
-          },
+          filterLens: { parent: lensFor('User'), root: { picks: ['name'] } },
           searchFields: { 'bad path!': 'x' },
         }),
       ).toThrow(/Invalid search field|not searchable/);
@@ -422,7 +477,7 @@ describe('buildWhereClause', () => {
         searchFields: { tokens: { some: { name: 'tok-prod' } } },
       });
       expect(result).toEqual({
-        AND: [{ tokens: { some: { name: { contains: 'tok-prod', mode: 'insensitive' } } } }],
+        AND: [{ tokens: { some: { name: { contains: 'tok-prod' } } } }],
       });
     });
 
@@ -442,10 +497,7 @@ describe('buildWhereClause', () => {
     it('rejects non-whitelisted relation paths', () => {
       expect(() =>
         buildWhereClause({
-          filterLens: {
-            parent: lensFor('User'),
-            root: { picks: ['email'] },
-          },
+          filterLens: { parent: lensFor('User'), root: { picks: ['email'] } },
           searchFields: { tokens: { some: { name: 'x' } } },
         }),
       ).toThrow(/'tokens' is not searchable/);
@@ -455,25 +507,19 @@ describe('buildWhereClause', () => {
   describe('skipFieldValidation (superadmin bypass)', () => {
     it('allows fields not in picks when bypass is on', () => {
       const result = buildWhereClause({
-        filterLens: {
-          parent: lensFor('User'),
-          root: { picks: [] },
-        },
+        filterLens: { parent: lensFor('User'), root: { picks: [] } },
         searchFields: { name: 'aron', platformRole: 'user' },
         skipFieldValidation: true,
       });
       expect(result).toEqual({
-        AND: [{ name: { contains: 'aron', mode: 'insensitive' } }, { platformRole: { equals: 'user' } }],
+        AND: [{ name: { contains: 'aron' } }, { platformRole: { equals: 'user' } }],
       });
     });
 
     it("still validates operators per kind — bypass doesn't loosen kind rules", () => {
       expect(() =>
         buildWhereClause({
-          filterLens: {
-            parent: lensFor('User'),
-            root: { picks: [] },
-          },
+          filterLens: { parent: lensFor('User'), root: { picks: [] } },
           searchFields: { platformRole: { contains: 'super' } },
           skipFieldValidation: true,
         }),
@@ -482,10 +528,7 @@ describe('buildWhereClause', () => {
 
     it('passes through fields that do not resolve in the schema (synthetic / dynamic paths)', () => {
       const result = buildWhereClause({
-        filterLens: {
-          parent: lensFor('User'),
-          root: { picks: [] },
-        },
+        filterLens: { parent: lensFor('User'), root: { picks: [] } },
         searchFields: { _customField: 'anything' },
         skipFieldValidation: true,
       });
@@ -496,10 +539,7 @@ describe('buildWhereClause', () => {
   describe('filters + orNullFields', () => {
     it('combines pre-built filters with search', () => {
       const result = buildWhereClause({
-        filterLens: {
-          parent: lensFor('User'),
-          root: { picks: ['name'] },
-        },
+        filterLens: { parent: lensFor('User'), root: { picks: ['name'] } },
         search: 'aron',
         filters: { deletedAt: null },
       });
@@ -511,15 +551,12 @@ describe('buildWhereClause', () => {
 
     it('widens orNullFields to OR null', () => {
       const result = buildWhereClause({
-        filterLens: {
-          parent: lensFor('User'),
-          root: { picks: ['name'] },
-        },
+        filterLens: { parent: lensFor('User'), root: { picks: ['name'] } },
         searchFields: { name: 'aron' },
         orNullFields: ['name'],
       });
       expect(result).toEqual({
-        AND: [{ OR: [{ name: { contains: 'aron', mode: 'insensitive' } }, { name: null }] }],
+        AND: [{ OR: [{ name: { contains: 'aron' } }, { name: null }] }],
       });
     });
   });
@@ -528,10 +565,7 @@ describe('buildWhereClause', () => {
     it('rejects array values without an operator', () => {
       expect(() =>
         buildWhereClause({
-          filterLens: {
-            parent: lensFor('User'),
-            root: { picks: ['name'] },
-          },
+          filterLens: { parent: lensFor('User'), root: { picks: ['name'] } },
           searchFields: { name: ['a', 'b'] },
         }),
       ).toThrow(/does not support array values without an operator/);
@@ -542,10 +576,7 @@ describe('buildWhereClause', () => {
       for (let i = 0; i < 11; i += 1) nested = { wrap: nested };
       expect(() =>
         buildWhereClause({
-          filterLens: {
-            parent: lensFor('User'),
-            root: { picks: ['wrap'] },
-          },
+          filterLens: { parent: lensFor('User'), root: { picks: ['wrap'] } },
           searchFields: nested as never,
           skipFieldValidation: true,
         }),
@@ -553,45 +584,380 @@ describe('buildWhereClause', () => {
     });
   });
 
-  describe('row scope (narrowing chain composition)', () => {
-    const role = { platformRole: { equals: 'superadmin' } };
-    const verified = { emailVerified: { equals: true } };
-    const named = { name: { equals: 'x' } };
-
-    it('applies the route layer root.where', () => {
+  describe('narrowing wheres (lensWhere owns them all)', () => {
+    it('composes no narrowing wheres — root and relation wheres are applied by lensWhere in paginate', () => {
       const result = buildWhereClause({
         filterLens: {
           parent: lensFor('User'),
-          root: { picks: [], where: { field: 'platformRole', operator: 'equals', value: 'superadmin' } },
-        },
-      });
-      expect(result).toEqual({ AND: [role] });
-    });
-
-    it('composes every stacked scopeNarrowing layer (route + children), ANDed', () => {
-      const result = buildWhereClause({
-        filterLens: {
-          parent: {
-            parent: lensFor('User'),
-            root: { picks: [], where: { field: 'platformRole', operator: 'equals', value: 'superadmin' } },
+          root: {
+            picks: ['name'],
+            where: { field: 'platformRole', operator: 'equals', value: 'superadmin' },
+            relations: {
+              tokens: {
+                picks: ['name'],
+                where: { field: 'isActive', operator: 'equals', value: true },
+              },
+            },
           },
-          root: { where: { field: 'emailVerified', operator: 'equals', value: true } },
         },
       });
-      const and = (result as { AND: unknown[] }).AND;
-      expect(and).toHaveLength(2);
-      expect(and).toEqual(expect.arrayContaining([role, verified]));
+      expect(result).toEqual({});
+    });
+  });
+
+  describe('soft-delete pass-through (injection lives in paginate)', () => {
+    it('does not inject deletedAt — a bare lens produces no conditions', () => {
+      const result = buildWhereClause({
+        filterLens: { parent: lensFor('User'), root: { picks: ['name'] } },
+      });
+      expect(result).toEqual({});
     });
 
-    it('applies mapDefaults wheres anchored to the root model', () => {
+    it('a root deletedAt lens where is lensWhere business too — nothing composes here', () => {
       const result = buildWhereClause({
         filterLens: {
           parent: lensFor('User'),
-          root: { picks: [] },
-          mapDefaults: { prisma: { models: { User: { where: { field: 'name', operator: 'equals', value: 'x' } } } } },
+          root: { picks: [], where: { field: 'deletedAt', operator: 'notEquals', value: null } },
         },
       });
-      expect(result).toEqual({ AND: [named] });
+      expect(result).toEqual({});
+    });
+
+    it('a lens that picks deletedAt makes it client-filterable — explicit wins over the live scope', () => {
+      const result = buildWhereClause({
+        filterLens: { parent: lensFor('User'), root: { picks: ['deletedAt'] } },
+        searchFields: { deletedAt: { not: null } },
+      });
+      expect(result).toEqual({ AND: [{ deletedAt: { not: null } }] });
+    });
+  });
+  describe('searchPaths — restricting the global fan-out', () => {
+    const WITH_TO_MANY = {
+      parent: lensFor('User'),
+      root: { picks: ['name', 'email'], relations: { tokens: { picks: ['name'] } } },
+    };
+
+    it('restricts the global search fan-out to the given subset, in caller order', () => {
+      const result = buildWhereClause({
+        filterLens: WITH_TO_MANY,
+        search: 'greg',
+        searchPaths: ['name', 'email'],
+      });
+      expect(result).toEqual({
+        AND: [
+          {
+            OR: [
+              { name: { contains: 'greg', mode: 'insensitive' } },
+              { email: { contains: 'greg', mode: 'insensitive' } },
+            ],
+          },
+        ],
+      });
+    });
+
+    it('leaves explicit searchFields on the full lens whitelist, so relation filters still work', () => {
+      const result = buildWhereClause({
+        filterLens: WITH_TO_MANY,
+        search: 'greg',
+        searchPaths: ['name'],
+        searchFields: { tokens: { some: { name: 'tok-a' } } },
+      });
+      expect(result).toEqual({
+        AND: [
+          { OR: [{ name: { contains: 'greg', mode: 'insensitive' } }] },
+          { tokens: { some: { name: { contains: 'tok-a' } } } },
+        ],
+      });
+    });
+
+    it('an empty searchPaths disables free-text search entirely', () => {
+      expect(
+        buildWhereClause({ filterLens: WITH_TO_MANY, search: 'greg', searchPaths: [] }),
+      ).toEqual({});
+    });
+
+    it('throws 500 (route-author bug, not a client 400) on a path outside the lens', () => {
+      expect(() =>
+        buildWhereClause({ filterLens: WITH_TO_MANY, search: 'greg', searchPaths: ['nope'] }),
+      ).toThrow("searchPaths entry 'nope' is not a searchable path of the User lens");
+      try {
+        buildWhereClause({ filterLens: WITH_TO_MANY, search: 'greg', searchPaths: ['nope'] });
+      } catch (err) {
+        expect((err as { status: number }).status).toBe(500);
+      }
+    });
+
+    it('validates searchPaths even without a search term, so lens drift fails on every request', () => {
+      expect(() => buildWhereClause({ filterLens: WITH_TO_MANY, searchPaths: ['nope'] })).toThrow(
+        "searchPaths entry 'nope' is not a searchable path of the User lens",
+      );
+    });
+  });
+
+  describe('AND / OR combinators (clause groups)', () => {
+    const TOKENS = {
+      parent: lensFor('User'),
+      root: { relations: { tokens: { picks: ['name'] } } },
+    };
+
+    it('emits one independent relation block per indexed child', () => {
+      const result = buildWhereClause({
+        filterLens: TOKENS,
+        searchFields: {
+          AND: {
+            0: { tokens: { some: { name: 'tok-a' } } },
+            1: { tokens: { some: { name: 'tok-b' } } },
+          },
+        },
+      });
+      // Two blocks, not one merged `some` — a single row cannot carry both names, so the merged
+      // form matches nothing where the grouped form matches a user holding two tokens.
+      expect(result).toEqual({
+        AND: [
+          { tokens: { some: { name: { contains: 'tok-a' } } } },
+          { tokens: { some: { name: { contains: 'tok-b' } } } },
+        ],
+      });
+    });
+
+    it('orders children by index, not by key insertion', () => {
+      const result = buildWhereClause({
+        filterLens: { parent: lensFor('User'), root: { picks: ['name'] } },
+        searchFields: { AND: { 10: { name: 'ten' }, 2: { name: 'two' } } },
+      });
+      expect(result).toEqual({
+        AND: [{ name: { contains: 'two' } }, { name: { contains: 'ten' } }],
+      });
+    });
+
+    it('accepts a combinator nested under a relation, keeping the relation prefix', () => {
+      const result = buildWhereClause({
+        filterLens: TOKENS,
+        searchFields: { tokens: { some: { AND: { 0: { name: 'tok-a' }, 1: { name: 'tok-b' } } } } },
+      });
+      expect(result).toEqual({
+        AND: [
+          {
+            tokens: {
+              some: {
+                AND: [{ name: { contains: 'tok-a' } }, { name: { contains: 'tok-b' } }],
+              },
+            },
+          },
+        ],
+      });
+    });
+
+    it('flattens a combinator nested directly inside another (AND is associative)', () => {
+      const result = buildWhereClause({
+        filterLens: { parent: lensFor('User'), root: { picks: ['name'] } },
+        searchFields: { AND: { 0: { AND: { 0: { name: 'aron' } } } } },
+      });
+      expect(result).toEqual({ AND: [{ name: { contains: 'aron' } }] });
+    });
+
+    it('still enforces the whitelist inside a child', () => {
+      expect(() =>
+        buildWhereClause({
+          filterLens: { parent: lensFor('User'), root: { picks: ['name'] } },
+          searchFields: { AND: { 0: { nope: 'x' } } },
+        }),
+      ).toThrow(/not searchable/);
+    });
+
+    it('400s when children are not indexed', () => {
+      expect(() =>
+        buildWhereClause({
+          filterLens: { parent: lensFor('User'), root: { picks: ['name'] } },
+          searchFields: { AND: { name: 'x' } },
+        }),
+      ).toThrow(/requires indexed children/);
+    });
+
+    it('400s past the group cap rather than issuing unbounded subqueries', () => {
+      const tooMany = Object.fromEntries(
+        Array.from({ length: 26 }, (_, i) => [String(i), { name: `n${i}` }]),
+      );
+      expect(() =>
+        buildWhereClause({
+          filterLens: { parent: lensFor('User'), root: { picks: ['name'] } },
+          searchFields: { AND: tooMany },
+        }),
+      ).toThrow(/at most 25 groups/);
+    });
+
+    it('leaves a query with no combinator untouched', () => {
+      const result = buildWhereClause({
+        filterLens: TOKENS,
+        searchFields: { tokens: { some: { name: 'tok-prod' } } },
+      });
+      expect(result).toEqual({
+        AND: [{ tokens: { some: { name: { contains: 'tok-prod' } } } }],
+      });
+    });
+
+    it('keeps OR as one union condition instead of flattening it into the enclosing AND', () => {
+      const result = buildWhereClause({
+        filterLens: { parent: lensFor('User'), root: { picks: ['name', 'email'] } },
+        searchFields: { OR: { 0: { name: 'aron' }, 1: { email: 'phil@x.com' } } },
+      });
+      // Flattened, these two would land side by side in the outer AND and the query would
+      // demand BOTH — an intersection where the caller asked for a union.
+      expect(result).toEqual({
+        AND: [
+          {
+            OR: [{ name: { contains: 'aron' } }, { email: { contains: 'phil@x.com' } }],
+          },
+        ],
+      });
+    });
+
+    it('ANDs the leaves inside a single OR arm', () => {
+      const result = buildWhereClause({
+        filterLens: { parent: lensFor('User'), root: { picks: ['name', 'email'] } },
+        searchFields: { OR: { 0: { name: 'aron', email: 'aron@x.com' }, 1: { name: 'phil' } } },
+      });
+      expect(result).toEqual({
+        AND: [
+          {
+            OR: [
+              {
+                AND: [{ name: { contains: 'aron' } }, { email: { contains: 'aron@x.com' } }],
+              },
+              { name: { contains: 'phil' } },
+            ],
+          },
+        ],
+      });
+    });
+
+    it('nests OR inside AND', () => {
+      const result = buildWhereClause({
+        filterLens: { parent: lensFor('User'), root: { picks: ['name', 'email'] } },
+        searchFields: {
+          AND: { 0: { email: 'x@y.com' }, 1: { OR: { 0: { name: 'aron' }, 1: { name: 'phil' } } } },
+        },
+      });
+      expect(result).toEqual({
+        AND: [
+          { email: { contains: 'x@y.com' } },
+          {
+            OR: [{ name: { contains: 'aron' } }, { name: { contains: 'phil' } }],
+          },
+        ],
+      });
+    });
+
+    it('flattens an AND nested inside an OR arm into that arm', () => {
+      const result = buildWhereClause({
+        filterLens: { parent: lensFor('User'), root: { picks: ['name', 'email'] } },
+        searchFields: {
+          OR: {
+            0: { AND: { 0: { name: 'aron' }, 1: { email: 'aron@x.com' } } },
+            1: { name: 'phil' },
+          },
+        },
+      });
+      expect(result).toEqual({
+        AND: [
+          {
+            OR: [
+              {
+                AND: [{ name: { contains: 'aron' } }, { email: { contains: 'aron@x.com' } }],
+              },
+              { name: { contains: 'phil' } },
+            ],
+          },
+        ],
+      });
+    });
+
+    it('splits a NULL member out of `in` inside an OR arm', () => {
+      const result = buildWhereClause({
+        filterLens: { parent: lensFor('User'), root: { picks: ['platformRole'] } },
+        searchFields: { OR: { 0: { platformRole: { in: ['superadmin', null] } } } },
+      });
+      // The inner OR is the null-split; the outer one is the arm. Pushed raw the arm would
+      // emit `in: ['superadmin', null]`, which Prisma rejects for a typed array.
+      expect(result).toEqual({
+        AND: [{ OR: [{ OR: [{ platformRole: { in: ['superadmin'] } }, { platformRole: null }] }] }],
+      });
+    });
+
+    it('still enforces the whitelist inside an OR arm', () => {
+      expect(() =>
+        buildWhereClause({
+          filterLens: { parent: lensFor('User'), root: { picks: ['name'] } },
+          searchFields: { OR: { 0: { nope: 'x' } } },
+        }),
+      ).toThrow(/not searchable/);
+    });
+
+    it('names OR in the indexed-children error', () => {
+      expect(() =>
+        buildWhereClause({
+          filterLens: { parent: lensFor('User'), root: { picks: ['name'] } },
+          searchFields: { OR: 'aron' },
+        }),
+      ).toThrow(/'OR' requires indexed children/);
+    });
+
+    it('hands an OR nested under a relation to Prisma as-is', () => {
+      const result = buildWhereClause({
+        filterLens: TOKENS,
+        searchFields: { tokens: { some: { OR: { 0: { name: 'tok-a' }, 1: { name: 'tok-b' } } } } },
+      });
+      expect(result).toEqual({
+        AND: [
+          {
+            tokens: {
+              some: {
+                OR: [{ name: { contains: 'tok-a' } }, { name: { contains: 'tok-b' } }],
+              },
+            },
+          },
+        ],
+      });
+    });
+
+    it('splits a NULL member out of `in` inside an AND group, as it does at the top level', () => {
+      const result = buildWhereClause({
+        filterLens: { parent: lensFor('User'), root: { picks: ['platformRole'] } },
+        searchFields: { AND: { 0: { platformRole: { in: ['superadmin', null] } } } },
+      });
+      expect(result).toEqual({
+        AND: [{ OR: [{ platformRole: { in: ['superadmin'] } }, { platformRole: null }] }],
+      });
+    });
+
+    it('applies orNullFields inside an AND group', () => {
+      const result = buildWhereClause({
+        filterLens: { parent: lensFor('User'), root: { picks: ['name'] } },
+        searchFields: { AND: { 0: { name: 'aron' } } },
+        orNullFields: ['name'],
+      });
+      expect(result).toEqual({
+        AND: [{ OR: [{ name: { contains: 'aron' } }, { name: null }] }],
+      });
+    });
+
+    it('400s on a scalar combinator value', () => {
+      expect(() =>
+        buildWhereClause({
+          filterLens: { parent: lensFor('User'), root: { picks: ['name'] } },
+          searchFields: { AND: 'aron' },
+        }),
+      ).toThrow(/requires indexed children/);
+    });
+
+    it('accepts sparse indices', () => {
+      const result = buildWhereClause({
+        filterLens: { parent: lensFor('User'), root: { picks: ['name', 'email'] } },
+        searchFields: { AND: { 0: { name: 'aron' }, 5: { email: 'aron@x.com' } } },
+      });
+      expect(result).toEqual({
+        AND: [{ name: { contains: 'aron' } }, { email: { contains: 'aron@x.com' } }],
+      });
     });
   });
 });

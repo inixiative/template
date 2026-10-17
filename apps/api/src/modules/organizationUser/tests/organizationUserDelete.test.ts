@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import type { Organization, OrganizationUser, User } from '@template/db';
+import type { Organization, OrganizationUser, User } from '@template/db/generated/client/client';
 import { cleanupTouchedTables, createOrganizationUser } from '@template/db/test';
 import { organizationUserRouter } from '#/modules/organizationUser';
 import { createTestApp } from '#tests/createTestApp';
@@ -32,7 +32,10 @@ describe('DELETE /api/v1/organizationUser/:id', () => {
   });
 
   it('deletes the organizationUser', async () => {
-    const { entity: toDelete } = await createOrganizationUser({ role: 'viewer' }, { organization: org });
+    const { entity: toDelete } = await createOrganizationUser(
+      { role: 'viewer' },
+      { organization: org },
+    );
 
     const response = await fetch(del(`/api/v1/organizationUser/${toDelete.id}`));
     expect(response.status).toBe(204);

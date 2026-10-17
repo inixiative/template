@@ -29,12 +29,14 @@ model User {
   tokens                 Token[]
   cronJobsCreated        CronJob[]
   webhookSubscriptions   WebhookSubscription[]
+  integrations           Integration[]
   contacts               Contact[]
   tagAttachments         TagAttachment[]
   tags                   Tag[]
   tagCategories          TagCategory[]
   inquiriesSent          Inquiry[]             @relation("InquirySource")
   inquiriesReceived      Inquiry[]             @relation("InquiryTarget")
+  customerRefs           CustomerRef[]         @relation("customerRefs")
   providerRefs           CustomerRef[]         @relation("providerRefs")
   auditLogsAsActor       AuditLog[]            @relation("AuditLogActorUser")
   auditLogsAsSpoofActor  AuditLog[]            @relation("AuditLogActorSpoofUser")
@@ -42,6 +44,8 @@ model User {
   auditLogsAsContextUser AuditLog[]            @relation("AuditLogContextUser")
   communicationsSent     CommunicationLog[]    @relation("CommunicationSenderUser")
   communicationsReceived CommunicationLog[]    @relation("CommunicationRecipientUser")
+  segments               Segment[]
+  flows                  Flow[]
 
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below

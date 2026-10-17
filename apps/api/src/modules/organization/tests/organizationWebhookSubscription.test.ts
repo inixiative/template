@@ -1,6 +1,26 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
-import type { Organization, OrganizationUser, User, WebhookSubscription } from '@template/db/generated/client/client';
-import { cleanupTouchedTables, createOrganizationUser, createWebhookSubscription, getNextSeq } from '@template/db/test';
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  mock,
+  spyOn,
+} from 'bun:test';
+import type {
+  Organization,
+  OrganizationUser,
+  User,
+  WebhookSubscription,
+} from '@template/db/generated/client/client';
+import {
+  cleanupTouchedTables,
+  createOrganizationUser,
+  createWebhookSubscription,
+  getNextSeq,
+} from '@template/db/test';
 import { organizationRouter } from '#/modules/organization';
 import { createTestApp } from '#tests/createTestApp';
 import { get, json, post } from '#tests/utils/request';
@@ -28,8 +48,14 @@ describe('organization/webhookSubscriptions', () => {
   });
 
   beforeEach(() => {
-    spyOn(globalThis, 'fetch').mockImplementation((() =>
-      Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 200 }))) as typeof fetch);
+    spyOn(globalThis, 'fetch').mockImplementation(
+      Object.assign(
+        () => Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 200 })),
+        {
+          preconnect: globalThis.fetch.preconnect,
+        },
+      ),
+    );
   });
 
   afterEach(() => {
@@ -85,6 +111,7 @@ describe('organization/webhookSubscriptions', () => {
     it('returns org webhooks', async () => {
       const seq = getNextSeq();
       await createWebhookSubscription({
+        model: 'CustomerRef',
         ownerModel: 'Organization',
         organizationId: org.id,
         url: `https://example.com/org-list-${seq}`,
@@ -103,6 +130,7 @@ describe('organization/webhookSubscriptions', () => {
       const otherOrg = otherContext.organization;
       const seq = getNextSeq();
       await createWebhookSubscription({
+        model: 'CustomerRef',
         ownerModel: 'Organization',
         organizationId: otherOrg.id,
         url: `https://example.com/other-org-${seq}`,

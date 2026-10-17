@@ -57,7 +57,7 @@ describe('searchable', () => {
   });
 
   it('throws for invalid model name', () => {
-    expect(() => searchable({ notAModel: ['name'] })).toThrow('not a valid Prisma model');
+    expect(() => searchable({ notAModel: ['name'] })).toThrow("Unknown model 'notAModel'");
   });
 
   it('throws for invalid field on model', () => {
@@ -69,10 +69,14 @@ describe('searchable', () => {
   });
 
   it('throws when using a scalar as a relation', () => {
-    expect(() => searchable({ organization: [{ name: ['something'] }] })).toThrow('is not a relation');
+    expect(() => searchable({ organization: [{ name: ['something'] }] })).toThrow(
+      'is not a relation',
+    );
   });
 
   it('throws for multiple root keys', () => {
-    expect(() => searchable({ organization: ['name'], user: ['email'] })).toThrow('exactly one model');
+    expect(() => searchable({ organization: ['name'], user: ['email'] })).toThrow(
+      'exactly one model',
+    );
   });
 });

@@ -50,7 +50,12 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     const displayText = isDisabled && disabledText ? disabledText : children;
 
     return (
-      <button className={cn(buttonVariants({ variant, size, className }))} ref={ref} disabled={isDisabled} {...props}>
+      <button
+        className={cn(buttonVariants({ variant, size, className }))}
+        ref={ref}
+        disabled={isDisabled}
+        {...props}
+      >
         {displayText}
       </button>
     );

@@ -1,6 +1,12 @@
 import type { Condition } from '@inixiative/json-rules';
 import { Operator } from '@inixiative/json-rules';
-import { type ModelName, type PolymorphicAxis, type PolymorphicValue, PolymorphismRegistry } from '@template/db';
+import {
+  type ModelName,
+  type PolymorphicAxis,
+  type PolymorphicValue,
+  PolymorphismRegistry,
+  toModelName,
+} from '@template/db';
 
 const buildAxisRule = (model: ModelName, axis: PolymorphicAxis): Condition => {
   const allFks = [...new Set(Object.values(axis.fkMap).flat())];
@@ -39,7 +45,7 @@ export const polymorphismRules: Partial<Record<ModelName, Condition>> = {};
 
 for (const [model, config] of Object.entries(PolymorphismRegistry)) {
   if (!config) continue;
-  const modelName = model as ModelName;
+  const modelName = toModelName(model);
   const rules = config.axes.map((axis) => buildAxisRule(modelName, axis));
   if (rules.length === 1) polymorphismRules[modelName] = rules[0];
   else if (rules.length > 1) polymorphismRules[modelName] = { all: rules };

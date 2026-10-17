@@ -6,9 +6,9 @@
     "packages/*",
     "apps/*"
   ],
-  "packageManager": "bun@1.3.10",
+  "packageManager": "bun@1.4.2",
   "engines": {
-    "bun": "1.3.10"
+    "bun": "1.4.2"
   },
   "scripts": {
     "postinstall": "bash ./scripts/postinstall.sh",
@@ -29,7 +29,7 @@
     "pretest": "bun run with test api bun run --cwd packages/db db:push:force",
     "test": "bun run --cwd packages/permissions test && bun run --cwd packages/db test && bun run --cwd packages/email test && bun run --cwd apps/api test",
     "test:init": "bash init/tests/with-init-env.sh env NODE_ENV=test bun test init/",
-    "test:fe": "bun run generate:sdk && bun run generate:routes && bun run --filter=@template/shared test && bun run --cwd packages/ui test && bun test --concurrency=1 tests/frontend",
+    "test:fe": "bun run generate:sdk && bun run generate:routes && bun run --filter=@template/shared test && bun run --cwd packages/ui test && __TEST_REDIRECT__=1 NODE_ENV=test bun test --concurrency=1 tests/frontend",
     "typecheck": "bun run '--filter=*' typecheck",
     "typecheck:fe": "bun run generate:routes && bun run --cwd apps/web typecheck && bun run --cwd apps/admin typecheck && bun run --cwd apps/superadmin typecheck",
     "tsc": "bun run '--filter=*' typecheck",
@@ -49,7 +49,7 @@
     "db:restore": "./scripts/db/restore.sh",
     "db:clone": "./scripts/db/clone.sh",
     "generate:routes": "bun --cwd apps/web generate:routes && bun --cwd apps/admin generate:routes && bun --cwd apps/superadmin generate:routes",
-    "generate:sdk": "bun run with local api bash ./scripts/generate-sdk.sh",
+    "generate:sdk": "bun run with ${SDK_ENVIRONMENT:-local} api bash ./scripts/generate-sdk.sh",
     "deploy": "./scripts/deployment/deploy.sh",
     "check": "bun run lint && bun run typecheck && bun run test && bun run test:fe && bash scripts/ci/run-ci-rules.sh",
     "lint": "biome check . && bun run lint:postBiome",
@@ -58,17 +58,19 @@
     "lint:generated": "./scripts/lint/check-generated-files.sh",
     "lint:fix": "biome check --write . && bun run lint:postBiome",
     "format": "biome format --write .",
-    "docs:toc": "bun run scripts/docs/regenToc.ts"
+    "docs:toc": "bun run scripts/docs/regenToc.ts",
+    "prepare": "if git rev-parse --git-dir >/dev/null 2>&1; then lefthook install; fi"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.5.0",
-    "@inixiative/atlas": "^0.1.0",
+    "@biomejs/biome": "2.5.2",
+    "@inixiative/atlas": "^0.4.0",
+    "@inixiative/config": "^0.5.104",
     "@lightpanda/browser": "^1.2.0",
     "@mendable/firecrawl-js": "^4.18.1",
     "@tanstack/react-router": "^1.166.2",
     "@tanstack/router-generator": "^1.166.2",
     "@tanstack/router-plugin": "^1.166.2",
-    "@types/bun": "^1.3.10",
+    "@types/bun": "1.4.2",
     "@types/lodash-es": "^4.17.12",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
@@ -76,9 +78,10 @@
     "@vitejs/plugin-react": "^5.1.4",
     "concurrently": "^9.2.1",
     "enhanced-resolve": "^5.20.0",
+    "lefthook": "2.1.9",
     "tailwindcss": "^4.2.1",
     "turbo": "^2.8.14",
-    "typescript": "^5.9.3",
+    "typescript": "6.0.3",
     "vite": "^7.3.2",
     "vite-tsconfig-paths": "^6.1.1"
   },
@@ -95,7 +98,7 @@
     "uuid": "14.0.0"
   },
   "dependencies": {
-    "@inixiative/json-rules": "^2.10.0",
+    "@inixiative/json-rules": "^3.5.4",
     "ink": "^6.8.0",
     "ink-select-input": "^6.2.0",
     "ink-spinner": "^5.0.0",

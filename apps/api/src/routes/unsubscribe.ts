@@ -6,6 +6,7 @@
  */
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { db } from '@template/db';
+import { emitAppEvent } from '#/appEvents/emit';
 import { verifyUnsubscribe } from '#/lib/email/unsubscribe';
 import { makeError } from '#/lib/errors';
 import type { AppEnv } from '#/types/appEnv';
@@ -25,10 +26,11 @@ unsubscribeRouter.post('/', async (c) => {
   });
   const owns = !claim.userId || contact?.userId === claim.userId;
   if (contact && owns && contact.acceptedKinds.includes(claim.kind)) {
-    await db.contact.update({
+    const updated = await db.contact.update({
       where: { id: contact.id },
       data: { acceptedKinds: { set: contact.acceptedKinds.filter((k) => k !== claim.kind) } },
     });
+    await emitAppEvent('contact.updated', { contact: updated });
   }
   return c.json({ status: 'ok' });
 });

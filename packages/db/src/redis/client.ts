@@ -4,6 +4,7 @@
  * @partOf infrastructure:prisma, infrastructure:redis
  * @uses none
  */
+import { instrumentRedis } from '@template/db/redis/instrumentRedis';
 import { LogScope, log } from '@template/shared/logger';
 import { isTest } from '@template/shared/utils';
 import Redis from 'ioredis';
@@ -13,14 +14,20 @@ let __main: Redis | null = null;
 let __subscriber: Redis | null = null;
 let __mock: Redis | null = null;
 
-export const createRedisConnection = (scope: LogScope | string = LogScope.db): Redis => {
+export const resolveRedisUrl = (url?: string): string =>
+  url || process.env.REDIS_URL || 'redis://localhost:6379';
+
+export const createRedisConnection = (
+  scope: LogScope | string = LogScope.db,
+  url?: string,
+): Redis => {
   if (isTest) {
     if (!__mock) __mock = new RedisMock() as unknown as Redis;
     log.info('Using shared in-memory mock', scope);
     return __mock;
   }
 
-  const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
+  const redis = new Redis(resolveRedisUrl(url), {
     maxRetriesPerRequest: null,
     enableReadyCheck: false,
   });
@@ -28,7 +35,7 @@ export const createRedisConnection = (scope: LogScope | string = LogScope.db): R
   redis.on('error', (err) => log.error('Error:', err, scope));
   redis.on('connect', () => log.info('Connected', scope));
 
-  return redis;
+  return instrumentRedis(redis);
 };
 
 export const getRedisClient = (): Redis => {
@@ -39,7 +46,10 @@ export const getRedisClient = (): Redis => {
 export const getRedisPub = (): Redis => getRedisClient();
 
 export const getRedisSub = (): Redis => {
-  if (!__subscriber) __subscriber = createRedisConnection(LogScope.ws);
+  // A subscribed connection can only run subscriber commands, so the subscriber is always
+  // its own connection — in tests a duplicate() of the shared mock (same broker, separate mode).
+  if (!__subscriber)
+    __subscriber = isTest ? getRedisClient().duplicate() : createRedisConnection(LogScope.ws);
   return __subscriber;
 };
 

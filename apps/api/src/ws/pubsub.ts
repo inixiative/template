@@ -4,32 +4,88 @@
  * @partOf primitive:websockets
  * @uses infrastructure:redis
  */
-// @wip — cross-server WebSocket pub/sub layer not yet finalized.
-// Known TODOs for the next pass:
-//   - Three duplicate switches on `type` (init handler, fallback in publish,
-//     redis-error fallback in publish) should collapse into one `Record<type, fn>`
-//     once the message contract is stable.
-//   - Redis-unavailable fallback is duplicated with the redis-error fallback.
-
 import { getRedisPub, getRedisSub } from '@template/db';
 import { LogScope, log } from '@template/shared/logger';
-import { broadcastLocal, sendToChannelLocal, sendToUserLocal } from '#/ws/delivery';
+import { type StreamAppend, streamAppendFrame } from '#/ws/dataFrame';
+import {
+  broadcastLocal,
+  sendToChannelLocal,
+  sendToStreamLocal,
+  sendToUserLocal,
+} from '#/ws/delivery';
+import { publishStreamAppend } from '#/ws/queries/publishStreamAppend';
+import { byId, byStream } from '#/ws/registry';
+import { rejectDataStream } from '#/ws/rejectDataStream';
+import { inStreamOrder } from '#/ws/streamPublishOrder';
+import { streamSeqKey } from '#/ws/streamSeq';
 import type { WSOutbound } from '#/ws/types';
 
 const WS_CHANNEL = 'ws:broadcast';
 
-type PubSubMessage = {
-  type: 'user' | 'channel' | 'broadcast';
-  target?: string;
-  event: WSOutbound;
-};
+type PubSubMessage =
+  | { type: 'user' | 'channel'; target: string; event: WSOutbound }
+  | { type: 'broadcast'; event: WSOutbound }
+  | { type: 'stream'; target: string; userIds?: string[]; seqs: number[]; append: StreamAppend }
+  | { type: 'streamResync'; target: string; origin: string };
+
+const RESYNC_RETRY_MS = 1_000;
 
 let initialized = false;
 let pubsubEnabled = false;
 
+// An unsequenced append would drift its holders, so they re-open for a snapshot instead.
+const resyncLocalHolders = (stream: string): void => {
+  for (const id of [...(byStream.get(stream) ?? [])]) {
+    const ws = byId.get(id);
+    if (!ws) continue;
+    void ws.data.queue.run(async () => {
+      if (byId.has(id) && ws.data.streams.has(stream)) rejectDataStream(ws, stream, 'retryable');
+    });
+  }
+};
+
+const deliverStreamAppend = ({
+  target,
+  userIds,
+  seqs,
+  append,
+}: Extract<PubSubMessage, { type: 'stream' }>): void => {
+  const frame = (seq: number | undefined) =>
+    seq === undefined ? null : JSON.stringify(streamAppendFrame(target, seq, append));
+  if (!userIds) {
+    const shared = frame(seqs[0]);
+    sendToStreamLocal(target, () => shared);
+    return;
+  }
+  const seqByUserId = new Map(userIds.map((userId, index) => [userId, seqs[index]]));
+  sendToStreamLocal(target, (ws) =>
+    frame(ws.data.userId ? seqByUserId.get(ws.data.userId) : undefined),
+  );
+};
+
+const deliverLocal = (message: PubSubMessage): void => {
+  switch (message.type) {
+    case 'user':
+      sendToUserLocal(message.target, message.event);
+      break;
+    case 'channel':
+      sendToChannelLocal(message.target, message.event);
+      break;
+    case 'stream':
+      deliverStreamAppend(message);
+      break;
+    case 'streamResync':
+      if (message.origin !== INSTANCE_ID) resyncLocalHolders(message.target);
+      break;
+    case 'broadcast':
+      broadcastLocal(message.event);
+      break;
+  }
+};
+
+// Only socket-holding processes subscribe; publishers (the job worker too) always publish through Redis.
 export const initWebSocketPubSub = async (): Promise<void> => {
   if (initialized) return;
-  initialized = true;
 
   try {
     const sub = getRedisSub();
@@ -39,25 +95,15 @@ export const initWebSocketPubSub = async (): Promise<void> => {
       if (channel !== WS_CHANNEL) return;
 
       try {
-        const { type, target, event } = JSON.parse(message) as PubSubMessage;
-
-        switch (type) {
-          case 'user':
-            if (target) sendToUserLocal(target, event);
-            break;
-          case 'channel':
-            if (target) sendToChannelLocal(target, event);
-            break;
-          case 'broadcast':
-            broadcastLocal(event);
-            break;
-        }
+        deliverLocal(JSON.parse(message) as PubSubMessage);
       } catch (err) {
         log.error('Failed to process pub/sub message:', err);
       }
     });
 
     pubsubEnabled = true;
+    // Only a successful subscription marks init done — a failure leaves it retryable.
+    initialized = true;
     log.info('Pub/Sub Enabled', LogScope.ws);
   } catch (err) {
     log.warn('⚠️ WebSocket pub/sub disabled (Redis unavailable):', err);
@@ -65,52 +111,82 @@ export const initWebSocketPubSub = async (): Promise<void> => {
   }
 };
 
-const publish = async (message: PubSubMessage): Promise<void> => {
-  if (!pubsubEnabled) {
-    switch (message.type) {
-      case 'user':
-        if (message.target) sendToUserLocal(message.target, message.event);
-        break;
-      case 'channel':
-        if (message.target) sendToChannelLocal(message.target, message.event);
-        break;
-      case 'broadcast':
-        broadcastLocal(message.event);
-        break;
-    }
-    return;
-  }
-
+const publish = async (
+  message: Exclude<PubSubMessage, { type: 'stream' | 'streamResync' }>,
+): Promise<void> => {
   try {
-    const pub = getRedisPub();
-    await pub.publish(WS_CHANNEL, JSON.stringify(message));
+    await getRedisPub().publish(WS_CHANNEL, JSON.stringify(message));
   } catch (err) {
     log.error('Failed to publish to Redis:', err);
-    switch (message.type) {
-      case 'user':
-        if (message.target) sendToUserLocal(message.target, message.event);
-        break;
-      case 'channel':
-        if (message.target) sendToChannelLocal(message.target, message.event);
-        break;
-      case 'broadcast':
-        broadcastLocal(message.event);
-        break;
-    }
+    deliverLocal(message);
   }
 };
 
-export const sendToUser = (userId: string, event: WSOutbound): void => {
+export const sendToUser = (userId: string, event: WSOutbound): Promise<void> =>
   publish({ type: 'user', target: userId, event });
-};
 
-export const sendToChannel = (channel: string, event: WSOutbound): void => {
+export const sendToChannel = (channel: string, event: WSOutbound): Promise<void> =>
   publish({ type: 'channel', target: channel, event });
+
+const INSTANCE_ID = crypto.randomUUID();
+const pendingResyncs = new Set<string>();
+let publishingResyncs = false;
+
+const retryPendingResyncs = (): void => {
+  setTimeout(() => void publishPendingResyncs(), RESYNC_RETRY_MS).unref?.();
 };
 
-export const broadcast = (event: WSOutbound): void => {
-  publish({ type: 'broadcast', event });
+// Holders on other instances missed the append too, so every instance hears a resync once Redis is back.
+const publishPendingResyncs = async (): Promise<void> => {
+  if (publishingResyncs) return;
+  publishingResyncs = true;
+  try {
+    while (pendingResyncs.size > 0) {
+      const [stream] = pendingResyncs;
+      const message = { type: 'streamResync', target: stream, origin: INSTANCE_ID };
+      await getRedisPub().publish(WS_CHANNEL, JSON.stringify(message));
+      pendingResyncs.delete(stream);
+    }
+  } catch {
+    retryPendingResyncs();
+  } finally {
+    publishingResyncs = false;
+  }
 };
+
+const resyncEverywhere = (stream: string): void => {
+  resyncLocalHolders(stream);
+  pendingResyncs.add(stream);
+  void publishPendingResyncs();
+};
+
+// Serialized per stream so this instance publishes a stream's appends in emission order.
+export const appendToStream = (
+  stream: string,
+  append: StreamAppend,
+  userIds?: string[],
+): Promise<void> =>
+  inStreamOrder(stream, async () => {
+    const recipients = userIds && [...new Set(userIds)];
+    const seqKeys = recipients
+      ? recipients.map((userId) => streamSeqKey(stream, userId))
+      : [streamSeqKey(stream)];
+    try {
+      await publishStreamAppend(getRedisPub(), WS_CHANNEL, seqKeys, {
+        type: 'stream',
+        target: stream,
+        ...(recipients ? { userIds: recipients } : {}),
+        append,
+      });
+    } catch (err) {
+      // maxRetriesPerRequest: null queues the eval through an outage; only a Redis error lands here.
+      log.error(`Failed to publish a stream append (${stream}); resyncing its holders:`, err);
+      resyncEverywhere(stream);
+    }
+  });
+
+export const broadcast = (event: WSOutbound): Promise<void> =>
+  publish({ type: 'broadcast', event });
 
 export const isPubSubEnabled = (): boolean => {
   return pubsubEnabled;

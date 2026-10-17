@@ -1,0 +1,10 @@
+// Enum-value @map is allowed (legacy stored enum strings) — the rule must not flag it.
+model Example {
+  id   String      @id
+  kind ExampleKind
+}
+
+enum ExampleKind {
+  SURVEY    @map("Survey")
+  INTERVIEW @map("Interview")
+}

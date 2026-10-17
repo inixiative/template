@@ -20,5 +20,6 @@ export const validateInquiryPreCreate = async (
   content: Record<string, unknown>,
 ): Promise<void> => {
   if (handler.validate) await handler.validate(db, { ...source, ...target }, content);
-  if (handler.unique) await validateUniqueInquiry(db, { type, ...source, ...target }, handler.unique);
+  if (handler.unique)
+    await validateUniqueInquiry(db, { type, ...source, ...target }, handler.unique);
 };

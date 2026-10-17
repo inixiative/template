@@ -7,6 +7,7 @@
  */
 import { createRoute } from '@hono/zod-openapi';
 import pluralize from 'pluralize';
+import { securityForRoute } from '#/lib/auth/routeSecurity';
 import type { RouteArgs } from '#/lib/routeTemplates/types';
 import {
   buildOperationId,
@@ -36,7 +37,13 @@ export const readRoute = <const T extends RouteArgs>(args: T) => {
 
   if (!responseSchema) throw new Error('responseSchema is required for read routes');
 
-  const resourceName = submodel ? (many ? pluralize(submodel) : submodel) : many ? pluralize(model) : model;
+  const resourceName = submodel
+    ? many
+      ? pluralize(submodel)
+      : submodel
+    : many
+      ? pluralize(model)
+      : model;
   const parentContext = submodel ? ` for a ${model}` : '';
   const routePath = buildRoutePath({ submodel, action, skipId, many });
   const routeTags = buildTags({ model, submodel, tags, admin, internal });
@@ -44,16 +51,24 @@ export const readRoute = <const T extends RouteArgs>(args: T) => {
 
   return createRoute({
     ...args,
-    operationId: buildOperationId({ action: action || 'read', model, submodel, many, admin, internal }),
+    operationId: buildOperationId({
+      action: action || 'read',
+      model,
+      submodel,
+      many,
+      admin,
+      internal,
+    }),
     method: 'get',
     path: routePath,
     tags: routeTags,
+    security: securityForRoute(args),
     description:
       description ??
       (many
         ? `Retrieves a list of ${resourceName}${parentContext}.`
         : `Retrieves an existing ${resourceName}${parentContext}.`),
-    middleware: prepareMiddleware(middleware, skipResource, filterLens),
+    middleware: prepareMiddleware(middleware, skipResource, filterLens, args.includeDeleted),
     request: buildRequest(args),
     responses: buildResponses(args, 200),
   });

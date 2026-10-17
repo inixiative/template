@@ -7,7 +7,10 @@
 import { lensFor } from '@template/db/lens';
 import { readRoute } from '#/lib/routeTemplates';
 import { providerFilterSchema } from '#/modules/customerRef/schemas/customerRefQuerySchemas';
-import { customerRefAsCustomerSchema, customerRefTags } from '#/modules/customerRef/schemas/customerRefSchemas';
+import {
+  customerRefAsCustomerSchema,
+  customerRefTags,
+} from '#/modules/customerRef/schemas/customerRefSchemas';
 import { Modules } from '#/modules/modules';
 import { Tags } from '#/modules/tags';
 

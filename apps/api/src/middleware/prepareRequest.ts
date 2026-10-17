@@ -7,7 +7,7 @@
 import { db } from '@template/db';
 import type { UserId } from '@template/db/typedModelIds';
 import { createPermissions } from '@template/permissions';
-import { logScope } from '@template/shared/logger';
+import { logScope, withLogContext } from '@template/shared/logger';
 import type { Context, Next } from 'hono';
 import { isSuperadmin } from '#/lib/context/isSuperadmin';
 import { setupOrgPermissions } from '#/lib/permissions/setupOrgPermissions';
@@ -85,6 +85,8 @@ export const prepareRequest = async (c: Context<AppEnv>, next: Next) => {
   if (batchContext) {
     await next();
   } else {
-    await logScope('api', () => logScope(requestId, () => db.scope(requestId, next, 'api')));
+    await withLogContext({ requestId }, () =>
+      logScope('api', () => logScope(requestId, () => db.scope(requestId, next, 'api'))),
+    );
   }
 };

@@ -441,7 +441,8 @@ export const timezoneIdSet: ReadonlySet<TimezoneId> = new Set(TIMEZONE_IDS);
 
 export const TimezoneIdSchema = z.enum(TIMEZONE_IDS as readonly [TimezoneId, ...TimezoneId[]]);
 
-export const isTimezoneId = (value: string): value is TimezoneId => timezoneIdSet.has(value as TimezoneId);
+export const isTimezoneId = (value: string): value is TimezoneId =>
+  timezoneIdSet.has(value as TimezoneId);
 
 // Current UTC offset in minutes for a zone at `at` (defaults to now).
 // Positive = ahead of UTC. Uses Intl, which respects DST and tzdb updates.

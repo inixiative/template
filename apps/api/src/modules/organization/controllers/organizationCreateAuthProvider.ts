@@ -31,7 +31,12 @@ export const organizationCreateAuthProviderController = makeController(
       },
     });
 
-    const { encryptedSecrets, encryptedSecretsMetadata, encryptedSecretsKeyVersion, ...safeProvider } = provider;
+    const {
+      encryptedSecrets,
+      encryptedSecretsMetadata,
+      encryptedSecretsKeyVersion,
+      ...safeProvider
+    } = provider;
 
     return respond.created(safeProvider);
   },

@@ -6,6 +6,8 @@
  */
 import { z } from '@hono/zod-openapi';
 import { JobHandlerName } from '#/jobs/handlers';
+import { SLOW_LANE_PRIORITY } from '#/jobs/lanePriority';
+import { JobLane } from '#/jobs/types';
 import { createRoute } from '#/lib/routeTemplates';
 import { Modules } from '#/modules/modules';
 
@@ -16,10 +18,13 @@ const JobEnqueueBodySchema = z.object({
   payload: z.record(z.string(), z.unknown()).optional(),
   options: z
     .object({
-      priority: z.number().optional(),
+      // Reaches all three bands: none = fast lane, SLOW_LANE_PRIORITY = slow lane, anything between = between.
+      // Integer because BullMQ's priority score is priority * 2^32 + counter.
+      priority: z.number().int().min(0).max(SLOW_LANE_PRIORITY).optional(),
       delay: z.number().optional(),
       attempts: z.number().optional(),
       backoff: z.number().optional(),
+      lane: z.enum(Object.values(JobLane) as [JobLane, ...JobLane[]]).optional(),
     })
     .optional(),
 });

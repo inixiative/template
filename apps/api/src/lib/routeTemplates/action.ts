@@ -6,11 +6,13 @@
  * @constructs route
  */
 import { createRoute } from '@hono/zod-openapi';
+import { securityForRoute } from '#/lib/auth/routeSecurity';
 import type { RouteArgs } from '#/lib/routeTemplates/types';
 import {
   buildOperationId,
   buildRequest,
   buildResponses,
+  buildRoutePath,
   buildTags,
   prepareMiddleware,
 } from '#/lib/routeTemplates/utils';
@@ -32,7 +34,7 @@ export const actionRoute = <const T extends RouteArgs>(args: T) => {
   if (!action) throw new Error('action is required for action routes');
 
   const resourceName = submodel || model;
-  const routePath = skipId ? `/${action}` : `/:id/${action}`;
+  const routePath = buildRoutePath({ submodel, action, skipId, operation: 'action' });
   const routeTags = buildTags({ model, submodel, tags, admin, internal });
 
   return createRoute({
@@ -41,8 +43,9 @@ export const actionRoute = <const T extends RouteArgs>(args: T) => {
     method: 'post',
     path: routePath,
     tags: routeTags,
+    security: securityForRoute(args),
     description: description ?? `Performs ${action} on a ${resourceName}.`,
-    middleware: prepareMiddleware(middleware, skipId),
+    middleware: prepareMiddleware(middleware, skipId, undefined, args.includeDeleted),
     request: buildRequest(args),
     responses: buildResponses(args, 200),
   });

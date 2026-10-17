@@ -1,6 +1,17 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import type { Inquiry, Organization, OrganizationUser, Space, SpaceUser, User } from '@template/db';
-import { InquiryResourceModel, InquiryStatus, InquiryType } from '@template/db/generated/client/enums';
+import type {
+  Inquiry,
+  Organization,
+  OrganizationUser,
+  Space,
+  SpaceUser,
+  User,
+} from '@template/db/generated/client/client';
+import {
+  InquiryResourceModel,
+  InquiryStatus,
+  InquiryType,
+} from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
   createInquiry,
@@ -13,8 +24,6 @@ import {
 import { spaceRouter } from '#/modules/space';
 import { createTestApp, type MountFn } from '#tests/createTestApp';
 import { get, json, post } from '#tests/utils/request';
-
-type InquiryList = { data: Inquiry[]; pagination: unknown };
 
 const mount: MountFn[] = [(app) => app.route('/api/v1/space', spaceRouter)];
 
@@ -79,7 +88,7 @@ describe('GET /api/v1/space/:id/inquiries/sent', () => {
     });
 
     const response = await fetch(get(`/api/v1/space/${space.id}/inquiries/sent`));
-    const { data } = await json<InquiryList>(response);
+    const { data } = await json<Inquiry[]>(response);
 
     expect(response.status).toBe(200);
     expect(data.some((i) => i.id === mine.id)).toBe(true);
@@ -92,7 +101,10 @@ describe('GET /api/v1/space/:id/inquiries/sent', () => {
       { role: 'member' },
       { user: viewer, organization: org },
     );
-    const { entity: viewerSu } = await createSpaceUser({ role: 'viewer' }, { ...viewerOuCtx, space });
+    const { entity: viewerSu } = await createSpaceUser(
+      { role: 'viewer' },
+      { ...viewerOuCtx, space },
+    );
 
     const viewerFetch = createTestApp({
       mockUser: viewer,
@@ -268,11 +280,13 @@ describe('GET /api/v1/space/:id/inquiries/received', () => {
     });
 
     const response = await fetch(get(`/api/v1/space/${space.id}/inquiries/received`));
-    const { data } = await json<InquiryList>(response);
+    const { data } = await json<Inquiry[]>(response);
 
     expect(response.status).toBe(200);
     expect(data.some((i) => i.id === mine.id)).toBe(true);
     expect(data.every((i) => i.targetSpaceId === space.id)).toBe(true);
-    expect(data.every((i) => i.status !== InquiryStatus.draft && i.status !== InquiryStatus.canceled)).toBe(true);
+    expect(
+      data.every((i) => i.status !== InquiryStatus.draft && i.status !== InquiryStatus.canceled),
+    ).toBe(true);
   });
 });

@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'bun:test';
-import { buildContextFkFields, buildSubjectFkFields, computeDiff, processAuditData } from '#/hooks/auditLog/utils';
+import { redactChangeDiff } from '@template/db';
+import {
+  buildContextFkFields,
+  buildSubjectFkFields,
+  computeDiff,
+  processAuditData,
+} from '#/hooks/auditLog/utils';
 
 describe('auditLog/utils', () => {
   describe('processAuditData', () => {
@@ -11,7 +17,12 @@ describe('auditLog/utils', () => {
     });
 
     it('removes User model-specific ignored fields', () => {
-      const data = { id: '1', email: 'test@example.com', lastLoginAt: new Date(), updatedAt: new Date() };
+      const data = {
+        id: '1',
+        email: 'test@example.com',
+        lastLoginAt: new Date(),
+        updatedAt: new Date(),
+      };
       const result = processAuditData('User', data);
       expect(result).not.toHaveProperty('lastLoginAt');
       expect(result).not.toHaveProperty('updatedAt');
@@ -33,11 +44,39 @@ describe('auditLog/utils', () => {
     });
 
     it('strips orderedList position field for Contact so ordering-only updates produce no diff', () => {
-      const before = processAuditData('Contact', { id: '1', value: { e164: '+15551234567' }, position: 3 });
-      const after = processAuditData('Contact', { id: '1', value: { e164: '+15551234567' }, position: 1 });
+      const before = processAuditData('Contact', {
+        id: '1',
+        value: { e164: '+15551234567' },
+        position: 3,
+      });
+      const after = processAuditData('Contact', {
+        id: '1',
+        value: { e164: '+15551234567' },
+        position: 1,
+      });
       expect(before).not.toHaveProperty('position');
       expect(after).not.toHaveProperty('position');
       expect(computeDiff(before, after)).toEqual({});
+    });
+  });
+
+  // The audit diff is computed on unredacted data, so a changed sensitive field IS in the diff;
+  // redactChangeDiff then masks both sides so the row records THAT it changed without the value.
+  // This is what keeps a sensitive-only change from vanishing under the empty-diff guard.
+  describe('redactChangeDiff', () => {
+    it('masks both sides of a changed sensitive field, leaving other changes intact', () => {
+      const changes = {
+        password: { before: 'old', after: 'new' },
+        providerId: { before: 'email', after: 'oauth' },
+      };
+      const masked = redactChangeDiff('Account', changes);
+      expect(masked.password).toEqual({ before: '[REDACTED]', after: '[REDACTED]' });
+      expect(masked.providerId).toEqual({ before: 'email', after: 'oauth' });
+    });
+
+    it('returns the diff untouched for a model with no sensitive fields', () => {
+      const changes = { name: { before: 'A', after: 'B' } };
+      expect(redactChangeDiff('Organization', changes)).toBe(changes);
     });
   });
 
@@ -67,7 +106,12 @@ describe('auditLog/utils', () => {
     });
 
     it('returns composite FK fields for SpaceUser', () => {
-      const record = { id: 'su-123', organizationId: 'org-456', spaceId: 'space-789', userId: 'user-321' };
+      const record = {
+        id: 'su-123',
+        organizationId: 'org-456',
+        spaceId: 'space-789',
+        userId: 'user-321',
+      };
       const result = buildSubjectFkFields('SpaceUser', record);
       expect(result).toEqual({
         subjectOrganizationId: 'org-456',
@@ -104,12 +148,20 @@ describe('auditLog/utils', () => {
   describe('buildContextFkFields', () => {
     it('uses record.id as contextOrganizationId for Organization', () => {
       const result = buildContextFkFields('Organization', { id: 'org-123' });
-      expect(result).toEqual({ contextOrganizationId: 'org-123', contextSpaceId: null, contextUserId: null });
+      expect(result).toEqual({
+        contextOrganizationId: 'org-123',
+        contextSpaceId: null,
+        contextUserId: null,
+      });
     });
 
     it('uses organizationId plus record.id for Space', () => {
       const result = buildContextFkFields('Space', { id: 'space-123', organizationId: 'org-123' });
-      expect(result).toEqual({ contextOrganizationId: 'org-123', contextSpaceId: 'space-123', contextUserId: null });
+      expect(result).toEqual({
+        contextOrganizationId: 'org-123',
+        contextSpaceId: 'space-123',
+        contextUserId: null,
+      });
     });
 
     it('passes through organizationId and spaceId for composite members', () => {

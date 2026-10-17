@@ -22,12 +22,18 @@ export type CFPagesProject = {
   name: string;
   subdomain: string;
   domains: string[];
-  source?: { type: 'github'; config: { owner: string; repo_name: string; production_branch: string } };
+  source?: {
+    type: 'github';
+    config: { owner: string; repo_name: string; production_branch: string };
+  };
 };
 
 const requireToken = (): string => {
   const token = process.env.CLOUDFLARE_API_TOKEN;
-  if (!token) throw new Error('CLOUDFLARE_API_TOKEN missing — set it via Cloudflare Pages Setup → Store API token.');
+  if (!token)
+    throw new Error(
+      'CLOUDFLARE_API_TOKEN missing — set it via Cloudflare Pages Setup → Store API token.',
+    );
   return token;
 };
 
@@ -41,7 +47,11 @@ const cfFetch = async <T>(path: string, init?: RequestInit): Promise<T> => {
       ...(init?.headers ?? {}),
     },
   });
-  const body = (await res.json()) as { success: boolean; result: T; errors: Array<{ message: string }> };
+  const body = (await res.json()) as {
+    success: boolean;
+    result: T;
+    errors: Array<{ message: string }>;
+  };
   if (!res.ok || !body.success) {
     const msg = body.errors?.[0]?.message ?? `Cloudflare ${path} failed: ${res.status}`;
     throw new Error(msg);

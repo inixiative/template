@@ -5,7 +5,12 @@
  * @uses primitive:shared
  */
 import { join } from 'node:path';
+import {
+  classifyResendError,
+  type ResendErrorResponse,
+} from '@template/email/client/classifyResendError';
 import type { EmailClient, SendEmailOptions, SendEmailResult } from '@template/email/client/types';
+import { EmailProviderError } from '@template/email/errors/EmailProviderError';
 import { VCR } from '@template/shared/vcr';
 import { Resend } from 'resend';
 
@@ -31,6 +36,15 @@ const getResendClient = (apiKey: string): Resend => {
   return resendClient;
 };
 
+const toProviderError = (error: ResendErrorResponse): EmailProviderError =>
+  new EmailProviderError(
+    'Resend',
+    classifyResendError(error),
+    error.statusCode,
+    error.name,
+    error.message,
+  );
+
 const chunk = <T>(arr: T[], size: number): T[][] => {
   const chunks: T[][] = [];
   for (let i = 0; i < arr.length; i += size) {
@@ -46,6 +60,7 @@ const toResendPayload = (options: SendEmailOptions) => ({
   from: options.from,
   subject: options.subject,
   html: options.html,
+  text: options.text,
   replyTo: options.replyTo,
   tags: options.tags?.map((name) => ({ name, value: 'true' })),
   headers: options.headers,
@@ -83,11 +98,12 @@ class ResendEmailClient implements EmailClient {
   }
 
   private async __send(options: SendEmailOptions): Promise<SendEmailResult> {
-    const { data, error } = await this.resend.emails.send(toResendPayload(options));
+    const { data, error } = await this.resend.emails.send(
+      toResendPayload(options),
+      options.idempotencyKey ? { idempotencyKey: options.idempotencyKey } : undefined,
+    );
 
-    if (error) {
-      throw new Error(`Resend error: ${error.message}`);
-    }
+    if (error) throw toProviderError(error);
 
     return {
       id: data?.id ?? '',
@@ -98,9 +114,7 @@ class ResendEmailClient implements EmailClient {
   private async __sendBatch(batch: SendEmailOptions[]): Promise<SendEmailResult[]> {
     const { data, error } = await this.resend.batch.send(batch.map(toResendPayload));
 
-    if (error) {
-      throw new Error(`Resend batch error: ${error.message}`);
-    }
+    if (error) throw toProviderError(error);
 
     return (data?.data ?? []).map((d) => ({
       id: d.id,

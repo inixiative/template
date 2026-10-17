@@ -22,7 +22,10 @@ type UserWithRelations = MeReadResponses[200]['data'];
 
 export type { PermissionsSlice };
 
-export const createPermissionsSlice: StateCreator<AppStore, [], [], PermissionsSlice> = (set, get) => {
+export const createPermissionsSlice: StateCreator<AppStore, [], [], PermissionsSlice> = (
+  set,
+  get,
+) => {
   return {
     permissions: {
       permix: createPermissions(),

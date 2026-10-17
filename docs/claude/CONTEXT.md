@@ -482,7 +482,8 @@ const accessor = pathParts[3] as AccessorName;
 // Supports alternate lookups: ?lookup=slug
 const lookup = c.req.query('lookup') || 'id';
 
-// Finds resources via the db delegate for that accessor
+// Finds resources via the db delegate for that accessor. The soft-delete
+// extension scopes the lookup and its include tree — no filter here.
 const resources = await db[accessor].findMany({
   where: { [lookup]: id },
   ...resourceContextArgs[accessor],  // Custom inclusions
@@ -503,6 +504,22 @@ c.set('resourceType', accessor);
 | 0 results | 404 Resource not found |
 | 1 result | Sets resource context |
 | >1 results | 409 Multiple resources found |
+
+### Soft-Delete Invisibility
+
+The middleware adds no soft-delete filter of its own: the lookup runs through the db client, whose
+soft-delete extension scopes it (see DATABASE.md → Soft-delete read scoping). **The endpoint
+decides visibility, not the actor.** On every ordinary route a soft-deleted resource 404s for
+everyone — a superadmin calling `/api/v1/organization/:id` included. Superadmin endpoints (mounted
+on `adminRouter`, behind `validateSuperadmin`) run inside `db.withDeleted`, so there the lookup
+resolves tombstones too. Revival is a create path, never load-the-deleted-row-by-id: inside
+`db.txn`, `db.findForUpdate(model, where, { upserting: true })` on the unique key fences it and
+returns the tombstone if there is one (raw SQL, so the soft-delete scope doesn't hide it); then an
+update whose `where` names `deletedAt` clears it, or a create follows (DATABASE.md → Row Locks and
+Create-If-Missing). No bare `upsert` and no caught unique violation: the `no-create-race-machinery`
+rule ratchets both down per file. The JobOutbox flush (`apps/api/src/jobs/outbox/accumulator.ts`,
+superseding lanes keyed on `handlerName_dedupeKey`) is the standing pre-rule upsert the ratchet
+grandfathers. Models without `deletedAt` are unaffected.
 
 ### Lookup Parameter
 

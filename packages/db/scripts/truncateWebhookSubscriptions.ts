@@ -13,7 +13,10 @@ const truncateWebhookSubscriptions = async () => {
 
   // Safety check - only run in local/test (explicit allowlist)
   if (env !== 'local' && env !== 'test') {
-    log.error(`Cannot truncate webhooks in "${env}" environment. Only allowed in local/test.`, LogScope.db);
+    log.error(
+      `Cannot truncate webhooks in "${env}" environment. Only allowed in local/test.`,
+      LogScope.db,
+    );
     process.exit(1);
   }
 

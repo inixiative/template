@@ -10,7 +10,7 @@ import {
   createUser,
 } from '@template/db/test';
 import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
-import { adminUserRouter } from '#/modules/user';
+import { adminRouter } from '#/routes/admin';
 import { createTestApp } from '#tests/createTestApp';
 import { post } from '#tests/utils/request';
 
@@ -31,7 +31,7 @@ describe('POST /api/admin/user/:id/redact', () => {
 
     const harness = createTestApp({
       mockUser: superadmin,
-      mount: [(app) => app.route('/api/admin/user', adminUserRouter)],
+      mount: [(app) => app.route('/api/admin', adminRouter)],
     });
     fetch = harness.fetch;
     db = harness.db;
@@ -48,7 +48,9 @@ describe('POST /api/admin/user/:id/redact', () => {
     const response = await fetch(post(`/api/admin/user/${targetUser.id}/redact`, {}));
     expect(response.status).toBe(204);
 
-    const redactedUser = await db.user.findUnique({ where: { id: targetUser.id } });
+    const redactedUser = await db.withDeleted(() =>
+      db.user.findUnique({ where: { id: targetUser.id } }),
+    );
     expect(redactedUser?.email).toBe(`deleted-${targetUser.id}@deleted.null`);
     expect(redactedUser?.name).toBe('[DELETED]');
     expect(redactedUser?.deletedAt).not.toBeNull();
@@ -56,7 +58,7 @@ describe('POST /api/admin/user/:id/redact', () => {
 
   it('deletes user tokens', async () => {
     const { entity: targetUser, context } = await createUser();
-    await createToken({}, context);
+    await createToken({ ownerModel: 'User' }, context);
 
     await fetch(post(`/api/admin/user/${targetUser.id}/redact`, {}));
 
@@ -71,7 +73,10 @@ describe('POST /api/admin/user/:id/redact', () => {
 
     await fetch(post(`/api/admin/user/${targetUser.id}/redact`, {}));
 
-    const deletedOrg = await db.organization.findUnique({ where: { id: org.id } });
+    const deletedOrg = await db.withDeleted(() =>
+      db.organization.findUnique({ where: { id: org.id } }),
+    );
+    expect(deletedOrg).not.toBeNull();
     expect(deletedOrg?.deletedAt).not.toBeNull();
   });
 
@@ -92,9 +97,9 @@ describe('POST /api/admin/user/:id/redact', () => {
 
     await fetch(post(`/api/admin/user/${targetUser.id}/redact`, {}));
 
-    const refreshed = await db.contact.findMany({
-      where: { id: { in: [emailContact.id, whatsappContact.id] } },
-    });
+    const refreshed = await db.withDeleted(() =>
+      db.contact.findMany({ where: { id: { in: [emailContact.id, whatsappContact.id] } } }),
+    );
     expect(refreshed).toHaveLength(2);
     for (const c of refreshed) {
       expect(c.deletedAt).not.toBeNull();

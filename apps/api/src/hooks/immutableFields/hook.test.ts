@@ -2,7 +2,10 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import { cleanupTouchedTables, createOrganizationUser } from '@template/db/test';
 import { registerImmutableFieldsHook } from '#/hooks/immutableFields/hook';
-import { clearImmutableFieldsCache, setImmutableFieldsCache } from '#/hooks/immutableFields/registry';
+import {
+  clearImmutableFieldsCache,
+  setImmutableFieldsCache,
+} from '#/hooks/immutableFields/registry';
 
 registerImmutableFieldsHook();
 
@@ -96,10 +99,16 @@ describe('immutableFields hook', () => {
 
     it('can lock nested JSON paths via cache', async () => {
       const initialEntitlements = { canInvite: true, maxProjects: 5 };
-      const { entity: testOrgUser } = await createOrganizationUser({ entitlements: initialEntitlements });
+      const { entity: testOrgUser } = await createOrganizationUser({
+        entitlements: initialEntitlements,
+      });
 
       // Lock only the canInvite path, not the whole entitlements object
-      setImmutableFieldsCache('OrganizationUser', ['userId', 'organizationId', 'entitlements.canInvite']);
+      setImmutableFieldsCache('OrganizationUser', [
+        'userId',
+        'organizationId',
+        'entitlements.canInvite',
+      ]);
 
       const result = await db.organizationUser.update({
         where: { id: testOrgUser.id },

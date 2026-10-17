@@ -21,6 +21,7 @@
   - [How It Works](#how-it-works)
   - [Webhook Payload](#webhook-payload)
   - [Circuit Breaker](#circuit-breaker)
+  - [Poisoned Records](#poisoned-records)
   - [Ignored Fields](#ignored-fields)
   - [Related Models](#related-models)
 - [Cache Invalidation](#cache-invalidation)
@@ -113,6 +114,9 @@ Registered in `apps/api/src/hooks/index.ts` via `registerHooks()` from both API 
 | `orderedList` | Dense `[1..N]` position columns + soft-delete sentinels + bulk re-densify (registry-driven) |
 | `preventHardDelete` | Blocks `delete` / `deleteMany` on models that should only be soft-deleted |
 | `rules` | Declarative validation via `@inixiative/json-rules` (registry-driven) |
+| `segmentConditions` | Segment `conditions` required, validated against `segmentLensFor(owner)` + normalized on write; refuses self-reference, path-read references, and references to segments the owner does not have live |
+| `segmentMemberOwner` | A SegmentMember's customer reference must belong to the segment's owner as its provider |
+| `softDeleteCascade` | Cascades `deletedAt` to owned children (shared timestamp = the revive group; revive matches it exactly). `HARD_DELETE_ON_TOMBSTONE` hard-deletes ephemeral grants that must not survive a revive — `Session`, `Token`, `WebhookSubscription` |
 | `tagOwnerCategory` | Tag.ownerModel + FK must match its TagCategory's owner |
 | `webhooks` | Webhook delivery on mutations (post-commit) |
 
@@ -175,20 +179,26 @@ If a mutation transitions `deletedAt` from `null` to a timestamp, it is recorded
 
 ### Actor Context
 
-Actor info is set in async-local storage before the mutation:
+Actor info is scoped in async-local storage around the request:
 
 ```typescript
-import { auditActorContext } from '#/lib/auditActorContext';
+import { auditActorContext } from '@template/db/lib/auditActorContext';
 
-auditActorContext.set({
-  actorUserId: user.id,
-  actorSpoofUserId: spoofUser?.id,
-  actorTokenId: token?.id,
-  ipAddress: c.req.header('x-forwarded-for'),
-  userAgent: c.req.header('user-agent'),
-  sourceInquiryId: inquiry?.id,
-});
+auditActorContext.scope(
+  {
+    actorUserId: user.id,
+    actorSpoofUserId: spoofUser?.id,
+    actorTokenId: token?.id,
+    ipAddress: c.req.header('x-forwarded-for'),
+    userAgent: c.req.header('user-agent'),
+    sourceInquiryId: inquiry?.id,
+    bypassSoftDeleteScope: false, // flipped by db.withDeleted()
+  },
+  () => next(),
+);
 ```
+
+The same store carries the soft-delete bypass flag, so anything that bridges this context across a boundary (e.g. into a transaction) carries them too.
 
 ---
 
@@ -235,6 +245,17 @@ After 5 consecutive failures, subscription auto-disables:
 const FAILURE_THRESHOLD = 5;
 // If last 5 events all failed → isActive = false
 ```
+
+### Poisoned Records
+
+On a subscription with an `integrationId`, one record the receiver keeps rejecting is poisoned
+instead of tripping the circuit. A rejection is an `error` event with `httpStatus` 400 or 422
+(`RECORD_REJECTION` in `sendWebhook.ts`). Other terminal failures such as redirects, 401, 403 or 429
+do not count, and neither does `unreachable`. When a record has 3 rejections since its own last
+success, and some other record has delivered since the first of them, `poisonIntegrationRecord`
+stamps `IntegrationRecord.poisonedAt`. Later deliveries of that record are skipped before signing,
+with no `WebhookEvent` and nothing fed to the circuit. Nothing clears the stamp yet. See
+`tickets/INFRA-032-webhook-poisoned-records.md`.
 
 ### Ignored Fields
 
@@ -588,14 +609,6 @@ The mutation lifecycle wraps these Prisma operations:
 | `deleteMany` | ✅ | Fetches `previous[]` automatically |
 
 `createMany`/`updateMany` are disabled because they don't return records, breaking hooks that need `result` (webhooks, cache invalidation).
-
-### Slow Mutation Logging
-
-Mutations exceeding 5 seconds log a warning:
-
-```
-[db] slow mutation: User.update took 6.23s [scope: abc12345]
-```
 
 ---
 

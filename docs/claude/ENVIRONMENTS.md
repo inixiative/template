@@ -308,6 +308,7 @@ export const env = envSchema.parse(process.env);
 | `ENVIRONMENT` | Environment name | Yes |
 | `DATABASE_URL` | Postgres connection | Yes |
 | `REDIS_URL` | Redis connection | Yes |
+| `REDIS_BULLMQ_URL` | Dedicated BullMQ store (falls back to `REDIS_URL`) | Optional |
 | `PORT` | API port | Default: 8000 |
 | `LOG_LEVEL` | Logging verbosity | Default: info |
 | `SENTRY_DSN` | Sentry error tracking | Optional |

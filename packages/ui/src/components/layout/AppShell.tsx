@@ -5,7 +5,7 @@
  * @uses none
  */
 import { Icon } from '@iconify/react';
-import { Breadcrumbs } from '@template/ui/components/layout/Breadcrumbs';
+import { AppIdentity } from '@template/ui/components/layout/AppIdentity';
 import { ContextSelector } from '@template/ui/components/layout/ContextSelector';
 import { Header } from '@template/ui/components/layout/Header';
 import { Sidebar } from '@template/ui/components/layout/Sidebar';
@@ -20,7 +20,12 @@ export type AppShellProps = {
   children: React.ReactNode;
 };
 
-export const AppShell = ({ onSupport, lockedContext = false, showSpoofControls = true, children }: AppShellProps) => {
+export const AppShell = ({
+  onSupport,
+  lockedContext = false,
+  showSpoofControls = true,
+  children,
+}: AppShellProps) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   return (
@@ -32,7 +37,8 @@ export const AppShell = ({ onSupport, lockedContext = false, showSpoofControls =
         )}
       >
         <div className="flex flex-col h-full">
-          <div className="p-4 border-b">
+          <div className="flex flex-col gap-3 border-b p-4">
+            <AppIdentity className="h-8 px-2 text-lg" />
             <ContextSelector locked={lockedContext} />
           </div>
           <div className="flex-1 overflow-y-auto">
@@ -57,12 +63,16 @@ export const AppShell = ({ onSupport, lockedContext = false, showSpoofControls =
       </aside>
 
       {isMobileMenuOpen && (
-        <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={() => setIsMobileMenuOpen(false)} />
+        <button
+          type="button"
+          aria-label="Close menu"
+          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
       )}
 
       <div className="flex flex-col flex-1 overflow-hidden">
         <Header onMenuClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} />
-        <Breadcrumbs className="px-6 py-3 border-b" />
         <main className="flex-1 overflow-y-auto">{children}</main>
       </div>
     </div>

@@ -3,8 +3,8 @@
  * @kind utils
  * @partOf primitive:ui
  */
-import fs from 'fs';
-import path from 'path';
+import fs from 'node:fs';
+import path from 'node:path';
 
 interface EndpointInfo {
   method: string;
@@ -47,7 +47,9 @@ const extractEndpoints = (sdkContent: string): EndpointInfo[] => {
 };
 
 const generateHandlers = (endpoints: EndpointInfo[]): string => {
-  const apiEndpoints = endpoints.filter((e) => e.url.startsWith('/api/v1') || e.url.startsWith('/api/admin'));
+  const apiEndpoints = endpoints.filter(
+    (e) => e.url.startsWith('/api/v1') || e.url.startsWith('/api/admin'),
+  );
 
   const handlerCases: string[] = [];
 
@@ -84,7 +86,7 @@ export const handlers = [${handlerCases.join('')}
 };
 
 const main = async () => {
-  const sdkPath = path.join(process.cwd(), '../sdk/src/sdk.gen.ts');
+  const sdkPath = path.join(process.cwd(), '../sdk/src/generated/sdk.gen.ts');
 
   const sdkContent = fs.readFileSync(sdkPath, 'utf-8');
   const endpoints = extractEndpoints(sdkContent);

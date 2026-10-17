@@ -2,12 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 import { faker } from '@faker-js/faker';
 import { db } from '@template/db';
 import { getNextSeq } from '@template/db/test/factory';
-import { cleanupTouchedTables, registerTestTracker } from '@template/db/test/testTracker';
+import { cleanupTouchedTables } from '@template/db/test/testTracker';
 
 describe('transactions', () => {
-  beforeEach(() => {
-    registerTestTracker();
-  });
+  beforeEach(() => {});
 
   afterEach(async () => {
     await cleanupTouchedTables(db);
@@ -95,6 +93,21 @@ describe('transactions', () => {
       });
 
       expect(result).toEqual({ success: true, value: 42 });
+    });
+
+    it('gives up waiting to start after maxWait', async () => {
+      const { promise: released, resolve: release } = Promise.withResolvers<void>();
+      // pg's default pool size: every connection is held open until release().
+      const holders = Array.from({ length: 10 }, () => db.txn(() => released));
+      try {
+        await Bun.sleep(200);
+        const start = performance.now();
+        await expect(db.txn(async () => 'unreachable', { maxWait: 100 })).rejects.toThrow();
+        expect(performance.now() - start).toBeLessThan(1_000);
+      } finally {
+        release();
+        await Promise.all(holders);
+      }
     });
   });
 

@@ -8,6 +8,8 @@
     "./components": "./src/components/index.ts",
     "./components/auth": "./src/components/auth/index.ts",
     "./components/auth/*": "./src/components/auth/*",
+    "./components/flows": "./src/components/flows/index.ts",
+    "./components/flows/*": "./src/components/flows/*",
     "./components/layout": "./src/components/layout/index.ts",
     "./components/layout/*": "./src/components/layout/*",
     "./components/organizations": "./src/components/organizations/index.ts",
@@ -31,18 +33,19 @@
     "./pages/*": "./src/pages/*.tsx",
     "./lib/auth/token": "./src/lib/auth/token.ts",
     "./test": "./src/test/index.ts",
-    "./test/*": "./src/test/*"
+    "./test/*": "./src/test/*",
+    "./lib/browserTelemetry": "./src/lib/browserTelemetry.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "bun test src/",
+    "test": "NODE_ENV=test bun test src/",
     "generate:msw": "bun scripts/generateMswHandlers.ts"
   },
   "dependencies": {
     "@ariakit/react": "^0.4.22",
     "@iconify/react": "^6.0.2",
+    "@inixiative/rules-builder": "0.31.0",
     "@tanstack/react-router": "^1.166.2",
-    "consola": "^3.4.2",
     "@template/db": "workspace:*",
     "@template/permissions": "workspace:*",
     "@template/sdk": "workspace:*",
@@ -50,11 +53,15 @@
     "better-auth": "^1.5.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "consola": "^3.4.2",
     "lodash-es": "^4.18.1",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.5.0",
     "tailwindcss-animate": "^1.0.7",
-    "zustand": "^5.0.11"
+    "zustand": "^5.0.11",
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/core": "^2.6.0",
+    "@opentelemetry/sdk-trace-base": "^2.6.0"
   },
   "devDependencies": {
     "@happy-dom/global-registrator": "^20.8.9",
@@ -66,8 +73,7 @@
     "@types/react-dom": "^19",
     "msw": "^2.12.10",
     "react": "^19.2.4",
-    "react-dom": "^19.2.4",
-    "typescript": "^5"
+    "react-dom": "^19.2.4"
   },
   "peerDependencies": {
     "react": "^19.0.0",

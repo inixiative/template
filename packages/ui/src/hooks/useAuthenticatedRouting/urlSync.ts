@@ -4,27 +4,36 @@
  * @partOf primitive:ui
  * @uses none
  */
-import type { RoutingSearchParams, UrlSearchParamUpdates } from '@template/ui/hooks/useAuthenticatedRouting/types';
+import type {
+  RoutingSearchParams,
+  UrlSearchParamUpdates,
+} from '@template/ui/hooks/useAuthenticatedRouting/types';
 import type { TenantContext } from '@template/ui/store/types/tenant';
 
 export type BuildSearchParamUpdatesInput = {
   searchParams: RoutingSearchParams;
   context: TenantContext;
   spoofUserEmail: string | null;
+  flowId: string | null;
 };
 
 export const buildSearchParamUpdates = ({
   searchParams,
   context,
   spoofUserEmail,
+  flowId,
 }: BuildSearchParamUpdatesInput): UrlSearchParamUpdates | null => {
   const updates: UrlSearchParamUpdates = {};
   if (spoofUserEmail !== searchParams.spoofEmail) updates.spoof = spoofUserEmail;
+  if (flowId !== searchParams.flowId) updates.flow = flowId;
 
   if (context.type === 'space' && context.space?.id !== searchParams.spaceId) {
     updates.space = context.space!.id;
     updates.org = null;
-  } else if (context.type === 'organization' && context.organization?.id !== searchParams.organizationId) {
+  } else if (
+    context.type === 'organization' &&
+    context.organization?.id !== searchParams.organizationId
+  ) {
     updates.org = context.organization!.id;
     updates.space = null;
   } else if (

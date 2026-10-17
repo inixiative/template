@@ -16,7 +16,9 @@ const resolveRelation: ResolveRelation = (resource, relationName) => {
   const modelEntry = prismaMap.models[upperFirst(accessor) as keyof typeof prismaMap.models];
   if (!modelEntry) return null;
 
-  const field = (modelEntry.fields as Record<string, { kind: string; type?: string }>)[relationName];
+  const field = (modelEntry.fields as Record<string, { kind: string; type?: string }>)[
+    relationName
+  ];
   if (field?.kind !== 'object') return null;
   if (!field.type) return null;
 
@@ -34,4 +36,10 @@ export const check = (
   data?: Record<string, HydratedRecord[]>,
   visited?: Set<string>,
 ): boolean =>
-  rebacCheck(permix as PermixLike, schema, { resource: `db:${model}`, record, data }, actionOrRule, visited);
+  rebacCheck(
+    permix as PermixLike,
+    schema,
+    { resource: `db:${model}`, record, data },
+    actionOrRule,
+    visited,
+  );

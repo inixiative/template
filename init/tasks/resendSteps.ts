@@ -8,7 +8,10 @@ type ResendProgressGroup = {
   getLabel: (config: ProjectConfig, completedCount: number, totalCount: number) => string;
 };
 
-const countCompletedActions = (progress: ResendProgress, actions: readonly ResendAction[]): number => {
+const countCompletedActions = (
+  progress: ResendProgress,
+  actions: readonly ResendAction[],
+): number => {
   return actions.filter((action) => progress[action]).length;
 };
 
@@ -62,7 +65,9 @@ export const getResendProgressSummaries = (config: ProjectConfig): ResendProgres
   });
 };
 
-export const getResendProgressItems = (config: ProjectConfig): Array<{ label: string; completed: boolean }> => {
+export const getResendProgressItems = (
+  config: ProjectConfig,
+): Array<{ label: string; completed: boolean }> => {
   return getResendProgressSummaries(config).map((summary) => ({
     label: summary.label,
     completed: summary.completed,

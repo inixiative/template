@@ -38,7 +38,10 @@ export const readSearchParam = (search: SearchInput, key: string): string | null
   return params.get(key);
 };
 
-export const pickSearchParams = (search: SearchInput, keys: readonly string[]): Record<string, string> | undefined => {
+export const pickSearchParams = (
+  search: SearchInput,
+  keys: readonly string[],
+): Record<string, string> | undefined => {
   const params = toUrlSearchParams(search);
   const picked: Record<string, string> = {};
 
@@ -52,7 +55,11 @@ export const pickSearchParams = (search: SearchInput, keys: readonly string[]): 
   return Object.keys(picked).length > 0 ? picked : undefined;
 };
 
-export const buildPathWithSearch = (pathname: string, search?: SearchInput, hash?: string): string => {
+export const buildPathWithSearch = (
+  pathname: string,
+  search?: SearchInput,
+  hash?: string,
+): string => {
   const params = toUrlSearchParams(search);
   const query = params.toString();
   const searchPart = query ? `?${query}` : '';

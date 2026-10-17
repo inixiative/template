@@ -22,7 +22,11 @@ const LOGIN_COMMANDS: Record<string, string> = {
   docker: 'open -a Docker  # then wait for the daemon to start',
 };
 
-type Failure = { label: string; reason: 'not-installed' | 'not-authed' | 'docker-down'; cliCommand: string };
+type Failure = {
+  label: string;
+  reason: 'not-installed' | 'not-authed' | 'docker-down';
+  cliCommand: string;
+};
 
 type PrerequisitesProps = {
   onComplete: () => void;
@@ -273,7 +277,8 @@ export const Prerequisites: React.FC<PrerequisitesProps> = ({ onComplete }) => {
     };
     const sessionRow = (label: string, cliCommand: string, cli: Check, sess: Check) => {
       // If CLI itself failed we already reported install above; only flag auth when CLI is OK but session isn't.
-      if (cli.status === 'success' && sess.status === 'failed') out.push({ label, cliCommand, reason: 'not-authed' });
+      if (cli.status === 'success' && sess.status === 'failed')
+        out.push({ label, cliCommand, reason: 'not-authed' });
     };
 
     cliRow('Bun', 'bun', bunCLI);

@@ -5,7 +5,12 @@
  * @uses infrastructure:prisma
  */
 import type { OrganizationId } from '@template/db';
-import { type Entitlements, getOrgPermissions, intersectEntitlements, lesserRole } from '@template/permissions';
+import {
+  type Entitlements,
+  getOrgPermissions,
+  intersectEntitlements,
+  lesserRole,
+} from '@template/permissions';
 import type { Context } from 'hono';
 import { validateRole } from '#/lib/permissions/validateRole';
 import type { AppEnv } from '#/types/appEnv';
@@ -35,7 +40,10 @@ export const setupOrgPermissions = async (c: Context<AppEnv>) => {
         getOrgPermissions(
           lesserRole(validateRole(orgUser.role), validateRole(token.role)),
           token.organizationId as OrganizationId,
-          intersectEntitlements(orgUser.entitlements as Entitlements, token.entitlements as Entitlements),
+          intersectEntitlements(
+            orgUser.entitlements as Entitlements,
+            token.entitlements as Entitlements,
+          ),
         ),
       );
     }
@@ -48,9 +56,14 @@ export const setupOrgPermissions = async (c: Context<AppEnv>) => {
   // User token or session → all orgs (with token restrictions if present)
   for (const orgUser of orgUsers) {
     const orgId = orgUser.organizationId as OrganizationId;
-    const role = token ? lesserRole(validateRole(orgUser.role), validateRole(token.role)) : validateRole(orgUser.role);
+    const role = token
+      ? lesserRole(validateRole(orgUser.role), validateRole(token.role))
+      : validateRole(orgUser.role);
     const entitlements = token
-      ? intersectEntitlements(orgUser.entitlements as Entitlements, token.entitlements as Entitlements)
+      ? intersectEntitlements(
+          orgUser.entitlements as Entitlements,
+          token.entitlements as Entitlements,
+        )
       : (orgUser.entitlements as Entitlements);
 
     await permix.setup(getOrgPermissions(role, orgId, entitlements));

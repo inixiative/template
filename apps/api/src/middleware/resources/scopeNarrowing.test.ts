@@ -1,25 +1,23 @@
 import { describe, expect, it } from 'bun:test';
 import { OpenAPIHono } from '@hono/zod-openapi';
-import { type Condition, type LensNarrowing, projectByPath } from '@inixiative/json-rules';
+import { type Condition, type LensNarrowing, projectLens } from '@inixiative/json-rules';
 import { lensFor } from '@template/db/lens';
 import { scopeNarrowing } from '#/middleware/resources/scopeNarrowing';
 import type { AppEnv } from '#/types/appEnv';
 
 const inquiryNarrowing = (): LensNarrowing => ({
   parent: lensFor('Inquiry'),
-  root: { picks: ['type'] },
+  root: { picks: ['type', 'status'], relations: { sourceUser: {} } },
 });
 
-const ruleA: Condition = { field: 'a', operator: 'equals', value: 1 };
-const ruleB: Condition = { field: 'b', operator: 'equals', value: 2 };
+const ruleA: Condition = { field: 'status', operator: 'equals', value: 'sent' };
+const ruleB: Condition = { field: 'type', operator: 'equals', value: 'inviteOrganizationUser' };
+const userRule: Condition = { field: 'email', operator: 'equals', value: 'a@example.com' };
 
 // The composed root-model wheres along the full narrowing chain — exactly what
 // buildWhereClause reads off the stacked layers.
-const composedWheres = (n: LensNarrowing): Condition[] => {
-  const byPath = projectByPath(n) as Map<string, { whereClauses: Condition[] }>;
-  const rootKey = byPath.keys().next().value;
-  return rootKey ? (byPath.get(rootKey)?.whereClauses ?? []) : [];
-};
+const composedWheres = (n: LensNarrowing): Condition[] =>
+  projectLens(n).Inquiry?.whereClauses ?? [];
 
 // Run middlewares against a fresh app with inquiryNarrowing seeded on ctx; return the
 // resulting filterLens captured after they ran.
@@ -33,8 +31,9 @@ const runMiddlewares = async (
     c.set('filterLens', inquiryNarrowing());
     await next();
   });
-  app.get(path, ...middlewares, (c) => {
-    captured = c.get('filterLens');
+  app.use(path, ...middlewares);
+  app.get(path, (c) => {
+    captured = c.get('filterLens') ?? undefined;
     return c.json({ ok: true });
   });
   await app.fetch(new Request(`http://test${path}`));
@@ -74,15 +73,16 @@ describe('scopeNarrowing', () => {
     expect(capturedPath).toBe('/inquiry/abc');
   });
 
-  it('stacks root.relations and mapDefaults onto the layer', async () => {
+  it('stacks root.relations and mapDefaults onto the layer, narrowing a relation the route turned on', async () => {
     const lens = await runMiddlewares([
       scopeNarrowing(() => ({
-        root: { relations: { sourceUser: { where: ruleA } } },
-        mapDefaults: { prisma: { models: { User: { where: ruleB } } } },
+        root: { relations: { sourceUser: { where: userRule } } },
+        mapDefaults: { prisma: { models: { User: { where: userRule } } } },
       })),
     ]);
-    expect(lens?.root?.relations?.sourceUser.where).toEqual(ruleA);
-    expect(lens?.mapDefaults?.prisma?.models?.User.where).toEqual(ruleB);
+    expect(lens?.root?.relations?.sourceUser.where).toEqual(userRule);
+    expect(lens?.mapDefaults?.prisma?.models?.User.where).toEqual(userRule);
+    expect(projectLens(lens!)['Inquiry.sourceUser']?.whereClauses).toEqual([userRule, userRule]);
   });
 
   it('awaits async scope callbacks (for integration-source lookups)', async () => {

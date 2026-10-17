@@ -18,9 +18,19 @@ export const autoRegisterRoutes = async (
   const routesDir = resolve(moduleDir, 'routes');
   const controllersDir = resolve(moduleDir, 'controllers');
 
-  const routeFiles = readdirSync(routesDir).filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'));
+  const routeFiles = readdirSync(routesDir).filter(
+    (f) => f.endsWith('.ts') && !f.endsWith('.test.ts'),
+  );
 
   const prefix = options?.admin ? 'admin' : options?.internal ? 'internal' : '';
+  const routeKey = (route: Pick<RouteConfig, 'method' | 'path'>) =>
+    `${route.method.toUpperCase()} ${route.path}`;
+  const mountedByHand = new Set(
+    router.openAPIRegistry.definitions.flatMap((definition) =>
+      definition.type === 'route' ? [routeKey(definition.route)] : [],
+    ),
+  );
+  const registrations = [];
 
   for (const file of routeFiles) {
     const baseName = file.replace('.ts', '');
@@ -40,15 +50,42 @@ export const autoRegisterRoutes = async (
       log.warn(`Skipping ${baseName}: route or controller not found`);
       continue;
     }
+    if (mountedByHand.has(routeKey(route))) continue;
 
-    router.openapi(toOpenApi(route as RouteConfig), controller);
+    registrations.push({ route: route as RouteConfig, controller });
+  }
+
+  registrations.sort((left, right) => {
+    const leftSegments = left.route.path.split('/');
+    const rightSegments = right.route.path.split('/');
+    for (const [index, leftSegment] of leftSegments.entries()) {
+      const rightSegment = rightSegments[index];
+      if (rightSegment === undefined) break;
+      const leftPriority = leftSegment.startsWith('*') ? 2 : /^[{:]/.test(leftSegment) ? 1 : 0;
+      const rightPriority = rightSegment.startsWith('*') ? 2 : /^[{:]/.test(rightSegment) ? 1 : 0;
+      if (leftPriority !== rightPriority) return leftPriority - rightPriority;
+      if (leftPriority === 0 && leftSegment !== rightSegment) {
+        return leftSegment.localeCompare(rightSegment);
+      }
+    }
+    return leftSegments.length - rightSegments.length;
+  });
+
+  for (const { route, controller } of registrations) {
+    router.openapi(toOpenApi(route), controller);
   }
 };
 
-export const autoRegisterAdminRoutes = async (router: OpenAPIHono<AppEnv>, modulePath: string): Promise<void> => {
+export const autoRegisterAdminRoutes = async (
+  router: OpenAPIHono<AppEnv>,
+  modulePath: string,
+): Promise<void> => {
   return autoRegisterRoutes(router, modulePath, { admin: true });
 };
 
-export const autoRegisterInternalRoutes = async (router: OpenAPIHono<AppEnv>, modulePath: string): Promise<void> => {
+export const autoRegisterInternalRoutes = async (
+  router: OpenAPIHono<AppEnv>,
+  modulePath: string,
+): Promise<void> => {
   return autoRegisterRoutes(router, modulePath, { internal: true });
 };

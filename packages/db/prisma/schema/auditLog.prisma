@@ -7,16 +7,19 @@ model AuditLog {
   createdAt DateTime @default(now())
 
   // Actor — who made the change
-  actorUserId       String?      @db.VarChar(36)
-  actorUser         User?        @relation("AuditLogActorUser", fields: [actorUserId], references: [id], onDelete: SetNull)
-  actorSpoofUserId  String?      @db.VarChar(36)
-  actorSpoofUser    User?        @relation("AuditLogActorSpoofUser", fields: [actorSpoofUserId], references: [id], onDelete: SetNull)
-  actorTokenId      String?      @db.VarChar(36)
-  actorToken        Token?       @relation("AuditLogActorToken", fields: [actorTokenId], references: [id], onDelete: SetNull)
-  actorJobName      String?
-  ipAddress         String?
-  userAgent         String?
-  originIntegration Integration?
+  actorUserId         String?      @db.VarChar(36)
+  actorUser           User?        @relation("AuditLogActorUser", fields: [actorUserId], references: [id], onDelete: SetNull)
+  actorSpoofUserId    String?      @db.VarChar(36)
+  actorSpoofUser      User?        @relation("AuditLogActorSpoofUser", fields: [actorSpoofUserId], references: [id], onDelete: SetNull)
+  actorTokenId        String?      @db.VarChar(36)
+  actorToken          Token?       @relation("AuditLogActorToken", fields: [actorTokenId], references: [id], onDelete: SetNull)
+  actorTokenName      String?
+  actorTokenKeyPrefix String?
+  actorJobName        String?
+  ipAddress           String?
+  userAgent           String?
+  integrationId       String?      @db.VarChar(36)
+  integration         Integration? @relation("AuditLogOriginIntegration", fields: [integrationId], references: [id], onDelete: SetNull)
 
   // What happened
   action       AuditAction
@@ -68,6 +71,10 @@ model AuditLog {
   subjectEmailComponent   EmailComponent?   @relation(fields: [subjectEmailComponentId], references: [id], onDelete: SetNull)
   subjectCustomerRefId    String?           @db.VarChar(36)
   subjectCustomerRef      CustomerRef?      @relation(fields: [subjectCustomerRefId], references: [id], onDelete: SetNull)
+  subjectIntegrationId    String?           @db.VarChar(36)
+  subjectIntegration      Integration?      @relation("AuditLogSubjectIntegration", fields: [subjectIntegrationId], references: [id], onDelete: SetNull)
+  subjectSegmentId        String?           @db.VarChar(36)
+  subjectSegment          Segment?          @relation(fields: [subjectSegmentId], references: [id], onDelete: SetNull)
   // Composite FKs
   subjectOrganizationUser OrganizationUser? @relation("AuditLogSubjectOrganizationUser", fields: [subjectOrganizationId, subjectUserId], references: [organizationId, userId], onDelete: SetNull)
   subjectSpaceUser        SpaceUser?        @relation("AuditLogSubjectSpaceUser", fields: [subjectOrganizationId, subjectSpaceId, subjectUserId], references: [organizationId, spaceId, userId], onDelete: SetNull)
@@ -78,7 +85,8 @@ model AuditLog {
 
   componentVersions Json?
 
-  communicationLogs CommunicationLog[] @relation("CommunicationEmailTemplateAuditLog")
+  communicationLogs              CommunicationLog[]              @relation("CommunicationEmailTemplateAuditLog")
+  communicationComponentVersions CommunicationComponentVersion[] @relation("CommunicationComponentVersionAuditLog")
 
   @@index([actorUserId])
   @@index([actorSpoofUserId])
@@ -102,6 +110,9 @@ model AuditLog {
   @@index([subjectEmailTemplateId])
   @@index([subjectEmailComponentId])
   @@index([subjectCustomerRefId])
+  @@index([integrationId])
+  @@index([subjectIntegrationId])
+  @@index([subjectSegmentId])
 }
 
 enum AuditAction {
@@ -126,4 +137,6 @@ enum AuditSubjectModel {
   EmailTemplate
   EmailComponent
   CustomerRef
+  Integration
+  Segment
 }

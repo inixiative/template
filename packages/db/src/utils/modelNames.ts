@@ -27,11 +27,14 @@ export const ModelNames = Prisma.ModelName;
 
 export const modelNames = Object.values(Prisma.ModelName);
 
-export const isModelName = (value: string): value is ModelName => modelNames.includes(value as ModelName);
+const modelNameSet = new Set<string>(modelNames);
 
-export const toModelName = (accessor: string): ModelName | undefined => {
-  const capitalized = upperFirst(accessor);
-  return isModelName(capitalized) ? capitalized : undefined;
+export const isModelName = (value: string): value is ModelName => modelNameSet.has(value);
+
+export const toModelName = (model: string): ModelName => {
+  const modelName = upperFirst(model);
+  if (!isModelName(modelName)) throw new Error(`Unknown model '${model}'`);
+  return modelName;
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -46,6 +49,12 @@ export const AccessorNames: AccessorTypeMap = Object.fromEntries(
 
 export const accessorNames = Object.values(AccessorNames);
 
-export const isAccessorName = (value: string): value is AccessorName => accessorNames.includes(value as AccessorName);
+const accessorNameSet = new Set<string>(accessorNames);
 
-export const toAccessor = (model: ModelName): AccessorName => lowerFirst(model) as AccessorName;
+export const isAccessorName = (value: string): value is AccessorName => accessorNameSet.has(value);
+
+export const toAccessor = (model: string): AccessorName => {
+  const accessor = lowerFirst(model);
+  if (!isAccessorName(accessor)) throw new Error(`Unknown model '${model}'`);
+  return accessor;
+};

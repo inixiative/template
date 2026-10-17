@@ -9,20 +9,20 @@ import { isLocal, isTest } from '@template/shared/utils/env';
 import { createConsola, LogLevels } from 'consola';
 
 const consola = createConsola({
-  level: LogLevels[process.env.LOG_LEVEL as keyof typeof LogLevels] ?? LogLevels.info,
+  level: LogLevels.trace,
   formatOptions: { date: false, colors: isLocal || isTest, compact: true, columns: 0 },
 });
 
 export const consolaAdapter: LoggerAdapter = {
   level: process.env.LOG_LEVEL ?? 'info',
-  info: (msg) => consola.info(msg),
-  warn: (msg) => consola.warn(msg),
-  error: (msg) => consola.error(msg),
-  debug: (msg) => consola.debug(msg),
-  fatal: (msg) => consola.fatal(msg),
-  trace: (msg) => consola.trace(msg),
-  success: (msg) => consola.success(msg),
-  box: (msg) => consola.box(msg as string),
+  info: (fields, msg) => consola.info(`${msg} ${JSON.stringify(fields)}`),
+  warn: (fields, msg) => consola.warn(`${msg} ${JSON.stringify(fields)}`),
+  error: (fields, msg) => consola.error(`${msg} ${JSON.stringify(fields)}`),
+  debug: (fields, msg) => consola.debug(`${msg} ${JSON.stringify(fields)}`),
+  fatal: (fields, msg) => consola.fatal(`${msg} ${JSON.stringify(fields)}`),
+  trace: (fields, msg) => consola.trace(`${msg} ${JSON.stringify(fields)}`),
+  success: (fields, msg) => consola.success(`${msg} ${JSON.stringify(fields)}`),
+  box: (fields, msg) => consola.box(`${msg} ${JSON.stringify(fields)}`),
   child: () => {
     throw new Error('child() not supported — use logScope(id, fn) for ALS-bound scoping');
   },

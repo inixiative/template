@@ -1,7 +1,19 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import type { CustomerRef, Organization, OrganizationUser, Space, SpaceUser, User } from '@template/db';
 import { db } from '@template/db';
-import { cleanupTouchedTables, createOrganizationUser, createSpace, createUser } from '@template/db/test';
+import type {
+  CustomerRef,
+  Organization,
+  OrganizationUser,
+  Space,
+  SpaceUser,
+  User,
+} from '@template/db/generated/client/client';
+import {
+  cleanupTouchedTables,
+  createOrganizationUser,
+  createSpace,
+  createUser,
+} from '@template/db/test';
 import { spaceRouter } from '#/modules/space';
 import { createTestApp } from '#tests/createTestApp';
 import { get, json } from '#tests/utils/request';

@@ -1,8 +1,9 @@
 // ============================================================================
 // TAG - Normalized label with optional category + intended-use resources
 // ============================================================================
-// `Tag.resources` is the intended-use layer (TagResource enum lives in
-// tagAttachment.prisma since it also discriminates TagAttachment.ownerModel).
+// Two enums, two questions. TagOwnerModel: who owns the tag (Tag.ownerModel,
+// TagCategory.ownerModel). TagResource: where the tag can be applied
+// (Tag.resources, TagAttachment.resourceModel; lives in tagAttachment.prisma).
 // PascalCase entries in TagResource are physical attachment models (User,
 // Organization, …); camelCase entries are use-case concepts (userMessages, …).
 // Empty resources array = unrestricted.
@@ -20,10 +21,10 @@ model Tag {
   // Owner — false polymorphism. `platform` (default) means no specific
   // owner row → visible to everyone. PascalCase values pair to one FK
   // column. Polymorphism config in registries/falsePolymorphism.ts.
-  ownerModel     TagResource @default(platform)
-  userId         String?     @db.VarChar(36)
-  organizationId String?     @db.VarChar(36)
-  spaceId        String?     @db.VarChar(36)
+  ownerModel     TagOwnerModel @default(platform)
+  userId         String?       @db.VarChar(36)
+  organizationId String?       @db.VarChar(36)
+  spaceId        String?       @db.VarChar(36)
 
   user         User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
   organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -32,7 +33,8 @@ model Tag {
   tagCategoryId String      @db.VarChar(36)
   tagCategory   TagCategory @relation(fields: [tagCategoryId], references: [id], onDelete: Cascade)
 
-  attachments TagAttachment[]
+  attachments    TagAttachment[]
+  targetRuleReferences RuleReference[] @relation("RuleReferenceTarget")
 
   // Per-owner uniqueness on (category, name) — partial uniques (see Contact
   // for rationale). The platform partial scopes platform-owned tags to one
@@ -44,4 +46,17 @@ model Tag {
   @@unique([tagCategoryId, name], where: raw("\"ownerModel\" = 'platform'"))
   @@index([tagCategoryId])
   @@index([ownerModel])
+}
+
+enum TagOwnerModel {
+  // No owner row; visible everywhere. No FK.
+  platform
+
+  User
+  Organization
+  Space
+
+  // ==========================================================================
+  // TEMPLATE ABOVE — Add app-specific owners below (also add FK + falsePolymorphism entry).
+  // ==========================================================================
 }

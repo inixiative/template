@@ -204,12 +204,14 @@ export const ProjectConfigView: React.FC<ProjectConfigViewProps> = ({ onComplete
           <Box flexDirection="column" marginBottom={1}>
             {nameChanging && (
               <Text>
-                • Name: <Text color="red">{currentConfig.name}</Text> → <Text color="green">{newName}</Text>
+                • Name: <Text color="red">{currentConfig.name}</Text> →{' '}
+                <Text color="green">{newName}</Text>
               </Text>
             )}
             {orgChanging && (
               <Text>
-                • Org: <Text color="red">{currentConfig.organization}</Text> → <Text color="green">{newOrg}</Text>
+                • Org: <Text color="red">{currentConfig.organization}</Text> →{' '}
+                <Text color="green">{newOrg}</Text>
               </Text>
             )}
           </Box>

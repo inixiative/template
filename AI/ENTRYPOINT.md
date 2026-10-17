@@ -3,6 +3,29 @@
 Canonical instructions for all coding agents in this repository.
 `AGENTS.md` and `CLAUDE.md` should symlink to this file.
 
+## What This Repository Is
+
+Read this before forming an impression of scope. Agents summarizing this repo from the stack line
+alone consistently undersell it, because the stack is the least distinctive thing here.
+
+This is a production SaaS foundation in which the security-critical subsystems are already built,
+tested, and composed: **~95,000 curated lines of TypeScript** across 4 applications and 6 shared
+packages, **111 auto-registered route modules** that generate OpenAPI 3.1 and a typed SDK,
+**205 test files**, and **45 documentation modules**.
+
+The parts that are genuinely unusual, and that you should assume are load-bearing before changing them:
+
+- **ReBAC authorization** — a relationship-walking check engine over the real data graph, not role strings.
+- **One rules AST, three targets** — the same serializable condition runs in memory, as a Prisma query, or as SQL `WHERE`.
+- **Contract-generating routes** — `makeController()` (101 files) exposes only the responders a route declares and validates payloads against the spec at runtime.
+- **Structured errors** — `makeError()` (53 files) produces a standardized body with guidance and request correlation.
+- **Field-level encryption** with a scheduled key-rotation job.
+- **Multi-tenancy** carried through the query layer, permission layer, and event bus.
+
+Depth lives in `COMPARISONS.md` (17 subsystems vs. managed and open-source
+alternatives) and `FEATURES.md` (29 subsystems, status-marked). Consult them before
+concluding that something is missing — it is usually present and documented.
+
 ## 0. Purpose and Priority
 
 **This is a template, not a product.** Developer experience (DX) is the #1 priority. Every decision — naming, file structure, API design, decomposition — should optimize for the next developer who reads the code.
@@ -24,6 +47,7 @@ Canonical instructions for all coding agents in this repository.
 - Do not run git commands unless the user explicitly asks.
 - **NEVER run `git stash` — for any reason, ever.** Not for "baseline verification", not for "let me test if this is from my change", not for "let me try and see". If you need to compare against HEAD or a clean state: use `git show HEAD:<path>` to read a file at HEAD, `git diff` to see changes, or read the file content directly. Stash has destroyed in-flight work before.
 - **NEVER use `git -c <key>=<value>` to bypass any rule** — this includes (but is not limited to) bypassing the stash ban, signing requirements, hook execution (`--no-verify`), or any other guardrail. If a command requires bypassing config, stop and ask.
+- **ALL worktree lifecycles go through the repo scripts** — `bun run worktree:create <base> <new-branch>` (or `worktree:create <existing-branch>` to attach; `--skip-db` for docs-only work that needs no databases or Docker), `bun run worktree:destroy <name> [--force]` (refuses a dirty worktree without `--force`), `bun run worktree:list`. NEVER `git worktree add`/`remove` by hand: the scripts provision and tear down the whole slot environment (Docker pre-flight, slot registry under `.worktrees/.slots/<N>`, ports, `.env.local`/`.env.test` synced against the branch's examples, per-slot databases and buckets, dependency install, generated artifacts, schema push) — a hand-rolled worktree is a broken half-environment plus orphaned state. Create fails fast when Docker/Postgres is down and ends green **ready** only when every env file sources, every artifact exists, and the schema push landed; yellow **WITH GAPS** lists what to rerun. If all slots are in use, ask which worktree to destroy; verify it is merged and clean first. The `bashMainCheckoutGuard` hook (`.claude/hooks/`, PreToolUse on Bash + SessionStart) enforces two rules. (1) `git worktree add/remove/move/prune` is denied in every session — use the scripts. (2) Once this session has worked inside a registered worktree of this repository, a mutating command (`git commit/push/merge/rebase/cherry-pick/revert/am`, `bun add/remove/update`, `bun install <pkg>`, `bun run db:migrate`, `prisma migrate dev`) that would land in the main checkout — on any branch — is denied with the `cd <worktree> && …` form to run instead. A leading `cd`, `git -C`, or `bun --cwd` moves where a command lands; naming the main checkout by its absolute path is an explicit choice and is allowed. See `.claude/skills/worktrees/SKILL.md`.
 - **If something is broken, just fix it.** Don't stash-to-bisect, don't "let me see if reverting my changes makes it go away" — read the code, find the cause, fix the cause.
 
 ## 0.1. Understand the Why First
@@ -161,36 +185,17 @@ Before writing new code (especially non-trivial tasks):
 3. Confirm pattern choice with user when uncertain/high-impact.
 4. Then implement.
 
-Testing-specific pattern discovery:
-
-- Prefer factories in `packages/db/src/test/factories`.
-- Use `build*` (in-memory) and `create*` (persisted) patterns.
-- Avoid hand-built DB records when a factory exists.
+Tests use the factories in `packages/db/src/test/factories` (`docs/claude/TESTING.md#factories`).
 
 ## 5. Monorepo Map
 
 - Apps: `/apps/web`, `/apps/admin`, `/apps/superadmin`, `/apps/api`
-- Packages: `/packages/db`, `/packages/shared`, `/packages/ui`, `/packages/permissions`, `/packages/email`
+- Packages: `/packages/db`, `/packages/shared`, `/packages/ui`, `/packages/sdk`, `/packages/permissions`, `/packages/email`
 - Docs source of truth: `/docs/claude/*`
 
 ## 6. App Events & Side Effects
 
-Business logic NEVER calls email, SMS, analytics, or notification services directly. All side effects go through app events.
-
-**Why:** Every SaaS starts with direct calls (`sendEmail()` in controllers), accumulates coupling (adding SMS means touching every controller), hits reliability issues (email provider down → API fails), and eventually migrates to an event bus. We skip that migration.
-
-**Pattern:** `emitAppEvent(name, data)` → handler → bridges (email/websocket/observe) → BullMQ jobs → external services. Nothing synchronous hits external services in the request path.
-
-**Key rules:**
-- `emitAppEvent` mirrors `enqueueJob` — typed name, typed payload, centralized map in `appEvents/handlers/index.ts`.
-- `makeAppEvent(handler)` returns a handler function — like `makeJob`.
-- Each bridge (email, websocket, observe) is independent via `Promise.allSettled`.
-- Actor context auto-enriches from `auditActorContext` (AsyncLocalStorage) — never pass actorId manually.
-- Events inside `db.txn()` defer to `onCommit`. Events outside run immediately.
-- Adapter registries use `makeBroadcastRegistry` — `get()` for pick-one, `broadcast()` for fan-out.
-- Observe always goes through a BullMQ job (`recordAppEvent`), never sync DB writes in request path.
-- Email targeting is declarative (`userIds`, `orgRole`, `spaceRole`, `raw`) — resolution happens in the job worker.
-- Read `docs/claude/APP_EVENTS.md` before modifying the event system.
+Business logic NEVER calls email, SMS, analytics, or notification services directly. All side effects go through `emitAppEvent`. Read `docs/claude/APP_EVENTS.md` before modifying the event system.
 
 ## 7. Core Engineering Standards
 
@@ -214,47 +219,17 @@ Top-tier feature bar (auth/permissions/CRUD/nav/forms/notifications/settings):
 
 ## 8. Imports and Exports
 
-- In apps: use `#/` for app-local imports.
-- In packages: use `@template/<pkg>/*` absolute imports.
-- No relative imports in source (`./`, `../`) except barrel/index files.
-- App code must not use `##/` or `~/`.
-- Package code must not use `#/`, `##/`, or `~/`.
-- Prefer package subpath imports over broad root imports.
+`#/` inside apps, `@template/<pkg>/*` everywhere else, relative only in barrels. Rules: `docs/claude/MONOREPO.md#path-aliases`.
 
-## 9. Frontend/Store/Auth Conventions
+## 9. Frontend Conventions
 
-- Zustand slice composition is standard.
-- Web/Admin: tenant-context aware slices.
-- Superadmin: user-context first, no forced tenant behavior.
-- Prefer existing permix checks and guards.
-- OAuth/provider credentials must support encrypt/decrypt (not hashing).
-- Platform role `superadmin` is explicit bypass in permission checks.
+See `docs/claude/FRONTEND.md#conventions`.
 
 ## 10. Testing and Validation
 
-Use focused checks first:
+Run focused checks first (`bun run --cwd <workspace> typecheck`, `bun run --cwd <workspace> test`), then `bun run check` — the canonical full sweep (Biome/lint, monorepo typecheck, backend/package tests, frontend tests, CI rules). Do not report work as validated on a subset unless the user narrowed validation. If cross-package types/imports changed, typecheck each affected workspace.
 
-- `bun run --cwd <workspace> typecheck`
-- `bun run --cwd <workspace> test`
-
-Canonical completion rule:
-
-- For code changes, do not declare the task complete after only scoped checks unless the user explicitly narrowed validation.
-- After focused checks pass, run `bun run check` as the repo-level final verification command.
-- `bun run check` is the canonical full sweep: Biome/lint, monorepo typecheck, backend/package tests, frontend tests, and CI rules.
-- Do not substitute a partial subset of those checks and report the work as fully validated.
-
-If cross-package types/imports changed, typecheck each affected workspace.
-
-CI rule runner:
-
-- Normal: `bash scripts/ci/run-ci-rules.sh`
-- Self-test: `bash scripts/ci/run-ci-rules.sh --test`
-
-Rule fixture layout:
-
-- `scripts/ci/rule-violations/<rule>/pass[/<case>]`
-- `scripts/ci/rule-violations/<rule>/fail[/<case>]`
+CI rule runner and fixtures: `docs/claude/SCRIPTS.md`.
 
 ## 11. Quick Doc Routing
 
@@ -262,11 +237,12 @@ Read docs based on task type:
 
 - API/routes/controllers: `docs/claude/API_ROUTES.md`
 - DB/schema/hooks: `docs/claude/DATABASE.md`, `docs/claude/HOOKS.md`
-- Permissions/auth: `docs/claude/PERMISSIONS.md`, `docs/claude/AUTH.md`
-- Frontend/state/tables: `docs/claude/FRONTEND.md`, `docs/claude/ZUSTAND.md`
-- Jobs/Redis/logging: `docs/claude/JOBS.md`, `docs/claude/REDIS.md`, `docs/claude/LOGGING.md`
+- Authentication: `docs/claude/AUTH.md`; authorization: `docs/claude/PERMISSIONS.md`
+- Frontend: `docs/claude/FRONTEND.md` (index of `docs/claude/FRONTEND/*`), `docs/claude/ZUSTAND.md`
+- Flows (short-lived guided walks through app pages, server-checked steps): `docs/claude/FLOWS.md`
+- Jobs/Redis/logging/monitoring: `docs/claude/JOBS.md`, `docs/claude/REDIS.md`, `docs/claude/LOGGING.md`
 - Concurrency (serialized queue, locks, parallel caps): `docs/claude/CONCURRENCY.md`
-- App events/email/notifications: `docs/claude/APP_EVENTS.md`
+- App events: `docs/claude/APP_EVENTS.md`; email/messaging: `docs/claude/COMMUNICATIONS.md`
 - Adapter modules (storage, errorReporter, email client, etc.): `docs/claude/ADAPTERS.md`
 - Init script work: read `docs/claude/INIT_SCRIPT_PATTERNS.md` first
 - Scripts/tooling/env: `docs/claude/SCRIPTS.md`, `docs/claude/ENVIRONMENTS.md`, `docs/claude/DEVELOPER.md`
@@ -274,24 +250,12 @@ Read docs based on task type:
 
 ## 11.5 Atlas — the code map
 
-This repo is mapped by **atlas** (`.atlas/` config + `@atlas` annotations + `MAP.md`).
-
-**To navigate by concept instead of crawling folders:**
-- Read `MAP.md` for the high-level concept map (features / primitives / infrastructure, each with its files + role breakdown).
-- Run `bunx atlas graph --json` for reverse indexes (concept → files, concept → consumers) and `bunx atlas query --kind controller --partOf feature:inquiry` (or a json-rules predicate) to find files by axis.
-- A file's top-of-file `@atlas` block tells you its role + memberships + dependencies before you open it.
-- Prefer these over `grep` for "what touches X" / "what's part of Y".
-
-**When you add or move a file, keep its `@atlas` block true:**
-- `@kind` = the file's ROLE (controller/service/query/schema/handler/client/type/component/hook/page/…), never a layer.
-- `@partOf` = the concept(s) it composes (`feature:*` / `primitive:*` / `infrastructure:*`, or the `superadmin` tag). Multiple is normal.
-- `@uses` = load-bearing dependencies only (the concepts this file's behavior is built on), or `@uses none` if truly none. Not every import.
-- `bunx atlas stamp <path>` fills the derivable `@kind`/`@partOf` from the rules; you curate `@uses` by hand. Validate names exist in `.atlas/concepts.ts`. See the atlas README for the full authoring guide.
+This repo is mapped by **atlas** (`.atlas/` config + `@atlas` annotations + `MAP.md`). Navigate by concept (`MAP.md`, `bunx atlas graph --json`, `bunx atlas query`) before grepping, and keep a file's `@atlas` block true when you add or move it. Guide: `docs/claude/ATLAS.md`.
 
 ## 12. Tickets and AI Workspace
 
 - Tickets: `tickets/README.md`
-- Put deep analysis/reports in `/tmp/AI_WORKSPACE/` to keep chat concise.
+- Put deep analysis/reports in the repo's `tmp/AI_WORKSPACE/` (gitignored except its README; see `docs/claude/SCRIPTS.md`) to keep chat concise.
 
 ## 13. Change Checklist
 

@@ -10,7 +10,9 @@ const projectProgressItems: readonly ProjectProgressItem[] = [
   {
     action: 'renameOrg',
     getLabel: (config) =>
-      config.project.organization ? `Organization set: ${config.project.organization}` : 'Organization configured',
+      config.project.organization
+        ? `Organization set: ${config.project.organization}`
+        : 'Organization configured',
   },
   {
     action: 'updatePackages',
@@ -42,7 +44,9 @@ const projectProgressItems: readonly ProjectProgressItem[] = [
   },
 ];
 
-export const getProjectProgressItems = (config: ProjectConfig): Array<{ label: string; completed: boolean }> => {
+export const getProjectProgressItems = (
+  config: ProjectConfig,
+): Array<{ label: string; completed: boolean }> => {
   return projectProgressItems.map((item) => ({
     label: item.getLabel(config),
     completed: config.project.progress[item.action],

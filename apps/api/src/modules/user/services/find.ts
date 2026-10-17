@@ -13,10 +13,17 @@ const USER_CACHE_TTL = 60 * 10 + 6; // 10.1 minutes
 const RECORD_CACHE_TTL = 60 * 10; // 10 minutes
 
 export const findUserByEmail = async (db: Db, email: string): Promise<User | null> => {
-  return cache<User | null>(cacheKey('User', { email }), () => db.user.findFirst({ where: { email } }), USER_CACHE_TTL);
+  return cache<User | null>(
+    cacheKey('User', { email }),
+    () => db.user.findFirst({ where: { email } }),
+    USER_CACHE_TTL,
+  );
 };
 
-export const findUserWithRelations = async (db: Db, userId: string): Promise<UserWithRelations | null> => {
+export const findUserWithRelations = async (
+  db: Db,
+  userId: string,
+): Promise<UserWithRelations | null> => {
   return cache<UserWithRelations | null>(
     cacheKey('User', userId, ['relations']),
     async () => {
@@ -31,7 +38,9 @@ export const findUserWithRelations = async (db: Db, userId: string): Promise<Use
 
       if (!user) return null;
 
-      const ownedOrgIds = user.organizationUsers.filter((ou) => ou.role === Role.owner).map((ou) => ou.organizationId);
+      const ownedOrgIds = user.organizationUsers
+        .filter((ou) => ou.role === Role.owner)
+        .map((ou) => ou.organizationId);
 
       const [organizations, spaceUsers, spaces] = await Promise.all([
         db.organization.findMany({
@@ -74,7 +83,10 @@ export const findUserWithRelations = async (db: Db, userId: string): Promise<Use
 
       for (const orgUser of user.organizationUsers) {
         upsertCache(
-          cacheKey('organizationUser', { organizationId: orgUser.organizationId, userId: orgUser.userId }),
+          cacheKey('organizationUser', {
+            organizationId: orgUser.organizationId,
+            userId: orgUser.userId,
+          }),
           orgUser,
           { ttl: RECORD_CACHE_TTL },
         );

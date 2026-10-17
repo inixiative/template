@@ -1,13 +1,15 @@
 /**
  * @atlas
- * @partOf infrastructure:prisma
+ * @kind utils
+ * @partOf infrastructure:prisma, primitive:testFactories
  * @uses none
  */
 import type { Db } from '@template/db/clientTypes';
-import { DbAction, HookTiming, registerDbHook } from '@template/db/extensions/mutationLifeCycle';
+import { DbAction, HookTiming, registerDbHook } from '@template/db/extensions/hookRegistry';
 
 const touchedTables = new Set<string>();
 
+// Registered once by packages/db/src/client.ts; a test never calls it (check-test-tracker-registration).
 export const registerTestTracker = () => {
   if (process.env.NODE_ENV !== 'test' && process.env.ENVIRONMENT !== 'test') return;
 

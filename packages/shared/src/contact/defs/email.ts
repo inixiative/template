@@ -10,7 +10,9 @@ import { z } from 'zod';
 
 export type EmailValue = { address: string };
 
-const emailSchema = z.object({ address: z.string().email() });
+export const emailAddressSchema = z.string().email();
+
+const emailSchema = z.object({ address: emailAddressSchema });
 
 export const emailDef: ContactTypeDef<EmailValue, EmailValue> = {
   inputSchema: emailSchema,

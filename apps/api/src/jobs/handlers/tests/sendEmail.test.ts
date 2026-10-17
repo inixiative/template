@@ -1,16 +1,26 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
-import { type Condition, type LensNarrowing, Operator } from '@inixiative/json-rules';
+import { Operator } from '@inixiative/json-rules';
 import { clearHookRegistry } from '@template/db';
 import { lensFor } from '@template/db/lens';
-import { cleanupTouchedTables, createEmailTemplate, createUser } from '@template/db/test';
+import {
+  cleanupTouchedTables,
+  createEmailTemplate,
+  createOrganization,
+  createOrganizationUser,
+  createTag,
+  createTagAttachment,
+  createUser,
+} from '@template/db/test';
 import type { EmailClient, SendEmailOptions } from '@template/email/client/types';
+import { fieldsLens } from '@template/email/rules';
 import { registerContactRulesHook } from '#/hooks/contactRules/hook';
 import { registerOrderedListHook } from '#/hooks/orderedList/hook';
 import { registerRulesHook } from '#/hooks/rules/hook';
 import { registerUserEmailContactHook } from '#/hooks/userEmailContact/hook';
 import { sendEmail } from '#/jobs/handlers/sendEmail';
 import { emailRegistry } from '#/lib/email';
-import { type EmailEntry, registry } from '#/lib/email/registry';
+import { type EmailEntry, type RecipientTarget, registry } from '#/lib/email/registry';
+import { saveEmailTemplate } from '#/lib/email/saveEmailTemplate';
 import { createTestApp } from '#tests/createTestApp';
 
 registerRulesHook();
@@ -20,21 +30,37 @@ registerUserEmailContactHook();
 
 const ADAPTER = 'test-recorder';
 
-const userLens = (id: unknown): LensNarrowing => ({
+const userEntity = (): EmailEntry['entity'] => ({
   parent: lensFor('User'),
   root: {
-    where: { field: 'id', operator: Operator.equals, value: id } as unknown as Condition,
+    where: { field: 'id', operator: Operator.equals, bind: 'userId' },
     picks: ['id', 'name', 'email'],
   },
 });
 
-const usersLens = (ids: string[]): LensNarrowing => ({
+const userData: EmailEntry['data'] = {
   parent: lensFor('User'),
-  root: {
-    where: { field: 'id', operator: Operator.in, value: ids } as unknown as Condition,
-    picks: ['id', 'name', 'email'],
-  },
+  root: { picks: ['id', 'name', 'email'] },
+};
+
+const recipientSelf: RecipientTarget = {
+  where: { field: 'id', operator: Operator.equals, bind: 'id' },
+};
+
+const recipientsIn = (ids: string[]): RecipientTarget => ({
+  where: { field: 'id', operator: Operator.in, value: ids },
 });
+
+const recipientById = (id: string): RecipientTarget => ({
+  where: { field: 'id', operator: Operator.equals, value: id },
+});
+
+const taggedBlock = (tagId: string) =>
+  `{{#if rule=${JSON.stringify({
+    field: 'recipient.tagAttachments',
+    arrayOperator: 'any',
+    condition: { field: 'tag.id', operator: 'equals', value: tagId },
+  })}}}VIP{{else}}BASE{{/if}}`;
 
 const plainMjml = (body: string) =>
   `<mjml><mj-body><mj-section><mj-column><mj-text>${body}</mj-text></mj-column></mj-section></mj-body></mjml>`;
@@ -85,15 +111,106 @@ describe('sendEmail handler', () => {
     });
 
     addEntry('test-fanout', {
-      entity: (data) => userLens(data.userId),
-      sender: () => ({ type: 'platform' }),
-      recipients: () => usersLens([alice.id, bob.id]),
+      entity: userEntity(),
+      data: userData,
+      sender: { type: 'platform' },
+      recipients: recipientsIn([alice.id, bob.id]),
     });
 
-    await sendEmail(ctx(), { eventName: 'test', template: 'test-fanout', data: { userId: alice.id } });
+    await sendEmail(ctx(), {
+      eventName: 'test',
+      template: 'test-fanout',
+      data: { userId: alice.id },
+    });
 
     expect(sent.map((s) => s.to).sort()).toEqual([alice.email, bob.email].sort());
     expect(sent.every((s) => s.cc === undefined && s.bcc === undefined)).toBe(true);
+  });
+
+  it('the recipient reaches delivery hydrated through the lens, so a membership rule decides the branch', async () => {
+    const { entity: tag } = await createTag();
+    const { entity: vip } = await createUser({ name: 'Vip' });
+    const { entity: plain } = await createUser({ name: 'Plain' });
+    await createTagAttachment({ resourceModel: 'User' }, { user: vip, tag });
+    await saveEmailTemplate({
+      slug: 'test-tagged',
+      name: 'tagged',
+      subject: 'Hi',
+      kind: 'system',
+      mjml: plainMjml(taggedBlock(tag.id)),
+      ownerModel: 'default',
+    });
+    addEntry('test-tagged', {
+      entity: userEntity(),
+      data: userData,
+      sender: { type: 'platform' },
+      recipients: recipientsIn([vip.id, plain.id]),
+    });
+
+    await sendEmail(ctx(), {
+      eventName: 'test',
+      template: 'test-tagged',
+      data: { userId: vip.id },
+    });
+
+    const byAddress = new Map(sent.map((s) => [s.to, s.html]));
+    expect(byAddress.get(vip.email)).toContain('VIP');
+    expect(byAddress.get(vip.email)).not.toContain('BASE');
+    expect(byAddress.get(plain.email)).toContain('BASE');
+  });
+
+  it("an organization's email shows nothing of the recipient's other organizations, in the send or at rest, while its rules judge them as the database does", async () => {
+    const { entity: own } = await createOrganization({ name: 'Own Org' });
+    const { entity: other } = await createOrganization({ name: 'Other Org' });
+    const { entity: member } = await createUser({ name: 'Member' });
+    await createOrganizationUser({}, { user: member, organization: own });
+    await createOrganizationUser({}, { user: member, organization: other });
+    const anyNotOwn = JSON.stringify({
+      field: 'recipient.organizationUsers',
+      arrayOperator: 'any',
+      condition: { field: 'organization.name', operator: 'notEquals', value: own.name },
+    });
+    await saveEmailTemplate({
+      slug: 'test-foreign-membership',
+      name: 'foreign membership',
+      subject: 'Hi',
+      kind: 'system',
+      mjml: plainMjml(
+        `{{#each recipient.organizationUsers as=m}}[{{m.organization.id}}]{{/each}}|{{#if rule=${anyNotOwn}}}OTHER{{else}}ONLY{{/if}}`,
+      ),
+      ownerModel: 'Organization',
+      organizationId: own.id,
+    });
+    const organization: EmailEntry['entity'] = {
+      parent: lensFor('Organization'),
+      root: {
+        where: { field: 'id', operator: Operator.equals, bind: 'organizationId' },
+        picks: ['id', 'name'],
+      },
+    };
+    addEntry('test-foreign-membership', {
+      entity: organization,
+      data: { parent: lensFor('Organization'), root: { picks: ['id', 'name'] } },
+      sender: { type: 'Organization', organizationId: 'id' },
+      recipients: recipientById(member.id),
+      render: { onIssue: 'degrade' },
+    });
+
+    await sendEmail(ctx(), {
+      eventName: 'test',
+      template: 'test-foreign-membership',
+      data: { organizationId: own.id },
+    });
+
+    expect(sent).toHaveLength(1);
+    expect(sent[0].html).toContain(`[${own.id}]`);
+    expect(sent[0].html).toContain('ONLY');
+    expect(sent[0].html).not.toContain(other.id);
+    const [entry] = await testDb.communicationLog.findMany({
+      where: { recipientUserId: member.id },
+    });
+    expect(JSON.stringify(entry?.variables)).toContain(own.id);
+    expect(JSON.stringify(entry?.variables)).not.toContain(other.id);
   });
 
   it('resolves cc per recipient and attaches it to that recipient’s email', async () => {
@@ -102,10 +219,11 @@ describe('sendEmail handler', () => {
     await createEmailTemplate({ slug: 'test-cc', subject: 'Hi', mjml: plainMjml('Hi') });
 
     addEntry('test-cc', {
-      entity: (data) => userLens(data.userId),
-      sender: () => ({ type: 'platform' }),
-      recipients: (user) => userLens(user.id),
-      cc: () => userLens(manager.id),
+      entity: userEntity(),
+      data: userData,
+      sender: { type: 'platform' },
+      recipients: recipientSelf,
+      cc: recipientById(manager.id),
     });
 
     await sendEmail(ctx(), { eventName: 'test', template: 'test-cc', data: { userId: rep.id } });
@@ -119,9 +237,10 @@ describe('sendEmail handler', () => {
     const { entity: u } = await createUser({ name: 'Ledger' });
     await createEmailTemplate({ slug: 'test-log', subject: 'Hi', mjml: plainMjml('Hi') });
     addEntry('test-log', {
-      entity: (data) => userLens(data.userId),
-      sender: () => ({ type: 'platform' }),
-      recipients: (user) => userLens(user.id),
+      entity: userEntity(),
+      data: userData,
+      sender: { type: 'platform' },
+      recipients: recipientSelf,
     });
 
     await sendEmail(ctx(), { eventName: 'log-evt', template: 'test-log', data: { userId: u.id } });
@@ -141,9 +260,10 @@ describe('sendEmail handler', () => {
     const { entity: u } = await createUser({ name: 'Dedup' });
     await createEmailTemplate({ slug: 'test-dedup', subject: 'Hi', mjml: plainMjml('Hi') });
     addEntry('test-dedup', {
-      entity: (data) => userLens(data.userId),
-      sender: () => ({ type: 'platform' }),
-      recipients: (user) => userLens(user.id),
+      entity: userEntity(),
+      data: userData,
+      sender: { type: 'platform' },
+      recipients: recipientSelf,
     });
 
     const payload = { eventName: 'dedup-evt', template: 'test-dedup', data: { userId: u.id } };
@@ -157,14 +277,24 @@ describe('sendEmail handler', () => {
 
   it('suppresses delivery when the recipient has opted out of the kind', async () => {
     const { entity: u } = await createUser({ name: 'OptOut' });
-    await createEmailTemplate({ slug: 'test-promo', subject: 'Promo', mjml: plainMjml('Promo'), kind: 'marketing' });
+    await createEmailTemplate({
+      slug: 'test-promo',
+      subject: 'Promo',
+      mjml: plainMjml('Promo'),
+      kind: 'marketing',
+    });
     addEntry('test-promo', {
-      entity: (data) => userLens(data.userId),
-      sender: () => ({ type: 'platform' }),
-      recipients: (user) => userLens(user.id),
+      entity: userEntity(),
+      data: userData,
+      sender: { type: 'platform' },
+      recipients: recipientSelf,
     });
 
-    await sendEmail(ctx(), { eventName: 'promo-evt', template: 'test-promo', data: { userId: u.id } });
+    await sendEmail(ctx(), {
+      eventName: 'promo-evt',
+      template: 'test-promo',
+      data: { userId: u.id },
+    });
 
     const rows = await testDb.communicationLog.findMany({ where: { recipientUserId: u.id } });
     expect(rows).toHaveLength(1);
@@ -177,16 +307,21 @@ describe('sendEmail handler', () => {
     await createEmailTemplate({
       slug: 'test-unsub-link',
       subject: 'News',
-      mjml: plainMjml('News {{recipient.unsubscribeUrl}}'),
+      mjml: plainMjml('News {{system.unsubscribeUrl}}'),
       kind: 'platform',
     });
     addEntry('test-unsub-link', {
-      entity: (data) => userLens(data.userId),
-      sender: () => ({ type: 'platform' }),
-      recipients: (user) => userLens(user.id),
+      entity: userEntity(),
+      data: userData,
+      sender: { type: 'platform' },
+      recipients: recipientSelf,
     });
 
-    await sendEmail(ctx(), { eventName: 'unsub-link-evt', template: 'test-unsub-link', data: { userId: u.id } });
+    await sendEmail(ctx(), {
+      eventName: 'unsub-link-evt',
+      template: 'test-unsub-link',
+      data: { userId: u.id },
+    });
 
     expect(sent).toHaveLength(1);
     expect(sent[0].headers?.['List-Unsubscribe']).toMatch(/\/unsubscribe\?token=/);
@@ -196,16 +331,24 @@ describe('sendEmail handler', () => {
 
   it('marks undeliverable and skips the send for a known-bad address', async () => {
     const { entity: u } = await createUser({ name: 'BadAddr' });
-    const contact = await testDb.contact.findFirstOrThrow({ where: { userId: u.id, type: 'email' } });
+    const contact = await testDb.contact.findFirstOrThrow({
+      where: { userId: u.id, type: 'email' },
+    });
     await testDb.contact.update({
       where: { id: contact.id },
       data: { deliverability: 'undeliverable', deliverabilityCheckedAt: new Date() },
     });
-    await createEmailTemplate({ slug: 'test-bad', subject: 'Hi', mjml: plainMjml('Hi'), kind: 'platform' });
+    await createEmailTemplate({
+      slug: 'test-bad',
+      subject: 'Hi',
+      mjml: plainMjml('Hi'),
+      kind: 'platform',
+    });
     addEntry('test-bad', {
-      entity: (data) => userLens(data.userId),
-      sender: () => ({ type: 'platform' }),
-      recipients: (user) => userLens(user.id),
+      entity: userEntity(),
+      data: userData,
+      sender: { type: 'platform' },
+      recipients: recipientSelf,
     });
 
     await sendEmail(ctx(), { eventName: 'bad-evt', template: 'test-bad', data: { userId: u.id } });
@@ -214,5 +357,29 @@ describe('sendEmail handler', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0].status).toBe('undeliverable');
     expect(sent.filter((s) => s.to === u.email)).toHaveLength(0);
+  });
+  it('a template with no registry entry is a planning failure, not a silent skip', async () => {
+    await expect(
+      sendEmail(ctx(), { eventName: 'test', template: 'unregistered', data: {} }),
+    ).rejects.toThrow('No email registry entry');
+  });
+
+  it('a declared data field the event did not supply is a planning failure', async () => {
+    const { entity: u } = await createUser({ name: 'Needs data' });
+    await createEmailTemplate({
+      slug: 'test-data',
+      subject: 'Hi',
+      mjml: plainMjml('{{data.code}}'),
+    });
+    addEntry('test-data', {
+      entity: userEntity(),
+      sender: { type: 'platform' },
+      recipients: recipientSelf,
+      data: fieldsLens({ code: 'String' }),
+    });
+
+    await expect(
+      sendEmail(ctx(), { eventName: 'test', template: 'test-data', data: { userId: u.id } }),
+    ).rejects.toThrow('declares data field "code"');
   });
 });

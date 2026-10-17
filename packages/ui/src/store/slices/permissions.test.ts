@@ -25,7 +25,9 @@ describe('permissions slice', () => {
 
   describe('check', () => {
     it('should return false for unauthorized actions', () => {
-      const result = store.getState().permissions.check('organization', organizationRecord, 'delete');
+      const result = store
+        .getState()
+        .permissions.check('organization', organizationRecord, 'delete');
 
       expect(result).toBe(false);
     });
@@ -39,7 +41,9 @@ describe('permissions slice', () => {
       }).not.toThrow();
 
       // After clear, check should return false
-      const result = store.getState().permissions.check('organization', organizationRecord, 'delete');
+      const result = store
+        .getState()
+        .permissions.check('organization', organizationRecord, 'delete');
       expect(result).toBe(false);
     });
   });

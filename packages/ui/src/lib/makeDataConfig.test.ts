@@ -76,20 +76,6 @@ describe('makeDataConfig', () => {
     expect(config.canOrder).toBe(true);
   });
 
-  it('sets search mode to combined by default', () => {
-    const config = makeDataConfig('adminOrganizationReadMany');
-
-    expect(config.searchMode).toBe('combined');
-  });
-
-  it('allows overriding search mode to field', () => {
-    const config = makeDataConfig('adminOrganizationReadMany', {
-      searchMode: 'field',
-    });
-
-    expect(config.searchMode).toBe('field');
-  });
-
   it('allows custom defaultOrderBy', () => {
     const config = makeDataConfig('adminOrganizationReadMany', {
       defaultOrderBy: [{ field: 'createdAt', direction: 'desc' }],

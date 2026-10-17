@@ -1,12 +1,22 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import type { Inquiry, User } from '@template/db';
-import { InquiryResourceModel, InquiryStatus, InquiryType } from '@template/db/generated/client/enums';
-import { cleanupTouchedTables, createInquiry, createUser } from '@template/db/test';
+import type { Inquiry, User } from '@template/db/generated/client/client';
+import {
+  InquiryResourceModel,
+  InquiryStatus,
+  InquiryType,
+} from '@template/db/generated/client/enums';
+import {
+  cleanupTouchedTables,
+  createInquiry,
+  createOrganization,
+  createOrganizationUser,
+  createSpace,
+  createSpaceUser,
+  createUser,
+} from '@template/db/test';
 import { meRouter } from '#/modules/me';
 import { createTestApp, type MountFn } from '#tests/createTestApp';
 import { get, json } from '#tests/utils/request';
-
-type InquiryList = { data: Inquiry[]; pagination: unknown };
 
 const mount: MountFn[] = [(app) => app.route('/api/v1/me', meRouter)];
 
@@ -55,7 +65,7 @@ describe('GET /api/v1/me/inquiries/sent', () => {
     });
 
     const response = await fetch(get('/api/v1/me/inquiries/sent'));
-    const { data } = await json<InquiryList>(response);
+    const { data } = await json<Inquiry[]>(response);
 
     expect(response.status).toBe(200);
     expect(data.some((i) => i.id === mine.id)).toBe(true);
@@ -118,11 +128,52 @@ describe('GET /api/v1/me/inquiries/received', () => {
     });
 
     const response = await fetch(get('/api/v1/me/inquiries/received'));
-    const { data } = await json<InquiryList>(response);
+    const { data } = await json<Inquiry[]>(response);
 
     expect(response.status).toBe(200);
     expect(data.some((i) => i.id === mine.id)).toBe(true);
     expect(data.every((i) => i.targetUserId === user.id)).toBe(true);
     expect(data.every((i) => i.status !== InquiryStatus.draft)).toBe(true);
+  });
+
+  it('includes inquiries addressed to my organization and space memberships', async () => {
+    const { entity: sender } = await createUser();
+    const { entity: org } = await createOrganization();
+    const { entity: space } = await createSpace({}, { organization: org });
+    const { entity: orgMembership, context } = await createOrganizationUser(
+      {},
+      { user, organization: org },
+    );
+    const { entity: spaceMembership } = await createSpaceUser({}, { ...context, space });
+
+    const { entity: toOrgUser } = await createInquiry({
+      type: InquiryType.inviteOrganizationUser,
+      status: InquiryStatus.sent,
+      sourceModel: InquiryResourceModel.User,
+      sourceUserId: sender.id,
+      targetModel: InquiryResourceModel.OrganizationUser,
+      targetOrganizationId: orgMembership.organizationId,
+      targetUserId: user.id,
+      content: { role: 'member' },
+    });
+
+    const { entity: toSpaceUser } = await createInquiry({
+      type: InquiryType.inviteOrganizationUser,
+      status: InquiryStatus.sent,
+      sourceModel: InquiryResourceModel.User,
+      sourceUserId: sender.id,
+      targetModel: InquiryResourceModel.SpaceUser,
+      targetOrganizationId: spaceMembership.organizationId,
+      targetSpaceId: spaceMembership.spaceId,
+      targetUserId: user.id,
+      content: { role: 'member' },
+    });
+
+    const response = await fetch(get('/api/v1/me/inquiries/received'));
+    const { data } = await json<Inquiry[]>(response);
+
+    expect(response.status).toBe(200);
+    expect(data.some((i) => i.id === toOrgUser.id)).toBe(true);
+    expect(data.some((i) => i.id === toSpaceUser.id)).toBe(true);
   });
 });

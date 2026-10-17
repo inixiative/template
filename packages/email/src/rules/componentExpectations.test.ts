@@ -1,0 +1,83 @@
+import { describe, expect, it } from 'bun:test';
+import { lensFor } from '@template/db/lens';
+import {
+  checkExpectations,
+  collectUnprovidedPathWarnings,
+  deriveComponentExpectations,
+} from '@template/email/rules/componentExpectations';
+import { type EmailLens, systemSlot } from '@template/email/rules/emailLens';
+
+describe('deriveComponentExpectations', () => {
+  it('derives the absolute paths a component body demands, from tokens, rules and loops alike', () => {
+    const mjml = [
+      '<mj-text>{{recipient.firstName}}</mj-text>',
+      '{{#if rule={"field":"recipient.pointsAmount","operator":"greaterThan","value":10}}}X{{/if}}',
+      '{{#each recipient.contacts as=c}}{{c.label}}{{/each}}',
+    ].join('\n');
+
+    expect(deriveComponentExpectations(mjml)).toEqual([
+      'recipient.contacts',
+      'recipient.contacts.label',
+      'recipient.firstName',
+      'recipient.pointsAmount',
+    ]);
+  });
+
+  it('excludes paths rooted at bindings the component does not open itself', () => {
+    expect(deriveComponentExpectations('<mj-text>{{c.label}}</mj-text>')).toEqual([]);
+  });
+});
+
+describe('checkExpectations (the "can this belong to this template" walk)', () => {
+  const lens: EmailLens = {
+    recipient: { parent: lensFor('User'), root: { relations: { contacts: {} } } },
+    system: systemSlot(),
+  };
+
+  it('accepts paths that resolve against the lens, across scalars and through relations', () => {
+    const checks = checkExpectations(
+      ['recipient.email', 'recipient.displayName', 'recipient.contacts.label'],
+      lens,
+    );
+    expect(checks.every((check) => check.ok)).toBe(true);
+  });
+
+  it('rejects paths the lens never exposed — including ones that merely resemble real fields', () => {
+    const checks = checkExpectations(
+      ['recipient.notAColumn', 'recipient.contacts.notAField', 'sender.name'],
+      lens,
+    );
+    expect(checks.map((check) => check.ok)).toEqual([false, false, false]);
+  });
+
+  it('accepts the open-ended tail beneath a Json column (covered by the opacity warning instead)', () => {
+    expect(
+      checkExpectations(['recipient.contacts.permissionRules.anything.below'], lens)[0]?.ok,
+    ).toBe(true);
+  });
+
+  it('resolves system.* against the system lens like any other root', () => {
+    const checks = checkExpectations(['system.now', 'system.notAToken'], lens);
+    expect(checks.map((check) => check.ok)).toEqual([true, false]);
+  });
+
+  it('treats {{system.unsubscribeUrl}} as rail-provided, and nothing else beyond the token list', () => {
+    expect(checkExpectations(['system.unsubscribeUrl', 'system.notAToken'], lens)).toEqual([
+      { path: 'system.unsubscribeUrl', ok: true },
+      { path: 'system.notAToken', ok: false },
+    ]);
+  });
+});
+
+describe('collectUnprovidedPathWarnings (save-time token lint)', () => {
+  it('phrases each unprovided path for the author and stays silent on provided ones', () => {
+    const lens: EmailLens = { recipient: lensFor('User') };
+    const warnings = collectUnprovidedPathWarnings(
+      ['recipient.email', 'recipient.notAColumn'],
+      lens,
+    );
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain('{{recipient.notAColumn}}');
+    expect(warnings[0]).toContain('literal text');
+  });
+});

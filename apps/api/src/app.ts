@@ -4,13 +4,18 @@
  * @uses primitive:routeTemplates
  */
 import { OpenAPIHono } from '@hono/zod-openapi';
+import { registerSecuritySchemes } from '#/lib/auth/securitySchemes';
+import { validationDefaultHook } from '#/lib/openapi/validationDefaultHook';
 import { errorHandlerMiddleware } from '#/middleware/error/errorHandlerMiddleware';
 import { notFoundHandlerMiddleware } from '#/middleware/error/notFoundHandlerMiddleware';
+import { telemetryMiddleware } from '#/middleware/telemetryMiddleware';
 import { Tags } from '#/modules/tags';
 import { routes } from '#/routes';
 import type { AppEnv } from '#/types/appEnv';
 
-export const app = new OpenAPIHono<AppEnv>();
+export const app = new OpenAPIHono<AppEnv>({ defaultHook: validationDefaultHook });
+
+app.use('*', telemetryMiddleware);
 
 // Make app available in context
 app.use('*', (c, next) => {
@@ -25,6 +30,7 @@ app.onError(errorHandlerMiddleware);
 app.route('/', routes);
 
 // OpenAPI
+registerSecuritySchemes(app);
 app.doc31('/openapi/docs', {
   openapi: '3.1.0',
   info: { title: `${process.env.PROJECT_NAME ?? 'Template'} API`, version: '0.1.0' },

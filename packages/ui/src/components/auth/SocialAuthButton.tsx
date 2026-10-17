@@ -38,7 +38,13 @@ const providerIcons = {
 
 export const SocialAuthButton = ({ provider, onClick, disabled, text }: SocialAuthButtonProps) => {
   return (
-    <Button type="button" variant="outline" onClick={onClick} disabled={disabled} className="w-full">
+    <Button
+      type="button"
+      variant="outline"
+      onClick={onClick}
+      disabled={disabled}
+      className="w-full"
+    >
       {providerIcons[provider]}
       <span className="ml-2">{text}</span>
     </Button>

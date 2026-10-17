@@ -103,7 +103,9 @@ describe('interpolation', () => {
       };
 
       expect(() => interpolateValue('<<1.0.id>>', context)).toThrow('Round index out of bounds');
-      expect(() => interpolateValue('<<5.0.id>>', context)).toThrow('round 5 does not exist (only 1 rounds completed)');
+      expect(() => interpolateValue('<<5.0.id>>', context)).toThrow(
+        'round 5 does not exist (only 1 rounds completed)',
+      );
     });
 
     it('throws error for request index out of bounds', () => {
@@ -122,7 +124,9 @@ describe('interpolation', () => {
         results: [[{ id: 'user-123' }]],
       };
 
-      expect(() => interpolateValue('<<0.0.email>>', context)).toThrow('Field not found in interpolation');
+      expect(() => interpolateValue('<<0.0.email>>', context)).toThrow(
+        'Field not found in interpolation',
+      );
     });
 
     it('throws error for invalid path notation', () => {
@@ -130,7 +134,9 @@ describe('interpolation', () => {
         results: [[{ id: 'user-123' }]],
       };
 
-      expect(() => interpolateValue('<<0.0.a.b.c.d.e.f.g>>', context)).toThrow('Invalid interpolation path');
+      expect(() => interpolateValue('<<0.0.a.b.c.d.e.f.g>>', context)).toThrow(
+        'Invalid interpolation path',
+      );
     });
 
     it('throws error for malformed interpolation syntax - missing field', () => {
@@ -146,7 +152,9 @@ describe('interpolation', () => {
         results: [[{ id: 'user-123' }]],
       };
 
-      expect(() => interpolateValue('<<abc.def.field>>', context)).toThrow('Malformed interpolation syntax');
+      expect(() => interpolateValue('<<abc.def.field>>', context)).toThrow(
+        'Malformed interpolation syntax',
+      );
     });
 
     it('throws error for malformed interpolation syntax - single number', () => {
@@ -172,7 +180,9 @@ describe('interpolation', () => {
       };
 
       expect(() => interpolateValue('<<1.0.id>>', context)).toThrow('Invalid round reference');
-      expect(() => interpolateValue('<<1.0.id>>', context)).toThrow('cannot reference round 1 from round 1');
+      expect(() => interpolateValue('<<1.0.id>>', context)).toThrow(
+        'cannot reference round 1 from round 1',
+      );
     });
 
     it('throws error when referencing future round', () => {
@@ -182,7 +192,9 @@ describe('interpolation', () => {
       };
 
       expect(() => interpolateValue('<<2.0.id>>', context)).toThrow('Invalid round reference');
-      expect(() => interpolateValue('<<5.0.id>>', context)).toThrow('cannot reference round 5 from round 1');
+      expect(() => interpolateValue('<<5.0.id>>', context)).toThrow(
+        'cannot reference round 5 from round 1',
+      );
     });
 
     it('allows referencing previous rounds', () => {

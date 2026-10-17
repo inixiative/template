@@ -51,7 +51,10 @@ export const usePageMeta = (): { title: string; description: string } => {
     let description = appDescription;
     if (currentRouteMatch.item.description) {
       const descriptionValue = currentRouteMatch.item.description;
-      description = typeof descriptionValue === 'function' ? descriptionValue(context, pageContext) : descriptionValue;
+      description =
+        typeof descriptionValue === 'function'
+          ? descriptionValue(context, pageContext)
+          : descriptionValue;
     }
 
     return { title, description };

@@ -16,7 +16,10 @@ describe('buildJsonWhere (Postgres)', () => {
   });
 
   it('keeps an array path as-is', () => {
-    expect(buildJsonWhere({ path: ['a', 'b'], equals: 'x' }, 'meta')).toEqual({ path: ['a', 'b'], equals: 'x' });
+    expect(buildJsonWhere({ path: ['a', 'b'], equals: 'x' }, 'meta')).toEqual({
+      path: ['a', 'b'],
+      equals: 'x',
+    });
   });
 
   it('rejects an unknown json operator', () => {

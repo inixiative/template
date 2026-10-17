@@ -4,13 +4,7 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
-import type { FieldDef } from '#/lib/prisma/fieldMetadata';
-
-// Prisma supports `mode: 'insensitive'` on these string ops. We always emit
-// it for them so user-facing search matches regardless of case. `in` /
-// `notIn` don't support `mode` natively — those remain case-sensitive on
-// strings (caveat lives at the call site).
-export const STRING_OPS_WITH_MODE = new Set(['contains', 'startsWith', 'endsWith', 'equals', 'not']);
+import type { ModelField } from '@template/db';
 
 const ENUM_OPS = ['equals', 'in', 'notIn', 'not'] as const;
 
@@ -20,6 +14,9 @@ const ENUM_OPS = ['equals', 'in', 'notIn', 'not'] as const;
 const OPERATORS_BY_TYPE: Record<string, readonly string[]> = {
   String: ['contains', 'startsWith', 'endsWith', 'equals', 'in', 'notIn', 'not'],
   Int: ['equals', 'gt', 'gte', 'lt', 'lte', 'in', 'notIn', 'not'],
+  BigInt: ['equals', 'gt', 'gte', 'lt', 'lte', 'in', 'notIn', 'not'],
+  Float: ['equals', 'gt', 'gte', 'lt', 'lte', 'in', 'notIn', 'not'],
+  Decimal: ['equals', 'gt', 'gte', 'lt', 'lte', 'in', 'notIn', 'not'],
   DateTime: ['equals', 'gt', 'gte', 'lt', 'lte', 'not'],
   Boolean: ['equals', 'not'],
   Json: [],
@@ -32,14 +29,14 @@ const DEFAULT_OP_BY_TYPE: Record<string, string> = {
   String: 'contains',
 };
 
-export const getValidOperators = (field: FieldDef): readonly string[] => {
+export const getValidOperators = (field: ModelField): readonly string[] => {
   if (field.kind === 'enum') return ENUM_OPS;
   if (field.kind !== 'scalar') return [];
   return OPERATORS_BY_TYPE[field.type] ?? [];
 };
 
-export const getDefaultOperator = (field: FieldDef): string =>
+export const getDefaultOperator = (field: ModelField): string =>
   field.kind === 'scalar' ? (DEFAULT_OP_BY_TYPE[field.type] ?? 'equals') : 'equals';
 
-export const isValidOperatorForField = (field: FieldDef, operator: string): boolean =>
+export const isValidOperatorForField = (field: ModelField, operator: string): boolean =>
   getValidOperators(field).includes(operator);

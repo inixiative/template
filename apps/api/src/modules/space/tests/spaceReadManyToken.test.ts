@@ -1,6 +1,13 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import type { Organization, OrganizationUser, Space, SpaceUser, Token, User } from '@template/db';
 import { db } from '@template/db';
+import type {
+  Organization,
+  OrganizationUser,
+  Space,
+  SpaceUser,
+  Token,
+  User,
+} from '@template/db/generated/client/client';
 import { cleanupTouchedTables, createOrganizationUser, createSpace } from '@template/db/test';
 import { spaceRouter } from '#/modules/space';
 import { createTestApp } from '#tests/createTestApp';
@@ -103,7 +110,9 @@ describe('GET /api/v1/space/:id/tokens', () => {
   });
 
   it('returns 403 for user without space access', async () => {
-    const { entity: otherOrgUser, context: otherCtx } = await createOrganizationUser({ role: 'member' });
+    const { entity: otherOrgUser, context: otherCtx } = await createOrganizationUser({
+      role: 'member',
+    });
 
     const otherHarness = createTestApp({
       mockUser: otherCtx.user,

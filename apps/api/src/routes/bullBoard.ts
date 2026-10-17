@@ -19,7 +19,9 @@ const hasCredentials = process.env.BULL_BOARD_USERNAME && process.env.BULL_BOARD
 const createBullBoardRouter = (): OpenAPIHono<AppEnv> => {
   // Non-local requires auth credentials
   if (!isLocal && !hasCredentials) {
-    log.warn('[BullBoard] No auth credentials configured - disabled. Set BULL_BOARD_USERNAME and BULL_BOARD_PASSWORD');
+    log.warn(
+      '[BullBoard] No auth credentials configured - disabled. Set BULL_BOARD_USERNAME and BULL_BOARD_PASSWORD',
+    );
     return new OpenAPIHono<AppEnv>();
   }
 
@@ -28,22 +30,29 @@ const createBullBoardRouter = (): OpenAPIHono<AppEnv> => {
 
   createBullBoard({
     queues: [new BullMQAdapter(queue)],
-    serverAdapter: serverAdapter as unknown as Parameters<typeof createBullBoard>[0]['serverAdapter'],
+    serverAdapter: serverAdapter as unknown as Parameters<
+      typeof createBullBoard
+    >[0]['serverAdapter'],
   });
 
   serverAdapter.setBasePath('/bullBoard');
 
-  const router = serverAdapter.registerPlugin() as unknown as OpenAPIHono<AppEnv>;
+  const pluginRouter = serverAdapter.registerPlugin() as unknown as OpenAPIHono<AppEnv>;
 
-  // Add auth for non-local (we know credentials exist if we're here and not local)
-  if (!isLocal) {
-    router.use(
-      '*',
-      basicAuthMiddleware(process.env.BULL_BOARD_USERNAME!, process.env.BULL_BOARD_PASSWORD!, 'BullBoard'),
-    );
-  }
+  if (isLocal) return pluginRouter;
 
-  return router;
+  const guarded = new OpenAPIHono<AppEnv>();
+  guarded.use(
+    '*',
+    basicAuthMiddleware(
+      process.env.BULL_BOARD_USERNAME!,
+      process.env.BULL_BOARD_PASSWORD!,
+      'BullBoard',
+    ),
+  );
+  guarded.route('/', pluginRouter);
+
+  return guarded;
 };
 
 export const bullBoardRouter = createBullBoardRouter();

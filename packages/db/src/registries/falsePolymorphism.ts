@@ -15,7 +15,7 @@ import type { ModelName } from '@template/db/utils/modelNames';
 // - Immutable fields (type fields are immutable)
 
 // Special non-model values for ownership
-type SpecialOwner = 'default' | 'admin' | 'platform' | 'public' | 'url';
+type SpecialOwner = 'default' | 'admin' | 'platform';
 
 // Valid type values in polymorphic fields (strongly typed)
 export type PolymorphicValue = ModelName | SpecialOwner;
@@ -40,7 +40,7 @@ export type PolymorphicConfig = {
 export type FalsePolymorphismRef = {
   model: ModelName; // The polymorphic model (e.g., CustomerRef)
   axis: string; // Which axis (e.g., customerModel, providerModel)
-  value: PolymorphicValue; // The type value (e.g., User, Organization, Space)
+  value: string; // The type value (e.g., User, Organization, Space)
 };
 
 // Flexible reference: either a direct model name or a false polymorphism reference
@@ -52,75 +52,18 @@ export const isFalsePolymorphismRef = (ref: FlexibleRef): ref is FalsePolymorphi
 
 // Resolve FalsePolymorphismRef to FK field using the registry
 export const resolveFalsePolymorphismRef = (ref: FalsePolymorphismRef): string | null => {
-  const config = PolymorphismRegistry[ref.model];
+  const config = getPolymorphismConfig(ref.model);
   if (!config) return null;
 
   const axis = config.axes.find((a) => a.field === ref.axis);
   if (!axis) return null;
 
-  const fkFields = axis.fkMap[ref.value];
+  const fkFields = (axis.fkMap as Partial<Record<string, string[]>>)[ref.value];
   // Return the first FK field (usually there's just one per type)
   return fkFields?.[0] ?? null;
 };
 
-export const PolymorphismRegistry: Partial<Record<ModelName, PolymorphicConfig>> = {
-  File: {
-    axes: [
-      {
-        field: 'ownerModel',
-        fkMap: { User: ['userId'], Organization: ['organizationId'], Space: ['spaceId'] },
-      },
-    ],
-  },
-
-  Folder: {
-    axes: [
-      {
-        field: 'ownerModel',
-        fkMap: { User: ['userId'], Organization: ['organizationId'], Space: ['spaceId'] },
-      },
-    ],
-  },
-
-  FilePermission: {
-    axes: [
-      {
-        field: 'targetModel',
-        fkMap: { File: ['fileId'], Folder: ['folderId'] },
-      },
-      {
-        field: 'granteeModel',
-        fkMap: {
-          public: [],
-          User: ['granteeUserId'],
-          Organization: ['granteeOrganizationId'],
-          Space: ['granteeSpaceId'],
-          OrganizationUser: ['granteeOrganizationId', 'granteeUserId'],
-          SpaceUser: ['granteeSpaceId', 'granteeUserId'],
-          CustomerRef: ['granteeCustomerRefId'],
-        },
-      },
-    ],
-  },
-
-  ResourceBinding: {
-    axes: [
-      {
-        field: 'sourceModel',
-        fkMap: { File: ['fileId'], url: [] },
-      },
-      {
-        field: 'resourceModel',
-        fkMap: {
-          Organization: ['organizationId'],
-          Space: ['spaceId'],
-          User: ['userId'],
-          CustomerRef: ['customerRefId'],
-        },
-      },
-    ],
-  },
-
+export const PolymorphismRegistry = {
   Token: {
     axes: [
       {
@@ -144,6 +87,21 @@ export const PolymorphismRegistry: Partial<Record<ModelName, PolymorphicConfig>>
           User: ['userId'],
           Organization: ['organizationId'],
           Space: ['spaceId'],
+        },
+      },
+    ],
+  },
+
+  Integration: {
+    axes: [
+      {
+        field: 'ownerModel',
+        fkMap: {
+          User: ['userId'],
+          OrganizationUser: ['organizationId', 'userId'],
+          Organization: ['organizationId'],
+          Space: ['organizationId', 'spaceId'],
+          SpaceUser: ['organizationId', 'spaceId', 'userId'],
         },
       },
     ],
@@ -228,15 +186,39 @@ export const PolymorphismRegistry: Partial<Record<ModelName, PolymorphicConfig>>
       {
         field: 'providerModel',
         fkMap: {
+          User: ['providerUserId'],
+          Organization: ['providerOrganizationId'],
           Space: ['providerSpaceId'],
         },
       },
     ],
     allowedCombinations: {
-      User: ['Space'],
-      Organization: ['Space'],
-      Space: ['Space'],
+      User: ['User', 'Organization', 'Space'],
+      Organization: ['User', 'Organization', 'Space'],
+      Space: ['User', 'Organization', 'Space'],
     },
+  },
+
+  RuleReference: {
+    axes: [
+      {
+        field: 'sourceModel',
+        fkMap: {
+          EmailTemplate: ['sourceEmailTemplateId'],
+          EmailComponent: ['sourceEmailComponentId'],
+          Segment: ['sourceSegmentId'],
+        },
+      },
+      {
+        field: 'targetModel',
+        fkMap: {
+          Tag: ['targetTagId'],
+          Organization: ['targetOrganizationId'],
+          Space: ['targetSpaceId'],
+          Segment: ['targetSegmentId'],
+        },
+      },
+    ],
   },
 
   Inquiry: {
@@ -246,8 +228,12 @@ export const PolymorphismRegistry: Partial<Record<ModelName, PolymorphicConfig>>
         fkMap: {
           admin: [],
           User: ['sourceUserId'],
+          OrganizationUser: ['sourceOrganizationId', 'sourceUserId'],
           Organization: ['sourceOrganizationId'],
           Space: ['sourceSpaceId'],
+          SpaceUser: ['sourceOrganizationId', 'sourceSpaceId', 'sourceUserId'],
+          Integration: ['sourceIntegrationId'],
+          Token: ['sourceTokenId'],
         },
       },
       {
@@ -255,8 +241,12 @@ export const PolymorphismRegistry: Partial<Record<ModelName, PolymorphicConfig>>
         fkMap: {
           admin: [],
           User: ['targetUserId'],
+          OrganizationUser: ['targetOrganizationId', 'targetUserId'],
           Organization: ['targetOrganizationId'],
           Space: ['targetSpaceId'],
+          SpaceUser: ['targetOrganizationId', 'targetSpaceId', 'targetUserId'],
+          Integration: ['targetIntegrationId'],
+          Token: ['targetTokenId'],
         },
       },
     ],
@@ -316,6 +306,32 @@ export const PolymorphismRegistry: Partial<Record<ModelName, PolymorphicConfig>>
           EmailTemplate: ['subjectEmailTemplateId'],
           EmailComponent: ['subjectEmailComponentId'],
           CustomerRef: ['subjectCustomerRefId'],
+          Integration: ['subjectIntegrationId'],
+          Segment: ['subjectSegmentId'],
+        },
+      },
+    ],
+  },
+
+  Segment: {
+    axes: [
+      {
+        field: 'ownerModel',
+        fkMap: {
+          User: ['userId'],
+          Organization: ['organizationId'],
+          Space: ['spaceId'],
+        },
+      },
+    ],
+  },
+
+  IntegrationRecord: {
+    axes: [
+      {
+        field: 'model',
+        fkMap: {
+          CustomerRef: ['customerRefId'],
         },
       },
     ],
@@ -337,8 +353,10 @@ export const PolymorphismRegistry: Partial<Record<ModelName, PolymorphicConfig>>
       },
     ],
   },
-};
+} satisfies Partial<Record<ModelName, PolymorphicConfig>>;
+
+const polymorphicConfigs: Partial<Record<ModelName, PolymorphicConfig>> = PolymorphismRegistry;
 
 // Helper to get config for a model
 export const getPolymorphismConfig = (model: ModelName): PolymorphicConfig | null =>
-  PolymorphismRegistry[model] ?? null;
+  polymorphicConfigs[model] ?? null;

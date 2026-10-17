@@ -1,10 +1,18 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it, spyOn } from 'bun:test';
+import { afterAll, afterEach, beforeAll, describe, expect, it, type Mock, spyOn } from 'bun:test';
 import { clearHookRegistry, db } from '@template/db';
-import { Integration, WebhookModel } from '@template/db/generated/client/enums';
+import { IntegrationOwnerModel, WebhookModel } from '@template/db/generated/client/enums';
 import { auditActorContext, nullAuditActor } from '@template/db/lib/auditActorContext';
-import { cleanupTouchedTables, createUser, createWebhookSubscription } from '@template/db/test';
+import {
+  cleanupTouchedTables,
+  createIntegration,
+  createUser,
+  createWebhookSubscription,
+} from '@template/db/test';
 import { registerWebhookHook } from '#/hooks/webhooks/hook';
 import * as enqueueModule from '#/jobs/enqueue';
+import { processJob } from '#/jobs/processJob';
+import { JobType } from '#/jobs/types';
+import { createMockJob } from '#tests/createTestWorker';
 
 registerWebhookHook();
 
@@ -16,14 +24,17 @@ afterAll(async () => {
 describe('webhook hook', () => {
   describe('with enabled models', () => {
     let userId: string;
-    let enqueueSpy: ReturnType<typeof spyOn>;
+    let enqueueSpy: Mock<typeof enqueueModule.enqueueJob>;
 
     beforeAll(async () => {
       const { entity: user, context } = await createUser();
       userId = user.id;
 
       // Subscribe to CustomerRef - User changes route here via relatedModels
-      await createWebhookSubscription({ model: WebhookModel.CustomerRef, url: 'https://example.com/webhook' }, context);
+      await createWebhookSubscription(
+        { ownerModel: 'User', model: WebhookModel.CustomerRef, url: 'https://example.com/webhook' },
+        context,
+      );
     });
 
     afterEach(() => {
@@ -31,11 +42,12 @@ describe('webhook hook', () => {
     });
 
     it('enqueues webhook job on create', async () => {
-      enqueueSpy = spyOn(enqueueModule, 'enqueueJob').mockResolvedValue({ jobId: 'mock-1', name: 'sendWebhook' });
-
-      const user = await db.user.create({
-        data: { email: `webhook-test-create-${Date.now()}@example.com` },
+      enqueueSpy = spyOn(enqueueModule, 'enqueueJob').mockResolvedValue({
+        jobId: 'mock-1',
+        name: 'sendWebhook',
       });
+
+      const { entity: user } = await createUser();
 
       expect(enqueueSpy).toHaveBeenCalledWith(
         'sendWebhook',
@@ -47,7 +59,10 @@ describe('webhook hook', () => {
     });
 
     it('enqueues webhook job on update with relevant changes', async () => {
-      enqueueSpy = spyOn(enqueueModule, 'enqueueJob').mockResolvedValue({ jobId: 'mock-2', name: 'sendWebhook' });
+      enqueueSpy = spyOn(enqueueModule, 'enqueueJob').mockResolvedValue({
+        jobId: 'mock-2',
+        name: 'sendWebhook',
+      });
 
       await db.user.update({
         where: { id: userId },
@@ -64,7 +79,10 @@ describe('webhook hook', () => {
     });
 
     it('skips webhook for no-op updates (only updatedAt changed)', async () => {
-      enqueueSpy = spyOn(enqueueModule, 'enqueueJob').mockResolvedValue({ jobId: 'mock-3', name: 'sendWebhook' });
+      enqueueSpy = spyOn(enqueueModule, 'enqueueJob').mockResolvedValue({
+        jobId: 'mock-3',
+        name: 'sendWebhook',
+      });
 
       const user = await db.user.findUnique({ where: { id: userId } });
       await db.user.update({
@@ -76,7 +94,10 @@ describe('webhook hook', () => {
     });
 
     it('enqueues webhook job on delete', async () => {
-      enqueueSpy = spyOn(enqueueModule, 'enqueueJob').mockResolvedValue({ jobId: 'mock-4', name: 'sendWebhook' });
+      enqueueSpy = spyOn(enqueueModule, 'enqueueJob').mockResolvedValue({
+        jobId: 'mock-4',
+        name: 'sendWebhook',
+      });
 
       const { entity: tempUser } = await createUser();
       enqueueSpy.mockClear();
@@ -93,7 +114,10 @@ describe('webhook hook', () => {
     });
 
     it('enqueues webhook job on upsert (update path)', async () => {
-      enqueueSpy = spyOn(enqueueModule, 'enqueueJob').mockResolvedValue({ jobId: 'mock-5', name: 'sendWebhook' });
+      enqueueSpy = spyOn(enqueueModule, 'enqueueJob').mockResolvedValue({
+        jobId: 'mock-5',
+        name: 'sendWebhook',
+      });
 
       await db.user.upsert({
         where: { id: userId },
@@ -111,7 +135,10 @@ describe('webhook hook', () => {
     });
 
     it('enqueues webhook job on upsert (create path)', async () => {
-      enqueueSpy = spyOn(enqueueModule, 'enqueueJob').mockResolvedValue({ jobId: 'mock-6', name: 'sendWebhook' });
+      enqueueSpy = spyOn(enqueueModule, 'enqueueJob').mockResolvedValue({
+        jobId: 'mock-6',
+        name: 'sendWebhook',
+      });
 
       const newEmail = `upsert-new-${Date.now()}@example.com`;
       const result = await db.user.upsert({
@@ -132,8 +159,9 @@ describe('webhook hook', () => {
 });
 
 describe('webhook hook — origin suppression', () => {
-  let enqueueSpy: ReturnType<typeof spyOn>;
+  let enqueueSpy: Mock<typeof enqueueModule.enqueueJob>;
   let writeUserId: string;
+  let sfIntegrationId: string;
   let sfSub: { id: string };
   let hsSub: { id: string };
   let plainSub: { id: string };
@@ -141,21 +169,48 @@ describe('webhook hook — origin suppression', () => {
   beforeAll(async () => {
     // Spy before fixtures: createUser triggers the pre-existing subscription's webhook,
     // which in test mode runs sendWebhook for real.
-    enqueueSpy = spyOn(enqueueModule, 'enqueueJob').mockResolvedValue({ jobId: 'mock', name: 'sendWebhook' });
+    enqueueSpy = spyOn(enqueueModule, 'enqueueJob').mockResolvedValue({
+      jobId: 'mock',
+      name: 'sendWebhook',
+    });
 
     const { entity: user, context } = await createUser();
     writeUserId = user.id;
 
+    const { entity: sfIntegration } = await createIntegration(
+      { ownerModel: IntegrationOwnerModel.User, userId: user.id, name: 'Salesforce' },
+      context,
+    );
+    const { entity: hsIntegration } = await createIntegration(
+      { ownerModel: IntegrationOwnerModel.User, userId: user.id, name: 'HubSpot' },
+      context,
+    );
+    sfIntegrationId = sfIntegration.id;
+
     const { entity: sf } = await createWebhookSubscription(
-      { model: WebhookModel.CustomerRef, url: 'https://example.com/webhook-sf', integration: Integration.salesforce },
+      {
+        ownerModel: 'User',
+        model: WebhookModel.CustomerRef,
+        url: 'https://example.com/webhook-sf',
+        integrationId: sfIntegration.id,
+      },
       context,
     );
     const { entity: hs } = await createWebhookSubscription(
-      { model: WebhookModel.CustomerRef, url: 'https://example.com/webhook-hs', integration: Integration.hubspot },
+      {
+        ownerModel: 'User',
+        model: WebhookModel.CustomerRef,
+        url: 'https://example.com/webhook-hs',
+        integrationId: hsIntegration.id,
+      },
       context,
     );
     const { entity: plain } = await createWebhookSubscription(
-      { model: WebhookModel.CustomerRef, url: 'https://example.com/webhook-plain' },
+      {
+        ownerModel: 'User',
+        model: WebhookModel.CustomerRef,
+        url: 'https://example.com/webhook-plain',
+      },
       context,
     );
     sfSub = sf;
@@ -168,14 +223,42 @@ describe('webhook hook — origin suppression', () => {
   });
 
   const deliveredSubIds = () =>
-    enqueueSpy.mock.calls.map(([, payload]) => (payload as { subscriptionId: string }).subscriptionId);
+    enqueueSpy.mock.calls.map(
+      ([, payload]) => (payload as { subscriptionId: string }).subscriptionId,
+    );
 
   it('skips the subscription whose integration is the write origin, delivers to the rest', async () => {
     enqueueSpy.mockClear();
 
-    await auditActorContext.scope({ ...nullAuditActor, originIntegration: Integration.salesforce }, async () => {
-      await db.user.update({ where: { id: writeUserId }, data: { name: 'Origin SF' } });
-    });
+    await auditActorContext.scope(
+      { ...nullAuditActor, integrationId: sfIntegrationId },
+      async () => {
+        await db.user.update({ where: { id: writeUserId }, data: { name: 'Origin SF' } });
+      },
+    );
+
+    const delivered = deliveredSubIds();
+    expect(delivered).toContain(hsSub.id);
+    expect(delivered).toContain(plainSub.id);
+    expect(delivered).not.toContain(sfSub.id);
+  });
+
+  it('skips the subscription of the integration a job writes for', async () => {
+    enqueueSpy.mockClear();
+
+    const handlers = {
+      sendWebhook: async () => {
+        await db.user.update({ where: { id: writeUserId }, data: { name: 'Job for SF' } });
+      },
+    };
+    await processJob(
+      createMockJob({
+        id: 'sync-sf',
+        name: 'sendWebhook',
+        data: { type: JobType.adhoc, payload: { integrationId: sfIntegrationId } },
+      }),
+      { handlers: handlers as never },
+    );
 
     const delivered = deliveredSubIds();
     expect(delivered).toContain(hsSub.id);

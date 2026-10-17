@@ -20,8 +20,11 @@ export const inquiryCreateBodySchema = InquiryScalarInputSchema.omit({ resolutio
 
 export const inquiryCreateSanitizeKeys = [
   'sentAt',
+  'expiresAt',
   'sourceModel',
   'sourceUserId',
   'sourceOrganizationId',
   'sourceSpaceId',
+  'sourceIntegrationId',
+  'sourceTokenId',
 ] as const;

@@ -1,0 +1,27 @@
+// ============================================================================
+// FLOW - A short-lived walk through a registered definition (apps/api/src/modules/flow/definitions)
+// ============================================================================
+
+model Flow {
+  id        String   @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId String @db.VarChar(36)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  flowKey   FlowKey
+  steps     Json
+  returnUrl String?
+
+  // ==========================================================================
+  // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
+  // ==========================================================================
+
+  @@index([userId])
+  @@index([updatedAt])
+}
+
+enum FlowKey {
+  setUpOrganization
+}

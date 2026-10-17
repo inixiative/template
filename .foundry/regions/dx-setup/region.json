@@ -1,0 +1,75 @@
+{
+  "id": "dx-setup",
+  "title": "Dev setup and worktrees",
+  "routing": "Is this about getting the repo running on a machine rather than app logic: bun run setup vs bun run init / init:agent, the local loop (bun run local, turbo watch local#<app>, local:worker#api), Docker services (local:db / start:db, stop:db, reset:db, pg-init.sh, minio-init.sh / minio-provision.sh, wait-postgres.sh, the pinned compose project name), prime seed users and local API tokens, worktrees (worktree:create/list/destroy, slots 1-9, --skip-db, ready / WITH GAPS, bashMainCheckoutGuard, no raw git worktree), local ports from the @inixiative/config ports.json registry, or local debugging (redis-cli, BullBoard, db:studio)?",
+  "concepts": ["dev-setup", "worktrees"],
+  "tokens": 13969,
+  "tokenMethod": "chars/4",
+  "files": {
+    "recognise": {
+      "path": "recognise.md",
+      "tokens": 3203,
+      "experimental": true,
+      "note": "recognise/pick split under test (model round); not the standard"
+    },
+    "knowledge": {
+      "path": "knowledge.md",
+      "tokens": 13969
+    }
+  },
+  "runsAgreed": 0,
+  "sources": {
+    "docs": [
+      "AI/ENTRYPOINT.md",
+      "docs/claude/DATABASE.md",
+      "docs/claude/DEVELOPER.md",
+      "docs/claude/DOCKER.md",
+      "docs/claude/SCRIPTS.md",
+      "docs/claude/SETUP.md"
+    ],
+    "docUnits": [
+      "doc:docs/claude/DEVELOPER.md#development",
+      "doc:docs/claude/DEVELOPER.md#common-commands",
+      "doc:docs/claude/DEVELOPER.md#daily-workflow",
+      "doc:docs/claude/DEVELOPER.md#debugging",
+      "doc:docs/claude/DOCKER.md#quick-start",
+      "doc:docs/claude/DOCKER.md#services",
+      "doc:docs/claude/DOCKER.md#commands",
+      "doc:docs/claude/DOCKER.md#configuration",
+      "doc:docs/claude/DOCKER.md#database-operations",
+      "doc:docs/claude/DOCKER.md#troubleshooting",
+      "doc:docs/claude/SCRIPTS.md#setup-scripts",
+      "doc:docs/claude/SCRIPTS.md#docker",
+      "doc:docs/claude/SETUP.md#prerequisites",
+      "doc:docs/claude/SETUP.md#init-vs-setup",
+      "doc:docs/claude/SETUP.md#quick-start",
+      "doc:docs/claude/SETUP.md#what-setup-does",
+      "doc:docs/claude/SETUP.md#environment-variables",
+      "doc:docs/claude/SETUP.md#database-setup",
+      "doc:docs/claude/SETUP.md#forking-this-template",
+      "doc:docs/claude/DATABASE.md#local-setup",
+      "doc:docs/claude/SCRIPTS.md#worktrees",
+      "doc:AI/ENTRYPOINT.md#0-0-critical-guardrails"
+    ],
+    "catalogClusters": [
+      "build-deploy-ci",
+      "data-models",
+      "database-scripts-migrations",
+      "dev-setup-scripts",
+      "documentation-process",
+      "environment-config",
+      "job-definition-and-enqueue",
+      "module-layout-monorepo",
+      "naming-vocabulary",
+      "outbound-webhooks",
+      "redis-infrastructure",
+      "seeding-data",
+      "storage-clients",
+      "testing-rules"
+    ],
+    "codeEntries": 8,
+    "docMembers": 60
+  },
+  "bypassLines": 14,
+  "glossaryTerms": 21
+}

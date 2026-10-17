@@ -1,6 +1,15 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import type { Inquiry, Organization, OrganizationUser, User } from '@template/db';
-import { InquiryResourceModel, InquiryStatus, InquiryType } from '@template/db/generated/client/enums';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
+import type {
+  Inquiry,
+  Organization,
+  OrganizationUser,
+  User,
+} from '@template/db/generated/client/client';
+import {
+  InquiryResourceModel,
+  InquiryStatus,
+  InquiryType,
+} from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
   createInquiry,
@@ -8,11 +17,10 @@ import {
   createOrganizationUser,
   createUser,
 } from '@template/db/test';
+import { inquiryHandlers } from '#/modules/inquiry/handlers';
 import { organizationRouter } from '#/modules/organization';
 import { createTestApp, type MountFn } from '#tests/createTestApp';
 import { get, json, post } from '#tests/utils/request';
-
-type InquiryList = { data: Inquiry[]; pagination: unknown };
 
 const mount: MountFn[] = [(app) => app.route('/api/v1/organization', organizationRouter)];
 
@@ -29,12 +37,19 @@ describe('GET /api/v1/organization/:id/inquiries/sent', () => {
     admin = u;
     const { entity: o } = await createOrganization();
     org = o;
-    const { entity: ou } = await createOrganizationUser({ role: 'owner' }, { user: admin, organization: org });
+    const { entity: ou } = await createOrganizationUser(
+      { role: 'owner' },
+      { user: admin, organization: org },
+    );
     adminOrgUser = ou;
     const { entity: other } = await createOrganization();
     otherOrg = other;
 
-    const harness = createTestApp({ mockUser: admin, mockOrganizationUsers: [adminOrgUser], mount });
+    const harness = createTestApp({
+      mockUser: admin,
+      mockOrganizationUsers: [adminOrgUser],
+      mount,
+    });
     fetch = harness.fetch;
     db = harness.db;
   });
@@ -67,7 +82,7 @@ describe('GET /api/v1/organization/:id/inquiries/sent', () => {
     });
 
     const response = await fetch(get(`/api/v1/organization/${org.id}/inquiries/sent`));
-    const { data } = await json<InquiryList>(response);
+    const { data } = await json<Inquiry[]>(response);
 
     expect(response.status).toBe(200);
     expect(data.some((i) => i.id === mine.id)).toBe(true);
@@ -76,11 +91,128 @@ describe('GET /api/v1/organization/:id/inquiries/sent', () => {
 
   it('returns 403 for non-owner', async () => {
     const { entity: member } = await createUser();
-    const { entity: memberOu } = await createOrganizationUser({ role: 'member' }, { user: member, organization: org });
+    const { entity: memberOu } = await createOrganizationUser(
+      { role: 'member' },
+      { user: member, organization: org },
+    );
 
-    const memberFetch = createTestApp({ mockUser: member, mockOrganizationUsers: [memberOu], mount }).fetch;
+    const memberFetch = createTestApp({
+      mockUser: member,
+      mockOrganizationUsers: [memberOu],
+      mount,
+    }).fetch;
     const response = await memberFetch(get(`/api/v1/organization/${org.id}/inquiries/sent`));
     expect(response.status).toBe(403);
+  });
+});
+
+describe('POST /api/v1/organization/:id/inquiries — create and send with autoApprove', () => {
+  let fetch: ReturnType<typeof createTestApp>['fetch'];
+  let db: ReturnType<typeof createTestApp>['db'];
+  let org: Organization;
+  const origAutoApprove = inquiryHandlers.inviteOrganizationUser.autoApprove;
+
+  beforeAll(async () => {
+    const { entity: adminUser } = await createUser();
+    const { entity: o } = await createOrganization();
+    org = o;
+    const { entity: adminOu } = await createOrganizationUser(
+      { role: 'admin' },
+      { user: adminUser, organization: org },
+    );
+
+    const harness = createTestApp({ mockUser: adminUser, mockOrganizationUsers: [adminOu], mount });
+    fetch = harness.fetch;
+    db = harness.db;
+  });
+
+  beforeEach(() => {
+    inquiryHandlers.inviteOrganizationUser.autoApprove = async () => true;
+  });
+
+  afterEach(() => {
+    inquiryHandlers.inviteOrganizationUser.autoApprove = origAutoApprove;
+  });
+
+  afterAll(async () => {
+    await cleanupTouchedTables(db);
+  });
+
+  it('auto-approves through the send path and runs handler side effects', async () => {
+    const { entity: invitee } = await createUser();
+
+    const response = await fetch(
+      post(`/api/v1/organization/${org.id}/inquiries`, {
+        type: InquiryType.inviteOrganizationUser,
+        targetModel: InquiryResourceModel.User,
+        status: InquiryStatus.sent,
+        content: { organizationId: org.id, role: 'member' },
+        targetUserId: invitee.id,
+      }),
+    );
+    const { data } = await json<Inquiry>(response);
+
+    expect(response.status).toBe(201);
+    expect(data.status).toBe(InquiryStatus.approved);
+
+    const record = await db.inquiry.findUniqueOrThrow({ where: { id: data.id } });
+    expect(record.status).toBe(InquiryStatus.approved);
+    expect(record.sentAt).not.toBeNull();
+
+    const membership = await db.organizationUser.findUnique({
+      where: { organizationId_userId: { organizationId: org.id, userId: invitee.id } },
+    });
+    expect(membership?.role).toBe('member');
+  });
+
+  it('leaves a draft untouched by autoApprove', async () => {
+    const { entity: invitee } = await createUser();
+
+    const response = await fetch(
+      post(`/api/v1/organization/${org.id}/inquiries`, {
+        type: InquiryType.inviteOrganizationUser,
+        targetModel: InquiryResourceModel.User,
+        content: { organizationId: org.id, role: 'member' },
+        targetUserId: invitee.id,
+      }),
+    );
+    const { data } = await json<Inquiry>(response);
+
+    expect(response.status).toBe(201);
+    expect(data.status).toBe(InquiryStatus.draft);
+    expect(data.sentAt).toBeNull();
+    expect(data.expiresAt).toBeNull();
+  });
+
+  it('refuses a source named by the request body', async () => {
+    const { entity: invitee } = await createUser();
+    const body = {
+      type: InquiryType.inviteOrganizationUser,
+      targetModel: InquiryResourceModel.User,
+      content: { organizationId: org.id, role: 'member' },
+      targetUserId: invitee.id,
+    };
+
+    for (const spoofed of [
+      { sourceIntegrationId: '01a00000-0000-7000-8000-000000000000' },
+      { sourceTokenId: '01a00000-0000-7000-8000-000000000001' },
+    ]) {
+      const rejected = await fetch(
+        post(`/api/v1/organization/${org.id}/inquiries`, { ...body, ...spoofed }),
+      );
+      expect(rejected.status).toBe(422);
+    }
+
+    const response = await fetch(post(`/api/v1/organization/${org.id}/inquiries`, body));
+    const { data } = await json<Inquiry>(response);
+
+    expect(response.status).toBe(201);
+
+    const record = await db.inquiry.findUniqueOrThrow({ where: { id: data.id } });
+    expect(record.sourceModel).toBe(InquiryResourceModel.Organization);
+    expect(record.sourceOrganizationId).toBe(org.id);
+    expect(record.sourceIntegrationId).toBeNull();
+    expect(record.sourceTokenId).toBeNull();
   });
 });
 
@@ -93,7 +225,10 @@ describe('POST /api/v1/organization/:id/inquiries — inviteOrganizationUser (lo
     const { entity: adminUser } = await createUser();
     const { entity: o } = await createOrganization();
     org = o;
-    const { entity: adminOu } = await createOrganizationUser({ role: 'admin' }, { user: adminUser, organization: org });
+    const { entity: adminOu } = await createOrganizationUser(
+      { role: 'admin' },
+      { user: adminUser, organization: org },
+    );
 
     const harness = createTestApp({ mockUser: adminUser, mockOrganizationUsers: [adminOu], mount });
     fetch = harness.fetch;
@@ -143,6 +278,8 @@ describe('POST /api/v1/organization/:id/inquiries — inviteOrganizationUser (lo
     expect(response.status).toBe(201);
     expect(data.status).toBe(InquiryStatus.sent);
     expect(data.sentAt).toBeTruthy();
+    expect(data.expiresAt).not.toBeNull();
+    expect(new Date(data.expiresAt!).getTime()).toBeGreaterThan(Date.now());
   });
 
   it('rejects duplicate open invite to same user', async () => {
@@ -193,7 +330,11 @@ describe('POST /api/v1/organization/:id/inquiries — inviteOrganizationUser (lo
     );
     const { entity: invitee } = await createUser();
 
-    const memberFetch = createTestApp({ mockUser: memberUser, mockOrganizationUsers: [memberOu], mount }).fetch;
+    const memberFetch = createTestApp({
+      mockUser: memberUser,
+      mockOrganizationUsers: [memberOu],
+      mount,
+    }).fetch;
     const response = await memberFetch(
       post(`/api/v1/organization/${org.id}/inquiries`, {
         type: InquiryType.inviteOrganizationUser,
@@ -218,13 +359,27 @@ describe('POST /api/v1/organization/:id/inquiries — inviteOrganizationUser (hi
     const { entity: adminUser } = await createUser();
     const { entity: o } = await createOrganization();
     org = o;
-    const { entity: ownerOu } = await createOrganizationUser({ role: 'owner' }, { user: ownerUser, organization: org });
-    const { entity: adminOu } = await createOrganizationUser({ role: 'admin' }, { user: adminUser, organization: org });
+    const { entity: ownerOu } = await createOrganizationUser(
+      { role: 'owner' },
+      { user: ownerUser, organization: org },
+    );
+    const { entity: adminOu } = await createOrganizationUser(
+      { role: 'admin' },
+      { user: adminUser, organization: org },
+    );
 
-    const ownerHarness = createTestApp({ mockUser: ownerUser, mockOrganizationUsers: [ownerOu], mount });
+    const ownerHarness = createTestApp({
+      mockUser: ownerUser,
+      mockOrganizationUsers: [ownerOu],
+      mount,
+    });
     ownerFetch = ownerHarness.fetch;
     db = ownerHarness.db;
-    adminFetch = createTestApp({ mockUser: adminUser, mockOrganizationUsers: [adminOu], mount }).fetch;
+    adminFetch = createTestApp({
+      mockUser: adminUser,
+      mockOrganizationUsers: [adminOu],
+      mount,
+    }).fetch;
   });
 
   afterAll(async () => {
@@ -305,13 +460,27 @@ describe('POST /api/v1/organization/:id/inquiries — createSpace', () => {
     const { entity: adminUser } = await createUser();
     const { entity: o } = await createOrganization();
     org = o;
-    const { entity: ownerOu } = await createOrganizationUser({ role: 'owner' }, { user: ownerUser, organization: org });
-    const { entity: adminOu } = await createOrganizationUser({ role: 'admin' }, { user: adminUser, organization: org });
+    const { entity: ownerOu } = await createOrganizationUser(
+      { role: 'owner' },
+      { user: ownerUser, organization: org },
+    );
+    const { entity: adminOu } = await createOrganizationUser(
+      { role: 'admin' },
+      { user: adminUser, organization: org },
+    );
 
-    const ownerHarness = createTestApp({ mockUser: ownerUser, mockOrganizationUsers: [ownerOu], mount });
+    const ownerHarness = createTestApp({
+      mockUser: ownerUser,
+      mockOrganizationUsers: [ownerOu],
+      mount,
+    });
     ownerFetch = ownerHarness.fetch;
     db = ownerHarness.db;
-    adminFetch = createTestApp({ mockUser: adminUser, mockOrganizationUsers: [adminOu], mount }).fetch;
+    adminFetch = createTestApp({
+      mockUser: adminUser,
+      mockOrganizationUsers: [adminOu],
+      mount,
+    }).fetch;
   });
 
   afterAll(async () => {
@@ -361,7 +530,10 @@ describe('GET /api/v1/organization/:id/inquiries/received', () => {
     admin = u;
     const { entity: o } = await createOrganization();
     org = o;
-    const { entity: ou } = await createOrganizationUser({ role: 'admin' }, { user: admin, organization: org });
+    const { entity: ou } = await createOrganizationUser(
+      { role: 'admin' },
+      { user: admin, organization: org },
+    );
     adminOu = ou;
     const { entity: other } = await createOrganization();
     otherOrg = other;
@@ -409,7 +581,7 @@ describe('GET /api/v1/organization/:id/inquiries/received', () => {
     });
 
     const response = await fetch(get(`/api/v1/organization/${org.id}/inquiries/received`));
-    const { data } = await json<InquiryList>(response);
+    const { data } = await json<Inquiry[]>(response);
 
     expect(response.status).toBe(200);
     expect(data.some((i) => i.id === mine.id)).toBe(true);

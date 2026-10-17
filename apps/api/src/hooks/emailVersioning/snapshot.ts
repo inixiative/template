@@ -7,7 +7,11 @@
 import { db, Prisma } from '@template/db';
 import { AuditAction, type AuditSubjectModel } from '@template/db/generated/client/enums';
 import { auditActorContext } from '@template/db/lib/auditActorContext';
-import { buildContextFkFields, buildSubjectFkFields, processAuditData } from '#/hooks/auditLog/utils';
+import {
+  buildContextFkFields,
+  buildSubjectFkFields,
+  processAuditData,
+} from '#/hooks/auditLog/utils';
 
 export const createVersionBumpSnapshot = async (
   model: AuditSubjectModel,
@@ -31,6 +35,7 @@ export const createVersionBumpSnapshot = async (
     ipAddress: actor?.ipAddress ?? null,
     userAgent: actor?.userAgent ?? null,
     sourceInquiryId: actor?.sourceInquiryId ?? null,
+    integrationId: actor?.integrationId ?? null,
     ...buildContextFkFields(model, record),
     ...buildSubjectFkFields(model, record),
   };

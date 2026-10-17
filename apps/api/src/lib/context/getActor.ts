@@ -12,14 +12,18 @@ type OrgUserFromToken = NonNullable<TokenWithRelations['organizationUser']>;
 type OrgUserWithoutRelations = Omit<OrgUserFromToken, 'user' | 'organization'>;
 
 type SpaceUserFromToken = NonNullable<TokenWithRelations['spaceUser']>;
-type SpaceUserWithoutRelations = Omit<SpaceUserFromToken, 'user' | 'organization' | 'organizationUser' | 'space'>;
+type SpaceUserWithoutRelations = Omit<
+  SpaceUserFromToken,
+  'user' | 'organization' | 'organizationUser' | 'space'
+>;
 
 export const getActor = (c: Context<AppEnv>) => {
   const token = c.get('token');
   const orgUser = token?.organizationUser;
   const spcUser = token?.spaceUser;
 
-  const organization = orgUser?.organization ?? spcUser?.organization ?? token?.organization ?? null;
+  const organization =
+    orgUser?.organization ?? spcUser?.organization ?? token?.organization ?? null;
   const user = c.get('user') ?? orgUser?.user ?? spcUser?.user ?? token?.user ?? null;
   const space = spcUser?.space ?? token?.space ?? null;
 

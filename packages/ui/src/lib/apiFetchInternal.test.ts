@@ -51,7 +51,10 @@ describe('api transport wrappers', () => {
 
   it('apiFetchInternal forwards request options from generated query keys', async () => {
     const sdkFn = mock(async (opts: SdkOpts) => opts);
-    const fetcher = apiFetchInternal(sdkFn, { token: 'test-token', spoofUserEmail: 'spoof@example.com' });
+    const fetcher = apiFetchInternal(sdkFn, {
+      token: 'test-token',
+      spoofUserEmail: 'spoof@example.com',
+    });
 
     const result = await fetcher({
       queryKey: [
@@ -120,7 +123,11 @@ describe('api transport wrappers', () => {
     const result = await fetcher();
 
     expect(result.data).toEqual([{ id: 1 }, { id: 2 }]);
-    expect((result as Record<string, unknown>).pagination).toEqual({ page: 1, pageSize: 10, total: 2 });
+    expect((result as Record<string, unknown>).pagination).toEqual({
+      page: 1,
+      pageSize: 10,
+      total: 2,
+    });
     expect((result as Record<string, unknown>).response).toBeInstanceOf(Response);
   });
 
@@ -150,7 +157,11 @@ describe('api transport wrappers', () => {
     const result = await fetcher();
 
     expect(result.data).toEqual([{ id: 1 }]);
-    expect((result as Record<string, unknown>).pagination).toEqual({ page: 1, pageSize: 10, total: 1 });
+    expect((result as Record<string, unknown>).pagination).toEqual({
+      page: 1,
+      pageSize: 10,
+      total: 1,
+    });
   });
 
   it('preserves error and response.status when throwOnError is false (404 check pattern)', async () => {
@@ -211,7 +222,9 @@ describe('api transport wrappers', () => {
     );
 
     const handedClient = sdkFn.mock.calls[0][0].client!;
-    expect(headerMap(handedClient.getConfig().headers)['x-spoof-user-email']).toBe('store-spoof@example.com');
+    expect(headerMap(handedClient.getConfig().headers)['x-spoof-user-email']).toBe(
+      'store-spoof@example.com',
+    );
   });
 
   it('apiMutation reads spoofing state from the app store and forwards vars', async () => {
@@ -239,6 +252,8 @@ describe('api transport wrappers', () => {
     );
 
     const handedClient = sdkFn.mock.calls[0][0].client!;
-    expect(headerMap(handedClient.getConfig().headers)['x-spoof-user-email']).toBe('mutation-spoof@example.com');
+    expect(headerMap(handedClient.getConfig().headers)['x-spoof-user-email']).toBe(
+      'mutation-spoof@example.com',
+    );
   });
 });

@@ -1,4 +1,5 @@
 export * from './auditEnabledModels';
+export * from './discriminatorDefaults';
 export {
   type FalsePolymorphismRef,
   type FlexibleRef,
@@ -10,6 +11,7 @@ export {
   PolymorphismRegistry,
   resolveFalsePolymorphismRef,
 } from './falsePolymorphism';
+export * from './hardDeleteOnTombstone';
 export * from './ignoreFields';
 export * from './orderedList';
 export * from './redactFields';

@@ -1,0 +1,41 @@
+{
+  "id": "database-tooling",
+  "title": "Database scripts and seeding",
+  "routing": "Is this about moving schema or data in and out of a database-client / data-modeling rather than querying it? Signals: running or wiring `bun run db:generate` / `db:push` / `db:push:dev` / `db:push:force` / `db:migrate` / `db:deploy` / `db:studio`, `db:dump` / `db:restore` / `db:clone` / `db:truncate:webhooks`, `reset:db`, scripts/db/*.sh (clone, dump, restore, release), choosing push versus a migration file, or adding and running seed data: packages/db/prisma/seeds/*.seed.ts, a `SeedFile`, seeds/index.ts order, `prime: true`, `db:seed --prime`, seed / seedTable.",
+  "concepts": ["db-scripts", "seeding"],
+  "tokens": 7291,
+  "tokenMethod": "chars/4",
+  "files": {
+    "recognise": {
+      "path": "recognise.md",
+      "tokens": 1496,
+      "experimental": true,
+      "note": "recognise/pick split under test (model round); not the standard"
+    },
+    "knowledge": {
+      "path": "knowledge.md",
+      "tokens": 7291
+    }
+  },
+  "runsAgreed": 0,
+  "sources": {
+    "docs": ["docs/claude/DATABASE.md", "docs/claude/SCRIPTS.md"],
+    "docUnits": [
+      "doc:docs/claude/DATABASE.md#scripts",
+      "doc:docs/claude/SCRIPTS.md#database",
+      "doc:docs/claude/DATABASE.md#seeding"
+    ],
+    "catalogClusters": [
+      "database-scripts-migrations",
+      "module-layout-monorepo",
+      "outbound-webhooks",
+      "prisma-schema-introspection",
+      "request-response-schemas",
+      "seeding-data"
+    ],
+    "codeEntries": 26,
+    "docMembers": 15
+  },
+  "bypassLines": 4,
+  "glossaryTerms": 22
+}

@@ -20,10 +20,14 @@ export const organizationReadManyUsersController = makeController(
     const db = c.get('db');
     const org = getResource<'organization'>(c);
 
-    const { data: users, pagination } = await paginate<typeof db.user, UserWithOrgUsers>(c, db.user, {
-      where: { organizationUsers: { some: { organizationId: org.id } } },
-      include: { organizationUsers: { where: { organizationId: org.id } } },
-    });
+    const { data: users, pagination } = await paginate<typeof db.user, UserWithOrgUsers>(
+      c,
+      db.user,
+      {
+        where: { organizationUsers: { some: { organizationId: org.id } } },
+        include: { organizationUsers: { where: { organizationId: org.id } } },
+      },
+    );
 
     const data = users.map(({ organizationUsers, ...user }) => ({
       ...user,

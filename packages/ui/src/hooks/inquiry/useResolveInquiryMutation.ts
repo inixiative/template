@@ -8,12 +8,12 @@ import { inquiryResolve } from '@template/sdk';
 import { useInquiryResolutionEffects } from '@template/ui/hooks/inquiry/useInquiryResolutionEffects';
 import { useOptimisticMutation } from '@template/ui/hooks/useOptimisticMutation';
 import { apiMutation } from '@template/ui/lib/apiMutation';
-import type { InquiryMeta } from '@template/ui/lib/inquiries/queryKeys';
+import type { InquiryMeta, InquiryResolutionStatus } from '@template/ui/lib/inquiries/queryKeys';
 import { targetMutations } from '@template/ui/lib/inquiries/queryKeys';
 
 type ResolveVars = {
   inquiry: InquiryMeta;
-  status: 'approved' | 'denied' | 'changesRequested';
+  status: InquiryResolutionStatus;
 };
 
 export const useResolveInquiryMutation = () => {

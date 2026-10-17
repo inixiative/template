@@ -28,10 +28,18 @@ model CommunicationLog {
   recipientContact   Contact? @relation(fields: [recipientContactId], references: [id], onDelete: SetNull)
   address            String
 
+  settledMjml  String? @db.Text
+  variables    Json?
+  // Typed render issues the send proceeded past (the registry entry opted into degrade). Null = clean.
+  renderIssues Json?
+
   idempotencyKey    String    @unique
   providerMessageId String?
   error             String?
+  reasonCode        CommunicationReasonCode?
   sentAt            DateTime?
+
+  componentVersions CommunicationComponentVersion[]
 
   @@index([sendKey])
   @@index([emailTemplateId])
@@ -44,11 +52,44 @@ model CommunicationLog {
   @@index([status])
 }
 
+model CommunicationComponentVersion {
+  id        String   @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime @default(now())
+
+  communicationLogId String           @db.VarChar(36)
+  communicationLog   CommunicationLog @relation(fields: [communicationLogId], references: [id], onDelete: Cascade)
+
+  slug String
+
+  emailComponentId String?         @db.VarChar(36)
+  emailComponent   EmailComponent? @relation(fields: [emailComponentId], references: [id], onDelete: SetNull)
+
+  emailComponentAuditLogId String?   @db.VarChar(36)
+  emailComponentAuditLog   AuditLog? @relation("CommunicationComponentVersionAuditLog", fields: [emailComponentAuditLogId], references: [id], onDelete: SetNull)
+
+  @@unique([communicationLogId, slug])
+  @@index([emailComponentId])
+  @@index([emailComponentAuditLogId])
+}
+
 enum CommunicationChannel {
   email
   sms
   push
   inApp
+}
+
+enum CommunicationReasonCode {
+  render_failed
+  rate_limit_exhausted
+  transient_exhausted
+  ambiguous_timeout
+  quota_exceeded
+  permanent
+  auth
+  validation
+  not_found
+  send_error
 }
 
 enum CommunicationStatus {

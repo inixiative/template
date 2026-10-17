@@ -24,7 +24,9 @@ export const useAuthProviders = () => {
 
   const platformQuery = useQuery({
     queryKey: ['authProviders', 'platform'],
-    queryFn: apiQuery((opts: Parameters<typeof authProviderReadMany>[0]) => authProviderReadMany(opts)),
+    queryFn: apiQuery((opts: Parameters<typeof authProviderReadMany>[0]) =>
+      authProviderReadMany(opts),
+    ),
     enabled: !organizationId,
     retry: 2,
   });

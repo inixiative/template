@@ -15,7 +15,7 @@ import { resolve } from 'node:path';
 // gets reverted, openapi-ts will drop the querySerializer and the client
 // will crash again at request time — this guard catches it at test time.
 
-const SDK_PATH = resolve(__dirname, '../../../sdk/src/sdk.gen.ts');
+const SDK_PATH = resolve(__dirname, '../../../sdk/src/generated/sdk.gen.ts');
 
 const ADMIN_READ_MANY_FNS = [
   'adminAuditLogReadMany',
@@ -25,7 +25,8 @@ const ADMIN_READ_MANY_FNS = [
   'adminWebhookSubscriptionReadMany',
 ];
 
-const QUERY_SERIALIZER_LITERAL = "querySerializer: { parameters: { searchFields: { object: { style: 'form' } } } }";
+const QUERY_SERIALIZER_LITERAL =
+  "querySerializer: { parameters: { searchFields: { object: { style: 'form' } } } }";
 
 describe('admin readMany SDK querySerializer', () => {
   const sdk = readFileSync(SDK_PATH, 'utf8');

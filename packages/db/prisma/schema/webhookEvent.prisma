@@ -3,12 +3,13 @@
 // ============================================================================
 
 model WebhookEvent {
-  id        String             @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
-  createdAt DateTime           @default(now())
-  status    WebhookEventStatus
-  action    WebhookEventAction
-  payload   Json?
-  error     String?
+  id         String             @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt  DateTime           @default(now())
+  status     WebhookEventStatus
+  action     WebhookEventAction
+  payload    Json?
+  error      String?
+  httpStatus Int?
 
   // Relations
   webhookSubscriptionId String              @db.VarChar(36)

@@ -4,7 +4,6 @@
  * @partOf infrastructure:prisma
  * @uses infrastructure:redis
  */
-import type { Db } from '@template/db/clientTypes';
 import { fetchOne } from '@template/db/hydrate/fetchOne';
 import type { HydratedRecord } from '@template/db/hydrate/types';
 import { cacheKey } from '@template/db/redis';
@@ -31,7 +30,6 @@ const resolveIdentifier = (record: HydratedRecord, fk: Identifier): Identifier |
 };
 
 export const hydrate = async <T extends HydratedRecord>(
-  db: Db,
   accessor: AccessorName,
   record: T,
   pending: PendingMap = new Map(),
@@ -47,13 +45,13 @@ export const hydrate = async <T extends HydratedRecord>(
 
     const key = cacheKey(rel.targetAccessor, identifier);
     if (!pending.has(key)) {
-      pending.set(key, fetchOne<HydratedRecord>(db, rel.targetAccessor, identifier));
+      pending.set(key, fetchOne<HydratedRecord>(rel.targetAccessor, identifier));
     }
 
     const related = await pending.get(key)!;
     if (!related) return { name: rel.relationName, value: null };
 
-    const hydrated = await hydrate(db, rel.targetAccessor, related, pending);
+    const hydrated = await hydrate(rel.targetAccessor, related, pending);
     return { name: rel.relationName, value: hydrated };
   });
 

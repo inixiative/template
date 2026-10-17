@@ -1,6 +1,6 @@
 // Database client with scope/transaction methods
 export { db } from './client';
-export type { Db } from './clientTypes';
+export type { Db, FinallyFn, FindForUpdateOptions } from './clientTypes';
 // Mutation lifecycle hooks
 export {
   clearHookRegistry,
@@ -12,7 +12,8 @@ export {
   type ManyAction,
   registerDbHook,
   type SingleAction,
-} from './extensions/mutationLifeCycle';
+  unregisterDbHook,
+} from './extensions/hookRegistry';
 // Prisma namespace for advanced types (Prisma.UserWhereInput, etc.)
 export { Prisma } from './generated/client/client';
 // Scalar schemas (model schemas without relations)
@@ -23,9 +24,29 @@ export type { HydratedRecord, HydrateInclude, Identifier } from './hydrate';
 // Hydration
 export { fetchOne, hydrate } from './hydrate';
 // Supersede lanes (last-claim-wins coordination batons)
-export { claimLane, laneKey, watchLane } from './lanes';
+export {
+  claimLane,
+  getJobSupersededBy,
+  holdLaneWhileParked,
+  laneKey,
+  reclaimLane,
+  releaseLane,
+  supersededKey,
+  tombstoneJob,
+  watchLane,
+} from './lanes';
 // Distributed lock
-export { createLock, type Lock, type LockOptions } from './lock';
+export {
+  type AcquireOptions,
+  createLock,
+  FindForUpdateLockTimeoutError,
+  type Lock,
+  type LockLostReason,
+  type LockOptions,
+  type LockRedis,
+  type LockReleaseResult,
+  maxSafeHeartbeatMs,
+} from './lock';
 // Redis client and cache utilities
 export {
   cache,
@@ -36,8 +57,23 @@ export {
   getRedisClient,
   getRedisPub,
   getRedisSub,
+  getRollingCache,
+  listRollingCaches,
+  MAX_ROLLING_CACHE_TARGETS,
+  MIN_ROLLING_CACHE_INTERVAL_SECONDS,
+  makeRollingCache,
+  type RedisEval,
   type RedisNamespace,
+  type RegisteredRollingCache,
+  ROLLING_CACHE_LEAF_ATTEMPTS,
+  ROLLING_CACHE_TICK_SECONDS,
+  type RollingCache,
+  type RollingCacheConfig,
+  type RollingCacheFindManyArgs,
+  type RollingCacheTarget,
+  type RollingCacheTargets,
   redisNamespace,
+  unregisterRollingCache,
   upsertCache,
 } from './redis';
 // Registries (schema-level configuration)
@@ -46,9 +82,30 @@ export * from './registries';
 export * from './typedModelIds';
 // biome-ignore lint/complexity/noBannedTypes: Prisma GetPayload generics require {}
 export type PrismaBaseArgs = {};
+export {
+  type EnumField,
+  isScalarField,
+  type ModelField,
+  type RelationField,
+  type ScalarField,
+} from '@inixiative/prisma-map';
+export {
+  POLYMORPHIC_BINDS,
+  type PolymorphicKind,
+  polymorphicBindings,
+  polymorphicIs,
+  polymorphicKeyColumn,
+  polymorphicTarget,
+} from './registries/polymorphicIs';
 // User with relations type and schema
 export type { UserWithRelations } from './types/userWithRelations';
 export { UserWithRelationsSchema } from './types/userWithRelations';
+export {
+  admitRuleReferences,
+  type ReferenceScope,
+  type ReferenceScopes,
+  type RuleReferenceAdmission,
+} from './utils/admitRuleReferences';
 // SQL utilities
 export { aliasColumns } from './utils/aliasColumns';
 // Type-safe delegate helpers (pass-the-delegate pattern)
@@ -67,6 +124,12 @@ export {
   type RuntimeDelegate,
   update,
 } from './utils/delegates';
+export { hasDeletedAt, lookupField, modelFields, SOFT_DELETE_MODELS } from './utils/fieldMetadata';
+// Prisma error narrowing
+export { isUniqueConstraintError } from './utils/isUniqueConstraintError';
+export { isWriteConflictError } from './utils/isWriteConflictError';
+// Rule references: the rows a stored rule names, as edges
+export { lockedTargetStates, type TargetState } from './utils/lockedTargetStates';
 // Model name utilities
 export {
   type AccessorName,
@@ -83,6 +146,39 @@ export {
 } from './utils/modelNames';
 // Relation introspection, derived from the generated prismaMap (single source of truth)
 export { getModelRelations } from './utils/prismaMapRelations';
+export { revive } from './utils/revive';
+export { RULE_REFERENCEABLE_MODELS } from './utils/ruleReferenceable';
+export { RuleReferenceError } from './utils/ruleReferenceError';
+export {
+  liveRuleReferenceKeys,
+  liveRuleReferences,
+  type RuleReferenceIssue,
+  type RuleReferenceRow,
+  ruleHealthFromEdges,
+  ruleReferenceIssues,
+} from './utils/ruleReferenceHealth';
+export {
+  type DynamicRuleReference,
+  dynamicRuleReferences,
+  ruleReferences,
+} from './utils/ruleReferences';
+export {
+  compiledSourceWhere,
+  type SourceQueryScope,
+  sourceQueryValues,
+} from './utils/sourceQueryValues';
+export { sourceQueryWhere } from './utils/sourceQueryWhere';
+export {
+  type RuleReferenceGate,
+  type RuleReferenceSource,
+  syncRuleReferenceEdges,
+} from './utils/syncRuleReferenceEdges';
+export { type NodeContext, type NodeScope, walkWhere } from './utils/whereWalker';
+export {
+  type RuleValidation,
+  type ValidateRuleForLensOptions,
+  validateRuleForLens,
+} from './validations/validateRuleForLens';
 
 // Hook shared utilities (ignore fields, redact fields)
 

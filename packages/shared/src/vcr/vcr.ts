@@ -18,7 +18,7 @@ export type Fixture<T = unknown> = {
 };
 
 type Sanitizer = {
-  fn?: (s: string) => string;
+  fn?: (data: unknown) => unknown;
   keys?: string[];
   isArray?: boolean;
   binaryExtension?: string;
@@ -79,7 +79,8 @@ export class VCR {
         if (saved.status >= 400) {
           throw new Error(typeof saved.body === 'string' ? saved.body : JSON.stringify(saved.body));
         }
-        if (saved.bodyFile) return readFileSync(join(dirname(fixturePath), saved.bodyFile)) as unknown as T;
+        if (saved.bodyFile)
+          return readFileSync(join(dirname(fixturePath), saved.bodyFile)) as unknown as T;
         return saved.body as T;
       }
       log.warn(
@@ -140,7 +141,8 @@ export class VCR {
     const cached = VCR.versionCache.get(this.service);
     if (cached !== undefined) return cached;
     const resolved = await this.versionFn();
-    if (!resolved) throw new Error(`VCR: version callback resolved to empty string (service=${this.service})`);
+    if (!resolved)
+      throw new Error(`VCR: version callback resolved to empty string (service=${this.service})`);
     VCR.versionCache.set(this.service, resolved);
     return resolved;
   }
@@ -160,7 +162,12 @@ export class VCR {
       const sidecarPath = join(dirname(fixturePath), sidecarName);
       mkdirSync(dirname(sidecarPath), { recursive: true });
       writeFileSync(sidecarPath, body as Uint8Array);
-      this.__save(fixturePath, { version, status, bodyFile: sidecarName, ...(headers && { headers }) });
+      this.__save(fixturePath, {
+        version,
+        status,
+        bodyFile: sidecarName,
+        ...(headers && { headers }),
+      });
       return { status, body: body as T, ...(headers && { headers }) };
     }
     this.__save(fixturePath, { version, status, body, ...(headers && { headers }) });
@@ -178,9 +185,9 @@ export class VCR {
   }
 
   private __applyRule<T>(rule: Sanitizer, data: T): T {
-    if (rule.fn && typeof data === 'string') return rule.fn(data) as unknown as T;
-    if (rule.keys?.length) return redactKeys(data, rule.keys);
-    return data;
+    const transformed = rule.fn ? (rule.fn(data) as T) : data;
+    if (rule.keys?.length) return redactKeys(transformed, rule.keys);
+    return transformed;
   }
 
   private __popFixturePath(method: string): string {

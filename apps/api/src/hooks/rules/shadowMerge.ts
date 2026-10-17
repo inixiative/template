@@ -1,3 +1,8 @@
+/**
+ * @atlas
+ * @kind hook
+ * @partOf infrastructure:prisma
+ */
 import { castArray, cloneDeep } from 'lodash-es';
 
 type PrismaOp = {

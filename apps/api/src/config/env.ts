@@ -5,13 +5,39 @@
  * @uses primitive:shared
  */
 import { encryptionEnv } from '@template/db/lib/encryption/envValidation';
-import { isTest } from '@template/shared/utils';
+import { type EnvOverrideParser, isTest, wrapEnvWithOverrides } from '@template/shared/utils';
 import { z } from 'zod';
 
 const { fields: encryptionFields, applyRefinements: applyEncryptionRefinements } = encryptionEnv();
 
-const preprocessEnv = (env: Record<string, string | undefined>): Record<string, string | undefined> => {
-  return Object.fromEntries(Object.entries(env).filter(([, value]) => value !== ''));
+const jobEnvFields = {
+  JOBS_WORKER_CONCURRENCY: z.coerce.number().int().positive().default(10),
+  JOBS_MAX_QUEUE_DEPTH: z.coerce.number().int().positive().default(10_000),
+  JOBS_OUTBOX_FLUSH_MAX_ROWS: z.coerce.number().int().positive().default(1000),
+  JOBS_OUTBOX_FLUSH_LINGER_MS: z.coerce.number().int().nonnegative().default(200),
+  JOBS_OVERFLOW_STUCK_MS: z.coerce.number().int().positive().default(300_000),
+  JOBS_OVERFLOW_TTL_MS: z.coerce.number().int().positive().default(60_000),
+  JOBS_SLOW_QUEUE_DEPTH_FRACTION: z.coerce.number().min(0).max(1).default(0.5),
+  JOBS_SLOW_SLOT_FRACTION: z.coerce.number().min(0).max(1).default(0.5),
+  JOBS_SLOW_PARK_MAX_MS: z.coerce.number().int().min(1_000).default(60_000),
+  EMAIL_SLOW_LANE_MIN_RECIPIENTS: z.coerce.number().int().nonnegative().default(25),
+};
+
+const parseJobEnvOverride: EnvOverrideParser = (key, override, current) => {
+  if (!(key in jobEnvFields)) return override;
+  const parsedOverride = jobEnvFields[key as keyof typeof jobEnvFields].safeParse(override);
+  return parsedOverride.success ? parsedOverride.data : current;
+};
+
+const preprocessEnv = (
+  env: Record<string, string | undefined>,
+): Record<string, string | undefined> => {
+  return Object.fromEntries(
+    Object.entries(env).filter(
+      ([key, value]) =>
+        value !== '' || (key.startsWith('OTEL_EXPORTER_OTLP_') && key.endsWith('_HEADERS')),
+    ),
+  );
 };
 
 // .passthrough() so unknown keys (NODE_ENV, PROJECT_NAME, etc.) survive — we
@@ -23,10 +49,13 @@ const baseEnvSchema = z
     DATABASE_URL: z.string(),
     BETTER_AUTH_SECRET: z.string().min(32),
     REDIS_URL: z.string(),
+    REDIS_BULLMQ_URL: z.string().optional(),
 
     // Core (defaults)
     PORT: z.coerce.number().default(8000),
-    LOG_LEVEL: z.enum(['silent', 'fatal', 'error', 'warn', 'log', 'info', 'debug', 'trace', 'verbose']).optional(),
+    LOG_LEVEL: z
+      .enum(['silent', 'fatal', 'error', 'warn', 'log', 'info', 'debug', 'trace', 'verbose'])
+      .optional(),
 
     // URLs
     API_URL: z.string().url(),
@@ -47,7 +76,7 @@ const baseEnvSchema = z
     SENTRY_DSN: z.string().optional(),
 
     // OTEL (optional integration)
-    OTEL_ENABLED: z.coerce.boolean().default(false),
+    OTEL_ENABLED: z.enum(['true', 'false']).optional(),
     OTEL_EXPORTER_OTLP_ENDPOINT: z.string().optional(),
     OTEL_EXPORTER_OTLP_HEADERS: z.string().optional(),
     OTEL_SERVICE_NAME: z.string().optional(),
@@ -58,6 +87,7 @@ const baseEnvSchema = z
 
     // Job tuning
     AUDIT_LOG_RETENTION_DAYS: z.coerce.number().int().positive().default(2555),
+    ...jobEnvFields,
 
     // Stripe (optional integration)
     STRIPE_SECRET_KEY: z.string().optional(),
@@ -84,4 +114,7 @@ declare global {
 const parsed = isTest
   ? baseEnvSchema.partial().parse(preprocessEnv(process.env))
   : envSchema.parse(preprocessEnv(process.env));
-process.env = parsed as unknown as NodeJS.ProcessEnv;
+// In test the parsed env is wrapped so setEnvOverride/withEnv overrides win over reads.
+process.env = (isTest
+  ? wrapEnvWithOverrides(parsed, parseJobEnvOverride)
+  : parsed) as unknown as NodeJS.ProcessEnv;

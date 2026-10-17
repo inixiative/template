@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import type { z } from '@hono/zod-openapi';
-import type { Organization, OrganizationUser, User } from '@template/db';
+import type { Organization, OrganizationUser, User } from '@template/db/generated/client/client';
 import { cleanupTouchedTables, createOrganizationUser } from '@template/db/test';
 import { organizationUserRouter } from '#/modules/organizationUser';
 import type { organizationUserUpdateRoute } from '#/modules/organizationUser/routes/organizationUserUpdate';
@@ -36,9 +36,14 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
   });
 
   it('updates the role', async () => {
-    const { entity: member } = await createOrganizationUser({ role: 'member' }, { organization: org });
+    const { entity: member } = await createOrganizationUser(
+      { role: 'member' },
+      { organization: org },
+    );
 
-    const response = await fetch(patch(`/api/v1/organizationUser/${member.id}`, { role: 'viewer' }));
+    const response = await fetch(
+      patch(`/api/v1/organizationUser/${member.id}`, { role: 'viewer' }),
+    );
     const { data } = await json<UpdateOrgUserResponse>(response);
 
     expect(response.status).toBe(200);

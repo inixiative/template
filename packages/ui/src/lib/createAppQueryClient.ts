@@ -1,17 +1,18 @@
 /**
  * @atlas
- * @kind factory
+ * @kind constructor
+ * @constructs queryClient
  * @partOf primitive:ui
  * @uses none
  */
 import { MutationCache, QueryCache, QueryClient } from '@tanstack/react-query';
+import type { Flow } from '@template/sdk';
+import { flowReadQueryKeyFor } from '@template/ui/lib/flows/flowReadQuery';
 import { handleApiError, shouldSkipToast } from '@template/ui/lib/handleApiError';
+import { useAppStore } from '@template/ui/store';
 
-// The app's QueryClient. Created once at the app root (beside the router) and handed to both the
-// provider and the store — see each app's main.tsx. Construction lives outside the store so the
-// store never depends on it (its error handlers read the store, not the other way around).
-export const createAppQueryClient = (): QueryClient =>
-  new QueryClient({
+export const createAppQueryClient = (): QueryClient => {
+  const queryClient = new QueryClient({
     queryCache: new QueryCache({
       onError: (error, query) => {
         if (shouldSkipToast(query.meta)) return;
@@ -19,6 +20,14 @@ export const createAppQueryClient = (): QueryClient =>
       },
     }),
     mutationCache: new MutationCache({
+      onSuccess: (_data, _variables, _context, mutation) => {
+        const { flowId } = useAppStore.getState().navigation;
+        if (!flowId || mutation.meta?.skipFlowInvalidate) return;
+        const queryKey = flowReadQueryKeyFor(flowId);
+        const flow = queryClient.getQueryData<Flow>(queryKey);
+        if (flow && flow.currentStep >= flow.steps.length) return;
+        void queryClient.invalidateQueries({ queryKey });
+      },
       onError: (error, _variables, _context, mutation) => {
         if (shouldSkipToast(mutation.meta)) return;
         handleApiError(error);
@@ -35,3 +44,6 @@ export const createAppQueryClient = (): QueryClient =>
       },
     },
   });
+  useAppStore.getState().setClient(queryClient);
+  return queryClient;
+};

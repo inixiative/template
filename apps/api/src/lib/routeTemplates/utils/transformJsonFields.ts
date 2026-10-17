@@ -27,7 +27,9 @@ const InputJsonValueSchema: z.ZodType<unknown> = z
     example: { key: 'value' },
   });
 
-export const transformJsonFields = (shape: Record<string, z.ZodTypeAny>): Record<string, z.ZodTypeAny> => {
+export const transformJsonFields = (
+  shape: Record<string, z.ZodTypeAny>,
+): Record<string, z.ZodTypeAny> => {
   const replaceUnknown = (field: z.ZodTypeAny): z.ZodTypeAny => {
     if (field instanceof z.ZodUnknown) return InputJsonValueSchema;
 

@@ -13,7 +13,10 @@ import type { AppStore } from '@template/ui/store/types';
 import type { PermissionsSlice } from '@template/ui/store/types/permissions';
 import { createStore, type StateCreator, type StoreApi } from 'zustand';
 
-const createTestPermissionsSlice: StateCreator<AppStore, [], [], PermissionsSlice> = (set, _get) => {
+const createTestPermissionsSlice: StateCreator<AppStore, [], [], PermissionsSlice> = (
+  set,
+  _get,
+) => {
   const makeMockPermix = (): Permix => ({
     check: () => false,
     setup: async () => {},

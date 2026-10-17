@@ -17,7 +17,9 @@ type UpdateVars = {
 
 export const useUpdateInquiryMutation = () => {
   return useOptimisticMutation<unknown, Error, UpdateVars>({
-    mutationFn: apiMutation(({ inquiry, body }: UpdateVars) => inquiryUpdate({ path: { id: inquiry.id }, body })),
+    mutationFn: apiMutation(({ inquiry, body }: UpdateVars) =>
+      inquiryUpdate({ path: { id: inquiry.id }, body }),
+    ),
     targets: ({ inquiry, body }) =>
       sourceMutations[inquiry.type](inquiry).map((queryKey) => ({
         queryKey,

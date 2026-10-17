@@ -1,0 +1,9 @@
+name: template-monitoring
+services:
+  collector:
+    image: otel/opentelemetry-collector:0.149.0
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./collector.yaml:/etc/otelcol/config.yaml:ro
+    ports:
+      - "127.0.0.1:${OTEL_PORT:-4318}:4318"

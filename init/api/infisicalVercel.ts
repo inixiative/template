@@ -35,13 +35,16 @@ class InfisicalVercelApi {
     service: 'infisical|vercel',
     // Composite: either CLI bumping should invalidate cassettes since
     // both shape the Infisical-Vercel connection payload.
-    version: async () => (await Promise.all([cliVersion('infisical'), cliVersion('vercel')])).join('|'),
+    version: async () =>
+      (await Promise.all([cliVersion('infisical'), cliVersion('vercel')])).join('|'),
     sanitizers: {
       createVercelConnection: { fn: () => 'REDACTED' },
     },
   });
 
-  async listVercelConnections(infisicalProjectId: string): Promise<Array<{ id: string; name: string }>> {
+  async listVercelConnections(
+    infisicalProjectId: string,
+  ): Promise<Array<{ id: string; name: string }>> {
     return this.vcr.capture('listVercelConnections', async () => {
       const infisicalToken = await getInfisicalToken();
       const response = await fetch(
@@ -49,9 +52,13 @@ class InfisicalVercelApi {
         { method: 'GET', headers: { Authorization: `Bearer ${infisicalToken}` } },
       );
       if (!response.ok) {
-        throw new Error(`Failed to list Vercel connections: ${response.statusText}\n${await response.text()}`);
+        throw new Error(
+          `Failed to list Vercel connections: ${response.statusText}\n${await response.text()}`,
+        );
       }
-      const data = (await response.json()) as { appConnections?: Array<{ id: string; name: string }> };
+      const data = (await response.json()) as {
+        appConnections?: Array<{ id: string; name: string }>;
+      };
       return data.appConnections ?? [];
     });
   }
@@ -64,7 +71,9 @@ class InfisicalVercelApi {
         { method: 'GET', headers: { Authorization: `Bearer ${infisicalToken}` } },
       );
       if (!response.ok) {
-        throw new Error(`Failed to list Vercel syncs: ${response.statusText}\n${await response.text()}`);
+        throw new Error(
+          `Failed to list Vercel syncs: ${response.statusText}\n${await response.text()}`,
+        );
       }
       const data = (await response.json()) as { secretSyncs?: VercelSecretSync[] };
       return data.secretSyncs ?? [];
@@ -77,7 +86,9 @@ class InfisicalVercelApi {
     connectionName: string,
   ): Promise<string> {
     return this.vcr.capture('createVercelConnection', async () => {
-      const existing = (await this.listVercelConnections(infisicalProjectId)).find((c) => c.name === connectionName);
+      const existing = (await this.listVercelConnections(infisicalProjectId)).find(
+        (c) => c.name === connectionName,
+      );
       if (existing) return existing.id;
 
       const infisicalToken = await getInfisicalToken();
@@ -92,7 +103,9 @@ class InfisicalVercelApi {
         }),
       });
       if (!response.ok) {
-        throw new Error(`Failed to create Vercel connection: ${response.statusText}\n${await response.text()}`);
+        throw new Error(
+          `Failed to create Vercel connection: ${response.statusText}\n${await response.text()}`,
+        );
       }
       const data = (await response.json()) as { appConnection?: { id?: string }; id?: string };
       const connectionId = data.appConnection?.id ?? data.id;
@@ -137,7 +150,9 @@ class InfisicalVercelApi {
         }),
       });
       if (!response.ok) {
-        throw new Error(`Failed to create Vercel sync: ${response.statusText}\n${await response.text()}`);
+        throw new Error(
+          `Failed to create Vercel sync: ${response.statusText}\n${await response.text()}`,
+        );
       }
       const data = (await response.json()) as { secretSync?: { id?: string }; id?: string };
       const syncId = data.secretSync?.id ?? data.id;
@@ -149,19 +164,26 @@ class InfisicalVercelApi {
   async deleteVercelSync(syncId: string): Promise<void> {
     return this.vcr.capture('deleteVercelSync', async () => {
       const infisicalToken = await getInfisicalToken();
-      const response = await fetch(`https://app.infisical.com/api/v1/secret-syncs/vercel/${syncId}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${infisicalToken}` },
-      });
+      const response = await fetch(
+        `https://app.infisical.com/api/v1/secret-syncs/vercel/${syncId}`,
+        {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${infisicalToken}` },
+        },
+      );
       if (!response.ok) {
-        throw new Error(`Failed to delete Vercel sync: ${response.statusText}\n${await response.text()}`);
+        throw new Error(
+          `Failed to delete Vercel sync: ${response.statusText}\n${await response.text()}`,
+        );
       }
     });
   }
 
   async ensureVercelSync(input: EnsureVercelSyncInput): Promise<void> {
     return this.vcr.capture('ensureVercelSync', async () => {
-      const existing = (await this.listVercelSyncs(input.infisicalProjectId)).find((s) => s.name === input.syncName);
+      const existing = (await this.listVercelSyncs(input.infisicalProjectId)).find(
+        (s) => s.name === input.syncName,
+      );
       if (existing) {
         // Detect stale branch config — delete and recreate if branch setting has drifted
         const currentBranch = existing.destinationConfig?.branch;

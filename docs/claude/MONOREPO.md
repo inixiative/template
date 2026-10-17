@@ -11,6 +11,7 @@
     - [@template/db](#templatedb)
     - [@template/shared](#templateshared)
     - [@template/ui](#templateui)
+    - [@template/sdk](#templatesdk)
     - [@template/permissions](#templatepermissions)
     - [@template/email](#templateemail)
 - [Path Aliases](#path-aliases)
@@ -75,6 +76,7 @@ Defined in root `package.json`:
 | `packages/permissions` | `@template/permissions` |
 | `packages/email` | `@template/email` |
 | `packages/ui` | `@template/ui` |
+| `packages/sdk` | `@template/sdk` |
 | `apps/api` | `api` |
 | `apps/web` | `web` |
 | `apps/admin` | `admin` |
@@ -139,12 +141,13 @@ ui/src/components/
 └── utility/           # ErrorBoundary, NotFound
 ```
 
-**OpenAPI client:**
-- Auto-generated from API spec (`openapi.gen.json`)
-- Type-safe API calls
-- Located in `apiClient/`
-
 See `docs/claude/FRONTEND.md` for detailed frontend patterns.
+
+#### @template/sdk
+
+**Location:** `packages/sdk/`
+
+API client generated from `openapi.gen.json` by hey-api: operations, types, schemas and TanStack Query helpers. See `docs/claude/FRONTEND/API_CLIENT.md`.
 
 #### @template/permissions
 
@@ -179,7 +182,7 @@ See `docs/claude/COMMUNICATIONS.md` for details.
 
 | Context | Alias | Example |
 |---------|-------|---------|
-| Within an app | `#/` | `import { getUser } from '#/lib/context/getUser'` |
+| Within an app | `#/` | `import { getActor } from '#/lib/context/getActor'` |
 | Shared packages | `@template/` | `import { db } from '@template/db'` |
 | Within a shared package | `@template/` | `import { log } from '@template/shared/logger'` |
 | Top-level barrel exports | Relative | `export { foo } from './foo'` |
@@ -188,7 +191,7 @@ See `docs/claude/COMMUNICATIONS.md` for details.
 
 ```typescript
 // In apps/api - use #/ for internal imports
-import { getUser } from '#/lib/context/getUser';
+import { getActor } from '#/lib/context/getActor';
 import { authMiddleware } from '#/middleware/auth/authMiddleware';
 ```
 
@@ -201,7 +204,7 @@ import { log } from '@template/shared/logger';
 import { setupOrgContext } from '@template/permissions';
 
 // Within a shared package - ALSO use @template/
-// packages/db/src/extensions/mutationLifeCycle.ts
+// packages/db/src/extensions/mutationLifeCycle/mutationLifeCycleExtension.ts
 import { log } from '@template/shared/logger';  // Not '../../../shared/...'
 ```
 
@@ -217,7 +220,21 @@ export { logScope } from './scope';
 
 Actual code files always use aliases.
 
+**Rules:**
+- No relative imports (`./`, `../`) in source, except in barrel/index files.
+- App code never uses `##/` or `~/`; package code never uses `#/`, `##/`, or `~/`.
+- Prefer package subpath imports (`@template/shared/logger`) over broad root imports.
+
 ### TypeScript Configuration
+
+Compiler options come from the shared `@inixiative/config` presets, not from local config. Backend
+workspaces (`apps/api`, `packages/db`, `packages/email`, `packages/permissions`, `packages/shared`,
+`init`) extend `@inixiative/config/tsconfig/base.json`. Browser workspaces extend
+`@inixiative/config/tsconfig/react.json`: `packages/ui` and `packages/sdk` directly, and the three
+frontend apps through `tsconfig.frontend.json`, which adds the `vite/client` types. A workspace
+tsconfig holds only `extends`, `paths`, and `include`/`exclude`, plus `jsx` in `init`, whose Ink CLI
+renders JSX without the DOM. `baseUrl` is deprecated in TypeScript 6, so `paths` entries are
+written relative to the tsconfig that declares them.
 
 Each package's `tsconfig.json` must map **all packages** to ensure consistent import resolution across the monorepo.
 
@@ -226,7 +243,6 @@ Each package's `tsconfig.json` must map **all packages** to ensure consistent im
 ```json
 {
   "compilerOptions": {
-    "baseUrl": ".",
     "paths": {
       "@template/<package>/*": ["./src/*"],          // Self-reference
       "@template/db/*": ["../db/src/*"],             // Database package
@@ -320,8 +336,8 @@ bun add -d <package>
 | Looking For | Location |
 |-------------|----------|
 | API routes | `apps/api/src/modules/<model>/routes/` |
-| Database hooks | `apps/api/src/modules/<model>/hooks/` |
-| Background jobs | `apps/api/src/modules/<model>/jobs/` or `apps/api/src/jobs/` |
+| Database hooks | `apps/api/src/hooks/` |
+| Background jobs | `apps/api/src/jobs/` |
 | Prisma schema | `packages/db/prisma/schema/` (modular — one `.prisma` file per model) |
 | Database client | `packages/db/src/client.ts` |
 | Logger | `packages/shared/src/logger/` |
@@ -342,11 +358,11 @@ bun add -d <package>
 
 ```typescript
 // Good - direct imports
-import { getUser } from '#/lib/context/getUser';
-import { cache } from '#/lib/cache/cache';
+import { getActor } from '#/lib/context/getActor';
+import { emailRegistry } from '#/lib/email';
 
 // Bad - intermediate barrel
-import { getUser, cache } from '#/lib';
+import { getActor, emailRegistry } from '#/lib';
 ```
 
 Direct imports:

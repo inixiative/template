@@ -4,26 +4,27 @@
 **Assignee**: TBD
 **Priority**: Medium
 **Created**: 2026-02-06
-**Updated**: 2026-02-06
+**Updated**: 2026-10-01
 
 ---
 
 ## Overview
 
-Port notes system from Carde with false polymorphism pattern (ownerModel + polymorphic foreign keys). Support attaching notes to any entity (User, Organization, Space, etc.).
+Falsely-polymorphic notes: a `Note` row carries a `subjectModel` discriminator plus one FK column per enabled model, registered in the polymorphism registry. Any model can opt in to notes. A note-enabled model's single read returns its notes, and the notes respect permissions on who can see them.
 
 ## Key Components
 
-- **Schema**: Note model with polymorphic ownership
-- **API**: CRUD endpoints for notes
-- **Permissions**: Notes inherit owner permissions
-- **Search**: Full-text search across notes
+- **Schema**: `Note` with `subjectModel` + per-model subject FKs, registered in the false-polymorphism registry (no separate notes registry).
+- **API**: submodel create `POST /{model}/{id}/notes`; `PATCH` and `DELETE /notes/{id}`. Only the author edits or deletes.
+- **Reads**: notes ride the resource-context include on single reads. They are not added to paginated reads.
+- **Visibility**: an enum broad enough to cover each audience a note can have (e.g. author only / org / participants on the record). The author always sees their own note.
+- **Author**: taken from the actor context, so any actor kind can write a note, not just org users.
+- **Not audited**: the author columns record who wrote the note.
 
 ## Reference
 
-- TODO.md: Line 159 (Modules to Port - Notes system)
+- Zealot: ZLT-5190 (generalizing the existing `Note` from ZLT-3129)
 - Source: `~/Carde.io/organized-play-api` (notes module)
-- Pattern: Use `ownerModel` + polymorphic fields like FeatureFlag design
 
 ## Related Tickets
 

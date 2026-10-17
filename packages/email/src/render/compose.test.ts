@@ -1,8 +1,15 @@
 import { afterAll, beforeEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
-import { cleanupTouchedTables, createEmailComponent, createEmailTemplate, createOrganization } from '@template/db/test';
-import { composeComponent, composeTemplate, parentOwner } from '@template/email/render/compose';
-import { EmailRenderError } from '@template/email/render/errors';
+import {
+  cleanupTouchedTables,
+  createEmailComponent,
+  createEmailTemplate,
+  createOrganization,
+  createSpace,
+} from '@template/db/test';
+import { EmailRenderError } from '@template/email/errors/EmailRenderError';
+import { composeComponent, composeTemplate } from '@template/email/render/compose';
+import { parentOwner } from '@template/email/render/owner';
 
 describe('composeTemplate', () => {
   afterAll(async () => {
@@ -10,8 +17,7 @@ describe('composeTemplate', () => {
   });
 
   beforeEach(async () => {
-    await db.emailComponent.deleteMany({});
-    await db.emailTemplate.deleteMany({});
+    await cleanupTouchedTables(db);
   });
 
   it('composes template with no components', async () => {
@@ -33,9 +39,7 @@ describe('composeTemplate', () => {
     expect(result.mjml).toContain('<mj-text>Hello</mj-text>');
     expect(result.subject).toBe('Hello {{recipient.name}}');
     expect(result.kind).toBe('system');
-    // Resolved owner + render-error policy drive the send-side fallback loop.
     expect(result.ownerModel).toBe('default');
-    expect(result.onError).toBe('fail');
   });
 
   it('composes template with single component', async () => {
@@ -228,12 +232,46 @@ describe('composeTemplate', () => {
   });
 });
 
+describe('composeTemplate — the row that won the cascade names its owner', () => {
+  afterAll(async () => {
+    await cleanupTouchedTables(db);
+  });
+
+  it('an Organization row rendered for a Space sender is owned by the organization, not the space', async () => {
+    const { entity: org } = await createOrganization();
+    const { entity: space } = await createSpace({}, { organization: org });
+    await createEmailTemplate({
+      slug: 'owned',
+      subject: 'Hi',
+      mjml: '<mjml><mj-body><mj-text>Org</mj-text></mj-body></mjml>',
+      ownerModel: 'Organization',
+      organizationId: org.id,
+      inheritToSpaces: true,
+    });
+
+    const result = await composeTemplate('owned', {
+      ownerModel: 'Space',
+      spaceId: space.id,
+      organizationId: org.id,
+      locale: 'en',
+    });
+
+    expect(result.owner).toEqual({
+      ownerModel: 'Organization',
+      organizationId: org.id,
+      spaceId: null,
+      userId: null,
+      locale: 'en',
+    });
+  });
+});
+
 describe('parentOwner', () => {
-  it('walks the cascade Space → Organization → default and stops at base owners', () => {
+  it('walks the cascade Space → Organization → default and admin → default, stopping at default', () => {
     expect(parentOwner('Space')).toBe('Organization');
     expect(parentOwner('Organization')).toBe('default');
+    expect(parentOwner('admin')).toBe('default');
     expect(parentOwner('default')).toBeNull();
-    expect(parentOwner('admin')).toBeNull();
   });
 });
 
@@ -243,7 +281,7 @@ describe('composeComponent', () => {
   });
 
   beforeEach(async () => {
-    await db.emailComponent.deleteMany({});
+    await cleanupTouchedTables(db);
   });
 
   it('composes standalone component', async () => {

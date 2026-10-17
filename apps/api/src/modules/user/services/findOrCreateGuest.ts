@@ -15,7 +15,10 @@ type GuestParams = {
   name?: string;
 };
 
-export const findUserOrCreateGuest = async (c: Context<AppEnv>, { email, name }: GuestParams): Promise<User> => {
+export const findUserOrCreateGuest = async (
+  c: Context<AppEnv>,
+  { email, name }: GuestParams,
+): Promise<User> => {
   const db = c.get('db');
   const normalized = normalizeEmail(email);
 

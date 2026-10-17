@@ -4,14 +4,22 @@
  * @partOf feature:email
  * @uses none
  */
-import type { EmailComponent, EmailOwnerModel, EmailTemplate } from '@template/db/generated/client/client';
+import type {
+  EmailComponent,
+  EmailOwnerModel,
+  EmailTemplate,
+} from '@template/db/generated/client/client';
+
+import type { EmailRenderError } from '@template/email/errors/EmailRenderError';
+
+export type RenderObserver = {
+  onRenderFailure?: (error: EmailRenderError) => void;
+};
 
 export type OwnerScope = {
   ownerModel: EmailOwnerModel;
   organizationId?: string | null;
   spaceId?: string | null;
-  // Carried from the Sender so the cascade is a pure transform (no DB round-trip to
-  // resolve a space's org). userId is carried for user-owned-template lookup.
   userId?: string | null;
   locale: string;
 };

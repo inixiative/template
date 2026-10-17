@@ -5,7 +5,12 @@
  */
 import { getRelations, type Identifier, type PrismaMap } from '@inixiative/prisma-map';
 import { prismaMap } from '@template/db/generated/prismaMap';
-import { type AccessorName, type ModelName, toAccessor, toModelName } from '@template/db/utils/modelNames';
+import {
+  type AccessorName,
+  type ModelName,
+  toAccessor,
+  toModelName,
+} from '@template/db/utils/modelNames';
 
 export type { Identifier } from '@inixiative/prisma-map';
 
@@ -26,13 +31,11 @@ export type RelationInfo = {
 export const getModelRelations = (modelName: ModelName): RelationInfo[] =>
   getRelations(models, modelName).map((relation) => ({
     relationName: relation.relationName,
-    targetModel: relation.targetModel as ModelName,
-    targetAccessor: toAccessor(relation.targetModel as ModelName),
+    targetModel: toModelName(relation.targetModel),
+    targetAccessor: toAccessor(relation.targetModel),
     foreignKey: relation.foreignKey,
   }));
 
 export const getAccessorRelations = (accessor: AccessorName): RelationInfo[] => {
-  const modelName = toModelName(accessor);
-  if (!modelName) throw new Error(`Unknown accessor: ${accessor}`);
-  return getModelRelations(modelName);
+  return getModelRelations(toModelName(accessor));
 };

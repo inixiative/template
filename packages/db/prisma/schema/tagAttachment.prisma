@@ -13,9 +13,9 @@ model TagAttachment {
   createdAt DateTime  @default(now())
   deletedAt DateTime?
 
-  // Resource — false polymorphism. resourceModel restricts to PascalCase
-  // entries of TagResource (the model names); camelCase entries
-  // (use-cases) are not valid attachment resources.
+  // Resource — false polymorphism. Only the PascalCase entries of
+  // TagResource (the model names) are valid here; camelCase entries are
+  // use-cases for Tag.resources.
   resourceModel  TagResource
   userId         String?     @db.VarChar(36)
   organizationId String?     @db.VarChar(36)
@@ -39,16 +39,12 @@ model TagAttachment {
   @@index([tagId])
 }
 
-// Mixed enum: PascalCase = physical attachment models, camelCase = use-case
-// concepts (only valid for `Tag.resources`, not `TagAttachment.ownerModel`).
+// Where a tag can be applied. PascalCase = physical attachment models (valid
+// for TagAttachment.resourceModel and Tag.resources); camelCase = use-case
+// concepts (only valid in Tag.resources). Who owns a tag is TagOwnerModel.
 enum TagResource {
-  // SPECIAL — lowercase, no FK. Used as `Tag.ownerModel` for tags that
-  // aren't owned by any specific row (visible everywhere).
-  platform
-
   // PHYSICAL MODELS — PascalCase. Each pairs to one FK column on
-  // TagAttachment (and Tag, when used as the tag's owner) via the
-  // falsePolymorphism registry.
+  // TagAttachment via the falsePolymorphism registry.
   User
   Organization
   Space

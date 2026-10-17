@@ -1,7 +1,7 @@
 import { afterAll, describe, expect, it } from 'bun:test';
 import { OpenAPIHono } from '@hono/zod-openapi';
-import type { Token, User } from '@template/db';
 import { db } from '@template/db';
+import type { Token, User } from '@template/db/generated/client/client';
 import { cleanupTouchedTables, createToken, createUser } from '@template/db/test';
 import type { TokenWithRelations } from '#/lib/context/types';
 import { prepareRequest } from '#/middleware/prepareRequest';
@@ -32,14 +32,14 @@ describe('validateNotToken', () => {
 
   it('rejects non-superadmin token with 403', async () => {
     const { entity: user } = await createUser();
-    const { entity: token } = await createToken({}, { user });
+    const { entity: token } = await createToken({ ownerModel: 'User' }, { user });
     const res = await buildApp({ user, token }).fetch(new Request('http://test/protected'));
     expect(res.status).toBe(403);
   });
 
   it('allows superadmin token through', async () => {
     const { entity: admin } = await createUser({ platformRole: 'superadmin' });
-    const { entity: token } = await createToken({}, { user: admin });
+    const { entity: token } = await createToken({ ownerModel: 'User' }, { user: admin });
     const res = await buildApp({ user: admin, token }).fetch(new Request('http://test/protected'));
     expect(res.status).toBe(200);
   });

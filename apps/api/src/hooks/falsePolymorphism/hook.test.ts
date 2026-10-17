@@ -22,7 +22,13 @@ describe('falsePolymorphism hook', () => {
     const seq = getNextSeq();
 
     const token = await db.token.create({
-      data: { name: 'test', keyHash: `h${seq}`, keyPrefix: `p${seq}`, ownerModel: 'User', userId: user.id },
+      data: {
+        name: 'test',
+        keyHash: `h${seq}`,
+        keyPrefix: `p${seq}`,
+        ownerModel: 'User',
+        userId: user.id,
+      },
     });
 
     expect(token.userId).toBe(user.id);
@@ -95,7 +101,13 @@ describe('falsePolymorphism hook', () => {
     const promise = async () =>
       db.token.createManyAndReturn({
         data: [
-          { name: 'valid', keyHash: `h${seq1}`, keyPrefix: `p${seq1}`, ownerModel: 'User', userId: user.id },
+          {
+            name: 'valid',
+            keyHash: `h${seq1}`,
+            keyPrefix: `p${seq1}`,
+            ownerModel: 'User',
+            userId: user.id,
+          },
           {
             name: 'invalid',
             keyHash: `h${seq2}`,
@@ -157,7 +169,13 @@ describe('falsePolymorphism hook', () => {
       const seq = getNextSeq();
 
       const token = await db.token.create({
-        data: { name: 'original', keyHash: `h${seq}`, keyPrefix: `p${seq}`, ownerModel: 'User', userId: user.id },
+        data: {
+          name: 'original',
+          keyHash: `h${seq}`,
+          keyPrefix: `p${seq}`,
+          ownerModel: 'User',
+          userId: user.id,
+        },
       });
 
       const updated = await db.token.update({

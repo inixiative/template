@@ -10,8 +10,8 @@
   - [Schema Location](#schema-location)
   - [Generator Output](#generator-output)
 - [Scripts](#scripts)
+  - [Schema Changes: Push Before Launch, Migrations After](#schema-changes-push-before-launch-migrations-after)
   - [Development Workflow](#development-workflow)
-  - [Production Workflow](#production-workflow)
   - [Database Operations](#database-operations)
 - [Seeding](#seeding)
   - [Prime Development Data](#prime-development-data)
@@ -39,12 +39,14 @@
 - [Transactions](#transactions)
   - [Manual Transaction](#manual-transaction)
   - [After Commit Callbacks](#after-commit-callbacks)
+  - [Finally Callbacks](#finally-callbacks)
+  - [Row Locks and Create-If-Missing](#row-locks-and-create-if-missing)
 - [Query Building Utilities](#query-building-utilities)
   - [buildWhereClause](#buildwhereclause)
+  - [Soft-delete read scoping](#soft-delete-read-scoping)
   - [Path Notation Utilities](#path-notation-utilities)
 - [False Polymorphism](#false-polymorphism)
   - [Special Owner Values (No FK)](#special-owner-values-no-fk)
-- [Constraint Helpers](#constraint-helpers)
 - [Registries](#registries)
 - [Schema Reference](#schema-reference)
 
@@ -115,28 +117,37 @@ Run from repo root or `packages/db`:
 | Script | Command | Purpose |
 |--------|---------|---------|
 | Generate | `bun run db:generate` | Generate Prisma client + Zod schemas |
-| Push | `bun run db:push` | Push schema to DB (dev only, no migration) |
-| Migrate | `bun run db:migrate` | Create migration file |
-| Deploy | `bun run db:deploy` | Run migrations (CI/production) |
+| Push | `bun run db:push` | Push schema to DB, no migration (`db:push:dev` = worktree-aware local + test push) |
+| Migrate | `bun run db:migrate` | Create a migration file (`prisma migrate dev`) — after launch |
+| Deploy | `bun run db:deploy` | Apply migrations (`prisma migrate deploy`) — after launch |
+| Baseline | `bun run db:baseline` | Create `prisma/migrations/0_init` from the schema; the Launch step runs it |
 | Studio | `bun run db:studio` | Open Prisma Studio GUI |
 | Seed | `bun run db:seed` | Run seed script |
+
+### Schema Changes: Push Before Launch, Migrations After
+
+The cut-over is `launched` in `project.config.ts`, flipped by the init script's Launch step. **Before launch a deployed database is disposable:** schema reaches it by `prisma db push --accept-data-loss`, which drops whatever no longer fits. **After launch nothing may clobber a database:** schema reaches it only through committed migrations, applied by `prisma migrate deploy`, and the push paths close.
+
+| | Pre-launch (`launched: false`, the default) | Launched |
+|---|---|---|
+| Release step (`scripts/db/release.sh`) | `prisma db push --accept-data-loss`, then the non-prime seed | `prisma migrate deploy`, then the non-prime seed |
+| Changing the schema | edit `prisma/schema/`, `bun run db:generate && bun run db:push` (`db:push:dev` in a worktree) | `bun run db:migrate` creates a migration under `packages/db/prisma/migrations/`; review and commit it |
+| `setup.sh` | pushes and seeds the local database | skips push and seed |
+| Migration files | none | start at `0_init`, created by Launch |
+
+`scripts/checkLaunched.ts` reads the flag for the shell scripts. Guards that hold either way: `db:push:force` refuses outside `test`/`local`, and `push-dev.sh` refuses a non-local `DATABASE_URL`.
+
+**What Launch does** (init → Launch, [#197](https://github.com/inixiative/template/pull/197)): `bun run db:baseline` writes `prisma/migrations/0_init` as the diff from an empty database to `prisma/schema` (once); for prod, and staging when enabled, it checks the deployed database matches `prisma/schema` and otherwise blocks launch ("deploy the current schema there, then launch"); it records `0_init` as applied on each (`prisma migrate resolve --applied 0_init`); then it sets `launched = true`. Commit `prisma/migrations` and `project.config.ts` together.
+
+**Not built:** nothing invokes `scripts/db/release.sh`. The Railway services the init creates run only `db:generate` at build and start the API/worker, and `scripts/deployment/deploy.sh` is a stub. Until a deploy hook runs it, the release step is run by hand against the target database.
 
 ### Development Workflow
 
 ```bash
 # After schema changes
 bun run db:generate   # Regenerate client
-bun run db:push       # Push to local DB (fast, no migration)
-
-# When ready to commit
-bun run db:migrate    # Create migration file
-# Review migration, commit
-```
-
-### Production Workflow
-
-```bash
-bun run db:deploy     # Run pending migrations
+bun run db:push       # Pre-launch: push to the local DB (in a worktree: bun run db:push:dev)
+bun run db:migrate    # Launched: create a migration, review it, commit it
 ```
 
 ### Database Operations
@@ -371,14 +382,14 @@ const orgId: OrganizationId = organizationId('org-456');
 
 ```typescript
 // Function signatures enforce correct ID types
-async function getUser(id: UserId): Promise<User> { ... }
-async function getOrg(id: OrganizationId): Promise<Organization> { ... }
+async function loadUser(id: UserId): Promise<User> { ... }
+async function loadOrganization(id: OrganizationId): Promise<Organization> { ... }
 
 // Compile-time error: can't pass UserId where OrganizationId expected
-getOrg(userId('abc'));  // ❌ Type error
+loadOrganization(userId('abc'));  // ❌ Type error
 
 // Correct usage
-getOrg(organizationId('abc'));  // ✓
+loadOrganization(organizationId('abc'));  // ✓
 ```
 
 ### Available Types
@@ -522,6 +533,8 @@ db.raw.user.findMany()  // Always raw, bypasses txn
 db.scope(id, fn)        // Create AsyncLocalStorage context
 db.txn(fn)              // Start transaction
 db.onCommit(fns)        // Queue callbacks for after commit
+db.onFinally(fns)       // Queue callbacks for when the txn ends, commit or rollback
+db.findForUpdate(model, where, opts?) // SELECT ... FOR UPDATE; { upserting: true } fences a missing row
 db.getScopeId()         // Get current scope ID
 db.isInTxn()            // Check if in transaction
 ```
@@ -550,6 +563,36 @@ db.onCommit(async () => {
 });
 ```
 
+### Finally Callbacks
+
+`db.onFinally(fns)` queues callbacks that run when the transaction ends, whether it commits or rolls
+back. They drain after the database transaction has settled (never before the commit lands) and
+before the `onCommit` callbacks, without waiting for them. Every callback runs even if one throws;
+failures are logged and never replace the transaction's own result or error. Like `onCommit`, it
+throws outside `db.txn()`, and a nested `db.txn()` registers on the outermost transaction.
+
+### Row Locks and Create-If-Missing
+
+`db.findForUpdate(model, where)` runs `SELECT * ... FOR UPDATE` inside `db.txn()`. A row that does
+not exist yet locks nothing, so find-then-create races: two callers both see nothing and both
+insert. Do not answer that with a bare `upsert` or a caught unique violation — fence the key:
+
+```typescript
+await db.txn(async () => {
+  const [existing] = await db.findForUpdate<User>('User', { email }, { upserting: true });
+  return existing ?? db.user.create({ data: { email, name } });
+});
+```
+
+`upserting: true` takes a Redis lock (`createLock`, service `find-for-update`, keyed on the model
+plus the where entries sorted by key, hashed) **before** the `SELECT`, and releases it through
+`db.onFinally` once the transaction ends. The where must be scalar equalities only — no arrays,
+`in`, operator objects, `null` or `undefined`. A caller that cannot get the lock waits up to
+`waitMs` (default 3000ms, inside Prisma's 5000ms interactive default) and then throws
+`FindForUpdateLockTimeoutError`, rolling its transaction back. Fencing the same key twice in one
+transaction does not wait on itself. The `no-create-race-machinery` CI rule fails a change that
+adds a bare `.upsert(` or a unique-violation catch to a file.
+
 ---
 
 ## Query Building Utilities
@@ -575,9 +618,10 @@ const users = await db.user.findMany({ where });
 
 **What it does:**
 1. Applies `search` across all `searchableFields` (case-insensitive `contains`, OR logic)
-2. Applies `searchFields` to individual fields (case-insensitive `contains`, AND logic with search)
-3. Merges with `filters` object
-4. Returns combined `where` clause
+2. Applies `searchFields` to individual fields (case-sensitive; a bare String value is `contains`; pass `mode: 'insensitive'` to opt in), AND logic with search
+3. Escapes LIKE metacharacters (`%`, `_`, `\`) in `contains` / `startsWith` / `endsWith`, an insensitive `equals` / `not`, Json `string_*`, and the `search` term, so a value matches only itself
+4. Merges with `filters` object
+5. Returns combined `where` clause
 
 **Security:** Uses `validatePathNotation()` to prevent injection attacks on nested field paths.
 
@@ -599,6 +643,18 @@ buildWhereClause({
 //   ]
 // }
 ```
+
+> The explicit `deletedAt: null` above is no longer required — see Soft-delete read scoping below.
+
+### Soft-delete read scoping
+
+A Prisma client extension (`packages/db/src/extensions/softDeleteScopeExtension.ts`) auto-injects `deletedAt: null` into every read (`findMany`/`findFirst`/`findUnique`/`count`/`aggregate`/`groupBy`) and every write `where` (`update`/`delete`/`upsert`), plus nested `include`/`select` trees, for any model that has a `deletedAt` column. You do **not** hand-write `deletedAt: null` — forgetting it can no longer leak soft-deleted rows.
+
+One bypass, `db.withDeleted(fn)`: it runs `fn` with scoping off (revive, redaction/GDPR, inspecting tombstones). Must be `await`ed inside the callback. Who the caller is never unscopes anything — **the endpoint decides**. `validateSuperadmin`, mounted on `adminRouter`, runs the rest of the request inside `db.withDeleted`, so superadmin endpoints read and write tombstones; every other route is scoped for every caller, superadmin included.
+
+The extension is the only soft-delete scoping layer — no middleware, `paginate` or lens code adds `deletedAt: null` by hand. It covers the root `where` (including relation filters like `some`/`every`/`is`), nested `include`/`select` trees, `_count` relation counts, `count`/`aggregate`/`groupBy` (the lens count plans). Its engine (`liveWhere` / `liveIncludes`, `packages/db/src/extensions/softDeleteScope.ts`) lives beside it in `packages/db`. It is not a mutation-lifecycle hook and needs no registration: the client composes it (`client.ts`, `.$extends(softDeleteScopeExtension())`), so every process and every test sees what production sees. A test that inspects a tombstone wraps the read in `db.withDeleted`.
+
+Write `where`s are scoped too, so a soft-deleted row can't be mutated without a bypass. Cascade revive is exempt automatically: it matches on an explicit `deletedAt` value, and an explicit `deletedAt` mention in a `where` opts that query out of injection.
 
 ### Path Notation Utilities
 
@@ -699,12 +755,6 @@ See [HOOKS.md](HOOKS.md#false-polymorphism) for validation.
 
 ---
 
-## Constraint Helpers (planned — not yet built)
-
-DB-level constraint helpers (CHECK constraints, partial unique indexes, GIST indexes, exactly-one-FK polymorphic guards) are **not implemented yet** — `packages/db/src/constraints/` does not exist. App-level validation is handled today by the [rules hook](HOOKS.md#rules-registry); add these helpers when DB-level guards are needed. See TODO.md.
-
----
-
 ## Registries
 
 Schema-level configuration in `packages/db/src/registries/`:
@@ -742,7 +792,10 @@ For complete model definitions, relationships, and fields, see the schema files 
 - `token.prisma` - API tokens (user/org/space scoped)
 - `webhookSubscription.prisma` - Webhook configurations
 - `inquiry.prisma` - False polymorphic inquiry system
-- `customer.prisma` - Customer references
+- `integrationRecord.prisma` - One record's standing in one integration (false-polymorphic over `WebhookModel`); `poisonedAt` makes sendWebhook skip the record
+- `customerRef.prisma` - Customer references (false-polymorphic customer User/Organization/Space → provider)
+- `segment.prisma` / `segmentMember.prisma` - Segments: a provider-owned (false-polymorphic over `ProviderModel`) named set of its customer references. Every segment has json-rules `conditions` over the segment lens; `static` is computed when created or its conditions change, `dynamic` is recomputed continuously by the reconcile jobs. A hand-picked audience is a static segment whose rule is `id in [...]`. Members are written only by reconcile. See [SEGMENTS.md](SEGMENTS.md) for rules, reconciliation, API routes and the Owned/Memberships pages
+- `flow.prisma` - `Flow`: one user's short-lived walk through a registered flow (`flowKey`, resolved `steps`, optional `returnUrl`); deleted after 15 idle minutes. See [FLOWS.md](FLOWS.md)
 - `contact.prisma` - Unified contact-info entries (phone/email/social handles), false-polymorphic owner (User/Organization/Space), per-type validation registry, per-owner uniqueness on `(ownerModel, …, type, valueKey)`, optional row-level `permissionRules` for sharing
 
 **Communications:**

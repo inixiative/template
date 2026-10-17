@@ -1,0 +1,46 @@
+{
+  "id": "email-render",
+  "title": "Email compose, render and save",
+  "routing": "Is this about turning a template into a message or checking one before it is saved: composeTemplate / composeComponent, lookupTemplate / lookupComponent / lookupCascade / lookupLens, expand and hydrate / hydrateCascade, interpolate and variable prefixes (TOKEN_PATTERN, SCOPE_ROOTS, RESERVED_BINDING_NAMES, guardedToken), evaluateConditions and the condition parser, settle / settleTemplate, renderForRecipient, parseBlocks / decompose / serialize, the render issue policy (RuleErrorSink, registry onIssue / substitute, EmailRenderError), the save pipeline (saveEmailTemplate, saveEmailComponents, validateMjml, validateTokens, validateConditions, validateNoCycle, validateDependents, mapRefs), preflight (runPreflight, emailTemplatePreflight, visibleText), or deliverEmailMessage's claim and error handling?",
+  "concepts": ["email-render"],
+  "tokens": 17076,
+  "tokenMethod": "chars/4",
+  "files": {
+    "recognise": {
+      "path": "recognise.md",
+      "tokens": 3346,
+      "experimental": true,
+      "note": "recognise/pick split under test (model round); not the standard"
+    },
+    "knowledge": {
+      "path": "knowledge.md",
+      "tokens": 17076
+    }
+  },
+  "runsAgreed": 0,
+  "sources": {
+    "docs": ["docs/claude/COMMUNICATIONS.md"],
+    "docUnits": [
+      "doc:docs/claude/COMMUNICATIONS.md#email/variable-interpolation",
+      "doc:docs/claude/COMMUNICATIONS.md#email/cascade-resolution",
+      "doc:docs/claude/COMMUNICATIONS.md#email/render-pipeline",
+      "doc:docs/claude/COMMUNICATIONS.md#email/save-pipeline",
+      "doc:docs/claude/COMMUNICATIONS.md#email/mjml-validation"
+    ],
+    "catalogClusters": [
+      "caching-and-invalidation",
+      "email-composition-rendering",
+      "error-handling",
+      "graceful-shutdown-lifecycle",
+      "job-definition-and-enqueue",
+      "json-rules-engine",
+      "locks-and-serialization",
+      "request-response-schemas",
+      "roles-and-permissions"
+    ],
+    "codeEntries": 150,
+    "docMembers": 22
+  },
+  "bypassLines": 21,
+  "glossaryTerms": 18
+}

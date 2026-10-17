@@ -15,6 +15,7 @@ export type TestSocketHandle = {
   socket: WSSocket;
   sent: string[];
   markClosed: () => void;
+  dropSends: () => void;
   closeInfo: () => { code: number; reason: string } | null;
 };
 
@@ -22,13 +23,17 @@ export const createTestSocket = (data?: Partial<WSData>): TestSocketHandle => {
   const now = Date.now();
   const sent: string[] = [];
   let readyState = WS_OPEN;
+  let dropping = false;
   let closeInfo: { code: number; reason: string } | null = null;
 
   const socket = {
     data: {
       connectionId: data?.connectionId ?? `conn-${++seq}`,
       userId: data?.userId ?? null,
+      headers: data?.headers ?? {},
       channels: data?.channels ?? new Set<string>(),
+      streams: data?.streams ?? new Set<string>(),
+      heldAppends: data?.heldAppends ?? new Map<string, string[]>(),
       connectedAt: data?.connectedAt ?? now,
       lastPing: data?.lastPing ?? now,
       queue: data?.queue ?? createSerializedQueue(),
@@ -37,7 +42,9 @@ export const createTestSocket = (data?: Partial<WSData>): TestSocketHandle => {
       return readyState;
     },
     send(message: string) {
+      if (dropping || readyState !== WS_OPEN) return 0;
       sent.push(message);
+      return message.length;
     },
     close(code: number, reason: string) {
       readyState = WS_CLOSED;
@@ -50,6 +57,9 @@ export const createTestSocket = (data?: Partial<WSData>): TestSocketHandle => {
     sent,
     markClosed: () => {
       readyState = WS_CLOSED;
+    },
+    dropSends: () => {
+      dropping = true;
     },
     closeInfo: () => closeInfo,
   };

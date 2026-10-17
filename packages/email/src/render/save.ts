@@ -5,18 +5,31 @@
  * @uses infrastructure:prisma
  */
 import { db } from '@template/db';
-import type { EmailComponent, EmailOwnerModel, EmailTemplate } from '@template/db/generated/client/client';
-import { IF, parseIfBlock } from '@template/email/render/conditionParser';
+import type {
+  EmailComponent,
+  EmailOwnerModel,
+  EmailTemplate,
+} from '@template/db/generated/client/client';
+import { EACH, IF, parseEachBlock, parseIfBlock } from '@template/email/render/conditionParser';
+import { decomposeNodes } from '@template/email/render/decompose';
 import { expand } from '@template/email/render/expand';
-import { mapRefs } from '@template/email/render/extractRefs';
 import { lookupCascade } from '@template/email/render/lookupCascade';
-import { resolveVariants } from '@template/email/render/resolveVariants';
+import { collectSlugsFromNodes } from '@template/email/render/nodes';
+import { parseBlocks } from '@template/email/render/parseBlocks';
 import { saveComponents } from '@template/email/render/saveComponents';
 import { saveTemplate } from '@template/email/render/saveTemplate';
 import type { OwnerScope } from '@template/email/render/types';
-import { assertValidConditions } from '@template/email/render/validateConditions';
-import { validateNoCycle } from '@template/email/render/validateNoCycle';
+import { validateDependents } from '@template/email/render/validateDependents';
+import {
+  componentRuleContents,
+  type EmailLens,
+  syncRuleReferences,
+  templateRuleContents,
+} from '@template/email/rules';
+import { assertValidConditions } from '@template/email/validations/validateConditions';
 import { validateMjml } from '@template/email/validations/validateMjml';
+import { validateNoCycle } from '@template/email/validations/validateNoCycle';
+import { assertValidTokens } from '@template/email/validations/validateTokens';
 
 export type SaveTemplateInput = Partial<EmailTemplate> & {
   mjml: string;
@@ -24,6 +37,7 @@ export type SaveTemplateInput = Partial<EmailTemplate> & {
   ownerModel: EmailOwnerModel;
   organizationId?: string | null;
   spaceId?: string | null;
+  userId?: string | null;
   locale?: string;
 };
 
@@ -32,72 +46,121 @@ export type SaveTemplateResult = {
   components: EmailComponent[];
 };
 
-// Strip {{#if rule=…}}…{{/if}} blocks so a link that only renders conditionally doesn't satisfy the
-// unsubscribe requirement — the link must be unconditional. Uses the canonical string-aware, depth-aware
-// parser (not a brace-naive regex) so a rule-JSON value containing a literal {{/if}} can't fool it.
+export type LensForSlug = (slug: string, owner: OwnerScope) => Promise<EmailLens | undefined>;
+
+export type SaveTemplateOptions = {
+  lens?: EmailLens;
+  lensFor?: LensForSlug;
+};
+
 const withoutConditionals = (mjml: string): string => {
   let out = '';
   let i = 0;
   while (i < mjml.length) {
-    const open = mjml.indexOf(IF, i);
-    if (open === -1) {
+    const ifIdx = mjml.indexOf(IF, i);
+    const eachIdx = mjml.indexOf(EACH, i);
+    if (ifIdx === -1 && eachIdx === -1) {
       out += mjml.slice(i);
       break;
     }
+    const isEach = eachIdx !== -1 && (ifIdx === -1 || eachIdx < ifIdx);
+    const open = isEach ? eachIdx : ifIdx;
     out += mjml.slice(i, open);
-    const block = parseIfBlock(mjml, open);
-    i = block ? block.end : open + IF.length;
+    const block = isEach ? parseEachBlock(mjml, open) : parseIfBlock(mjml, open);
+    i = block ? block.end : open + (isEach ? EACH.length : IF.length);
   }
   return out;
 };
 
-export const saveEmailTemplate = async (input: SaveTemplateInput): Promise<SaveTemplateResult> => {
+export const ownerScopeOf = (input: SaveTemplateInput): OwnerScope => ({
+  ownerModel: input.ownerModel,
+  organizationId: input.organizationId,
+  spaceId: input.spaceId,
+  userId: input.userId,
+  locale: input.locale ?? 'en',
+});
+
+/** Components saved and their rule references synced, inside the caller's transaction. */
+export const saveEmailComponents = async (
+  inputs: EmailComponent[],
+  ctx: OwnerScope,
+  lens?: EmailLens,
+): Promise<EmailComponent[]> => {
+  const components = await saveComponents(inputs, ctx, lens);
+  for (const component of components) {
+    await syncRuleReferences(
+      { model: 'EmailComponent', id: component.id },
+      componentRuleContents(component),
+      lens,
+    );
+  }
+  return components;
+};
+
+export const saveEmailTemplate = async (
+  input: SaveTemplateInput,
+  options: SaveTemplateOptions = {},
+): Promise<SaveTemplateResult> => {
   await validateMjml(input.mjml);
-  // Fail fast on broken conditional rules instead of shipping a silent render-time time-bomb.
-  // Subjects are interpolated too, so they carry conditionals and need the same floor.
-  assertValidConditions(input.mjml);
-  if (input.subject) assertValidConditions(input.subject);
+  const nodes = parseBlocks(input.mjml);
+  assertValidConditions(input.mjml, { lens: options.lens });
+  if (input.subject) assertValidConditions(input.subject, { isSubject: true, lens: options.lens });
 
-  const ctx: OwnerScope = {
-    ownerModel: input.ownerModel,
-    organizationId: input.organizationId,
-    spaceId: input.spaceId,
-    locale: input.locale ?? 'en',
-  };
+  const ctx = ownerScopeOf(input);
 
-  // 1. Parse template MJML for component refs (sync, outside tx)
-  const { map, mjml: indexedMjml, refs: templateRefs } = mapRefs(input.mjml);
-  const baseSlugs = Object.keys(map);
+  const slugs = collectSlugsFromNodes(nodes);
 
-  // 2. Lookup + resolve + save in transaction
   return db.txn(
     async () => {
-      const existing = await lookupCascade(baseSlugs, ctx);
-      const resolved = resolveVariants(map, indexedMjml, templateRefs, existing, ctx);
+      const existing = await lookupCascade(slugs, ctx);
+      const { mjml, refs, writes } = decomposeNodes(nodes, (slug) => existing[slug]?.mjml);
 
-      const finalTemplate = { ...input, ...resolved.template, locale: ctx.locale } as EmailTemplate;
-      const finalComponents = resolved.components as EmailComponent[];
+      const finalComponents = writes.map((write) => ({
+        slug: write.slug,
+        locale: ctx.locale,
+        mjml: write.mjml,
+        componentRefs: [...new Set(write.refs)],
+      })) as EmailComponent[];
 
-      // Cycle check before writes. mapRefs guarantees the intra-save graph
-      // is a tree (text-nested → can't self-reference); this defends against
-      // cross-save cycles where this save's new edge closes a loop with
-      // edges already in the DB.
+      const finalTemplate = {
+        ...input,
+        mjml,
+        componentRefs: [...new Set(refs)],
+        locale: ctx.locale,
+      } as EmailTemplate;
+
       for (const component of finalComponents) {
         await validateNoCycle(component.slug, component.componentRefs ?? [], ctx);
       }
 
-      const components = finalComponents.length ? await saveComponents(finalComponents, ctx) : [];
+      const components = finalComponents.length
+        ? await saveEmailComponents(finalComponents, ctx, options.lens)
+        : [];
       const template = await saveTemplate(finalTemplate, ctx);
 
-      // Non-system kinds are subject to unsubscribe compliance: the composed body (template +
-      // expanded components) must carry the unsubscribe link variable. Throws → rolls back the save.
+      await syncRuleReferences(
+        { model: 'EmailTemplate', id: template.id },
+        templateRuleContents(template),
+        options.lens,
+      );
+
+      const composed = await expand(template.mjml, ctx);
+      assertValidConditions(composed, { lens: options.lens });
+      assertValidTokens(composed, { lens: options.lens });
+      if (template.subject)
+        assertValidTokens(template.subject, { lens: options.lens, isSubject: true });
+
       if (template.kind && template.kind !== 'system') {
-        const composed = await expand(template.mjml, template.componentRefs ?? [], ctx);
-        if (!withoutConditionals(composed).includes('{{recipient.unsubscribeUrl}}')) {
+        if (!withoutConditionals(composed).includes('{{system.unsubscribeUrl}}')) {
           throw new Error(
-            `Non-system email template "${template.slug}" must include an unconditional unsubscribe link {{recipient.unsubscribeUrl}}.`,
+            `Non-system email template "${template.slug}" must include an unconditional unsubscribe link {{system.unsubscribeUrl}}.`,
           );
         }
+      }
+
+      if (options.lensFor) {
+        for (const component of components)
+          await validateDependents(component.slug, template.slug, ctx, options.lensFor);
       }
 
       return { template, components };

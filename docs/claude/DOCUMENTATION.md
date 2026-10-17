@@ -6,10 +6,6 @@
 
 - [Workflow](#workflow)
 - [Before Starting Work](#before-starting-work)
-- [Writing Notes](#writing-notes)
-  - [RAW_NOTES.md](#raw_notesmd)
-  - [When to Sort](#when-to-sort)
-  - [Sorting Examples](#sorting-examples)
 - [Doc Structure](#doc-structure)
   - [TOC Required](#toc-required)
   - [Standard Sections](#standard-sections)
@@ -33,10 +29,9 @@
 ## Workflow
 
 ```
-1. Capture ideas → docs/RAW_NOTES.md
-2. Periodically sort → docs/claude/<topic>.md
-3. Before implementing → read relevant doc
-4. After implementing → update doc if needed
+1. Before implementing → read the relevant doc
+2. After implementing → update the doc if behavior or a contract changed
+3. Open questions and planned work → tickets/ (not docs/claude/)
 ```
 
 ---
@@ -55,6 +50,8 @@
 | Caching | REDIS.md |
 | New package/dep | DEPENDENCIES.md, MONOREPO.md |
 
+Writing a doc that names a primitive, pattern, rule or system: follow [DOMAIN-DOCS.md](DOMAIN-DOCS.md) (the Problem | Use | Read | Signs row, plain-language phrasings, exact identifiers); the Warden region builder reads docs in that shape.
+
 The docs contain patterns, conventions, and decisions. Reading them prevents:
 - Reinventing existing utilities
 - Breaking established patterns
@@ -62,67 +59,15 @@ The docs contain patterns, conventions, and decisions. Reading them prevents:
 
 ---
 
-## Writing Notes
-
-### RAW_NOTES.md
-
-Dump thoughts, ideas, and discoveries here:
-
-```markdown
-## 2024-01-29
-
-- found edge case in token permissions when org is deleted
-- maybe we need cascading deletes?
-- look at how zealot handles this
-
-## 2024-01-28
-
-- webhook retry logic could use exponential backoff
-- currently fixed 5 min delay
-```
-
-### When to Sort
-
-Periodically (or when RAW_NOTES gets long):
-1. Review accumulated notes
-2. Move relevant content to topic docs
-3. Delete or archive processed notes
-
-### Sorting Examples
-
-| Raw Note | Destination |
-|----------|-------------|
-| "tokens can't exceed user's org role" | PERMISSIONS.md |
-| "use `bun run db:push` not migrate in dev" | SCRIPTS.md |
-| "cache keys should include orgId" | REDIS.md |
-| "need to add email provider" | COMMUNICATIONS.md |
-
----
-
 ## Doc Structure
 
 ### TOC Required
 
-Every doc must have a `## Contents` section at the top with links to all major sections. This helps Claude (and humans) quickly navigate.
+Every doc carries a generated contents list between the `toc:start` / `toc:end` HTML comment markers. Regenerate after adding or removing headings: `bun run docs:toc` (`scripts/docs/regenToc.ts`, which covers `docs/claude/**`, `FEATURES.md`, `COMPARISONS.md`, `TODO.md`, `README.md`).
 
 ### Standard Sections
 
-```markdown
-# Topic
-
-
----
-
-## Section 1
-
-Content...
-
----
-
-## Section 2
-
-Content...
-```
+One `# Title`, the TOC markers, a one-line purpose, then `##` sections separated by `---`. Keep it terse; reference what the code does, not how it was arrived at.
 
 ### Stub Format
 
@@ -147,16 +92,16 @@ Always include real usage:
 
 ```typescript
 // Good - shows actual pattern
-import { cache } from '#/lib/cache/cache';
-const user = await cache('user', userId, () => db.user.findUnique(...));
+import { cache, cacheKey } from '@template/db';
+const user = await cache(cacheKey('user', userId), () => db.user.findUnique(...));
 
 // Not just signatures
-cache(prefix: string, key: string, fn: () => Promise<T>): Promise<T>
+cache<T>(key: string, fn: () => Promise<T>, ttl?: number | ((value: T) => number)): Promise<T>
 ```
 
 ### Diagrams with Mermaid
 
-Use [Mermaid](https://mermaid.js.org/) for flowcharts, sequence diagrams, and architecture diagrams. Mermaid is installed at the project root.
+Use [Mermaid](https://mermaid.js.org/) for flowcharts, sequence diagrams, and architecture diagrams. GitHub renders Mermaid blocks natively.
 
 ```markdown
 ```mermaid
@@ -194,13 +139,14 @@ Update docs when you:
 - Change existing conventions
 - Add new utilities or helpers
 - Discover gotchas worth documenting
-- **Keep TOC updated** when adding/removing sections
+- **Regenerate the TOC** (`bun run docs:toc`) when adding/removing sections
 
 ### Keep Docs Honest
 
 - Remove outdated information
 - Mark incomplete sections as stubs
 - Don't document aspirational features as if they exist
+- The `doc-freshness` CI rule fails a doc that names a path, line, heading or symbol the repo no longer has (see [SCRIPTS.md](SCRIPTS.md#ci-rule-scripts)). Planned work goes under an "Under construction" or "Migrations in progress" heading, which the rule skips
 
 ---
 

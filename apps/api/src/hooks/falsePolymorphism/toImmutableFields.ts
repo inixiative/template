@@ -1,4 +1,4 @@
-import { type ModelName, PolymorphismRegistry } from '@template/db';
+import { type ModelName, PolymorphismRegistry, toModelName } from '@template/db';
 
 type ImmutableFieldsOverride = {
   exclude?: string[];
@@ -10,5 +10,5 @@ export const polymorphismImmutableFields: Partial<Record<ModelName, ImmutableFie
 for (const [model, config] of Object.entries(PolymorphismRegistry)) {
   if (!config) continue;
   const typeFields = config.axes.map((axis) => axis.field);
-  if (typeFields.length) polymorphismImmutableFields[model as ModelName] = { include: typeFields };
+  if (typeFields.length) polymorphismImmutableFields[toModelName(model)] = { include: typeFields };
 }

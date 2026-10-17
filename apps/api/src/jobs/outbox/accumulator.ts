@@ -8,7 +8,13 @@ import { db, type Prisma } from '@template/db';
 import { LogScope, log } from '@template/shared/logger';
 import { flushLinger, flushMaxRows, SHUTDOWN_FLUSH_RETRIES } from '#/jobs/outbox/config';
 import { flushQueue } from '#/jobs/outbox/mutex';
-import { type OutboxRow, toCreateInput } from '#/jobs/outbox/types';
+import {
+  type OutboxRow,
+  outboxLaneOf,
+  type SpillOptions,
+  toCreateInput,
+} from '#/jobs/outbox/types';
+import { JobLane } from '#/jobs/types';
 
 // --- accumulator: ALL spills (fan-out AND superseding) coalesce into one batched write ---
 type Pending = { row: OutboxRow; resolve: () => void; reject: (e: unknown) => void };
@@ -17,6 +23,15 @@ let acc: Pending[] = [];
 let timer: ReturnType<typeof setTimeout> | null = null;
 let closing = false; // shutdown: stop arming timers — flushOutbox owns the final drain
 let lastFlush: Promise<void> = Promise.resolve();
+
+// Accepted but not yet committed (or rejected) — rows still in `acc` plus rows in a flush queued behind
+// the outbox mutex. Each lane's overflow-clear waits on that lane's pending spills; quarantine reset
+// waits on both.
+let pendingSpills = 0;
+let pendingFastSpills = 0;
+export const hasPendingSpills = (): boolean => pendingSpills > 0;
+export const hasPendingFastSpills = (): boolean => pendingFastSpills > 0;
+export const hasPendingSlowSpills = (): boolean => pendingSpills - pendingFastSpills > 0;
 
 // Within a batch, keep only the latest row per superseding lane; plain (null-dedupeKey) rows all kept.
 const dedupeLatestPerLane = (batch: Pending[]): OutboxRow[] => {
@@ -47,13 +62,23 @@ const writeBatch = (batch: Pending[]): Promise<void> =>
     const rows = dedupeLatestPerLane(batch);
     const plain = rows.filter((r) => r.dedupeKey === null);
     const keyed = rows.filter((r) => r.dedupeKey !== null);
-    if (plain.length) await db.jobOutbox.createManyAndReturn({ data: plain.map(toCreateInput), skipDuplicates: true });
+    if (plain.length)
+      await db.jobOutbox.createManyAndReturn({
+        data: plain.map(toCreateInput),
+        skipDuplicates: true,
+      });
     for (const row of keyed) {
       await db.jobOutbox.upsert({
-        where: { handlerName_dedupeKey: { handlerName: row.handlerName, dedupeKey: row.dedupeKey as string } },
+        where: {
+          handlerName_dedupeKey: {
+            handlerName: row.handlerName,
+            dedupeKey: row.dedupeKey as string,
+          },
+        },
         create: toCreateInput(row),
         update: {
           jobId: row.jobId,
+          lane: outboxLaneOf(row),
           data: row.data as Prisma.InputJsonValue,
           options: row.options as Prisma.InputJsonValue,
         },
@@ -81,18 +106,38 @@ const flush = (): void => {
   lastFlush.catch(() => {}); // fire-and-forget (timer/size) path: callers already got the rejection
 };
 
-const accumulate = (row: OutboxRow): Promise<void> =>
+const accumulate = (row: OutboxRow, { flushImmediately = false }: SpillOptions): Promise<void> =>
   new Promise((resolve, reject) => {
-    acc.push({ row, resolve, reject });
-    if (closing) return; // shutdown drains via flushOutbox (with retry); its finally re-arms mid-drain stragglers
-    if (acc.length >= flushMaxRows())
+    const isFast = outboxLaneOf(row) === JobLane.fast;
+    pendingSpills++;
+    if (isFast) pendingFastSpills++;
+    const settle = (): void => {
+      pendingSpills--;
+      if (isFast) pendingFastSpills--;
+    };
+    acc.push({
+      row,
+      resolve: () => {
+        settle();
+        resolve();
+      },
+      reject: (e: unknown) => {
+        settle();
+        reject(e);
+      },
+    });
+    if (closing) return; // shutdown drains via flushOutbox — its loop catches mid-drain spills, or rejects them if it gives up
+    if (flushImmediately || acc.length >= flushMaxRows())
       flush(); // size trip — partitions a Promise.all burst inline
     else if (!timer) timer = setTimeout(flush, flushLinger()); // arm for the partial-batch tail
   });
 
 // Spill one job. Everything routes through the accumulator; superseding lanes collapse at flush
 // time. Resolves on COMMIT, never on accumulation — a crash in the flush window must not drop it.
-export const spillToOutbox = (row: OutboxRow): Promise<void> => accumulate(row);
+// `flushImmediately` commits as soon as the row is accepted, carrying every row already pending into
+// the same batch — the slow-lane refusal path uses it so a worker slot waits only for the commit.
+export const spillToOutbox = (row: OutboxRow, options: SpillOptions = {}): Promise<void> =>
+  accumulate(row, options);
 
 // Shutdown: persist every buffered row, retrying transient failures and surfacing the rest loudly.
 // Call AFTER intake has stopped (server stopped / worker closed) so no new spills race the flush.
@@ -105,11 +150,18 @@ const flushBatchWithRetry = async (batch: Pending[]): Promise<void> => {
       return;
     } catch (e) {
       lastErr = e;
-      log.warn(`flushOutbox: flush failed (attempt ${attempt}/${SHUTDOWN_FLUSH_RETRIES})`, LogScope.job);
+      log.warn(
+        `flushOutbox: flush failed (attempt ${attempt}/${SHUTDOWN_FLUSH_RETRIES})`,
+        LogScope.job,
+      );
     }
   }
   for (const p of batch) p.reject(lastErr);
-  log.error(`flushOutbox: gave up persisting ${batch.length} buffered job(s)`, lastErr, LogScope.job);
+  log.error(
+    `flushOutbox: gave up persisting ${batch.length} buffered job(s)`,
+    lastErr,
+    LogScope.job,
+  );
   throw lastErr;
 };
 
@@ -130,6 +182,17 @@ export const flushOutbox = async (): Promise<void> => {
     }
     if (persisted) log.info(`flushOutbox: persisted ${persisted} buffered job(s)`, LogScope.job);
   } finally {
+    // Only reachable non-empty when flushBatchWithRetry gave up mid-drain: spills accepted during
+    // those awaits sit unarmed in acc, and their callers would hang forever — fail them loudly.
+    if (acc.length) {
+      const stranded = acc;
+      acc = [];
+      const err = new Error(
+        `flushOutbox: shutdown flush gave up before ${stranded.length} spill(s) persisted`,
+      );
+      for (const p of stranded) p.reject(err);
+      log.error(err.message, err, LogScope.job);
+    }
     closing = false; // don't latch — an aborted shutdown (or a test) must be able to buffer again.
     // No timer re-arm here: during a real shutdown it could fire after Redis/DB are torn down. The
     // loop above already drained everything present; an aborted shutdown re-arms on its next spill.

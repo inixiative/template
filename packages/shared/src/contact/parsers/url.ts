@@ -11,7 +11,8 @@ export const stripQueryAndFragment = (s: string): string => s.split('?')[0]!.spl
 
 export const trimSlashes = (s: string): string => s.replace(/^\/+|\/+$/g, '');
 
-export const stripWwwAndProtocol = (url: string): string => url.replace(/^https?:\/\//i, '').replace(/^www\./i, '');
+export const stripWwwAndProtocol = (url: string): string =>
+  url.replace(/^https?:\/\//i, '').replace(/^www\./i, '');
 
 export const splitUrl = (url: string): string[] =>
   trimSlashes(stripQueryAndFragment(stripWwwAndProtocol(url)))

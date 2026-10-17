@@ -91,7 +91,7 @@ Resolutions from a design pass. Where these conflict with the inline spec above,
    `eligible` are the *same* disjunction over an action's paths:
    - `available(record)` = `∃ path. from(record)`
    - `check(record, changes)` = `permission ∧ (∃ path. from(record) ∧ to(merge(record, changes)))`
-   - `eligible()` = `toPrisma(Any[...froms])` → `{ OR: [...] }`
+   - `eligible()` = `toPrisma(Any[...froms])` → a Prisma plan whose `where` is `{ OR: [...] }`
    First-match was the odd one out — it implied winner-selection, which only matters to an
    *executor*, and this primitive doesn't execute. "All-match" (`∀`) would be wrong the other way
    (too strict). The correction makes all three ops one uniform fold, which is the tell it's right.
@@ -128,8 +128,8 @@ Resolutions from a design pass. Where these conflict with the inline spec above,
 
 Every `from.predicate` is also a query:
 - **point**: `check(t, record, changes)` — guard one change.
-- **set**: `toPrisma(t.from.predicate)` → a `where` for *all* records eligible for `t`,
-  e.g. `prisma.inquiry.findMany({ where: toPrisma(resolve.from.predicate) })`.
+- **set**: `toPrisma(t.from.predicate)` → a Prisma plan selecting *all* records eligible for `t`,
+  e.g. `prisma.inquiry.findMany({ where: await executePrismaPlan(eligible(rules, 'db:Inquiry', 'resolve', { map, model: 'Inquiry' }), prisma) })`.
 
 ## Registry + Actions (the affordance layer)
 
@@ -156,8 +156,9 @@ hang those — both are already on the roadmap, so the object isn't speculative.
   action permission holds AND **some** path satisfies `from(current) ∧ to(merged)`. Not first-match,
   not all-match. Paths may overlap (a feature — multiple legal routes to one affordance). Returns
   the aggregated `{ ok, failures }`; see Clarifications.
-- `eligible(model, action)` → `toPrisma(Any[...paths.map(p => p.from.predicate)])` — one OR'd
-  `where` for bulk "who can take this action" (verified: `toPrisma(Any) → { OR: [...] }`).
+- `eligible(model, action)` → `toPrisma(Any[...paths.map(p => p.from.predicate)])` — the Prisma plan
+  (run with `executePrismaPlan`) whose `where` is one OR'd filter for bulk "who can take this action"
+  (verified: `toPrisma(Any) → { OR: [...] }`).
 
 ## Serializable → tenant-configurable
 
@@ -242,7 +243,7 @@ _Source-checked 2026-06-08 against `@inixiative/json-rules@2.5.0` + `@monorepo/p
   orthogonal axes: field-scope → lens; actor-authz → injected `rebac.check`.
 - **`toPrisma` compiles booleans** (verified in impl): `Any → { OR: [...] }` (empty →
   match-nothing), `All → { AND: [...] }`. So `eligible(action) = toPrisma(Any[...froms])` yields
-  one OR'd `where`.
+  a plan whose `where` is one OR'd filter.
 
 - **Field-scope = reuse `@monorepo/db/lens`, don't build.** `lensFor(model)` is the base lens;
   `redactLens(lens)` narrows out redacted fields (from `HOOK_REDACT_FIELDS`); the read route

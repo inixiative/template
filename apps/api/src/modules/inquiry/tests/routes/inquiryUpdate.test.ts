@@ -1,6 +1,15 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import type { Inquiry, Organization, OrganizationUser, User } from '@template/db';
-import { InquiryResourceModel, InquiryStatus, InquiryType } from '@template/db/generated/client/enums';
+import type {
+  Inquiry,
+  Organization,
+  OrganizationUser,
+  User,
+} from '@template/db/generated/client/client';
+import {
+  InquiryResourceModel,
+  InquiryStatus,
+  InquiryType,
+} from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
   createInquiry,
@@ -26,10 +35,17 @@ describe('PATCH /api/v1/inquiry/:id', () => {
     admin = u;
     const { entity: o } = await createOrganization();
     org = o;
-    const { entity: ou } = await createOrganizationUser({ role: 'owner' }, { user: admin, organization: org });
+    const { entity: ou } = await createOrganizationUser(
+      { role: 'owner' },
+      { user: admin, organization: org },
+    );
     adminOrgUser = ou;
 
-    const harness = createTestApp({ mockUser: admin, mockOrganizationUsers: [adminOrgUser], mount });
+    const harness = createTestApp({
+      mockUser: admin,
+      mockOrganizationUsers: [adminOrgUser],
+      mount,
+    });
     fetch = harness.fetch;
     db = harness.db;
   });
@@ -51,7 +67,9 @@ describe('PATCH /api/v1/inquiry/:id', () => {
     });
 
     const response = await fetch(
-      patch(`/api/v1/inquiry/${inquiry.id}`, { content: { organizationId: org.id, role: 'member' } }),
+      patch(`/api/v1/inquiry/${inquiry.id}`, {
+        content: { organizationId: org.id, role: 'member' },
+      }),
     );
     const { data } = await json<Inquiry>(response);
 
@@ -72,15 +90,75 @@ describe('PATCH /api/v1/inquiry/:id', () => {
     });
 
     const response = await fetch(
-      patch(`/api/v1/inquiry/${inquiry.id}`, { content: { organizationId: org.id, role: 'member' } }),
+      patch(`/api/v1/inquiry/${inquiry.id}`, {
+        content: { organizationId: org.id, role: 'member' },
+      }),
     );
     expect(response.status).toBe(200);
   });
 
+  it('sends a draft via PATCH with the content edit', async () => {
+    const { entity: invitee } = await createUser();
+    const { entity: inquiry } = await createInquiry({
+      type: InquiryType.inviteOrganizationUser,
+      status: InquiryStatus.draft,
+      sourceModel: InquiryResourceModel.Organization,
+      sourceOrganizationId: org.id,
+      targetModel: InquiryResourceModel.User,
+      targetUserId: invitee.id,
+      content: { organizationId: org.id, role: 'member' },
+    });
+
+    const response = await fetch(
+      patch(`/api/v1/inquiry/${inquiry.id}`, {
+        content: { organizationId: org.id, role: 'admin' },
+        status: InquiryStatus.sent,
+      }),
+    );
+    expect(response.status).toBe(200);
+
+    const stored = await db.inquiry.findUniqueOrThrow({ where: { id: inquiry.id } });
+    expect(stored.status).toBe(InquiryStatus.sent);
+    expect(stored.sentAt).not.toBeNull();
+    expect(stored.expiresAt).not.toBeNull();
+    expect(stored.content).toEqual({ organizationId: org.id, role: 'admin' });
+  });
+
+  it('unsends a sent inquiry back to draft', async () => {
+    const { entity: invitee } = await createUser();
+    const { entity: inquiry } = await createInquiry({
+      type: InquiryType.inviteOrganizationUser,
+      status: InquiryStatus.sent,
+      sentAt: new Date(),
+      expiresAt: new Date(Date.now() + 86_400_000),
+      sourceModel: InquiryResourceModel.Organization,
+      sourceOrganizationId: org.id,
+      targetModel: InquiryResourceModel.User,
+      targetUserId: invitee.id,
+      content: { organizationId: org.id, role: 'member' },
+    });
+
+    const response = await fetch(
+      patch(`/api/v1/inquiry/${inquiry.id}`, { status: InquiryStatus.draft }),
+    );
+    expect(response.status).toBe(200);
+
+    const stored = await db.inquiry.findUniqueOrThrow({ where: { id: inquiry.id } });
+    expect(stored.status).toBe(InquiryStatus.draft);
+    expect(stored.expiresAt).toBeNull();
+  });
+
   it('rejects role elevation via content update', async () => {
     const { entity: adminUser } = await createUser();
-    const { entity: adminOu } = await createOrganizationUser({ role: 'admin' }, { user: adminUser, organization: org });
-    const adminFetch = createTestApp({ mockUser: adminUser, mockOrganizationUsers: [adminOu], mount }).fetch;
+    const { entity: adminOu } = await createOrganizationUser(
+      { role: 'admin' },
+      { user: adminUser, organization: org },
+    );
+    const adminFetch = createTestApp({
+      mockUser: adminUser,
+      mockOrganizationUsers: [adminOu],
+      mount,
+    }).fetch;
 
     const { entity: invitee } = await createUser();
     const { entity: inquiry } = await createInquiry({
@@ -94,7 +172,9 @@ describe('PATCH /api/v1/inquiry/:id', () => {
     });
 
     const response = await adminFetch(
-      patch(`/api/v1/inquiry/${inquiry.id}`, { content: { organizationId: org.id, role: 'admin' } }),
+      patch(`/api/v1/inquiry/${inquiry.id}`, {
+        content: { organizationId: org.id, role: 'admin' },
+      }),
     );
     expect(response.status).toBe(403);
   });

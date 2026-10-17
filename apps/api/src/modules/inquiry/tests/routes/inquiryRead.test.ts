@@ -1,6 +1,15 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import type { Inquiry, Organization, OrganizationUser, User } from '@template/db';
-import { InquiryResourceModel, InquiryStatus, InquiryType } from '@template/db/generated/client/enums';
+import type {
+  Inquiry,
+  Organization,
+  OrganizationUser,
+  User,
+} from '@template/db/generated/client/client';
+import {
+  InquiryResourceModel,
+  InquiryStatus,
+  InquiryType,
+} from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
   createInquiry,
@@ -8,7 +17,6 @@ import {
   createOrganizationUser,
   createUser,
 } from '@template/db/test';
-import { uuidv7 } from 'uuidv7';
 import { inquiryRouter } from '#/modules/inquiry';
 import { createTestApp, type MountFn } from '#tests/createTestApp';
 import { get, json } from '#tests/utils/request';
@@ -27,10 +35,17 @@ describe('GET /api/v1/inquiry/:id', () => {
     admin = u;
     const { entity: o } = await createOrganization();
     org = o;
-    const { entity: ou } = await createOrganizationUser({ role: 'admin' }, { user: admin, organization: org });
+    const { entity: ou } = await createOrganizationUser(
+      { role: 'admin' },
+      { user: admin, organization: org },
+    );
     adminOrgUser = ou;
 
-    const harness = createTestApp({ mockUser: admin, mockOrganizationUsers: [adminOrgUser], mount });
+    const harness = createTestApp({
+      mockUser: admin,
+      mockOrganizationUsers: [adminOrgUser],
+      mount,
+    });
     fetch = harness.fetch;
     db = harness.db;
   });
@@ -97,7 +112,7 @@ describe('GET /api/v1/inquiry/:id', () => {
   });
 
   it('returns 404 for unknown id', async () => {
-    const response = await fetch(get(`/api/v1/inquiry/${uuidv7()}`));
+    const response = await fetch(get(`/api/v1/inquiry/${Bun.randomUUIDv7()}`));
     expect(response.status).toBe(404);
   });
 });

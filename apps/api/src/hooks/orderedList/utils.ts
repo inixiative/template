@@ -22,7 +22,10 @@ export const extractRows = (args: unknown): Record<string, unknown>[] => {
 // originating row. We compensate here: queue a cache invalidation per affected
 // row on commit, using the same fetchCacheKeys / clearKey primitives the
 // cache hook uses.
-export const queueOrderedListCacheInvalidation = (model: string, rows: Record<string, unknown>[]): void => {
+export const queueOrderedListCacheInvalidation = (
+  model: string,
+  rows: Record<string, unknown>[],
+): void => {
   if (rows.length === 0) return;
 
   const keys = new Set<string>();

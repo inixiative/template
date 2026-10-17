@@ -18,7 +18,9 @@ export default defineConfig({
   migrate: {
     async url() {
       if (!process.env.DATABASE_URL) {
-        throw new Error('DATABASE_URL is required. Run commands via: bun run with <env> api <command>');
+        throw new Error(
+          'DATABASE_URL is required. Run commands via: bun run with <env> api <command>',
+        );
       }
       return process.env.DATABASE_URL;
     },

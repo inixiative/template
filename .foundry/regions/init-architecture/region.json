@@ -1,0 +1,51 @@
+{
+  "id": "init-architecture",
+  "title": "Init script architecture and direction",
+  "routing": "Is this about how the init TUI is structured or where it is heading: ConfigProvider / useConfig / syncConfig and the root config state, getProjectConfig with cache-busted imports, markComplete / isComplete and detectSetupState / derived setupState with useMemo, manual sync not polling, viewState naming vs execution flags, state management standards, resource naming, the file layout (init/views, init/tasks, init/api), creating a new task view, checkPrerequisites, execAsync vs execSync, retryWithTimeout, getSecret, the Launch preflight gate, or the cut-over from the TUI to headless init:agent and from push to migrations?",
+  "concepts": ["init-architecture"],
+  "tokens": 11363,
+  "tokenMethod": "chars/4",
+  "files": {
+    "recognise": {
+      "path": "recognise.md",
+      "tokens": 2310,
+      "experimental": true,
+      "note": "recognise/pick split under test (model round); not the standard"
+    },
+    "knowledge": {
+      "path": "knowledge.md",
+      "tokens": 11363
+    }
+  },
+  "runsAgreed": 0,
+  "sources": {
+    "docs": ["docs/claude/INIT_SCRIPT_PATTERNS.md"],
+    "docUnits": [
+      "doc:docs/claude/INIT_SCRIPT_PATTERNS.md#architecture-overview",
+      "doc:docs/claude/INIT_SCRIPT_PATTERNS.md#core-patterns",
+      "doc:docs/claude/INIT_SCRIPT_PATTERNS.md#core-patterns/1-root-level-config-state-context-provider",
+      "doc:docs/claude/INIT_SCRIPT_PATTERNS.md#core-patterns/2-manual-sync-triggers-no-polling",
+      "doc:docs/claude/INIT_SCRIPT_PATTERNS.md#core-patterns/3-cache-busting-on-imports",
+      "doc:docs/claude/INIT_SCRIPT_PATTERNS.md#core-patterns/4-derived-state-with-usememo",
+      "doc:docs/claude/INIT_SCRIPT_PATTERNS.md#core-patterns/16-state-management-standards",
+      "doc:docs/claude/INIT_SCRIPT_PATTERNS.md#resource-naming",
+      "doc:docs/claude/INIT_SCRIPT_PATTERNS.md#file-structure",
+      "doc:docs/claude/INIT_SCRIPT_PATTERNS.md#creating-a-new-task-view",
+      "doc:docs/claude/INIT_SCRIPT_PATTERNS.md#key-takeaways"
+    ],
+    "catalogClusters": [
+      "build-deploy-ci",
+      "dev-setup-scripts",
+      "environment-config",
+      "guided-flows",
+      "module-layout-monorepo",
+      "naming-vocabulary",
+      "testing-helpers",
+      "testing-rules"
+    ],
+    "codeEntries": 0,
+    "docMembers": 36
+  },
+  "bypassLines": 21,
+  "glossaryTerms": 23
+}

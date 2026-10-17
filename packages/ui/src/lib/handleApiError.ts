@@ -5,6 +5,7 @@
  * @uses primitive:shared
  */
 import type { ApiErrorBody } from '@template/shared/errors';
+import { formatFieldErrors } from '@template/ui/lib/formatFieldErrors';
 import { navigateToLogin } from '@template/ui/lib/routeRedirect';
 import { toast } from '@template/ui/lib/toast';
 import { useAppStore } from '@template/ui/store';
@@ -22,6 +23,12 @@ export const handleApiError = (error: unknown) => {
     if ('message' in error && typeof error.message === 'string') message = error.message;
     if ('guidance' in error && typeof error.guidance === 'string')
       guidance = error.guidance as ApiErrorBody['guidance'];
+    if ('fieldErrors' in error && error.fieldErrors && typeof error.fieldErrors === 'object') {
+      const details = formatFieldErrors(
+        error.fieldErrors as NonNullable<ApiErrorBody['fieldErrors']>,
+      );
+      if (details) message = details;
+    }
   }
 
   const handlers = {

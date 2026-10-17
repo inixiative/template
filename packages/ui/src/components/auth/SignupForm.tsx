@@ -7,10 +7,17 @@
 import { Icon } from '@iconify/react';
 import { useSearch } from '@tanstack/react-router';
 import { Button } from '@template/ui/components/primitives/Button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@template/ui/components/primitives/Card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@template/ui/components/primitives/Card';
 import { Input } from '@template/ui/components/primitives/Input';
 import { Label } from '@template/ui/components/primitives/Label';
 import { useAuthProviders } from '@template/ui/hooks';
+import { type DescribedError, describeError } from '@template/ui/lib/describeError';
 import { toast } from '@template/ui/lib/toast';
 import { useAppStore } from '@template/ui/store';
 import { useState } from 'react';
@@ -29,8 +36,9 @@ export const SignupForm = ({ onLoginClick }: SignupFormProps) => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState<string>();
+  const [error, setError] = useState<DescribedError>();
   const [isLoading, setIsLoading] = useState(false);
+  const [verificationEmail, setVerificationEmail] = useState<string>();
 
   const search = useSearch({ strict: false }) as { redirectTo?: string };
   const signUp = useAppStore((state) => state.auth.signUp);
@@ -43,12 +51,15 @@ export const SignupForm = ({ onLoginClick }: SignupFormProps) => {
     setIsLoading(true);
 
     try {
-      await signUp({ type: 'email', email, password, name });
-      navigatePreserving(search.redirectTo || '/dashboard', 'context');
+      const result = await signUp({ type: 'email', email, password, name });
+      setPassword('');
+      if (result.status === 'verification-pending') setVerificationEmail(result.email);
+      else if (result.status === 'authenticated')
+        navigatePreserving(search.redirectTo || '/dashboard', 'context');
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Sign up failed. Please try again.';
-      setError(message);
-      toast.error(message);
+      const described = describeError(err, 'Sign up failed. Please try again.');
+      setError(described);
+      toast.error(described.message, { description: described.detail });
     } finally {
       setIsLoading(false);
     }
@@ -67,9 +78,9 @@ export const SignupForm = ({ onLoginClick }: SignupFormProps) => {
         callbackURL: `${window.location.origin}/auth/callback`,
       });
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'OAuth sign up failed. Please try again.';
-      setError(message);
-      toast.error(message);
+      const described = describeError(err, 'Sign up failed. Please try again.');
+      setError(described);
+      toast.error(described.message, { description: described.detail });
       setIsLoading(false);
     }
   };
@@ -77,8 +88,31 @@ export const SignupForm = ({ onLoginClick }: SignupFormProps) => {
   const enabledProviders = providers?.filter((p) => p.enabled) || [];
   const showProviders = enabledProviders.length > 0;
   const displayError = providerError
-    ? 'Unable to load authentication providers. You can still sign up with email and password.'
+    ? describeError(
+        providerError,
+        'Unable to load authentication providers. You can still sign up with email and password.',
+      )
     : error;
+
+  if (verificationEmail) {
+    return (
+      <Card className="w-full shadow-lg border-border/50">
+        <CardHeader>
+          <CardTitle className="text-xl">Check your email</CardTitle>
+          <CardDescription role="status">
+            Open the verification link sent to {verificationEmail}, then log in to continue.
+          </CardDescription>
+        </CardHeader>
+        {onLoginClick && (
+          <CardContent>
+            <Button type="button" className="w-full" onClick={onLoginClick}>
+              Back to log in
+            </Button>
+          </CardContent>
+        )}
+      </Card>
+    );
+  }
 
   return (
     <Card className="w-full shadow-lg border-border/50">
@@ -92,7 +126,10 @@ export const SignupForm = ({ onLoginClick }: SignupFormProps) => {
         <div className="space-y-4">
           {displayError && (
             <div className="bg-error/10 border border-error text-error-foreground rounded-md p-3 text-sm">
-              {displayError}
+              {displayError.message}
+              {displayError.detail && (
+                <div className="mt-1 text-xs opacity-80 break-all">{displayError.detail}</div>
+              )}
             </div>
           )}
 
@@ -122,7 +159,9 @@ export const SignupForm = ({ onLoginClick }: SignupFormProps) => {
                   <span className="w-full border-t" />
                 </div>
                 <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-background px-2 text-muted-foreground">Or continue with email</span>
+                  <span className="bg-background px-2 text-muted-foreground">
+                    Or continue with email
+                  </span>
                 </div>
               </div>
             </>
@@ -176,7 +215,11 @@ export const SignupForm = ({ onLoginClick }: SignupFormProps) => {
             {onLoginClick && (
               <div className="text-center text-sm text-muted-foreground">
                 Already have an account?{' '}
-                <button type="button" onClick={onLoginClick} className="text-primary hover:underline">
+                <button
+                  type="button"
+                  onClick={onLoginClick}
+                  className="text-primary hover:underline"
+                >
                   Log In
                 </button>
               </div>

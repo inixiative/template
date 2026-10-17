@@ -1,17 +1,6 @@
 {
+  "extends": "@inixiative/config/tsconfig/base.json",
   "compilerOptions": {
-    "target": "ESNext",
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "typeRoots": ["../../node_modules/@types", "../../node_modules"],
-    "types": ["bun"],
-    "declaration": true,
-    "declarationMap": true,
-    "outDir": "./dist",
-    "baseUrl": ".",
     "paths": {
       "@template/permissions": ["./src/index.ts"],
       "@template/permissions/*": ["./src/*"],

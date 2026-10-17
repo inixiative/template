@@ -9,13 +9,10 @@ import {
   createSession,
   createToken,
   createUser,
-  registerTestTracker,
 } from '@template/db/test';
 
 describe('hydrate', () => {
-  beforeEach(() => {
-    registerTestTracker();
-  });
+  beforeEach(() => {});
 
   afterEach(async () => {
     await cleanupTouchedTables(db);
@@ -27,7 +24,7 @@ describe('hydrate', () => {
       ownerModel: TokenOwnerModel.OrganizationUser,
     });
 
-    const result = await hydrate(db, 'token', {
+    const result = await hydrate('token', {
       id: token.id,
       userId: token.userId,
       organizationId: token.organizationId,
@@ -45,7 +42,7 @@ describe('hydrate', () => {
       ownerModel: TokenOwnerModel.OrganizationUser,
     });
 
-    const result = await hydrate(db, 'token', {
+    const result = await hydrate('token', {
       id: token.id,
       userId: token.userId,
       organizationId: token.organizationId,
@@ -66,7 +63,6 @@ describe('hydrate', () => {
 
     const pending = new Map();
     await hydrate(
-      db,
       'token',
       {
         id: token.id,
@@ -85,7 +81,7 @@ describe('hydrate', () => {
   it('handles null FK gracefully', async () => {
     const { entity: user } = await createUser();
 
-    const result = await hydrate(db, 'user', { id: user.id });
+    const result = await hydrate('user', { id: user.id });
 
     expect(result.id).toBe(user.id);
   });
@@ -96,15 +92,13 @@ describe('hydrate', () => {
     // Delete user to create orphan
     await db.user.delete({ where: { id: context.user!.id } });
 
-    const result = await hydrate(db, 'session', { id: session.id, userId: session.userId });
+    const result = await hydrate('session', { id: session.id, userId: session.userId });
     expect(result.user).toBeUndefined();
   });
 });
 
 describe('fetchOne', () => {
-  beforeEach(() => {
-    registerTestTracker();
-  });
+  beforeEach(() => {});
 
   afterEach(async () => {
     await cleanupTouchedTables(db);
@@ -113,7 +107,7 @@ describe('fetchOne', () => {
   it('fetches by simple id', async () => {
     const { entity: user } = await createUser();
 
-    const result = await fetchOne(db, 'user', user.id);
+    const result = await fetchOne('user', user.id);
 
     expect(result).toBeDefined();
     expect(result?.id).toBe(user.id);
@@ -122,7 +116,7 @@ describe('fetchOne', () => {
   it('fetches by composite key', async () => {
     const { entity: orgUser } = await createOrganizationUser();
 
-    const result = await fetchOne(db, 'organizationUser', {
+    const result = await fetchOne('organizationUser', {
       organizationId: orgUser.organizationId,
       userId: orgUser.userId,
     });
@@ -133,7 +127,7 @@ describe('fetchOne', () => {
   });
 
   it('returns null for missing record', async () => {
-    const result = await fetchOne(db, 'user', 'nonexistent-id');
+    const result = await fetchOne('user', 'nonexistent-id');
     expect(result).toBeNull();
   });
 });

@@ -15,7 +15,9 @@ export default defineConfig({
     '**/*.config.ts', // build tooling (vite/app/prisma/openapiTs config) — not app source
     '**/scripts/**', // codegen / build scripts
     '**/watchAndGenerate.ts',
-    '**/test/**', // test infra (factories, mocks, setup) — singular, complements **/tests/**
+    // test setup/mocks — singular, complements **/tests/**. packages/db/src/test is mapped: it is the factory system (primitive:testFactories)
+    'apps/**/test/**',
+    'packages/ui/src/test/**',
     '**/*.example.tsx',
   ],
   stamp: [
@@ -33,9 +35,12 @@ export default defineConfig({
     // structural roles common in packages + frontend
     { include: ['**/types/**', '**/*.types.ts'], kind: 'type' },
     { include: '**/factories/**', kind: 'factory' },
-    { include: ['**/client.ts', '**/*.client.ts', '**/client/**', '**/clients/**'], kind: 'client' },
+    {
+      include: ['**/client.ts', '**/*.client.ts', '**/client/**', '**/clients/**'],
+      kind: 'client',
+    },
     { include: ['**/registries/**', '**/registry.ts'], kind: 'registry' },
-    { include: '**/bridges/**', kind: 'bridge' },
+    { include: '**/channels/**', kind: 'channel' },
     { include: '**/defs/**', kind: 'definition' },
     { include: '**/*Error.ts', kind: 'error' },
     { include: '**/generate*.ts', kind: 'generator' },
@@ -56,9 +61,17 @@ export default defineConfig({
       kind: 'hook',
     },
     // frontend (TanStack apps): file-based routes are pages, app bootstrap is an entrypoint
-    { include: ['apps/web/**/routes/**', 'apps/admin/**/routes/**', 'apps/superadmin/**/routes/**'], kind: 'page' },
     {
-      include: ['apps/*/app/main.tsx', 'apps/*/app/client.tsx', 'apps/*/app/router.tsx', 'apps/*/app/ssr.tsx'],
+      include: ['apps/web/**/routes/**', 'apps/admin/**/routes/**', 'apps/superadmin/**/routes/**'],
+      kind: 'page',
+    },
+    {
+      include: [
+        'apps/*/app/main.tsx',
+        'apps/*/app/client.tsx',
+        'apps/*/app/router.tsx',
+        'apps/*/app/ssr.tsx',
+      ],
       kind: 'entrypoint',
     },
     { include: 'apps/*/app/lib/**', kind: 'utils' },
@@ -78,6 +91,7 @@ export default defineConfig({
     { include: 'apps/api/src/appEvents/**', partOf: 'primitive:appEvents' },
     { include: 'apps/api/src/jobs/**', partOf: 'primitive:jobs' },
     { include: 'apps/api/src/ws/**', partOf: 'primitive:websockets' },
+    { include: 'packages/db/src/test/**', partOf: 'primitive:testFactories' },
     {
       include: 'packages/$1/**',
       exclude: ['**/seed.ts', '**/*.seed.ts', '**/seeds/**'],
@@ -90,23 +104,39 @@ export default defineConfig({
       include: ['apps/api/src/lib/routeTemplates/**', 'apps/api/src/lib/utils/makeController.ts'],
       partOf: 'primitive:routeTemplates',
     },
-    { include: ['apps/api/src/lib/auth.ts', 'apps/api/src/middleware/auth/**'], partOf: 'feature:auth' },
+    {
+      include: ['apps/api/src/lib/auth.ts', 'apps/api/src/middleware/auth/**'],
+      partOf: 'feature:auth',
+    },
     {
       include: ['apps/api/src/lib/webhooks/**', 'apps/api/src/hooks/webhookSubscriptionUrl/**'],
       partOf: 'feature:webhooks',
     },
-    { include: ['packages/db/src/redis/**', 'packages/db/src/lock/**'], partOf: 'infrastructure:redis' },
+    {
+      include: ['packages/db/src/redis/**', 'packages/db/src/lock/**'],
+      partOf: 'infrastructure:redis',
+    },
     // api lib/middleware primitives + infrastructure + external integrations
     {
       include: ['apps/api/src/lib/context/**', 'apps/api/src/middleware/resources/**'],
       partOf: 'primitive:requestContext',
     },
-    { include: ['apps/api/src/lib/errors/**', 'apps/api/src/middleware/error/**'], partOf: 'primitive:errors' },
+    {
+      include: ['apps/api/src/lib/errors/**', 'apps/api/src/middleware/error/**'],
+      partOf: 'primitive:errors',
+    },
     { include: 'apps/api/src/lib/messaging/**', partOf: 'primitive:messaging' },
     { include: 'apps/api/src/lib/shutdown.ts', partOf: 'primitive:lifecycle' },
-    { include: ['apps/api/src/lib/storage/**', 'apps/api/src/lib/clients/s3.ts'], partOf: 'infrastructure:storage' },
     {
-      include: ['apps/api/src/config/otel.ts', 'apps/api/src/lib/observe.ts', 'apps/api/src/lib/errorReporter/**'],
+      include: ['apps/api/src/lib/storage/**', 'apps/api/src/lib/clients/s3.ts'],
+      partOf: 'infrastructure:storage',
+    },
+    {
+      include: [
+        'apps/api/src/config/otel.ts',
+        'apps/api/src/lib/observe.ts',
+        'apps/api/src/lib/errorReporter/**',
+      ],
       partOf: 'infrastructure:observability',
     },
     { include: 'apps/api/src/config/env.ts', partOf: 'infrastructure:env' },

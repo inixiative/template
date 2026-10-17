@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it, mock } from 'bun:test';
 import { db } from '@template/db';
-import { auditActorContext } from '@template/db/lib/auditActorContext';
+import { auditActorContext, nullAuditActor } from '@template/db/lib/auditActorContext';
 import { emitAppEvent } from '#/appEvents/emit';
 import { AppEventName, appEventHandlers } from '#/appEvents/handlers';
+import type { AppEventPayload } from '#/appEvents/types';
 
 describe('emitAppEvent', () => {
   const originalHandlers = { ...appEventHandlers };
@@ -14,7 +15,7 @@ describe('emitAppEvent', () => {
   });
 
   it('dispatches to the correct handler by name', async () => {
-    const mockHandler = mock(async () => {});
+    const mockHandler = mock(async (_event: AppEventPayload) => {});
     appEventHandlers[AppEventName.userCreated] = mockHandler;
 
     await emitAppEvent('user.created', { userId: 'test-id', isGuest: false });
@@ -26,18 +27,16 @@ describe('emitAppEvent', () => {
   });
 
   it('auto-enriches actor from auditActorContext', async () => {
-    const mockHandler = mock(async () => {});
+    const mockHandler = mock(async (_event: AppEventPayload) => {});
     appEventHandlers[AppEventName.userCreated] = mockHandler;
 
     await auditActorContext.scope(
       {
+        ...nullAuditActor,
         actorUserId: 'actor-123',
-        actorSpoofUserId: null,
         actorTokenId: 'token-456',
-        actorJobName: null,
         ipAddress: '10.0.0.1',
         userAgent: 'TestAgent/1.0',
-        sourceInquiryId: null,
       },
       () => emitAppEvent('user.created', { userId: 'test-id', isGuest: true }),
     );
@@ -50,7 +49,7 @@ describe('emitAppEvent', () => {
   });
 
   it('uses nullAuditActor when no context scope', async () => {
-    const mockHandler = mock(async () => {});
+    const mockHandler = mock(async (_event: AppEventPayload) => {});
     appEventHandlers[AppEventName.userCreated] = mockHandler;
 
     await emitAppEvent('user.created', { userId: 'test-id', isGuest: false });
@@ -60,20 +59,19 @@ describe('emitAppEvent', () => {
     expect(event.actor.ipAddress).toBeNull();
   });
 
-  it('sets timestamp', async () => {
-    const mockHandler = mock(async () => {});
+  it('stamps a unique id per event', async () => {
+    const mockHandler = mock(async (_event: AppEventPayload) => {});
     appEventHandlers[AppEventName.userCreated] = mockHandler;
 
-    const before = new Date().toISOString();
     await emitAppEvent('user.created', { userId: 'test-id', isGuest: false });
-    const after = new Date().toISOString();
+    await emitAppEvent('user.created', { userId: 'test-id', isGuest: false });
 
-    const event = mockHandler.mock.calls[0][0];
-    expect(event.timestamp >= before).toBe(true);
-    expect(event.timestamp <= after).toBe(true);
+    const [first, second] = mockHandler.mock.calls.map((call) => call[0].id);
+    expect(first).toBeTruthy();
+    expect(first).not.toBe(second);
   });
 
-  it('does nothing for unknown event names', async () => {
+  it('dispatches no handler for unknown event names', async () => {
     await emitAppEvent('nonexistent.event' as never, {} as never);
   });
 

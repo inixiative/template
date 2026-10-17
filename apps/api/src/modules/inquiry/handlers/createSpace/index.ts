@@ -19,7 +19,11 @@ export type SpaceContent = z.infer<typeof spaceContentSchema>;
 type CreateSpaceContent = SpaceContent;
 type CreateSpaceResolution = z.infer<typeof resolutionSchema>;
 
-const validate = async (db: Db, inquiry: Partial<Inquiry>, content: CreateSpaceContent): Promise<void> => {
+const validate = async (
+  db: Db,
+  inquiry: Partial<Inquiry>,
+  content: CreateSpaceContent,
+): Promise<void> => {
   const organizationId = inquiry.sourceOrganizationId as OrganizationId;
   const { slug } = content;
 
@@ -36,9 +40,13 @@ const validate = async (db: Db, inquiry: Partial<Inquiry>, content: CreateSpaceC
     }),
   ]);
 
-  if (existingSpace) throw makeError({ status: 409, message: 'A space with this slug already exists' });
+  if (existingSpace)
+    throw makeError({ status: 409, message: 'A space with this slug already exists' });
   if (existingInquiry)
-    throw makeError({ status: 409, message: 'An open request to create a space with this slug already exists' });
+    throw makeError({
+      status: 409,
+      message: 'An open request to create a space with this slug already exists',
+    });
 };
 
 export const createSpaceHandler: InquiryHandler<CreateSpaceContent, CreateSpaceResolution> = {

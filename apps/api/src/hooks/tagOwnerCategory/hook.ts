@@ -7,6 +7,7 @@ import {
   type Prisma,
   registerDbHook,
   type SingleAction,
+  withDiscriminatorDefaults,
 } from '@template/db';
 import { castArray } from 'lodash-es';
 import { makeError } from '#/lib/errors';
@@ -14,7 +15,9 @@ import { makeError } from '#/lib/errors';
 type TagRow = Partial<Prisma.TagGetPayload<Record<string, never>>> & Record<string, unknown>;
 
 // Derived from the polymorphism registry — single source of truth.
-const ownerKeyFields = [...new Set(Object.values(PolymorphismRegistry.Tag?.axes[0]?.fkMap ?? {}).flat())];
+const ownerKeyFields = [
+  ...new Set(Object.values(PolymorphismRegistry.Tag?.axes[0]?.fkMap ?? {}).flat()),
+];
 
 const ownerSelect: Record<string, true> = Object.fromEntries(ownerKeyFields.map((k) => [k, true]));
 
@@ -29,9 +32,7 @@ const validateRowAgainstCategory = (row: TagRow, category: CategoryOwner | undef
     throw makeError({ status: 422, message: `TagCategory ${row.tagCategoryId} not found` });
   }
 
-  // ownerModel has a DB default of 'platform' — apply it during validation so
-  // creates that omit it match Prisma's post-default semantics.
-  const ownerModel = (row.ownerModel as string | undefined) ?? 'platform';
+  const { ownerModel } = withDiscriminatorDefaults('Tag', row);
 
   if (ownerModel !== category.ownerModel) {
     throw makeError({
@@ -55,7 +56,11 @@ const validateRowAgainstCategory = (row: TagRow, category: CategoryOwner | undef
 // Batch-fetch every referenced TagCategory in one findMany, then validate
 // rows against the in-memory map. Avoids N+1 on createManyAndReturn.
 const validateRowsBatch = async (rows: TagRow[]): Promise<void> => {
-  const ids = [...new Set(rows.map((r) => r.tagCategoryId).filter((id): id is string => typeof id === 'string'))];
+  const ids = [
+    ...new Set(
+      rows.map((r) => r.tagCategoryId).filter((id): id is string => typeof id === 'string'),
+    ),
+  ];
   if (ids.length === 0) {
     // Each row will throw its own "not found" via the single-row path.
     for (const row of rows) validateRowAgainstCategory(row, undefined);
@@ -65,7 +70,9 @@ const validateRowsBatch = async (rows: TagRow[]): Promise<void> => {
     where: { id: { in: ids } },
     select: { id: true, ownerModel: true, ...ownerSelect },
   });
-  const byId = new Map<string, CategoryOwner>(categories.map((c) => [c.id as string, c as unknown as CategoryOwner]));
+  const byId = new Map<string, CategoryOwner>(
+    categories.map((c) => [c.id as string, c as unknown as CategoryOwner]),
+  );
   for (const row of rows) {
     validateRowAgainstCategory(row, byId.get(row.tagCategoryId as string));
   }
@@ -99,19 +106,25 @@ export const registerTagOwnerCategoryHook = () => {
     },
   );
 
-  registerDbHook('tagOwnerCategory:upsert', 'Tag', HookTiming.before, [DbAction.upsert], async (options) => {
-    const { args, previous } = options as HookOptions & { action: SingleAction };
-    if (!args || typeof args !== 'object') return;
-    const a = args as Record<string, unknown>;
-    const create = a.create as TagRow | undefined;
-    const update = a.update as TagRow | undefined;
-    if (create) await validateOwnerMatchesCategory(create);
-    if (update) {
-      const prev = previous as TagRow | undefined;
-      const merged: TagRow = { ...(prev ?? {}), ...update };
-      await validateOwnerMatchesCategory(merged);
-    }
-  });
+  registerDbHook(
+    'tagOwnerCategory:upsert',
+    'Tag',
+    HookTiming.before,
+    [DbAction.upsert],
+    async (options) => {
+      const { args, previous } = options as HookOptions & { action: SingleAction };
+      if (!args || typeof args !== 'object') return;
+      const a = args as Record<string, unknown>;
+      const create = a.create as TagRow | undefined;
+      const update = a.update as TagRow | undefined;
+      if (create) await validateOwnerMatchesCategory(create);
+      if (update) {
+        const prev = previous as TagRow | undefined;
+        const merged: TagRow = { ...(prev ?? {}), ...update };
+        await validateOwnerMatchesCategory(merged);
+      }
+    },
+  );
 
   registerDbHook(
     'tagOwnerCategory:update',

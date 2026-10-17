@@ -4,29 +4,36 @@
  * @partOf infrastructure:prisma
  * @uses primitive:shared
  */
-import { type Condition, type LensNarrowing, projectByPath, toPrisma } from '@inixiative/json-rules';
-import type { ModelName } from '@template/db';
-import { dialect, rootLens, searchablePaths } from '@template/db/lens';
+import { getLensRoot, type LensNarrowing } from '@inixiative/json-rules';
+import { lookupField, type ModelField, type ModelName, toModelName } from '@template/db';
+import { dialect, searchablePaths } from '@template/db/lens';
 import {
   FIELD_OPERATORS,
   isArrayFieldOperator,
   isBracketSymbol,
+  isCombinator,
   isRelationOperator,
 } from '@template/shared/bracketQuery';
 import { makeError } from '#/lib/errors';
-import { buildSearchClause } from '#/lib/prisma/buildSearchClause';
+import { buildSearchPath } from '#/lib/prisma/buildSearchPath';
 import { coerceValueForField } from '#/lib/prisma/coerceValue';
-import { type FieldDef, lookupField } from '#/lib/prisma/fieldMetadata';
+import { escapeLikePattern } from '#/lib/prisma/escapeLikePattern';
+import { fieldSearchOperator } from '#/lib/prisma/fieldSearchOperator';
 import { buildJsonWhere } from '#/lib/prisma/jsonFilter';
-import { buildNestedPath, validatePathNotation } from '#/lib/prisma/pathNotation';
-import { getDefaultOperator, getValidOperators, STRING_OPS_WITH_MODE } from '#/lib/prisma/scalarOperators';
-import type { BracketQueryPrimitive, BracketQueryRecord, BracketQueryValue } from '#/lib/utils/parseBracketNotation';
+import { validatePathNotation } from '#/lib/prisma/pathNotation';
+import { getDefaultOperator, getValidOperators } from '#/lib/prisma/scalarOperators';
+import type {
+  BracketQueryPrimitive,
+  BracketQueryRecord,
+  BracketQueryValue,
+} from '#/lib/utils/parseBracketNotation';
 
 type BuildWhereOptions = {
   filterLens: LensNarrowing;
   search?: string;
   searchFields?: BracketQueryRecord;
-  // Superadmin bypasses the picks whitelist; coercion + op validation still apply.
+  searchPaths?: string[];
+  // Superadmin: skips the picks whitelist (coercion + op validation still apply).
   skipFieldValidation?: boolean;
   filters?: Record<string, unknown>;
   orNullFields?: string[];
@@ -38,6 +45,18 @@ const isPrimitive = (v: BracketQueryValue): v is BracketQueryPrimitive =>
 const isRecord = (v: BracketQueryValue | undefined): v is BracketQueryRecord =>
   typeof v === 'object' && v !== null && !Array.isArray(v);
 
+// Prisma rejects a NULL member inside `in` (a typed `Int | Null` array is invalid). When the bracket
+// query carries one (`[in][:]=null`), pull the NULL out so it can be OR'd back as `{ field: null }` —
+// the only way to match concrete values PLUS NULL in one filter.
+const splitNullFromInClause = (
+  value: BracketQueryValue | undefined,
+): { clause: BracketQueryValue | undefined; orNull: boolean } => {
+  if (!isRecord(value) || !Array.isArray(value.in) || !value.in.includes(null)) {
+    return { clause: value, orNull: false };
+  }
+  return { clause: { ...value, in: value.in.filter((v) => v !== null) }, orNull: true };
+};
+
 // `tokens.some.name` → `tokens.name`. `lookupField` walks Prisma model
 // relations but doesn't know about Prisma's relation operators, so we strip
 // them before calling.
@@ -47,9 +66,59 @@ const stripRelationOperators = (path: string): string =>
     .filter((seg) => !isRelationOperator(seg))
     .join('.');
 
-const kindLabel = (field: FieldDef): string => (field.kind === 'enum' ? 'enum' : field.type);
+const MAX_COMBINATOR_CHILDREN = 25;
 
-const wrapBareValue = (field: FieldDef, value: BracketQueryPrimitive): Record<string, unknown> => {
+// `{ '0': …, '1': … }` → ordered array. The wire carries combinator siblings under numeric
+// segments and the parse yields numeric-STRING keys, never a real array, so order comes from
+// the key rather than insertion.
+const indexedChildren = (
+  combinator: string,
+  value: BracketQueryValue | undefined,
+): BracketQueryRecord[] => {
+  const entries = isRecord(value) ? Object.entries(value) : [];
+  if (!entries.length || entries.some(([key, child]) => !/^\d+$/.test(key) || !isRecord(child))) {
+    throw makeError({
+      status: 400,
+      message: `'${combinator}' requires indexed children, e.g. ${combinator}[0][field]`,
+    });
+  }
+  // Every group is its own relation subquery, so an unbounded list buys unbounded database
+  // work off one URL. Bounded for the same reason the nesting depth is.
+  if (entries.length > MAX_COMBINATOR_CHILDREN) {
+    throw makeError({
+      status: 400,
+      message: `'${combinator}' accepts at most ${MAX_COMBINATOR_CHILDREN} groups, got ${entries.length}`,
+    });
+  }
+  return entries
+    .sort(([a], [b]) => Number(a) - Number(b))
+    .map(([, child]) => child as BracketQueryRecord);
+};
+
+const kindLabel = (field: ModelField): string => (field.kind === 'enum' ? 'enum' : field.type);
+
+const PATTERN_OPS = new Set(['contains', 'startsWith', 'endsWith']);
+const EQUALITY_OPS = new Set(['equals', 'not']);
+
+const isTextField = (field: ModelField): boolean =>
+  field.kind === 'scalar' && field.type === 'String' && !field.isList;
+
+const matchesLiterally = (
+  field: ModelField,
+  op: string,
+  value: unknown,
+  insensitive: boolean,
+): unknown =>
+  typeof value === 'string' &&
+  isTextField(field) &&
+  (PATTERN_OPS.has(op) || (insensitive && EQUALITY_OPS.has(op)))
+    ? escapeLikePattern(value)
+    : value;
+
+const wrapBareValue = (
+  field: ModelField,
+  value: BracketQueryPrimitive,
+): Record<string, unknown> => {
   // Bare symbols (null/true/false) on a json column → equals that json scalar (null
   // is the provider json-null). Non-symbol bare values never reach here for json.
   if (field.kind === 'scalar' && field.type === 'Json' && isBracketSymbol(value)) {
@@ -59,15 +128,11 @@ const wrapBareValue = (field: FieldDef, value: BracketQueryPrimitive): Record<st
     return { equals: null };
   }
   const op = getDefaultOperator(field);
-  const coerced = coerceValueForField(field, value);
-  if (dialect.stringMode && field.kind === 'scalar' && field.type === 'String' && STRING_OPS_WITH_MODE.has(op)) {
-    return { [op]: coerced, mode: dialect.stringMode };
-  }
-  return { [op]: coerced };
+  return { [op]: matchesLiterally(field, op, coerceValueForField(field, value), false) };
 };
 
 const transformOperatorValue = (
-  field: FieldDef,
+  field: ModelField,
   value: BracketQueryRecord,
   fieldPath: string,
 ): Record<string, unknown> => {
@@ -94,16 +159,9 @@ const transformOperatorValue = (
     }
   }
 
-  // String ops support `mode` on Postgres. Auto-add it when any mode-capable op is
-  // present and the caller didn't override `mode`. No-op where dialect omits mode.
-  if (
-    dialect.stringMode &&
-    field.kind === 'scalar' &&
-    field.type === 'String' &&
-    out.mode === undefined &&
-    Object.keys(out).some((k) => STRING_OPS_WITH_MODE.has(k))
-  ) {
-    out.mode = dialect.stringMode;
+  const insensitive = out.mode === 'insensitive';
+  for (const [op, opValue] of Object.entries(out)) {
+    out[op] = matchesLiterally(field, op, opValue, insensitive);
   }
   return out;
 };
@@ -116,12 +174,30 @@ const validateAndTransformSearchFields = (
   prefix = '',
   depth = 0,
 ): BracketQueryRecord => {
-  if (depth > 10) throw makeError({ status: 400, message: 'Search query nesting too deep (max 10 levels)' });
+  if (depth > 10)
+    throw makeError({ status: 400, message: 'Search query nesting too deep (max 10 levels)' });
 
   const result: BracketQueryRecord = {};
 
   for (const [key, value] of Object.entries(obj)) {
     if (value === undefined) continue;
+
+    // Combinators group clauses and name no field, so they do NOT extend the path — children
+    // resolve against the same prefix, and the per-leaf whitelist still applies inside each.
+    if (isCombinator(key)) {
+      result[key] = indexedChildren(key, value).map((child) =>
+        validateAndTransformSearchFields(
+          child,
+          searchableFields,
+          skipFieldValidation,
+          model,
+          prefix,
+          depth + 1,
+        ),
+      ) as unknown as BracketQueryValue;
+      continue;
+    }
+
     const currentPath = prefix ? `${prefix}.${key}` : key;
 
     // Bare scalar — apply field's default operator + coerce.
@@ -181,7 +257,10 @@ const validateAndTransformSearchFields = (
     const hasFieldOp = keys.some((k) => (FIELD_OPERATORS as readonly string[]).includes(k));
 
     if (hasRelationOp) {
-      if (!skipFieldValidation && !searchableFields.some((f) => f === currentPath || f.startsWith(`${currentPath}.`))) {
+      if (
+        !skipFieldValidation &&
+        !searchableFields.some((f) => f === currentPath || f.startsWith(`${currentPath}.`))
+      ) {
         throw makeError({
           status: 400,
           message: `Relation '${currentPath}' is not searchable. Allowed fields: ${searchableFields.join(', ')}`,
@@ -197,7 +276,7 @@ const validateAndTransformSearchFields = (
             model,
             currentPath,
             depth + 1,
-          );
+          ) as BracketQueryValue;
         }
       }
       result[key] = relationValue;
@@ -220,11 +299,14 @@ const validateAndTransformSearchFields = (
         result[key] = value;
         continue;
       }
-      result[key] = transformOperatorValue(field, value, currentPath) as unknown as BracketQueryValue;
+      result[key] = transformOperatorValue(
+        field,
+        value,
+        currentPath,
+      ) as unknown as BracketQueryValue;
       continue;
     }
 
-    // No relation/field operators → deeper nesting (e.g. `{ user: { name: 'x' } }`).
     result[key] = validateAndTransformSearchFields(
       value,
       searchableFields,
@@ -232,52 +314,104 @@ const validateAndTransformSearchFields = (
       model,
       currentPath,
       depth + 1,
-    );
+    ) as BracketQueryValue;
   }
 
   return result;
 };
 
-export const buildWhereClause = (options: BuildWhereOptions): Record<string, unknown> => {
-  const { filterLens, search, searchFields, skipFieldValidation = false, filters = {}, orNullFields = [] } = options;
-  const lens = rootLens(filterLens);
-  const model = lens.model as ModelName;
-  const searchableFields = searchablePaths(filterLens);
-  const conditions: Record<string, unknown>[] = [];
+// A group's own conditions AND together. One condition needs no wrapper. An empty group cannot
+// reach here: `indexedChildren` requires every child to be a record, and every key of a record
+// yields a condition.
+const allOf = (conditions: Record<string, unknown>[]): Record<string, unknown> =>
+  conditions.length === 1 ? (conditions[0] as Record<string, unknown>) : { AND: conditions };
 
-  // Global search — broad: each searchable field contributes a clause based on its
-  // kind (String→contains, String[]→has, Json→string_contains); non-text fields skip.
-  if (search && searchableFields.length) {
-    const searchConditions = searchableFields.flatMap((field) => {
-      const def = lookupField(model, stripRelationOperators(field));
-      const clause = def && buildSearchClause(def, search);
-      if (!clause) return [];
-      if (!validatePathNotation(field)) throw new Error(`Invalid searchable field: ${field}`);
-      return [buildNestedPath(field, clause)];
-    });
-    if (searchConditions.length) conditions.push({ OR: searchConditions });
-  }
+// One transformed record → the conditions it contributes, which the caller ANDs together.
+// Combinator children recurse through here rather than being pushed raw, so a grouped leaf gets
+// the same null-in-`in` split and orNull treatment a top-level leaf gets.
+//
+// AND is the ONLY combinator associative with the caller's AND, so it alone flattens into the
+// caller's list. Every other combinator contributes exactly one condition, whose arms are each
+// group's own conditions AND'd together — flattening OR would turn a union into an
+// intersection, silently. The check names AND rather than OR so that a combinator added later
+// lands on the correct side by default.
+const toConditions = (
+  record: BracketQueryRecord,
+  orNullFields: string[],
+): Record<string, unknown>[] => {
+  const out: Record<string, unknown>[] = [];
 
-  if (searchFields && (searchableFields.length || skipFieldValidation)) {
-    const transformed = validateAndTransformSearchFields(searchFields, searchableFields, skipFieldValidation, model);
-    for (const [key, value] of Object.entries(transformed)) {
-      if (orNullFields.includes(key)) {
-        conditions.push({ OR: [{ [key]: value }, { [key]: null }] });
+  for (const [key, value] of Object.entries(record)) {
+    if (isCombinator(key) && Array.isArray(value)) {
+      const children = value as unknown as BracketQueryRecord[];
+      if (key === 'AND') {
+        for (const child of children) out.push(...toConditions(child, orNullFields));
       } else {
-        conditions.push({ [key]: value });
+        out.push({ [key]: children.map((child) => allOf(toConditions(child, orNullFields))) });
       }
+      continue;
+    }
+    const { clause, orNull } = splitNullFromInClause(value);
+    if (orNull || orNullFields.includes(key)) {
+      out.push({ OR: [{ [key]: clause }, { [key]: null }] });
+    } else {
+      out.push({ [key]: clause });
     }
   }
 
-  // Row scope: the composed where for the root model. projectByPath walks the whole
-  // narrowing chain (route filterLens + every stacked scopeNarrowing layer), folding in
-  // mapDefaults + filter-first `all`-negation, and exposes the root visit's `whereClauses`.
-  // Each is toPrisma'd and ANDed into `conditions`.
-  const byPath = projectByPath(filterLens) as Map<string, { whereClauses: Condition[] }>;
-  const rootKey = byPath.keys().next().value;
-  for (const clause of (rootKey ? byPath.get(rootKey)?.whereClauses : undefined) ?? []) {
-    const step = toPrisma(clause, { map: lens, mapName: lens.mapName, model }).steps[0];
-    if (step && 'where' in step && Object.keys(step.where).length > 0) conditions.push(step.where);
+  return out;
+};
+
+export const buildWhereClause = (options: BuildWhereOptions): Record<string, unknown> => {
+  const {
+    filterLens,
+    search,
+    searchFields,
+    searchPaths,
+    skipFieldValidation = false,
+    filters = {},
+    orNullFields = [],
+  } = options;
+  const lens = getLensRoot(filterLens);
+  const model = toModelName(lens.model);
+  const searchableFields = searchablePaths(filterLens);
+  const conditions: Record<string, unknown>[] = [];
+
+  for (const path of searchPaths ?? []) {
+    if (!searchableFields.includes(path)) {
+      throw makeError({
+        status: 500,
+        message: `buildWhereClause: searchPaths entry '${path}' is not a searchable path of the ${model} lens.`,
+      });
+    }
+  }
+  const globalSearchFields = searchPaths ?? searchableFields;
+
+  if (search?.trim() && globalSearchFields.length) {
+    // Split on whitespace so "Phil Smith" matches a row where one field contains "Phil" and another
+    // contains "Smith" — the whole string is rarely in one column. Each token ORs across the fields;
+    // tokens AND together.
+    for (const token of search.trim().split(/\s+/)) {
+      const searchConditions = globalSearchFields.flatMap((field) => {
+        const def = lookupField(model, stripRelationOperators(field));
+        const clause = def && fieldSearchOperator(def, token);
+        if (!clause) return [];
+        if (!validatePathNotation(field))
+          throw makeError({ status: 400, message: `Invalid searchable field: ${field}` });
+        return [buildSearchPath(model, field, clause)];
+      });
+      if (searchConditions.length) conditions.push({ OR: searchConditions });
+    }
+  }
+
+  if (searchFields && (searchableFields.length || skipFieldValidation)) {
+    const transformed = validateAndTransformSearchFields(
+      searchFields,
+      searchableFields,
+      skipFieldValidation,
+      model,
+    );
+    conditions.push(...toConditions(transformed, orNullFields));
   }
 
   return {

@@ -7,7 +7,10 @@
 import { ContactScalarSchema } from '@template/db';
 import { updateRoute } from '#/lib/routeTemplates';
 import { validatePermission } from '#/middleware/validations/validatePermission';
-import { CONTACT_UPDATE_IMMUTABLE_FIELDS, contactUpdateBodySchema } from '#/modules/contact/schemas/contactSchemas';
+import {
+  CONTACT_UPDATE_IMMUTABLE_FIELDS,
+  contactUpdateBodySchema,
+} from '#/modules/contact/schemas/contactSchemas';
 import { Modules } from '#/modules/modules';
 
 export const contactUpdateRoute = updateRoute({

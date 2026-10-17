@@ -21,7 +21,9 @@ export const useSendInquiryMutation = () => {
           if (!cached?.data) return cached;
           return {
             ...cached,
-            data: cached.data.map((inq) => (inq.id === inquiry.id ? { ...inq, status: 'sent' } : inq)),
+            data: cached.data.map((inq) =>
+              inq.id === inquiry.id ? { ...inq, status: 'sent' } : inq,
+            ),
           };
         },
       })),

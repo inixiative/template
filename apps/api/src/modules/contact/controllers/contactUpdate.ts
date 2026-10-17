@@ -5,6 +5,7 @@
  * @uses primitive:routeTemplates
  */
 import type { Prisma } from '@template/db';
+import { emitAppEvent } from '#/appEvents/emit';
 import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
 import { contactUpdateRoute } from '#/modules/contact/routes/contactUpdate';
@@ -18,6 +19,8 @@ export const contactUpdateController = makeController(contactUpdateRoute, async 
     where: { id: contact.id },
     data: body as Prisma.ContactUncheckedUpdateInput,
   });
+
+  await emitAppEvent('contact.updated', { contact: updated });
 
   return respond.ok(updated);
 });

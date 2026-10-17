@@ -1,22 +1,63 @@
+export * from './authoring';
+export { BLOCK_TAG, componentTagPattern, SLUG_PATTERN } from './blockTags';
 export {
   type ComposeComponentResult,
   type ComposeTemplateResult,
   composeComponent,
   composeTemplate,
-  parentOwner,
 } from './compose';
-export { type EmailErrorType, EmailRenderError } from './errors';
-export { evaluateConditions, type RuleErrorSink } from './evaluateConditions';
-export { expand } from './expand';
-export { type MappedComponent, type MapResult, mapRefs, type RefMap } from './extractRefs';
-export { interpolate, VariablePrefix, type Variables } from './interpolate';
-export { lookupCascade } from './lookupCascade';
-export { lookupComponent, lookupTemplate } from './lookupTemplate';
-export { type SaveTemplateInput, type SaveTemplateResult, saveEmailTemplate } from './save';
-export { type EmailModel, EmailModels, type EmailModelType, type OwnerScope } from './types';
+export { computeDegradedComponentRefs } from './computeDegradedComponentRefs';
 export {
-  assertValidConditions,
-  type ConditionIssue,
-  ConditionValidationError,
-  validateConditions,
-} from './validateConditions';
+  type ComponentWrite,
+  collectSlugs,
+  type DecomposeResult,
+  decompose,
+  decomposeNodes,
+  type ResolveCascade,
+  serialize,
+} from './decompose';
+export { deriveTextFromHtml } from './deriveTextFromHtml';
+export { evaluateConditions, type RuleErrorSink } from './evaluateConditions';
+export { expand, expandWith, type LookupComponents } from './expand';
+export { hydrate, hydrateCascade, type ResolveHydrateBodies } from './hydrate';
+export { type InterpolateOptions, interpolate, type Variables } from './interpolate';
+export { EACH_MAX_DEPTH, EACH_MAX_ELEMENTS } from './limits';
+export { lookupCascade } from './lookupCascade';
+export { lookupComponent, lookupLens, lookupTemplate, templateLens } from './lookupTemplate';
+export {
+  type ComponentNode,
+  collectSlugsFromNodes,
+  isOverrideSlot,
+  type Node,
+  type SlotNode,
+  type TextNode,
+} from './nodes';
+export {
+  cascadeLookups,
+  type EmailOwnerRef,
+  emailOwnerProvider,
+  ownerCascade,
+  ownerWhere,
+  parentOwner,
+  rowOwner,
+} from './owner';
+export { parseBlocks } from './parseBlocks';
+export { recomputeDegradedComponentRefs } from './recomputeDegradedComponentRefs';
+export { sanitizeSubject } from './sanitizeSubject';
+export {
+  type LensForSlug,
+  ownerScopeOf,
+  type SaveTemplateInput,
+  type SaveTemplateOptions,
+  type SaveTemplateResult,
+  saveEmailComponents,
+  saveEmailTemplate,
+} from './save';
+export type { RenderIssue, RenderIssueKind } from './settle';
+export { SYSTEM_TOKENS, type SystemToken, type SystemTokenName } from './systemTokens';
+export {
+  type EmailModel,
+  EmailModels,
+  type EmailModelType,
+  type OwnerScope,
+} from './types';

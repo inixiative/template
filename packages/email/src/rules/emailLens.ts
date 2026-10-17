@@ -1,0 +1,560 @@
+/**
+ * @atlas
+ * @kind helper
+ * @partOf feature:email
+ * @uses primitive:shared
+ */
+import {
+  assertValidNarrowing,
+  type Condition,
+  check,
+  createLens,
+  type FieldMap,
+  type FieldMapEntry,
+  getLensRoot,
+  type Lens,
+  type LensNarrowing,
+  lensVisit,
+  type ModelNarrowing,
+  narrowRule,
+  Operator,
+  projectRows,
+  type SourceValues,
+  type ValidationIssue,
+  validateRuleInLens,
+} from '@inixiative/json-rules';
+import { builderSource } from '@inixiative/rules-builder';
+import {
+  type DynamicRuleReference,
+  dynamicRuleReferences,
+  RULE_REFERENCEABLE_MODELS,
+  ruleReferences,
+} from '@template/db';
+import { lensFor, live, omitForeignKeys } from '@template/db/lens';
+import { redactLens } from '@template/db/lens/redactLens';
+import {
+  RESERVED_SCOPE_ROOTS,
+  SCOPE_ROOTS,
+  type ScopeRoot,
+} from '@template/email/render/conditionParser';
+import { SYSTEM_TOKENS } from '@template/email/render/systemTokens';
+import { RAIL_PROVIDED_SYSTEM_FIELDS } from '@template/email/rules/railProvidedSystemFields';
+import type { EmailLensOwner } from '@template/email/rules/scopeEmailLens';
+import { walkConditionTree } from '@template/email/rules/walkConditionTree';
+import { type LensPathWalk, walkLensPath } from '@template/email/rules/walkLensPath';
+import type { RuleLens, RuleReference, RuleVocabulary } from '@template/shared/rules';
+import { startCase } from 'lodash-es';
+
+export const OPAQUE_SLOT = 'opaque';
+export const EMAIL_MAP_NAME = 'email';
+export const EMAIL_SURFACE_ROOT = 'Email';
+export const EMAIL_DATA_MODEL = 'EmailData';
+export const EMAIL_SYSTEM_MODEL = 'EmailSystem';
+
+export type SlotLens = RuleLens | typeof OPAQUE_SLOT;
+export type EmailLens = { [Root in ScopeRoot]?: SlotLens };
+
+export type EmailSlotLenses = {
+  recipient?: ModelNarrowing;
+  sender?: ModelNarrowing;
+  data?: ModelNarrowing;
+};
+
+export type EmailLensInput = {
+  sender?: RuleLens | null;
+  recipient?: RuleLens;
+  data?: RuleLens | null;
+  narrowing?: EmailSlotLenses;
+  recipientDefault?: ModelNarrowing;
+};
+
+const referenced: ModelNarrowing = {
+  picks: ['id', 'name'],
+  sources: { id: { from: 'mapDefaults' } },
+};
+
+export const DEFAULT_RECIPIENT_NARROWING: ModelNarrowing = {
+  picks: ['id', 'name', 'email'],
+  relations: {
+    tagAttachments: { picks: [], where: live, relations: { tag: referenced } },
+    spaceUsers: { picks: ['role'], relations: { space: referenced } },
+    organizationUsers: { picks: ['role'], relations: { organization: referenced } },
+    providerRefs: {
+      picks: [],
+      relations: { segmentMembers: { picks: [], relations: { segment: referenced } } },
+    },
+  },
+};
+
+const viewOf = ({ picks, relations }: ModelNarrowing): ModelNarrowing => ({
+  ...(picks ? { picks } : {}),
+  ...(relations
+    ? {
+        relations: Object.fromEntries(
+          Object.entries(relations).map(([name, child]) => [name, viewOf(child)]),
+        ),
+      }
+    : {}),
+});
+
+const DEFAULT_RECIPIENT_VIEW = viewOf(DEFAULT_RECIPIENT_NARROWING);
+
+const withMemberships = (memberships: {
+  organizationUsers?: ModelNarrowing;
+  spaceUsers?: ModelNarrowing;
+}): ModelNarrowing => {
+  const { organizationUsers: _o, spaceUsers: _s, ...relations } = DEFAULT_RECIPIENT_VIEW.relations!;
+  return { ...DEFAULT_RECIPIENT_VIEW, relations: { ...relations, ...memberships } };
+};
+
+export const defaultRecipientNarrowing = (sender: EmailLensOwner): ModelNarrowing | undefined => {
+  const { organizationUsers, spaceUsers } = DEFAULT_RECIPIENT_VIEW.relations!;
+  switch (sender?.ownerModel) {
+    case 'Organization':
+      return withMemberships({ organizationUsers });
+    case 'Space':
+      return withMemberships({
+        spaceUsers: {
+          ...spaceUsers,
+          where: { field: 'space.id', operator: Operator.equals, value: sender.ownerId },
+        },
+      });
+    case undefined:
+      return undefined;
+    default:
+      return withMemberships({});
+  }
+};
+
+const referenceableSources = Object.fromEntries(
+  RULE_REFERENCEABLE_MODELS.map((model) => [model, { sources: { id: { label: 'name' } } }]),
+);
+
+export const scalarPicks = (fields: Record<string, { kind: string }>): ModelNarrowing => ({
+  picks: Object.entries(fields)
+    .filter(([, field]) => field.kind !== 'object' && field.kind !== 'bridge')
+    .map(([name]) => name),
+});
+
+const shownRelations = (shown: RuleLens, path: string): string[] =>
+  Object.entries(lensVisit(shown, path)?.fields ?? {})
+    .filter(([, field]) => field.kind === 'object')
+    .map(([name]) => name);
+
+const exactly = (shown: RuleLens, node: ModelNarrowing, path = ''): ModelNarrowing => {
+  const relations = node.relations ?? {};
+  const hidden = shownRelations(shown, path).filter((name) => !(name in relations));
+  return {
+    ...node,
+    ...(hidden.length ? { omits: [...(node.omits ?? []), ...hidden] } : {}),
+    ...(node.relations
+      ? {
+          relations: Object.fromEntries(
+            Object.entries(node.relations).map(([name, child]) => [
+              name,
+              exactly(shown, child, path ? `${path}.${name}` : name),
+            ]),
+          ),
+        }
+      : {}),
+  };
+};
+
+const slot = (lens: RuleLens, view?: ModelNarrowing, surface?: ModelNarrowing): RuleLens => {
+  const base = getLensRoot(lens);
+  const prisma = base.mapName === 'prisma';
+  const root =
+    surface ??
+    ('parent' in lens
+      ? undefined
+      : scalarPicks(base.maps[base.mapName]?.models[base.model]?.fields ?? {}));
+  const declared: LensNarrowing = {
+    parent: lens,
+    ...(prisma ? { mapDefaults: { prisma: { models: referenceableSources } } } : {}),
+    ...(root ? { root } : {}),
+  };
+  if (root) assertValidNarrowing(declared);
+  const shown = prisma ? redactLens(omitForeignKeys(declared)) : declared;
+  if (!view) return shown;
+  const viewed: LensNarrowing = { parent: shown, root: exactly(shown, view) };
+  assertValidNarrowing(viewed);
+  return viewed;
+};
+
+export const fieldsLens = (fields: Record<string, string>, model = EMAIL_DATA_MODEL): Lens =>
+  createLens({
+    maps: {
+      [EMAIL_MAP_NAME]: {
+        models: {
+          [model]: {
+            fields: Object.fromEntries(
+              Object.entries(fields).map(([name, type]) => [name, { kind: 'scalar', type }]),
+            ),
+          },
+        },
+      },
+    },
+    mapName: EMAIL_MAP_NAME,
+    model,
+  });
+
+export const declaredFields = (lens: RuleLens): string[] | null => {
+  const base = getLensRoot(lens);
+  return base.mapName === EMAIL_MAP_NAME
+    ? Object.keys(base.maps[EMAIL_MAP_NAME]?.models[base.model]?.fields ?? {})
+    : null;
+};
+
+const relation = (model: string, relationName: string, isList: boolean): FieldMapEntry => ({
+  kind: 'object',
+  type: model,
+  isList,
+  relationName,
+  fromFields: [],
+  toFields: [],
+});
+
+const SYSTEM_FIELDS: Record<string, string> = {
+  ...Object.fromEntries(SYSTEM_TOKENS.map(({ name, kind }) => [name, kind])),
+  ...Object.fromEntries(RAIL_PROVIDED_SYSTEM_FIELDS.map((name) => [name, 'String'])),
+};
+
+export const systemSlot = (): Lens => fieldsLens(SYSTEM_FIELDS, EMAIL_SYSTEM_MODEL);
+
+const isUserLens = (lens: RuleLens): boolean => {
+  const base = getLensRoot(lens);
+  return base.mapName === 'prisma' && base.model === 'User';
+};
+
+export const emailLens = ({
+  sender,
+  recipient = lensFor('User'),
+  data,
+  narrowing = {},
+  recipientDefault,
+}: EmailLensInput = {}): EmailLens => ({
+  ...(sender ? { sender: slot(sender, narrowing.sender) } : {}),
+  recipient: slot(
+    recipient,
+    narrowing.recipient ?? recipientDefault,
+    isUserLens(recipient) ? DEFAULT_RECIPIENT_NARROWING : undefined,
+  ),
+  data: data ? slot(data, narrowing.data) : OPAQUE_SLOT,
+  system: systemSlot(),
+});
+
+export const defaultEmailLens: EmailLens = emailLens();
+
+export const splitRoot = (path: string): { root: string; rest: string } => {
+  const dot = path.indexOf('.');
+  return dot === -1
+    ? { root: path, rest: '' }
+    : { root: path.slice(0, dot), rest: path.slice(dot + 1) };
+};
+
+const isScopeRoot = (root: string): root is ScopeRoot => RESERVED_SCOPE_ROOTS.has(root);
+
+export const slotOf = (lens: EmailLens, root: string): SlotLens | undefined =>
+  isScopeRoot(root) ? lens[root] : undefined;
+
+export const walkEmailLensPath = (path: string, lens: EmailLens): LensPathWalk => {
+  const { root, rest } = splitRoot(path);
+  const slot = slotOf(lens, root);
+  if (!slot) return { outcome: 'missing', index: 0 };
+  if (slot === OPAQUE_SLOT)
+    return rest ? { outcome: 'beneathJson', index: 0 } : { outcome: 'resolved' };
+  if (!rest) return { outcome: 'resolved' };
+  const walk = walkLensPath(rest, slot);
+  return walk.outcome === 'resolved' ? walk : { ...walk, index: walk.index + 1 };
+};
+
+type Leaf = Record<string, unknown> & { field: string };
+
+type Slice = { root: ScopeRoot; rest: string; slot: SlotLens; leaf: Leaf };
+
+const isLeaf = (condition: unknown): condition is Leaf =>
+  typeof condition === 'object' &&
+  condition !== null &&
+  typeof (condition as Leaf).field === 'string';
+
+const sliceOf = (lens: EmailLens, leaf: Leaf): Slice | undefined => {
+  const { root, rest } = splitRoot(leaf.field);
+  if (!isScopeRoot(root)) return undefined;
+  const slot = lens[root];
+  return slot ? { root, rest, slot, leaf } : undefined;
+};
+
+export const rootRelativePath = (path: string, top: boolean): string =>
+  top && path.startsWith('$.') ? path.slice(2) : path;
+
+const absolutePathsIn = (leaf: Leaf): Set<string> => {
+  const out = new Set<string>();
+  walkConditionTree(leaf as Condition, true, (node, top) => {
+    const record = node as Record<string, unknown>;
+    if (typeof record.path === 'string') {
+      const path = rootRelativePath(record.path, top);
+      if (isScopeRoot(splitRoot(path).root)) out.add(path);
+    }
+    return [
+      { condition: record.condition as Condition | undefined, context: false },
+      { condition: record.filter as Condition | undefined, context: false },
+    ];
+  });
+  return out;
+};
+
+const leaves = (rule: Condition): Leaf[] => {
+  const out: Leaf[] = [];
+  walkConditionTree(rule, undefined, (node) => {
+    if (isLeaf(node)) out.push(node);
+    return undefined;
+  });
+  return out;
+};
+
+const arrayChain = (rule: Condition): string[] => {
+  const chain: string[] = [];
+  let node = rule as Record<string, unknown>;
+  while (typeof node.field === 'string' && node.arrayOperator && isLeaf(node.condition)) {
+    chain.push(chain.length ? `${chain.at(-1)}.${node.field}` : node.field);
+    node = node.condition as Record<string, unknown>;
+  }
+  if (typeof node.field === 'string' && node.arrayOperator)
+    chain.push(chain.length ? `${chain.at(-1)}.${node.field}` : node.field);
+  return chain;
+};
+
+export const emailRuleViolations = (lens: EmailLens, rule: Condition): ValidationIssue[] => {
+  const violations: ValidationIssue[] = [];
+  for (const leaf of leaves(rule)) {
+    const { root, rest } = splitRoot(leaf.field);
+    const slot = slotOf(lens, root);
+    if (!slot) {
+      violations.push({
+        path: leaf.field,
+        code: 'not_in_lens',
+        message: `"${root}" is not a lens this template renders with`,
+      });
+      continue;
+    }
+    const crossings = absolutePathsIn(leaf);
+    for (const crossing of crossings) {
+      const walk = walkEmailLensPath(crossing, lens);
+      if (walk.outcome === 'missing' || walk.outcome === 'pastScalar') {
+        violations.push({
+          path: crossing,
+          code: 'not_in_lens',
+          message: 'path (comparison ref) does not resolve through the narrowed lens',
+        });
+      }
+    }
+    if (slot === OPAQUE_SLOT) continue;
+    if (!rest) {
+      violations.push({
+        path: leaf.field,
+        code: 'not_in_lens',
+        message: 'names a lens, not a field',
+      });
+      continue;
+    }
+    const chain = arrayChain({ ...leaf, field: rest } as Condition);
+    for (const violation of validateRuleInLens({ ...leaf, field: rest } as Condition, slot)
+      .errors) {
+      if (crossings.has(violation.path)) continue;
+      const within = chain.find(
+        (prefix) => violation.path === prefix || violation.path.startsWith(`${prefix}.`),
+      );
+      const path =
+        within || violation.path.startsWith('$')
+          ? violation.path
+          : `${chain.at(-1) ?? rest}.${violation.path}`;
+      violations.push({ ...violation, path: `${root}.${path}` });
+    }
+  }
+  return violations;
+};
+
+export const emailRuleVocabularyIssues = (lens: EmailLens, rule: Condition): string[] =>
+  emailRuleViolations(lens, rule).map((violation) => `${violation.path}: ${violation.message}`);
+
+export const emailRuleVocabulary = (lens: EmailLens): RuleVocabulary => ({
+  vocabularyIssues: (rule) => emailRuleVocabularyIssues(lens, rule),
+});
+
+export const emailRuleReferences = (
+  lens: EmailLens,
+  rule: Condition,
+  root?: ScopeRoot,
+): RuleReference[] =>
+  leaves(rule).flatMap((leaf) => {
+    const slice = sliceOf(lens, leaf);
+    if (!slice || slice.slot === OPAQUE_SLOT || !slice.rest) return [];
+    if (root && slice.root !== root) return [];
+    return ruleReferences(slice.slot, { ...leaf, field: slice.rest } as Condition);
+  });
+
+export const emailDynamicRuleReferences = (
+  lens: EmailLens,
+  rule: Condition,
+): DynamicRuleReference[] =>
+  leaves(rule).flatMap((leaf) => {
+    const slice = sliceOf(lens, leaf);
+    if (!slice || slice.slot === OPAQUE_SLOT || !slice.rest) return [];
+    return dynamicRuleReferences(slice.slot, { ...leaf, field: slice.rest } as Condition).map(
+      (reference) => ({ ...reference, path: `${slice.root}.${reference.path}` }),
+    );
+  });
+
+const mapRuleTree = (condition: Condition, map: (leaf: Condition) => Condition): Condition => {
+  if (condition == null || typeof condition === 'boolean') return condition;
+  const node = condition as Record<string, unknown>;
+  for (const key of ['all', 'any']) {
+    if (Array.isArray(node[key])) {
+      return {
+        ...node,
+        [key]: (node[key] as Condition[]).map((child) => mapRuleTree(child, map)),
+      } as Condition;
+    }
+  }
+  if ('if' in node) {
+    const out: Record<string, unknown> = { ...node };
+    for (const key of ['if', 'then', 'else']) {
+      if (node[key] !== undefined) out[key] = mapRuleTree(node[key] as Condition, map);
+    }
+    return out as Condition;
+  }
+  return map(condition);
+};
+
+const prefixed = (condition: Condition, root: string): Condition =>
+  mapRuleTree(condition, (leaf) =>
+    isLeaf(leaf) ? ({ ...leaf, field: `${root}.${leaf.field}` } as Condition) : leaf,
+  );
+
+export const applyEmailLens = (lens: EmailLens, rule: Condition): Condition =>
+  mapRuleTree(rule, (leaf) => {
+    if (!isLeaf(leaf)) return leaf;
+    const slice = sliceOf(lens, leaf);
+    if (!slice || slice.slot === OPAQUE_SLOT || !slice.rest) return leaf;
+    return prefixed(
+      narrowRule({ ...leaf, field: slice.rest } as Condition, slice.slot),
+      slice.root,
+    );
+  });
+
+export const evaluateScopedRule = (
+  lens: EmailLens,
+  scoped: Condition,
+  narrowed: Record<string, unknown>,
+): boolean | string => {
+  if (!isLeaf(scoped)) return check(applyEmailLens(lens, scoped), narrowed);
+  const slice = sliceOf(lens, scoped);
+  if (!slice || slice.slot === OPAQUE_SLOT || !slice.rest) return check(scoped, narrowed);
+  const row = (narrowed[slice.root] ?? {}) as Record<string, unknown>;
+  return check(narrowRule({ ...scoped, field: slice.rest } as Condition, slice.slot), row);
+};
+
+export const emailSlotLenses = (lens: EmailLens): [ScopeRoot, RuleLens][] =>
+  SCOPE_ROOTS.flatMap((root) => {
+    const slot = lens[root];
+    return slot && slot !== OPAQUE_SLOT ? [[root, slot] as [ScopeRoot, RuleLens]] : [];
+  });
+
+export const narrowVariables = <V extends Record<string, unknown>>(
+  lens: EmailLens,
+  variables: V,
+  { keepClampColumns = false }: { keepClampColumns?: boolean } = {},
+): V => {
+  const out: Record<string, unknown> = { ...variables };
+  for (const [root, slot] of emailSlotLenses(lens)) {
+    const value = variables[root];
+    if (value && typeof value === 'object')
+      out[root] = Array.isArray(value)
+        ? projectRows(slot, value, { keepClampColumns })
+        : (projectRows(slot, [value as Record<string, unknown>], { keepClampColumns })[0] ?? null);
+  }
+  return out as V;
+};
+
+export const narrowEmailLens = (
+  lens: EmailLens,
+  narrow: (root: ScopeRoot, slot: RuleLens) => RuleLens,
+): EmailLens => ({
+  ...lens,
+  ...Object.fromEntries(emailSlotLenses(lens).map(([root, slot]) => [root, narrow(root, slot)])),
+});
+
+export type EmailSurface = Lens & { narrowing: Omit<LensNarrowing, 'parent'> };
+
+export const emailSurface = (lens: EmailLens): EmailSurface => {
+  const models: FieldMap['models'] = {};
+  const enums: NonNullable<FieldMap['enums']> = {};
+  const rootFields: Record<string, FieldMapEntry> = {};
+  const relations: Record<string, ModelNarrowing> = {};
+  for (const root of SCOPE_ROOTS) {
+    const slot = lens[root];
+    if (!slot) continue;
+    if (slot === OPAQUE_SLOT) {
+      rootFields[root] = { kind: 'scalar', type: 'Json' };
+      continue;
+    }
+    const surface = builderSource(slot);
+    for (const map of Object.values(surface.maps)) {
+      for (const [model, entry] of Object.entries(map.models)) {
+        const fields = { ...(models[model]?.fields ?? {}), ...entry.fields };
+        models[model] = { ...models[model], ...entry, fields };
+      }
+      Object.assign(enums, map.enums ?? {});
+    }
+    rootFields[root] = relation(surface.model, `Email_${root}`, false);
+    relations[root] = surface.narrowing.root;
+  }
+  const base = createLens({
+    maps: {
+      [EMAIL_MAP_NAME]: {
+        models: { ...models, [EMAIL_SURFACE_ROOT]: { fields: rootFields } },
+        enums,
+      },
+    },
+    mapName: EMAIL_MAP_NAME,
+    model: EMAIL_SURFACE_ROOT,
+  });
+  return {
+    maps: base.maps,
+    mapName: base.mapName,
+    model: base.model,
+    narrowing: { root: { relations } },
+  };
+};
+
+export const emailSurfaceSourceValues = (
+  values: readonly (readonly [ScopeRoot, SourceValues])[],
+): SourceValues[] =>
+  values.map(([root, value]) => {
+    const dot = value.path.indexOf('.');
+    return {
+      ...value,
+      mapName: EMAIL_MAP_NAME,
+      path: `${EMAIL_SURFACE_ROOT}.${root}${dot === -1 ? '' : value.path.slice(dot)}`,
+    };
+  });
+
+export type EmailRuleFacet = { path: string; label: string };
+export type EmailRuleDecoration = { facets: EmailRuleFacet[] };
+
+export const emailRuleDecoration = (lens: EmailLens): EmailRuleDecoration => ({
+  facets: SCOPE_ROOTS.filter((root) => lens[root]).map((root) => ({
+    path: root,
+    label: startCase(root),
+  })),
+});
+
+const isNarrowing = (value: unknown): value is ModelNarrowing =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+export const parseSlotLenses = (raw: unknown): EmailSlotLenses => {
+  if (!isNarrowing(raw)) return {};
+  const doc = raw as Record<string, unknown>;
+  const slots = (['recipient', 'sender', 'data'] as const).filter((root) => isNarrowing(doc[root]));
+  return Object.fromEntries(slots.map((root) => [root, doc[root]]));
+};

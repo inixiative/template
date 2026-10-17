@@ -8,8 +8,8 @@ import { db, getRedisClient, redisNamespace } from '@template/db';
 import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { bearer } from 'better-auth/plugins';
-import { uuidv7 } from 'uuidv7';
 import { emitAppEvent } from '#/appEvents/emit';
+import { oauthHandoffPlugins } from '#/lib/auth/oauthHandoffPlugins';
 import { getAllowedOrigins } from '#/middleware/corsMiddleware';
 
 export const auth = betterAuth({
@@ -23,6 +23,9 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: true,
+  },
+
+  emailVerification: {
     sendVerificationEmail: async ({ user, url }: { user: { id: string }; url: string }) => {
       await emitAppEvent('user.verificationRequested', { userId: user.id, verificationUrl: url });
     },
@@ -40,11 +43,11 @@ export const auth = betterAuth({
 
   session: {
     expiresIn: 7 * 24 * 60 * 60,
-    // Stateless JWT sessions - no DB session lookups
+    // Bearer clients: opaque session token looked up in Redis. JWE cache: cookie clients only.
     cookieCache: {
       enabled: true,
       maxAge: 7 * 24 * 60 * 60,
-      strategy: 'jwe', // Encrypted JWT - use 'jwt' if you need external verification
+      strategy: 'jwe',
     },
   },
 
@@ -61,13 +64,16 @@ export const auth = betterAuth({
 
   advanced: {
     database: {
-      generateId: uuidv7,
+      generateId: () => Bun.randomUUIDv7(),
     },
   },
 
-  plugins: [bearer()],
+  plugins: [bearer(), ...oauthHandoffPlugins()],
 
   trustedOrigins: getAllowedOrigins(),
+
+  // Failures before the flow's own errorCallbackURL is known (e.g. state_mismatch) land on web login, not the API.
+  onAPIError: process.env.WEB_URL ? { errorURL: `${process.env.WEB_URL}/login` } : undefined,
 
   secondaryStorage: {
     get: async (key) => {
@@ -75,10 +81,18 @@ export const auth = betterAuth({
       return value ? JSON.parse(value) : null;
     },
     set: async (key, value, ttl) => {
-      await getRedisClient().setex(`${redisNamespace.session}:${key}`, ttl ?? 86400, JSON.stringify(value));
+      await getRedisClient().setex(
+        `${redisNamespace.session}:${key}`,
+        ttl ?? 86400,
+        JSON.stringify(value),
+      );
     },
     delete: async (key) => {
       await getRedisClient().del(`${redisNamespace.session}:${key}`);
+    },
+    getAndDelete: async (key) => {
+      const value = await getRedisClient().getdel(`${redisNamespace.session}:${key}`);
+      return value ? JSON.parse(value) : null;
     },
   },
 });

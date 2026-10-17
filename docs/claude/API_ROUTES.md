@@ -8,6 +8,8 @@
 - [Route Templates](#route-templates)
   - [Template Args](#template-args)
   - [Examples](#examples)
+- [Lens Wheres](#lens-wheres)
+  - [How pagination applies them](#how-pagination-applies-them)
 - [Controllers](#controllers)
   - [Respond Types](#respond-types)
 - [Module Examples](#module-examples)
@@ -24,13 +26,19 @@
   - [Pagination](#pagination)
   - [paginate() Utility](#paginate-utility)
   - [Search & Filtering](#search--filtering)
+  - [Route declaration (lens narrowing)](#route-declaration-lens-narrowing)
+  - [Dynamic per-request scope — `scopeNarrowing` middleware](#dynamic-per-request-scope--scopenarrowing-middleware)
+  - [Admin routes](#admin-routes)
+  - [Controller — `paginate()` integration](#controller--paginate-integration)
+  - [How it works](#how-it-works)
+  - [Security](#security)
   - [Bracket Notation Query Parsing](#bracket-notation-query-parsing)
   - [Relation Field Security](#relation-field-security)
   - [OrderBy](#orderby)
 - [Frontend Metadata](#frontend-metadata)
-  - [OpenAPI Extensions](#openapi-extensions)
+  - [OpenAPI surface (Phase 4 work-in-progress)](#openapi-surface-phase-4-work-in-progress)
   - [Extracting Metadata](#extracting-metadata)
-  - [DataTable Configuration](#datatable-configuration)
+  - [Data Config + Filters](#data-config--filters)
 - [Error Responses](#error-responses)
 - [Complex Operations & HTTP Status](#complex-operations--http-status)
   - [Batch Operations](#batch-operations)
@@ -126,11 +134,34 @@ createRoute({ model: 'organization', submodel: 'token', bodySchema, responseSche
 // Action
 actionRoute({ model: 'user', action: 'activate', bodySchema, responseSchema })
 
+// Action on a subresource collection → POST /:id/segments/reach
+actionRoute({ model: 'space', submodel: 'segment', action: 'reach', bodySchema, responseSchema })
+
 // Admin
 readRoute({ model: 'user', many: true, admin: true, responseSchema })
 ```
 
 ---
+
+## Lens Wheres
+
+A lens narrowing can declare a `where` in three places, and they assert three different things.
+
+**Root where** (`root.where`, plus any stacked `scopeNarrowing` layers) — a predicate on the root rows themselves: through this lens, the only rows that exist are the ones matching. Its rule may traverse relations (`tokens.isActive`-style fields), but the traversal qualifies *roots*: "give me Users such that…". It answers **which rows are in the result set**.
+
+**Relation-node where** (`root.relations.<rel>.where`) — a standing condition on that edge: whenever a query traverses this relation, the related rows are scoped by this condition. It says nothing about which roots qualify — a User with zero matching tokens is still in the set. It answers **what the related collection looks like when you traverse to it**. Declared per *path*, not per model: two edges reaching the same model can carry different wheres.
+
+**mapDefaults model where** (`mapDefaults.prisma.models.<Model>.where`) — the broadest: wherever this model appears anywhere in the lens's projection, apply this condition. Placement-independent; this is the mechanism `redactLens` rides.
+
+`projectLens` merges all three before consumption: each visit's `whereClauses` is the union of node-declared wheres and mapDefaults wheres for that visit's model, keyed by path.
+
+### How pagination applies them
+
+- **Root clauses**: compiled in `buildWhereClause` and ANDed into the query unconditionally — superadmin included. Lens narrowing is authorization shape, not a visibility preference.
+- **Non-root clauses**: `lensWhere` compiles each once, keyed by dotted path, then walks the fully composed where (caller base where + client filters + global search). Wherever the query traverses a relation, the clause folds in with operator-aware semantics: ANDed inside `some`/`none`/`is` and bare to-one nesting; into `every` by implication (an out-of-scope row must never fail it); as a fail-closed `is` sibling on bare `isNot`. A relation the query never touches contributes nothing — the lens where doesn't add joins, it colors the joins the query already makes.
+- **Soft-delete live scope** is not paginate's job: the db client's soft-delete extension scopes the final query, its include/select trees and the lens count plans. It is visibility, not authorization, and the endpoint decides it — superadmin endpoints (the admin router) run unscoped; every other route is live-scoped for every caller, superadmin included.
+
+One line: **root where = who's in the list; relation where = what you see when you look sideways from a row; model where = the same, declared once per model instead of once per edge.**
 
 ## Controllers
 
@@ -144,7 +175,7 @@ export const userReadController = makeController(userReadRoute, async (c, respon
   const { id } = c.req.valid('param');
 
   const user = await db.user.findUnique({ where: { id } });
-  if (!user) throw new HTTPException(404, { message: 'User not found' });
+  if (!user) throw makeError({ status: 404, message: 'User not found' });
 
   return respond.ok(user);
 });
@@ -375,33 +406,7 @@ GET /organizations/org_123/authProviders
 
 #### Integration with Frontend
 
-```typescript
-// packages/ui/src/hooks/useAuthProviders.ts
-import { useQuery } from '@tanstack/react-query';
-import { organizationReadAuthProvider } from '@template/ui/apiClient';
-import { apiQuery } from '@template/ui/lib';
-
-export const useAuthProviders = () => {
-  const search = useSearch({ strict: false }) as { org?: string };
-
-  const { data, isLoading, error } = useQuery({
-    queryKey: search.org ? ['authProviders', 'org', search.org] : ['authProviders', 'platform'],
-    queryFn: search.org
-      ? apiQuery((opts) => organizationReadAuthProvider({ ...opts, path: { id: search.org! } }))
-      : apiQuery((opts) => authProviderReadMany(opts)),
-    retry: 2,
-  });
-
-  // Flatten platform + organization providers for display
-  const providers = search.org && data?.platform && data?.organization
-    ? [...data.platform, ...data.organization]
-    : data ?? [];
-
-  return { providers, isLoading, error };
-};
-```
-
-See `docs/claude/AUTH.md` for complete frontend integration patterns.
+`useAuthProviders` (`packages/ui/src/hooks/useAuthProviders.ts`) reads these routes; see [FRONTEND/AUTH.md](FRONTEND/AUTH.md#useauthproviders).
 
 ---
 
@@ -494,6 +499,12 @@ List endpoints support search via query parameters. Define a `filterLens` on the
 GET /api/v1/organizations?search=acme
 ```
 
+**Narrowing the fan-out** — every to-many relation path in the lens becomes a correlated `some` subquery with a leading-wildcard `contains`, evaluated once per candidate row, which does not scale past tens of thousands of rows. Routes whose lens carries such paths pin the global `search` term to a subset:
+```typescript
+const { data, pagination } = await paginate(c, db.user, { searchPaths: ['name', 'email'] });
+```
+`searchPaths` must be a subset of the lens's searchable paths — a stray entry throws 500 on every request, so lens drift fails loudly rather than silently dropping a field from search. An empty array disables free-text search. Explicit `searchFields` filters keep the full lens whitelist.
+
 **Advanced search** — bracket notation per field:
 ```
 GET /api/v1/organizations?searchFields[name]=acme&searchFields[slug]=corp
@@ -514,7 +525,25 @@ GET /api/v1/orgs?searchFields[members][every][role]=admin
 GET /api/v1/items?searchFields[comments][none][flagged]=true
 ```
 
-**Supported operators:** `contains`, `startsWith`, `endsWith`, `equals`, `gt`, `gte`, `lt`, `lte`, `in`, `notIn`, `some`, `every`, `none`, `is`, `isNot`.
+**Clause groups via `AND` / `OR`** — every path sharing a prefix merges into one object, so a relation carries one group by default. Two filters on the SAME relation therefore need a combinator with indexed children, or the second silently merges into the first and changes its meaning:
+```
+# One group: ONE post must be both published AND pinned
+GET /api/v1/users?searchFields[posts][some][status]=published&searchFields[posts][some][pinned][:]=true
+
+# Two groups: one published post AND a (possibly different) pinned post
+GET /api/v1/users?searchFields[AND][0][posts][some][status]=published&searchFields[AND][1][posts][some][pinned][:]=true
+
+# Same two groups under OR: either will do
+GET /api/v1/users?searchFields[OR][0][posts][some][status]=published&searchFields[OR][1][posts][some][pinned][:]=true
+
+# Nested: verified, and either published or pinned
+GET /api/v1/users?searchFields[AND][0][verified][:]=true&searchFields[AND][1][OR][0][posts][some][status]=published&searchFields[AND][1][OR][1][posts][some][pinned][:]=true
+```
+Indices are required — repeated keys merge, so siblings need them to stay distinct. A combinator names no field, so it does not lengthen the field path a group's leaves resolve against, and the per-field whitelist still applies inside each group. It does count as a level against the max-10 nesting guard. Capped at 25 groups each: every group is its own relation subquery.
+
+The two combinators differ in one place. `AND` is associative with the enclosing `AND`, so its groups flatten into it. `OR` is not, so it stays one condition whose arms are each group's own leaves AND'd together. Nest them freely on the wire; the typed `searchFields` schema advertises only one level, because each advertised level multiplies the inlined shape across every read route's OpenAPI doc.
+
+**Supported operators:** `contains`, `startsWith`, `endsWith`, `equals`, `gt`, `gte`, `lt`, `lte`, `in`, `notIn`, `some`, `every`, `none`, `is`, `isNot`, plus the `AND` / `OR` combinators above.
 
 **Bare values default to the field's operator** — `searchFields[email]=foo` is shorthand for the field's default op (String → `contains`, others → `equals`). The leaf schema accepts either the bare value or the operator object.
 
@@ -533,7 +562,7 @@ GET /api/v1/users?searchFields[emailVerified][:]=true
 
 ### Route declaration (lens narrowing)
 
-The `filterLens` field on `readRoute` is a `LensNarrowing` from `@inixiative/json-rules` (2.2.0+). Shape:
+The `filterLens` field on `readRoute` is a `LensNarrowing` from `@inixiative/json-rules` (3.0+). Shape:
 
 ```typescript
 import { lensFor } from '@template/db/lens';
@@ -546,20 +575,21 @@ readRoute({
   filterLens: {
     parent: lensFor('Organization'),         // anchors the lens
     root: {
-      picks: ['name', 'slug', 'description'],  // filterable fields (dot-paths for relations)
+      picks: ['name', 'slug', 'description'],  // filterable columns (columns only — never a relation)
       // omits: [...],                       // alternatively: exclude specific fields
       // enumOmits: { Status: ['draft'] },   // hide enum values from the SDK type surface
       // where: { ... },                     // server-enforced row filter (Condition AST)
-      // relations: { author: { picks: [...], where: ... } },  // descent scoping
+      // relations: { author: { picks: [...], where: ... } },  // turns a relation on, and scopes it
     },
   },
 });
 ```
 
-**Picks dot-paths** for relations:
+**Relations** are off until the route's `filterLens` turns them on, through `relations` (never `picks`):
 ```typescript
 root: {
-  picks: ['name', 'slug', 'organizationUsers.role', 'organizationUsers.user.name'],
+  picks: ['name', 'slug'],
+  relations: { organizationUsers: { picks: ['role'], relations: { user: { picks: ['name'] } } } },
 }
 ```
 
@@ -668,15 +698,15 @@ const { data, pagination } = await paginate(c, db.organization, {
 2. `prepareMiddleware` injects an inline middleware that sets `filterLens` on context from the route's static `filterLens`
 3. `scopeNarrowing` middleware(s) merge ctx-aware wheres into the narrowing
 4. `paginate()` reads the final narrowing + bracket-query searchFields, calls `buildWhereClause`
-5. `buildWhereClause` validates fields against `filterLens.root.picks`, translates `filterLens.root.where` via `toPrisma`, AND-merges everything
+5. `buildWhereClause` validates fields against `searchablePaths(filterLens)` (the columns each shown path keeps), translates the lens's wheres via `toPrisma`, AND-merges everything
 
 ### Security
 
-- Only fields in `filterLens.root.picks` can be searched (whitelist with full dot-paths)
+- Only paths the lens shows can be searched: columns kept by `picks` / `omits`, through relations the route's `filterLens` turns on
 - **Superadmin bypass:** users with `platformRole: 'superadmin'` skip the whitelist (`skipFieldValidation: true`). Path notation validation still applies.
 - Path notation: camelCase enforced, rejects snake_case, prevents injection
 - Supports Prisma meta-fields (`_count`, `_max`, `_min`, `_avg`, `_sum`)
-- Relation fields must be explicitly whitelisted (non-superadmin)
+- Relations must be turned on by the route's `filterLens` (non-superadmin); a `scopeNarrowing` layer can only narrow them
 - Max 10 levels of nesting in the bracket query
 - Routes without a `filterLens` skip search entirely (`paginate` no-ops the search path)
 - `root.where` is AND-merged into the prisma where — server enforces even when the SDK type would allow a value through
@@ -731,55 +761,42 @@ export function parseBracketNotation(url: string): Record<string, any> {
 
 ### Relation Field Security
 
-When using relation filters, explicitly whitelist nested fields in `filterLens.root.picks` as dot-paths:
+A relation is off until the route's `filterLens` (the first narrowing over `lensFor(...)`) turns it on through `relations`. `picks` names columns only; a relation name in `picks` is a `wrong_kind` error. Each relation object keeps its own columns and may turn on further relations:
 
 ```typescript
 filterLens: {
   parent: lensFor('Organization'),
   root: {
-    picks: [
-      'name',
-      'slug',
-      'organizationUsers.role',
-      'organizationUsers.user.name',
-    ],
-  },
-}
-
-// Allowed queries:
-?searchFields[organizationUsers][some][role]=admin              // ✓ organizationUsers.role whitelisted
-?searchFields[organizationUsers][some][user][name]=John         // ✓ organizationUsers.user.name whitelisted
-
-// Rejected queries (non-superadmin):
-?searchFields[organizationUsers][some][secretField]=hack        // ✗ not in picks
-?searchFields[organizationUsers][some][user][email]=test        // ✗ not in picks
-
-// Superadmin: all valid fields allowed regardless of picks (skipFieldValidation bypass)
-```
-
-For deeper structural narrowing of related models, use `root.relations`:
-
-```typescript
-filterLens: {
-  parent: lensFor('Organization'),
-  root: {
-    picks: ['name'],
+    picks: ['name', 'slug'],
     relations: {
       organizationUsers: {
         picks: ['role'],
         where: { field: 'role', operator: 'notEquals', value: 'pending' },  // descent scope
         relations: {
-          user: { picks: ['name', 'email'] },
+          user: { picks: ['name'] },
         },
       },
     },
   },
 }
+
+// Allowed queries:
+?searchFields[organizationUsers][some][role]=admin              // ✓ organizationUsers is on, role kept
+?searchFields[organizationUsers][some][user][name]=John         // ✓ organizationUsers.user is on, name kept
+
+// Rejected queries (non-superadmin):
+?searchFields[organizationUsers][some][secretField]=hack        // ✗ not kept on organizationUsers
+?searchFields[organizationUsers][some][user][email]=test        // ✗ not kept on organizationUsers.user
+?searchFields[spaces][some][name]=x                             // ✗ spaces is not turned on
+
+// Superadmin: all valid fields allowed regardless of the lens (skipFieldValidation bypass)
 ```
 
+A `scopeNarrowing` layer stacked on top can only narrow: it may hide a relation (`omits`) or restate one the route turned on to add a `where`, and its wheres may read only what the route's lens shows. Turn on everything a route crosses in its `filterLens`.
+
 **Validation:**
-- Full dot-path must be in `picks` (non-superadmin users)
-- Superadmin (`platformRole: 'superadmin'`) bypasses picks validation entirely
+- The full path must be shown by the lens (non-superadmin users)
+- Superadmin (`platformRole: 'superadmin'`) bypasses the whitelist entirely
 - Relation operators (`some`, `every`, `none`) automatically supported
 - Error thrown for non-whitelisted fields (not silently ignored)
 
@@ -881,8 +898,8 @@ function OrganizationsTable() {
 ### Data Config + Filters
 
 `makeDataConfig(operationId, options?)` builds a `DataConfig` from the operation's metadata
-(`searchableFields`, `orderableFields`, `enumFilters`, `searchMode`, `canSearch`, `canOrder`);
-`useDataFilters(config)` drives the live filter/search/order state. See FRONTEND.md for the full
+(`searchableFields`, `orderableFields`, `enumFilters`, `defaultOrderBy`, `canSearch`, `canOrder`);
+`useDataFilters(config)` drives the live filter/search/order state. See [FRONTEND/API_CLIENT.md](FRONTEND/API_CLIENT.md#data-hooks) for the full
 wiring (debounce, URL/history state, `buildFilterQuery`).
 
 ```typescript
@@ -903,7 +920,7 @@ const { search, setSearch, orderBy, toggleOrderBy, query } = useDataFilters(conf
 
 ## Error Responses
 
-All routes return standardized error responses. Use `makeError` to throw structured errors, or let the error handler normalize unexpected errors.
+All routes return standardized error responses: throw `makeError` for caller errors, and let the error handler normalize everything else. The few responses outside the envelope (better-auth's `/api/auth/*`, the telemetry beacon, a failed WebSocket upgrade) are listed in [ERRORS.md](ERRORS.md#the-global-handler).
 
 **Contract:**
 
@@ -973,10 +990,10 @@ throw makeError({
 
 **How it works:**
 
-- `makeError` returns an `HTTPException` with a pre-built JSON response
-- Error handler middleware catches and returns `err.getResponse()` for HTTPException
+- `makeError` returns an `AppError` (an `HTTPException`) with a pre-built JSON body
+- The error handler stamps `requestId` and returns that body; a plain `HTTPException` (from Hono middleware or a library) is wrapped in the same envelope with its status, message and headers
 - Unknown errors are normalized to 500 with standardized body
-- Zod validation errors automatically map to 422 with fieldErrors
+- Request validation failures (body, query, path, headers) are **422** with `fieldErrors`: the root app's `validationDefaultHook` rethrows the `ZodError`, and the handler formats it. There is no `{"success":false,"error":{"name":"ZodError"}}` shape. Set `defaultHook` only on a root app (`app.ts`, `createTestApp`); every router mounted under it inherits it (`@hono/zod-openapi` ≥ 1.6)
 - Prisma errors (P2002, P2025) map to 409/404 with standardized body
 
 Types are defined in `@template/shared/errors` and derived from `HTTP_ERROR_MAP` to prevent drift.
@@ -985,14 +1002,7 @@ Default guidance for unknown/internal errors: `contactSupport`.
 
 `type` is optional and not required by default. In most cases, `status + guidance` is enough to drive frontend behavior.
 
-Throw `HTTPException` to return errors:
-
-```typescript
-import { HTTPException } from 'hono/http-exception';
-
-throw new HTTPException(404, { message: 'User not found' });
-throw new HTTPException(403, { message: 'Not authorized' });
-```
+Never throw `new HTTPException` in API code; throw `makeError` (the `no-raw-http-exception` CI rule enforces it).
 
 ---
 

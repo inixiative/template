@@ -4,27 +4,45 @@ import type { ConceptRegistry } from '@inixiative/atlas';
 // (feature / primitive / infrastructure); `module`/`package` are the constituent
 // categories that fill @partOf during stamping.
 export const CONCEPTS: ConceptRegistry = {
-  'feature:auth': { module: ['token', 'authProvider'], docs: ['AUTH.md'] },
+  'feature:auth': { module: ['token', 'authProvider'], docs: ['AUTH.md', 'FRONTEND/AUTH.md'] },
   'feature:tenancy': { module: ['organization', 'space', 'organizationUser', 'spaceUser'] },
   'feature:users': { module: ['user', 'me'] },
   'feature:inquiry': { module: ['inquiry'], docs: ['INQUIRIES.md'] },
   'feature:contact': { module: ['contact'] },
   'feature:customer': { module: ['customerRef'] },
-  'feature:files': { module: ['file'] }, // FEAT-009 — File/FileVersion/Folder/FilePermission/ResourceBinding + storage adapter
+  'feature:segment': { module: ['segment'] },
   'feature:auditLogs': { module: ['auditLog'], docs: ['HOOKS.md'] }, // lives under modules/admin/, but is its own feature
   'feature:cronJob': { module: ['cronJob'] }, // admin/cronJob — scheduled job management (own model + CRUD)
   'primitive:caching': { module: ['cache'], docs: ['REDIS.md'] }, // built on infrastructure:redis
   'feature:webhooks': { module: ['webhookSubscription'], docs: ['HOOKS.md'] },
+  'feature:integrations': { module: ['integration'] },
   'feature:email': { package: ['email'], docs: ['COMMUNICATIONS.md'] },
 
   // classless cross-cutting tag (derived): the BE admin surface IS superadmin.
   superadmin: {},
+  // classless cross-cutting tag: the ordering / mutual-exclusion primitives (serialized queue, lock, supersede lanes).
+  mutex: { docs: ['CONCURRENCY.md'] },
 
   'primitive:authz': { package: ['permissions'], docs: ['PERMISSIONS.md'] },
   'primitive:batch': { module: ['batch'], docs: ['BATCH.md'] },
-  'primitive:ui': { package: ['ui'], docs: ['FRONTEND.md', 'ZUSTAND.md'] }, // the component library
-  'primitive:shared': { package: ['shared'], docs: ['CONCURRENCY.md', 'LOGGING.md', 'ENCRYPTION.md'] }, // shared utils/types
-  'primitive:sdk': { package: ['sdk'] }, // generated API client
+  'primitive:flows': { module: ['flow'], docs: ['FLOWS.md'] },
+  'primitive:testFactories': { docs: ['TESTING.md'] }, // the test-factory engine + one factory per model
+  'primitive:ui': {
+    package: ['ui'],
+    docs: [
+      'FRONTEND.md',
+      'FRONTEND/ROUTING_NAVIGATION.md',
+      'FRONTEND/API_CLIENT.md',
+      'FRONTEND/COMPONENTS.md',
+      'FRONTEND/THEME_LAYOUT.md',
+      'ZUSTAND.md',
+    ],
+  }, // the component library
+  'primitive:shared': {
+    package: ['shared'],
+    docs: ['CONCURRENCY.md', 'LOGGING.md', 'ENCRYPTION.md'],
+  }, // shared utils/types
+  'primitive:sdk': { package: ['sdk'], docs: ['FRONTEND/API_CLIENT.md'] }, // generated API client
   'primitive:appEvents': { module: ['appEvents'], docs: ['APP_EVENTS.md'] },
   'primitive:jobs': { module: ['jobs', 'job'], docs: ['JOBS.md'] }, // 'job' = admin/job enqueue surface
   'primitive:websockets': { module: ['ws'], docs: ['WEBSOCKETS.md', 'APP_EVENTS.md'] },

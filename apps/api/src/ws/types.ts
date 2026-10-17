@@ -10,21 +10,24 @@ import type { ServerWebSocket } from 'bun';
 export type WSData = {
   connectionId: string; // unique per connection (multiple tabs = multiple ids)
   userId: string | null; // effective identity: real, or spoofed-as; null = anonymous
+  headers: Record<string, string>; // the credential behind `userId`, shaped as the HTTP surface expects
   channels: Set<string>; // subscribed channels (normalized query keys)
+  streams: Set<string>;
+  heldAppends: Map<string, string[]>;
   connectedAt: number;
   lastPing: number; // staleness detection
   queue: SerializedQueue; // serializes this connection's async message handling
 };
 
-// Inbound: FE → BE, one per frame. Identity actions carry the session token and
-// are validated server-side; only logout is token-free (clears to anonymous).
+// Inbound: FE → BE, one per frame. authenticate carries credential headers exactly as an HTTP
+// request would (authorization, x-spoof-user-email); spoofing is just a header.
 export type WSMessage =
-  | { action: 'authenticate'; token: string }
-  | { action: 'spoof'; token: string; email: string }
-  | { action: 'unspoof'; token: string }
+  | { action: 'authenticate'; headers: Record<string, string> }
   | { action: 'logout' }
   | { action: 'subscribe'; channel: string }
   | { action: 'unsubscribe'; channel: string }
+  | { action: 'open'; stream: string }
+  | { action: 'close'; stream: string }
   | { action: 'ping' };
 
 export type WSSocket = ServerWebSocket<WSData>;
