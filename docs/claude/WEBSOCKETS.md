@@ -149,8 +149,9 @@ client → { action: 'open', stream }        server → { type: 'opened', stream
 server → { category: 'data', action: 'snapshot', stream, seq, payload }
 server → { category: 'data', action: 'append', stream, seq, type, payload } …
 client → { action: 'close', stream }       server → { type: 'closed', stream }
-unauthorized (401/403/404/400…) → { type: 'openRejected', stream }
+unauthorized (401/403/404/400…), unregistered or over-long name → { type: 'openRejected', stream }
 transient (429/5xx), full queue, exception → { type: 'error', action: 'open', stream, retryable: true }
+server lost appends for an open stream → { type: 'resync', stream }
 ```
 
 Closing the socket or changing the user or credential closes every stream on it. There is no
@@ -214,7 +215,9 @@ include soft-deleted rows.
 
 ### Authorization and re-authorization
 
-`openDataStream` (`apps/api/src/ws/dataStreams.ts`) resolves the name with `resolveStreamRoute`,
+`openDataStream` (`apps/api/src/ws/dataStreams.ts`) first rejects a name longer than
+`WS_MAX_STREAM_NAME_LENGTH` (256) or of an unregistered family, before touching Redis. It then
+resolves the name with `resolveStreamRoute`,
 which requires a registered stream family and a `GET` operation, and requests that route
 in-process with the connection's credential (`fetchStreamSnapshot`). This is not a probe: the
 route runs, and a 2xx response both grants the open and becomes the snapshot (the route's
@@ -272,6 +275,13 @@ instance hands every holder the seq of its own counter. `openDataStream` reads t
 stamps the snapshot with it: appends are published after their transaction commits, so every
 append at or below the stamp is already in the snapshot.
 
+The read writes nothing, because the open is not authorized yet: an absent counter reads as Redis
+`TIME` in microseconds. Only once the route grants the open does `queries/claimStreamSeq.ts` persist
+it: it refreshes the TTL of a counter that existed, or seeds an absent one with the read value
+(`SET NX`). If the counter appeared in between (an append or another open created it), the read
+cannot stamp the snapshot, so the open reads the seq and the snapshot again (up to three times,
+then a retryable `error`). An unauthorized or junk open therefore never creates a Redis key.
+
 The client (`createApiWebsocket`) keeps the last seq per open stream:
 
 - a snapshot sets it, replacing the stream's state;
@@ -281,7 +291,7 @@ The client (`createApiWebsocket`) keeps the last seq per open stream:
 - an append further past it is a gap: the client forgets the last seq, drops appends until the
   next snapshot, and re-sends `open` (`websocket.resync`) for a fresh one.
 
-The counter's TTL (one day) is refreshed by every append and every open, so only an idle stream's
+The counter's TTL (one day) is refreshed by every append and every authorized open, so only an idle stream's
 counter expires. A counter is seeded inside the script from Redis `TIME` in microseconds, one clock
 for every instance, so one re-created after expiry or a flush starts above any seq it gave out
 before and holders resync instead of ignoring every append. An instance whose own clock lags
@@ -295,12 +305,18 @@ A Redis outage does not fail a publish. The client is created with `maxRetriesPe
 and ioredis's offline queue on (`packages/db/src/redis/client.ts`), so a sequencing `eval`, a seq
 read for an open, and every channel or user `publish` wait through the outage and run once Redis is
 back. A stream's appends queue behind its waiting one (`inStreamOrder`), and opens hang rather than
-answer `error`. Nothing adds a timeout: the seq already covers what an outage loses. The subscriber
-connection is down too, so appends published while it reconnects never reach this instance's
-holders, and their next append arrives past a gap and triggers a resync.
+answer `error`. Nothing adds a timeout: the seq already covers what an outage loses. The client
+re-sends an unanswered `open` every ack timeout, so the handler keeps the newest queued `open` or
+`close` per stream (`latestStreamFrames`): an `open` superseded while queued is answered `opened`
+without a snapshot read. A recovery therefore runs at most one snapshot per socket and stream
+beyond the open already in flight, not one per retry.
 
-When Redis answers a sequencing `eval` with an error, its local holders get a retryable `error` for
-the stream and re-open with backoff, and the instance keeps re-publishing a `streamResync` for that
+The subscriber connection is down too, so appends published while it reconnects never reach this
+instance's holders, and a quiet stream would never show the gap. When the subscriber is ready again
+after a drop, the instance resubscribes and then sends `resync` for every stream held locally.
+
+When Redis answers a sequencing `eval` with an error, its local holders get a `resync` for the
+stream and re-open at once, and the instance keeps re-publishing a `streamResync` for that
 stream (once a second, one per stream) until Redis takes it, so holders on every other instance
 re-open too. A stream queued while that publisher is running goes out in the same run. There is no
 replay buffer, no queue and no acknowledgement.
@@ -361,6 +377,8 @@ stream for a fresh snapshot (`websocket.resync`).
 
 `openRejected` puts the query in the error state and wipes its data; the stream stays held (the
 holder count is kept) but is not replayed until a new holder mounts or the identity changes. A
+`resync` is not a failure: the client forgets the last seq and re-opens at once (unless an open is
+already in flight), keeping the query's data and state. A
 retryable `error` puts the query in the error state but keeps the last snapshot, and the client
 re-opens with exponential backoff (1s doubling to 30s, jittered), resetting once an open
 succeeds. An open that gets no answer within 10 seconds is treated the same way. Each open is
@@ -391,13 +409,18 @@ is unavailable during the outage; stream appends cannot be sequenced, so local h
   registries, delivery, ordering and Redis pub/sub.
 - `apps/api/src/ws/probe.test.ts`: real-route authorization, unknown channels, dot segments,
   missing credentials and spoof authority.
-- `apps/api/src/ws/dataStreams.test.ts`: open/snapshot/held appends, snapshot seq stamps, a
+- `apps/api/src/ws/dataStreams.test.ts`: open/snapshot/held appends, snapshot seq stamps, no Redis
+  key from an unauthorized or junk open, seeding and the claim race, coalesced opens, a
   dropped frame closing the socket, transient vs rejected statuses, the pending-frame cap, credential swaps and re-authorization after revocation.
 - `apps/api/src/ws/streamAudience.test.ts`: the audience enforcement.
 - `apps/api/src/ws/pubsub.test.ts`: per-stream publish order, a shared counter across instances,
-  an unsequenced append, and per-recipient delivery.
-- `apps/api/src/ws/queries/streamSeq.test.ts`: snapshot stamp vs next seq, TTL refresh, re-seed
-  after expiry.
+  an unsequenced append, a subscriber reconnect, and per-recipient delivery.
+- `apps/api/src/ws/multiInstance.test.ts`: two API instances and a publish-only worker, each its
+  own process (`apps/api/tests/wsInstance/`) against a throwaway Redis container: one gap-free seq
+  order on every instance, per-user counters, a dropped subscriber resyncing only its own holders,
+  and an unsequenced append resyncing every instance. It needs Docker.
+- `apps/api/src/ws/queries/streamSeq.test.ts`: snapshot stamp vs next seq, a read that writes
+  nothing, the claim, TTL refresh, re-seed after expiry.
 - `apps/api/src/appEvents/handlers/contact/organizationContactsStream.test.ts`: app event →
   Redis → open socket, with append rows matching the route snapshot.
 - `packages/ui/src/lib/ws/createApiWebsocket.test.ts`,
