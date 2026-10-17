@@ -6,7 +6,7 @@
  */
 import { db, type HydratedRecord, hydrate } from '@template/db';
 import { greaterRole } from '@template/permissions';
-import { check, rebacSchema } from '@template/permissions/rebac';
+import { canAssign } from '@template/permissions/assign';
 import { getResource } from '#/lib/context/getResource';
 import { makeError } from '#/lib/errors';
 import { makeController } from '#/lib/utils/makeController';
@@ -23,7 +23,8 @@ export const spaceUserUpdateController = makeController(
     const space = hydrated.space as HydratedRecord;
     const targetRole = greaterRole(spaceUser.role, body.role);
 
-    if (!check(permix, rebacSchema, 'space', { ...space, role: targetRole }, 'assign')) {
+    const owner = { model: 'space' as const, record: space };
+    if (!canAssign(permix, owner, owner, targetRole, null)) {
       throw makeError({ status: 403, message: `Cannot assign ${targetRole} role` });
     }
 

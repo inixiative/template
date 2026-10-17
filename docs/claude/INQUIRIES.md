@@ -93,6 +93,8 @@ draft → sent → approved
 
 draft → canceled
 sent  → canceled
+
+approved → revoked   (revocable types only: the standing grant is withdrawn)
 ```
 
 | Status | Description |
@@ -103,6 +105,7 @@ sent  → canceled
 | `approved` | Target approved. Handler's side effect has run. |
 | `denied` | Target denied. No side effect. |
 | `canceled` | Source withdrew the inquiry. |
+| `revoked` | Either party withdrew the grant an approved inquiry held (`revocable` types). |
 
 ## API Endpoints
 
@@ -115,6 +118,7 @@ Each source context has its own create endpoint. The source fields (`sourceModel
 | `POST` | `/api/v1/me/inquiries` | Create inquiry from current user |
 | `POST` | `/api/v1/organization/:id/inquiries` | Create inquiry from an organization |
 | `POST` | `/api/v1/space/:id/inquiries` | Create inquiry from a space |
+| `POST` | `/api/v1/integration/:id/inquiries` | Create inquiry from an integration (needs `manage` on it) |
 | `POST` | `/api/admin/inquiry` | Create inquiry from admin (superadmin only) |
 
 Who may create is the type's `send` rule (see [Permissions](#permissions-rebac)), checked inside `createInquiry`.
@@ -146,11 +150,15 @@ Who may create is the type's `send` rule (see [Permissions](#permissions-rebac))
 | `POST` | `/api/v1/inquiry/:id/send` | `send` | Send a draft or changesRequested inquiry |
 | `POST` | `/api/v1/inquiry/:id/resolve` | `resolve` | Approve, deny, or request changes |
 | `DELETE` | `/api/v1/inquiry/:id/cancel` | `send` | Cancel (source only): sets `canceled`, clears `expiresAt`, soft-deletes |
+| `POST` | `/api/v1/inquiry/:id/revoke` | `revoke` | Revoke an approved inquiry of a `revocable` type: sets `revoked` |
+
+**Every state-changing action carries the version the actor saw.** `expectedUpdatedAt` is the inquiry's `updatedAt` as the actor read it: in the body of `PATCH`, `/send`, `/resolve` and `/revoke`, and as a query parameter on `DELETE /cancel`. `lockInquiryAtVersion` row-locks the inquiry (`db.findForUpdate`, inside the action's `db.txn`) and answers **409** when the version moved, so an edit between reading and approving fails the approval instead of approving something nobody looked at. It replaces the bare row lock `resolveInquiry` already had; the status checks run on the locked row.
 
 **Resolve body:**
 ```typescript
 {
   status: 'approved' | 'denied' | 'changesRequested';
+  expectedUpdatedAt: string;   // the updatedAt you read
   explanation?: string;
 }
 ```
@@ -187,11 +195,12 @@ Each context exposes two list endpoints. Requires `manage` on the parent resourc
 ```
 POST /organization/:id/inquiries → sourceModel: Organization, sourceOrganizationId: org.id
 POST /space/:id/inquiries        → sourceModel: Space, sourceSpaceId: space.id
+POST /integration/:id/inquiries  → sourceModel: Integration, sourceIntegrationId: integration.id
 POST /me/inquiries               → sourceModel: User, sourceUserId: user.id
 POST /api/admin/inquiry          → sourceModel: admin (no FK)
 ```
 
-No create route sources an `OrganizationUser`, `SpaceUser`, `Integration` or `Token` inquiry; those sources are set by the service that already holds the party.
+No create route sources an `OrganizationUser`, `SpaceUser` or `Token` inquiry; those sources are set by the service that already holds the party.
 
 The handler's `sources` config is checked by `validateInquiryHandler` to confirm the resolved source is valid for this inquiry type.
 
@@ -223,6 +232,9 @@ type InquiryHandler<TContent, TResolution, TResolutionInput = TResolution> = {
   validate?(db, inquiry, content: TContent): Promise<void>; // called pre-create and pre-update
   handleApprove(db, inquiry, resolvedContent: TContent): Promise<Partial<TResolution> | undefined | void>;
   autoApprove(db, inquiry): Promise<boolean>;    // called after send; return true to skip human review
+  revocable?: boolean;               // an approved inquiry holds a standing grant either party can revoke
+  handleRevoke?(db, inquiry, content): Promise<void>; // undo an approval's side effect on revoke
+  canApprove?(c, inquiry, content): Promise<boolean>; // the approver's authority; also gates auto-approval
   unique?: 'targeted' | 'untargeted'; // enforces one open inquiry per source+target+type ('targeted') or per source+type regardless of target ('untargeted')
   defaultExpirationDays?: number;     // drives computeExpiresAt on send and changesRequested; undefined = no expiry
   appEvents?: InquiryAppEvents;       // per-status app event handlers: sent, approved, denied, changesRequested, resolved
@@ -295,8 +307,9 @@ const { role } = resolvedContent; // always from original inquiry.content
 | `createSpace` | Organization | admin | — | 90 days | Creates `Space` under source org |
 | `updateSpace` | Space | admin | `untargeted` | 90 days | Updates `Space` with content fields |
 | `transferSpace` | Space | Organization | `untargeted` | 30 days | Sets `Space.organizationId` to target org |
+| `grantUserEntitlements` | User, Integration | User, Organization, Space | — | 7 days | Organization/Space target: adds the entitlements to the requester's membership; User target: writes `resolution.grant`. Revocable ([PERMISSIONS.md](./PERMISSIONS.md#granting-user-entitlements)) |
 
-All four handlers return `autoApprove: async () => false` — no type currently auto-approves.
+**Auto-approval is off for every type but one handshake.** `grantUserEntitlements` auto-approves only when a user asks for their own grant and could approve it themselves (`autoApproveOwnRequest`, in `handlers/autoApproveOwnRequest.ts`, plus the handler's `canApprove`); the other four return `autoApprove: async () => false`. To turn auto-approval on for a type, set its `autoApprove` (to `autoApproveOwnRequest` or its own rule). A handler with `canApprove(c, inquiry, content)` decides the approver's authority: `resolveInquiry` refuses (403) an approval it rejects, and `sendInquiry` only auto-approves when the sender passes it.
 
 **Send permissions by type:**
 
@@ -307,6 +320,7 @@ All four handlers return `autoApprove: async () => false` — no type currently 
 | `createSpace` | org `own` | Owner only |
 | `updateSpace` | space `own` | Space owner or org owner (via `space.own → org.own` delegation) |
 | `transferSpace` | org `own` (explicit 2-hop) | Org owner only — space owner alone is not enough |
+| `grantUserEntitlements` | the source user (self), or integration `manage` | Asking needs nothing; the approver needs authority to assign (`assign` on the target org/space at the entitlements' level, or the user holding `token.create` and the grant) |
 
 `updateSpace` and `transferSpace` differ intentionally: `updateSpace` uses `{ rel: 'sourceSpace', action: 'own' }` which delegates through to org.own, so both direct space owners and org owners can update. `transferSpace` uses `{ rel: 'sourceSpace.organization', action: 'own' }` — dot-path traversal that explicitly resolves to the owning organization, bypassing any direct space.own check, ensuring only org owners can initiate a transfer.
 
@@ -340,7 +354,8 @@ Each mutation uses the include that matches what its caller needs:
 |--------|--------------------|
 | `read` | Source user/manage-on-source-org-or-space OR target user/manage-on-target-org-or-space |
 | `send` | Source-side permission (see handler table above). For user-sourced inquiry types, `{ self: 'sourceUserId' }` is also checked — add the type to that rule's `value: []` list in `schema.ts` when creating a user-sourced handler. |
-| `resolve` | Target user (self); target org `manage` (except `transferSpace` which requires `own`); target space `manage`; superadmin bypass for `admin` targets |
+| `resolve` | Target user (self; `grantUserEntitlements` also needs `token.create` on them); target org `manage` (except `transferSpace` which requires `own`); target space `manage`; superadmin bypass for `admin` targets |
+| `revoke` | `grantUserEntitlements` only: source user, target user, `manage` on the source integration, or `manage` on the target org/space |
 
 ## Adding a New Handler
 
@@ -363,12 +378,13 @@ Each mutation uses the include that matches what its caller needs:
 
 | Export | Used in | Meaning |
 |--------|---------|---------|
-| `inquiryTerminalStatuses` | Prisma `status: { notIn: ... }` queries | `[approved, denied, canceled]` — closed states |
+| `inquiryTerminalStatuses` | Prisma `status: { notIn: ... }` queries | `[approved, denied, canceled, revoked]` — closed states |
 | `validateInquiryIsEditable` | update controller | draft, sent, or changesRequested |
 | `validateInquiryIsSendable` | `sendInquiry` | draft or changesRequested |
 | `validateInquiryIsResolvable` | `resolveInquiry` (inside its row-locked txn) | sent or changesRequested |
 | `validateInquiryNotExpired` | editable and resolvable checks | 410 when `expiresAt` is past |
 | `validateInquiryIsCancelable` | cancel controller | not yet in a terminal state |
+| `validateInquiryIsRevocable` | revoke controller | `approved`, and the handler is `revocable` |
 
 ### Create route permission pattern
 
@@ -387,7 +403,7 @@ This allows per-type permission rules (e.g. `inviteOrganizationUser` with a high
 
 ```typescript
 // Backend terminal statuses — does NOT include expiry
-export const INQUIRY_TERMINAL_STATUSES: InquiryStatus[] = ['approved', 'denied', 'canceled'];
+export const INQUIRY_TERMINAL_STATUSES: InquiryStatus[] = ['approved', 'denied', 'canceled', 'revoked'];
 
 // Frontend terminal check — also treats past-expiresAt as terminal
 export const isTerminalInquiry = (inq: { status: InquiryStatus; expiresAt?: string | null }): boolean => {

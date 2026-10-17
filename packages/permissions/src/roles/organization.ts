@@ -7,6 +7,7 @@
 import type { OrganizationId } from '@template/db';
 import type { Role } from '@template/db/generated/client/enums';
 import type { Entitlements, PermissionEntry } from '@template/permissions/client';
+import { grantActions } from '@template/permissions/roles/shared';
 
 export const organizationRoles = {
   owner: { organization: { own: true } },
@@ -19,11 +20,12 @@ export const getOrgPermissions = (
   role: Role,
   orgId: OrganizationId,
   entitlements?: Entitlements,
+  entitlementsOnly = false,
 ): PermissionEntry => {
   const baseActions = organizationRoles[role].organization;
   return {
     resource: 'db:organization',
     id: orgId,
-    actions: { ...baseActions, ...entitlements },
+    actions: grantActions(baseActions, entitlements, entitlementsOnly),
   };
 };

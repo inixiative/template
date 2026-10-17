@@ -6,12 +6,13 @@
  */
 import { InquiryStatus } from '@template/db/generated/client/enums';
 import { makeError } from '#/lib/errors';
-import type { Inquiry } from '#/modules/inquiry/handlers/types';
+import type { Inquiry, InquiryHandler } from '#/modules/inquiry/handlers/types';
 
 export const inquiryTerminalStatuses: InquiryStatus[] = [
   InquiryStatus.approved,
   InquiryStatus.denied,
   InquiryStatus.canceled,
+  InquiryStatus.revoked,
 ];
 
 export const validateInquiryIsSendable = (inquiry: Inquiry): void => {
@@ -48,14 +49,16 @@ export const validateInquiryNotExpired = (inquiry: Inquiry): void => {
 
 // not yet resolved or canceled
 export const validateInquiryIsCancelable = (inquiry: Inquiry): void => {
-  const terminal: InquiryStatus[] = [
-    InquiryStatus.approved,
-    InquiryStatus.denied,
-    InquiryStatus.canceled,
-  ];
-  if (terminal.includes(inquiry.status as InquiryStatus))
+  if (inquiryTerminalStatuses.includes(inquiry.status as InquiryStatus))
     throw makeError({
       status: 400,
       message: 'Cannot cancel a resolved or already canceled inquiry',
     });
+};
+
+export const validateInquiryIsRevocable = (inquiry: Inquiry, handler: InquiryHandler): void => {
+  if (!handler.revocable)
+    throw makeError({ status: 400, message: 'This inquiry type holds no grant to revoke' });
+  if (inquiry.status !== InquiryStatus.approved)
+    throw makeError({ status: 400, message: 'Only an approved inquiry can be revoked' });
 };

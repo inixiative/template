@@ -6,6 +6,7 @@
  */
 import { lensFor } from '@template/db/lens';
 import { readRoute } from '#/lib/routeTemplates';
+import { validateSelfPermission } from '#/middleware/validations/validateSelfPermission';
 import { Modules } from '#/modules/modules';
 import { segmentMembershipSchema } from '#/modules/segment/schemas/segmentSchemas';
 import { Tags } from '#/modules/tags';
@@ -18,5 +19,6 @@ export const meReadManySegmentMembershipsRoute = readRoute({
   paginate: true,
   filterLens: { parent: lensFor('SegmentMember') },
   responseSchema: segmentMembershipSchema,
+  middleware: [validateSelfPermission('read')],
   tags: [Tags.me, Tags.segment, Tags.segmentMembership],
 });

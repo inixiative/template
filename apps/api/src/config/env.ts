@@ -66,6 +66,9 @@ const baseEnvSchema = z
     // Auth
     GOOGLE_CLIENT_ID: z.string().optional(),
     GOOGLE_CLIENT_SECRET: z.string().optional(),
+    AUTH_ISSUER: z.string().url().optional(),
+    AUTH_JWKS_URL: z.string().url().optional(),
+    AUTH_AUDIENCE: z.string().optional(),
 
     // Webhooks (required)
     WEBHOOK_SIGNING_PRIVATE_KEY: z.string(),

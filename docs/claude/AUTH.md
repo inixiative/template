@@ -28,6 +28,10 @@
   - [Space Token](#space-token)
   - [SpaceUser Token](#spaceuser-token)
   - [Token Schema](#token-schema)
+- [Issuer JWT](#issuer-jwt)
+  - [Verification](#verification)
+  - [Claims](#claims)
+  - [What Kingdom Adds](#what-kingdom-adds)
 - [Auth Middleware Chain](#auth-middleware-chain)
   - [Flow](#flow)
 - [Spoof Middleware](#spoof-middleware)
@@ -36,7 +40,7 @@
 - [Validation Middleware](#validation-middleware)
   - [validateUser](#validateuser)
   - [validateActor](#validateactor)
-  - [validateNotToken](#validatenottoken)
+  - [Session-Only Actions](#session-only-actions)
   - [validateSuperadmin](#validatesuperadmin)
 - [Choosing Between validateUser and validateActor](#choosing-between-validateuser-and-validateactor)
 
@@ -323,7 +327,7 @@ organizationId: null
 ```
 
 - Tied to a specific user
-- Has access to all user's orgs (restricted by token's role/entitlements)
+- Reaches the user and every org and space they belong to, each capped by the user's own grant there ([Grants](./PERMISSIONS.md#grants))
 - Used for personal API access
 
 ### Organization Token
@@ -348,8 +352,8 @@ organizationId: set
 ```
 
 - Tied to a user's membership in a specific org
-- Has access only to that org
-- Permissions are intersection of user's role AND token's role
+- Has access only to that org: no user entry, no spaces
+- Permissions are the token's grant capped by the membership
 - Used for scoped access to a single org
 
 ### Space Token
@@ -376,8 +380,8 @@ spaceId: set
 ```
 
 - Tied to a user's membership in a specific space
-- Has access only to that space
-- Permissions are intersection of user's space role AND token's role
+- Has access only to that space: no user entry, no organization entry
+- Permissions are the token's grant capped by the space membership
 - Used for scoped access to a single space
 
 ### Token Schema
@@ -402,9 +406,10 @@ model Token {
   space            Space?
   spaceUser        SpaceUser?
 
-  // Permissions
-  role         Role @default(member)
-  entitlements Json?
+  // Permissions: full (entitlements null) or narrowed, capped per request by the owner's grant
+  role             Role    @default(member)
+  entitlements     Json?
+  entitlementsOnly Boolean @default(false)
 
   integrationId String?   // optional link to an Integration
 
@@ -428,6 +433,42 @@ enum TokenOwnerModel {
 
 ---
 
+## Issuer JWT
+
+A JWT from a configured issuer is **the user, not a token**. With no `grant` claim it carries the full user, exactly as a session does ("the most access you can have"). With a `grant` claim it carries the narrower grant of the same user that an approved `grantUserEntitlements` inquiry holds ([Granting User Entitlements](./PERMISSIONS.md#granting-user-entitlements)). No Token row exists for it.
+
+Located in `apps/api/src/middleware/auth/jwtAuthMiddleware.ts`; verifier in `apps/api/src/lib/auth/verifyIssuerJwt.ts`.
+
+### Verification
+
+Off unless `AUTH_ISSUER`, `AUTH_JWKS_URL` and `AUTH_AUDIENCE` are all set. When on, a bearer shaped like a JWT (three dot-separated segments) is verified with `jose`:
+
+- keys from `createRemoteJWKSet(AUTH_JWKS_URL)` (cached 10 minutes, unknown `kid` refetches);
+- `algorithms: ['ES256']` only, so `alg: none` and HS256 are refused;
+- `issuer`, `audience`, `exp` and `sub` required; 30 s clock tolerance.
+
+A JWT-shaped bearer that fails is a **401**, never a fall-through to API-token hashing; unreachable issuer keys are a **503** (retryable, so a WebSocket keeps its identity). `sub` must be a local `User` id.
+
+### Claims
+
+| Claim | Meaning |
+|---|---|
+| `sub` | `User.id` |
+| `grant` (optional) | id of an approved `grantUserEntitlements` inquiry targeting `sub`; read live on every request, so revoking it locks the JWT out at once |
+| `iss`, `aud`, `exp`, `iat` | standard |
+
+The step sets `c.get('entitlementGrant')` (the grant, its inquiry id and the requesting integration) before `setUserContext`, so the setup functions cap by it. Downstream:
+
+- **Audit:** the actor is the user (`actorUserId`), `actorTokenId` stays null; the requesting integration, if any, is the audit `integrationId`.
+- **Batch:** `entitlementGrant` is cloned into sub-requests with the user.
+- **Superadmin:** a superadmin's JWT is superadmin, spoofing included.
+
+### What Kingdom Adds
+
+Template verifies; Kingdom issues. Left for the Kingdom change: Better Auth `jwt()` with ES256 keys and a JWKS model, the embed login that mints the JWT (AUTH-008), a session-id check against the live session, and Kingdom's owner-authority code that still assumes a Token row (owner routes that re-hash the bearer, the actor-authority loader, and the org/space manage checks that cap memberships by hand and must move to `capGrant`).
+
+---
+
 ## Auth Middleware Chain
 
 Order matters. Applied in `apps/api/src/routes/api.ts`:
@@ -440,10 +481,11 @@ apiRouter.route('/internal', internalRouter);    // Shared-secret auth only
 apiRouter.use('/auth/*', authRateLimit);         // BetterAuth handles its own auth
 apiRouter.all('/auth/*', (c) => auth.handler(c.req.raw));
 apiRouter.route('/unsubscribe', …);              // Public, signed link
-apiRouter.use('*', tokenAuthMiddleware);         // 2. Token auth (Authorization header wins)
-apiRouter.use('*', authMiddleware);              // 3. Session auth
-apiRouter.use('*', spoofMiddleware);             // 4. Superadmin spoofing (after user is resolved)
-apiRouter.use('*', auditActorMiddleware);        // 5. Actor context for audit logs
+apiRouter.use('*', jwtAuthMiddleware);           // 2. Issuer JWT (JWT-shaped bearer)
+apiRouter.use('*', tokenAuthMiddleware);         // 3. Token auth (Authorization header wins)
+apiRouter.use('*', authMiddleware);              // 4. Session auth
+apiRouter.use('*', spoofMiddleware);             // 5. Superadmin spoofing (after user is resolved)
+apiRouter.use('*', auditActorMiddleware);        // 6. Actor context for audit logs
 apiRouter.use('*', apiRateLimit);
 ```
 
@@ -457,7 +499,11 @@ Spoof runs last so a superadmin can spoof via either auth path.
 Request
   ↓
 prepareRequest
-  - user: null, token: null, permix: empty
+  - user: null, token: null, entitlementGrant: null, permix: empty
+  ↓
+jwtAuthMiddleware
+  - If issuer configured + JWT-shaped bearer → verify, load the grant, setUserContext()
+  - Invalid JWT → 401
   ↓
 tokenAuthMiddleware
   - If valid Bearer/URL token matches a Token row → set token, setUserContext()
@@ -544,14 +590,12 @@ router.get('/resource', validateActor, handler);  // 401 if no user from getActo
 
 `getActor(c).user` falls back from `c.get('user')` to the organizationUser / spaceUser / token user. Token auth already calls `setUserContext` for User, OrganizationUser and SpaceUser tokens, so in practice both validators admit the same callers.
 
-### validateNotToken
+### Session-Only Actions
 
-Requires session auth (tokens forbidden):
+There is no "tokens forbidden" guard. Token minting, token deletion, account redaction and organization deletion are `SessionAction`s, checked with `validateSelfPermission` ([PERMISSIONS.md](./PERMISSIONS.md#validateselfpermission)). A session (or a JWT with no grant) holds them all; a token or grant holds one only when its entitlements name it.
 
 ```typescript
-import { validateNotToken } from '#/middleware/validations/validateNotToken';
-
-router.post('/sensitive', validateNotToken, handler);  // 403 if using token
+middleware: [validateSelfPermission(SessionAction.createToken)]
 ```
 
 ### validateSuperadmin
@@ -574,7 +618,8 @@ router.get('/admin/users', validateSuperadmin, handler);  // 403 if not superadm
 | User token | ✅ | ✅ | ✅ |
 | OrganizationUser token | ✅ (scoped to its org) | ✅ | ✅ |
 | SpaceUser token | ✅ (scoped to its space) | ✅ | ✅ |
+| Issuer JWT (with or without grant) | ✅ | ✅ | ✅ |
 | Organization token | ❌ (no user) | ❌ 401 | ❌ 401 |
 | Space token | ❌ (no user) | ❌ 401 | ❌ 401 |
 
-Organization and Space tokens are created without a `userId` (`organizationCreateToken`, `spaceCreateToken`); token auth only sets up their permissions. A route meant for them must skip both validators and rely on `validatePermission`. Use `validateUser` for `/me/*` and anything that acts as a person; `validateNotToken` where a token must never be enough.
+Organization and Space tokens are created without a `userId` (`organizationCreateToken`, `spaceCreateToken`); token auth only sets up their permissions. A route meant for them must skip both validators and rely on `validatePermission`. Use `validateUser` for `/me/*` and anything that acts as a person; authentication alone is never the whole check: every route also declares an action (`validatePermission` or `validateSelfPermission`).
