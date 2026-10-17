@@ -11,7 +11,7 @@
 
 ## Ruling (Aron, 2026-10-13)
 
-The test tracker is always registered, and a test never deletes rows by hand in an after hook. Cleanup
+The test tracker is always registered, and a test never deletes rows by hand in a cleanup hook (after hooks, or a `beforeEach` that wipes). Cleanup
 stays per file (`cleanupTouchedTables`); there's no global cleanup, because most files here seed in
 `beforeAll` and clean in `afterAll`.
 
@@ -28,7 +28,7 @@ stays per file (`cleanupTouchedTables`); there's no global cleanup, because most
    the per-file calls go.
 2. Each hand-delete is either a tracker blind spot, fixed so the tracker sees the write, or redundant
    and removed.
-3. CI rules: no `delete`/`deleteMany`/`TRUNCATE` inside an after hook in a test file, and no in-file
+3. CI rules: no `delete`/`deleteMany`/`TRUNCATE` inside an after hook or `beforeEach` in a test file, and no in-file
    `registerTestTracker`. Exceptions need a stated reason.
 
 ## Done (2026-10-13)
