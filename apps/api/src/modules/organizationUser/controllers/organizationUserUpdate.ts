@@ -6,10 +6,11 @@
  */
 import type { OrganizationId } from '@template/db';
 import { Role } from '@template/db/generated/client/enums';
-import { greaterRole } from '@template/permissions';
+import { type Entitlements, greaterRole } from '@template/permissions';
 import { check, rebacSchema } from '@template/permissions/rebac';
 import { getResource } from '#/lib/context/getResource';
 import { makeError } from '#/lib/errors';
+import { assignLevel } from '#/lib/permissions/assignLevel';
 import { makeController } from '#/lib/utils/makeController';
 import { validateNotLastOwner } from '#/modules/organization/validations/validateNotLastOwner';
 import { organizationUserUpdateRoute } from '#/modules/organizationUser/routes/organizationUserUpdate';
@@ -22,7 +23,10 @@ export const organizationUserUpdateController = makeController(
     const body = c.req.valid('json');
     const permix = c.get('permix');
 
-    const role = greaterRole(orgUser.role, body.role);
+    const role = assignLevel(
+      greaterRole(orgUser.role, body.role),
+      (body.entitlements ?? null) as Entitlements,
+    );
     if (
       !check(
         permix,

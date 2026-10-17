@@ -33,6 +33,7 @@ const contentSchema = entitlementGrantSchema.extend({
 
 const resolutionSchema = baseResolutionInputSchema.extend({
   grant: entitlementGrantSchema.optional(),
+  addedEntitlements: z.array(z.string()).optional(),
 });
 
 type GrantUserEntitlementsContent = z.infer<typeof contentSchema>;
@@ -133,7 +134,7 @@ export const grantUserEntitlementsHandler: InquiryHandler<
         permix,
         rebacSchema,
         'space',
-        { ...space, role: assignLevel(null, content.entitlements) },
+        { ...space, role: assignLevel(null, content.entitlements, 'db:space') },
         'assign',
       );
     }
@@ -148,19 +149,22 @@ export const grantUserEntitlementsHandler: InquiryHandler<
   handleApprove: async (db, inquiry, content) => {
     await validate(db, inquiry, content);
     if (isMembershipTarget(inquiry)) {
-      await writeMembershipEntitlements(db, inquiry, (current) => ({
-        ...current,
-        ...content.entitlements,
-      }));
-      return;
+      let addedEntitlements: string[] = [];
+      await writeMembershipEntitlements(db, inquiry, (current) => {
+        addedEntitlements = Object.keys(content.entitlements ?? {}).filter(
+          (action) => content.entitlements?.[action] === true && current?.[action] !== true,
+        );
+        return { ...current, ...content.entitlements };
+      });
+      return { addedEntitlements };
     }
     const { role, entitlements, entitlementsOnly } = content;
     return { grant: { role, entitlements, entitlementsOnly } };
   },
 
-  handleRevoke: async (db, inquiry, content) => {
+  handleRevoke: async (db, inquiry) => {
     if (!isMembershipTarget(inquiry)) return;
-    const granted = new Set(Object.keys(content.entitlements ?? {}));
+    const granted = new Set(resolutionSchema.parse(inquiry.resolution).addedEntitlements ?? []);
     await writeMembershipEntitlements(db, inquiry, (current) =>
       Object.fromEntries(Object.entries(current ?? {}).filter(([action]) => !granted.has(action))),
     );
