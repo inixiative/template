@@ -1,4 +1,3 @@
-export { buildBodyRefinementSchema } from '#/lib/routeTemplates/utils/buildBodyRefinementSchema';
 export { buildOperationId } from '#/lib/routeTemplates/utils/buildOperationId';
 export { buildRequest } from '#/lib/routeTemplates/utils/buildRequest';
 export { buildResponses } from '#/lib/routeTemplates/utils/buildResponses';

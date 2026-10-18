@@ -107,7 +107,7 @@ describe('makeController', () => {
     });
   });
 
-  describe('body refinement', () => {
+  describe('request refinements', () => {
     const rangeSchema = z.object({ min: z.number(), max: z.number() });
     const rangeRefinement = (range: { min: number; max: number }, ctx: z.RefinementCtx) => {
       if (range.min > range.max)
@@ -170,7 +170,7 @@ describe('makeController', () => {
         action: 'range',
         skipId: true,
         bodySchema: rangeSchema,
-        bodyRefinement: async (range, ctx) => {
+        bodyRefinement: async (range: z.infer<typeof rangeSchema>, ctx) => {
           await Promise.resolve();
           rangeRefinement(range, ctx);
         },
@@ -229,6 +229,30 @@ describe('makeController', () => {
           responseSchema: z.object({ ran: z.boolean() }),
         }),
       ).toThrow('pass them as bodyRefinement instead');
+    });
+
+    it('rejects a query that fails the query refinement', async () => {
+      const route = readRoute({
+        model: Modules.user,
+        action: 'range',
+        skipId: true,
+        query: z.object({ min: z.coerce.number(), max: z.coerce.number() }),
+        queryRefinement: rangeRefinement,
+        responseSchema: z.object({ ran: z.boolean() }),
+      });
+      const app = new OpenAPIHono<AppEnv>();
+      app.openapi(
+        route,
+        makeController(route, (_c, respond) => respond.ok({ ran: true })),
+      );
+
+      const rejected = await app.request('/range?min=5&max=1');
+      const accepted = await app.request('/range?min=1&max=5');
+      const body = await jsonValidationFailure(rejected);
+
+      expect(rejected.status).toBe(400);
+      expect(body.error.message).toContain('min must not exceed max');
+      expect(accepted.status).toBe(200);
     });
 
     it('refuses a refinement on a route without a body', () => {

@@ -46,7 +46,7 @@ export const batchExecuteRoute = actionRoute({
   action: 'execute',
   skipId: true,
   bodySchema: batchExecuteBodySchema,
-  bodyRefinement: ({ requests }, ctx) => {
+  bodyRefinement: ({ requests }: z.infer<typeof batchExecuteBodySchema>, ctx) => {
     if (requests.some((round) => round.length > 50))
       ctx.addIssue({
         code: 'custom',

@@ -8,7 +8,7 @@
 import { createRoute } from '@hono/zod-openapi';
 import { securityForRoute } from '#/lib/auth/routeSecurity';
 import { errorResponses } from '#/lib/routeTemplates/errorResponses';
-import type { RouteArgs, RouteBuilderArgs, ZodSchema } from '#/lib/routeTemplates/types';
+import type { RouteArgs } from '#/lib/routeTemplates/types';
 import {
   buildOperationId,
   buildRequest,
@@ -16,9 +16,7 @@ import {
   prepareMiddleware,
 } from '#/lib/routeTemplates/utils';
 
-export const deleteRoute = <const T extends RouteArgs, Body extends ZodSchema>(
-  args: RouteBuilderArgs<T, Body>,
-) => {
+export const deleteRoute = <const T extends RouteArgs>(args: T) => {
   const {
     model,
     submodel,

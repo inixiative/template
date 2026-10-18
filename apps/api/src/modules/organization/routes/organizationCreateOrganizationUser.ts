@@ -25,7 +25,7 @@ export const organizationCreateOrganizationUserRoute = createRoute({
   model: Modules.organization,
   submodel: Modules.organizationUser,
   bodySchema,
-  bodyRefinement: (body, ctx) => {
+  bodyRefinement: (body: z.infer<typeof bodySchema>, ctx) => {
     if (!body.userId && !body.email)
       ctx.addIssue({ code: 'custom', message: 'Either userId or email is required' });
   },

@@ -101,7 +101,7 @@ import { readRoute, createRoute, updateRoute, deleteRoute, actionRoute } from '#
 | `admin` | boolean | Adds 'Admin' prefix to operationId and tag |
 | `skipId` | boolean | Omit `:id` param from path |
 | `bodySchema` | ZodSchema | Request body validation (no object-level `.refine()`; route build throws) |
-| `bodyRefinement` | `(body, ctx) => void` | Cross-field body checks, run before the controller; not in OpenAPI/SDK |
+| `bodyRefinement` / `queryRefinement` / `paramsRefinement` | `(value, ctx) => void` | Cross-field checks on the validated body/query/params, run before the controller; not in OpenAPI/SDK |
 | `responseSchema` | ZodSchema | Response shape |
 | `query` | ZodSchema | Query params (merged with pagination if enabled) |
 | `params` | ZodSchema | Path params (merged with id if not skipped) |
@@ -1127,14 +1127,14 @@ export const userBodySchema = z.object({ ... });
 
 ### Cross-Field Validations
 
-Route build throws on a `bodySchema` that carries an object-level `.refine()`/`.superRefine()`: sanitizing rebuilds its shape and would drop them silently. Pass cross-field checks as `bodyRefinement`, a `superRefine` callback typed against the body. `makeController` runs it on the validated body before the handler; a failure returns the same 400 as a schema failure. With `many`, it runs per item. It is not part of the OpenAPI document or SDK.
+Route build throws on a `bodySchema` that carries an object-level `.refine()`/`.superRefine()`: sanitizing rebuilds its shape and would drop them silently. Pass cross-field checks as `bodyRefinement`, `queryRefinement` or `paramsRefinement`: optional `superRefine` callbacks on the route args, annotated with the value's type. `makeController` runs each on the validated value before the handler; a failure returns the same 400 as a schema failure. With `many`, the body refinement runs per item. An omitted optional body skips it. None of them reach the OpenAPI document or SDK.
 
 ```typescript
 createRoute({
   model: Modules.organization,
   submodel: Modules.organizationUser,
   bodySchema,
-  bodyRefinement: (body, ctx) => {
+  bodyRefinement: (body: z.infer<typeof bodySchema>, ctx) => {
     if (!body.userId && !body.email)
       ctx.addIssue({ code: 'custom', message: 'Either userId or email is required' });
   },
