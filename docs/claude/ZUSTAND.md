@@ -188,8 +188,9 @@ re-identifies the websocket.
 
 #### logout()
 
-Revokes the server session, then (always) clears the token, auth state and permissions,
-calls `tenant.setPublic()` and navigates to `/login`. Throws if the server revoke failed.
+Signs out of this browser: clears the JWT, auth state, permissions and websocket identity,
+calls `tenant.setPublic()` and navigates to `/login`. It makes no server call; the API keeps no
+session to end. Signing out everywhere revokes every JWT: `POST /api/v1/me/signOut`.
 
 ### Usage Patterns
 

@@ -6,7 +6,7 @@
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { auth } from '#/lib/auth';
 import { auditActorMiddleware } from '#/middleware/auth/auditActorMiddleware';
-import { authMiddleware } from '#/middleware/auth/authMiddleware';
+import { jwtAuthMiddleware } from '#/middleware/auth/jwtAuthMiddleware';
 import { spoofMiddleware } from '#/middleware/auth/spoofMiddleware';
 import { tokenAuthMiddleware } from '#/middleware/auth/tokenAuthMiddleware';
 import { corsMiddleware } from '#/middleware/corsMiddleware';
@@ -43,20 +43,20 @@ apiRouter.route('/telemetry/browser', browserTelemetryRouter);
 
 // Internal service-to-service routes (shared-secret auth). Mounted BEFORE
 // the better-auth middlewares so the secret check in internalRouter is the
-// only auth gate — internal callers don't have user sessions or tokens.
+// only auth gate — internal callers carry no JWT or token.
 apiRouter.route('/internal', internalRouter);
 
 // Auth routes (better-auth handles its own auth, returns early)
 apiRouter.use('/auth/*', authRateLimit);
 apiRouter.all('/auth/*', (c) => auth.handler(c.req.raw));
 
-// One-click unsubscribe — public (no session/token); authorized by its own signed link.
+// One-click unsubscribe — public (no JWT or token); authorized by its own signed link.
 apiRouter.route('/unsubscribe', unsubscribeRouter);
 
-// Bearer only: a value is tried as an API token, then as a session token; cookies
-// never authenticate. Spoof runs last so it applies whichever path resolved the user.
+// A person presents a JWT, a program an API token; sessions never reach past /auth.
+// Spoof runs last so it applies whichever credential resolved the user.
+apiRouter.use('*', jwtAuthMiddleware);
 apiRouter.use('*', tokenAuthMiddleware);
-apiRouter.use('*', authMiddleware);
 apiRouter.use('*', spoofMiddleware);
 apiRouter.use('*', auditActorMiddleware);
 apiRouter.use('*', apiRateLimit);

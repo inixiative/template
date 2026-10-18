@@ -274,7 +274,7 @@ Each `pass`/`fail` folder can contain one or more case subfolders (run alphabeti
 - Why: ids are time-ordered, and `paginate()`'s `{ id: desc }` tiebreaker and cursors depend on it
 
 **one-middleware-chain.sh:**
-- Fails unless `apps/api/src/routes/api.ts` runs `corsMiddleware → prepareRequest → tokenAuthMiddleware → authMiddleware → spoofMiddleware → auditActorMiddleware → apiRateLimit` in order, and every router is mounted after it
+- Fails unless `apps/api/src/routes/api.ts` runs `corsMiddleware → prepareRequest → jwtAuthMiddleware → tokenAuthMiddleware → spoofMiddleware → auditActorMiddleware → apiRateLimit` in order, and every router is mounted after it
 - A mount (`.route`, `.get`, `.all`, `.doc31`, …, chained or across lines, or a `.use` on a path with an inline handler) before the chain completes, on `routes` other than `/api`, on `app` other than `/`, or on `app`/`routes`/`apiRouter` from any other file fails unless its full path is in `scripts/ci/one-middleware-chain/exempt.txt` with a reason (template: `/health`, `/bullBoard`, `/test`, `/openapi/docs`, `/api/telemetry/browser`, `/api/internal`, `/api/auth/*`, `/api/unsubscribe`)
 
 **no-raw-locks.sh:**
@@ -286,8 +286,8 @@ Each `pass`/`fail` folder can contain one or more case subfolders (run alphabeti
 - Use the scoped client, `import { db } from '@template/db'`, which resolves to the open `db.txn()` through AsyncLocalStorage. The only code that takes a client is the client itself and json-rules' Prisma planner, which lives outside the app
 
 **bearer-only-auth.sh:**
-- Fails, in non-test source under `apps/` and `packages/`, on `cookieCache`, `credentials` set to `'include'`, `withCredentials`, `document.cookie`, and a `getSession(...)` whose headers come from the request (`<x>.headers`, `c.req.header()`, `new Headers(...)` of those, or a local variable holding one) unless that variable had `.delete('cookie')` called on it before the lookup, or whose headers are built with a `cookie` (an object key, or `.set`/`.append('cookie', …)`); a `getSession` with non-inline options fails too. Takes no exemptions
-- Why: API auth is bearer-only ([AUTH.md § Session Storage Strategy](./AUTH.md#session-storage-strategy)); a cookie path was a second way in, and its JWE cookie cache kept a revoked session valid for up to 7 days. BetterAuth's own `/api/auth/*` cookies (OAuth state, one-time-token handoff) are library code and out of scope
+- Fails, in non-test source under `apps/` and `packages/`, on `cookieCache`, `credentials` set to `'include'`, `withCredentials`, `document.cookie`, any session lookup (a `getSession(...)` or `findSession(...)` call, or a read of the `session` table: `<x>.session.findUnique`, `findUniqueOrThrow`, `findFirst`, `findFirstOrThrow`, `findMany` or `count`), and importing BetterAuth's `bearer` plugin. Takes no exemptions
+- Why: API auth is bearer-only and session-free ([AUTH.md](./AUTH.md#overview)). A person presents a JWT; a session exists only inside BetterAuth's `/api/auth/*` handler for the sign-in handshake, and `jwtHandoff` swaps it for a JWT. A cookie path was a second way in, a session lookup is a second way to resolve a person, and the `bearer` plugin turns a session token into a credential
 
 **ui-serialized-factories.sh:**
 - For UI tests importing `@template/db/test`, requires `__serialize()` usage

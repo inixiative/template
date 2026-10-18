@@ -5,7 +5,7 @@
 ## Contents
 
 - [The Cross-Cutting Advantage](#the-cross-cutting-advantage)
-- [1. Authentication & Sessions](#1-authentication--sessions)
+- [1. Authentication](#1-authentication)
   - [What the template provides](#what-the-template-provides)
   - [Comparison](#comparison)
   - [The gap no one fills](#the-gap-no-one-fills)
@@ -117,10 +117,10 @@ The moment permissions live in Permify Cloud, jobs live in Redis, and webhooks l
 
 ---
 
-## 1. Authentication & Sessions
+## 1. Authentication
 
 ### What the template provides
-BetterAuth with email/password + OAuth, per-organization custom OAuth/SAML providers with AES-256-GCM encrypted client secrets, bearer tokens with SHA-256 hashing and 10-minute Redis cache, URL token fallback for WebSocket/email contexts, hierarchical token scopes (User → Organization → Space), personal access tokens with expiry and usage tracking, superadmin spoofing with `X-Spoofed-By` audit headers, per-token configurable rate limits.
+BetterAuth sign-in with email/password + OAuth that ends in a self-issued ES256 person JWT (no sessions after sign-in; per-user revocation in Redis; signing keys under the template field encryption), per-organization custom OAuth/SAML providers with AES-256-GCM encrypted client secrets, bearer tokens with SHA-256 hashing and 10-minute Redis cache, URL token fallback for email/download contexts, hierarchical token scopes (User → Organization → Space), personal access tokens with expiry and usage tracking, superadmin spoofing with `X-Spoofed-By` audit headers, per-token configurable rate limits.
 
 ### Comparison
 
@@ -524,7 +524,7 @@ OpenTelemetry instrumentation is the right 2025 approach — instrument once, ch
 ## 15. Middleware & Request Pipeline
 
 ### What the template provides
-11-step middleware chain executing in order: CORS (environment-specific wildcard patterns for preview deploys) → session auth (BetterAuth) → token auth (SHA-256 lookup with Redis cache) → superadmin spoofing → request preparation (requestId, fresh Permix instance, DB scope, batch context cloning) → rate limiting (per-token or IP-based, Redis-backed 1-second windows) → resource context loading (auto-load by ID with `?lookup=` for alternate fields) → actor/user validation → permission validation (ReBAC traversal with cycle detection) → searchable field constraints → route handler. Plus a global error handler (Sentry for 5xx) and 404 handler.
+11-step middleware chain executing in order: CORS (environment-specific wildcard patterns for preview deploys) → person JWT (signature + revocation check) → token auth (SHA-256 lookup with Redis cache) → superadmin spoofing → request preparation (requestId, fresh Permix instance, DB scope, batch context cloning) → rate limiting (per-token or IP-based, Redis-backed 1-second windows) → resource context loading (auto-load by ID with `?lookup=` for alternate fields) → actor/user validation → permission validation (ReBAC traversal with cycle detection) → searchable field constraints → route handler. Plus a global error handler (Sentry for 5xx) and 404 handler.
 
 ### Comparison
 

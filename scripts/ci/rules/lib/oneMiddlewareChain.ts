@@ -4,7 +4,7 @@
  *   bun scripts/ci/rules/lib/oneMiddlewareChain.ts [--write-baseline]
  *
  * Every router is served from inside the standard chain in apps/api/src/routes/api.ts:
- *   corsMiddleware → prepareRequest → tokenAuthMiddleware → authMiddleware → spoofMiddleware
+ *   corsMiddleware → prepareRequest → jwtAuthMiddleware → tokenAuthMiddleware → spoofMiddleware
  *   → auditActorMiddleware → apiRateLimit
  * so every route gets the scoped db, a resolved actor, permissions and the rate limit. Fails on
  * - a chain middleware missing from api.ts, or out of order;
@@ -34,8 +34,8 @@ const API = 'apps/api/src/routes/api.ts';
 const CHAIN = [
   'corsMiddleware',
   'prepareRequest',
+  'jwtAuthMiddleware',
   'tokenAuthMiddleware',
-  'authMiddleware',
   'spoofMiddleware',
   'auditActorMiddleware',
   'apiRateLimit',

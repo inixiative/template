@@ -10,6 +10,7 @@ import { contactId as toContactId } from '@template/db/typedModelIds';
 import { ContactRegistry } from '@template/shared/contact';
 import type { Context } from 'hono';
 import { emitAppEvent } from '#/appEvents/emit';
+import { revokeUserJwts } from '#/lib/auth/jwtRevocation';
 import type { AppEnv } from '#/types/appEnv';
 
 export const redactUser = async (c: Context<AppEnv>, userId: string) => {
@@ -44,7 +45,6 @@ export const redactUser = async (c: Context<AppEnv>, userId: string) => {
 
   // Ephemeral auth state — hard delete.
   await db.token.deleteMany({ where: { userId } });
-  await db.session.deleteMany({ where: { userId } });
   await db.account.deleteMany({ where: { userId } });
   await db.webhookSubscription.deleteMany({ where: { userId, ownerModel: 'User' } });
 
@@ -87,5 +87,6 @@ export const redactUser = async (c: Context<AppEnv>, userId: string) => {
       deletedAt: now,
     },
   });
+  await revokeUserJwts(userId);
   await emitAppEvent('user.redacted', { userId });
 };

@@ -1076,7 +1076,7 @@ updateRoute({
   responseSchema,
 });
 
-// Forbid token auth (session only)
+// Forbid token auth (person JWT only)
 createRoute({
   model: 'token',
   middleware: [validateNotToken],

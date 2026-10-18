@@ -68,7 +68,6 @@
   - [ ] Dynamic UI that renders available auth methods
   - [ ] Move auth methods into Zustand (remove createAuthClient prop pattern)
   - [ ] Standardized sign-in/sign-up experience across all methods
-  - [ ] Session handling consistent regardless of auth type
 - [ ] Feature flags system
   - [ ] Backend: Feature flag model with polymorphic ownership
     - Uses `ownerModel` pattern: 'Platform' | 'Organization' | 'Space'
@@ -172,7 +171,7 @@
 ## Notes
 
 ### Auth Documentation
-- Done: neither strategy is a JWT and both are bearer-only (docs/claude/AUTH.md). A session is BetterAuth's opaque token with its record in Redis; an API token is a hashed `Token` row. Cookies never authenticate an API request
+- Done: a person presents a self-issued JWT and a program an API token, both bearer-only (docs/claude/AUTH.md). A BetterAuth session exists only for the sign-in handshake; cookies and sessions never authenticate an API request
 
 ### Optimistic Updates
 - ✅ Already implemented in `@template/shared`

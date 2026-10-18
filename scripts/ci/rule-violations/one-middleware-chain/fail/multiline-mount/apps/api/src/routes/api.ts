@@ -6,8 +6,8 @@ apiRouter
   .route('/v1/early', earlyRouter);
 apiRouter.all('/auth/*', (c) => auth.handler(c.req.raw));
 // apiRouter.route('/v1/commented', commentedRouter);
+apiRouter.use('*', jwtAuthMiddleware);
 apiRouter.use('*', tokenAuthMiddleware);
-apiRouter.use('*', authMiddleware);
 apiRouter.use('*', spoofMiddleware);
 apiRouter.use('*', auditActorMiddleware);
 apiRouter.use('*', apiRateLimit);

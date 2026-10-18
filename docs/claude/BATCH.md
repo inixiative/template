@@ -497,7 +497,7 @@ if (batchContext) {
   c.set('app', batchContext.baseContext.get('app'));
 
   // Deep clone mutable state (isolated per request)
-  const keysToClone = ['user', 'session', 'organizationUsers', 'organizations',
+  const keysToClone = ['user', 'organizationUsers', 'organizations',
                        'spaceUsers', 'spaces', 'token', 'spoofedBy'];
   for (const key of keysToClone) {
     const value = batchContext.baseContext.get(key);

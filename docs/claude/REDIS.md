@@ -12,6 +12,7 @@
 - [Built-In Uses](#built-in-uses)
   - [Cache (`cache:*`)](#cache-cache)
   - [Sessions (`session:*`)](#sessions-session)
+  - [JWT Revocation (`jwtvalidafter:*`)](#jwt-revocation-jwtvalidafter)
   - [Rate Limiting (`limit:*`)](#rate-limiting-limit)
   - [Job Coordination (`job:*`, `lock:*`)](#job-coordination-job-lock)
   - [Supersede Lanes (`lane:*`)](#supersede-lanes-lane)
@@ -46,7 +47,7 @@ Located in `packages/db/src/redis/`.
 
 | Connection | Purpose | Notes |
 |------------|---------|-------|
-| Main (`getRedisClient`) | All regular operations | Cache, rate limits, sessions, OTP |
+| Main (`getRedisClient`) | All regular operations | Cache, rate limits, sign-in handshake sessions, JWT revocation markers, OTP |
 | Subscriber (`getRedisSub`) | Pub/sub subscriptions | `SUBSCRIBE` is blocking, needs own connection |
 | Publisher (`getRedisPub`) | Pub/sub publishing | Shares main client (publish doesn't block) |
 | BullMQ | Job queues | Manages own connections via `createRedisConnection` |
@@ -98,7 +99,8 @@ const key = `cache:User:${id}`;  // Don't do this
 | `job` | `job:*` | Job-system state: overflow flags (`job:overflow`), the slow lane's deferral list and idle clock |
 | `ws` | `ws:*` | WebSocket pub/sub channels and data-stream seq counters (`ws:seq:{<stream>}`) |
 | `otp` | `otp:*` | One-time passwords / verification codes |
-| `session` | `session:*` | BetterAuth sessions (via secondaryStorage) |
+| `session` | `session:*` | BetterAuth sign-in handshake sessions and one-time tokens (via secondaryStorage) |
+| `jwtValidAfter` | `jwtvalidafter:*` | Per-user JWT revocation markers (`jwtvalidafter:<userId>`) |
 | `limit` | `limit:*` | Rate limiting counters |
 | `lock` | `lock:*` | Distributed locks via `createLock` |
 | `lane` | `lane:*` | Supersede lane batons via `claimLane`/`watchLane`, and per-job tombstones (`lane:superseded:<jobId>`) |
@@ -122,7 +124,7 @@ cacheKey('user', { email })            // → cache:user:email:foo@example.com
 
 ### Sessions (`session:*`)
 
-BetterAuth session storage via `secondaryStorage` config:
+BetterAuth's `secondaryStorage` (in `apps/api/src/lib/auth.ts`). It holds only the sign-in handshake: a session lives at most 10 minutes and `jwtHandoff` deletes it as soon as it hands out the person's JWT, plus the 1-minute OAuth one-time tokens. No request outside `/api/auth` reads it ([AUTH.md](./AUTH.md#what-lives-where)).
 
 ```typescript
 // In lib/auth.ts
@@ -130,8 +132,15 @@ secondaryStorage: {
   get: (key) => redis.get(`${redisNamespace.session}:${key}`),
   set: (key, value, ttl) => redis.setex(`${redisNamespace.session}:${key}`, ttl, JSON.stringify(value)),
   delete: (key) => redis.del(`${redisNamespace.session}:${key}`),
+  getAndDelete: (key) => redis.getdel(`${redisNamespace.session}:${key}`),
 }
 ```
+
+### JWT Revocation (`jwtvalidafter:*`)
+
+`revokeUserJwts(userId)` (`apps/api/src/lib/auth/jwtRevocation.ts`) writes `jwtvalidafter:<userId>` = now in unix seconds, TTL 30 days (the JWT lifetime: after it, every older JWT has expired anyway). `jwtAuthMiddleware` reads it on every person request and refuses a JWT whose `iat` is at or before it; if Redis is unreachable the request is a 503, never a pass.
+
+**Eviction policy must be `noeviction`.** These keys carry a TTL, so a `volatile-*` or `allkeys-*` policy evicts them first under memory pressure, and a revoked JWT would work again.
 
 ### Rate Limiting (`limit:*`)
 

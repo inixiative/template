@@ -4,7 +4,8 @@
  * @partOf primitive:ui
  * @uses none
  */
-import { clearToken, setToken } from '@template/ui/lib/auth/token';
+import { storeJwtHandoff } from '@template/ui/lib/auth/storeJwtHandoff';
+import { clearToken } from '@template/ui/lib/auth/token';
 import type {
   AuthMethod,
   EmailAuthMethod,
@@ -44,8 +45,7 @@ const signUpWithEmail = async (method: EmailAuthMethod): Promise<SignUpResult> =
     throw new Error('No token returned from sign up');
   }
 
-  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-  setToken(data.token, expiresAt);
+  storeJwtHandoff(data);
   return { status: 'authenticated' };
 };
 

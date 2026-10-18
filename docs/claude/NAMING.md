@@ -51,7 +51,7 @@
 | Route handler | `<model><Action><Submodel?>`.ts | `userCreate.ts`, `organizationReadManySpaces.ts` |
 | Hook | `<model><Timing><Purpose>.ts` | `userAfterCreate.ts` |
 | Job | `<verb><Noun>.ts` | `sendWebhook.ts`, `processInquiry.ts` |
-| Middleware | `<purpose>Middleware.ts` | `authMiddleware.ts` |
+| Middleware | `<purpose>Middleware.ts` | `jwtAuthMiddleware.ts` |
 | Utility | `<verb><Noun>.ts` or `<noun>.ts` | `makeController.ts`, `cache.ts` |
 
 **ReadMany subresources use plural form:**

@@ -9,7 +9,6 @@ import type { AccessorName, Db, Prisma } from '@template/db';
 import type {
   Organization,
   OrganizationUser,
-  Session,
   Space,
   SpaceUser,
   User,
@@ -28,7 +27,6 @@ export type AppVars = {
   organizations: Organization[] | null;
   spaceUsers: SpaceUser[] | null;
   spaces: Space[] | null;
-  session: Session | null;
   token: TokenWithRelations | null;
   spoofedBy: User | null;
   permix: Permix;

@@ -7,9 +7,9 @@
 import { db, getRedisClient, redisNamespace } from '@template/db';
 import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
-import { bearer } from 'better-auth/plugins';
 import { emitAppEvent } from '#/appEvents/emit';
-import { oauthHandoffPlugins } from '#/lib/auth/oauthHandoffPlugins';
+import { authPlugins } from '#/lib/auth/authPlugins';
+import { revokeUserJwts } from '#/lib/auth/jwtRevocation';
 import { getAllowedOrigins } from '#/middleware/corsMiddleware';
 
 export const auth = betterAuth({
@@ -23,6 +23,7 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: true,
+    onPasswordReset: async ({ user }) => revokeUserJwts(user.id),
   },
 
   emailVerification: {
@@ -41,8 +42,9 @@ export const auth = betterAuth({
         : undefined,
   },
 
+  // Sessions exist only for the sign-in handshake; jwtHandoff swaps each one for a JWT.
   session: {
-    expiresIn: 7 * 24 * 60 * 60,
+    expiresIn: 10 * 60,
   },
 
   user: {
@@ -51,6 +53,11 @@ export const auth = betterAuth({
         type: ['user', 'superadmin'],
         required: false,
         defaultValue: 'user',
+        input: false,
+      },
+      lastLoginAt: {
+        type: 'date',
+        required: false,
         input: false,
       },
     },
@@ -62,7 +69,32 @@ export const auth = betterAuth({
     },
   },
 
-  plugins: [bearer(), ...oauthHandoffPlugins()],
+  plugins: authPlugins(),
+
+  // Every endpoint that acts on a live session: none survives sign-in, and a session never mints a JWT.
+  disabledPaths: [
+    '/token',
+    '/get-session',
+    '/update-session',
+    '/list-sessions',
+    '/revoke-session',
+    '/revoke-sessions',
+    '/revoke-other-sessions',
+    '/sign-out',
+    '/update-user',
+    '/change-email',
+    '/change-password',
+    '/verify-password',
+    '/delete-user',
+    '/delete-user/callback',
+    '/link-social',
+    '/unlink-account',
+    '/list-accounts',
+    '/account-info',
+    '/get-access-token',
+    '/refresh-token',
+    '/one-time-token/generate',
+  ],
 
   trustedOrigins: getAllowedOrigins(),
 
@@ -92,4 +124,3 @@ export const auth = betterAuth({
 });
 
 export type Auth = typeof auth;
-export type Session = typeof auth.$Infer.Session;

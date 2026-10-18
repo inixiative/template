@@ -39,7 +39,6 @@ export const prepareRequest = async (c: Context<AppEnv>, next: Next) => {
     // Deep clone mutable context to prevent mutation leakage between batch sub-requests
     const keysToClone = [
       'user',
-      'session',
       'organizationUsers',
       'organizations',
       'spaceUsers',
@@ -64,7 +63,6 @@ export const prepareRequest = async (c: Context<AppEnv>, next: Next) => {
     }
   } else {
     c.set('user', null);
-    c.set('session', null);
     c.set('organizationUsers', null);
     c.set('organizations', null);
     c.set('spaceUsers', null);

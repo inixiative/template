@@ -14,7 +14,7 @@ model User {
   displayName   String?
   image         String?
 
-  // Stamped on sign-in by the lastLoginAt hook (off Session create). Operational, not
+  // Stamped on sign-in by jwtHandoff when it issues the JWT. Operational, not
   // versioned — see registries/ignoreFields.
   lastLoginAt DateTime?
 
