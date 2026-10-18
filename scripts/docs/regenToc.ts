@@ -30,7 +30,7 @@ const DEFAULTS = ['docs/claude', 'FEATURES.md', 'COMPARISONS.md', 'TODO.md', 'RE
 // `&`) anchors to `a--b`. Drop backticks and any char that isn't a word char,
 // whitespace, or hyphen — matches GitHub's behavior for the heading shapes in
 // our doc set. Doesn't perfectly handle emojis or duplicate-heading dedup.
-const slugify = (heading: string): string =>
+export const slugify = (heading: string): string =>
   heading
     .toLowerCase()
     .replace(/`/g, '')
@@ -151,4 +151,4 @@ const main = () => {
   console.log(`\n${touched} file(s) updated, ${files.length - touched} unchanged`);
 };
 
-main();
+if (import.meta.main) main();

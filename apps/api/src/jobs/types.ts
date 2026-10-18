@@ -4,7 +4,6 @@
  * @partOf primitive:jobs
  * @uses infrastructure:prisma, infrastructure:redis
  */
-import type { Db } from '@template/db';
 import { JobLane } from '@template/db/generated/client/enums';
 import type { Job, Queue } from 'bullmq';
 import type { Redis } from 'ioredis';
@@ -17,7 +16,6 @@ export type JobsQueue = Queue & { redis: Redis };
 // invoking the handler, so log calls automatically also flow to job.log()
 // without needing a context wrapper.
 export type WorkerContext = {
-  db: Db;
   queue: JobsQueue;
   job: Job;
   signal?: AbortSignal;
@@ -63,6 +61,7 @@ export type JobHandler<TPayload = void> = ((
 };
 
 // Adds a child of the running job. Exists only on a stage's context: only a job can have children.
+// A superseding job may only add superseding children (validateChildJobHandler).
 export type EnqueueChildJob = <K extends keyof JobPayloads>(
   handlerName: K,
   payload: JobPayloads[K],
@@ -76,7 +75,8 @@ export type JobStage<TPayload = void> = (
 ) => Promise<void>;
 
 // A job that fans out and waits: each stage runs once its predecessor's children have all reported,
-// and `finish` runs once, after the last stage.
+// and `finish` runs once, after the last stage. Every constructor (makeJob, makeSingletonJob,
+// makeSupersedingJob) takes one in place of a handler.
 export type StagedJob<TPayload = void> = {
   stages: JobStage<TPayload>[];
   finish: (ctx: WorkerContext, ...args: JobHandlerArgs<TPayload>) => Promise<void>;
@@ -94,4 +94,7 @@ export type JobOptions = {
   // its retries counts as done rather than leaving its parent waiting.
   parent?: { id: string; queue: string };
   ignoreDependencyOnFailure?: boolean;
+  // Set only by enqueueJob for a keyed singleton (singletonDeduplicationId): while a job with this id
+  // exists, BullMQ ignores another add.
+  deduplication?: { id: string };
 };

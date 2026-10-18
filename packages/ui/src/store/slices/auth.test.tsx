@@ -15,9 +15,9 @@ import {
 import { buildUser } from '@template/db/test';
 import { SignupForm } from '@template/ui/components/auth/SignupForm';
 import { UserMenu } from '@template/ui/components/layout/UserMenu';
-import { clearToken, getToken, setToken } from '@template/ui/lib/auth/token';
+import { completeOAuthSignIn } from '@template/ui/lib/auth/signin';
+import { clearToken, getToken, getTokenExpiry, setToken } from '@template/ui/lib/auth/token';
 import type { EmailAuthMethod } from '@template/ui/lib/auth/types';
-import { toast } from '@template/ui/lib/toast';
 import type { ApiWebsocket } from '@template/ui/lib/ws/createApiWebsocket';
 import { useAppStore } from '@template/ui/store';
 import { createTestStore } from '@template/ui/test';
@@ -29,7 +29,8 @@ const method: EmailAuthMethod = {
   name: 'Signup Test',
   password: 'test-password',
 };
-const token = 'synthetic-session-token';
+const token = 'eyJhbGciOiJFUzI1NiJ9.eyJzdWIiOiJzeW50aGV0aWMifQ.c2lnbmF0dXJl';
+const expiresAt = new Date(Date.now() + 30 * 86_400_000).toISOString();
 let requests: Array<{ path: string; authorization: string | null }>;
 let respond: (path: string) => Response;
 let fetchSpy: ReturnType<typeof spyOn<typeof globalThis, 'fetch'>>;
@@ -115,7 +116,7 @@ test('pending signup clears stale local identity without navigation or remote si
 test.each([
   'signIn',
   'signUp',
-] as const)('%s with a session token hydrates the user with bearer auth', async (action) => {
+] as const)('%s with a JWT hydrates the user with bearer auth', async (action) => {
   const { entity } = await buildUser({ email: method.email, emailVerified: true });
   const user = entity.__serialize();
   respond = (path) =>
@@ -123,7 +124,7 @@ test.each([
       ? Response.json({
           data: { ...user, organizations: [], organizationUsers: [], spaces: [], spaceUsers: [] },
         })
-      : Response.json({ token, user });
+      : Response.json({ token, expiresAt, user });
   const result = await store.getState().auth[action](method);
   if (action === 'signUp') expect(result).toEqual({ status: 'authenticated' });
   expect(getToken()).toBe(token);
@@ -154,22 +155,28 @@ test('a malformed tokenless signup remains an error', async () => {
   expect(getToken()).toBeNull();
 });
 
-test.each([
-  200, 403,
-])('logout sends the bearer session and clears local access on HTTP %i', async (status) => {
+test('the OAuth callback exchanges its one-time token for the JWT and its expiry', async () => {
+  respond = () => Response.json({ token, expiresAt, user: { id: 'u1' } });
+  await completeOAuthSignIn('one-time');
+  expect(requests.map((r) => r.path)).toEqual(['/api/auth/one-time-token/verify']);
+  expect(getToken()).toBe(token);
+  expect(getTokenExpiry()?.toISOString()).toBe(expiresAt);
+});
+
+test('a sign-in answer without a JWT handoff stores nothing', async () => {
+  respond = () => Response.json({ token, user: { id: 'u1' } });
+  await expect(store.getState().auth.signIn(method)).rejects.toThrow('No token');
+  expect(getToken()).toBeNull();
+});
+
+test('logout drops the JWT locally and calls no server', async () => {
   setToken(token, new Date(Date.now() + 60_000));
   store.setState((state) => ({
     auth: { ...state.auth, isAuthenticated: true, organizations: {}, spaces: {}, spaceUsers: {} },
   }));
   store.getState().tenant.setUser();
-  respond = () =>
-    Response.json(status === 200 ? { success: true } : { message: 'Revocation failed' }, {
-      status,
-    });
-  const pending = store.getState().auth.logout();
-  if (status === 200) await pending;
-  else await expect(pending).rejects.toThrow('Revocation failed');
-  expect(requests).toEqual([{ path: '/api/auth/sign-out', authorization: `Bearer ${token}` }]);
+  await store.getState().auth.logout();
+  expect(requests).toEqual([]);
   expect(getToken()).toBeNull();
   expect(socketLogout).toHaveBeenCalledTimes(1);
   expect(store.getState().auth.isAuthenticated).toBe(false);
@@ -217,24 +224,14 @@ test('signup form displays verification success without navigating to the dashbo
   }
 });
 
-test('logout menu reports remote revocation failure after clearing local access', async () => {
+test('the logout menu signs out on this device without a server call', async () => {
   setToken(token, new Date(Date.now() + 60_000));
   useAppStore.setState(store.getState());
-  respond = () => Response.json({ message: 'Revocation failed' }, { status: 403 });
-  const errorToast = spyOn(toast, 'error').mockImplementation(() => 'test-toast');
   const view = render(<UserMenu />);
-  try {
-    fireEvent.click(view.getByRole('button'));
-    await waitFor(() => expect(view.getByRole('menuitem', { name: 'Log out' })).toBeDefined());
-    fireEvent.click(view.getByRole('menuitem', { name: 'Log out' }));
-    await waitFor(() =>
-      expect(errorToast).toHaveBeenCalledWith(
-        'Signed out on this device, but the server session could not be revoked.',
-      ),
-    );
-    expect(getToken()).toBeNull();
-    expect(socketLogout).toHaveBeenCalledTimes(1);
-  } finally {
-    errorToast.mockRestore();
-  }
+  fireEvent.click(view.getByRole('button'));
+  await waitFor(() => expect(view.getByRole('menuitem', { name: 'Log out' })).toBeDefined());
+  fireEvent.click(view.getByRole('menuitem', { name: 'Log out' }));
+  await waitFor(() => expect(getToken()).toBeNull());
+  expect(socketLogout).toHaveBeenCalledTimes(1);
+  expect(requests).toEqual([]);
 });

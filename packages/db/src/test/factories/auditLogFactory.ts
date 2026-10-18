@@ -1,7 +1,7 @@
 /**
  * @atlas
  * @kind factory
- * @partOf infrastructure:prisma
+ * @partOf infrastructure:prisma, primitive:testFactories
  * @uses none
  */
 import { AuditAction } from '@template/db/generated/client/enums';

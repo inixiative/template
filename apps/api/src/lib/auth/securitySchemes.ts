@@ -8,13 +8,16 @@ import type { OpenAPIHono, RouteConfig } from '@hono/zod-openapi';
 import type { AppEnv } from '#/types/appEnv';
 
 export const securitySchemes = {
-  sessionToken: {
+  userJwt: {
     type: 'http',
     scheme: 'bearer',
+    bearerFormat: 'JWT',
     description:
-      'Session of a signed-in person, issued under `/api/auth`. Sent as `Authorization: Bearer <token>` ' +
-      '(the session cookie set at sign-in is accepted the same way). Operations under `/api/admin` ' +
-      'additionally require the superadmin platform role.',
+      'JWT of a signed-in person, returned by sign-in under `/api/auth` and sent as ' +
+      '`Authorization: Bearer <jwt>`. Signed ES256 by this API (keys at `/api/auth/jwks`) or by the ' +
+      'configured issuer (`AUTH_ISSUER`, keys at `AUTH_JWKS_URL`); `sub` is the user. Sessions and ' +
+      'cookies are never accepted. Operations under `/api/admin` additionally require the superadmin ' +
+      'platform role.',
   },
   apiToken: {
     type: 'http',
@@ -22,7 +25,7 @@ export const securitySchemes = {
     description:
       'API token minted at a token create endpoint, sent as `Authorization: Bearer <key>`. The token carries ' +
       'its owner, so it acts as that user, organization user or space user. Operations that publish only ' +
-      '`sessionToken` refuse it.',
+      '`userJwt` refuse it.',
   },
   internalSecret: {
     type: 'apiKey',

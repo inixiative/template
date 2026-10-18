@@ -26,19 +26,19 @@ model RuleReference {
   createdAt DateTime @default(now())
 
   sourceModel            RuleReferenceSourceModel
-  sourceEmailTemplateId  String? @db.VarChar(36)
-  sourceEmailComponentId String? @db.VarChar(36)
-  sourceSegmentId        String? @db.VarChar(36)
+  sourceEmailTemplateId  String?                  @db.VarChar(36)
+  sourceEmailComponentId String?                  @db.VarChar(36)
+  sourceSegmentId        String?                  @db.VarChar(36)
 
-  targetModel            RuleReferenceTargetModel
+  targetModel          RuleReferenceTargetModel
   // True poly beside the false: the name, written once and never updated. The typed FK below is the
   // relation, and the database nulls it when the row is purged - this is what still says which row
   // the rule meant. Written from the same value as the FK, so the two agree by construction.
-  targetId               String  @db.VarChar(36)
-  targetTagId            String? @db.VarChar(36)
-  targetOrganizationId   String? @db.VarChar(36)
-  targetSpaceId          String? @db.VarChar(36)
-  targetSegmentId        String? @db.VarChar(36)
+  targetId             String                   @db.VarChar(36)
+  targetTagId          String?                  @db.VarChar(36)
+  targetOrganizationId String?                  @db.VarChar(36)
+  targetSpaceId        String?                  @db.VarChar(36)
+  targetSegmentId      String?                  @db.VarChar(36)
 
   // Snapshot of the target row's deletedAt, maintained by ruleReference:target. One scalar
   // copied across one hop, so a reader answers "is this rule degraded" from the edge alone rather

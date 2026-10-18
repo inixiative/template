@@ -1,4 +1,4 @@
-import type { Db, SpaceId } from '@template/db';
+import { db, type SpaceId } from '@template/db';
 import { InquiryResourceModel, InquiryType } from '@template/db/generated/client/enums';
 import type { z } from 'zod';
 import { emitAppEvent } from '#/appEvents/emit';
@@ -12,11 +12,7 @@ const contentSchema = spaceContentSchema.partial();
 
 type UpdateSpaceContent = z.infer<typeof contentSchema>;
 
-const validate = async (
-  db: Db,
-  inquiry: Partial<Inquiry>,
-  content: UpdateSpaceContent,
-): Promise<void> => {
+const validate = async (inquiry: Partial<Inquiry>, content: UpdateSpaceContent): Promise<void> => {
   const { slug } = content;
   if (!slug) return;
 
@@ -57,7 +53,7 @@ export const updateSpaceHandler: InquiryHandler<UpdateSpaceContent> = {
   validate,
   autoApprove: async () => false,
 
-  handleApprove: async (db, inquiry, content) => {
+  handleApprove: async (inquiry, content) => {
     const space = await db.space.update({
       where: { id: inquiry.sourceSpaceId as SpaceId },
       data: content,

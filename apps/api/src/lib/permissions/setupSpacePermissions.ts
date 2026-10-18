@@ -53,7 +53,7 @@ export const setupSpacePermissions = async (c: Context<AppEnv>) => {
   // No space memberships → nothing to set up
   if (!spaceUsers?.length) return;
 
-  // User token or session → all spaces (with token restrictions if present)
+  // User token or person JWT → all spaces (with token restrictions if present)
   for (const spaceUser of spaceUsers) {
     const spaceId = spaceUser.spaceId as SpaceId;
     const role = token

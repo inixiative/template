@@ -35,7 +35,7 @@ export const organizationUserUpdateController = makeController(
       throw makeError({ status: 403, message: 'Access denied' });
 
     if (orgUser.role === Role.owner && body.role !== Role.owner) {
-      await validateNotLastOwner(db, orgUser.organizationId as OrganizationId);
+      await validateNotLastOwner(orgUser.organizationId as OrganizationId);
     }
 
     const updated = await db.organizationUser.update({

@@ -15,7 +15,9 @@ export default defineConfig({
     '**/*.config.ts', // build tooling (vite/app/prisma/openapiTs config) — not app source
     '**/scripts/**', // codegen / build scripts
     '**/watchAndGenerate.ts',
-    '**/test/**', // test infra (factories, mocks, setup) — singular, complements **/tests/**
+    // test setup/mocks — singular, complements **/tests/**. packages/db/src/test is mapped: it is the factory system (primitive:testFactories)
+    'apps/**/test/**',
+    'packages/ui/src/test/**',
     '**/*.example.tsx',
   ],
   stamp: [
@@ -89,6 +91,7 @@ export default defineConfig({
     { include: 'apps/api/src/appEvents/**', partOf: 'primitive:appEvents' },
     { include: 'apps/api/src/jobs/**', partOf: 'primitive:jobs' },
     { include: 'apps/api/src/ws/**', partOf: 'primitive:websockets' },
+    { include: 'packages/db/src/test/**', partOf: 'primitive:testFactories' },
     {
       include: 'packages/$1/**',
       exclude: ['**/seed.ts', '**/*.seed.ts', '**/seeds/**'],

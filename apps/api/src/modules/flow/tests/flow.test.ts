@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test';
 import type { Organization, OrganizationUser, User } from '@template/db/generated/client/client';
 import {
   InquiryResourceModel,
@@ -17,6 +17,7 @@ import {
 } from '@template/db/test';
 import type { z } from 'zod';
 import { flowRouter } from '#/modules/flow';
+import { flowRegistry } from '#/modules/flow/registry/flowRegistry';
 import type { flowResponseSchema } from '#/modules/flow/schemas/flowSchemas';
 import { meRouter } from '#/modules/me';
 import { organizationRouter } from '#/modules/organization';
@@ -109,6 +110,23 @@ describe('flows', () => {
 
     expect(response.status).toBe(404);
     expect(await harness.db.flow.count({ where: { userId: owner.id } })).toBe(0);
+  });
+
+  it('hands steps the flow owner as the caller, and refuses a userId in the bindings', async () => {
+    const { organization, app } = await ownedOrganization();
+    const stepsSpy = spyOn(flowRegistry.setUpOrganization, 'steps');
+    try {
+      const flow = await started(app, organization.id);
+      const smuggled = await startIn(app, { organizationId: organization.id, userId: owner.id });
+
+      expect(flow.userId).toBe(owner.id);
+      expect(stepsSpy).toHaveBeenCalledTimes(1);
+      expect(stepsSpy.mock.calls[0]?.[1]).toEqual({ userId: owner.id, now: expect.any(Date) });
+      expect(smuggled.status).toBe(422);
+      expect((await jsonError(smuggled)).fieldErrors).toHaveProperty('bindings');
+    } finally {
+      stepsSpy.mockRestore();
+    }
   });
 
   it('resolves and stores every step at create', async () => {

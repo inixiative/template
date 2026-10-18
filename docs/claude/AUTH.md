@@ -5,14 +5,19 @@
 ## Contents
 
 - [Overview](#overview)
-- [BetterAuth (Session)](#betterauth-session)
+- [Sign-in (the BetterAuth handshake)](#sign-in-the-betterauth-handshake)
   - [Configuration](#configuration)
-  - [Session Storage Strategy](#session-storage-strategy)
+  - [What lives where](#what-lives-where)
+  - [jwtHandoff](#jwthandoff)
   - [Auth Routes](#auth-routes)
-  - [authMiddleware](#authmiddleware)
-- [OAuth + Bearer Tokens](#oauth--bearer-tokens)
+- [Person JWT](#person-jwt)
+  - [Verification](#verification)
+  - [jwtAuthMiddleware](#jwtauthmiddleware)
+  - [Revocation and sign-out](#revocation-and-sign-out)
+  - [Spoofing and WebSockets](#spoofing-and-websockets)
+- [OAuth + One-Time Token](#oauth--one-time-token)
   - [OAuth Flow](#oauth-flow)
-  - [Bearer Token Handoff](#bearer-token-handoff)
+  - [One-Time Token Handoff](#one-time-token-handoff)
 - [Multi-Provider Authentication (AuthProvider)](#multi-provider-authentication-authprovider)
   - [Database Schema](#database-schema)
   - [Encryption](#encryption)
@@ -42,24 +47,26 @@
 
 <!-- toc:end -->
 
-Who is the caller: sessions, API tokens, OAuth, spoofing, and the middleware that enforces them. What they can do: [PERMISSIONS.md](./PERMISSIONS.md). Client side (forms, guards, auth slice): [FRONTEND/AUTH.md](./FRONTEND/AUTH.md).
+Who is the caller: person JWTs, API tokens, the sign-in handshake, OAuth, spoofing, and the middleware that enforces them. What they can do: [PERMISSIONS.md](./PERMISSIONS.md). Client side (forms, guards, auth slice): [FRONTEND/AUTH.md](./FRONTEND/AUTH.md).
 
 ## Overview
 
-Two authentication methods, both populate the same context:
+Two credentials, both populate the same context. Both are bearer-only, and neither is a session: a cookie or a BetterAuth session never authenticates an API request (CI rule `bearer-only-auth`, [SCRIPTS.md](./SCRIPTS.md)).
 
-| Method | Use Case | Header/Cookie | Middleware |
+| Credential | Who presents it | Header | Middleware |
 |--------|----------|---------------|------------|
-| Session | Browser clients | `Authorization: Bearer <session token>` (or BetterAuth cookie, or `?token=`) | `authMiddleware` |
-| API token | API clients | `Authorization: Bearer <key>` or `?token=<key>` | `tokenAuthMiddleware` |
+| Person JWT | A signed-in person (web, admin and superadmin apps, or anything holding their JWT) | `Authorization: Bearer <jwt>` | `jwtAuthMiddleware` |
+| API token | A program (MCP, integrations, CI) | `Authorization: Bearer <key>` or `?token=<key>` | `tokenAuthMiddleware` |
 
-Both methods ultimately set `user`, `organizationUsers`, and configure `permix`.
+Both set `user`, `organizationUsers`, and configure `permix`.
+
+Why no sessions: a session is server state that every request must look up, and a session cookie is a second way in. Sessions lived on as the real credential under an earlier JWE cookie cache, and a revoked session stayed valid in that cache for up to 7 days. A person JWT is verified from its signature, and revocation is a per-user check in Redis ([Revocation and sign-out](#revocation-and-sign-out)).
 
 ---
 
-## BetterAuth (Session)
+## Sign-in (the BetterAuth handshake)
 
-Located in `apps/api/src/lib/auth.ts`. Session-based authentication for browser clients.
+Located in `apps/api/src/lib/auth.ts`. BetterAuth runs sign-up, sign-in, email verification and OAuth. It still creates a session at the end of each sign-in, because its flows are built around one; `jwtHandoff` swaps that session for a JWT before the response leaves the API, so the client never holds a session.
 
 ### Configuration
 
@@ -69,43 +76,56 @@ export const auth = betterAuth({
   secret: process.env.BETTER_AUTH_SECRET,
   baseURL: process.env.API_URL,
 
-  emailAndPassword: { enabled: true, requireEmailVerification: true },
+  emailAndPassword: {
+    enabled: true,
+    requireEmailVerification: true,
+    onPasswordReset: async ({ user }) => rotateUserJwts(user.id),
+  },
   emailVerification: {
     sendVerificationEmail: async ({ user, url }) =>
       emitAppEvent('user.verificationRequested', { userId: user.id, verificationUrl: url }),
   },
 
-  socialProviders: {
-    google: process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
-      ? { clientId: process.env.GOOGLE_CLIENT_ID, clientSecret: process.env.GOOGLE_CLIENT_SECRET }
-      : undefined,
-  },
+  socialProviders: { google: /* when GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET are set */ },
 
-  session: {
-    expiresIn: 7 * 24 * 60 * 60,
-    cookieCache: { enabled: true, maxAge: 7 * 24 * 60 * 60, strategy: 'jwe' },
-  },
+  session: { expiresIn: 10 * 60 },          // handshake only
 
-  user: {
-    additionalFields: {
-      platformRole: { type: ['user', 'superadmin'], defaultValue: 'user', input: false },
-    },
-  },
-
-  plugins: [bearer(), ...oauthHandoffPlugins()],
+  plugins: authPlugins(),                   // jwt(), oneTimeToken, oauthCallbackToken, jwtHandoff
+  disabledPaths: [/* every endpoint that acts on a live session, see below */],
   trustedOrigins: getAllowedOrigins(),
-  onAPIError: process.env.WEB_URL ? { errorURL: `${process.env.WEB_URL}/login` } : undefined,
-
   secondaryStorage: { get, set, delete, getAndDelete },  // Redis, `redisNamespace.session`
 });
 ```
 
-### Session Storage Strategy
+The plugin list lives in `apps/api/src/lib/auth/authPlugins.ts`. Its order matters: `jwtHandoff` runs last, after the one-time-token hook has read the new session.
 
-- **Sessions live in Redis** via `secondaryStorage` (keys under `redisNamespace.session`). `getAndDelete` (Redis `GETDEL`) makes one-time-token verification atomic.
-- **Bearer for the SPAs.** The `bearer()` plugin accepts the session token as `Authorization: Bearer <token>`; the frontends store it in localStorage (see [FRONTEND/AUTH.md](./FRONTEND/AUTH.md)).
-- **Cookie cache.** Cookie clients get an encrypted (`jwe`) session cookie cache, valid up to the 7-day session lifetime.
-- **Email verification is required** for email/password sign-up; the verification email goes out through the `user.verificationRequested` app event.
+### What lives where
+
+| Piece | What it is | Where it lives |
+|-------|-----------|----------------|
+| **Person JWT** | ES256 JWT, `sub` = `User.id`, `iss` = `aud` = `API_URL`, `iat`, `exp` 30 days | The client. Web apps keep it in localStorage (`packages/ui/src/lib/auth/token.ts`) and send `Authorization: Bearer <jwt>` on every call |
+| **Signing keys** | BetterAuth `jwt()` plugin keys, ES256, rotated every 90 days; a retired key stays published for 30 days so JWTs it signed keep verifying | `Jwks` table; the private key is encrypted by the template field encryption (`jwks.privateKey`, [ENCRYPTION.md](./ENCRYPTION.md)) through `apps/api/src/lib/auth/jwksStore.ts`. Public keys at `GET /api/auth/jwks` |
+| **Handshake session** | BetterAuth's session for one sign-in. Lives 10 minutes at most; `jwtHandoff` deletes it as soon as it hands out the JWT | Redis (`secondaryStorage`, `redisNamespace.session`). `storeSessionInDatabase` is off; the Prisma `Session` model is BetterAuth's schema and holds no rows |
+| **OAuth one-time token** | Single-use, 1 minute, stored hashed; consumed with Redis `GETDEL` (`getAndDelete`) | Redis |
+| **JWT version** | `User.jwtVersion`; every person JWT carries it as `ver`, and a JWT whose `ver` differs is refused. Incrementing it signs the user out everywhere | Postgres, on the `User` row `jwtAuthMiddleware` already loads |
+
+- **Why the signing keys use the template field encryption:** one scheme for secrets at rest, rotated by the existing `rotateEncryptionKeys` job, instead of a second scheme keyed off `BETTER_AUTH_SECRET`.
+- **Why 30 days and no refresh token:** revocation is the control, not short expiry. A refresh token would be a second long-lived credential to store, rotate and revoke; incrementing `User.jwtVersion` already ends every JWT a person holds.
+- **Email verification is required** for email/password sign-up; the verification email goes out through the `user.verificationRequested` app event. Verifying does not sign the person in; they sign in afterwards.
+
+### jwtHandoff
+
+`apps/api/src/lib/auth/jwtHandoff.ts`, a BetterAuth plugin with one after-hook. On every endpoint that produced a new session it:
+
+1. expires the session cookie on the response;
+2. on `/callback/*` (the OAuth redirect) stops there, because the one-time token must still resolve to that session;
+3. otherwise signs the person's JWT (`signJWT` with `personJwtOptions()` from `apps/api/src/lib/auth/personJwt.ts`), deletes the session, and replaces the response body with:
+
+```json
+{ "token": "<jwt>", "expiresAt": "<ISO time>", "user": { "...": "..." } }
+```
+
+That covers `POST /api/auth/sign-in/email`, `POST /api/auth/one-time-token/verify`, and `POST /api/auth/sign-up/email` when verification is not required.
 
 ### Auth Routes
 
@@ -113,42 +133,67 @@ export const auth = betterAuth({
 
 ```
 POST /api/auth/sign-up/email
-POST /api/auth/sign-in/email
+POST /api/auth/sign-in/email           # → { token, expiresAt, user }
+GET  /api/auth/verify-email            # email verification link
 POST /api/auth/sign-in/social          # OAuth start
 GET  /api/auth/callback/:provider      # OAuth callback (register as the provider redirect URI)
-POST /api/auth/one-time-token/verify   # OAuth handoff exchange
-POST /api/auth/sign-out
-GET  /api/auth/get-session
+POST /api/auth/one-time-token/verify   # OAuth handoff exchange → { token, expiresAt, user }
+GET  /api/auth/jwks                    # public signing keys
 ```
 
-### authMiddleware
-
-Located in `apps/api/src/middleware/auth/authMiddleware.ts`:
-
-```typescript
-export const authMiddleware = async (c: Context<AppEnv>, next: Next) => {
-  if (c.get('user')) return next();
-
-  const headers = c.req.raw.headers;
-  const urlToken = new URL(c.req.url).searchParams.get('token');
-  if (urlToken && !headers.get('authorization')) headers.set('authorization', `Bearer ${urlToken}`);
-
-  const session = await auth.api.getSession({ headers });
-  if (!session?.user?.id) return next();
-
-  const user = await findUserWithRelations(c.get('db'), session.user.id);
-  if (!user) return next();
-
-  await setUserContext(c, user);
-  await next();
-};
-```
+`disabledPaths` turns every endpoint that acts on a live session into a 404: `/token` (it would mint a JWT from a session), `/get-session`, `/update-session`, `/list-sessions`, `/revoke-session`, `/revoke-sessions`, `/revoke-other-sessions`, `/sign-out`, `/update-user`, `/change-email`, `/change-password`, `/verify-password`, `/delete-user`, `/delete-user/callback`, `/link-social`, `/unlink-account`, `/list-accounts`, `/account-info`, `/get-access-token`, `/refresh-token`, `/one-time-token/generate`. Changing a password or linking a social account needs a JWT-authenticated route of our own; neither exists yet.
 
 ---
 
-## OAuth + Bearer Tokens
+## Person JWT
 
-Server side: `apps/api/src/lib/auth/oauthHandoffPlugins.ts`. Client side: `packages/ui/src/lib/auth/signin.ts` and `AuthCallbackPage` ([FRONTEND/AUTH.md](./FRONTEND/AUTH.md#oauth-callback)).
+### Verification
+
+`apps/api/src/lib/auth/verifyIssuerJwt.ts` is the one verification path. It trusts:
+
+- **this API**, always: issuer and audience `API_URL`, public keys read in-process from the `Jwks` table (no HTTP call to itself, no private key decrypted). The key set is cached 10 minutes, dropped when this process creates a key, and reloaded on an unknown `kid` at most once a second (another instance rotated; a forged `kid` cannot force a read per request);
+- **a configured external issuer**, when `AUTH_ISSUER`, `AUTH_JWKS_URL` and `AUTH_AUDIENCE` are all set: keys from `createRemoteJWKSet(AUTH_JWKS_URL)`, cached 10 minutes.
+
+The token's `iss` picks the issuer; an unknown `iss` is refused. `algorithms: ['ES256']` only, so `alg: none` and HS256 are refused; `iss`, `aud`, `exp`, `sub` and `iat` are required; 30 s clock tolerance. `sub` must be a local `User` id.
+
+### jwtAuthMiddleware
+
+`apps/api/src/middleware/auth/jwtAuthMiddleware.ts`. A bearer shaped like a JWT (three dot-separated segments) is verified and its user loaded with `findUserWithRelations` (the cached user every request loads) → `setUserContext`. A JWT this API signed must carry the user's current `jwtVersion` as `ver`; a soft-deleted user is refused.
+
+- A JWT-shaped bearer that fails is a **401**, never a fall-through to API-token hashing.
+- Unreachable issuer keys are a **503** (retryable, so a WebSocket keeps its identity).
+- A JWT is never read from `?token=`: a JWT in a URL ends up in logs and referrers. API tokens keep `?token=`.
+
+### Revocation and sign-out
+
+`rotateUserJwts(userId)` (`apps/api/src/modules/user/services/rotateUserJwts.ts`) is the one writer of `User.jwtVersion`: it increments it through the scoped db client, inside the caller's transaction. Every caller below goes through it; the cache hooks drop the cached user, so the next request with an older JWT is a 401. No Redis lookup and no extra query: the version rides on the user row each request already loads. Why a version, not a timestamp: it needs no clock comparison and no second store (Aron, 2026-10-18: "the token just carries the version on the user… we just rotate that"). Permissions are not on the JWT, so a role or membership change applies on the next request without revoking anything. `jwtVerify` enforces `maxTokenAge` (30 days), so no JWT, external ones included, lives longer than that. A JWT from the configured external issuer carries that issuer's version, not ours, so the version check does not apply to it: rotating here (`/me/rotateJwts`, the admin rotation, password reset) does not end it. It ends when it expires (30 days at most), when the user is deleted here, when the issuer stops publishing its key, or, for a `grant` JWT, when the grant inquiry is revoked (read live). Signing out at the issuer is the issuer's job. The cached user row (`findUserWithRelations`, 10 minutes) is dropped by the cache hooks on the version bump; if that clear fails (the hook logs Redis errors), an old JWT can work until the cache entry expires, the same bound a role change has.
+
+| What | Revokes |
+|---|---|
+| Sign out of one browser | Nothing on the server: the SPA drops its JWT |
+| `POST /api/v1/me/rotateJwts` | Every JWT this API signed for the caller, on every device: the nuclear option, not a sign-out of one device. Person-only (`validateNotToken`): an API token cannot rotate its user's JWTs |
+| `POST /api/admin/user/:id/rotateJwts` | Every JWT this API signed for that user (superadmin) |
+| `redactUser` (`POST /api/v1/me/redact`, `POST /api/admin/user/:id/redact`) | Every JWT of the deleted account (`rotateUserJwts`; the soft-deleted user is refused too) |
+| Password reset (BetterAuth `onPasswordReset`) | Every JWT this API signed for that user |
+
+`jwtVersion` is never returned: every user response schema is `userResponseSchema` (`apps/api/src/modules/user/schemas/userResponseSchema.ts`, `UserScalarSchema.omit({ jwtVersion: true }).strip()`), and `jwtHandoff` omits it from the sign-in `user`. Nothing accepts it as input: BetterAuth declares it `input: false`, and no route takes a user body.
+
+**Future: profile editing.** Profile editing will come (Aron, 2026-10-18); the write protection belongs in that route's body schema, not in a new mechanism.
+
+- BetterAuth's `input: false` on `additionalFields` (`platformRole`, `lastLoginAt`, `jwtVersion`) only stops those fields in the request body of BetterAuth's own endpoints. It does nothing for our API routes or for server code calling `db.user.update`.
+- Today nothing outside `rotateUserJwts` writes `jwtVersion`: there is no user update route, and BetterAuth's `/update-user` is in `disabledPaths`.
+- A `/me` update route's body schema is the guard: accept only profile fields, never `jwtVersion`, `platformRole`, `email` or `lastLoginAt`. Email and password changes get their own JWT-authenticated routes, and a password change calls `rotateUserJwts`, like password reset does. Responses already go through `userResponseSchema`.
+
+
+### Spoofing and WebSockets
+
+A superadmin's JWT is superadmin, so spoofing rides it ([Spoof Middleware](#spoof-middleware)). A WebSocket's `authenticate` frame carries the JWT as its `authorization` header; `apps/api/src/ws/probe.ts` replays `/api/v1/me` with it, and the reauthorize sweep drops an identity whose JWT was revoked or expired.
+
+---
+
+## OAuth + One-Time Token
+
+Server side: `apps/api/src/lib/auth/oauthHandoffPlugins.ts` and `jwtHandoff.ts`. Client side: `packages/ui/src/lib/auth/signin.ts` and `AuthCallbackPage` ([FRONTEND/AUTH.md](./FRONTEND/AUTH.md#oauth-callback)).
 
 ### OAuth Flow
 
@@ -157,30 +202,22 @@ Server side: `apps/api/src/lib/auth/oauthHandoffPlugins.ts`. Client side: `packa
 3. **BetterAuth redirects** to the OAuth provider
 4. **User authenticates** with provider
 5. **Provider redirects to the API** at `{API_URL}/api/auth/callback/<provider>` — register this as the redirect URI with the provider
-6. **API mints a one-time token** and redirects to `/auth/callback#ott=...`
+6. **API mints a one-time token** and redirects to `/auth/callback#ott=...`; the session cookie on that redirect is expired
 7. **Callback page exchanges it** via `completeOAuthSignIn()`:
-   - `POST /api/auth/one-time-token/verify` returns the session
-   - Store the session token in localStorage via `setToken()`
+   - `POST /api/auth/one-time-token/verify` returns `{ token, expiresAt, user }`; `jwtHandoff` deletes the session
+   - `storeJwtHandoff()` stores the JWT
    - Hydrate user data via `fetchAndHydrateMe()`
    - Navigate to redirectTo destination
 
-### Bearer Token Handoff
+### One-Time Token Handoff
 
-The SPA authenticates with bearer tokens, but the OAuth callback is a browser redirect: the session BetterAuth
-creates there exists only as a cookie on the API origin, which the SPA never sends. `oauthHandoffPlugins()`
-(`apps/api/src/lib/auth/oauthHandoffPlugins.ts`) bridges the two:
+The OAuth callback is a browser redirect, so the API cannot hand the SPA a JSON body there. `oauthHandoffPlugins()` bridges it:
 
 - `oneTimeToken({ setOttHeaderOnNewSession: true })` mints a single-use token (1 minute, stored hashed) for every new session
 - `oauthCallbackToken` moves that token onto the callback redirect as `#ott=` — a fragment, so it never reaches server logs or referrers
-- The browser can't mint tokens itself (`disableClientRequest`); verify consumes atomically via Redis `GETDEL` (`secondaryStorage.getAndDelete`)
+- The browser can't mint tokens itself (`disableClientRequest`, and `/one-time-token/generate` is disabled); verify consumes atomically via Redis `GETDEL` (`secondaryStorage.getAndDelete`)
 
-The session token itself never appears in a URL.
-
-All API requests include the bearer token:
-
-```typescript
-Authorization: Bearer <token>
-```
+Neither the session nor the JWT appears in a URL. The one-time token resolves only to the callback's 10-minute session, and its cookie is already expired.
 
 See [FRONTEND/AUTH.md](./FRONTEND/AUTH.md) for the client side.
 
@@ -261,9 +298,9 @@ Located in `apps/api/src/middleware/auth/tokenAuthMiddleware.ts`. API key authen
 4. Validate: `isActive`, not expired
 5. Set context based on token type
 
-URL token is useful for WebSocket connections, email links, file downloads (where headers can't be set).
+URL token is useful for email links and file downloads (where headers can't be set). Only API tokens are read from the URL; a person JWT never is.
 
-**Security:** Token lookups are cached for 10 minutes, so a revoked token (`isActive = false`) stops working within that window. `lastUsedAt` is touched on cache miss only. `authMiddleware` also reads `?token=` for session tokens.
+**Security:** Token lookups are cached for 10 minutes, so a revoked token (`isActive = false`) stops working within that window. `lastUsedAt` is touched on cache miss only.
 
 ### tokenAuthMiddleware
 
@@ -295,7 +332,7 @@ export const tokenAuthMiddleware = async (c: Context<AppEnv>, next: Next) => {
 };
 ```
 
-A non-`Bearer` header or no key falls through to `authMiddleware`. A bearer value that is not an API key (a session token) misses the lookup and falls through too.
+`jwtAuthMiddleware` runs first and claims every JWT-shaped bearer; API keys are hex and never look like a JWT. A bearer that is neither (a BetterAuth session token, say) misses the lookup and authenticates no one.
 
 ---
 
@@ -426,19 +463,18 @@ apiRouter.use('*', corsMiddleware);
 apiRouter.use('*', prepareRequest);              // 1. Initialize context
 apiRouter.route('/telemetry/browser', …);        // Public, before auth
 apiRouter.route('/internal', internalRouter);    // Shared-secret auth only
-apiRouter.use('/auth/*', authRateLimit);         // BetterAuth handles its own auth
+apiRouter.use('/auth/*', authRateLimit);         // BetterAuth: the sign-in handshake
 apiRouter.all('/auth/*', (c) => auth.handler(c.req.raw));
 apiRouter.route('/unsubscribe', …);              // Public, signed link
-apiRouter.use('*', tokenAuthMiddleware);         // 2. Token auth (Authorization header wins)
-apiRouter.use('*', authMiddleware);              // 3. Session auth
+apiRouter.use('*', jwtAuthMiddleware);           // 2. Person JWT
+apiRouter.use('*', tokenAuthMiddleware);         // 3. API token
 apiRouter.use('*', spoofMiddleware);             // 4. Superadmin spoofing (after user is resolved)
 apiRouter.use('*', auditActorMiddleware);        // 5. Actor context for audit logs
 apiRouter.use('*', apiRateLimit);
 ```
 
-Token auth runs first so an `Authorization: Bearer <key>` header always wins
-over a session cookie when both are present (typical SDK xhr from a browser).
-Spoof runs last so a superadmin can spoof via either auth path.
+A JWT-shaped bearer is the person's JWT; any other bearer is looked up as an API token.
+Spoof runs last so a superadmin can spoof through either credential.
 
 ### Flow
 
@@ -448,14 +484,15 @@ Request
 prepareRequest
   - user: null, token: null, permix: empty
   ↓
-tokenAuthMiddleware
-  - If valid Bearer/URL token matches a Token row → set token, setUserContext()
+jwtAuthMiddleware
+  - JWT-shaped bearer → verify, load the user, check `ver` against `jwtVersion`, setUserContext()
+  - Invalid or revoked JWT → 401; issuer keys unreachable → 503
   - Otherwise pass through unchanged
   ↓
-authMiddleware
-  - If already has user (token won) → skip
-  - If valid better-auth session → setUserContext()
-  - If no session → pass through unchanged
+tokenAuthMiddleware
+  - If already has user (JWT) → skip
+  - If valid Bearer/URL token matches a Token row → set token, setUserContext()
+  - Otherwise pass through unchanged
   ↓
 spoofMiddleware
   - If superadmin + spoof header → replace user context
@@ -477,9 +514,9 @@ export const spoofMiddleware = async (c: Context<AppEnv>, next: Next) => {
   if (!rawEmail) return next();
 
   const spoofEmail = normalizeEmail(rawEmail);
-  const spoofedBasic = await findUserByEmail(db, spoofEmail);
+  const spoofedBasic = await findUserByEmail(spoofEmail);
   if (!spoofedBasic) return next();
-  const spoofedUser = await findUserWithRelations(db, spoofedBasic.id);
+  const spoofedUser = await findUserWithRelations(spoofedBasic.id);
   if (!spoofedUser) return next();
 
   await setUserContext(c, spoofedUser);
@@ -494,7 +531,7 @@ export const spoofMiddleware = async (c: Context<AppEnv>, next: Next) => {
 ### Usage
 
 ```bash
-curl -H "Authorization: Bearer <session-token>" \
+curl -H "Authorization: Bearer <jwt>" \
      -H "x-spoof-user-email: target@example.com" \
      https://api.example.com/api/v1/me
 ```
@@ -513,7 +550,7 @@ Use these after auth to enforce requirements:
 
 ### validateUser
 
-Requires any authenticated user (session or token with user):
+Requires any authenticated user (person JWT or token with user):
 
 ```typescript
 import { validateUser } from '#/middleware/validations/validateUser';
@@ -535,7 +572,7 @@ router.get('/resource', validateActor, handler);  // 401 if no user from getActo
 
 ### validateNotToken
 
-Requires session auth (tokens forbidden):
+Person-only actions: a person's JWT holds them, an API token does not. Token minting, token deletion, organization deletion and `POST /api/v1/me/rotateJwts` use it. A superadmin's token passes.
 
 ```typescript
 import { validateNotToken } from '#/middleware/validations/validateNotToken';
@@ -559,7 +596,7 @@ router.get('/admin/users', validateSuperadmin, handler);  // 403 if not superadm
 
 | Credential | `c.get('user')` | `validateUser` | `validateActor` |
 |------------|-----------------|----------------|-----------------|
-| Session | ✅ | ✅ | ✅ |
+| Person JWT | ✅ | ✅ | ✅ |
 | User token | ✅ | ✅ | ✅ |
 | OrganizationUser token | ✅ (scoped to its org) | ✅ | ✅ |
 | SpaceUser token | ✅ (scoped to its space) | ✅ | ✅ |

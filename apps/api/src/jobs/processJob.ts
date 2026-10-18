@@ -10,13 +10,14 @@ import { addLogBroadcast, LogScope, log, logScope } from '@template/shared/logge
 import type { Job } from 'bullmq';
 import { isSlowJobData } from '#/jobs/buildJobData';
 import { claimSlotOrRequeue } from '#/jobs/claimSlotOrRequeue';
+import { enqueueCronRun } from '#/jobs/enqueueCronRun';
 import { isValidHandlerName, type JobHandlers, jobHandlers } from '#/jobs/handlers';
 import { jobAuditActor } from '#/jobs/jobAuditActor';
 import { queue } from '#/jobs/queue';
 import { recordSlowFinished } from '#/jobs/slowLaneSignals';
 import { createSlowSlotPool, type SlowSlotPool } from '#/jobs/slowSlotPool';
 import { traceJob } from '#/jobs/traceJob';
-import type { WorkerContext } from '#/jobs/types';
+import { type JobData, type JobOptions, JobType, type WorkerContext } from '#/jobs/types';
 
 type ProcessJobSeams = {
   handlers?: Partial<JobHandlers>;
@@ -38,7 +39,7 @@ const runJob = async (
           async () => {
             addLogBroadcast((_level, msg) => job.log(msg));
 
-            const ctx: WorkerContext = { db, queue, job };
+            const ctx: WorkerContext = { queue, job };
 
             log.info(`Processing job ${job.name} (${job.id})`);
 
@@ -70,6 +71,22 @@ export const processJob = async (
   if (!handler) {
     log.error(`Unknown job handler: ${job.name}`, LogScope.worker);
     throw new Error(`Unknown job handler: ${job.name}`);
+  }
+
+  // A cron tick never runs its handler: it enqueues the real run (see enqueueCronRun), so it takes no
+  // slot and has no actor of its own.
+  const data = job.data as JobData | undefined;
+  if (data?.type === JobType.cron) {
+    const placed = await enqueueCronRun({
+      handlerName: job.name,
+      cronJobId: data.id,
+      payload: data.payload,
+      lane: data.lane,
+      attempts: job.opts?.attempts,
+      backoff: job.opts?.backoff as JobOptions['backoff'],
+    });
+    log.info(`Cron tick ${job.name} (${job.id}) enqueued run ${placed.jobId}`, LogScope.worker);
+    return;
   }
 
   const releaseSlot = await claimSlotOrRequeue(job, queue, slowSlots);

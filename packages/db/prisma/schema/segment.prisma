@@ -43,8 +43,8 @@ model Segment {
   conditions       Json
   conditionsPrompt String?
 
-  members           SegmentMember[]
-  auditLogs         AuditLog[]
+  members              SegmentMember[]
+  auditLogs            AuditLog[]
   sourceRuleReferences RuleReference[] @relation("RuleReferenceSource")
   targetRuleReferences RuleReference[] @relation("RuleReferenceTarget")
 
@@ -65,4 +65,3 @@ enum SegmentType {
   static
   dynamic
 }
-

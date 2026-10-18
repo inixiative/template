@@ -19,7 +19,7 @@ import { cleanupStaleConnections, updateLastPing } from '#/ws/lifecycle';
 import { canSubscribe, resolveIdentity, sanitizeWSHeaders } from '#/ws/probe';
 import { addConnection, byId, removeConnection } from '#/ws/registry';
 import { subscribeToChannel, unsubscribeFromChannel } from '#/ws/subscriptions';
-import type { WSData, WSMessage, WSSocket } from '#/ws/types';
+import type { StreamFrame, WSData, WSMessage, WSSocket } from '#/ws/types';
 
 type WSServer = Server<WSData>;
 
@@ -42,6 +42,7 @@ export const acceptWebSocket = (req: Request, server: WSServer): Response | unde
     channels: new Set(),
     streams: new Set(),
     heldAppends: new Map(),
+    latestStreamFrames: new Map(),
     connectedAt: now,
     lastPing: now,
     queue: createSerializedQueue(),
@@ -61,6 +62,17 @@ const parseFrame = (raw: string | Buffer): WSMessage | null => {
   } catch {
     return null;
   }
+};
+
+const isStreamFrame = (msg: WSMessage): msg is StreamFrame =>
+  msg.action === 'open' || msg.action === 'close';
+
+// An open a later open or close of the same stream superseded while queued skips its snapshot read;
+// it is still answered, since the client counts one answer per open it sent.
+const takeLatestStreamFrame = (ws: WSSocket, msg: StreamFrame): boolean => {
+  if (ws.data.latestStreamFrames.get(msg.stream) !== msg) return false;
+  ws.data.latestStreamFrames.delete(msg.stream);
+  return true;
 };
 
 const dispatch = async (ws: WSSocket, msg: WSMessage): Promise<void> => {
@@ -106,10 +118,15 @@ const dispatch = async (ws: WSSocket, msg: WSMessage): Promise<void> => {
       return;
     }
     case 'open': {
+      if (!takeLatestStreamFrame(ws, msg)) {
+        sendTo(ws, { type: 'opened', stream: msg.stream });
+        return;
+      }
       await openDataStream(ws, msg.stream);
       return;
     }
     case 'close': {
+      takeLatestStreamFrame(ws, msg);
       closeDataStream(ws, msg.stream);
       return;
     }
@@ -142,6 +159,7 @@ export const websocketHandler = {
       sendTo(ws, frameError(msg));
       return;
     }
+    if (isStreamFrame(msg)) ws.data.latestStreamFrames.set(msg.stream, msg);
     return ws.data.queue
       .run(() => dispatch(ws, msg))
       .catch((err) => {

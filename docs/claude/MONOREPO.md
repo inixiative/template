@@ -192,7 +192,7 @@ See `docs/claude/COMMUNICATIONS.md` for details.
 ```typescript
 // In apps/api - use #/ for internal imports
 import { getActor } from '#/lib/context/getActor';
-import { authMiddleware } from '#/middleware/auth/authMiddleware';
+import { jwtAuthMiddleware } from '#/middleware/auth/jwtAuthMiddleware';
 ```
 
 ### Package Imports (`@template/`)

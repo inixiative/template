@@ -185,6 +185,14 @@ Before writing new code (especially non-trivial tasks):
 3. Confirm pattern choice with user when uncertain/high-impact.
 4. Then implement.
 
+Every plan, ticket and PR names, for each concern it touches (auth, permissions, db access, requests, locks, jobs, events, errors), the existing primitive it uses with its path, or says why none fits.
+
+"Why none fits" shows the bridge: what would make the existing primitive fit (extend it, add a parameter, compose two), what was tried, and why that bridge is wrong if it is. "It doesn't match exactly" is not a reason. Adversarially review the bridge analysis before building.
+
+Every adversarial review checks the diff for parallel machinery first.
+
+Why: parallel machinery multiplies the cost of every later fix.
+
 Tests use the factories in `packages/db/src/test/factories` (`docs/claude/TESTING.md#factories`).
 
 ## 5. Monorepo Map
@@ -255,7 +263,7 @@ This repo is mapped by **atlas** (`.atlas/` config + `@atlas` annotations + `MAP
 ## 12. Tickets and AI Workspace
 
 - Tickets: `tickets/README.md`
-- Put deep analysis/reports in `/tmp/AI_WORKSPACE/` to keep chat concise.
+- Put deep analysis/reports in the repo's `tmp/AI_WORKSPACE/` (gitignored except its README; see `docs/claude/SCRIPTS.md`) to keep chat concise.
 
 ## 13. Change Checklist
 
@@ -264,4 +272,5 @@ This repo is mapped by **atlas** (`.atlas/` config + `@atlas` annotations + `MAP
 3. Keep imports aligned with alias rules.
 4. Remove stale/duplicate logic/exports.
 5. Run targeted validation.
-6. Summarize exactly what changed and why.
+6. Before pushing, run the cleanup scan (`.claude/skills/cleanup-scan/SKILL.md`): duplicates and parallel machinery, in-flight branches and PRs, doctrine drift, template parity, leftovers. The `cleanupScanGate` hook refuses `git push` until the commit being pushed has been scanned.
+7. Summarize exactly what changed and why.

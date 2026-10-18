@@ -1,0 +1,55 @@
+{
+  "id": "test-harness",
+  "title": "Test harness, request helpers and VCR",
+  "routing": "Is this about writing or running a test: bun test (never Jest or Vitest), bun run test / test:fe / test:init, tests in each module's tests/ folder, createTestApp with mock users and the get / post / patch / del / json request helpers, createBearerToken, createTestWorker, createTestSocket / expectStreamAudience, createTestStore and the MSW server for UI tests, happy-dom, setEnvOverride / withEnv, flushRedis and cleanupTestJobs, receivedWebhooks / clearReceivedWebhooks, DB-backed tests run serially, CI rule fixtures (run-ci-rules.sh, check-generated-files.sh), or VCR: recording a real provider call once and replaying the cassette (vcr.queue, vcr.capture, emitFromCassette) instead of stubbing or mocking the API?",
+  "concepts": ["test-harness", "vcr"],
+  "tokens": 10965,
+  "tokenMethod": "chars/4",
+  "files": {
+    "recognise": {
+      "path": "recognise.md",
+      "tokens": 2038,
+      "experimental": true,
+      "note": "recognise/pick split under test (model round); not the standard"
+    },
+    "knowledge": {
+      "path": "knowledge.md",
+      "tokens": 10965
+    }
+  },
+  "runsAgreed": 0,
+  "sources": {
+    "docs": [
+      "AI/ENTRYPOINT.md",
+      "FEATURES.md",
+      "docs/claude/FRONTEND/API_CLIENT.md",
+      "docs/claude/SCRIPTS.md",
+      "docs/claude/TESTING.md"
+    ],
+    "docUnits": [
+      "doc:docs/claude/FRONTEND/API_CLIENT.md#testing",
+      "doc:docs/claude/SCRIPTS.md#testing",
+      "doc:docs/claude/TESTING.md#running-tests",
+      "doc:docs/claude/TESTING.md#test-structure",
+      "doc:docs/claude/TESTING.md#test-app",
+      "doc:docs/claude/TESTING.md#request-helpers",
+      "doc:docs/claude/TESTING.md#frontend-testing-happy-dom",
+      "doc:AI/ENTRYPOINT.md#10-testing-and-validation",
+      "doc:FEATURES.md#developer-experience",
+      "doc:docs/claude/TESTING.md#vcr-external-services"
+    ],
+    "catalogClusters": [
+      "build-deploy-ci",
+      "code-style-lint-checks",
+      "dev-setup-scripts",
+      "request-response-schemas",
+      "route-templates-controllers",
+      "testing-helpers",
+      "testing-rules"
+    ],
+    "codeEntries": 36,
+    "docMembers": 21
+  },
+  "bypassLines": 33,
+  "glossaryTerms": 19
+}

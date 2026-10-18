@@ -135,8 +135,8 @@ bun run build           # Build to dist/
 # Schema operations (proxied to @template/db)
 bun run db:generate          # Generate Prisma client
 bun run db:push              # Push schema (dev only)
-bun run db:migrate           # Create migration
-bun run db:deploy            # Run migrations (production)
+bun run db:migrate           # Create migration (after launch)
+bun run db:deploy            # Apply migrations (after launch; pre-launch prod uses db push, see DATABASE.md)
 bun run db:studio            # Open Prisma Studio
 bun run db:seed              # Seed database
 bun run db:seed --prime      # Include prime dev data
@@ -258,6 +258,36 @@ Each `pass`/`fail` folder can contain one or more case subfolders (run alphabeti
 **no-vitest.sh:**
 - Fails on Vitest dependencies in `package.json`
 - Fails on Vitest imports in source and tests
+
+**doc-freshness.sh:**
+- Fails when `docs/claude/**`, `AI/ENTRYPOINT.md`, `FEATURES.md` or `apps/*/CLAUDE.md` names a repo path that doesn't exist, a `path:line` / `path#La-Lb` past the end of the file, a `<doc>.md#<heading>` with no such heading, or a backticked camelCase/PascalCase name that appears nowhere in the code (comments don't count)
+- Skips fenced code and sections headed "Under construction" or "Migrations in progress"
+- External or illustrative names: `scripts/ci/doc-freshness/allow.txt` (`<doc>\t<value>` scopes one to a doc). References that were stale before the rule: `scripts/ci/doc-freshness/baseline.txt`, reported but not failed; an entry that stops occurring fails until its line is deleted
+- Warns, never fails, when the branch changes code whose `@atlas` `@partOf` concept lists docs in `.atlas/concepts.ts` and touches none of them
+
+**Fence rules** (`uuidv7-ids`, `one-middleware-chain`, `no-raw-locks`, `no-db-params`, `bearer-only-auth`) scan the whole tree through `scripts/ci/rules/lib/fence.ts`. Each keeps its data in `scripts/ci/<rule>/`:
+- `exempt.txt`: `<key>\t<reason>`, a named, deliberate exception. The reason is required, and an entry that no longer matches fails.
+- `baseline.txt`: the violations that predate the rule, written by `bun scripts/ci/rules/lib/<detector>.ts --write-baseline`. Listed violations are reported, not failed, so the rule fences new code at once while the old is burned down. Keys name a violation by content (model, mount path, function and parameter, SQL text), not by line, so a new violation in a listed file fails; an identical repeat is `<key>#2`. An entry that stops occurring fails until its line is deleted, and in a git checkout a line the merge base's baseline lacks fails, so the baseline only shrinks. A rule that takes no exemptions fails on an `exempt.txt`. Template has no baselines; downstream repos start with one.
+
+**uuidv7-ids.sh:**
+- Fails on a Prisma model whose primary key is not exactly `id String @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)` (attribute order free), including a composite `@@id`
+- Why: ids are time-ordered, and `paginate()`'s `{ id: desc }` tiebreaker and cursors depend on it
+
+**one-middleware-chain.sh:**
+- Fails unless `apps/api/src/routes/api.ts` runs `corsMiddleware → prepareRequest → jwtAuthMiddleware → tokenAuthMiddleware → spoofMiddleware → auditActorMiddleware → apiRateLimit` in order, and every router is mounted after it
+- A mount (`.route`, `.get`, `.all`, `.doc31`, …, chained or across lines, or a `.use` on a path with an inline handler) before the chain completes, on `routes` other than `/api`, on `app` other than `/`, or on `app`/`routes`/`apiRouter` from any other file fails unless its full path is in `scripts/ci/one-middleware-chain/exempt.txt` with a reason (template: `/health`, `/bullBoard`, `/test`, `/openapi/docs`, `/api/telemetry/browser`, `/api/internal`, `/api/auth/*`, `/api/unsubscribe`)
+
+**no-raw-locks.sh:**
+- Fails on `FOR UPDATE` / `FOR NO KEY UPDATE` in non-test source outside `packages/db/src/client.ts` (`db.findForUpdate`), and on `FOR SHARE` / `FOR KEY SHARE` / `LOCK IN SHARE MODE` anywhere: there is no shared mode ([CONCURRENCY.md § Row Locks](./CONCURRENCY.md#row-locks-dbfindforupdate))
+- Reads string and template-literal text only (comments never count); lower-case keywords count only in a string that also says `select`
+
+**no-db-params.sh:**
+- Fails on a function or method parameter (signatures in types included) named or destructuring `db`/`txn`/`tx`/`prisma` (or `_db`, …), or whose type mentions `Db`, `PrismaClient`, `TransactionClient` or `typeof db`, outside tests and `packages/db`
+- Use the scoped client, `import { db } from '@template/db'`, which resolves to the open `db.txn()` through AsyncLocalStorage. The only code that takes a client is the client itself and json-rules' Prisma planner, which lives outside the app
+
+**bearer-only-auth.sh:**
+- Fails, in non-test source under `apps/` and `packages/`, on `cookieCache`, `credentials` set to `'include'`, `withCredentials`, `document.cookie`, any session lookup (a `getSession(...)` or `findSession(...)` call, or a read of the `session` table: `<x>.session.findUnique`, `findUniqueOrThrow`, `findFirst`, `findFirstOrThrow`, `findMany` or `count`), and importing BetterAuth's `bearer` plugin. Takes no exemptions
+- Why: API auth is bearer-only and session-free ([AUTH.md](./AUTH.md#overview)). A person presents a JWT; a session exists only inside BetterAuth's `/api/auth/*` handler for the sign-in handshake, and `jwtHandoff` swaps it for a JWT. A cookie path was a second way in, a session lookup is a second way to resolve a person, and the `bearer` plugin turns a session token into a credential
 
 **ui-serialized-factories.sh:**
 - For UI tests importing `@template/db/test`, requires `__serialize()` usage

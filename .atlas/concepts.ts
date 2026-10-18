@@ -26,6 +26,7 @@ export const CONCEPTS: ConceptRegistry = {
   'primitive:authz': { package: ['permissions'], docs: ['PERMISSIONS.md'] },
   'primitive:batch': { module: ['batch'], docs: ['BATCH.md'] },
   'primitive:flows': { module: ['flow'], docs: ['FLOWS.md'] },
+  'primitive:testFactories': { docs: ['TESTING.md'] }, // the test-factory engine + one factory per model
   'primitive:ui': {
     package: ['ui'],
     docs: [

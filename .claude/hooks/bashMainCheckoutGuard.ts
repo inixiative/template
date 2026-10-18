@@ -46,6 +46,7 @@ export type Landing = {
   directory?: string;
   absolute: boolean;
   lifecycle: boolean;
+  subcommand?: string;
 };
 
 const unquote = (token: string) => token.replace(/^(['"])(.*)\1$/s, '$2');
@@ -95,7 +96,7 @@ const gitLanding = (words: string[], cursor: Cursor): Omit<Landing, 'command'> |
   }
   const subcommand = words[i];
   if (subcommand === 'worktree' && GIT_WORKTREE_LIFECYCLE.has(words[i + 1] ?? '')) return { ...here, lifecycle: true };
-  return GIT_MUTATING.has(subcommand ?? '') ? { ...here, lifecycle: false } : undefined;
+  return GIT_MUTATING.has(subcommand ?? '') ? { ...here, lifecycle: false, subcommand } : undefined;
 };
 
 const isPrismaMigrateDev = (words: string[]) => words.join(' ').match(/(^|\s)prisma migrate dev(\s|$)/) !== null;

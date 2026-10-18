@@ -125,6 +125,15 @@ describe('segment reconcile', () => {
     expect(await memberIds(segment.id)).toEqual([acmeRef.id]);
   });
 
+  it('a rule that matches nobody admits nobody, not every customer of the owner', async () => {
+    const segment = await saveSegment(
+      { ownerModel: ProviderModel.Space, type: SegmentType.dynamic, conditions: { any: [] } },
+      { space },
+    );
+    expect(await evaluateSegment(segment)).toEqual([]);
+    expect(await memberIds(segment.id)).toEqual([]);
+  });
+
   it('a tag rule sees platform tags and the owner’s own, never another owner’s, even by name', async () => {
     const elsewhere = (await createSpace({}, { organization })).entity;
     const theirs = (

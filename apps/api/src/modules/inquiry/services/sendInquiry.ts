@@ -38,7 +38,7 @@ export const sendInquiry = async (c: Context<AppEnv>, inquiry: Inquiry) => {
   });
 
   const handler = inquiryHandlers[inquiry.type];
-  const autoApproved = await handler.autoApprove(db, sent);
+  const autoApproved = await handler.autoApprove(sent);
 
   if (autoApproved) {
     await resolveInquiry(c, sent, InquiryStatus.approved, {});

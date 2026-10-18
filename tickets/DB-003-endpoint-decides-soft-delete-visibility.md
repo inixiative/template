@@ -1,10 +1,10 @@
 # DB-003: The endpoint decides soft-delete visibility, not the actor
 
-**Status**: 👀 Review
+**Status**: ✅ Done
 **Assignee**: Aron
 **Priority**: High
 **Created**: 2026-10-10
-**Updated**: 2026-10-13
+**Updated**: 2026-10-15
 **Related**: ZLT-5486 (Zealot mirror)
 
 ---
@@ -82,7 +82,7 @@ the extension's implementation and stay as that — they lose every other caller
   run inside the bypass unchanged.
 - **Batch actions run under `db.withDeleted`** so a find-then-create collides with a tombstone
   instead of duplicating it. They don't necessarily revive it. A read inside one that must stay
-  live uses `db.withSoftDeleteScope` (backported here) rather than a hand-written `deletedAt: null`.
+  live uses `db.withoutDeleted` (backported here) rather than a hand-written `deletedAt: null`.
 - **Imports never revive.** A sync that meets a removed or banned record skips it. Bringing one
   back is a manual, superadmin act, and the audit log keeps the history.
 - **`SOFT_DELETE_MODELS`** (backported) is the set of models with `deletedAt`, exported for other
@@ -90,6 +90,13 @@ the extension's implementation and stay as that — they lose every other caller
 - The template's extension scopes every write, including one whose `data` sets `deletedAt`, so a
   tombstoning `updateManyAndReturn` never re-stamps old tombstones. Zealot's extension skips those writes and
   hand-guards the few that need it. The template is the shape to converge on, not the reverse.
+
+## Since (2026-10-15)
+
+- `db.withSoftDeleteScope` is renamed `db.withoutDeleted`, the inverse of `db.withDeleted`: one
+  flag set either way, not a second system (Zealot ZLT-5745).
+- `whereWalker`'s folds were part of the engine this ticket moved into `packages/db`; they now
+  compose through json-rules' `andWhere` / `orWhere` (DB-006).
 
 ## Follow-ups
 

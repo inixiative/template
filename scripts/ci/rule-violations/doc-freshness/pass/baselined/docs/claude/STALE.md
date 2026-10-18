@@ -1,0 +1,3 @@
+# Stale
+
+Calls `ghostName`.

@@ -1,0 +1,65 @@
+{
+  "id": "lib-atlas",
+  "title": "Atlas code map (library + template usage)",
+  "routing": "Is this about Atlas, the code map: the @atlas top-of-file block in any template file (@kind / @partOf / @uses / @constructs, @atlas pin, @uses none / @uses?), keeping a file's block true when adding or moving it, the template's .atlas/ folder (config.ts stamp rules with defineConfig and partOfFor, kinds.ts KINDS, concepts.ts CONCEPTS with feature: / primitive: / infrastructure: / integration: / superadmin), navigating by concept with bunx atlas graph --json / bunx atlas query / MAP.md instead of grep, the atlas CLI (stamp, check, coverage, generate, report), or rolling atlas check / coverage gates into CI?",
+  "concepts": ["lib-atlas", "atlas"],
+  "tokens": 18919,
+  "tokenMethod": "chars/4",
+  "files": {
+    "recognise": {
+      "path": "recognise.md",
+      "tokens": 3130,
+      "experimental": true,
+      "note": "recognise/pick split under test (model round); not the standard"
+    },
+    "knowledge": {
+      "path": "knowledge.md",
+      "tokens": 18919
+    }
+  },
+  "runsAgreed": 0,
+  "sources": {
+    "docs": [
+      "@inixiative/atlas/README.md",
+      "@inixiative/atlas/examples/atlas-config/README.md",
+      "@inixiative/atlas/examples/ci/README.md",
+      "AI/ENTRYPOINT.md",
+      "docs/claude/ATLAS.md"
+    ],
+    "docUnits": [
+      "doc:@inixiative/atlas/README.md#preface",
+      "doc:@inixiative/atlas/README.md#why",
+      "doc:@inixiative/atlas/README.md#install",
+      "doc:@inixiative/atlas/README.md#configure",
+      "doc:@inixiative/atlas/README.md#cli",
+      "doc:@inixiative/atlas/README.md#for-ai-agents",
+      "doc:@inixiative/atlas/README.md#visualize",
+      "doc:@inixiative/atlas/README.md#the-annotation-model",
+      "doc:@inixiative/atlas/README.md#the-patcher-atlas-stamp",
+      "doc:@inixiative/atlas/README.md#ci",
+      "doc:@inixiative/atlas/README.md#enforcement-existence-not-correctness",
+      "doc:@inixiative/atlas/README.md#license",
+      "doc:@inixiative/atlas/examples/atlas-config/README.md#preface",
+      "doc:@inixiative/atlas/examples/ci/README.md#preface",
+      "doc:@inixiative/atlas/examples/ci/README.md#rollout-dev-003-phase-4-warn-only-enforcing",
+      "doc:@inixiative/atlas/examples/ci/README.md#coverage-gate",
+      "doc:@inixiative/atlas/examples/ci/README.md#keep-map-md-honest",
+      "doc:@inixiative/atlas/examples/ci/README.md#package-json-scripts",
+      "doc:@inixiative/atlas/examples/ci/README.md#why-not-a-standalone-inixiative-atlas-ci-package",
+      "doc:docs/claude/ATLAS.md#what-atlas-is",
+      "doc:docs/claude/ATLAS.md#the-concept-vocabulary",
+      "doc:docs/claude/ATLAS.md#the-atlas-annotation-block",
+      "doc:docs/claude/ATLAS.md#navigating-by-concept",
+      "doc:docs/claude/ATLAS.md#authoring-annotations",
+      "doc:docs/claude/ATLAS.md#the-atlas-config",
+      "doc:docs/claude/ATLAS.md#enforcement",
+      "doc:docs/claude/ATLAS.md#cross-references",
+      "doc:AI/ENTRYPOINT.md#11-5-atlas-the-code-map"
+    ],
+    "catalogClusters": ["build-deploy-ci", "code-map-atlas"],
+    "codeEntries": 26,
+    "docMembers": 55
+  },
+  "bypassLines": 15,
+  "glossaryTerms": 30
+}

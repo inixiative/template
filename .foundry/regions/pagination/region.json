@@ -1,0 +1,41 @@
+{
+  "id": "pagination",
+  "title": "Offset and cursor pagination",
+  "routing": "Is this about paging a list \u2014 page/pageSize with totals or cursor/limit with nextCursor and hasMore \u2014 i.e. paginate() / cursorPaginate(), paginateRequestSchema / cursorPaginateRequestSchema, the keyset cursor helpers (encodeCursor, decodeCursor, buildKeysetWhere), the pagination metadata passed to respond.ok, the stable id tiebreaker, fetchAllPages, or the frontend list hooks and renderer (usePaginatedData, useInfiniteData, useInfiniteDataQuery, useInfiniteScrollTrigger, Pagination, useScrollState, useSectionHash)?",
+  "concepts": ["pagination"],
+  "tokens": 8797,
+  "tokenMethod": "chars/4",
+  "files": {
+    "recognise": {
+      "path": "recognise.md",
+      "tokens": 1309,
+      "experimental": true,
+      "note": "recognise/pick split under test (model round); not the standard"
+    },
+    "knowledge": {
+      "path": "knowledge.md",
+      "tokens": 8797
+    }
+  },
+  "runsAgreed": 0,
+  "sources": {
+    "docs": ["docs/claude/API_ROUTES.md", "docs/claude/FRONTEND/API_CLIENT.md"],
+    "docUnits": [
+      "doc:docs/claude/API_ROUTES.md#response-format/pagination",
+      "doc:docs/claude/API_ROUTES.md#response-format/paginate-utility",
+      "doc:docs/claude/API_ROUTES.md#response-format/controller-paginate-integration",
+      "doc:docs/claude/FRONTEND/API_CLIENT.md#data-hooks"
+    ],
+    "catalogClusters": [
+      "frontend-navigation-context",
+      "frontend-state-api-client",
+      "naming-vocabulary",
+      "pagination",
+      "ui-components"
+    ],
+    "codeEntries": 21,
+    "docMembers": 6
+  },
+  "bypassLines": 27,
+  "glossaryTerms": 26
+}

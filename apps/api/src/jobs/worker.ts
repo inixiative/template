@@ -5,6 +5,7 @@
  * @uses infrastructure:redis, infrastructure:prisma
  */
 import '#/config/env';
+import '#/lib/rollingCaches';
 import { createRedisConnection, db } from '@template/db';
 import { LogScope, log } from '@template/shared/logger';
 import { metrics } from '@template/shared/telemetry';

@@ -11,7 +11,7 @@ export type LockRedis = Pick<Redis, 'set' | 'get'> & RedisEval;
 export type LockLostReason = 'token_mismatch' | 'refresh_errors';
 export type LockReleaseResult = 'released' | 'notHeld' | 'unconfirmed';
 
-type LockTarget = { service: string; identifier: string } | { key: string };
+export type LockTarget = { service: string; identifier: string } | { key: string };
 
 export type LockOptions = LockTarget & {
   redis?: LockRedis;

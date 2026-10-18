@@ -32,24 +32,32 @@ export const transactionAll: StrategyExecutor = async (
   try {
     await db.txn(
       async () => {
-        registerBatch(batchId, db, baseContext);
+        registerBatch(batchId, baseContext);
 
         try {
           for (let roundIndex = 0; roundIndex < rounds.length; roundIndex++) {
             const round = rounds[roundIndex];
 
-            const roundPromises = round.map(async (request) => {
-              const interpolatedRequest = interpolateRequest(request, {
-                results,
-                currentRound: roundIndex,
-              });
-              return await executeRequest(
-                app,
-                interpolatedRequest,
-                batchId,
-                sharedHeaders,
-                baseRequest,
-              );
+            const roundPromises = round.map(async (request): Promise<RequestResult> => {
+              try {
+                const interpolatedRequest = interpolateRequest(request, {
+                  results,
+                  currentRound: roundIndex,
+                });
+                return await executeRequest(
+                  app,
+                  interpolatedRequest,
+                  batchId,
+                  sharedHeaders,
+                  baseRequest,
+                );
+              } catch (error) {
+                return {
+                  status: 500,
+                  body: null,
+                  error: error instanceof Error ? error.message : 'Unknown error',
+                };
+              }
             });
 
             const roundResults = await Promise.all(roundPromises);

@@ -1,0 +1,2 @@
+/health	liveness probe
+/api/auth/*	better-auth authenticates itself

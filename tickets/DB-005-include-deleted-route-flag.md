@@ -30,7 +30,7 @@ gates, both required:
   Authentication runs at app level, before the route chain, so it never runs unscoped.
 - The unlock covers the whole request, not only the lookup. A soft-delete cascade stamps the
   parent's `deletedAt` onto its children, so a lookup-only unlock loads the target without them.
-- `withDeleted` / `withSoftDeleteScope` nest and run in parallel safely (AsyncLocalStorage per
+- `withDeleted` / `withoutDeleted` nest and run in parallel safely (AsyncLocalStorage per
   callback; an inner call returning restores the outer value), so a superadmin endpoint that also
   declares the flag gets no double effect.
 
