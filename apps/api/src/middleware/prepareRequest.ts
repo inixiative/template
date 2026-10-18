@@ -27,8 +27,8 @@ export const prepareRequest = async (c: Context<AppEnv>, next: Next) => {
 
   const requestId = batchContext?.baseContext.get('requestId') ?? crypto.randomUUID();
 
-  c.set('db', batchContext?.txn ?? db);
-  c.set('txn', batchContext?.txn);
+  c.set('db', db);
+  c.set('txn', batchContext ? db : undefined);
   c.set('requestId', requestId);
   c.set('permix', createPermissions());
 

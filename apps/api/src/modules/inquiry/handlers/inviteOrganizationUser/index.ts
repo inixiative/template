@@ -1,4 +1,4 @@
-import type { Db, OrganizationId, UserId } from '@template/db';
+import { db, type OrganizationId, type UserId } from '@template/db';
 import { InquiryResourceModel } from '@template/db/generated/client/enums';
 import { makeError } from '#/lib/errors';
 import { inviteOrganizationUserAppEvents } from '#/modules/inquiry/handlers/inviteOrganizationUser/appEvents';
@@ -18,7 +18,7 @@ export const inviteOrganizationUserHandler: InquiryHandler<InviteOrganizationUse
   unique: 'targeted',
   defaultExpirationDays: 30,
 
-  validate: async (db: Db, inquiry: Partial<Inquiry>, _content: InviteOrganizationUserContent) => {
+  validate: async (inquiry: Partial<Inquiry>, _content: InviteOrganizationUserContent) => {
     const organizationId = inquiry.sourceOrganizationId! as OrganizationId;
     const userId = inquiry.targetUserId! as UserId;
 
@@ -32,11 +32,7 @@ export const inviteOrganizationUserHandler: InquiryHandler<InviteOrganizationUse
 
   autoApprove: async () => false,
 
-  handleApprove: async (
-    db: Db,
-    inquiry: Inquiry,
-    resolvedContent: InviteOrganizationUserContent,
-  ) => {
+  handleApprove: async (inquiry: Inquiry, resolvedContent: InviteOrganizationUserContent) => {
     await db.organizationUser.create({
       data: {
         organizationId: inquiry.sourceOrganizationId as OrganizationId,

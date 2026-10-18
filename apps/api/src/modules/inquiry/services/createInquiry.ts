@@ -51,7 +51,7 @@ export const createInquiry = async (
   if (!check(permix, rebacSchema, 'inquiry', partial, 'send'))
     throw makeError({ status: 403, message: 'Access denied' });
 
-  await validateInquiryPreCreate(db, handler, body.type, source, target, content);
+  await validateInquiryPreCreate(handler, body.type, source, target, content);
 
   return db.txn(async () => {
     const draft = await db.inquiry.create({

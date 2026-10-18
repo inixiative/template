@@ -1,0 +1,7 @@
+model Tag {
+  id String @db.VarChar(36) @default(dbgenerated("uuidv7()")) @id // reordered
+  // id Int @id  (a comment, not a field)
+  name String
+
+  @@index([name])
+}

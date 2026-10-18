@@ -4,7 +4,7 @@
  * @partOf feature:inquiry
  * @uses primitive:appEvents
  */
-import type { Db, Prisma, PrismaBaseArgs } from '@template/db';
+import type { Prisma, PrismaBaseArgs } from '@template/db';
 import type { InquiryResourceModel } from '@template/db/generated/client/enums';
 import type { z } from 'zod';
 import type { AppEventHandlerDefinition } from '#/appEvents/types';
@@ -42,12 +42,11 @@ export type InquiryHandler<
   resolutionInputSchema: z.ZodType<TResolutionInput>;
   resolutionSchema: z.ZodType<TResolution>;
   handleApprove(
-    db: Db,
     inquiry: Inquiry,
     resolvedContent: TContent,
   ): Promise<Partial<TResolution> | undefined | void>;
-  validate?(db: Db, inquiry: Partial<Inquiry>, content: TContent): Promise<void>;
-  autoApprove(db: Db, inquiry: Inquiry): Promise<boolean>;
+  validate?(inquiry: Partial<Inquiry>, content: TContent): Promise<void>;
+  autoApprove(inquiry: Inquiry): Promise<boolean>;
   unique?: 'targeted' | 'untargeted';
   defaultExpirationDays?: number;
   appEvents?: InquiryAppEvents;

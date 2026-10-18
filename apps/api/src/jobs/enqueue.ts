@@ -63,7 +63,6 @@ export const enqueueJob = async <K extends keyof JobPayloads>(
     }
     const data = buildJobData(handler, { type, id, payload, dedupeKey }, lane);
     const ctx: WorkerContext = {
-      db,
       queue,
       job: { id: jobId, name: handlerName, data, attemptsMade: 0 } as Job,
     };

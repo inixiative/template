@@ -427,7 +427,7 @@ Located in `apps/api/src/lib/context/refreshUserContext.ts`. Reloads user's memb
 ```typescript
 import { refreshUserContext } from '#/lib/context/refreshUserContext';
 
-await refreshUserContext(c, db);
+await refreshUserContext(c);
 ```
 
 **What it does:**
@@ -443,7 +443,7 @@ await refreshUserContext(c, db);
 
 **Implementation:**
 ```typescript
-export const refreshUserContext = async (c: Context<AppEnv>, db: Db): Promise<void> => {
+export const refreshUserContext = async (c: Context<AppEnv>): Promise<void> => {
   const user = c.get('user');
   if (!user) return;
 
@@ -452,7 +452,7 @@ export const refreshUserContext = async (c: Context<AppEnv>, db: Db): Promise<vo
   await permix.setup([], { replace: true });
 
   // Reload user with all relations (uses cache, optimized queries)
-  const userWithRelations = await findUserWithRelations(db, user.id);
+  const userWithRelations = await findUserWithRelations(user.id);
   if (!userWithRelations) return;
 
   // Set up fresh context and permissions
@@ -599,7 +599,6 @@ Jobs have their own context, separate from HTTP request context.
 ```typescript
 // apps/api/src/jobs/types.ts
 type WorkerContext = {
-  db: Db;
   queue: JobsQueue;
   job: Job;
   signal?: AbortSignal;  // For superseding jobs
@@ -613,7 +612,7 @@ type WorkerContext = {
 ```typescript
 // worker.ts
 await db.scope(`job:${job.name}:${job.id}`, async () => {
-  const ctx: WorkerContext = { db, queue, job };
+  const ctx: WorkerContext = { queue, job };
   await handler(ctx, job.data.payload);
 });
 ```
@@ -624,7 +623,7 @@ await db.scope(`job:${job.name}:${job.id}`, async () => {
 import { makeJob } from '#/jobs/makeJob';
 
 export const myJob = makeJob<MyPayload>(async (ctx, payload) => {
-  // ctx.db - database client (scoped to this job)
+  // db (imported from '@template/db') resolves to this job's scope; it is not on ctx
   // ctx.queue - for enqueueing follow-up jobs
   // ctx.job - BullMQ job instance (id, attemptsMade, etc.)
   // ctx.signal - abort signal (if using makeSupersedingJob)

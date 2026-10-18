@@ -1,0 +1,3 @@
+model Counter {
+  id Int @id @default(autoincrement())
+}

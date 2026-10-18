@@ -265,6 +265,26 @@ Each `pass`/`fail` folder can contain one or more case subfolders (run alphabeti
 - External or illustrative names: `scripts/ci/doc-freshness/allow.txt` (`<doc>\t<value>` scopes one to a doc). References that were stale before the rule: `scripts/ci/doc-freshness/baseline.txt`, reported but not failed; an entry that stops occurring fails until its line is deleted
 - Warns, never fails, when the branch changes code whose `@atlas` `@partOf` concept lists docs in `.atlas/concepts.ts` and touches none of them
 
+**Fence rules** (`uuidv7-ids`, `one-middleware-chain`, `no-raw-locks`, `no-db-params`) scan the whole tree through `scripts/ci/rules/lib/fence.ts`. Each keeps its data in `scripts/ci/<rule>/`:
+- `exempt.txt`: `<key>\t<reason>`, a named, deliberate exception. The reason is required, and an entry that no longer matches fails.
+- `baseline.txt`: the violations that predate the rule, written by `bun scripts/ci/rules/lib/<detector>.ts --write-baseline`. Listed violations are reported, not failed, so the rule fences new code at once while the old is burned down. A new violation fails even in a listed file (a second one in the same function is `<key>#2`), and an entry that stops occurring fails until its line is deleted, so the baseline only shrinks. Template has no baselines; downstream repos start with one.
+
+**uuidv7-ids.sh:**
+- Fails on a Prisma model whose primary key is not exactly `id String @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)` (attribute order free), including a composite `@@id`
+- Why: ids are time-ordered, and `paginate()`'s `{ id: desc }` tiebreaker and cursors depend on it
+
+**one-middleware-chain.sh:**
+- Fails unless `apps/api/src/routes/api.ts` runs `corsMiddleware → prepareRequest → tokenAuthMiddleware → authMiddleware → spoofMiddleware → auditActorMiddleware → apiRateLimit` in order, and every router is mounted after it
+- A mount before the chain completes, on `routes` other than `/api`, on `app` other than `/`, or on `app`/`routes`/`apiRouter` from any other file fails unless its full path is in `scripts/ci/one-middleware-chain/exempt.txt` with a reason (template: `/health`, `/bullBoard`, `/test`, `/api/telemetry/browser`, `/api/internal`, `/api/auth/*`, `/api/unsubscribe`)
+
+**no-raw-locks.sh:**
+- Fails on `FOR UPDATE` / `FOR NO KEY UPDATE` in non-test source outside `packages/db/src/client.ts` (`db.findForUpdate`), and on `FOR SHARE` / `FOR KEY SHARE` / `LOCK IN SHARE MODE` anywhere: there is no shared mode ([CONCURRENCY.md § Row Locks](./CONCURRENCY.md#row-locks-dbfindforupdate))
+- Reads string and template-literal text only (comments never count); lower-case keywords count only in a string that also says `select`
+
+**no-db-params.sh:**
+- Fails on a function or method parameter (signatures in types included) named `db`/`txn`/`tx`/`prisma` or typed `Db`, `PrismaClient`, `TransactionClient` or `typeof db`, outside tests and `packages/db`
+- Use the scoped client, `import { db } from '@template/db'`, which resolves to the open `db.txn()` through AsyncLocalStorage. The only code that takes a client is the client itself and json-rules' Prisma planner, which lives outside the app
+
 **ui-serialized-factories.sh:**
 - For UI tests importing `@template/db/test`, requires `__serialize()` usage
 - Fails on `__serialize() as any` casts

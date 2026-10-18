@@ -4,15 +4,15 @@
  * @partOf feature:users
  * @uses infrastructure:prisma, primitive:caching
  */
-import type { Db, UserWithRelations } from '@template/db';
-import { cache, cacheKey, upsertCache } from '@template/db';
+import type { UserWithRelations } from '@template/db';
+import { cache, cacheKey, db, upsertCache } from '@template/db';
 import type { User } from '@template/db/generated/client/client';
 import { Role } from '@template/db/generated/client/enums';
 
 const USER_CACHE_TTL = 60 * 10 + 6; // 10.1 minutes
 const RECORD_CACHE_TTL = 60 * 10; // 10 minutes
 
-export const findUserByEmail = async (db: Db, email: string): Promise<User | null> => {
+export const findUserByEmail = async (email: string): Promise<User | null> => {
   return cache<User | null>(
     cacheKey('User', { email }),
     () => db.user.findFirst({ where: { email } }),
@@ -20,10 +20,7 @@ export const findUserByEmail = async (db: Db, email: string): Promise<User | nul
   );
 };
 
-export const findUserWithRelations = async (
-  db: Db,
-  userId: string,
-): Promise<UserWithRelations | null> => {
+export const findUserWithRelations = async (userId: string): Promise<UserWithRelations | null> => {
   return cache<UserWithRelations | null>(
     cacheKey('User', userId, ['relations']),
     async () => {

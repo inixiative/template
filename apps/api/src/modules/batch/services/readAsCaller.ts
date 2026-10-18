@@ -12,7 +12,7 @@ import type { AppEnv } from '#/types/appEnv';
 
 export const readAsCaller = async (c: Context<AppEnv>, path: string): Promise<RequestResult> => {
   const batchId = crypto.randomUUID();
-  registerBatch(batchId, c.get('db'), c);
+  registerBatch(batchId, c);
   try {
     return await executeRequest(c.get('app'), { method: 'GET', path }, batchId, {}, c.req.raw);
   } finally {

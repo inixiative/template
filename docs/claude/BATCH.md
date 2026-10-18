@@ -463,7 +463,7 @@ type StrategyExecutor = (
 ```
 
 **Common structure:**
-1. Initialize batch registry with `registerBatch(batchId, db, baseContext)`
+1. Initialize batch registry with `registerBatch(batchId, baseContext)`
 2. Execute rounds (transaction or non-transaction)
 3. Track success/failure counts
 4. Calculate status based on strategy semantics
@@ -476,7 +476,7 @@ Internal requests inherit authentication from parent request:
 ```typescript
 // Parent request authenticated → all batch requests use same auth
 const batchId = crypto.randomUUID();
-registerBatch(batchId, db, parentContext);
+registerBatch(batchId, parentContext);
 
 // Internal requests detect batch via X-Batch-Id header
 const internalRequest = new Request(url, {

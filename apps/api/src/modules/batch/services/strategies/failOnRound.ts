@@ -24,7 +24,7 @@ export const failOnRound: StrategyExecutor = async (
   _timeout,
 ) => {
   const batchId = crypto.randomUUID();
-  registerBatch(batchId, db, baseContext);
+  registerBatch(batchId, baseContext);
 
   const results: RequestResult[][] = [];
   const totalRequests = rounds.reduce((sum, round) => sum + round.length, 0);

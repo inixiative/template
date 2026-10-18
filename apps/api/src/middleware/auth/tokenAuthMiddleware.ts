@@ -104,7 +104,7 @@ export const tokenAuthMiddleware = async (c: Context<AppEnv>, next: Next) => {
 
     if (token.ownerModel === 'User' && token.user) {
       // User token → load user with all org memberships
-      const userWithOrgs = await findUserWithRelations(db, token.user.id);
+      const userWithOrgs = await findUserWithRelations(token.user.id);
       if (userWithOrgs) await setUserContext(c, userWithOrgs);
     } else if (token.ownerModel === 'OrganizationUser' && token.organizationUser) {
       // OrgUser token → use token data directly (scoped to single org)
