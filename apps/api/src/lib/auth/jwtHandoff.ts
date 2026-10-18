@@ -8,6 +8,7 @@ import type { BetterAuthPlugin } from 'better-auth';
 import { createAuthMiddleware, isAPIError } from 'better-auth/api';
 import { deleteSessionCookie } from 'better-auth/cookies';
 import { signJWT } from 'better-auth/plugins';
+import { omit } from 'lodash-es';
 import { PERSON_JWT_TTL_SECONDS, personJwtOptions } from '#/lib/auth/personJwt';
 
 export type PersonJwtHandoff = { token: string; expiresAt: string };
@@ -39,10 +40,10 @@ export const jwtHandoff = (): BetterAuthPlugin => ({
           });
           await ctx.context.internalAdapter.deleteSession(newSession.session.token);
 
-          const handoff: PersonJwtHandoff & { user: typeof newSession.user } = {
+          const handoff: PersonJwtHandoff & { user: Omit<typeof newSession.user, 'jwtVersion'> } = {
             token,
             expiresAt: new Date((iat + PERSON_JWT_TTL_SECONDS) * 1000).toISOString(),
-            user: newSession.user,
+            user: omit(newSession.user, 'jwtVersion'),
           };
           return ctx.json(handoff);
         }),

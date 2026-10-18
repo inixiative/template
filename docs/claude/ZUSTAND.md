@@ -190,7 +190,7 @@ re-identifies the websocket.
 
 Signs out of this browser: clears the JWT, auth state, permissions and websocket identity,
 calls `tenant.setPublic()` and navigates to `/login`. It makes no server call; the API keeps no
-session to end. Signing out everywhere revokes every JWT: `POST /api/v1/me/signOut`.
+session to end. Ending every JWT on every device is `POST /api/v1/me/rotateJwts`.
 
 ### Usage Patterns
 

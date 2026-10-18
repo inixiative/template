@@ -16,7 +16,7 @@ import { registerClearCacheHook } from '#/hooks/cache/hook';
 import { auth } from '#/lib/auth';
 import type { PersonJwtHandoff } from '#/lib/auth/jwtHandoff';
 import { selfIssuer } from '#/lib/auth/personJwt';
-import { signOutEverywhere } from '#/modules/user/services/signOutEverywhere';
+import { rotateUserJwts } from '#/modules/user/services/rotateUserJwts';
 import { resolveIdentity } from '#/ws/probe';
 import { createBearerToken } from '#tests/utils/createBearerToken';
 import { createUserJwt } from '#tests/utils/createUserJwt';
@@ -85,6 +85,13 @@ describe('a person authenticates with a JWT, never a session', () => {
     expect(user.lastLoginAt).not.toBeNull();
   });
 
+  it('neither sign-in nor /me returns jwtVersion', async () => {
+    expect(handoff.user).not.toHaveProperty('jwtVersion');
+    const me = (await (await readMe(bearer(handoff.token))).json()) as { data: object };
+    expect(me.data).toHaveProperty('id');
+    expect(me.data).not.toHaveProperty('jwtVersion');
+  });
+
   it('the JWT authenticates API requests as the person', async () => {
     const response = await readMe(bearer(handoff.token));
     expect(response.status).toBe(200);
@@ -137,8 +144,8 @@ describe('a person authenticates with a JWT, never a session', () => {
     await context.internalAdapter.deleteSession(session.token);
   });
 
-  it('a sign-in right after signing out everywhere gets a working JWT', async () => {
-    await signOutEverywhere(person.userId);
+  it('a sign-in right after revoking every JWT gets a working JWT', async () => {
+    await rotateUserJwts(person.userId);
     const again = await signInOverHttp(person.email, person.password);
     const { token } = (await again.json()) as PersonJwtHandoff;
     expect((await readMe(bearer(token))).status).toBe(200);
@@ -288,11 +295,11 @@ describe('revocation: a new jwtVersion refuses every JWT signed with the old one
   const freshUser = async () => (await createUser()).entity;
   const reload = (target: User) => db.user.findUniqueOrThrow({ where: { id: target.id } });
 
-  it('signOutEverywhere refuses the old JWT on the next request and a new JWT works', async () => {
+  it('rotateUserJwts refuses the old JWT on the next request and a new JWT works', async () => {
     const target = await freshUser();
     const older = await createUserJwt(target);
     expect((await readMe(older)).status).toBe(200);
-    await signOutEverywhere(target.id);
+    await rotateUserJwts(target.id);
     expect((await readMe(older)).status).toBe(401);
     expect((await readMe(await createUserJwt(await reload(target)))).status).toBe(200);
   });
@@ -323,26 +330,26 @@ describe('revocation: a new jwtVersion refuses every JWT signed with the old one
     expect((await rename()).status).toBe(200);
   });
 
-  it('POST /me/signOut signs the caller out everywhere', async () => {
+  it('POST /me/rotateJwts ends every JWT of the caller', async () => {
     const jwt = await createUserJwt(await freshUser());
-    const response = await app.request('/api/v1/me/signOut', { method: 'POST', headers: jwt });
+    const response = await app.request('/api/v1/me/rotateJwts', { method: 'POST', headers: jwt });
     expect(response.status).toBe(204);
     expect((await readMe(jwt)).status).toBe(401);
   });
 
-  it('an API token cannot sign its user out', async () => {
+  it("an API token cannot rotate its user's JWTs", async () => {
     const { authorization } = await createBearerToken(user);
-    const response = await app.request('/api/v1/me/signOut', {
+    const response = await app.request('/api/v1/me/rotateJwts', {
       method: 'POST',
       headers: { authorization },
     });
     expect(response.status).toBe(403);
   });
 
-  it('a superadmin signs a user out everywhere', async () => {
+  it("a superadmin rotates a user's JWTs", async () => {
     const target = await freshUser();
     const jwt = await createUserJwt(target);
-    const response = await app.request(`/api/admin/user/${target.id}/signOut`, {
+    const response = await app.request(`/api/admin/user/${target.id}/rotateJwts`, {
       method: 'POST',
       headers: await createUserJwt(superadmin),
     });
@@ -366,7 +373,7 @@ describe('revocation: a new jwtVersion refuses every JWT signed with the old one
 
     const identity = await resolveIdentity(admin);
     expect(identity).toMatchObject({ status: 'resolved', id: superadmin.id });
-    await signOutEverywhere(superadmin.id);
+    await rotateUserJwts(superadmin.id);
     expect(await resolveIdentity(admin)).toEqual({ status: 'anonymous' });
   });
 });

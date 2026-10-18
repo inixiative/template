@@ -9,13 +9,13 @@ import { validateNotToken } from '#/middleware/validations/validateNotToken';
 import { Modules } from '#/modules/modules';
 import { Tags } from '#/modules/tags';
 
-export const meSignOutRoute = actionRoute({
+export const meRotateJwtsRoute = actionRoute({
   model: Modules.me,
-  action: 'signOut',
+  action: 'rotateJwts',
   skipId: true,
   middleware: [validateNotToken],
   description:
-    'Signs you out everywhere: every JWT issued to you until now stops working. Signing out of one ' +
-    'browser needs no call; that browser drops its JWT.',
+    'Rotates your JWT version: every JWT this API has signed for you, on every device, stops working. ' +
+    'Sign in again afterwards. Signing out of one browser needs no call; that browser drops its JWT.',
   tags: [Tags.me, Tags.user],
 });

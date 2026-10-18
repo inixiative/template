@@ -21,7 +21,7 @@ const PERSON_ONLY = new Set([
   'spaceUserCreateToken',
   'organizationDelete',
   'tokenDelete',
-  'meSignOut',
+  'meRotateJwts',
 ]);
 
 const expectedSchemes = (path: string, operationId: string | undefined): string[] => {

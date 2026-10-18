@@ -7,9 +7,10 @@
 import { actionRoute } from '#/lib/routeTemplates';
 import { Modules } from '#/modules/modules';
 
-export const adminUserSignOutRoute = actionRoute({
+export const adminUserRotateJwtsRoute = actionRoute({
   model: Modules.user,
-  action: 'signOut',
+  action: 'rotateJwts',
   admin: true,
-  description: 'Signs the user out everywhere: every JWT issued to them until now stops working',
+  description:
+    "Rotates the user's JWT version: every JWT this API has signed for them, on every device, stops working",
 });

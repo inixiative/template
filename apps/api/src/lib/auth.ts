@@ -10,7 +10,7 @@ import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { emitAppEvent } from '#/appEvents/emit';
 import { authPlugins } from '#/lib/auth/authPlugins';
 import { getAllowedOrigins } from '#/middleware/corsMiddleware';
-import { signOutEverywhere } from '#/modules/user/services/signOutEverywhere';
+import { rotateUserJwts } from '#/modules/user/services/rotateUserJwts';
 
 export const auth = betterAuth({
   database: prismaAdapter(db, {
@@ -23,7 +23,7 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: true,
-    onPasswordReset: async ({ user }) => signOutEverywhere(user.id),
+    onPasswordReset: async ({ user }) => rotateUserJwts(user.id),
   },
 
   emailVerification: {

@@ -178,7 +178,7 @@ Initialization errors are swallowed; the redirect handles the unauthenticated ca
 | `signUp(method)` | Calls `lib/auth/signUp`; hydrates on `authenticated`, clears local auth on `verification-pending`; returns the result |
 | `refreshMe()` | Re-hydrate `/me` |
 | `setSpoof(email \| null)` | Sets `spoofUserEmail`, re-hydrates `/me` (sent as `x-spoof-user-email`), spoofs/unspoofs the websocket |
-| `logout()` | Signs out of this browser: clears the JWT, user, permissions, websocket identity and tenant (→ public) and navigates to `/login`. No server call: the API keeps no session to end. Signing out everywhere is `POST /api/v1/me/signOut` ([AUTH.md → Revocation and sign-out](../AUTH.md#revocation-and-sign-out)) |
+| `logout()` | Signs out of this browser: clears the JWT, user, permissions, websocket identity and tenant (→ public) and navigates to `/login`. No server call: the API keeps no session to end. Ending every JWT on every device is `POST /api/v1/me/rotateJwts` ([AUTH.md → Revocation and sign-out](../AUTH.md#revocation-and-sign-out)) |
 | `setStrategy(strategy)` | `{ type: 'login' }` or `{ type: 'embed', parentOrigin? }`; sets `isEmbedded` |
 
 State: `user`, `organizations`, `spaces`, `spaceUsers` (dicts by id / spaceId), `spoofUserEmail`, `spoofingUserEmail` (from the `x-spoofing-user-email` response header), `isAuthenticated`, `isInitialized`, `strategy`, `client`.
