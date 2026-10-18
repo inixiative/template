@@ -27,7 +27,7 @@ registerAuditLogHook();
 const issuer = 'https://issuer.test';
 const audience = 'https://api.test';
 
-describe('issuer JWT principal', () => {
+describe('JWT from a configured issuer, with and without a grant', () => {
   let user: User;
   let otherUser: User;
   let ownedOrganization: Organization;
@@ -187,14 +187,14 @@ describe('issuer JWT principal', () => {
       expect((await call(await sign({}), 'GET', '/me')).status).toBe(503);
     });
 
-    it('is ignored when no issuer is configured', async () => {
+    it('is refused when its issuer is not configured', async () => {
       setEnvOverride('AUTH_ISSUER', undefined);
       expect((await call(await sign({}), 'GET', '/me')).status).toBe(401);
     });
   });
 
   describe('a JWT with no grant is the full user', () => {
-    it('acts as the session would, token minting included', async () => {
+    it('acts as the full user, token minting included', async () => {
       const jwt = await sign({});
       expect((await rename(jwt, ownedOrganization)).status).toBe(200);
       expect((await rename(jwt, viewedOrganization)).status).toBe(403);
