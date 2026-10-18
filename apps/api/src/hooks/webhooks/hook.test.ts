@@ -268,68 +268,117 @@ describe('webhook hook — tenancy', () => {
     expect(enqueued()).toEqual([]);
   });
 
-  it('delivers a party change to the parties of its CustomerRefs only, once each', async () => {
+  const relate = (
+    customer: { model: 'User' | 'Organization' | 'Space'; id: string },
+    provider: { model: 'User' | 'Organization' | 'Space'; id: string },
+  ) =>
+    createCustomerRef({
+      customerModel: customer.model,
+      providerModel: provider.model,
+      [`customer${customer.model}Id`]: customer.id,
+      [`provider${provider.model}Id`]: provider.id,
+    });
+
+  it('a provider hears its customer change; the customer does not hear itself', async () => {
     const { customerUserId, sub } = await subscribedCustomer();
     const { entity: organization } = await createOrganization();
     const { entity: space } = await createSpace({}, { organization });
     const spaceSub = await subscribeSpace(space.id);
-    await createCustomerRef({
-      customerModel: 'User',
-      providerModel: 'Space',
-      customerUserId,
-      providerSpaceId: space.id,
-    });
+    await relate({ model: 'User', id: customerUserId }, { model: 'Space', id: space.id });
     enqueueSpy.mockClear();
 
-    await db.user.update({ where: { id: customerUserId }, data: { name: 'Party Changed' } });
+    await db.user.update({ where: { id: customerUserId }, data: { name: 'Customer Changed' } });
 
     expect(deliveredTo(spaceSub.id)).toEqual([
       expect.objectContaining({ action: 'update', resourceId: customerUserId }),
     ]);
-    expect(deliveredTo(sub.id)).toEqual([
-      expect.objectContaining({ action: 'update', resourceId: customerUserId }),
-    ]);
+    expect(deliveredTo(sub.id)).toEqual([]);
     expect(deliveredTo(outsiderSub.id)).toEqual([]);
   });
 
-  it('delivers a Space change once per subscription when the Space sits on both axes', async () => {
+  it('a customer hears its organization vendor change; the vendor does not hear itself', async () => {
+    const { customerUserId, sub } = await subscribedCustomer();
+    const { entity: vendor } = await createOrganization();
+    const vendorSub = await subscribeOrganization(vendor.id);
+    await relate({ model: 'User', id: customerUserId }, { model: 'Organization', id: vendor.id });
+    enqueueSpy.mockClear();
+
+    await db.organization.update({ where: { id: vendor.id }, data: { name: 'Vendor Changed' } });
+
+    expect(deliveredTo(sub.id)).toEqual([
+      expect.objectContaining({ action: 'update', resourceId: vendor.id }),
+    ]);
+    expect(deliveredTo(vendorSub.id)).toEqual([]);
+    expect(deliveredTo(outsiderSub.id)).toEqual([]);
+  });
+
+  it('a customer hears its user vendor change', async () => {
+    const { entity: customer } = await createOrganization();
+    const customerSub = await subscribeOrganization(customer.id);
+    const { entity: vendor } = await createUser();
+    const vendorSub = await subscribeUser(vendor.id);
+    await relate({ model: 'Organization', id: customer.id }, { model: 'User', id: vendor.id });
+    enqueueSpy.mockClear();
+
+    await db.user.update({ where: { id: vendor.id }, data: { name: 'Vendor Changed' } });
+
+    expect(deliveredTo(customerSub.id)).toEqual([
+      expect.objectContaining({ action: 'update', resourceId: vendor.id }),
+    ]);
+    expect(deliveredTo(vendorSub.id)).toEqual([]);
+  });
+
+  it('a Space on both axes reaches its customer and its vendor once each, never itself', async () => {
     const { customerUserId, sub } = await subscribedCustomer();
     const { entity: organization } = await createOrganization();
     const { entity: space } = await createSpace({}, { organization });
     const spaceSub = await subscribeSpace(space.id);
-    await createCustomerRef({
-      customerModel: 'User',
-      providerModel: 'Space',
-      customerUserId,
-      providerSpaceId: space.id,
-    });
-    await createCustomerRef({
-      customerModel: 'Space',
-      providerModel: 'Organization',
-      customerSpaceId: space.id,
-      providerOrganizationId,
-    });
+    await relate({ model: 'User', id: customerUserId }, { model: 'Space', id: space.id });
+    await relate(
+      { model: 'Space', id: space.id },
+      { model: 'Organization', id: providerOrganizationId },
+    );
     enqueueSpy.mockClear();
 
     await db.space.update({ where: { id: space.id }, data: { name: 'Space Changed' } });
 
-    for (const subscription of [spaceSub, sub, providerSub]) {
-      expect(deliveredTo(subscription.id)).toEqual([
+    for (const counterparty of [sub, providerSub]) {
+      expect(deliveredTo(counterparty.id)).toEqual([
         expect.objectContaining({ action: 'update', resourceId: space.id }),
       ]);
     }
+    expect(deliveredTo(spaceSub.id)).toEqual([]);
     expect(deliveredTo(outsiderSub.id)).toEqual([]);
   });
 
-  it('sends a party email change and never sends platformRole', async () => {
-    const { customerUserId, sub } = await subscribedCustomer();
+  it('does not reach past one CustomerRef: a vendor of my vendor hears nothing about me', async () => {
+    const { customerUserId } = await subscribedCustomer();
+    const { entity: vendor } = await createOrganization();
+    const vendorSub = await subscribeOrganization(vendor.id);
+    const { entity: vendorOfVendor } = await createOrganization();
+    const vendorOfVendorSub = await subscribeOrganization(vendorOfVendor.id);
+    await relate({ model: 'User', id: customerUserId }, { model: 'Organization', id: vendor.id });
+    await relate(
+      { model: 'Organization', id: vendor.id },
+      { model: 'Organization', id: vendorOfVendor.id },
+    );
+    enqueueSpy.mockClear();
+
+    await db.user.update({ where: { id: customerUserId }, data: { name: 'Customer Changed' } });
+
+    expect(deliveredTo(vendorSub.id)).toHaveLength(1);
+    expect(deliveredTo(vendorOfVendorSub.id)).toEqual([]);
+  });
+
+  it('sends a customer email change to the vendor and never sends platformRole', async () => {
+    const { customerUserId } = await subscribedCustomer();
     await createRef(customerUserId);
     enqueueSpy.mockClear();
 
     const email = `changed-${randomUUID()}@example.com`;
     await db.user.update({ where: { id: customerUserId }, data: { email } });
 
-    const [payload] = deliveredTo(sub.id);
+    const [payload] = deliveredTo(providerSub.id);
     expect(payload?.data).toEqual(expect.objectContaining({ email }));
     expect(payload?.data).not.toHaveProperty('platformRole');
 

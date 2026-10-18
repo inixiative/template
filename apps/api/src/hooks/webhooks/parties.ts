@@ -20,13 +20,27 @@ import { groupBy, mergeWith } from 'lodash-es';
 export type WebhookRow = Record<string, unknown> & { id: string };
 export type Party = { kind: PolymorphicKind; id: string };
 
-export const recordParties = (model: WebhookModel, row: Record<string, unknown>): Party[] =>
-  (getPolymorphismConfig(model)?.axes ?? []).flatMap(({ field }) => {
-    const target = polymorphicTarget(row, model, field);
-    return target && isOwnerKind(target.kind) ? [{ kind: target.kind, id: target.id }] : [];
-  });
+const axisParty = (model: WebhookModel, row: Record<string, unknown>, axis: string): Party[] => {
+  const target = polymorphicTarget(row, model, axis);
+  return target && isOwnerKind(target.kind) ? [{ kind: target.kind, id: target.id }] : [];
+};
 
-export const relatedParties = async (
+const partyAxes = (model: WebhookModel) =>
+  (getPolymorphismConfig(model)?.axes ?? []).map(({ field }) => field);
+
+export const recordParties = (model: WebhookModel, row: Record<string, unknown>): Party[] =>
+  partyAxes(model).flatMap((axis) => axisParty(model, row, axis));
+
+const counterparties = (
+  model: WebhookModel,
+  row: Record<string, unknown>,
+  ownAxis: string,
+): Party[] =>
+  partyAxes(model)
+    .filter((axis) => axis !== ownAxis)
+    .flatMap((axis) => axisParty(model, row, axis));
+
+export const relatedCounterparties = async (
   ref: FalsePolymorphismRef,
   rowIds: string[],
 ): Promise<Record<string, Party[]>> => {
@@ -39,7 +53,9 @@ export const relatedParties = async (
   return Object.fromEntries(
     Object.entries(relationsByRowId).map(([rowId, rowRelations]) => [
       rowId,
-      rowRelations.flatMap((relation) => recordParties(ref.model as WebhookModel, relation)),
+      rowRelations.flatMap((relation) =>
+        counterparties(ref.model as WebhookModel, relation, ref.axis),
+      ),
     ]),
   );
 };
@@ -59,7 +75,9 @@ export const recordAudiences = async (
   const rowIds = rows.map((row) => row.id);
   return Promise.all(
     Object.entries(groupBy(refs, 'model')).map(async ([webhookModel, modelRefs]) => {
-      const partyMaps = await Promise.all(modelRefs.map((ref) => relatedParties(ref, rowIds)));
+      const partyMaps = await Promise.all(
+        modelRefs.map((ref) => relatedCounterparties(ref, rowIds)),
+      );
       const merged = mergeWith({}, ...partyMaps, (current: Party[] | undefined, next: Party[]) =>
         current ? current.concat(next) : next,
       );

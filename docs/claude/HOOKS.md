@@ -218,13 +218,13 @@ export const webhookEnabledModels: WebhookModel[] = [
 ### How It Works
 
 1. A mutation runs the `webhookDelivery` hook (after the write; jobs are scheduled with `db.onCommit`). It acts when the model is webhook-enabled, or when `webhookRelatedModels` lists it as a party of one
-2. The hook determines each changed row's parties from the model's false-polymorphism axes. A CustomerRef's parties are its customer and its provider. A related row (a User, Organization or Space) takes the parties of every live CustomerRef it sits on
+2. The hook determines each changed row's parties from the model's false-polymorphism axes. A CustomerRef's parties are its customer and its provider. A related row (a User, Organization or Space) takes the counterparty of every live CustomerRef it sits on, on either axis
 3. It loads only the active subscriptions owned by those parties, and enqueues one `sendWebhook` job per (subscription, changed row), skipping the write's origin integration and no-op updates
 4. The job signs the payload with RSA-SHA256 and delivers it
 
 ### Tenancy (AUTH-006 stopgap)
 
-A subscription receives a change only when its owner (User, Organization or Space) is a party to it: to the CustomerRef itself, or to a CustomerRef the changed User, Organization or Space sits on. A row that sits on several CustomerRefs, or on both axes, reaches each subscription once. An organization does not yet hear about the CustomerRefs of its spaces (no inheritance), and `sendWebhook` does not re-check the relationship at delivery time. Both are part of `tickets/AUTH-006-webhook-tenant-isolation.md`.
+A subscription receives a CustomerRef change when its owner (User, Organization or Space) is one of its two parties. It receives a party's own change when its owner is that party's counterparty on a live CustomerRef: a provider hears its customers, a customer hears its providers. The changed party does not hear its own change, and nothing travels past one CustomerRef. A row that sits on several CustomerRefs, or on both axes, reaches each subscription once. An organization does not yet hear about the CustomerRefs of its spaces (no inheritance), and `sendWebhook` does not re-check the relationship at delivery time. Both are part of `tickets/AUTH-006-webhook-tenant-isolation.md`.
 
 ### Webhook Payload
 
@@ -290,12 +290,15 @@ Use cases:
 
 ### Related Models
 
-A party's own row changes reach the subscriptions of the parties of its CustomerRefs:
+A party's own row changes reach its counterparties on its CustomerRefs. Each party model is registered on both axes:
 
 ```typescript
 // packages/db/src/registries/webhook/relatedModels.ts
 export const webhookRelatedModels: Record<string, FalsePolymorphismRef[]> = {
-  User: [{ model: 'CustomerRef', axis: 'customerModel', value: 'User' }],
+  User: [
+    { model: 'CustomerRef', axis: 'customerModel', value: 'User' },
+    { model: 'CustomerRef', axis: 'providerModel', value: 'User' },
+  ],
 };
 ```
 
