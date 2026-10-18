@@ -17,7 +17,7 @@ export const inquiryCancelController = makeController(inquiryCancelRoute, async 
   const { expectedUpdatedAt } = c.req.valid('query');
 
   await db.txn(async () => {
-    validateInquiryIsCancelable(await lockInquiryAtVersion(db, inquiry.id, expectedUpdatedAt));
+    validateInquiryIsCancelable(await lockInquiryAtVersion(inquiry.id, expectedUpdatedAt));
     await db.inquiry.update({
       where: { id: inquiry.id },
       data: { status: InquiryStatus.canceled, expiresAt: null, deletedAt: new Date() },

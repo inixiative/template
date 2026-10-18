@@ -26,14 +26,14 @@ describe('buildPermix: the same actor gives the same permix from a request or ca
   let spaceId: string;
 
   const direct = async (userId: string) =>
-    buildPermix({ user: await findUserWithRelations(db, userId), token: null, grant: null });
+    buildPermix({ user: await findUserWithRelations(userId), token: null, grant: null });
 
   const requestPath = (userId: string) =>
     createTestApp({
       mount: [
         (app) =>
           app.get('/permix/:id', async (c) => {
-            const found = await findUserWithRelations(c.get('db'), c.req.param('id'));
+            const found = await findUserWithRelations(c.req.param('id'));
             if (found) await setUserContext(c, found);
             const permix = c.get('permix');
             return c.json({ grants: permix.getJSON(), superadmin: permix.isSuperadmin() });
@@ -111,7 +111,7 @@ describe('buildPermix: the same actor gives the same permix from a request or ca
     })
       .fetch(new Request('http://test/permix', { headers: { authorization: `Bearer ${key}` } }))
       .then((response) => response.json())) as unknown;
-    const stored = await findUserWithRelations(db, user.id);
+    const stored = await findUserWithRelations(user.id);
     if (!stored) throw new Error('expected the user');
     const permix = await buildPermix({
       user: stored,

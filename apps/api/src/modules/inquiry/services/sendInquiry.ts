@@ -25,7 +25,7 @@ export const sendInquiry = async (
   const db = c.get('db');
 
   return db.txn(async () => {
-    const fresh = await lockInquiryAtVersion(db, inquiry.id, expectedUpdatedAt);
+    const fresh = await lockInquiryAtVersion(inquiry.id, expectedUpdatedAt);
 
     if (fresh.status === InquiryStatus.sent)
       return db.inquiry.findUniqueOrThrow({ where: { id: fresh.id }, include: includeInquirySent });

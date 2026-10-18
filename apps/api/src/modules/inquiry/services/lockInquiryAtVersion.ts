@@ -4,12 +4,11 @@
  * @partOf feature:inquiry
  * @uses infrastructure:prisma, primitive:errors
  */
-import type { Db } from '@template/db';
+import { db } from '@template/db';
 import { makeError } from '#/lib/errors';
 import type { Inquiry } from '#/modules/inquiry/handlers/types';
 
 export const lockInquiryAtVersion = async (
-  db: Db,
   inquiryId: string,
   expectedUpdatedAt?: Date,
 ): Promise<Inquiry> => {

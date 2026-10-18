@@ -42,7 +42,7 @@ export const jwtAuthMiddleware = async (c: Context<AppEnv>, next: Next) => {
 
   if (claims.grant !== undefined) {
     if (typeof claims.grant !== 'string') throw unauthorized();
-    const grantedEntitlements = await findLiveEntitlementGrant(c.get('db'), claims.grant, user.id);
+    const grantedEntitlements = await findLiveEntitlementGrant(claims.grant, user.id);
     if (!grantedEntitlements) throw unauthorized();
     c.set('entitlementGrant', grantedEntitlements);
   }

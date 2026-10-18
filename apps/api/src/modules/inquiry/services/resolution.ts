@@ -33,7 +33,7 @@ export const resolveInquiry = async (
 
   try {
     return await db.txn(async () => {
-      const fresh = await lockInquiryAtVersion(db, inquiry.id, expectedUpdatedAt);
+      const fresh = await lockInquiryAtVersion(inquiry.id, expectedUpdatedAt);
       validateInquiryIsResolvable(fresh);
 
       let approvalOutput: Record<string, unknown> = {};

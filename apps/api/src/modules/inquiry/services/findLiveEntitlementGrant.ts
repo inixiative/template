@@ -4,7 +4,7 @@
  * @partOf feature:inquiry, primitive:authz
  * @uses infrastructure:prisma
  */
-import type { Db } from '@template/db';
+import { db } from '@template/db';
 import {
   InquiryResourceModel,
   InquiryStatus,
@@ -14,7 +14,6 @@ import type { GrantedEntitlements } from '#/lib/context/types';
 import { entitlementGrantSchema } from '#/modules/inquiry/handlers/grantUserEntitlements';
 
 export const findLiveEntitlementGrant = async (
-  db: Db,
   inquiryId: string,
   userId: string,
 ): Promise<GrantedEntitlements | null> => {

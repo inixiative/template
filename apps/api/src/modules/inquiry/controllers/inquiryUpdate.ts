@@ -36,7 +36,7 @@ export const inquiryUpdateController = makeController(inquiryUpdateRoute, async 
     throw makeError({ status: 403, message: 'Access denied' });
 
   const updated = await db.txn(async () => {
-    validateInquiryIsEditable(await lockInquiryAtVersion(db, inquiry.id, expectedUpdatedAt));
+    validateInquiryIsEditable(await lockInquiryAtVersion(inquiry.id, expectedUpdatedAt));
     const saved = await db.inquiry.update({
       where: { id: inquiry.id },
       data: {
