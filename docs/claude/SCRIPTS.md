@@ -286,7 +286,7 @@ Each `pass`/`fail` folder can contain one or more case subfolders (run alphabeti
 - Use the scoped client, `import { db } from '@template/db'`, which resolves to the open `db.txn()` through AsyncLocalStorage. The only code that takes a client is the client itself and json-rules' Prisma planner, which lives outside the app
 
 **bearer-only-auth.sh:**
-- Fails, in non-test source under `apps/` and `packages/`, on `cookieCache`, `credentials` set to `'include'`, `withCredentials`, `document.cookie`, and a `getSession(...)` whose headers come from the request (`<x>.headers`, `c.req.header()`, `new Headers(...)` of those, or a local variable holding one) unless that variable had `.delete('cookie')` called on it before the lookup; a `getSession` with non-inline options fails too. Takes no exemptions
+- Fails, in non-test source under `apps/` and `packages/`, on `cookieCache`, `credentials` set to `'include'`, `withCredentials`, `document.cookie`, and a `getSession(...)` whose headers come from the request (`<x>.headers`, `c.req.header()`, `new Headers(...)` of those, or a local variable holding one) unless that variable had `.delete('cookie')` called on it before the lookup, or whose headers are built with a `cookie` (an object key, or `.set`/`.append('cookie', …)`); a `getSession` with non-inline options fails too. Takes no exemptions
 - Why: API auth is bearer-only ([AUTH.md § Session Storage Strategy](./AUTH.md#session-storage-strategy)); a cookie path was a second way in, and its JWE cookie cache kept a revoked session valid for up to 7 days. BetterAuth's own `/api/auth/*` cookies (OAuth state, one-time-token handoff) are library code and out of scope
 
 **ui-serialized-factories.sh:**

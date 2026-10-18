@@ -15,8 +15,9 @@
  * - `document.cookie` (auth state lives in the bearer token, never a cookie)
  * - a `getSession(...)` call whose headers come from the request (`<x>.headers`, `c.req.header()`,
  *   `new Headers(<those>)`, or a local variable holding one) unless that variable had
- *   `.delete('cookie')` called on it earlier in the file; and a `getSession` whose options are not an
- *   inline object, since the rule cannot see what it is passed
+ *   `.delete('cookie')` called on it earlier in the file; a `getSession` whose headers are built with a
+ *   `cookie` (an object key, or `.set`/`.append('cookie', …)` on the variable); and a `getSession`
+ *   whose options are not an inline object, since the rule cannot see what it is passed
  *
  * Exemptions: none.
  */
@@ -68,15 +69,18 @@ const declarationsOf = (sourceFile: ts.SourceFile): Map<string, ts.Expression> =
   return out;
 };
 
-const cookieDeletes = (sourceFile: ts.SourceFile): { name: string; position: number }[] => {
+const cookieHeaderCalls = (
+  sourceFile: ts.SourceFile,
+  methods: string[],
+): { name: string; position: number }[] => {
   const out: { name: string; position: number }[] = [];
   const visit = (node: ts.Node) => {
     if (
       ts.isCallExpression(node) &&
       ts.isPropertyAccessExpression(node.expression) &&
-      node.expression.name.text === 'delete' &&
+      methods.includes(node.expression.name.text) &&
       ts.isIdentifier(node.expression.expression) &&
-      node.arguments.length === 1 &&
+      node.arguments.length >= 1 &&
       ts.isStringLiteralLike(node.arguments[0]) &&
       node.arguments[0].text.toLowerCase() === 'cookie'
     )
@@ -119,9 +123,35 @@ const fromRequest = (
   return false;
 };
 
+const carriesCookie = (
+  expression: ts.Expression,
+  declarations: Map<string, ts.Expression>,
+  sets: { name: string }[],
+  sourceFile: ts.SourceFile,
+  seen = new Set<string>(),
+): boolean => {
+  const node = unwrap(expression);
+  if (ts.isObjectLiteralExpression(node))
+    return node.properties.some(
+      (property) => propertyName(property, sourceFile)?.toLowerCase() === 'cookie',
+    );
+  if (ts.isNewExpression(node))
+    return (node.arguments ?? []).some((argument) =>
+      carriesCookie(argument, declarations, sets, sourceFile, seen),
+    );
+  if (ts.isIdentifier(node) && !seen.has(node.text)) {
+    seen.add(node.text);
+    if (sets.some((call) => call.name === node.text)) return true;
+    const initializer = declarations.get(node.text);
+    return initializer ? carriesCookie(initializer, declarations, sets, sourceFile, seen) : false;
+  }
+  return false;
+};
+
 const sessionLookupCheck = (sourceFile: ts.SourceFile): Check => {
   const declarations = declarationsOf(sourceFile);
-  const deletes = cookieDeletes(sourceFile);
+  const deletes = cookieHeaderCalls(sourceFile, ['delete']);
+  const sets = cookieHeaderCalls(sourceFile, ['set', 'append']);
   return (node) => {
     if (!isGetSessionCall(node)) return null;
     const { inline, headers } = headersArgument(node, sourceFile);
@@ -130,6 +160,12 @@ const sessionLookupCheck = (sourceFile: ts.SourceFile): Check => {
         node,
         key: 'getSession-opaque-options',
         detail: 'getSession options must be an inline object so the rule can see its headers',
+      };
+    if (headers && carriesCookie(headers, declarations, sets, sourceFile))
+      return {
+        node,
+        key: `getSession-cookie-header: ${headers.getText(sourceFile)}`,
+        detail: 'getSession resolves a session from a cookie; send the session token as a bearer',
       };
     if (!headers || !fromRequest(headers, declarations)) return null;
     const target = unwrap(headers);
