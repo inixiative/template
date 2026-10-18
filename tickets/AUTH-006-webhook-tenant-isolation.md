@@ -1,6 +1,6 @@
 # AUTH-006: Enforce webhook tenant isolation
 
-**Status**: 🆕 Not Started (stopgap in 2026-10-15: no cross-tenant delivery; a subscription hears only CustomerRefs its owner is a party to, and party changes emit no events)
+**Status**: 🆕 Not Started (stopgap in 2026-10-18: no cross-tenant delivery; a subscription hears only CustomerRefs its owner is a party to, and changes to the Users, Organizations and Spaces on those CustomerRefs)
 **Assignee**: Unassigned
 **Priority**: High
 **Created**: 2026-09-30

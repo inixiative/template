@@ -74,6 +74,7 @@ export {
   type ScalarField,
 } from '@inixiative/prisma-map';
 export {
+  isOwnerKind,
   POLYMORPHIC_BINDS,
   type PolymorphicKind,
   polymorphicBindings,

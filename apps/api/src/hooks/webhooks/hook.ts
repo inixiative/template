@@ -5,18 +5,16 @@ import {
   filterFields,
   HookTiming,
   isNoOpUpdate,
-  polymorphicTarget,
   registerDbHook,
   WEBHOOK_NOOP_FIELDS,
-  webhookAudienceAxes,
-  webhookEnabledModels,
 } from '@template/db';
-import type { WebhookModel, WebhookSubscription } from '@template/db/generated/client/client';
-import { WebhookOwnerModel } from '@template/db/generated/client/enums';
+import type { WebhookSubscription } from '@template/db/generated/client/client';
 import { auditActorContext, auditActorStore } from '@template/db/lib/auditActorContext';
 import { ConcurrencyType } from '@template/shared/utils';
-import { keyBy, uniq } from 'lodash-es';
+import { keyBy } from 'lodash-es';
 import { isManyAction } from '#/hooks/shared/hookRows';
+import { recordAudiences, type WebhookRow } from '#/hooks/webhooks/parties';
+import { findPartySubscriptions, isPartyTo } from '#/hooks/webhooks/subscriptions';
 import { enqueueJob } from '#/jobs/enqueue';
 
 export enum WebhookAction {
@@ -56,54 +54,10 @@ const dbActionToWebhookAction = (dbAction: DbAction, hasPrevious: boolean): Webh
   return dbAction as unknown as WebhookAction;
 };
 
-type WebhookRow = Record<string, unknown> & { id: string };
-type Party = { kind: WebhookOwnerModel; id: string };
-
-const isWebhookModel = (model: string): model is WebhookModel =>
-  (webhookEnabledModels as readonly string[]).includes(model);
-
-const isOwnerModel = (kind: string): kind is WebhookOwnerModel =>
-  (Object.values(WebhookOwnerModel) as string[]).includes(kind);
-
-const recordParties = (model: WebhookModel, row: WebhookRow): Party[] =>
-  webhookAudienceAxes[model].flatMap((axis) => {
-    const target = polymorphicTarget(row, model, axis);
-    return target && isOwnerModel(target.kind) ? [{ kind: target.kind, id: target.id }] : [];
-  });
-
-const isPartyTo = (subscription: WebhookSubscription, parties: Party[]) => {
-  const owner = polymorphicTarget(subscription, 'WebhookSubscription', 'ownerModel');
-  return !!owner && parties.some((party) => party.kind === owner.kind && party.id === owner.id);
-};
-
-const partyIds = (parties: Party[], kind: WebhookOwnerModel) =>
-  uniq(parties.filter((party) => party.kind === kind).map((party) => party.id));
-
-const findPartySubscriptions = (model: WebhookModel, parties: Party[]) =>
-  db.webhookSubscription.findMany({
-    where: {
-      model,
-      isActive: true,
-      OR: [
-        {
-          ownerModel: WebhookOwnerModel.User,
-          userId: { in: partyIds(parties, WebhookOwnerModel.User) },
-        },
-        {
-          ownerModel: WebhookOwnerModel.Organization,
-          organizationId: { in: partyIds(parties, WebhookOwnerModel.Organization) },
-        },
-        {
-          ownerModel: WebhookOwnerModel.Space,
-          spaceId: { in: partyIds(parties, WebhookOwnerModel.Space) },
-        },
-      ],
-    },
-  });
-
 const processSingleRecord = (
   subscriptions: WebhookSubscription[],
-  model: WebhookModel,
+  webhookModel: string,
+  model: string,
   webhookAction: WebhookAction,
   resultData: WebhookRow,
   previousData?: Record<string, unknown>,
@@ -115,15 +69,14 @@ const processSingleRecord = (
     return [];
   }
 
-  const parties = recordParties(model, resultData);
   const origin = auditActorContext.getScope()?.integrationId ?? null;
-  const targets = subscriptions.filter(
-    (sub) => isPartyTo(sub, parties) && (!origin || sub.integrationId !== origin),
-  );
+  const targets = origin
+    ? subscriptions.filter((sub) => sub.integrationId !== origin)
+    : subscriptions;
   if (targets.length === 0) return [];
 
   const payload: WebhookPayload = {
-    model,
+    model: webhookModel,
     action: webhookAction,
     resourceId: resultData.id,
     data: filterFields(model, resultData, WEBHOOK_NOOP_FIELDS),
@@ -152,7 +105,6 @@ export const registerWebhookHook = () => {
     actions,
     async (options: HookOptions) => {
       const { model, action: dbAction } = options;
-      if (!isWebhookModel(model)) return;
 
       const records: { resultData: WebhookRow; previousData?: Record<string, unknown> }[] = [];
       if (isManyAction(dbAction)) {
@@ -169,21 +121,34 @@ export const registerWebhookHook = () => {
         });
       }
 
-      const parties = records.flatMap(({ resultData }) => recordParties(model, resultData));
-      if (parties.length === 0) return;
-
-      const subscriptions = await findPartySubscriptions(model, parties);
-      if (subscriptions.length === 0) return;
-
-      const allCallbacks = records.flatMap(({ resultData, previousData }) =>
-        processSingleRecord(
-          subscriptions,
-          model,
-          dbActionToWebhookAction(dbAction, previousData !== undefined),
-          resultData,
-          previousData,
-        ),
+      const audiences = await recordAudiences(
+        model,
+        records.map(({ resultData }) => resultData),
       );
+
+      let allCallbacks: (() => Promise<void>)[] = [];
+
+      for (const [webhookModel, partiesByRowId] of audiences) {
+        const subscriptions = await findPartySubscriptions(
+          webhookModel,
+          Object.values(partiesByRowId).flat(),
+        );
+        if (subscriptions.length === 0) continue;
+
+        for (const { resultData, previousData } of records) {
+          const parties = partiesByRowId[resultData.id] ?? [];
+          const callbacks = processSingleRecord(
+            subscriptions.filter((sub) => isPartyTo(sub, parties)),
+            webhookModel,
+            model,
+            dbActionToWebhookAction(dbAction, previousData !== undefined),
+            resultData,
+            previousData,
+          );
+          allCallbacks = allCallbacks.concat(callbacks);
+        }
+      }
+
       if (allCallbacks.length === 0) return;
 
       db.onCommit(allCallbacks, ConcurrencyType.queue);

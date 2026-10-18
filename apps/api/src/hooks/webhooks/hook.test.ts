@@ -1,14 +1,4 @@
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  type Mock,
-  spyOn,
-} from 'bun:test';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, type Mock, spyOn } from 'bun:test';
 import { randomUUID } from 'node:crypto';
 import { clearHookRegistry, db } from '@template/db';
 import { IntegrationOwnerModel, WebhookModel } from '@template/db/generated/client/enums';
@@ -30,22 +20,28 @@ import { createMockJob } from '#tests/createTestWorker';
 
 registerWebhookHook();
 
-type Enqueued = { subscriptionId: string; action: string; resourceId: string };
+type Enqueued = {
+  subscriptionId: string;
+  action: string;
+  resourceId: string;
+  data: Record<string, unknown>;
+};
 
 let enqueueSpy: Mock<typeof enqueueModule.enqueueJob>;
 
-beforeEach(() => {
+beforeAll(() => {
   enqueueSpy = spyOn(enqueueModule, 'enqueueJob').mockResolvedValue({
     jobId: 'mock',
     name: 'sendWebhook',
   });
 });
 
-afterEach(() => {
-  enqueueSpy.mockRestore();
+beforeEach(() => {
+  enqueueSpy.mockClear();
 });
 
 afterAll(async () => {
+  enqueueSpy.mockRestore();
   await cleanupTouchedTables(db);
   clearHookRegistry();
 });
@@ -263,34 +259,82 @@ describe('webhook hook — tenancy', () => {
     expect(deliveredTo(organizationSub.id)).toEqual([]);
   });
 
-  it('AUTH-006 regression: an unrelated organization hears nothing about a user it has no CustomerRef with', async () => {
+  it('AUTH-006 regression: a change to a user with no CustomerRef emits nothing', async () => {
     const { entity: user } = await createUser();
     enqueueSpy.mockClear();
 
     await db.user.update({ where: { id: user.id }, data: { name: 'Changed Name' } });
 
-    expect(deliveredTo(outsiderSub.id)).toEqual([]);
     expect(enqueued()).toEqual([]);
   });
 
-  it('a party change emits no CustomerRef events, even to the parties', async () => {
+  it('delivers a party change to the parties of its CustomerRefs only, once each', async () => {
+    const { customerUserId, sub } = await subscribedCustomer();
     const { entity: organization } = await createOrganization();
     const { entity: space } = await createSpace({}, { organization });
+    const spaceSub = await subscribeSpace(space.id);
     await createCustomerRef({
       customerModel: 'User',
       providerModel: 'Space',
-      customerUserId: customerId,
+      customerUserId,
       providerSpaceId: space.id,
     });
     enqueueSpy.mockClear();
 
-    await db.user.update({ where: { id: customerId }, data: { name: 'Party Changed' } });
-    await db.organization.update({
-      where: { id: providerOrganizationId },
-      data: { name: 'Provider Changed' },
+    await db.user.update({ where: { id: customerUserId }, data: { name: 'Party Changed' } });
+
+    expect(deliveredTo(spaceSub.id)).toEqual([
+      expect.objectContaining({ action: 'update', resourceId: customerUserId }),
+    ]);
+    expect(deliveredTo(sub.id)).toEqual([
+      expect.objectContaining({ action: 'update', resourceId: customerUserId }),
+    ]);
+    expect(deliveredTo(outsiderSub.id)).toEqual([]);
+  });
+
+  it('delivers a Space change once per subscription when the Space sits on both axes', async () => {
+    const { customerUserId, sub } = await subscribedCustomer();
+    const { entity: organization } = await createOrganization();
+    const { entity: space } = await createSpace({}, { organization });
+    const spaceSub = await subscribeSpace(space.id);
+    await createCustomerRef({
+      customerModel: 'User',
+      providerModel: 'Space',
+      customerUserId,
+      providerSpaceId: space.id,
     });
+    await createCustomerRef({
+      customerModel: 'Space',
+      providerModel: 'Organization',
+      customerSpaceId: space.id,
+      providerOrganizationId,
+    });
+    enqueueSpy.mockClear();
+
     await db.space.update({ where: { id: space.id }, data: { name: 'Space Changed' } });
 
+    for (const subscription of [spaceSub, sub, providerSub]) {
+      expect(deliveredTo(subscription.id)).toEqual([
+        expect.objectContaining({ action: 'update', resourceId: space.id }),
+      ]);
+    }
+    expect(deliveredTo(outsiderSub.id)).toEqual([]);
+  });
+
+  it('sends a party email change and never sends platformRole', async () => {
+    const { customerUserId, sub } = await subscribedCustomer();
+    await createRef(customerUserId);
+    enqueueSpy.mockClear();
+
+    const email = `changed-${randomUUID()}@example.com`;
+    await db.user.update({ where: { id: customerUserId }, data: { email } });
+
+    const [payload] = deliveredTo(sub.id);
+    expect(payload?.data).toEqual(expect.objectContaining({ email }));
+    expect(payload?.data).not.toHaveProperty('platformRole');
+
+    enqueueSpy.mockClear();
+    await db.user.update({ where: { id: customerUserId }, data: { platformRole: 'superadmin' } });
     expect(enqueued()).toEqual([]);
   });
 });
