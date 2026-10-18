@@ -4,7 +4,6 @@
  * @partOf primitive:jobs
  * @uses infrastructure:redis
  */
-import { db } from '@template/db';
 import { log } from '@template/shared/logger';
 import { captureTraceContext } from '@template/shared/telemetry';
 import { isTest } from '@template/shared/utils';
