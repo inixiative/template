@@ -20,6 +20,6 @@ export const securityForRoute = ({
   if (security) return security;
   if (internal) return securityRequirements('internalSecret');
   if (castArray(middleware ?? []).includes(validateNotToken))
-    return securityRequirements('sessionToken');
-  return securityRequirements('sessionToken', 'apiToken');
+    return securityRequirements('userJwt');
+  return securityRequirements('userJwt', 'apiToken');
 };

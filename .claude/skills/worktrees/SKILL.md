@@ -68,11 +68,11 @@ The main checkout uses slot 0 / default ports (`3000`, `3001`, `3002`, `8000`). 
 6. Creates both Postgres databases; a failed inventory query (`pg_database`) aborts rather than being read as "absent". A database already on the slot is dropped only when no registered worktree references that slot (a leftover from a worktree removed without `worktree:destroy`); if one does, the script refuses and names it.
 7. Provisions the slot's MinIO buckets.
 8. `bun install --force --ignore-scripts` in the worktree and verifies `apps/api/node_modules/@template/db` resolves *inside* the worktree.
-9. Builds the gitignored artifacts: `bun run generate:routes` (`apps/*/app/routeTree.gen.ts`), `bun run db:generate` (Prisma client, `prismaMap.gen.ts`, zod), `bun run generate:sdk` (OpenAPI spec, `packages/sdk/src/generated`, `packages/ui/src/test/mocks/handlers.gen.ts`).
-10. Pushes the Prisma schema to both DBs (`bun run db:push:dev`) and pings the local one.
+9. Pushes the Prisma schema to both DBs and regenerates the Prisma client, `prismaMap.gen.ts` and zod from it (`bun run db:push:dev`; Prisma 7's `db push` no longer generates, so `push-dev.sh` ends with `db:generate`), then pings the local DB. With `--skip-db` it runs `bun run db:generate` alone.
+10. Builds the other gitignored artifacts: `bun run generate:routes` (`apps/*/app/routeTree.gen.ts`), `bun run generate:sdk` (OpenAPI spec, `packages/sdk/src/generated`, `packages/ui/src/test/mocks/handlers.gen.ts`).
 11. Prints a summary. Any failure or interruption (Ctrl-C, SIGTERM, SIGHUP) after the git worktree exists ends with the exact `bun run worktree:destroy <name> --force` to clean up; one before it releases the slot registry entry and removes any partial directory. A create killed with `kill -9` leaves a lock with a dead pid and possibly a registry entry with no directory: the next create consults the lock first — dead pid → reclaims the lock and removes that entry with a notice; live pid → prints `slot N: being provisioned by <path> (pid P) — skipping`. Every skipped slot prints one line saying why and how to free it, and `worktree:list` shows `stale lock (pid N dead) — next create reclaims` only when the pid really is dead. Green **ready** means every step passed. Yellow **created WITH GAPS** lists exactly which env file, artifact, or push is missing and the command to rerun in the worktree; do not run services or tests until the list is empty.
 
-`--skip-db` (any position) skips step 1's Docker gate and steps 6, 7, and 10 — for docs/skills work that never runs services or tests. Artifacts are still built.
+`--skip-db` (any position) skips step 1's Docker gate, steps 6 and 7, and the push in step 9 — for docs/skills work that never runs services or tests. Artifacts are still built.
 
 ## Running services in the worktree
 
@@ -124,7 +124,7 @@ If Docker is unreachable at destroy time it says so; the next `worktree:create` 
 | `scripts/worktree/list.sh` | Output format and how the slot is read from `.env.local` |
 | `.claude/hooks/bashMainCheckoutGuard.ts` | The PreToolUse / SessionStart hook described above; `.claude/hooks/tests/` has its tests (`__TEST_REDIRECT__=1 bun test ./.claude/hooks/tests/bashMainCheckoutGuard.test.ts`) |
 | `scripts/setup/sync-env.sh` | What the env sync appends (keys the branch's examples have that the copied file lacks, whole quoted values included; never overwrites a value) |
-| `scripts/db/push-dev.sh` | What `db:push:dev` does (worktree-aware, refuses non-local DATABASE_URLs) |
+| `scripts/db/push-dev.sh` | What `db:push:dev` does (worktree-aware, refuses non-local DATABASE_URLs, regenerates the Prisma client after the push) |
 
 ## Common mistakes
 

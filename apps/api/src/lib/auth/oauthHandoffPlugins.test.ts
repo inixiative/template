@@ -1,10 +1,11 @@
 import { afterAll, afterEach, describe, expect, mock, spyOn, test } from 'bun:test';
 import { db } from '@template/db';
-import { cleanupTouchedTables, registerTestTracker } from '@template/db/test';
+import { cleanupTouchedTables } from '@template/db/test';
 import { betterAuth } from 'better-auth';
 import { memoryAdapter } from 'better-auth/adapters/memory';
-import { bearer } from 'better-auth/plugins';
-import { oauthHandoffPlugins } from '#/lib/auth/oauthHandoffPlugins';
+import { authPlugins } from '#/lib/auth/authPlugins';
+import type { PersonJwtHandoff } from '#/lib/auth/jwtHandoff';
+import { verifyIssuerJwt } from '#/lib/auth/verifyIssuerJwt';
 
 const baseURL = 'http://api.test';
 const webCallback = 'http://web.test/auth/callback';
@@ -30,8 +31,24 @@ const createAuth = () =>
         }),
       },
     },
-    plugins: [bearer(), ...oauthHandoffPlugins()],
+    user: {
+      additionalFields: {
+        jwtVersion: { type: 'number', required: false, defaultValue: 0, input: false },
+      },
+    },
+    plugins: authPlugins(),
   });
+
+const verifyOtt = (auth: ReturnType<typeof createAuth>, token: string) =>
+  auth.api.verifyOneTimeToken({ body: { token } }) as unknown as Promise<
+    PersonJwtHandoff & { user: { id: string; email: string } }
+  >;
+
+const sessionCookieOf = (response: Response) =>
+  response.headers
+    .getSetCookie()
+    .filter((cookie) => cookie.includes('session_token='))
+    .at(-1);
 
 const cookieHeader = (response: Response) =>
   response.headers
@@ -70,7 +87,7 @@ afterEach(() => {
 });
 
 describe('oauthHandoffPlugins', () => {
-  test('appends a one-time token to the callback redirect that exchanges for a bearer session', async () => {
+  test('the callback redirect carries a one-time token that exchanges for a JWT, never a session', async () => {
     const auth = createAuth();
     const callback = await completeGoogleCallback(auth);
 
@@ -80,14 +97,16 @@ describe('oauthHandoffPlugins', () => {
     expect(location.search).toBe('');
     const ott = new URLSearchParams(location.hash.slice(1)).get('ott');
     expect(ott).toBeTruthy();
+    expect(sessionCookieOf(callback)).toContain('Max-Age=0');
 
-    const verified = await auth.api.verifyOneTimeToken({ body: { token: ott! } });
-    expect(verified.user.email).toBe('oauth@example.com');
+    const handoff = await verifyOtt(auth, ott!);
+    expect(handoff.user.email).toBe('oauth@example.com');
+    expect(Object.keys(handoff).sort()).toEqual(['expiresAt', 'token', 'user']);
+    const claims = await verifyIssuerJwt(handoff.token);
+    expect(claims.sub).toBe(handoff.user.id);
 
-    const session = await auth.api.getSession({
-      headers: new Headers({ authorization: `Bearer ${verified.session.token}` }),
-    });
-    expect(session?.user.email).toBe('oauth@example.com');
+    const context = await auth.$context;
+    expect(await context.internalAdapter.listSessions(handoff.user.id)).toEqual([]);
   });
 
   test('the one-time token is single-use', async () => {
@@ -97,10 +116,8 @@ describe('oauthHandoffPlugins', () => {
       'ott',
     )!;
 
-    await auth.api.verifyOneTimeToken({ body: { token: ott } });
-    await expect(auth.api.verifyOneTimeToken({ body: { token: ott } })).rejects.toThrow(
-      'Invalid token',
-    );
+    await verifyOtt(auth, ott);
+    await expect(verifyOtt(auth, ott)).rejects.toThrow('Invalid token');
   });
 
   test('leaves failed callbacks untouched', async () => {
@@ -113,20 +130,20 @@ describe('oauthHandoffPlugins', () => {
     expect(callback.headers.get('location')).not.toContain('ott=');
   });
 
-  test('browsers cannot mint one-time tokens directly', async () => {
+  test('a JWT cannot mint one-time tokens', async () => {
     const auth = createAuth();
     const callback = await completeGoogleCallback(auth);
     const ott = new URLSearchParams(new URL(callback.headers.get('location')!).hash.slice(1)).get(
       'ott',
     )!;
-    const { session } = await auth.api.verifyOneTimeToken({ body: { token: ott } });
+    const { token } = await verifyOtt(auth, ott);
 
     const generate = await auth.handler(
       new Request(`${baseURL}/api/auth/one-time-token/generate`, {
-        headers: { authorization: `Bearer ${session.token}` },
+        headers: { authorization: `Bearer ${token}` },
       }),
     );
-    expect(generate.status).toBe(400);
+    expect(generate.status).toBe(401);
   });
 });
 
@@ -135,8 +152,7 @@ describe('auth one-time token wiring', () => {
     await cleanupTouchedTables(db);
   });
 
-  test('a new session gets a one-time token that exchanges for a working bearer token', async () => {
-    registerTestTracker();
+  test('email sign-in answers with a JWT and leaves no session behind', async () => {
     const { auth } = await import('#/lib/auth');
     const email = `ott-${Bun.randomUUIDv7()}@example.com`;
     const password = 'synthetic-ott-password';
@@ -144,13 +160,16 @@ describe('auth one-time token wiring', () => {
     await db.user.update({ where: { id: user.id }, data: { emailVerified: true } });
 
     const signIn = await auth.api.signInEmail({ body: { email, password }, asResponse: true });
+    const handoff = (await signIn.json()) as PersonJwtHandoff;
+    expect((await verifyIssuerJwt(handoff.token)).sub).toBe(user.id);
+    expect(sessionCookieOf(signIn) ?? 'Max-Age=0').toContain('Max-Age=0');
+
     const ott = signIn.headers.get('set-ott');
     expect(ott).toBeTruthy();
-
-    const verified = await auth.api.verifyOneTimeToken({ body: { token: ott! } });
-    const session = await auth.api.getSession({
-      headers: new Headers({ authorization: `Bearer ${verified.session.token}` }),
-    });
-    expect(session?.user.id).toBe(user.id);
+    await expect(auth.api.verifyOneTimeToken({ body: { token: ott! } })).rejects.toThrow(
+      'Session not found',
+    );
+    const context = await auth.$context;
+    expect(await context.internalAdapter.listSessions(user.id)).toEqual([]);
   });
 });

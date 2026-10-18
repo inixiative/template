@@ -28,6 +28,7 @@
 - [Resource Context](#resource-context)
   - [resourceContextMiddleware](#resourcecontextmiddleware)
   - [Enforcement Rules](#enforcement-rules)
+  - [Soft-Delete Invisibility](#soft-delete-invisibility)
   - [Lookup Parameter](#lookup-parameter)
   - [Custom Inclusions](#custom-inclusions)
 - [Database Scope](#database-scope)
@@ -59,22 +60,22 @@ prepareRequest
   - Initializes all context vars to null
   - Wraps request in db.scope(requestId)
     ↓
-authMiddleware (session)
-  - Checks BetterAuth session cookie
-  - Loads user + organizationUsers
-  - Calls setUserContext → sets up permix
+jwtAuthMiddleware (person JWT)
+  - Verifies a JWT-shaped `Authorization: Bearer` (never `?token=`); cookies are ignored
+  - Refuses a revoked JWT (401); keys or Redis unreachable → 503
+  - Loads user + organizationUsers, calls setUserContext → sets up permix
+    ↓
+tokenAuthMiddleware (API token)
+  - Skips if user already set (a JWT resolved the person)
+  - Parses Authorization header or ?token=
+  - Validates token hash, expiry, isActive
+  - Sets token, optionally user
+  - Calls setUserContext or sets up the token's org/space permissions
     ↓
 spoofMiddleware (superadmin only)
   - Checks spoof-user-email header
   - Replaces user context with spoofed user
   - Sets spoofedBy to original admin
-    ↓
-tokenAuthMiddleware (Bearer)
-  - Skips if user already set (session takes precedence)
-  - Parses Authorization header
-  - Validates token hash, expiry, isActive
-  - Sets token, optionally user
-  - Calls setupOrgPermissions/setupUserPermissions
     ↓
 resourceContextMiddleware (per-route)
   - Extracts :id param and model from path
@@ -104,7 +105,6 @@ type AppVars = {
   organizations: Organization[] | null;
   spaceUsers: SpaceUser[] | null;
   spaces: Space[] | null;
-  session: Session | null;
   token: TokenWithRelations | null;
   spoofedBy: User | null;
   permix: Permix;
@@ -123,12 +123,11 @@ type AppEnv = { Variables: AppVars };
 | `db` | `Db` | Prisma client for database access |
 | `txn` | `TransactionClient \| undefined` | Active transaction client (if in txn) |
 | `app` | `Hono<AppEnv>` | App instance (for internal routing in batch API) |
-| `user` | `User \| null` | Authenticated user (session or token) |
+| `user` | `User \| null` | Authenticated user (person JWT or token) |
 | `organizationUsers` | `OrganizationUser[] \| null` | User's org memberships |
 | `organizations` | `Organization[] \| null` | All orgs user belongs to (flattened) |
 | `spaceUsers` | `SpaceUser[] \| null` | User's space memberships |
 | `spaces` | `Space[] \| null` | All spaces user has access to (membership + org owner) |
-| `session` | `Session \| null` | BetterAuth session |
 | `token` | `TokenWithRelations \| null` | API token with relations |
 | `spoofedBy` | `User \| null` | Original admin when spoofing |
 | `bracketQuery` | `Record<string, any>` | Parsed URL search params (bracket notation) |
@@ -172,7 +171,6 @@ export const prepareRequest = async (c: Context<AppEnv>, next: Next) => {
 
   // Initialize auth context to null
   c.set('user', null);
-  c.set('session', null);
   c.set('token', null);
   c.set('spoofedBy', null);
 
@@ -196,7 +194,7 @@ export const prepareRequest = async (c: Context<AppEnv>, next: Next) => {
 
 1. **Creates request ID** - UUID for correlating logs and responses
 2. **Initializes permix** - Fresh permission instance (no permissions until auth runs)
-3. **Nulls all auth vars** - Ensures clean slate for auth middleware (user, session, token, spoofedBy, organizationUsers, organizations, spaceUsers, spaces)
+3. **Nulls all auth vars** - Ensures clean slate for auth middleware (user, token, spoofedBy, organizationUsers, organizations, spaceUsers, spaces)
 4. **Wraps in scopes** - Enables `db.getScopeId()` and log correlation throughout request
 
 ---
@@ -256,7 +254,6 @@ Most context values can be accessed directly via `c.get()`:
 ```typescript
 const user = c.get('user');                    // User | null
 const token = c.get('token');                  // TokenWithRelations | null
-const session = c.get('session');              // Session | null
 const organizationUsers = c.get('organizationUsers');  // OrganizationUser[] | null
 const organizations = c.get('organizations');  // Organization[] | null
 const spaceUsers = c.get('spaceUsers');        // SpaceUser[] | null
@@ -367,7 +364,7 @@ const { user, organization, organizationUser, space, spaceUser, token } = getAct
 ```
 
 Unified accessor that resolves the current actor from any auth method:
-- **Session auth**: user only
+- **Person JWT**: user only
 - **User token**: user from token
 - **OrgUser token**: user + org from token's organizationUser
 - **SpaceUser token**: user + org + space from token's spaceUser
@@ -427,7 +424,7 @@ Located in `apps/api/src/lib/context/refreshUserContext.ts`. Reloads user's memb
 ```typescript
 import { refreshUserContext } from '#/lib/context/refreshUserContext';
 
-await refreshUserContext(c, db);
+await refreshUserContext(c);
 ```
 
 **What it does:**
@@ -443,7 +440,7 @@ await refreshUserContext(c, db);
 
 **Implementation:**
 ```typescript
-export const refreshUserContext = async (c: Context<AppEnv>, db: Db): Promise<void> => {
+export const refreshUserContext = async (c: Context<AppEnv>): Promise<void> => {
   const user = c.get('user');
   if (!user) return;
 
@@ -452,7 +449,7 @@ export const refreshUserContext = async (c: Context<AppEnv>, db: Db): Promise<vo
   await permix.setup([], { replace: true });
 
   // Reload user with all relations (uses cache, optimized queries)
-  const userWithRelations = await findUserWithRelations(db, user.id);
+  const userWithRelations = await findUserWithRelations(user.id);
   if (!userWithRelations) return;
 
   // Set up fresh context and permissions
@@ -512,8 +509,14 @@ soft-delete extension scopes it (see DATABASE.md → Soft-delete read scoping). 
 decides visibility, not the actor.** On every ordinary route a soft-deleted resource 404s for
 everyone — a superadmin calling `/api/v1/organization/:id` included. Superadmin endpoints (mounted
 on `adminRouter`, behind `validateSuperadmin`) run inside `db.withDeleted`, so there the lookup
-resolves tombstones too. Revival flows go through create-path upserts on unique keys, never
-load-the-deleted-row-by-id. Models without `deletedAt` are unaffected.
+resolves tombstones too. Revival is a create path, never load-the-deleted-row-by-id: inside
+`db.txn`, `db.findForUpdate(model, where, { upserting: true })` on the unique key fences it and
+returns the tombstone if there is one (raw SQL, so the soft-delete scope doesn't hide it); then an
+update whose `where` names `deletedAt` clears it, or a create follows (DATABASE.md → Row Locks and
+Create-If-Missing). No bare `upsert` and no caught unique violation: the `no-create-race-machinery`
+rule ratchets both down per file. The JobOutbox flush (`apps/api/src/jobs/outbox/accumulator.ts`,
+superseding lanes keyed on `handlerName_dedupeKey`) is the standing pre-rule upsert the ratchet
+grandfathers. Models without `deletedAt` are unaffected.
 
 ### Lookup Parameter
 
@@ -593,7 +596,6 @@ Jobs have their own context, separate from HTTP request context.
 ```typescript
 // apps/api/src/jobs/types.ts
 type WorkerContext = {
-  db: Db;
   queue: JobsQueue;
   job: Job;
   signal?: AbortSignal;  // For superseding jobs
@@ -607,7 +609,7 @@ type WorkerContext = {
 ```typescript
 // worker.ts
 await db.scope(`job:${job.name}:${job.id}`, async () => {
-  const ctx: WorkerContext = { db, queue, job };
+  const ctx: WorkerContext = { queue, job };
   await handler(ctx, job.data.payload);
 });
 ```
@@ -618,7 +620,7 @@ await db.scope(`job:${job.name}:${job.id}`, async () => {
 import { makeJob } from '#/jobs/makeJob';
 
 export const myJob = makeJob<MyPayload>(async (ctx, payload) => {
-  // ctx.db - database client (scoped to this job)
+  // db (imported from '@template/db') resolves to this job's scope; it is not on ctx
   // ctx.queue - for enqueueing follow-up jobs
   // ctx.job - BullMQ job instance (id, attemptsMade, etc.)
   // ctx.signal - abort signal (if using makeSupersedingJob)

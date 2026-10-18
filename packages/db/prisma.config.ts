@@ -9,6 +9,7 @@ import { defineConfig } from 'prisma/config';
 export default defineConfig({
   earlyAccess: true,
   schema: path.join(__dirname, 'prisma/schema'),
+  migrations: { path: path.join(__dirname, 'prisma/migrations') },
 
   // Required for db push
   datasource: {

@@ -15,10 +15,10 @@ model TagCategory {
 
   // Owner — same shape as Tag. `platform` = global category, visible
   // everywhere. PascalCase values scope to a specific row.
-  ownerModel     TagResource @default(platform)
-  userId         String?     @db.VarChar(36)
-  organizationId String?     @db.VarChar(36)
-  spaceId        String?     @db.VarChar(36)
+  ownerModel     TagOwnerModel @default(platform)
+  userId         String?       @db.VarChar(36)
+  organizationId String?       @db.VarChar(36)
+  spaceId        String?       @db.VarChar(36)
 
   user         User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
   organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)

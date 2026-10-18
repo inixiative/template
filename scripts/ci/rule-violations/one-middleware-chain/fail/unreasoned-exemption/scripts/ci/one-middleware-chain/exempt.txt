@@ -1,0 +1,2 @@
+/health
+/api/auth/*	better-auth authenticates itself

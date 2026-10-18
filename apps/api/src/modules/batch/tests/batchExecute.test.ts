@@ -557,7 +557,7 @@ describe('POST /api/v1/batch/execute', () => {
         }),
       );
 
-      expect(response.status).toBe(400);
+      expect(response.status).toBe(422);
     });
 
     it('enforces maximum requests per round limit', async () => {

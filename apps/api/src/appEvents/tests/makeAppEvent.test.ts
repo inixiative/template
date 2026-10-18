@@ -1,5 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
+import { cleanupTouchedTables } from '@template/db/test';
 import { makeAppEvent } from '#/appEvents/makeAppEvent';
 import type { AppEventPayload } from '#/appEvents/types';
 import { observeRegistry } from '#/lib/observe';
@@ -32,7 +33,7 @@ describe('makeAppEvent', () => {
   afterAll(() => observeRegistry.unregister('test-recorder'));
   afterEach(async () => {
     observed.length = 0;
-    await db.appEvent.deleteMany({ where: { name: 'test' } });
+    await cleanupTouchedTables(db);
   });
 
   it('returns a handler function', () => {

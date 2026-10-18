@@ -1,0 +1,42 @@
+{
+  "id": "auth-middleware-users",
+  "title": "Auth middleware, validators and users",
+  "routing": "Is this about what happens to a credential once it reaches the API: the middleware order in apps/api/src/routes/api.ts (corsMiddleware, tokenAuthMiddleware, authMiddleware, spoofMiddleware, auditActorMiddleware), requireAuth / requirePublic, validateUser vs validateActor vs validateNotToken, basicAuthMiddleware, probes (isAuthProbe, isSystemProbe), spoofing (x-spoof-user-email, spoofedBy), or the User model: findUserByEmail, findUserOrCreateGuest, findUserWithRelations, normalizeEmail, phoneToStubEmail, redactUser / redactSensitiveFields, the me and user modules?",
+  "concepts": ["auth-middleware", "users"],
+  "tokens": 10274,
+  "tokenMethod": "chars/4",
+  "files": {
+    "recognise": {
+      "path": "recognise.md",
+      "tokens": 2337,
+      "experimental": true,
+      "note": "recognise/pick split under test (model round); not the standard"
+    },
+    "knowledge": {
+      "path": "knowledge.md",
+      "tokens": 10274
+    }
+  },
+  "runsAgreed": 0,
+  "sources": {
+    "docs": ["FEATURES.md", "docs/claude/AUTH.md"],
+    "docUnits": [
+      "doc:docs/claude/AUTH.md#auth-middleware-chain",
+      "doc:docs/claude/AUTH.md#spoof-middleware",
+      "doc:docs/claude/AUTH.md#validation-middleware",
+      "doc:docs/claude/AUTH.md#choosing-between-validateuser-and-validateactor",
+      "doc:FEATURES.md#user-management"
+    ],
+    "catalogClusters": [
+      "auth-middleware-validation",
+      "authentication-methods",
+      "request-context-access",
+      "route-registration-openapi",
+      "user-identity-management"
+    ],
+    "codeEntries": 33,
+    "docMembers": 10
+  },
+  "bypassLines": 21,
+  "glossaryTerms": 19
+}

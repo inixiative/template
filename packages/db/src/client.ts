@@ -33,6 +33,9 @@ import { Prisma, PrismaClient } from '@template/db/generated/client/client';
 import { prismaMap } from '@template/db/generated/prismaMap';
 import { auditActorContext } from '@template/db/lib/auditActorContext';
 import { acquireFindForUpdateLock } from '@template/db/lock/acquireFindForUpdateLock';
+import type { AcquireOptions, LockOptions } from '@template/db/lock/types';
+import { withLockUntilSettled } from '@template/db/lock/withLockUntilSettled';
+import { registerTestTracker } from '@template/db/test/testTracker';
 import type { RuntimeDelegate } from '@template/db/utils/delegates';
 import {
   type AccessorName,
@@ -129,7 +132,8 @@ const dbMethods = {
               prismaTransactionId: null,
               afterCommitBatches: [],
               finallyFns: [],
-              heldLockKeys: new Set(),
+              heldLocks: new Map(),
+              settled: false,
               bridgedContext,
             };
             opened = openTransaction;
@@ -161,6 +165,7 @@ const dbMethods = {
         // why: after $transaction settles — the callback's own finally runs before the commit, and a
         // why: lock dropped there lets a waiter read pre-commit state — and before the on-commit
         // why: batches, so no waiter stalls behind slow side effects.
+        if (opened) (opened as OpenTransaction).settled = true;
         await drainFinally(opened);
       }
       const { result, openTransaction } = settled;
@@ -237,10 +242,10 @@ const dbMethods = {
   },
 
   withDeleted: <T>(fn: () => T | Promise<T>): Promise<Awaited<T>> =>
-    auditActorContext.withSoftDeleteBypass(fn),
+    auditActorContext.withDeleted(fn),
 
-  withSoftDeleteScope: <T>(fn: () => T | Promise<T>): Promise<Awaited<T>> =>
-    auditActorContext.withSoftDeleteScope(fn),
+  withoutDeleted: <T>(fn: () => T | Promise<T>): Promise<Awaited<T>> =>
+    auditActorContext.withoutDeleted(fn),
 
   getScopeId: (): string | null => store.getStore()?.scopeId ?? null,
 
@@ -297,6 +302,16 @@ const dbMethods = {
     return db.$queryRaw<T[]>(
       Prisma.sql`SELECT * FROM ${Prisma.raw(`"${table}"`)} WHERE ${Prisma.join(conds, ' AND ')} FOR UPDATE`,
     );
+  },
+
+  withLockUntilSettled: async <T>(
+    options: LockOptions,
+    fn: () => Promise<T>,
+    acquireOptions?: AcquireOptions,
+  ): Promise<T> => {
+    const openTransaction = store.getStore()?.openTransaction;
+    if (!openTransaction) throw new Error('db.withLockUntilSettled() requires db.txn()');
+    return withLockUntilSettled(openTransaction, options, fn, acquireOptions);
   },
 };
 
@@ -362,3 +377,7 @@ export const db: Db = new Proxy({} as Db, {
     return bareDelegate(prop);
   },
 });
+
+// Every process that loads the client in a test environment tracks the tables it writes, so a test
+// never registers the tracker itself and can't forget to. Outside test this is a no-op.
+registerTestTracker();

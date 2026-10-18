@@ -39,7 +39,7 @@
 ### Single-Line Early Exits
 
 ```typescript
-if (!user) throw new HTTPException(404, { message: 'Not found' });
+if (!user) throw makeError({ status: 404, message: 'Not found' });
 if (!valid) return null;
 ```
 
@@ -78,8 +78,8 @@ packages/db/src/index.ts
 
 | Prefix | Meaning |
 |--------|---------|
-| `_` | Unused parameter |
-| `__` | Module-private state (not exported) |
+| `_` | Unused binding (parameter, destructured field) |
+| `__` | Private / internal: class privates, module-private state, type brands, object-literal internals ([NAMING.md → Underscore Prefix](NAMING.md#underscore-prefix)) |
 
 ```typescript
 // Unused parameter
@@ -88,6 +88,9 @@ app.get('/', (_req, res) => res.send('ok'));
 // Module-private state
 let __cache: Map<string, unknown> | null = null;
 export const getCache = () => __cache ??= new Map();
+
+// Type brand
+type UserId = string & { readonly __model: 'User' };
 ```
 
 ---

@@ -12,14 +12,11 @@ import {
   createTagAttachment,
   createTagCategory,
   createUser,
-  registerTestTracker,
 } from '@template/db/test';
 import type { SendEmailOptions } from '@template/email/client/types';
 import { saveEmailTemplate } from '@template/email/render';
 import { emailRegistry } from '#/lib/email';
 import { deliverEmailMessage } from '#/lib/email/deliverEmailMessage';
-
-registerTestTracker();
 
 const ADAPTER = 'link-rows-bound';
 const sent: SendEmailOptions[] = [];

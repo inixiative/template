@@ -15,17 +15,6 @@ export type AuthUser = {
   updatedAt: string;
 };
 
-export type AuthSession = {
-  id: string;
-  userId: string;
-  token: string;
-  accessToken: string;
-  expiresAt: string;
-  createdAt: string;
-  ipAddress: string | null;
-  userAgent: string | null;
-};
-
 export type AuthOrganization = {
   id: string;
   name: string;
@@ -58,19 +47,6 @@ export type AuthSpaceUser = {
   spaceId: string;
   role: 'owner' | 'admin' | 'member' | 'viewer';
   space?: AuthSpace;
-};
-
-export type AuthClient = {
-  signIn: (credentials: {
-    email: string;
-    password: string;
-  }) => Promise<{ user: AuthUser; session: AuthSession }>;
-  signUp: (credentials: {
-    email: string;
-    password: string;
-    name?: string;
-  }) => Promise<{ user: AuthUser; session: AuthSession }>;
-  signOut: () => Promise<void>;
 };
 
 export type ApiClient = {

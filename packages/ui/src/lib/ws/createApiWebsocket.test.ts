@@ -693,6 +693,37 @@ describe('createApiWebsocket', () => {
         expect(ids()).toEqual(['gap', 'b', 'a']);
       });
 
+      it('a server resync re-opens at once and keeps the data, without failing the stream', async () => {
+        const { ws } = await opened();
+        receive(ws, snapshot(10, ['a']));
+
+        receive(ws, { type: 'resync', stream });
+        receive(ws, upsert(11, 'before-resync-snapshot'));
+
+        expect(opensOf(ws)).toEqual([{ action: 'open', stream }]);
+        expect(client.getQueryState(dataStreamQueryKey(stream))?.status).toBe('success');
+        expect(ids()).toEqual(['a']);
+
+        receive(ws, { type: 'opened', stream });
+        receive(ws, snapshot(20, ['b', 'a']));
+        receive(ws, upsert(21, 'c'));
+        expect(ids()).toEqual(['c', 'b', 'a']);
+      });
+
+      it('a server resync while an open is in flight waits for that open, whose answer still counts', async () => {
+        const { api, ws } = await opened();
+        receive(ws, snapshot(10, ['a']));
+        api.authenticate('tok');
+        expect(opensOf(ws)).toHaveLength(1);
+
+        receive(ws, { type: 'resync', stream });
+        expect(opensOf(ws)).toHaveLength(1);
+        receive(ws, { type: 'opened', stream });
+        receive(ws, snapshot(30, ['b', 'a']));
+        expect(ids()).toEqual(['b', 'a']);
+        expect(client.getQueryState(dataStreamQueryKey(stream))?.status).toBe('success');
+      });
+
       it('after a server-side close (dropped frame), the reconnect snapshot restores state', async () => {
         const { api, ws } = await opened();
         receive(ws, snapshot(10, ['a']));

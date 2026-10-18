@@ -1,0 +1,72 @@
+{
+  "id": "encryption",
+  "title": "Encryption and secrets",
+  "routing": "Is this about a secret: encrypting a field at rest or reading it back (encryptField / decryptField, the ENCRYPTED_MODELS registry, encrypted{Key} / \u2026Metadata / \u2026KeyVersion columns, buildAAD), an encryption keyring ({PREFIX}_ENCRYPTION_VERSION / _KEY_CURRENT / _KEY_PREVIOUS) in any environment including test and CI, rotating or cycling keys (rotateEncryptionKeys, validateEncryptionVersions), storing a provider credential, or where secret env vars live and how they get in (Infisical, with-env, .env.local / .env.test, adding an env var)?",
+  "concepts": ["encryption", "secrets"],
+  "tokens": 18930,
+  "tokenMethod": "chars/4",
+  "files": {
+    "recognise": {
+      "path": "recognise.md",
+      "tokens": 2362,
+      "experimental": true,
+      "note": "recognise/pick split under test (model round); not the standard"
+    },
+    "knowledge": {
+      "path": "knowledge.md",
+      "tokens": 18930
+    }
+  },
+  "runsAgreed": 0,
+  "sources": {
+    "docs": [
+      "FEATURES.md",
+      "docs/claude/AUTH.md",
+      "docs/claude/ENCRYPTION.md",
+      "docs/claude/ENVIRONMENTS.md",
+      "docs/claude/INIT_SCRIPT_PATTERNS.md",
+      "docs/claude/SETUP.md"
+    ],
+    "docUnits": [
+      "doc:docs/claude/ENCRYPTION.md#overview",
+      "doc:docs/claude/ENCRYPTION.md#field-scoped-encryption",
+      "doc:docs/claude/ENCRYPTION.md#adding-encrypted-fields",
+      "doc:docs/claude/ENCRYPTION.md#key-rotation",
+      "doc:docs/claude/ENCRYPTION.md#environment-variables",
+      "doc:docs/claude/ENCRYPTION.md#deploy-time-validation",
+      "doc:docs/claude/ENCRYPTION.md#implementation-details",
+      "doc:docs/claude/ENCRYPTION.md#deployment-checklist",
+      "doc:docs/claude/ENCRYPTION.md#faq",
+      "doc:FEATURES.md#encryption-security",
+      "doc:docs/claude/AUTH.md#multi-provider-authentication-authprovider",
+      "doc:docs/claude/ENVIRONMENTS.md#environment-names",
+      "doc:docs/claude/ENVIRONMENTS.md#infisical-cloud-environments",
+      "doc:docs/claude/ENVIRONMENTS.md#with-env-composition",
+      "doc:docs/claude/ENVIRONMENTS.md#adding-environment-variables",
+      "doc:docs/claude/INIT_SCRIPT_PATTERNS.md#core-patterns/8-always-fetch-from-source-never-trust-props",
+      "doc:docs/claude/SETUP.md#environment-variables",
+      "doc:FEATURES.md#infrastructure-devops"
+    ],
+    "catalogClusters": [
+      "auth-middleware-validation",
+      "authentication-methods",
+      "build-deploy-ci",
+      "data-access-rules",
+      "dev-setup-scripts",
+      "encryption-key-rotation",
+      "environment-config",
+      "job-definition-and-enqueue",
+      "locks-and-serialization",
+      "naming-vocabulary",
+      "prisma-schema-introspection",
+      "rate-limiting",
+      "ui-components",
+      "user-identity-management",
+      "websocket-connection-management"
+    ],
+    "codeEntries": 14,
+    "docMembers": 42
+  },
+  "bypassLines": 25,
+  "glossaryTerms": 30
+}

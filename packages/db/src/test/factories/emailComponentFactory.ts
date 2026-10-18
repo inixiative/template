@@ -1,7 +1,7 @@
 /**
  * @atlas
  * @kind factory
- * @partOf infrastructure:prisma
+ * @partOf infrastructure:prisma, primitive:testFactories
  * @uses none
  */
 import { createFactory, getNextSeq } from '@template/db/test/factory';

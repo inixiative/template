@@ -46,7 +46,7 @@ describe.skipIf(!redisReachable)('cron repeatables in real Redis', () => {
 
   afterEach(async () => {
     await realQueue.obliterate({ force: true });
-    await db.cronJob.deleteMany({});
+    await cleanupTouchedTables(db);
   });
 
   afterAll(async () => {

@@ -120,7 +120,14 @@ never auto-stamps `@uses`:
 
 ### `@constructs` — factory output
 
-For constructor/factory files only — names what the factory builds.
+For constructor files only: it names what the constructor builds.
+
+Two kinds mark the things that produce other things, so the map shows how many there are and where they live:
+
+- **`constructor`**: a `make<Thing>()` that produces a category of thing (`makeController` builds controllers, `makeJob` builds job handlers, `makeError` builds errors). It always pairs with `@constructs`.
+- **`factory`**: a test factory, one per model, in `packages/db/src/test/factories/`. Every factory and the factory engine (`factory.ts`, `dependencyInference.ts`, `factoryTypes.ts`, `factoryPolymorphism.ts`, `testTracker.ts`) are `@partOf primitive:testFactories`. Tests that only use a factory are not tagged.
+
+Why: these primitives are small and carry a lot of the codebase, and the tags make that reach visible.
 
 ---
 

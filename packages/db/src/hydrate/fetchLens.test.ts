@@ -3,12 +3,7 @@ import { type Condition, type LensNarrowing, Operator } from '@inixiative/json-r
 import { db } from '@template/db';
 import { fetchLens } from '@template/db/hydrate/fetchLens';
 import { lensFor } from '@template/db/lens/lensFor';
-import {
-  cleanupTouchedTables,
-  createOrganizationUser,
-  createUser,
-  registerTestTracker,
-} from '@template/db/test';
+import { cleanupTouchedTables, createOrganizationUser, createUser } from '@template/db/test';
 
 const eq = (field: string, value: unknown): Condition =>
   ({ field, operator: Operator.equals, value }) as unknown as Condition;
@@ -21,9 +16,7 @@ const usersWhere = (where: Condition): LensNarrowing => ({
 });
 
 describe('fetchLens', () => {
-  beforeEach(() => {
-    registerTestTracker();
-  });
+  beforeEach(() => {});
 
   afterEach(async () => {
     await cleanupTouchedTables(db);

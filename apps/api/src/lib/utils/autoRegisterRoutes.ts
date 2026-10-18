@@ -23,6 +23,13 @@ export const autoRegisterRoutes = async (
   );
 
   const prefix = options?.admin ? 'admin' : options?.internal ? 'internal' : '';
+  const routeKey = (route: Pick<RouteConfig, 'method' | 'path'>) =>
+    `${route.method.toUpperCase()} ${route.path}`;
+  const mountedByHand = new Set(
+    router.openAPIRegistry.definitions.flatMap((definition) =>
+      definition.type === 'route' ? [routeKey(definition.route)] : [],
+    ),
+  );
   const registrations = [];
 
   for (const file of routeFiles) {
@@ -43,6 +50,7 @@ export const autoRegisterRoutes = async (
       log.warn(`Skipping ${baseName}: route or controller not found`);
       continue;
     }
+    if (mountedByHand.has(routeKey(route))) continue;
 
     registrations.push({ route: route as RouteConfig, controller });
   }

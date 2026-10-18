@@ -176,7 +176,7 @@ export const userReadController = makeController(userReadRoute, async (c, respon
   const { id } = c.req.valid('param');
 
   const user = await db.user.findUnique({ where: { id } });
-  if (!user) throw new HTTPException(404, { message: 'User not found' });
+  if (!user) throw makeError({ status: 404, message: 'User not found' });
 
   return respond.ok(user);
 });
@@ -921,7 +921,7 @@ const { search, setSearch, orderBy, toggleOrderBy, query } = useDataFilters(conf
 
 ## Error Responses
 
-All routes return standardized error responses. Use `makeError` to throw structured errors, or let the error handler normalize unexpected errors.
+All routes return standardized error responses: throw `makeError` for caller errors, and let the error handler normalize everything else. The few responses outside the envelope (better-auth's `/api/auth/*`, the telemetry beacon, a failed WebSocket upgrade) are listed in [ERRORS.md](ERRORS.md#the-global-handler).
 
 **Contract:**
 
@@ -991,10 +991,10 @@ throw makeError({
 
 **How it works:**
 
-- `makeError` returns an `HTTPException` with a pre-built JSON response
-- Error handler middleware catches and returns `err.getResponse()` for HTTPException
+- `makeError` returns an `AppError` (an `HTTPException`) with a pre-built JSON body
+- The error handler stamps `requestId` and returns that body; a plain `HTTPException` (from Hono middleware or a library) is wrapped in the same envelope with its status, message and headers
 - Unknown errors are normalized to 500 with standardized body
-- Zod validation errors automatically map to 422 with fieldErrors
+- Request validation failures (body, query, path, headers) are **422** with `fieldErrors`: the root app's `validationDefaultHook` rethrows the `ZodError`, and the handler formats it. There is no `{"success":false,"error":{"name":"ZodError"}}` shape. Set `defaultHook` only on a root app (`app.ts`, `createTestApp`); every router mounted under it inherits it (`@hono/zod-openapi` ≥ 1.6)
 - Prisma errors (P2002, P2025) map to 409/404 with standardized body
 
 Types are defined in `@template/shared/errors` and derived from `HTTP_ERROR_MAP` to prevent drift.
@@ -1003,14 +1003,7 @@ Default guidance for unknown/internal errors: `contactSupport`.
 
 `type` is optional and not required by default. In most cases, `status + guidance` is enough to drive frontend behavior.
 
-Throw `HTTPException` to return errors:
-
-```typescript
-import { HTTPException } from 'hono/http-exception';
-
-throw new HTTPException(404, { message: 'User not found' });
-throw new HTTPException(403, { message: 'Not authorized' });
-```
+Never throw `new HTTPException` in API code; throw `makeError` (the `no-raw-http-exception` CI rule enforces it).
 
 ---
 
@@ -1084,7 +1077,7 @@ updateRoute({
   responseSchema,
 });
 
-// Forbid token auth (session only)
+// Forbid token auth (person JWT only)
 createRoute({
   model: 'token',
   middleware: [validateNotToken],

@@ -1,9 +1,9 @@
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { type Db, db, type UserId } from '@template/db';
 import type { OrganizationUser, SpaceUser, User } from '@template/db/generated/client/client';
-import { registerTestTracker } from '@template/db/test';
 import { auth } from '#/lib/auth';
 import type { TokenWithRelations } from '#/lib/context/types';
+import { validationDefaultHook } from '#/lib/openapi/validationDefaultHook';
 import { setupOrgPermissions } from '#/lib/permissions/setupOrgPermissions';
 import { setupSpacePermissions } from '#/lib/permissions/setupSpacePermissions';
 import { setupUserPermissions } from '#/lib/permissions/setupUserPermissions';
@@ -11,8 +11,6 @@ import { errorHandlerMiddleware } from '#/middleware/error/errorHandlerMiddlewar
 import { notFoundHandlerMiddleware } from '#/middleware/error/notFoundHandlerMiddleware';
 import { prepareRequest } from '#/middleware/prepareRequest';
 import type { AppEnv } from '#/types/appEnv';
-
-registerTestTracker();
 
 export type MountFn = (app: OpenAPIHono<AppEnv>) => void;
 
@@ -25,7 +23,7 @@ type CreateTestAppOptions = {
 };
 
 export const createTestApp = (options?: CreateTestAppOptions) => {
-  const app = new OpenAPIHono<AppEnv>();
+  const app = new OpenAPIHono<AppEnv>({ defaultHook: validationDefaultHook });
 
   app.onError(errorHandlerMiddleware);
 

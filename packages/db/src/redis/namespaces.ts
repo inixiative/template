@@ -13,6 +13,9 @@ export const redisNamespace = {
   limit: 'limit',
   lock: 'lock',
   lane: 'lane',
+  // A rolling cache's scheduling state (its timer), deliberately not under `cache:`: flushing cached
+  // values must not reschedule the refresh.
+  rollingCache: 'rollingcache',
   // flag: 'flag',
 } as const;
 

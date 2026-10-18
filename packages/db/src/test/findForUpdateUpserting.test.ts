@@ -4,7 +4,7 @@ import type { User } from '@template/db/generated/client/client';
 import { getRedisClient } from '@template/db/redis/client';
 import { createUser } from '@template/db/test/factories';
 import { getNextSeq } from '@template/db/test/factory';
-import { cleanupTouchedTables, registerTestTracker } from '@template/db/test/testTracker';
+import { cleanupTouchedTables } from '@template/db/test/testTracker';
 
 const findOrCreateUser = (email: string, model = 'User') =>
   db.txn(async () => {
@@ -23,9 +23,7 @@ const withTimeout = <T>(promise: Promise<T>, ms: number): Promise<T> =>
   ]);
 
 describe('db.findForUpdate upserting mode', () => {
-  beforeEach(() => {
-    registerTestTracker();
-  });
+  beforeEach(() => {});
 
   afterEach(async () => {
     await cleanupTouchedTables(db);

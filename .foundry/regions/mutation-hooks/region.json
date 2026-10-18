@@ -1,0 +1,55 @@
+{
+  "id": "mutation-hooks",
+  "title": "Mutation hooks, immutable fields, ordered lists",
+  "routing": "Is this about what runs around a db write: the mutationLifeCycle extension, registerDbHook / registerHooks, before and after hooks, previous and shadowMerge, writtenPatches, isNoOpUpdate / NOOP_FIELDS / HOOK_IGNORE_FIELDS, the RulesRegistry (getRule, rules, contactRules, segmentConditions), createManyAndReturn / updateManyAndReturn instead of createMany / updateMany, no-select-on-mutations, db.raw to skip hooks, immutable fields (GLOBAL_IMMUTABLE_FIELDS, getImmutableFields, ImmutableFieldsOverrides, FK fields auto-immutable), or ordered lists (orderedListRegistry, orderedList hook, buildScope, nextSortOrderRaw, bulkAssignAppend / bulkAssignNegatives)?",
+  "concepts": ["mutation-hooks", "immutable-fields", "ordered-lists"],
+  "tokens": 14680,
+  "tokenMethod": "chars/4",
+  "files": {
+    "recognise": {
+      "path": "recognise.md",
+      "tokens": 2931,
+      "experimental": true,
+      "note": "recognise/pick split under test (model round); not the standard"
+    },
+    "knowledge": {
+      "path": "knowledge.md",
+      "tokens": 14680
+    }
+  },
+  "runsAgreed": 0,
+  "sources": {
+    "docs": ["docs/claude/ARCHITECTURE.md", "docs/claude/HOOKS.md"],
+    "docUnits": [
+      "doc:docs/claude/ARCHITECTURE.md#data-flow",
+      "doc:docs/claude/ARCHITECTURE.md#key-patterns",
+      "doc:docs/claude/HOOKS.md#mutation-lifecycle",
+      "doc:docs/claude/HOOKS.md#registering-hooks",
+      "doc:docs/claude/HOOKS.md#application-hooks",
+      "doc:docs/claude/HOOKS.md#rules-registry",
+      "doc:docs/claude/HOOKS.md#supported-operations",
+      "doc:docs/claude/HOOKS.md#limitations",
+      "doc:docs/claude/HOOKS.md#immutable-fields",
+      "doc:docs/claude/HOOKS.md#ordered-list"
+    ],
+    "catalogClusters": [
+      "caching-and-invalidation",
+      "customers-providers",
+      "data-access-rules",
+      "data-models",
+      "immutable-fields",
+      "lenses-multi-source",
+      "mutation-hooks",
+      "ordered-lists",
+      "outbound-webhooks",
+      "request-context-access",
+      "rule-references-registry",
+      "segments-membership",
+      "soft-delete-cascade"
+    ],
+    "codeEntries": 47,
+    "docMembers": 46
+  },
+  "bypassLines": 27,
+  "glossaryTerms": 18
+}

@@ -1,16 +1,11 @@
 // Test request helpers
 
+import type { ApiErrorBody } from '@template/shared/errors';
 import { LogScope, log } from '@template/shared/logger';
 import type { PaginationMetadata } from '#/lib/routeTemplates';
 
 type SuccessResponse<T> = { data: T; pagination?: PaginationMetadata };
-type ErrorResponse = {
-  error: string;
-  message: string;
-  stack?: string;
-  guidance?: string;
-  fieldErrors?: Record<string, string[]>;
-};
+type ErrorResponse = ApiErrorBody;
 
 type ValidationFailureResponse = {
   success: false;

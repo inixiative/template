@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from 'bun:
 import { redisNamespace } from '@template/db/redis/namespaces';
 import { log } from '@template/shared/logger';
 import { makeSingletonJob } from '#/jobs/makeSingletonJob';
+import { singletonDeduplicationId } from '#/jobs/singletonDeduplicationId';
 import type { WorkerContext } from '#/jobs/types';
 import { createTestWorker } from '#tests/createTestWorker';
 
@@ -192,6 +193,39 @@ describe('makeSingletonJob', () => {
       await firstRun;
     });
 
+    test('a staged singleton skips its stages and finish while its key is busy', async () => {
+      const started = deferred();
+      const gate = deferred();
+      const firstRun = makeSingletonJob<ChannelPayload>(
+        async () => {
+          started.resolve();
+          await gate.promise;
+        },
+        { lockKey: channelKey },
+      )(ctx, ADP_FULL);
+      await started.promise;
+
+      const ran: string[] = [];
+      const staged = makeSingletonJob<ChannelPayload>(
+        {
+          stages: [
+            async () => {
+              ran.push('stage');
+            },
+          ],
+          finish: async () => {
+            ran.push('finish');
+          },
+        },
+        { lockKey: channelKey },
+      );
+      await staged(singletonContext('staged-job'), ADP_FULL);
+
+      expect(ran).toEqual([]);
+      gate.resolve();
+      await firstRun;
+    });
+
     test('does not take the data.id lane', async () => {
       const started = deferred();
       const gate = deferred();
@@ -237,5 +271,17 @@ describe('makeSingletonJob', () => {
     });
     expect(errorSpy).not.toHaveBeenCalledWith('singletonJob.lockLost', expect.anything());
     expect(await backingRedis.get(LOCK_KEY)).toHaveLength(36);
+  });
+
+  test('exposes its key to enqueueJob: the lockKey result, else the cron row id, else none', () => {
+    const keyed = makeSingletonJob<{ recordId: string }>(async () => {}, {
+      lockKey: ({ recordId }) => recordId,
+    });
+    const unkeyed = makeSingletonJob(async () => {});
+
+    expect(keyed.singletonKey?.({ recordId: 'record-1' }, { id: 'cron-row' })).toBe('record-1');
+    expect(unkeyed.singletonKey?.(undefined, { id: 'cron-row' })).toBe('cron-row');
+    expect(unkeyed.singletonKey?.(undefined, {})).toBeUndefined();
+    expect(singletonDeduplicationId('sweepSegments', 'cron-row')).toBe('sweepSegments-cron-row');
   });
 });

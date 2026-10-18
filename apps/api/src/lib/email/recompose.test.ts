@@ -71,17 +71,11 @@ describe('recomposeFromSnapshots', () => {
 
 import { afterAll, afterEach, beforeAll } from 'bun:test';
 import { clearHookRegistry, db } from '@template/db';
-import {
-  cleanupTouchedTables,
-  createCommunicationLog,
-  registerTestTracker,
-} from '@template/db/test';
+import { cleanupTouchedTables, createCommunicationLog } from '@template/db/test';
 import { saveEmailTemplate } from '@template/email/render';
 import { registerAuditLogHook } from '#/hooks/auditLog/hook';
 import { registerEmailVersioningHook } from '#/hooks/emailVersioning/hook';
 import { recomposeCommunication } from '#/lib/email/recompose';
-
-registerTestTracker();
 
 const documentMjml = (content: string) =>
   `<mjml><mj-body><mj-section><mj-column>${content}</mj-column></mj-section></mj-body></mjml>`;

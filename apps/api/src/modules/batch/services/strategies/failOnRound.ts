@@ -5,6 +5,7 @@
  * @uses infrastructure:prisma
  */
 import { db } from '@template/db';
+import { ConcurrencyType, getConcurrency } from '@template/shared/utils';
 import {
   refreshBatchContext,
   registerBatch,
@@ -23,7 +24,7 @@ export const failOnRound: StrategyExecutor = async (
   _timeout,
 ) => {
   const batchId = crypto.randomUUID();
-  registerBatch(batchId, db, baseContext);
+  registerBatch(batchId, baseContext);
 
   const results: RequestResult[][] = [];
   const totalRequests = rounds.reduce((sum, round) => sum + round.length, 0);
@@ -35,7 +36,7 @@ export const failOnRound: StrategyExecutor = async (
     for (let roundIndex = 0; roundIndex < rounds.length; roundIndex++) {
       const round = rounds[roundIndex];
 
-      const roundPromises = round.map(async (request) => {
+      const roundThunks = round.map((request) => async (): Promise<RequestResult> => {
         try {
           const interpolatedRequest = interpolateRequest(request, {
             results,
@@ -64,7 +65,9 @@ export const failOnRound: StrategyExecutor = async (
         }
       });
 
-      const roundResults = await Promise.all(roundPromises);
+      const roundResults = await db.parallel(roundThunks, {
+        concurrency: getConcurrency([ConcurrencyType.db]),
+      });
       results.push(roundResults);
       completedRounds++;
 

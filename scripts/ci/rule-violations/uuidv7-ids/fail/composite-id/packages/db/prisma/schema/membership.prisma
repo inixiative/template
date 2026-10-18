@@ -1,0 +1,6 @@
+model Membership {
+  userId  String @db.VarChar(36)
+  groupId String @db.VarChar(36)
+
+  @@id([userId, groupId])
+}

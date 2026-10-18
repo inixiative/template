@@ -20,9 +20,14 @@ export type {
   WSStreamAppendEvent,
   WSStreamSnapshotEvent,
 } from './events';
-export { WS_FRAME_LIMIT, WS_FRAME_WINDOW_MS, WS_MAX_PENDING_FRAMES } from './frameLimits';
+export {
+  WS_FRAME_LIMIT,
+  WS_FRAME_WINDOW_MS,
+  WS_MAX_PENDING_FRAMES,
+  WS_MAX_STREAM_NAME_LENGTH,
+} from './frameLimits';
 export { LIVE_QUERIES } from './liveQueries';
-export type { WSFrameErrorFrame, WSStreamAckFrame } from './streamControl';
+export type { WSFrameErrorFrame, WSStreamAckFrame, WSStreamResyncFrame } from './streamControl';
 export {
   type RegisteredStream,
   STREAM_DEFINITIONS,

@@ -1,0 +1,2 @@
+# known
+docs/claude/STALE.md	name	ghostName

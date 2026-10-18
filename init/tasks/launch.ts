@@ -1,5 +1,6 @@
 import { setLaunched } from '../utils/configHelpers';
-import type { ProjectConfig } from '../utils/getProjectConfig';
+import { getProjectConfig, type ProjectConfig } from '../utils/getProjectConfig';
+import { baselineDeployedDatabases } from './baselineDeployedDatabases';
 
 export type PreflightCheck = {
   label: string;
@@ -82,9 +83,7 @@ export const runPreflightChecks = (
   return { checks, allPassed };
 };
 
-/**
- * Execute the launch: flip the launched flag in config.
- */
 export const executeLaunch = async (): Promise<void> => {
+  await baselineDeployedDatabases(await getProjectConfig());
   await setLaunched(true);
 };

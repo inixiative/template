@@ -2,9 +2,11 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   claimLane,
   getJobSupersededBy,
+  holdLaneWhileParked,
   laneKey,
   reclaimLane,
   releaseLane,
+  tombstoneJob,
   watchLane,
 } from '@template/db/lanes/lanes';
 import { getRedisClient } from '@template/db/redis/client';
@@ -49,6 +51,40 @@ describe('supersede lane baton', () => {
 
     await claimLane(lane, 'job-a'); // no delay → base TTL only
     expect(await redis.ttl(lane)).toBeLessThanOrEqual(300);
+  });
+
+  test('holdLaneWhileParked stretches a lane it still holds to a tombstone lifetime, and leaves a newer holder alone', async () => {
+    const lane = laneKey('h', 'parked');
+    await claimLane(lane, 'job-a');
+    expect(await holdLaneWhileParked(lane, 'job-a')).toBe(true);
+    expect(await redis.ttl(lane)).toBeGreaterThan(24 * 60 * 60);
+
+    await claimLane(lane, 'job-b');
+    expect(await holdLaneWhileParked(lane, 'job-a')).toBe(false);
+    expect(await redis.get(lane)).toBe('job-b');
+    expect(await redis.ttl(lane)).toBeLessThanOrEqual(300);
+  });
+
+  test('watchLane with a parentId: a tombstone on the parent usurps the child and tombstones it too', async () => {
+    const lane = laneKey('h', 'child');
+    await claimLane(lane, 'child-job');
+    let usurped = false;
+    const stop = watchLane(
+      lane,
+      'child-job',
+      () => {
+        usurped = true;
+      },
+      'parent-job',
+    );
+
+    await tombstoneJob('parent-job', 'newer-parent');
+    await sleep(700);
+    stop();
+
+    expect(usurped).toBe(true);
+    expect(await getJobSupersededBy('child-job')).toBe('newer-parent');
+    expect(await redis.get(lane)).toBe('child-job');
   });
 
   test('reclaimLane restores a lapsed baton but never steals from a newer holder', async () => {

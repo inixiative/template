@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, spyOn } from 'bun:test';
-import { claimLane, getJobSupersededBy, laneKey, watchLane } from '@template/db';
+import { claimLane, db, getJobSupersededBy, laneKey, watchLane } from '@template/db';
 import { cleanupTouchedTables, createJobOutbox } from '@template/db/test';
 import { setEnvOverride } from '@template/shared/utils';
 import { SLOW_LANE_PRIORITY } from '#/jobs/lanePriority';
@@ -101,26 +101,26 @@ describe('jobs overflow buffer (spill + drain)', () => {
   afterEach(async () => {
     queued.clear();
     poison.clear();
-    await ctx.db.jobOutbox.deleteMany({});
+    await cleanupTouchedTables(db);
     await ctx.queue.redis.flushdb(); // clears the flag
   });
 
   afterAll(async () => {
     restoreQueueSpies();
-    await cleanupTouchedTables(ctx.db);
+    await cleanupTouchedTables(db);
     await ctx.queue.redis.flushdb();
   });
 
   it('persists spilled fan-out rows (resolve-on-commit)', async () => {
     await spillToOutbox(fanRow('a'));
     await spillToOutbox(fanRow('b'));
-    expect(await ctx.db.jobOutbox.count()).toBe(2);
+    expect(await db.jobOutbox.count()).toBe(2);
   });
 
   it('dedupes the same jobId across flushes (@unique jobId + skipDuplicates)', async () => {
     await spillToOutbox(fanRow('dup'));
     await spillToOutbox(fanRow('dup'));
-    expect(await ctx.db.jobOutbox.count()).toBe(1);
+    expect(await db.jobOutbox.count()).toBe(1);
   });
 
   it('superseding spills across flushes collapse to the latest (upsert)', async () => {
@@ -135,7 +135,7 @@ describe('jobs overflow buffer (spill + drain)', () => {
     await spillToOutbox(supRow(1)); // size=1 → its own flush
     await spillToOutbox(supRow(2)); // flush deletes lane-1's prior row, inserts this one
 
-    const rows = await ctx.db.jobOutbox.findMany({ where: { dedupeKey: 'lane-1' } });
+    const rows = await db.jobOutbox.findMany({ where: { dedupeKey: 'lane-1' } });
     expect(rows).toHaveLength(1);
     expect((rows[0].data as { payload: { n: number } }).payload.n).toBe(2);
   });
@@ -156,7 +156,7 @@ describe('jobs overflow buffer (spill + drain)', () => {
       spillToOutbox(supRow(3)),
     ]);
 
-    const rows = await ctx.db.jobOutbox.findMany({ where: { dedupeKey: 'lane-batch' } });
+    const rows = await db.jobOutbox.findMany({ where: { dedupeKey: 'lane-batch' } });
     expect(rows).toHaveLength(1);
     expect((rows[0].data as { payload: { n: number } }).payload.n).toBe(3);
   });
@@ -176,12 +176,12 @@ describe('jobs overflow buffer (spill + drain)', () => {
     setEnvOverride('JOBS_MAX_QUEUE_DEPTH', '3');
     await ctx.queue.redis.set(FLAG_KEY, String(Date.now()));
     for (const id of ['r1', 'r2', 'r3', 'r4', 'r5']) await spillToOutbox(fanRow(id));
-    expect(await ctx.db.jobOutbox.count()).toBe(5);
+    expect(await db.jobOutbox.count()).toBe(5);
 
     await runDrainOutboxPass();
 
     // room = cap(3) − depth(0) → 3 admitted, 2 remain buffered
-    expect(await ctx.db.jobOutbox.count()).toBe(2);
+    expect(await db.jobOutbox.count()).toBe(2);
     expect((await ctx.queue.getJobCounts('waiting')).waiting).toBe(3);
   });
 
@@ -192,7 +192,7 @@ describe('jobs overflow buffer (spill + drain)', () => {
 
     await runDrainOutboxPass();
 
-    expect(await ctx.db.jobOutbox.count()).toBe(0);
+    expect(await db.jobOutbox.count()).toBe(0);
     expect(await isOverflowing()).toBe(false);
   });
 
@@ -218,7 +218,7 @@ describe('jobs overflow buffer (spill + drain)', () => {
     await runDrainOutboxPass();
 
     // the displaced row is deleted without re-adding — re-claiming would tombstone 'newer' right back
-    expect(await ctx.db.jobOutbox.count()).toBe(0);
+    expect(await db.jobOutbox.count()).toBe(0);
     expect(await ctx.queue.getJob('older')).toBeUndefined();
     expect(await ctx.queue.redis.get(lane)).toBe('newer');
     expect(await getJobSupersededBy('newer')).toBeNull();
@@ -239,7 +239,7 @@ describe('jobs overflow buffer (spill + drain)', () => {
 
     await runDrainOutboxPass();
 
-    const rows = await ctx.db.jobOutbox.findMany();
+    const rows = await db.jobOutbox.findMany();
     expect(rows).toHaveLength(1);
     expect(rows[0].attempts).toBe(1);
     expect(await ctx.queue.redis.get(lane)).toBe('p-lane');
@@ -283,7 +283,7 @@ describe('jobs overflow buffer (spill + drain)', () => {
     await runDrainOutboxPass();
 
     // good row admitted + deleted; the poison row stays buffered with attempts bumped, not stranded
-    const rows = await ctx.db.jobOutbox.findMany();
+    const rows = await db.jobOutbox.findMany();
     expect(rows).toHaveLength(1);
     expect(rows[0].jobId).toBe('p1');
     expect(rows[0].attempts).toBe(1);
@@ -303,7 +303,7 @@ describe('jobs overflow buffer (spill + drain)', () => {
     await runDrainOutboxPass();
 
     // fresh row admitted despite the older quarantined row; quarantined row untouched (not bumped, not reset)
-    const rows = await ctx.db.jobOutbox.findMany();
+    const rows = await db.jobOutbox.findMany();
     expect(rows).toHaveLength(1);
     expect(rows[0].jobId).toBe('quarantined');
     expect(rows[0].attempts).toBe(5);
@@ -320,7 +320,7 @@ describe('jobs overflow buffer (spill + drain)', () => {
     await runDrainOutboxPass();
 
     // queue healthy + nothing admittable → the quarantined row gets another chance and the flag clears
-    const row = await ctx.db.jobOutbox.findFirst();
+    const row = await db.jobOutbox.findFirst();
     expect(row?.attempts).toBe(0);
     expect(await isOverflowing()).toBe(false);
   });
@@ -333,7 +333,7 @@ describe('jobs overflow buffer (spill + drain)', () => {
     await flushOutbox();
     await Promise.all(spills);
 
-    expect(await ctx.db.jobOutbox.count()).toBe(2);
+    expect(await db.jobOutbox.count()).toBe(2);
   });
 
   it('rejects the spill promise when the commit fails (resolves on commit, not accumulation)', async () => {
@@ -362,7 +362,7 @@ describe('jobs overflow buffer (spill + drain)', () => {
     it('persists the lane column from the envelope', async () => {
       await spillToOutbox(fanRow('lane-fast'));
       await spillToOutbox(slowRow('lane-slow'));
-      const rows = await ctx.db.jobOutbox.findMany({ orderBy: { id: 'asc' } });
+      const rows = await db.jobOutbox.findMany({ orderBy: { id: 'asc' } });
       expect(rows.map((row) => [row.jobId, row.lane])).toEqual([
         ['lane-fast', JobLane.fast],
         ['lane-slow', JobLane.slow],
@@ -389,7 +389,7 @@ describe('jobs overflow buffer (spill + drain)', () => {
       await runDrainOutboxPass();
 
       expect([...queued.keys()]).toEqual(['s1', 's2', 's3']);
-      expect(await ctx.db.jobOutbox.count()).toBe(2);
+      expect(await db.jobOutbox.count()).toBe(2);
     });
 
     it('gives slow rows only the budget left after fast rows', async () => {
@@ -414,7 +414,7 @@ describe('jobs overflow buffer (spill + drain)', () => {
 
       expect(await isOverflowing(JobLane.fast)).toBe(false);
       expect(await isOverflowing(JobLane.slow)).toBe(true);
-      expect(await ctx.db.jobOutbox.count()).toBe(1);
+      expect(await db.jobOutbox.count()).toBe(1);
     });
 
     it('resets quarantined rows only once no slow row is admittable either', async () => {
@@ -434,11 +434,11 @@ describe('jobs overflow buffer (spill + drain)', () => {
       await spillToOutbox(slowRow('blocked'));
 
       await runDrainOutboxPass();
-      expect((await ctx.db.jobOutbox.findFirst({ where: { jobId: 'q' } }))?.attempts).toBe(5);
+      expect((await db.jobOutbox.findFirst({ where: { jobId: 'q' } }))?.attempts).toBe(5);
 
-      await ctx.db.jobOutbox.deleteMany({ where: { jobId: 'blocked' } });
+      await db.jobOutbox.deleteMany({ where: { jobId: 'blocked' } });
       await runDrainOutboxPass();
-      expect((await ctx.db.jobOutbox.findFirst({ where: { jobId: 'q' } }))?.attempts).toBe(0);
+      expect((await db.jobOutbox.findFirst({ where: { jobId: 'q' } }))?.attempts).toBe(0);
     });
 
     it('tracks pending spills per lane', async () => {
@@ -465,7 +465,7 @@ describe('jobs overflow buffer (spill + drain)', () => {
 
       await runDrainOutboxPass();
 
-      expect(await ctx.db.jobOutbox.count()).toBe(0);
+      expect(await db.jobOutbox.count()).toBe(0);
       expect([...queued.keys()]).toHaveLength(1);
       expect([...queued.keys()][0]).not.toContain(':');
     });

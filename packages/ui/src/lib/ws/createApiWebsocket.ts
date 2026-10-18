@@ -287,6 +287,8 @@ export const createApiWebsocket = (
       case 'openRejected':
         if (isFinalOpenAnswer(frame.stream as string)) failOpen(frame.stream as string, false);
         return;
+      case 'resync':
+        return void resyncStream(frame.stream as string);
       case 'error':
         onFrameError(frame);
         return;

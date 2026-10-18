@@ -1,0 +1,54 @@
+{
+  "id": "conventions",
+  "title": "Naming and code style",
+  "routing": "Is this about what to name something or how code should read: operationId and route file names (resourceActionSubresource, plural ReadMany subresources), hook/job/middleware file names, util vs helper, services vs handlers, make*/validate*/get*/is* prefixes, txn, <Model>Id, SCREAMING_SNAKE vs PascalCase const objects with keyof typeof, Prisma model/field/relation casing and no @map, polymorphic side names (owner, source/target, resource, subject, actor; never referenced*) and side-prefixed FKs, _ vs __ prefixes, or style rules (no comments, one export per file, named exports, type over interface, no TS enum, inferred types, single-line early exits, minimal index files, #/ and @template/ imports, quiet logging, no root-level dependencies)?",
+  "concepts": ["naming", "code-style"],
+  "tokens": 10082,
+  "tokenMethod": "chars/4",
+  "files": {
+    "recognise": {
+      "path": "recognise.md",
+      "tokens": 2077,
+      "experimental": true,
+      "note": "recognise/pick split under test (model round); not the standard"
+    },
+    "knowledge": {
+      "path": "knowledge.md",
+      "tokens": 10082
+    }
+  },
+  "runsAgreed": 1,
+  "sources": {
+    "docs": [
+      "AI/ENTRYPOINT.md",
+      "docs/claude/API_ROUTES.md",
+      "docs/claude/NAMING.md",
+      "docs/claude/STYLE.md"
+    ],
+    "docUnits": [
+      "doc:docs/claude/API_ROUTES.md#naming-conventions",
+      "doc:docs/claude/NAMING.md#terminology",
+      "doc:docs/claude/NAMING.md#backend",
+      "doc:docs/claude/NAMING.md#frontend",
+      "doc:docs/claude/NAMING.md#database",
+      "doc:docs/claude/NAMING.md#files-directories",
+      "doc:docs/claude/STYLE.md#naming-conventions",
+      "doc:docs/claude/STYLE.md#code-formatting",
+      "doc:docs/claude/STYLE.md#typescript",
+      "doc:docs/claude/STYLE.md#comments-logging",
+      "doc:AI/ENTRYPOINT.md#0-purpose-and-priority"
+    ],
+    "catalogClusters": [
+      "code-style-lint-checks",
+      "data-models",
+      "module-layout-monorepo",
+      "naming-vocabulary",
+      "request-response-schemas",
+      "structured-logging"
+    ],
+    "codeEntries": 1,
+    "docMembers": 34
+  },
+  "bypassLines": 19,
+  "glossaryTerms": 15
+}

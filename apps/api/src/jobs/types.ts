@@ -4,10 +4,10 @@
  * @partOf primitive:jobs
  * @uses infrastructure:prisma, infrastructure:redis
  */
-import type { Db } from '@template/db';
 import { JobLane } from '@template/db/generated/client/enums';
 import type { Job, Queue } from 'bullmq';
 import type { Redis } from 'ioredis';
+import type { JobPayloads } from '#/jobs/handlers';
 
 export type JobsQueue = Queue & { redis: Redis };
 
@@ -16,7 +16,6 @@ export type JobsQueue = Queue & { redis: Redis };
 // invoking the handler, so log calls automatically also flow to job.log()
 // without needing a context wrapper.
 export type WorkerContext = {
-  db: Db;
   queue: JobsQueue;
   job: Job;
   signal?: AbortSignal;
@@ -46,6 +45,8 @@ export type JobData<TPayload = unknown> = {
   payload: TPayload;
   dedupeKey?: string;
   traceContext?: Record<string, string>;
+  // The next stage a staged job runs (see runJobStages); absent until its first stage completes.
+  stage?: number;
 };
 
 export type JobHandlerArgs<TPayload = void> = [TPayload] extends [undefined]
@@ -59,6 +60,28 @@ export type JobHandler<TPayload = void> = ((
   lane?: JobLane;
 };
 
+// Adds a child of the running job. Exists only on a stage's context: only a job can have children.
+// A superseding job may only add superseding children (validateChildJobHandler).
+export type EnqueueChildJob = <K extends keyof JobPayloads>(
+  handlerName: K,
+  payload: JobPayloads[K],
+) => Promise<void>;
+
+export type StageContext = WorkerContext & { enqueueChildJob: EnqueueChildJob };
+
+export type JobStage<TPayload = void> = (
+  ctx: StageContext,
+  ...args: JobHandlerArgs<TPayload>
+) => Promise<void>;
+
+// A job that fans out and waits: each stage runs once its predecessor's children have all reported,
+// and `finish` runs once, after the last stage. Every constructor (makeJob, makeSingletonJob,
+// makeSupersedingJob) takes one in place of a handler.
+export type StagedJob<TPayload = void> = {
+  stages: JobStage<TPayload>[];
+  finish: (ctx: WorkerContext, ...args: JobHandlerArgs<TPayload>) => Promise<void>;
+};
+
 export type JobOptions = {
   priority?: number;
   delay?: number;
@@ -67,4 +90,11 @@ export type JobOptions = {
   removeOnComplete?: boolean | number | { age: number; count?: number };
   removeOnFail?: boolean | number | { age: number; count?: number };
   jobId?: string;
+  // Set only by a stage's enqueueChildJob: the BullMQ flow parent, and whether a child that exhausts
+  // its retries counts as done rather than leaving its parent waiting.
+  parent?: { id: string; queue: string };
+  ignoreDependencyOnFailure?: boolean;
+  // Set only by enqueueJob for a keyed singleton (singletonDeduplicationId): while a job with this id
+  // exists, BullMQ ignores another add.
+  deduplication?: { id: string };
 };

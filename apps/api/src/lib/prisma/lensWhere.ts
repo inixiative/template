@@ -5,6 +5,7 @@
  * @uses none
  */
 import {
+  andWhere,
   describeRule,
   executePrismaPlan,
   getLensRoot,
@@ -39,7 +40,7 @@ const scopePlan = (
   );
   if (!back) return;
   step.args.where = step.args.where
-    ? { AND: [step.args.where, { [back[0]]: scope }] }
+    ? andWhere([step.args.where, { [back[0]]: scope }])
     : { [back[0]]: scope };
 };
 

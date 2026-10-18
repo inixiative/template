@@ -68,9 +68,9 @@
 Request
   │
   ├─► prepareRequest     # Initialize context (db, requestId, permix)
-  ├─► authMiddleware     # Session auth (BetterAuth)
-  ├─► spoofMiddleware    # Superadmin impersonation
+  ├─► jwtAuthMiddleware  # Person JWT
   ├─► tokenAuthMiddleware # API token auth
+  ├─► spoofMiddleware    # Superadmin impersonation
   │
   ├─► Route middleware   # validatePermission, validateNotToken, etc.
   ├─► Controller         # Business logic

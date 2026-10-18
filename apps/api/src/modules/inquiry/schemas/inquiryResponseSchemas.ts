@@ -5,33 +5,29 @@
  * @uses feature:auditLogs
  */
 import { z } from '@hono/zod-openapi';
-import {
-  InquiryScalarSchema,
-  OrganizationScalarSchema,
-  SpaceScalarSchema,
-  UserScalarSchema,
-} from '@template/db';
+import { InquiryScalarSchema, OrganizationScalarSchema, SpaceScalarSchema } from '@template/db';
 import { auditLogResponseSchema } from '#/modules/admin/auditLog/schemas/auditLogResponseSchema';
+import { userResponseSchema } from '#/modules/user/schemas/userResponseSchema';
 
 export const inquiryResponseSchema = InquiryScalarSchema.extend({
-  sourceUser: UserScalarSchema.nullable(),
+  sourceUser: userResponseSchema.nullable(),
   sourceOrganization: OrganizationScalarSchema.nullable(),
   sourceSpace: SpaceScalarSchema.nullable(),
-  targetUser: UserScalarSchema.nullable(),
+  targetUser: userResponseSchema.nullable(),
   targetOrganization: OrganizationScalarSchema.nullable(),
   targetSpace: SpaceScalarSchema.nullable(),
   auditLogsAsSubject: z.array(auditLogResponseSchema),
 }).openapi('InquiryItem');
 
 export const inquirySentResponseSchema = InquiryScalarSchema.extend({
-  targetUser: UserScalarSchema.nullable(),
+  targetUser: userResponseSchema.nullable(),
   targetOrganization: OrganizationScalarSchema.nullable(),
   targetSpace: SpaceScalarSchema.nullable(),
   auditLogsAsSubject: z.array(auditLogResponseSchema),
 }).openapi('InquirySentItem');
 
 export const inquiryReceivedResponseSchema = InquiryScalarSchema.extend({
-  sourceUser: UserScalarSchema.nullable(),
+  sourceUser: userResponseSchema.nullable(),
   sourceOrganization: OrganizationScalarSchema.nullable(),
   sourceSpace: SpaceScalarSchema.nullable(),
   auditLogsAsSubject: z.array(auditLogResponseSchema),

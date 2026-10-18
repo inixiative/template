@@ -10,8 +10,8 @@
   - [Schema Location](#schema-location)
   - [Generator Output](#generator-output)
 - [Scripts](#scripts)
+  - [Schema Changes: Push Before Launch, Migrations After](#schema-changes-push-before-launch-migrations-after)
   - [Development Workflow](#development-workflow)
-  - [Production Workflow](#production-workflow)
   - [Database Operations](#database-operations)
 - [Seeding](#seeding)
   - [Prime Development Data](#prime-development-data)
@@ -40,6 +40,7 @@
   - [Manual Transaction](#manual-transaction)
   - [After Commit Callbacks](#after-commit-callbacks)
   - [Finally Callbacks](#finally-callbacks)
+  - [Redis Locks Held Until the Transaction Ends](#redis-locks-held-until-the-transaction-ends)
   - [Row Locks and Create-If-Missing](#row-locks-and-create-if-missing)
 - [Query Building Utilities](#query-building-utilities)
   - [buildWhereClause](#buildwhereclause)
@@ -117,28 +118,37 @@ Run from repo root or `packages/db`:
 | Script | Command | Purpose |
 |--------|---------|---------|
 | Generate | `bun run db:generate` | Generate Prisma client + Zod schemas |
-| Push | `bun run db:push` | Push schema to DB (dev only, no migration) |
-| Migrate | `bun run db:migrate` | Create migration file |
-| Deploy | `bun run db:deploy` | Run migrations (CI/production) |
+| Push | `bun run db:push` | Push schema to DB, no migration (`db:push:dev` = worktree-aware local + test push) |
+| Migrate | `bun run db:migrate` | Create a migration file (`prisma migrate dev`) — after launch |
+| Deploy | `bun run db:deploy` | Apply migrations (`prisma migrate deploy`) — after launch |
+| Baseline | `bun run db:baseline` | Create `prisma/migrations/0_init` from the schema; the Launch step runs it |
 | Studio | `bun run db:studio` | Open Prisma Studio GUI |
 | Seed | `bun run db:seed` | Run seed script |
+
+### Schema Changes: Push Before Launch, Migrations After
+
+The cut-over is `launched` in `project.config.ts`, flipped by the init script's Launch step. **Before launch a deployed database is disposable:** schema reaches it by `prisma db push --accept-data-loss`, which drops whatever no longer fits. **After launch nothing may clobber a database:** schema reaches it only through committed migrations, applied by `prisma migrate deploy`, and the push paths close.
+
+| | Pre-launch (`launched: false`, the default) | Launched |
+|---|---|---|
+| Release step (`scripts/db/release.sh`) | `prisma db push --accept-data-loss`, then the non-prime seed | `prisma migrate deploy`, then the non-prime seed |
+| Changing the schema | edit `prisma/schema/`, `bun run db:generate && bun run db:push` (`db:push:dev` in a worktree) | `bun run db:migrate` creates a migration under `packages/db/prisma/migrations/`; review and commit it |
+| `setup.sh` | pushes and seeds the local database | skips push and seed |
+| Migration files | none | start at `0_init`, created by Launch |
+
+`scripts/checkLaunched.ts` reads the flag for the shell scripts. Guards that hold either way: `db:push:force` refuses outside `test`/`local`, and `push-dev.sh` refuses a non-local `DATABASE_URL`.
+
+**What Launch does** (init → Launch, [#197](https://github.com/inixiative/template/pull/197)): `bun run db:baseline` writes `prisma/migrations/0_init` as the diff from an empty database to `prisma/schema` (once); for prod, and staging when enabled, it checks the deployed database matches `prisma/schema` and otherwise blocks launch ("deploy the current schema there, then launch"); it records `0_init` as applied on each (`prisma migrate resolve --applied 0_init`); then it sets `launched = true`. Commit `prisma/migrations` and `project.config.ts` together.
+
+**Not built:** nothing invokes `scripts/db/release.sh`. The Railway services the init creates run only `db:generate` at build and start the API/worker, and `scripts/deployment/deploy.sh` is a stub. Until a deploy hook runs it, the release step is run by hand against the target database.
 
 ### Development Workflow
 
 ```bash
 # After schema changes
 bun run db:generate   # Regenerate client
-bun run db:push       # Push to local DB (fast, no migration)
-
-# When ready to commit
-bun run db:migrate    # Create migration file
-# Review migration, commit
-```
-
-### Production Workflow
-
-```bash
-bun run db:deploy     # Run pending migrations
+bun run db:push       # Pre-launch: push to the local DB (in a worktree: bun run db:push:dev)
+bun run db:migrate    # Launched: create a migration, review it, commit it
 ```
 
 ### Database Operations
@@ -373,14 +383,14 @@ const orgId: OrganizationId = organizationId('org-456');
 
 ```typescript
 // Function signatures enforce correct ID types
-async function getUser(id: UserId): Promise<User> { ... }
-async function getOrg(id: OrganizationId): Promise<Organization> { ... }
+async function loadUser(id: UserId): Promise<User> { ... }
+async function loadOrganization(id: OrganizationId): Promise<Organization> { ... }
 
 // Compile-time error: can't pass UserId where OrganizationId expected
-getOrg(userId('abc'));  // ❌ Type error
+loadOrganization(userId('abc'));  // ❌ Type error
 
 // Correct usage
-getOrg(organizationId('abc'));  // ✓
+loadOrganization(organizationId('abc'));  // ✓
 ```
 
 ### Available Types
@@ -526,6 +536,7 @@ db.txn(fn)              // Start transaction
 db.onCommit(fns)        // Queue callbacks for after commit
 db.onFinally(fns)       // Queue callbacks for when the txn ends, commit or rollback
 db.findForUpdate(model, where, opts?) // SELECT ... FOR UPDATE; { upserting: true } fences a missing row
+db.withLockUntilSettled(lockOptions, fn, acquireOptions?) // Redis lock held until the txn ends
 db.getScopeId()         // Get current scope ID
 db.isInTxn()            // Check if in transaction
 ```
@@ -562,6 +573,33 @@ before the `onCommit` callbacks, without waiting for them. Every callback runs e
 failures are logged and never replace the transaction's own result or error. Like `onCommit`, it
 throws outside `db.txn()`, and a nested `db.txn()` registers on the outermost transaction.
 
+### Redis Locks Held Until the Transaction Ends
+
+A lock taken inside a transaction must outlive the code that took it: the writes made under it are
+invisible to everyone else until the commit, so releasing when `fn` returns lets the next holder read
+the state before them. `db.withLockUntilSettled(lockOptions, fn, acquireOptions?)` takes a `createLock`
+lock (same options; `acquireOptions` is `{ waitMs, pollMs, onTimeout }`), runs `fn`, and releases the
+lock on the transaction's finally queue (the one `db.onFinally` feeds) once the transaction settles,
+commit or rollback. The release is queued before the wait starts, so an acquisition that finishes
+after the transaction ended is still released, and that late holder throws instead of running `fn`
+outside the transaction. It throws outside `db.txn()`.
+
+- **One acquisition per transaction.** A second take of a key the transaction holds, or is still
+  waiting for, joins it instead of waiting on itself: a nested `db.txn()`, later rounds of a
+  `transactionAll` batch, parallel sub-requests of one round.
+- **Holders inside the transaction still run one at a time**, in call order (a per-key
+  `createSerializedQueue` on the transaction), so parallel branches each see what the one before
+  wrote. A take from inside a holder's own `fn` runs straight through. The queue wait has no
+  deadline (`waitMs` bounds only the Redis wait), so a holder must not await a sibling holder of the
+  same key, and a transaction taking several keys takes them in one fixed order everywhere.
+- **Timeouts.** A wait past `waitMs` throws `onTimeout()` (or an error naming the key) and the
+  transaction rolls back. Keep `waitMs` under the transaction's own timeout. The lease is
+  heartbeat-renewed, so a long transaction keeps it.
+
+`withOwnerLock` (`apps/api/src/lib/locks/withOwnerLock.ts`) uses it whenever it is called inside a
+transaction; outside one it takes and releases a plain `createLock` lock around `fn`. Upserting
+`findForUpdate` holds its keys the same way.
+
 ### Row Locks and Create-If-Missing
 
 `db.findForUpdate(model, where)` runs `SELECT * ... FOR UPDATE` inside `db.txn()`. A row that does
@@ -576,9 +614,10 @@ await db.txn(async () => {
 ```
 
 `upserting: true` takes a Redis lock (`createLock`, service `find-for-update`, keyed on the model
-plus the where entries sorted by key, hashed) **before** the `SELECT`, and releases it through
-`db.onFinally` once the transaction ends. The where must be scalar equalities only — no arrays,
-`in`, operator objects, `null` or `undefined`. A caller that cannot get the lock waits up to
+plus the where entries sorted by key, hashed) **before** the `SELECT`, and holds it until the
+transaction ends, the same way `db.withLockUntilSettled` does. The where must be scalar
+equalities (no arrays, operator objects, `null` or `undefined`), except that one field may list
+values as `{ in: [...] }`, fencing each value under the key a single-row fence on it takes. A caller that cannot get the lock waits up to
 `waitMs` (default 3000ms, inside Prisma's 5000ms interactive default) and then throws
 `FindForUpdateLockTimeoutError`, rolling its transaction back. Fencing the same key twice in one
 transaction does not wait on itself. The `no-create-race-machinery` CI rule fails a change that

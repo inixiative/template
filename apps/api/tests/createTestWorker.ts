@@ -29,7 +29,7 @@ export const createTestWorker = (
   jobOverrides?: Partial<Job>,
 ): WorkerContext & { run: (payload?: unknown) => Promise<void> } => {
   const job = createMockJob(jobOverrides);
-  const ctx: WorkerContext = { db, queue, job };
+  const ctx: WorkerContext = { queue, job };
 
   const run = (payload?: unknown): Promise<void> =>
     db.scope(

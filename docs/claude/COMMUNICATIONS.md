@@ -165,9 +165,10 @@ model EmailTemplate {
   componentRefs    String[]            // Pre-computed slugs
 
   // Ownership (false polymorphism)
-  ownerModel       EmailOwnerModel     // default|admin|Organization|Space
+  ownerModel       EmailOwnerModel     // see Enums: platform, tenant and user tiers
   organizationId   String?
   spaceId          String?
+  userId           String?
   inheritToSpaces  Boolean             // Allow Space to use Org template
 }
 ```
@@ -188,6 +189,7 @@ model EmailComponent {
   ownerModel       EmailOwnerModel
   organizationId   String?
   spaceId          String?
+  userId           String?
   inheritToSpaces  Boolean
 }
 ```
@@ -243,10 +245,13 @@ enum CommunicationStatus {
 }
 
 enum EmailOwnerModel {
-  default       // Base templates - read: all, write: super admin
-  admin         // Platform internal - super admin only
-  Organization  // Tenant-branded
-  Space         // Space-specific overrides
+  default           // Base templates - read: all, write: super admin
+  admin             // Platform internal - super admin only
+  Organization      // Tenant-branded - org admins
+  Space             // Space-specific overrides
+  User              // User chain floor - a user's personal template/component
+  OrganizationUser  // User-owned within an org
+  SpaceUser         // User-owned within a space
 }
 
 ```
@@ -777,7 +782,7 @@ edges are persisted so that "who references X" is an index and a stale rule is n
   axis therefore carries true polymorphism beside the false — the FK is the relation and may go
   null, `targetId` is the name and never changes, and the sync writes both from one value.
   `ruleReferenceIssues(edges)` reads both from the edge rows alone, so consumers
-  write `include: { ruleReferences: true }` and never grow that include as models become
+  write `include: { sourceRuleReferences: true }` and never grow that include as models become
   referenceable. At render, `composeTemplate` reads the template's edges plus those of the
   components the cascade resolved into one live set, and every branch goes through **`withRule`**
   (`@template/shared/rules`) — the one fork a stored rule is evaluated through anywhere.

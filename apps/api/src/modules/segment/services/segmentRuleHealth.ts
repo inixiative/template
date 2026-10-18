@@ -14,7 +14,7 @@ import { segmentOwnerId } from '#/modules/segment/lib/segmentOwner';
 
 export type SegmentRuleState = { segment: Segment; health: RuleHealth; issues: RuleIssue[] };
 
-export type SegmentWithEdges = Segment & { ruleReferences?: RuleReferenceRow[] };
+export type SegmentWithEdges = Segment & { sourceRuleReferences?: RuleReferenceRow[] };
 
 const segmentKey = (id: string): string => referenceKey({ model: 'Segment', id });
 
@@ -109,11 +109,11 @@ export const segmentRuleState = async (segment: Segment): Promise<SegmentRuleSta
 
 /** Issues read off the row's own edges; null when a live segment reference means the owner closure decides. */
 export const segmentRuleIssuesFromEdges = (segment: SegmentWithEdges): RuleIssue[] | null => {
-  if (!segment.ruleReferences) return null;
+  if (!segment.sourceRuleReferences) return null;
   const health = ruleHealthFromEdges(
     customerRefLens,
     segment.conditions as Condition,
-    segment.ruleReferences,
+    segment.sourceRuleReferences,
   );
   if (
     health.references.some(
