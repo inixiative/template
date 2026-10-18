@@ -5,6 +5,7 @@
 ## Contents
 
 - [What an artifact is](#what-an-artifact-is)
+  - [Why: no orphans, no rug pulls](#why-no-orphans-no-rug-pulls)
 - [Kinds](#kinds)
 - [Placements and the owner root](#placements-and-the-owner-root)
 - [Access](#access)
@@ -22,6 +23,12 @@
 An **artifact** is anything that is owned, placed in containers, shared and made public: a file, a folder, and in forks other kinds. There is one node model, `Artifact`, with a `kind`. A container is just an artifact whose kind may hold others, so there is no separate folder table. A kind with content of its own keeps its own tables (`file` → `File`, `FileVersion`).
 
 Why one node: a grant then has a single target, "who may hold what" is a fact in the code catalog rather than a table per kind, and the same access rules serve files, folders and anything a fork adds. The file system's wider design (upload, versions, bindings, lazy copy) is `tickets/FEAT-009-file-management.md`.
+
+### Why: no orphans, no rug pulls
+
+**Nothing gets lost by being organised.** File systems that let one item live in several places tend to strand it: remove it from the last folder that showed it and it still exists, still costs storage, and nobody can find it. Here an item can sit in several containers of its owner, and every owner has a root that takes back anything that loses its last container, so an item is never reachable only by search. Placements are soft-deleted and audited, so "where was this, and who moved it" always has an answer. Moving something between places never changes who owns it. Changing ownership is a separate, deliberate act (an Inquiry, coming next), so reorganising a folder can't silently hand bytes to someone else.
+
+**Using something can't be pulled out from under you.** This is the less common property. When you use an artifact, for example as a logo, an avatar or an attachment (a `ResourceBinding`), you depend on it. If the owner revokes your access or deletes the source, your use is not left broken: it is repointed to a frozen copy that you own (lazy copy, also called copy-on-revoke, FEAT-009 § 6). An active use always triggers this; a grant marked `preserveOnRevoke` opts in without one. The lazy copy is designed but not built yet; the bindings and the grant flag that drive it are in place.
 
 | Problem | Use | Read | Signs you're bypassing it |
 |---|---|---|---|

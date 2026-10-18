@@ -803,7 +803,31 @@ async function sweepVersions(db, storage) {
 
 No automatic heal. When a snapshot in `__preserved/` has a `sourceFileId` the user can access again, offer a manual **reconnect**: repoint the binding(s) from the snapshot back to the live original, then discard the snapshot. Detection is an access check on `sourceFileId`; the mechanic is the existing binding-repoint. Deferred — break (keep the snapshot) is current behavior.
 
-### Reference-Safe Delete
+### History / provenance
+
+### How the design got here (2026)
+
+1. **Folder tree** (#72, first draft). `File` + `Folder` with a materialized `path`, a `FilePermission` with a `public` sentinel, "most specific wins", and `FolderVisibility` for admin-hidden folders.
+2. **Artifact + containers.** One `Artifact` node with a `kind`; a folder is a container kind, `ArtifactContainer` is the edge, and `ArtifactPermission` grants targets artifacts only. Access became the node's own column plus grants, resolved as a union over containers (`private` takes nothing from them). `FolderVisibility` was dropped for one visibility system.
+3. **Multi-parent within one owner.** An item may sit in several containers ("compliance" under both "legal" and "operations"), but every container edge stays within one owner, so the container graph never crosses a billing and tenancy boundary.
+4. **Owner root.** Every owner gets a root container that takes back anything losing its last container: no orphan state. Containment organises; grants give access.
+5. **Ownership transfer as an Inquiry** (next). Changing who owns an artifact is a request between parties, approved or auto-approved like any other Inquiry, and never a side effect of moving it.
+
+### Prior art, and where we differ
+
+**Anti-orphaning.**
+- **Unix hard links.** A file (inode) can have several names (directory entries). It keeps a link count and is freed only when the last name goes and nothing holds it open (POSIX `link`/`unlink`). Ours is the same refcount idea with a guaranteed home: the owner root means the last placement leaving never frees anything; deleting is always explicit. *(General knowledge; not separately cited.)*
+- **Gmail labels and All Mail.** A message can carry many labels; removing them all leaves it in All Mail, and only deleting it removes it ([UC Santa Barbara guide](https://connect.ucsb.edu/training-support/connect-user-guides/google-workspace-email/using-archive-rather-delete), [University of Alaska KB](https://service.alaska.edu/TDClient/36/Portal/KB/Article/239/Gmail-Labels-Are-Different-From-Folders)). All Mail is our owner root. *(Third-party help pages; Google's own article not found.)*
+- **Google Drive's multi-parent era.** Drive let an item sit in several folders. When a shared folder's owner deleted it, files the user owned were left with no folder: still taking storage, invisible in My Drive, findable only with the `is:unorganized owner:me` search ([UW–Madison KB](https://kb.wisc.edu/googleapps/138027), [BetterCloud](https://www.bettercloud.com/monitor/the-academy/find-rehome-orphaned-files-google-drive/), [How-To Geek](https://www.howtogeek.com/747579/how-to-remove-orphaned-files-taking-up-space-in-google-drive/)). In March 2020 Google announced that from **30 September 2020** every item would have exactly one location, with shortcuts for the rest ([Google Workspace blog, "Simplifying Google Drive's folder structure and sharing models"](https://workspace.google.com/blog/product-announcements/simplifying-google-drives-folder-structure-and-sharing-models)). It then migrated existing multi-location items to shortcuts, a migration moved from 2021 to 2022 ([Workspace Updates, Dec 2021](https://workspaceupdates.googleblog.com/2021/12/timeline-update-for-migration-of-multi-location-drive-files.html), [Google admin help](https://support.google.com/a/answer/10686746)). The difference: in Drive, placement was tangled with ownership and sharing, since where a file sat decided who could reach it and who owned it. Here placement, grants and ownership are three separate records, so we keep multiple placements and fix orphaning with the owner root rather than giving multiple placements up. *(The causal reading, "because placement and ownership were tangled", is our interpretation; Google's post gives its reasons as simplifying the folder and sharing models.)*
+
+**Anti-rug-pull.**
+- **Figma libraries.** Deleting or unpublishing a main component does not immediately break its instances in other files; they keep rendering and can be detached or repaired. *(Community-forum sourced, e.g. [Figma forum](https://forum.figma.com/t/how-do-i-remove-a-shared-component-whose-original-component-is-deleted/668); no official Figma article found: unverified as documented behaviour.)*
+- **npm after left-pad.** In March 2016 a package many builds depended on (left-pad) was unpublished and broke them. npm then restricted unpublishing: a package could only be removed within 24 hours of publishing, and older packages with dependents were protected ([InfoQ](https://www.infoq.com/news/2016/03/npm-package-removal-policy), [ADTmag](https://adtmag.com/articles/2016/03/30/npm-policy-changes.aspx), [Wikipedia: npm](https://en.wikipedia.org/wiki/Npm)). The current window is reported as 72 hours with no public dependents; unverified against npm's own docs.
+- **Where we differ.** Each of these protects one product's one kind of dependency, and npm does it by refusing the removal. Ours is a general primitive for any use: any `ResourceBinding`, on any artifact kind, survives the source's owner revoking access or deleting it, by repointing to a copy the user owns (lazy copy, §6). The owner keeps the right to withdraw.
+
+---
+
+## Reference-Safe Delete
 
 A file with active ResourceBindings or ArtifactPermission shares should not be hard-deletable without explicit override. Options:
 - **Block delete** — "This file is used as a logo on 2 resources and shared with 3 users. Remove bindings first."
