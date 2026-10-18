@@ -75,6 +75,7 @@ enum InquiryType {
   createSpace
   updateSpace
   transferSpace
+  transferArtifact
 }
 
 enum InquiryStatus {

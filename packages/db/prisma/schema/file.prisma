@@ -1,0 +1,89 @@
+model File {
+  id        String   @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  artifactId String   @unique @db.VarChar(36)
+  artifact   Artifact @relation(fields: [artifactId], references: [id], onDelete: Cascade)
+
+  sourceFileId String? @db.VarChar(36)
+  source       File?   @relation("FileLazyCopy", fields: [sourceFileId], references: [id])
+  copies       File[]  @relation("FileLazyCopy")
+
+  versions FileVersion[]
+
+  @@index([sourceFileId])
+}
+
+model FileVersion {
+  id        String   @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  fileId String @db.VarChar(36)
+  file   File   @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  version      Int
+  key          String // S3 object key; NOT unique - a revert reuses a prior version's key.
+  contentType  String
+  size         Int
+  status       FileVersionStatus @default(pending)
+  revertedFrom Int?
+
+  @@unique([fileId, version])
+  @@index([fileId, status])
+  @@index([key])
+}
+
+model ResourceBinding {
+  id        String   @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sourceModel ResourceBindingSourceModel
+  artifactId  String?                    @db.VarChar(36)
+  artifact    Artifact?                  @relation(fields: [artifactId], references: [id])
+  url         String?
+
+  resourceModel  ResourceBindingResourceModel
+  organizationId String?                      @db.VarChar(36)
+  spaceId        String?                      @db.VarChar(36)
+  userId         String?                      @db.VarChar(36)
+  customerRefId  String?                      @db.VarChar(36)
+
+  organization Organization? @relation("ResourceBindingOrganization", fields: [organizationId], references: [id], onDelete: Cascade)
+  space        Space?        @relation("ResourceBindingSpace", fields: [spaceId], references: [id], onDelete: Cascade)
+  user         User?         @relation("ResourceBindingUser", fields: [userId], references: [id], onDelete: Cascade)
+  customerRef  CustomerRef?  @relation("ResourceBindingCustomerRef", fields: [customerRefId], references: [id], onDelete: Cascade)
+
+  bindingType String
+  order       Int    @default(0)
+  media       Json?
+  conditions  Json?
+
+  @@index([resourceModel, organizationId, bindingType])
+  @@index([resourceModel, spaceId, bindingType])
+  @@index([resourceModel, userId, bindingType])
+  @@index([resourceModel, customerRefId, bindingType])
+  @@index([artifactId])
+}
+
+enum FileVersionStatus {
+  pending
+  active
+  purging
+  purged
+  failed
+}
+
+enum ResourceBindingSourceModel {
+  Artifact
+  url
+}
+
+enum ResourceBindingResourceModel {
+  Organization
+  Space
+  User
+  CustomerRef
+}

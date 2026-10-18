@@ -1,0 +1,142 @@
+model Artifact {
+  id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  kind   String
+  type   ArtifactType
+  name   String
+  access ArtifactAccess @default(inherit)
+  system    Boolean        @default(false)
+  systemKey String?
+
+  integrationId String?      @db.VarChar(36)
+  integration   Integration? @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  ownerModel     ArtifactOwnerModel
+  userId         String?            @db.VarChar(36)
+  organizationId String?            @db.VarChar(36)
+  spaceId        String?            @db.VarChar(36)
+
+  user         User?         @relation("ArtifactOwnerUser", fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization? @relation("ArtifactOwnerOrganization", fields: [organizationId], references: [id], onDelete: Cascade)
+  space        Space?        @relation("ArtifactOwnerSpace", fields: [spaceId], references: [id], onDelete: Cascade)
+
+  file        File?
+  bindings    ResourceBinding[]
+  permissions ArtifactPermission[]
+  placements  ArtifactPlacement[] @relation("ArtifactPlacementArtifact")
+  contents    ArtifactPlacement[] @relation("ArtifactPlacementContainer")
+  auditLogs   AuditLog[]
+
+  integrationRecords IntegrationRecord[]
+
+  // ==========================================================================
+  // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
+  // ==========================================================================
+
+  @@unique([organizationId, systemKey], where: raw("\"ownerModel\" = 'Organization' AND \"systemKey\" IS NOT NULL AND \"deletedAt\" IS NULL"), map: "Artifact_organization_system_key")
+  @@index([ownerModel])
+  @@index([userId])
+  @@index([organizationId])
+  @@index([spaceId])
+  @@index([kind])
+  @@index([type])
+  @@index([integrationId])
+}
+
+model ArtifactPlacement {
+  id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  containerArtifactId String   @db.VarChar(36)
+  artifactId          String   @db.VarChar(36)
+  containerArtifact   Artifact @relation("ArtifactPlacementContainer", fields: [containerArtifactId], references: [id], onDelete: Restrict)
+  artifact            Artifact @relation("ArtifactPlacementArtifact", fields: [artifactId], references: [id], onDelete: Cascade)
+
+  auditLogs AuditLog[]
+
+  @@unique([containerArtifactId, artifactId], where: raw("\"deletedAt\" IS NULL"), map: "ArtifactPlacement_edge_key")
+  @@index([containerArtifactId])
+  @@index([artifactId])
+}
+
+model ArtifactPermission {
+  id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  artifactId String   @db.VarChar(36)
+  artifact   Artifact @relation(fields: [artifactId], references: [id], onDelete: Cascade)
+
+  granteeModel          ArtifactPermissionGranteeModel
+  granteeUserId         String?                        @db.VarChar(36)
+  granteeOrganizationId String?                        @db.VarChar(36)
+  granteeSpaceId        String?                        @db.VarChar(36)
+  granteeCustomerRefId  String?                        @db.VarChar(36)
+  granteeIntegrationId  String?                        @db.VarChar(36)
+
+  granteeUser             User?             @relation("ArtifactPermissionGranteeUser", fields: [granteeUserId], references: [id], onDelete: Cascade)
+  granteeOrganization     Organization?     @relation("ArtifactPermissionGranteeOrganization", fields: [granteeOrganizationId], references: [id], onDelete: Cascade)
+  granteeSpace            Space?            @relation("ArtifactPermissionGranteeSpace", fields: [granteeSpaceId], references: [id], onDelete: Cascade)
+  granteeOrganizationUser OrganizationUser? @relation("ArtifactPermissionGranteeOrganizationUser", fields: [granteeOrganizationId, granteeUserId], references: [organizationId, userId], onDelete: Cascade)
+  granteeSpaceUser        SpaceUser?        @relation("ArtifactPermissionGranteeSpaceUser", fields: [granteeOrganizationId, granteeSpaceId, granteeUserId], references: [organizationId, spaceId, userId], onDelete: Cascade)
+  granteeCustomerRef      CustomerRef?      @relation("ArtifactPermissionGranteeCustomerRef", fields: [granteeCustomerRefId], references: [id], onDelete: Cascade)
+  granteeIntegration      Integration?      @relation("ArtifactPermissionGranteeIntegration", fields: [granteeIntegrationId], references: [id], onDelete: Cascade)
+
+  role             Role
+  expiresAt        DateTime?
+  fromVersion      Int       @default(1)
+  preserveOnRevoke Boolean   @default(false)
+
+  auditLogs AuditLog[]
+
+  // ==========================================================================
+  // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
+  // ==========================================================================
+
+  @@unique([artifactId, granteeUserId], where: raw("\"granteeModel\" = 'User' AND \"deletedAt\" IS NULL"), map: "ArtifactPermission_user_key")
+  @@unique([artifactId, granteeOrganizationId], where: raw("\"granteeModel\" = 'Organization' AND \"deletedAt\" IS NULL"), map: "ArtifactPermission_organization_key")
+  @@unique([artifactId, granteeSpaceId], where: raw("\"granteeModel\" = 'Space' AND \"deletedAt\" IS NULL"), map: "ArtifactPermission_space_key")
+  @@unique([artifactId, granteeOrganizationId, granteeUserId], where: raw("\"granteeModel\" = 'OrganizationUser' AND \"deletedAt\" IS NULL"), map: "ArtifactPermission_organization_user_key")
+  @@unique([artifactId, granteeSpaceId, granteeUserId], where: raw("\"granteeModel\" = 'SpaceUser' AND \"deletedAt\" IS NULL"), map: "ArtifactPermission_space_user_key")
+  @@unique([artifactId, granteeCustomerRefId], where: raw("\"granteeModel\" = 'CustomerRef' AND \"deletedAt\" IS NULL"), map: "ArtifactPermission_customer_ref_key")
+  @@unique([artifactId, granteeIntegrationId], where: raw("\"granteeModel\" = 'Integration' AND \"deletedAt\" IS NULL"), map: "ArtifactPermission_integration_key")
+  @@index([artifactId])
+  @@index([granteeModel, granteeUserId])
+  @@index([granteeModel, granteeOrganizationId])
+  @@index([granteeModel, granteeSpaceId])
+  @@index([granteeModel, granteeCustomerRefId])
+  @@index([granteeModel, granteeIntegrationId])
+}
+
+enum ArtifactType {
+  container
+  object
+}
+
+enum ArtifactAccess {
+  inherit
+  public
+  private
+}
+
+enum ArtifactOwnerModel {
+  User
+  Organization
+  Space
+}
+
+enum ArtifactPermissionGranteeModel {
+  User
+  Organization
+  Space
+  OrganizationUser
+  SpaceUser
+  CustomerRef
+  Integration
+}

@@ -1,3 +1,4 @@
+import { registerArtifactAccessHook } from '#/hooks/artifactAccess/hook';
 import { registerAuditLogHook } from '#/hooks/auditLog/hook';
 import { registerClearCacheHook } from '#/hooks/cache/hook';
 import { registerContactRulesHook } from '#/hooks/contactRules/hook';
@@ -7,6 +8,7 @@ import { registerEmailVersioningHook } from '#/hooks/emailVersioning/hook';
 import { registerImmutableFieldsHook } from '#/hooks/immutableFields/hook';
 import { registerLastLoginAtHook } from '#/hooks/lastLoginAt/hook';
 import { registerOrderedListHook } from '#/hooks/orderedList/hook';
+import { registerOrganizationUserFolderHook } from '#/hooks/organizationUserFolder/hook';
 import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
 import { registerRuleReferenceTargetHook } from '#/hooks/ruleReference/targetHook';
 import { registerRulesHook } from '#/hooks/rules/hook';
@@ -22,6 +24,7 @@ import { registerWebhookHook } from '#/hooks/webhooks/hook';
 
 export const registerHooks = () => {
   registerRulesHook();
+  registerArtifactAccessHook();
   registerAuditLogHook();
   registerEmailVersioningHook();
   registerEmailTemplateSlugReservationHook();
@@ -31,6 +34,7 @@ export const registerHooks = () => {
   registerImmutableFieldsHook();
   registerLastLoginAtHook();
   registerOrderedListHook();
+  registerOrganizationUserFolderHook();
   registerPreventHardDeleteHook();
   registerRuleReferenceTargetHook();
   registerSegmentConditionsHook();

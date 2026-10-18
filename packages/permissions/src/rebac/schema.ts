@@ -213,6 +213,19 @@ export const rebacSchema: RebacSchema = {
                 { rel: 'sourceSpace', action: 'own' },
               ],
             },
+            // transferArtifact — whoever manages the owner the artifact is leaving
+            {
+              all: [
+                { rule: { field: 'type', operator: Operator.in, value: ['transferArtifact'] } },
+                {
+                  any: [
+                    { self: 'sourceUserId' },
+                    { rel: 'sourceOrganization', action: 'manage' },
+                    { rel: 'sourceSpace', action: 'manage' },
+                  ],
+                },
+              ],
+            },
             // transferSpace — org owner only (explicit 2-hop traversal bypasses direct space.own)
             {
               all: [

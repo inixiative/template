@@ -8,14 +8,12 @@ import type { Condition } from '@inixiative/json-rules';
 import { ruleReferences } from '@template/db';
 import type { Segment } from '@template/db/generated/client/client';
 import type { ProviderModel } from '@template/db/generated/client/enums';
+import { findReferenceCycle } from '@template/shared/graph';
 import { referenceKey } from '@template/shared/rules';
 import { makeError } from '#/lib/errors';
 import { customerRefLens } from '#/modules/customerRef/lib/customerRefLens';
 import { segmentOwnerId } from '#/modules/segment/lib/segmentOwner';
-import {
-  buildReferenceMap,
-  findReferenceCycle,
-} from '#/modules/segment/services/segmentReferenceGraph';
+import { buildReferenceMap } from '#/modules/segment/services/segmentReferenceGraph';
 import { assertSegmentReferencesOwned } from '#/modules/segment/validations/assertSegmentReferencesOwned';
 
 type Owner = { ownerModel: ProviderModel } & Record<string, unknown>;

@@ -15,7 +15,6 @@ docs/claude/CONTEXT.md	name	OrganizationUserWithSpaceUsers
 docs/claude/CONTEXT.md	name	getRequestId
 docs/claude/CONTEXT.md	name	getUser
 docs/claude/DATABASE.md	name	FalsePolymorphismRegistry
-docs/claude/HOOKS.md	anchor	#slow-mutation-logging
 docs/claude/HOOKS.md	name	segmentLensFor
 docs/claude/INIT_SCRIPT_PATTERNS.md	name	setStoringToken
 docs/claude/INIT_SCRIPT_PATTERNS.md	name	storingToken
