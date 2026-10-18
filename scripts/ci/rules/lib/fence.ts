@@ -7,18 +7,33 @@
  *   no longer matches a violation fails so the list stays true.
  * - baseline.txt: `<file>\t<key>`, one per existing violation, written by `--write-baseline`. Listed
  *   violations are reported, not failed, so the rule fences new code while the old is burned down.
- *   An entry that no longer occurs fails until its line is deleted, so the baseline only shrinks.
+ *   An entry that no longer occurs fails until its line is deleted, and in a git checkout a line the
+ *   merge base's baseline does not have fails, so the baseline only shrinks.
+ * A key names the violation by content (model, mount path, function and parameter, SQL text), never
+ * by line, so unrelated edits do not churn it and a new violation does not inherit a fixed one's key.
  */
-import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { basename, join } from 'node:path';
 
 export type Violation = { file: string; line: number; key: string; detail: string };
 
 export const ROOT = process.cwd();
 
 const SKIPPED_DIRS = new Set(['node_modules', '.git', '.worktrees', 'generated', 'dist', '.turbo']);
+const IS_GIT = existsSync(join(ROOT, '.git'));
+
+const git = (args: string[]): { ok: boolean; out: string } => {
+  const result = Bun.spawnSync(['git', ...args], { cwd: ROOT, stderr: 'ignore' });
+  return { ok: result.exitCode === 0, out: new TextDecoder().decode(result.stdout) };
+};
 
 export const listFiles = (dirs: string[], extension: RegExp): string[] => {
+  if (IS_GIT)
+    return git(['ls-files', '--cached', '--others', '--exclude-standard', '--', ...dirs])
+      .out.split('\n')
+      .filter((f) => f && extension.test(f) && !f.split('/').some((p) => SKIPPED_DIRS.has(p)))
+      .filter((f) => existsSync(join(ROOT, f)))
+      .sort();
   const out: string[] = [];
   const walk = (dir: string) => {
     for (const entry of readdirSync(join(ROOT, dir))) {
@@ -43,14 +58,23 @@ export const lineAt = (source: string, offset: number): number => {
   return line;
 };
 
+const parseEntries = (text: string): string[][] =>
+  text
+    .split('\n')
+    .map((l) => l.trimEnd())
+    .filter((l) => l.trim() && !l.trimStart().startsWith('#'))
+    .map((l) => l.split('\t'));
+
 const readEntries = (path: string): string[][] =>
-  existsSync(join(ROOT, path))
-    ? readFileSync(join(ROOT, path), 'utf8')
-        .split('\n')
-        .map((l) => l.trimEnd())
-        .filter((l) => l.trim() && !l.trimStart().startsWith('#'))
-        .map((l) => l.split('\t'))
-    : [];
+  existsSync(join(ROOT, path)) ? parseEntries(readFileSync(join(ROOT, path), 'utf8')) : [];
+
+const mergeBaseEntries = (path: string): string[][] | null => {
+  if (!IS_GIT) return null;
+  const base = git(['merge-base', `origin/${process.env.GITHUB_BASE_REF || 'main'}`, 'HEAD']);
+  if (!base.ok) return null;
+  const shown = git(['show', `${base.out.trim()}:${path}`]);
+  return shown.ok ? parseEntries(shown.out) : null;
+};
 
 export const readExemptions = (rule: string): Map<string, string> =>
   new Map(readEntries(`scripts/ci/${rule}/exempt.txt`).map(([key, reason]) => [key, reason ?? '']));
@@ -82,11 +106,13 @@ export const finishFence = ({ rule, violations, usedExemptions, explain, clean }
   const keys = baselineKeys(sorted);
 
   if (process.argv.includes('--write-baseline')) {
+    const detector = `scripts/ci/rules/lib/${basename(process.argv[1] ?? '')}`;
     const header = [
       `# Violations of the ${rule} rule that predate it: reported, not failed.`,
       '# One per line: <file>\\t<key>. Fix the code and delete its line; never add lines by hand.',
-      `# Regenerate: bun scripts/ci/rules/lib/<detector>.ts --write-baseline (see scripts/ci/rules/${rule}.sh)`,
+      `# Written by \`bun ${detector} --write-baseline\` when the rule landed; rewriting it to absorb new violations defeats the fence.`,
     ];
+    mkdirSync(join(ROOT, dataDir), { recursive: true });
     writeFileSync(
       join(ROOT, baselineFile),
       `${[...header, ...[...new Set(keys)].sort()].join('\n')}\n`,
@@ -104,6 +130,10 @@ export const finishFence = ({ rule, violations, usedExemptions, explain, clean }
     console.log(`${dataDir}/exempt.txt entries need a one-line reason after a tab:`);
     for (const [key] of unreasoned) console.log(`  ${key}`);
   }
+  if (!usedExemptions && exemptions.size > 0) {
+    failed = true;
+    console.log(`${rule} takes no exemptions; delete ${dataDir}/exempt.txt and fix the code.`);
+  }
   if (usedExemptions) {
     const unused = [...exemptions.keys()].filter((key) => !usedExemptions.has(key));
     if (unused.length > 0) {
@@ -114,6 +144,16 @@ export const finishFence = ({ rule, violations, usedExemptions, explain, clean }
   }
 
   const baseline = new Set(readEntries(baselineFile).map((parts) => parts.join('\t')));
+  const baseEntries = mergeBaseEntries(baselineFile);
+  if (baseEntries) {
+    const before = new Set(baseEntries.map((parts) => parts.join('\t')));
+    const added = [...baseline].filter((k) => !before.has(k));
+    if (added.length > 0) {
+      failed = true;
+      console.log(`${baselineFile} gained entries since the merge base; fix the code instead:`);
+      for (const k of added) console.log(`  ${k.replaceAll('\t', ' ')}`);
+    }
+  }
   const current = new Set(keys);
   const fresh = sorted.filter((_, i) => !baseline.has(keys[i]));
   const fixed = [...baseline].filter((k) => !current.has(k));
@@ -131,6 +171,6 @@ export const finishFence = ({ rule, violations, usedExemptions, explain, clean }
     console.log(`These ${baselineFile} entries no longer occur; delete their lines:`);
     for (const k of fixed) console.log(`  ${k.replaceAll('\t', ' ')}`);
   }
-  if (!failed) console.log(clean);
+  if (!failed) console.log(known > 0 ? 'No new violations.' : clean);
   process.exit(failed ? 1 : 0);
 };

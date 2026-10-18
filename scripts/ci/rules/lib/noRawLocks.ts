@@ -62,11 +62,12 @@ for (const file of listFiles(['apps', 'packages'], /\.(tsx?|sql)$/)) {
   const pieces = file.endsWith('.sql') ? sqlWithoutComments(source) : stringsOf(source);
   for (const { text, offset } of pieces) {
     const line = lineAt(source, offset);
+    const statement = text.replace(/\s+/g, ' ').trim().slice(0, 120);
     if (lockIn(text, SHARED))
       violations.push({
         file,
         line,
-        key: 'shared-lock',
+        key: `shared-lock: ${statement}`,
         detail:
           'shared row lock (FOR SHARE / FOR KEY SHARE / LOCK IN SHARE MODE); there is no shared mode',
       });
@@ -74,7 +75,7 @@ for (const file of listFiles(['apps', 'packages'], /\.(tsx?|sql)$/)) {
       violations.push({
         file,
         line,
-        key: 'raw-for-update',
+        key: `raw-for-update: ${statement}`,
         detail: 'raw FOR UPDATE; use db.findForUpdate(model, where, opts?) inside db.txn()',
       });
   }

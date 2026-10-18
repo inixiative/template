@@ -677,7 +677,7 @@ Located in `apps/api/src/lib/context/refreshUserContext.ts`. Reloads user's memb
 ```typescript
 import { refreshUserContext } from '#/lib/context/refreshUserContext';
 
-await refreshUserContext(c, db);
+await refreshUserContext(c);
 ```
 
 **What it does:**
@@ -693,7 +693,7 @@ await refreshUserContext(c, db);
 
 **Implementation:**
 ```typescript
-export const refreshUserContext = async (c: Context<AppEnv>, db: Db): Promise<void> => {
+export const refreshUserContext = async (c: Context<AppEnv>): Promise<void> => {
   const user = c.get('user');
   if (!user) return;
 
@@ -702,7 +702,7 @@ export const refreshUserContext = async (c: Context<AppEnv>, db: Db): Promise<vo
   await permix.setup([], { replace: true });
 
   // Reload user with all relations (uses cache, optimized queries)
-  const userWithRelations = await findUserWithRelations(db, user.id);
+  const userWithRelations = await findUserWithRelations(user.id);
   if (!userWithRelations) return;
 
   // Set up fresh context and permissions
@@ -1116,7 +1116,7 @@ From the catalog (`.foundry/catalog/catalog.json`, extracted from the code). Eac
 - **getResource** `apps/api/src/lib/context/getResource.ts#getResource` [primitive] read the record auto-loaded for a route's :id param from context Use: const space = getResource<'space'>(c)
 - **getValidatedBody** `apps/api/src/lib/context/getValidatedData.ts#getValidatedBody` [primitive] read the typed, schema-validated JSON body in a controller Use: const body = getValidatedBody(c)
 - **getValidatedQuery** `apps/api/src/lib/context/getValidatedData.ts#getValidatedQuery` [primitive] read the typed, schema-validated query params in a controller Use: const query = getValidatedQuery(c)
-- **refreshUserContext** `apps/api/src/lib/context/refreshUserContext.ts#refreshUserContext` [primitive] reload the current user from the database and re-set request context after changes Use: await refreshUserContext(c, db);
+- **refreshUserContext** `apps/api/src/lib/context/refreshUserContext.ts#refreshUserContext` [primitive] reload the current user from the database and re-set request context after changes Use: await refreshUserContext(c);
 - **resourceContextMiddleware** `apps/api/src/middleware/resources/resourceContextMiddleware.ts#resourceContextMiddleware` [primitive] load the route's :id resource into context, 404 if missing, 409 if ambiguous Use: router.use('/:id/*', resourceContextMiddleware())
 - **setUserContext** `apps/api/src/lib/context/setUserContext.ts#setUserContext` [primitive] store user, organizations, spaces and permissions on the request context Use: await setUserContext(c, userWithRelations);
 

@@ -8,7 +8,8 @@
  *   → auditActorMiddleware → apiRateLimit
  * so every route gets the scoped db, a resolved actor, permissions and the rate limit. Fails on
  * - a chain middleware missing from api.ts, or out of order;
- * - a mount (`.route`, `.all`, `.get`, … with a path) on `apiRouter` before the chain completes;
+ * - a mount (`.route`, `.all`, `.get`, `.doc31`, …, chained or not, or a `.use` on a path whose
+ *   handler is written inline) on `apiRouter` before the chain completes;
  * - a mount on `routes` (routes/index.ts) other than `/api`, or on `app` (app.ts) other than `/`;
  * - a mount on `app`, `routes` or `apiRouter` from any other file.
  * Deliberate exceptions are named, one per line with a one-line reason, in
@@ -44,8 +45,59 @@ const ROOTS: Record<string, { file: string; prefix: string }> = {
   routes: { file: ROUTES, prefix: '' },
   apiRouter: { file: API, prefix: '/api' },
 };
-const MOUNT =
-  /\b(app|routes|apiRouter)\.(route|all|get|post|put|patch|delete|options|on|openapi|mount)\(\s*(?:(['"`])([^'"`]*)\3)?/g;
+const RECEIVER = /\b(app|routes|apiRouter)\s*(?=\.)/g;
+const MOUNT_METHODS = new Set([
+  'route',
+  'all',
+  'get',
+  'post',
+  'put',
+  'patch',
+  'delete',
+  'options',
+  'on',
+  'openapi',
+  'mount',
+  'doc',
+  'doc31',
+]);
+
+type Call = { method: string; args: string; offset: number };
+
+const chainedCalls = (text: string, from: number): Call[] => {
+  const calls: Call[] = [];
+  let i = from;
+  for (;;) {
+    while (/\s/.test(text[i] ?? '')) i++;
+    if (text[i] !== '.') return calls;
+    const offset = i;
+    i++;
+    while (/\s/.test(text[i] ?? '')) i++;
+    const name = /^[A-Za-z_$][\w$]*/.exec(text.slice(i))?.[0];
+    if (!name) return calls;
+    i += name.length;
+    while (/\s/.test(text[i] ?? '')) i++;
+    if (text[i] !== '(') return calls;
+    let depth = 0;
+    const argsStart = i + 1;
+    for (; i < text.length; i++) {
+      if (text[i] === '(') depth++;
+      else if (text[i] === ')' && --depth === 0) break;
+    }
+    calls.push({ method: name, args: text.slice(argsStart, i), offset });
+    i++;
+  }
+};
+
+const literalPath = (args: string): string | undefined =>
+  /^\s*(['"`])([^'"`$]*)\1\s*(,|$)/.exec(args)?.[2];
+
+const isMount = (call: Call): boolean => {
+  if (MOUNT_METHODS.has(call.method)) return true;
+  if (call.method !== 'use') return false;
+  const path = literalPath(call.args);
+  return path !== '*' && /=>|\bfunction\b/.test(call.args);
+};
 
 const exemptions = readExemptions('one-middleware-chain');
 const usedExemptions = new Set<string>();
@@ -59,14 +111,17 @@ const code = (source: string): string =>
 const mountsIn = (file: string) => {
   const source = readSource(file);
   const text = code(source);
-  MOUNT.lastIndex = 0;
-  return [...text.matchAll(MOUNT)].map((m) => ({
-    receiver: m[1],
-    method: m[2],
-    path: m[4],
-    offset: m.index ?? 0,
-    line: lineAt(source, m.index ?? 0),
-  }));
+  return [...text.matchAll(RECEIVER)].flatMap((m) =>
+    chainedCalls(text, (m.index ?? 0) + m[0].length)
+      .filter(isMount)
+      .map((call) => ({
+        receiver: m[1],
+        method: call.method,
+        path: literalPath(call.args),
+        offset: call.offset,
+        line: lineAt(source, call.offset),
+      })),
+  );
 };
 
 const outside = (file: string, line: number, key: string, detail: string) => {
