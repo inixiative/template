@@ -4,26 +4,22 @@
  * @partOf feature:files
  * @uses none
  */
+export type ArtifactTypeName = 'container' | 'object';
+
 export type ArtifactKindDef = {
+  type: ArtifactTypeName;
   contains: readonly string[];
   defaultAccess: 'public' | 'private';
   holder: 'local' | 'integration';
   contentModel?: 'File';
   systemOnly?: true;
-  ownerRoot?: true;
-  ownerReach?: 'owners';
+  memberScoped?: true;
   lazyCopy?: true;
 };
 
 export const ArtifactKinds = {
-  ownerRoot: {
-    contains: ['file', 'folder', 'organizationUserFolder'],
-    defaultAccess: 'private',
-    holder: 'local',
-    systemOnly: true,
-    ownerRoot: true,
-  },
   file: {
+    type: 'object',
     contains: [],
     defaultAccess: 'private',
     holder: 'local',
@@ -31,16 +27,18 @@ export const ArtifactKinds = {
     lazyCopy: true,
   },
   folder: {
+    type: 'container',
     contains: ['file', 'folder'],
     defaultAccess: 'private',
     holder: 'local',
   },
   organizationUserFolder: {
+    type: 'container',
     contains: ['file', 'folder'],
     defaultAccess: 'private',
     holder: 'local',
     systemOnly: true,
-    ownerReach: 'owners',
+    memberScoped: true,
   },
   // ==========================================================================
   // TEMPLATE ABOVE — Add app-specific kinds below
@@ -55,14 +53,9 @@ export const isArtifactKind = (kind: string): kind is ArtifactKind => kind in ki
 
 export const artifactKindDef = (kind: string): ArtifactKindDef | null => kindDefs[kind] ?? null;
 
-export const isContainerKind = (kind: string): boolean =>
-  (artifactKindDef(kind)?.contains.length ?? 0) > 0;
-
 export const plainArtifactKinds = (Object.keys(kindDefs) as ArtifactKind[]).filter(
   (kind) => !kindDefs[kind]!.contentModel && !kindDefs[kind]!.systemOnly,
 );
 
-export const isOwnerRootKind = (kind: string): boolean => artifactKindDef(kind)?.ownerRoot === true;
-
-export const canContain = (containerKind: string, memberKind: string): boolean =>
-  artifactKindDef(containerKind)?.contains.includes(memberKind) ?? false;
+export const canContain = (containerKind: string, objectOrContainerKind: string): boolean =>
+  artifactKindDef(containerKind)?.contains.includes(objectOrContainerKind) ?? false;

@@ -6,7 +6,6 @@
  */
 import { db, polymorphicTarget } from '@template/db';
 import type { ArtifactPermission } from '@template/db/generated/client/client';
-import { isOwnerRootKind } from '@template/shared/artifact';
 import type { WebhookAudienceResolver, WebhookParty } from '#/hooks/webhooks/webhookParty';
 import { type ArtifactPrincipal, granteePrincipal } from '#/modules/artifact/lib/artifactPrincipal';
 import { resolveArtifactAccess } from '#/modules/artifact/services/resolveArtifactAccess';
@@ -67,14 +66,14 @@ const principalParties = async (
 };
 
 export const artifactWebhookAudience: WebhookAudienceResolver = async (rows) => {
-  const resolutions = await resolveArtifactAccess(
-    rows.filter((row) => !isOwnerRootKind(String(row.kind))).map((row) => row.id),
-  );
+  const resolutions = await resolveArtifactAccess(rows.map((row) => row.id));
   return principalParties(
     new Map(
       [...resolutions.values()].map((resolution) => [
         resolution.artifactId,
-        resolution.grants.map((grant) => grant.principal),
+        resolution.grants
+          .filter((grant) => !(resolution.memberScoped && grant.implicit))
+          .map((grant) => grant.principal),
       ]),
     ),
   );

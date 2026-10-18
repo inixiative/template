@@ -77,8 +77,8 @@ model AuditLog {
   subjectSegment          Segment?          @relation(fields: [subjectSegmentId], references: [id], onDelete: SetNull)
   subjectArtifactId       String?           @db.VarChar(36)
   subjectArtifact         Artifact?         @relation(fields: [subjectArtifactId], references: [id], onDelete: SetNull)
-  subjectArtifactContainerId  String?            @db.VarChar(36)
-  subjectArtifactContainer    ArtifactContainer? @relation(fields: [subjectArtifactContainerId], references: [id], onDelete: SetNull)
+  subjectArtifactPlacementId  String?            @db.VarChar(36)
+  subjectArtifactPlacement    ArtifactPlacement? @relation(fields: [subjectArtifactPlacementId], references: [id], onDelete: SetNull)
   subjectArtifactPermissionId String?            @db.VarChar(36)
   subjectArtifactPermission   ArtifactPermission? @relation(fields: [subjectArtifactPermissionId], references: [id], onDelete: SetNull)
   // Composite FKs
@@ -120,7 +120,7 @@ model AuditLog {
   @@index([subjectIntegrationId])
   @@index([subjectSegmentId])
   @@index([subjectArtifactId])
-  @@index([subjectArtifactContainerId])
+  @@index([subjectArtifactPlacementId])
   @@index([subjectArtifactPermissionId])
 }
 
@@ -149,6 +149,6 @@ enum AuditSubjectModel {
   Integration
   Segment
   Artifact
-  ArtifactContainer
+  ArtifactPlacement
   ArtifactPermission
 }

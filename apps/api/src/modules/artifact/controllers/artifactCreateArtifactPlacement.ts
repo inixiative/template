@@ -7,11 +7,11 @@
 import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
 import { artifactActorFromContext } from '#/modules/artifact/lib/artifactActor';
-import { artifactCreateArtifactContainerRoute } from '#/modules/artifact/routes/artifactCreateArtifactContainer';
-import { placeArtifact } from '#/modules/artifact/services/placeArtifact';
+import { artifactCreateArtifactPlacementRoute } from '#/modules/artifact/routes/artifactCreateArtifactPlacement';
+import { placeArtifact } from '#/modules/artifact/services/artifactPlacements';
 
-export const artifactCreateArtifactContainerController = makeController(
-  artifactCreateArtifactContainerRoute,
+export const artifactCreateArtifactPlacementController = makeController(
+  artifactCreateArtifactPlacementRoute,
   async (c, respond) => {
     const artifact = getResource<'artifact'>(c);
     const { containerArtifactId, inherit } = c.req.valid('json');

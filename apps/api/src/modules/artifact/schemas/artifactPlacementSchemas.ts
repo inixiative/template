@@ -5,11 +5,11 @@
  * @uses infrastructure:prisma
  */
 import { z } from '@hono/zod-openapi';
-import { ArtifactContainerScalarSchema } from '@template/db';
+import { ArtifactPlacementScalarSchema } from '@template/db';
 
-export const artifactContainerCreateBodySchema = z.object({
+export const artifactPlacementCreateBodySchema = z.object({
   containerArtifactId: z.string(),
   inherit: z.boolean().optional(),
 });
 
-export const artifactContainerReadResponseSchema = ArtifactContainerScalarSchema;
+export const artifactPlacementReadResponseSchema = ArtifactPlacementScalarSchema;

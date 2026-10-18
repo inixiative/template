@@ -16,7 +16,7 @@ export const artifactReadManyArtifactsController = makeController(
     const db = c.get('db');
     const container = getResource<'artifact'>(c);
     const members = await db.artifact.findMany({
-      where: { containers: { some: { containerArtifactId: container.id } } },
+      where: { placements: { some: { containerArtifactId: container.id } } },
       orderBy: { name: 'asc' },
     });
     const verdicts = await checkArtifactAccess(
@@ -24,6 +24,6 @@ export const artifactReadManyArtifactsController = makeController(
       members.map((member) => member.id),
       'read',
     );
-    return respond.ok(members.filter((member) => verdicts.get(member.id)?.allowed));
+    return respond.ok(members.filter((member) => verdicts.get(member.id)?.listed));
   },
 );

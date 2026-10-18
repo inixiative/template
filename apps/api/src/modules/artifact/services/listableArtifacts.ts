@@ -8,7 +8,7 @@ import type { Artifact } from '@template/db/generated/client/client';
 import type { ArtifactActor } from '#/modules/artifact/lib/artifactActor';
 import { checkArtifactAccess } from '#/modules/artifact/services/checkArtifactAccess';
 
-export const readableArtifacts = async <T extends Pick<Artifact, 'id'>>(
+export const listableArtifacts = async <T extends Pick<Artifact, 'id'>>(
   actor: ArtifactActor,
   artifacts: T[],
 ): Promise<T[]> => {
@@ -17,5 +17,5 @@ export const readableArtifacts = async <T extends Pick<Artifact, 'id'>>(
     artifacts.map((artifact) => artifact.id),
     'read',
   );
-  return artifacts.filter((artifact) => verdicts.get(artifact.id)?.allowed);
+  return artifacts.filter((artifact) => verdicts.get(artifact.id)?.listed);
 };

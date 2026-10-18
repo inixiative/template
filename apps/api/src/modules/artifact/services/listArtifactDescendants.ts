@@ -8,18 +8,18 @@ import { db } from '@template/db';
 import type { ReferenceMap } from '@template/shared/graph';
 import { ARTIFACT_MAX_DEPTH } from '#/modules/artifact/services/loadArtifactGraph';
 
-export type ArtifactDescendants = { artifactIds: string[]; members: ReferenceMap; height: number };
+export type ArtifactDescendants = { artifactIds: string[]; contents: ReferenceMap; height: number };
 
 export const listArtifactDescendants = async (
   containerArtifactId: string,
   depth: number = ARTIFACT_MAX_DEPTH,
 ): Promise<ArtifactDescendants> => {
-  const members: ReferenceMap = new Map();
+  const contents: ReferenceMap = new Map();
   const seen = new Set<string>([containerArtifactId]);
   let frontier = [containerArtifactId];
   let height = 0;
   while (frontier.length > 0 && height < depth) {
-    const edges = await db.artifactContainer.findMany({
+    const edges = await db.artifactPlacement.findMany({
       where: { containerArtifactId: { in: frontier } },
       select: { containerArtifactId: true, artifactId: true },
     });
@@ -27,8 +27,8 @@ export const listArtifactDescendants = async (
     height += 1;
     const next: string[] = [];
     for (const { containerArtifactId: parent, artifactId } of edges) {
-      if (!members.has(parent)) members.set(parent, new Set());
-      members.get(parent)!.add(artifactId);
+      if (!contents.has(parent)) contents.set(parent, new Set());
+      contents.get(parent)!.add(artifactId);
       if (seen.has(artifactId)) continue;
       seen.add(artifactId);
       next.push(artifactId);
@@ -36,5 +36,5 @@ export const listArtifactDescendants = async (
     frontier = next;
   }
   seen.delete(containerArtifactId);
-  return { artifactIds: [...seen], members, height };
+  return { artifactIds: [...seen], contents, height };
 };

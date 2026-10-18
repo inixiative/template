@@ -21,6 +21,7 @@
   - [How It Works](#how-it-works)
   - [Tenancy (AUTH-006 stopgap)](#tenancy-auth-006-stopgap)
   - [Webhook Payload](#webhook-payload)
+  - [Retries](#retries)
   - [Circuit Breaker](#circuit-breaker)
   - [Poisoned Records](#poisoned-records)
   - [Ignored Fields](#ignored-fields)
@@ -108,8 +109,8 @@ Registered in `apps/api/src/hooks/index.ts` via `registerHooks()` from both API 
 
 | Hook | Purpose |
 |------|---------|
-| `artifactAccess` | An Artifact's `access` at creation is its kind's default when it is `inherit` or unset; refuses a kind the catalog does not know ([ARTIFACTS.md](ARTIFACTS.md)) |
-| `artifactOwnerRoot` | Creates the `ownerRoot` container of every new User, Organization and Space (`ensureOwnerRoot`) |
+| `artifactAccess` | An Artifact's `type` is set from its kind and its `access` at creation is its kind's default when it is `inherit` or unset; refuses a kind the catalog does not know ([ARTIFACTS.md](ARTIFACTS.md)) |
+| `organizationUserFolder` | Creates a member's `organizationUserFolder` when an OrganizationUser is created (`ensureOrganizationUserFolder`; the invite `sent` callback creates it earlier) |
 | `auditLog` | Immutable audit trail of all mutations on enabled models |
 | `cache` | Cache invalidation on mutations (post-commit) |
 | `contactRules` | Per-type Contact validation + canonicalization (registry-driven) |
@@ -308,12 +309,12 @@ A child model's change fires its parent's webhook: the event is the **parent** r
 // packages/db/src/registries/webhook/relatedModels.ts
 export const webhookRelatedModels: Record<string, FlexibleRef[]> = {
   ArtifactPermission: ['Artifact'],
-  ArtifactContainer: ['Artifact'],
+  ArtifactPlacement: ['Artifact'],
   // ...party refs (User → CustomerRef) are not read until AUTH-006
 };
 ```
 
-- Only **direct model refs** (`'Artifact'`) are read. The hook follows the child's foreign keys to that model (an `ArtifactContainer` has two, so both ends fire), loads the parents and delivers an `update` of each parent to the parent's audience. False-polymorphism refs (the User/Organization/Space → CustomerRef party entries) stay unread until AUTH-006 defines per-CustomerRef party events.
+- Only **direct model refs** (`'Artifact'`) are read. The hook follows the child's foreign keys to that model (an `ArtifactPlacement` has two, so both ends fire), loads the parents and delivers an `update` of each parent to the parent's audience. False-polymorphism refs (the User/Organization/Space → CustomerRef party entries) stay unread until AUTH-006 defines per-CustomerRef party events.
 - `webhookRelatedRowAudiences` adds the parties a child row names that the parent's audience may no longer hold: a deleted `ArtifactPermission`'s grantee still hears its revocation.
 - The event names the node that changed. A receiver that needs a container's members fans out itself.
 

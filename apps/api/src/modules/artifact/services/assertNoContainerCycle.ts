@@ -14,11 +14,11 @@ export const assertNoContainerCycle = async (
   containerArtifactId: string,
   artifactId: string,
 ): Promise<void> => {
-  const { members, height } = await listArtifactDescendants(artifactId, ARTIFACT_MAX_DEPTH + 1);
-  const candidate = new Map(members);
+  const { contents, height } = await listArtifactDescendants(artifactId, ARTIFACT_MAX_DEPTH + 1);
+  const candidate = new Map(contents);
   candidate.set(
     containerArtifactId,
-    new Set([...(members.get(containerArtifactId) ?? []), artifactId]),
+    new Set([...(contents.get(containerArtifactId) ?? []), artifactId]),
   );
   const cycle = findReferenceCycle(candidate, containerArtifactId);
   if (cycle) {

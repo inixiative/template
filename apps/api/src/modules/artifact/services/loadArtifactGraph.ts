@@ -22,13 +22,11 @@ export const loadArtifactGraph = async (artifactIds: string[]): Promise<Artifact
   for (let depth = 0; frontier.length > 0 && depth <= ARTIFACT_MAX_DEPTH + 1; depth++) {
     const artifacts = await db.artifact.findMany({
       where: { id: { in: frontier }, deletedAt: undefined },
-      include: { permissions: true, containers: { select: { containerArtifactId: true } } },
+      include: { permissions: true, placements: { select: { containerArtifactId: true } } },
     });
     const next = new Set<string>();
-    for (const { containers, ...artifact } of artifacts) {
-      const containerArtifactIds = containers.flatMap((edge) =>
-        edge.containerArtifactId ? [edge.containerArtifactId] : [],
-      );
+    for (const { placements, ...artifact } of artifacts) {
+      const containerArtifactIds = placements.map((placement) => placement.containerArtifactId);
       graph.set(artifact.id, { ...artifact, containerArtifactIds });
       for (const id of containerArtifactIds) if (!graph.has(id)) next.add(id);
     }

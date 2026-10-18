@@ -18,7 +18,7 @@ export type ResourceBindingMedia = {
 export type ResourceBindingTypeDef = {
   cardinality: 'single' | 'many';
   accepts: FileKind[] | '*';
-  source: 'File' | 'url' | 'both';
+  source: 'Artifact' | 'url' | 'both';
   requiresPublic: boolean;
   media?: ResourceBindingMedia;
 };
@@ -28,14 +28,15 @@ export type ResourceBindingTypeDef = {
 export const ResourceBindingRegistry = {
   logo: { cardinality: 'single', accepts: ['image'], source: 'both', requiresPublic: true },
   avatar: { cardinality: 'single', accepts: ['image'], source: 'both', requiresPublic: true },
+  tracking: { cardinality: 'many', accepts: '*', source: 'Artifact', requiresPublic: false },
 } satisfies Record<string, ResourceBindingTypeDef>;
 
 export type ResourceBindingType = keyof typeof ResourceBindingRegistry;
 
 // Which binding types each resource may carry.
 export const ResourceBindings = {
-  Organization: ['logo'],
-  Space: ['logo'],
-  User: ['avatar'],
+  Organization: ['logo', 'tracking'],
+  Space: ['logo', 'tracking'],
+  User: ['avatar', 'tracking'],
   CustomerRef: ['avatar'],
 } satisfies Partial<Record<ResourceBindingResourceModel, ResourceBindingType[]>>;

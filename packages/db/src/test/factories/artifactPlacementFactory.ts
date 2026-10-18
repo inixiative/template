@@ -6,7 +6,7 @@
  */
 import { createFactory } from '@template/db/test/factory';
 
-const artifactContainerFactory = createFactory('ArtifactContainer', {
+const artifactPlacementFactory = createFactory('ArtifactPlacement', {
   defaults: () => ({}),
   dependencies: {
     containerArtifact: {
@@ -17,5 +17,5 @@ const artifactContainerFactory = createFactory('ArtifactContainer', {
   },
 });
 
-export const buildArtifactContainer = artifactContainerFactory.build;
-export const createArtifactContainer = artifactContainerFactory.create;
+export const buildArtifactPlacement = artifactPlacementFactory.build;
+export const createArtifactPlacement = artifactPlacementFactory.create;

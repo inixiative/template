@@ -8,8 +8,10 @@ import type { QueryKey } from '@tanstack/react-query';
 import type { InquiryItem, InquiryResolveData } from '@template/sdk';
 import {
   meReceivedManyInquiriesQueryKey,
+  meSentManyInquiriesQueryKey,
   organizationReceivedManyInquiriesQueryKey,
   organizationSentManyInquiriesQueryKey,
+  spaceReceivedManyInquiriesQueryKey,
   spaceSentManyInquiriesQueryKey,
 } from '@template/sdk';
 
@@ -22,6 +24,7 @@ export const INQUIRY_TYPE_LABELS: Record<InquiryType, string> = {
   createSpace: 'Space Request',
   updateSpace: 'Space Update',
   transferSpace: 'Space Transfer',
+  transferArtifact: 'Artifact Transfer',
 };
 
 export const INQUIRY_STATUS_COLORS: Record<InquiryStatus | 'expired', string> = {
@@ -111,6 +114,7 @@ export type InquiryMeta = {
   sourceOrganizationId: string | null;
   sourceSpaceId: string | null;
   targetOrganizationId: string | null;
+  targetSpaceId?: string | null;
 };
 
 // Query keys affected when the SOURCE side mutates (cancel/delete)
@@ -123,6 +127,13 @@ export const sourceMutations: Record<InquiryType, (inq: InquiryMeta) => QueryKey
   ],
   updateSpace: (inq) => [spaceSentManyInquiriesQueryKey({ path: { id: inq.sourceSpaceId! } })],
   transferSpace: (inq) => [spaceSentManyInquiriesQueryKey({ path: { id: inq.sourceSpaceId! } })],
+  transferArtifact: (inq) => [
+    inq.sourceOrganizationId
+      ? organizationSentManyInquiriesQueryKey({ path: { id: inq.sourceOrganizationId } })
+      : inq.sourceSpaceId
+        ? spaceSentManyInquiriesQueryKey({ path: { id: inq.sourceSpaceId } })
+        : meSentManyInquiriesQueryKey(),
+  ],
 };
 
 // Query keys affected when the TARGET side mutates (resolve/approve/deny)
@@ -132,5 +143,12 @@ export const targetMutations: Record<InquiryType, (inq: InquiryMeta) => QueryKey
   updateSpace: (_inq) => [],
   transferSpace: (inq) => [
     organizationReceivedManyInquiriesQueryKey({ path: { id: inq.targetOrganizationId! } }),
+  ],
+  transferArtifact: (inq) => [
+    inq.targetOrganizationId
+      ? organizationReceivedManyInquiriesQueryKey({ path: { id: inq.targetOrganizationId } })
+      : inq.targetSpaceId
+        ? spaceReceivedManyInquiriesQueryKey({ path: { id: inq.targetSpaceId } })
+        : meReceivedManyInquiriesQueryKey(),
   ],
 };

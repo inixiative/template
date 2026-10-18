@@ -4,8 +4,8 @@ import type { Artifact, Organization, Space, User } from '@template/db/generated
 import {
   cleanupTouchedTables,
   createArtifact,
-  createArtifactContainer,
   createArtifactPermission,
+  createArtifactPlacement,
   createOrganization,
   createSpace,
   createUser,
@@ -25,7 +25,7 @@ const folderOf = async (organization: Organization, access?: Artifact['access'])
   ).entity;
 
 const place = async (member: Artifact, container: Artifact) => {
-  await createArtifactContainer({ artifactId: member.id, containerArtifactId: container.id });
+  await createArtifactPlacement({ artifactId: member.id, containerArtifactId: container.id });
   return db.artifact.update({ where: { id: member.id }, data: { access: 'inherit' } });
 };
 

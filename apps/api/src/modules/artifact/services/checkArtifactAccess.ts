@@ -16,6 +16,7 @@ export type ArtifactAccessVerdict = {
   role: Role | null;
   public: boolean;
   allowed: boolean;
+  listed: boolean;
 };
 
 export const checkArtifactAccess = async (
@@ -28,8 +29,11 @@ export const checkArtifactAccess = async (
   const verdicts = new Map<string, ArtifactAccessVerdict>();
   for (const resolution of resolutions.values()) {
     let role: Role | null = null;
+    let explicitRole: Role | null = null;
     for (const grant of resolution.grants) {
-      role = strongerRole(role, cappedRole(grant.role, await roleFor(grant.principal)));
+      const held = cappedRole(grant.role, await roleFor(grant.principal));
+      role = strongerRole(role, held);
+      if (!grant.implicit) explicitRole = strongerRole(explicitRole, held);
     }
     const allowed = roleAllows(role, action) || (action === 'read' && resolution.public);
     verdicts.set(resolution.artifactId, {
@@ -37,6 +41,9 @@ export const checkArtifactAccess = async (
       role,
       public: resolution.public,
       allowed,
+      listed: resolution.memberScoped
+        ? explicitRole !== null || resolution.public
+        : roleAllows(role, 'read') || resolution.public,
     });
   }
   return verdicts;

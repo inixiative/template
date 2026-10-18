@@ -6,14 +6,14 @@
  */
 import { readRoute } from '#/lib/routeTemplates';
 import { validateArtifactAccess } from '#/middleware/validations/validateArtifactAccess';
-import { artifactContainerReadResponseSchema } from '#/modules/artifact/schemas/artifactContainerSchemas';
+import { artifactPlacementReadResponseSchema } from '#/modules/artifact/schemas/artifactPlacementSchemas';
 import { Modules } from '#/modules/modules';
 
-export const artifactReadManyArtifactContainersRoute = readRoute({
+export const artifactReadManyArtifactPlacementsRoute = readRoute({
   model: Modules.artifact,
-  submodel: Modules.artifactContainer,
+  submodel: Modules.artifactPlacement,
   many: true,
   description: 'Lists the container edges an artifact sits in.',
-  responseSchema: artifactContainerReadResponseSchema,
+  responseSchema: artifactPlacementReadResponseSchema,
   middleware: [validateArtifactAccess('read')],
 });

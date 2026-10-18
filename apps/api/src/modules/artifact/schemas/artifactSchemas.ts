@@ -35,3 +35,13 @@ export const artifactAccessResponseSchema = z.object({
   role: z.enum(Role).nullable(),
   public: z.boolean(),
 });
+
+export const artifactMoveBodySchema = z.object({
+  fromContainerArtifactId: z.string().optional(),
+  toContainerArtifactId: z.string().optional(),
+});
+
+export const artifactCopyBodySchema = z.object({
+  containerArtifactId: z.string(),
+  name: z.string().optional(),
+});

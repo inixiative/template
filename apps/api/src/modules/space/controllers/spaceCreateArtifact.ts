@@ -7,29 +7,18 @@
 import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
 import { artifactActorFromContext } from '#/modules/artifact/lib/artifactActor';
-import { createArtifact } from '#/modules/artifact/services/placeArtifact';
+import { creatorGrantFor } from '#/modules/artifact/lib/creatorGrant';
+import { createArtifact } from '#/modules/artifact/services/artifactPlacements';
 import { spaceCreateArtifactRoute } from '#/modules/space/routes/spaceCreateArtifact';
 
 export const spaceCreateArtifactController = makeController(
   spaceCreateArtifactRoute,
   async (c, respond) => {
-    const space = getResource<'space'>(c);
-    const user = c.get('user');
-    const spaceUser = user
-      ? (c.get('spaceUsers') ?? []).find((membership) => membership.spaceId === space.id)
-      : undefined;
+    const owner = { ownerModel: 'Space' as const, spaceId: getResource<'space'>(c).id };
     const artifact = await createArtifact(artifactActorFromContext(c), {
       ...c.req.valid('json'),
-      ownerModel: 'Space',
-      spaceId: space.id,
-      creatorGrant: spaceUser
-        ? {
-            granteeModel: 'SpaceUser',
-            granteeOrganizationId: spaceUser.organizationId,
-            granteeSpaceId: space.id,
-            granteeUserId: spaceUser.userId,
-          }
-        : undefined,
+      ...owner,
+      creatorGrant: creatorGrantFor(c, owner),
     });
     return respond.created(artifact);
   },

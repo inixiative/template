@@ -13,6 +13,7 @@ const stampCreationAccess = (row: HookRow): void => {
   const kind = artifactKindDef(String(row.kind));
   if (!kind)
     throw makeError({ status: 422, message: `Unknown artifact kind: ${String(row.kind)}` });
+  row.type = kind.type;
   if (row.access === undefined || row.access === 'inherit') row.access = kind.defaultAccess;
 };
 

@@ -5,6 +5,7 @@ model Artifact {
   deletedAt DateTime?
 
   kind   String
+  type   ArtifactType
   name   String
   access ArtifactAccess @default(inherit)
   system Boolean        @default(false)
@@ -24,8 +25,8 @@ model Artifact {
   file        File?
   bindings    ResourceBinding[]
   permissions ArtifactPermission[]
-  containers  ArtifactContainer[] @relation("ArtifactContainerArtifact")
-  members     ArtifactContainer[] @relation("ArtifactContainerContainer")
+  placements  ArtifactPlacement[] @relation("ArtifactPlacementArtifact")
+  contents    ArtifactPlacement[] @relation("ArtifactPlacementContainer")
   auditLogs   AuditLog[]
 
   integrationRecords IntegrationRecord[]
@@ -34,18 +35,16 @@ model Artifact {
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
   // ==========================================================================
 
-  @@unique([userId], where: raw("\"kind\" = 'ownerRoot' AND \"ownerModel\" = 'User' AND \"deletedAt\" IS NULL"), map: "Artifact_user_root_key")
-  @@unique([organizationId], where: raw("\"kind\" = 'ownerRoot' AND \"ownerModel\" = 'Organization' AND \"deletedAt\" IS NULL"), map: "Artifact_organization_root_key")
-  @@unique([spaceId], where: raw("\"kind\" = 'ownerRoot' AND \"ownerModel\" = 'Space' AND \"deletedAt\" IS NULL"), map: "Artifact_space_root_key")
   @@index([ownerModel])
   @@index([userId])
   @@index([organizationId])
   @@index([spaceId])
   @@index([kind])
+  @@index([type])
   @@index([integrationId])
 }
 
-model ArtifactContainer {
+model ArtifactPlacement {
   id        String    @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -53,12 +52,12 @@ model ArtifactContainer {
 
   containerArtifactId String   @db.VarChar(36)
   artifactId          String   @db.VarChar(36)
-  containerArtifact   Artifact @relation("ArtifactContainerContainer", fields: [containerArtifactId], references: [id], onDelete: Restrict)
-  artifact            Artifact @relation("ArtifactContainerArtifact", fields: [artifactId], references: [id], onDelete: Cascade)
+  containerArtifact   Artifact @relation("ArtifactPlacementContainer", fields: [containerArtifactId], references: [id], onDelete: Restrict)
+  artifact            Artifact @relation("ArtifactPlacementArtifact", fields: [artifactId], references: [id], onDelete: Cascade)
 
   auditLogs AuditLog[]
 
-  @@unique([containerArtifactId, artifactId], where: raw("\"deletedAt\" IS NULL"), map: "ArtifactContainer_edge_key")
+  @@unique([containerArtifactId, artifactId], where: raw("\"deletedAt\" IS NULL"), map: "ArtifactPlacement_edge_key")
   @@index([containerArtifactId])
   @@index([artifactId])
 }
@@ -111,6 +110,11 @@ model ArtifactPermission {
   @@index([granteeModel, granteeSpaceId])
   @@index([granteeModel, granteeCustomerRefId])
   @@index([granteeModel, granteeIntegrationId])
+}
+
+enum ArtifactType {
+  container
+  object
 }
 
 enum ArtifactAccess {

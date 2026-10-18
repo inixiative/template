@@ -9,20 +9,18 @@ import type {
 import {
   cleanupTouchedTables,
   createArtifact,
-  createArtifactContainer,
   createArtifactPermission,
+  createArtifactPlacement,
   createOrganization,
   createOrganizationUser,
   createResourceBinding,
 } from '@template/db/test';
 import { registerArtifactAccessHook } from '#/hooks/artifactAccess/hook';
-import { registerArtifactOwnerRootHook } from '#/hooks/artifactOwnerRoot/hook';
 import { registerAuditLogHook } from '#/hooks/auditLog/hook';
 import { registerSoftDeleteCascadeHook } from '#/hooks/softDeleteCascade/hook';
 import { artifactRouter } from '#/modules/artifact';
-import { ensureOwnerRoot, findOwnerRoot } from '#/modules/artifact/services/ensureOwnerRoot';
-import { artifactContainerRouter } from '#/modules/artifactContainer';
 import { artifactPermissionRouter } from '#/modules/artifactPermission';
+import { artifactPlacementRouter } from '#/modules/artifactPlacement';
 import { batchRouter } from '#/modules/batch';
 import { meRouter } from '#/modules/me';
 import { organizationRouter } from '#/modules/organization';
@@ -32,7 +30,7 @@ import { del, get, json, patch, post } from '#tests/utils/request';
 const mount: MountFn[] = [
   (app) => {
     app.route('/api/v1/artifact', artifactRouter);
-    app.route('/api/v1/artifactContainer', artifactContainerRouter);
+    app.route('/api/v1/artifactPlacement', artifactPlacementRouter);
     app.route('/api/v1/artifactPermission', artifactPermissionRouter);
     app.route('/api/v1/batch', batchRouter);
     app.route('/api/v1/organization', organizationRouter);
@@ -58,26 +56,18 @@ describe('artifact lifecycle', () => {
     return { user: context.user, entity };
   };
 
-  const inRoot = async (artifact: Artifact) => {
-    const root = await ensureOwnerRoot(artifact);
-    await createArtifactContainer({ artifactId: artifact.id, containerArtifactId: root.id });
-    return artifact;
-  };
-
   const orgArtifact = async (kind: string, extra: Record<string, unknown> = {}) =>
-    inRoot(
-      (
-        await createArtifact({
-          kind,
-          ownerModel: 'Organization',
-          organizationId: organization.id,
-          ...extra,
-        })
-      ).entity,
-    );
+    (
+      await createArtifact({
+        kind,
+        ownerModel: 'Organization',
+        organizationId: organization.id,
+        ...extra,
+      })
+    ).entity;
 
   const placeInside = async (artifact: Artifact, container: Artifact) => {
-    await createArtifactContainer({ artifactId: artifact.id, containerArtifactId: container.id });
+    await createArtifactPlacement({ artifactId: artifact.id, containerArtifactId: container.id });
     await db.artifact.update({ where: { id: artifact.id }, data: { access: 'inherit' } });
   };
 
@@ -88,7 +78,6 @@ describe('artifact lifecycle', () => {
     registerArtifactAccessHook();
     registerSoftDeleteCascadeHook();
     registerAuditLogHook();
-    registerArtifactOwnerRootHook();
     const first = await createOrganizationUser({ role: 'owner' });
     organization = first.context.organization;
     owner = first.context.user;
@@ -139,11 +128,21 @@ describe('artifact lifecycle', () => {
       await placeInside(note, memberFolder);
     });
 
-    it('the member reaches it, org owners reach it, org admins do not', async () => {
+    const listedFor = async (fetch: Fetch, container: Artifact) =>
+      (
+        await json<Artifact[]>(await fetch(get(`/api/v1/artifact/${container.id}/artifacts`)))
+      ).data.map((artifact) => artifact.id);
+
+    it('org owners can reach it on purpose but never browse it; admins cannot reach it', async () => {
       expect(await status(memberFetch, note)).toBe(200);
       expect(await status(ownerFetch, note)).toBe(200);
       expect(await status(adminFetch, note)).toBe(404);
-      expect(await status(adminFetch, memberFolder)).toBe(404);
+      expect(await listedFor(memberFetch, memberFolder)).toContain(note.id);
+      expect(await listedFor(ownerFetch, memberFolder)).not.toContain(note.id);
+      const roots = await json<Artifact[]>(
+        await ownerFetch(get(`/api/v1/organization/${organization.id}/artifacts`)),
+      );
+      expect(roots.data.map((artifact) => artifact.id)).not.toContain(memberFolder.id);
     });
 
     it('an explicit grant always works', async () => {
@@ -154,16 +153,16 @@ describe('artifact lifecycle', () => {
         role: 'viewer',
       });
       expect(await status(adminFetch, note)).toBe(200);
+      expect(await listedFor(ownerFetch, memberFolder)).not.toContain(note.id);
     });
 
-    it('cannot be left in no container; shared first, the edge can go and admins then see it', async () => {
+    it('cannot be left in no container; once shared, the edge can go and it shows in team browse', async () => {
       const draft = await orgArtifact('folder');
       await placeInside(draft, memberFolder);
-      const [edge] = await db.artifactContainer.findMany({
+      const [edge] = await db.artifactPlacement.findMany({
         where: { artifactId: draft.id, containerArtifactId: memberFolder.id },
       });
-      expect((await memberFetch(del(`/api/v1/artifactContainer/${edge!.id}`))).status).toBe(422);
-      expect(await status(adminFetch, draft)).toBe(404);
+      expect((await memberFetch(del(`/api/v1/artifactPlacement/${edge!.id}`))).status).toBe(422);
 
       const team = await orgArtifact('folder');
       await createArtifactPermission({
@@ -174,19 +173,19 @@ describe('artifact lifecycle', () => {
         role: 'member',
       });
       const placed = await memberFetch(
-        post(`/api/v1/artifact/${draft.id}/artifactContainers`, { containerArtifactId: team.id }),
+        post(`/api/v1/artifact/${draft.id}/artifactPlacements`, { containerArtifactId: team.id }),
       );
       expect(placed.status).toBe(201);
-      expect(await status(adminFetch, draft)).toBe(200);
-      expect((await memberFetch(del(`/api/v1/artifactContainer/${edge!.id}`))).status).toBe(204);
+      expect(await listedFor(adminFetch, team)).toContain(draft.id);
+      expect((await memberFetch(del(`/api/v1/artifactPlacement/${edge!.id}`))).status).toBe(204);
     });
 
     it('a team artifact a member also files into their folder stays visible to admins', async () => {
       const team = await orgArtifact('folder');
       const plan = await orgArtifact('folder');
       await placeInside(plan, team);
-      await createArtifactContainer({ artifactId: plan.id, containerArtifactId: memberFolder.id });
-      expect(await status(adminFetch, plan)).toBe(200);
+      await createArtifactPlacement({ artifactId: plan.id, containerArtifactId: memberFolder.id });
+      expect(await listedFor(adminFetch, team)).toContain(plan.id);
     });
 
     it('is a system kind the plain create route refuses', async () => {
@@ -206,7 +205,7 @@ describe('artifact lifecycle', () => {
     const compliance = await orgArtifact('folder');
     for (const parent of [legal, operations]) {
       const response = await ownerFetch(
-        post(`/api/v1/artifact/${compliance.id}/artifactContainers`, {
+        post(`/api/v1/artifact/${compliance.id}/artifactPlacements`, {
           containerArtifactId: parent.id,
         }),
       );
@@ -242,16 +241,12 @@ describe('artifact lifecycle', () => {
       expect(data.map((artifact) => artifact.id).sort()).toEqual([legal.id, operations.id].sort());
     });
 
-    it('ancestors returns the upward graph with the shared folder once and the owner root on top', async () => {
+    it('ancestors returns the upward graph with the shared folder once, up to the root', async () => {
       const { data } = await json<Ancestry>(
         await ownerFetch(get(`/api/v1/artifact/${compliance.id}/ancestors`)),
       );
-      const ownerRoot = (await findOwnerRoot({
-        ownerModel: 'Organization',
-        organizationId: organization.id,
-      }))!;
       expect(data.artifacts.map((artifact) => artifact.id).sort()).toEqual(
-        [root.id, legal.id, operations.id, ownerRoot.id].sort(),
+        [root.id, legal.id, operations.id].sort(),
       );
       const edgeKeys = data.edges.map((edge) => `${edge.artifactId}>${edge.containerArtifactId}`);
       expect(edgeKeys.sort()).toEqual(
@@ -260,7 +255,6 @@ describe('artifact lifecycle', () => {
           `${compliance.id}>${operations.id}`,
           `${legal.id}>${root.id}`,
           `${operations.id}>${root.id}`,
-          `${root.id}>${ownerRoot.id}`,
         ].sort(),
       );
     });
@@ -341,10 +335,10 @@ describe('artifact lifecycle', () => {
         granteeUserId: member.id,
         role: 'member',
       });
-      const [edge] = await db.artifactContainer.findMany({
+      const [edge] = await db.artifactPlacement.findMany({
         where: { artifactId: item.id, containerArtifactId: shelf.id },
       });
-      expect((await memberFetch(del(`/api/v1/artifactContainer/${edge!.id}`))).status).toBe(204);
+      expect((await memberFetch(del(`/api/v1/artifactPlacement/${edge!.id}`))).status).toBe(204);
     });
 
     it('deleting a container keeps its contents; contents only there are listed and deleted through batch', async () => {
@@ -416,185 +410,6 @@ describe('artifact lifecycle', () => {
     );
     expect(again.status).toBe(201);
   });
-  describe('roots, uses and cross-owner placement', () => {
-    let team: Artifact;
-    let personal: Artifact;
-
-    beforeAll(async () => {
-      team = await orgArtifact('folder', { name: 'team' });
-      await createArtifactPermission({
-        artifactId: team.id,
-        granteeModel: 'OrganizationUser',
-        granteeOrganizationId: organization.id,
-        granteeUserId: member.id,
-        role: 'member',
-      });
-      personal = await inRoot(
-        (await createArtifact({ kind: 'file', ownerModel: 'User', userId: member.id })).entity,
-      );
-    });
-
-    it('a new owner gets its root container', async () => {
-      const created = (await createOrganization()).entity;
-      const root = await findOwnerRoot({ ownerModel: 'Organization', organizationId: created.id });
-      expect(root?.kind).toBe('ownerRoot');
-      expect(root?.system).toBe(true);
-    });
-
-    it('the root placement stays while the artifact lives, and the root carries no grants', async () => {
-      const root = (await findOwnerRoot({
-        ownerModel: 'Organization',
-        organizationId: organization.id,
-      }))!;
-      const placement = await db.artifactContainer.findFirstOrThrow({
-        where: { artifactId: team.id, containerArtifactId: root.id },
-      });
-      expect((await ownerFetch(del(`/api/v1/artifactContainer/${placement.id}`))).status).toBe(422);
-      const grant = await ownerFetch(
-        post(`/api/v1/artifact/${root.id}/artifactPermissions`, {
-          granteeModel: 'User',
-          granteeUserId: member.id,
-          role: 'viewer',
-        }),
-      );
-      expect(grant.status).toBe(422);
-    });
-
-    it("a file placed in another owner's folder gives that owner read only", async () => {
-      const placed = await memberFetch(
-        post(`/api/v1/artifact/${personal.id}/artifactContainers`, {
-          containerArtifactId: team.id,
-        }),
-      );
-      expect(placed.status).toBe(201);
-      const access = await json<{ role: string }>(
-        await ownerFetch(get(`/api/v1/artifact/${personal.id}/access`)),
-      );
-      expect(access.data.role).toBe('viewer');
-      expect(
-        (await ownerFetch(patch(`/api/v1/artifact/${personal.id}`, { name: 'x' }))).status,
-      ).toBe(403);
-      expect((await ownerFetch(del(`/api/v1/artifact/${personal.id}`))).status).toBe(403);
-    });
-
-    it('lists where the artifact exists and is used', async () => {
-      await createResourceBinding({
-        sourceModel: 'Artifact',
-        artifactId: personal.id,
-        resourceModel: 'User',
-        userId: member.id,
-        bindingType: 'avatar',
-      });
-      const { data } = await json<{
-        placements: { containerArtifactId: string }[];
-        bindings: { bindingType: string }[];
-      }>(await memberFetch(get(`/api/v1/artifact/${personal.id}/uses`)));
-      expect(data.placements.map((placement) => placement.containerArtifactId)).toContain(team.id);
-      expect(data.placements).toHaveLength(2);
-      expect(data.bindings.map((binding) => binding.bindingType)).toEqual(['avatar']);
-    });
-
-    it("the container's side can evict a foreign item with operate on the container", async () => {
-      const placement = await db.artifactContainer.findFirstOrThrow({
-        where: { artifactId: personal.id, containerArtifactId: team.id },
-      });
-      expect((await adminFetch(del(`/api/v1/artifactContainer/${placement.id}`))).status).toBe(204);
-    });
-
-    it("org-user content can't be placed in another owner's container", async () => {
-      const memberFolder = await orgArtifact('organizationUserFolder', { system: true });
-      await createArtifactPermission({
-        artifactId: memberFolder.id,
-        granteeModel: 'OrganizationUser',
-        granteeOrganizationId: organization.id,
-        granteeUserId: member.id,
-        role: 'owner',
-      });
-      const draft = await orgArtifact('file');
-      await placeInside(draft, memberFolder);
-      const personalFolder = await inRoot(
-        (await createArtifact({ kind: 'folder', ownerModel: 'User', userId: member.id })).entity,
-      );
-      const response = await memberFetch(
-        post(`/api/v1/artifact/${draft.id}/artifactContainers`, {
-          containerArtifactId: personalFolder.id,
-        }),
-      );
-      expect(response.status).toBe(422);
-    });
-  });
-  describe('org-user content never ends up abroad, whatever the order', () => {
-    let memberFolder: Artifact;
-    let abroad: Artifact;
-
-    const grant = (artifact: Artifact, role: 'member' | 'admin' | 'owner') =>
-      createArtifactPermission({
-        artifactId: artifact.id,
-        granteeModel: 'User',
-        granteeUserId: member.id,
-        role,
-      });
-
-    const placeAs = (artifact: Artifact, container: Artifact) =>
-      memberFetch(
-        post(`/api/v1/artifact/${artifact.id}/artifactContainers`, {
-          containerArtifactId: container.id,
-        }),
-      );
-
-    const sharedFile = async () => {
-      const file = await orgArtifact('file');
-      await grant(file, 'admin');
-      return file;
-    };
-
-    beforeAll(async () => {
-      memberFolder = await orgArtifact('organizationUserFolder', { system: true });
-      await grant(memberFolder, 'owner');
-      abroad = await inRoot(
-        (await createArtifact({ kind: 'folder', ownerModel: 'User', userId: member.id })).entity,
-      );
-    });
-
-    it('placing abroad content into the member folder is refused', async () => {
-      const file = await sharedFile();
-      expect((await placeAs(file, abroad)).status).toBe(201);
-      expect((await placeAs(file, memberFolder)).status).toBe(422);
-    });
-
-    it('removing the last shared folder of abroad content is refused', async () => {
-      const team = await orgArtifact('folder');
-      await grant(team, 'admin');
-      const file = await sharedFile();
-      expect((await placeAs(file, team)).status).toBe(201);
-      expect((await placeAs(file, memberFolder)).status).toBe(201);
-      expect((await placeAs(file, abroad)).status).toBe(201);
-      const edge = await db.artifactContainer.findFirstOrThrow({
-        where: { artifactId: file.id, containerArtifactId: team.id },
-      });
-      expect((await memberFetch(del(`/api/v1/artifactContainer/${edge.id}`))).status).toBe(422);
-    });
-
-    it("placing an abroad item's parent folder into the member folder is refused", async () => {
-      const parent = await orgArtifact('folder');
-      await grant(parent, 'admin');
-      const file = await sharedFile();
-      expect((await placeAs(file, parent)).status).toBe(201);
-      expect((await placeAs(file, abroad)).status).toBe(201);
-      expect((await placeAs(parent, memberFolder)).status).toBe(422);
-    });
-
-    it('deleting the shared folder that keeps abroad content shareable is refused', async () => {
-      const team = await orgArtifact('folder');
-      await grant(team, 'admin');
-      const file = await sharedFile();
-      expect((await placeAs(file, team)).status).toBe(201);
-      expect((await placeAs(file, memberFolder)).status).toBe(201);
-      expect((await placeAs(file, abroad)).status).toBe(201);
-      expect((await ownerFetch(del(`/api/v1/artifact/${team.id}`))).status).toBe(422);
-    });
-  });
-
   it('inherit: false keeps an artifact that left its folders private', async () => {
     const outsider = (await createOrganizationUser({}, {})).context.user;
     const outsiderFetch = createTestApp({ mockUser: outsider, mount }).fetch;
@@ -604,16 +419,16 @@ describe('artifact lifecycle', () => {
     expect(
       (
         await ownerFetch(
-          post(`/api/v1/artifact/${file.id}/artifactContainers`, { containerArtifactId: box.id }),
+          post(`/api/v1/artifact/${file.id}/artifactPlacements`, { containerArtifactId: box.id }),
         )
       ).status,
     ).toBe(201);
-    const edge = await db.artifactContainer.findFirstOrThrow({
+    const edge = await db.artifactPlacement.findFirstOrThrow({
       where: { artifactId: file.id, containerArtifactId: box.id },
     });
-    expect((await ownerFetch(del(`/api/v1/artifactContainer/${edge.id}`))).status).toBe(204);
+    expect((await ownerFetch(del(`/api/v1/artifactPlacement/${edge.id}`))).status).toBe(204);
     const placed = await ownerFetch(
-      post(`/api/v1/artifact/${file.id}/artifactContainers`, {
+      post(`/api/v1/artifact/${file.id}/artifactPlacements`, {
         containerArtifactId: lobby.id,
         inherit: false,
       }),

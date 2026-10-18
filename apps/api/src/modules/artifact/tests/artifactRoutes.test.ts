@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { clearHookRegistry, db } from '@template/db';
 import type {
   Artifact,
-  ArtifactContainer,
+  ArtifactPlacement,
   Organization,
   OrganizationUser,
   User,
@@ -18,8 +18,8 @@ import {
 import { registerArtifactAccessHook } from '#/hooks/artifactAccess/hook';
 import type { TokenWithRelations } from '#/lib/context/types';
 import { artifactRouter } from '#/modules/artifact';
-import { artifactContainerRouter } from '#/modules/artifactContainer';
 import { artifactPermissionRouter } from '#/modules/artifactPermission';
+import { artifactPlacementRouter } from '#/modules/artifactPlacement';
 import { meRouter } from '#/modules/me';
 import { organizationRouter } from '#/modules/organization';
 import { createTestApp, type MountFn } from '#tests/createTestApp';
@@ -28,7 +28,7 @@ import { del, get, json, patch, post } from '#tests/utils/request';
 const mount: MountFn[] = [
   (app) => {
     app.route('/api/v1/artifact', artifactRouter);
-    app.route('/api/v1/artifactContainer', artifactContainerRouter);
+    app.route('/api/v1/artifactPlacement', artifactPlacementRouter);
     app.route('/api/v1/artifactPermission', artifactPermissionRouter);
     app.route('/api/v1/me', meRouter);
     app.route('/api/v1/organization', organizationRouter);
@@ -49,7 +49,7 @@ describe('artifact routes', () => {
   let testDb: ReturnType<typeof createTestApp>['db'];
   let shared: Artifact;
   let drafts: Artifact;
-  let edge: ArtifactContainer;
+  let edge: ArtifactPlacement;
 
   const createFolder = async (fetch: Fetch, path: string, body: Record<string, unknown> = {}) => {
     const response = await fetch(post(path, { kind: 'folder', name: 'folder', ...body }));
@@ -59,7 +59,7 @@ describe('artifact routes', () => {
 
   const place = (fetch: Fetch, artifact: Artifact, container: Artifact) =>
     fetch(
-      post(`/api/v1/artifact/${artifact.id}/artifactContainers`, {
+      post(`/api/v1/artifact/${artifact.id}/artifactPlacements`, {
         containerArtifactId: container.id,
       }),
     );
@@ -126,7 +126,7 @@ describe('artifact routes', () => {
   it('an edge needs manage on the artifact and operate on the container', async () => {
     const response = await place(memberFetch, drafts, shared);
     expect(response.status).toBe(201);
-    edge = (await json<ArtifactContainer>(response)).data;
+    edge = (await json<ArtifactPlacement>(response)).data;
     const placed = await db.artifact.findUniqueOrThrow({ where: { id: drafts.id } });
     expect(placed.access).toBe('inherit');
   });
@@ -291,8 +291,8 @@ describe('artifact routes', () => {
   it('removing its last folder needs both sides; it then shows at its owner root', async () => {
     const stranger = (await createUser()).entity;
     const strangerFetch = createTestApp({ mockUser: stranger, mount }).fetch;
-    expect((await strangerFetch(del(`/api/v1/artifactContainer/${edge.id}`))).status).toBe(404);
-    expect((await memberFetch(del(`/api/v1/artifactContainer/${edge.id}`))).status).toBe(204);
+    expect((await strangerFetch(del(`/api/v1/artifactPlacement/${edge.id}`))).status).toBe(404);
+    expect((await memberFetch(del(`/api/v1/artifactPlacement/${edge.id}`))).status).toBe(204);
     const roots = await json<Artifact[]>(
       await memberFetch(get(`/api/v1/organization/${organization.id}/artifacts`)),
     );

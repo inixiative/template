@@ -15,8 +15,8 @@ import { WebhookModel } from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
   createArtifact,
-  createArtifactContainer,
   createArtifactPermission,
+  createArtifactPlacement,
   createOrganization,
   createSpace,
   createUser,
@@ -136,7 +136,7 @@ describe('webhook hook: Artifact audience', () => {
     });
     const member = await folder();
     enqueueSpy.mockClear();
-    await createArtifactContainer({ artifactId: member.id, containerArtifactId: container.id });
+    await createArtifactPlacement({ artifactId: member.id, containerArtifactId: container.id });
     expect(heardBy(spaceSub.id)).toEqual([container.id]);
     expect(heardBy(organizationSub.id).sort()).toEqual([container.id, member.id].sort());
     expect(heardBy(outsiderSub.id)).toEqual([]);
@@ -151,7 +151,7 @@ describe('webhook hook: Artifact audience', () => {
       role: 'viewer',
     });
     const member: Artifact = await folder();
-    await createArtifactContainer({ artifactId: member.id, containerArtifactId: container.id });
+    await createArtifactPlacement({ artifactId: member.id, containerArtifactId: container.id });
     enqueueSpy.mockClear();
     await db.artifact.update({ where: { id: member.id }, data: { access: 'inherit' } });
     expect(heardBy(granteeSub.id)).toEqual([member.id]);
@@ -166,7 +166,7 @@ describe('webhook hook: Artifact audience', () => {
       })
     ).entity;
     const note = await folder();
-    await createArtifactContainer({ artifactId: note.id, containerArtifactId: memberFolder.id });
+    await createArtifactPlacement({ artifactId: note.id, containerArtifactId: memberFolder.id });
     enqueueSpy.mockClear();
     await db.artifact.update({
       where: { id: note.id },

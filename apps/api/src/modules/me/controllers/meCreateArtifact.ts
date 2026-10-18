@@ -6,7 +6,7 @@
  */
 import { makeController } from '#/lib/utils/makeController';
 import { artifactActorFromContext } from '#/modules/artifact/lib/artifactActor';
-import { createArtifact } from '#/modules/artifact/services/placeArtifact';
+import { createArtifact } from '#/modules/artifact/services/artifactPlacements';
 import { meCreateArtifactRoute } from '#/modules/me/routes/meCreateArtifact';
 
 export const meCreateArtifactController = makeController(

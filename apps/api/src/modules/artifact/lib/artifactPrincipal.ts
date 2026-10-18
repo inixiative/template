@@ -42,10 +42,10 @@ type OwnedRow = {
   spaceId: string | null;
 };
 
-export const ownerPrincipal = (artifact: OwnedRow, ownersOnly = false): ArtifactPrincipal => {
+export const ownerPrincipal = (artifact: OwnedRow, memberScoped = false): ArtifactPrincipal => {
   if (artifact.ownerModel === 'Organization')
     return {
-      kind: ownersOnly ? 'OrganizationOwner' : 'OrganizationManager',
+      kind: memberScoped ? 'OrganizationOwner' : 'OrganizationManager',
       ids: [artifact.organizationId!],
     };
   if (artifact.ownerModel === 'Space') return { kind: 'SpaceManager', ids: [artifact.spaceId!] };

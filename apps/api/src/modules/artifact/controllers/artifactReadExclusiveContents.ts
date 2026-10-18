@@ -20,6 +20,6 @@ export const artifactReadExclusiveContentsController = makeController(
       contents.map((artifact) => artifact.id),
       'read',
     );
-    return respond.ok(contents.filter((artifact) => verdicts.get(artifact.id)?.allowed));
+    return respond.ok(contents.filter((artifact) => verdicts.get(artifact.id)?.listed));
   },
 );

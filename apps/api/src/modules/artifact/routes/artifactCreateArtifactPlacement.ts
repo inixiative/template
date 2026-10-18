@@ -6,16 +6,16 @@
  */
 import { createRoute } from '#/lib/routeTemplates';
 import {
-  artifactContainerCreateBodySchema,
-  artifactContainerReadResponseSchema,
-} from '#/modules/artifact/schemas/artifactContainerSchemas';
+  artifactPlacementCreateBodySchema,
+  artifactPlacementReadResponseSchema,
+} from '#/modules/artifact/schemas/artifactPlacementSchemas';
 import { Modules } from '#/modules/modules';
 
-export const artifactCreateArtifactContainerRoute = createRoute({
+export const artifactCreateArtifactPlacementRoute = createRoute({
   model: Modules.artifact,
-  submodel: Modules.artifactContainer,
+  submodel: Modules.artifactPlacement,
   description:
     'Places an artifact in a container. Needs manage on the artifact and operate on the container.',
-  bodySchema: artifactContainerCreateBodySchema,
-  responseSchema: artifactContainerReadResponseSchema,
+  bodySchema: artifactPlacementCreateBodySchema,
+  responseSchema: artifactPlacementReadResponseSchema,
 });

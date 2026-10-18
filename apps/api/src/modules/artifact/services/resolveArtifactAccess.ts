@@ -5,9 +5,7 @@
  * @uses infrastructure:prisma
  */
 import type { Role } from '@template/db/generated/client/enums';
-import { lesserRole } from '@template/permissions';
-import { artifactKindDef, isOwnerRootKind } from '@template/shared/artifact';
-import { sameArtifactOwner } from '#/modules/artifact/lib/artifactOwner';
+import { artifactKindDef } from '@template/shared/artifact';
 import {
   type ArtifactPrincipal,
   granteePrincipal,
@@ -15,18 +13,17 @@ import {
   principalKey,
 } from '#/modules/artifact/lib/artifactPrincipal';
 import { strongerRole } from '#/modules/artifact/lib/artifactRoles';
-import { CROSS_OWNER_INHERITED_ROLE } from '#/modules/artifact/lib/crossOwnerInheritance';
 import {
   type ArtifactGraph,
   loadArtifactGraph,
 } from '#/modules/artifact/services/loadArtifactGraph';
 
-export type ArtifactGrant = { principal: ArtifactPrincipal; role: Role };
+export type ArtifactGrant = { principal: ArtifactPrincipal; role: Role; implicit: boolean };
 
 export type ArtifactAccessResolution = {
   artifactId: string;
   public: boolean;
-  ownersOnly: boolean;
+  memberScoped: boolean;
   grants: ArtifactGrant[];
 };
 
@@ -38,10 +35,11 @@ const addGrant = (grants: Map<string, ArtifactGrant>, grant: ArtifactGrant): voi
   grants.set(key, {
     principal: grant.principal,
     role: strongerRole(held?.role ?? null, grant.role)!,
+    implicit: (held?.implicit ?? true) && grant.implicit,
   });
 };
 
-const ownersOnlyReach = (graph: ArtifactGraph) => {
+const memberScopedReach = (graph: ArtifactGraph) => {
   const memo = new Map<string, boolean>();
   const reach = (artifactId: string, walking: Set<string>): boolean => {
     const cached = memo.get(artifactId);
@@ -49,20 +47,13 @@ const ownersOnlyReach = (graph: ArtifactGraph) => {
     const node = graph.get(artifactId);
     if (!node || walking.has(artifactId)) return false;
     const path = new Set(walking).add(artifactId);
-    const ownContainers = node.containerArtifactIds.filter((containerArtifactId) => {
-      const container = graph.get(containerArtifactId);
-      return (
-        container !== undefined &&
-        !isOwnerRootKind(container.kind) &&
-        sameArtifactOwner(container, node)
-      );
-    });
-    const ownersOnly =
-      artifactKindDef(node.kind)?.ownerReach === 'owners' ||
-      (ownContainers.length > 0 &&
-        ownContainers.every((containerArtifactId) => reach(containerArtifactId, path)));
-    memo.set(artifactId, ownersOnly);
-    return ownersOnly;
+    const containers = node.containerArtifactIds.filter((id) => graph.has(id));
+    const scoped =
+      artifactKindDef(node.kind)?.memberScoped === true ||
+      (containers.length > 0 &&
+        containers.every((containerArtifactId) => reach(containerArtifactId, path)));
+    memo.set(artifactId, scoped);
+    return scoped;
   };
   return (artifactId: string) => reach(artifactId, new Set());
 };
@@ -70,7 +61,7 @@ const ownersOnlyReach = (graph: ArtifactGraph) => {
 const effectiveAccess = (
   graph: ArtifactGraph,
   now: Date,
-  isOwnersOnly: (artifactId: string) => boolean,
+  isMemberScoped: (artifactId: string) => boolean,
 ) => {
   const memo = new Map<string, Effective>();
   const resolve = (artifactId: string, walking: Set<string>): Effective => {
@@ -81,14 +72,16 @@ const effectiveAccess = (
 
     const grants = new Map<string, ArtifactGrant>();
     addGrant(grants, {
-      principal: ownerPrincipal(node, isOwnersOnly(artifactId)),
+      principal: ownerPrincipal(node, isMemberScoped(artifactId)),
       role: 'owner',
+      implicit: true,
     });
     for (const permission of node.permissions) {
       if (permission.expiresAt && permission.expiresAt <= now) continue;
       addGrant(grants, {
         principal: granteePrincipal(permission),
         role: permission.role,
+        implicit: false,
       });
     }
 
@@ -97,18 +90,8 @@ const effectiveAccess = (
       const path = new Set(walking).add(artifactId);
       for (const containerArtifactId of node.containerArtifactIds) {
         const container = resolve(containerArtifactId, path);
-        const containerNode = graph.get(containerArtifactId);
-        if (!containerNode || isOwnerRootKind(containerNode.kind)) continue;
-        const foreign = !!containerNode && !sameArtifactOwner(containerNode, node);
         inheritedPublic ||= container.public;
-        for (const grant of container.grants.values()) {
-          addGrant(
-            grants,
-            foreign
-              ? { ...grant, role: lesserRole(grant.role, CROSS_OWNER_INHERITED_ROLE) }
-              : grant,
-          );
-        }
+        for (const grant of container.grants.values()) addGrant(grants, grant);
       }
     }
 
@@ -126,8 +109,8 @@ export const resolveArtifactAccess = async (
   artifactIds: string[],
 ): Promise<Map<string, ArtifactAccessResolution>> => {
   const graph = await loadArtifactGraph(artifactIds);
-  const isOwnersOnly = ownersOnlyReach(graph);
-  const resolve = effectiveAccess(graph, new Date(), isOwnersOnly);
+  const isMemberScoped = memberScopedReach(graph);
+  const resolve = effectiveAccess(graph, new Date(), isMemberScoped);
   const resolutions = new Map<string, ArtifactAccessResolution>();
   for (const artifactId of artifactIds) {
     if (!graph.has(artifactId)) continue;
@@ -135,7 +118,7 @@ export const resolveArtifactAccess = async (
     resolutions.set(artifactId, {
       artifactId,
       public: effective.public,
-      ownersOnly: isOwnersOnly(artifactId),
+      memberScoped: isMemberScoped(artifactId),
       grants: [...effective.grants.values()],
     });
   }
