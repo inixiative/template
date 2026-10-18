@@ -33,6 +33,8 @@ import { Prisma, PrismaClient } from '@template/db/generated/client/client';
 import { prismaMap } from '@template/db/generated/prismaMap';
 import { auditActorContext } from '@template/db/lib/auditActorContext';
 import { acquireFindForUpdateLock } from '@template/db/lock/acquireFindForUpdateLock';
+import type { AcquireOptions, LockOptions } from '@template/db/lock/types';
+import { withLockUntilSettled } from '@template/db/lock/withLockUntilSettled';
 import { registerTestTracker } from '@template/db/test/testTracker';
 import type { RuntimeDelegate } from '@template/db/utils/delegates';
 import {
@@ -130,7 +132,7 @@ const dbMethods = {
               prismaTransactionId: null,
               afterCommitBatches: [],
               finallyFns: [],
-              heldLockKeys: new Set(),
+              heldLocks: new Map(),
               bridgedContext,
             };
             opened = openTransaction;
@@ -298,6 +300,16 @@ const dbMethods = {
     return db.$queryRaw<T[]>(
       Prisma.sql`SELECT * FROM ${Prisma.raw(`"${table}"`)} WHERE ${Prisma.join(conds, ' AND ')} FOR UPDATE`,
     );
+  },
+
+  withLockUntilSettled: async <T>(
+    options: LockOptions,
+    fn: () => Promise<T>,
+    acquireOptions?: AcquireOptions,
+  ): Promise<T> => {
+    const openTransaction = store.getStore()?.openTransaction;
+    if (!openTransaction) throw new Error('db.withLockUntilSettled() requires db.txn()');
+    return withLockUntilSettled(openTransaction, options, fn, acquireOptions);
   },
 };
 

@@ -135,6 +135,8 @@ try {
 
 Use when multiple processes can race for the same resource (multiple golem instances both wanting to own the same bot session, multiple workers wanting to run a singleton cron, etc.).
 
+**Inside a transaction, release at the end of the transaction, not the critical section.** A lock that guards a check-then-write must stay held until that write commits, or the next holder checks against state from before it. `db.withLockUntilSettled(lockOptions, fn)` holds a `createLock` lock until the open transaction settles, joins a key the transaction already holds instead of waiting on itself, and runs the transaction's own holders of the key one at a time (the lock + serialized-queue pair above, scoped to the transaction). `withOwnerLock` switches to it whenever it runs inside a transaction, which is how a `transactionAll` batch's sub-requests keep the owner lock until the batch commits. See [DATABASE.md](./DATABASE.md#redis-locks-held-until-the-transaction-ends).
+
 ---
 
 ## Supersede Lanes (`claimLane` / `watchLane`)

@@ -6,8 +6,9 @@
  */
 import type { AsyncLocalStorage } from 'node:async_hooks';
 import type { PrismaClient } from '@template/db/generated/client/client';
+import type { AcquireOptions, LockOptions } from '@template/db/lock/types';
 import type { RuntimeDelegate } from '@template/db/utils/delegates';
-import type { ConcurrencyType } from '@template/shared/utils';
+import type { ConcurrencyType, SerializedQueue } from '@template/shared/utils';
 
 export type AfterCommitFn = () => Promise<void> | void;
 
@@ -53,12 +54,21 @@ export type DbMethods = {
     where: Record<string, unknown>,
     options?: FindForUpdateOptions,
   ) => Promise<T[]>;
+  withLockUntilSettled: <T>(
+    options: LockOptions,
+    fn: () => Promise<T>,
+    acquireOptions?: AcquireOptions,
+  ) => Promise<T>;
 };
 
 export type Db = PrismaClient & DbMethods;
 
 // Async-local stores a hook declared it needs, paired with the value read at db.txn() open.
 export type BridgedContext = [AsyncLocalStorage<unknown>, unknown][];
+
+// `acquired` settles once the transaction holds the key; `holders` runs its holders inside the
+// transaction one at a time.
+export type HeldLock = { acquired: Promise<void>; holders: SerializedQueue };
 
 export type CommitBatch = { fns: AfterCommitFn[]; concurrency?: number; types?: ConcurrencyType[] };
 
@@ -80,8 +90,9 @@ export type OpenTransaction = {
   // Drained once the database transaction has settled, commit or rollback, before the on-commit
   // batches run.
   finallyFns: FinallyFn[];
-  // Upserting findForUpdate lock keys this transaction holds, so a second fence on the same key
-  // does not wait on itself.
-  heldLockKeys: Set<string>;
+  // Redis lock keys this transaction holds or is acquiring (db.withLockUntilSettled, upserting
+  // findForUpdate), each to its one acquisition, so a second take of a key joins it instead of
+  // waiting on itself.
+  heldLocks: Map<string, HeldLock>;
   bridgedContext: BridgedContext;
 };
