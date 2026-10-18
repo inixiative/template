@@ -66,7 +66,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - the test swaps global fetch directly
 - writing process.env in the test file
 - I'll use vitest for this package
-- record which tables tests touch so cleanup knows
 - you don't need the org explicitly, it's inferred
 - before writing inline test rows check for a factory
 - spying on a global without restoring it
@@ -106,7 +105,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - I'll assign a fake to the global for the test
 - I'll set the env var at the top of the test
 - vi.mock in a test
-- I'll call the tracker setup at the top of my test file
 - the organizationUser helper creates its own dependencies
 - I'll inline the data for this record
 - I'll spyOn fetch and leave it
@@ -139,7 +137,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - test mocks enqueueJob, that violates the testing rules
 - use a spy on the global, not an assignment
 - static test config belongs in the test env file
-- the db client already wires the tracker
 - get the user and org off the context
 - I spied on it but didn't restore
 - every external client is tested from recordings
@@ -164,7 +161,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - use cassettes, not mocks or stubs
 - stomping a global in a test file
 - mutating environment variables inside tests
-- hook table tracking into the client once
 - you don't need to pass the org, it's inferred
 - spies leaking into the next test
 - I'll let the test send a real email to a sandbox

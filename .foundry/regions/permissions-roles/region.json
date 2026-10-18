@@ -3,7 +3,7 @@
   "title": "Roles, actions and permission checks",
   "routing": "Is this about who may do what by role: PlatformRole and superadmin, Role on OrganizationUser / SpaceUser (owner, admin, member, viewer; roleHierarchy, greaterRole / lesserRole / rolesAtOrAbove, isSuperadmin), StandardAction tiers (own \u2287 manage \u2287 operate \u2287 read), the per-request Permix (setupOrgPermissions / setupSpacePermissions / setupUserPermissions, setupOrgContext / setupSpaceContext / setupUserContext, permix.setup / check / setSuperadmin / getJSON), entitlements and their allow-override, tokens never exceeding the user's role, validateRole, validatePermission and the validation middleware order, role assignment (assign, leave), session-only actions, or frontend checks (permissions-roles / permissions-rebac.check, usePermission / checkPermission, NavItem.access, Button show / disabledText)?",
   "concepts": ["permissions-roles"],
-  "tokens": 14252,
+  "tokens": 14168,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
@@ -14,7 +14,7 @@
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 14252
+      "tokens": 14168
     }
   },
   "runsAgreed": 0,

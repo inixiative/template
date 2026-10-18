@@ -2,7 +2,7 @@
 // Scans only each afterEach/afterAll body, brace-matched, so a delete that is the subject of a test
 // body is never flagged. Comments are blanked; strings are not, because a TRUNCATE or DELETE FROM in
 // raw SQL is exactly the hand cleanup this check exists to catch. DROP TABLE is schema teardown.
-const AFTER_HOOK = /\bafter(Each|All)\s*\(/g;
+const CLEANUP_HOOK = /\b(afterEach|afterAll|beforeEach)\s*\(/g;
 const HAND_CLEANUP = /\.(delete|deleteMany)\s*\(|\bTRUNCATE\b|\bDELETE\s+FROM\b/i;
 
 const blankComments = (src: string): string =>
@@ -24,7 +24,7 @@ const lineAt = (src: string, offset: number): number => src.slice(0, offset).spl
 const violations: string[] = [];
 for (const file of process.argv.slice(2)) {
   const src = blankComments(await Bun.file(file).text());
-  for (const hook of src.matchAll(AFTER_HOOK)) {
+  for (const hook of src.matchAll(CLEANUP_HOOK)) {
     const open = src.indexOf('{', hook.index ?? 0);
     if (open === -1) continue;
     const body = src.slice(open, bodyEnd(src, open));
@@ -38,7 +38,7 @@ for (const file of process.argv.slice(2)) {
 
 if (violations.length) {
   process.stdout.write(
-    'Found hand cleanup in a test after hook.\n' +
+    'Found hand cleanup in a test cleanup hook (afterEach, afterAll, beforeEach).\n' +
       'The test tracker records every table a test writes and cleanupTouchedTables() truncates them,\n' +
       'so call cleanupTouchedTables(db) instead of deleting rows yourself. If a write genuinely escapes\n' +
       'the tracker (raw SQL), make that write visible to the tracker instead.\n\n' +

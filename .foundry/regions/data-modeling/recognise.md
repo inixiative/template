@@ -35,7 +35,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - the whole country record for a code
 - validate the country field in the request
 - display name for a country code
-- every model gets created and updated timestamps
 - the full list of currencies
 - just the three-letter currency codes
 - the whole currency record for a code
@@ -44,7 +43,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - a model owned by either a user or an org
 - an owner type string plus an owner id
 - constraints and hooks read the FK map from one place
-- how to declare a foreign key column
 - which FK column does this owner kind use
 - defaults that must never change after deploy
 - skip the webhook for a record that keeps failing
@@ -69,16 +67,13 @@ A moment that says any of these, or something close, is this region's. Both voic
 - the raw list of timezones for a picker
 - validate a timezone field in the request
 - take a user id, not a plain string
-- construct a typed user id from a string
 - what id type for the new model
-- generate the id in code with a random UUID
 - dial code for this country code
 - iterate every country for a picker
 - the readonly array of ISO country codes
 - look up a country by its code
 - a zod field for country
 - show the country name not the code
-- add timestamps to the new model
 - iterate every currency
 - the array of ISO currency codes
 - look up one currency by its code
@@ -87,7 +82,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - point at one of several entity types safely
 - entity type and entity id pair with runtime lookups
 - hand-declare the FK map in the hook
-- FK column type in the schema
 - read the polymorphic mapping for a model
 - seeded resources nobody can edit
 - mark a record as poisoned for this integration
@@ -112,9 +106,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - every IANA timezone id
 - a zod field for timezone
 - stop mixing up user ids and org ids
-- wrap the raw id in its branded type
 - use a random uuid for the primary key
-- autoincrement id for the new table
 - country calling code only
 - the country table itself
 - enumerate valid country codes
@@ -152,9 +144,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - iterate all timezone names
 - check the timezone against the runtime's supported list inline
 - branded id type for function signatures
-- a constructor per model for typed ids
 - ids that sort by creation time
-- time-ordered ids for the primary key
 - a countries array with name and dial code
 - all country codes for a dropdown of codes
 - hand-write a country list in the schema
@@ -172,8 +162,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - a namespace for tags
 - plain string for the timezone field
 - I'll make my own branded type for this id
-- brand the id before passing it along
-- the default id generator for a model
 - country must be a valid ISO code
 - look up the model's polymorphic axis config
 - register the new model so the hook enforces its target kinds

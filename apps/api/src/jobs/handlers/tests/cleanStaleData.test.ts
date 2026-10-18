@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type { User } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
@@ -17,19 +17,14 @@ describe('cleanStaleData handler', () => {
   let ctx: WorkerContext;
   let user: User;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity } = await createUser();
     user = entity;
     ctx = createTestWorker({ name: 'cleanStaleData', data: { id: 'cleanStaleData' } });
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanupTouchedTables(ctx.db);
-    await ctx.queue.redis.flushdb();
-  });
-
-  beforeEach(async () => {
-    await ctx.db.webhookEvent.deleteMany({});
     await ctx.queue.redis.flushdb();
   });
 

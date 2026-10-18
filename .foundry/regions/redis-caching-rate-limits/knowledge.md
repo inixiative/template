@@ -18,6 +18,7 @@
   - [4a. Doc sections](#4a-doc-sections)
     - `docs/claude/REDIS.md`: Connection Management; Namespaces; Built-In Uses; Testing; Error Handling; Cache Utilities
     - `docs/claude/HOOKS.md`: Cache Invalidation
+    - `docs/claude/JOBS.md`: Handler Patterns › Rolling Caches (Root, Branch, Leaf)
   - [4b. Code entries](#4b-code-entries)
 
 ## Glossary
@@ -133,21 +134,22 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 
 | Problem | Use | Read | Signs you're bypassing it |
 |---|---|---|---|
-| a dedicated connection for the queue or a blocking command; I'll construct a new redis client for this; the worker needs its own connection; not for ordinary commands, those share the main client | **createRedisConnection** · primitive `packages/db/src/redis/client.ts#createRedisConnection` — Only for dedicated connections (BullMQ, blocking); getRedisClient for regular operations. | docs/claude/REDIS.md § Connection Management; docs/claude/REDIS.md § Testing | — |
+| a dedicated connection for the queue or a blocking command; I'll construct a new redis client for this; the worker needs its own connection; not for ordinary commands, those share the main client | **createRedisConnection** · primitive `packages/db/src/redis/client.ts#createRedisConnection` — For dedicated connections like BullMQ; for ordinary commands or pub/sub use getRedisClient or getRedisSub. | docs/claude/REDIS.md § Connection Management; docs/claude/REDIS.md § Testing | — |
 | the shared redis client for ordinary commands; I'll new up a redis client from the env url; cache, rate limits, sessions and codes all use this one; where do I get redis from | **getRedisClient** · primitive `packages/db/src/redis/client.ts#getRedisClient` — Default for cache, rate limits, sessions, OTP; createRedisConnection only for dedicated connections. | docs/claude/REDIS.md § Connection Management; docs/claude/REDIS.md § Testing | Constructing a new ioredis client (new Redis(process.env.REDIS_URL)) for ordinary commands instead of the shared main client. (docs/claude/REDIS.md § Connection Strategy) |
 | publish a message to a channel; the publishing connection, not the subscribing one; I'll publish on the main client | **getRedisPub** · primitive `packages/db/src/redis/client.ts#getRedisPub` — Publishing only; subscribing needs getRedisSub's dedicated connection. Plain commands: getRedisClient. | docs/claude/REDIS.md § Connection Management | — |
 | subscribe to a channel; I'll call subscribe on the main client; subscribing puts the connection in pub/sub mode so it needs its own; open an ad-hoc connection to listen | **getRedisSub** · primitive `packages/db/src/redis/client.ts#getRedisSub` — Subscribing only; publishing uses getRedisPub, ordinary commands use getRedisClient or createRedisConnection. | docs/claude/REDIS.md § Connection Management; docs/claude/REDIS.md § Testing | Calling SUBSCRIBE on the main client, or opening an ad-hoc connection to subscribe. (docs/claude/REDIS.md § Why Separate Connections? (SUBSCRIBE puts a connection in pub/sub mode)) |
-| what prefix do I put on this redis key; I'll hardcode a cache colon prefix on the key; build the lock key with the right namespace; keys for jobs, sessions and locks each have a namespace | **redisNamespace** · primitive `packages/db/src/redis/namespaces.ts#redisNamespace` — Use instead of hard-coded key prefix strings. | docs/claude/REDIS.md § Built-In Uses; docs/claude/REDIS.md § Namespaces | Hard-coded key prefix strings like `cache:User:${id}` or `lock:${x}` instead of `${redisNamespace.cache}:...`. (docs/claude/REDIS.md § Namespaces ("Bad - hardcoded prefixes")) |
+| what prefix do I put on this redis key; I'll hardcode a cache colon prefix on the key; build the lock key with the right namespace; keys for jobs, sessions and locks each have a namespace | **redisNamespace** · primitive `packages/db/src/redis/namespaces.ts#redisNamespace` — prefix Redis keys by use case to avoid collisions and allow selective clearing | docs/claude/REDIS.md § Built-In Uses; docs/claude/REDIS.md § Namespaces | Hard-coded key prefix strings like `cache:User:${id}` or `lock:${x}` instead of `${redisNamespace.cache}:...`. (docs/claude/REDIS.md § Namespaces ("Bad - hardcoded prefixes")) |
 | an inline lua string in a service; where does the lua script go; lua scripts go in the module's queries folder with their eval | **lua-in-queries** · rule `scripts/ci/rules/lua-in-queries.sh` — keep each Redis Lua script with its eval function in the module's queries/ folder | docs/claude/REDIS.md § Built-In Uses | An inline Lua string passed to redis.eval inside a service, middleware or handler rather than a queries/ file with its eval function. (CI rule scripts/ci/rules/lua-in-queries.sh; docs/claude/REDIS.md § Rate Limiting) |
-| sessions are stored in redis under the session namespace; where do auth sessions live | **BetterAuth sessions via secondaryStorage** · pattern lib/auth.ts secondaryStorage — store BetterAuth sessions in Redis under the session namespace | part 4 | — |
-| fan out a websocket message to clients on other servers; the other instance's clients didn't get the event; a pub/sub channel for broadcasts across servers | **Cross-server WebSocket broadcast** · pattern docs/claude/REDIS.md § WebSocket Pub/Sub — fan out WS messages across servers via the ws:broadcast pub/sub channel | part 4 | — |
-| log when redis connects or errors; redis connection events go through the shared logger | **Redis connection event logging** · pattern docs/claude/REDIS.md § Error Handling › Connection Errors — log Redis connect and error events through the shared logger | part 4 | — |
-| one sequence number shared across instances per stream; publish and increment the seq atomically; I'll keep the seq counter in memory | **Shared stream sequence via Lua** · pattern docs/claude/REDIS.md § WebSocket Pub/Sub — publish stream appends while INCRing ws:seq:{stream} for one shared sequence | part 4 | — |
-| the cron should run once across workers; the lock key for a one-at-a-time job; general locks go through the lock primitive, this is the job case | **Singleton job lock** · pattern docs/claude/REDIS.md § Job Coordination — Cron run-once; general distributed locks use createLock. | part 4 | — |
-| where the background jobs live in redis; the bull keys in redis | **BullMQ jobs queue** · primitive docs/claude/REDIS.md § BullMQ — hold background jobs in BullMQ-managed bull:jobs:* keys | part 4 | — |
-| put the script next to its eval function in queries; I'll inline the lua in the middleware | **Lua scripts live in queries/** · rule docs/claude/REDIS.md § Rate Limiting — Writing any Redis Lua script; enforced by lua-in-queries CI rule. | part 4 | — |
-| every key starts with a namespace, never a bare string; I'll build the key with a template string | **Redis keys must use namespaces** · rule packages/db/src/redis/namespaces.ts — Any Redis key construction. | part 4 | — |
-| one connection per role: commands, sub, pub, worker; don't reuse the main client for subscribe or blocking | **Separate Redis connections by role** · rule docs/claude/REDIS.md § Connection Management › Connection Strategy — Any code opening or using a Redis connection. | code `getRedisClient`, `getRedisSub`, `getRedisPub`, `createRedisConnection` | — |
+| sessions are stored in redis under the session namespace; where do auth sessions live | **BetterAuth sessions via secondaryStorage** · pattern lib/auth.ts — store BetterAuth sessions in Redis under the session namespace | part 4 | — |
+| keep a second job for the same key from being added | **BullMQ deduplication for singleton jobs** · pattern JOBS.md § singleton-job — stops enqueuing duplicates; singleton lock stops concurrent execution | part 4 | — |
+| fan out a websocket message to clients on other servers; the other instance's clients didn't get the event; a pub/sub channel for broadcasts across servers | **Cross-server WebSocket broadcast** · pattern docs/claude/REDIS.md § websocket-pubsub — fan out WS messages across servers via the ws:broadcast channel | part 4 | — |
+| one sequence number shared across instances per stream; publish and increment the seq atomically; I'll keep the seq counter in memory | **Shared stream sequence via Lua** · pattern WEBSOCKETS.md § sequence-numbers — publish stream appends while INCRing ws:seq:{stream} for one shared sequence | part 4 | — |
+| the cron should run once across workers; the lock key for a one-at-a-time job; general locks go through the lock primitive, this is the job case | **Singleton job lock** · pattern docs/claude/REDIS.md § job-coordination — blocks concurrent runs; BullMQ deduplication prevents adding duplicates at all | part 4 | — |
+| where the background jobs live in redis; the bull keys in redis | **BullMQ jobs queue** · primitive docs/claude/REDIS.md § bullmq — hold background jobs in BullMQ-managed bull:jobs:* keys | part 4 | — |
+| put the script next to its eval function in queries; I'll inline the lua in the middleware | **Lua scripts live in queries/** · rule docs/claude/REDIS.md § Built-In Uses › Rate Limiting (`limit:*`) — adding any Redis Lua script; lua-in-queries CI rule enforces | code `redisNamespace`, `clientIp`, `Token`, `cacheKey` | — |
+| every key starts with a namespace, never a bare string; I'll build the key with a template string | **Redis keys must use namespaces** · rule packages/db/src/redis/namespaces.ts — every Redis key the app writes | part 4 | — |
+| Rolling-cache timers live under rollingcache:, not cache:, so cache flushes don't reschedule refreshes. | **Rolling-cache timers outside cache namespace** · rule docs/claude/REDIS.md § Namespaces › Current Namespaces — storing rolling-cache refresh timers | code `redisNamespace`, `User`, `createLock`, `claimLane` | — |
+| one connection per role: commands, sub, pub, worker; don't reuse the main client for subscribe or blocking | **Separate Redis connections by role** · rule docs/claude/REDIS.md § Connection Management › Connection Strategy — whenever obtaining a Redis connection | code `getRedisClient`, `getRedisSub`, `getRedisPub`, `createRedisConnection` | — |
 
 - *Also here, by name:* resolveBullmqRedisUrl (`apps/api/src/jobs/bullmqRedisUrl.ts`); resolveRedisUrl (`packages/db/src/redis/client.ts`); slowDeferredKey (`apps/api/src/jobs/slowLaneSignals.ts`); slowLastFinishedKey (`apps/api/src/jobs/slowLaneSignals.ts`)
 
@@ -170,25 +172,36 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 
 | Problem | Use | Read | Signs you're bypassing it |
 |---|---|---|---|
-| return it from the cache or compute and store it; get or set in one call; I'll do a get, parse, compute on miss, set with expiry; two concurrent misses should only compute once; redis being down shouldn't break the read; a null result should be cached too | **cache** · primitive `packages/db/src/redis/cache.ts#cache` — Read-through caching; upsertCache to write a known value, clearKey to invalidate. | docs/claude/REDIS.md § Cache Utilities; docs/claude/HOOKS.md § Cache Invalidation | A hand-written `const hit = await redis.get(key); if (hit) return JSON.parse(hit); const v = await fn(); await redis.set(key, JSON.stringify(v), 'EX', ttl)` get-or-set without single-flight, negative caching or graceful degradation. (docs/claude/REDIS.md § cache() Get-or-Set; § Cache Fallback). throws cache key Error (`server-error`) |
+| return it from the cache or compute and store it; get or set in one call; I'll do a get, parse, compute on miss, set with expiry; two concurrent misses should only compute once; redis being down shouldn't break the read; a null result should be cached too | **cache** · primitive `packages/db/src/redis/cache.ts#cache` — One-off read-through caching; values recomputed on a timer belong in makeRollingCache. | docs/claude/REDIS.md § Cache Utilities; docs/claude/JOBS.md § Handler Patterns › Rolling Caches (Root, Branch, Leaf) | A hand-written `const hit = await redis.get(key); if (hit) return JSON.parse(hit); const v = await fn(); await redis.set(key, JSON.stringify(v), 'EX', ttl)` get-or-set without single-flight, negative caching or graceful degradation. (docs/claude/REDIS.md § cache() Get-or-Set; § Cache Fallback). throws cache key Error (`server-error`) |
 | build the key so the write and the clear match; I'll format the key with a template string; two utilities for the same job, one key builder; the key never matched so the clear missed; the cache key generator in code and in docs | **cacheKey** · primitive `packages/db/src/redis/cache.ts#cacheKey` — Always use instead of hand-formatted key strings, or invalidation silently misses. | docs/claude/REDIS.md § Cache Utilities; docs/claude/HOOKS.md § Cache Invalidation | Template-string cache keys (`cache:user:${id}`) or differently cased domains, so the clear never meets the write. (docs/claude/REDIS.md § Invalidation conventions ("Always build keys with cacheKey, never hand-format")) |
 | clear the cache automatically when the row changes; add the one-liner to the cache-clear map; I'll clear the key in the service after the update; register every key this model is read under; the after-commit hook clears old and new keys; we shouldn't cache things we can't clear | **cacheReference** · primitive `apps/api/src/hooks/cache/constants/cacheReference.ts#cacheReference` — Register keys here so the clear-cache hook invalidates automatically; don't clear caches by hand in services. | docs/claude/HOOKS.md § Cache Invalidation | Calling clearKey / redis.del in a service after an update instead of registering the model's keys in cacheReference so the after-commit hook clears them. (catalog entry cacheReference; docs/claude/HOOKS.md § Cache Invalidation) |
 | clear this exact key or pattern; an ad-hoc clear outside the mutation hooks; defer the clears to after commit; wildcard invalidation with a scan | **clearKey** · primitive `packages/db/src/redis/cache.ts#clearKey` — Invalidation; mutation cache hooks already clear post-commit, call directly only outside them. | docs/claude/REDIS.md § Cache Utilities; docs/claude/HOOKS.md § Ordered List | — |
 | load one record by id or unique key, cached; I'll wrap the find in a redis get and set; a single row by key, not a lens or relations; look up the user by id with caching | **fetchOne** · primitive `packages/db/src/hydrate/fetchOne.ts#fetchOne` — Single record by key: fetchOne; already have the record and need relations: hydrate; set of rows from a lens: fetchLens. | — | A findUnique wrapped in a hand-rolled Redis get/set to cache a single record by id or unique field. (catalog entry fetchOne) |
+| look up a registered rolling cache by name, throwing if none registered | **getRollingCache** · primitive `packages/db/src/redis/rollingCacheRegistry.ts#getRollingCache` — Single known cache: use this; iterating all caches: listRollingCaches instead. | docs/claude/REDIS.md § Cache Utilities | — |
+| register a cached value that shared handlers recompute on a timer | **makeRollingCache** · primitive `packages/db/src/redis/makeRollingCache.ts#makeRollingCache` — For values recomputed on a schedule, instead of a new job handler or CronJob row; one-off reads use cache(). | docs/claude/REDIS.md § Cache Utilities; docs/claude/JOBS.md § Handler Patterns › Rolling Caches (Root, Branch, Leaf) | — |
+| register a named rolling cache so the minute coordinator refreshes it | **registerRollingCache** · primitive `packages/db/src/redis/rollingCacheRegistry.ts#registerRollingCache` — Defining a new rolling cache; names must be unique or it throws. | — | — |
 | I already have the value, just store it; write a known value into the cache; I'll set it with a manual redis set and expiry; not compute-on-miss, I hold the value already | **upsertCache** · primitive `packages/db/src/redis/cache.ts#upsertCache` — When you already hold the value; cache() when it must be computed on miss. | — | — |
-| mutations clear the cache without any code in services; invalidation driven by the lifecycle hooks; I'll sprinkle clears after each write; raw sql writes bypass it, clear by hand there | **Automatic cache invalidation via reference map** · pattern docs/claude/REDIS.md § Cache Utilities › Automatic Invalidation — Mutation-driven invalidation; clearKey only for ad-hoc clears. | code `cacheKey`, `User`, `clearKey`, `CustomerRef` | — |
-| tests shouldn't hit the real queue; the queue is mocked by default in tests | **BullMQ queue mock** · pattern tests/mocks/queue.ts — Default in tests; use inline jobs helpers when job execution must be asserted. | part 4 | — |
-| a redis read error should count as a miss; write errors get logged, not thrown; redis down must not take the request down | **Cache graceful degradation** · pattern docs/claude/REDIS.md § Error Handling › Cache Fallback — treat Redis read errors as misses, log write errors without blocking | part 4 | — |
+| require every makeRollingCache definition to be imported by the worker's refresh barrel | **rolling-cache-registered** · rule `scripts/ci/rules/rolling-cache-registered.sh` — Applies whenever you call makeRollingCache from @template/db; without the barrel entry the cache is never refreshed. | docs/claude/JOBS.md § Handler Patterns › Rolling Caches (Root, Branch, Leaf); docs/claude/REDIS.md § Cache Utilities | — |
+| mutations clear the cache without any code in services; invalidation driven by the lifecycle hooks; I'll sprinkle clears after each write; raw sql writes bypass it, clear by hand there | **Automatic cache invalidation via reference map** · pattern docs/claude/REDIS.md § Cache Utilities › Automatic Invalidation — Mutation-driven caches; values computed from aggregated data: rolling cache instead. | code `cacheKey`, `User`, `clearKey`, `makeRollingCache` | — |
+| tests shouldn't hit the real queue; the queue is mocked by default in tests | **BullMQ queue mock** · pattern tests/mocks/queue.ts — stub queue add/getJobs so tests don't process real jobs | part 4 | — |
+| a redis read error should count as a miss; write errors get logged, not thrown; redis down must not take the request down | **Cache graceful degradation** · pattern docs/claude/REDIS.md § Error Handling › Cache Fallback — treat Redis read errors as misses, log write errors without blocking, propagate compute errors | part 4 | — |
 | cache the permission lookups across calls; I'll memoize the whole check call; wrap the single load read, not the engine; the hydrator already de-dupes within one call | **Cache in hydrator load seam** · pattern @inixiative/permissions/README.md § Hydration (Prisma example) — Hydrator already de-dupes within one call; wrap load only for cross-call caching. | code `createHydrator`, `buildPrismaMapV7`, `createRebacCheck`, `buildPrismaMapV6` | a memo map wrapped around the whole hydrator or check call, or caching added inside the engine, instead of wrapping the single read passed as load (@inixiative/permissions/README.md § Hydration ("load is the cache seam")) |
-| tests run against an in-memory redis; all connections go to one shared mock under test | **In-memory Redis mock in tests** · pattern packages/db/src/redis/client.ts — route all Redis connections to one shared RedisMock in test env | part 4 | — |
-| the key contains the word undefined; catch a bad key before it hits redis | **validateKey** · primitive packages/db/src/redis/cache.ts — throw when a cache key contains 'undefined' to catch bugs early | part 4 | throws cache key Error (`server-error`) |
-| never hand-format a cache key; every read, write and clear uses the same builder | **Build cache keys only with cacheKey** · rule docs/claude/REDIS.md § Cache Utilities › Invalidation conventions — Every cache read, write and invalidation. | code `cacheKey`, `User`, `clearKey`, `CustomerRef` | Any hand-formatted key in a cache read, write or clear. (docs/claude/REDIS.md § Invalidation conventions) |
-| the read goes through relationships so it can't be invalidated right; cache only the slow-moving linkage side; subscriptions reached via customer refs shouldn't be cached | **Don't cache graph-walk reads** · rule docs/claude/REDIS.md § Cache Utilities › Invalidation conventions — When correct invalidation would require traversing relationships. | code `cacheKey`, `User`, `clearKey`, `CustomerRef` | Caching a read reached through relationships (e.g. webhook subscriptions via customerRef) keyed by the affected model, which cannot be invalidated correctly. (docs/claude/REDIS.md § Invalidation conventions ("Know what not to cache")) |
-| clear when the relationship changes, not when the payload does; caches reached through relations key on structure | **Invalidate on structure, not payload** · rule docs/claude/REDIS.md § Cache Utilities › Invalidation conventions — Caches reached via relationships like CustomerRef or subscriptions. | code `cacheKey`, `User`, `clearKey`, `CustomerRef` | — |
-| update it, read it back, prove the cache cleared; every cached model needs a read-after-write test | **Read-after-write test per cached entity** · rule docs/claude/REDIS.md § Cache Utilities › Invalidation conventions — Any new or changed cached entity. | code `cacheKey`, `User`, `clearKey`, `CustomerRef` | — |
-| the record is also cached by email and slug, not just id; the map entry only returns the id key; every key the row is read under must be in the map | **Reference map covers every read surface** · rule docs/claude/REDIS.md § Cache Utilities › Invalidation conventions — Every cached model in the cache reference map. | code `cacheKey`, `User`, `clearKey`, `CustomerRef` | A cacheReference entry that returns only the id key while the record is also cached by email, slug or a tag key. (docs/claude/REDIS.md § Invalidation conventions (One tool, every surface — Previous ∪ Result)) |
+| tests run against an in-memory redis; all connections go to one shared mock under test | **In-memory Redis mock in tests** · pattern packages/db/src/redis/client.ts — route getRedisClient, getRedisSub and createRedisConnection to one shared RedisMock in tests | part 4 | — |
+| log when redis connects or errors; redis connection events go through the shared logger | **Redis connection event logging** · pattern docs/claude/REDIS.md § Error Handling › Connection Errors — log Redis connect and error events through the shared logger | part 4 | — |
+| serve a rolling cache entry, computing once via cache() on cold miss | **read** · primitive packages/db/src/redis/makeRollingCache.ts — Normal reads; refresh to force recompute. | part 4 | — |
+| recompute one target and overwrite its entry, skipping write if aborted | **refresh** · primitive packages/db/src/redis/makeRollingCache.ts — Forcing recompute; read for serving values. | part 4 | — |
+| the key contains the word undefined; catch a bad key before it hits redis | **validateKey** · primitive docs/claude/REDIS.md § Error Handling › Key Validation — throw when a cache key contains 'undefined' to catch bugs early | part 4 | throws cache key Error (`server-error`) |
+| never hand-format a cache key; every read, write and clear uses the same builder | **Build cache keys only with cacheKey** · rule docs/claude/REDIS.md § Cache Utilities › Invalidation conventions — Every cache read, write and invalidation. | code `cacheKey`, `User`, `clearKey`, `makeRollingCache` | Any hand-formatted key in a cache read, write or clear. (docs/claude/REDIS.md § Invalidation conventions) |
+| A cache compute function must never return null or undefined. | **compute never returns null or undefined** · rule docs/claude/REDIS.md — Any cache() or rolling cache compute callback. | part 4 | — |
+| Values computed only to serve fast must be rolling caches, never materialized tables. | **Derived values are rolling caches, not tables** · rule docs/claude/REDIS.md § Cache Utilities › Rolling Caches — Counts, rollups, picker vocabularies read on load. | code `cacheKey`, `User`, `clearKey`, `makeRollingCache` | — |
+| the read goes through relationships so it can't be invalidated right; cache only the slow-moving linkage side; subscriptions reached via customer refs shouldn't be cached | **Don't cache graph-walk reads** · rule docs/claude/REDIS.md § Cache Utilities › Invalidation conventions — Reads reached via relationships like webhook subscriptions through customerRef. | code `cacheKey`, `User`, `clearKey`, `makeRollingCache` | Caching a read reached through relationships (e.g. webhook subscriptions via customerRef) keyed by the affected model, which cannot be invalidated correctly. (docs/claude/REDIS.md § Invalidation conventions ("Know what not to cache")) |
+| clear when the relationship changes, not when the payload does; caches reached through relations key on structure | **Invalidate on structure, not payload** · rule docs/claude/REDIS.md § Cache Utilities › Invalidation conventions — Caches keyed on relationships between models. | code `cacheKey`, `User`, `clearKey`, `makeRollingCache` | — |
+| update it, read it back, prove the cache cleared; every cached model needs a read-after-write test | **Read-after-write test per cached entity** · rule docs/claude/REDIS.md § Cache Utilities › Invalidation conventions — Whenever adding or changing a cached entity. | code `cacheKey`, `User`, `clearKey`, `makeRollingCache` | — |
+| the record is also cached by email and slug, not just id; the map entry only returns the id key; every key the row is read under must be in the map | **Reference map covers every read surface** · rule docs/claude/REDIS.md § Cache Utilities › Invalidation conventions — Every cached model in the reference map. | code `cacheKey`, `User`, `clearKey`, `makeRollingCache` | A cacheReference entry that returns only the id key while the record is also cached by email, slug or a tag key. (docs/claude/REDIS.md § Invalidation conventions (One tool, every surface — Previous ∪ Result)) |
+| Every rolling cache module must be imported in the rollingCaches registry. | **Register rolling caches in rollingCaches.ts** · rule apps/api/src/lib/rollingCaches.ts — Every makeRollingCache definition; enforced by rolling-cache-registered CI rule. | part 4 | — |
+| targets must be { model, args } with real findMany args selecting JSON-scalar columns. | **Rolling cache targets use Prisma findMany args** · rule docs/claude/REDIS.md § Cache Utilities › Rolling Caches — Per-target rolling caches; omit targets for one system-wide value. | code `cacheKey`, `User`, `clearKey`, `makeRollingCache` | — |
 
-- *Also here, by name:* fetchCacheKeys (`apps/api/src/hooks/cache/constants/cacheReference.ts`); registerClearCacheHook (`apps/api/src/hooks/cache/hook.ts`)
+- *Also here, by name:* MAX_ROLLING_CACHE_TARGETS (`packages/db/src/redis/rollingCacheTypes.ts`); MIN_ROLLING_CACHE_INTERVAL_SECONDS (`packages/db/src/redis/rollingCacheTypes.ts`); ROLLING_CACHE_LEAF_ATTEMPTS (`packages/db/src/redis/rollingCacheTypes.ts`); ROLLING_CACHE_TICK_SECONDS (`packages/db/src/redis/rollingCacheTypes.ts`); coordinateRollingCaches (`apps/api/src/jobs/handlers/coordinateRollingCaches.ts`); fetchCacheKeys (`apps/api/src/hooks/cache/constants/cacheReference.ts`); listRollingCaches (`packages/db/src/redis/rollingCacheRegistry.ts`); refreshRollingCache (`apps/api/src/jobs/handlers/refreshRollingCache.ts`); refreshRollingCacheTarget (`apps/api/src/jobs/handlers/refreshRollingCacheTarget.ts`); registerClearCacheHook (`apps/api/src/hooks/cache/hook.ts`); resolveRollingCacheTargets (`packages/db/src/redis/resolveRollingCacheTargets.ts`); rollingCacheTimerKey (`apps/api/src/jobs/rollingCacheTimerKey.ts`); unregisterRollingCache (`packages/db/src/redis/rollingCacheRegistry.ts`)
 
 ### Class `rate-limiting`: Fixed-window rate limits keyed by user/space/org/IP; 429 + Retry-After
 
@@ -218,9 +231,9 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 | where do the limit numbers live; I'll hardcode the max in the rule; I'll add a rate limit column to the token; change the limits in one place | **rateLimitMax** · primitive `apps/api/src/middleware/rateLimit/limits.ts#rateLimitMax` — The single seam for limit values; change limits here, never hardcode maxes in rules. | docs/claude/REDIS.md § Built-In Uses; FEATURES.md § Encryption & Security | Hard-coded max numbers in rate-limit rules, or a rateLimit column on Token, Organization or Space. (docs/claude/REDIS.md § Rate Limiting ("never a column on Token, Organization or Space"); catalog note "never hardcode maxes in rules") |
 | a per-space cap on calls; limit by space, not the whole org; key the limit by the current space | **spaceIdentity** · primitive `apps/api/src/middleware/rateLimit/identities.ts#spaceIdentity` — Per-space caps; org-wide: organizationIdentity; per-user: userIdentity. | — | — |
 | per-user caps for authenticated callers; key the limit by the signed-in user; anonymous callers need a fallback, this one doesn't have it | **userIdentity** · primitive `apps/api/src/middleware/rateLimit/identities.ts#userIdentity` — Authenticated per-user caps; need IP fallback for anonymous callers: principalIdentity instead. | — | — |
-| how the counter key is built: scope, window, identity; counters keyed by actor or bucketed IP | **Rate limit key shape** · pattern docs/claude/REDIS.md § Rate Limiting — key counters by scope, window and identity from getActor or /64 clientIp | part 4 | — |
-| a batch of N limited calls 429s mid-batch; the batch request paid once, sub-requests are not limited; I'll key the skip on the batch id header; spend caps need a separate detector, not a rule here | **Batch sub-requests skip identity limits** · rule docs/claude/REDIS.md § Rate Limiting — Rate limiting batched requests or adding spend limits. | part 4 | Adding a spend/cost cap (e.g. AI calls) as an apiRateLimit rule, which batch sub-requests skip, or keying the batch skip on the spoofable x-batch-id header. (docs/claude/REDIS.md § Rate Limiting) |
-| I'll add a per-tenant limit column; per-token limits as a schema field | **Rate limit maxes never stored as columns** · rule docs/claude/REDIS.md § Rate Limiting — Configuring per-tenant or per-token rate limits. | part 4 | Adding a per-tenant or per-token limit column to the schema. (docs/claude/REDIS.md § Rate Limiting) |
+| how the counter key is built: scope, window, identity; counters keyed by actor or bucketed IP | **Rate limit key shape** · pattern docs/claude/REDIS.md § Built-In Uses › Rate Limiting (`limit:*`) — key counters by scope, window and identity from getActor or /64 clientIp | code `redisNamespace`, `clientIp`, `Token`, `cacheKey` | — |
+| a batch of N limited calls 429s mid-batch; the batch request paid once, sub-requests are not limited; I'll key the skip on the batch id header; spend caps need a separate detector, not a rule here | **Batch sub-requests skip identity limits** · rule docs/claude/REDIS.md § Built-In Uses › Rate Limiting (`limit:*`) — rate limiting within batch requests | code `redisNamespace`, `clientIp`, `Token`, `cacheKey` | Adding a spend/cost cap (e.g. AI calls) as an apiRateLimit rule, which batch sub-requests skip, or keying the batch skip on the spoofable x-batch-id header. (docs/claude/REDIS.md § Rate Limiting) |
+| I'll add a per-tenant limit column; per-token limits as a schema field | **Rate limit maxes never stored as columns** · rule docs/claude/REDIS.md § Built-In Uses › Rate Limiting (`limit:*`) — setting or changing any rate limit max | code `redisNamespace`, `clientIp`, `Token`, `cacheKey` | Adding a per-tenant or per-token limit column to the schema. (docs/claude/REDIS.md § Rate Limiting) |
 
 - *Also here, by name:* incrementFixedWindows (`apps/api/src/middleware/rateLimit/queries/incrementFixedWindows.ts`); overFrameLimit (`apps/api/src/ws/frameRateLimit.ts`)
 
@@ -293,13 +306,14 @@ const key = `cache:User:${id}`;  // Don't do this
 |-----------|--------|---------|
 | `bull` | `bull:*` | BullMQ job queues (managed by BullMQ) |
 | `cache` | `cache:*` | Application cache (user lookups, tokens, etc.) |
-| `job` | `job:*` | Singleton job locks (cron run-once) |
+| `job` | `job:*` | Job-system state: overflow flags (`job:overflow`), the slow lane's deferral list and idle clock |
 | `ws` | `ws:*` | WebSocket pub/sub channels and data-stream seq counters (`ws:seq:{<stream>}`) |
 | `otp` | `otp:*` | One-time passwords / verification codes |
 | `session` | `session:*` | BetterAuth sessions (via secondaryStorage) |
 | `limit` | `limit:*` | Rate limiting counters |
 | `lock` | `lock:*` | Distributed locks via `createLock` |
-| `lane` | `lane:*` | Supersede lane batons via `claimLane`/`watchLane` |
+| `lane` | `lane:*` | Supersede lane batons via `claimLane`/`watchLane`, and per-job tombstones (`lane:superseded:<jobId>`) |
+| `rollingCache` | `rollingcache:*` | Rolling-cache timers (`rollingcache:timer:<name>`), kept out of `cache:` so a flush never reschedules a refresh |
 
 ---
 
@@ -361,13 +375,16 @@ Identity comes from `getActor` (session user, token owner, token scope), the IP 
 `x-forwarded-for` hop bucketed to /64 (`clientIp`). Maxes resolve through `rateLimitMax(tier, c)`,
 the seam for subscriptions / feature flags (INFRA-027) — never a column on Token, Organization or Space.
 
-##### Job Coordination (`job:*`)
+##### Job Coordination (`job:*`, `lock:*`)
 
-Singleton job locks:
+Singleton job locks are `createLock` locks on the queue's connection; BullMQ deduplication
+(`deduplication: { id: <handler>-<key> }`) keeps a second job for the same key from being added at all
+(see [JOBS.md](JOBS.md#singleton-job)):
 
 ```typescript
-// Singleton job lock (prevents concurrent runs)
-`${redisNamespace.job}:lock:${cronJobId}`
+// Singleton job lock (prevents concurrent runs): keyed by lockKey(payload), else the cron row id
+`${redisNamespace.lock}:job-singleton:${handlerName}:${key}`
+`${redisNamespace.lock}:job-singleton:${cronJobId}`
 ```
 
 ##### Supersede Lanes (`lane:*`)
@@ -524,6 +541,23 @@ cacheKey('Session', userId, ['userId'], true)  // → cache:Session:userId:abc:*
 
 ---
 
+<!-- unit doc:docs/claude/JOBS.md#handler-patterns/rolling-caches-root-branch-leaf -->
+**Source:** `docs/claude/JOBS.md` § Handler Patterns › Rolling Caches (Root, Branch, Leaf) (in "Jobs")
+
+##### Rolling Caches (Root, Branch, Leaf)
+
+A job whose only work is recomputing a cached value on a timer is not a new handler or a `CronJob` row: it is a rolling cache (`makeRollingCache`, see [REDIS.md](REDIS.md#rolling-caches)). Three handlers serve every registered cache, one per layer, each built from the primitive that fits it:
+
+- **Root:** `coordinateRollingCaches`, `makeSingletonJob`, one seeded cron row (`coordinateRollingCaches`, every minute — `ROLLING_CACHE_TICK_SECONDS`). Each cache keeps its own timer in Redis (`rollingcache:timer:<name>`, TTL = one interval), so caches with different intervals share the root. Every cache whose timer has a tick or less left gets its branch enqueued; deduplication makes that a no-op while a branch is open. Nothing else: there is no supervisor, and BullMQ keeps the branch open until its leaves report.
+- **Branch:** `refreshRollingCache`, a keyed staged singleton (`makeSingletonJob({ stages, finish }, { lockKey: ({ name }) => name })`). Its stage resolves the target selector and adds one leaf per target as a child; it stays open until every leaf has reported, and `finish` sets the timer, so the next refresh is one interval after the data was fresh. A branch never refires while it is open.
+- **Leaf:** `refreshRollingCacheTarget`, a child, `makeSupersedingJob` keyed by the target's cache key, slow lane. Refreshes one target. A leaf that fails all its attempts keeps the last good value, and the next interval tries again. An unregistered cache name or a failed write throws; nothing in this path swallows an error. A forced refresh is just enqueueing the leaf; it supersedes a running copy by key.
+
+Each leaf attempt runs under `timeoutSeconds` (`settleWithin` from `@template/shared/utils`, with the deadline combined into the refresh signal via `AbortSignal.any`). Past it the leaf emits `rollingCache.leafStuck` (`{ rollingCache, key, target, timeoutSeconds, attempt }`) and throws, so BullMQ retries it and, after the last attempt, counts it done so the branch closes. The hung compute cannot be stopped, but the aborted signal keeps its late result from being written. Entries live longer than an interval plus every attempt (`ttlSeconds`, enforced at registration), so a read always hits. The template has no platform alert rules: the `rollingCache.leafStuck` app event (recorded as an `AppEvent` row by the observe adapter) is the hook an app wires its alert to.
+
+The schedule lives in the definition: changing the interval is a code change, deleting the definition stops the refreshes, and there is nothing to prune. The worker sees every definition because `jobs/worker.ts` imports `apps/api/src/lib/rollingCaches.ts`; the `rolling-cache-registered` CI rule keeps that barrel complete. Full rebuild only: each interval refreshes every target.
+
+---
+
 <!-- unit doc:docs/claude/REDIS.md#cache-utilities -->
 **Source:** `docs/claude/REDIS.md` § Cache Utilities (in "Redis")
 
@@ -603,6 +637,56 @@ Correctness here is enforced by **discipline and tests, not by types** — nothi
 - **Know what *not* to cache.** A read whose correct invalidation needs a relationship/graph walk (webhook subscriptions reached via `customerRef`) is fetched fresh, or cached only on the slow-moving *linkage* side. Caching it by affected-model can't be invalidated correctly — a missed clear is a stale read served silently.
 - **Tests are the enforcement.** Because none of the above is compiler-checked, every cached entity needs a read-after-write test (cache under the call-site key → mutate → assert cleared). That test catches drift; nothing else does.
 
+##### Rolling Caches
+
+A value computed from stored data only to serve it fast — a count, a rollup, a picker vocabulary read
+on every load — is a **rolling cache**, not a table. A table of materialized values needs hand-written
+invalidation for every way its inputs change, and each one missed is a stale read nobody notices. A
+rolling cache recomputes on a fixed interval, and its entries outlive the longest a refresh can take,
+every retry included, so a read always hits. There is no invalidation to write.
+
+```typescript
+import { cacheKey, db, makeRollingCache } from '@template/db';
+
+export const spaceCounts = makeRollingCache({
+  name: 'spaceCounts',                          // unique; a second registration throws
+  intervalSeconds: 3600,                        // at least 300 (five coordinator ticks)
+  key: ({ id }) => cacheKey('spaceCounts', id),
+  compute: ({ id }) => db.space.count({ where: { organizationId: id } }),
+  targets: { model: 'Organization', args: { select: { id: true } } },
+});
+
+const count = await spaceCounts.read({ id: organizationId });
+```
+
+- **Define it inline**, in the module that owns the data (`packages/db/src/redis/makeRollingCache.ts`
+  is the primitive). It registers itself on import, like a factory.
+- **Register the module** in `apps/api/src/lib/rollingCaches.ts` (import-only). The worker imports
+  that barrel and its coordinator refreshes every registered cache; the `rolling-cache-registered`
+  CI rule fails a definition missing from it.
+- **`targets` is `{ model, args }`**, where `args` is that model's own Prisma `findMany` args — no
+  shorthand of our own. Each returned row is one refresh job's payload and the argument to `key` and
+  `compute`, typed by your `select`; select JSON-scalar columns, since the row crosses the queue as
+  JSON (a BigInt throws, a Date arrives as a string). `distinct` is a real `DISTINCT` on Postgres.
+  Resolution fails closed above `MAX_ROLLING_CACHE_TARGETS` (10,000) rather than refreshing a
+  partial list. A cache with one value for the whole system omits `targets`; `read()` takes no
+  argument.
+- **Three times.** `intervalSeconds` is how often a target is refreshed. `timeoutSeconds` (default:
+  one interval) is how long one leaf attempt may run before it reports itself stuck. `ttlSeconds`
+  (default: interval × (`ROLLING_CACHE_LEAF_ATTEMPTS` + 2)) is how long an entry lives; registration
+  throws unless it is longer than interval + every attempt × timeout + one tick.
+- **`read`** serves the cached value; a cold miss (first read after a deploy) computes through
+  `cache()`, so concurrent readers share one computation. **`refresh`** recomputes one target and
+  overwrites the entry (`force`); a refresh whose signal aborted while it computed writes nothing, and
+  a write that fails throws so the leaf retries.
+- **`compute` never returns null or undefined**: `cache()` keeps null for only a minute and reads
+  undefined as a miss. Return an empty value of the shape instead.
+- `getRollingCache(name)` throws for a name nothing registered; tests that define their own cache
+  remove it with `unregisterRollingCache`.
+
+Scheduling (root, branch and leaf jobs) is in [JOBS.md](JOBS.md#rolling-caches-root-branch-leaf).
+
+
 ---
 
 ### 4b. Code entries
@@ -610,20 +694,24 @@ Correctness here is enforced by **discipline and tests, not by types** — nothi
 From the catalog (`.foundry/catalog/catalog.json`, extracted from the code). Each line: **name** `where` [kind] the job it does. Use: canonical usage.
 
 #### Class `redis`
-- **createRedisConnection** `packages/db/src/redis/client.ts#createRedisConnection` [primitive] open a new dedicated Redis connection with log scope Use: const conn = createRedisConnection(LogScope.db)
+- **createRedisConnection** `packages/db/src/redis/client.ts#createRedisConnection` [primitive] open a dedicated, scoped Redis connection (shared mock in tests) Use: const redis = createRedisConnection(LogScope.db)
 - **getRedisClient** `packages/db/src/redis/client.ts#getRedisClient` [primitive] get the shared main Redis connection for regular operations Use: const redis = getRedisClient()
 - **getRedisPub** `packages/db/src/redis/client.ts#getRedisPub` [primitive] get the shared Redis client for publishing pub/sub messages Use: getRedisPub().publish(channel, message)
 - **getRedisSub** `packages/db/src/redis/client.ts#getRedisSub` [primitive] get the dedicated Redis connection for blocking pub/sub subscriptions Use: getRedisSub().subscribe(channel)
-- **redisNamespace** `packages/db/src/redis/namespaces.ts#redisNamespace` [primitive] name the reserved Redis key prefixes for bull, cache, jobs and others Use: `${redisNamespace.cache}:${key}`
+- **redisNamespace** `packages/db/src/redis/namespaces.ts#redisNamespace` [primitive] prefix Redis keys by use case to avoid collisions and allow selective clearing Use: `${redisNamespace.cache}:${key}`
 - **lua-in-queries** `scripts/ci/rules/lua-in-queries.sh` [rule] keep each Redis Lua script with its eval function in the module's queries/ folder Use: scripts/ci/rules/lua-in-queries.sh
 
 #### Class `caching`
-- **cache** `packages/db/src/redis/cache.ts#cache` [primitive] return cached value or compute, cache and return it with single-flight on misses Use: const user = await cache(cacheKey('User', id), () => db.user.findUnique(...), ttl)
+- **cache** `packages/db/src/redis/cache.ts#cache` [primitive] get a Redis-cached value or compute, store and return it with single-flight Use: const value = await cache(key, () => load(), ttlSeconds)
 - **cacheKey** `packages/db/src/redis/cache.ts#cacheKey` [primitive] build the canonical normalized cache key from domain, identifier and tags Use: cacheKey('User', { email }, tags)
 - **cacheReference** `apps/api/src/hooks/cache/constants/cacheReference.ts#cacheReference` [primitive] map each model to the cache keys cleared when its records mutate Use: Add `Model: (r) => [cacheKey('model', r.id)]` to cacheReference
 - **clearKey** `packages/db/src/redis/cache.ts#clearKey` [primitive] delete cache entries matching a key or pattern Use: await clearKey(cacheKey('User', id))
 - **fetchOne** `packages/db/src/hydrate/fetchOne.ts#fetchOne` [primitive] fetch one hydrated record by identifier, cached in Redis with a TTL Use: const rec = await fetchOne<T>(accessor, identifier, ttl)
+- **getRollingCache** `packages/db/src/redis/rollingCacheRegistry.ts#getRollingCache` [primitive] look up a registered rolling cache by name, throwing if none registered Use: const cache = getRollingCache('myCache');
+- **makeRollingCache** `packages/db/src/redis/makeRollingCache.ts#makeRollingCache` [primitive] register a cached value that shared handlers recompute on a timer Use: export const myCache = makeRollingCache({ ...config })
+- **registerRollingCache** `packages/db/src/redis/rollingCacheRegistry.ts#registerRollingCache` [primitive] register a named rolling cache so the minute coordinator refreshes it Use: registerRollingCache({ name: 'myCache', ... });
 - **upsertCache** `packages/db/src/redis/cache.ts#upsertCache` [primitive] write a known value into the cache, optionally forcing overwrite Use: await upsertCache(cacheKey('User', id), user, { ttl })
+- **rolling-cache-registered** `scripts/ci/rules/rolling-cache-registered.sh` [rule] require every makeRollingCache definition to be imported by the worker's refresh barrel Use: Add `import '<module>';` to the worker's rolling-cache import-only barrel
 
 #### Class `rate-limiting`
 - **apiRateLimit** `apps/api/src/middleware/rateLimit/apiRateLimit.ts#apiRateLimit` [primitive] rate-limit general API requests, skipping batch sub-requests and system probes Use: app.use('/api/*', apiRateLimit);

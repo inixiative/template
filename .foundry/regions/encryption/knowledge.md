@@ -15,7 +15,7 @@
   - [Class `secrets`](#class-secrets-secrets-around-the-app-infisical-storage-secret-env-vars-and-keyrings-per-environment-ci-included-provider-credentials-how-keys-rotate)
 - [4. The specifics, in full](#4-the-specifics-in-full)
   - [4a. Doc sections](#4a-doc-sections)
-    - `docs/claude/ENCRYPTION.md`: Overview; Field-Scoped Encryption; Adding Encrypted Fields; Key Rotation; Environment Variables; CI Validation; Implementation Details; Deployment Checklist; FAQ
+    - `docs/claude/ENCRYPTION.md`: Overview; Field-Scoped Encryption; Adding Encrypted Fields; Key Rotation; Environment Variables; Deploy-Time Validation; Implementation Details; Deployment Checklist; FAQ
     - `FEATURES.md`: Encryption & Security; Infrastructure & DevOps
     - `docs/claude/AUTH.md`: Multi-Provider Authentication (AuthProvider)
     - `docs/claude/ENVIRONMENTS.md`: Environment Names; Infisical (Cloud Environments); with-env Composition; Adding Environment Variables
@@ -161,39 +161,39 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 | store the OAuth client secret safely; encrypt this credential before saving it; call node crypto directly to encrypt the value; base64 the secret before storing; put the token in a plain json column; seal the access and refresh tokens on the row | **encryptField** · primitive `packages/db/src/lib/encryption/helpers.ts#encryptField` — Use instead of ad-hoc credential storage or calling createEncryption directly. | docs/claude/AUTH.md § Multi-Provider Authentication (AuthProvider); docs/claude/ENCRYPTION.md § Overview | calling node crypto createCipheriv directly, base64-encoding a secret, or storing a provider credential in plain text or a plain Json column (catalog: encryptField (use instead of ad-hoc credential storage or calling createEncryption directly)) |
 | declare the env vars for the encryption keys; hand-write zod string entries for the key env vars; validate the keyring env at startup; key env plus version with its refinement | **encryptionEnv** · primitive `packages/db/src/lib/encryption/envValidation.ts#encryptionEnv` — Prefer over hand-declaring key env vars; wraps encryptionKeySchema and the version refinement. | — | hand-declared z.string() env entries for encryption keys and versions (catalog: encryptionEnv (prefer over hand-declaring key env vars)) |
 | re-encrypt everything on the old key; a migration script to rotate the key; the job that moves rows to the new key version; re-encrypt rows still on the stale version; a new job to re-encrypt after a key change | **rotateEncryptionKeys** · primitive `apps/api/src/jobs/handlers/rotateEncryptionKeys.ts#rotateEncryptionKeys` — re-encrypt every registered encrypted field holding a stale key version | docs/claude/ENCRYPTION.md § Key Rotation; FEATURES.md § Encryption & Security | a one-off migration script or new job that re-encrypts rows after a key change (docs/claude/ENCRYPTION.md § Key Rotation (worker startup auto-enqueues the rotation job)) |
-| is it safe to bump the key version; check what versions the stored rows are on; a SQL group by on the version column; are all rows on the current version yet; a script to decide if the bump is safe | **validateEncryptionVersions** · primitive `packages/db/src/lib/encryption/validation.ts#validateEncryptionVersions` — check stored encrypted fields against expected encryption key versions, collecting errors | docs/claude/ENCRYPTION.md § CI Validation | a hand-written SQL GROUP BY on the key version column or a new script to decide whether a version bump is safe (packages/db/src/lib/encryption/validation.ts (+ validation.test.ts); docs/claude/ENCRYPTION.md § CI Validation) |
-| add an encrypted field to a model; steps to encrypt a new column; a new per-feature encryption helper; schema triplet, env vars, registry entry | **Adding an encrypted field** · pattern docs/claude/ENCRYPTION.md § Adding Encrypted Fields — add field triplet to schema, three env vars, and a registry entry; no rotation code | code `ENCRYPTED_MODELS`, `registry`, `encryptField`, `decryptField` | a new per-feature encryption helper or encryption manager, or a field encrypted without schema triplet + keyring env vars + registry entry (docs/claude/ENCRYPTION.md § Adding Encrypted Fields) |
-| cookie or bearer token for this login flow; how does the session travel for OAuth vs password; CSRF for the cookie flow | **Auth transport by flow** · pattern FEATURES.md > General Security > HTTP-Only Cookie / Bearer Token — cookie for email/password (CSRF double-submit); Bearer for OAuth | part 4 | — |
+| is it safe to bump the key version; check what versions the stored rows are on; a SQL group by on the version column; are all rows on the current version yet; a script to decide if the bump is safe | **validateEncryptionVersions** · primitive `packages/db/src/lib/encryption/validation.ts#validateEncryptionVersions` — detect encrypted rows lagging more than one key version behind; not wired to any script | docs/claude/ENCRYPTION.md § Deploy-Time Validation; docs/claude/ENCRYPTION.md § Overview | a hand-written SQL GROUP BY on the key version column or a new script to decide whether a version bump is safe (packages/db/src/lib/encryption/validation.ts (+ validation.test.ts); docs/claude/ENCRYPTION.md § CI Validation) |
+| add an encrypted field to a model; steps to encrypt a new column; a new per-feature encryption helper; schema triplet, env vars, registry entry | **Adding an encrypted field** · pattern docs/claude/ENCRYPTION.md § Adding Encrypted Fields — Any new secret column; use instead of ad-hoc credential storage. | code `registry`, `ENCRYPTED_MODELS`, `encryptField`, `decryptField` | a new per-feature encryption helper or encryption manager, or a field encrypted without schema triplet + keyring env vars + registry entry (docs/claude/ENCRYPTION.md § Adding Encrypted Fields) |
+| cookie or bearer token for this login flow; how does the session travel for OAuth vs password; CSRF for the cookie flow | **Auth transport by flow** · pattern FEATURES.md > General Security > Bearer Session Token — SPAs use bearer for email/password and OAuth alike; BetterAuth HTTP-only cookies exist but are not relied on | part 4 | — |
 | encrypt sensitive fields with automatic rotation; the encryption system as a whole; encrypted columns with CI checks | **Field-level encryption registry** · pattern FEATURES.md > Unique Selling Points — encrypt sensitive fields with AES-256-GCM, auto-rotate keys, and validate them in CI | part 4 | — |
 | rerunning the rotation double-encrypts rows; only re-encrypt rows still on the old version; update by id without checking the version; rotation is safe to run twice | **Idempotent rotation precondition** · pattern FEATURES.md > Field-Level Encryption Engine > Idempotent Rotation — re-encrypt only rows still on the old version so reruns never double-encrypt | part 4 | a rotation update using update({ where: { id } }) without the old version in the where clause (docs/claude/ENCRYPTION.md § Key Rotation › Idempotent Protection and FAQ (why updateManyAndReturn)) |
-| two workers rotating the same row; optimistic per-row race during rotation; a lock around each re-encrypt | **Idempotent version-precondition update** · pattern docs/claude/ENCRYPTION.md § Key Rotation › Idempotent Protection — Optimistic per-row races; use createLock for cross-process critical sections instead. | code `ENCRYPTED_MODELS`, `resolveAll`, `rotateEncryptionKeys` | — |
+| two workers rotating the same row; optimistic per-row race during rotation; a lock around each re-encrypt | **Idempotent version-precondition update** · pattern docs/claude/ENCRYPTION.md § Key Rotation › Idempotent Protection — Concurrent workers rewriting the same rows; use instead of a lock when a version column exists. | code `ENCRYPTED_MODELS`, `resolveAll`, `AuthProvider`, `rotateEncryptionKeys` | — |
 | how the rotation job works end to end; the rotation job's steps; concurrency-limited re-encryption from the target version | **Key rotation job flow** · pattern docs/claude/ENCRYPTION.md § Implementation Details › Rotation Job Flow — re-encrypt stale-version records from env target version with concurrency-limited idempotent updates | code `encryptField`, `decryptField`, `makeSingletonJob`, `createLock` | — |
-| a user editing their own profile; own data vs managing other users; self-service endpoints for own data | **Me routes for self-service** · pattern FEATURES.md > User Management > Me Endpoint System — own data: /me; managing other users: admin routes | part 4 | — |
+| a user editing their own profile; own data vs managing other users; self-service endpoints for own data | **Me routes for self-service** · pattern FEATURES.md > User Management > Me Endpoint System — own-account operations; platform-level user management uses admin routes | part 4 | — |
 | limit requests per user, space and org; fixed window rate limiting in redis; throttle this endpoint | **Rate limiting windows** · pattern FEATURES.md > General Security > Rate Limiting — limit requests with atomic Redis fixed windows AND-checked per user, space, org | part 4 | — |
-| only one worker should run the rotation; cross-worker singleton job; two workers picked up the rotation | **Singleton job locking** · pattern FEATURES.md > Field-Level Encryption Engine > Singleton Job Locking — cross-worker singleton jobs such as key rotation | part 4 | — |
-| put the version in the where clause; an already-rotated flag on the row; a lock around the re-encrypt update; concurrent retryable rewrite of the same row | **Version-guarded idempotent update** · pattern docs/claude/ENCRYPTION.md § FAQ — Concurrent retryable rewrites; plain update when no race on the record version. | part 4 | a lock or 'already rotated' flag added around a re-encrypt update instead of putting the version in the where clause (docs/claude/ENCRYPTION.md § FAQ (why updateManyAndReturn instead of update)) |
-| the record shape decrypt accepts; type the row I pass to decrypt | **DecryptFieldInput** · primitive packages/db/src/lib/encryption — type the record shape decryptField accepts for a model and key | part 4 | — |
-| the shape of the stored ciphertext payload; encrypted, metadata and version columns together; what the encrypted blob contains | **EncryptedFieldData** · primitive packages/db/src/lib/encryption — describe the AES-256-GCM payload stored across encrypted, metadata and version columns | part 4 | — |
+| only one worker should run the rotation; cross-worker singleton job; two workers picked up the rotation | **Singleton job locking** · pattern FEATURES.md > Field-Level Encryption Engine > Singleton Job Locking — cross-worker exclusivity for long jobs like rotation | part 4 | — |
+| put the version in the where clause; an already-rotated flag on the row; a lock around the re-encrypt update; concurrent retryable rewrite of the same row | **Version-guarded idempotent update** · pattern docs/claude/ENCRYPTION.md § FAQ — Concurrent retry-safe rewrites; plain update would fail or duplicate work. | code `validateEncryptionVersions` | a lock or 'already rotated' flag added around a re-encrypt update instead of putting the version in the where clause (docs/claude/ENCRYPTION.md § FAQ (why updateManyAndReturn instead of update)) |
+| the record shape decrypt accepts; type the row I pass to decrypt | **DecryptFieldInput** · primitive docs/claude/ENCRYPTION.md § Implementation Details › Type Safety — type the record shape decryptField accepts for a model and key | code `encryptField`, `decryptField`, `makeSingletonJob`, `createLock` | — |
+| the shape of the stored ciphertext payload; encrypted, metadata and version columns together; what the encrypted blob contains | **EncryptedFieldData** · primitive docs/claude/ENCRYPTION.md § Implementation Details › Encryption Payload — describe the AES-256-GCM payload stored across encrypted, metadata and version columns | code `encryptField`, `decryptField`, `makeSingletonJob`, `createLock` | — |
 | the current and previous key plus version; which env vars hold the encryption keys; dual-key decryption during a rotation | **Encryption keyring env vars** · primitive ENCRYPTION_KEY_CURRENT / ENCRYPTION_KEY_PREVIOUS / ENCRYPTION_KEY_VERSION — supply current and previous keys plus version for dual-key decryption | part 4 | — |
-| import the encryption internals directly in feature code; the service underneath the field helpers; a new encryption manager for this feature; the internal service, rarely needed | **encryptionService** · primitive @template/db/lib/encryption/encryptionService.ts — Rarely; prefer encryptField/decryptField which handle registry, versions and metadata. | part 4 | importing encryptionService directly in feature code (catalog: encryptionService (rarely; prefer encryptField/decryptField which handle registry, versions and metadata)) |
-| kick off the rotation by hand; manually trigger a job; run the job now from the admin API | **POST /admin/jobs/enqueue** · primitive docs/claude/ENCRYPTION.md § Key Rotation › Manual Trigger — Manual or ad-hoc runs; normal code enqueues jobs programmatically. | code `ENCRYPTED_MODELS`, `resolveAll`, `rotateEncryptionKeys` | — |
-| pick the Prisma model dynamically with one cast; resolve the delegate from a model name without any; cast at every call site for a dynamic model; a method missing on the dynamic delegate type | **RuntimeDelegate** · primitive packages/db/src/lib/encryption — type dynamically selected Prisma model delegates with a single cast instead of any | part 4 | — |
-| an API token that acts as a user; automation as a user without a session; scripted access to the API as me | **User-scoped tokens** · primitive FEATURES.md > User Management > User-Scoped Tokens — API automation as a user; sessions for interactive use | part 4 | — |
-| which fields bind the ciphertext; including the name in the AAD; old ciphertext became undecryptable after a rename | **AAD uses immutable fields only** · rule packages/db/src/lib/encryption/registry.ts buildAAD — Every registry key entry. | part 4 | a buildAAD that includes name, provider or another mutable field (docs/claude/ENCRYPTION.md § Field-Scoped Encryption (never use mutable fields; changing them makes old ciphertext undecryptable)) |
+| import the encryption internals directly in feature code; the service underneath the field helpers; a new encryption manager for this feature; the internal service, rarely needed | **encryptionService** · primitive @template/db/lib/encryption/encryptionService.ts — Internal crypto layer; controllers use encryptField/decryptField instead. | part 4 | importing encryptionService directly in feature code (catalog: encryptionService (rarely; prefer encryptField/decryptField which handle registry, versions and metadata)) |
+| kick off the rotation by hand; manually trigger a job; run the job now from the admin API | **POST /admin/jobs/enqueue** · primitive docs/claude/ENCRYPTION.md § Key Rotation › Manual Trigger — Manual or ad-hoc triggering of a job; normal code enqueues programmatically. | code `ENCRYPTED_MODELS`, `resolveAll`, `AuthProvider`, `rotateEncryptionKeys` | — |
+| pick the Prisma model dynamically with one cast; resolve the delegate from a model name without any; cast at every call site for a dynamic model; a method missing on the dynamic delegate type | **RuntimeDelegate** · primitive docs/claude/ENCRYPTION.md § Implementation Details › Type Safety — Only when the model is chosen at runtime; use typed db.<model> otherwise. | code `encryptField`, `decryptField`, `makeSingletonJob`, `createLock` | — |
+| an API token that acts as a user; automation as a user without a session; scripted access to the API as me | **User-scoped tokens** · primitive FEATURES.md > User Management > User-Scoped Tokens — let users automate the API with their permissions across organizations | part 4 | — |
+| which fields bind the ciphertext; including the name in the AAD; old ciphertext became undecryptable after a rename | **AAD uses immutable fields only** · rule packages/db/src/lib/encryption/registry.ts buildAAD — Every registry key's buildAAD. | part 4 | a buildAAD that includes name, provider or another mutable field (docs/claude/ENCRYPTION.md § Field-Scoped Encryption (never use mutable fields; changing them makes old ciphertext undecryptable)) |
 | CI checks the key versions before deploy; block the deploy on a bad version bump; validate encryption on every deploy | **CI encryption version validation** · rule FEATURES.md > Field-Level Encryption Engine > CI Version Validation — every deploy | part 4 | — |
-| how to name the encrypted columns; one encrypted column for the whole model; metadata and version stored at model level; the three columns for an encrypted field | **Encrypted field column naming** · rule docs/claude/ENCRYPTION.md § Field-Scoped Encryption › Database Schema Pattern — Every new encrypted field in the Prisma schema. | code `AuthProvider`, `registry`, `ENCRYPTED_MODELS` | a single encrypted column, metadata and version stored at model level, or column names that don't match getFieldNames (encrypted{Key}, encrypted{Key}Metadata, encrypted{Key}KeyVersion) (docs/claude/ENCRYPTION.md § Field-Scoped Encryption › Database Schema Pattern; registry.ts getFieldNames) |
-| one global encryption key for everything; three env vars for each encrypted field; a separate keyring per field | **Encryption env vars per keyring** · rule @template/db/lib/encryption/envValidation.ts — Adding or rotating any encrypted field keyring. | part 4 | one global ENCRYPTION_KEY shared by every encrypted field instead of three vars per envPrefix (docs/claude/ENCRYPTION.md § Environment Variables › Per Keyring (3 vars)) |
-| jump the version from one to three; reuse an old version number; bump while rows are on mixed versions; versions only go up by one | **Encryption version bumps by one only** · rule docs/claude/ENCRYPTION.md § CI Validation — Every encryption key rotation; CI validate:encryption enforces it before deploy. | code `validateEncryptionVersions`, `registry`, `Integration` | setting the version from 1 to 3, reusing an old version, or bumping while rows are still on mixed versions (docs/claude/ENCRYPTION.md § CI Validation (rules in validateEncryptionVersions; the validate:encryption script and workflow do not exist yet)) |
-| encrypt an existing column; existing rows stay unencrypted until updated; encryption per field, not per table | **Field-scoped encryption** · rule docs/claude/ENCRYPTION.md § FAQ — Adding encryption to any field, including existing ones (unencrypted until next update or migration). | part 4 | — |
-| the order of steps when deploying a key rotation; drop the previous key in the same deploy; when can I remove the old key; keep the previous key until every row is verified | **Key rotation deployment checklist** · rule docs/claude/ENCRYPTION.md § Deployment Checklist — Any encryption key rotation; keep _KEY_PREVIOUS until all records verified on the new version. | part 4 | dropping _KEY_PREVIOUS in the same deploy that bumps the version (docs/claude/ENCRYPTION.md § Deployment Checklist) |
-| how do I rotate the encryption key; swap the current key in place; move the old key to previous and bump the version; changing a key; generate a new key and update the env | **Key rotation procedure** · rule FEATURES.md > Field-Level Encryption Engine > 3 Env Vars Per Keyring — every key rotation; CI blocks version gaps, downgrades or mixed versions | part 4 | replacing _KEY_CURRENT in place without moving the old key to _KEY_PREVIOUS and bumping _VERSION (FEATURES.md § Field-Level Encryption Engine › 3 Env Vars Per Keyring; docs/claude/ENCRYPTION.md § Deployment Checklist) |
-| the log line includes the token; print the decrypted credential in the error message; a password in plaintext anywhere; redact secrets from logs | **Never store or log plaintext secrets** · rule FEATURES.md > General Security > Password Hashing / Token Hashing — any credential persisted | part 4 | a log line or error message that includes a token, password or decrypted credential (FEATURES.md § General Security › Password Hashing / Token Hashing) |
+| how to name the encrypted columns; one encrypted column for the whole model; metadata and version stored at model level; the three columns for an encrypted field | **Encrypted field column naming** · rule docs/claude/ENCRYPTION.md § Field-Scoped Encryption › Database Schema Pattern — Every encrypted field in the Prisma schema. | code `registry`, `AuthProvider`, `ENCRYPTED_MODELS` | a single encrypted column, metadata and version stored at model level, or column names that don't match getFieldNames (encrypted{Key}, encrypted{Key}Metadata, encrypted{Key}KeyVersion) (docs/claude/ENCRYPTION.md § Field-Scoped Encryption › Database Schema Pattern; registry.ts getFieldNames) |
+| one global encryption key for everything; three env vars for each encrypted field; a separate keyring per field | **Encryption env vars per keyring** · rule docs/claude/ENCRYPTION.md § Environment Variables — Every registry key; PREVIOUS empty on initial version. | part 4 | one global ENCRYPTION_KEY shared by every encrypted field instead of three vars per envPrefix (docs/claude/ENCRYPTION.md § Environment Variables › Per Keyring (3 vars)) |
+| jump the version from one to three; reuse an old version number; bump while rows are on mixed versions; versions only go up by one | **Encryption version bumps by one only** · rule docs/claude/ENCRYPTION.md § Deploy-Time Validation › Validation Rules — Every change to an encrypted field's version env vars. | code `validateEncryptionVersions`, `registry` | setting the version from 1 to 3, reusing an old version, or bumping while rows are still on mixed versions (docs/claude/ENCRYPTION.md § CI Validation (rules in validateEncryptionVersions; the validate:encryption script and workflow do not exist yet)) |
+| encrypt an existing column; existing rows stay unencrypted until updated; encryption per field, not per table | **Field-scoped encryption** · rule docs/claude/ENCRYPTION.md § FAQ — When adding encryption to any field. | code `validateEncryptionVersions` | — |
+| the order of steps when deploying a key rotation; drop the previous key in the same deploy; when can I remove the old key; keep the previous key until every row is verified | **Key rotation deployment checklist** · rule docs/claude/ENCRYPTION.md § Deployment Checklist — Every key rotation; rollback by reverting env vars and redeploying. | code `validateEncryptionVersions` | dropping _KEY_PREVIOUS in the same deploy that bumps the version (docs/claude/ENCRYPTION.md § Deployment Checklist) |
+| how do I rotate the encryption key; swap the current key in place; move the old key to previous and bump the version; changing a key; generate a new key and update the env | **Key rotation procedure** · rule FEATURES.md > Field-Level Encryption Engine > 3 Env Vars Per Keyring — every encryption key rotation | part 4 | replacing _KEY_CURRENT in place without moving the old key to _KEY_PREVIOUS and bumping _VERSION (FEATURES.md § Field-Level Encryption Engine › 3 Env Vars Per Keyring; docs/claude/ENCRYPTION.md § Deployment Checklist) |
+| the log line includes the token; print the decrypted credential in the error message; a password in plaintext anywhere; redact secrets from logs | **Never store or log plaintext secrets** · rule FEATURES.md > General Security > Password Hashing / Token Hashing — any credential or token persistence | part 4 | a log line or error message that includes a token, password or decrypted credential (FEATURES.md § General Security › Password Hashing / Token Hashing) |
 | render the HTML string in React; inject markup into the page | **No dangerouslySetInnerHTML** · rule FEATURES.md > General Security > XSS Prevention — all frontend rendering | part 4 | rendering HTML strings via dangerouslySetInnerHTML (FEATURES.md § General Security › XSS Prevention) |
 | write the query in raw SQL; SQL injection risk in a string query; use the client, not raw SQL | **No raw SQL** · rule FEATURES.md > General Security > SQL Injection Prevention — all database access | part 4 | — |
-| skip a version during rotation; the version is two ahead of the rows; rotate one version at a time | **One key version gap at a time** · rule @template/db/lib/encryption/validation.ts — Every key rotation deploy. | part 4 | — |
+| skip a version during rotation; the version is two ahead of the rows; rotate one version at a time | **One key version gap at a time** · rule docs/claude/ENCRYPTION.md § Key Rotation › Version Constraints — Every key rotation deploy. | code `ENCRYPTED_MODELS`, `resolveAll`, `AuthProvider`, `rotateEncryptionKeys` | — |
 | encrypted columns in the schema but no registry entry; rotation never sees my new field; a sensitive field stored at rest | **Register encrypted fields in ENCRYPTED_MODELS** · rule FEATURES.md > Encryption & Security > Field-Level Encryption Engine — any sensitive field stored at rest, e.g. OAuth client secrets | part 4 | encrypted columns added to the schema with no registry entry, so rotation, validation and audit redaction never see them (FEATURES.md § Encryption & Security › Registry Pattern) |
 | the response includes the encrypted columns; return the decrypted secret in the API; strip the secret from the response schema; secrets at rest, omitted from responses | **Secrets encrypted, never returned** · rule CLAUDE.md §7 Core Engineering Standards — Encrypt secrets at rest and never return them in API responses. | part 4 | a response schema or select that returns encryptedSecrets / metadata / version columns or the decrypted secret (CLAUDE.md §7 Core Engineering Standards; docs/claude/AUTH.md Operations (secrets omitted)) |
-| model ids should be branded types; an id as a plain string | **Typed IDs** · rule FEATURES.md > User Management > User CRUD — all model IDs | part 4 | — |
+| model ids should be branded types; an id as a plain string | **Typed IDs** · rule FEATURES.md > User Management > User CRUD — all model identifiers | part 4 | — |
 
 - *Also here, by name:* createEncryptionEnvRefinement (`packages/db/src/lib/encryption/envValidation.ts`); encryptionKeySchema (`packages/db/src/lib/encryption/envValidation.ts`); getEncryptedFieldsByModel (`packages/db/src/lib/encryption/registry.ts`); getFieldNames (`packages/db/src/lib/encryption/registry.ts`)
 
@@ -217,15 +217,15 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 |---|---|---|---|
 | show the new API token once; a custom modal with a copy button for the secret; reveal the webhook secret one time; display a secret the user can't see again | **SecretRevealModal** · primitive `packages/ui/src/components/utility/SecretRevealModal.tsx#SecretRevealModal` — Any one-time secret display (API tokens, webhook secrets) instead of a custom modal. | docs/claude/FRONTEND/COMPONENTS.md § Package Organization; docs/claude/FRONTEND/COMPONENTS.md § Settings | a custom modal that displays a new API token or webhook secret with its own copy logic (docs/claude/FRONTEND/COMPONENTS.md § Modals and Pages; catalog entry SecretRevealModal) |
 | create the row then encrypt the secret after; pull the secrets out of the body and encrypt first; the create route takes a client secret; store the provider credentials on create | **Encrypt secrets before storage** · pattern docs/claude/API_ROUTES.md — Example: Create Organization Provider — Extract secrets from the body, encrypt them with encryptField, then create the row. | part 4 | creating the row with the secret from the request body and encrypting afterwards, or not at all (docs/claude/API_ROUTES.md — Example: Create Organization Provider) |
-| internal probes shouldn't count against the rate limit; the server's own health probe gets throttled; exempt system probes from limits | **System probe secret rate-limit exemption** · pattern docs/claude/WEBSOCKETS.md § Data streams › Authorization and re-authorization › Authorization and re-authorization — Only server-internal probes; client-driven opens and subscribes still count. | code `openDataStream`, `resolveStreamRoute`, `fetchStreamSnapshot`, `routeAccessOf` | — |
-| read the credential from the secret store in an init step; pass the connection string from the previous step; fetch the password from the vault at this step; an init step needs an API key | **getSecret** · primitive init script (docs/claude/INIT_SCRIPT_PATTERNS.md § 8) — Secrets in init steps; non-secret metadata: getProjectConfig instead. | part 4 | passing a connection string, password or API key from one init step to the next instead of re-fetching it from Infisical (docs/claude/INIT_SCRIPT_PATTERNS.md § 8. Always Fetch from Source, Never Trust Props) |
-| store the credential in the secret store from init; save the generated key for the environment; hand the secret to the next step as a prop; write a secret under the project's environment path | **setSecret** · primitive docs/claude/INIT_SCRIPT_PATTERNS.md §12 — store a credential in Infisical under a project environment path | part 4 | — |
-| where do OAuth client secrets go; store the provider's client secret; a stored provider credential | **Encrypt OAuth client secrets** · rule FEATURES.md > Encrypted Secrets — Any stored provider credential. | part 4 | — |
+| internal probes shouldn't count against the rate limit; the server's own health probe gets throttled; exempt system probes from limits | **System probe secret rate-limit exemption** · pattern docs/claude/WEBSOCKETS.md § Data streams › Authorization and re-authorization › Authorization and re-authorization — Server-initiated probes only; client opens and subscribes still count against limits. | code `openDataStream`, `fetchStreamSnapshot`, `routeAccessOf`, `startStreamReauthorizeSweep` | — |
+| read the credential from the secret store in an init step; pass the connection string from the previous step; fetch the password from the vault at this step; an init step needs an API key | **getSecret** · primitive getSecretAsync (init utils) — For secrets; use getProjectConfig for non-secret config metadata. | part 4 | passing a connection string, password or API key from one init step to the next instead of re-fetching it from Infisical (docs/claude/INIT_SCRIPT_PATTERNS.md § 8. Always Fetch from Source, Never Trust Props) |
+| store the credential in the secret store from init; save the generated key for the environment; hand the secret to the next step as a prop; write a secret under the project's environment path | **setSecret** · primitive docs/claude/INIT_SCRIPT_PATTERNS.md § 12 (setSecretAsync) — store a credential in Infisical under a project environment path | part 4 | — |
+| where do OAuth client secrets go; store the provider's client secret; a stored provider credential | **Encrypt OAuth client secrets** · rule FEATURES.md › Multi-Provider Auth (AuthProvider) › Encrypted Secrets — Any AuthProvider secret write or read response. | part 4 | — |
 | where do staging and prod secrets live; set the env var directly on the host; copy the env file to the server; inject secrets into the cloud environment; secrets for pr, staging and prod | **Infisical for cloud secrets** · rule docs/claude/ENVIRONMENTS.md § Infisical (Cloud Environments) — Cloud environments; local/test use .env files. | code `Token` | a hand-copied env file or a secret set directly on a pr/staging/prod host instead of Infisical injected via with-env (docs/claude/ENVIRONMENTS.md § Infisical (Cloud Environments); § with-env Composition) |
-| commit the staging env file; real secret values in the repo; which env files are okay to check in; example env files only | **No committed env files** · rule FEATURES.md › Infisical Secrets Management — any secret or environment value for pr, staging or prod | part 4 | committing a .env.staging / .env.prod or real secret values instead of the .env.*.example files plus Infisical (FEATURES.md § Infrastructure & DevOps › Infisical Secrets Management) |
-| hash the provider secret like a password; the server must replay this secret to a third party; reversible storage for a credential we send onward; hash or encrypt this token | **Provider credentials encrypted, never hashed** · rule docs/claude/AUTH.md › Encryption — Any stored credential the server must later replay to a third party. | part 4 | hashing a provider secret that must be replayed to a third party (docs/claude/AUTH.md › Encryption) |
+| commit the staging env file; real secret values in the repo; which env files are okay to check in; example env files only | **No committed env files** · rule FEATURES.md > Environment & Secrets > Infisical Secrets Management — Every app and environment. | part 4 | committing a .env.staging / .env.prod or real secret values instead of the .env.*.example files plus Infisical (FEATURES.md § Infrastructure & DevOps › Infisical Secrets Management) |
+| hash the provider secret like a password; the server must replay this secret to a third party; reversible storage for a credential we send onward; hash or encrypt this token | **Provider credentials encrypted, never hashed** · rule docs/claude/AUTH.md § Multi-Provider Authentication (AuthProvider) › Encryption — any stored credential the server must later use | code `AuthProvider`, `encryptField`, `decryptField`, `getPlatformProviders` | hashing a provider secret that must be replayed to a third party (docs/claude/AUTH.md › Encryption) |
 | telemetry key in the browser build; which secrets can the frontend see; the logging token belongs on the API only | **Provider credentials only in /api secrets** · rule docs/claude/LOGGING.md § Setup — Any telemetry secret or browser build variable. | part 4 | — |
-| return 404 so non-members can't tell it exists; the lookup runs before the permission check; hide whether the resource exists | **Resource existence is non-secret** · rule docs/claude/PERMISSIONS.md § Permission Checks › Resource Lookup Runs Before Authorization — Only resources that must hide existence from non-members need custom middleware. | code `resourceContextMiddleware`, `validateUser`, `validateActor`, `getActor` | — |
+| return 404 so non-members can't tell it exists; the lookup runs before the permission check; hide whether the resource exists | **Resource existence is non-secret** · rule docs/claude/PERMISSIONS.md — Resource Lookup Runs Before Authorization — Default for all resources; custom 404-on-deny middleware only when existence must be hidden. | part 4 | — |
 
 - *Also here, by name:* AUTH_PROBE_SECRET (`apps/api/src/lib/utils/authProbe.ts`); SYSTEM_PROBE_SECRET (`apps/api/src/lib/utils/authProbe.ts`)
 
@@ -245,10 +245,10 @@ AES-256-GCM field-level encryption with automatic key rotation. Encryption infra
 ```
 encryption/
 ├── types.ts            # EncryptedFieldData, EncryptionKeyring
-├── registry.ts         # ENCRYPTED_MODELS - model → keys[] mapping
+├── registry.ts         # ENCRYPTED_MODELS - model → { keyName: config } map, getFieldNames()
 ├── helpers.ts          # encryptField(), decryptField()
 ├── encryptionService.ts # Low-level crypto operations
-├── validation.ts       # CI version validation
+├── validation.ts       # validateEncryptionVersions() — deploy-time version check (not wired, see below)
 └── envValidation.ts    # Environment schema validation
 ```
 
@@ -273,24 +273,18 @@ Each encrypted field gets its own version tracking and metadata (not model-level
 
 ```prisma
 model AuthProvider {
-  id             String @id @default(uuid())
+  id             String @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
   organizationId String
 
-  // Field 1: Secrets encryption
-  encryptedSecrets                        String?
-  encryptedSecretsEncryptionMetadata      Json?    // { iv, authTag }
-  encryptedSecretsEncryptionKeyVersion    Int?     // 1, 2, 3, etc.
+  encryptedSecrets           String // Base64 AES-256-GCM ciphertext
+  encryptedSecretsMetadata   Json   // { iv, authTag }
+  encryptedSecretsKeyVersion Int    // 1, 2, 3, etc.
 
-  // Field 2: API keys (future example)
-  encryptedApiKey                         String?
-  encryptedApiKeyEncryptionMetadata       Json?
-  encryptedApiKeyEncryptionKeyVersion     Int?
-
-  @@index([encryptedSecretsEncryptionKeyVersion])
+  @@index([encryptedSecretsKeyVersion])
 }
 ```
 
-**Convention**: `encrypted{Field}`, `encrypted{Field}EncryptionMetadata`, `encrypted{Field}EncryptionKeyVersion`
+**Convention**: `encrypted{Key}`, `encrypted{Key}Metadata`, `encrypted{Key}KeyVersion`, where `{Key}` is the registry key name upper-first (`secrets` → `encryptedSecrets`). `getFieldNames(keyName)` derives all three; the registry never lists column names.
 
 ##### Registry Structure
 
@@ -298,18 +292,16 @@ model AuthProvider {
 // packages/db/src/lib/encryption/registry.ts
 export const ENCRYPTED_MODELS = {
   authProvider: {
-    model: "authProvider",  // Prisma accessor name
-    keys: [
-      {
-        encryptedField: "encryptedSecrets",
-        metadataField: "encryptedSecretsEncryptionMetadata",
-        versionField: "encryptedSecretsEncryptionKeyVersion",
-        envPrefix: "AUTH_PROVIDER_SECRETS",
-        buildAAD: (r) => `authProvider:${(r as any).id}:${(r as any).organizationId}`,
+    model: 'authProvider', // Prisma accessor name
+    keys: {
+      secrets: {
+        envPrefix: 'AUTH_PROVIDER_SECRETS',
+        buildAAD: (r: Pick<AuthProvider, 'id' | 'organizationId'>) =>
+          `authProvider:${r.id}:${r.organizationId}`,
       },
-    ],
-  },
-};
+    },
+  } satisfies EncryptedModelConfig<'authProvider'>,
+} as const;
 ```
 
 **AAD (Additional Authenticated Data)**: Only use **immutable** fields (id, organizationId). Never use mutable fields (name, provider, etc.) - changing them would make old ciphertext undecryptable.
@@ -329,11 +321,11 @@ export const ENCRYPTED_MODELS = {
 model ExistingModel {
   // ... existing fields ...
 
-  encryptedApiKey                         String?
-  encryptedApiKeyEncryptionMetadata       Json?
-  encryptedApiKeyEncryptionKeyVersion     Int?
+  encryptedApiKey           String?
+  encryptedApiKeyMetadata   Json?
+  encryptedApiKeyKeyVersion Int?
 
-  @@index([encryptedApiKeyEncryptionKeyVersion])
+  @@index([encryptedApiKeyKeyVersion])
 }
 ```
 
@@ -351,19 +343,17 @@ Generate keys: `openssl rand -base64 32`
 
 ```typescript
 export const ENCRYPTED_MODELS = {
+  // ...authProvider
   existingModel: {
-    model: "existingModel",
-    keys: [
-      {
-        encryptedField: "encryptedApiKey",
-        metadataField: "encryptedApiKeyEncryptionMetadata",
-        versionField: "encryptedApiKeyEncryptionKeyVersion",
-        envPrefix: "API_KEY",
-        buildAAD: (r) => `existingModel:${(r as any).id}`,
+    model: 'existingModel',
+    keys: {
+      apiKey: {
+        envPrefix: 'API_KEY',
+        buildAAD: (r: Pick<ExistingModel, 'id'>) => `existingModel:${r.id}`,
       },
-    ],
-  },
-};
+    },
+  } satisfies EncryptedModelConfig<'existingModel'>,
+} as const;
 ```
 
 ##### 4. Use in Controllers
@@ -374,7 +364,6 @@ import { ENCRYPTED_MODELS } from '@template/db/lib/encryption/registry';
 
 // Encrypt before create
 const body = c.req.valid('json');
-const keyConfig = ENCRYPTED_MODELS.existingModel.keys[0];
 const encryptedData = await encryptField(
   'existingModel',
   'apiKey',
@@ -413,7 +402,7 @@ const decrypted = await decryptField(
 
 2. **Worker startup auto-enqueues rotation job**:
    - Iterates all models/keys in `ENCRYPTED_MODELS`
-   - Finds records with `encryptedSecretsEncryptionKeyVersion = 1`
+   - Finds records with `encryptedSecretsKeyVersion = 1`
    - Re-encrypts with version 2
 
 3. **Job processes in parallel**:
@@ -423,9 +412,9 @@ const decrypted = await decryptField(
 
 4. **Verify completion**:
    ```sql
-   SELECT encryptedSecretsEncryptionKeyVersion, COUNT(*)
-   FROM auth_provider
-   GROUP BY encryptedSecretsEncryptionKeyVersion;
+   SELECT "encryptedSecretsKeyVersion", COUNT(*)
+   FROM "AuthProvider"
+   GROUP BY "encryptedSecretsKeyVersion";
    -- Should show only version 2
    ```
 
@@ -462,7 +451,7 @@ If another process already rotated the record (changing the version), the where 
 
 - **Max 2 versions at once**: Current + previous
 - **One version gap only**: Can only rotate from v(n-1) → v(n)
-- **CI enforcement**: Deploy blocked if >1 version gap detected
+- **Deploy-time check**: `validateEncryptionVersions` detects a >1 version gap, but nothing runs it yet (see [Deploy-Time Validation](#deploy-time-validation))
 
 ---
 
@@ -501,47 +490,27 @@ Env schema validates:
 
 ---
 
-<!-- unit doc:docs/claude/ENCRYPTION.md#ci-validation -->
-**Source:** `docs/claude/ENCRYPTION.md` § CI Validation (in "Encryption")
+<!-- unit doc:docs/claude/ENCRYPTION.md#deploy-time-validation -->
+**Source:** `docs/claude/ENCRYPTION.md` § Deploy-Time Validation (in "Encryption")
 
-#### CI Validation
+#### Deploy-Time Validation
 
-**Prevents deploying bad key versions** - runs before deployment can proceed.
+**Not wired.** `validateEncryptionVersions(db)` (`packages/db/src/lib/encryption/validation.ts`) exists and is tested (`validation.test.ts`), but no script runs it: there is no `validate:encryption` package script and no `.github/workflows` in the repo. Until something calls it before a deploy, the version rules below are only as enforced as the person deploying.
 
 ##### Validation Rules
 
-```typescript
-// packages/db/src/lib/encryption/validation.ts
-export const validateEncryptionVersions = async (db: PrismaClient) => {
-  // For each model → key in registry:
+For each model → key in the registry it compares the env version with the versions in the database and returns `{ valid, errors }` (it doesn't throw):
 
-  // 1. Version cannot go down
-  if (currentVersion < maxDbVersion) throw Error('Version downgrade!');
+- Missing `{PREFIX}_ENCRYPTION_VERSION` / `_KEY_CURRENT`, or a non-integer version
+- Version > 1 without `_KEY_PREVIOUS`; current and previous keys identical
+- Version downgrade (env version < highest DB version)
+- Version jump > 1
+- Bump while records are still on more than one version
+- More than 2 versions in the database
 
-  // 2. Can only increment by 1
-  if (currentVersion > maxDbVersion + 1) throw Error('Version jump too large!');
+##### Wiring It (not built)
 
-  // 3. Can only bump if all records on latest
-  if (currentVersion > maxDbVersion && versions.length > 1) {
-    throw Error('Mixed versions detected!');
-  }
-
-  // 4. Max 2 versions in system
-  if (versions.length > 2) throw Error('Too many versions!');
-};
-```
-
-##### CI Integration
-
-```yaml
-# .github/workflows/deploy.yml (when CI exists)
-- name: Validate Encryption Versions
-  run: |
-    cd packages/db
-    bun run validate:encryption
-```
-
-**Result**: Can't deploy with bad version configurations - CI fails first.
+The intended shape is a pre-deploy step that runs `validateEncryptionVersions` against the target database and fails the deploy when `valid` is false — part of the deploy pipeline that doesn't exist yet ([CICD.md](CICD.md)).
 
 ---
 
@@ -618,7 +587,8 @@ export const makeSingletonJob = <T>(handler: JobHandler<T>) => {
 ```typescript
 // 1. Auto-discovery
 for (modelName in ENCRYPTED_MODELS) {
-  for (keyConfig of modelConfig.keys) {
+  for ([keyName, keyConfig] of Object.entries(modelConfig.keys)) {
+    const { versionField } = getFieldNames(keyName);
 
     // 2. Read target version from env
     const targetVersion = parseInt(process.env[`${envPrefix}_ENCRYPTION_VERSION`]);
@@ -669,7 +639,7 @@ const results = await resolveAll(allRotations, getConcurrency([ConcurrencyType.d
    - Move current key to `_KEY_PREVIOUS`
    - Set new key as `_KEY_CURRENT`
 
-4. ✅ Run CI validation (automatic in pipeline)
+4. ✅ Run `validateEncryptionVersions` against the target database by hand (no pipeline runs it yet)
 
 5. ✅ Deploy and monitor BullBoard for job completion
 
@@ -688,7 +658,7 @@ const results = await resolveAll(allRotations, getConcurrency([ConcurrencyType.d
 #### FAQ
 
 **Q: Can I skip versions (v1 → v3)?**
-A: No. CI validation blocks this. Must go v1 → v2 → v3.
+A: No. Must go v1 → v2 → v3. `validateEncryptionVersions` reports a jump, but nothing runs it automatically yet.
 
 **Q: What if rotation fails mid-way?**
 A: Safe to retry! Idempotent updates skip already-rotated records.
@@ -730,11 +700,11 @@ A: **Idempotent protection**. The where clause includes version field - if anoth
 
 ##### General Security
 
-- ✅ **HTTP-Only Cookie (email/password)** - Email/password auth issues a stateless JWT in an HTTP-only, Secure, SameSite=Lax cookie. Not accessible from JavaScript. CSRF protection via BetterAuth double-submit cookie pattern
-- ✅ **Bearer Token (OAuth)** - OAuth flow stores the JWT in localStorage and sends it as `Authorization: Bearer <token>`. No cookie — CSRF is not a risk for Bearer tokens, but XSS is (localStorage is JS-accessible). Trade-off accepted for OAuth compatibility
+- ✅ **HTTP-Only Session Cookies** - BetterAuth also sets HTTP-only cookies on the API origin (a signed session-token cookie and the encrypted JWE cookie cache). The SPAs don't rely on them; they authenticate with the bearer token
+- ✅ **Bearer Session Token** - Both email/password and OAuth sign-ins store the opaque session token in localStorage and send it as `Authorization: Bearer <token>`. No cookie, so CSRF is not a risk, but XSS is (localStorage is JS-accessible). Trade-off accepted for cross-origin SPAs
 - ✅ **SQL Injection Prevention** - Prisma uses parameterized queries exclusively. No string interpolation in queries. Raw SQL escape hatches disabled by convention
 - ✅ **XSS Prevention** - React escapes all interpolated values by default. No `dangerouslySetInnerHTML` usage. Content Security Policy headers configurable via Hono middleware
-- ✅ **Password Hashing** - bcrypt via BetterAuth with configurable cost factor. Passwords never stored or logged in plaintext
+- ✅ **Password Hashing** - scrypt via BetterAuth (`node:crypto`). Passwords never stored or logged in plaintext
 - ✅ **Token Hashing** - API tokens stored as SHA-256 hashes. Raw token shown once at creation, never retrievable. Token comparison done on hash
 - ✅ **Rate Limiting** - Atomic Redis fixed windows, AND-checked per user / space / organization plus an IP window on `/api/auth/*`; 429 with `Retry-After`, fail-open on a Redis outage. Limits resolve through one seam (`rateLimitMax`) awaiting subscriptions / feature flags (INFRA-027)
 - ✅ **Audit Logs** - `AuditLog` model with full actor context (user, spoof user, token, job, inquiry). Automatic hook captures create/update/delete for 10 enabled models. Soft-delete detection, empty-diff guard, sensitive field redaction, and inquiry lineage via `sourceInquiryId`. Retention job and admin API shipped (FEAT-005 Complete); explorer UI deferred to FEAT-017
@@ -1046,14 +1016,14 @@ export const env = envSchema.parse(process.env);
 **Implementation:**
 ```typescript
 // ❌ Bad: Rely on password object from previous step
-if (!(await isProgressComplete('planetscale', 'initProdMigrationTable'))) {
+if (!(await isComplete('planetscale', 'initProdMigrationTable'))) {
   const prodConnectionString = productionPassword.connection_strings.general; // undefined if resuming!
   await initPrismaMigrationTable(prodConnectionString);
 }
 
 // ✅ Good: Fetch from Infisical (where step 8 stored it)
-if (!(await isProgressComplete('planetscale', 'initProdMigrationTable'))) {
-  const prodConnectionString = getSecret('DATABASE_URL', {
+if (!(await isComplete('planetscale', 'initProdMigrationTable'))) {
+  const prodConnectionString = await getSecretAsync('DATABASE_URL', {
     projectId: infisicalProjectId,
     environment: 'prod',
     path: '/api',
@@ -1062,7 +1032,7 @@ if (!(await isProgressComplete('planetscale', 'initProdMigrationTable'))) {
 }
 
 // ✅ Good: Re-read from config (don't trust local variables)
-if (!(await isProgressComplete('planetscale', 'configureDB'))) {
+if (!(await isComplete('planetscale', 'configureDB'))) {
   const latestConfig = await getProjectConfig();
   const orgName = latestConfig.planetscale.organization;
   const dbName = latestConfig.planetscale.database;
@@ -1071,7 +1041,7 @@ if (!(await isProgressComplete('planetscale', 'configureDB'))) {
 ```
 
 **Rule of thumb:**
-- Secrets → Always fetch from Infisical with `getSecret()`
+- Secrets → Always fetch from Infisical with `getSecretAsync()`
 - Config metadata → Always re-read from config with `getProjectConfig()`
 - Never pass connection strings, passwords, or API keys between steps
 
@@ -1124,11 +1094,11 @@ See [ENVIRONMENTS.md](ENVIRONMENTS.md) for full environment configuration.
 
 ##### Caching & Performance
 
-- ✅ **Redis with IORedis** - Distributed caching layer (Redis 7 alpine). Singleton connections with automatic reconnection, error handling, and connection pooling. Mock Redis in tests for isolation
+- ✅ **Redis with IORedis** - Distributed caching layer (Redis 7 alpine). Singleton connections with automatic reconnection, error handling, and connection pooling. Tests get one shared in-memory `ioredis-mock` client (`createRedisConnection` in test); a test that needs real Redis (BullMQ repeatables) opens its own connection
 
-- ✅ **Redis Use Cases** - Session cache (5min cookieCache TTL), permission evaluation cache (10min), token hash cache (10min), BullMQ job queue persistence, WebSocket pub/sub for multi-server broadcasting
+- ✅ **Redis Use Cases** - Session store (BetterAuth `secondaryStorage`, 7-day sliding TTL), cached reads via `cache()` (API tokens 10min, user lookups, permission hydration), BullMQ job queue persistence, WebSocket pub/sub for multi-server broadcasting, rate-limit windows, locks
 
-- ✅ **Namespace Support** - Redis keys auto-prefixed by use case (session:, perm:, token:, job:) preventing collisions and enabling selective cache clearing
+- ✅ **Namespace Support** - Redis keys prefixed by use case (`redisNamespace`: bull, cache, job, ws, otp, session, limit, lock, lane) preventing collisions and enabling selective cache clearing
 
 - ✅ **Multiple Redis Connections** - Main client (general operations), dedicated subscriber (pub/sub is blocking), separate BullMQ connections per queue/worker. Prevents blocking operations from interfering
 
@@ -1169,7 +1139,7 @@ From the catalog (`.foundry/catalog/catalog.json`, extracted from the code). Eac
 - **encryptField** `packages/db/src/lib/encryption/helpers.ts#encryptField` [primitive] encrypt a registered field on a record before persisting, type-checked per model Use: await encryptField('authProvider', keyName, record)
 - **encryptionEnv** `packages/db/src/lib/encryption/envValidation.ts#encryptionEnv` [primitive] build env schema for encryption keys across registered env prefixes Use: encryptionEnv({ envPrefixes })
 - **rotateEncryptionKeys** `apps/api/src/jobs/handlers/rotateEncryptionKeys.ts#rotateEncryptionKeys` [primitive] re-encrypt every registered encrypted field holding a stale key version Use: enqueue the rotateEncryptionKeys singleton job
-- **validateEncryptionVersions** `packages/db/src/lib/encryption/validation.ts#validateEncryptionVersions` [primitive] check stored encrypted fields against expected encryption key versions, collecting errors Use: await validateEncryptionVersions(db)
+- **validateEncryptionVersions** `packages/db/src/lib/encryption/validation.ts#validateEncryptionVersions` [primitive] detect encrypted rows lagging more than one key version behind; not wired to any script Use: const { valid, errors } = await validateEncryptionVersions(db)
 
 #### Class `secrets`
 - **SecretRevealModal** `packages/ui/src/components/utility/SecretRevealModal.tsx#SecretRevealModal` [primitive] show a newly created secret once with a copy button Use: <SecretRevealModal secret={key} title="API key" label="Key" onDismiss={() => setKey(null)} />

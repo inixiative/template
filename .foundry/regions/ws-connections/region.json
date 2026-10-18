@@ -3,7 +3,7 @@
   "title": "WebSocket connections",
   "routing": "Is this about the API WebSocket connection itself: the upgrade and handler (acceptWebSocket, websocketHandler), the authenticate frame and /api/v1/me identity (resolveIdentity, setIdentity, sanitizeWSHeaders), the connection registry (addConnection, removeConnection, byUser/byChannel/byStream), frame limits and per-connection serialization (WS_MAX_PENDING_FRAMES, WS_FRAME_LIMIT), retryable errors, heartbeat and the stale sweep, sendFrame and the senders (sendToChannel, sendToUser, broadcast, the *Local variants, Redis ws:broadcast), or the client socket (createApiWebsocket, useApiWebsocket, reconnect replay, streamSettleMs)?",
   "concepts": ["ws-connections"],
-  "tokens": 6503,
+  "tokens": 6633,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
@@ -14,7 +14,7 @@
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 6503
+      "tokens": 6633
     }
   },
   "runsAgreed": 0,
@@ -27,9 +27,10 @@
     "catalogClusters": [
       "app-events-side-effects",
       "rate-limiting",
-      "websocket-connection-management"
+      "websocket-connection-management",
+      "websocket-realtime-delivery"
     ],
-    "codeEntries": 26,
+    "codeEntries": 28,
     "docMembers": 11
   },
   "bypassLines": 9,

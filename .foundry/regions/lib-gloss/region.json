@@ -3,7 +3,7 @@
   "title": "Gloss (margin comments)",
   "routing": "Is this about @inixiative/gloss or writing / reading a gloss: keeping source comment-free except `// why:`, daggers (`// gloss`, `// gloss:file`) and machine directives; the mirrored .gloss/ sidecar (src/foo.ts -> .gloss/src/foo.ts.md, `# <path>` h1, one `## <symbol>` section per symbol); the CLAUDE.gloss.md agent guidance that gloss setup installs (the filing rule, never delete a section or dagger to green a check, run gloss fix); or the gloss CLI (lint, check, fix, harvest --staged, watch, read, history, setup) and its package.json directives / exclude config?",
   "concepts": ["lib-gloss", "gloss"],
-  "tokens": 5523,
+  "tokens": 6760,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
@@ -14,7 +14,7 @@
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 5523
+      "tokens": 6760
     }
   },
   "runsAgreed": 0,
@@ -23,12 +23,13 @@
     "docUnits": [
       "doc:@inixiative/gloss/README.md#preface",
       "doc:@inixiative/gloss/README.md#where-the-gloss-lives",
-      "doc:@inixiative/gloss/README.md#the-three-permitted-comment-forms",
+      "doc:@inixiative/gloss/README.md#the-comment-rule",
       "doc:@inixiative/gloss/README.md#the-sidecar",
       "doc:@inixiative/gloss/README.md#the-harvester",
       "doc:@inixiative/gloss/README.md#derived-staleness",
       "doc:@inixiative/gloss/README.md#cli",
       "doc:@inixiative/gloss/README.md#setup",
+      "doc:@inixiative/gloss/README.md#agent-hooks",
       "doc:@inixiative/gloss/README.md#doctrine",
       "doc:@inixiative/gloss/README.md#design",
       "doc:@inixiative/gloss/snippets/CLAUDE.gloss.md#gloss-commentary-lives-in-the-margin-not-in-the-code"

@@ -3,7 +3,7 @@
   "title": "Inquiry model and handlers",
   "routing": "Is this about a request one party makes of another and how it is decided: the Inquiry row (sourceModel / targetModel false polymorphism, InquiryStatus draft \u2192 sent \u2192 approved / denied / changesRequested / canceled, sentAt, expiresAt), InquiryHandler per type (sources, targets, contentSchema, resolutionInputSchema, resolutionSchema, validate, unique, defaultExpirationDays, handleApprove, autoApprove), the services (createInquiry, sendInquiry, resolveInquiry, resolveInquirySource / resolveInquiryTarget, computeExpiresAt, validateInquiryPreCreate, validateUniqueInquiry, validateInquiryHandler, validateInquiryNotExpired, inquiryTerminalStatuses), adding a new inquiry type, or who may send / resolve / read (the per-type ReBAC rule)?",
   "concepts": ["inquiry-handlers"],
-  "tokens": 12329,
+  "tokens": 12327,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
@@ -14,7 +14,7 @@
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 12329
+      "tokens": 12327
     }
   },
   "runsAgreed": 0,

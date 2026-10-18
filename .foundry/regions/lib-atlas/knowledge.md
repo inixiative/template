@@ -135,7 +135,27 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 
 | Problem | Use | Read | Signs you're bypassing it |
 |---|---|---|---|
-| make CI fail when a file has no annotation header; add the annotation gate to the pipeline; run the code-map validation on every push | **atlas check in CI** · rule @inixiative/atlas/README.md § CLI — Every CI run and before pushing annotation changes. | part 4 | — |
+| the header comment that says what a file is and belongs to; add the file header describing role, membership and dependencies; every source file carries a tag block at the top; where do I declare which concept this file is in; I'll put a description comment at the top of the file | **@atlas annotation block** · pattern @inixiative/atlas/README.md § Writing a block — declare a file's role, membership and load-bearing dependencies for the code map | part 4 | — |
+| turn on the annotation gate gradually on an existing repo; start with warnings only, then make it fail; adopt the code map without blocking every PR on day one; ratchet the coverage instead of demanding all files annotated now; how do we bring an old codebase under the annotation check | **Atlas CI rollout** · pattern @inixiative/atlas/README.md § CI — adopt atlas enforcement gradually on existing codebases | code `registry` | — |
+| find code by concept using MAP.md, atlas graph and @atlas blocks instead of grep | **Navigate by concept via atlas** · pattern @inixiative/atlas/README.md § For AI agents — "what touches X" or "what's part of Y" questions: prefer this over grep | code `registry`, `serialize`, `renderNeighbourhood`, `renderConceptMatches` | — |
+| map each concept to search phrases people use and its doc | **.atlas/thesaurus.ts** · primitive .atlas/thesaurus.ts — Search phrasing and doc lookup; structure belongs in concepts.ts. | part 4 | — |
+| keep the resync from rewriting this one exception; this file's tags are deliberate, don't let stamping touch them; the stamp keeps overwriting my hand-edited header; freeze this block against the rules; mark this header as an exception to the path rules | **@atlas pin** · primitive @inixiative/atlas/README.md § The patcher: atlas stamp — When hand-set @kind/@partOf must survive --overwrite. | part 4 | an exception block that atlas stamp --overwrite keeps rewriting, handled by re-editing it after every stamp instead of adding @atlas pin (@inixiative/atlas/README.md § The patcher: atlas stamp) |
+| verify every file has its header and the tags are valid; fail CI when a tag names a concept that doesn't exist; I'll write a script that greps for the annotation blocks; validate the annotations against the allowed vocabulary; does this block point at a doc that exists | **atlas check** · primitive @inixiative/atlas/README.md § CI — Checks existence and vocabulary, not correctness; scoped path skips registry-wide and doc checks; coverage gates use atlas coverage. | code `registry` | a custom CI script that greps files for @atlas blocks or validates tags against a list, instead of running atlas check (@inixiative/atlas/README.md § CI; examples/ci/README.md ("atlas check is the CI primitive")) |
+| show Claude Code the concepts a grep pattern names | **atlas hook grep** · primitive @inixiative/atlas/README.md § CLI — After greps; atlas hook read for file reads. | part 4 | — |
+| show Claude Code the concept neighbourhood of the file just read | **atlas hook read** · primitive @inixiative/atlas/README.md § CLI — After file reads; atlas hook grep for search patterns. | part 4 | — |
+| files matching this role and this membership; narrow files by role, membership, use or path; filter the tree with a predicate on the tags; I'll search by file path pattern instead; give me only the controllers under this module | **atlas query** · primitive @inixiative/atlas/README.md § For AI agents › Hooks: the neighbourhood on every Read and Grep — single concept membership listing; atlas graph --json for full reverse indexes | code `registry`, `serialize`, `renderNeighbourhood`, `renderConceptMatches` | — |
+| add both atlas hooks to .claude/settings.json | **atlas setup** · primitive @inixiative/atlas/README.md § CLI — Prefer over hand-editing .claude/settings.json to install the hooks. | part 4 | — |
+| print otherwise-silent atlas hook errors to stderr | **ATLAS_HOOK_DEBUG** · primitive @inixiative/atlas/README.md § For AI agents › Hooks: the neighbourhood on every Read and Grep — print otherwise-silent atlas hook errors to stderr | code `registry`, `serialize`, `renderNeighbourhood`, `renderConceptMatches` | — |
+| map concepts to search phrases and doc so job-worded greps find them | **THESAURUS** · primitive .atlas/thesaurus.ts — map concepts to search phrases and doc so job-worded greps find them | part 4 | — |
+| what is this file, a controller, a route, a registry; the role tag says what the file is, not which layer; I'll tag this file as a feature; feature and primitive are classes, not roles; don't put infrastructure as the kind | **@kind is a role, never a layer** · rule @inixiative/atlas/README.md § Writing a block — Every @atlas block. | part 4 | `@kind feature` / `@kind primitive` / `@kind infrastructure` in an @atlas block (docs/claude/ATLAS.md § @kind — the role) |
+| belongs to versus depends on; the thing that breaks without this file is membership; I'll put everything it touches as what it's part of; a dependency is not membership | **@partOf is membership** · rule @inixiative/atlas/README.md § Writing a block — Every @atlas block, including reusable helpers that build a concept. | part 4 | — |
+| one db update through request context is not a dependency; list only what the file really relies on; I'll include every concept it imports; incidental touches don't go in the dependency line | **@uses is load-bearing only** · rule @inixiative/atlas/README.md § Writing a block — When curating dependencies; never auto-stamped. | part 4 | an @uses line listing every imported concept, including incidental db or logger touches (@inixiative/atlas/README.md#Writing a block; docs/claude/ATLAS.md § @uses) |
+| make CI fail when a file has no annotation header; add the annotation gate to the pipeline; run the code-map validation on every push | **atlas check in CI** · rule @inixiative/atlas/README.md § CLI — Every CI run; run locally before pushing annotation or registry changes. | part 4 | — |
+| Add the words of a missed search to the found concept's thesaurus phrases, never test answers. | **Grow thesaurus from missed searches** · rule @inixiative/atlas/README.md § Keeping it up — When an atlas concept search missed and you later found the thing. | part 4 | — |
+| several broad tags that are true beat one narrow one; I'll create a concept just for this edge case; combine existing concepts instead of adding a specific one | **Prefer broad-true tags** · rule @inixiative/atlas/README.md § Writing a block — When choosing @partOf/@uses values. | part 4 | minting a new hyper-specific concept for one file instead of combining existing broad concepts (@inixiative/atlas/README.md § Why; § Writing a block) |
+| Omit thesaurus doc when the concept's first docs: entry applies; never write a doc twice. | **Thesaurus doc defaults to concept docs** · rule @inixiative/atlas/README.md § For AI agents › Thesaurus — when adding a thesaurus entry | code `registry`, `serialize`, `renderNeighbourhood`, `renderConceptMatches` | — |
+| Write thesaurus phrases in base form; matching adds simple inflections itself. | **Thesaurus phrases in base form** · rule @inixiative/atlas/README.md § For AI agents › Thesaurus — whenever adding phrases to .atlas/thesaurus.ts | code `registry`, `serialize`, `renderNeighbourhood`, `renderConceptMatches` | — |
+| is this concept name actually registered; the role you wrote isn't in the allowed list; I'll pick a concept name that sounds right; check the tags against the repo's own vocabulary | **Validate atlas names against .atlas/** · rule @inixiative/atlas/README.md § Writing a block — Every annotation value. | part 4 | an @partOf or @uses naming a concept missing from .atlas/concepts.ts, or an @kind outside kinds.ts (docs/claude/ATLAS.md § Authoring rules; § Enforcement) |
 
 
 ### Class `atlas`: Atlas code map: concept vocabulary, @atlas annotations, navigating by concept
@@ -170,54 +190,51 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 
 | Problem | Use | Read | Signs you're bypassing it |
 |---|---|---|---|
+| get the Atlas code graph from cache | **cachedGraph** · package `@inixiative/atlas#cachedGraph` — get the Atlas code graph from cache | — | — |
 | set up the code-map config file with typed rules; the function that wraps the stamping rules in the config; type the include globs and their derived tags; I'll export a plain object from the config file | **defineConfig** · package `@inixiative/atlas#defineConfig` — Same function as @inixiative/atlas/config#defineConfig; prefer the root import. | @inixiative/atlas/README.md § Configure | — |
+| locate the Atlas root directory | **findAtlasRoot** · package `@inixiative/atlas#findAtlasRoot` — locate the Atlas root directory | — | — |
 | read the annotation header out of a source file; parse the tags from a file's comment block; I'll regex the header comment to pull out the tags; turn the comment block into structured tags | **parseAtlasBlock** · package `@inixiative/atlas#parseAtlasBlock` — parse an Atlas annotation block from source or docs | — | — |
 | derive the concept from the captured folder name in the glob; one rule for all modules instead of one rule per module; I'll list each module's concept explicitly in the rules; map the path capture to the concept of that class; the module folder name becomes the membership tag | **partOfFor** · package `@inixiative/atlas#partOfFor` — Use instead of listing explicit concepts per rule; re-export of @inixiative/atlas/config#partOfFor. | @inixiative/atlas/README.md § Configure; docs/claude/ATLAS.md § The `.atlas/` config | stamp rules listing explicit concepts per path instead of capturing module/package with partOfFor('module', '$1') (catalog @inixiative/atlas#partOfFor; docs/claude/ATLAS.md § The .atlas/ config) |
-| the header comment that says what a file is and belongs to; add the file header describing role, membership and dependencies; every source file carries a tag block at the top; where do I declare which concept this file is in; I'll put a description comment at the top of the file | **@atlas annotation block** · pattern @inixiative/atlas/README.md § Writing a block — declare a file's role, membership and load-bearing dependencies for the code map | part 4 | — |
-| turn on the annotation gate gradually on an existing repo; start with warnings only, then make it fail; adopt the code map without blocking every PR on day one; ratchet the coverage instead of demanding all files annotated now; how do we bring an old codebase under the annotation check | **Atlas CI rollout** · pattern @inixiative/atlas/README.md § CI — adopt atlas enforcement gradually on existing codebases | code `registry` | — |
-| what touches caching; find everything that reaches this system, including indirectly; I'll grep the tree for usages; ask the map before searching the code; which files are part of this feature; I'll crawl the folders to see what depends on this | **Navigate by concept before grep** · pattern @inixiative/atlas/README.md § For AI agents — For 'what touches X' / 'what's part of Y' questions, including transitive edges; grep only as fallback. | part 4 | grepping the tree or crawling folders to answer "what touches caching" or "what reaches redis", missing transitive edges, instead of one `bunx atlas graph --json` call (@inixiative/atlas/README.md § For AI agents) |
+| render plain-text Atlas concept matches for a search pattern | **renderConceptMatches** · package `@inixiative/atlas#renderConceptMatches` — Lookup by concept pattern; for a file's surrounding map use renderNeighbourhood instead. | @inixiative/atlas/README.md § For AI agents | — |
+| render plain-text Atlas map context around one file path | **renderNeighbourhood** · package `@inixiative/atlas#renderNeighbourhood` — Harness-agnostic per-file context; for concept search use renderConceptMatches; inside Claude Code use runClaudeCodeHook. | @inixiative/atlas/README.md § For AI agents | — |
+| run Atlas as a Claude Code hook, injecting map context | **runClaudeCodeHook** · package `@inixiative/atlas#runClaudeCodeHook` — Claude Code harness adapter; for other harnesses call renderNeighbourhood or renderConceptMatches directly. | @inixiative/atlas/README.md § For AI agents | — |
+| install Atlas hooks into Claude Code settings | **setupClaudeHooks** · package `@inixiative/atlas#setupClaudeHooks` — One-time setup; runClaudeCodeHook is what runs on each hook event. | — | — |
+| what touches caching; find everything that reaches this system, including indirectly; I'll grep the tree for usages; ask the map before searching the code; which files are part of this feature; I'll crawl the folders to see what depends on this | **Navigate by concept before grep** · pattern @inixiative/atlas/README.md § Why — Prefer over crawling folders or raw grep when looking for everything touching a concept. | part 4 | grepping the tree or crawling folders to answer "what touches caching" or "what reaches redis", missing transitive edges, instead of one `bunx atlas graph --json` call (@inixiative/atlas/README.md § For AI agents) |
 | the rules that derive tags from file paths; where the stamping rules live; which globs get which role and membership; I'll add a config describing which folders are which module; extend the path rules to cover the new app | **.atlas/config.ts** · primitive .atlas/config.ts — derivable tags per path; concepts.ts for concept definitions, kinds.ts for vocabulary | part 4 | — |
-| where the allowed role values are defined; add a new file role to the vocabulary; the list of what a file can be; I'll just use a new role word in the header | **.atlas/kinds.ts** · primitive .atlas/kinds.ts — define the repo's @kind vocabulary extending atlas defaults | part 4 | — |
-| keep the resync from rewriting this one exception; this file's tags are deliberate, don't let stamping touch them; the stamp keeps overwriting my hand-edited header; freeze this block against the rules; mark this header as an exception to the path rules | **@atlas pin** · primitive @inixiative/atlas/README.md § The patcher: atlas stamp — exempt a block from atlas stamp --overwrite resyncing | part 4 | an exception block that atlas stamp --overwrite keeps rewriting, handled by re-editing it after every stamp instead of adding @atlas pin (@inixiative/atlas/README.md § The patcher: atlas stamp) |
-| verify every file has its header and the tags are valid; fail CI when a tag names a concept that doesn't exist; I'll write a script that greps for the annotation blocks; validate the annotations against the allowed vocabulary; does this block point at a doc that exists | **atlas check** · primitive @inixiative/atlas/README.md § CI — Checks existence/vocab only, not correctness; use atlas coverage for annotation percentage gates. | code `registry` | a custom CI script that greps files for @atlas blocks or validates tags against a list, instead of running atlas check (@inixiative/atlas/README.md § CI; examples/ci/README.md ("atlas check is the CI primitive")) |
-| how many files still have no annotation; list the unannotated files; don't let a PR add files without annotations; fail the build if annotated percentage drops below the floor; I'll count the annotated files with a script; which files still have an uncurated uses line | **atlas coverage** · primitive @inixiative/atlas CLI — Gap lists or ratchet gates; atlas report for visual COVERAGE.md and atlas.html. | part 4 | a hand-counted annotation percentage or a script listing unannotated files, instead of atlas coverage --min / --ratchet (@inixiative/atlas/examples/ci/README.md § Coverage gate) |
-| regenerate the overview document from the annotations; the map is stale, rebuild it; write the concept overview from the tagged tree; I'll update the overview document by hand; refresh the generated map after annotating | **atlas generate** · primitive @inixiative/atlas CLI — write MAP.md concept overview from the annotated tree | part 4 | — |
-| the relation graph between concepts and files as data; who is part of or uses this concept, with transitive edges; a build step that joins route files to their concepts; I'll maintain a hand-written map of the surface; query the whole map in one call | **atlas graph** · primitive @inixiative/atlas CLI — Querying relations; atlas generate for the readable overview. | part 4 | — |
-| files matching this role and this membership; narrow files by role, membership, use or path; filter the tree with a predicate on the tags; I'll search by file path pattern instead; give me only the controllers under this module | **atlas query** · primitive docs/claude/ATLAS.md — bunx atlas query — Filtering files by axis combos; whole-concept reverse indexes: atlas graph instead. Prefer over grep. | part 4 | — |
-| a visual work plan of what's left to annotate per concept; render the concept graph as a picture; write out a coverage document with a diagram; show me the gaps per concept in a browsable page | **atlas report** · primitive @inixiative/atlas CLI — Visual per-concept work plans; atlas coverage for plain gap listings. | part 4 | — |
-| fill in the headers for all these files from the path rules; bulk annotate the new module; I'll hand-write the role and membership on each of these files; derive the role and membership tags from where the file lives; add the missing tags without touching the existing ones | **atlas stamp** · primitive @inixiative/atlas CLI — Bulk annotating from path rules; add --overwrite only to replace existing blocks; hand-write for exceptions. | part 4 | hand-writing @kind/@partOf on many files that the .atlas/config.ts rules would derive (docs/claude/ATLAS.md § Authoring annotations) |
+| where the allowed role values are defined; add a new file role to the vocabulary; the list of what a file can be; I'll just use a new role word in the header | **.atlas/kinds.ts** · primitive .atlas/kinds.ts — For @kind values; concepts for @partOf/@uses go in concepts.ts instead. | part 4 | — |
+| how many files still have no annotation; list the unannotated files; don't let a PR add files without annotations; fail the build if annotated percentage drops below the floor; I'll count the annotated files with a script; which files still have an uncurated uses line | **atlas coverage** · primitive @inixiative/atlas/README.md § CLI — Textual gap list/threshold; atlas report for Mermaid and HTML visuals. | part 4 | a hand-counted annotation percentage or a script listing unannotated files, instead of atlas coverage --min / --ratchet (@inixiative/atlas/examples/ci/README.md § Coverage gate) |
+| regenerate the overview document from the annotations; the map is stale, rebuild it; write the concept overview from the tagged tree; I'll update the overview document by hand; refresh the generated map after annotating | **atlas generate** · primitive @inixiative/atlas/README.md § CLI — Committed map; atlas graph for ad-hoc indexes. | part 4 | — |
+| the relation graph between concepts and files as data; who is part of or uses this concept, with transitive edges; a build step that joins route files to their concepts; I'll maintain a hand-written map of the surface; query the whole map in one call | **atlas graph** · primitive @inixiative/atlas/README.md § CLI — Ad-hoc traversal; atlas generate for the committed MAP.md overview. | part 4 | — |
+| a visual work plan of what's left to annotate per concept; render the concept graph as a picture; write out a coverage document with a diagram; show me the gaps per concept in a browsable page | **atlas report** · primitive @inixiative/atlas/README.md § CLI — Visual reports; atlas coverage for CLI gap lists and ratchets. | part 4 | — |
+| fill in the headers for all these files from the path rules; bulk annotate the new module; I'll hand-write the role and membership on each of these files; derive the role and membership tags from where the file lives; add the missing tags without touching the existing ones | **atlas stamp** · primitive @inixiative/atlas/README.md § CLI — Bulk path-derived tagging; hand-write blocks for file-specific tags. --overwrite replaces existing. | part 4 | hand-writing @kind/@partOf on many files that the .atlas/config.ts rules would derive (docs/claude/ATLAS.md § Authoring annotations) |
 | the path rules changed, resync the derived tags; replace the existing role and membership tags from the rules; re-derive every tag now that the module moved; I'll re-edit each header after changing the rules | **atlas stamp --overwrite** · primitive docs/claude/ATLAS.md — bunx atlas stamp — after rules change; default additive stamp only fills absent tags | part 4 | — |
-| everything that touches caching, including things that reach it indirectly; what reaches redis anywhere in the tree; give me the whole dependency picture for one concept as json; which files are part of or use this area, transitively; I'll grep the tree to find what uses this; a reverse index of who depends on this module | **bunx atlas graph** · primitive CLAUDE.md §11.5 Atlas — the code map — Whole-map analysis; bunx atlas query for a single concept. | part 4 | — |
-| list the route files in this module; files of this role under this path; filter files by their role and what they belong to; I'll find the controllers by walking the folders; all the registries that use the jobs system | **bunx atlas query** · primitive CLAUDE.md §11.5 Atlas — the code map — Targeted concept lookup; bunx atlas graph --json for the whole graph, MAP.md for browsing. | part 4 | — |
-| the repo-owned list of concepts the tags can name; add a concept so the tags can reference it; the vocabulary of modules, features and primitives in this repo; I'll add a status field to the concept entries; keep the vocabulary broad and closed, no hyper-specific labels | **Concept registry** · primitive .atlas/concepts.ts — Structure only, no status; keep vocabulary broad but closed rather than adding hyper-specific labels. | part 4 | — |
+| everything that touches caching, including things that reach it indirectly; what reaches redis anywhere in the tree; give me the whole dependency picture for one concept as json; which files are part of or use this area, transitively; I'll grep the tree to find what uses this; a reverse index of who depends on this module | **bunx atlas graph** · primitive CLAUDE.md §11.5 Atlas — the code map — Whole-map overview; bunx atlas query for a single concept lookup. | part 4 | — |
+| list the route files in this module; files of this role under this path; filter files by their role and what they belong to; I'll find the controllers by walking the folders; all the registries that use the jobs system | **bunx atlas query** · primitive CLAUDE.md §11.5 Atlas — the code map — Targeted concept lookup; bunx atlas graph --json for the full graph, MAP.md for browsing. | part 4 | — |
+| the repo-owned list of concepts the tags can name; add a concept so the tags can reference it; the vocabulary of modules, features and primitives in this repo; I'll add a status field to the concept entries; keep the vocabulary broad and closed, no hyper-specific labels | **Concept registry** · primitive .atlas/concepts.ts — declare the closed class:name concept vocabulary with modules and existence-checked docs | part 4 | — |
 | the type of the concept-to-modules map; type the registry of concept names and what they contain; I'll type the concept map as a plain record | **ConceptRegistry** · primitive .atlas/concepts.ts — type the repo-owned map of concepts to constituent modules and docs | part 4 | — |
 | the registry object keyed class colon name; add an entry mapping a concept to its module or docs; the concept entries the annotations are validated against; I'll hardcode the concept list in the config | **CONCEPTS** · primitive .atlas/concepts.ts — registry of concepts keyed class:name with module, package or docs | part 4 | — |
 | the allowed role values, extending the defaults; declare the repo's extra file roles; I'll add a role string without registering it | **KINDS** · primitive .atlas/kinds.ts — declare allowed @kind vocabulary extending atlas defaults | part 4 | — |
 | the closed enum of file roles; register a new role the defaults don't cover; where do I add a role like channel or registry; I'll invent a new role name in the header | **kinds.ts** · primitive .atlas/kinds.ts — define the closed enum of allowed @kind role values, extending DEFAULT_KINDS | part 4 | — |
-| give me the high-level overview of the codebase first; where do I start reading this repo; a readable map of what concepts exist and where; I'll write up a prose overview of the modules; the generated overview to skim before opening files | **MAP.md** · primitive MAP.md (repo root) — High-altitude overview before opening the tree; precise lookups: atlas graph or query. | part 4 | — |
-| which files need the header block; every included source file gets a tag block; tests and index files are excluded from the header requirement; I'll skip the header on these engine files | **@atlas file annotation block** · rule @inixiative/atlas/README.md § (preface) › atlas — All files matched by .atlas/config.ts include globs, excluding ignored tests and index files. | code `registry` | — |
-| what does this factory build; the tag for a constructor's output, only on factory files; I'll add a constructs line to a plain module | **@constructs for factories only** · rule docs/claude/ATLAS.md — @constructs — factory output — Factory/constructor files only. | part 4 | — |
-| what is this file, a controller, a route, a registry; the role tag says what the file is, not which layer; I'll tag this file as a feature; feature and primitive are classes, not roles; don't put infrastructure as the kind | **@kind is a role, never a layer** · rule @inixiative/atlas/README.md § Writing a block — Every @atlas block's @kind line. | part 4 | `@kind feature` / `@kind primitive` / `@kind infrastructure` in an @atlas block (docs/claude/ATLAS.md § @kind — the role) |
-| belongs to versus depends on; the thing that breaks without this file is membership; I'll put everything it touches as what it's part of; a dependency is not membership | **@partOf is membership** · rule @inixiative/atlas/README.md § Writing a block — Concepts that break if the file is removed; use @uses for mere dependencies. | part 4 | — |
-| what does this file belong to; the concept that breaks if you delete this file; which module or feature is this file a member of; this file is part of the jobs system, not just using it; I'll list every concept it imports as what it belongs to | **@partOf membership** · rule docs/claude/ATLAS.md — @partOf — membership — Concepts that break without this file; dependencies go in @uses instead. | part 4 | — |
-| one db update through request context is not a dependency; list only what the file really relies on; I'll include every concept it imports; incidental touches don't go in the dependency line | **@uses is load-bearing only** · rule @inixiative/atlas/README.md § Writing a block — Skip incidental touches like one db update via request context. | part 4 | an @uses line listing every imported concept, including incidental db or logger touches (@inixiative/atlas/README.md#Writing a block; docs/claude/ATLAS.md § @uses) |
-| what this file relies on without being part of it; only the dependencies that matter, not every import; skip the one-off db call, it's incidental; I'll list every imported concept in the uses line; the logger import isn't a real dependency | **@uses load-bearing only** · rule docs/claude/ATLAS.md — @uses — load-bearing dependencies — Dependencies the file relies on but isn't part of; skip incidental imports like one db update. | part 4 | — |
+| give me the high-level overview of the codebase first; where do I start reading this repo; a readable map of what concepts exist and where; I'll write up a prose overview of the modules; the generated overview to skim before opening files | **MAP.md** · primitive MAP.md — High-altitude overview before opening the tree; precise lookups: atlas graph or query. | part 4 | — |
+| which files need the header block; every included source file gets a tag block; tests and index files are excluded from the header requirement; I'll skip the header on these engine files | **@atlas file annotation block** · rule @inixiative/atlas/README.md § (preface) › atlas — Applies to every file matched by config include globs and not ignored. | code `registry` | — |
+| what does this factory build; the tag for a constructor's output, only on factory files; I'll add a constructs line to a plain module | **@constructs for factories only** · rule docs/claude/ATLAS.md > @constructs — factory output — make<Thing>() constructors; test factories use @kind factory instead. | part 4 | — |
+| what does this file belong to; the concept that breaks if you delete this file; which module or feature is this file a member of; this file is part of the jobs system, not just using it; I'll list every concept it imports as what it belongs to | **@partOf membership** · rule docs/claude/ATLAS.md > @partOf — membership — Composed concepts go in @partOf; relied-on but not composed concepts go in @uses. | part 4 | — |
+| what this file relies on without being part of it; only the dependencies that matter, not every import; skip the one-off db call, it's incidental; I'll list every imported concept in the uses line; the logger import isn't a real dependency | **@uses load-bearing only** · rule docs/claude/ATLAS.md > @uses — load-bearing dependencies — Skip incidental touches like a single db update through request context. | part 4 | — |
 | say it depends on nothing only once you've looked; I'll put uses none on all the files I haven't read; leave the dependencies line out if nobody inspected the file; an unknown dependency list is different from an empty one | **@uses none only after checking** · rule docs/claude/ATLAS.md — Authoring rules — When a file seems to use no concepts | part 4 | `@uses none` written on files nobody inspected, instead of omitting the line (uncurated) (docs/claude/ATLAS.md § Authoring rules) |
-| don't mint a hyper-specific concept for one file; keep the vocabulary small and reuse it liberally; I'll add a new concept just for this file; meaning comes from combining broad tags, not one narrow one | **Broad closed concept vocabulary** · rule @inixiative/atlas/README.md § Why — When choosing @partOf/@uses tags or proposing a new concept. | part 4 | — |
-| no status, maturity or notes in the registry; I'll add a todo field to the concept entries; the registry says what exists, never how done it is | **Concept registry is structure only** · rule .atlas/concepts.ts — When adding or editing entries in .atlas/concepts.ts. | part 4 | status, maturity or TODO fields added to .atlas/concepts.ts, or a hyper-specific concept added for one file (docs/claude/ATLAS.md § The concept vocabulary; § What Atlas is) |
+| don't mint a hyper-specific concept for one file; keep the vocabulary small and reuse it liberally; I'll add a new concept just for this file; meaning comes from combining broad tags, not one narrow one | **Broad closed concept vocabulary** · rule @inixiative/atlas/README.md § Why — Whenever choosing or adding concepts and kinds for annotations. | part 4 | — |
+| no status, maturity or notes in the registry; I'll add a todo field to the concept entries; the registry says what exists, never how done it is | **Concept registry is structure only** · rule .atlas/concepts.ts — Whenever editing the concept registry. | part 4 | status, maturity or TODO fields added to .atlas/concepts.ts, or a hyper-specific concept added for one file (docs/claude/ATLAS.md § The concept vocabulary; § What Atlas is) |
 | record what this file actually depends on; the uses line has to be written by a person who looked; I'll have the stamper fill in the dependencies too; write down the load-bearing dependencies yourself; dependencies can't be derived from the path | **Curate @uses by hand** · rule docs/claude/ATLAS.md — bunx atlas stamp — Whenever recording what a file uses | part 4 | — |
-| the stamped tag is wrong for this one file; hand-written tags beat the derived ones; I'll change the path rule to fix one file's tag; override the derived membership on this file only | **Explicit annotations win over stamp rules** · rule .atlas/config.ts — When a stamped tag is wrong for a specific file. | part 4 | — |
-| update the header when you move a file; a new file needs its tag block; I'll move the file and leave the header as is; the tags must stay accurate as the code changes | **Keep @atlas block true** · rule CLAUDE.md §11.5 Atlas — the code map — Adding, moving or repurposing any file. | part 4 | — |
+| the stamped tag is wrong for this one file; hand-written tags beat the derived ones; I'll change the path rule to fix one file's tag; override the derived membership on this file only | **Explicit annotations win over stamp rules** · rule .atlas/config.ts — When a stamp rule's path-derived tag is wrong for a specific file. | part 4 | — |
+| update the header when you move a file; a new file needs its tag block; I'll move the file and leave the header as is; the tags must stay accurate as the code changes | **Keep @atlas block true** · rule CLAUDE.md §11.5 Atlas — the code map — Adding or moving any annotated file. | part 4 | — |
 | moved it to another module, fix its membership tag; new files land with a header, not after; I'll add the header later in a follow-up; a stale membership after a move is a bug | **Keep @atlas block true on add/move** · rule docs/claude/ATLAS.md — Authoring rules — Any file added or moved | part 4 | a new or moved file with no @atlas block, or a stale @partOf left after moving a file to another module (docs/claude/ATLAS.md § Authoring rules; AI/ENTRYPOINT.md § 11.5) |
-| don't edit the overview by hand, regenerate it; I'll write a prose map of the modules; the map is a projection of the code and can't drift; a hand-written features document goes stale | **MAP.md is generated, not hand-edited** · rule @inixiative/atlas/README.md § CLI — Whenever annotations change; prefer this over hand-written FEATURES.md or prose maps. | part 4 | manual edits to MAP.md or a hand-written prose map of modules (@inixiative/atlas/README.md#CLI; docs/claude/ATLAS.md § Navigating by concept) |
+| don't edit the overview by hand, regenerate it; I'll write a prose map of the modules; the map is a projection of the code and can't drift; a hand-written features document goes stale | **MAP.md is generated, not hand-edited** · rule @inixiative/atlas/README.md § Why — Whenever the code map needs to change; edit annotations instead of MAP.md. | part 4 | manual edits to MAP.md or a hand-written prose map of modules (@inixiative/atlas/README.md#CLI; docs/claude/ATLAS.md § Navigating by concept) |
 | where is the existing code for this; I'll run a few greps to find what uses this; locate the code by concept first, grep as fallback; which files does this task touch; repeated searches to answer what touches this | **Navigate by Atlas concept before grepping** · rule CLAUDE.md §11.5 Atlas — the code map — Locating existing code for any task. | part 4 | repeated rg/grep sweeps to answer 'what touches X' instead of `bunx atlas graph --json` / `bunx atlas query --uses ...` (AI/ENTRYPOINT.md § 11.5; docs/claude/ATLAS.md § Navigating by concept) |
-| what's part of this system; what depends on this module; I'll search the tree for the import; membership and dependency questions go to the map | **Navigate by concept, not grep** · rule docs/claude/ATLAS.md — Navigating by concept — Concept-membership or dependency questions about the codebase. | part 4 | — |
-| several broad tags that are true beat one narrow one; I'll create a concept just for this edge case; combine existing concepts instead of adding a specific one | **Prefer broad-true tags** · rule @inixiative/atlas/README.md § Writing a block — When choosing @partOf/@uses values. | part 4 | minting a new hyper-specific concept for one file instead of combining existing broad concepts (@inixiative/atlas/README.md § Why; § Writing a block) |
+| what's part of this system; what depends on this module; I'll search the tree for the import; membership and dependency questions go to the map | **Navigate by concept, not grep** · rule docs/claude/ATLAS.md > Navigating by concept — Concept-membership and consumer questions. | part 4 | — |
 | the stamp couldn't find a concept for this capture; a module folder with no concept entry; I'll leave the membership blank where it didn't resolve; add the missing concept to the registry so stamping fills it | **Register unresolved concepts** · rule docs/claude/ATLAS.md — bunx atlas stamp — When a stamp capture resolves to no concept | part 4 | — |
+| Every test factory and the factory engine use @kind factory and @partOf primitive:testFactories. | **Test factories tagged primitive:testFactories** · rule docs/claude/ATLAS.md > @constructs — factory output — Factory files and engine only; tests that merely use a factory are not tagged. | part 4 | — |
 | only use roles and concepts that are registered; I'll write whatever tag seems right; the tag names come from a closed list | **Valid atlas vocabulary** · rule docs/claude/ATLAS.md — Authoring rules — Writing any @atlas tag | part 4 | — |
-| is this concept name actually registered; the role you wrote isn't in the allowed list; I'll pick a concept name that sounds right; check the tags against the repo's own vocabulary | **Validate atlas names against .atlas/** · rule .atlas/kinds.ts, .atlas/concepts.ts — Whenever writing or editing an @atlas block. | part 4 | an @partOf or @uses naming a concept missing from .atlas/concepts.ts, or an @kind outside kinds.ts (docs/claude/ATLAS.md § Authoring rules; § Enforcement) |
 
-- *Also here, by name:* DEFAULT_KINDS (`@inixiative/atlas`); conceptClass (`@inixiative/atlas`); conceptClasses (`@inixiative/atlas`); defineConfig (`@inixiative/atlas/config`); invert (`@inixiative/atlas`); isPartOfFor (`@inixiative/atlas/config`); isPartOfFor (`@inixiative/atlas`); partOfFor (`@inixiative/atlas/config`)
+- *Also here, by name:* CLAUDE_SETTINGS (`@inixiative/atlas`); DEFAULT_KINDS (`@inixiative/atlas`); GRAPH_CACHE_TTL_MS (`@inixiative/atlas`); HOOK_EVENTS (`@inixiative/atlas`); REACH_KINDS (`@inixiative/atlas`); atlasHookEntry (`@inixiative/atlas`); conceptClass (`@inixiative/atlas`); conceptClasses (`@inixiative/atlas`); defineConfig (`@inixiative/atlas/config`); hookCommandFor (`@inixiative/atlas`); identifierToken (`@inixiative/atlas`); invert (`@inixiative/atlas`); isPartOfFor (`@inixiative/atlas/config`); isPartOfFor (`@inixiative/atlas`); mergeAtlasHooks (`@inixiative/atlas`); partOfFor (`@inixiative/atlas/config`); toAdditionalContext (`@inixiative/atlas`)
 
 ## 4. The specifics, in full
 
@@ -283,7 +300,8 @@ repo **owns** its concept registry.
 .atlas/
   config.ts     // stamp rules (path → tags) + ignore + reference resolvers
   kinds.ts      // @kind vocab — extends atlas's defaults
-  concepts.ts      // the concept registry — repo-OWNED, structure only
+  concepts.ts   // the concept registry — repo-OWNED, structure only
+  thesaurus.ts  // optional: per concept, the phrases people search with + its doc (see Thesaurus)
 ```
 
 ```ts
@@ -313,7 +331,8 @@ export default defineConfig({
 ```
 
 A complete, commented set you can copy into your repo's `.atlas/` is in
-[`examples/atlas-config/`](./examples/atlas-config/) (`kinds.ts`, `concepts.ts`, `config.ts`).
+[`examples/atlas-config/`](./examples/atlas-config/) (`kinds.ts`, `concepts.ts`, `config.ts`,
+`thesaurus.ts`).
 
 <!-- unit doc:@inixiative/atlas/README.md#cli -->
 **Source:** `@inixiative/atlas/README.md` § CLI (in "atlas")
@@ -322,11 +341,14 @@ A complete, commented set you can copy into your repo's `.atlas/` is in
 
 ```bash
 atlas graph       # reverse indexes: concept → files, file → concepts, doc → concepts
-atlas check       # presence + vocab existence + reference existence  (the CI command)
+atlas check       # presence + vocab + reference + thesaurus existence  (the CI command)
 atlas coverage    # unannotated files; @uses curation buckets; unresolved memberships
 atlas generate    # write MAP.md from the annotated tree
 atlas report      # coverage gaps + concept graph → COVERAGE.md (Mermaid) and atlas.html (Cytoscape)
 atlas stamp [dir] # write/refresh @atlas blocks from the rules (the patcher; dry-run by default)
+atlas hook read   # Claude Code PostToolUse hook: the concept neighbourhood of the file just read
+atlas hook grep   # Claude Code PostToolUse hook: the concepts a grep pattern names
+atlas setup       # offer to add both hooks to .claude/settings.json (--yes: no prompt)
 ```
 
 Common flags: `--root <dir>`, `--json`, `generate --stdout`, `stamp --write`, `stamp --overwrite`,
@@ -352,6 +374,151 @@ that touches caching" in **one** `graph --json` call, and learns a file's role/e
 before opening it. In an A/B test on a repo with a transitive dependency, agents given this line
 used `atlas graph` and solved a "what reaches redis (directly or transitively)" question in ~2 tool
 calls; agents left to `grep` took 2–3× as many and risk missing the transitive edge entirely.
+
+##### Hooks: the neighbourhood on every Read and Grep
+
+The map only helps if the agent looks at it. `atlas hook read` and `atlas hook grep` put it in
+front of the agent without asking: when it reads a file, it sees which concepts the file is part
+of, how many sibling files and `@uses` consumers each concept has, and the file's own `@uses`.
+Agents under-weight small primitives because they can't see how much relies on them; the
+consumer count is that reach, stated as a fact.
+
+```
+atlas neighbourhood of src/test/factories/userFactory.ts:
+
+factory, 1 of 2 factories in primitive:testFactories
+
+primitive:testFactories — 2 other file(s), 1 consumer(s) via @uses; `bunx atlas query --partOf primitive:testFactories` lists all
+  src/test/factories/buildFactory.ts
+  src/test/factories/organizationFactory.ts
+
+@uses feature:users — load-bearing dependencies; `bunx atlas query --partOf <concept>` shows what implements each
+```
+
+A file of `@kind factory` or `@kind constructor` also gets a line counting that kind in its
+concept (`REACH_KINDS`). On Grep, the pattern is matched first against the
+[thesaurus](#thesaurus), then its longest identifier against concept names, and the matching
+concepts' files are listed.
+
+Install them with `atlas setup` (asks first; `atlas setup --yes` for scripts and agents). It
+merges two `PostToolUse` entries into `.claude/settings.json`, leaves every other key and hook as it
+was, and adds nothing on a second run:
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -e \"$CLAUDE_PROJECT_DIR/node_modules/.bin/atlas\" ] && bun \"$CLAUDE_PROJECT_DIR/node_modules/.bin/atlas\" hook read || true",
+            "timeout": 20,
+            "statusMessage": "atlas: concept neighbourhood of this file"
+          }
+        ]
+      },
+      {
+        "matcher": "Grep",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -e \"$CLAUDE_PROJECT_DIR/node_modules/.bin/atlas\" ] && bun \"$CLAUDE_PROJECT_DIR/node_modules/.bin/atlas\" hook grep || true",
+            "timeout": 20,
+            "statusMessage": "atlas: concepts matching this pattern"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+How they behave:
+
+- **Silent on failure.** Bad input, no `.atlas/` above the file, an unannotated file, atlas not
+  installed yet (the command checks for the binary first): no output, exit 0. Set `ATLAS_HOOK_DEBUG=1` to see errors on stderr.
+- **The owning `.atlas/` is the one above the file**, so a file in a worktree maps against that
+  worktree's config even when the session runs from the main checkout.
+- **Cached graph.** The graph is built with atlas's own `analyze` and cached per repo root in the
+  OS temp dir for 10 minutes, keyed by atlas version and rebuilt early when any `.atlas/` file
+  (`thesaurus.ts` included) changes.
+- **Harness-agnostic core.** `renderNeighbourhood(graph, relPath)` and
+  `renderConceptMatches(graph, pattern)` return plain text; `runClaudeCodeHook` is the Claude Code
+  adapter (stdin JSON in, `hookSpecificOutput.additionalContext` out). Another harness needs only
+  its own adapter.
+
+##### Thesaurus
+
+A grep for the job ("seed a user", "lock", "factory") names no concept, so the grep hook used to
+say nothing at exactly the moment an agent was looking for something that already exists. The
+thesaurus sits beside the registry and makes those searches land. Like a book's thesaurus it is
+keyed by the thing, not the word: each concept lists the phrases people search with when they mean
+it, and where its doc is, so a hit also says where to read.
+
+```ts
+// .atlas/thesaurus.ts — optional. Keyed by concept id from concepts.ts.
+import type { Thesaurus } from '@inixiative/atlas';
+
+export const THESAURUS: Thesaurus = {
+  'primitive:testFactories': {
+    phrases: ['seed a user', 'factory', 'fixture'],
+    doc: 'TESTING.md#factories', // optional: a `docs:` value + optional #section
+  },
+  'primitive:mutex': { phrases: ['lock', 'serialize'] }, // doc defaults to the concept's first `docs:`
+};
+```
+
+`doc` takes the same value a `docs:` entry in `concepts.ts` does and goes through the same
+`references.docs` resolver (as written when there is none); a `#section` is kept on the end. Leave
+it out and the concept's first `docs:` entry is used, so a doc is never written twice.
+
+Matching is case-insensitive and on whole words or phrases:
+
+- **Words, in order.** One alternative of the pattern spells the phrase in consecutive whole words,
+  compared joined: camelCase and `snake_case` split, `a`/`an`/`the`/`to`/`of`/`for` ignored.
+  `seedUser` and `seed_user` match "seed a user", `acquireLock` matches "lock",
+  `createGitHubClient` matches "github". `unlock`, `lockfile` and `seed|user` (two alternatives)
+  match nothing. Only an unescaped `|`, `(` or `)` separates alternatives.
+- **Conjugations.** Each phrase word also matches its simple English inflections: `-s`, `-es`,
+  `-ing`, `-ed`, `-er`; a final `e` dropped before `-ing`/`-ed`/`-er`; a final consonant after a
+  single vowel doubled (`log` → `logging`, `logger`; `stop` → `stopped`); a consonant + `y` becoming
+  `-ies`/`-ied`. So "lock" matches `locks`, `locking`, `locked`, `locker`; "serialize" matches
+  `serializing`, `serialized`; "factory" matches `factories`. A three-letter word keeps its `e`
+  before `-er`, so "use" matches `using` and `used` but not `user`. It is a suffix rule, not a
+  stemmer, and stays whole-word: `unlocked`, `blocking` and `serializable` don't match. Write
+  phrases in their base form.
+- **The pattern as a regex.** The pattern matches the whole phrase (`seed.*user`, `factor(y|ies)`),
+  provided one of its own literal words of three or more letters starts a word of the phrase, so
+  `.*` matches nothing and `lock|.*` reaches "lock the door" but not "unlock the door". This
+  reading follows regex semantics rather than whole words, and is skipped for patterns over 200
+  characters, nested quantifiers, more than four unbounded quantifiers, and syntax JavaScript can't
+  parse.
+
+Thesaurus hits are listed first, labelled with the phrase so the agent knows a person made the
+mapping, with a `read:` line pointing at the doc; past eight concepts the rest are counted, not
+listed. Then come the concept-name matches not already shown:
+
+```
+atlas concept(s) matching "seeding.*users?":
+
+primitive:testFactories (thesaurus "seed a user") — 3 file(s), 1 consumer(s) via @uses; `bunx atlas query --partOf primitive:testFactories` lists all
+  read: docs/claude/TESTING.md#factories
+  src/test/factories/buildFactory.ts
+  src/test/factories/organizationFactory.ts
+  src/test/factories/userFactory.ts
+```
+
+`atlas check` flags an entry for a concept the registry doesn't have, an empty phrase list, an empty
+phrase (one with no letter or digit), and a `doc` whose file doesn't resolve to a real file; a
+scoped `atlas check <target>` skips the doc check like the other reference checks. `loadConfig`
+refuses an entry with any key besides `phrases` and `doc`, so a `docs:` typo can't silently fall
+back to the default doc. Whether a phrase is apt is the curator's call.
+
+**Keeping it up:** when a search misses and you later find the thing, add the words you searched
+with to that concept's phrases. Phrases come from how people describe the job, never from a test
+case's expected answer: a thesaurus tuned to its tests only teaches the tests.
 
 <!-- unit doc:@inixiative/atlas/README.md#visualize -->
 **Source:** `@inixiative/atlas/README.md` § Visualize (in "atlas")
@@ -474,7 +641,7 @@ MIT
 
 ### Example `.atlas/` config
 
-Copy these three files into a **`.atlas/`** folder at your repo root, then adjust them to your
+Copy these files into a **`.atlas/`** folder at your repo root, then adjust them to your
 layout. This is the entire configuration surface — atlas ships the `@kind` defaults; **your repo
 owns the concept registry.**
 
@@ -483,6 +650,7 @@ owns the concept registry.**
   kinds.ts    # @kind vocab — atlas's defaults, extended with any roles you add
   concepts.ts    # the concept registry — repo-OWNED, structure only (the one you'll edit most)
   config.ts   # stamp rules (path → tags), ignore globs, and reference resolvers
+  thesaurus.ts   # optional: per concept, the phrases people search with + its doc, for `atlas hook grep`
 ```
 
 The key idea: atlas hardcodes **no** concept classes (`feature`/`primitive`/…) and **no** constituent
@@ -495,6 +663,7 @@ concept that exists, that a `@kind` is in your vocab, and that referenced docs r
 | [`concepts.ts`](./concepts.ts) | constantly | add a concept when you add a feature/primitive; list its constituent folders so `@partOf` auto-fills |
 | [`config.ts`](./config.ts) | rarely | structural globs → `@kind`; capture globs → `@partOf` via membership |
 | [`kinds.ts`](./kinds.ts) | rarely | only when a role the defaults don't cover shows up |
+| [`thesaurus.ts`](./thesaurus.ts) | when a search misses | add the words you searched with to the concept you found |
 
 After copying, `bunx atlas stamp --write` fills `@kind`/`@partOf` from the rules, `bunx atlas check`
 gates it, and `bunx atlas generate` writes `MAP.md`.
@@ -696,7 +865,14 @@ never auto-stamps `@uses`:
 
 ##### `@constructs` — factory output
 
-For constructor/factory files only — names what the factory builds.
+For constructor files only: it names what the constructor builds.
+
+Two kinds mark the things that produce other things, so the map shows how many there are and where they live:
+
+- **`constructor`**: a `make<Thing>()` that produces a category of thing (`makeController` builds controllers, `makeJob` builds job handlers, `makeError` builds errors). It always pairs with `@constructs`.
+- **`factory`**: a test factory, one per model, in `packages/db/src/test/factories/`. Every factory and the factory engine (`factory.ts`, `dependencyInference.ts`, `factoryTypes.ts`, `factoryPolymorphism.ts`, `testTracker.ts`) are `@partOf primitive:testFactories`. Tests that only use a factory are not tagged.
+
+Why: these primitives are small and carry a lot of the codebase, and the tags make that reach visible.
 
 ---
 
@@ -851,6 +1027,12 @@ This repo is mapped by **atlas** (`.atlas/` config + `@atlas` annotations + `MAP
 From the catalog (`.foundry/catalog/catalog.json`, extracted from the code). Each line: **name** `where` [kind] the job it does. Use: canonical usage.
 
 #### Class `atlas`
+- **cachedGraph** `@inixiative/atlas#cachedGraph` [package] get the Atlas code graph from cache Use: import { cachedGraph } from '@inixiative/atlas'
 - **defineConfig** `@inixiative/atlas#defineConfig` [package] type-check an Atlas code map config object at definition time Use: export default defineConfig({ ... }) from '@inixiative/atlas'
+- **findAtlasRoot** `@inixiative/atlas#findAtlasRoot` [package] locate the Atlas root directory Use: import { findAtlasRoot } from '@inixiative/atlas'
 - **parseAtlasBlock** `@inixiative/atlas#parseAtlasBlock` [package] parse an Atlas annotation block from source or docs Use: import { parseAtlasBlock } from '@inixiative/atlas'
 - **partOfFor** `@inixiative/atlas#partOfFor` [package] assign files to concepts by module or package path capture in Atlas rules Use: partOfFor('module', '$1') // in Atlas config rules
+- **renderConceptMatches** `@inixiative/atlas#renderConceptMatches` [package] render plain-text Atlas concept matches for a search pattern Use: renderConceptMatches(graph, pattern)
+- **renderNeighbourhood** `@inixiative/atlas#renderNeighbourhood` [package] render plain-text Atlas map context around one file path Use: renderNeighbourhood(graph, relPath)
+- **runClaudeCodeHook** `@inixiative/atlas#runClaudeCodeHook` [package] run Atlas as a Claude Code hook, injecting map context Use: import { runClaudeCodeHook } from '@inixiative/atlas'
+- **setupClaudeHooks** `@inixiative/atlas#setupClaudeHooks` [package] install Atlas hooks into Claude Code settings Use: import { setupClaudeHooks } from '@inixiative/atlas'

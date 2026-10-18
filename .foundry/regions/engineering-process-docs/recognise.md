@@ -28,7 +28,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - which doc do I read first
 - I think this is a bug
 - are the docs still accurate
-- stage a large change for review before committing
 - regenerate the table of contents
 - what do I check before saying this is done
 - this minimal task is now touching eight files
@@ -53,7 +52,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - what is this thing for before changing it
 - I changed how the helper works, what about the doc
 - verify commands yourself before handing them to the user
-- a scratch folder for the experiment
 - I added headings, the contents list is stale
 - confirm the nearby pattern, minimal fix, remove stale code, validate
 - I've failed twice, I'll try a third approach
@@ -79,7 +77,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - I'll simplify away this part, it looks redundant
 - update the doc that describes this pattern
 - test the change in a tmp script first
-- delete the workspace folder when done
 - I'll edit the contents list by hand
 - I'll ship without removing the old code path
 - the scope keeps growing, stop and offer options
@@ -105,7 +102,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - these two look alike so I'll merge them
 - landed a new convention with no doc change
 - test init in a tmp folder before handoff
-- I'll keep the draft files under docs until reviewed
 - summarize what changed and how it was validated
 - I'll introduce an abstraction nobody asked for
 - are you sure we don't have that already

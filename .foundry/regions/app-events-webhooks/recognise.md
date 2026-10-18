@@ -75,7 +75,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - a receiver signed up to be told when this model changes
 - the URL check on the subscription request body
 - tell the handler which sockets to notify
-- let the receiver verify the payload came from us
 - the bridge between handoffs and actual delivery
 - a registered handler doesn't prove anyone emits the event
 - an append-only diagnostic record of emits that no code reads back
@@ -115,7 +114,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - the endpoint config an owner registers for a model
 - I'll use a plain string URL validator in the schema
 - channel subscribers, specific users, or append to a stream
-- sign the body with a timestamp
 - port the email channel and kill the synchronous sends
 - check that a writer actually fires this event
 - I'll add an activity table to record what happened
@@ -156,7 +154,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - I'll build a custom pipeline to push changes to the CRM
 - schema-level safety for the target URL
 - I'll build the stream handoff object by hand
-- I'll use a shared secret HMAC per subscription
 - I'll call the mailer from inside the handler
 - the index of events the system knows
 - where to see which side effects were triggered
@@ -187,7 +184,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - I'll hand-roll subscription, trigger, loop-break and retry machinery
 - validate the URL during body parsing
 - the shape a handler returns to push realtime updates
-- the signature header on every delivery
 - before-and-after diffs of a row belong in the audit log, not here
 - enqueue the job once the transaction lands
 - make these two writes atomic

@@ -48,7 +48,7 @@ model EmailTemplate {
   // tier rationale). The uniques are partial on tier only, never on deletedAt: a natural key holds
   // exactly one row, live or tombstoned. Delete tombstones that row and re-saving the key revives it
   // in place with the same id (saveScopedRow), so a second tombstone for a key cannot exist.
-  @@unique([slug, locale, ownerModel], where: raw("\"ownerModel\" IN ('default', 'admin')"), map: "EmailTemplate_slug_locale_platform_key")
+  @@unique([slug, locale, ownerModel], where: raw("\"ownerModel\" = ANY (ARRAY['default'::\"EmailOwnerModel\", 'admin'::\"EmailOwnerModel\"])"), map: "EmailTemplate_slug_locale_platform_key")
   @@unique([slug, locale, organizationId], where: raw("\"ownerModel\" = 'Organization'"), map: "EmailTemplate_slug_locale_organization_key")
   @@unique([slug, locale, spaceId], where: raw("\"ownerModel\" = 'Space'"), map: "EmailTemplate_slug_locale_space_key")
   @@unique([slug, locale, userId], where: raw("\"ownerModel\" = 'User'"), map: "EmailTemplate_slug_locale_user_key")

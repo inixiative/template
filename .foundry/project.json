@@ -1,4 +1,4 @@
 {
-  "$comment": "Template's shared Foundry settings (read by Foundry >= 7273a6b; personal projects[id] settings in your Foundry's settings.json win key by key). The region chorus is off: .foundry/regions holds 70 generated region Wardens. To turn it on, set chorus.source to \"regions\" here (for everyone) or projects[<template id>].chorus.source = \"regions\" in your Foundry settings (for you).",
-  "chorus": { "source": "roster" }
+  "$comment": "Template's shared Foundry settings (read by Foundry after the 2026-10-17 roster retirement; personal projects[id] settings in your Foundry's settings.json win key by key). The chorus is on: .foundry/regions holds 70 generated region Wardens, the only Wardens Foundry runs. To turn it off for yourself, set projects[<template id>].chorus.enabled = false in your Foundry settings.",
+  "chorus": { "enabled": true }
 }

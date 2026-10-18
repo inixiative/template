@@ -57,7 +57,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - look the record up by slug instead of id
 - what order do the middlewares run in
 - type the context variables available in handlers
-- the error class with status and body
 - why does the batch route skip context setup
 - where do Zod and Prisma errors become HTTP responses
 - the nested object from the bracket query params
@@ -90,7 +89,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - is this user object a superadmin
 - did the insert hit a duplicate key
 - the transaction hit a serialization conflict or deadlock
-- how do I log inside a job handler
 - throw a 4xx with a message and guidance
 - I'll add deletedAt null to the where
 - throw an HTTP error from the shared package
@@ -112,7 +110,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - a lookup param for non-id fields
 - where does auth happen relative to resource loading
 - what's available on the context in a handler
-- I'll make a custom error class carrying the status
 - sub-requests get their own context
 - I'll translate the duplicate key error to 409 in the controller
 - where do filter brackets get parsed
@@ -145,7 +142,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - check the platform role on a user record
 - I'll check the Prisma error code for a duplicate
 - I'll match the deadlock error string before retrying
-- I'll use the shared logger in the job
 - I'll throw new Error not found in the controller
 - don't filter deleted rows by hand
 - packages can't import the API's error factory
@@ -167,7 +163,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - the identifier isn't a UUID
 - cors, then prepare, then session, then token
 - I'll keep the current user in a module-level variable
-- build an HTTPException with a JSON response myself
 - the batch endpoint only sets db
 - a package throwing HTTP errors
 - query params as a nested object
@@ -200,7 +195,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - superadmin check when I have a user, not a context
 - let the DB decide and map the duplicate to 409
 - detect a write conflict to retry the transaction
-- log lines that show up in the job board
 - return c.json with an error body and status
 - the extension already hides deleted rows
 - what do I throw from packages
@@ -221,7 +215,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - load the memberships along with the resource
 - what if two rows match the lookup field
 - the typed Hono environment for middleware
-- don't set the request id on the error yourself
 - errors from libraries get mapped at the edge
 - get at the bracket query without re-parsing
 - the real address of the request, not a bucket

@@ -28,7 +28,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - I'll return 207 for partial failure
 - create the parent, then use its id in the next request
 - sub-requests inherit the caller's auth without re-authenticating
-- bulk and multi-step endpoints answer 200 with a status field
 - reference a value from an earlier response in a later path or body
 - rounds go one after another so interpolation works
 - how many requests can a batch hold
@@ -58,7 +57,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - the batch call itself succeeded even if items failed
 - run several operations atomically feeding earlier results forward
 - auth middleware skips when batch context exists
-- I'll return a 4xx when some items fail
 - feed round one's id into round two
 - I'll run the rounds in parallel
 - cap requests per batch and per round

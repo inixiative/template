@@ -16,7 +16,7 @@
 - [4. The specifics, in full](#4-the-specifics-in-full)
   - [4a. Doc sections](#4a-doc-sections)
     - `docs/claude/CONTEXT.md`: Job Context
-    - `docs/claude/JOBS.md`: Job System; Built-in Handlers; Creating Handlers; Handler Patterns; Enqueuing Jobs; BullBoard; Cron Jobs
+    - `docs/claude/JOBS.md`: Job System; Built-in Handlers; Creating Handlers; Handler Patterns; Handler Patterns › ctx.log() - Dual-Write Logging; Handler Patterns › Singleton Job; Handler Patterns › Staged Job (Fan Out and Wait); Enqueuing Jobs; BullBoard; Cron Jobs
     - `FEATURES.md`: Background Jobs & Cron
   - [4b. Code entries](#4b-code-entries)
 
@@ -142,55 +142,80 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 | Problem | Use | Read | Signs you're bypassing it |
 |---|---|---|---|
 | build the job envelope and decide its lane; where the lane gets picked: request, then option, then handler default; I'll construct the job data object by hand before adding it; what stamps type and lane on the payload | **buildJobData** · primitive `apps/api/src/jobs/buildJobData.ts#buildJobData` — build the job envelope and resolve its lane: request, then enqueue option, then handler default, then fast | docs/claude/JOBS.md § Job System; docs/claude/JOBS.md § Fast and Slow Lanes › Choosing a Lane | — |
-| put this on the background queue; anything retry-worthy hands off to a job from the handler; I'll add it to the queue object directly; I'll call the handler function from the service to run it in the background; the delay option extends the lane claim so a chatty org collapses; in tests it runs the handler inline | **enqueueJob** · primitive `apps/api/src/jobs/enqueue.ts#enqueueJob` — Default way to queue work; inside a running stage use ctx.enqueueChildJob for children; test routing/overflow: enqueueOrSpill directly. | docs/claude/JOBS.md § Enqueuing Jobs; docs/claude/JOBS.md § Built-in Handlers | calling `queue.add` directly (skipping lane stamping, job-id validation and overflow spill), or invoking a handler function directly from a service to run it 'in the background' (docs/claude/JOBS.md § Enqueuing Jobs; § Choosing a Lane (every queue.add stamps lane)) |
+| put this on the background queue; anything retry-worthy hands off to a job from the handler; I'll add it to the queue object directly; I'll call the handler function from the service to run it in the background; the delay option extends the lane claim so a chatty org collapses; in tests it runs the handler inline | **enqueueJob** · primitive `apps/api/src/jobs/enqueue.ts#enqueueJob` — Default enqueue; cron ticks use enqueueCronRun, children inside a stage use ctx.enqueueChildJob, routing tests call enqueueOrSpill. | docs/claude/JOBS.md § Enqueuing Jobs; docs/claude/JOBS.md § Built-in Handlers | calling `queue.add` directly (skipping lane stamping, job-id validation and overflow spill), or invoking a handler function directly from a service to run it 'in the background' (docs/claude/JOBS.md § Enqueuing Jobs; § Choosing a Lane (every queue.add stamps lane)) |
 | start the worker that processes jobs; the worker shouldn't start in tests; I'll new up a worker in the server bootstrap; where the worker process boots | **initializeWorker** · primitive `apps/api/src/jobs/worker.ts#initializeWorker` — start the background job worker, skipped in test environment | — | — |
+| tell whether this run is the job's last retry so it can settle instead of rethrow | **isFinalAttempt** · primitive `apps/api/src/jobs/isFinalAttempt.ts#isFinalAttempt` — tell whether this run is the job's last retry so it can settle instead of rethrow | docs/claude/JOBS.md § Built-in Handlers; docs/claude/HOOKS.md § Webhooks | — |
 | a yes or no check whether this job id is allowed; check the id without throwing | **isValidJobId** · primitive `apps/api/src/jobs/validateJobId.ts#isValidJobId` — Need a boolean check; to fail at enqueue use validateJobId instead. | — | — |
-| build a new background job; move the email send out of the request into a job; independent runs can execute at the same time, no dedupe; I'll fire and forget the work with a timeout in the handler; I'll spin up my own queue and worker for this; a parallel retryable job enqueued on commit | **makeJob** · primitive `apps/api/src/jobs/makeJob.ts#makeJob` — Default wrapper; no concurrent runs: makeSingletonJob; newer cancels older by key: makeSupersedingJob. Use stages instead of hand-rolled Redis pending/polling. | docs/claude/JOBS.md § Handler Patterns; docs/claude/CONTEXT.md § Job Context | a fire-and-forget `void doWork()` / `setTimeout` in a request handler, or a raw `new Queue(...).add` with a hand-written Worker, instead of a makeJob handler registered in handlers/index.ts and enqueued with enqueueJob (docs/claude/JOBS.md § Creating Handlers) |
-| one run at a time across all workers; the next cron tick should skip while the previous run holds the lock; I'll add a time budget and scheduler to prevent overlapping runs; enqueued on commit when a row changes, plus a slow cron as drift repair; drop the in-flight wrapper, wrong job primitive | **makeSingletonJob** · primitive `apps/api/src/jobs/makeSingletonJob.ts#makeSingletonJob` — Only one run at a time: this; newer run should replace older: makeSupersedingJob; plain job: makeJob. | docs/claude/JOBS.md § Handler Patterns; FEATURES.md § Background Jobs & Cron | a handler that takes and releases its own Redis lock (or a `running` flag) to avoid overlapping runs (docs/claude/JOBS.md § Handler Patterns; FEATURES.md § Background Jobs & Cron) |
-| the worker's per-job entry point; where every job gets its context and runs the handler; wrap all handlers in one place rather than per handler; where to scope the actor for every job run | **processJob** · primitive `apps/api/src/jobs/processJob.ts#processJob` — Worker entrypoint only; to schedule work use the enqueue helpers, not processJob directly. | docs/claude/JOBS.md § Job System; docs/claude/JOBS.md § Fast and Slow Lanes › Slots: Slow Work Uses at Most Its Share | — |
+| build a new background job; move the email send out of the request into a job; independent runs can execute at the same time, no dedupe; I'll fire and forget the work with a timeout in the handler; I'll spin up my own queue and worker for this; a parallel retryable job enqueued on commit | **makeJob** · primitive `apps/api/src/jobs/makeJob.ts#makeJob` — Default for emails, webhooks, side effects; one run per key: makeSingletonJob; only latest matters: makeSupersedingJob. | docs/claude/CONTEXT.md § Job Context; docs/claude/JOBS.md § Creating Handlers | a fire-and-forget `void doWork()` / `setTimeout` in a request handler, or a raw `new Queue(...).add` with a hand-written Worker, instead of a makeJob handler registered in handlers/index.ts and enqueued with enqueueJob (docs/claude/JOBS.md § Creating Handlers) |
+| one run at a time across all workers; the next cron tick should skip while the previous run holds the lock; I'll add a time budget and scheduler to prevent overlapping runs; enqueued on commit when a row changes, plus a slow cron as drift repair; drop the in-flight wrapper, wrong job primitive | **makeSingletonJob** · primitive `apps/api/src/jobs/makeSingletonJob.ts#makeSingletonJob` — Cron jobs, queue draining, one open fan-out per key; every run must happen: makeJob; newest should replace older: makeSupersedingJob. | docs/claude/JOBS.md § Handler Patterns › Singleton Job; docs/claude/JOBS.md § Job System | a handler that takes and releases its own Redis lock (or a `running` flag) to avoid overlapping runs (docs/claude/JOBS.md § Handler Patterns; FEATURES.md § Background Jobs & Cron) |
+| the worker's per-job entry point; where every job gets its context and runs the handler; wrap all handlers in one place rather than per handler; where to scope the actor for every job run | **processJob** · primitive `apps/api/src/jobs/processJob.ts#processJob` — Worker entrypoint only; to schedule work use the enqueue helpers, not processJob directly. | docs/claude/JOBS.md § Job System; docs/claude/JOBS.md § Cron Jobs | — |
 | look at the raw queue for inspection or depth; low-level queue operations, not for adding jobs; I'll add to the queue object directly from the service; a gauge of queue depth by state | **queue** · primitive `apps/api/src/jobs/queue.ts#queue` — Enqueue through the job enqueue helpers so outbox spill applies; use queue directly for inspection or low-level ops. | docs/claude/CONCURRENCY.md § Serialized Queue (`createSerializedQueue`); docs/claude/DEPENDENCIES.md § Cache & Queue | — |
-| a job that runs in stages and fans out children; wait for the children before the next stage; I'll poll until all child jobs finish; multi-step job, each step after the previous completes | **runJobStages** · primitive `apps/api/src/jobs/runJobStages.ts#runJobStages` — Multi-stage jobs that fan out children; a plain handler for single-step work. | docs/claude/JOBS.md § Handler Patterns | — |
 | custom job ids with colons get rejected later; fail at enqueue if the id is one the queue won't accept; I'll build the id as the handler name, a colon, then the record id; guard the id before it reaches the queue | **validateJobId** · primitive `apps/api/src/jobs/validateJobId.ts#validateJobId` — Throwing guard at enqueue; for a non-throwing check use isValidJobId. | docs/claude/JOBS.md § Job System; docs/claude/JOBS.md § Enqueuing Jobs | custom job ids built with ':' separators (e.g. `sync:${id}`) or '0', which BullMQ rejects later, instead of ids that pass validateJobId (docs/claude/JOBS.md § Enqueuing Jobs). throws validateJobId Error (`server-error`) |
+| require fan-out-and-wait jobs to use staged jobs instead of hand-rolled BullMQ flows | **no-hand-rolled-flows** · rule `scripts/ci/rules/no-hand-rolled-flows.sh` — Use when a job waits on child jobs; plain jobs enqueue directly. Never poll or refire pending children. | docs/claude/JOBS.md § Handler Patterns › Staged Job (Fan Out and Wait); FEATURES.md § Background Jobs & Cron | — |
 | the route that serves the queue dashboard; where do I look at failed jobs; retry a stuck job from a UI; I'll build an admin page listing jobs | **apps/api/src/routes/bullBoard** · system `apps/api/src/routes/bullBoard` — serve the Bull Board dashboard for inspecting job queues | — | — |
-| big fan-outs should use the slow lane; keep latency-sensitive jobs from waiting behind bulk work; I don't want a bulk job constructor, the lane is a tag; which lane does this job belong in | **Fast/slow job lanes** · pattern FEATURES.md › Background Jobs & Cron — large fan-outs use slow lane; fast lane for latency-sensitive work | part 4 | — |
-| in tests the job runs right away, no queue; I'll mock the enqueue in the test; the test spies on the enqueue instead of letting it run; assert the rows appear, with no spy | **Inline jobs in tests** · pattern docs/claude/JOBS.md § Enqueuing Jobs — default in tests; enqueueOrSpill directly when testing queue routing | code `enqueueJob`, `sendWebhook`, `validateJobId`, `isTest` | — |
-| one file per job with its payload type exported; where does a new job handler go | **Job handler file layout** · pattern Creating Handlers — define each job in its own handlers file with exported payload type | part 4 | — |
-| register the new handler so the worker knows it; the handler exists but nothing picks it up | **Job handler registry** · pattern apps/api/src/jobs/handlers/index.ts — register each background job handler in one registry file | part 4 | — |
-| publish who joined and left the segment after recompute; emit membership changes on both the owner and member side | **Segment junction diff events** · pattern reconcileSegment / reconcileCustomerRefSegments — publish membership diffs as owner- and member-side events after reconcile | part 4 | — |
-| fan out many children and continue when they're done; I'll keep a pending set in redis and poll it; re-fire whatever is still pending; a parent job that waits for its children; count completed children by hand inside the job | **Staged job fan-out and wait** · pattern docs/claude/JOBS.md § Handler Patterns › Staged Job (Fan Out and Wait) — instead of hand-rolled pending hashes, polling loops or refiring pending work | code `makeJob`, `makeSupersedingJob`, `redisNamespace`, `makeSingletonJob` | a Redis pending hash or set of child ids, a polling loop waiting for children to finish, or a 'refire whatever is still pending' retry, instead of makeJob stages + ctx.enqueueChildJob (docs/claude/JOBS.md § Staged Job (Fan Out and Wait)) |
-| a webhook subscription belongs to a user, org or space; who owns this subscription, polymorphically | **WebhookSubscription ownership** · pattern FEATURES.md › Webhooks — own subscriptions by User, Organization or Space via false polymorphism | part 4 | — |
-| inspect, filter and retry jobs visually; see why the job failed; I'll query the queue and print the jobs; a visual view of what's queued | **BullBoard dashboard** · primitive FEATURES.md › Background Jobs & Cron — inspect, filter and retry queued jobs visually | part 4 | — |
-| this job is latency-critical and must never be buffered; skip the overflow spill for this enqueue; I'll check the overflow flag myself and add directly; never park this one when the queue is full | **bypass enqueue option** · primitive docs/claude/JOBS.md § Enqueuing Jobs — latency-critical jobs; default lets adhoc enqueues spill when overflow active | code `enqueueJob`, `sendWebhook`, `validateJobId`, `isTest` | — |
-| supersession goes by dedupe key, never by job id; the newest enqueue for this key wins; I'll reuse the job id to dedupe; a per-lane claim, last one wins | **claimLane / watchLane** · primitive docs/claude/JOBS.md § Job System › Job IDs — supersession by dedupeKey lane, never by jobId | code `sendWebhook`, `spillToOutbox`, `flushOutbox`, `heartbeat` | — |
-| add a child job inside a running stage; enqueue children that the parent waits for; I'll pass parent options to the normal enqueue; children from within the job, not top-level | **ctx.enqueueChildJob** · primitive docs/claude/JOBS.md § Handler Patterns › Staged Job (Fan Out and Wait) — inside a stage only; enqueueJob for top-level jobs | code `makeJob`, `makeSupersedingJob`, `redisNamespace`, `makeSingletonJob` | — |
-| log from inside the job so it shows in the dashboard; job logs should go to both the logger and the queue; I'll import the shared logger in the handler; the lines never reach the board | **ctx.log** · primitive docs/claude/JOBS.md § Handler Patterns › ctx.log() - Dual-Write Logging — inside job handlers instead of importing log from @template/shared/logger | code `makeJob`, `makeSupersedingJob`, `redisNamespace`, `makeSingletonJob` | importing `log` from @template/shared/logger inside a job handler, so lines never reach BullBoard (docs/claude/JOBS.md § ctx.log() - Dual-Write Logging) |
-| isolate the jobs redis from the cache redis; point the queue at its own redis url | **jobs queue** · primitive FEATURES.md › Background Jobs & Cron — set REDIS_BULLMQ_URL to isolate from cache Redis | part 4 | — |
-| how many jobs one worker runs at once; cap parallel jobs per worker | **JOBS_WORKER_CONCURRENCY** · primitive docs/claude/JOBS.md § Job System › Worker Configuration — cap parallel jobs per worker (default 10) | code `sendWebhook`, `spillToOutbox`, `flushOutbox`, `heartbeat` | — |
-| override the handler's lane for this one enqueue; send this particular run through the slow lane; the producer knows the size, set the lane here | **lane enqueue option** · primitive docs/claude/JOBS.md § Enqueuing Jobs — override the handler's declared fast or slow lane | code `enqueueJob`, `sendWebhook`, `validateJobId`, `isTest` | — |
-| mark that the queue is overflowing; a set-once redis flag with a TTL the drain renews | **Overflow flag** · primitive apps/api/src/jobs/outbox/flag.ts — mark queue overflow in Redis with set-once TTL and heartbeat | part 4 | — |
-| make this auth provider available to every org; a platform-wide default provider | **platformDefault** · primitive FEATURES.md › Admin Operations — make an auth provider available to all organizations | part 4 | — |
-| role changes left stale permission caches; clear the caches by hand after an admin change | **POST /admin/cache/clear** · primitive FEATURES.md › Admin Operations — after role changes leave stale permission caches | part 4 | — |
-| fire an ad-hoc job with a payload from the admin side; manually enqueue a job with an arbitrary payload | **POST /admin/jobs/enqueue** · primitive docs jobs: rotateEncryptionKeys — manual/admin triggers; code paths call enqueueJob instead. | part 4 | — |
-| run this job once, right now, by hand; a one-off manual run, not a cron; I'll write a script that calls the handler; kick off a job from the admin API | **POST /api/admin/job** · primitive docs/claude/JOBS.md § Cron Jobs › Admin Routes — one-off runs; recurring: cronJob routes; rerun a cron now: cronJob/:id/trigger. | code `registerCronJobs`, `CronJob`, `registry`, `User` | — |
-| how deep is the queue right now; waiting plus active count, cached | **queueDepth** · primitive apps/api/src/jobs/outbox/queueDepth.ts — probe cached waiting plus active queue depth | part 4 | — |
-| what the handler receives: db, queue, job, signal, log; share a client across job runs instead of creating one per run; I'll create the S3 client inside each handler run; scoped db and log for a job | **WorkerContext** · primitive apps/api/src/jobs/types.ts — give job handlers scoped db, queue, job, abort signal and log | part 4 | — |
-| where new background jobs live; add the handler in the handlers folder | **Add job handlers in handlers/** · rule FEATURES.md › Background Jobs & Cron — adding any background job | part 4 | — |
-| don't enqueue reconciliation for a segment whose rule is broken; skip degraded segments in the sweep | **Degraded segments never queued** · rule sweepSegments — when enqueueing segment reconciliation | part 4 | — |
-| recompute segment membership when a customer changes; I'll re-evaluate membership inside the write hook; controllers emit the event, the handler enqueues the recompute | **Enqueue customer segment reconcile from business events** · rule reconcileCustomerRefSegments — when wiring segment membership updates to data changes | part 4 | re-evaluating segment membership inside a Prisma write hook or synchronously in the controller after a customer change (docs/claude/SEGMENTS.md § Static and dynamic membership (controllers emit business events; event handlers enqueue reconciliation jobs; not a lookup inside a model's write hook)) |
-| what to use as the job id for ad-hoc, superseding and cron; the logical id is data only, never the queue id | **Job ID assignment** · rule docs/claude/JOBS.md § Job System › Job IDs — every enqueue, including cron and superseding jobs | code `sendWebhook`, `spillToOutbox`, `flushOutbox`, `heartbeat` | — |
-| how job log lines are prefixed; the log scope for worker lines | **Job log scope format** · rule docs/claude/JOBS.md § Job System › Job IDs — logging inside job handlers | code `sendWebhook`, `spillToOutbox`, `flushOutbox`, `heartbeat` | — |
-| I'll add a retry loop around the insert; throw and let the queue retry, don't swallow; the handler catches its own errors so it never retries | **Job worker failure handling** · rule docs/claude/JOBS.md § BullBoard › Error Boundaries — writing job handlers. | part 4 | a handler that catches and swallows its own errors (so BullMQ never retries) or hand-rolls retry loops, instead of throwing and setting `attempts` (docs/claude/JOBS.md § BullBoard › Error Boundaries) |
-| I'll poll until the children are done; count the completed children myself | **Never hand-roll fan-out waiting** · rule docs/claude/JOBS.md § Handler Patterns › Staged Job (Fan Out and Wait) — any job that must wait for its fanned-out work | code `makeJob`, `makeSupersedingJob`, `redisNamespace`, `makeSingletonJob` | polling job states or counting completed children by hand inside a job (docs/claude/JOBS.md § Staged Job (Fan Out and Wait)) |
-| pass the parent id to the normal enqueue for a child; children must come from inside a stage | **Never pass parent to enqueueJob** · rule docs/claude/JOBS.md § Handler Patterns › Staged Job (Fan Out and Wait) — adding any child job | code `makeJob`, `makeSupersedingJob`, `redisNamespace`, `makeSingletonJob` | `enqueueJob(name, payload, { parent: ... })` from inside a job, instead of ctx.enqueueChildJob within a stage (docs/claude/JOBS.md § Staged Job (Fan Out and Wait)) |
-| don't start a second staged parent while one is open; the cron root should not stack staged parents | **One open staged parent at a time** · rule docs/claude/JOBS.md § Handler Patterns › Staged Job (Fan Out and Wait) — enqueuing a staged parent, e.g. from a cron root | code `makeJob`, `makeSupersedingJob`, `redisNamespace`, `makeSingletonJob` | — |
-| the new job isn't picked up by the worker; add it to the handler index | **Register job handlers in index** · rule handlers/index.ts — whenever creating a new job handler | part 4 | — |
-| the worker needs its own redis connection; don't share the cache client with the queue worker; blocking commands on the shared client | **Separate worker Redis connection** · rule docs/claude/JOBS.md § Job System › Worker Configuration — any BullMQ worker setup | code `sendWebhook`, `spillToOutbox`, `flushOutbox`, `heartbeat` | — |
-| a child may run twice, make it safe to repeat; re-running a child must not double-apply | **Staged children must be idempotent** · rule docs/claude/JOBS.md § Handler Patterns › Staged Job (Fan Out and Wait) — any child enqueued from a stage | code `makeJob`, `makeSupersedingJob`, `redisNamespace`, `makeSingletonJob` | — |
-| build the dedupe key with the namespace helper; hardcoded prefix on the dedupe key | **Superseding dedupe key via redisNamespace** · rule docs/claude/JOBS.md § Handler Patterns › Superseding Job — defining a makeSupersedingJob dedupe key | code `makeJob`, `makeSupersedingJob`, `redisNamespace`, `makeSingletonJob` | — |
-| use the job's logger, not the imported one; job output missing from the dashboard | **Use ctx.log in job handlers** · rule docs/claude/JOBS.md § Handler Patterns › ctx.log() - Dual-Write Logging — any logging inside a job handler | code `makeJob`, `makeSupersedingJob`, `redisNamespace`, `makeSingletonJob` | — |
-| what to name a new webhook event; the event name convention for webhooks | **Webhook event naming** · rule FEATURES.md › Webhooks — naming any webhook event | part 4 | — |
+| register a new job handler with db, queue and logger context | **Adding job handlers** · pattern FEATURES.md > Background Jobs & Cron — register a new job handler with db, queue and logger context | part 4 | — |
+| cron tick under scheduler jobId only enqueues the real run with uuidv7 jobId | **Cron tick enqueues a cronTrigger run** · pattern Job IDs — cron tick under scheduler jobId only enqueues the real run with uuidv7 jobId | part 4 | — |
+| run slow work at lowest priority within its depth share, spilling to outbox | **Fast/slow lanes** · pattern FEATURES.md > Background Jobs & Cron — Bulk work like email fan-out; default fast lane for interactive work. | part 4 | — |
+| Enqueue follow-up jobs from a handler using the queue provided on WorkerContext. | **Follow-up jobs via ctx.queue** · pattern docs/claude/CONTEXT.md — Handler Usage — Enqueue follow-up jobs from a handler using the queue provided on WorkerContext. | part 4 | — |
+| in tests the job runs right away, no queue; I'll mock the enqueue in the test; the test spies on the enqueue instead of letting it run; assert the rows appear, with no spy | **Inline jobs in tests** · pattern docs/claude/JOBS.md § Enqueuing Jobs — Default in tests; routing tests: enqueueOrSpill; flow failure: jobFlowCheck. | code `enqueueJob`, `sendWebhook`, `validateJobId`, `isTest` | — |
+| Run background work as BullMQ jobs with handlers registered centrally | **Job layout** · pattern apps/api/src/jobs/ — Run background work as BullMQ jobs with handlers registered centrally | part 4 | — |
+| Scope each job execution as job:{name}:{id} with context type 'worker'. | **Job scope ID format** · pattern docs/claude/CONTEXT.md — Job Scope — Requests use {requestId} scope with type 'api' instead. | part 4 | — |
+| recompute cached values on a timer via root/branch/leaf jobs | **Rolling cache for timed recomputation** · pattern docs/claude/JOBS.md § Handler Patterns › Rolling Caches (Root, Branch, Leaf) › Rolling Caches (Root, Branch, Leaf) — Timer-only cache recompute: use instead of a new handler or CronJob row. | code `makeSingletonJob`, `CronJob`, `makeRollingCache`, `makeSupersedingJob` | — |
+| fan out many children and continue when they're done; I'll keep a pending set in redis and poll it; re-fire whatever is still pending; a parent job that waits for its children; count completed children by hand inside the job | **Staged job fan-out and wait** · pattern docs/claude/JOBS.md § Handler Patterns › Staged Job (Fan Out and Wait) › Staged Job (Fan Out and Wait) — any constructor when work fans out and must wait; not a collision policy. | code `makeJob`, `enqueueJob`, `makeSingletonJob`, `makeSupersedingJob` | a Redis pending hash or set of child ids, a polling loop waiting for children to finish, or a 'refire whatever is still pending' retry, instead of makeJob stages + ctx.enqueueChildJob (docs/claude/JOBS.md § Staged Job (Fan Out and Wait)) |
+| fan out child jobs per stage, park without a worker slot, then run finish once | **Staged jobs** · pattern FEATURES.md > Background Jobs & Cron — Fan-out-and-wait work; any constructor accepts stages in place of a handler. | part 4 | — |
+| supersede older work by dedupeKey through a last-wins per-lane claim, not jobId | **Supersession via dedupeKey lane claim** · pattern Job IDs — Superseding jobs; singleton dedup uses cronJob.id via singletonDeduplicationId instead. | part 4 | — |
+| inspect, filter and retry jobs visually; see why the job failed; I'll query the queue and print the jobs; a visual view of what's queued | **BullBoard dashboard** · primitive FEATURES.md > Background Jobs & Cron — inspect queue jobs, payloads, timings and errors, and retry failed jobs | part 4 | — |
+| this job is latency-critical and must never be buffered; skip the overflow spill for this enqueue; I'll check the overflow flag myself and add directly; never park this one when the queue is full | **bypass enqueue option** · primitive § /jobs/enqueue — Latency-critical jobs only; otherwise let overflow spill apply. | part 4 | — |
+| each minute, enqueue branches for caches whose timer is nearly expired | **coordinateRollingCaches** · primitive docs/claude/JOBS.md — each minute, enqueue branches for caches whose timer is nearly expired | part 4 | — |
+| add a child job inside a running stage; enqueue children that the parent waits for; I'll pass parent options to the normal enqueue; children from within the job, not top-level | **ctx.enqueueChildJob** · primitive makeEnqueueChildJob — only inside a stage; top-level enqueues: enqueueJob. | part 4 | — |
+| log from inside the job so it shows in the dashboard; job logs should go to both the logger and the queue; I'll import the shared logger in the handler; the lines never reach the board | **ctx.log** · primitive apps/api/src/jobs/types.ts (WorkerContext.log) — In job handlers prefer ctx.log over shared log for BullBoard visibility; in requests use log from @template/shared. | part 4 | importing `log` from @template/shared/logger inside a job handler, so lines never reach BullBoard (docs/claude/JOBS.md § ctx.log() - Dual-Write Logging) |
+| cooperatively signal a superseded job to stop work | **ctx.signal** · primitive docs/claude/JOBS.md § Handler Patterns › Superseding Job › Superseding Job — honoured by fetch, timers, own loops; not Prisma queries. | code `redisNamespace`, `makeSupersedingJob`, `claimLane`, `watchLane` | — |
+| run work under a named scope ID so db context is attributed | **db.scope** · primitive worker.ts — run work under a named scope ID so db context is attributed | part 4 | — |
+| register every job handler so workers can dispatch them | **handlers/index.ts** · primitive apps/api/src/jobs/handlers/index.ts — register every job handler so workers can dispatch them | part 4 | — |
+| keep a parked superseding parent's lane alive so newer enqueues tombstone it | **holdLaneWhileParked** · primitive docs/claude/JOBS.md — keep a parked superseding parent's lane alive so newer enqueues tombstone it | part 4 | — |
+| exercise BullMQ child-failure tolerance against real Redis | **jobFlowCheck** · primitive apps/api/scripts/jobFlowCheck.ts — Flow behavior inline tests can't cover; otherwise inline enqueueJob in tests. | part 4 | — |
+| prove staged job flow behaviour against real Redis | **jobFlowCheck.ts** · primitive apps/api/scripts/jobFlowCheck.ts — prove staged job flow behaviour against real Redis | part 4 | — |
+| how many jobs one worker runs at once; cap parallel jobs per worker | **JOBS_WORKER_CONCURRENCY** · primitive Worker Configuration — cap parallel jobs per worker (default 10) | part 4 | — |
+| override the handler's lane for this one enqueue; send this particular run through the slow lane; the producer knows the size, set the lane here | **lane enqueue option** · primitive § /jobs/enqueue — override the handler's declared fast or slow lane | part 4 | — |
+| derive the singleton key from the payload instead of data.id | **lockKey option** · primitive makeSingletonJob options — when the key isn't the cron row id or enqueued id; default falls back to data.id then handler name. | part 4 | — |
+| mark overflow in Redis with set-once, TTL and heartbeat | **overflow flag** · primitive apps/api/src/jobs/outbox/flag.ts — mark overflow in Redis with set-once, TTL and heartbeat | part 4 | — |
+| make this auth provider available to every org; a platform-wide default provider | **platformDefault** · primitive FEATURES.md > Admin Operations — make a platform auth provider available to all organizations | part 4 | — |
+| role changes left stale permission caches; clear the caches by hand after an admin change | **POST /admin/cache/clear** · primitive FEATURES.md > Admin Operations — After role changes leave stale permission caches; rolling caches need no manual invalidation. | part 4 | — |
+| fire an ad-hoc job with a payload from the admin side; manually enqueue a job with an arbitrary payload | **POST /admin/jobs/enqueue** · primitive docs/claude/JOBS.md rotateEncryptionKeys — manually trigger any job handler by name from the admin API | part 4 | — |
+| run this job once, right now, by hand; a one-off manual run, not a cron; I'll write a script that calls the handler; kick off a job from the admin API | **POST /api/admin/job** · primitive POST /api/admin/job — one-off runs; existing cron rows: POST /api/admin/cronJob/:id/trigger instead | part 4 | — |
+| how deep is the queue right now; waiting plus active count, cached | **queueDepth** · primitive apps/api/src/jobs/outbox/queueDepth.ts — probe cached waiting+active queue depth for spill decisions | part 4 | — |
+| isolate the jobs queue Redis from cache Redis, falling back to REDIS_URL | **REDIS_BULLMQ_URL** · primitive FEATURES.md > Background Jobs & Cron — Separate queue Redis; otherwise REDIS_URL serves both. | part 4 | — |
+| fan out one leaf per target and reset the cache timer on finish | **refreshRollingCache** · primitive docs/claude/JOBS.md — fan out one leaf per target and reset the cache timer on finish | part 4 | — |
+| refresh one cache target; enqueue it to force a refresh | **refreshRollingCacheTarget** · primitive docs/claude/JOBS.md — Forced refresh of one target; scheduled refreshes come via the branch. | part 4 | — |
+| signal a leaf exceeded timeoutSeconds so apps can wire alerts | **rollingCache.leafStuck** · primitive docs/claude/JOBS.md — signal a leaf exceeded timeoutSeconds so apps can wire alerts | part 4 | — |
+| build a rolling cache's timer key as rollingcache:timer:<name> | **rollingCacheTimerKey** · primitive rollingCacheTimerKey.ts — build a rolling cache's timer key as rollingcache:timer:<name> | part 4 | — |
+| mark a job superseded so its own children stop at any depth | **tombstoneJob** · primitive docs/claude/JOBS.md — mark a job superseded so its own children stop at any depth | part 4 | — |
+| what the handler receives: db, queue, job, signal, log; share a client across job runs instead of creating one per run; I'll create the S3 client inside each handler run; scoped db and log for a job | **WorkerContext** · primitive apps/api/src/jobs/types.ts — Inside job handlers use WorkerContext; in controllers/middleware use request context accessors instead. | part 4 | — |
+| A cron tick never runs its handler inline; it enqueues the run. | **Cron ticks enqueue, never run** · rule FEATURES.md > Background Jobs & Cron — All scheduled jobs. | part 4 | — |
+| Webhook and message deliveries must be plain makeJob jobs, never singletons or locked. | **Deliveries are plain jobs** · rule docs/claude/JOBS.md § Handler Patterns — Any outbound delivery such as sendWebhook or messages. | code `makeJob`, `makeSingletonJob`, `makeSupersedingJob`, `claimSlotOrRequeue` | — |
+| I'll add a retry loop around the insert; throw and let the queue retry, don't swallow; the handler catches its own errors so it never retries | **Job worker failure handling** · rule docs/claude/JOBS.md § BullBoard › Error Boundaries — all job handlers | part 4 | a handler that catches and swallows its own errors (so BullMQ never retries) or hand-rolls retry loops, instead of throwing and setting `attempts` (docs/claude/JOBS.md § BullBoard › Error Boundaries) |
+| Job context is system-level with no user, token or permissions; never rely on request identity in jobs. | **Jobs run without auth context** · rule docs/claude/CONTEXT.md — Key Differences from Request Context — Any job handler that needs to know who triggered the work. | part 4 | — |
+| Job handlers must log through ctx.log so output appears in BullBoard, not only stdout. | **Log via ctx.log in job handlers** · rule docs/claude/CONTEXT.md — Key Differences from Request Context — Any logging inside a background job handler. | part 4 | — |
+| The job data id is the singleton-lock identity and must never be used as the BullMQ jobId. | **Logical id is never the jobId** · rule Job IDs — Ad-hoc, superseding and cron-run jobs. | part 4 | — |
+| I'll poll until the children are done; count the completed children myself | **Never hand-roll fan-out waiting** · rule docs/claude/JOBS.md § Handler Patterns › Staged Job (Fan Out and Wait) › Staged Job (Fan Out and Wait) — Any job that waits for work it fanned out. | code `makeJob`, `enqueueJob`, `makeSingletonJob`, `makeSupersedingJob` | polling job states or counting completed children by hand inside a job (docs/claude/JOBS.md § Staged Job (Fan Out and Wait)) |
+| pass the parent id to the normal enqueue for a child; children must come from inside a stage | **Never pass parent to enqueueJob** · rule docs/claude/JOBS.md — Any time a job adds child jobs under a running parent. | part 4 | `enqueueJob(name, payload, { parent: ... })` from inside a job, instead of ctx.enqueueChildJob within a stage (docs/claude/JOBS.md § Staged Job (Fan Out and Wait)) |
+| Flow (parent/child) machinery must stay in the job constructor primitive. | **No hand-rolled flows** · rule FEATURES.md > Background Jobs & Cron — Any job that waits on children. | part 4 | — |
+| Job collisions are binary: singleton skips, superseding takes over, nothing parks waiting. | **No job parking** · rule FEATURES.md > Background Jobs & Cron — Any job that may collide with another run. | part 4 | — |
+| Never requeue a job via moveToDelayed + DelayedError because a key is busy. | **No job parking on busy keys** · rule docs/claude/JOBS.md § Handler Patterns — Any job colliding on a key; only exception is claimSlotOrRequeue admission control. | code `makeJob`, `makeSingletonJob`, `makeSupersedingJob`, `claimSlotOrRequeue` | — |
+| don't start a second staged parent while one is open; the cron root should not stack staged parents | **One open staged parent at a time** · rule docs/claude/JOBS.md — Any staged parent job; the adder (e.g. cron root) just adds and finishes. | part 4 | — |
+| Every job handler must be registered in JobHandlerName, JobPayloads and jobHandlers. | **Register handlers in handlers/index.ts** · rule handlers/index.ts — Whenever a new job handler is created. | part 4 | — |
+| Every rolling cache definition must be imported by the rollingCaches barrel. | **Register rolling caches in barrel** · rule apps/api/src/lib/rollingCaches.ts — Any new rolling cache; enforced by rolling-cache-registered CI rule. | part 4 | — |
+| Every makeRollingCache definition must be imported by the worker. | **Rolling caches must be registered** · rule FEATURES.md > Background Jobs & Cron — Whenever adding a rolling cache. | part 4 | — |
+| reconcileCustomerRefSegments is enqueued by business events on lens-read rows, never by a DB hook. | **Segment reconcile enqueued by business events** · rule docs/claude/JOBS.md reconcileSegment — When wiring segment membership triggers. | part 4 | — |
+| a child may run twice, make it safe to repeat; re-running a child must not double-apply | **Staged children must be idempotent** · rule docs/claude/JOBS.md — All children added from job stages. | part 4 | — |
+| A superseded handler keeps running, so it must never perform writes. | **Superseded runs never write** · rule docs/claude/JOBS.md § Handler Patterns › Superseding Job › Superseding Job — All makeSupersedingJob handlers. | code `redisNamespace`, `makeSupersedingJob`, `claimLane`, `watchLane` | a superseding job that keeps writing after ctx.signal aborts (docs/claude/JOBS.md § Superseding Job) |
+| A superseding parent may only add superseding children, which stop when the parent is tombstoned. | **Superseding children follow parent tombstone** · rule docs/claude/JOBS.md — Superseding staged parents; singleton or plain parents may have any children. | part 4 | — |
+| build the dedupe key with the namespace helper; hardcoded prefix on the dedupe key | **Superseding dedupe key via redisNamespace** · rule docs/claude/JOBS.md § Handler Patterns › Superseding Job › Superseding Job — Every makeSupersedingJob dedupe key. | code `redisNamespace`, `makeSupersedingJob`, `claimLane`, `watchLane` | — |
+| use the job's logger, not the imported one; job output missing from the dashboard | **Use ctx.log in job handlers** · rule docs/claude/JOBS.md § Handler Patterns › ctx.log() - Dual-Write Logging › ctx.log() - Dual-Write Logging — Any code inside a job handler. | code `makeJob` | — |
+| Worker log scopes must use the format [worker][{handlerName}:{jobId}]. | **Worker log scope format** · rule Job IDs — All job processing logs. | part 4 | — |
+| The BullMQ worker must use a separate Redis connection from the queue. | **Worker uses its own Redis connection** · rule Worker Configuration — Whenever constructing a BullMQ worker. | part 4 | — |
 
-- *Also here, by name:* JobLane (`apps/api/src/jobs/types.ts`); JobType (`apps/api/src/jobs/types.ts`); fanOutLane (`apps/api/src/lib/email/fanOutLane.ts`); isSlowJobData (`apps/api/src/jobs/buildJobData.ts`)
+- *Also here, by name:* JobLane (`apps/api/src/jobs/types.ts`); JobType (`apps/api/src/jobs/types.ts`); fanOutLane (`apps/api/src/lib/email/fanOutLane.ts`); isSlowJobData (`apps/api/src/jobs/buildJobData.ts`); makeEnqueueChildJob (`apps/api/src/jobs/makeEnqueueChildJob.ts`); parkOnUnfinishedChildren (`apps/api/src/jobs/parkOnUnfinishedChildren.ts`); runJobStages (`apps/api/src/jobs/runJobStages.ts`); singletonDeduplicationId (`apps/api/src/jobs/singletonDeduplicationId.ts`); toJobHandler (`apps/api/src/jobs/toJobHandler.ts`); validateChildJobHandler (`apps/api/src/jobs/validateChildJobHandler.ts`)
 
 ### Class `cron`: DB-stored cron jobs, repeatables, manual trigger, retention cleanup
 
@@ -213,21 +238,23 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 | run this every night; schedule this to run on an interval across instances; I'll set up an interval in the server process; I'll hardcode repeat options at startup; a nightly background job rather than a standalone script; the schedule lives in a table row | **CronJob** · model `packages/db/prisma/schema/cronJob.prisma` — Recurring time-based work; enqueue a one-off job for event-driven work instead. | docs/claude/JOBS.md § Cron Jobs; FEATURES.md § Background Jobs & Cron | a `setInterval` / node-cron schedule in process code, or BullMQ `repeat` options hard-coded at startup, instead of a CronJob row registered by registerCronJobs (docs/claude/JOBS.md § Cron Jobs; FEATURES.md § Background Jobs & Cron) |
 | move old rows to an archive rather than deleting; keep the data but get it out of the live table; I'll write a job that copies then deletes old rows; retention where nothing is lost | **archiveStaleRecords** · primitive `apps/api/src/jobs/handlers/archiveStaleRecords.ts#archiveStaleRecords` — Archive rather than delete; to hard-delete idle rows like Flows use cleanStaleData. | — | — |
 | delete rows that have been idle longer than fifteen minutes; a cleanup for abandoned flows; I'll write a new cron that deletes rows older than N; point the generic cleanup at a model, field and retention; hard delete transient rows past retention | **cleanStaleData** · primitive `apps/api/src/jobs/handlers/cleanStaleData.ts#cleanStaleData` — Hard deletes stale transient rows (e.g. Flows after 15 min); keep data instead: archiveStaleRecords. | docs/claude/FLOWS.md § Lifecycle; FEATURES.md § Flows | a new bespoke cleanup job or cron that deletes rows older than N minutes, instead of a cron row pointing cleanStaleData at the model, field and retention (catalog cleanStaleData; cleanStaleFlows cron row) |
-| sync the cron rows to the queue at worker startup; remove repeatables with no enabled row; I'll hardcode the cron config and seed it every boot; the handler is in the map but no row exists so it never runs; crons already register and dedup firing, no parallel path | **registerCronJobs** · primitive `apps/api/src/jobs/registerCronJobs.ts#registerCronJobs` — Startup sync of all rows; per-row changes are handled by the cronJobSync hook. | docs/claude/JOBS.md § Job System; docs/claude/JOBS.md § Cron Jobs | — |
-| run the cron now instead of waiting for the schedule; manually fire a stored cron; I'll add an endpoint that calls the cron's handler; rerun this scheduled job on demand | **triggerCronJob** · primitive `apps/api/src/modules/admin/cronJob/services/triggerCronJob.ts#triggerCronJob` — Manually firing a stored CronJob; for arbitrary background work call enqueueJob directly. | — | a new admin endpoint or script that runs a cron's handler directly, instead of POST /api/admin/cronJob/:id/trigger (docs/claude/JOBS.md § Admin Routes) |
-| cron schedules live in a table, not in code; cron rows come from seed, not a migration; I'll put the schedule in a TS constant; recurring work with the schedule as data | **Cron jobs stored in DB** · pattern docs/claude/JOBS.md § Cron Jobs — recurring scheduled work; one-off work: POST /api/admin/job adhoc instead. | code `registerCronJobs`, `CronJob`, `registry`, `User` | — |
+| enqueue the real run for a cron tick instead of running the handler | **enqueueCronRun** · primitive `apps/api/src/jobs/enqueueCronRun.ts#enqueueCronRun` — Cron ticks only; ad-hoc work uses enqueueJob. | docs/claude/JOBS.md § Cron Jobs; docs/claude/JOBS.md § Job System | — |
+| sync the cron rows to the queue at worker startup; remove repeatables with no enabled row; I'll hardcode the cron config and seed it every boot; the handler is in the map but no row exists so it never runs; crons already register and dedup firing, no parallel path | **registerCronJobs** · primitive `apps/api/src/jobs/registerCronJobs.ts#registerCronJobs` — schedule every enabled CronJob row from the database onto the queue | docs/claude/JOBS.md § Job System; docs/claude/JOBS.md § Cron Jobs | — |
+| run the cron now instead of waiting for the schedule; manually fire a stored cron; I'll add an endpoint that calls the cron's handler; rerun this scheduled job on demand | **triggerCronJob** · primitive `apps/api/src/modules/admin/cronJob/services/triggerCronJob.ts#triggerCronJob` — Use for manual runs from admin; it dedupes with scheduled runs. To enqueue arbitrary jobs, use the jobs enqueue primitive instead. | docs/claude/JOBS.md § Cron Jobs | a new admin endpoint or script that runs a cron's handler directly, instead of POST /api/admin/cronJob/:id/trigger (docs/claude/JOBS.md § Admin Routes) |
+| cron schedules live in a table, not in code; cron rows come from seed, not a migration; I'll put the schedule in a TS constant; recurring work with the schedule as data | **Cron jobs stored in DB** · pattern docs/claude/JOBS.md § Cron Jobs — recurring schedules: CronJob row; one-off work: POST /api/admin/job or enqueueJob instead | code `enqueueCronRun`, `processJob`, `enqueueJob`, `triggerCronJob` | — |
 | monitor, retry, clean and pause the queues from a web UI; a UI over the job queue; I'll write a CLI to list and retry failed jobs; which jobs are stuck right now | **BullBoard** · primitive /bullBoard — monitor, retry, clean and pause BullMQ queues via web UI | part 4 | — |
-| when the cron row changes, move the repeatable; editing a cron at runtime should update the schedule; I'll remove and re-add the repeatable after saving the row; the hook that keeps the queue in step with cron rows | **cronJobSync** · primitive cronJobSync hook — runtime cron edits; startup-wide reconciliation: registerCronJobs instead. | part 4 | — |
-| run a named cron once from the admin; key rotation or cache warming on demand | **POST /admin/cron/:name/trigger** · primitive FEATURES.md › Admin Operations — one-off runs (key rotation, cache warming); POST /admin/jobs/enqueue for ad-hoc job payloads | part 4 | — |
-| rerun an existing cron now by id; the manual trigger route for a stored cron | **POST /api/admin/cronJob/:id/trigger** · primitive docs/claude/JOBS.md § Cron Jobs › Admin Routes — manual run of existing cron; new one-off work: POST /api/admin/job. | code `registerCronJobs`, `CronJob`, `registry`, `User` | — |
-| delete webhook events older than ninety days; retention on webhook event rows | **Webhook event cleanup cron** · primitive FEATURES.md › Webhooks — delete webhook events older than the retention period (default 90 days) | part 4 | — |
-| protect the queue dashboard outside local; the dashboard must need a password in deployed environments | **BullBoard basic auth outside local** · rule docs/claude/JOBS.md § BullBoard Access — any non-local deployment. | part 4 | — |
-| the cron fires at the wrong hour; I'll add a timezone option to the cron; write the pattern in UTC | **Cron patterns in UTC** · rule docs/claude/JOBS.md § Cron Jobs › Cron Patterns (UTC) — writing any CronJob pattern. | code `registerCronJobs`, `CronJob`, `registry`, `User` | cron patterns written in local time, or a timezone option added to compensate (docs/claude/JOBS.md § Cron Patterns (UTC)) |
-| write the cron row inside a transaction so the hook fires; I'll edit the row and update the repeatable alongside | **CronJob mutations inside db.txn** · rule docs/claude/JOBS.md § Cron Jobs — any write to a CronJob row. | code `registerCronJobs`, `CronJob`, `registry`, `User` | editing a CronJob row outside db.txn or calling queue.removeRepeatable/add by hand alongside the edit, instead of letting cronJobSync move the repeatable (docs/claude/JOBS.md § Cron Jobs) |
-| cron runs and flow children never go to the buffer; only ad-hoc jobs may spill | **Only adhoc jobs spill to overflow** · rule docs/claude/JOBS.md § Cron Jobs › JobType Values — enqueue paths touching the overflow buffer. | code `registerCronJobs`, `CronJob`, `registry`, `User` | — |
-| the repeatable never gets removed, the key doesn't match; removing a repeatable needs the id passed separately | **removeRepeatable jobId as third argument** · rule docs/claude/JOBS.md § Cron Jobs — whenever removing a BullMQ repeatable. | code `registerCronJobs`, `CronJob`, `registry`, `User` | `queue.removeRepeatable(name, { ...repeat, jobId })`, where the jobId inside repeat is overwritten and the key never matches (docs/claude/JOBS.md § Cron Jobs) |
-| finish the running jobs before the process exits; drain the worker on termination | **Worker graceful shutdown** · rule docs/claude/JOBS.md § BullBoard › Error Boundaries — process termination. | part 4 | — |
-| no worker in tests, jobs run inline; the worker must not start under test | **Worker skipped in tests** · rule docs/claude/JOBS.md § BullBoard › Error Boundaries — tests involving background jobs. | part 4 | — |
+| when the cron row changes, move the repeatable; editing a cron at runtime should update the schedule; I'll remove and re-add the repeatable after saving the row; the hook that keeps the queue in step with cron rows | **cronJobSync** · primitive cronJobSync — live row changes; startup reconciliation uses registerCronJobs | part 4 | — |
+| run a named cron once from the admin; key rotation or cache warming on demand | **POST /admin/cron/:name/trigger** · primitive FEATURES.md > Admin Operations — One-off cron runs; for arbitrary jobs with custom payload use POST /admin/jobs/enqueue. | part 4 | — |
+| rerun an existing cron now by id; the manual trigger route for a stored cron | **POST /api/admin/cronJob/:id/trigger** · primitive POST /api/admin/cronJob/:id/trigger — existing cron rows; arbitrary handlers: POST /api/admin/job instead | part 4 | — |
+| protect the queue dashboard outside local; the dashboard must need a password in deployed environments | **BullBoard basic auth outside local** · rule docs/claude/JOBS.md § BullBoard — any non-local deployment | part 4 | — |
+| the cron fires at the wrong hour; I'll add a timezone option to the cron; write the pattern in UTC | **Cron patterns in UTC** · rule docs/claude/JOBS.md § Cron Jobs › Cron Patterns (UTC) — every CronJob pattern | code `enqueueCronRun`, `processJob`, `enqueueJob`, `triggerCronJob` | cron patterns written in local time, or a timezone option added to compensate (docs/claude/JOBS.md § Cron Patterns (UTC)) |
+| A cron tick never runs its handler; it enqueues a cronTrigger run via enqueueCronRun. | **Cron tick hands off to cronTrigger** · rule docs/claude/JOBS.md § Cron Jobs — any scheduled or manually triggered CronJob run | code `enqueueCronRun`, `processJob`, `enqueueJob`, `triggerCronJob` | — |
+| write the cron row inside a transaction so the hook fires; I'll edit the row and update the repeatable alongside | **CronJob mutations inside db.txn** · rule docs/claude/JOBS.md § Cron Jobs — any write to CronJob rows | code `enqueueCronRun`, `processJob`, `enqueueJob`, `triggerCronJob` | editing a CronJob row outside db.txn or calling queue.removeRepeatable/add by hand alongside the edit, instead of letting cronJobSync move the repeatable (docs/claude/JOBS.md § Cron Jobs) |
+| cron runs and flow children never go to the buffer; only ad-hoc jobs may spill | **Only adhoc jobs spill to overflow** · rule docs/claude/JOBS.md § Cron Jobs › JobType Values — routing any enqueue past the overflow buffer | code `enqueueCronRun`, `processJob`, `enqueueJob`, `triggerCronJob` | — |
+| WaitingChildrenError, DelayedError and WaitingError park a job with outcome waiting, not failure. | **Parked jobs are not failures** · rule docs/claude/JOBS.md § BullBoard › Error Boundaries — handlers awaiting children or slot gates; real failures throw normal errors | part 4 | — |
+| the repeatable never gets removed, the key doesn't match; removing a repeatable needs the id passed separately | **removeRepeatable jobId as third argument** · rule docs/claude/JOBS.md § Cron Jobs — removing any BullMQ repeatable | code `enqueueCronRun`, `processJob`, `enqueueJob`, `triggerCronJob` | `queue.removeRepeatable(name, { ...repeat, jobId })`, where the jobId inside repeat is overwritten and the key never matches (docs/claude/JOBS.md § Cron Jobs) |
+| finish the running jobs before the process exits; drain the worker on termination | **Worker graceful shutdown** · rule docs/claude/JOBS.md § BullBoard › Error Boundaries — On shutdown the worker waits for active jobs then closes connections. | part 4 | — |
+| no worker in tests, jobs run inline; the worker must not start under test | **Worker skipped in tests** · rule docs/claude/JOBS.md § BullBoard › Error Boundaries — tests involving jobs | part 4 | — |
 
 - *Also here, by name:* registerCronJobSyncHook (`apps/api/src/hooks/cronJobSync/hook.ts`)
 
@@ -319,13 +346,24 @@ jobs/
 ├── enqueueOrSpill.ts   # Routes a built envelope: BullMQ (at its lane's priority) or the outbox
 ├── claimSlotOrRequeue.ts # Job-start check: slow slot cap, and returning a line-jumper to its priority
 ├── buildJobData.ts     # The one job-data envelope every producer builds (lane resolved here)
-├── enqueue.ts          # enqueueJob function
+├── enqueue.ts          # enqueueJob function (singleton deduplication applied here)
+├── enqueueCronRun.ts   # A cron tick's whole action: enqueue the real run as cronTrigger
 ├── lanePriority.ts     # Slow lane → lowest BullMQ priority
-├── makeJob.ts          # Job wrapper constructors
-├── processJob.ts       # Per-job processor: slot claim, scopes, tracing
+├── makeJob.ts          # Plain job constructor
+├── makeSingletonJob.ts # At most one run per key; a busy key skips
+├── makeSupersedingJob.ts # Newer run of a key takes over; children honour a parent's tombstone
+├── toJobHandler.ts     # Handler or { stages, finish } → handler (every constructor)
+├── runJobStages.ts     # Staged jobs: stages, parking in waiting-children, finish
+├── makeEnqueueChildJob.ts # A stage's ctx.enqueueChildJob (parent link + ignoreDependencyOnFailure)
+├── parkOnUnfinishedChildren.ts # moveToWaitingChildren → WaitingChildrenError
+├── validateChildJobHandler.ts # A superseding parent only adds superseding children
+├── singletonDeduplicationId.ts # BullMQ deduplication id for a singleton key
+├── rollingCacheTimerKey.ts # A rolling cache's timer key (rollingcache:timer:<name>)
+├── processJob.ts       # Per-job processor: cron hand-off, slot claim, scopes, tracing
 ├── queue.ts            # BullMQ queue setup
 ├── registerCronJobs.ts # Cron registration on worker startup
 ├── slowSlotPool.ts     # Per-worker count of slots running slow jobs
+├── traceJob.ts         # Job span; BullMQ wait signals end it OK, not as an error
 ├── types.ts            # Type definitions
 ├── validateJobId.ts    # BullMQ custom-id rules, shared by enqueue and the drain
 └── worker.ts           # Worker entry point
@@ -345,7 +383,8 @@ jobs/
 |----------|-------|-----------------|
 | Ad-hoc / superseding | `jobOptions.jobId ?? uuidv7()` | the logical `id` is data-only (the singleton-lock identity) — never the jobId |
 | Superseding | (as above) | supersession is by `dedupeKey` → a per-lane claim (`claimLane`/`watchLane`, last-wins), not the jobId |
-| Cron | `cronJob.jobId` (repeatable scheduler key) | `cronJob.id` — the singleton-lock identity |
+| Cron tick | `cronJob.jobId` (repeatable scheduler key) | `cronJob.id`; the tick only enqueues the real run (see [Cron Jobs](#cron-jobs)) |
+| Cron run (`cronTrigger`) | `uuidv7()` | `cronJob.id` — the singleton key (lock and deduplication) |
 
 Scope ID format for logging: `[worker][{handlerName}:{jobId}]`
 
@@ -372,10 +411,11 @@ await enqueueJob('sendWebhook', {
 | Feature | Detail |
 |---------|--------|
 | Signing | RSA-SHA256 (`X-Webhook-Signature` header) |
-| Timeout | 5 seconds per delivery |
-| Circuit breaker | Disables after 5 consecutive failures |
+| Timeout | 5 seconds per attempt |
+| Retries | Network error, timeout, 5xx, 404 and 429 rethrow so the job retries (queue default 3 attempts, exponential backoff); the last attempt (`isFinalAttempt`) settles the delivery. 400/422, 401/403 and redirects settle on the first attempt |
+| Circuit breaker | Disables after 5 consecutive failed deliveries; a retry cycle counts once |
 | Poisoned records | Integration-owned subscriptions skip a record after 3 rejections (HTTP 400/422) while other records deliver |
-| Logging | Creates `WebhookEvent` record per attempt |
+| Logging | Creates a `WebhookEvent` per attempt: `retrying` for an attempt that will be retried, the settled status for the last |
 
 ##### reconcileSegment / reconcileCustomerRefSegments / sweepSegments
 
@@ -471,9 +511,24 @@ export const jobHandlers = {
 
 | Pattern | Use Case |
 |---------|----------|
-| `makeJob` | Basic job wrapper |
-| `makeSingletonJob` | Redis lock prevents concurrent runs |
-| `makeSupersedingJob` | Newer job cancels older with same key |
+| `makeJob` | Parallel work; every run happens (emails, webhooks, fire-and-forget side effects) |
+| `makeSingletonJob` | At most one run per key; a busy key skips (cron jobs, draining a queue, one open fan-out per key) |
+| `makeSupersedingJob` | Newer job cancels older with same key (recomputations where only the latest matters) |
+| `{ stages, finish }` | Any of the three, when the job fans out children and waits for them (see [Staged Job](#staged-job-fan-out-and-wait)) |
+
+**Collision policy is binary: a singleton skips the new run, superseding takes over. Nothing parks.**
+No job is ever put back with `moveToDelayed` + `DelayedError` to "try again in a moment" because a key
+is busy: that quietly serializes a plain job, every run queues behind the slowest, and a hung holder
+parks the rest forever. The only sanctioned park is the slow-lane capacity gate (`claimSlotOrRequeue`),
+which is admission control. The `no-job-parking` CI rule enforces it.
+
+A delivery (a webhook, a message) is a plain job, never a singleton: a skip would drop it. If a
+receiver needs ordering or refuses a concurrent write, make the receiving side idempotent (an upsert,
+newest-wins on `updatedAt`) and retry the refusal like any failure. Never serialize deliveries with a
+lock. `sendWebhook` is a plain job.
+
+<!-- unit doc:docs/claude/JOBS.md#handler-patterns/ctx-log-dual-write-logging -->
+**Source:** `docs/claude/JOBS.md` § Handler Patterns › ctx.log() - Dual-Write Logging (in "Jobs")
 
 ##### ctx.log() - Dual-Write Logging
 
@@ -497,41 +552,43 @@ Benefits:
 
 **Note**: Use `ctx.log()` in job handlers instead of importing `log` directly from `@template/shared/logger`.
 
+<!-- unit doc:docs/claude/JOBS.md#handler-patterns/singleton-job -->
+**Source:** `docs/claude/JOBS.md` § Handler Patterns › Singleton Job (in "Jobs")
+
 ##### Singleton Job
 
 ```typescript
 export const dailyCleanup = makeSingletonJob(async (ctx, payload) => {
   // Only one instance runs at a time
 });
-```
 
-##### Superseding Job
-
-Newer jobs with the same dedupe key cancel older running jobs.
-
-```typescript
-import { redisNamespace } from '@template/db';
-
-export const syncData = makeSupersedingJob(
-  async (ctx, payload) => {
-    // Check ctx.signal.aborted periodically
-    if (ctx.signal?.aborted) return;
-  },
-  // Dedupe key - use redisNamespace for consistency
-  (payload) => `${redisNamespace.job}:sync:${payload.resourceId}`
+export const refreshRollingCache = makeSingletonJob<RefreshRollingCachePayload>(
+  { stages: [/* … */], finish: async () => {} },
+  { lockKey: ({ name }) => name },
 );
 ```
 
-How it works:
-1. Enqueue/drain claims the lane: `claimLane(job:lane:{handler}:{dedupeKey}, jobId)` (last claim wins)
-2. The running job's `watchLane` polls its lane (~500ms); a different holder means it was usurped
-3. Usurped jobs abort via `ctx.signal` and exit gracefully
+- **The key:** `lockKey(payload)` when given; otherwise `data.id` (the cron row's id for a cron run, or
+  an `id` passed to `enqueueJob`). A run with neither locks on the handler name.
+- **Deduplicated at enqueue:** when there is a key, `enqueueOrSpill` adds the job with BullMQ's
+  `deduplication: { id: <handler>-<key> }` (`singletonDeduplicationId`; kept on an outbox spill), so
+  while a job with that key exists — queued, running, retrying, or parked waiting on its children —
+  another add is a no-op and `enqueueJob` returns the holder's `jobId`.
+  That covers what the lock cannot: a staged singleton releases its lock while it waits in
+  `waiting-children`, but it still exists, so the skip holds.
+- **Locked while it runs:** each run takes `lock:job-singleton:<handler>:<key>` (keyed) or
+  `lock:job-singleton:<id or handler>` through `createLock` on the queue's connection. A busy key returns
+  without running. A Redis error while acquiring throws, and BullMQ retries it. Release is a fenced
+  compare-and-delete; lock loss is reported, never cancels the handler.
+- **Cron:** a tick never runs its handler (see [Cron Jobs](#cron-jobs)), so a scheduled run and a
+  manual trigger collide like any two enqueues.
 
-**Superseding does not kill.** `makeSupersedingJob` stops *waiting* for the old run; it does not stop it. Workers run handlers in-process, so the superseded handler's promise keeps running to the end. The signal is cooperative: `fetch`, timers and your own loops can honour it, Prisma queries cannot. A superseded run must therefore never write: check `ctx.signal.aborted` before every write, or fence the write against the lane.
+<!-- unit doc:docs/claude/JOBS.md#handler-patterns/staged-job-fan-out-and-wait -->
+**Source:** `docs/claude/JOBS.md` § Handler Patterns › Staged Job (Fan Out and Wait) (in "Jobs")
 
 ##### Staged Job (Fan Out and Wait)
 
-When a job fans out work and must not finish (or run again) until every piece is done, give `makeJob` stages instead of a handler. Never hand-roll the waiting: no pending hash in Redis, no polling loop, no "refire whatever is still pending".
+When a job fans out work and must not finish (or run again) until every piece is done, give the constructor stages instead of a handler. All three take `{ stages, finish }`: `makeJob`, `makeSingletonJob` (one open per key, held across the wait by deduplication), and `makeSupersedingJob`. Fanning out and waiting is not a collision policy, so it is a form of every constructor (`toJobHandler`), not a fourth one. Never hand-roll the waiting: no pending hash in Redis, no polling loop, no "refire whatever is still pending", no singleton that returns right after enqueueing.
 
 ```typescript
 export const refreshThings = makeJob<RefreshThingsPayload>({
@@ -547,14 +604,15 @@ export const refreshThings = makeJob<RefreshThingsPayload>({
 });
 ```
 
-- **Stages run in order; each waits for the children it added.** The job is a BullMQ flow parent run as a step job (`runJobStages`). The next stage is stored on the job envelope (`data.stage`), so a resumed run starts there and an earlier stage never runs twice. After a stage that added children the job parks in `waiting-children`, holding no worker slot, and BullMQ runs it again once the last child has reported. A stage that added none runs straight into the next.
-- **`ctx.enqueueChildJob` exists only inside a stage**, so only a job can have children. It adds the child with the running job as its `parent` and `ignoreDependencyOnFailure`: a child keeps the queue's retries, and only after its last attempt fails does it count as done, so a dead child never holds its parent open. Never pass `parent` to `enqueueJob` yourself.
+- **Stages run in order; each waits for the children it added.** The job is a BullMQ flow parent run as a step job (`runJobStages`). The current stage is stored on the job envelope (`data.stage`), so a resumed run starts there and an earlier stage never runs twice. After each stage the job parks in `waiting-children` if any child is unfinished (`parkOnUnfinishedChildren`), holding no worker slot, and BullMQ runs it again once the last child has reported. With nothing unfinished the next stage runs straight away.
+- **A run that resumes past stage 0 parks first** if children are still unfinished: a worker that died between recording the stage and parking would otherwise retry straight into the next stage while the previous stage's children were still running.
+- **`ctx.enqueueChildJob` exists only inside a stage**, so only a job can have children (`makeEnqueueChildJob`). It adds the child with the running job as its `parent` and `ignoreDependencyOnFailure`: a child keeps the queue's retries (3 attempts, exponential backoff), and only after its last attempt fails does it count as done, so a dead child never holds its parent open. Never pass `parent` to `enqueueJob` yourself. The `no-hand-rolled-flows` CI rule keeps BullMQ's flow machinery inside these files.
 - **A flow child never spills to the outbox** (see [Spill Routing](#spill-routing)): the drained re-add would lose its parent link.
-- **One open parent at a time:** add the parent under a fixed `jobId` with `removeOnComplete`/`removeOnFail` set. BullMQ refuses a second job with an id still in the queue, and the id frees the moment the parent finishes. Whatever adds the parent (a cron root, say) just adds it and finishes: it is not itself a parent.
-- **Tests:** an inline run has no worker token, so children run inline as they are added, the stages and `finish` run in order within one call, and a child that throws is logged and swallowed, as `ignoreDependencyOnFailure` does under a worker.
+- **A superseding child listens to its superseding parent as well as to itself.** A superseding parent may only add superseding children (`validateChildJobHandler`, checked when the child is added). When the parent is replaced, the existing lane claim tombstones it; each child treats that tombstone as its own, at start and on every lane poll (`watchLane(lane, jobId, onUsurped, parentId)`), and tombstones itself (`tombstoneJob`) so its own children stop too, at any depth. Nothing evicts children. The old parent then wakes, finds its tombstone at start, and exits without `finish`. A parked superseding parent stretches its lane to the tombstone's lifetime (`holdLaneWhileParked`) so a newer enqueue still finds and tombstones it. A singleton or plain parent is never superseded and may have any children.
+- **One open parent at a time:** make the parent a keyed singleton (deduplication holds while it is parked), or add it under a fixed `jobId` with `removeOnComplete`/`removeOnFail`. Whatever adds the parent (a cron root, say) just adds it and finishes: it is not itself a parent.
+- **Tests:** `enqueueJob` runs children inline (an inline run has no worker token and no parent), so the stages and `finish` run in order within one call, and a child that throws fails the parent's call. Child-failure tolerance (`ignoreDependencyOnFailure`) is BullMQ's; `apps/api/scripts/jobFlowCheck.ts` exercises it against real Redis (see [Validating Against Real Infrastructure](#validating-against-real-infrastructure)).
 - A worker that dies mid-stage reruns that stage and may add its children twice. Children must be idempotent.
-
----
+- `traceJob` treats BullMQ's wait signals (`WaitingChildrenError`, and the slot gate's `DelayedError` / `WaitingError`) as the job working as designed: the span ends OK with outcome `waiting`, nothing logs as a failed attempt, and BullMQ still gets the signal.
 
 <!-- unit doc:docs/claude/JOBS.md#enqueuing-jobs -->
 **Source:** `docs/claude/JOBS.md` § Enqueuing Jobs (in "Jobs")
@@ -585,6 +643,8 @@ await enqueueJob('myJob', payload, {
 A custom `jobId` must satisfy BullMQ's rules (`validateJobId`): not `'0'`, no `'0:'` prefix, no `':'`. An invalid id throws at enqueue rather than being quarantined later.
 
 When overflow is active, an `adhoc` enqueue returns `{ jobId, name, outboxed: true }` (spilled to the buffer) instead of adding to BullMQ directly. See [Overflow Buffer](#overflow-buffer).
+
+A keyed singleton (or a singleton's cron run) is added with BullMQ's `deduplication` id (see [Singleton Job](#singleton-job)): while one exists, another add is a no-op.
 
 In test (`isTest`), `enqueueJob` skips BullMQ entirely and runs the handler inline — cascading effects happen for real, errors propagate, no queue/overflow machinery involved. The inline job still receives the resolved envelope (lane included). To test routing, call `enqueueOrSpill` directly (see `jobs/tests/`).
 
@@ -625,6 +685,7 @@ BULL_BOARD_PASSWORD=secret
 |----------|----------|
 | Unknown handler name | Logs error, throws (job fails) |
 | Handler throws | Logs error, re-throws (BullMQ retries based on `attempts`) |
+| Handler parks (`WaitingChildrenError`, slot-gate `DelayedError`/`WaitingError`) | Span ends OK with outcome `waiting`; not logged as a failure; BullMQ moves the job |
 | Test environment | Worker skipped entirely |
 | Graceful shutdown | Waits for active jobs, closes connections |
 
@@ -646,13 +707,17 @@ BULL_BOARD_PASSWORD=secret
 
 - ✅ **makeJob()** - Basic job constructor providing type-safe handler wrapper. Use for standard async operations (send email, process upload, generate report). Jobs run independently, multiple instances can execute concurrently
 
-- ✅ **makeSingletonJob()** - Ensures only one instance runs at a time across all workers using Redis locks with heartbeat. Prevents duplicate execution of sensitive operations (database migrations, billing runs, encryption key rotation). Lock TTL is 5 minutes with a 1-minute heartbeat; refresh/release are token-fenced and lock loss is reported without cancelling the running handler
+- ✅ **makeSingletonJob()** - Ensures only one instance runs at a time across all workers using Redis locks with heartbeat. Prevents duplicate execution of sensitive operations (database migrations, billing runs, encryption key rotation). Keyed per payload with `lockKey`, otherwise per cron row. A busy key skips — collision policy is binary (singleton skips, superseding takes over, nothing parks; the `no-job-parking` CI rule enforces it). Keyed runs are also deduplicated at enqueue (BullMQ `deduplication`), so the skip holds while a staged singleton waits on its children. Lock TTL is 5 minutes with a 1-minute heartbeat; refresh/release are token-fenced and lock loss is reported without cancelling the running handler
 
-- ✅ **makeSupersedingJob()** - Allows newer jobs to cancel/supersede older jobs with same dedupeKey. Long-running jobs poll Redis every 500ms for supersession signal and abort gracefully. Perfect for search indexing, cache warming, or report generation where only latest matters
+- ✅ **makeSupersedingJob()** - Allows newer jobs to cancel/supersede older jobs with same dedupeKey. Long-running jobs poll Redis every 500ms for supersession signal and abort gracefully. Perfect for search indexing, cache warming, or report generation where only latest matters. A superseding job's children honour its tombstone, at start and on every poll, at any depth
+
+- ✅ **Staged jobs (fan out and wait)** - Every constructor takes `{ stages, finish }` in place of a handler: each stage adds children with `ctx.enqueueChildJob`, the job parks in BullMQ's `waiting-children` (holding no worker slot) until they report, and `finish` runs once after the last stage. The stage index lives on the job, so a resumed run never repeats a stage. Children keep their retries and then count as done (`ignoreDependencyOnFailure`). The `no-hand-rolled-flows` CI rule keeps the flow machinery in the primitive; `apps/api/scripts/jobFlowCheck.ts` proves it against real Redis
+
+- ✅ **Rolling caches** - `makeRollingCache({ name, intervalSeconds, key, compute, targets })` keeps a computed value warm on a timer with no invalidation to write. Targets are a model plus its own Prisma `findMany` args. One seeded cron root (`coordinateRollingCaches`, every minute) enqueues a staged singleton branch per due cache, which fans out a superseding slow-lane leaf per target under a per-attempt timeout (`rollingCache.leafStuck` app event when it runs over). Entries outlive every retry, so a read always hits; the `rolling-cache-registered` CI rule keeps every definition imported by the worker
 
 - ✅ **BullMQ Integration** - Redis-backed persistent queue with automatic retries (3 attempts, exponential backoff 5s base). Jobs survive server restarts. One `jobs` queue serves registered handlers; `REDIS_BULLMQ_URL` can isolate it from cache Redis (fallback: `REDIS_URL`)
 
-- ✅ **Cron Jobs** - Scheduled recurring tasks registered at startup. CronJob model persists schedule, last run, next run. Admin endpoints for manual triggering, enabling/disabling schedules
+- ✅ **Cron Jobs** - Scheduled recurring tasks registered at startup. CronJob model persists schedule, last run, next run. Admin endpoints for manual triggering, enabling/disabling schedules. A tick never runs its handler: it enqueues the real run (`enqueueCronRun`), so a scheduled run and a manual trigger collide like any two enqueues
 
 - ✅ **Job Handlers** - Type-safe handlers with full context (db, queue, logger). Registered handlers include email planning/delivery, webhooks, stale-data cleanup, key rotation and segment reconciliation/sweep. Add new handlers by creating file in `handlers/` directory and exporting from index
 
@@ -673,7 +738,11 @@ BULL_BOARD_PASSWORD=secret
 
 #### Cron Jobs
 
-Stored in DB, registered on worker startup; `registerCronJobs` then removes any BullMQ repeatable no enabled row registered (a renamed or disabled job left behind), unless a row failed to register. The `cronJobSync` hook moves the BullMQ repeatable when a row is created, updated or deleted inside `db.txn`. BullMQ's `removeRepeatable(name, repeat, jobId)` takes the job id as its third argument: a `jobId` inside `repeat` is overwritten, so the key never matches.
+Stored in DB, registered on worker startup. **A tick never runs its handler:** `processJob` hands a `cron` job to `enqueueCronRun`, which enqueues the real run through `enqueueJob` as a `cronTrigger` job carrying the row's `id`, with the row's attempts and backoff. The admin trigger (`triggerCronJob`) goes through the same `enqueueCronRun`. So a scheduled run and a manual trigger collide like any two enqueues (a singleton is deduplicated on the row; a superseding job takes over). A repeatable's job template cannot carry a deduplication id, which is why the tick hands off. On startup `registerCronJobs` also removes any BullMQ repeatable no enabled row registered (a renamed or disabled job left behind), unless a row failed to register. The `cronJobSync` hook moves the BullMQ repeatable whenever a row's handler, jobId, pattern, enabled, payload or retry policy changes (create, update, upsert, delete inside `db.txn`). BullMQ's `removeRepeatable(name, repeat, jobId)` takes the job id as its third argument: a `jobId` inside `repeat` is overwritten, so the key never matches.
+
+##### System Cron Jobs (seeded)
+
+The system's own jobs are rows in `packages/db/prisma/seeds/cronJob.seed.ts` with stable ids. The seed runner writes each record inside `db.txn`, so with the api seed (`bun run db:seed`, hooks registered) every deploy's seed brings `name`, `jobId`, `handler` and `description` back in line with the code and the hook swaps the repeatable: renaming a handler is a code change plus a seed. `pattern`, `enabled`, `payload`, `maxAttempts` and `backoffMs` are admin-tunable in superadmin, so the seed sets them on insert only (`updateOmitFields`).
 
 ##### Cron Patterns (UTC)
 
@@ -720,8 +789,8 @@ POST   /api/admin/cronJob/:id/trigger  # Run immediately (optional body { lane }
 
 | Type | Description |
 |------|-------------|
-| `cron` | Scheduled by BullMQ repeater |
-| `cronTrigger` | Manually triggered cron |
+| `cron` | The BullMQ repeatable tick; it only enqueues a `cronTrigger` run |
+| `cronTrigger` | A cron row's real run, scheduled (from a tick) or manual (admin trigger) |
 | `adhoc` | One-off job |
 
 `type` gates overflow routing: only `adhoc` jobs ever spill to the buffer; `cron`/`cronTrigger` always go direct to BullMQ. See [Overflow Buffer](#overflow-buffer).
@@ -734,20 +803,22 @@ From the catalog (`.foundry/catalog/catalog.json`, extracted from the code). Eac
 
 #### Class `jobs`
 - **buildJobData** `apps/api/src/jobs/buildJobData.ts#buildJobData` [primitive] build the job envelope and resolve its lane: request, then enqueue option, then handler default, then fast Use: const data = buildJobData(handler, request, enqueueLane);
-- **enqueueJob** `apps/api/src/jobs/enqueue.ts#enqueueJob` [primitive] queue a typed background job by handler name; runs inline in tests Use: await enqueueJob('deliverEmail', payload, options)
+- **enqueueJob** `apps/api/src/jobs/enqueue.ts#enqueueJob` [primitive] queue a background job by handler name with typed payload; runs inline in tests Use: await enqueueJob('sendWebhook', payload, { id })
 - **initializeWorker** `apps/api/src/jobs/worker.ts#initializeWorker` [primitive] start the background job worker, skipped in test environment Use: await initializeWorker();
+- **isFinalAttempt** `apps/api/src/jobs/isFinalAttempt.ts#isFinalAttempt` [primitive] tell whether this run is the job's last retry so it can settle instead of rethrow Use: if (isFinalAttempt(ctx.job)) { /* settle delivery */ }
 - **isValidJobId** `apps/api/src/jobs/validateJobId.ts#isValidJobId` [primitive] check a custom job id against BullMQ id rules without throwing Use: if (!isValidJobId(jobId)) { ... }
-- **makeJob** `apps/api/src/jobs/makeJob.ts#makeJob` [primitive] define a background job handler, optionally staged fan-out that waits for all pieces Use: export const myJob = makeJob<Payload>(async (ctx, payload) => { ... }, { lane });
-- **makeSingletonJob** `apps/api/src/jobs/makeSingletonJob.ts#makeSingletonJob` [primitive] wrap a job handler so a Redis lock prevents concurrent runs Use: export const myJob = makeSingletonJob(handler, { lockKey: (payload) => key });
+- **makeJob** `apps/api/src/jobs/makeJob.ts#makeJob` [primitive] define a background job where every enqueued run happens, in parallel Use: export const sendThing = makeJob<Payload>(async (payload, ctx) => { ... })
+- **makeSingletonJob** `apps/api/src/jobs/makeSingletonJob.ts#makeSingletonJob` [primitive] define a job allowing at most one run per key; busy keys skip Use: export const drain = makeSingletonJob<Payload>(handler, { lockKey: (p) => p.id })
 - **processJob** `apps/api/src/jobs/processJob.ts#processJob` [primitive] run a queued job's handler, managing slow-lane slots and idle-clock stamping Use: new Worker(queueName, (job) => processJob(job));
 - **queue** `apps/api/src/jobs/queue.ts#queue` [primitive] shared BullMQ jobs queue instance with its Redis connection attached Use: import { queue } from '#/jobs/queue'; await queue.getJobCounts();
-- **runJobStages** `apps/api/src/jobs/runJobStages.ts#runJobStages` [primitive] build a resumable job handler running ordered stages that wait for child jobs Use: export const handler = runJobStages<Payload>({ stages, finish });
 - **validateJobId** `apps/api/src/jobs/validateJobId.ts#validateJobId` [primitive] reject custom job ids BullMQ forbids ('0', '0:' prefix, colons) before enqueue Use: validateJobId(jobId);
+- **no-hand-rolled-flows** `scripts/ci/rules/no-hand-rolled-flows.sh` [rule] require fan-out-and-wait jobs to use staged jobs instead of hand-rolled BullMQ flows Use: new Job({ stages, finish }) with ctx.enqueueChildJob inside each stage; runJobStages parks the parent
 - **apps/api/src/routes/bullBoard** `apps/api/src/routes/bullBoard` [system] serve the Bull Board dashboard for inspecting job queues Use: open the bullBoard route on the API server
 
 #### Class `cron`
 - **CronJob** `packages/db/prisma/schema/cronJob.prisma` [model] persist a scheduled recurring job with pattern, handler, payload and retry settings Use: db.cronJob.create({ data: { name, jobId, pattern, handler, payload, enabled: true } })
 - **archiveStaleRecords** `apps/api/src/jobs/handlers/archiveStaleRecords.ts#archiveStaleRecords` [primitive] archive records of a model matching a where filter per archive config Use: await archiveStaleRecords(model, where, config)
 - **cleanStaleData** `apps/api/src/jobs/handlers/cleanStaleData.ts#cleanStaleData` [primitive] hard-delete rows idle past a retention window, run as a singleton cron job Use: cron row → handler 'cleanStaleData' with { model, field: 'updatedAt', retention }
-- **registerCronJobs** `apps/api/src/jobs/registerCronJobs.ts#registerCronJobs` [primitive] register enabled DB cron rows as BullMQ repeatables and remove orphaned ones Use: await registerCronJobs(); // on worker startup
-- **triggerCronJob** `apps/api/src/modules/admin/cronJob/services/triggerCronJob.ts#triggerCronJob` [primitive] run a cron job's handler on demand through the shared enqueue seam Use: await triggerCronJob(cronJob, lane)
+- **enqueueCronRun** `apps/api/src/jobs/enqueueCronRun.ts#enqueueCronRun` [primitive] enqueue the real run for a cron tick instead of running the handler Use: await enqueueCronRun({ handlerName, cronJobId, payload })
+- **registerCronJobs** `apps/api/src/jobs/registerCronJobs.ts#registerCronJobs` [primitive] schedule every enabled CronJob row from the database onto the queue Use: await registerCronJobs()
+- **triggerCronJob** `apps/api/src/modules/admin/cronJob/services/triggerCronJob.ts#triggerCronJob` [primitive] manually enqueue a cron job run through the same path as a scheduled tick Use: await triggerCronJob(cronJob, lane)

@@ -3,7 +3,7 @@
   "title": "Inquiry API and frontend",
   "routing": "Is this about exposing or showing inquiry-handlers / inquiry-routes-ui: the API endpoints (create per context with the source inferred, list sent and received with drafts hidden from received, update, send, resolve, cancel soft-deletes), inquiryCreateBodySchema and the response schemas (inquiryResponseSchema, inquirySentResponseSchema, inquiryReceivedResponseSchema), the standardized includes (includeInquirySent / includeInquiryReceived / includeInquiryResponse, side-matched relations), in-controller create permission checks, or the frontend: registerInquiryType / getInquiryInterface, InquiriesPage / AdminInquiriesPage and the typed pages, InquirySourceControls / InquiryTargetControls, useInquiryPermission, the mutation hooks (useCreate / useSend / useResolve / useCancel / useUpdateInquiryMutation), sentInquiryContextQueries / receivedInquiryContextQueries, sourceMutations / targetMutations, inquiryFiltersToSearchFields, isTerminalInquiry?",
   "concepts": ["inquiry-routes-ui"],
-  "tokens": 11901,
+  "tokens": 11904,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
@@ -14,7 +14,7 @@
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 11901
+      "tokens": 11904
     }
   },
   "runsAgreed": 0,

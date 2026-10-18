@@ -180,25 +180,48 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 | the unsubscribe link for this recipient; I'll store an unsubscribe token in a table; generate the signed one-click link; build the clickable opt-out url | **unsubscribeUrl** · primitive `apps/api/src/lib/email/unsubscribe.ts#unsubscribeUrl` — Prefer over signUnsubscribe when you need the clickable link rather than the raw token. | — | storing an unsubscribe token row in the database, or building the unsubscribe link by hand (docs/claude/COMMUNICATIONS.md § Communication Preferences (signed HMAC capability link, no DB token row)) |
 | check the unsubscribe token is genuine; validate the signed link when they click it; the counterpart that verifies the link in the handler | **verifyUnsubscribe** · primitive `apps/api/src/lib/email/unsubscribe.ts#verifyUnsubscribe` — Counterpart to signUnsubscribe/unsubscribeUrl; use in the unsubscribe handler only. | — | — |
 | the endpoint the unsubscribe link hits; where does the opt-out link land; the route handling unsubscribe clicks | **apps/api/src/routes/unsubscribe** · system `apps/api/src/routes/unsubscribe` — handle email unsubscribe link requests | — | — |
-| make sure we never send the same email twice; I'll rely on the job id to dedupe sends; I'll keep a set of recipients already sent; one queued row per recipient, keyed on the event; a retry shouldn't create a fresh log row | **CommunicationLog find-or-create** · pattern docs/claude/COMMUNICATIONS.md § Planner (sendEmail) — dedupe per-recipient sends via queued log row keyed on idempotencyKey | part 4 | relying on BullMQ job ids or an in-memory set to avoid duplicate sends, or creating a fresh log row per attempt (docs/claude/COMMUNICATIONS.md § Planner (sendEmail) step 3 (the at-most-once fence, durable beyond BullMQ retention)) |
-| plan once, then one job per recipient; split a send into per-recipient deliveries; the two-job shape of outbound email; why are there two jobs for one email | **Email planner/deliver fan-out** · pattern docs/claude/COMMUNICATIONS.md § Email › Send Pipeline › Send Pipeline — plan email once, then deliver per recipient as separate queued jobs | code `deliverEmail`, `registry`, `CommunicationLog`, `sendEmail` | — |
+| prevent double-send by atomically claiming the log before sending | **CAS claim queued → sending** · pattern docs EMAIL § Deliver step 7 — prevent double-send by atomically claiming the log before sending | part 4 | — |
+| guarantee at-most-once email per recipient durably beyond queue retention | **CommunicationLog idempotency fence** · pattern docs EMAIL § Dispatch step 3 — guarantee at-most-once email per recipient durably beyond queue retention | part 4 | — |
+| mark reusable, nestable email components inside MJML templates | **Component block syntax** · pattern docs/claude/COMMUNICATIONS.md › Component System › Syntax — mark reusable, nestable email components inside MJML templates | part 4 | — |
+| resolve email entity, recipients and data through json-rules lenses inside the worker | **Email data resolved via lenses in the worker** · pattern apps/api/src/lib/email/registry.ts — resolve email entity, recipients and data through json-rules lenses inside the worker | part 4 | — |
+| fan an app event out to one BullMQ deliver job per recipient | **Email send pipeline: planner plus per-recipient deliver** · pattern docs/claude/COMMUNICATIONS.md § Email › Send Pipeline › Send Pipeline — fan an app event out to one BullMQ deliver job per recipient | code `deliverEmail`, `registry`, `CommunicationLog`, `sendEmail` | — |
 | resolve who gets the email and queue each one; the planner that turns an event into deliveries; resolve the template owner, load recipients, log intent; where recipients are figured out | **Email send planner** · pattern COMMUNICATIONS.md § planner-sendemail — resolve ownership, hydrate recipients, create idempotent CommunicationLog per recipient, enqueue deliverEmail | part 4 | — |
-| record what degraded in this send; where are the render problems of a sent email stored; see why the email went out with empty blocks | **CommunicationLog.renderIssues** · primitive CommunicationLog — record render issues of a degraded send for later inspection | part 4 | — |
+| Keep sent email reconstructable: live rows use slug refs, versions live in AuditLog snapshots with componentVersions. | **Email version graph in audit log** · pattern apps/api/src/hooks/emailVersioning — Over versioning columns on EmailTemplate/EmailComponent rows. | part 4 | — |
+| interpolate platform name and URL in templates without a sender row | **Platform system tokens** · pattern docs/claude/COMMUNICATIONS.md § Sender — sender-specific values: {{sender.*}} instead; platform/admin sends have no sender | part 4 | — |
+| point a referenced model's path source at its own model source to offer every nameable row | **Referenced model path source** · pattern docs/claude/COMMUNICATIONS.md — point a referenced model's path source at its own model source to offer every nameable row | part 4 | — |
 | turn the event's email handoff into a planner job; the bridge from app events to the email planner; deterministic job ids so the same event doesn't plan twice; the handler-side step that enqueues the planner | **deliverEmailHandoffs** · primitive docs/claude/APP_EVENTS.md § Email pipeline — enqueue sendEmail jobs for handoffs with deterministic planner job IDs | code `registry`, `sendEmail`, `CommunicationLog`, `deliverEmail` | — |
 | declare the welcome email: who sends it, who gets it, what data; where each email type says its recipients and lens; add a new email kind to the app; the per-template configuration in code | **email registry** · primitive apps/api/src/lib/email/registry.ts — define per-template entity lens, sender, recipient rules, data lens and render policy | part 4 | — |
 | the one method a provider client implements; deliver one message with recipients, subject and html; the adapter interface for sending | **EmailClient.send** · primitive packages/email/src/client/types.ts — deliver one email with recipients, sender, subject, HTML, tags and metadata | part 4 | — |
-| the config object for one email slug; declare entity, sender, recipients and data as lenses; the shape of a registry entry | **EmailEntry** · primitive apps/api/src/lib/email/registry.ts — declare per-template entity, sender, recipients, cc/bcc and data as lenses | part 4 | — |
+| the config object for one email slug; declare entity, sender, recipients and data as lenses; the shape of a registry entry | **EmailEntry** · primitive apps/api/src/lib/email/registry.ts — declare entity, sender, recipients, cc/bcc and data lenses per template slug | part 4 | — |
 | ask for an email from inside an event handler; the handler returns which template and what data; request a templated email without naming recipients; hand the email off from the event | **EmailHandoff** · primitive docs/claude/APP_EVENTS.md § Handler and handoff contracts — request a templated email with binding data from an event handler | code `registry` | — |
-| every send must respect the contact's preferences; no email goes without the preference check | **Email preference acceptance** · rule FEATURES.md — Preferences and Verification — Every email send. | part 4 | — |
-| I'll put a timestamp in the idempotency key; the key comes from the event, so a retry is the same send; to resend on purpose, emit a new event | **Event-anchored idempotency keys** · rule docs/claude/COMMUNICATIONS.md — Every email plan/deliver step; intentional resends emit a distinct event. | part 4 | an idempotency key built from a timestamp or random id, or mutated to force a resend (docs/claude/COMMUNICATIONS.md § Deliver (intentional resends are distinct events, never key mutation)) |
-| send the email from the route handler; outbound email starts with an event, never a client call; move the inline sends behind events; the service shouldn't talk to the provider directly | **Event-driven email send** · rule docs/claude/COMMUNICATIONS.md § Email › Send Pipeline › Send Pipeline — Any outbound email from business logic. | code `deliverEmail`, `registry`, `CommunicationLog`, `sendEmail` | an email sent inline in a route or service handler through a provider client (docs/claude/COMMUNICATIONS.md § Send Pipeline) |
-| add the one-click unsubscribe headers; mail clients need the unsubscribe header for non-system mail | **List-Unsubscribe headers on non-system email** · rule Email docs § Deliver step 6 — All non-system sends. | part 4 | — |
-| I'll put the recipient's email in the job payload; the job carries an id, delivery re-reads the address; don't put user rows on the queue | **No addresses on the queue** · rule docs/claude/COMMUNICATIONS.md § Planner (sendEmail) — Any per-recipient delivery job. | part 4 | a job payload carrying the recipient's email address or hydrated user row instead of the recipient id plus the bound targeting where (docs/claude/COMMUNICATIONS.md § Planner (sendEmail) step 2) |
-| I'll pass the list of recipients to send; recipients come from the registry's lens, not the caller; the send payload has no to field | **No caller-supplied recipients** · rule SendEmailPayload — Any email send payload. | part 4 | — |
+| signal MJML syntax failures for catch and reporting | **MjmlValidationError** · primitive packages/email/src/validations/MjmlValidationError.ts — syntax errors; EmailRenderError for render failures | part 4 | error class `validation-error` (Submitted data fails schema validation or a business rule (Zod issues, RulesRegistry).); classified by convention; thrown by validateMjml |
+| match an existing component variant or create a new one | **resolveVariants** · primitive docs/claude/COMMUNICATIONS.md § Email › Save Pipeline › Save Pipeline — match an existing component variant or create a new one | code `saveEmailTemplate`, `Organization`, `assertValidConditions` | — |
+| copy target soft delete and undelete onto edges naming it | **ruleReference:target** · primitive ruleReference:target — copy target soft delete and undelete onto edges naming it | part 4 | — |
+| Template paths and rules must resolve through EmailLens; cross-root comparisons use a path, no bridges. | **All email paths and rules go through the email lens** · rule docs/claude/COMMUNICATIONS.md › The email lens — Any token, path or rule in an email template, at save, render or preflight. | part 4 | — |
+| Sources across a bridge must be rechecked with a farSide loader or refused. | **Bridged sources need farSide** · rule docs/claude/COMMUNICATIONS.md — any lens source reached across a bridge | part 4 | — |
+| Email saves run children before parent so parent snapshots pin existing child snapshots. | **Children-before-parent saves** · rule apps/api/src/hooks/emailVersioning — Any multi-row email template/component write. | part 4 | — |
+| Deliver jobs carry recipient id and targeting where, re-resolving addresses at send time. | **Delivery jobs carry ids, not addresses** · rule docs/claude/COMMUNICATIONS.md § Planner (sendEmail) — when building email delivery payloads | part 4 | — |
+| Outbound email must be sent by emitting an app event, never by calling an email client directly. | **Email is event-driven, never a direct client call** · rule docs/claude/COMMUNICATIONS.md § Email › Send Pipeline › Send Pipeline — any business logic that needs to send email | code `deliverEmail`, `registry`, `CommunicationLog`, `sendEmail` | — |
+| Email lenses must be scoped to the owner of the row being saved, edited or rendered. | **Email lens scoped to row owner** · rule docs email lens: The lens is the row owner's — Any email lens use; no inheritance up the tree. | part 4 | — |
+| I'll put a timestamp in the idempotency key; the key comes from the event, so a retry is the same send; to resend on purpose, emit a new event | **Event-anchored idempotency keys** · rule docs/claude/COMMUNICATIONS.md — Any email planning or delivery; resend by emitting a distinct event. | part 4 | an idempotency key built from a timestamp or random id, or mutated to force a resend (docs/claude/COMMUNICATIONS.md § Deliver (intentional resends are distinct events, never key mutation)) |
+| A fallback or substitute renders through the primary template's lens and never sends what the primary refuses. | **Fallbacks render through primary lens** · rule docs/claude/COMMUNICATIONS.md — Any platform fallback or substitute render. | part 4 | — |
+| Non-system emails must carry List-Unsubscribe and List-Unsubscribe-Post headers. | **List-Unsubscribe headers on non-system** · rule docs EMAIL § Deliver step 6 — every non-system email send | part 4 | — |
+| At send, membership rows never show outside the sender's organization. | **Memberships bounded by sender organization** · rule docs email lens: Memberships are the sender's — All sends; platform/admin sends unrestricted. | part 4 | — |
+| A recipient or data entity that no longer resolves must mark failed not_found without sending. | **Missing entity fails as not_found** · rule docs EMAIL § Deliver step 2 — during deliverEmail resolution | part 4 | — |
+| I'll pass the list of recipients to send; recipients come from the registry's lens, not the caller; the send payload has no to field | **No caller-supplied recipients** · rule SendEmailPayload — every outbound email | part 4 | — |
 | the handler can't say who gets it; handoffs carry template and data only | **No recipients on email handoffs** · rule docs/claude/APP_EVENTS.md § Handler and handoff contracts — Any event that sends email. | code `registry` | — |
-| a retry shouldn't reopen a failed row; only a queued row can be sent; I'll reset the status back to queued and resend | **Only queued email logs are open** · rule lib/email/deliverEmailMessage.ts — Every email delivery, retry, duplicate job or re-dispatch. | part 4 | a retry or resend path that reopens a sending/failed row or sends without the queued → sending compare-and-set claim (docs/claude/COMMUNICATIONS.md § Deliver (only a queued row is open; every terminal write is CAS-guarded)) |
-| retry only rate limits and server errors; send with an idempotency key so the provider dedupes; record the failure, don't throw it; what do we retry on the provider side | **Provider send idempotency and retry policy** · rule lib/email/deliverEmailMessage.ts — Every provider email send; outcome failures are recorded, not thrown. | part 4 | — |
-| every non-system template needs an unsubscribe link; the save should refuse a marketing template without the opt-out; why did the save complain about a missing unsubscribe | **Unsubscribe link mandatory** · rule docs/claude/COMMUNICATIONS.md § render-issues — All non-system templates. | part 4 | — |
+| Delivery must only proceed from a queued log; all other statuses are closed and never resent. | **Only queued rows are open** · rule lib/email/deliverEmailMessage.ts — every retry, duplicate job or re-dispatch of deliverEmail | part 4 | — |
+| A rule inside a loop over the opaque data bag must not read a lens-backed root. | **Opaque data loops cannot read lens-backed roots** · rule docs/claude/COMMUNICATIONS.md › The email lens (opaqueLoopIssue) — Rules inside {{#each}} over the opaque data bag. | part 4 | — |
+| Every prisma slot in an email lens must exclude foreign keys and be redacted. | **Prisma lens slots foreign-key-free and redacted** · rule apps/api/src/lib/email/emailLensFor.ts — Declaring email data lenses. | part 4 | — |
+| Retry only rate-limit/5xx up to five times; close everything else on first attempt, recording not throwing. | **Provider send retry policy** · rule docs EMAIL § Deliver step 8 — provider send inside the claim | part 4 | — |
+| Render-issue handling is declared on the template's code registry entry, never on the row. | **Render issue behaviour on registry entry** · rule apps/api/src/lib/email/registry.ts — Every email template; subject issues are always fatal regardless. | part 4 | — |
+| Canonical seed runs through the api script that registers all hooks first; packages/db seed refuses email seeds. | **Seed through apps/api/scripts/seed.ts** · rule apps/api/scripts/seed.ts — Any seeding needing hooks, including email templates/components. | part 4 | — |
+| Sender identity sets from-address only; the template cascade decides branding. | **Sender identity separate from branding** · rule apps/api/src/lib/email/sender.ts — when adding senders or templates | part 4 | — |
+| A stored slot may only narrow the declared surface, never turn on more. | **Stored slots are a later layer** · rule apps/api/src/lib/email/emailLensFor.ts — Whenever persisting or applying stored email lens slots. | part 4 | — |
+| A relation the lens does not declare is refused at save. | **Undeclared lens relations refused** · rule docs/claude/COMMUNICATIONS.md — Any rule-tracked lens surface | part 4 | — |
+| Non-system templates fail with unsubscribe_unavailable before sending when the recipient has no contact row. | **Unsubscribe link required** · rule docs/claude/COMMUNICATIONS.md — All non-system email sends. | part 4 | — |
+| Template save and dependent re-validation must check the composed template with resolved components. | **Validate the composed template** · rule docs/claude/COMMUNICATIONS.md › The email lens — Template save and re-validation of dependents. | part 4 | — |
+| Template variables must use the sender, recipient or data prefix by source. | **Variable prefixes sender/recipient/data** · rule docs/claude/COMMUNICATIONS.md › Variable Interpolation — Every template variable reference. | part 4 | — |
 
 - *Also here, by name:* CommunicationComponentVersion (`packages/db/prisma/schema/communicationLog.prisma`); CommunicationKind (`packages/db/prisma/schema/communication.prisma`); CommunicationReasonCode (`packages/db/prisma/schema/communicationLog.prisma`); CommunicationStatus (`packages/db/prisma/schema/communicationLog.prisma`); addressesThrough (`apps/api/src/lib/email/renderForRecipient.ts`); classifyResendError (`packages/email/src/client/classifyResendError.ts`); communicationReasonCodeFor (`apps/api/src/lib/email/communicationReasonCode.ts`); deliverJobId (`apps/api/src/lib/email/idempotency.ts`); plannerJobId (`apps/api/src/lib/email/idempotency.ts`); signUnsubscribe (`apps/api/src/lib/email/unsubscribe.ts`); unsubscribeLinkPresent (`packages/email/src/preflight/checks/unsubscribeLinkPresent.ts`)
 
@@ -291,9 +314,10 @@ model EmailTemplate {
   componentRefs    String[]            // Pre-computed slugs
 
   // Ownership (false polymorphism)
-  ownerModel       EmailOwnerModel     // default|admin|Organization|Space
+  ownerModel       EmailOwnerModel     // see Enums: platform, tenant and user tiers
   organizationId   String?
   spaceId          String?
+  userId           String?
   inheritToSpaces  Boolean             // Allow Space to use Org template
 }
 ```
@@ -314,6 +338,7 @@ model EmailComponent {
   ownerModel       EmailOwnerModel
   organizationId   String?
   spaceId          String?
+  userId           String?
   inheritToSpaces  Boolean
 }
 ```
@@ -369,10 +394,13 @@ enum CommunicationStatus {
 }
 
 enum EmailOwnerModel {
-  default       // Base templates - read: all, write: super admin
-  admin         // Platform internal - super admin only
-  Organization  // Tenant-branded
-  Space         // Space-specific overrides
+  default           // Base templates - read: all, write: super admin
+  admin             // Platform internal - super admin only
+  Organization      // Tenant-branded - org admins
+  Space             // Space-specific overrides
+  User              // User chain floor - a user's personal template/component
+  OrganizationUser  // User-owned within an org
+  SpaceUser         // User-owned within a space
 }
 
 ```

@@ -70,7 +70,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - I'll import the schema from the other module
 - I'll scaffold all the folders up front
 - domain logic called from a job rather than a route
-- the record doesn't exist, return a 404
 - I'll add this export to the existing file
 - generate the API spec from the routes
 - return more fields to admins on the same endpoint
@@ -133,7 +132,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - a schema two modules both need
 - don't create folders you don't use yet
 - where does a non-HTTP entry point go
-- throw not found from the controller when the row is missing
 - don't pile unrelated exports into one file
 - where are the interactive API docs served
 - privileged callers see extra data, others see less
@@ -192,7 +190,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - don't reach into a sibling module's schemas
 - empty placeholder directories in a module
 - I'll put the job's entry point in controllers
-- return c.json with an error when nothing is found
 - split the file when it serves different consumers
 - I'll maintain an OpenAPI file by hand
 - I'll make a separate admin route that returns the full record

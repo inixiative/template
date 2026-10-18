@@ -3,18 +3,18 @@
   "title": "Prisma-map and schema introspection",
   "routing": "Is this about reading the Prisma schema at runtime instead of hand-declaring it? Signals: the @inixiative/prisma-map library (buildPrismaMapV7 / buildPrismaMapV6, parseRuntimeDataModel, parseSchemaText, buildFromSchemaFile, ScalarField / EnumField / RelationField, fromFields / toFields, getRelations / relationForeignKey, tableName / columnName / storedValue and the DbIdentifier / DbValue brands, the /// @tagClass(key: value) DSL and parseTagClasses), or the template's use of it: prismaMap.gen.ts, ModelNames / AccessorNames / toAccessor / toModelName / isModelName, modelFields / lookupField, getModelRelations / getAccessorRelations, hydrate, aliasColumns in raw SQL, polymorphicTarget / polymorphicKeyColumn, withDiscriminatorDefaults, walkWhere.",
   "concepts": ["lib-prisma-map", "schema-introspection"],
-  "tokens": 13910,
+  "tokens": 13707,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
       "path": "recognise.md",
-      "tokens": 2946,
+      "tokens": 2849,
       "experimental": true,
       "note": "recognise/pick split under test (model round); not the standard"
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 13910
+      "tokens": 13707
     }
   },
   "runsAgreed": 0,
@@ -39,7 +39,7 @@
     ],
     "catalogClusters": ["prisma-schema-introspection"],
     "codeEntries": 66,
-    "docMembers": 8
+    "docMembers": 6
   },
   "bypassLines": 15,
   "glossaryTerms": 30

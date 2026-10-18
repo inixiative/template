@@ -135,10 +135,11 @@ await enqueueJob('sendWebhook', {
 | Feature | Detail |
 |---------|--------|
 | Signing | RSA-SHA256 (`X-Webhook-Signature` header) |
-| Timeout | 5 seconds per delivery |
-| Circuit breaker | Disables after 5 consecutive failures |
+| Timeout | 5 seconds per attempt |
+| Retries | Network error, timeout, 5xx, 404 and 429 rethrow so the job retries (queue default 3 attempts, exponential backoff); the last attempt (`isFinalAttempt`) settles the delivery. 400/422, 401/403 and redirects settle on the first attempt |
+| Circuit breaker | Disables after 5 consecutive failed deliveries; a retry cycle counts once |
 | Poisoned records | Integration-owned subscriptions skip a record after 3 rejections (HTTP 400/422) while other records deliver |
-| Logging | Creates `WebhookEvent` record per attempt |
+| Logging | Creates a `WebhookEvent` per attempt: `retrying` for an attempt that will be retried, the settled status for the last |
 
 ### reconcileSegment / reconcileCustomerRefSegments / sweepSegments
 
@@ -551,7 +552,11 @@ Defined in the env schema (`apps/api/src/config/env.ts`), read lazily through `o
 
 ## Cron Jobs
 
-Stored in DB, registered on worker startup. **A tick never runs its handler:** `processJob` hands a `cron` job to `enqueueCronRun`, which enqueues the real run through `enqueueJob` as a `cronTrigger` job carrying the row's `id`, with the row's attempts and backoff. The admin trigger (`triggerCronJob`) goes through the same `enqueueCronRun`. So a scheduled run and a manual trigger collide like any two enqueues (a singleton is deduplicated on the row; a superseding job takes over). A repeatable's job template cannot carry a deduplication id, which is why the tick hands off. On startup `registerCronJobs` also removes any BullMQ repeatable no enabled row registered (a renamed or disabled job left behind), unless a row failed to register. The `cronJobSync` hook moves the BullMQ repeatable when a row is created, updated or deleted inside `db.txn`. BullMQ's `removeRepeatable(name, repeat, jobId)` takes the job id as its third argument: a `jobId` inside `repeat` is overwritten, so the key never matches.
+Stored in DB, registered on worker startup. **A tick never runs its handler:** `processJob` hands a `cron` job to `enqueueCronRun`, which enqueues the real run through `enqueueJob` as a `cronTrigger` job carrying the row's `id`, with the row's attempts and backoff. The admin trigger (`triggerCronJob`) goes through the same `enqueueCronRun`. So a scheduled run and a manual trigger collide like any two enqueues (a singleton is deduplicated on the row; a superseding job takes over). A repeatable's job template cannot carry a deduplication id, which is why the tick hands off. On startup `registerCronJobs` also removes any BullMQ repeatable no enabled row registered (a renamed or disabled job left behind), unless a row failed to register. The `cronJobSync` hook moves the BullMQ repeatable whenever a row's handler, jobId, pattern, enabled, payload or retry policy changes (create, update, upsert, delete inside `db.txn`). BullMQ's `removeRepeatable(name, repeat, jobId)` takes the job id as its third argument: a `jobId` inside `repeat` is overwritten, so the key never matches.
+
+### System Cron Jobs (seeded)
+
+The system's own jobs are rows in `packages/db/prisma/seeds/cronJob.seed.ts` with stable ids. The seed runner writes each record inside `db.txn`, so with the api seed (`bun run db:seed`, hooks registered) every deploy's seed brings `name`, `jobId`, `handler` and `description` back in line with the code and the hook swaps the repeatable: renaming a handler is a code change plus a seed. `pattern`, `enabled`, `payload`, `maxAttempts` and `backoffMs` are admin-tunable in superadmin, so the seed sets them on insert only (`updateOmitFields`).
 
 ### Cron Patterns (UTC)
 

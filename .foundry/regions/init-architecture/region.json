@@ -3,7 +3,7 @@
   "title": "Init script architecture and direction",
   "routing": "Is this about how the init TUI is structured or where it is heading: ConfigProvider / useConfig / syncConfig and the root config state, getProjectConfig with cache-busted imports, markComplete / isComplete and detectSetupState / derived setupState with useMemo, manual sync not polling, viewState naming vs execution flags, state management standards, resource naming, the file layout (init/views, init/tasks, init/api), creating a new task view, checkPrerequisites, execAsync vs execSync, retryWithTimeout, getSecret, the Launch preflight gate, or the cut-over from the TUI to headless init:agent and from push to migrations?",
   "concepts": ["init-architecture"],
-  "tokens": 11363,
+  "tokens": 12102,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
@@ -14,13 +14,14 @@
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 11363
+      "tokens": 12102
     }
   },
   "runsAgreed": 0,
   "sources": {
     "docs": ["docs/claude/INIT_SCRIPT_PATTERNS.md"],
     "docUnits": [
+      "doc:docs/claude/INIT_SCRIPT_PATTERNS.md#direction-pre-launch-launched-in-progress",
       "doc:docs/claude/INIT_SCRIPT_PATTERNS.md#architecture-overview",
       "doc:docs/claude/INIT_SCRIPT_PATTERNS.md#core-patterns",
       "doc:docs/claude/INIT_SCRIPT_PATTERNS.md#core-patterns/1-root-level-config-state-context-provider",
@@ -34,7 +35,7 @@
       "doc:docs/claude/INIT_SCRIPT_PATTERNS.md#key-takeaways"
     ],
     "catalogClusters": [
-      "build-deploy-ci",
+      "database-scripts-migrations",
       "dev-setup-scripts",
       "environment-config",
       "guided-flows",
@@ -44,7 +45,7 @@
       "testing-rules"
     ],
     "codeEntries": 0,
-    "docMembers": 36
+    "docMembers": 39
   },
   "bypassLines": 21,
   "glossaryTerms": 23

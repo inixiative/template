@@ -137,6 +137,7 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 
 | Problem | Use | Read | Signs you're bypassing it |
 |---|---|---|---|
+| baseline the database migration history in the db package | **bun run db:baseline** · script `package.json` — baseline the database migration history in the db package | — | — |
 | copy the remote database down to my machine; pull staging data into my local database; clone prod locally without firing its webhooks; dump and restore to get remote data locally | **bun run db:clone** · script `package.json` — Direct copy without keeping a file; use db:dump plus db:restore when you need a reusable snapshot. | — | — |
 | run the pending migrations in production; apply migrations in CI; ship the schema to the deployed database; the deploy step that updates the database | **bun run db:deploy** · script `package.json` — Ship schema to a database; for local data snapshots use db:dump/db:restore instead. | — | — |
 | save a snapshot of the database to a file; export the database so I can restore it later; keep a reusable dump of this data; back up the database before I try this | **bun run db:dump** · script `package.json` — Save a snapshot for later db:restore; to copy one database into another directly use db:clone. | — | — |
@@ -147,11 +148,10 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 | push refuses because of data loss, force it; accept the data loss and reset the local schema; the schema push warns about dropping a column; force the schema through on my local database | **bun run db:push:force** · script `package.json` — Only when db:push refuses due to data loss; otherwise db:push. | — | — |
 | load a dump file into the database; import the snapshot I saved earlier; restore the database from a file; bring back the backup | **bun run db:restore** · script `package.json` — Restore a db:dump snapshot; for direct database copy use db:clone, for fixture data db:seed. | — | — |
 | open a GUI to browse the rows; poke at the database tables visually; edit a row by hand in a UI | **bun run db:studio** · script `package.json` — open Prisma Studio to browse and edit database rows | — | — |
-| the script behind the remote-to-local copy; pipe a dump straight into a restore by hand; copy a remote database and strip its live webhooks | **scripts/db/clone.sh** · primitive scripts/db/clone.sh — Pulling remote data locally; use instead of dump.sh plus restore.sh to avoid live webhooks. | part 4 | copying a remote database with a hand-run pg_dump \| pg_restore (or db:dump + db:restore), which leaves live webhook subscriptions in the local copy (docs/claude/DATABASE.md § Scripts › Database Operations) |
-| the script that exports the database; run the dump with the right flags | **scripts/db/dump.sh** · primitive scripts/db/dump.sh — export the database to a dump | part 4 | — |
-| the release-time database script; what runs against the database on deploy; migrate during the release, not a local push | **scripts/db/release.sh** · primitive scripts/db/release.sh — Release/deploy only; local dev uses db:push:dev. | part 4 | — |
-| the script that imports a dump; run the restore for a saved file | **scripts/db/restore.sh** · primitive scripts/db/restore.sh — import a database dump | part 4 | — |
-| push the schema in the CI deploy step; use push in production instead of migrations; schema sync for a shared or production database | **db:push is dev only** · rule docs Database — any non-dev schema delivery | part 4 | `db:push` (or `prisma db push`) in a CI or production deploy step instead of `db:migrate` to create a migration and `db:deploy` to run it (docs/claude/DATABASE.md § Scripts (Development / Production Workflow); docs/claude/SCRIPTS.md § Database) |
+| apply schema (push pre-launch, migrate deploy launched) then run non-prime seed | **Release step: schema then non-prime seed** · pattern scripts/db/release.sh — Deploying schema to a deployed database; no deploy hook invokes it yet. | part 4 | — |
+| read the launched flag for shell scripts | **checkLaunched.ts** · primitive scripts/checkLaunched.ts — read the launched flag for shell scripts | part 4 | — |
+| prisma/migrations and project.config.ts must be committed together when launching. | **Commit migrations with launch config** · rule docs/claude/DATABASE.md § Schema Changes — When the Launch step flips launched to true. | part 4 | — |
+| Pre-launch schema reaches databases by db push; after launch only via committed migrations. | **Push before launch, migrations after** · rule project.config.ts launched; scripts/db/release.sh — Every schema change; the launched flag decides the path. | part 4 | — |
 
 - *Also here, by name:* bun run db:truncate:webhooks (`package.json`)
 
@@ -166,19 +166,24 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 
 | Problem | Use | Read | Signs you're bypassing it |
 |---|---|---|---|
-| populate every table with the fixture data; run the whole seed in dependency order; seed everything as the seed actor so audit sees it; write a one-off script to insert fixture rows; loop over records with create to populate the database | **seed** · primitive `packages/db/prisma/seed.ts#seed` — Seeds every table; use seedTable to load one SeedFile alone. For test data use factories instead. | docs/claude/DATABASE.md § Seeding; docs/claude/SCRIPTS.md § Database | one-off fixture-insert scripts or hand-run `db.x.create` loops to populate a database, instead of SeedFiles run by the seed runner (use factories for test data) (docs/claude/DATABASE.md § Seeding; catalog seed) |
+| populate every table with the fixture data; run the whole seed in dependency order; seed everything as the seed actor so audit sees it; write a one-off script to insert fixture rows; loop over records with create to populate the database | **seed** · primitive `packages/db/prisma/seed.ts#seed` — Seeds every table; use seedTable to load one SeedFile alone. For test data use factories instead. | docs/claude/DATABASE.md § Seeding; docs/claude/DATABASE.md § Scripts | one-off fixture-insert scripts or hand-run `db.x.create` loops to populate a database, instead of SeedFiles run by the seed runner (use factories for test data) (docs/claude/DATABASE.md § Seeding; catalog seed) |
 | seed just this one model; load a single seed file; re-seed one table without the rest; run only the email template seeds | **seedTable** · primitive `packages/db/prisma/seed.ts#seedTable` — One model's seed file only; run seed for the full dataset under the seed audit actor. | — | — |
 | put fresh fixture data in the database; seed the database from the command line; seed with the dev users and tokens too; a provisioning script to insert the rows; reset to the standard data set | **bun run db:seed** · script `package.json` — Fresh fixture data; to copy real data use db:clone or db:restore instead. | — | inserting seed rows with a one-off script or `db.x.createMany` outside the seed runner, skipping hooks and savers (seeding runs through the api seed script) (package.json db:seed (api seed script); docs/claude/DATABASE.md § Seeding) |
-| store the seeded login password hashed; plaintext password in the seed file; seed a user I can log in as | **Seed passwords as bcrypt hashes** · pattern packages/db/prisma/seeds/account.seed.ts — store seeded credential passwords pre-hashed with bcrypt on account records | part 4 | — |
-| seeds upsert by id so reruns are safe; tables in order, records in parallel; run the seed again without duplicates; use a promise pool library for seed concurrency | **Seed pipeline: id upsert, tables sequential, records concurrent** · pattern packages/db/prisma/seed.ts — upsert by id, seeding tables in order and records via resolveAll concurrency 10 | part 4 | — |
-| where is the zod schema for this model; hand-write a request type for the model shape; validate against the model's generated schema | **generated zod schemas** · primitive packages/db/src/generated/zod/ — use instead of hand-written request/response types for model shapes. | part 4 | — |
-| model metadata available at runtime; which fields does this model have, in code; hand-declare the model types in a map | **prismaMap.gen.ts** · primitive packages/db/src/generated/prismaMap.gen.ts — runtime model metadata instead of hand-declared model types. | part 4 | — |
-| declare a model's seed records; which fields to skip on update when re-seeding; create-only seed data that never updates; the shape of a seed definition | **SeedFile** · primitive packages/db/prisma/seed.ts — declare a model's seed records, omitted update fields and create-only mode | part 4 | — |
-| loaded prod data and webhooks started firing; truncate webhook subscriptions after cloning; live subscriptions in my local copy | **Never fire production webhooks locally** · rule docs/claude/DATABASE.md > Database Operations — whenever loading remote data into local or test databases. | part 4 | — |
-| dev users and tokens that must not reach production; seed data only for local development; mark a seed record as not production-safe | **Prime flag for dev-only seed data** · rule packages/db/prisma/seeds/ — any record not safe for production; omit flag for production-safe data. | part 4 | — |
-| add the new seed file to the index; seed fails because the parent table isn't seeded yet; order the seeds so references exist first | **Register seeds in FK-safe order** · rule packages/db/prisma/seeds/index.ts — when adding a new seed file. | part 4 | a seed file that isn't added to seeds/index.ts, or is added before the tables it references (docs/claude/DATABASE.md § Seeding › Adding Seed Data) |
-| ids for seed records; random uuids in the seed file; leave the id out of the seed record | **Seed records use valid unique UUIDv7 ids** · rule packages/db/prisma/seeds/ — every seed record. | part 4 | seed records with uuid v4, sequential or omitted ids (the seed upserts by id and validates v7) (docs/claude/DATABASE.md § Seeding › Seed Architecture) |
-| where does the new model's schema go; one prisma file per model | **Split Prisma schema, one file per model** · rule packages/db/prisma/schema/ — whenever adding or changing a model. | part 4 | — |
+| add seed data via a seed file registered in FK-safe order | **Adding seed data** · pattern packages/db/prisma/seeds/index.ts — add seed data via a seed file registered in FK-safe order | part 4 | — |
+| Type ID parameters with phantom-branded model IDs so wrong-model IDs fail at compile time. | **Typed model IDs** · pattern packages/db/src/typedModelIds.ts — Function signatures taking model ids; prefer branded types over plain string. | part 4 | function signatures taking `id: string` for model IDs, or ad-hoc branded types, instead of `UserId` / `OrganizationId` from typedModelIds.ts (docs/claude/DATABASE.md § Typed Model IDs) |
+| where is the zod schema for this model; hand-write a request type for the model shape; validate against the model's generated schema | **generated zod schemas** · primitive packages/db/src/generated/zod/ — Use instead of hand-written request/response types for model shapes. | part 4 | — |
+| cast a raw string to a compile-time branded OrganizationId | **organizationId** · primitive packages/db/src/typedModelIds.ts — For Organization ids; userId, spaceId and others for their models. | part 4 | — |
+| model metadata available at runtime; which fields does this model have, in code; hand-declare the model types in a map | **prismaMap.gen.ts** · primitive packages/db/src/generated/prismaMap.gen.ts — Runtime model metadata instead of hand-declared model types. | part 4 | — |
+| declare a model's seed records; which fields to skip on update when re-seeding; create-only seed data that never updates; the shape of a seed definition | **SeedFile** · primitive packages/db/prisma/seeds/ — Static dev/prod data; set createOnly to never update, prime: true for dev-only records. | part 4 | — |
+| cast a raw string to a compile-time branded UserId | **userId** · primitive packages/db/src/typedModelIds.ts — One constructor per model (organizationId, spaceId, tokenId, inquiryId, etc.); pick the matching model. | part 4 | — |
+| Models carry createdAt defaulting to now() and updatedAt maintained by @updatedAt. | **createdAt/updatedAt timestamps** · rule docs/claude/DATABASE.md § Schema Conventions / DateTime Fields — Every Prisma model's timestamp fields. | part 4 | — |
+| Enum names end in Model (PascalCase values), Type, or Status/Role/Action (camelCase values). | **Enum suffix naming** · rule docs/claude/DATABASE.md § Schema Conventions / Enum Naming — Naming any new Prisma enum and its values. | part 4 | — |
+| Foreign key fields must always be declared as @db.VarChar(36). | **FK fields VarChar(36)** · rule docs/claude/DATABASE.md § Schema Conventions / Foreign Keys — Every foreign key field in the Prisma schema. | part 4 | FK columns declared as plain `String` without `@db.VarChar(36)` (docs/claude/DATABASE.md § Schema Conventions › Foreign Keys) |
+| loaded prod data and webhooks started firing; truncate webhook subscriptions after cloning; live subscriptions in my local copy | **Never fire production webhooks locally** · rule docs/claude/DATABASE.md § Scripts › Database Operations — Whenever production data lands in a local or test database. | part 4 | — |
+| Records flagged prime are never seeded in production. | **Prime data is dev-only** · rule docs/claude/DATABASE.md § Seeding / Prime Development Data — Any seed record not safe for production. | part 4 | — |
+| Every seed record id must be a valid, globally unique UUIDv7. | **Seed IDs must be unique UUIDv7** · rule docs/claude/DATABASE.md § Seeding / Adding Seed Data — Every record in any seed file; the seed script validates version 7 and duplicates. | part 4 | — |
+| where does the new model's schema go; one prisma file per model | **Split Prisma schema, one file per model** · rule packages/db/prisma/schema/ — Whenever adding or editing a Prisma model. | part 4 | — |
+| Every model id is a time-sortable UUIDv7 generated by the database as VarChar(36). | **UUIDv7 primary keys** · rule docs/claude/DATABASE.md § Schema Conventions / ID Fields (UUIDv7) — Every Prisma model's primary key. | part 4 | `@default(uuid())` / `cuid()` / autoincrement ids or `crypto.randomUUID()`, instead of `@default(dbgenerated("uuidv7()")) @db.VarChar(36)` (and `uuidv7()` in code) (docs/claude/DATABASE.md § Schema Conventions › ID Fields (UUIDv7)) |
 
 - *Also here, by name:* accountSeeds (`packages/db/prisma/seeds/account.seed.ts`); contactSeeds (`packages/db/prisma/seeds/contact.seed.ts`); cronJobSeeds (`packages/db/prisma/seeds/cronJob.seed.ts`); emailComponentSeeds (`packages/db/prisma/seeds/emailComponent.seed.ts`); emailSeedSavers (`apps/api/src/lib/email/emailSeedSavers.ts`); emailTemplateSeeds (`packages/db/prisma/seeds/emailTemplate.seed.ts`); organizationSeeds (`packages/db/prisma/seeds/organization.seed.ts`); organizationUserSeeds (`packages/db/prisma/seeds/organizationUser.seed.ts`); spaceSeeds (`packages/db/prisma/seeds/space.seed.ts`); spaceUserSeeds (`packages/db/prisma/seeds/spaceUser.seed.ts`); tokenSeeds (`packages/db/prisma/seeds/token.seed.ts`); userSeeds (`packages/db/prisma/seeds/user.seed.ts`)
 
@@ -198,28 +203,37 @@ Run from repo root or `packages/db`:
 | Script | Command | Purpose |
 |--------|---------|---------|
 | Generate | `bun run db:generate` | Generate Prisma client + Zod schemas |
-| Push | `bun run db:push` | Push schema to DB (dev only, no migration) |
-| Migrate | `bun run db:migrate` | Create migration file |
-| Deploy | `bun run db:deploy` | Run migrations (CI/production) |
+| Push | `bun run db:push` | Push schema to DB, no migration (`db:push:dev` = worktree-aware local + test push) |
+| Migrate | `bun run db:migrate` | Create a migration file (`prisma migrate dev`) — after launch |
+| Deploy | `bun run db:deploy` | Apply migrations (`prisma migrate deploy`) — after launch |
+| Baseline | `bun run db:baseline` | Create `prisma/migrations/0_init` from the schema; the Launch step runs it |
 | Studio | `bun run db:studio` | Open Prisma Studio GUI |
 | Seed | `bun run db:seed` | Run seed script |
+
+##### Schema Changes: Push Before Launch, Migrations After
+
+The cut-over is `launched` in `project.config.ts`, flipped by the init script's Launch step. **Before launch a deployed database is disposable:** schema reaches it by `prisma db push --accept-data-loss`, which drops whatever no longer fits. **After launch nothing may clobber a database:** schema reaches it only through committed migrations, applied by `prisma migrate deploy`, and the push paths close.
+
+| | Pre-launch (`launched: false`, the default) | Launched |
+|---|---|---|
+| Release step (`scripts/db/release.sh`) | `prisma db push --accept-data-loss`, then the non-prime seed | `prisma migrate deploy`, then the non-prime seed |
+| Changing the schema | edit `prisma/schema/`, `bun run db:generate && bun run db:push` (`db:push:dev` in a worktree) | `bun run db:migrate` creates a migration under `packages/db/prisma/migrations/`; review and commit it |
+| `setup.sh` | pushes and seeds the local database | skips push and seed |
+| Migration files | none | start at `0_init`, created by Launch |
+
+`scripts/checkLaunched.ts` reads the flag for the shell scripts. Guards that hold either way: `db:push:force` refuses outside `test`/`local`, and `push-dev.sh` refuses a non-local `DATABASE_URL`.
+
+**What Launch does** (init → Launch, [#197](https://github.com/inixiative/template/pull/197)): `bun run db:baseline` writes `prisma/migrations/0_init` as the diff from an empty database to `prisma/schema` (once); for prod, and staging when enabled, it checks the deployed database matches `prisma/schema` and otherwise blocks launch ("deploy the current schema there, then launch"); it records `0_init` as applied on each (`prisma migrate resolve --applied 0_init`); then it sets `launched = true`. Commit `prisma/migrations` and `project.config.ts` together.
+
+**Not built:** nothing invokes `scripts/db/release.sh`. The Railway services the init creates run only `db:generate` at build and start the API/worker, and `scripts/deployment/deploy.sh` is a stub. Until a deploy hook runs it, the release step is run by hand against the target database.
 
 ##### Development Workflow
 
 ```bash
 # After schema changes
 bun run db:generate   # Regenerate client
-bun run db:push       # Push to local DB (fast, no migration)
-
-# When ready to commit
-bun run db:migrate    # Create migration file
-# Review migration, commit
-```
-
-##### Production Workflow
-
-```bash
-bun run db:deploy     # Run pending migrations
+bun run db:push       # Pre-launch: push to the local DB (in a worktree: bun run db:push:dev)
+bun run db:migrate    # Launched: create a migration, review it, commit it
 ```
 
 ##### Database Operations
@@ -244,8 +258,8 @@ bun run db:truncate:webhooks    # Clear webhook subscriptions (local/test only)
 # Schema operations (proxied to @template/db)
 bun run db:generate          # Generate Prisma client
 bun run db:push              # Push schema (dev only)
-bun run db:migrate           # Create migration
-bun run db:deploy            # Run migrations (production)
+bun run db:migrate           # Create migration (after launch)
+bun run db:deploy            # Apply migrations (after launch; pre-launch prod uses db push, see DATABASE.md)
 bun run db:studio            # Open Prisma Studio
 bun run db:seed              # Seed database
 bun run db:seed --prime      # Include prime dev data
@@ -422,6 +436,7 @@ export const accountSeeds: SeedFile = {
 From the catalog (`.foundry/catalog/catalog.json`, extracted from the code). Each line: **name** `where` [kind] the job it does. Use: canonical usage.
 
 #### Class `db-scripts`
+- **bun run db:baseline** `package.json` [script] baseline the database migration history in the db package Use: bun run db:baseline
 - **bun run db:clone** `package.json` [script] copy one database into another in a single step Use: bun run db:clone
 - **bun run db:deploy** `package.json` [script] apply database schema/migrations to the target database via the db package Use: bun run db:deploy
 - **bun run db:dump** `package.json` [script] export the database to a dump file Use: bun run db:dump

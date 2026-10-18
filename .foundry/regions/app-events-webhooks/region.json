@@ -3,18 +3,18 @@
   "title": "App events and webhooks",
   "routing": "Is this about a side effect leaving a business write (emitAppEvent, makeAppEvent, AppEventName, the handlers index, email/WebSocket handoffs, cb callbacks, streamAppend, observeRegistry, AppEvent rows, db.onCommit deferral, db.parallel allSettled) or outbound webhooks (WebhookSubscription, WebhookEvent, sendWebhook, the webhookDelivery hook, webhookEnabledModels, webhookRelatedModels, webhookOwnerAllowedModels, x-webhook-signature, validateWebhookUrl, webhookUrlSchema, circuit breaker, HOOK_IGNORE_FIELDS)?",
   "concepts": ["app-events", "webhooks"],
-  "tokens": 14421,
+  "tokens": 15766,
   "tokenMethod": "chars/4",
   "files": {
     "recognise": {
       "path": "recognise.md",
-      "tokens": 2827,
+      "tokens": 2783,
       "experimental": true,
       "note": "recognise/pick split under test (model round); not the standard"
     },
     "knowledge": {
       "path": "knowledge.md",
-      "tokens": 14421
+      "tokens": 15766
     }
   },
   "runsAgreed": 1,
@@ -42,15 +42,22 @@
     ],
     "catalogClusters": [
       "app-events-side-effects",
+      "cron-and-recurring-work",
       "data-access-rules",
+      "email-composition-rendering",
+      "email-delivery-senders",
+      "lenses-multi-source",
       "mutation-hooks",
+      "naming-vocabulary",
       "observability-telemetry",
       "outbound-webhooks",
       "request-response-schemas",
+      "superadmin-operations",
+      "websocket-connection-management",
       "websocket-realtime-delivery"
     ],
-    "codeEntries": 49,
-    "docMembers": 27
+    "codeEntries": 50,
+    "docMembers": 44
   },
   "bypassLines": 27,
   "glossaryTerms": 27

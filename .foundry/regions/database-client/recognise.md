@@ -42,7 +42,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - skip the hooks on purpose for this write
 - open a context that carries transaction state
 - these writes need to commit together or not at all
-- how do I name a new enum
 - the row lock wasn't acquired in time
 - hand-write a request type for the model
 - turn the model name into the lowercase accessor
@@ -60,7 +59,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - re-enter the transaction that's already open
 - which models have a deleted-at column
 - where does a new Prisma model go
-- each test runs in its own rolled-back transaction
 - enforce a row-level rule at the database layer
 - index for range or geometric queries
 - one per owner but the owner column is nullable
@@ -76,7 +74,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - I need to bypass the transaction for this one query
 - start a new async scope for this work
 - wrap the whole thing in one transaction
-- naming convention for enum values
 - waited for the lock and gave up
 - where do I get the validation schema for this model
 - check whether this string is a real model name
@@ -94,7 +91,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - run this callback inside the existing transaction scope
 - list a model's fields at runtime
 - one schema file per model
-- tests shouldn't see each other's rows
 - Prisma can't express this constraint, write the check
 - no two bookings may overlap at the database level
 - partial unique index over a nullable foreign key
@@ -127,7 +123,6 @@ A moment that says any of these, or something close, is this region's. Both voic
 - get back into the open transaction from a detached callback
 - hand-declare the model metadata in a map
 - add the model to the big schema file
-- roll back after every test instead of wiping tables
 - end date must be after start date in the database
 - composite unique across all the nullable polymorphic FKs
 - fixture objects for tests

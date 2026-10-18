@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, spyOn } from 'bun:test';
 import { createHash, randomBytes } from 'node:crypto';
-import { db, getRedisClient, unregisterDbHook } from '@template/db';
+import { db, getRedisClient, redisNamespace, unregisterDbHook } from '@template/db';
 import type { Contact, Organization, User } from '@template/db/generated/client/client';
 import { PlatformRole, TokenOwnerModel } from '@template/db/generated/client/enums';
 import {
@@ -10,7 +10,12 @@ import {
   createToken,
   createUser,
 } from '@template/db/test';
-import { STREAM_DEFINITIONS, WS_CHANNELS, WS_MAX_PENDING_FRAMES } from '@template/shared/ws';
+import {
+  STREAM_DEFINITIONS,
+  WS_CHANNELS,
+  WS_MAX_PENDING_FRAMES,
+  WS_MAX_STREAM_NAME_LENGTH,
+} from '@template/shared/ws';
 import { app } from '#/app';
 import { registerClearCacheHook } from '#/hooks/cache/hook';
 import { streamAppendFrame } from '#/ws/dataFrame';
@@ -176,6 +181,47 @@ describe('data streams (real app)', () => {
     }
   });
 
+  it('opens of one stream queued behind each other read one snapshot, and every open is answered', async () => {
+    const { socket, sent } = connect(memberBearer);
+    const probe = spyOn(app, 'request');
+    try {
+      await Promise.all(
+        Array.from({ length: 6 }, () => websocketHandler.message(socket, openFrame(stream))),
+      );
+      expect(
+        probe.mock.calls.filter(([input]) => String(input).endsWith('/contacts')),
+      ).toHaveLength(1);
+    } finally {
+      probe.mockRestore();
+    }
+
+    const answered = frames(sent);
+    expect(answered.filter((frame) => frame.type === 'opened')).toHaveLength(6);
+    expect(answered.filter((frame) => frame.action === 'snapshot')).toHaveLength(1);
+    expect(answered.at(-1)).toMatchObject({ action: 'snapshot', stream });
+    expect(socket.data.latestStreamFrames.size).toBe(0);
+  });
+
+  it('an open superseded by a queued close reads nothing and leaves the stream closed', async () => {
+    const { socket, sent } = connect(memberBearer);
+    const probe = spyOn(app, 'request');
+    try {
+      await Promise.all([
+        websocketHandler.message(socket, openFrame(stream)),
+        websocketHandler.message(socket, JSON.stringify({ action: 'close', stream })),
+      ]);
+      expect(probe).not.toHaveBeenCalled();
+    } finally {
+      probe.mockRestore();
+    }
+
+    expect(frames(sent)).toEqual([
+      { type: 'opened', stream },
+      { type: 'closed', stream },
+    ]);
+    expect(byStream.has(stream)).toBe(false);
+  });
+
   it('an open dequeued after the socket closed leaves nothing indexed', async () => {
     const { socket } = connect(memberBearer);
     const first = websocketHandler.message(socket, openFrame(stream));
@@ -326,7 +372,7 @@ describe('data streams (real app)', () => {
 
     it('stamps the snapshot with the seq of the last append before its read', async () => {
       await appendToStream(stream, { type: 'remove', payload: { id: 'before' } });
-      const counter = await readStreamSeq(getRedisClient(), streamSeqKey(stream));
+      const { seq: counter } = await readStreamSeq(getRedisClient(), streamSeqKey(stream));
       const { socket, sent } = connect(bearer);
       await websocketHandler.message(socket, openFrame(stream));
 
@@ -387,12 +433,90 @@ describe('data streams (real app)', () => {
       const reconnected = connect(bearer);
       await websocketHandler.message(reconnected.socket, openFrame(stream));
       const snapshot = frames(reconnected.sent)[1];
-      expect(snapshot.seq).toBe(await readStreamSeq(getRedisClient(), streamSeqKey(stream)));
+      expect(snapshot.seq).toBe((await readStreamSeq(getRedisClient(), streamSeqKey(stream))).seq);
       expect(snapshot.payload.data.map((row: { id: string }) => row.id)).toContain(created.id);
 
       await appendToStream(stream, { type: 'remove', payload: { id: created.id } });
       await waitFor(() => appendsOf(reconnected.sent).length === 1);
       expect(appendsOf(reconnected.sent)[0].seq).toBe(snapshot.seq + 1);
+    });
+
+    const freshStream = async () => {
+      const { context } = await createOrganizationUser({ role: 'member' });
+      return {
+        name: STREAM_DEFINITIONS.organizationReadManyContacts.name({ id: context.organization.id }),
+        authorization: (await createBearerToken(context.user)).authorization,
+      };
+    };
+
+    it('an unauthorized open creates no Redis key, and junk names never reach Redis', async () => {
+      const redis = getRedisClient();
+      const { socket, sent } = connect();
+      const knownFamily = STREAM_DEFINITIONS.organizationReadManyContacts.name({
+        id: crypto.randomUUID(),
+      });
+      const overLong = STREAM_DEFINITIONS.organizationReadManyContacts.name({
+        id: 'x'.repeat(WS_MAX_STREAM_NAME_LENGTH),
+      });
+      const unknownFamily = `junk-i-${'x'.repeat(100_000)}`;
+      const wsKeys = async () => (await redis.keys(`${redisNamespace.ws}:*`)).sort();
+      const wsKeysBefore = await wsKeys();
+      const evals = spyOn(redis, 'eval');
+      try {
+        for (const name of [overLong, unknownFamily])
+          await websocketHandler.message(socket, openFrame(name));
+        expect(evals).not.toHaveBeenCalled();
+        for (let i = 0; i < 5; i++) await websocketHandler.message(socket, openFrame(knownFamily));
+      } finally {
+        evals.mockRestore();
+      }
+
+      const answers = frames(sent).map((frame) => frame.type);
+      expect(answers.slice(0, 2)).toEqual(['openRejected', 'openRejected']);
+      expect(answers).toHaveLength(7);
+      expect(await redis.exists(streamSeqKey(knownFamily))).toBe(0);
+      expect(await wsKeys()).toEqual(wsKeysBefore);
+      expect(byStream.size).toBe(0);
+    });
+
+    it('an authorized open seeds an absent counter with its stamp, so the next append is one past it', async () => {
+      const fresh = await freshStream();
+      expect(await getRedisClient().exists(streamSeqKey(fresh.name))).toBe(0);
+      const { socket, sent } = connect(fresh.authorization);
+      await websocketHandler.message(socket, openFrame(fresh.name));
+
+      const snapshot = frames(sent)[1];
+      expect(await getRedisClient().get(streamSeqKey(fresh.name))).toBe(String(snapshot.seq));
+      await appendToStream(fresh.name, { type: 'remove', payload: { id: 'next' } });
+      await waitFor(() => appendsOf(sent).length === 1);
+      expect(appendsOf(sent)[0].seq).toBe(snapshot.seq + 1);
+    });
+
+    it('a counter created between the seq read and the claim re-reads the snapshot under the new counter', async () => {
+      const fresh = await freshStream();
+      const { socket, sent } = connect(fresh.authorization);
+      const realRequest = app.request.bind(app);
+      let reads = 0;
+      const spy = spyOn(app, 'request').mockImplementation((async (
+        input: string,
+        init?: RequestInit,
+      ) => {
+        if (!String(input).endsWith('/contacts')) return realRequest(input, init);
+        if (++reads === 1)
+          await appendToStream(fresh.name, { type: 'remove', payload: { id: 'racing' } });
+        return realRequest(input, init);
+      }) as never);
+      try {
+        await websocketHandler.message(socket, openFrame(fresh.name));
+      } finally {
+        spy.mockRestore();
+      }
+
+      const [opened, snapshot, ...rest] = frames(sent);
+      expect(reads).toBe(2);
+      expect(opened).toEqual({ type: 'opened', stream: fresh.name });
+      expect(snapshot.seq).toBe(Number(await getRedisClient().get(streamSeqKey(fresh.name))));
+      expect(rest.map((frame) => frame.seq)).toEqual([snapshot.seq]);
     });
 
     it('a dropped snapshot closes the socket instead of leaving the stream open without one', async () => {
