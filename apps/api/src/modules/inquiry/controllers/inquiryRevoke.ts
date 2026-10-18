@@ -20,11 +20,8 @@ export const inquiryRevokeController = makeController(inquiryRevokeRoute, async 
   const handler = inquiryHandlers[inquiry.type];
 
   await db.txn(async () => {
-    validateInquiryIsRevocable(
-      await lockInquiryAtVersion(db, inquiry.id, expectedUpdatedAt),
-      handler,
-    );
-    await handler.handleRevoke?.(db, inquiry, handler.contentSchema.parse(inquiry.content));
+    validateInquiryIsRevocable(await lockInquiryAtVersion(inquiry.id, expectedUpdatedAt), handler);
+    await handler.handleRevoke?.(inquiry, handler.contentSchema.parse(inquiry.content));
     await db.inquiry.update({
       where: { id: inquiry.id },
       data: { status: InquiryStatus.revoked },

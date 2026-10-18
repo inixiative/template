@@ -51,7 +51,7 @@ export type InquiryHandler<
   autoApprove(inquiry: Inquiry): Promise<boolean>;
   unique?: 'targeted' | 'untargeted';
   revocable?: boolean;
-  handleRevoke?(db: Db, inquiry: Inquiry, content: TContent): Promise<void>;
+  handleRevoke?(inquiry: Inquiry, content: TContent): Promise<void>;
   canApprove?(c: Context<AppEnv>, inquiry: Inquiry, content: TContent): Promise<boolean>;
   defaultExpirationDays?: number;
   appEvents?: InquiryAppEvents;

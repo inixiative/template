@@ -5,7 +5,7 @@
  * @uses infrastructure:prisma
  */
 
-import { type Db, type HydratedRecord, hydrate, type Prisma, type UserId } from '@template/db';
+import { db, type HydratedRecord, hydrate, type Prisma, type UserId } from '@template/db';
 import { InquiryResourceModel, Role } from '@template/db/generated/client/enums';
 import { type Entitlements, SessionAction } from '@template/permissions';
 import { canAssign } from '@template/permissions/assign';
@@ -40,7 +40,7 @@ const resolutionSchema = baseResolutionInputSchema.extend({
 type GrantUserEntitlementsContent = z.infer<typeof contentSchema>;
 type GrantUserEntitlementsResolution = z.infer<typeof resolutionSchema>;
 
-const findMembership = (db: Db, inquiry: Partial<Inquiry>) => {
+const findMembership = (inquiry: Partial<Inquiry>) => {
   if (inquiry.targetModel === InquiryResourceModel.Organization)
     return db.organizationUser.findFirst({
       where: { organizationId: inquiry.targetOrganizationId!, userId: inquiry.sourceUserId! },
@@ -51,11 +51,10 @@ const findMembership = (db: Db, inquiry: Partial<Inquiry>) => {
 };
 
 const writeMembershipEntitlements = async (
-  db: Db,
   inquiry: Inquiry,
   update: (current: Entitlements) => Entitlements,
 ) => {
-  const membership = await findMembership(db, inquiry);
+  const membership = await findMembership(inquiry);
   if (!membership) throw makeError({ status: 422, message: 'The requester is not a member' });
   const entitlements = update(membership.entitlements as Entitlements) as Prisma.InputJsonValue;
   if (inquiry.targetModel === InquiryResourceModel.Organization)
@@ -68,7 +67,6 @@ const isMembershipTarget = (inquiry: Partial<Inquiry>) =>
   inquiry.targetModel === InquiryResourceModel.Space;
 
 const validate = async (
-  db: Db,
   inquiry: Partial<Inquiry>,
   content: GrantUserEntitlementsContent,
 ): Promise<void> => {
@@ -77,7 +75,7 @@ const validate = async (
       throw makeError({ status: 422, message: 'Only a member can ask its organization or space' });
     if (!Object.values(content.entitlements ?? {}).some(Boolean))
       throw makeError({ status: 422, message: 'Name the entitlements to grant' });
-    if (!(await findMembership(db, inquiry)))
+    if (!(await findMembership(inquiry)))
       throw makeError({ status: 422, message: 'The requester is not a member' });
     return;
   }
@@ -88,7 +86,7 @@ const validate = async (
   )
     throw makeError({ status: 422, message: 'A user can only grant their own entitlements' });
 
-  const targetUser = await findUserWithRelations(db, inquiry.targetUserId as UserId);
+  const targetUser = await findUserWithRelations(inquiry.targetUserId as UserId);
   if (!targetUser) throw makeError({ status: 404, message: 'Target user not found' });
   const lacking = findActionsUserLacks(targetUser, content.entitlements);
   if (lacking.length)
@@ -141,11 +139,11 @@ export const grantUserEntitlementsHandler: InquiryHandler<
     );
   },
 
-  handleApprove: async (db, inquiry, content) => {
-    await validate(db, inquiry, content);
+  handleApprove: async (inquiry, content) => {
+    await validate(inquiry, content);
     if (isMembershipTarget(inquiry)) {
       let addedEntitlements: string[] = [];
-      await writeMembershipEntitlements(db, inquiry, (current) => {
+      await writeMembershipEntitlements(inquiry, (current) => {
         addedEntitlements = Object.keys(content.entitlements ?? {}).filter(
           (action) => content.entitlements?.[action] === true && current?.[action] !== true,
         );
@@ -157,10 +155,10 @@ export const grantUserEntitlementsHandler: InquiryHandler<
     return { grant: { role, entitlements, entitlementsOnly } };
   },
 
-  handleRevoke: async (db, inquiry) => {
+  handleRevoke: async (inquiry) => {
     if (!isMembershipTarget(inquiry)) return;
     const granted = new Set(resolutionSchema.parse(inquiry.resolution).addedEntitlements ?? []);
-    await writeMembershipEntitlements(db, inquiry, (current) =>
+    await writeMembershipEntitlements(inquiry, (current) =>
       Object.fromEntries(Object.entries(current ?? {}).filter(([action]) => !granted.has(action))),
     );
   },
