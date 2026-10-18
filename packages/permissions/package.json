@@ -9,7 +9,9 @@
   },
   "exports": {
     ".": "./src/index.ts",
+    "./assign": "./src/assign.ts",
     "./client": "./src/client.ts",
+    "./grant": "./src/grant.ts",
     "./types": "./src/types.ts",
     "./rebac/*": "./src/rebac/*",
     "./roles/*": "./src/roles/*"

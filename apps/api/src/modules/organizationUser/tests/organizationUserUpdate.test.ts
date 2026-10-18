@@ -49,4 +49,68 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
     expect(response.status).toBe(200);
     expect(data.role).toBe('viewer');
   });
+
+  it('an admin cannot give a member a custom key it does not hold itself', async () => {
+    const { entity: member } = await createOrganizationUser(
+      { role: 'member' },
+      { organization: org },
+    );
+    const response = await fetch(
+      patch(`/api/v1/organizationUser/${member.id}`, { entitlements: { 'report.export': true } }),
+    );
+    expect(response.status).toBe(403);
+  });
+
+  it('an admin holding the key gives it', async () => {
+    const { entity: holderMembership, context } = await createOrganizationUser(
+      { role: 'admin', entitlements: { 'report.export': true } },
+      { organization: org },
+    );
+    const holderFetch = createTestApp({
+      mockUser: context.user,
+      mockOrganizationUsers: [holderMembership],
+      mount: [(app) => app.route('/api/v1/organizationUser', organizationUserRouter)],
+    }).fetch;
+    const { entity: member } = await createOrganizationUser(
+      { role: 'member' },
+      { organization: org },
+    );
+    const response = await holderFetch(
+      patch(`/api/v1/organizationUser/${member.id}`, { entitlements: { 'report.export': true } }),
+    );
+    expect(response.status).toBe(200);
+  });
+
+  it('an admin cannot write owner- or admin-level entitlements, or assign itself', async () => {
+    const { entity: member } = await createOrganizationUser(
+      { role: 'member' },
+      { organization: org },
+    );
+    for (const entitlements of [{ own: true }, { manage: true }, { assign: true }]) {
+      const response = await fetch(
+        patch(`/api/v1/organizationUser/${member.id}`, { entitlements }),
+      );
+      expect(response.status).toBe(403);
+    }
+  });
+
+  it('an admin holding { assign } still cannot make someone an owner', async () => {
+    const { entity: assignerMembership, context } = await createOrganizationUser(
+      { role: 'admin', entitlements: { assign: true } },
+      { organization: org },
+    );
+    const assignerFetch = createTestApp({
+      mockUser: context.user,
+      mockOrganizationUsers: [assignerMembership],
+      mount: [(app) => app.route('/api/v1/organizationUser', organizationUserRouter)],
+    }).fetch;
+    const { entity: member } = await createOrganizationUser(
+      { role: 'member' },
+      { organization: org },
+    );
+    const response = await assignerFetch(
+      patch(`/api/v1/organizationUser/${member.id}`, { role: 'owner' }),
+    );
+    expect(response.status).toBe(403);
+  });
 });

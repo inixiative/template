@@ -8,6 +8,8 @@ import { roleToStandardAction } from '@template/permissions';
 import { check, rebacSchema } from '@template/permissions/rebac';
 import { getResource } from '#/lib/context/getResource';
 import { makeError } from '#/lib/errors';
+import { validateFullGrantIssuer } from '#/lib/permissions/validateFullGrantIssuer';
+import { validateHeldActions } from '#/lib/permissions/validateHeldActions';
 import { makeController } from '#/lib/utils/makeController';
 import { createToken } from '#/modules/me/services/createToken';
 import { organizationUserCreateTokenRoute } from '#/modules/organizationUser/routes/organizationUserCreateToken';
@@ -33,12 +35,25 @@ export const organizationUserCreateTokenController = makeController(
     if (!checkLeave || !checkOrg)
       throw makeError({ status: 403, message: `Cannot create ${body.role} token` });
 
+    validateHeldActions(
+      permix,
+      [{ model: 'organization', record: { id: orgUser.organizationId } }],
+      body.entitlements,
+    );
+
+    validateFullGrantIssuer(c, {
+      entitlements: body.entitlements ?? null,
+      entitlementsOnly: body.entitlementsOnly ?? false,
+    });
+
     const token = await createToken(c, {
       name: body.name,
       ownerModel: 'OrganizationUser',
       userId: orgUser.userId,
       organizationId: orgUser.organizationId,
       role: body.role,
+      entitlements: body.entitlements,
+      entitlementsOnly: body.entitlementsOnly,
       expiresAt: body.expiresAt,
     });
 

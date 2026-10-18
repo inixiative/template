@@ -14,9 +14,6 @@ export const refreshUserContext = async (c: Context<AppEnv>): Promise<void> => {
   const user = c.get('user');
   if (!user) return;
 
-  const permix = c.get('permix');
-  await permix.setup([], { replace: true });
-
   const userWithRelations = await findUserWithRelations(user.id);
   if (!userWithRelations) throw makeError({ status: 401, message: 'User no longer exists' });
 

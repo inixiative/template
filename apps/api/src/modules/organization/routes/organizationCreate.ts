@@ -4,13 +4,15 @@
  * @partOf feature:tenancy
  * @uses primitive:routeTemplates
  */
+
 import {
   OrganizationScalarInputSchema,
   OrganizationScalarSchema,
   OrganizationUserScalarSchema,
 } from '@template/db';
+import { UserAction } from '@template/permissions/client';
 import { createRoute } from '#/lib/routeTemplates';
-import { validateUser } from '#/middleware/validations/validateUser';
+import { validateSelfPermission } from '#/middleware/validations/validateSelfPermission';
 import { Modules } from '#/modules/modules';
 
 const responseSchema = OrganizationScalarSchema.extend({
@@ -21,5 +23,5 @@ export const organizationCreateRoute = createRoute({
   model: Modules.organization,
   bodySchema: OrganizationScalarInputSchema.pick({ name: true, slug: true }),
   responseSchema,
-  middleware: [validateUser],
+  middleware: [validateSelfPermission(UserAction.createOrganization)],
 });

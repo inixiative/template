@@ -5,36 +5,34 @@
  * @uses infrastructure:prisma
  */
 import type { UserId } from '@template/db';
-import { type Entitlements, getUserPermissions } from '@template/permissions';
-import type { Context } from 'hono';
-import { validateRole } from '#/lib/permissions/validateRole';
-import type { AppEnv } from '#/types/appEnv';
+import type { Permix } from '@template/permissions';
+import { capGrant, getUserPermissions, UserAction, userLoginGrant } from '@template/permissions';
+import type { PermissionPrincipal } from '#/lib/permissions/permissionPrincipal';
 
-export const setupUserPermissions = async (c: Context<AppEnv>) => {
-  const permix = c.get('permix');
-  const user = c.get('user');
-  const token = c.get('token');
+const membershipTokenModels = ['OrganizationUser', 'SpaceUser'];
 
-  // No user → no user permissions
+export const setupUserPermissions = async (permix: Permix, principal: PermissionPrincipal) => {
+  const { user, token } = principal;
   if (!user) return;
 
-  // Org or OrgUser tokens are org-scoped, don't get user permissions
-  if (token?.ownerModel === 'Organization' || token?.ownerModel === 'OrganizationUser') {
-    return;
-  }
-
-  // User token → restricted by token role
-  if (token?.ownerModel === 'User') {
+  if (token && membershipTokenModels.includes(token.ownerModel)) {
     await permix.setup(
-      getUserPermissions(
-        user.id as UserId,
-        validateRole(token.role),
-        token.entitlements as Entitlements,
-      ),
+      getUserPermissions(user.id as UserId, 'viewer', { [UserAction.identify]: true }, true),
     );
     return;
   }
 
-  // Person JWT → owner (full permissions)
-  await permix.setup(getUserPermissions(user.id as UserId));
+  const principalGrant = principal.grant;
+  const grant = principalGrant
+    ? capGrant('db:user', userLoginGrant, principalGrant)
+    : { ...userLoginGrant, entitlementsOnly: false };
+
+  await permix.setup(
+    getUserPermissions(
+      user.id as UserId,
+      grant.role,
+      { ...grant.entitlements, [UserAction.identify]: true },
+      grant.entitlementsOnly,
+    ),
+  );
 };

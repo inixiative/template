@@ -5,14 +5,11 @@
  * @uses primitive:batch
  */
 import { db } from '@template/db';
-import type { UserId } from '@template/db/typedModelIds';
 import { createPermissions } from '@template/permissions';
 import { logScope, withLogContext } from '@template/shared/logger';
 import type { Context, Next } from 'hono';
-import { isSuperadmin } from '#/lib/context/isSuperadmin';
-import { setupOrgPermissions } from '#/lib/permissions/setupOrgPermissions';
-import { setupSpacePermissions } from '#/lib/permissions/setupSpacePermissions';
-import { setupUserPermissions } from '#/lib/permissions/setupUserPermissions';
+import { buildPermix } from '#/lib/permissions/buildPermix';
+import { principalFromContext } from '#/lib/permissions/permissionPrincipal';
 import { parseBracketNotation } from '#/lib/utils/parseBracketNotation';
 import type { getBatchContext as getBatchContextFn } from '#/modules/batch/services/batchRegistry';
 import type { AppEnv } from '#/types/appEnv';
@@ -44,6 +41,7 @@ export const prepareRequest = async (c: Context<AppEnv>, next: Next) => {
       'spaceUsers',
       'spaces',
       'token',
+      'entitlementGrant',
       'spoofedBy',
     ] as const;
     for (const key of keysToClone) {
@@ -51,16 +49,7 @@ export const prepareRequest = async (c: Context<AppEnv>, next: Next) => {
       c.set(key, value ? structuredClone(value) : null);
     }
 
-    const user = batchContext.baseContext.get('user');
-    if (user) {
-      const permix = c.get('permix');
-      permix.setUserId(user.id as UserId);
-      if (isSuperadmin(c)) permix.setSuperadmin(true);
-
-      await setupUserPermissions(c);
-      await setupOrgPermissions(c);
-      await setupSpacePermissions(c);
-    }
+    c.set('permix', await buildPermix(principalFromContext(c)));
   } else {
     c.set('user', null);
     c.set('organizationUsers', null);
@@ -68,6 +57,7 @@ export const prepareRequest = async (c: Context<AppEnv>, next: Next) => {
     c.set('spaceUsers', null);
     c.set('spaces', null);
     c.set('token', null);
+    c.set('entitlementGrant', null);
     c.set('spoofedBy', null);
   }
 

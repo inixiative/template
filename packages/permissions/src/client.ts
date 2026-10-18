@@ -24,17 +24,34 @@ export type OrganizationAction = (typeof OrganizationAction)[keyof typeof Organi
 export const SpaceAction = { ...StandardAction } as const;
 export type SpaceAction = (typeof SpaceAction)[keyof typeof SpaceAction];
 
-export const UserAction = { ...StandardAction } as const;
+export const SessionAction = {
+  createToken: 'token.create',
+  deleteToken: 'token.delete',
+  redactUser: 'user.redact',
+  rotateUserJwts: 'user.rotateJwts',
+  deleteOrganization: 'organization.delete',
+} as const;
+export type SessionAction = (typeof SessionAction)[keyof typeof SessionAction];
+
+export const UserAction = {
+  ...StandardAction,
+  ...SessionAction,
+  identify: 'user.identify',
+  createOrganization: 'organization.create',
+} as const;
 export type UserAction = (typeof UserAction)[keyof typeof UserAction];
 
 export const InquiryAction = {
   read: 'read',
   send: 'send',
   resolve: 'resolve',
+  revoke: 'revoke',
 } as const;
 export type InquiryAction = (typeof InquiryAction)[keyof typeof InquiryAction];
 
-export type Action = UserAction | OrganizationAction | SpaceAction | InquiryAction;
+export type CustomAction = `${string}.${string}`;
+
+export type Action = UserAction | OrganizationAction | SpaceAction | InquiryAction | CustomAction;
 
 export type Entitlements = Record<string, boolean> | null;
 
@@ -42,13 +59,14 @@ export type ActionState = Partial<Record<Action, boolean | ((data?: unknown) => 
 export type PermissionEntry = { resource: string; id?: string; actions: ActionState };
 type PermissionDefinition = Record<string, { action: Action }>;
 
-const deniedActions: Record<Action, false> = {
+const deniedActions: Record<StandardAction | InquiryAction, false> = {
   read: false,
   operate: false,
   manage: false,
   own: false,
   send: false,
   resolve: false,
+  revoke: false,
 };
 
 export type Permix = {

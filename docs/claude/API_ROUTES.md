@@ -1060,7 +1060,7 @@ Add route-level middleware via the `middleware` option:
 ```typescript
 import { validatePermission } from '#/middleware/validations/validatePermission';
 import { validateOwnerPermission } from '#/middleware/validations/validateOwnerPermission';
-import { validateNotToken } from '#/middleware/validations/validateNotToken';
+import { validateSelfPermission } from '#/middleware/validations/validateSelfPermission';
 
 // ReBAC permission check on loaded resource
 readRoute({
@@ -1077,16 +1077,18 @@ updateRoute({
   responseSchema,
 });
 
-// Forbid token auth (person JWT only)
+// No resource to load: check an action on the user itself (session actions included)
 createRoute({
-  model: 'token',
-  middleware: [validateNotToken],
+  model: Modules.me,
+  submodel: Modules.token,
+  skipId: true,
+  middleware: [validateSelfPermission(SessionAction.createToken)],
   bodySchema,
   responseSchema,
 });
 ```
 
-See [AUTH.md](AUTH.md#validation-middleware) for all available validation middlewares.
+Every route declares an action; authentication alone is not a check. See [AUTH.md](AUTH.md#validation-middleware) for all available validation middlewares and [PERMISSIONS.md](PERMISSIONS.md#the-action-catalog) for the catalog.
 
 ---
 

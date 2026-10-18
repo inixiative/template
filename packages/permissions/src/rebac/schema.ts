@@ -19,6 +19,8 @@ export const rebacSchema: RebacSchema = {
         manage: 'own',
         operate: 'manage',
         read: 'operate',
+        'user.identify': 'read',
+        'organization.create': 'operate',
       },
     },
 
@@ -220,6 +222,17 @@ export const rebacSchema: RebacSchema = {
                 { rel: 'sourceSpace.organization', action: 'own' },
               ],
             },
+            // grantUserEntitlements — asking needs nothing; the approver needs authority to assign it
+            {
+              all: [
+                {
+                  rule: { field: 'type', operator: Operator.in, value: ['grantUserEntitlements'] },
+                },
+                {
+                  any: [{ self: 'sourceUserId' }, { rel: 'sourceIntegration', action: 'manage' }],
+                },
+              ],
+            },
           ],
         },
 
@@ -228,7 +241,27 @@ export const rebacSchema: RebacSchema = {
         // self check fails for regular users — superadmin bypass handles it.
         resolve: {
           any: [
-            { self: 'targetUserId' },
+            {
+              all: [
+                {
+                  rule: {
+                    field: 'type',
+                    operator: Operator.notIn,
+                    value: ['grantUserEntitlements'],
+                  },
+                },
+                { self: 'targetUserId' },
+              ],
+            },
+            {
+              all: [
+                {
+                  rule: { field: 'type', operator: Operator.in, value: ['grantUserEntitlements'] },
+                },
+                { self: 'targetUserId' },
+                { rel: 'targetUser', action: 'token.create' },
+              ],
+            },
             {
               any: [
                 // transferSpace — target org owner only
@@ -248,6 +281,22 @@ export const rebacSchema: RebacSchema = {
               ],
             },
             { rel: 'targetSpace', action: 'manage' },
+          ],
+        },
+
+        // Revoke: either party withdraws a standing grant
+        revoke: {
+          all: [
+            { rule: { field: 'type', operator: Operator.in, value: ['grantUserEntitlements'] } },
+            {
+              any: [
+                { self: 'sourceUserId' },
+                { self: 'targetUserId' },
+                { rel: 'sourceIntegration', action: 'manage' },
+                { rel: 'targetOrganization', action: 'manage' },
+                { rel: 'targetSpace', action: 'manage' },
+              ],
+            },
           ],
         },
       },

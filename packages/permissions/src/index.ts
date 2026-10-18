@@ -3,16 +3,27 @@ export { Role } from '@template/db/generated/client/enums';
 export {
   type Action,
   type ActionState,
+  type CustomAction,
   createPermissions,
   type Entitlements,
   InquiryAction,
   OrganizationAction,
   type PermissionEntry,
   type Permix,
+  SessionAction,
   SpaceAction,
   StandardAction,
   UserAction,
 } from './client';
+// Grants
+export {
+  capGrant,
+  type EntitlementGrant,
+  type Grant,
+  type GrantResource,
+  grantReaches,
+  userLoginGrant,
+} from './grant';
 // ReBAC
 export { check as rebacCheck } from './rebac/check';
 export { rebacSchema } from './rebac/schema';
@@ -28,8 +39,8 @@ export { getOrgPermissions, organizationRoles } from './roles/organization';
 // Shared role utilities
 export {
   allTrue,
+  grantActions,
   greaterRole,
-  intersectEntitlements,
   isSuperadmin,
   lesserRole,
   roleHierarchy,

@@ -25,6 +25,10 @@ export type InquirySourceFields =
       sourceOrganizationId: OrganizationId;
     }
   | { sourceModel: (typeof InquiryResourceModel)['Space']; sourceSpaceId: SpaceId }
+  | {
+      sourceModel: (typeof InquiryResourceModel)['Integration'];
+      sourceIntegrationId: string;
+    }
   | { sourceModel: (typeof InquiryResourceModel)['admin'] };
 
 export const resolveInquirySource = (c: Context<AppEnv>): InquirySourceFields => {
@@ -45,6 +49,15 @@ export const resolveInquirySource = (c: Context<AppEnv>): InquirySourceFields =>
       ...nullSourceFields,
       sourceModel: InquiryResourceModel.Space,
       sourceSpaceId: space.id as SpaceId,
+    };
+  }
+
+  if (resourceType === 'integration') {
+    const integration = getResource<'integration'>(c);
+    return {
+      ...nullSourceFields,
+      sourceModel: InquiryResourceModel.Integration,
+      sourceIntegrationId: integration.id,
     };
   }
 

@@ -10,8 +10,8 @@ import { LogScope, log } from '@template/shared/logger';
 import type { Context, Next } from 'hono';
 import { setUserContext } from '#/lib/context/setUserContext';
 import type { TokenWithRelations } from '#/lib/context/types';
-import { setupOrgPermissions } from '#/lib/permissions/setupOrgPermissions';
-import { setupSpacePermissions } from '#/lib/permissions/setupSpacePermissions';
+import { buildPermix } from '#/lib/permissions/buildPermix';
+import { principalFromContext } from '#/lib/permissions/permissionPrincipal';
 import { findUserWithRelations } from '#/modules/user/services/find';
 import type { AppEnv } from '#/types/appEnv';
 
@@ -133,9 +133,7 @@ export const tokenAuthMiddleware = async (c: Context<AppEnv>, next: Next) => {
         spaces: space ? [space] : [],
       });
     } else {
-      // Org/Space token → just set up permissions (no user context)
-      await setupOrgPermissions(c);
-      await setupSpacePermissions(c);
+      c.set('permix', await buildPermix(principalFromContext(c)));
     }
   } catch (err) {
     // Invalid token, lookup failure, or cache miss. Log so failure modes like

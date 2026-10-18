@@ -5,7 +5,9 @@
  * @uses infrastructure:prisma, feature:auth
  */
 import { createHash, randomBytes } from 'node:crypto';
+import type { Prisma } from '@template/db';
 import type { Role, TokenOwnerModel } from '@template/db/generated/client/enums';
+import type { Entitlements } from '@template/permissions';
 import type { Context } from 'hono';
 import type { AppEnv } from '#/types/appEnv';
 
@@ -24,6 +26,8 @@ type CreateTokenParams = {
   organizationId?: string;
   spaceId?: string;
   role: Role;
+  entitlements?: Entitlements;
+  entitlementsOnly?: boolean;
   expiresAt?: Date;
 };
 
@@ -45,6 +49,8 @@ export const createToken = async (c: Context<AppEnv>, params: CreateTokenParams)
       organizationId: params.organizationId,
       spaceId: params.spaceId,
       role: params.role,
+      entitlements: (params.entitlements ?? undefined) as Prisma.InputJsonValue | undefined,
+      entitlementsOnly: params.entitlementsOnly,
       expiresAt: params.expiresAt,
     },
   });

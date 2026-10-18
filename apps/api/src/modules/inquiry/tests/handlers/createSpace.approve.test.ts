@@ -51,7 +51,10 @@ describe('handler: createSpace — approve', () => {
     });
 
     const response = await adminFetch(
-      post(`/api/v1/inquiry/${inquiry.id}/resolve`, { status: 'approved' }),
+      post(`/api/v1/inquiry/${inquiry.id}/resolve`, {
+        expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
+        status: 'approved',
+      }),
     );
     expect(response.status).toBe(200);
 
@@ -72,7 +75,12 @@ describe('handler: createSpace — approve', () => {
       content: { name: 'Denied Space', slug: 'denied-space' },
     });
 
-    await adminFetch(post(`/api/v1/inquiry/${inquiry.id}/resolve`, { status: 'denied' }));
+    await adminFetch(
+      post(`/api/v1/inquiry/${inquiry.id}/resolve`, {
+        expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
+        status: 'denied',
+      }),
+    );
 
     const space = await db.space.findFirst({ where: { slug: 'denied-space' } });
     expect(space).toBeNull();

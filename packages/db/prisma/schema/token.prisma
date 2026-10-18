@@ -30,9 +30,10 @@ model Token {
   auditLogsAsActor   AuditLog[]        @relation("AuditLogActorToken")
   auditLogsAsSubject AuditLog[]        @relation("AuditLogSubjectToken")
 
-  // Permissions (for org-owned tokens)
-  role         Role  @default(member)
-  entitlements Json?
+  // Permissions: role + entitlements, capped per request by the owner's grant
+  role             Role    @default(member)
+  entitlements     Json?
+  entitlementsOnly Boolean @default(false)
 
   // TODO: Replace with a proper rate limiting system (tiers, quotas, etc.)
   // For now, simple per-second limit. Null = use default (10/s).

@@ -6,7 +6,7 @@
  */
 import type { User } from '@template/db/generated/client/client';
 import { PlatformRole, Role } from '@template/db/generated/client/enums';
-import type { Action, Entitlements } from '@template/permissions/client';
+import type { Action, ActionState, Entitlements } from '@template/permissions/client';
 import { compact } from 'lodash-es';
 
 export const isSuperadmin = (user?: Pick<User, 'platformRole'> | null) =>
@@ -30,20 +30,6 @@ export const greaterRole = (...roles: (Role | null | undefined)[]): Role => {
   );
 };
 
-export const intersectEntitlements = (
-  ...entitlements: (Entitlements | undefined)[]
-): Entitlements => {
-  const valid = compact(entitlements);
-  if (!valid.length) return null;
-  if (valid.length === 1) return valid[0];
-
-  const result: Record<string, boolean> = {};
-  for (const key of Object.keys(valid[0])) {
-    if (valid.every((e) => e[key])) result[key] = true;
-  }
-  return Object.keys(result).length ? result : null;
-};
-
 export const allTrue = <T extends Record<string, string>>(actions: T): Record<keyof T, boolean> =>
   Object.fromEntries(Object.keys(actions).map((k) => [k, true])) as Record<keyof T, boolean>;
 
@@ -61,3 +47,9 @@ export const rolesAtOrAbove = (role: Role | string): Role[] => {
   if (idx === -1) return [role as Role];
   return roleHierarchy.slice(idx) as unknown as Role[];
 };
+
+export const grantActions = (
+  baseActions: ActionState,
+  entitlements?: Entitlements,
+  entitlementsOnly = false,
+): ActionState => (entitlementsOnly ? { ...entitlements } : { ...baseActions, ...entitlements });
