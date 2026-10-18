@@ -60,7 +60,7 @@ prepareRequest
   - Wraps request in db.scope(requestId)
     ↓
 authMiddleware (session)
-  - Checks BetterAuth session cookie
+  - Resolves the bearer session token (`Authorization` or `?token=`); the cookie header is ignored
   - Loads user + organizationUsers
   - Calls setUserContext → sets up permix
     ↓

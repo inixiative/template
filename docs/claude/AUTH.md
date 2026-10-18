@@ -46,11 +46,11 @@ Who is the caller: sessions, API tokens, OAuth, spoofing, and the middleware tha
 
 ## Overview
 
-Two authentication methods, both populate the same context:
+Two authentication methods, both populate the same context. Both are bearer-only: a cookie never authenticates an API request (CI rule `bearer-only-auth`, [SCRIPTS.md](./SCRIPTS.md)).
 
-| Method | Use Case | Header/Cookie | Middleware |
+| Method | Use Case | Header | Middleware |
 |--------|----------|---------------|------------|
-| Session | Browser clients | `Authorization: Bearer <session token>` (or BetterAuth cookie, or `?token=`) | `authMiddleware` |
+| Session | Browser clients | `Authorization: Bearer <session token>` (or `?token=`) | `authMiddleware` |
 | API token | API clients | `Authorization: Bearer <key>` or `?token=<key>` | `tokenAuthMiddleware` |
 
 Both methods ultimately set `user`, `organizationUsers`, and configure `permix`.
@@ -83,7 +83,6 @@ export const auth = betterAuth({
 
   session: {
     expiresIn: 7 * 24 * 60 * 60,
-    cookieCache: { enabled: true, maxAge: 7 * 24 * 60 * 60, strategy: 'jwe' },
   },
 
   user: {
@@ -102,18 +101,17 @@ export const auth = betterAuth({
 
 ### Session Storage Strategy
 
-What is JWT and what is Redis:
+Nothing here is a JWT; the session lives in Redis:
 
 | Piece | What it is | Where it lives |
 |-------|-----------|----------------|
-| **Session token** | BetterAuth's session token: an opaque random id (32 chars), **not a JWT**. There is no `jwt()` plugin, only `bearer()`. As a cookie it's HMAC-signed with `BETTER_AUTH_SECRET`; `bearer()` accepts it signed or bare. | Web apps: localStorage. Sign-in returns it (`data.token` for email, `data.session.token` after the OAuth one-time-token exchange), `packages/ui/src/lib/auth/token.ts` stores it, and `packages/ui/src/lib/apiFetchInternal.ts` sends `Authorization: Bearer <token>` on every call |
+| **Session token** | BetterAuth's session token: an opaque random id (32 chars), **not a JWT**. There is no `jwt()` plugin, only `bearer()`. In BetterAuth's own cookie it's HMAC-signed with `BETTER_AUTH_SECRET`; `bearer()` accepts it signed or bare. | Web apps: localStorage. Sign-in returns it (`data.token` for email, `data.session.token` after the OAuth one-time-token exchange), `packages/ui/src/lib/auth/token.ts` stores it, and `packages/ui/src/lib/apiFetchInternal.ts` sends `Authorization: Bearer <token>` on every call |
 | **Session record** | `{ session, user }` JSON for that token, TTL = session expiry. A second key, `active-sessions-<userId>`, lists a user's live tokens. | **Redis** (`secondaryStorage`, keys under `redisNamespace.session`). Not written to Postgres: `storeSessionInDatabase` is off. The Prisma `Session` model is BetterAuth's default schema and is unused |
-| **Cookie cache** | The only JWT-format piece: an encrypted JWE (`strategy: 'jwe'`) `session_data` cookie carrying the session + user, valid up to `maxAge` (7 days). Applies only to cookie-based clients; the web apps don't use it. | Browser cookie on the API origin. Requests that carry it skip the Redis lookup |
 | **OAuth one-time token** | Single-use, 1 minute, stored hashed; consumed with Redis `GETDEL` (`getAndDelete`). | Redis |
 
-- **The web apps are bearer clients, and every bearer request reads Redis.** `authMiddleware` → `auth.api.getSession` resolves the token through Redis; the web apps send no cookie, so the JWE cache doesn't apply to them. Deleting the Redis key ends the session at once (that's how sign-out and revocation work).
+- **Every API client is a bearer client, and every request reads Redis.** `authMiddleware` → `auth.api.getSession` resolves the token through Redis. There is no cookie cache, so deleting the Redis key ends the session on the next request (that's how sign-out and revocation work).
 - **Lifetime.** `expiresIn` is 7 days, sliding: a session used more than a day (`updateAge`, default) after its last refresh is extended.
-- **Cookie clients.** A client that keeps the API's cookies gets the JWE cache, so it can authenticate without Redis for up to `maxAge`, and a revoked session stays valid there until the cookie cache expires.
+- **Cookies never authenticate an API request.** BetterAuth still sets its cookies on the API origin and uses them inside `/api/auth/*` (the OAuth state check, the one-time-token handoff), but `authMiddleware` deletes the `cookie` header before `getSession`, so a session cookie alone resolves no user. Why: a cookie path was a second way in, and its JWE cookie cache kept a revoked session valid for up to 7 days.
 - **Email verification is required** for email/password sign-up; the verification email goes out through the `user.verificationRequested` app event.
 
 API tokens are a different mechanism: SHA-256-hashed `Token` rows in Postgres, cached in Redis for 10 minutes ([Token Authentication](#token-authentication)).
@@ -140,7 +138,8 @@ Located in `apps/api/src/middleware/auth/authMiddleware.ts`:
 export const authMiddleware = async (c: Context<AppEnv>, next: Next) => {
   if (c.get('user')) return next();
 
-  const headers = c.req.raw.headers;
+  const headers = new Headers(c.req.raw.headers);
+  headers.delete('cookie');
   const urlToken = new URL(c.req.url).searchParams.get('token');
   if (urlToken && !headers.get('authorization')) headers.set('authorization', `Bearer ${urlToken}`);
 
@@ -178,7 +177,7 @@ Server side: `apps/api/src/lib/auth/oauthHandoffPlugins.ts`. Client side: `packa
 ### Bearer Token Handoff
 
 The SPA authenticates with bearer tokens, but the OAuth callback is a browser redirect: the session BetterAuth
-creates there exists only as a cookie on the API origin, which the SPA never sends. `oauthHandoffPlugins()`
+creates there exists only as a cookie on the API origin, which the SPA never sends and the API never accepts. `oauthHandoffPlugins()`
 (`apps/api/src/lib/auth/oauthHandoffPlugins.ts`) bridges the two:
 
 - `oneTimeToken({ setOttHeaderOnNewSession: true })` mints a single-use token (1 minute, stored hashed) for every new session
@@ -447,8 +446,8 @@ apiRouter.use('*', auditActorMiddleware);        // 5. Actor context for audit l
 apiRouter.use('*', apiRateLimit);
 ```
 
-Token auth runs first so an `Authorization: Bearer <key>` header always wins
-over a session cookie when both are present (typical SDK xhr from a browser).
+Token auth runs first: a bearer value is looked up as an API token, and only
+when it isn't one does `authMiddleware` resolve it as a session token.
 Spoof runs last so a superadmin can spoof via either auth path.
 
 ### Flow

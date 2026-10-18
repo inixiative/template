@@ -1,5 +1,6 @@
 /**
- * Shared runner for the fence rules (uuidv7-ids, one-middleware-chain, no-raw-locks, no-db-params).
+ * Shared runner for the fence rules (uuidv7-ids, one-middleware-chain, no-raw-locks, no-db-params,
+ * bearer-only-auth).
  * A detector hands over its violations; this file applies the rule's exemptions and baseline and exits.
  *
  * Data lives in scripts/ci/<rule>/ under the repo (or fixture) root:

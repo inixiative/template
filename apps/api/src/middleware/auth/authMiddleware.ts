@@ -14,7 +14,8 @@ export const authMiddleware = async (c: Context<AppEnv>, next: Next) => {
   // Skip if context already set from batch
   if (c.get('user')) return next();
 
-  const headers = c.req.raw.headers;
+  const headers = new Headers(c.req.raw.headers);
+  headers.delete('cookie');
 
   // Fall back to URL token if no auth header (for WebSocket, email links, etc.)
   const urlToken = new URL(c.req.url).searchParams.get('token');

@@ -265,7 +265,7 @@ Each `pass`/`fail` folder can contain one or more case subfolders (run alphabeti
 - External or illustrative names: `scripts/ci/doc-freshness/allow.txt` (`<doc>\t<value>` scopes one to a doc). References that were stale before the rule: `scripts/ci/doc-freshness/baseline.txt`, reported but not failed; an entry that stops occurring fails until its line is deleted
 - Warns, never fails, when the branch changes code whose `@atlas` `@partOf` concept lists docs in `.atlas/concepts.ts` and touches none of them
 
-**Fence rules** (`uuidv7-ids`, `one-middleware-chain`, `no-raw-locks`, `no-db-params`) scan the whole tree through `scripts/ci/rules/lib/fence.ts`. Each keeps its data in `scripts/ci/<rule>/`:
+**Fence rules** (`uuidv7-ids`, `one-middleware-chain`, `no-raw-locks`, `no-db-params`, `bearer-only-auth`) scan the whole tree through `scripts/ci/rules/lib/fence.ts`. Each keeps its data in `scripts/ci/<rule>/`:
 - `exempt.txt`: `<key>\t<reason>`, a named, deliberate exception. The reason is required, and an entry that no longer matches fails.
 - `baseline.txt`: the violations that predate the rule, written by `bun scripts/ci/rules/lib/<detector>.ts --write-baseline`. Listed violations are reported, not failed, so the rule fences new code at once while the old is burned down. Keys name a violation by content (model, mount path, function and parameter, SQL text), not by line, so a new violation in a listed file fails; an identical repeat is `<key>#2`. An entry that stops occurring fails until its line is deleted, and in a git checkout a line the merge base's baseline lacks fails, so the baseline only shrinks. A rule that takes no exemptions fails on an `exempt.txt`. Template has no baselines; downstream repos start with one.
 
@@ -284,6 +284,10 @@ Each `pass`/`fail` folder can contain one or more case subfolders (run alphabeti
 **no-db-params.sh:**
 - Fails on a function or method parameter (signatures in types included) named or destructuring `db`/`txn`/`tx`/`prisma` (or `_db`, …), or whose type mentions `Db`, `PrismaClient`, `TransactionClient` or `typeof db`, outside tests and `packages/db`
 - Use the scoped client, `import { db } from '@template/db'`, which resolves to the open `db.txn()` through AsyncLocalStorage. The only code that takes a client is the client itself and json-rules' Prisma planner, which lives outside the app
+
+**bearer-only-auth.sh:**
+- Fails, in non-test source under `apps/` and `packages/`, on `cookieCache`, `credentials` set to `'include'`, `withCredentials`, `document.cookie`, and a `getSession(...)` whose headers come from the request (`<x>.headers`, `c.req.header()`, `new Headers(...)` of those, or a local variable holding one) unless that variable had `.delete('cookie')` called on it before the lookup; a `getSession` with non-inline options fails too. Takes no exemptions
+- Why: API auth is bearer-only ([AUTH.md § Session Storage Strategy](./AUTH.md#session-storage-strategy)); a cookie path was a second way in, and its JWE cookie cache kept a revoked session valid for up to 7 days. BetterAuth's own `/api/auth/*` cookies (OAuth state, one-time-token handoff) are library code and out of scope
 
 **ui-serialized-factories.sh:**
 - For UI tests importing `@template/db/test`, requires `__serialize()` usage

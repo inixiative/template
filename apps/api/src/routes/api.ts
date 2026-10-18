@@ -53,9 +53,8 @@ apiRouter.all('/auth/*', (c) => auth.handler(c.req.raw));
 // One-click unsubscribe — public (no session/token); authorized by its own signed link.
 apiRouter.route('/unsubscribe', unsubscribeRouter);
 
-// Token first so an Authorization header always wins over a session cookie when
-// both are present (e.g. SDK xhr from a browser). Spoof runs last so it applies
-// regardless of which auth path resolved the user.
+// Bearer only: a value is tried as an API token, then as a session token; cookies
+// never authenticate. Spoof runs last so it applies whichever path resolved the user.
 apiRouter.use('*', tokenAuthMiddleware);
 apiRouter.use('*', authMiddleware);
 apiRouter.use('*', spoofMiddleware);

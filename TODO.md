@@ -172,10 +172,7 @@
 ## Notes
 
 ### Auth Documentation
-- Both BetterAuth strategies use JWT tokens
-- "Session" auth = JWT in httpOnly cookies
-- "Token" auth = JWT in Authorization header
-- Update docs to clarify this
+- Done: neither strategy is a JWT and both are bearer-only (docs/claude/AUTH.md). A session is BetterAuth's opaque token with its record in Redis; an API token is a hashed `Token` row. Cookies never authenticate an API request
 
 ### Optimistic Updates
 - ✅ Already implemented in `@template/shared`

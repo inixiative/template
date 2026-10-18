@@ -12,8 +12,8 @@ export const securitySchemes = {
     type: 'http',
     scheme: 'bearer',
     description:
-      'Session of a signed-in person, issued under `/api/auth`. Sent as `Authorization: Bearer <token>` ' +
-      '(the session cookie set at sign-in is accepted the same way). Operations under `/api/admin` ' +
+      'Session of a signed-in person, issued under `/api/auth`. Sent as `Authorization: Bearer <token>`; ' +
+      'a session cookie never authenticates an API request. Operations under `/api/admin` ' +
       'additionally require the superadmin platform role.',
   },
   apiToken: {
