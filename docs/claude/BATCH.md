@@ -523,6 +523,11 @@ sub-requests of one round, joins the batch's hold and runs after the holders bef
 waiting on itself. A lock wait past its `waitMs` fails that sub-request, which rolls the batch (or
 round) back. See [DATABASE.md](./DATABASE.md#redis-locks-held-until-the-transaction-ends).
 
+A round under `transactionAll` or `transactionPerRound` waits for every one of its sub-requests to
+settle before a failure rolls the transaction back; a sub-request that throws (an absolute URL, a bad
+interpolation) is recorded as a failed result rather than rejecting the round while its siblings
+still run, which would let them finish outside the rolled-back transaction.
+
 `allowFailures` and `failOnRound` run each round's sub-requests through `db.parallel` (capped by
 `getConcurrency([ConcurrencyType.db])`), so each sub-request gets its own scope and its own
 transaction; without that, parallel sub-requests sharing the parent request's scope joined whichever

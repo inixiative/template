@@ -120,6 +120,26 @@ describe('db.withLockUntilSettled', () => {
     expect(await isFree(options)).toBe(true);
   });
 
+  it('releases a lock whose acquisition finishes after the transaction already settled', async () => {
+    const options = lockOptions();
+    const outside = createLock(options);
+    await outside.acquire();
+    setTimeout(() => void outside.release(), 200);
+
+    let late: Promise<unknown> = Promise.resolve();
+    const failure = db.txn(async () => {
+      late = db
+        .withLockUntilSettled(options, async () => 'ran', { waitMs: 2_000 })
+        .catch(() => null);
+      await sleep(20);
+      throw new Error('roll back');
+    });
+    await expect(failure).rejects.toThrow('roll back');
+    await late;
+
+    expect(await isFree(options)).toBe(true);
+  });
+
   it('takes the same key again in one transaction without waiting on itself', async () => {
     const options = lockOptions();
     const started = Date.now();

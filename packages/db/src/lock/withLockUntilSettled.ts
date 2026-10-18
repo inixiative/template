@@ -12,10 +12,6 @@ import type { AcquireOptions, LockOptions } from '@template/db/lock/types';
 
 const keysHeldByCaller = new AsyncLocalStorage<ReadonlySet<string>>();
 
-// The Redis lock keeps other transactions out until this one settles; inside the transaction the
-// key's holders still run one at a time, so parallel branches of one batch round each validate
-// against what the branch before them wrote. A take from inside a holder's own `fn` (same async
-// chain) runs straight through rather than queueing behind itself.
 export const withLockUntilSettled = async <T>(
   openTransaction: OpenTransaction,
   options: LockOptions,

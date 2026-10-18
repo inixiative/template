@@ -185,6 +185,32 @@ describe('batch sub-requests under the owner lock', () => {
     });
   });
 
+  describe.each(['transactionAll', 'transactionPerRound'] as const)('%s', (strategy) => {
+    it('rolls back only after every sub-request of the failing round has settled', async () => {
+      const ownerLockHeld = gate();
+      const releaseOwnerLock = gate();
+      const outsideHolder = withOwnerLock(
+        { ownerModel: 'Space', ownerId: space.id },
+        'rules',
+        async () => {
+          ownerLockHeld.open();
+          await releaseOwnerLock.opened;
+        },
+      );
+      await ownerLockHeld.opened;
+      setTimeout(releaseOwnerLock.open, 300);
+
+      const result = await runBatch(strategy, [
+        [save(second, membersOf(first.id)), { method: 'GET', path: 'http://evil.test/x' }],
+      ]);
+      await outsideHolder;
+      await sleep(500);
+
+      expect(result.summary.status).toBe('failed');
+      expect(await conditionsOf(second)).toEqual(acmeRule);
+    });
+  });
+
   describe('transactionPerRound', () => {
     it('releases the lock when its round commits, not at the end of the batch', async () => {
       const holding = runBatch('transactionPerRound', [
