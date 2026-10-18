@@ -31,6 +31,11 @@ const createAuth = () =>
         }),
       },
     },
+    user: {
+      additionalFields: {
+        jwtVersion: { type: 'number', required: false, defaultValue: 0, input: false },
+      },
+    },
     plugins: authPlugins(),
   });
 

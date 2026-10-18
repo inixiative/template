@@ -166,15 +166,15 @@ The token's `iss` picks the issuer; an unknown `iss` is refused. `algorithms: ['
 
 ### Revocation and sign-out
 
-`signOutEverywhere(userId)` (`apps/api/src/modules/user/services/signOutEverywhere.ts`) increments `User.jwtVersion` through the scoped db client; the cache hooks drop the cached user, so the next request with an older JWT is a 401. No Redis lookup and no extra query: the version rides on the user row each request already loads. Why a version, not a timestamp: it needs no clock comparison and no second store (Aron, 2026-10-18: "the token just carries the version on the user… we just rotate that"). Permissions are not on the JWT, so a role or membership change applies on the next request without revoking anything. `jwtVerify` enforces `maxTokenAge` (30 days), so no JWT, external ones included, lives longer than that. A JWT from the configured external issuer carries that issuer's version, not ours; its revocation is the issuer's (and a `grant` claim is read live).
+`signOutEverywhere(userId)` (`apps/api/src/modules/user/services/signOutEverywhere.ts`) increments `User.jwtVersion` through the scoped db client; the cache hooks drop the cached user, so the next request with an older JWT is a 401. No Redis lookup and no extra query: the version rides on the user row each request already loads. Why a version, not a timestamp: it needs no clock comparison and no second store (Aron, 2026-10-18: "the token just carries the version on the user… we just rotate that"). Permissions are not on the JWT, so a role or membership change applies on the next request without revoking anything. `jwtVerify` enforces `maxTokenAge` (30 days), so no JWT, external ones included, lives longer than that. A JWT from the configured external issuer carries that issuer's version, not ours, so the version check does not apply to it: signing out here (`/me/signOut`, admin sign-out, password reset) does not end it. It ends when it expires (30 days at most), when the user is deleted here, when the issuer stops publishing its key, or, for a `grant` JWT, when the grant inquiry is revoked (read live). Signing out at the issuer is the issuer's job. The cached user row (`findUserWithRelations`, 10 minutes) is dropped by the cache hooks on the version bump; if that clear fails (the hook logs Redis errors), an old JWT can work until the cache entry expires, the same bound a role change has.
 
 | What | Revokes |
 |---|---|
 | Sign out of one browser | Nothing on the server: the SPA drops its JWT |
-| `POST /api/v1/me/signOut` | Every JWT of the caller (sign out everywhere). Person-only (`validateNotToken`): an API token cannot sign its user out |
-| `POST /api/admin/user/:id/signOut` | Every JWT of that user (superadmin) |
+| `POST /api/v1/me/signOut` | Every JWT this API signed for the caller (sign out everywhere). Person-only (`validateNotToken`): an API token cannot sign its user out |
+| `POST /api/admin/user/:id/signOut` | Every JWT this API signed for that user (superadmin) |
 | `redactUser` (`POST /api/v1/me/redact`, `POST /api/admin/user/:id/redact`) | Every JWT of the deleted account (version bumped; the soft-deleted user is refused too) |
-| Password reset (BetterAuth `onPasswordReset`) | Every JWT of that user |
+| Password reset (BetterAuth `onPasswordReset`) | Every JWT this API signed for that user |
 
 
 ### Spoofing and WebSockets

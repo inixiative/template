@@ -31,9 +31,11 @@ export const jwtHandoff = (): BetterAuthPlugin => ({
           const signedIn = (await ctx.context.internalAdapter.updateUser(newSession.user.id, {
             lastLoginAt: new Date(iat * 1000),
           })) as { jwtVersion?: number } | null;
+          if (typeof signedIn?.jwtVersion !== 'number')
+            throw new Error('Signed-in user has no jwtVersion to put on the JWT');
           const token = await signJWT(ctx, {
             options: personJwtOptions(),
-            payload: { sub: newSession.user.id, ver: signedIn?.jwtVersion ?? 0, iat },
+            payload: { sub: newSession.user.id, ver: signedIn.jwtVersion, iat },
           });
           await ctx.context.internalAdapter.deleteSession(newSession.session.token);
 
