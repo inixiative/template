@@ -13,6 +13,7 @@ import { auditActorContext, auditActorStore } from '@template/db/lib/auditActorC
 import { ConcurrencyType } from '@template/shared/utils';
 import { keyBy } from 'lodash-es';
 import { isManyAction } from '#/hooks/shared/hookRows';
+import { isSoftDeleteTransition } from '#/hooks/shared/softDeleteTransition';
 import { recordAudiences, type WebhookRow } from '#/hooks/webhooks/parties';
 import { findPartySubscriptions, isPartyTo } from '#/hooks/webhooks/subscriptions';
 import { enqueueJob } from '#/jobs/enqueue';
@@ -44,14 +45,17 @@ const getWebhookCallbacks = (subscriptions: WebhookSubscription[], payload: Webh
   });
 };
 
-const dbActionToWebhookAction = (dbAction: DbAction, hasPrevious: boolean): WebhookAction => {
-  if (dbAction === DbAction.upsert) {
-    return hasPrevious ? WebhookAction.update : WebhookAction.create;
+const dbActionToWebhookAction = (
+  dbAction: DbAction,
+  record: Record<string, unknown>,
+  previous?: Record<string, unknown>,
+): WebhookAction => {
+  if (dbAction === DbAction.createManyAndReturn || dbAction === DbAction.create) {
+    return WebhookAction.create;
   }
-  if (dbAction === DbAction.createManyAndReturn) return WebhookAction.create;
-  if (dbAction === DbAction.updateManyAndReturn) return WebhookAction.update;
-  if (dbAction === DbAction.deleteMany) return WebhookAction.delete;
-  return dbAction as unknown as WebhookAction;
+  if (dbAction === DbAction.delete || dbAction === DbAction.deleteMany) return WebhookAction.delete;
+  if (dbAction === DbAction.upsert && !previous) return WebhookAction.create;
+  return isSoftDeleteTransition(previous, record) ? WebhookAction.delete : WebhookAction.update;
 };
 
 const processSingleRecord = (
@@ -141,7 +145,7 @@ export const registerWebhookHook = () => {
             subscriptions.filter((sub) => isPartyTo(sub, parties)),
             webhookModel,
             model,
-            dbActionToWebhookAction(dbAction, previousData !== undefined),
+            dbActionToWebhookAction(dbAction, resultData, previousData),
             resultData,
             previousData,
           );

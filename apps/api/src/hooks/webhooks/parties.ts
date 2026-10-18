@@ -15,7 +15,7 @@ import {
   webhookRelatedModels,
 } from '@template/db';
 import type { WebhookModel } from '@template/db/generated/client/client';
-import { groupBy, mergeWith } from 'lodash-es';
+import { groupBy, keyBy, mergeWith } from 'lodash-es';
 
 export type WebhookRow = Record<string, unknown> & { id: string };
 export type Party = { kind: PolymorphicKind; id: string };
@@ -40,23 +40,38 @@ const counterparties = (
     .filter((axis) => axis !== ownAxis)
     .flatMap((axis) => axisParty(model, row, axis));
 
+const diedWith = (relation: Record<string, unknown>, row: WebhookRow) =>
+  relation.deletedAt == null ||
+  (row.deletedAt instanceof Date &&
+    relation.deletedAt instanceof Date &&
+    relation.deletedAt.getTime() === row.deletedAt.getTime());
+
 export const relatedCounterparties = async (
   ref: FalsePolymorphismRef,
-  rowIds: string[],
+  rows: WebhookRow[],
 ): Promise<Record<string, Party[]>> => {
   const column = polymorphicKeyColumn(ref.model, ref.axis, ref.value);
   if (!column) return {};
-  const relations = await db
-    .delegate(ref.model)
-    .findMany({ where: { [ref.axis]: ref.value, [column]: { in: rowIds } } });
-  const relationsByRowId = groupBy(relations, (relation) => relation[column]);
+  const tombstones = rows.flatMap(({ deletedAt }) =>
+    deletedAt instanceof Date ? [deletedAt] : [],
+  );
+  const relations = await db.delegate(ref.model).findMany({
+    where: {
+      [ref.axis]: ref.value,
+      [column]: { in: rows.map((row) => row.id) },
+      OR: [{ deletedAt: null }, { deletedAt: { in: tombstones } }],
+    },
+  });
+  const rowsById = keyBy(rows, 'id');
   return Object.fromEntries(
-    Object.entries(relationsByRowId).map(([rowId, rowRelations]) => [
-      rowId,
-      rowRelations.flatMap((relation) =>
-        counterparties(ref.model as WebhookModel, relation, ref.axis),
-      ),
-    ]),
+    Object.entries(groupBy(relations, (relation) => relation[column])).map(
+      ([rowId, rowRelations]) => [
+        rowId,
+        rowRelations
+          .filter((relation) => diedWith(relation, rowsById[rowId]))
+          .flatMap((relation) => counterparties(ref.model as WebhookModel, relation, ref.axis)),
+      ],
+    ),
   );
 };
 
@@ -72,12 +87,9 @@ export const recordAudiences = async (
   }
   const refs = (webhookRelatedModels[model] ?? []).filter((ref) => isWebhookModel(ref.model));
   if (refs.length === 0 || rows.length === 0) return [];
-  const rowIds = rows.map((row) => row.id);
   return Promise.all(
     Object.entries(groupBy(refs, 'model')).map(async ([webhookModel, modelRefs]) => {
-      const partyMaps = await Promise.all(
-        modelRefs.map((ref) => relatedCounterparties(ref, rowIds)),
-      );
+      const partyMaps = await Promise.all(modelRefs.map((ref) => relatedCounterparties(ref, rows)));
       const merged = mergeWith({}, ...partyMaps, (current: Party[] | undefined, next: Party[]) =>
         current ? current.concat(next) : next,
       );

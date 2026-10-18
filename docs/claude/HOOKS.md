@@ -224,7 +224,7 @@ export const webhookEnabledModels: WebhookModel[] = [
 
 ### Tenancy (AUTH-006 stopgap)
 
-A subscription receives a CustomerRef change when its owner (User, Organization or Space) is one of its two parties. It receives a party's own change when its owner is that party's counterparty on a live CustomerRef: a provider hears its customers, a customer hears its providers. The changed party does not hear its own change, and nothing travels past one CustomerRef. A row that sits on several CustomerRefs, or on both axes, reaches each subscription once. An organization does not yet hear about the CustomerRefs of its spaces (no inheritance), and `sendWebhook` does not re-check the relationship at delivery time. Both are part of `tickets/AUTH-006-webhook-tenant-isolation.md`.
+A subscription receives a CustomerRef change when its owner (User, Organization or Space) is one of its two parties. It receives a party's own change when its owner is that party's counterparty on a live CustomerRef: a provider hears its customers, a customer hears its providers. The changed party does not hear its own change, and nothing travels past one CustomerRef. A row that sits on several CustomerRefs, or on both axes, reaches each subscription once. A soft delete (`deletedAt` set) is delivered as `delete`. When a party is soft-deleted, its counterparties still hear it through CustomerRefs the cascade tombstoned with the same `deletedAt`; CustomerRefs deleted earlier stay silent. An organization does not yet hear about the CustomerRefs of its spaces (no inheritance), and `sendWebhook` does not re-check the relationship at delivery time. Both are part of `tickets/AUTH-006-webhook-tenant-isolation.md`.
 
 ### Webhook Payload
 

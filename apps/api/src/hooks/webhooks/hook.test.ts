@@ -12,12 +12,16 @@ import {
   createUser,
   createWebhookSubscription,
 } from '@template/db/test';
+import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
+import { registerSoftDeleteCascadeHook } from '#/hooks/softDeleteCascade/hook';
 import { registerWebhookHook } from '#/hooks/webhooks/hook';
 import * as enqueueModule from '#/jobs/enqueue';
 import { processJob } from '#/jobs/processJob';
 import { JobType } from '#/jobs/types';
 import { createMockJob } from '#tests/createTestWorker';
 
+registerPreventHardDeleteHook();
+registerSoftDeleteCascadeHook();
 registerWebhookHook();
 
 type Enqueued = {
@@ -147,12 +151,12 @@ describe('webhook hook — tenancy', () => {
     expect(enqueued()).toEqual([]);
   });
 
-  it('delivers deletes to the parties of the deleted row', async () => {
+  it('delivers a CustomerRef soft delete to its parties as a delete', async () => {
     const { customerUserId, sub } = await subscribedCustomer();
     const ref = await createRef(customerUserId);
     enqueueSpy.mockClear();
 
-    await db.customerRef.delete({ where: { id: ref.id } });
+    await db.customerRef.update({ where: { id: ref.id }, data: { deletedAt: new Date() } });
 
     expect(deliveredTo(sub.id)).toEqual([
       expect.objectContaining({ action: 'delete', resourceId: ref.id }),
@@ -368,6 +372,59 @@ describe('webhook hook — tenancy', () => {
 
     expect(deliveredTo(vendorSub.id)).toHaveLength(1);
     expect(deliveredTo(vendorOfVendorSub.id)).toEqual([]);
+  });
+
+  it('a vendor hears its customer soft delete as a delete', async () => {
+    const { customerUserId } = await subscribedCustomer();
+    const { entity: vendor } = await createOrganization();
+    const vendorSub = await subscribeOrganization(vendor.id);
+    await relate({ model: 'User', id: customerUserId }, { model: 'Organization', id: vendor.id });
+    enqueueSpy.mockClear();
+
+    await db.user.update({ where: { id: customerUserId }, data: { deletedAt: new Date() } });
+
+    expect(deliveredTo(vendorSub.id)).toEqual([
+      expect.objectContaining({ action: 'delete', resourceId: customerUserId }),
+    ]);
+  });
+
+  it('a customer hears its vendor soft delete, though the cascade tombstones their CustomerRef', async () => {
+    const { customerUserId, sub } = await subscribedCustomer();
+    const { entity: vendor } = await createOrganization();
+    const { entity: ref } = await relate(
+      { model: 'User', id: customerUserId },
+      { model: 'Organization', id: vendor.id },
+    );
+    enqueueSpy.mockClear();
+
+    await db.organization.update({ where: { id: vendor.id }, data: { deletedAt: new Date() } });
+
+    expect(
+      deliveredTo(sub.id)
+        .map(({ action, resourceId }) => ({ action, resourceId }))
+        .sort((a, b) => a.resourceId.localeCompare(b.resourceId)),
+    ).toEqual(
+      [
+        { action: 'delete', resourceId: vendor.id },
+        { action: 'delete', resourceId: ref.id },
+      ].sort((a, b) => a.resourceId.localeCompare(b.resourceId)),
+    );
+  });
+
+  it('a vendor deleted earlier does not resurface through a later customer change', async () => {
+    const { customerUserId } = await subscribedCustomer();
+    const { entity: vendor } = await createOrganization();
+    const vendorSub = await subscribeOrganization(vendor.id);
+    const { entity: ref } = await relate(
+      { model: 'User', id: customerUserId },
+      { model: 'Organization', id: vendor.id },
+    );
+    await db.customerRef.update({ where: { id: ref.id }, data: { deletedAt: new Date() } });
+    enqueueSpy.mockClear();
+
+    await db.user.update({ where: { id: customerUserId }, data: { name: 'After The Breakup' } });
+
+    expect(deliveredTo(vendorSub.id)).toEqual([]);
   });
 
   it('sends a customer email change to the vendor and never sends platformRole', async () => {
