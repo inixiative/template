@@ -232,7 +232,7 @@ describe('artifact routes', () => {
     expect(response.status).toBe(422);
   });
 
-  it("refuses a folder in another owner's container: crossing owners is a copy", async () => {
+  it("refuses a folder in another owner's container: placements stay within one owner", async () => {
     const personal = await createFolder(adminFetch, '/api/v1/me/artifacts');
     const response = await place(adminFetch, personal, shared);
     expect(response.status).toBe(422);

@@ -2,72 +2,66 @@
  * @atlas
  * @kind service
  * @partOf feature:files
- * @uses infrastructure:prisma
+ * @uses infrastructure:prisma, mutex
  */
 import { db } from '@template/db';
 import type { Artifact } from '@template/db/generated/client/client';
+
+const folderKey = (userId: string) => `organizationUser:${userId}`;
 
 export const findOrganizationUserFolder = (
   organizationId: string,
   userId: string,
 ): Promise<Artifact | null> =>
   db.artifact.findFirst({
-    where: {
-      ownerModel: 'Organization',
-      organizationId,
-      kind: 'organizationUserFolder',
-      permissions: { some: { granteeUserId: userId, role: 'owner' } },
-    },
+    where: { ownerModel: 'Organization', organizationId, systemKey: folderKey(userId) },
   });
 
-export const ensureOrganizationUserFolder = async (
-  organizationId: string,
-  userId: string,
-): Promise<Artifact> => {
-  const membership = await db.organizationUser.findUnique({
-    where: { organizationId_userId: { organizationId, userId } },
-  });
-  const folder =
-    (await findOrganizationUserFolder(organizationId, userId)) ??
-    (await db.artifact.create({
-      data: {
-        ownerModel: 'Organization',
-        organizationId,
-        kind: 'organizationUserFolder',
-        type: 'container',
-        name: 'Mine',
-        system: true,
-        access: 'private',
-      },
-    }));
+export const ensureOrganizationUserFolder = (organizationId: string, userId: string) =>
+  db.txn(async () => {
+    const [existing] = await db.findForUpdate<Artifact>(
+      'Artifact',
+      { organizationId, systemKey: folderKey(userId) },
+      { upserting: true },
+    );
+    const folder =
+      existing && !existing.deletedAt
+        ? existing
+        : await db.artifact.create({
+            data: {
+              ownerModel: 'Organization',
+              organizationId,
+              kind: 'organizationUserFolder',
+              type: 'container',
+              name: 'Mine',
+              system: true,
+              systemKey: folderKey(userId),
+              access: 'private',
+            },
+          });
 
-  const grants = await db.artifactPermission.findMany({
-    where: { artifactId: folder.id, granteeUserId: userId, role: 'owner' },
-  });
-  const memberGrant = grants.find((grant) => grant.granteeModel === 'OrganizationUser');
-  const pendingGrant = grants.find((grant) => grant.granteeModel === 'User');
-
-  if (membership && !memberGrant) {
-    await db.artifactPermission.create({
-      data: {
+    const membership = await db.organizationUser.findUnique({
+      where: { organizationId_userId: { organizationId, userId } },
+    });
+    if (!membership) return folder;
+    const granted = await db.artifactPermission.count({
+      where: {
         artifactId: folder.id,
         granteeModel: 'OrganizationUser',
         granteeOrganizationId: organizationId,
         granteeUserId: userId,
-        role: 'owner',
       },
     });
-  }
-  if (membership && pendingGrant) {
-    await db.artifactPermission.update({
-      where: { id: pendingGrant.id },
-      data: { deletedAt: new Date() },
-    });
-  }
-  if (!membership && !pendingGrant) {
-    await db.artifactPermission.create({
-      data: { artifactId: folder.id, granteeModel: 'User', granteeUserId: userId, role: 'owner' },
-    });
-  }
-  return folder;
-};
+    if (granted === 0) {
+      await db.artifactPermission.create({
+        data: {
+          artifactId: folder.id,
+          granteeModel: 'OrganizationUser',
+          granteeOrganizationId: organizationId,
+          granteeUserId: userId,
+          role: 'owner',
+        },
+      });
+    }
+    return folder;
+  });

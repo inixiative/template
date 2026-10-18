@@ -11,6 +11,7 @@ import { auditActorContext } from '@template/db/lib/auditActorContext';
 import { makeError } from '#/lib/errors';
 import { type OwnedArtifact, sameArtifactOwner } from '#/modules/artifact/lib/artifactOwner';
 import { copyArtifactInto } from '#/modules/artifact/services/artifactPlacements';
+import { resolveArtifactAccess } from '#/modules/artifact/services/resolveArtifactAccess';
 import { baseResolutionInputSchema } from '#/modules/inquiry/handlers/schemas';
 import {
   type TransferArtifactContent,
@@ -50,6 +51,14 @@ const loadOwnedObject = async (db: Db, artifactId: string, source: Party): Promi
   if (!artifact) throw makeError({ status: 404, message: 'Artifact not found' });
   if (!sameArtifactOwner(artifact, ownerOf(source))) {
     throw makeError({ status: 422, message: 'Only the owner of an artifact can transfer it' });
+  }
+  const resolution = (await resolveArtifactAccess([artifact.id])).get(artifact.id);
+  if (resolution?.memberScoped) {
+    throw makeError({
+      status: 422,
+      message:
+        "Org-user content can't be transferred; share it into one of the org's containers first",
+    });
   }
   if (artifact.type !== 'object') {
     throw makeError({
@@ -104,12 +113,22 @@ export const transferArtifactHandler: InquiryHandler<TransferArtifactContent> = 
   contentSchema: transferArtifactContentSchema,
   resolutionInputSchema: transferArtifactResolutionInputSchema,
   resolutionSchema: baseResolutionInputSchema,
-  unique: 'targeted',
   defaultExpirationDays: 30,
 
   validate: async (db, inquiry, content) => {
     const source = party(inquiry, 'sourceModel');
     await loadOwnedObject(db, content.artifactId, source);
+    const open = await db.inquiry.count({
+      where: {
+        type: 'transferArtifact',
+        status: { in: ['draft', 'sent', 'changesRequested'] },
+        content: { path: ['artifactId'], equals: content.artifactId },
+        ...(inquiry.id ? { id: { not: inquiry.id } } : {}),
+      },
+    });
+    if (open > 0) {
+      throw makeError({ status: 409, message: 'This artifact already has an open transfer' });
+    }
     if (inquiry.targetModel) {
       const target = party(inquiry, 'targetModel');
       if (target.kind === source.kind && target.id === source.id) {
@@ -129,6 +148,7 @@ export const transferArtifactHandler: InquiryHandler<TransferArtifactContent> = 
   handleApprove: async (db, inquiry, content) => {
     const source = party(inquiry, 'sourceModel');
     const target = party(inquiry, 'targetModel');
+    await db.findForUpdate('Artifact', { id: content.artifactId });
     const artifact = await loadOwnedObject(db, content.artifactId, source);
     const tracked = content.keepTracking && content.allowTracking !== false;
 

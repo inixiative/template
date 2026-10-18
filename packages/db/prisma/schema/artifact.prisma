@@ -8,7 +8,8 @@ model Artifact {
   type   ArtifactType
   name   String
   access ArtifactAccess @default(inherit)
-  system Boolean        @default(false)
+  system    Boolean        @default(false)
+  systemKey String?
 
   integrationId String?      @db.VarChar(36)
   integration   Integration? @relation(fields: [integrationId], references: [id], onDelete: Cascade)
@@ -35,6 +36,7 @@ model Artifact {
   // TEMPLATE ABOVE — Add app-specific fields, relations, indexes below
   // ==========================================================================
 
+  @@unique([organizationId, systemKey], where: raw("\"ownerModel\" = 'Organization' AND \"systemKey\" IS NOT NULL AND \"deletedAt\" IS NULL"), map: "Artifact_organization_system_key")
   @@index([ownerModel])
   @@index([userId])
   @@index([organizationId])

@@ -72,7 +72,7 @@ An `ArtifactPlacement` says "this artifact sits in that container". Containment 
 |---|---|---|
 | **place** (`POST /artifact/:id/artifactPlacements`) | adds a placement | `manage` on the artifact, `operate` on the container (`ARTIFACT_EDGE_AUTHORITY`) — the Google Drive shape |
 | **move** (`POST /artifact/:id/move`) | replaces one placement with another in one step; either end may be the root | the same, at each container end |
-| **copy** (`POST /artifact/:id/copy`) | a new artifact in the container, owned by its owner; a file copy shares the source's bytes until the sweeper copies them; a container is copied without its contents | `read` on the source, `operate` on the container |
+| **copy** (`POST /artifact/:id/copy`) | a new artifact in the container, owned by its owner; a file copy shares the source's bytes until the sweeper copies them (the sweeper, FEAT-009 § 16, is not built yet); a container is copied without its contents | `read` on the source, `operate` on the container |
 | **remove** (`DELETE /artifactPlacement/:id`) | removes a placement | as place |
 
 A placement is refused when the container's kind does not list the artifact's kind (`contains`), the two have different owners, or it would close a loop (`findReferenceCycle`, `packages/shared/src/graph/`) or nest deeper than 10.

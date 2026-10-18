@@ -305,6 +305,49 @@ describe('artifact actions', () => {
       expect(copies).toHaveLength(1);
     });
 
+    it("an org manager can't transfer a member's org-user content out", async () => {
+      const memberFolder = await findOrganizationUserFolder(organization.id, member.id);
+      const note = (
+        await createArtifact({
+          kind: 'file',
+          ownerModel: 'Organization',
+          organizationId: organization.id,
+        })
+      ).entity;
+      await createArtifactPlacement({ artifactId: note.id, containerArtifactId: memberFolder!.id });
+      const response = await adminFetch(
+        post(`/api/v1/organization/${organization.id}/inquiries`, {
+          type: InquiryType.transferArtifact,
+          targetModel: InquiryResourceModel.User,
+          targetUserId: admin.id,
+          content: { artifactId: note.id },
+          status: 'sent',
+        }),
+      );
+      expect(response.status).toBe(422);
+      expect((await db.artifact.findUniqueOrThrow({ where: { id: note.id } })).ownerModel).toBe(
+        'Organization',
+      );
+    });
+
+    it('one open transfer per artifact, not per receiver', async () => {
+      const first = await userFile(stranger);
+      const second = await userFile(stranger);
+      await transferTo(first, stranger, false);
+      const strangerSends = (artifact: Artifact) =>
+        strangerFetch(
+          post('/api/v1/me/inquiries', {
+            type: InquiryType.transferArtifact,
+            targetModel: InquiryResourceModel.Organization,
+            targetOrganizationId: organization.id,
+            content: { artifactId: artifact.id },
+            status: 'sent',
+          }),
+        );
+      expect((await strangerSends(second)).status).toBe(201);
+      expect((await strangerSends(first)).status).toBe(409);
+    });
+
     it('auto-approves only when the sender already manages the receiver', async () => {
       const file = await userFile(admin);
       const response = await adminFetch(
@@ -346,7 +389,24 @@ describe('artifact actions', () => {
       expect(grants.map((grant) => grant.granteeModel)).toEqual(['OrganizationUser']);
     });
 
-    it('an invite creates it early; accepting turns the grant into the membership grant', async () => {
+    it('another folder granted to the user is never mistaken for theirs', async () => {
+      const joiner = (await createUser()).entity;
+      const someone = (await createOrganizationUser({ role: 'member' }, { organization })).context
+        .user;
+      const theirs = await findOrganizationUserFolder(organization.id, someone.id);
+      await createArtifactPermission({
+        artifactId: theirs!.id,
+        granteeModel: 'User',
+        granteeUserId: joiner.id,
+        role: 'owner',
+      });
+      await createOrganizationUser({ role: 'member' }, { organization, user: joiner });
+      const own = await findOrganizationUserFolder(organization.id, joiner.id);
+      expect(own).not.toBeNull();
+      expect(own!.id).not.toBe(theirs!.id);
+    });
+
+    it('an invite creates it early with no grant; accepting grants the membership', async () => {
       const invitee = (await createUser()).entity;
       const response = await adminFetch(
         post(`/api/v1/organization/${organization.id}/inquiries`, {
@@ -360,6 +420,7 @@ describe('artifact actions', () => {
       expect(response.status).toBe(201);
       const early = await findOrganizationUserFolder(organization.id, invitee.id);
       expect(early).not.toBeNull();
+      expect(await db.artifactPermission.count({ where: { artifactId: early!.id } })).toBe(0);
       const { id: inquiryId } = (await json<{ id: string }>(response)).data;
       const inviteeFetch = createTestApp({ mockUser: invitee, mount }).fetch;
       expect(

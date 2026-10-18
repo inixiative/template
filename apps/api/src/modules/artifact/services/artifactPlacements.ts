@@ -108,6 +108,12 @@ const removePlacement = async (artifactId: string, containerArtifactId: string) 
   });
 };
 
+const lockArtifact = async (artifactId: string): Promise<Artifact> => {
+  const [locked] = await db.findForUpdate<Artifact>('Artifact', { id: artifactId });
+  if (!locked || locked.deletedAt) throw makeError({ status: 404, message: 'Artifact not found' });
+  return locked;
+};
+
 const loadArtifact = async (artifactId: string) => {
   const artifact = await db.artifact.findUnique({ where: { id: artifactId } });
   if (!artifact) throw makeError({ status: 404, message: 'Artifact not found' });
@@ -121,9 +127,10 @@ export const placeArtifact = async (
   await assertEdgeAuthority(actor, artifactId, containerArtifactId);
   const member = await loadArtifact(artifactId);
   return withOwnerLock(artifactOwner(member), 'containers', () =>
-    db.txn(async () =>
-      writePlacement(member, await loadContainer(member, containerArtifactId), inherit),
-    ),
+    db.txn(async () => {
+      const locked = await lockArtifact(artifactId);
+      return writePlacement(locked, await loadContainer(locked, containerArtifactId), inherit);
+    }),
   );
 };
 
@@ -143,8 +150,9 @@ export const moveArtifact = async (
 
   return withOwnerLock(artifactOwner(member), 'containers', () =>
     db.txn(async () => {
+      const locked = await lockArtifact(artifactId);
       if (toContainerArtifactId) {
-        await writePlacement(member, await loadContainer(member, toContainerArtifactId), undefined);
+        await writePlacement(locked, await loadContainer(locked, toContainerArtifactId), undefined);
       }
       if (fromContainerArtifactId) await removePlacement(artifactId, fromContainerArtifactId);
       return db.artifact.findUniqueOrThrow({ where: { id: artifactId } });
