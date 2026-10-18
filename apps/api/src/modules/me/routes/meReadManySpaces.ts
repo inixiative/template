@@ -12,6 +12,7 @@ import {
 } from '@template/db';
 import { lensFor } from '@template/db/lens';
 import { readRoute } from '#/lib/routeTemplates';
+import { validateSelfPermission } from '#/middleware/validations/validateSelfPermission';
 import { Modules } from '#/modules/modules';
 import { Tags } from '#/modules/tags';
 
@@ -23,6 +24,7 @@ const responseSchema = SpaceScalarSchema.extend({
 
 export const meReadManySpacesRoute = readRoute({
   model: Modules.me,
+  middleware: [validateSelfPermission('read')],
   submodel: Modules.space,
   many: true,
   skipId: true,

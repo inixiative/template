@@ -7,6 +7,7 @@
 import { WebhookSubscriptionScalarSchema } from '@template/db';
 import { lensFor } from '@template/db/lens';
 import { readRoute } from '#/lib/routeTemplates';
+import { validateSelfPermission } from '#/middleware/validations/validateSelfPermission';
 import { Modules } from '#/modules/modules';
 import { Tags } from '#/modules/tags';
 
@@ -18,5 +19,6 @@ export const meReadManyWebhookSubscriptionsRoute = readRoute({
   paginate: true,
   filterLens: { parent: lensFor('WebhookSubscription') },
   responseSchema: WebhookSubscriptionScalarSchema,
+  middleware: [validateSelfPermission('read')],
   tags: [Tags.me, Tags.webhookSubscription],
 });

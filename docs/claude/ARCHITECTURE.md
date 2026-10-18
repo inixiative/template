@@ -72,7 +72,7 @@ Request
   ├─► tokenAuthMiddleware # API token auth
   ├─► spoofMiddleware    # Superadmin impersonation
   │
-  ├─► Route middleware   # validatePermission, validateNotToken, etc.
+  ├─► Route middleware   # validatePermission, validateSelfPermission, etc.
   ├─► Controller         # Business logic
   │     │
   │     └─► db.model.create/update/delete

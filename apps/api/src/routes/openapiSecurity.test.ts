@@ -13,20 +13,8 @@ type Spec = {
 
 const METHODS = ['get', 'post', 'put', 'patch', 'delete'] as const;
 
-const PERSON_ONLY = new Set([
-  'meCreateToken',
-  'organizationCreateToken',
-  'organizationUserCreateToken',
-  'spaceCreateToken',
-  'spaceUserCreateToken',
-  'organizationDelete',
-  'tokenDelete',
-  'meRotateJwts',
-]);
-
-const expectedSchemes = (path: string, operationId: string | undefined): string[] => {
+const expectedSchemes = (path: string): string[] => {
   if (path.startsWith('/api/internal')) return ['internalSecret'];
-  if (operationId && PERSON_ONLY.has(operationId)) return ['userJwt'];
   return ['userJwt', 'apiToken'];
 };
 
@@ -46,13 +34,14 @@ const operations = (spec: Spec) =>
   );
 
 describe('OpenAPI security', () => {
-  it('publishes the three credential schemes the API accepts', async () => {
+  it('publishes the four credential schemes the API accepts', async () => {
     const spec = await loadSpec();
     const schemes = spec.components?.securitySchemes ?? {};
 
     expect(Object.keys(schemes).sort()).toEqual(['apiToken', 'internalSecret', 'userJwt']);
     expect(schemes.userJwt).toMatchObject({ type: 'http', scheme: 'bearer' });
     expect(schemes.apiToken).toMatchObject({ type: 'http', scheme: 'bearer' });
+    expect(schemes.userJwt).toMatchObject({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' });
     expect(schemes.internalSecret).toMatchObject({
       type: 'apiKey',
       in: 'header',
@@ -69,7 +58,7 @@ describe('OpenAPI security', () => {
 
     const wrong = all
       .map(({ path, method, op }) => {
-        const expectedSecurity = expectedSchemes(path, op.operationId).map((name) => ({
+        const expectedSecurity = expectedSchemes(path).map((name) => ({
           [name]: [],
         }));
         const ok =
@@ -94,13 +83,11 @@ describe('OpenAPI security', () => {
     expect(unregistered).toEqual([]);
   });
 
-  it('publishes session-only auth where a token is refused, and both credentials elsewhere', async () => {
+  it('session-only operations accept every credential: the action check refuses, not the scheme', async () => {
     const spec = await loadSpec();
+    const everyCredential = [{ userJwt: [] }, { apiToken: [] }];
 
-    expect(spec.paths?.['/api/v1/me/tokens']?.post?.security).toEqual([{ userJwt: [] }]);
-    expect(spec.paths?.['/api/v1/me/contacts']?.post?.security).toEqual([
-      { userJwt: [] },
-      { apiToken: [] },
-    ]);
+    expect(spec.paths?.['/api/v1/me/tokens']?.post?.security).toEqual(everyCredential);
+    expect(spec.paths?.['/api/v1/me/contacts']?.post?.security).toEqual(everyCredential);
   });
 });

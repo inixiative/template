@@ -5,67 +5,48 @@
  * @uses infrastructure:prisma
  */
 import type { OrganizationId } from '@template/db';
-import {
-  type Entitlements,
-  getOrgPermissions,
-  intersectEntitlements,
-  lesserRole,
-} from '@template/permissions';
-import type { Context } from 'hono';
+import { capGrant, type Entitlements, getOrgPermissions, type Permix } from '@template/permissions';
+import { membershipGrant } from '#/lib/permissions/membershipGrant';
+import type { PermissionPrincipal } from '#/lib/permissions/permissionPrincipal';
 import { validateRole } from '#/lib/permissions/validateRole';
-import type { AppEnv } from '#/types/appEnv';
 
-export const setupOrgPermissions = async (c: Context<AppEnv>) => {
-  const permix = c.get('permix');
-  const token = c.get('token');
-  const orgUsers = c.get('organizationUsers');
+export const setupOrgPermissions = async (permix: Permix, principal: PermissionPrincipal) => {
+  const { token } = principal;
 
-  // Org token → single org, token permissions only
   if (token?.ownerModel === 'Organization' && token.organizationId) {
     await permix.setup(
       getOrgPermissions(
         validateRole(token.role),
         token.organizationId as OrganizationId,
         token.entitlements as Entitlements,
+        token.entitlementsOnly,
       ),
     );
     return;
   }
 
-  // OrgUser token → single org, lesser of orgUser + token
-  if (token?.ownerModel === 'OrganizationUser' && token.organizationId) {
-    const orgUser = orgUsers?.find((ou) => ou.organizationId === token.organizationId);
-    if (orgUser) {
-      await permix.setup(
-        getOrgPermissions(
-          lesserRole(validateRole(orgUser.role), validateRole(token.role)),
-          token.organizationId as OrganizationId,
-          intersectEntitlements(
-            orgUser.entitlements as Entitlements,
-            token.entitlements as Entitlements,
-          ),
-        ),
-      );
-    }
-    return;
-  }
+  if (token?.ownerModel === 'Space' || token?.ownerModel === 'SpaceUser') return;
 
-  // No org memberships → nothing to set up
-  if (!orgUsers?.length) return;
-
-  // User token or person JWT → all orgs (with token restrictions if present)
-  for (const orgUser of orgUsers) {
-    const orgId = orgUser.organizationId as OrganizationId;
-    const role = token
-      ? lesserRole(validateRole(orgUser.role), validateRole(token.role))
-      : validateRole(orgUser.role);
-    const entitlements = token
-      ? intersectEntitlements(
-          orgUser.entitlements as Entitlements,
-          token.entitlements as Entitlements,
+  const orgUsers =
+    token?.ownerModel === 'OrganizationUser'
+      ? (principal.user?.organizationUsers ?? []).filter(
+          (ou) => ou.organizationId === token.organizationId,
         )
-      : (orgUser.entitlements as Entitlements);
+      : (principal.user?.organizationUsers ?? []);
+  const principalGrant = principal.grant;
 
-    await permix.setup(getOrgPermissions(role, orgId, entitlements));
+  for (const orgUser of orgUsers) {
+    const membership = membershipGrant(orgUser);
+    const grant = principalGrant
+      ? capGrant('db:organization', membership, principalGrant)
+      : { ...membership, entitlementsOnly: false };
+    await permix.setup(
+      getOrgPermissions(
+        grant.role,
+        orgUser.organizationId as OrganizationId,
+        grant.entitlements,
+        grant.entitlementsOnly,
+      ),
+    );
   }
 };

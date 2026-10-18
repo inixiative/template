@@ -1,12 +1,11 @@
 import { OpenAPIHono } from '@hono/zod-openapi';
-import { type Db, db, type UserId } from '@template/db';
+import { type Db, db } from '@template/db';
 import type { OrganizationUser, SpaceUser, User } from '@template/db/generated/client/client';
 import { auth } from '#/lib/auth';
 import type { TokenWithRelations } from '#/lib/context/types';
 import { validationDefaultHook } from '#/lib/openapi/validationDefaultHook';
-import { setupOrgPermissions } from '#/lib/permissions/setupOrgPermissions';
-import { setupSpacePermissions } from '#/lib/permissions/setupSpacePermissions';
-import { setupUserPermissions } from '#/lib/permissions/setupUserPermissions';
+import { buildPermix } from '#/lib/permissions/buildPermix';
+import { principalFromContext } from '#/lib/permissions/permissionPrincipal';
 import { errorHandlerMiddleware } from '#/middleware/error/errorHandlerMiddleware';
 import { notFoundHandlerMiddleware } from '#/middleware/error/notFoundHandlerMiddleware';
 import { prepareRequest } from '#/middleware/prepareRequest';
@@ -37,8 +36,6 @@ export const createTestApp = (options?: CreateTestAppOptions) => {
   app.use('*', async (c, next) => {
     if (options?.mockUser) {
       c.set('user', options.mockUser);
-      c.get('permix').setUserId(options.mockUser.id as UserId);
-      if (options.mockUser.platformRole === 'superadmin') c.get('permix').setSuperadmin(true);
     }
     if (options?.mockOrganizationUsers) {
       c.set('organizationUsers', options.mockOrganizationUsers);
@@ -57,9 +54,7 @@ export const createTestApp = (options?: CreateTestAppOptions) => {
       c.set('spaces', spaces);
     }
     if (options?.mockToken) c.set('token', options.mockToken);
-    await setupOrgPermissions(c);
-    await setupSpacePermissions(c);
-    await setupUserPermissions(c);
+    c.set('permix', await buildPermix(principalFromContext(c)));
     await next();
   });
 

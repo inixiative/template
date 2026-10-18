@@ -5,6 +5,7 @@
  * @uses primitive:routeTemplates, feature:segment
  */
 import { actionRoute } from '#/lib/routeTemplates';
+import { validateSelfPermission } from '#/middleware/validations/validateSelfPermission';
 import { Modules } from '#/modules/modules';
 import {
   segmentReachBodySchema,
@@ -20,5 +21,6 @@ export const meReachSegmentRoute = actionRoute({
   bodySchema: segmentReachBodySchema,
   responseSchema: segmentReachResponseSchema,
   description: 'Counts your customers a candidate segment rule matches today. Nothing is saved.',
+  middleware: [validateSelfPermission('operate')],
   tags: [Tags.me, Tags.segment],
 });
