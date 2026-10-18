@@ -9,6 +9,12 @@
             "command": "bun \"$CLAUDE_PROJECT_DIR/.claude/hooks/bashMainCheckoutGuard.ts\"",
             "timeout": 10,
             "statusMessage": "worktrees: did this session's cwd drift back to the main checkout?"
+          },
+          {
+            "type": "command",
+            "command": "bun \"$CLAUDE_PROJECT_DIR/.claude/hooks/cleanupScanGate.ts\"",
+            "timeout": 10,
+            "statusMessage": "cleanup scan: has this commit been scanned before it is pushed?"
           }
         ]
       }

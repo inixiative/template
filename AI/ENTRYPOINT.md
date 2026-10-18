@@ -272,4 +272,5 @@ This repo is mapped by **atlas** (`.atlas/` config + `@atlas` annotations + `MAP
 3. Keep imports aligned with alias rules.
 4. Remove stale/duplicate logic/exports.
 5. Run targeted validation.
-6. Summarize exactly what changed and why.
+6. Before pushing, run the cleanup scan (`.claude/skills/cleanup-scan/SKILL.md`): duplicates and parallel machinery, in-flight branches and PRs, doctrine drift, template parity, leftovers. The `cleanupScanGate` hook refuses `git push` until the commit being pushed has been scanned.
+7. Summarize exactly what changed and why.
