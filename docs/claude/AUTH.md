@@ -178,6 +178,12 @@ The token's `iss` picks the issuer; an unknown `iss` is refused. `algorithms: ['
 
 `jwtVersion` is never returned: every user response schema is `userResponseSchema` (`apps/api/src/modules/user/schemas/userResponseSchema.ts`, `UserScalarSchema.omit({ jwtVersion: true }).strip()`), and `jwtHandoff` omits it from the sign-in `user`. Nothing accepts it as input: BetterAuth declares it `input: false`, and no route takes a user body.
 
+**Future: profile editing.** Profile editing will come (Aron, 2026-10-18); the write protection belongs in that route's body schema, not in a new mechanism.
+
+- BetterAuth's `input: false` on `additionalFields` (`platformRole`, `lastLoginAt`, `jwtVersion`) only stops those fields in the request body of BetterAuth's own endpoints. It does nothing for our API routes or for server code calling `db.user.update`.
+- Today nothing outside `rotateUserJwts` writes `jwtVersion`: there is no user update route, and BetterAuth's `/update-user` is in `disabledPaths`.
+- A `/me` update route's body schema is the guard: accept only profile fields, never `jwtVersion`, `platformRole`, `email` or `lastLoginAt`. Email and password changes get their own JWT-authenticated routes, and a password change calls `rotateUserJwts`, like password reset does. Responses already go through `userResponseSchema`.
+
 
 ### Spoofing and WebSockets
 
