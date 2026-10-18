@@ -48,6 +48,8 @@ export const sendWebhook: JobHandler<SendWebhookPayload> = async (ctx, payload) 
     return;
   }
 
+  // `data` is the record's columns only. A model whose webhook shape needs related rows (a
+  // CustomerRef with its customer, a parent with its inherent children) fetches them fresh here.
   // timestamp (event time, carried from the hook) is inside the signed body so receivers can reject replays
   const body = { model: subscription.model, action, payload: data, timestamp };
   const bodyJson = JSON.stringify(body);

@@ -71,7 +71,7 @@ All Prisma mutations wrapped with before/after hooks via `mutationLifeCycle` ext
 | `model` | string | Prisma model name |
 | `action` | DbAction | create, update, delete, etc. |
 | `args` | object | Prisma query args |
-| `result` | object/array | Mutation result (after only) |
+| `result` | object/array | Mutation result projected onto the model's columns (after only). An `include` on the write never reaches hooks, so `result` and `previous` have the same shape |
 | `previous` | object/array | Previous state (if fetched) |
 
 ### Action Types
@@ -159,12 +159,12 @@ export const AUDIT_ENABLED_MODELS: AuditSubjectModel[] = [
 
 `buildAuditEntry` (`apps/api/src/hooks/auditLog/hook.ts`) runs each record through:
 
-1. **Project and filter** (`filterForAudit` → `filterFields`) — keep only the model's columns (scalar and enum fields from the generated `prismaMap`, via `pickColumns`), then strip noop fields (`updatedAt`, `lastLoginAt`, `lastUsedAt`, ordered-list positions). The mutation lifecycle hands hooks the write result *with* any `include`d relations, while `previous` is loaded without them; projecting first makes both sides column-only.
+1. **Filter** (`filterForAudit` → `filterFields`) — strip noop fields (`updatedAt`, `lastLoginAt`, `lastUsedAt`, ordered-list positions). Both sides are already column-only: the mutation lifecycle projects `result` through `pickColumns`.
 2. **Diff** — for updates, `computeDiff` compares the filtered, **unredacted** before/after, so a change to a sensitive column is still detected.
 3. **Empty-diff guard** — an update whose diff is empty (only noop fields changed) writes no audit log.
 4. **Redact** — `redactSensitiveFields` masks sensitive columns (passwords, token hashes, encrypted columns) in `before`/`after` with `[REDACTED]`, and `redactChangeDiff` masks both sides of a changed sensitive field in `changes`.
 
-`processAuditData` (project + filter + redact) builds the same column-only snapshot for the email-versioning hook.
+`processAuditData` (filter + redact) builds the same column-only snapshot for the email-versioning hook.
 
 ### Soft Delete Detection
 
@@ -260,7 +260,7 @@ with no `WebhookEvent` and nothing fed to the circuit. Nothing clears the stamp 
 
 ### Ignored Fields
 
-`HOOK_IGNORE_FIELDS` is the **shared** ignore registry — used by audit, cache, webhooks, and the generic `isNoOpUpdate`. `filterFields` (and so `isNoOpUpdate`) first projects the record onto its model's columns, so included relations never reach a payload or a no-op comparison. Any field listed here is:
+`HOOK_IGNORE_FIELDS` is the **shared** ignore registry — used by audit, cache, webhooks, and the generic `isNoOpUpdate`. Any field listed here is:
 
 1. **Excluded from payload** - never sent to webhook subscribers
 2. **Stripped before audit diff** - changes don't produce AuditLog entries

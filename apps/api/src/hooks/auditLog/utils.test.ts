@@ -43,17 +43,6 @@ describe('auditLog/utils', () => {
       expect(result.name).toBe('tok');
     });
 
-    it('drops included relations, so a nested keyHash never reaches the snapshot', () => {
-      const data = {
-        id: '1',
-        status: 'sent',
-        sourceOrganization: { id: 'org-1' },
-        auditLogsAsSubject: [{ id: 'a1', actorToken: { id: 't1', keyHash: 'sha256-hash' } }],
-      };
-      const result = processAuditData('Inquiry', data);
-      expect(result).toEqual({ id: '1', status: 'sent' });
-    });
-
     it('strips orderedList position field for Contact so ordering-only updates produce no diff', () => {
       const before = processAuditData('Contact', {
         id: '1',
