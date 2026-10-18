@@ -4,11 +4,11 @@
  * @partOf primitive:jobs
  * @uses infrastructure:prisma
  */
-import type { ModelName } from '@template/db';
+import { db, type ModelName } from '@template/db';
 import { log } from '@template/shared/logger';
 import { type ArchiveConfig, archiveStaleRecords } from '#/jobs/handlers/archiveStaleRecords';
 import { makeSingletonJob } from '#/jobs/makeSingletonJob';
-import type { JobHandler, WorkerContext } from '#/jobs/types';
+import type { JobHandler } from '#/jobs/types';
 
 // Generic stale-data cleanup. One handler, N cron rows — each row points at a
 // model + retention + (optional) filter in its payload. Add a new cleanup
@@ -31,8 +31,7 @@ export type CleanStaleDataPayload = {
 };
 
 export const cleanStaleData: JobHandler<CleanStaleDataPayload> = makeSingletonJob(
-  async (ctx: WorkerContext, payload: CleanStaleDataPayload) => {
-    const { db } = ctx;
+  async (_ctx, payload: CleanStaleDataPayload) => {
     const { model, retentionDays, dateField = 'createdAt', filters = {}, archive } = payload;
 
     const cutoffDate = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);

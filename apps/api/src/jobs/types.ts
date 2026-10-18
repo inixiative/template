@@ -4,7 +4,6 @@
  * @partOf primitive:jobs
  * @uses infrastructure:prisma, infrastructure:redis
  */
-import type { Db } from '@template/db';
 import { JobLane } from '@template/db/generated/client/enums';
 import type { Job, Queue } from 'bullmq';
 import type { Redis } from 'ioredis';
@@ -17,7 +16,6 @@ export type JobsQueue = Queue & { redis: Redis };
 // invoking the handler, so log calls automatically also flow to job.log()
 // without needing a context wrapper.
 export type WorkerContext = {
-  db: Db;
   queue: JobsQueue;
   job: Job;
   signal?: AbortSignal;

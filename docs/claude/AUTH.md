@@ -147,7 +147,7 @@ export const authMiddleware = async (c: Context<AppEnv>, next: Next) => {
   const session = await auth.api.getSession({ headers });
   if (!session?.user?.id) return next();
 
-  const user = await findUserWithRelations(c.get('db'), session.user.id);
+  const user = await findUserWithRelations(session.user.id);
   if (!user) return next();
 
   await setUserContext(c, user);
@@ -488,9 +488,9 @@ export const spoofMiddleware = async (c: Context<AppEnv>, next: Next) => {
   if (!rawEmail) return next();
 
   const spoofEmail = normalizeEmail(rawEmail);
-  const spoofedBasic = await findUserByEmail(db, spoofEmail);
+  const spoofedBasic = await findUserByEmail(spoofEmail);
   if (!spoofedBasic) return next();
-  const spoofedUser = await findUserWithRelations(db, spoofedBasic.id);
+  const spoofedUser = await findUserWithRelations(spoofedBasic.id);
   if (!spoofedUser) return next();
 
   await setUserContext(c, spoofedUser);

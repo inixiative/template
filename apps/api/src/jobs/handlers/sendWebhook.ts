@@ -5,7 +5,7 @@
  * @uses infrastructure:prisma, feature:webhooks
  */
 import crypto from 'node:crypto';
-import type { Db, Prisma } from '@template/db';
+import { db, type Prisma } from '@template/db';
 import type {
   WebhookEvent,
   WebhookEventAction,
@@ -27,7 +27,6 @@ export type SendWebhookPayload = {
 
 export const sendWebhook: JobHandler<SendWebhookPayload> = async (ctx, payload) => {
   const { subscriptionId, action, resourceId, data, timestamp } = payload;
-  const { db } = ctx;
 
   const subscription = await db.webhookSubscription.findUnique({ where: { id: subscriptionId } });
   if (!subscription?.isActive) {
@@ -122,7 +121,7 @@ export const sendWebhook: JobHandler<SendWebhookPayload> = async (ctx, payload) 
   if (
     subscription.integrationId &&
     isRecordRejection({ status, httpStatus }) &&
-    (await isRecordRejected(db, subscriptionId, resourceId))
+    (await isRecordRejected(subscriptionId, resourceId))
   ) {
     await poisonIntegrationRecord({
       integrationId: subscription.integrationId,
@@ -173,11 +172,7 @@ const isRecordRejection = (event: { status: WebhookEventStatus; httpStatus?: num
   RECORD_REJECTION.httpStatus.in.includes(event.httpStatus);
 
 // Ordered by id, not createdAt: ids are uuidv7, so events in the same millisecond still order exactly.
-const isRecordRejected = async (
-  db: Db,
-  subscriptionId: string,
-  resourceId: string,
-): Promise<boolean> => {
+const isRecordRejected = async (subscriptionId: string, resourceId: string): Promise<boolean> => {
   const lastSuccess = await db.webhookEvent.findFirst({
     where: { webhookSubscriptionId: subscriptionId, resourceId, status: 'success' },
     orderBy: { id: 'desc' },

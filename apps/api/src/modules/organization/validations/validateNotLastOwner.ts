@@ -4,11 +4,12 @@
  * @partOf feature:tenancy
  * @uses none
  */
+
+import { db, type OrganizationId } from '@template/db';
 import { Role } from '@template/db/generated/client/enums';
-import type { Db, OrganizationId } from '@template/db/index';
 import { makeError } from '#/lib/errors';
 
-export const validateNotLastOwner = async (db: Db, orgId: OrganizationId) => {
+export const validateNotLastOwner = async (orgId: OrganizationId) => {
   const ownerCount = await db.organizationUser.count({
     where: { organizationId: orgId, role: Role.owner },
   });

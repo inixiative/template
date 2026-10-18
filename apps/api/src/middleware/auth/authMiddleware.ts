@@ -23,8 +23,7 @@ export const authMiddleware = async (c: Context<AppEnv>, next: Next) => {
   const session = await auth.api.getSession({ headers });
   if (!session?.user?.id) return next();
 
-  const db = c.get('db');
-  const user = await findUserWithRelations(db, session.user.id);
+  const user = await findUserWithRelations(session.user.id);
   if (!user) return next();
 
   await setUserContext(c, user);

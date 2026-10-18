@@ -32,7 +32,7 @@ export const transactionAll: StrategyExecutor = async (
   try {
     await db.txn(
       async () => {
-        registerBatch(batchId, db, baseContext);
+        registerBatch(batchId, baseContext);
 
         try {
           for (let roundIndex = 0; roundIndex < rounds.length; roundIndex++) {

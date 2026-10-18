@@ -4,7 +4,7 @@
  * @partOf feature:inquiry
  * @uses infrastructure:prisma
  */
-import { type Db, getPolymorphismConfig, type PolymorphicValue, type Prisma } from '@template/db';
+import { db, getPolymorphismConfig, type PolymorphicValue, type Prisma } from '@template/db';
 import type { InquiryType } from '@template/db/generated/client/enums';
 import { makeError } from '#/lib/errors';
 import { inquiryTerminalStatuses } from '#/modules/inquiry/validations/validateInquiryStatus';
@@ -21,7 +21,6 @@ type InquiryShape = Omit<Prisma.InquiryWhereInput, 'id'> & {
 type UniqueMode = 'targeted' | 'untargeted';
 
 export const validateUniqueInquiry = async (
-  db: Db,
   inquiry: InquiryShape,
   mode: UniqueMode,
 ): Promise<void> => {
