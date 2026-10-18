@@ -267,7 +267,7 @@ Each `pass`/`fail` folder can contain one or more case subfolders (run alphabeti
 
 **Fence rules** (`uuidv7-ids`, `one-middleware-chain`, `no-raw-locks`, `no-db-params`) scan the whole tree through `scripts/ci/rules/lib/fence.ts`. Each keeps its data in `scripts/ci/<rule>/`:
 - `exempt.txt`: `<key>\t<reason>`, a named, deliberate exception. The reason is required, and an entry that no longer matches fails.
-- `baseline.txt`: the violations that predate the rule, written by `bun scripts/ci/rules/lib/<detector>.ts --write-baseline`. Listed violations are reported, not failed, so the rule fences new code at once while the old is burned down. A new violation fails even in a listed file (a second one in the same function is `<key>#2`), and an entry that stops occurring fails until its line is deleted, so the baseline only shrinks. Template has no baselines; downstream repos start with one.
+- `baseline.txt`: the violations that predate the rule, written by `bun scripts/ci/rules/lib/<detector>.ts --write-baseline`. Listed violations are reported, not failed, so the rule fences new code at once while the old is burned down. Keys name a violation by content (model, mount path, function and parameter, SQL text), not by line, so a new violation in a listed file fails; an identical repeat is `<key>#2`. An entry that stops occurring fails until its line is deleted, and in a git checkout a line the merge base's baseline lacks fails, so the baseline only shrinks. A rule that takes no exemptions fails on an `exempt.txt`. Template has no baselines; downstream repos start with one.
 
 **uuidv7-ids.sh:**
 - Fails on a Prisma model whose primary key is not exactly `id String @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)` (attribute order free), including a composite `@@id`
@@ -275,14 +275,14 @@ Each `pass`/`fail` folder can contain one or more case subfolders (run alphabeti
 
 **one-middleware-chain.sh:**
 - Fails unless `apps/api/src/routes/api.ts` runs `corsMiddleware → prepareRequest → tokenAuthMiddleware → authMiddleware → spoofMiddleware → auditActorMiddleware → apiRateLimit` in order, and every router is mounted after it
-- A mount before the chain completes, on `routes` other than `/api`, on `app` other than `/`, or on `app`/`routes`/`apiRouter` from any other file fails unless its full path is in `scripts/ci/one-middleware-chain/exempt.txt` with a reason (template: `/health`, `/bullBoard`, `/test`, `/api/telemetry/browser`, `/api/internal`, `/api/auth/*`, `/api/unsubscribe`)
+- A mount (`.route`, `.get`, `.all`, `.doc31`, …, chained or across lines, or a `.use` on a path with an inline handler) before the chain completes, on `routes` other than `/api`, on `app` other than `/`, or on `app`/`routes`/`apiRouter` from any other file fails unless its full path is in `scripts/ci/one-middleware-chain/exempt.txt` with a reason (template: `/health`, `/bullBoard`, `/test`, `/openapi/docs`, `/api/telemetry/browser`, `/api/internal`, `/api/auth/*`, `/api/unsubscribe`)
 
 **no-raw-locks.sh:**
 - Fails on `FOR UPDATE` / `FOR NO KEY UPDATE` in non-test source outside `packages/db/src/client.ts` (`db.findForUpdate`), and on `FOR SHARE` / `FOR KEY SHARE` / `LOCK IN SHARE MODE` anywhere: there is no shared mode ([CONCURRENCY.md § Row Locks](./CONCURRENCY.md#row-locks-dbfindforupdate))
 - Reads string and template-literal text only (comments never count); lower-case keywords count only in a string that also says `select`
 
 **no-db-params.sh:**
-- Fails on a function or method parameter (signatures in types included) named `db`/`txn`/`tx`/`prisma` or typed `Db`, `PrismaClient`, `TransactionClient` or `typeof db`, outside tests and `packages/db`
+- Fails on a function or method parameter (signatures in types included) named or destructuring `db`/`txn`/`tx`/`prisma` (or `_db`, …), or whose type mentions `Db`, `PrismaClient`, `TransactionClient` or `typeof db`, outside tests and `packages/db`
 - Use the scoped client, `import { db } from '@template/db'`, which resolves to the open `db.txn()` through AsyncLocalStorage. The only code that takes a client is the client itself and json-rules' Prisma planner, which lives outside the app
 
 **ui-serialized-factories.sh:**

@@ -234,9 +234,9 @@ export const spoofMiddleware = async (c: Context<AppEnv>, next: Next) => {
   if (!rawEmail) return next();
 
   const spoofEmail = normalizeEmail(rawEmail);
-  const spoofedBasic = await findUserByEmail(db, spoofEmail);
+  const spoofedBasic = await findUserByEmail(spoofEmail);
   if (!spoofedBasic) return next();
-  const spoofedUser = await findUserWithRelations(db, spoofedBasic.id);
+  const spoofedUser = await findUserWithRelations(spoofedBasic.id);
   if (!spoofedUser) return next();
 
   await setUserContext(c, spoofedUser);
@@ -293,7 +293,7 @@ From the catalog (`.foundry/catalog/catalog.json`, extracted from the code). Eac
 - **CreateOrganizationModal** `packages/ui/src/components/organizations/CreateOrganizationModal.tsx#CreateOrganizationModal` [primitive] collect a new organization's name and auto-derived, uniqueness-checked slug Use: <CreateOrganizationModal isOpen={open} onClose={close} onSubmit={(name, slug) => create(name, slug)} />
 - **OrganizationProfilePage** `packages/ui/src/pages/OrganizationProfilePage.tsx#OrganizationProfilePage` [primitive] show and edit the current organization's profile Use: <OrganizationProfilePage />
 - **OrganizationSpacesPage** `packages/ui/src/pages/OrganizationSpacesPage.tsx#OrganizationSpacesPage` [primitive] list the spaces belonging to an organization Use: <OrganizationSpacesPage organizationId={orgId} />
-- **validateNotLastOwner** `apps/api/src/modules/organization/validations/validateNotLastOwner.ts#validateNotLastOwner` [primitive] block removing or demoting an organization's last owner Use: await validateNotLastOwner(db, orgId)
+- **validateNotLastOwner** `apps/api/src/modules/organization/validations/validateNotLastOwner.ts#validateNotLastOwner` [primitive] block removing or demoting an organization's last owner Use: await validateNotLastOwner(orgId)
 - **apps/admin/app/routes/_authenticated/organizations** `apps/admin/app/routes/_authenticated/organizations` [system] list the user's organizations and manage organization invitations in admin Use: add organization pages under apps/admin/app/routes/_authenticated/organizations
 - **apps/admin/app/routes/_authenticated/spaces** `apps/admin/app/routes/_authenticated/spaces` [system] list spaces and handle space applications and incoming transfers in admin Use: add space pages under apps/admin/app/routes/_authenticated/spaces
 - **apps/admin/app/routes/_authenticated/users** `apps/admin/app/routes/_authenticated/users` [system] list users, members and user invitations in admin Use: add user/member pages under apps/admin/app/routes/_authenticated/users

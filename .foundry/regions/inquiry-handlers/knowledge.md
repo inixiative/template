@@ -299,9 +299,9 @@ type InquiryHandler<TContent, TResolution, TResolutionInput = TResolution> = {
   contentSchema: z.ZodType<TContent>;            // parsed on create/update; stored in inquiry.content
   resolutionInputSchema: z.ZodType<TResolutionInput>; // validated from the resolve request body
   resolutionSchema: z.ZodType<TResolution>;      // full stored shape (includes computed fields from handleApprove)
-  validate?(db, inquiry, content: TContent): Promise<void>; // called pre-create and pre-update
-  handleApprove(db, inquiry, resolvedContent: TContent): Promise<Partial<TResolution> | undefined | void>;
-  autoApprove(db, inquiry): Promise<boolean>;    // called after send; return true to skip human review
+  validate?(inquiry, content: TContent): Promise<void>; // called pre-create and pre-update
+  handleApprove(inquiry, resolvedContent: TContent): Promise<Partial<TResolution> | undefined | void>;
+  autoApprove(inquiry): Promise<boolean>;    // called after send; return true to skip human review
   unique?: 'targeted' | 'untargeted'; // enforces one open inquiry per source+target+type ('targeted') or per source+type regardless of target ('untargeted')
   defaultExpirationDays?: number;     // drives computeExpiresAt on send and changesRequested; undefined = no expiry
   appEvents?: InquiryAppEvents;       // per-status app event handlers: sent, approved, denied, changesRequested, resolved
@@ -329,14 +329,14 @@ Setting `unique` on a handler is automatically enforced — no controller code n
 
 ##### `validate` — pre-create and pre-update checks
 
-`validate(db, inquiry, content)` receives the **parsed, typed content** directly (not `inquiry.content`). The `inquiry` argument carries source/target FK fields needed for DB lookups. This is called:
+`validate(inquiry, content)` receives the **parsed, typed content** directly (not `inquiry.content`). The `inquiry` argument carries source/target FK fields needed for DB lookups. This is called:
 
 - **On create** — before the DB write, with the incoming content
 - **On update** — with the effective post-update content (incoming `content` merged over stored `inquiry.content`)
 
 ```typescript
 // createSpace handler
-const validate = async (db, inquiry, content: SpaceContent) => {
+const validate = async (inquiry, content: SpaceContent) => {
   const { slug } = content; // typed — no cast needed
   const [existingSpace, existingInquiry] = await Promise.all([
     db.space.findFirst({ where: { organizationId: inquiry.sourceOrganizationId, slug } }),
@@ -410,9 +410,9 @@ All four handlers return `autoApprove: async () => false` — no type currently 
    - `resolutionInputSchema` — what the resolver submits; fields here (except `explanation`) can override content
    - `resolutionSchema` — full stored shape; extend `resolutionInputSchema` with any computed fields returned by `handleApprove`
    - If no computed fields, both can be the same schema
-3. Implement `handleApprove(db, inquiry, resolvedContent: TContent)` — runs side effects; return partial resolution output (merged into stored `resolution`)
-4. Implement `autoApprove(db, inquiry)` — required; called immediately after send; return `true` to resolve as approved without human review, `async () => false` otherwise. Future: organizations may configure this via JSON rules stored on the organization record.
-5. Add `validate(db, inquiry, content: TContent)` for pre-create/pre-update business-rule checks (slug collisions, membership checks, etc.)
+3. Implement `handleApprove(inquiry, resolvedContent: TContent)` — runs side effects; return partial resolution output (merged into stored `resolution`)
+4. Implement `autoApprove(inquiry)` — required; called immediately after send; return `true` to resolve as approved without human review, `async () => false` otherwise. Future: organizations may configure this via JSON rules stored on the organization record.
+5. Add `validate(inquiry, content: TContent)` for pre-create/pre-update business-rule checks (slug collisions, membership checks, etc.)
 6. Set `defaultExpirationDays` if the inquiry should auto-expire (e.g. `30` for invitations). Drives `computeExpiresAt` on send and changesRequested. Omit for no expiry.
 7. Set `unique: 'targeted'` (one per source+target+type) or `unique: 'untargeted'` (one per source+type regardless of target) if uniqueness should be enforced — automatic
 8. Register in `handlers/index.ts`
@@ -459,6 +459,6 @@ From the catalog (`.foundry/catalog/catalog.json`, extracted from the code). Eac
 - **sendInquiry** `apps/api/src/modules/inquiry/services/sendInquiry.ts#sendInquiry` [primitive] mark an inquiry sent, set sentAt/expiresAt, and auto-approve when the handler allows Use: await sendInquiry(c, inquiry);
 - **validateInquiryHandler** `apps/api/src/modules/inquiry/validations/validateInquiryHandler.ts#validateInquiryHandler` [primitive] check resolved source and target models against the handler's allowed sources/targets Use: validateInquiryHandler(handler, sourceModel, targetModel);
 - **validateInquiryNotExpired** `apps/api/src/modules/inquiry/validations/validateInquiryStatus.ts#validateInquiryNotExpired` [primitive] reject edits or resolution of an inquiry whose expiresAt has passed with 410 Use: validateInquiryNotExpired(inquiry);
-- **validateInquiryPreCreate** `apps/api/src/modules/inquiry/services/validateInquiryPreCreate.ts#validateInquiryPreCreate` [primitive] run handler pre-create checks such as the unique-inquiry flag before creating Use: await validateInquiryPreCreate(db, handler, type, ...);
+- **validateInquiryPreCreate** `apps/api/src/modules/inquiry/services/validateInquiryPreCreate.ts#validateInquiryPreCreate` [primitive] run handler pre-create checks such as the unique-inquiry flag before creating Use: await validateInquiryPreCreate(handler, type, ...);
 - **validateUniqueInquiry** `apps/api/src/modules/inquiry/validations/validateUniqueInquiry.ts#validateUniqueInquiry` [primitive] block creating a duplicate inquiry when the handler marks it unique Use: set `unique` on the inquiry handler; validateInquiryPreCreate calls it automatically
 - **apps/api/src/modules/inquiry** `apps/api/src/modules/inquiry` [system] create, send, update, cancel and resolve inquiries, with superadmin create and listing Use: API endpoints: inquirySend, inquiryResolve, inquiryCancel, adminInquiryCreate, adminInquiryReadMany

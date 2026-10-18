@@ -6,9 +6,8 @@
  * Services, handlers and helpers use the scoped client (`import { db } from '@template/db'`): it
  * resolves to the open transaction through AsyncLocalStorage, so passing a client by hand is never
  * needed and a passed one can be the wrong one. Fails on a function or method parameter (signatures
- * in types and interfaces included) named `db`/`txn`/`tx`/`prisma`, or typed `Db`, `PrismaClient`,
- * `TransactionClient` or `typeof db`. A context object that carries `db` (a job's WorkerContext) is
- * not a parameter and is not flagged.
+ * in types and interfaces included) named `db`/`txn`/`tx`/`prisma` (or `_db`, …), destructuring one
+ * of those names, or whose type mentions `Db`, `PrismaClient`, `TransactionClient` or `typeof db`.
  *
  * Out of scope: tests and packages/db, whose internals define `db`. The one other client-taking
  * code is json-rules' Prisma planner, which lives outside the app (Aron, 2026-10-18). An exception
@@ -26,7 +25,7 @@ import {
 } from './fence';
 
 const OUT_OF_SCOPE = /^packages\/db\//;
-const DB_NAMES = new Set(['db', 'txn', 'tx', 'prisma']);
+const DB_NAME = /^_?(db|txn|tx|prisma)$/;
 const DB_TYPE = /(^|[^\w.])(Db|PrismaClient|(Prisma\.)?TransactionClient)\b|\btypeof\s+db\b/;
 
 const exemptions = readExemptions('no-db-params');
@@ -45,7 +44,7 @@ const functionName = (node: ts.Node, sourceFile: ts.SourceFile): string => {
 for (const file of listFiles(['apps', 'packages'], /\.tsx?$/)) {
   if (isTestFile(file) || OUT_OF_SCOPE.test(file) || file.endsWith('.d.ts')) continue;
   const source = readSource(file);
-  if (!/\b(db|txn|tx|prisma|Db|PrismaClient|TransactionClient)\b/.test(source)) continue;
+  if (!/db|tx|prisma|PrismaClient|TransactionClient/i.test(source)) continue;
   const sourceFile = ts.createSourceFile(
     file,
     source,
@@ -55,10 +54,17 @@ for (const file of listFiles(['apps', 'packages'], /\.tsx?$/)) {
   );
   const fileViolations: Violation[] = [];
   const visit = (node: ts.Node) => {
-    if (ts.isParameter(node) && ts.isIdentifier(node.name)) {
-      const name = node.name.text;
+    if (ts.isParameter(node)) {
+      const names = ts.isIdentifier(node.name)
+        ? [node.name.text]
+        : node.name.elements.flatMap((element) =>
+            ts.isBindingElement(element) && ts.isIdentifier(element.name)
+              ? [element.name.text]
+              : [],
+          );
+      const name = names.find((n) => DB_NAME.test(n)) ?? names.join(',');
       const type = node.type?.getText(sourceFile) ?? '';
-      if (DB_NAMES.has(name) || DB_TYPE.test(type)) {
+      if (names.some((n) => DB_NAME.test(n)) || DB_TYPE.test(type)) {
         const owner = functionName(node.parent, sourceFile);
         fileViolations.push({
           file,

@@ -647,7 +647,7 @@ type StrategyExecutor = (
 ```
 
 **Common structure:**
-1. Initialize batch registry with `registerBatch(batchId, db, baseContext)`
+1. Initialize batch registry with `registerBatch(batchId, baseContext)`
 2. Execute rounds (transaction or non-transaction)
 3. Track success/failure counts
 4. Calculate status based on strategy semantics
@@ -660,7 +660,7 @@ Internal requests inherit authentication from parent request:
 ```typescript
 // Parent request authenticated → all batch requests use same auth
 const batchId = crypto.randomUUID();
-registerBatch(batchId, db, parentContext);
+registerBatch(batchId, parentContext);
 
 // Internal requests detect batch via X-Batch-Id header
 const internalRequest = new Request(url, {
@@ -752,7 +752,7 @@ From the catalog (`.foundry/catalog/catalog.json`, extracted from the code). Eac
 - **failOnRound** `apps/api/src/modules/batch/services/strategies/failOnRound.ts#failOnRound` [primitive] run batch rounds, committing successes and stopping after a round with failures Use: strategy: 'failOnRound' in the batch request body
 - **readAllAsCaller** `apps/api/src/modules/batch/services/readAllAsCaller.ts#readAllAsCaller` [primitive] read every page of a list endpoint as the caller, capped by pages Use: const rows = await readAllAsCaller(c, path, { pageSize, maxPages });
 - **readAsCaller** `apps/api/src/modules/batch/services/readAsCaller.ts#readAsCaller` [primitive] read one API path internally with the caller's session, permissions and tenancy Use: const result = await readAsCaller(c, path);
-- **registerBatch** `apps/api/src/modules/batch/services/batchRegistry.ts#registerBatch` [primitive] register a batch so its sub-requests run as the caller with shared transaction Use: registerBatch(batchId, db, baseContext)
+- **registerBatch** `apps/api/src/modules/batch/services/batchRegistry.ts#registerBatch` [primitive] register a batch so its sub-requests run as the caller with shared transaction Use: registerBatch(batchId, baseContext)
 - **transactionAll** `apps/api/src/modules/batch/services/strategies/transactionAll.ts#transactionAll` [primitive] run all batch rounds in one transaction, rolling back everything on failure Use: strategy: 'transactionAll' in the batch request body
 - **transactionPerRound** `apps/api/src/modules/batch/services/strategies/transactionPerRound.ts#transactionPerRound` [primitive] run each round of batched requests inside its own Prisma transaction Use: import { transactionPerRound } from '#/modules/batch/services/strategies/transactionPerRound'
 - **apps/api/src/modules/batch** `apps/api/src/modules/batch` [system] execute a batch of API requests in one call Use: API endpoint: batchExecute

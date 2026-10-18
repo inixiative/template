@@ -7,3 +7,4 @@
 /api/internal	service-to-service routes authorized by the shared secret, not a session or token
 /api/auth/*	better-auth issues the sessions the chain later reads; it authenticates itself
 /api/unsubscribe	one-click unsubscribe authorized by its own signed link, used without a session
+/openapi/docs	the generated OpenAPI 3.1 spec, public by design (the SDK and docs read it)

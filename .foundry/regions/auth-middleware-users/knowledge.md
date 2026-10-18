@@ -258,9 +258,9 @@ export const spoofMiddleware = async (c: Context<AppEnv>, next: Next) => {
   if (!rawEmail) return next();
 
   const spoofEmail = normalizeEmail(rawEmail);
-  const spoofedBasic = await findUserByEmail(db, spoofEmail);
+  const spoofedBasic = await findUserByEmail(spoofEmail);
   if (!spoofedBasic) return next();
-  const spoofedUser = await findUserWithRelations(db, spoofedBasic.id);
+  const spoofedUser = await findUserWithRelations(spoofedBasic.id);
   if (!spoofedUser) return next();
 
   await setUserContext(c, spoofedUser);
@@ -391,9 +391,9 @@ From the catalog (`.foundry/catalog/catalog.json`, extracted from the code). Eac
 
 #### Class `users`
 - **User** `packages/db/prisma/schema/user.prisma` [model] hold a person's identity, email, platform role and all owned relations Use: db.user.findUnique({ where: { email } })
-- **findUserByEmail** `apps/api/src/modules/user/services/find.ts#findUserByEmail` [primitive] look up a user by email through the cache Use: const user = await findUserByEmail(db, email)
+- **findUserByEmail** `apps/api/src/modules/user/services/find.ts#findUserByEmail` [primitive] look up a user by email through the cache Use: const user = await findUserByEmail(email)
 - **findUserOrCreateGuest** `apps/api/src/modules/user/services/findOrCreateGuest.ts#findUserOrCreateGuest` [primitive] return the user for an email, creating a guest user and emitting an event if absent Use: const user = await findUserOrCreateGuest(c, { email, name })
-- **findUserWithRelations** `apps/api/src/modules/user/services/find.ts#findUserWithRelations` [primitive] load a user by id with all relations, cached 10 minutes Use: const user = await findUserWithRelations(db, userId)
+- **findUserWithRelations** `apps/api/src/modules/user/services/find.ts#findUserWithRelations` [primitive] load a user by id with all relations, cached 10 minutes Use: const user = await findUserWithRelations(userId)
 - **getRedactFields** `packages/db/src/registries/redactFields.ts#getRedactFields` [primitive] list the sensitive field names registered for one Prisma model Use: const fields = getRedactFields('User')
 - **normalizeEmail** `apps/api/src/modules/user/utils/normalizeEmail.ts#normalizeEmail` [primitive] lowercase and trim an email before storing or comparing Use: const email = normalizeEmail(input)
 - **phoneToStubEmail** `packages/shared/src/contact/stubEmail.ts#phoneToStubEmail` [primitive] build a placeholder email address from a phone number's digits for a contact type Use: const email = phoneToStubEmail(rawPhone, type);
