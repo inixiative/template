@@ -7,10 +7,11 @@ import {
   db,
   type FalsePolymorphismRef,
   getPolymorphismConfig,
+  isFalsePolymorphismRef,
   isOwnerKind,
   type PolymorphicKind,
-  polymorphicKeyColumn,
   polymorphicTarget,
+  resolveFalsePolymorphismRef,
   webhookEnabledModels,
   webhookRelatedModels,
 } from '@template/db';
@@ -50,7 +51,7 @@ export const relatedCounterparties = async (
   ref: FalsePolymorphismRef,
   rows: WebhookRow[],
 ): Promise<Record<string, Party[]>> => {
-  const column = polymorphicKeyColumn(ref.model, ref.axis, ref.value);
+  const column = resolveFalsePolymorphismRef(ref);
   if (!column) return {};
   const tombstones = rows.flatMap(({ deletedAt }) =>
     deletedAt instanceof Date ? [deletedAt] : [],
@@ -85,7 +86,9 @@ export const recordAudiences = async (
   if (isWebhookModel(model)) {
     return [[model, Object.fromEntries(rows.map((row) => [row.id, recordParties(model, row)]))]];
   }
-  const refs = (webhookRelatedModels[model] ?? []).filter((ref) => isWebhookModel(ref.model));
+  const refs = (webhookRelatedModels[model] ?? []).filter(
+    (ref): ref is FalsePolymorphismRef => isFalsePolymorphismRef(ref) && isWebhookModel(ref.model),
+  );
   if (refs.length === 0 || rows.length === 0) return [];
   return Promise.all(
     Object.entries(groupBy(refs, 'model')).map(async ([webhookModel, modelRefs]) => {

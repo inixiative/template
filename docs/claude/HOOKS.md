@@ -303,7 +303,7 @@ A party's own row changes reach its counterparties on its CustomerRefs. Each par
 
 ```typescript
 // packages/db/src/registries/webhook/relatedModels.ts
-export const webhookRelatedModels: Record<string, FalsePolymorphismRef[]> = {
+export const webhookRelatedModels: Record<string, FlexibleRef[]> = {
   User: [
     { model: 'CustomerRef', axis: 'customerModel', value: 'User' },
     { model: 'CustomerRef', axis: 'providerModel', value: 'User' },

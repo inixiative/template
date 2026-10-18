@@ -4,9 +4,9 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
-import type { FalsePolymorphismRef } from '@template/db/registries/falsePolymorphism';
+import type { FlexibleRef } from '@template/db/registries/falsePolymorphism';
 
-export const webhookRelatedModels: Record<string, FalsePolymorphismRef[]> = {
+export const webhookRelatedModels: Record<string, FlexibleRef[]> = {
   User: [
     { model: 'CustomerRef', axis: 'customerModel', value: 'User' },
     { model: 'CustomerRef', axis: 'providerModel', value: 'User' },
