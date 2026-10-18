@@ -30,6 +30,7 @@
 - [False Polymorphism](#false-polymorphism)
   - [Registry](#registry)
   - [Auto-Generated Validation](#auto-generated-validation)
+  - [Request Validation](#request-validation)
   - [Validation Errors](#validation-errors)
 - [Contact Rules](#contact-rules)
   - [Adding a Contact Type](#adding-a-contact-type)
@@ -346,21 +347,23 @@ cacheKey('Session', userId, ['userId'], true)  // → cache:Session:userId:abc:*
 Single source of truth in `@template/db` - used by both validation hooks and DB constraints:
 
 ```typescript
-import { FalsePolymorphismRegistry } from '@template/db';
+import { PolymorphismRegistry } from '@template/db';
 
 // packages/db/src/registries/falsePolymorphism.ts
-FalsePolymorphismRegistry = {
-  Token: [{
-    typeField: 'ownerModel',
-    fkMap: {
-      User: ['userId'],                          // Requires userId only
-      Organization: ['organizationId'],          // Requires organizationId only
-      OrganizationUser: ['organizationId', 'userId'],  // Requires both
-    },
-  }],
-  WebhookSubscription: [{ ... }],
-  Inquiry: [{ ... }],  // sourceModel + targetModel
-};
+PolymorphismRegistry = {
+  Token: {
+    axes: [{
+      field: 'ownerModel',
+      fkMap: {
+        User: ['userId'],                          // Requires userId only
+        Organization: ['organizationId'],          // Requires organizationId only
+        OrganizationUser: ['organizationId', 'userId'],  // Requires both
+      },
+    }],
+  },
+  WebhookSubscription: { ... },
+  Inquiry: { ... },  // sourceModel + targetModel axes
+} as const;
 ```
 
 ### Auto-Generated Validation
@@ -370,6 +373,113 @@ The registry auto-generates:
 1. **Rules** - Type field must be a valid enum value
 2. **FK validation** - Required FK fields must be present and non-null
 3. **Immutable fields** - Type field can't change after creation
+
+### Request Validation
+
+Use `polymorphicSchema` (`@template/db`) wherever a request names a false-polymorphic target, such
+as a flow's bindings. It builds the Zod schema from the same registry the write rule
+reads, so the request check and the database check cannot drift. Never hand-write
+`z.object({ ownerModel, organizationId?, ... }).refine(...)` for a registered axis.
+
+**What it produces.** A `z.discriminatedUnion` on the axis field with one strict arm per value.
+Each arm carries exactly that value's FKs as `uuidV7Schema`:
+
+```typescript
+const integrationOwner = polymorphicSchema('Integration', 'ownerModel');
+// { ownerModel: 'User', userId }
+// | { ownerModel: 'OrganizationUser', organizationId, userId }
+// | { ownerModel: 'Organization', organizationId }
+// | { ownerModel: 'Space', organizationId, spaceId }
+// | { ownerModel: 'SpaceUser', organizationId, spaceId, userId }
+```
+
+A missing FK, an FK from another arm, or an unknown key is a 422.
+
+**Options.** Each one is checked against the registry at the type level and again when the schema
+is built:
+
+| Option | Does | Example |
+|--------|------|---------|
+| `only` | Keeps these values; the default is every value | `only: ['User', 'Organization', 'Space']` |
+| `omit` | Drops a column from every arm, for one the server fills; sending it is a 422 | `omit: ['userId']` |
+| `extend` | Adds fields shared by every arm; it may not redefine the discriminator or an axis FK | `extend: { returnUrl: appPathSchema.optional() }` |
+
+**In a route body.** Route templates take a plain `ZodObject` `bodySchema`, so the route
+declares the axis field and every FK as optional, and `polymorphicBodyRefinement`
+(`#/lib/routeTemplates`) runs the strict per-arm check as its `bodyRefinement`. It takes the
+same `only` and `omit`, checks only the axis columns, and fails with the standard validation
+400:
+
+```typescript
+createRoute({
+  model: Modules.me,
+  submodel: Modules.integration,
+  bodySchema: z.object({
+    ownerModel: z.enum(['User', 'Organization', 'Space']),
+    organizationId: z.string().optional(),
+    spaceId: z.string().optional(),
+    provider: z.string(),
+  }),
+  bodyRefinement: polymorphicBodyRefinement('Integration', 'ownerModel', {
+    only: ['User', 'Organization', 'Space'],
+    omit: ['userId'],
+  }),
+  responseSchema,
+});
+// { ownerModel: 'Space', organizationId, spaceId, provider } passes
+// { ownerModel: 'Space', organizationId, provider } is a 400 at spaceId
+// { ownerModel: 'Organization', organizationId, spaceId, provider } is a 400: spaceId is unrecognized
+```
+
+**In flow bindings.** Bindings never carry the caller (see [FLOWS.md](FLOWS.md)), so omit
+`userId` and take it from `steps`' context:
+
+```typescript
+const bindingsSchema = polymorphicSchema('Integration', 'ownerModel', {
+  only: ['User', 'Organization', 'Space'],
+  omit: ['userId'],
+  extend: { returnUrl: appPathSchema.optional() },
+});
+// { ownerModel: 'User', returnUrl? }
+// | { ownerModel: 'Organization', organizationId, returnUrl? }
+// | { ownerModel: 'Space', organizationId, spaceId, returnUrl? }
+
+steps: async (owner, { userId }) => {
+  const target = owner.ownerModel === 'User' ? { ...owner, userId } : owner;
+  // ...
+};
+```
+
+An omitted column is gone from **every** arm, and nothing puts it back. Before writing, add the
+caller to each arm whose registry entry needs that column. Otherwise the write rule rejects the row.
+
+**Reading the parsed value.** Narrow on the discriminator; TypeScript knows each arm's FKs:
+
+```typescript
+if (owner.ownerModel === 'Space') owner.spaceId;
+```
+
+**Types.** The type helpers live in `packages/db/src/registries/polymorphicSchemaTypes.ts`, next to
+the builder. You rarely name them, because inference gives the result type:
+
+| Type | Is |
+|------|----|
+| `PolymorphicModel` | A model with a registered axis |
+| `PolymorphicAxisField<Model>` | That model's axis fields (`'ownerModel'`) |
+| `PolymorphicAxisValue<Model, Field>` | The allowed values on that axis |
+| `PolymorphicFkColumn<Model, Field>` | Every FK column any value on the axis needs |
+| `PolymorphicTarget<Model, Field, Value, Omitted>` | The union of arms, before `extend` |
+| `PolymorphicSchema<...>` | The Zod type `polymorphicSchema` returns |
+| `PolymorphicSchemaOptions<...>` | The `{ only, omit, extend }` argument |
+
+**Edges:**
+
+- Values with no FKs (`platform`, `admin`) get an arm that carries only the discriminator.
+- Arms are strict, so put every other field in `extend` rather than intersecting the schema.
+- Strict is a little tighter than the write rule: an explicit `null` on a foreign FK passes the
+  rule's `isEmpty` check but is an unknown key here.
+- One call covers one axis.
+- `toRules.test.ts` checks the schema against the write rule for every model with a single axis.
 
 ### Validation Errors
 

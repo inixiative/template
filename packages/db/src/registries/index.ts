@@ -9,6 +9,7 @@ export {
   type PolymorphicConfig,
   type PolymorphicValue,
   PolymorphismRegistry,
+  polymorphicAxis,
   resolveFalsePolymorphismRef,
 } from './falsePolymorphism';
 export * from './hardDeleteOnTombstone';

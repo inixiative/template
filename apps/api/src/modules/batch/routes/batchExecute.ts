@@ -46,6 +46,16 @@ export const batchExecuteRoute = actionRoute({
   action: 'execute',
   skipId: true,
   bodySchema: batchExecuteBodySchema,
+  bodyRefinement: ({ requests }: z.infer<typeof batchExecuteBodySchema>, ctx) => {
+    if (requests.some((round) => round.length > 50))
+      ctx.addIssue({
+        code: 'custom',
+        path: ['requests'],
+        message: 'Maximum 50 requests per round',
+      });
+    if (requests.flat().length > 100)
+      ctx.addIssue({ code: 'custom', path: ['requests'], message: 'Maximum 100 total requests' });
+  },
   responseSchema: batchExecuteResponseSchema,
   description: 'Execute multiple API requests in batches with interpolation support',
 });

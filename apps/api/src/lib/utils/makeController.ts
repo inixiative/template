@@ -7,11 +7,12 @@
  */
 import type { RouteConfig, RouteHandler } from '@hono/zod-openapi';
 import type { Env, TypedResponse } from 'hono';
-import { ZodError, type ZodSchema } from 'zod';
+import { ZodError, type ZodSchema, z } from 'zod';
 import {
   type ResponseMetadata,
   ResponseMetadataSchema,
 } from '#/lib/routeTemplates/responseMetadata';
+import type { RouteArgs } from '#/lib/routeTemplates/types';
 import { isAuthProbe } from '#/lib/utils/authProbe';
 import type { AppEnv } from '#/types/appEnv';
 
@@ -53,6 +54,10 @@ type JsonResponseBody = {
   pagination?: ResponseMetadata['pagination'];
 };
 
+type RefinableRoute = Pick<RouteArgs, 'bodyRefinement' | 'queryRefinement' | 'paramsRefinement'>;
+
+type ValidatedRequest = { valid: (target: 'json' | 'query' | 'param') => unknown };
+
 // Extract the context type from RouteHandler
 type RouteContext<R extends RouteConfig, E extends Env> = Parameters<RouteHandler<R, E>>[0];
 
@@ -63,12 +68,32 @@ export const makeController = <R extends RouteConfig, T>(
     respond: TypedResponders<R, T>,
   ) => TypedResponse | Promise<TypedResponse>,
 ): RouteHandler<R, AppEnv> => {
-  const impl = (c: RouteContext<R, AppEnv>) => {
+  const { bodyRefinement, queryRefinement, paramsRefinement } = route as RefinableRoute;
+  if (bodyRefinement && !route.request?.body)
+    throw new Error('bodyRefinement requires a JSON body schema');
+  const requestRefinements = (
+    [
+      ['json', bodyRefinement],
+      ['query', queryRefinement],
+      ['param', paramsRefinement],
+    ] as const
+  ).flatMap(([target, refinement]) =>
+    refinement ? [{ target, schema: z.unknown().superRefine(refinement) }] : [],
+  );
+
+  const impl = async (c: RouteContext<R, AppEnv>) => {
     c.set('routeConfig', route);
 
     // WS subscribe probe: reaching the controller means every auth middleware passed —
     // answer without running the handler.
     if (isAuthProbe(c)) return c.body(null, 204) as unknown as TypedResponse;
+
+    for (const { target, schema } of requestRefinements) {
+      const value = (c.req as ValidatedRequest).valid(target);
+      if (value === undefined) continue;
+      const result = await (Array.isArray(value) ? z.array(schema) : schema).safeParseAsync(value);
+      if (!result.success) return c.json(result, 400) as unknown as TypedResponse;
+    }
 
     const statusCodes = Object.keys(route.responses || {}).map(Number);
     const responders: ResponderBag<T> = {};

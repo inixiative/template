@@ -27,14 +27,14 @@ export const validateUniqueInquiry = async (
   const config = getPolymorphismConfig('Inquiry');
   if (!config) throw new Error('Inquiry polymorphism config missing from registry');
 
-  const fkFieldsFor = (axisField: 'sourceModel' | 'targetModel'): string[] => {
+  const fkFieldsFor = (axisField: 'sourceModel' | 'targetModel'): readonly string[] => {
     const axis = config.axes.find((a) => a.field === axisField);
     if (!axis) return [];
     const value = (inquiry as Record<string, unknown>)[axisField] as PolymorphicValue | undefined;
     return value ? (axis.fkMap[value] ?? []) : [];
   };
 
-  const pickValues = (fields: string[]): Record<string, unknown> =>
+  const pickValues = (fields: readonly string[]): Record<string, unknown> =>
     Object.fromEntries(fields.map((f) => [f, (inquiry as Record<string, unknown>)[f]]));
 
   const where: Prisma.InquiryWhereInput = {
