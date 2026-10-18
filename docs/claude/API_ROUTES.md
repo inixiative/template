@@ -1137,6 +1137,8 @@ createRoute({
 
 Field-level refinements (inside the shape) stay on the schema.
 
+A body that names a false-polymorphic target uses `polymorphicBodyRefinement` as its `bodyRefinement`; see [HOOKS.md#request-validation](HOOKS.md#request-validation).
+
 ---
 
 ## Router Exports

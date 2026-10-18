@@ -404,8 +404,32 @@ is built:
 | `omit` | Drops a column from every arm, for one the server fills; sending it is a 422 | `omit: ['userId']` |
 | `extend` | Adds fields shared by every arm; it may not redefine the discriminator or an axis FK | `extend: { returnUrl: appPathSchema.optional() }` |
 
-**Not a route body.** Route templates take a `ZodObject` `bodySchema`, and this returns a
-union, so passing it to `createRoute` / `actionRoute` is a type error.
+**In a route body.** Route templates take a plain `ZodObject` `bodySchema`, so the route
+declares the axis field and every FK as optional, and `polymorphicBodyRefinement`
+(`#/lib/routeTemplates`) runs the strict per-arm check as its `bodyRefinement`. It takes the
+same `only` and `omit`, checks only the axis columns, and fails with the standard validation
+400:
+
+```typescript
+createRoute({
+  model: Modules.me,
+  submodel: Modules.integration,
+  bodySchema: z.object({
+    ownerModel: z.enum(['User', 'Organization', 'Space']),
+    organizationId: z.string().optional(),
+    spaceId: z.string().optional(),
+    provider: z.string(),
+  }),
+  bodyRefinement: polymorphicBodyRefinement('Integration', 'ownerModel', {
+    only: ['User', 'Organization', 'Space'],
+    omit: ['userId'],
+  }),
+  responseSchema,
+});
+// { ownerModel: 'Space', organizationId, spaceId, provider } passes
+// { ownerModel: 'Space', organizationId, provider } is a 400 at spaceId
+// { ownerModel: 'Organization', organizationId, spaceId, provider } is a 400: spaceId is unrecognized
+```
 
 **In flow bindings.** Bindings never carry the caller (see [FLOWS.md](FLOWS.md)), so omit
 `userId` and take it from `steps`' context:
