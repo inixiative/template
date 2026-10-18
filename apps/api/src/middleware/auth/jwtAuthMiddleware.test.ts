@@ -1,19 +1,29 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { randomUUID } from 'node:crypto';
-import { db } from '@template/db';
+import { db, unregisterDbHook } from '@template/db';
 import type { User } from '@template/db/generated/client/client';
 import { PlatformRole } from '@template/db/generated/client/enums';
-import { cleanupTouchedTables, createUser } from '@template/db/test';
+import {
+  cleanupTouchedTables,
+  createOrganization,
+  createOrganizationUser,
+  createUser,
+} from '@template/db/test';
 import { setEnvOverride } from '@template/shared/utils';
 import { exportJWK, generateKeyPair, type JWTPayload, SignJWT } from 'jose';
 import { app } from '#/app';
+import { registerClearCacheHook } from '#/hooks/cache/hook';
 import { auth } from '#/lib/auth';
 import type { PersonJwtHandoff } from '#/lib/auth/jwtHandoff';
-import { revokeUserJwts } from '#/lib/auth/jwtRevocation';
 import { selfIssuer } from '#/lib/auth/personJwt';
+import { signOutEverywhere } from '#/modules/user/services/signOutEverywhere';
 import { resolveIdentity } from '#/ws/probe';
 import { createBearerToken } from '#tests/utils/createBearerToken';
 import { createUserJwt } from '#tests/utils/createUserJwt';
+
+// Revocation and role changes reach the next request through the cache hooks the app registers.
+beforeAll(() => registerClearCacheHook());
+afterAll(() => unregisterDbHook('clearCache'));
 
 const nowSeconds = () => Math.floor(Date.now() / 1000);
 
@@ -127,8 +137,8 @@ describe('a person authenticates with a JWT, never a session', () => {
     await context.internalAdapter.deleteSession(session.token);
   });
 
-  it('a sign-in right after a revocation still gets a working JWT', async () => {
-    await revokeUserJwts(person.userId);
+  it('a sign-in right after signing out everywhere gets a working JWT', async () => {
+    await signOutEverywhere(person.userId);
     const again = await signInOverHttp(person.email, person.password);
     const { token } = (await again.json()) as PersonJwtHandoff;
     expect((await readMe(bearer(token))).status).toBe(200);
@@ -262,7 +272,7 @@ describe('JWTs from a configured external issuer', () => {
   });
 });
 
-describe('revocation: every JWT issued before a revocation stops working', () => {
+describe('revocation: a new jwtVersion refuses every JWT signed with the old one', () => {
   let user: User;
   let superadmin: User;
 
@@ -276,24 +286,45 @@ describe('revocation: every JWT issued before a revocation stops working', () =>
   });
 
   const freshUser = async () => (await createUser()).entity;
-  const issuedBefore = (owner: User) => createUserJwt(owner, { iat: nowSeconds() - 5 });
+  const reload = (target: User) => db.user.findUniqueOrThrow({ where: { id: target.id } });
 
-  it('revokeUserJwts locks out older JWTs and lets newer ones through', async () => {
-    const older = await issuedBefore(user);
+  it('signOutEverywhere refuses the old JWT on the next request and a new JWT works', async () => {
+    const target = await freshUser();
+    const older = await createUserJwt(target);
     expect((await readMe(older)).status).toBe(200);
-    await revokeUserJwts(user.id);
+    await signOutEverywhere(target.id);
     expect((await readMe(older)).status).toBe(401);
-    const newer = await createUserJwt(user, { iat: nowSeconds() + 1 });
-    expect((await readMe(newer)).status).toBe(200);
+    expect((await readMe(await createUserJwt(await reload(target)))).status).toBe(200);
   });
 
-  it('a JWT issued in the revoking second is revoked too', async () => {
-    await revokeUserJwts(user.id);
-    expect((await readMe(await createUserJwt(user))).status).toBe(401);
+  it('a JWT without the version is refused', async () => {
+    const { token } = await auth.api.signJWT({
+      body: { payload: { sub: user.id, iat: nowSeconds() } },
+    });
+    expect((await readMe(bearer(token))).status).toBe(401);
+  });
+
+  it('a role change applies at once under the same JWT: permissions are not on the token', async () => {
+    const target = await freshUser();
+    const jwt = await createUserJwt(target);
+    const { entity: organization } = await createOrganization();
+    const { entity: membership } = await createOrganizationUser(
+      { role: 'viewer' },
+      { user: target, organization },
+    );
+    const rename = () =>
+      app.request(`/api/v1/organization/${organization.id}`, {
+        method: 'PATCH',
+        headers: { ...jwt, 'content-type': 'application/json' },
+        body: JSON.stringify({ name: `renamed-${randomUUID().slice(0, 6)}` }),
+      });
+    expect((await rename()).status).toBe(403);
+    await db.organizationUser.update({ where: { id: membership.id }, data: { role: 'owner' } });
+    expect((await rename()).status).toBe(200);
   });
 
   it('POST /me/signOut signs the caller out everywhere', async () => {
-    const jwt = await issuedBefore(await freshUser());
+    const jwt = await createUserJwt(await freshUser());
     const response = await app.request('/api/v1/me/signOut', { method: 'POST', headers: jwt });
     expect(response.status).toBe(204);
     expect((await readMe(jwt)).status).toBe(401);
@@ -310,11 +341,10 @@ describe('revocation: every JWT issued before a revocation stops working', () =>
 
   it('a superadmin signs a user out everywhere', async () => {
     const target = await freshUser();
-    const jwt = await issuedBefore(target);
-    const admin = await createUserJwt(superadmin, { iat: nowSeconds() + 1 });
+    const jwt = await createUserJwt(target);
     const response = await app.request(`/api/admin/user/${target.id}/signOut`, {
       method: 'POST',
-      headers: admin,
+      headers: await createUserJwt(superadmin),
     });
     expect(response.status).toBe(204);
     expect((await readMe(jwt)).status).toBe(401);
@@ -322,7 +352,7 @@ describe('revocation: every JWT issued before a revocation stops working', () =>
 
   it('a password reset revokes', async () => {
     const target = await freshUser();
-    const jwt = await issuedBefore(target);
+    const jwt = await createUserJwt(target);
     await auth.options.emailAndPassword?.onPasswordReset?.({
       user: { ...target, name: target.name ?? '' },
     });
@@ -330,13 +360,13 @@ describe('revocation: every JWT issued before a revocation stops working', () =>
   });
 
   it('a superadmin JWT spoofs, and the WebSocket identity follows the JWT', async () => {
-    const admin = await createUserJwt(superadmin, { iat: nowSeconds() - 1 });
+    const admin = await createUserJwt(await reload(superadmin));
     const spoofed = await readMe({ ...admin, 'x-spoof-user-email': user.email });
     expect(((await spoofed.json()) as { data: { id: string } }).data.id).toBe(user.id);
 
     const identity = await resolveIdentity(admin);
     expect(identity).toMatchObject({ status: 'resolved', id: superadmin.id });
-    await revokeUserJwts(superadmin.id);
+    await signOutEverywhere(superadmin.id);
     expect(await resolveIdentity(admin)).toEqual({ status: 'anonymous' });
   });
 });
@@ -348,7 +378,7 @@ describe('account deletion revokes', () => {
 
   it('redacting the account locks its JWTs out', async () => {
     const { entity: user } = await createUser();
-    const jwt = await createUserJwt(user, { iat: nowSeconds() - 5 });
+    const jwt = await createUserJwt(user);
     const response = await app.request('/api/v1/me/redact', { method: 'POST', headers: jwt });
     expect(response.status).toBe(204);
     expect((await readMe(jwt)).status).toBe(401);

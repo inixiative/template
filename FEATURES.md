@@ -130,7 +130,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 - ✅ **OAuth Flow → JWT** - The provider redirects to the API, which appends a single-use one-time token to `/auth/callback#ott=…` (fragment, never logged). The callback page exchanges it for the JWT. Neither the JWT nor a session token appears in a URL
 - ✅ **Signing Keys** - BetterAuth `jwt()` plugin keys, rotated every 90 days with a 30-day grace, published at `/api/auth/jwks`. Private keys are encrypted by the template field encryption (`jwks.privateKey`) and rotated by the same job as every other secret
 - ✅ **One Verification Path** - `verifyIssuerJwt` trusts this API's own keys and, when `AUTH_ISSUER` / `AUTH_JWKS_URL` / `AUTH_AUDIENCE` are set, one external issuer, so a JWT from a hub that issues for several apps works the same way
-- ✅ **Revocation** - A per-user revocation marker in Redis refuses every JWT issued before it: sign out everywhere (`POST /api/v1/me/signOut`), superadmin sign-out (`POST /api/admin/user/:id/signOut`), account deletion and password reset. Signing out of one browser drops the JWT there. Revocation is the control, not short expiry, so there is no refresh token
+- ✅ **Revocation** - Every person JWT carries the user's `jwtVersion` as `ver`; incrementing it refuses every JWT signed before, with no extra lookup (the user row is already loaded): sign out everywhere (`POST /api/v1/me/signOut`), superadmin sign-out (`POST /api/admin/user/:id/signOut`), account deletion and password reset. Signing out of one browser drops the JWT there. Revocation is the control, not short expiry, so there is no refresh token
 - ✅ **No Session Endpoints** - Every BetterAuth endpoint that acts on a live session (`/get-session`, `/sign-out`, `/token`, `/change-password`, …) is disabled (404)
 - ✅ **OAuth Social Providers** - Google wired via BetterAuth social plugin (callback handling, token issuance). Microsoft/GitHub are scaffolded in `platformProviders` but not yet configured in the BetterAuth client — adding them is config, not code
 - ✅ **BetterAuth Models** - Verification (email verification tokens), Account (OAuth provider linkage) and Jwks (signing keys) models in Prisma. `Session` is BetterAuth's schema and holds no rows: handshake sessions live in Redis
@@ -670,9 +670,9 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **Redis with IORedis** - Distributed caching layer (Redis 7 alpine). Singleton connections with automatic reconnection, error handling, and connection pooling. Tests get one shared in-memory `ioredis-mock` client (`createRedisConnection` in test); a test that needs real Redis (BullMQ repeatables) opens its own connection
 
-- ✅ **Redis Use Cases** - Sign-in handshake sessions and one-time tokens (BetterAuth `secondaryStorage`, 10 minutes), JWT revocation markers, cached reads via `cache()` (API tokens 10min, user lookups, permission hydration), BullMQ job queue persistence, WebSocket pub/sub for multi-server broadcasting, rate-limit windows, locks
+- ✅ **Redis Use Cases** - Sign-in handshake sessions and one-time tokens (BetterAuth `secondaryStorage`, 10 minutes), cached reads via `cache()` (API tokens 10min, user lookups, permission hydration), BullMQ job queue persistence, WebSocket pub/sub for multi-server broadcasting, rate-limit windows, locks
 
-- ✅ **Namespace Support** - Redis keys prefixed by use case (`redisNamespace`: bull, cache, job, ws, otp, session, jwtValidAfter, limit, lock, lane, rollingCache) preventing collisions and enabling selective cache clearing
+- ✅ **Namespace Support** - Redis keys prefixed by use case (`redisNamespace`: bull, cache, job, ws, otp, session, limit, lock, lane, rollingCache) preventing collisions and enabling selective cache clearing
 
 - ✅ **Multiple Redis Connections** - Main client (general operations), dedicated subscriber (pub/sub is blocking), separate BullMQ connections per queue/worker. Prevents blocking operations from interfering
 

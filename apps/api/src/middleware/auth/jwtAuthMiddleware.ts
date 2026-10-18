@@ -2,11 +2,11 @@
  * @atlas
  * @kind middleware
  * @partOf feature:auth
- * @uses infrastructure:prisma, infrastructure:redis, primitive:errors
+ * @uses infrastructure:prisma, primitive:errors
  */
 import type { Context, Next } from 'hono';
 import { errors, type JWTPayload } from 'jose';
-import { jwtValidAfter } from '#/lib/auth/jwtRevocation';
+import { selfIssuer } from '#/lib/auth/personJwt';
 import { verifyIssuerJwt } from '#/lib/auth/verifyIssuerJwt';
 import { setUserContext } from '#/lib/context/setUserContext';
 import { makeError } from '#/lib/errors';
@@ -33,15 +33,11 @@ export const jwtAuthMiddleware = async (c: Context<AppEnv>, next: Next) => {
     if (err instanceof errors.JOSEError && !isKeysUnavailable(err)) return null;
     throw makeError({ status: 503, message: 'JWT issuer keys are unreachable; retry' });
   });
-  if (!claims?.sub || typeof claims.iat !== 'number') throw unauthorized();
-
-  const validAfter = await jwtValidAfter(claims.sub).catch(() => {
-    throw makeError({ status: 503, message: 'JWT revocation state is unreachable; retry' });
-  });
-  if (validAfter !== null && claims.iat <= validAfter) throw unauthorized();
+  if (!claims?.sub) throw unauthorized();
 
   const user = await findUserWithRelations(claims.sub);
-  if (!user) throw unauthorized();
+  if (!user || user.deletedAt) throw unauthorized();
+  if (claims.iss === selfIssuer() && claims.ver !== user.jwtVersion) throw unauthorized();
 
   await setUserContext(c, user);
   await next();

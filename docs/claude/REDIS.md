@@ -12,7 +12,6 @@
 - [Built-In Uses](#built-in-uses)
   - [Cache (`cache:*`)](#cache-cache)
   - [Sessions (`session:*`)](#sessions-session)
-  - [JWT Revocation (`jwtvalidafter:*`)](#jwt-revocation-jwtvalidafter)
   - [Rate Limiting (`limit:*`)](#rate-limiting-limit)
   - [Job Coordination (`job:*`, `lock:*`)](#job-coordination-job-lock)
   - [Supersede Lanes (`lane:*`)](#supersede-lanes-lane)
@@ -47,7 +46,7 @@ Located in `packages/db/src/redis/`.
 
 | Connection | Purpose | Notes |
 |------------|---------|-------|
-| Main (`getRedisClient`) | All regular operations | Cache, rate limits, sign-in handshake sessions, JWT revocation markers, OTP |
+| Main (`getRedisClient`) | All regular operations | Cache, rate limits, sign-in handshake sessions, OTP |
 | Subscriber (`getRedisSub`) | Pub/sub subscriptions | `SUBSCRIBE` is blocking, needs own connection |
 | Publisher (`getRedisPub`) | Pub/sub publishing | Shares main client (publish doesn't block) |
 | BullMQ | Job queues | Manages own connections via `createRedisConnection` |
@@ -100,7 +99,6 @@ const key = `cache:User:${id}`;  // Don't do this
 | `ws` | `ws:*` | WebSocket pub/sub channels and data-stream seq counters (`ws:seq:{<stream>}`) |
 | `otp` | `otp:*` | One-time passwords / verification codes |
 | `session` | `session:*` | BetterAuth sign-in handshake sessions and one-time tokens (via secondaryStorage) |
-| `jwtValidAfter` | `jwtvalidafter:*` | Per-user JWT revocation markers (`jwtvalidafter:<userId>`) |
 | `limit` | `limit:*` | Rate limiting counters |
 | `lock` | `lock:*` | Distributed locks via `createLock` |
 | `lane` | `lane:*` | Supersede lane batons via `claimLane`/`watchLane`, and per-job tombstones (`lane:superseded:<jobId>`) |
@@ -135,12 +133,6 @@ secondaryStorage: {
   getAndDelete: (key) => redis.getdel(`${redisNamespace.session}:${key}`),
 }
 ```
-
-### JWT Revocation (`jwtvalidafter:*`)
-
-`revokeUserJwts(userId)` (`apps/api/src/lib/auth/jwtRevocation.ts`) writes `jwtvalidafter:<userId>` = now in unix seconds, TTL 30 days (the JWT lifetime: after it, every older JWT has expired anyway). `jwtAuthMiddleware` reads it on every person request and refuses a JWT whose `iat` is at or before it; if Redis is unreachable the request is a 503, never a pass.
-
-**Eviction policy must be `noeviction`.** These keys carry a TTL, so a `volatile-*` or `allkeys-*` policy evicts them first under memory pressure, and a revoked JWT would work again.
 
 ### Rate Limiting (`limit:*`)
 

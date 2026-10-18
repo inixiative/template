@@ -8,7 +8,6 @@ import type { BetterAuthPlugin } from 'better-auth';
 import { createAuthMiddleware, isAPIError } from 'better-auth/api';
 import { deleteSessionCookie } from 'better-auth/cookies';
 import { signJWT } from 'better-auth/plugins';
-import { jwtValidAfter } from '#/lib/auth/jwtRevocation';
 import { PERSON_JWT_TTL_SECONDS, personJwtOptions } from '#/lib/auth/personJwt';
 
 export type PersonJwtHandoff = { token: string; expiresAt: string };
@@ -28,17 +27,15 @@ export const jwtHandoff = (): BetterAuthPlugin => ({
           deleteSessionCookie(ctx);
           if (isOAuthCallback(ctx.path) || isAPIError(ctx.context.returned)) return;
 
-          // A JWT is issued after the user's latest revocation, even one made in this same second.
-          const validAfter = await jwtValidAfter(newSession.user.id);
-          const iat = Math.max(Math.floor(Date.now() / 1000), (validAfter ?? 0) + 1);
+          const iat = Math.floor(Date.now() / 1000);
+          const signedIn = (await ctx.context.internalAdapter.updateUser(newSession.user.id, {
+            lastLoginAt: new Date(iat * 1000),
+          })) as { jwtVersion?: number } | null;
           const token = await signJWT(ctx, {
             options: personJwtOptions(),
-            payload: { sub: newSession.user.id, iat },
+            payload: { sub: newSession.user.id, ver: signedIn?.jwtVersion ?? 0, iat },
           });
           await ctx.context.internalAdapter.deleteSession(newSession.session.token);
-          await ctx.context.internalAdapter.updateUser(newSession.user.id, {
-            lastLoginAt: new Date(iat * 1000),
-          });
 
           const handoff: PersonJwtHandoff & { user: typeof newSession.user } = {
             token,

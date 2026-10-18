@@ -79,7 +79,7 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: true,
-    onPasswordReset: async ({ user }) => revokeUserJwts(user.id),
+    onPasswordReset: async ({ user }) => signOutEverywhere(user.id),
   },
   emailVerification: {
     sendVerificationEmail: async ({ user, url }) =>
@@ -107,10 +107,10 @@ The plugin list lives in `apps/api/src/lib/auth/authPlugins.ts`. Its order matte
 | **Signing keys** | BetterAuth `jwt()` plugin keys, ES256, rotated every 90 days; a retired key stays published for 30 days so JWTs it signed keep verifying | `Jwks` table; the private key is encrypted by the template field encryption (`jwks.privateKey`, [ENCRYPTION.md](./ENCRYPTION.md)) through `apps/api/src/lib/auth/jwksStore.ts`. Public keys at `GET /api/auth/jwks` |
 | **Handshake session** | BetterAuth's session for one sign-in. Lives 10 minutes at most; `jwtHandoff` deletes it as soon as it hands out the JWT | Redis (`secondaryStorage`, `redisNamespace.session`). `storeSessionInDatabase` is off; the Prisma `Session` model is BetterAuth's schema and holds no rows |
 | **OAuth one-time token** | Single-use, 1 minute, stored hashed; consumed with Redis `GETDEL` (`getAndDelete`) | Redis |
-| **Revocation marker** | `jwtvalidafter:<userId>` = unix seconds; JWTs issued at or before it are refused. TTL 30 days (after that, every older JWT has expired anyway) | Redis (`redisNamespace.jwtValidAfter`) |
+| **JWT version** | `User.jwtVersion`; every person JWT carries it as `ver`, and a JWT whose `ver` differs is refused. Incrementing it signs the user out everywhere | Postgres, on the `User` row `jwtAuthMiddleware` already loads |
 
 - **Why the signing keys use the template field encryption:** one scheme for secrets at rest, rotated by the existing `rotateEncryptionKeys` job, instead of a second scheme keyed off `BETTER_AUTH_SECRET`.
-- **Why 30 days and no refresh token:** revocation is the control, not short expiry. A refresh token would be a second long-lived credential to store, rotate and revoke; the per-user revocation marker already ends every JWT a person holds.
+- **Why 30 days and no refresh token:** revocation is the control, not short expiry. A refresh token would be a second long-lived credential to store, rotate and revoke; incrementing `User.jwtVersion` already ends every JWT a person holds.
 - **Email verification is required** for email/password sign-up; the verification email goes out through the `user.verificationRequested` app event. Verifying does not sign the person in; they sign in afterwards.
 
 ### jwtHandoff
@@ -158,25 +158,24 @@ The token's `iss` picks the issuer; an unknown `iss` is refused. `algorithms: ['
 
 ### jwtAuthMiddleware
 
-`apps/api/src/middleware/auth/jwtAuthMiddleware.ts`. A bearer shaped like a JWT (three dot-separated segments) is verified, checked against the revocation marker, and its user loaded with `findUserWithRelations` → `setUserContext`.
+`apps/api/src/middleware/auth/jwtAuthMiddleware.ts`. A bearer shaped like a JWT (three dot-separated segments) is verified and its user loaded with `findUserWithRelations` (the cached user every request loads) → `setUserContext`. A JWT this API signed must carry the user's current `jwtVersion` as `ver`; a soft-deleted user is refused.
 
 - A JWT-shaped bearer that fails is a **401**, never a fall-through to API-token hashing.
-- Unreachable issuer keys or an unreachable Redis is a **503** (retryable, so a WebSocket keeps its identity). Revocation fails closed.
+- Unreachable issuer keys are a **503** (retryable, so a WebSocket keeps its identity).
 - A JWT is never read from `?token=`: a JWT in a URL ends up in logs and referrers. API tokens keep `?token=`.
 
 ### Revocation and sign-out
 
-`apps/api/src/lib/auth/jwtRevocation.ts`: `revokeUserJwts(userId)` sets `jwtvalidafter:<userId>` to now, and `jwtAuthMiddleware` refuses any JWT with `iat <= validAfter`. A JWT issued in the revoking second is refused too, so a stolen JWT minted that second cannot slip through; `jwtHandoff` therefore issues a new JWT at `iat = validAfter + 1` when a sign-in lands in that second. `jwtVerify` also enforces `maxTokenAge` (30 days), so no JWT, external ones included, outlives a revocation marker, which lives 30 days plus the clock tolerance.
+`signOutEverywhere(userId)` (`apps/api/src/modules/user/services/signOutEverywhere.ts`) increments `User.jwtVersion` through the scoped db client; the cache hooks drop the cached user, so the next request with an older JWT is a 401. No Redis lookup and no extra query: the version rides on the user row each request already loads. Why a version, not a timestamp: it needs no clock comparison and no second store (Aron, 2026-10-18: "the token just carries the version on the user… we just rotate that"). Permissions are not on the JWT, so a role or membership change applies on the next request without revoking anything. `jwtVerify` enforces `maxTokenAge` (30 days), so no JWT, external ones included, lives longer than that. A JWT from the configured external issuer carries that issuer's version, not ours; its revocation is the issuer's (and a `grant` claim is read live).
 
 | What | Revokes |
 |---|---|
 | Sign out of one browser | Nothing on the server: the SPA drops its JWT |
 | `POST /api/v1/me/signOut` | Every JWT of the caller (sign out everywhere). Person-only (`validateNotToken`): an API token cannot sign its user out |
 | `POST /api/admin/user/:id/signOut` | Every JWT of that user (superadmin) |
-| `redactUser` (`POST /api/v1/me/redact`, `POST /api/admin/user/:id/redact`) | Every JWT of the deleted account |
+| `redactUser` (`POST /api/v1/me/redact`, `POST /api/admin/user/:id/redact`) | Every JWT of the deleted account (version bumped; the soft-deleted user is refused too) |
 | Password reset (BetterAuth `onPasswordReset`) | Every JWT of that user |
 
-Redis must run with the `noeviction` policy: the markers carry a TTL, so a `volatile-*` or `allkeys-*` policy would evict them first and revive revoked JWTs.
 
 ### Spoofing and WebSockets
 
@@ -478,8 +477,8 @@ prepareRequest
   - user: null, token: null, permix: empty
   ↓
 jwtAuthMiddleware
-  - JWT-shaped bearer → verify, check revocation, setUserContext()
-  - Invalid or revoked JWT → 401; keys or Redis unreachable → 503
+  - JWT-shaped bearer → verify, load the user, check `ver` against `jwtVersion`, setUserContext()
+  - Invalid or revoked JWT → 401; issuer keys unreachable → 503
   - Otherwise pass through unchanged
   ↓
 tokenAuthMiddleware

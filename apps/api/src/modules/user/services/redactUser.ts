@@ -10,7 +10,6 @@ import { contactId as toContactId } from '@template/db/typedModelIds';
 import { ContactRegistry } from '@template/shared/contact';
 import type { Context } from 'hono';
 import { emitAppEvent } from '#/appEvents/emit';
-import { revokeUserJwts } from '#/lib/auth/jwtRevocation';
 import type { AppEnv } from '#/types/appEnv';
 
 export const redactUser = async (c: Context<AppEnv>, userId: string) => {
@@ -85,8 +84,8 @@ export const redactUser = async (c: Context<AppEnv>, userId: string) => {
       displayName: '[DELETED]',
       image: null,
       deletedAt: now,
+      jwtVersion: { increment: 1 },
     },
   });
-  await revokeUserJwts(userId);
   await emitAppEvent('user.redacted', { userId });
 };

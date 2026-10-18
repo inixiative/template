@@ -10,7 +10,6 @@ export const redisNamespace = {
   ws: 'ws',
   otp: 'otp',
   session: 'session',
-  jwtValidAfter: 'jwtvalidafter',
   limit: 'limit',
   lock: 'lock',
   lane: 'lane',
