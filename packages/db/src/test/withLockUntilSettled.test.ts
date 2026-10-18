@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { createLock, db } from '@template/db';
+import type { OpenTransaction } from '@template/db/clientTypes';
+import { holdLockUntilSettled } from '@template/db/lock/holdLockUntilSettled';
 import { getNextSeq } from '@template/db/test/factory';
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -137,6 +139,20 @@ describe('db.withLockUntilSettled', () => {
     await expect(failure).rejects.toThrow('roll back');
     await late;
 
+    expect(await isFree(options)).toBe(true);
+  });
+
+  it('refuses a take on a transaction that has already settled, holding nothing', async () => {
+    const options = lockOptions();
+    const settledTransaction = {
+      heldLocks: new Map(),
+      finallyFns: [],
+      settled: true,
+    } as unknown as OpenTransaction;
+
+    await expect(holdLockUntilSettled(settledTransaction, options)).rejects.toThrow(
+      'transaction settled before taking lock',
+    );
     expect(await isFree(options)).toBe(true);
   });
 

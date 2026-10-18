@@ -66,7 +66,7 @@ export type Db = PrismaClient & DbMethods;
 // Async-local stores a hook declared it needs, paired with the value read at db.txn() open.
 export type BridgedContext = [AsyncLocalStorage<unknown>, unknown][];
 
-export type HeldLock = { acquired: Promise<void>; holders: SerializedQueue; settled: boolean };
+export type HeldLock = { acquired: Promise<void>; holders: SerializedQueue };
 
 export type CommitBatch = { fns: AfterCommitFn[]; concurrency?: number; types?: ConcurrencyType[] };
 
@@ -90,5 +90,7 @@ export type OpenTransaction = {
   finallyFns: FinallyFn[];
   // Redis lock keys held until this transaction settles; a second take of a key joins its entry.
   heldLocks: Map<string, HeldLock>;
+  // Set once the transaction has settled, before its finally queue drains.
+  settled: boolean;
   bridgedContext: BridgedContext;
 };

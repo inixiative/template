@@ -25,22 +25,21 @@ const acquire = async (
   };
 };
 
-// why: the release is queued before the wait, so an acquisition that finishes after the drain is still released.
+// why: queued before the wait, so an acquisition finishing after the drain is still released.
 const holdOnce = (
   openTransaction: OpenTransaction,
   key: string,
   options: LockOptions,
   acquireOptions: AcquireOptions,
 ): HeldLock => {
+  if (openTransaction.settled) throw new Error(`transaction settled before taking lock ${key}`);
   const releasing = acquire(key, options, acquireOptions);
   const held: HeldLock = {
     acquired: releasing.then(() => undefined),
     holders: createSerializedQueue({ onError: () => {} }),
-    settled: false,
   };
   openTransaction.heldLocks.set(key, held);
   openTransaction.finallyFns.push(async () => {
-    held.settled = true;
     if (openTransaction.heldLocks.get(key) === held) openTransaction.heldLocks.delete(key);
     const release = await releasing.catch(() => null);
     await release?.();
@@ -62,6 +61,6 @@ export const holdLockUntilSettled = async (
     if (openTransaction.heldLocks.get(key) === held) openTransaction.heldLocks.delete(key);
     throw error;
   }
-  if (held.settled) throw new Error(`transaction settled while waiting for lock ${key}`);
+  if (openTransaction.settled) throw new Error(`transaction settled while waiting for lock ${key}`);
   return held;
 };

@@ -133,6 +133,7 @@ const dbMethods = {
               afterCommitBatches: [],
               finallyFns: [],
               heldLocks: new Map(),
+              settled: false,
               bridgedContext,
             };
             opened = openTransaction;
@@ -164,6 +165,7 @@ const dbMethods = {
         // why: after $transaction settles — the callback's own finally runs before the commit, and a
         // why: lock dropped there lets a waiter read pre-commit state — and before the on-commit
         // why: batches, so no waiter stalls behind slow side effects.
+        if (opened) (opened as OpenTransaction).settled = true;
         await drainFinally(opened);
       }
       const { result, openTransaction } = settled;

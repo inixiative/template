@@ -30,7 +30,8 @@ export const OWNER_LOCK_WAIT_MS = 3_000;
  * The lock is held until the writes made under it commit. Outside a transaction it is taken before
  * `fn` opens its own and released when `fn` returns, and it is not re-entrant. Inside one (a
  * `transactionAll` batch's sub-request), `fn`'s writes commit with that transaction, so the lock
- * goes through `db.withLockUntilSettled` and drops when the transaction settles (docs/claude/DATABASE.md).
+ * goes through `db.withLockUntilSettled` and drops when the transaction settles
+ * (docs/claude/DATABASE.md).
  *
  * Waiting longer than `waitMs` ends in a 409 with a retry message rather than a hung request; these
  * writes are admin-paced, so a wait that long means something other than a neighbouring save.

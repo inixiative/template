@@ -615,9 +615,9 @@ await db.txn(async () => {
 
 `upserting: true` takes a Redis lock (`createLock`, service `find-for-update`, keyed on the model
 plus the where entries sorted by key, hashed) **before** the `SELECT`, and holds it until the
-transaction ends, the same way `db.withLockUntilSettled` does. The where must be scalar equalities —
-no arrays, operator objects, `null` or `undefined` — except that one field may list values as
-`{ in: [...] }`, which fences each value under the key a single-row fence on it takes. A caller that cannot get the lock waits up to
+transaction ends, the same way `db.withLockUntilSettled` does. The where must be scalar
+equalities (no arrays, operator objects, `null` or `undefined`), except that one field may list
+values as `{ in: [...] }`, fencing each value under the key a single-row fence on it takes. A caller that cannot get the lock waits up to
 `waitMs` (default 3000ms, inside Prisma's 5000ms interactive default) and then throws
 `FindForUpdateLockTimeoutError`, rolling its transaction back. Fencing the same key twice in one
 transaction does not wait on itself. The `no-create-race-machinery` CI rule fails a change that
