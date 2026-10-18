@@ -11,6 +11,7 @@
 //   - verify() is point-in-time; the race between verify-returns-true and the next op
 //     completing is microseconds but non-zero. For exactly-once semantics, fence at the resource.
 import { createClaim } from '@template/db/lock/createClaim';
+import { lockKeyOf } from '@template/db/lock/lockKeyOf';
 import { fencedDelete } from '@template/db/lock/queries/fencedDelete';
 import { fencedRefresh } from '@template/db/lock/queries/fencedRefresh';
 import type {
@@ -24,7 +25,6 @@ import type {
   LockReleaseResult,
 } from '@template/db/lock/types';
 import { getRedisClient } from '@template/db/redis/client';
-import { redisNamespace } from '@template/db/redis/namespaces';
 import { log } from '@template/shared/logger';
 import { heartbeat } from '@template/shared/utils';
 
@@ -35,8 +35,7 @@ export function createLock(opts: ClaimOptions): Claim;
 export function createLock(opts: LockOptions): Lock;
 export function createLock(opts: LockOptions | ClaimOptions): Lock | Claim {
   const redisClient = opts.redis ?? getRedisClient();
-  const lockKey =
-    'key' in opts ? opts.key : `${redisNamespace.lock}:${opts.service}:${opts.identifier}`;
+  const lockKey = lockKeyOf(opts);
   if (opts.heartbeat === false) return createClaim(opts, redisClient, lockKey);
   return createRenewingLock(opts, redisClient, lockKey);
 }

@@ -5,6 +5,7 @@
  * @uses infrastructure:prisma
  */
 import { db } from '@template/db';
+import { ConcurrencyType, getConcurrency } from '@template/shared/utils';
 import {
   refreshBatchContext,
   registerBatch,
@@ -34,7 +35,7 @@ export const allowFailures: StrategyExecutor = async (
     for (let roundIndex = 0; roundIndex < rounds.length; roundIndex++) {
       const round = rounds[roundIndex];
 
-      const roundPromises = round.map(async (request) => {
+      const roundThunks = round.map((request) => async (): Promise<RequestResult> => {
         try {
           const interpolatedRequest = interpolateRequest(request, {
             results,
@@ -63,7 +64,9 @@ export const allowFailures: StrategyExecutor = async (
         }
       });
 
-      const roundResults = await Promise.all(roundPromises);
+      const roundResults = await db.parallel(roundThunks, {
+        concurrency: getConcurrency([ConcurrencyType.db]),
+      });
       results.push(roundResults);
 
       if (roundIndex < rounds.length - 1) {
