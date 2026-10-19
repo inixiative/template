@@ -15,3 +15,5 @@ export const membershipGrant = (membership: {
   role: validateRole(membership.role),
   entitlements: membership.entitlements as Entitlements,
 });
+
+export const membershipSelfGrant: Grant = { role: 'owner', entitlements: null };

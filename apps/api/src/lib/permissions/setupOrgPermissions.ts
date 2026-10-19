@@ -5,8 +5,14 @@
  * @uses infrastructure:prisma
  */
 import type { OrganizationId } from '@template/db';
-import { capGrant, type Entitlements, getOrgPermissions, type Permix } from '@template/permissions';
-import { membershipGrant } from '#/lib/permissions/membershipGrant';
+import {
+  capGrant,
+  type Entitlements,
+  getMembershipPermissions,
+  getOrgPermissions,
+  type Permix,
+} from '@template/permissions';
+import { membershipGrant, membershipSelfGrant } from '#/lib/permissions/membershipGrant';
 import type { PermissionPrincipal } from '#/lib/permissions/permissionPrincipal';
 import { validateRole } from '#/lib/permissions/validateRole';
 
@@ -48,5 +54,17 @@ export const setupOrgPermissions = async (permix: Permix, principal: PermissionP
         grant.entitlementsOnly,
       ),
     );
+    if (token?.ownerModel === 'OrganizationUser' && principalGrant) {
+      const self = capGrant('db:organizationUser', membershipSelfGrant, principalGrant);
+      await permix.setup(
+        getMembershipPermissions(
+          'db:organizationUser',
+          self.role,
+          orgUser.id,
+          self.entitlements,
+          self.entitlementsOnly,
+        ),
+      );
+    }
   }
 };

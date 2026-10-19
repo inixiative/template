@@ -255,7 +255,7 @@ describe('JWT from a configured issuer, with and without a grant', () => {
       expect((await rename(jwt, viewedOrganization)).status).toBe(403);
     });
 
-    it('a grant holding token.create may mint, capped by the user', async () => {
+    it('a grant naming token.create still cannot mint (Aron, 2026-10-18)', async () => {
       const { jwt } = await grantJwt({
         entitlements: { read: true, 'token.create': true },
         entitlementsOnly: true,
@@ -268,7 +268,7 @@ describe('JWT from a configured issuer, with and without a grant', () => {
             entitlements: { read: true },
           })
         ).status,
-      ).toBe(201);
+      ).toBe(403);
     });
 
     it('the user cannot be asked for an action they do not hold', async () => {
@@ -349,13 +349,17 @@ describe('JWT from a configured issuer, with and without a grant', () => {
       expect(data.status).toBe('sent');
     });
 
-    it('an org admin cannot auto-approve a grant through a member-owned integration', async () => {
+    it('an org admin cannot act through a member-owned integration; an org owner asks but cannot auto-approve', async () => {
       const admin = (await createUser()).entity;
-      const { entity: adminMembership } = await createOrganizationUser(
+      await createOrganizationUser(
         { role: 'admin' },
         { user: admin, organization: viewedOrganization },
       );
-      void adminMembership;
+      const orgOwner = (await createUser()).entity;
+      await createOrganizationUser(
+        { role: 'owner' },
+        { user: orgOwner, organization: viewedOrganization },
+      );
       const memberMembership = await db.organizationUser.findFirstOrThrow({
         where: { userId: user.id, organizationId: viewedOrganization.id },
       });
@@ -363,18 +367,16 @@ describe('JWT from a configured issuer, with and without a grant', () => {
         { ownerModel: 'OrganizationUser' },
         { user, organization: viewedOrganization, organizationUser: memberMembership },
       );
-      const response = await call(
-        await sign({ sub: admin.id }),
-        'POST',
-        `/integration/${integration.id}/inquiries`,
-        {
+      const ask = async (sub: string) =>
+        call(await sign({ sub }), 'POST', `/integration/${integration.id}/inquiries`, {
           type: 'grantUserEntitlements',
           targetModel: 'User',
           targetUserId: user.id,
           status: 'sent',
           content: { purpose: 'takeover', role: 'owner', entitlements: { 'token.create': true } },
-        },
-      );
+        });
+      expect((await ask(admin.id)).status).toBe(403);
+      const response = await ask(orgOwner.id);
       expect(response.status).toBe(201);
       const { data } = (await response.json()) as { data: { status: string } };
       expect(data.status).toBe('sent');

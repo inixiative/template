@@ -27,7 +27,9 @@ export const securitySchemes = {
       'API token minted at a token create endpoint, sent as `Authorization: Bearer <key>`. The token carries ' +
       'its owner, so it acts as that user, organization user or space user, with a role and entitlements ' +
       'capped by what the owner holds. An operation refuses it when the token lacks the action the ' +
-      'operation checks.',
+      'operation checks. Person-only operations (token create and edit, account redaction, ' +
+      'organization deletion) publish only `userJwt`: no API token or JWT grant holds their action, ' +
+      'even when it names it; a superadmin passes on any credential.',
   },
   internalSecret: {
     type: 'apiKey',

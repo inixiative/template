@@ -13,8 +13,20 @@ type Spec = {
 
 const METHODS = ['get', 'post', 'put', 'patch', 'delete'] as const;
 
-const expectedSchemes = (path: string): string[] => {
+const PERSON_ONLY = new Set([
+  'meCreateToken',
+  'meRedact',
+  'organizationCreateToken',
+  'organizationDelete',
+  'organizationUserCreateToken',
+  'spaceCreateToken',
+  'spaceUserCreateToken',
+  'tokenUpdate',
+]);
+
+const expectedSchemes = (path: string, operationId: string | undefined): string[] => {
   if (path.startsWith('/api/internal')) return ['internalSecret'];
+  if (operationId && PERSON_ONLY.has(operationId)) return ['userJwt'];
   return ['userJwt', 'apiToken'];
 };
 
@@ -58,7 +70,7 @@ describe('OpenAPI security', () => {
 
     const wrong = all
       .map(({ path, method, op }) => {
-        const expectedSecurity = expectedSchemes(path).map((name) => ({
+        const expectedSecurity = expectedSchemes(path, op.operationId).map((name) => ({
           [name]: [],
         }));
         const ok =
@@ -83,11 +95,13 @@ describe('OpenAPI security', () => {
     expect(unregistered).toEqual([]);
   });
 
-  it('session-only operations accept every credential: the action check refuses, not the scheme', async () => {
+  it('person-only operations publish only userJwt; other session actions accept every credential', async () => {
     const spec = await loadSpec();
     const everyCredential = [{ userJwt: [] }, { apiToken: [] }];
 
-    expect(spec.paths?.['/api/v1/me/tokens']?.post?.security).toEqual(everyCredential);
+    expect(spec.paths?.['/api/v1/me/tokens']?.post?.security).toEqual([{ userJwt: [] }]);
+    expect(spec.paths?.['/api/v1/me/redact']?.post?.security).toEqual([{ userJwt: [] }]);
+    expect(spec.paths?.['/api/v1/me/rotateJwts']?.post?.security).toEqual(everyCredential);
     expect(spec.paths?.['/api/v1/me/contacts']?.post?.security).toEqual(everyCredential);
   });
 });

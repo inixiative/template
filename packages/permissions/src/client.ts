@@ -33,6 +33,21 @@ export const SessionAction = {
 } as const;
 export type SessionAction = (typeof SessionAction)[keyof typeof SessionAction];
 
+// why: no token or JWT grant holds these, even when it names them (Aron, 2026-10-18)
+export const personOnlyActions: readonly SessionAction[] = [
+  SessionAction.createToken,
+  SessionAction.redactUser,
+  SessionAction.deleteOrganization,
+];
+
+export const MembershipAction = {
+  own: 'membership.own',
+  manage: 'membership.manage',
+  operate: 'membership.operate',
+  read: 'membership.read',
+} as const;
+export type MembershipAction = (typeof MembershipAction)[keyof typeof MembershipAction];
+
 export const UserAction = {
   ...StandardAction,
   ...SessionAction,
@@ -51,7 +66,13 @@ export type InquiryAction = (typeof InquiryAction)[keyof typeof InquiryAction];
 
 export type CustomAction = `${string}.${string}`;
 
-export type Action = UserAction | OrganizationAction | SpaceAction | InquiryAction | CustomAction;
+export type Action =
+  | UserAction
+  | OrganizationAction
+  | SpaceAction
+  | InquiryAction
+  | MembershipAction
+  | CustomAction;
 
 export type Entitlements = Record<string, boolean> | null;
 

@@ -8,10 +8,11 @@ import type { SpaceId } from '@template/db';
 import {
   capGrant,
   type Entitlements,
+  getMembershipPermissions,
   getSpacePermissions,
   type Permix,
 } from '@template/permissions';
-import { membershipGrant } from '#/lib/permissions/membershipGrant';
+import { membershipGrant, membershipSelfGrant } from '#/lib/permissions/membershipGrant';
 import type { PermissionPrincipal } from '#/lib/permissions/permissionPrincipal';
 import { validateRole } from '#/lib/permissions/validateRole';
 
@@ -53,5 +54,17 @@ export const setupSpacePermissions = async (permix: Permix, principal: Permissio
         grant.entitlementsOnly,
       ),
     );
+    if (token?.ownerModel === 'SpaceUser' && principalGrant) {
+      const self = capGrant('db:spaceUser', membershipSelfGrant, principalGrant);
+      await permix.setup(
+        getMembershipPermissions(
+          'db:spaceUser',
+          self.role,
+          spaceUser.id,
+          self.entitlements,
+          self.entitlementsOnly,
+        ),
+      );
+    }
   }
 };

@@ -5,7 +5,7 @@
  * @uses none
  */
 import { Operator } from '@inixiative/json-rules';
-import { ownerActions } from '@template/permissions/rebac/ownerActions';
+import { membershipOwnerActions, ownerActions } from '@template/permissions/rebac/ownerActions';
 import type { RebacSchema } from '@template/permissions/rebac/types';
 
 const highRoles = ['owner', 'admin'];
@@ -91,7 +91,7 @@ export const rebacSchema: RebacSchema = {
         read: { rel: 'segment', action: 'read' },
       },
     },
-    'db:integration': { actions: ownerActions() },
+    'db:integration': { actions: membershipOwnerActions() },
     'db:flow': { actions: ownerActions(['user']) },
 
     'db:organizationUser': {
@@ -100,6 +100,10 @@ export const rebacSchema: RebacSchema = {
         leave: { self: 'userId' },
         manage: { rel: 'organization', action: 'manage' },
         own: { rel: 'organization', action: 'own' },
+        'membership.own': null,
+        'membership.manage': 'membership.own',
+        'membership.operate': 'membership.manage',
+        'membership.read': 'membership.operate',
       },
     },
 
@@ -109,6 +113,10 @@ export const rebacSchema: RebacSchema = {
         leave: { self: 'userId' },
         manage: { rel: 'space', action: 'manage' },
         own: { rel: 'space', action: 'own' },
+        'membership.own': null,
+        'membership.manage': 'membership.own',
+        'membership.operate': 'membership.manage',
+        'membership.read': 'membership.operate',
       },
     },
 

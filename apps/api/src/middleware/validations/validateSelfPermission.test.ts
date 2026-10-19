@@ -116,17 +116,32 @@ describe('actions on the user itself', () => {
   });
 
   it('a token holds a session action its entitlements name, and nothing else', async () => {
-    const key = await mint(user, 'viewer', { 'token.create': true, read: true });
-    expect(
-      (
-        await call(key, 'POST', '/me/tokens', {
-          name: 't',
-          role: 'viewer',
-          entitlements: { read: true },
-        })
-      ).status,
-    ).toBe(201);
+    const key = await mint(user, 'viewer', { 'user.rotateJwts': true, read: true });
+    expect((await call(key, 'POST', '/me/rotateJwts')).status).toBe(204);
     expect((await call(key, 'POST', '/me/redact')).status).toBe(403);
+  });
+
+  it('a token never holds a person-only action, even when its entitlements name it (Aron, 2026-10-18)', async () => {
+    for (const role of ['viewer', 'owner'] as const) {
+      const key = await mint(user, role, {
+        'token.create': true,
+        'user.redact': true,
+        'organization.delete': true,
+        own: true,
+        read: true,
+      });
+      expect(
+        (
+          await call(key, 'POST', '/me/tokens', {
+            name: 't',
+            role: 'viewer',
+            entitlements: { read: true },
+          })
+        ).status,
+      ).toBe(403);
+      expect((await call(key, 'POST', '/me/redact')).status).toBe(403);
+      expect((await call(key, 'DELETE', `/organization/${organization.id}`)).status).toBe(403);
+    }
   });
 
   it('a superadmin token is superadmin', async () => {
@@ -187,7 +202,7 @@ describe('actions on the user itself', () => {
     expect((await call(key, 'POST', '/me/tokens', { name: 't', role: 'owner' })).status).toBe(403);
   });
 
-  it('a narrowed issuer cannot mint a full token', async () => {
+  it('a token naming token.create mints neither a full nor a narrowed token', async () => {
     const key = await mint(user, 'owner', { 'token.create': true, own: true });
     expect((await call(key, 'POST', '/me/tokens', { name: 't', role: 'viewer' })).status).toBe(403);
     expect(
@@ -198,7 +213,7 @@ describe('actions on the user itself', () => {
           entitlements: { read: true },
         })
       ).status,
-    ).toBe(201);
+    ).toBe(403);
   });
 
   it('a SpaceUser token knows who it is and holds nothing else on the user; a Space token holds nothing', async () => {
@@ -238,7 +253,7 @@ describe('actions on the user itself', () => {
     expect((await call(spaceKey, 'GET', '/me')).status).toBe(401);
   });
 
-  it('a narrowed issuer cannot mint or make a full membership token', async () => {
+  it('a token naming token.create cannot mint or widen a membership token', async () => {
     const issuer = (await createUser()).entity;
     const { entity: issuerMembership, context } = await createOrganizationUser(
       { role: 'owner', entitlements: { 'billing.export': true } },
@@ -250,7 +265,7 @@ describe('actions on the user itself', () => {
     expect(
       (await call(key, 'POST', path, { name: 't', role: 'member', entitlements: { read: true } }))
         .status,
-    ).toBe(201);
+    ).toBe(403);
 
     const { entity: narrowedToken } = await createToken(
       {

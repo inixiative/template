@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { SessionAction } from '@template/permissions/client';
+import { MembershipAction, SessionAction } from '@template/permissions/client';
 import { capGrant, grantReaches, userLoginGrant } from '@template/permissions/grant';
 
 describe('grantReaches', () => {
@@ -143,9 +143,40 @@ describe('capGrant', () => {
     expect(
       capGrant('db:user', userLoginGrant, {
         role: 'viewer',
-        entitlements: { [SessionAction.createToken]: true },
+        entitlements: { [SessionAction.deleteToken]: true },
         entitlementsOnly: false,
       }).entitlements,
-    ).toEqual({ [SessionAction.createToken]: true });
+    ).toEqual({ [SessionAction.deleteToken]: true });
+  });
+
+  it('a grant never holds a person-only action, even when it names it', () => {
+    for (const entitlementsOnly of [false, true])
+      expect(
+        capGrant('db:user', userLoginGrant, {
+          role: 'owner',
+          entitlements: {
+            [SessionAction.createToken]: true,
+            [SessionAction.redactUser]: true,
+            [SessionAction.deleteOrganization]: true,
+            [SessionAction.deleteToken]: true,
+          },
+          entitlementsOnly,
+        }).entitlements,
+      ).toEqual({ [SessionAction.deleteToken]: true });
+  });
+
+  it("a membership grant on its own row is the membership's role, capped by the grant", () => {
+    const self = { role: 'owner' as const, entitlements: null };
+    const member = capGrant('db:organizationUser', self, {
+      role: 'member',
+      entitlements: null,
+      entitlementsOnly: false,
+    });
+    expect(member).toEqual({ role: 'member', entitlements: null, entitlementsOnly: false });
+    expect(grantReaches('db:organizationUser', member, MembershipAction.operate)).toBe(true);
+    expect(grantReaches('db:organizationUser', member, MembershipAction.manage)).toBe(false);
+    expect(
+      grantReaches('db:spaceUser', { role: 'admin', entitlements: null }, 'membership.read'),
+    ).toBe(true);
   });
 });

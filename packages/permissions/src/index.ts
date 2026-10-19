@@ -7,9 +7,11 @@ export {
   createPermissions,
   type Entitlements,
   InquiryAction,
+  MembershipAction,
   OrganizationAction,
   type PermissionEntry,
   type Permix,
+  personOnlyActions,
   SessionAction,
   SpaceAction,
   StandardAction,
@@ -34,6 +36,12 @@ export type {
   ResourcePermission,
   RuleCheck,
 } from './rebac/types';
+// Membership permissions
+export {
+  getMembershipPermissions,
+  type MembershipResource,
+  membershipRoles,
+} from './roles/membership';
 // Organization permissions
 export { getOrgPermissions, organizationRoles } from './roles/organization';
 // Shared role utilities

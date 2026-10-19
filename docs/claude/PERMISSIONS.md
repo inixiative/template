@@ -135,7 +135,8 @@ Every route checks an action: on the resource it loads, or on the user itself (`
 export const StandardAction = { read, operate, manage, own };
 
 // Held by the login (session, or a JWT with no grant). A role never implies one;
-// a token or grant holds one only when its entitlements name it.
+// a token or grant holds one only when its entitlements name it, except the
+// person-only ones (personOnlyActions: token.create, user.redact, organization.delete), which it never holds.
 export const SessionAction = {
   createToken: 'token.create',        // every token create and token edit route
   deleteToken: 'token.delete',        // tokenDelete
@@ -145,9 +146,10 @@ export const SessionAction = {
 
 export const UserAction = { ...StandardAction, ...SessionAction, createOrganization: 'organization.create' };
 export const InquiryAction = { read, send, resolve, revoke };
+export const MembershipAction = { own: 'membership.own', manage: 'membership.manage', operate: 'membership.operate', read: 'membership.read' };
 
 export type CustomAction = `${string}.${string}`; // e.g. 'artifact.create'
-export type Action = UserAction | OrganizationAction | SpaceAction | InquiryAction | CustomAction;
+export type Action = UserAction | OrganizationAction | SpaceAction | InquiryAction | MembershipAction | CustomAction;
 ```
 
 An action maps to a role through the rebac schema: `'organization.create': 'operate'` on `db:user` means every principal holding `operate` on itself holds it. A custom key is a real action only once the schema maps it (`'artifact.create': 'operate'` on `db:organization`); an unmapped key is held only by a principal whose entitlements grant it, so a session never holds it and a grant cannot be capped to it. Any action can also be granted directly through entitlements.
@@ -250,12 +252,14 @@ permix.check('organization', 'own', 'any_org');  // Always true
 |---|---|---|---|
 | Session, or JWT with no grant | the login grant: `own` + every `SessionAction` | each membership's role + entitlements | each membership's role + entitlements |
 | User token, or JWT with a grant | the grant, capped by the login grant | the grant, capped by each membership | the grant, capped by each membership |
-| OrganizationUser token | none | its organization only, capped by that membership | none |
-| SpaceUser token | none | none | its space only, capped by that membership |
+| OrganizationUser token | `user.identify` only | its organization only, capped by that membership | none |
+| SpaceUser token | `user.identify` only | none | its space only, capped by that membership |
 | Organization token | none (no user) | its organization: token role + entitlements | none |
 | Space token | none (no user) | none | its space: token role + entitlements |
 
 A superadmin is superadmin through every principal (JWT, token), spoofing included: `setUserContext` sets the bypass from the user's platform role.
+
+**A membership token manages its membership's own things.** An OrganizationUser or SpaceUser token also gets a `db:organizationUser:<id>` / `db:spaceUser:<id>` entry on its own membership row: its role's `membership.*` action (`getMembershipPermissions`, `packages/permissions/src/roles/membership.ts`), capped by `capGrant` against the membership owning itself (`membershipSelfGrant`). `membershipOwnerActions` (below) reads it, so the token reaches the integrations its membership owns and nothing else of the user's. The `membership.*` chain (`read → operate → manage → own`) has no fallback to the organization or space, and the token gains nothing on the membership row's own `read`/`manage`/`own` or on `assign` (Aron, 2026-10-18: "If it's an org user token and there are org user integrations, it should obviously be able to touch them").
 
 ### Role Validation
 
@@ -389,11 +393,12 @@ An entitlement-only grant with no entitlements can do nothing except `user.ident
 ### capGrant
 
 ```typescript
-capGrant(resource: 'db:user' | 'db:organization' | 'db:space', owner: Grant, grant: EntitlementGrant): EntitlementGrant
+capGrant(resource: 'db:user' | 'db:organization' | 'db:space' | 'db:organizationUser' | 'db:spaceUser', owner: Grant, grant: EntitlementGrant): EntitlementGrant
 ```
 
 - A named entitlement survives only when `grantReaches(resource, owner, action)`: the owner holds it directly, or reaches it through a string delegation in the rebac schema (`read → operate → manage → own`, `'organization.create' → 'operate'`). Rule-gated actions (`assign`) are never reached this way.
 - A full grant inherits `owner.entitlements` minus the session actions.
+- A person-only action (`personOnlyActions`) never survives, even when the grant names it.
 
 Before `capGrant`, the token cap intersected entitlements and treated a `null` membership value as "no limit", returning the token's entitlements whole: a viewer member holding a User token with `{ manage: true }` could update the organization and its spaces. `apps/api/src/lib/permissions/grantCap.test.ts` keeps that case.
 
@@ -465,7 +470,7 @@ export const rebacSchema: RebacSchema = {
         revoke: { all: [/* grantUserEntitlements */, { any: [{ self: 'sourceUserId' }, { self: 'targetUserId' }, { rel: 'sourceIntegration', action: 'manage' }] }] },
       },
     },
-    // plus contact, webhookSubscription, segment, integration, flow (ownerActions),
+    // plus contact, webhookSubscription, segment, flow (ownerActions), integration (membershipOwnerActions),
     // organizationUser, spaceUser, token, authProvider
   },
 };
@@ -541,6 +546,10 @@ contact: { actions: { ...ownerActions(), share: { ... } } },
 For each of `own`/`manage`/`operate`/`read`, the helper expands to `{ any: [{ rel: 'user', action }, { rel: 'organization', action }, { rel: 'space', action }] }`. Only the populated FK resolves — `rel` returns false for the other relations because the record isn't loaded — so the `any` collapses to the actual owner's chain.
 
 This is what makes the `read → operate → manage → own` chain on User/Org/Space reusable as-is for every owner-polymorphic resource.
+
+### Member-Owned Models
+
+A model a membership can own (OrganizationUser or SpaceUser: `userId` and `organizationId` both set; Integration today) uses `membershipOwnerActions()` instead. A member's row is reached by the member (`rel: 'user'`), by an **owner** of the organization or space, or by a token of that membership (`membership.<action>` on its own OrganizationUser/SpaceUser row), never by an org or space admin. Rows with no `userId` (Organization- or Space-owned) take the normal organization/space chain. Why: owners are not admins (Aron, 2026-10-18). An admin is the average manager; an owner is the org's IT person, so work content stays private from managers but is never locked away from the org that owns it.
 
 ---
 
@@ -723,7 +732,7 @@ middleware: [validateSelfPermission(SessionAction.createToken)]       // meCreat
 middleware: [validateSelfPermission(SessionAction.deleteOrganization), validatePermission('own')] // organizationDelete
 ```
 
-401 without a user, 403 when the user entry lacks the action. It replaces the old session-only guard: "a token can't do this" is now "this principal doesn't hold the action". A person's JWT with no grant holds every `SessionAction`; a token or grant holds one only when its entitlements name it; Organization, OrganizationUser, SpaceUser and Space tokens hold no user entry, so they never do. A superadmin passes, through any principal.
+401 without a user, 403 when the user entry lacks the action. It replaces the old session-only guard: "a token can't do this" is now "this principal doesn't hold the action". A person's JWT with no grant holds every `SessionAction`; a token or grant holds one only when its entitlements name it, never a person-only one; Organization, OrganizationUser, SpaceUser and Space tokens hold no user entry, so they never do. A superadmin passes, through any principal. `token.create`, `user.redact` and `organization.delete` are person-only (`personOnlyActions`): `capGrant` drops them, so no API token or JWT grant holds them even when it names them, and their operations publish only `userJwt` in OpenAPI (`securityForRoute` reads the action off `validateSelfPermission`). A superadmin still passes on any credential (Aron, 2026-10-18: "put the same user check that we have in place on that one… we can revisit if things need to be more agentic"; 2026-10-19: "super admin is super admin").
 
 ---
 

@@ -5,6 +5,7 @@
  * @partOf primitive:authz
  * @uses none
  */
+import { Operator } from '@inixiative/json-rules';
 import type { ActionRule, ResourcePermission } from '@template/permissions/rebac/types';
 
 // Spreadable rebac action block for owner-polymorphic models. The model has
@@ -31,5 +32,54 @@ export const ownerActions = (
     manage: fanout('manage'),
     operate: fanout('operate'),
     read: fanout('read'),
+  };
+};
+
+// why: a member's row (userId and organizationId both set) is reached by the member or a tenant owner, never an admin.
+export const membershipOwnerActions = (): ResourcePermission['actions'] => {
+  const reach = (action: string): ActionRule => ({
+    any: [
+      { rel: 'user', action },
+      {
+        all: [
+          { rule: { field: 'userId', operator: Operator.notExists } },
+          {
+            any: [
+              { rel: 'organization', action },
+              { rel: 'space', action },
+            ],
+          },
+        ],
+      },
+      {
+        all: [
+          { rule: { field: 'userId', operator: Operator.exists } },
+          {
+            any: [
+              { rel: 'organization', action: 'own' },
+              { rel: 'space', action: 'own' },
+              {
+                all: [
+                  { rule: { field: 'spaceId', operator: Operator.notExists } },
+                  { rel: 'organizationUser', action: `membership.${action}` },
+                ],
+              },
+              {
+                all: [
+                  { rule: { field: 'spaceId', operator: Operator.exists } },
+                  { rel: 'spaceUser', action: `membership.${action}` },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  });
+  return {
+    own: reach('own'),
+    manage: reach('manage'),
+    operate: reach('operate'),
+    read: reach('read'),
   };
 };

@@ -604,7 +604,7 @@ router.get('/resource', validateActor, handler);  // 401 if no user from getActo
 
 ### Session-Only Actions
 
-There is no "tokens forbidden" guard. Token minting, token deletion, account redaction, organization deletion and rotating every JWT (`POST /api/v1/me/rotateJwts`) are `SessionAction`s, checked with `validateSelfPermission` ([PERMISSIONS.md](./PERMISSIONS.md#validateselfpermission)). A person's JWT with no grant holds them all; a token or grant holds one only when its entitlements name it.
+There is no "tokens forbidden" guard. Token minting, token deletion, account redaction, organization deletion and rotating every JWT (`POST /api/v1/me/rotateJwts`) are `SessionAction`s, checked with `validateSelfPermission` ([PERMISSIONS.md](./PERMISSIONS.md#validateselfpermission)). A person's JWT with no grant holds them all; a token or grant holds one only when its entitlements name it. `token.create`, `user.redact` and `organization.delete` are person-only (`personOnlyActions`): `capGrant` drops them, so no API token or JWT grant holds them even when it names them, and their operations publish only `userJwt` in OpenAPI (`securityForRoute` reads the action off `validateSelfPermission`). A superadmin still passes on any credential (Aron, 2026-10-18: "put the same user check that we have in place on that one… we can revisit if things need to be more agentic"; 2026-10-19: "super admin is super admin").
 
 ```typescript
 middleware: [validateSelfPermission(SessionAction.createToken)]
