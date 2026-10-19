@@ -320,7 +320,7 @@ const { role } = resolvedContent; // always from original inquiry.content
 | `createSpace` | org `own` | Owner only |
 | `updateSpace` | space `own` | Space owner or org owner (via `space.own → org.own` delegation) |
 | `transferSpace` | org `own` (explicit 2-hop) | Org owner only — space owner alone is not enough |
-| `grantUserEntitlements` | the source user (self), or integration `manage` | Asking needs nothing; the approver needs authority to assign (`assign` on the target org/space at the entitlements' level, or the user holding `token.create` and the grant) |
+| `grantUserEntitlements` | the source user (self), or integration `manage` | Asking needs nothing; the approver needs authority to assign (`assign` on the target org/space at the entitlements' level, or the user holding `token.create`, which is person-only, so only the person's JWT or a superadmin, and the grant) |
 
 `updateSpace` and `transferSpace` differ intentionally: `updateSpace` uses `{ rel: 'sourceSpace', action: 'own' }` which delegates through to org.own, so both direct space owners and org owners can update. `transferSpace` uses `{ rel: 'sourceSpace.organization', action: 'own' }` — dot-path traversal that explicitly resolves to the owning organization, bypassing any direct space.own check, ensuring only org owners can initiate a transfer.
 
@@ -354,7 +354,7 @@ Each mutation uses the include that matches what its caller needs:
 |--------|--------------------|
 | `read` | Source user/manage-on-source-org-or-space OR target user/manage-on-target-org-or-space |
 | `send` | Source-side permission (see handler table above). For user-sourced inquiry types, `{ self: 'sourceUserId' }` is also checked — add the type to that rule's `value: []` list in `schema.ts` when creating a user-sourced handler. |
-| `resolve` | Target user (self; `grantUserEntitlements` also needs `token.create` on them); target org `manage` (except `transferSpace` which requires `own`); target space `manage`; superadmin bypass for `admin` targets |
+| `resolve` | Target user (self; `grantUserEntitlements` also needs `token.create` on them, which no API token or JWT grant holds); target org `manage` (except `transferSpace` which requires `own`); target space `manage`; superadmin bypass for `admin` targets |
 | `revoke` | `grantUserEntitlements` only: source user, target user, `manage` on the source integration, or `manage` on the target org/space |
 
 ## Adding a New Handler

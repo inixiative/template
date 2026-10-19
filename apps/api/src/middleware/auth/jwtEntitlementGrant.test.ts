@@ -307,7 +307,7 @@ describe('JWT from a configured issuer, with and without a grant', () => {
   });
 
   describe('issuing is capped by the principal that issues', () => {
-    it('a { member, token.create } grant asking for an owner grant waits for the user', async () => {
+    it('a grant never approves a grant for its own user, even naming token.create; the person does', async () => {
       const { jwt } = await grantJwt({ role: 'member', entitlements: { 'token.create': true } });
       const response = await requestGrant(jwt, {
         role: 'owner',
@@ -334,7 +334,7 @@ describe('JWT from a configured issuer, with and without a grant', () => {
       ).toBe(200);
     });
 
-    it('a token holding no session action cannot self-approve them through its own integration', async () => {
+    it('a grant cannot self-approve a wider grant through its own integration', async () => {
       const { entity: integration } = await createIntegration({ ownerModel: 'User' }, { user });
       const { jwt } = await grantJwt({ role: 'admin' });
       const response = await call(jwt, 'POST', `/integration/${integration.id}/inquiries`, {

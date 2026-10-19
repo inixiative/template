@@ -144,6 +144,62 @@ describe('actions on the user itself', () => {
     }
   });
 
+  it('account and organization deletion are person-only: a token naming them is refused and the rows survive', async () => {
+    for (const role of ['viewer', 'owner'] as const) {
+      const holder = (await createUser()).entity;
+      const owned = (await createOrganization()).entity;
+      await createOrganizationUser({ role: 'owner' }, { user: holder, organization: owned });
+      const key = await mint(holder, role, {
+        'user.redact': true,
+        'organization.delete': true,
+        own: true,
+      });
+      expect((await call(key, 'POST', '/me/redact')).status).toBe(403);
+      expect((await call(key, 'DELETE', `/organization/${owned.id}`)).status).toBe(403);
+      expect(await db.user.findUniqueOrThrow({ where: { id: holder.id } })).toMatchObject({
+        email: holder.email,
+      });
+      expect(await db.organization.findUniqueOrThrow({ where: { id: owned.id } })).toMatchObject({
+        deletedAt: null,
+      });
+    }
+  });
+
+  it("a person's JWT redacts the account and deletes the organization", async () => {
+    const person = (await createUser()).entity;
+    const owned = (await createOrganization()).entity;
+    const { entity: ownership } = await createOrganizationUser(
+      { role: 'owner' },
+      { user: person, organization: owned },
+    );
+    const app = createTestApp({
+      mockUser: person,
+      mockOrganizationUsers: [ownership],
+      mount: [
+        (app) => {
+          app.route('/api/v1/me', meRouter);
+          app.route('/api/v1/organization', organizationRouter);
+        },
+      ],
+    });
+    expect(
+      (
+        await app.fetch(
+          new Request(`http://test/api/v1/organization/${owned.id}`, { method: 'DELETE' }),
+        )
+      ).status,
+    ).toBe(204);
+    expect((await app.fetch(post('/me/redact', {}))).status).toBe(204);
+  });
+
+  it('a superadmin viewer token passes person-only checks (Aron, 2026-10-19: "super admin is super admin")', async () => {
+    const admin = (await createUser({ platformRole: 'superadmin' })).entity;
+    const someoneElses = (await createOrganization()).entity;
+    const key = await mint(admin, 'viewer');
+    expect((await call(key, 'DELETE', `/organization/${someoneElses.id}`)).status).toBe(204);
+    expect((await call(key, 'POST', '/me/redact')).status).toBe(204);
+  });
+
   it('a superadmin token is superadmin', async () => {
     const key = await mint(superadmin, 'viewer');
     expect((await call(key, 'POST', '/me/tokens', { name: 't', role: 'viewer' })).status).toBe(201);
@@ -281,13 +337,10 @@ describe('actions on the user itself', () => {
     ).toBe(403);
   });
 
-  it('a minter cannot grant an action it does not hold', async () => {
-    const key = await mint(user, 'viewer', { 'token.create': true });
-    const response = await call(key, 'POST', '/me/tokens', {
-      name: 't',
-      role: 'viewer',
-      entitlements: { 'user.redact': true },
-    });
+  it('a person cannot grant an action they do not hold', async () => {
+    const response = await session(user).fetch(
+      post('/me/tokens', { name: 't', role: 'viewer', entitlements: { 'artifact.create': true } }),
+    );
     expect(response.status).toBe(403);
   });
 
