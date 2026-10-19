@@ -17,8 +17,14 @@
  * - any session lookup: a `getSession(...)` call, `findSession(...)`, or a read of the `session`
  *   table (`<x>.session.find*` / `.count`); a person is resolved from a JWT, never a session
  * - importing BetterAuth's `bearer` plugin (it accepts a session token as a bearer credential)
+ * - building a session credential: importing a session-cookie signer (`makeSignature`,
+ *   `setRequestCookie`, `setSessionCookie`, `serializeSignedCookie`, `signCookieValue`) from
+ *   better-auth or better-call, calling `<x>.internalAdapter.createSession(...)`, or destructuring
+ *   `internalAdapter` / `createSession`
  *
- * Exemptions: none.
+ * Exemptions: none in exempt.txt. One named file may build a session credential:
+ * `withThrowawaySession` (THROWAWAY_SESSION_HELPER), which hands a short-lived session to a
+ * BetterAuth server call and deletes it.
  */
 import ts from 'typescript';
 import { finishFence, isTestFile, lineAt, listFiles, readSource, type Violation } from './fence';
@@ -89,6 +95,56 @@ const bearerPluginImport: Check = (node) =>
       }
     : null;
 
+const THROWAWAY_SESSION_HELPER = 'apps/api/src/lib/auth/withThrowawaySession.ts';
+
+const SESSION_CREDENTIAL_SOURCES = /^(better-auth|better-call)(\/|$)/;
+const SESSION_CREDENTIAL_SIGNERS = new Set([
+  'makeSignature',
+  'setRequestCookie',
+  'setSessionCookie',
+  'serializeSignedCookie',
+  'signCookieValue',
+]);
+const SESSION_CREATORS = new Set(['internalAdapter', 'createSession']);
+
+const sessionCredential = (node: ts.Node, key: string): Found => ({
+  node,
+  key: `session-credential: ${key}`,
+  detail: `builds a BetterAuth session credential (${key}); only withThrowawaySession may (${THROWAWAY_SESSION_HELPER})`,
+});
+
+const sessionCredentialBuild: Check = (node, sourceFile) => {
+  if (sourceFile.fileName === THROWAWAY_SESSION_HELPER) return null;
+  if (
+    ts.isImportDeclaration(node) &&
+    ts.isStringLiteral(node.moduleSpecifier) &&
+    SESSION_CREDENTIAL_SOURCES.test(node.moduleSpecifier.text) &&
+    node.importClause?.namedBindings &&
+    ts.isNamedImports(node.importClause.namedBindings)
+  ) {
+    const signer = node.importClause.namedBindings.elements.find((element) =>
+      SESSION_CREDENTIAL_SIGNERS.has((element.propertyName ?? element.name).text),
+    );
+    return signer ? sessionCredential(node, (signer.propertyName ?? signer.name).text) : null;
+  }
+  if (
+    ts.isPropertyAccessExpression(node) &&
+    node.name.text === 'createSession' &&
+    ts.isPropertyAccessExpression(node.expression) &&
+    node.expression.name.text === 'internalAdapter'
+  )
+    return sessionCredential(node, 'internalAdapter.createSession');
+  if (
+    ts.isBindingElement(node) &&
+    SESSION_CREATORS.has(unquote((node.propertyName ?? node.name).getText(sourceFile)))
+  )
+    return sessionCredential(
+      node,
+      `destructured ${unquote((node.propertyName ?? node.name).getText(sourceFile))}`,
+    );
+  return null;
+};
+
 const CHECKS: Check[] = [
   (node, sourceFile) =>
     propertyName(node, sourceFile) === 'cookieCache'
@@ -128,6 +184,7 @@ const CHECKS: Check[] = [
       : null,
   sessionLookup,
   bearerPluginImport,
+  sessionCredentialBuild,
 ];
 
 const violations: Violation[] = [];

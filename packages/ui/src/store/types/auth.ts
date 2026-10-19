@@ -5,6 +5,7 @@
  * @uses primitive:sdk
  */
 import type { MeReadResponses } from '@template/sdk';
+import type { ChangePasswordInput } from '@template/ui/lib/auth/changePassword';
 import type { AuthMethod, SignUpResult } from '@template/ui/lib/auth/types';
 import type { createAuthClient } from 'better-auth/client';
 
@@ -38,6 +39,7 @@ export type AuthSlice = {
     refreshMe: () => Promise<void>;
     signIn: (method: AuthMethod) => Promise<void>;
     signUp: (method: AuthMethod) => Promise<SignUpResult>;
+    changePassword: (input: ChangePasswordInput) => Promise<void>;
     setStrategy: (strategy: AuthStrategy) => void;
     setSpoof: (email: string | null) => Promise<void>;
     logout: () => Promise<void>;

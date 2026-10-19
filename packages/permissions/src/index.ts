@@ -10,6 +10,7 @@ export {
   OrganizationAction,
   type PermissionEntry,
   type Permix,
+  personOnlyActions,
   SessionAction,
   SpaceAction,
   StandardAction,

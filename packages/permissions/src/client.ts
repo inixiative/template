@@ -30,8 +30,12 @@ export const SessionAction = {
   redactUser: 'user.redact',
   rotateUserJwts: 'user.rotateJwts',
   deleteOrganization: 'organization.delete',
+  changePassword: 'user.changePassword',
 } as const;
 export type SessionAction = (typeof SessionAction)[keyof typeof SessionAction];
+
+// why: no token or JWT grant holds these, even when it names them (Aron, 2026-10-18)
+export const personOnlyActions: readonly SessionAction[] = [SessionAction.changePassword];
 
 export const UserAction = {
   ...StandardAction,

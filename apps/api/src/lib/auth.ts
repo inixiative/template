@@ -9,6 +9,7 @@ import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { emitAppEvent } from '#/appEvents/emit';
 import { authPlugins } from '#/lib/auth/authPlugins';
+import { passwordLength } from '#/lib/auth/passwordLength';
 import { getAllowedOrigins } from '#/middleware/corsMiddleware';
 import { rotateUserJwts } from '#/modules/user/services/rotateUserJwts';
 
@@ -23,6 +24,8 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: true,
+    minPasswordLength: passwordLength.min,
+    maxPasswordLength: passwordLength.max,
     onPasswordReset: async ({ user }) => rotateUserJwts(user.id),
   },
 

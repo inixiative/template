@@ -5,7 +5,12 @@
  * @uses none
  */
 import type { Role } from '@template/db/generated/client/enums';
-import { type ActionState, type Entitlements, SessionAction } from '@template/permissions/client';
+import {
+  type ActionState,
+  type Entitlements,
+  personOnlyActions,
+  SessionAction,
+} from '@template/permissions/client';
 import { rebacSchema } from '@template/permissions/rebac/schema';
 import { organizationRoles } from '@template/permissions/roles/organization';
 import { grantActions, lesserRole } from '@template/permissions/roles/shared';
@@ -58,6 +63,7 @@ export const grantReaches = (
   );
 
 const sessionActions = new Set<string>(Object.values(SessionAction));
+const personOnly = new Set<string>(personOnlyActions);
 
 const inheritable = (entitlements: Entitlements): Entitlements =>
   grantAll(
@@ -72,7 +78,10 @@ export const capGrant = (
   grant: EntitlementGrant,
 ): EntitlementGrant => {
   const named = Object.keys(grant.entitlements ?? {}).filter(
-    (action) => grant.entitlements?.[action] === true && grantReaches(resource, owner, action),
+    (action) =>
+      grant.entitlements?.[action] === true &&
+      !personOnly.has(action) &&
+      grantReaches(resource, owner, action),
   );
   if (grant.entitlementsOnly)
     return { role: owner.role, entitlements: grantAll(named), entitlementsOnly: true };

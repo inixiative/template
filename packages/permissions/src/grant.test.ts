@@ -58,6 +58,15 @@ describe('grantReaches', () => {
 });
 
 describe('capGrant', () => {
+  it('drops a person-only action even when the grant names it', () => {
+    const capped = capGrant('db:user', userLoginGrant, {
+      role: 'owner',
+      entitlements: { [SessionAction.changePassword]: true, [SessionAction.rotateUserJwts]: true },
+      entitlementsOnly: false,
+    });
+    expect(capped.entitlements).toEqual({ [SessionAction.rotateUserJwts]: true });
+  });
+
   const viewer = { role: 'viewer' as const, entitlements: null };
   const owner = { role: 'owner' as const, entitlements: null };
 

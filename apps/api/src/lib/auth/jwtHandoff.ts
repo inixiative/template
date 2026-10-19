@@ -10,11 +10,14 @@ import { deleteSessionCookie } from 'better-auth/cookies';
 import { signJWT } from 'better-auth/plugins';
 import { omit } from 'lodash-es';
 import { PERSON_JWT_TTL_SECONDS, personJwtOptions } from '#/lib/auth/personJwt';
+import { rotateUserJwts } from '#/modules/user/services/rotateUserJwts';
 
 export type PersonJwtHandoff = { token: string; expiresAt: string };
 
 // The OAuth callback's session must outlive its redirect: the one-time token resolves to it.
 const isOAuthCallback = (path: string | undefined) => !!path?.startsWith('/callback/');
+
+const revokesEveryJwt = (path: string | undefined) => path === '/change-password';
 
 export const jwtHandoff = (): BetterAuthPlugin => ({
   id: 'jwt-handoff',
@@ -28,6 +31,7 @@ export const jwtHandoff = (): BetterAuthPlugin => ({
           deleteSessionCookie(ctx);
           if (isOAuthCallback(ctx.path) || isAPIError(ctx.context.returned)) return;
 
+          if (revokesEveryJwt(ctx.path)) await rotateUserJwts(newSession.user.id);
           const iat = Math.floor(Date.now() / 1000);
           const signedIn = (await ctx.context.internalAdapter.updateUser(newSession.user.id, {
             lastLoginAt: new Date(iat * 1000),
