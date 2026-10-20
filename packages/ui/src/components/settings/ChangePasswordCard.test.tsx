@@ -121,12 +121,12 @@ describe('ChangePasswordCard', () => {
     expect(authenticate).not.toHaveBeenCalled();
   });
 
-  test('is hidden while spoofing another user', () => {
+  test('is shown while spoofing another user', () => {
     useAppStore.setState((state) => ({
       auth: { ...state.auth, spoofUserEmail: 'someone@example.test' },
     }));
     const view = render(<ChangePasswordCard />);
-    expect(view.queryByLabelText('Current password')).toBeNull();
+    expect(view.queryByLabelText('Current password')).not.toBeNull();
   });
 
   test('a length error shows the field message, not a bare "Validation failed"', async () => {

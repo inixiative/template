@@ -30,14 +30,11 @@ const errorMessage = (error: unknown): string => {
 
 export const ChangePasswordCard = () => {
   const changePassword = useAppStore((state) => state.auth.changePassword);
-  const isSpoofing = useAppStore((state) => !!state.auth.spoofUserEmail);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [status, setStatus] = useState<Status>({ kind: 'idle' });
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  if (isSpoofing) return null;
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();

@@ -8,7 +8,6 @@ import { SessionAction } from '@template/permissions/client';
 import { actionRoute } from '#/lib/routeTemplates';
 import { authRateLimit } from '#/middleware/rateLimit/authRateLimit';
 import { credentialChangeRateLimit } from '#/middleware/rateLimit/credentialChangeRateLimit';
-import { validateNotSpoofed } from '#/middleware/validations/validateNotSpoofed';
 import { validateSelfPermission } from '#/middleware/validations/validateSelfPermission';
 import {
   changePasswordBodySchema,
@@ -25,7 +24,6 @@ export const meChangePasswordRoute = actionRoute({
   responseSchema: changePasswordResponseSchema,
   middleware: [
     authRateLimit,
-    validateNotSpoofed,
     validateSelfPermission(SessionAction.changePassword),
     credentialChangeRateLimit,
   ],

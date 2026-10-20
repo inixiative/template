@@ -193,7 +193,7 @@ describe('POST /api/v1/me/changePassword', () => {
     expect((await signIn(person.email, currentPassword)).status).toBe(200);
   });
 
-  it('a spoofing superadmin cannot change the spoofed user’s password', async () => {
+  it('a spoofing superadmin changes the spoofed user’s password like any other action', async () => {
     const person = await signUpVerified();
     const { entity: admin } = await createUser({ platformRole: PlatformRole.superadmin });
     const { jwt } = await createUserJwt(admin);
@@ -202,8 +202,9 @@ describe('POST /api/v1/me/changePassword', () => {
       { currentPassword, newPassword },
       { 'x-spoof-user-email': person.email },
     );
-    expect(response.status).toBe(403);
-    expect((await signIn(person.email, currentPassword)).status).toBe(200);
+    expect(response.status).toBe(200);
+    expect((await signIn(person.email, newPassword)).status).toBe(200);
+    expect((await signIn(person.email, currentPassword)).status).not.toBe(200);
   });
 
   it('two concurrent changes: one wins, the other is refused without a 401, no session left', async () => {
