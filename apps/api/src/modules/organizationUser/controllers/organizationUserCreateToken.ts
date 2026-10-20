@@ -4,12 +4,8 @@
  * @partOf feature:tenancy
  * @uses primitive:authz, primitive:routeTemplates, feature:auth
  */
-import { roleToStandardAction } from '@template/permissions';
-import { check, rebacSchema } from '@template/permissions/rebac';
 import { getResource } from '#/lib/context/getResource';
-import { makeError } from '#/lib/errors';
-import { validateFullGrantIssuer } from '#/lib/permissions/validateFullGrantIssuer';
-import { validateHeldActions } from '#/lib/permissions/validateHeldActions';
+import { validateHeldGrant } from '#/lib/permissions/validateHeldGrant';
 import { makeController } from '#/lib/utils/makeController';
 import { createToken } from '#/modules/me/services/createToken';
 import { organizationUserCreateTokenRoute } from '#/modules/organizationUser/routes/organizationUserCreateToken';
@@ -17,44 +13,33 @@ import { organizationUserCreateTokenRoute } from '#/modules/organizationUser/rou
 export const organizationUserCreateTokenController = makeController(
   organizationUserCreateTokenRoute,
   async (c, respond) => {
-    const permix = c.get('permix');
     const orgUser = getResource<'organizationUser'>(c);
     const body = c.req.valid('json');
 
-    const checkLeave = check(permix, rebacSchema, 'organizationUser', orgUser, 'leave');
-    // Option A: User can create tokens at or below their own role level
-    const checkOrg = check(
-      permix,
-      rebacSchema,
-      'organization',
-      { id: orgUser.organizationId },
-      roleToStandardAction(body.role),
-    );
-    // Option B: Only admins+ can create tokens (uses 'assign' rules)
-    // const checkOrg = check(permix, rebacSchema, 'organization', { id: orgUser.organizationId, role: body.role }, 'assign');
-    if (!checkLeave || !checkOrg)
-      throw makeError({ status: 403, message: `Cannot create ${body.role} token` });
-
-    validateHeldActions(
-      permix,
-      [{ model: 'organization', record: { id: orgUser.organizationId } }],
-      body.entitlements,
-    );
-
-    validateFullGrantIssuer(c, {
-      entitlements: body.entitlements ?? null,
-      entitlementsOnly: body.entitlementsOnly ?? false,
-    });
-
-    const token = await createToken(c, {
-      name: body.name,
-      ownerModel: 'OrganizationUser',
+    const credential = {
+      ownerModel: 'OrganizationUser' as const,
       userId: orgUser.userId,
       organizationId: orgUser.organizationId,
+      spaceId: null,
+    };
+    await validateHeldGrant(
+      c,
+      {
+        role: body.role,
+        entitlements: body.entitlements ?? null,
+        entitlementsOnly: body.entitlementsOnly ?? false,
+      },
+      credential,
+    );
+
+    const token = await createToken(c, {
+      ...credential,
+      name: body.name,
       role: body.role,
       entitlements: body.entitlements,
       entitlementsOnly: body.entitlementsOnly,
       expiresAt: body.expiresAt,
+      integrationId: body.integrationId,
       integrationReach: body.integrationReach,
       integrationReachIds: body.integrationReachIds,
     });

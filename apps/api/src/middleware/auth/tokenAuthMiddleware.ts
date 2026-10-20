@@ -8,10 +8,10 @@ import { createHash } from 'node:crypto';
 import { cache, cacheKey, upsertCache } from '@template/db';
 import { LogScope, log } from '@template/shared/logger';
 import type { Context, Next } from 'hono';
+import { getPrincipal } from '#/lib/context/getPrincipal';
 import { setUserContext } from '#/lib/context/setUserContext';
 import type { TokenWithRelations } from '#/lib/context/types';
 import { buildPermix } from '#/lib/permissions/buildPermix';
-import { principalFromContext } from '#/lib/permissions/permissionPrincipal';
 import { findUserWithRelations } from '#/modules/user/services/find';
 import type { AppEnv } from '#/types/appEnv';
 
@@ -133,7 +133,7 @@ export const tokenAuthMiddleware = async (c: Context<AppEnv>, next: Next) => {
         spaces: space ? [space] : [],
       });
     } else {
-      c.set('permix', await buildPermix(principalFromContext(c)));
+      c.set('permix', await buildPermix(getPrincipal(c)));
     }
   } catch (err) {
     // Invalid token, lookup failure, or cache miss. Log so failure modes like

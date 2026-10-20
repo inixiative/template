@@ -14,11 +14,14 @@ export const tokenCreateBodySchema = z.object({
   entitlements: z.record(z.string(), z.boolean()).nullable().optional(),
   entitlementsOnly: z.boolean().optional(),
   expiresAt: z.coerce.date().optional(),
+  integrationId: z.string().optional(),
   integrationReach: z.nativeEnum(IntegrationReach).optional(),
   integrationReachIds: z.array(z.string()).optional(),
 });
 
-export const tokenUpdateBodySchema = tokenCreateBodySchema.omit({ expiresAt: true }).partial();
+export const tokenUpdateBodySchema = tokenCreateBodySchema
+  .omit({ expiresAt: true, integrationId: true })
+  .partial();
 
 export const tokenCreateResponseSchema = TokenScalarSchema.omit({ keyHash: true }).extend({
   key: z.string(),

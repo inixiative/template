@@ -2,10 +2,10 @@ import { OpenAPIHono } from '@hono/zod-openapi';
 import { type Db, db } from '@template/db';
 import type { OrganizationUser, SpaceUser, User } from '@template/db/generated/client/client';
 import { auth } from '#/lib/auth';
+import { getPrincipal } from '#/lib/context/getPrincipal';
 import type { TokenWithRelations } from '#/lib/context/types';
 import { validationDefaultHook } from '#/lib/openapi/validationDefaultHook';
 import { buildPermix } from '#/lib/permissions/buildPermix';
-import { principalFromContext } from '#/lib/permissions/permissionPrincipal';
 import { errorHandlerMiddleware } from '#/middleware/error/errorHandlerMiddleware';
 import { notFoundHandlerMiddleware } from '#/middleware/error/notFoundHandlerMiddleware';
 import { prepareRequest } from '#/middleware/prepareRequest';
@@ -54,7 +54,7 @@ export const createTestApp = (options?: CreateTestAppOptions) => {
       c.set('spaces', spaces);
     }
     if (options?.mockToken) c.set('token', options.mockToken);
-    c.set('permix', await buildPermix(principalFromContext(c)));
+    c.set('permix', await buildPermix(getPrincipal(c)));
     await next();
   });
 

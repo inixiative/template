@@ -7,14 +7,15 @@
 
 import { db, type HydratedRecord, hydrate, type Prisma, type UserId } from '@template/db';
 import { InquiryResourceModel, IntegrationReach, Role } from '@template/db/generated/client/enums';
-import { type Entitlements, SessionAction } from '@template/permissions';
+import { type Entitlements, findUnheldGrant, SessionAction } from '@template/permissions';
 import { canAssign } from '@template/permissions/assign';
 import { check, rebacSchema } from '@template/permissions/rebac';
 import { z } from 'zod';
 import { makeError } from '#/lib/errors';
-import { findActionsUserLacks } from '#/lib/permissions/findActionsUserLacks';
-import { findUnheldGrant } from '#/lib/permissions/findUnheldGrant';
+import { buildPermix } from '#/lib/permissions/buildPermix';
+import { grantEntries } from '#/lib/permissions/grantEntries';
 import { resolveIntegrationReach } from '#/lib/permissions/resolveIntegrationReach';
+import { findUnheldIssuedGrant } from '#/lib/permissions/validateHeldGrant';
 import { autoApproveOwnRequest } from '#/modules/inquiry/handlers/autoApproveOwnRequest';
 import { baseResolutionInputSchema } from '#/modules/inquiry/handlers/schemas';
 import type { Inquiry, InquiryHandler } from '#/modules/inquiry/handlers/types';
@@ -101,7 +102,8 @@ const validate = async (
 
   const targetUser = await findUserWithRelations(inquiry.targetUserId as UserId);
   if (!targetUser) throw makeError({ status: 404, message: 'Target user not found' });
-  const lacking = findActionsUserLacks(targetUser, content.entitlements);
+  const targetPermix = await buildPermix({ user: targetUser, token: null, grant: null });
+  const lacking = findUnheldGrant(targetPermix, grantEntries(targetUser, null), content);
   if (lacking.length)
     throw makeError({
       status: 422,
@@ -146,11 +148,14 @@ export const grantUserEntitlementsHandler: InquiryHandler<
       return canAssign(permix, owner, owner, null, content.entitlements);
     }
     const user = c.get('user');
-    return (
-      !!user &&
-      check(permix, rebacSchema, 'user', user, SessionAction.createToken) &&
-      !(await findUnheldGrant(c, content)).length
-    );
+    if (!user || !check(permix, rebacSchema, 'user', user, SessionAction.createToken)) return false;
+    const unheld = await findUnheldIssuedGrant(c, content, {
+      ownerModel: 'User',
+      userId: inquiry.targetUserId ?? null,
+      organizationId: null,
+      spaceId: null,
+    });
+    return !unheld.length;
   },
 
   handleApprove: async (inquiry, content) => {

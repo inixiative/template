@@ -11,12 +11,12 @@ import {
   isSuperadmin,
   type Permix,
 } from '@template/permissions';
-import type { PermissionPrincipal } from '#/lib/permissions/permissionPrincipal';
-import { setupOrgPermissions } from '#/lib/permissions/setupOrgPermissions';
-import { setupSpacePermissions } from '#/lib/permissions/setupSpacePermissions';
-import { setupUserPermissions } from '#/lib/permissions/setupUserPermissions';
+import type { Principal } from '#/lib/context/getPrincipal';
+import { setupGrantPermissions } from '#/lib/permissions/setupGrantPermissions';
+import { setupOwnerTokenPermissions } from '#/lib/permissions/setupOwnerTokenPermissions';
+import { setupPersonPermissions } from '#/lib/permissions/setupPersonPermissions';
 
-export const buildPermix = async (principal: PermissionPrincipal): Promise<Permix> => {
+export const buildPermix = async (principal: Principal): Promise<Permix> => {
   const permix = createPermissions();
   const { user, token, grant } = principal;
   const actorId = user?.id ?? token?.id;
@@ -24,9 +24,16 @@ export const buildPermix = async (principal: PermissionPrincipal): Promise<Permi
     const model = token ? ActorModel.Token : grant ? ActorModel.Inquiry : ActorModel.User;
     permix.setActor(buildActor(actorId, model, grant));
   }
-  if (user) permix.setSuperadmin(isSuperadmin(user));
-  await setupUserPermissions(permix, principal);
-  await setupOrgPermissions(permix, principal);
-  await setupSpacePermissions(permix, principal);
+  if (!user) {
+    if (token) await setupOwnerTokenPermissions(permix, token);
+    return permix;
+  }
+  permix.setSuperadmin(isSuperadmin(user));
+  if (!grant) {
+    await setupPersonPermissions(permix, user);
+    return permix;
+  }
+  const holder = await buildPermix({ user, token: null, grant: null });
+  await setupGrantPermissions(permix, holder, user, token, grant);
   return permix;
 };

@@ -8,8 +8,8 @@ import { db } from '@template/db';
 import { createPermissions } from '@template/permissions';
 import { logScope, withLogContext } from '@template/shared/logger';
 import type { Context, Next } from 'hono';
+import { getPrincipal } from '#/lib/context/getPrincipal';
 import { buildPermix } from '#/lib/permissions/buildPermix';
-import { principalFromContext } from '#/lib/permissions/permissionPrincipal';
 import { parseBracketNotation } from '#/lib/utils/parseBracketNotation';
 import type { getBatchContext as getBatchContextFn } from '#/modules/batch/services/batchRegistry';
 import type { AppEnv } from '#/types/appEnv';
@@ -49,7 +49,7 @@ export const prepareRequest = async (c: Context<AppEnv>, next: Next) => {
       c.set(key, value ? structuredClone(value) : null);
     }
 
-    c.set('permix', await buildPermix(principalFromContext(c)));
+    c.set('permix', await buildPermix(getPrincipal(c)));
   } else {
     c.set('user', null);
     c.set('organizationUsers', null);

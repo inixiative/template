@@ -13,11 +13,15 @@ export const meCreateTokenController = makeController(meCreateTokenRoute, async 
   const user = c.get('user')!;
   const body = c.req.valid('json');
 
-  await validateHeldGrant(c, {
-    role: body.role,
-    entitlements: body.entitlements ?? null,
-    entitlementsOnly: body.entitlementsOnly ?? false,
-  });
+  await validateHeldGrant(
+    c,
+    {
+      role: body.role,
+      entitlements: body.entitlements ?? null,
+      entitlementsOnly: body.entitlementsOnly ?? false,
+    },
+    { ownerModel: 'User', userId: user.id, organizationId: null, spaceId: null },
+  );
 
   const token = await createToken(c, {
     name: body.name,
@@ -27,6 +31,7 @@ export const meCreateTokenController = makeController(meCreateTokenRoute, async 
     entitlements: body.entitlements,
     entitlementsOnly: body.entitlementsOnly,
     expiresAt: body.expiresAt,
+    integrationId: body.integrationId,
     integrationReach: body.integrationReach,
     integrationReachIds: body.integrationReachIds,
   });

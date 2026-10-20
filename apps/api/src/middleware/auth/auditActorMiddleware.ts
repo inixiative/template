@@ -2,38 +2,13 @@
  * @atlas
  * @kind middleware
  * @partOf feature:auth
- * @uses primitive:appEvents, feature:integrations
+ * @uses primitive:appEvents
  */
 
-import { hydrate } from '@template/db';
 import { auditActorContext } from '@template/db/lib/auditActorContext';
-import { check, rebacSchema } from '@template/permissions/rebac';
-import { log } from '@template/shared/logger';
 import type { Context, Next } from 'hono';
 import { clientAddress } from '#/lib/clientIp';
-import { findOwnedIntegration } from '#/modules/integration/services/findOwnedIntegration';
 import type { AppEnv } from '#/types/appEnv';
-
-const assertedIntegrationId = async (c: Context<AppEnv>): Promise<string | null> => {
-  const asserted = c.req.header('x-integration-id');
-  if (!asserted) return null;
-
-  const owned = await findOwnedIntegration(asserted, {
-    userId: c.get('user')?.id ?? null,
-    organizationIds: (c.get('organizations') ?? []).map((o) => o.id),
-    spaceIds: (c.get('spaces') ?? []).map((s) => s.id),
-  });
-  if (
-    owned &&
-    check(c.get('permix'), rebacSchema, 'integration', await hydrate('integration', owned), 'read')
-  )
-    return owned.id;
-
-  log.warn('x-integration-id not owned or not reached by the request principal — ignoring', {
-    assertedIntegrationId: asserted,
-  });
-  return null;
-};
 
 export const auditActorMiddleware = async (c: Context<AppEnv>, next: Next) => {
   const user = c.get('user');
@@ -50,7 +25,7 @@ export const auditActorMiddleware = async (c: Context<AppEnv>, next: Next) => {
     ipAddress: clientAddress(c),
     userAgent: c.req.header('user-agent') ?? null,
     sourceInquiryId: null,
-    integrationId: c.get('permix').getActor()?.integrationId ?? (await assertedIntegrationId(c)),
+    integrationId: c.get('permix').getActor()?.integrationId ?? null,
     bypassSoftDeleteScope: false,
   };
 

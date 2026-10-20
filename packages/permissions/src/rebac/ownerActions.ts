@@ -103,3 +103,50 @@ export const integrationReach: ActionRule = { any: [reachesAllIntegrations, list
 
 export const integrationActions = (): ResourcePermission['actions'] =>
   mapValues(membershipOwnerActions(), (rule) => ({ all: [rule, integrationReach] }));
+
+const sameAs = (field: string): RuleCheck => ({
+  rule: { field: `integration.${field}`, operator: Operator.equals, path: field },
+});
+
+const integrationOwnedBy = (ownerModel: string): RuleCheck => ({
+  rule: { field: 'integration.ownerModel', operator: Operator.equals, value: ownerModel },
+});
+
+const tokenOwnedBy = (ownerModel: string): RuleCheck => ({
+  rule: { field: 'ownerModel', operator: Operator.equals, value: ownerModel },
+});
+
+const tokenHas = (field: string): RuleCheck => ({
+  rule: { field, operator: Operator.exists },
+});
+
+// why: an org owner reaches its members' integrations, so a token may bind only to its own owner's integration or one above it
+export const bindsToOwnerOrAbove: ActionRule = {
+  any: [
+    { all: [integrationOwnedBy('User'), tokenOwnedBy('User'), sameAs('userId')] },
+    {
+      all: [
+        integrationOwnedBy('OrganizationUser'),
+        tokenOwnedBy('OrganizationUser'),
+        sameAs('userId'),
+        sameAs('organizationId'),
+      ],
+    },
+    {
+      all: [
+        integrationOwnedBy('SpaceUser'),
+        tokenOwnedBy('SpaceUser'),
+        sameAs('userId'),
+        sameAs('spaceId'),
+      ],
+    },
+    {
+      all: [
+        integrationOwnedBy('Organization'),
+        tokenHas('organizationId'),
+        sameAs('organizationId'),
+      ],
+    },
+    { all: [integrationOwnedBy('Space'), tokenHas('spaceId'), sameAs('spaceId')] },
+  ],
+};

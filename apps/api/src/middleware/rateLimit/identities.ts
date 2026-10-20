@@ -6,25 +6,25 @@
  */
 import type { Context } from 'hono';
 import { clientIp } from '#/lib/clientIp';
-import { getActor } from '#/lib/context/getActor';
+import { getPrincipal } from '#/lib/context/getPrincipal';
 import type { AppEnv } from '#/types/appEnv';
 
 export const ipIdentity = (c: Context<AppEnv>): string => `ip:${clientIp(c)}`;
 
 // A person's JWT and every token owned by or through the user share one bucket: minting tokens buys nothing.
 export const userIdentity = (c: Context<AppEnv>): string | null => {
-  const { user } = getActor(c);
+  const { user } = getPrincipal(c);
   return user ? `user:${user.id}` : null;
 };
 
 export const principalIdentity = (c: Context<AppEnv>): string => userIdentity(c) ?? ipIdentity(c);
 
 export const organizationIdentity = (c: Context<AppEnv>): string | null => {
-  const { organization } = getActor(c);
+  const { organization } = getPrincipal(c);
   return organization ? `organization:${organization.id}` : null;
 };
 
 export const spaceIdentity = (c: Context<AppEnv>): string | null => {
-  const { space } = getActor(c);
+  const { space } = getPrincipal(c);
   return space ? `space:${space.id}` : null;
 };

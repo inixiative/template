@@ -19,7 +19,7 @@
   - [Context Types](#context-types)
     - [TokenWithRelations](#tokenwithrelations)
   - [Complex Getters](#complex-getters)
-    - [getActor](#getactor)
+    - [getPrincipal](#getprincipal)
     - [getResource / getResourceType](#getresource--getresourcetype)
     - [getValidatedBody / getValidatedQuery](#getvalidatedbody--getvalidatedquery)
     - [isSuperadmin](#issuperadmin)
@@ -215,7 +215,7 @@ export const setUserContext = async (c: Context<AppEnv>, userWithRelations: User
   c.set('spaceUsers', spaceUsers);
   c.set('spaces', spaces);
 
-  c.set('permix', await buildPermix(principalFromContext(c)));
+  c.set('permix', await buildPermix(getPrincipal(c)));
 };
 ```
 
@@ -352,15 +352,15 @@ Loaded by `tokenAuthMiddleware` based on token's `ownerModel`.
 
 Some getters have logic and remain as functions in `apps/api/src/lib/context/`.
 
-#### getActor
+#### getPrincipal
 
 ```typescript
-import { getActor } from '#/lib/context/getActor';
+import { getPrincipal } from '#/lib/context/getPrincipal';
 
-const { user, organization, organizationUser, space, spaceUser, token } = getActor(c);
+const { user, token, grant, organization, organizationUser, space, spaceUser } = getPrincipal(c);
 ```
 
-Unified accessor that resolves the current actor from any auth method:
+The principal is the owner of the permissions a request uses; the actor is who acts (NAMING.md § Polymorphic Sides). `getPrincipal` reads it once from any auth method: `user` (with its memberships), the `token`, the narrowing `grant` (the token's role, entitlements and integration binding, or a JWT grant's), and the token unpacked:
 - **Person JWT**: user only
 - **User token**: user from token
 - **OrgUser token**: user + org from token's organizationUser
@@ -368,11 +368,7 @@ Unified accessor that resolves the current actor from any auth method:
 - **Org token**: org only (no user)
 - **Space token**: space + org (no user)
 
-**Returns stripped objects** (relations removed to prevent circular refs):
-```typescript
-type OrgUserWithoutRelations = Omit<OrgUserFromToken, 'user' | 'organization'>;
-type SpaceUserWithoutRelations = Omit<SpaceUserFromToken, 'user' | 'organization' | 'organizationUser' | 'space'>;
-```
+`buildPermix(getPrincipal(c))` builds the permix from it; `validateActor` and the rate-limit identities read it. The unpacked memberships are stripped of their relations to prevent circular refs. `permix.getActor()` is a different thing: the permission actor ([PERMISSIONS.md](./PERMISSIONS.md#the-actor)).
 
 #### getResource / getResourceType
 

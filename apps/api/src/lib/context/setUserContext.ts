@@ -6,8 +6,8 @@
  */
 import type { UserWithRelations } from '@template/db';
 import type { Context } from 'hono';
+import { getPrincipal } from '#/lib/context/getPrincipal';
 import { buildPermix } from '#/lib/permissions/buildPermix';
-import { principalFromContext } from '#/lib/permissions/permissionPrincipal';
 import type { AppEnv } from '#/types/appEnv';
 
 export const setUserContext = async (c: Context<AppEnv>, userWithRelations: UserWithRelations) => {
@@ -19,5 +19,5 @@ export const setUserContext = async (c: Context<AppEnv>, userWithRelations: User
   c.set('spaceUsers', spaceUsers);
   c.set('spaces', spaces);
 
-  c.set('permix', await buildPermix(principalFromContext(c)));
+  c.set('permix', await buildPermix(getPrincipal(c)));
 };

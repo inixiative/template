@@ -5,7 +5,11 @@
  * @uses none
  */
 import { Operator } from '@inixiative/json-rules';
-import { integrationActions, ownerActions } from '@template/permissions/rebac/ownerActions';
+import {
+  bindsToOwnerOrAbove,
+  integrationActions,
+  ownerActions,
+} from '@template/permissions/rebac/ownerActions';
 import type { RebacSchema } from '@template/permissions/rebac/types';
 
 const highRoles = ['owner', 'admin'];
@@ -105,6 +109,12 @@ export const rebacSchema: RebacSchema = {
         leave: { self: 'userId', action: 'operate' },
         manage: { rel: 'organization', action: 'manage' },
         own: { rel: 'organization', action: 'own' },
+        'token.create': {
+          all: [
+            { self: 'userId', action: 'token.create' },
+            { rel: 'organization', action: 'operate' },
+          ],
+        },
         'membership.own': null,
         'membership.manage': 'membership.own',
         'membership.operate': 'membership.manage',
@@ -123,6 +133,12 @@ export const rebacSchema: RebacSchema = {
         leave: { self: 'userId', action: 'operate' },
         manage: { rel: 'space', action: 'manage' },
         own: { rel: 'space', action: 'own' },
+        'token.create': {
+          all: [
+            { self: 'userId', action: 'token.create' },
+            { rel: 'space', action: 'operate' },
+          ],
+        },
         'membership.own': null,
         'membership.manage': 'membership.own',
         'membership.operate': 'membership.manage',
@@ -136,6 +152,7 @@ export const rebacSchema: RebacSchema = {
     // locally and only the seat check walks to the owner.
     'db:token': {
       actions: {
+        bind: { all: [{ rel: 'integration', action: 'operate' }, bindsToOwnerOrAbove] },
         // Self-delete for tokens with a userId (User, OrgUser, SpaceUser).
         leave: { self: 'userId', action: 'operate' },
         // Owner-side assign, role-aware.

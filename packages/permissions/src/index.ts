@@ -27,11 +27,16 @@ export {
 } from './client';
 // Grants
 export {
-  capGrant,
   type EntitlementGrant,
+  findUnheldGrant,
   type Grant,
+  type GrantEntry,
+  type GrantHolder,
   type GrantResource,
-  grantReaches,
+  holdsUnconditionally,
+  namedActions,
+  projectGrant,
+  roleAction,
   userLoginGrant,
 } from './grant';
 // ReBAC

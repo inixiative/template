@@ -12,7 +12,6 @@ import { check, rebacSchema } from '@template/permissions/rebac';
 import { getResource } from '#/lib/context/getResource';
 import { makeError } from '#/lib/errors';
 import { resolveIntegrationReach } from '#/lib/permissions/resolveIntegrationReach';
-import { validateFullGrantIssuer } from '#/lib/permissions/validateFullGrantIssuer';
 import { validateHeldGrant } from '#/lib/permissions/validateHeldGrant';
 import { validateRole } from '#/lib/permissions/validateRole';
 import { makeController } from '#/lib/utils/makeController';
@@ -48,11 +47,9 @@ export const tokenUpdateController = makeController(tokenUpdateRoute, async (c, 
       next.entitlements,
     );
 
-  validateFullGrantIssuer(c, next);
-
   if (!assigns) {
     if (!check(permix, rebacSchema, 'token', hydrated, 'leave')) throw denied();
-    await validateHeldGrant(c, next);
+    await validateHeldGrant(c, next, token);
   }
 
   const reach =

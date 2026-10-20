@@ -187,7 +187,7 @@ describe('integration reach: what a credential may touch among its owner integra
       });
     });
 
-    it('an asserted x-integration-id never overrides the bound integration', async () => {
+    it('an x-integration-id header is ignored: the bound integration is the origin', async () => {
       const response = await app.fetch(
         new Request('http://test/api/v1/audit-actor', {
           headers: { authorization: await boundToken(first, 'all'), 'x-integration-id': second.id },
@@ -197,7 +197,7 @@ describe('integration reach: what a credential may touch among its owner integra
       expect(body.integrationId).toBe(first.id);
     });
 
-    it('an asserted x-integration-id outside the credential reach is not the audit origin', async () => {
+    it('an x-integration-id header never makes an origin for an unbound credential', async () => {
       const { authorization } = await createBearerToken(person, {
         role: 'owner',
         integrationReach: 'none',

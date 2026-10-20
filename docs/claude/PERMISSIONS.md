@@ -245,7 +245,7 @@ type TemplateActor = {
 | API token (any owner) | `Token` | its user, or the token's id when it has none | the token's `integrationReach` |
 | JWT with a `grant` claim | `Inquiry` (the approved `grantUserEntitlements` row) | the user | the grant's `integrationReach` |
 
-**One builder.** `buildActor(id, model, binding)` builds it; `buildPermix` is its only server caller and the frontend store its only client caller (a person, so the `/me` it already loads is enough). The audit layer reads the same actor: `auditActorMiddleware` takes `permix.getActor().integrationId` as the audit `integrationId`, so the bound integration is resolved in one place. An asserted `x-integration-id` header is only an audit tag for an unbound caller that can read that integration, never reach. Why: the audit middleware used to read the bound integration off the token and the JWT grant by itself; now the permission check needs it too, so it is read once, into the actor, and both consume it.
+**One builder.** `buildActor(id, model, binding)` builds it; `buildPermix` is its only server caller and the frontend store its only client caller (a person, so the `/me` it already loads is enough). The audit layer reads the same actor: `auditActorMiddleware` takes `permix.getActor().integrationId` as the audit `integrationId`, so the bound integration is resolved in one place. There is no other source: an `x-integration-id` header is ignored, so an unbound credential writes with no origin (Aron, 2026-10-20: the origin is "on the token end or the signet"). A batch's sub-requests rebuild the permix from the cloned credential (`prepareRequest`), so they carry the same origin. Why: the audit middleware used to read the bound integration off the token and the JWT grant by itself; now the permission check needs it too, so it is read once, into the actor, and both consume it.
 
 **Every actor carries every field.** A `{ rule }` binding a field the actor lacks throws, so new actor fields go on `TemplateActor` and into `buildActor` for every model. Row rules (`permissionRules`) may bind only the fields `buildActor` produces (`actorBindNames`); the schema refuses any other `actor.` bind. Fields stay flat: scalars, dates, lists of ids.
 
@@ -274,7 +274,7 @@ A credential bound to an integration may touch its own integration, none, all, o
 ] }
 ```
 
-It narrows; it never grants. A fence is a schema rule, so a superadmin and a direct permix grant on `db:integration` skip it; nothing grants on `db:integration` directly, keep it that way. Everything that walks to an integration inherits it: `POST /integration/:id/inquiries` (`manage`), and the inquiry `send` and `revoke` arms through `sourceIntegration` (`manage`). So with the default `none`, an integration's credential cannot send its own `grantUserEntitlements` request or revoke one; give it `own` for that. Lists authorize on the parent, so `GET /me|organization/:id|space/:id/integrations` narrow rows with `scopeNarrowing(integrationReachScope)`, built from the fence's own two arms (`reachesAllIntegrations`, `listsIntegration`); creating an integration checks `read` on the new row (`validateReachableIntegration`), so only `all` creates. An asserted `x-integration-id` must be readable by the caller (owner reach and the fence) to become the audit origin. Rows an integration owns (a `webhookSubscription.integrationId`) take their owner's rules, not the fence; a model that should be fenced delegates `{ rel: 'integration', action }`.
+It narrows; it never grants. A fence is a schema rule, so a superadmin and a direct permix grant on `db:integration` skip it; nothing grants on `db:integration` directly, keep it that way. Everything that walks to an integration inherits it: `POST /integration/:id/inquiries` (`manage`), and the inquiry `send` and `revoke` arms through `sourceIntegration` (`manage`). So with the default `none`, an integration's credential cannot send its own `grantUserEntitlements` request or revoke one; give it `own` for that. Lists authorize on the parent, so `GET /me|organization/:id|space/:id/integrations` narrow rows with `scopeNarrowing(integrationReachScope)`, built from the fence's own two arms (`reachesAllIntegrations`, `listsIntegration`); creating an integration checks `read` on the new row (`validateReachableIntegration`), so only `all` creates. Rows an integration owns (a `webhookSubscription.integrationId`) take their owner's rules, not the fence; a model that should be fenced delegates `{ rel: 'integration', action }`.
 
 ### How It Works
 
@@ -374,7 +374,7 @@ if (!permix.check('organization', 'manage', orgId)) {
 
 ### Via Validation Middleware
 
-Authentication gates run first: `validateUser` (needs `c.get('user')`) or `validateActor` (needs `getActor(c).user`; Organization and Space tokens carry no user and fail both). Which to pick: [AUTH.md](./AUTH.md#choosing-between-validateuser-and-validateactor).
+Authentication gates run first: `validateUser` (needs `c.get('user')`) or `validateActor` (needs `getPrincipal(c).user`; Organization and Space tokens carry no user and fail both). Which to pick: [AUTH.md](./AUTH.md#choosing-between-validateuser-and-validateactor).
 
 The template uses a unified `validatePermission` middleware that leverages ReBAC for permission checks:
 

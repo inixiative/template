@@ -597,15 +597,15 @@ router.get('/me', validateUser, handler);  // 401 if no user
 
 ### validateActor
 
-Requires `getActor(c).user`:
+Requires `getPrincipal(c).user`:
 
 ```typescript
 import { validateActor } from '#/middleware/validations/validateActor';
 
-router.get('/resource', validateActor, handler);  // 401 if no user from getActor()
+router.get('/resource', validateActor, handler);  // 401 if the principal has no user
 ```
 
-`getActor(c).user` falls back from `c.get('user')` to the organizationUser / spaceUser / token user. Token auth already calls `setUserContext` for User, OrganizationUser and SpaceUser tokens, so in practice both validators admit the same callers.
+`getPrincipal(c).user` is `c.get('user')` with its memberships. Token auth calls `setUserContext` for User, OrganizationUser and SpaceUser tokens, so both validators admit the same callers; Organization and Space tokens carry no user and fail both.
 
 ### Session-Only Actions
 

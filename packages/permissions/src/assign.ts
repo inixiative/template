@@ -7,7 +7,13 @@
 import type { AccessorName, HydratedRecord } from '@template/db';
 import type { Role } from '@template/db/generated/client/enums';
 import type { Entitlements, Permix } from '@template/permissions/client';
-import { type GrantResource, grantReaches } from '@template/permissions/grant';
+import {
+  type GrantHolder,
+  type GrantResource,
+  holdsUnconditionally,
+  namedActions,
+  roleAction,
+} from '@template/permissions/grant';
 import { check } from '@template/permissions/rebac/check';
 import { rebacSchema } from '@template/permissions/rebac/schema';
 import {
@@ -16,16 +22,20 @@ import {
   roleToStandardAction,
 } from '@template/permissions/roles/shared';
 
+const probeId = 'role-probe';
+
+const rolePermix = (resource: GrantResource, role: Role): GrantHolder => ({
+  check: (checked, action, id) =>
+    checked === resource && id === probeId && roleAction(resource, role) === action,
+});
+
 const actionLevel = (resource: GrantResource, action: string): Role => {
   const reachedBy = roleHierarchy.find((role) =>
-    grantReaches(resource, { role, entitlements: null }, action),
+    holdsUnconditionally(rolePermix(resource, role), resource, probeId, action),
   );
   if (reachedBy) return reachedBy;
   return rebacSchema.permissions[resource]?.actions[action] === undefined ? 'member' : 'owner';
 };
-
-const namedActions = (entitlements: Entitlements | undefined) =>
-  Object.keys(entitlements ?? {}).filter((action) => entitlements?.[action] === true);
 
 export const assignLevel = (
   role: Role | null,
