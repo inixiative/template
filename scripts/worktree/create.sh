@@ -290,6 +290,10 @@ for f in "$WORKTREE_DIR"/apps/*/.env.local; do
   replace_env_var_if_present "$f" WEB_URL "http://localhost:${WEB_PORT}"
   replace_env_var_if_present "$f" ADMIN_URL "http://localhost:${ADMIN_PORT}"
   replace_env_var_if_present "$f" SUPERADMIN_URL "http://localhost:${SUPERADMIN_PORT}"
+  replace_env_var_if_present "$f" VITE_API_URL "http://localhost:${API_PORT}"
+  replace_env_var_if_present "$f" VITE_WEB_URL "http://localhost:${WEB_PORT}"
+  replace_env_var_if_present "$f" VITE_ADMIN_URL "http://localhost:${ADMIN_PORT}"
+  replace_env_var_if_present "$f" VITE_SUPERADMIN_URL "http://localhost:${SUPERADMIN_PORT}"
   rewrite_database_url "$f" "$DB_LOCAL"
   rewrite_redis_db "$f" "$REDIS_DB"
 done
