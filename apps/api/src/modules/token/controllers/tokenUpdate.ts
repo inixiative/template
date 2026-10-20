@@ -16,7 +16,6 @@ import { validateFullGrantIssuer } from '#/lib/permissions/validateFullGrantIssu
 import { validateHeldGrant } from '#/lib/permissions/validateHeldGrant';
 import { validateRole } from '#/lib/permissions/validateRole';
 import { makeController } from '#/lib/utils/makeController';
-import { integrationOwnerScope } from '#/modules/integration/services/integrationOwnerScope';
 import { tokenUpdateRoute } from '#/modules/token/routes/tokenUpdate';
 
 const denied = () => makeError({ status: 403, message: 'Cannot make this change to the token' });
@@ -65,7 +64,7 @@ export const tokenUpdateController = makeController(tokenUpdateRoute, async (c, 
             integrationReachIds: body.integrationReachIds,
           },
           token.integrationId,
-          integrationOwnerScope(token),
+          token,
         );
 
   const { keyHash: _keyHash, ...updated } = await db.token.update({

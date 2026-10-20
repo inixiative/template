@@ -6,7 +6,7 @@
  */
 import { createHash, randomBytes } from 'node:crypto';
 import { faker } from '@faker-js/faker';
-import { IntegrationReach, Role } from '@template/db/generated/client/enums';
+import { Role } from '@template/db/generated/client/enums';
 import { createFactory } from '@template/db/test/factory';
 
 const tokenFactory = createFactory('Token', {
@@ -19,7 +19,6 @@ const tokenFactory = createFactory('Token', {
       keyPrefix: rawKey.slice(0, 16),
       role: Role.member,
       isActive: true,
-      integrationReach: IntegrationReach.all,
     };
   },
   dependencies: {

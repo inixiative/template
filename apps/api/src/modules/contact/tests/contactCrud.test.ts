@@ -169,6 +169,13 @@ describe('Contact CRUD', () => {
       expect(
         (await create({ actor: { field: 'model', operator: 'equals', value: 'User' } })).status,
       ).toBe(201);
+      expect(
+        (await create({ rule: { field: 'userId', operator: 'equals', bind: 'actor.nope' } }))
+          .status,
+      ).toBe(422);
+      expect(
+        (await create({ rule: { field: 'userId', operator: 'equals', bind: 'actor.id' } })).status,
+      ).toBe(201);
     });
 
     // Note: same-owner duplicate detection via @@unique is currently a NO-OP

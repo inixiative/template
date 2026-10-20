@@ -8,10 +8,8 @@ import { IntegrationReach } from '@template/db/generated/client/enums';
 import { defaultIntegrationReach, type IntegrationBinding } from '@template/permissions';
 import { uniq } from 'lodash-es';
 import { makeError } from '#/lib/errors';
-import {
-  findOwnedIntegration,
-  type IntegrationOwnerScope,
-} from '#/modules/integration/services/findOwnedIntegration';
+import { findOwnedIntegration } from '#/modules/integration/services/findOwnedIntegration';
+import { integrationOwnerScope } from '#/modules/integration/services/integrationOwnerScope';
 
 export type RequestedIntegrationReach = {
   integrationReach?: IntegrationReach;
@@ -21,7 +19,7 @@ export type RequestedIntegrationReach = {
 export const resolveIntegrationReach = async (
   requested: RequestedIntegrationReach,
   integrationId: string | null,
-  scope: IntegrationOwnerScope,
+  owner: Parameters<typeof integrationOwnerScope>[0],
 ): Promise<Omit<IntegrationBinding, 'integrationId'>> => {
   const integrationReach = requested.integrationReach ?? defaultIntegrationReach(integrationId);
   const integrationReachIds = uniq(requested.integrationReachIds ?? []);
@@ -36,6 +34,7 @@ export const resolveIntegrationReach = async (
       throw invalid(
         'integrationReach "listed" names at least one integration in integrationReachIds',
       );
+    const scope = await integrationOwnerScope(owner);
     const owned = await Promise.all(
       integrationReachIds.map((id) => findOwnedIntegration(id, scope)),
     );

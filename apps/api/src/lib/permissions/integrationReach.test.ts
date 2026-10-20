@@ -46,6 +46,9 @@ describe('integration reach: what a credential may touch among its owner integra
             actor: c.get('permix').getActor(),
           }),
         );
+        app.get('/api/v1/permix-resources', (c) =>
+          c.json(Object.keys(c.get('permix').getJSON() ?? {})),
+        );
         app.route('/api/v1/me', meRouter);
         app.route('/api/v1/organization', organizationRouter);
         app.route('/api/v1/integration', integrationRouter);
@@ -194,6 +197,21 @@ describe('integration reach: what a credential may touch among its owner integra
       expect(body.integrationId).toBe(first.id);
     });
 
+    it('an asserted x-integration-id outside the credential reach is not the audit origin', async () => {
+      const { authorization } = await createBearerToken(person, {
+        role: 'owner',
+        integrationReach: 'none',
+      });
+      const response = await app.fetch(
+        new Request('http://test/api/v1/audit-actor', {
+          headers: { authorization, 'x-integration-id': first.id },
+        }),
+      );
+      expect(
+        ((await response.json()) as { integrationId: string | null }).integrationId,
+      ).toBeNull();
+    });
+
     it('an organization token acts as itself: its id, never a user', async () => {
       const { token, authorization } = await createBearerToken(person, {
         ownerModel: 'Organization',
@@ -205,6 +223,27 @@ describe('integration reach: what a credential may touch among its owner integra
       const body = (await response.json()) as { actor: { id: string; model: string } };
       expect(body.actor).toMatchObject({ id: token.id, model: 'Token' });
     });
+  });
+
+  it('no credential is granted on db:integration directly, which would skip the fence', async () => {
+    const organizationToken = await createBearerToken(person, {
+      ownerModel: 'Organization',
+      userId: null,
+      organizationId: organization.id,
+      role: 'owner',
+    });
+    const grantId = await approvedGrant(first, { integrationReach: 'own' });
+    for (const authorization of [
+      await personAuth(person),
+      await boundToken(first, 'all'),
+      organizationToken.authorization,
+      `Bearer ${(await createUserJwt(person, { grant: grantId })).jwt}`,
+    ]) {
+      const response = await call(authorization, 'GET', '/permix-resources');
+      const resources = (await response.json()) as string[];
+      expect(resources.length).toBeGreaterThan(0);
+      expect(resources.filter((resource) => resource.startsWith('db:integration'))).toEqual([]);
+    }
   });
 
   describe('a person and an unbound token are unaffected', () => {
@@ -264,6 +303,25 @@ describe('integration reach: what a credential may touch among its owner integra
       expect(await renames(authorization, second)).toBe(200);
       expect(await renames(authorization, organizationIntegration)).toBe(200);
       expect(await listed(authorization, '/me/integrations')).toEqual([second.id]);
+      expect(await listed(authorization, `/organization/${organization.id}/integrations`)).toEqual([
+        organizationIntegration.id,
+      ]);
+    });
+
+    it('lists exactly what the check lets it read, in every mode', async () => {
+      const owned = [first, second];
+      for (const [reach, ids] of [
+        ['none', []],
+        ['own', []],
+        ['listed', [second.id]],
+        ['all', []],
+      ] as const) {
+        const authorization = await boundToken(first, reach, [...ids]);
+        const readable: string[] = [];
+        for (const integration of owned)
+          if ((await reads(authorization, integration)) === 200) readable.push(integration.id);
+        expect(await listed(authorization, '/me/integrations')).toEqual(readable.sort());
+      }
     });
 
     it('all: every integration its roles allow, still none its roles deny', async () => {
@@ -307,6 +365,14 @@ describe('integration reach: what a credential may touch among its owner integra
       expect(response.status).toBe(201);
       const { data } = (await response.json()) as { data: { integrationReachIds: string[] } };
       expect(data.integrationReachIds).toEqual([first.id]);
+    });
+
+    it('a user token may list its organization integrations', async () => {
+      const response = await mint({
+        integrationReach: 'listed',
+        integrationReachIds: [organizationIntegration.id],
+      });
+      expect(response.status).toBe(201);
     });
 
     it('ids go only with listed', async () => {
@@ -371,12 +437,19 @@ describe('integration reach: what a credential may touch among its owner integra
       expect(await reads(authorization, second)).toBe(403);
     });
 
-    it('lists only integrations of the asking integration owner', async () => {
+    it('lists only integrations of the user the grant acts as', async () => {
       const asked = await askGrant(await personAuth(person), first, person, {
         integrationReach: 'listed',
         integrationReachIds: [foreign.id],
       });
       expect(asked.status).toBe(422);
+      const inquiryId = await approvedGrant(first, {
+        integrationReach: 'listed',
+        integrationReachIds: [second.id],
+      });
+      const authorization = `Bearer ${(await createUserJwt(person, { grant: inquiryId })).jwt}`;
+      expect(await reads(authorization, second)).toBe(200);
+      expect(await reads(authorization, first)).toBe(403);
     });
 
     it('a grant a person asks for itself stays unbound and reaches all', async () => {

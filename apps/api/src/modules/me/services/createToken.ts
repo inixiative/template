@@ -13,7 +13,6 @@ import {
   type RequestedIntegrationReach,
   resolveIntegrationReach,
 } from '#/lib/permissions/resolveIntegrationReach';
-import { integrationOwnerScope } from '#/modules/integration/services/integrationOwnerScope';
 import type { AppEnv } from '#/types/appEnv';
 
 const MODEL_PREFIXES: Record<TokenOwnerModel, string> = {
@@ -38,16 +37,7 @@ type CreateTokenParams = RequestedIntegrationReach & {
 
 export const createToken = async (c: Context<AppEnv>, params: CreateTokenParams) => {
   const db = c.get('db');
-  const reach = await resolveIntegrationReach(
-    params,
-    null,
-    integrationOwnerScope({
-      ownerModel: params.ownerModel,
-      userId: params.userId ?? null,
-      organizationId: params.organizationId ?? null,
-      spaceId: params.spaceId ?? null,
-    }),
-  );
+  const reach = await resolveIntegrationReach(params, null, params);
   const hex = randomBytes(24).toString('hex');
   const modelPrefix = MODEL_PREFIXES[params.ownerModel];
   const rawKey = `${process.env.ENVIRONMENT}_${modelPrefix}_${hex}`;

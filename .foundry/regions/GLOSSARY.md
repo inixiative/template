@@ -2665,8 +2665,8 @@ Makes every permix check pass for a superadmin. *Region:* [Tenancy and Superadmi
 **permix.setup**  
 Loads role-derived grants into permix. *Region:* [Permissions library (ReBAC engine)](lib-permissions/knowledge.md)
 
-**permix.setUserId**  
-Sets the actor id that { self } rules compare against. *Region:* [Permissions library (ReBAC engine)](lib-permissions/knowledge.md)
+**permix.setActor**  
+Sets the actor ({ id, ...meta }) that { self }, { actor } and actor.<field> binds read. *Region:* [Permissions library (ReBAC engine)](lib-permissions/knowledge.md)
 
 **PermixLike**  
 The grant-reading slice of permix the check engine consumes. *Region:* [Permissions library (ReBAC engine)](lib-permissions/knowledge.md)

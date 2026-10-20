@@ -51,3 +51,7 @@ export const buildActor = (
   integrationId: binding?.integrationId ?? null,
   ...(binding ? reachOf(binding) : { integrationReach: 'all', integrationIds: [] }),
 });
+
+export const actorBindNames: ReadonlySet<string> = new Set(
+  Object.keys(buildActor('', ActorModel.User, null)).map((field) => `actor.${field}`),
+);

@@ -4,16 +4,18 @@
  * @partOf feature:integrations, primitive:authz
  * @uses none
  */
-import { Operator } from '@inixiative/json-rules';
+import { bindRule } from '@inixiative/json-rules';
+import { check, rebacSchema } from '@template/permissions/rebac';
+import { listsIntegration, reachesAllIntegrations } from '@template/permissions/rebac/ownerActions';
 import type { Context } from 'hono';
 import type { WhereScope } from '#/middleware/resources/scopeNarrowing';
 import type { AppEnv } from '#/types/appEnv';
 
 export const integrationReachScope = (c: Context<AppEnv>): WhereScope => {
   const permix = c.get('permix');
-  const actor = permix.getActor();
-  if (permix.isSuperadmin() || actor?.integrationReach === 'all') return {};
+  if (check(permix, rebacSchema, 'integration', { id: '' }, reachesAllIntegrations)) return {};
+  const integrationIds = permix.getActor()?.integrationIds ?? [];
   return {
-    root: { where: { field: 'id', operator: Operator.in, value: actor?.integrationIds ?? [] } },
+    root: { where: bindRule(listsIntegration.rule, { 'actor.integrationIds': integrationIds }) },
   };
 };

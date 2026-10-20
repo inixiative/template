@@ -18,7 +18,6 @@ import { resolveIntegrationReach } from '#/lib/permissions/resolveIntegrationRea
 import { autoApproveOwnRequest } from '#/modules/inquiry/handlers/autoApproveOwnRequest';
 import { baseResolutionInputSchema } from '#/modules/inquiry/handlers/schemas';
 import type { Inquiry, InquiryHandler } from '#/modules/inquiry/handlers/types';
-import { integrationOwnerScope } from '#/modules/integration/services/integrationOwnerScope';
 import { findUserWithRelations } from '#/modules/user/services/find';
 
 export const entitlementGrantSchema = z.object({
@@ -72,20 +71,11 @@ const isMembershipTarget = (inquiry: Partial<Inquiry>) =>
   inquiry.targetModel === InquiryResourceModel.Organization ||
   inquiry.targetModel === InquiryResourceModel.Space;
 
-const resolveGrantReach = async (
-  inquiry: Partial<Inquiry>,
-  content: GrantUserEntitlementsContent,
-) => {
-  const integrationId = inquiry.sourceIntegrationId ?? null;
-  const integration = integrationId
-    ? await db.integration.findUnique({ where: { id: integrationId } })
-    : null;
-  return resolveIntegrationReach(
-    content,
-    integrationId,
-    integration ? integrationOwnerScope(integration) : { userId: inquiry.sourceUserId ?? null },
-  );
-};
+const resolveGrantReach = (inquiry: Partial<Inquiry>, content: GrantUserEntitlementsContent) =>
+  resolveIntegrationReach(content, inquiry.sourceIntegrationId ?? null, {
+    ownerModel: 'User',
+    userId: inquiry.targetUserId,
+  });
 
 const validate = async (
   inquiry: Partial<Inquiry>,

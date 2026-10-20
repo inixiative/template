@@ -86,6 +86,7 @@ describe('a membership token manages what its own membership owns (Aron, 2026-10
       {
         ownerModel: held.spaceUser ? 'SpaceUser' : 'OrganizationUser',
         role,
+        integrationReach: 'all',
         keyHash: createHash('sha256').update(key).digest('hex'),
       },
       held.spaceUser
@@ -100,6 +101,7 @@ describe('a membership token manages what its own membership owns (Aron, 2026-10
       {
         ownerModel: held.spaceUser ? 'SpaceUser' : 'OrganizationUser',
         role,
+        integrationReach: 'all',
         keyHash: createHash('sha256').update(randomUUID()).digest('hex'),
       },
       held.spaceUser

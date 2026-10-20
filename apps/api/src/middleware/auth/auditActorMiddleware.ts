@@ -5,7 +5,9 @@
  * @uses primitive:appEvents, feature:integrations
  */
 
+import { hydrate } from '@template/db';
 import { auditActorContext } from '@template/db/lib/auditActorContext';
+import { check, rebacSchema } from '@template/permissions/rebac';
 import { log } from '@template/shared/logger';
 import type { Context, Next } from 'hono';
 import { clientAddress } from '#/lib/clientIp';
@@ -21,9 +23,13 @@ const assertedIntegrationId = async (c: Context<AppEnv>): Promise<string | null>
     organizationIds: (c.get('organizations') ?? []).map((o) => o.id),
     spaceIds: (c.get('spaces') ?? []).map((s) => s.id),
   });
-  if (owned) return owned.id;
+  if (
+    owned &&
+    check(c.get('permix'), rebacSchema, 'integration', await hydrate('integration', owned), 'read')
+  )
+    return owned.id;
 
-  log.warn('x-integration-id not owned by the request principal — ignoring', {
+  log.warn('x-integration-id not owned or not reached by the request principal — ignoring', {
     assertedIntegrationId: asserted,
   });
   return null;
