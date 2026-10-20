@@ -6,7 +6,6 @@
  */
 import type { Context, Next } from 'hono';
 import { makeError } from '#/lib/errors';
-
 import type { AppEnv } from '#/types/appEnv';
 
 export const validateNotSpoofed = async (c: Context<AppEnv>, next: Next) => {

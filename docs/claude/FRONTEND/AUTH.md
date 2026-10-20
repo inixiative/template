@@ -196,7 +196,7 @@ await logout();
 
 ## Change Password
 
-`ChangePasswordCard` (`packages/ui/src/components/settings/ChangePasswordCard.tsx`) sits on the personal Profile page (`UserProfilePage`). Current, new and confirm fields; a confirmation that does not match is refused without a call; the button is disabled while a change is in flight, so a double submit can't race two changes; the API's message (`Invalid password`, a length error, `Credential account not found` for a Google-only account) shows in an alert, and success says every other device is signed out. It renders nothing while spoofing: the API refuses the change then. No cookie and no BetterAuth client are involved; the session BetterAuth needs lives and dies inside the API ([AUTH.md → withThrowawaySession](../AUTH.md#account-changes-through-betterauth-withthrowawaysession)).
+`ChangePasswordCard` (`packages/ui/src/components/settings/ChangePasswordCard.tsx`) sits on the personal Profile page (`UserProfilePage`). Current, new and confirm fields; a confirmation that does not match is refused without a call; the button is disabled while a change is in flight, so a double submit can't race two changes; length limits come from `passwordLength` (`@template/shared/auth/passwordLength`), the API's own; the API's message shows in an alert (`Invalid password`, `Credential account not found` for a Google-only account), and a 422's `fieldErrors` through `formatFieldErrors`, and success says every other device is signed out. It renders nothing while spoofing: the API refuses the change then. No cookie and no BetterAuth client are involved; the session BetterAuth needs lives and dies inside the API ([AUTH.md → withThrowawaySession](../AUTH.md#account-changes-through-betterauth-withthrowawaysession)).
 
 ---
 

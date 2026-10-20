@@ -5,11 +5,11 @@
  * @uses infrastructure:prisma, infrastructure:redis, primitive:appEvents
  */
 import { db, getRedisClient, redisNamespace } from '@template/db';
+import { passwordLength } from '@template/shared/auth/passwordLength';
 import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { emitAppEvent } from '#/appEvents/emit';
 import { authPlugins } from '#/lib/auth/authPlugins';
-import { passwordLength } from '#/lib/auth/passwordLength';
 import { getAllowedOrigins } from '#/middleware/corsMiddleware';
 import { rotateUserJwts } from '#/modules/user/services/rotateUserJwts';
 

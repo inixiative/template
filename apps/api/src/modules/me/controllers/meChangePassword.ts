@@ -6,6 +6,7 @@
  */
 import { auth } from '#/lib/auth';
 import { withThrowawaySession } from '#/lib/auth/withThrowawaySession';
+import { makeError } from '#/lib/errors';
 import { makeController } from '#/lib/utils/makeController';
 import { meChangePasswordRoute } from '#/modules/me/routes/meChangePassword';
 import { changePasswordResponseSchema } from '#/modules/me/schemas/changePasswordSchemas';
@@ -20,7 +21,8 @@ export const meChangePasswordController = makeController(
         headers,
       }),
     );
-    const { token, expiresAt } = changePasswordResponseSchema.parse(handoff);
-    return respond.ok({ token, expiresAt });
+    const parsed = changePasswordResponseSchema.safeParse(handoff);
+    if (!parsed.success) throw makeError({ status: 500 });
+    return respond.ok(parsed.data);
   },
 );

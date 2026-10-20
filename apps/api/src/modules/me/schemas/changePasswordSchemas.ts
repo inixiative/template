@@ -5,7 +5,7 @@
  * @uses none
  */
 import { z } from '@hono/zod-openapi';
-import { passwordLength } from '#/lib/auth/passwordLength';
+import { passwordLength } from '@template/shared/auth/passwordLength';
 
 export const changePasswordBodySchema = z.object({
   currentPassword: z.string().min(1).max(passwordLength.max),

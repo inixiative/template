@@ -5,6 +5,7 @@
  * @uses primitive:errors
  */
 import { isHttpErrorCode } from '@template/shared/errors';
+import { LogScope, log } from '@template/shared/logger';
 import { isAPIError } from 'better-auth/api';
 import { setRequestCookie } from 'better-auth/cookies';
 import { makeSignature } from 'better-auth/crypto';
@@ -16,8 +17,10 @@ const THROWAWAY_SESSION_SECONDS = 60;
 const asAppError = (error: unknown): unknown => {
   if (!isAPIError(error)) return error;
   // why: a 401 here means a concurrent revokeOtherSessions deleted our throwaway, not a bad credential
-  if (error.statusCode === 401)
+  if (error.statusCode === 401) {
+    log.warn('withThrowawaySession: BetterAuth refused the throwaway session', LogScope.auth);
     return makeError({ status: 409, message: 'Another account change is in progress; try again' });
+  }
   if (error.statusCode >= 500 || !isHttpErrorCode(error.statusCode))
     return makeError({ status: 500 });
   return makeError({ status: error.statusCode, message: error.message });

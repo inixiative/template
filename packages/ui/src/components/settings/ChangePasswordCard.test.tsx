@@ -128,4 +128,22 @@ describe('ChangePasswordCard', () => {
     const view = render(<ChangePasswordCard />);
     expect(view.queryByLabelText('Current password')).toBeNull();
   });
+
+  test('a length error shows the field message, not a bare "Validation failed"', async () => {
+    respond = () =>
+      Response.json(
+        {
+          error: 'VALIDATION_ERROR',
+          message: 'Validation failed',
+          fieldErrors: { newPassword: ['Too small: expected string to have >=8 characters'] },
+        },
+        { status: 422 },
+      );
+    const view = render(<ChangePasswordCard />);
+    submit(view, 'current-password', 'brand-new-password');
+    await waitFor(() =>
+      expect(view.getByRole('alert').textContent).toContain('newPassword: Too small'),
+    );
+    expect(getToken()).toBe(oldToken);
+  });
 });

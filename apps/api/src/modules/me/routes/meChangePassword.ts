@@ -25,9 +25,9 @@ export const meChangePasswordRoute = actionRoute({
   responseSchema: changePasswordResponseSchema,
   middleware: [
     authRateLimit,
-    credentialChangeRateLimit,
     validateNotSpoofed,
     validateSelfPermission(SessionAction.changePassword),
+    credentialChangeRateLimit,
   ],
   description:
     'Changes your password after checking the current one. Every JWT signed for you before stops working; ' +

@@ -4,6 +4,9 @@
  * @partOf primitive:ui
  * @uses primitive:sdk
  */
+
+import { passwordLength } from '@template/shared/auth/passwordLength';
+import type { ApiErrorBody } from '@template/shared/errors';
 import {
   Button,
   Card,
@@ -14,10 +17,16 @@ import {
   Label,
 } from '@template/ui/components';
 import { describeError } from '@template/ui/lib/describeError';
+import { formatFieldErrors } from '@template/ui/lib/formatFieldErrors';
 import { useAppStore } from '@template/ui/store';
 import { type FormEvent, useState } from 'react';
 
 type Status = { kind: 'idle' } | { kind: 'error'; message: string } | { kind: 'changed' };
+
+const errorMessage = (error: unknown): string => {
+  const fieldErrors = (error as Partial<ApiErrorBody> | null)?.fieldErrors;
+  return fieldErrors ? formatFieldErrors(fieldErrors) : describeError(error).message;
+};
 
 export const ChangePasswordCard = () => {
   const changePassword = useAppStore((state) => state.auth.changePassword);
@@ -46,7 +55,7 @@ export const ChangePasswordCard = () => {
       setConfirmPassword('');
       setStatus({ kind: 'changed' });
     } catch (error) {
-      setStatus({ kind: 'error', message: describeError(error).message });
+      setStatus({ kind: 'error', message: errorMessage(error) });
     } finally {
       setIsSubmitting(false);
     }
@@ -76,6 +85,8 @@ export const ChangePasswordCard = () => {
             <Input
               id="new-password"
               type="password"
+              minLength={passwordLength.min}
+              maxLength={passwordLength.max}
               autoComplete="new-password"
               value={newPassword}
               onChange={(event) => setNewPassword(event.target.value)}
@@ -88,6 +99,8 @@ export const ChangePasswordCard = () => {
             <Input
               id="confirm-password"
               type="password"
+              minLength={passwordLength.min}
+              maxLength={passwordLength.max}
               autoComplete="new-password"
               value={confirmPassword}
               onChange={(event) => setConfirmPassword(event.target.value)}

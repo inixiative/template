@@ -2,11 +2,11 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'bun:test'
 import { db, getRedisClient, redisNamespace, unregisterDbHook } from '@template/db';
 import { PlatformRole } from '@template/db/generated/client/enums';
 import { cleanupTouchedTables, createUser } from '@template/db/test';
+import { passwordLength } from '@template/shared/auth/passwordLength';
 import { app } from '#/app';
 import { registerClearCacheHook } from '#/hooks/cache/hook';
 import { auth } from '#/lib/auth';
 import type { PersonJwtHandoff } from '#/lib/auth/jwtHandoff';
-import { passwordLength } from '#/lib/auth/passwordLength';
 import { rateLimitMax } from '#/middleware/rateLimit/limits';
 import { createBearerToken } from '#tests/utils/createBearerToken';
 import { createUserJwt } from '#tests/utils/createUserJwt';
@@ -164,6 +164,21 @@ describe('POST /api/v1/me/changePassword', () => {
       );
     expect(statuses.slice(0, max).every((status) => status === 400)).toBe(true);
     expect(statuses.at(-1)).toBe(429);
+  });
+
+  it('a token’s refused calls do not use up the person’s attempts', async () => {
+    const person = await signUpVerified();
+    const user = await db.user.findUniqueOrThrow({ where: { id: person.userId } });
+    const { rawKey } = await createBearerToken(user);
+    const max = rateLimitMax('credentialChange', {} as never);
+    for (let i = 0; i <= max; i += 1)
+      expect((await changePassword(rawKey, { currentPassword, newPassword })).status).toBe(403);
+    const jwt = await signedInJwt(person.email);
+    const response = await changePassword(jwt, {
+      currentPassword: 'not-the-current-password',
+      newPassword,
+    });
+    expect(response.status).toBe(400);
   });
 
   it('shares the /api/auth rate limit per IP', async () => {
