@@ -294,40 +294,44 @@ Located in `apps/api/src/middleware/auth/tokenAuthMiddleware.ts`. API key authen
 
 1. Extract token from `Authorization: Bearer <token>` header OR `?token=<token>` URL param
 2. Hash token with SHA-256
-3. Look up token by hash (cached in Redis with 10-minute TTL)
+3. Look up the token row by hash (cached in Redis with 10-minute TTL; the row alone, no relations)
 4. Validate: `isActive`, not expired
-5. Set context based on token type
+5. `hydrate('token', row)` reads the owner records (user, organization, space, `OrganizationUser`, `SpaceUser`), each under its own cache key
+6. Refuse when the owner is gone: a removed or soft-deleted membership, or a deleted user, org or space, authenticates no one
+7. Set context based on token type
 
 URL token is useful for email links and file downloads (where headers can't be set). Only API tokens are read from the URL; a person JWT never is.
 
-**Security:** Token lookups are cached for 10 minutes, so a revoked token (`isActive = false`) stops working within that window. `lastUsedAt` is touched on cache miss only.
+**Security:** The token row is cached for 10 minutes and its key clears on every Token write, so a revoked token stops working on the next request. The owner records are never copied into the token's entry: the cache hook (`cacheReference`) clears their keys when they change, so a demoted member, a removed member and a revoked superadmin take effect on the next request. `lastUsedAt` is touched on cache miss only.
 
 ### tokenAuthMiddleware
 
 ```typescript
-export const tokenAuthMiddleware = async (c: Context<AppEnv>, next: Next) => {
-  if (c.get('user')) return next();
-
-  const authorization = c.req.header('authorization');
-  const urlToken = new URL(c.req.url).searchParams.get('token');
+const authenticateToken = async (c: Context<AppEnv>) => {
   const apiKey = authorization?.startsWith('Bearer ') ? authorization.slice(7) : urlToken;
-  if (!apiKey) return next();
+  if (!apiKey) return;
 
   const keyHash = createHash('sha256').update(apiKey).digest('hex');
-  const token = await cache(cacheKey('Token', { keyHash }), findActiveToken, TOKEN_CACHE_TTL);  // 10 min
-  if (!token) return next();
+  const tokenRow = await cache(cacheKey('Token', { keyHash }), findActiveToken, TOKEN_CACHE_TTL);  // the row only
+  if (!tokenRow || (tokenRow.expiresAt && tokenRow.expiresAt <= new Date())) return;
+
+  const token = (await hydrate('token', tokenRow)) as TokenWithRelations;  // owners under their own keys
+  if (!ownerExists(token)) return;
 
   c.set('token', token);
+  // User → findUserWithRelations → setUserContext
+  // OrganizationUser / SpaceUser → setUserContext from the one membership
+  // Organization / Space → setupOrgPermissions + setupSpacePermissions
+};
 
-  if (token.ownerModel === 'User') {
-    // load the user with all memberships → setUserContext
-  } else if (token.ownerModel === 'OrganizationUser' || token.ownerModel === 'SpaceUser') {
-    // setUserContext from the token's own membership (one org / one space)
-  } else {
-    await setupOrgPermissions(c);
-    await setupSpacePermissions(c);
+export const tokenAuthMiddleware = async (c: Context<AppEnv>, next: Next) => {
+  if (!c.get('user')) {
+    try {
+      await authenticateToken(c);
+    } catch (err) {
+      log.warn('token auth lookup failed', { err }, LogScope.auth);
+    }
   }
-
   await next();
 };
 ```
