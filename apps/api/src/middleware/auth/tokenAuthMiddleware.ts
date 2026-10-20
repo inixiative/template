@@ -5,8 +5,15 @@
  * @uses infrastructure:redis, infrastructure:prisma, primitive:authz
  */
 import { createHash } from 'node:crypto';
-import { cache, cacheKey, hydrate } from '@template/db';
-import type { Token } from '@template/db/generated/client/client';
+import { cache, cacheKey, fetchOne } from '@template/db';
+import type {
+  Organization,
+  OrganizationUser,
+  Space,
+  SpaceUser,
+  Token,
+  User,
+} from '@template/db/generated/client/client';
 import { LogScope, log } from '@template/shared/logger';
 import type { Context, Next } from 'hono';
 import { setUserContext } from '#/lib/context/setUserContext';
@@ -27,15 +34,38 @@ const ownerExists = (token: TokenWithRelations): boolean => {
     case 'Space':
       return Boolean(token.space);
     case 'OrganizationUser':
-      return Boolean(token.organizationUser?.user && token.organizationUser.organization);
+      return Boolean(token.organizationUser);
     case 'SpaceUser':
-      return Boolean(
-        token.spaceUser?.user &&
-          token.spaceUser.organization &&
-          token.spaceUser.organizationUser &&
-          token.spaceUser.space,
-      );
+      return Boolean(token.spaceUser);
   }
+};
+
+// why: owners load under their own keys, which the cache hook clears; the token's key does not.
+const loadOwners = async (token: Token): Promise<TokenWithRelations> => {
+  const { organizationId, spaceId, userId } = token;
+  const [user, organization, space, organizationUser, spaceUser] = await Promise.all([
+    userId ? fetchOne<User>('user', userId) : null,
+    organizationId ? fetchOne<Organization>('organization', organizationId) : null,
+    spaceId ? fetchOne<Space>('space', spaceId) : null,
+    organizationId && userId
+      ? fetchOne<OrganizationUser>('organizationUser', { organizationId, userId })
+      : null,
+    organizationId && spaceId && userId
+      ? fetchOne<SpaceUser>('spaceUser', { organizationId, spaceId, userId })
+      : null,
+  ]);
+  const hasMembership = organizationUser && user && organization;
+  return {
+    ...token,
+    user,
+    organization,
+    space,
+    organizationUser: hasMembership ? { ...organizationUser, user, organization } : null,
+    spaceUser:
+      spaceUser && hasMembership && space
+        ? { ...spaceUser, user, organization, organizationUser, space }
+        : null,
+  };
 };
 
 const authenticateToken = async (c: Context<AppEnv>): Promise<void> => {
@@ -72,8 +102,7 @@ const authenticateToken = async (c: Context<AppEnv>): Promise<void> => {
   if (!tokenRow) return;
   if (tokenRow.expiresAt && tokenRow.expiresAt <= new Date()) return;
 
-  // why: owners load under their own keys, which the cache hook clears; the token's key does not.
-  const token = (await hydrate('token', tokenRow)) as TokenWithRelations;
+  const token = await loadOwners(tokenRow);
   if (!ownerExists(token)) return;
 
   if (token.ownerModel === 'User' && token.user) {

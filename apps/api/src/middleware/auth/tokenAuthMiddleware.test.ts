@@ -81,7 +81,13 @@ const readMe = (headers: Record<string, string>) => app.request('/api/v1/me', { 
 const tokenApp = new OpenAPIHono<AppEnv>();
 tokenApp.use('*', prepareRequest);
 tokenApp.use('*', tokenAuthMiddleware);
-tokenApp.get('/echo', (c) => c.json({ tokenId: c.get('token')?.id ?? null }));
+tokenApp.get('/echo', (c) =>
+  c.json({
+    tokenId: c.get('token')?.id ?? null,
+    organizationUsers: c.get('organizationUsers') ?? [],
+    spaces: c.get('spaces') ?? [],
+  }),
+);
 
 const authenticatedTokenId = async (headers: Record<string, string>) => {
   const response = await tokenApp.request('/echo', { headers });
@@ -189,6 +195,18 @@ describe('a SpaceUser token follows its membership, not the cached token', () =>
 
     await db.spaceUser.update({ where: { id: spaceUser.id }, data: { role: 'viewer' } });
     expect((await rename(spacePath, headers)).status).toBe(403);
+  });
+
+  it("the space token's context holds the membership rows, not their relations", async () => {
+    const { spaceUser } = await spaceMember('owner');
+    const response = await tokenApp.request('/echo', { headers: await spaceUserToken(spaceUser) });
+    const context = (await response.json()) as { organizationUsers: object[]; spaces: object[] };
+
+    expect(context.organizationUsers).toHaveLength(1);
+    expect(context.organizationUsers[0]).not.toHaveProperty('user');
+    expect(context.organizationUsers[0]).not.toHaveProperty('organization');
+    expect(context.spaces).toHaveLength(1);
+    expect(context.spaces[0]).not.toHaveProperty('organization');
   });
 
   it('a removed space member is refused while the token row is still cached', async () => {

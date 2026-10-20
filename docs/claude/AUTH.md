@@ -296,7 +296,7 @@ Located in `apps/api/src/middleware/auth/tokenAuthMiddleware.ts`. API key authen
 2. Hash token with SHA-256
 3. Look up the token row by hash (cached in Redis with 10-minute TTL; the row alone, no relations)
 4. Validate: `isActive`, not expired
-5. `hydrate('token', row)` reads the owner records (user, organization, space, `OrganizationUser`, `SpaceUser`), each under its own cache key
+5. Read the owner records (user, organization, space, `OrganizationUser`, `SpaceUser`) with `fetchOne`, each under its own cache key (not `hydrate`, whose recursive walk nests relations past the owners' one level)
 6. Refuse when the owner is gone: a removed or soft-deleted membership, or a deleted user, org or space, authenticates no one
 7. Set context based on token type
 
@@ -315,7 +315,7 @@ const authenticateToken = async (c: Context<AppEnv>) => {
   const tokenRow = await cache(cacheKey('Token', { keyHash }), findActiveToken, TOKEN_CACHE_TTL);  // the row only
   if (!tokenRow || (tokenRow.expiresAt && tokenRow.expiresAt <= new Date())) return;
 
-  const token = (await hydrate('token', tokenRow)) as TokenWithRelations;  // owners under their own keys
+  const token = await loadOwners(tokenRow);  // fetchOne per owner record, each under its own key
   if (!ownerExists(token)) return;
 
   c.set('token', token);
