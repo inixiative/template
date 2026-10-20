@@ -6,7 +6,7 @@
  */
 
 import { db, type HydratedRecord, hydrate, type Prisma, type UserId } from '@template/db';
-import { InquiryResourceModel, Role } from '@template/db/generated/client/enums';
+import { InquiryResourceModel, IntegrationReach, Role } from '@template/db/generated/client/enums';
 import { type Entitlements, SessionAction } from '@template/permissions';
 import { canAssign } from '@template/permissions/assign';
 import { check, rebacSchema } from '@template/permissions/rebac';
@@ -14,15 +14,19 @@ import { z } from 'zod';
 import { makeError } from '#/lib/errors';
 import { findActionsUserLacks } from '#/lib/permissions/findActionsUserLacks';
 import { findUnheldGrant } from '#/lib/permissions/findUnheldGrant';
+import { resolveIntegrationReach } from '#/lib/permissions/resolveIntegrationReach';
 import { autoApproveOwnRequest } from '#/modules/inquiry/handlers/autoApproveOwnRequest';
 import { baseResolutionInputSchema } from '#/modules/inquiry/handlers/schemas';
 import type { Inquiry, InquiryHandler } from '#/modules/inquiry/handlers/types';
+import { integrationOwnerScope } from '#/modules/integration/services/integrationOwnerScope';
 import { findUserWithRelations } from '#/modules/user/services/find';
 
 export const entitlementGrantSchema = z.object({
   role: z.nativeEnum(Role),
   entitlements: z.record(z.string(), z.boolean()).nullable(),
   entitlementsOnly: z.boolean(),
+  integrationReach: z.nativeEnum(IntegrationReach),
+  integrationReachIds: z.array(z.string()),
 });
 
 const contentSchema = entitlementGrantSchema.extend({
@@ -30,6 +34,8 @@ const contentSchema = entitlementGrantSchema.extend({
   role: z.nativeEnum(Role).default(Role.viewer),
   entitlements: z.record(z.string(), z.boolean()).nullable().default(null),
   entitlementsOnly: z.boolean().default(false),
+  integrationReach: z.nativeEnum(IntegrationReach).optional(),
+  integrationReachIds: z.array(z.string()).optional(),
 });
 
 const resolutionSchema = baseResolutionInputSchema.extend({
@@ -66,6 +72,21 @@ const isMembershipTarget = (inquiry: Partial<Inquiry>) =>
   inquiry.targetModel === InquiryResourceModel.Organization ||
   inquiry.targetModel === InquiryResourceModel.Space;
 
+const resolveGrantReach = async (
+  inquiry: Partial<Inquiry>,
+  content: GrantUserEntitlementsContent,
+) => {
+  const integrationId = inquiry.sourceIntegrationId ?? null;
+  const integration = integrationId
+    ? await db.integration.findUnique({ where: { id: integrationId } })
+    : null;
+  return resolveIntegrationReach(
+    content,
+    integrationId,
+    integration ? integrationOwnerScope(integration) : { userId: inquiry.sourceUserId ?? null },
+  );
+};
+
 const validate = async (
   inquiry: Partial<Inquiry>,
   content: GrantUserEntitlementsContent,
@@ -77,6 +98,8 @@ const validate = async (
       throw makeError({ status: 422, message: 'Name the entitlements to grant' });
     if (!(await findMembership(inquiry)))
       throw makeError({ status: 422, message: 'The requester is not a member' });
+    if (content.integrationReach !== undefined || content.integrationReachIds !== undefined)
+      throw makeError({ status: 422, message: 'integrationReach applies to a grant to a user' });
     return;
   }
 
@@ -94,6 +117,7 @@ const validate = async (
       status: 422,
       message: `The user does not hold these actions: ${lacking.join(', ')}`,
     });
+  await resolveGrantReach(inquiry, content);
 };
 
 export const grantUserEntitlementsHandler: InquiryHandler<
@@ -152,7 +176,8 @@ export const grantUserEntitlementsHandler: InquiryHandler<
       return { addedEntitlements };
     }
     const { role, entitlements, entitlementsOnly } = content;
-    return { grant: { role, entitlements, entitlementsOnly } };
+    const reach = await resolveGrantReach(inquiry, content);
+    return { grant: { role, entitlements, entitlementsOnly, ...reach } };
   },
 
   handleRevoke: async (inquiry) => {

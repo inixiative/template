@@ -36,6 +36,8 @@ export const spaceCreateTokenController = makeController(
       entitlements: body.entitlements,
       entitlementsOnly: body.entitlementsOnly,
       expiresAt: body.expiresAt,
+      integrationReach: body.integrationReach,
+      integrationReachIds: body.integrationReachIds,
     });
 
     return respond.created(token);

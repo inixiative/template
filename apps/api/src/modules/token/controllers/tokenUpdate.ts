@@ -11,10 +11,12 @@ import { canAssign } from '@template/permissions/assign';
 import { check, rebacSchema } from '@template/permissions/rebac';
 import { getResource } from '#/lib/context/getResource';
 import { makeError } from '#/lib/errors';
+import { resolveIntegrationReach } from '#/lib/permissions/resolveIntegrationReach';
 import { validateFullGrantIssuer } from '#/lib/permissions/validateFullGrantIssuer';
 import { validateHeldGrant } from '#/lib/permissions/validateHeldGrant';
 import { validateRole } from '#/lib/permissions/validateRole';
 import { makeController } from '#/lib/utils/makeController';
+import { integrationOwnerScope } from '#/modules/integration/services/integrationOwnerScope';
 import { tokenUpdateRoute } from '#/modules/token/routes/tokenUpdate';
 
 const denied = () => makeError({ status: 403, message: 'Cannot make this change to the token' });
@@ -54,6 +56,18 @@ export const tokenUpdateController = makeController(tokenUpdateRoute, async (c, 
     await validateHeldGrant(c, next);
   }
 
+  const reach =
+    body.integrationReach === undefined && body.integrationReachIds === undefined
+      ? {}
+      : await resolveIntegrationReach(
+          {
+            integrationReach: body.integrationReach ?? token.integrationReach,
+            integrationReachIds: body.integrationReachIds,
+          },
+          token.integrationId,
+          integrationOwnerScope(token),
+        );
+
   const { keyHash: _keyHash, ...updated } = await db.token.update({
     where: { id: token.id },
     data: {
@@ -62,6 +76,7 @@ export const tokenUpdateController = makeController(tokenUpdateRoute, async (c, 
       entitlements:
         next.entitlements === null ? Prisma.DbNull : (next.entitlements as Prisma.InputJsonValue),
       entitlementsOnly: next.entitlementsOnly,
+      ...reach,
     },
   });
 

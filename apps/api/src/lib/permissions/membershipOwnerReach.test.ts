@@ -117,7 +117,14 @@ describe('a membership token manages what its own membership owns (Aron, 2026-10
         space: null,
         spaceUser: null,
       },
-      grant: { role: token.role, entitlements: null, entitlementsOnly: false },
+      grant: {
+        role: token.role,
+        entitlements: null,
+        entitlementsOnly: false,
+        integrationId: token.integrationId,
+        integrationReach: token.integrationReach,
+        integrationReachIds: token.integrationReachIds,
+      },
     });
   };
 

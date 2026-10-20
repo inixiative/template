@@ -7,6 +7,7 @@
  */
 import { Operator } from '@inixiative/json-rules';
 import type { ActionRule, ResourcePermission } from '@template/permissions/rebac/types';
+import { mapValues } from 'lodash-es';
 
 // Spreadable rebac action block for owner-polymorphic models. The model has
 // nullable FKs to one or more owner relations (default: user / organization /
@@ -83,3 +84,14 @@ export const membershipOwnerActions = (): ResourcePermission['actions'] => {
     read: reach('read'),
   };
 };
+
+// why: a fence ANDs onto the owner reach; superadmin and a direct permix grant on db:integration skip it
+export const integrationReach: ActionRule = {
+  any: [
+    { actor: { field: 'integrationReach', operator: Operator.equals, value: 'all' } },
+    { rule: { field: 'id', operator: Operator.in, bind: 'actor.integrationIds' } },
+  ],
+};
+
+export const integrationActions = (): ResourcePermission['actions'] =>
+  mapValues(membershipOwnerActions(), (rule) => ({ all: [rule, integrationReach] }));

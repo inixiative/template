@@ -15,6 +15,8 @@
   - [roleToStandardAction](#roletostandardaction)
 - [Permix](#permix)
   - [API](#api)
+  - [The Actor](#the-actor)
+  - [Integration Reach](#integration-reach)
   - [How It Works](#how-it-works)
   - [Superadmin Bypass](#superadmin-bypass)
 - [Permission Setup](#permission-setup)
@@ -38,6 +40,7 @@
   - [Dot-path vs. Single-hop Delegation](#dot-path-vs-single-hop-delegation)
   - [Example: Space Permission Check](#example-space-permission-check)
 - [Owner-Polymorphic Models](#owner-polymorphic-models)
+  - [Member-Owned Models](#member-owned-models)
 - [Row-Level Overrides](#row-level-overrides)
   - [Schema](#schema)
   - [How `check()` merges](#how-check-merges)
@@ -212,9 +215,66 @@ type Permix = {
   check: (resource: ResourceType, action: Action, id?: string, data?: unknown) => boolean;
   setup: (perms: PermissionEntry | PermissionEntry[], options?: { replace?: boolean }) => Promise<void>;
   setSuperadmin: (value: boolean) => void;
+  isSuperadmin: () => boolean;
+  setActor: (actor: TemplateActor) => void;
+  getActor: () => TemplateActor | null;
   getJSON: () => Record<string, Record<string, boolean>> | null;
 };
 ```
+
+It is `@inixiative/permissions`' wrapper (`createPermissions<Action, TemplateActor>()`), typed with the template's actions and actor in `packages/permissions/src/client.ts`; the template keeps no copy of its own.
+
+### The Actor
+
+The actor is plain data about who is acting, set once per request beside the grants (Aron, 2026-10-19: "The actor is kind of a bucket for meta, kind of like how `self` works"). `{ self, action }` reads its `id`, `{ actor: Condition }` is a json-rules predicate over it, and a `{ rule }` may compare the record against `{ bind: 'actor.<field>' }` ([ActionRule Types](#actionrule-types)). With nobody acting, `{ actor }` and actor-binding rules deny.
+
+```typescript
+// packages/permissions/src/actor.ts
+type TemplateActor = {
+  id: string;                          // the user acted for; a token with no user (Organization/Space) is its own id
+  model: 'User' | 'Token' | 'Inquiry'; // the row holding the credential's authority
+  integrationId: string | null;        // the integration the credential is bound to
+  integrationReach: 'all' | 'listed';
+  integrationIds: string[];            // reached when integrationReach is 'listed'
+};
+```
+
+| Credential | `model` | `id` | Reach |
+|---|---|---|---|
+| Person JWT (self-issued or the configured issuer), spoofing included | `User` | the user | `all` |
+| API token (any owner) | `Token` | its user, or the token's id when it has none | the token's `integrationReach` |
+| JWT with a `grant` claim | `Inquiry` (the approved `grantUserEntitlements` row) | the user | the grant's `integrationReach` |
+
+**One builder.** `buildActor(id, model, binding)` builds it; `buildPermix` is its only server caller and the frontend store its only client caller (a person, so the `/me` it already loads is enough). The audit layer reads the same actor: `auditActorMiddleware` takes `permix.getActor().integrationId` as the audit `integrationId`, so the bound integration is resolved in one place. An asserted `x-integration-id` header is only an audit tag for an unbound caller that owns that integration, never reach. Why: the audit middleware used to read the bound integration off the token and the JWT grant by itself; now the permission check needs it too, so it is read once, into the actor, and both consume it.
+
+**Every actor carries every field.** A `{ rule }` binding a field the actor lacks throws, so new actor fields go on `TemplateActor` and into `buildActor` for every model. Fields stay flat: scalars, dates, lists of ids.
+
+### Integration Reach
+
+A credential bound to an integration may touch its own integration, none, all, or listed ones (Aron, 2026-10-19: "you could have it be able to act on its own integration, no integrations, all integrations, or specific integrations… the default is to make them probably not able to touch anything"). It is an entitlement on the credential, stored as `integrationReach` (`own | none | all | listed`, enum `IntegrationReach`) and `integrationReachIds`:
+
+- **Token:** columns on `Token`; `POST …/tokens` and `PATCH /token/:id` accept both.
+- **JWT grant:** `content.integrationReach` / `content.integrationReachIds` of a `grantUserEntitlements` inquiry to a user, written into `resolution.grant` on approval.
+
+| Reach | Actor | Reaches |
+|---|---|---|
+| `own` | `listed`, `[integrationId]` | its bound integration |
+| `none` | `listed`, `[]` | nothing |
+| `all` | `all` | every integration its roles allow |
+| `listed` | `listed`, the ids | those, still only where its roles allow |
+
+**Defaults:** a credential bound to an integration gets `none`; an unbound token and a person get `all`. The default is written at mint time (`resolveIntegrationReach`, `apps/api/src/lib/permissions/resolveIntegrationReach.ts`), and the column defaults to `none`, so a row written outside that path fails closed. **Validation:** `own` needs a bound integration; `listed` names at least one integration, each of the credential's owner (`findOwnedIntegration` over the owner's user, organization or space); ids go only with `listed`. Every issuer is a person (`token.create` is person-only), so a credential never mints wider reach than its issuer holds.
+
+**The fence.** `db:integration` is `integrationActions()` (`packages/permissions/src/rebac/ownerActions.ts`): every action is the owner reach ([Member-Owned Models](#member-owned-models)) AND
+
+```typescript
+{ any: [
+  { actor: { field: 'integrationReach', operator: 'equals', value: 'all' } },
+  { rule: { field: 'id', operator: 'in', bind: 'actor.integrationIds' } },
+] }
+```
+
+It narrows; it never grants. A fence is a schema rule, so a superadmin and a direct permix grant on `db:integration` skip it; nothing grants on `db:integration` directly, keep it that way. Everything that walks to an integration inherits it: `POST /integration/:id/inquiries` (`manage`), and the inquiry `send` and `revoke` arms through `sourceIntegration` (`manage`). So with the default `none`, an integration's credential cannot send its own `grantUserEntitlements` request or revoke one; give it `own` for that. Lists authorize on the parent, so `GET /me|organization/:id|space/:id/integrations` narrow rows with `scopeNarrowing(integrationReachScope)`, and creating an integration checks `read` on the new row (`validateReachableIntegration`), so only `all` creates.
 
 ### How It Works
 
@@ -244,7 +304,7 @@ permix.check('organization', 'own', 'any_org');  // Always true
 
 `setUserContext` (`apps/api/src/lib/context/setUserContext.ts`) sets the user, then runs `setupUserPermissions`, `setupOrgPermissions` and `setupSpacePermissions` (`apps/api/src/lib/permissions/`). Each writes one entry per resource: `db:user:<id>`, `db:organization:<id>`, `db:space:<id>`. A principal that narrows the user (a user-bound token or a JWT grant: the principal's `grant`) goes through [`capGrant`](#capgrant) against the owner's grant for that entry.
 
-**One builder.** `buildPermix(principal)` (`apps/api/src/lib/permissions/buildPermix.ts`) builds the permix for an actor and loads nothing. A `PermissionPrincipal` is `{ user, token, grant }`, where `user` carries its memberships (`UserWithRelations`) and `grant` is the narrowing grant: the token's role and entitlements, or a JWT's (`apps/api/src/lib/permissions/permissionPrincipal.ts`). Each setup step exists once, `setupUserPermissions` / `setupOrgPermissions` / `setupSpacePermissions(permix, principal)`, called only by `buildPermix`. The middleware does `c.set('permix', await buildPermix(principalFromContext(c)))`. For an actor who isn't the requester (a stored issuer re-check, a job), use the user loader setUserContext already uses: `buildPermix({ user: await findUserWithRelations(userId), token: null, grant: null })`, then check the action. `buildPermix.test.ts` pins the direct call to the request path.
+**One builder.** `buildPermix(principal)` (`apps/api/src/lib/permissions/buildPermix.ts`) builds the permix for an actor and loads nothing: it sets the [actor](#the-actor), the superadmin bypass and the grants. A `PermissionPrincipal` is `{ user, token, grant }`, where `user` carries its memberships (`UserWithRelations`) and `grant` is the narrowing grant with the credential's integration binding: the token's role, entitlements and reach, or a JWT grant's (`apps/api/src/lib/permissions/permissionPrincipal.ts`). Each setup step exists once, `setupUserPermissions` / `setupOrgPermissions` / `setupSpacePermissions(permix, principal)`, called only by `buildPermix`. The middleware does `c.set('permix', await buildPermix(principalFromContext(c)))`. For an actor who isn't the requester (a stored issuer re-check, a job), use the user loader setUserContext already uses: `buildPermix({ user: await findUserWithRelations(userId), token: null, grant: null })`, then check the action. `buildPermix.test.ts` pins the direct call to the request path.
 
 ### Who Gets Which Entries
 
@@ -418,7 +478,7 @@ An Inquiry of type `grantUserEntitlements` (handler: `apps/api/src/modules/inqui
 |---|---|---|---|
 | `Organization` | a member (`POST /me/inquiries`) | someone who can assign it there (`canAssign`: an admin for member-level keys it holds, the owner for `own`/`manage`) | the entitlements onto the requester's `OrganizationUser` |
 | `Space` | a space member | `assign` on the space at that level | onto the requester's `SpaceUser` |
-| `User` | the user (handshake) or an integration (`POST /integration/:id/inquiries`, needs `manage` on it) | the user, holding `token.create` and the whole grant | `resolution.grant` (`role`, `entitlements`, `entitlementsOnly`) for a JWT `grant` claim |
+| `User` | the user (handshake) or an integration (`POST /integration/:id/inquiries`, needs `manage` on it) | the user, holding `token.create` and the whole grant | `resolution.grant` (`role`, `entitlements`, `entitlementsOnly`, `integrationReach`, `integrationReachIds`) for a JWT `grant` claim |
 
 ```typescript
 { type: 'grantUserEntitlements', targetModel: 'Organization', targetOrganizationId, status: 'sent',
@@ -428,6 +488,7 @@ An Inquiry of type `grantUserEntitlements` (handler: `apps/api/src/modules/inqui
 - **Auto-approval is off** except for the handshake: the user asks for their own grant and could approve it themselves (`autoApproveOwnRequest`, `apps/api/src/modules/inquiry/handlers/autoApproveOwnRequest.ts`; still gated by the handler's `canApprove`). To turn it on for another type, give that handler `autoApprove: autoApproveOwnRequest` or its own rule.
 - **Revoke:** `POST /inquiry/:id/revoke` (either party, or a manager of the target) sets `revoked`; a membership grant takes back the entitlements it added (`resolution.addedEntitlements`; ones the member already held stay), a JWT grant stops on its next request (the JWT step reads the live inquiry every time).
 - Whatever is granted is still capped at request time by what the user's memberships reach.
+- **Integration reach:** a user-target grant may name `integrationReach` / `integrationReachIds` ([Integration Reach](#integration-reach)). An integration's grant defaults to `none` and may be `own` (the asking integration); the handshake is unbound and defaults to `all`. Organization and space targets refuse them (422): they write membership entitlements, not a credential.
 
 ---
 
@@ -470,7 +531,7 @@ export const rebacSchema: RebacSchema = {
         revoke: { all: [/* grantUserEntitlements */, { any: [{ self: 'sourceUserId' }, { self: 'targetUserId' }, { rel: 'sourceIntegration', action: 'manage' }] }] },
       },
     },
-    // plus contact, webhookSubscription, segment, flow (ownerActions), integration (membershipOwnerActions),
+    // plus contact, webhookSubscription, segment, flow (ownerActions), integration (integrationActions),
     // organizationUser, spaceUser, token, authProvider
   },
 };
@@ -483,10 +544,12 @@ export const rebacSchema: RebacSchema = {
 | `string` | Inherit action from same resource | `manage: 'own'` → check `own` on same resource |
 | `{ rel, action }` | Delegate to related resource (supports dot-path) | `{ rel: 'organization', action: 'own' }` |
 | `{ self: field, action }` | Current user owns the record **and** holds `action` on its own `db:user` entry | `{ self: 'userId', action: 'operate' }` → user.id === record.userId and the principal may `operate` as itself |
-| `{ rule: Condition }` | JSON rule condition | `{ rule: { field: 'role', operator: 'in', value: ['owner'] } }` |
+| `{ rule: Condition }` | JSON rule condition over the record; `{ bind: 'actor.<field>' }` compares it against the actor | `{ rule: { field: 'id', operator: 'in', bind: 'actor.integrationIds' } }` |
+| `{ actor: Condition }` | JSON rule condition over the [actor](#the-actor) | `{ actor: { field: 'integrationReach', operator: 'equals', value: 'all' } }` |
 | `{ any: ActionRule[] }` | At least one must pass | `{ any: [{ self: 'userId', action: 'read' }, 'read'] }` |
 | `{ all: ActionRule[] }` | All must pass | `{ all: [{ rule: ... }, 'own'] }` |
-| `null` | Always false (terminal) | `own: null` |
+| `null` / `false` | Always false (terminal) | `own: null` |
+| `true` | Always true (terminal) | `read: true` |
 
 **A self arm names an action.** `self` used to pass on identity alone, so a narrowed grant could still leave an org, delete a token or accept an invite. Now `{ self: 'userId', action: 'operate' }` also requires the principal to hold `operate` on `db:user:<its id>` (`createRebacCheck(resolveRelation, { selfResource: 'db:user' })` in `rebac/check.ts`). Full principals hold `own` on themselves, so nothing changes for them. Read arms use `read`; leave, resolve, send and token self-delete use `operate`; any user action, custom ones included, may be named. A bare `{ self }` throws.
 
@@ -551,7 +614,7 @@ This is what makes the `read → operate → manage → own` chain on User/Org/S
 
 ### Member-Owned Models
 
-A model a membership can own (OrganizationUser or SpaceUser: `userId` and `organizationId` both set; Integration today) uses `membershipOwnerActions()` instead. A member's row is reached by the member (`rel: 'user'`), by an **owner** of the organization or space, or by a token of that membership (`membership.<action>` on its own OrganizationUser/SpaceUser row), never by an org or space admin. Rows with no `userId` (Organization- or Space-owned) take the normal organization/space chain. Why: owners are not admins (Aron, 2026-10-18). An admin is the average manager; an owner is the org's IT person, so work content stays private from managers but is never locked away from the org that owns it.
+A model a membership can own (OrganizationUser or SpaceUser: `userId` and `organizationId` both set; Integration today) uses `membershipOwnerActions()` instead (Integration wraps it in the [reach fence](#integration-reach)). A member's row is reached by the member (`rel: 'user'`), by an **owner** of the organization or space, or by a token of that membership (`membership.<action>` on its own OrganizationUser/SpaceUser row), never by an org or space admin. Rows with no `userId` (Organization- or Space-owned) take the normal organization/space chain. Why: owners are not admins (Aron, 2026-10-18). An admin is the average manager; an owner is the org's IT person, so work content stays private from managers but is never locked away from the org that owns it.
 
 ---
 
@@ -598,7 +661,7 @@ export const contactCreateBodySchema = ContactScalarInputSchema.omit({ ... }).ex
 });
 ```
 
-The schema validates the recursive `ActionRule` envelope (delegations, `{ rel, action }`, `{ self }`, `{ rule }`, `{ any }`, `{ all }`) but passes the inner json-rules `Condition` through as `unknown` — runtime `check()` validates it when the rule fires.
+The value schema is `@inixiative/permissions`' own `actionRuleSchema` (named `ActionRule` for OpenAPI): every arm the engine evaluates, `{ self, action }` and `{ actor }` included, with each `rule` / `actor` condition checked by json-rules' `validateRule`. A row rule may use the actor too; it still only widens that row's access.
 
 ### When to use it
 
@@ -777,7 +840,7 @@ Token creation needs `token.create` on the minter (`validateSelfPermission`), th
 - OrganizationUser and SpaceUser tokens: `leave` on the membership, the role's standard action on the org or space, and `validateHeldActions` for the named entitlements
 - User tokens (`/me/tokens`): `validateHeldGrant`, see [Issuing Is Capped by the Issuer](#issuing-is-capped-by-the-issuer)
 
-`entitlements` and `entitlementsOnly` are accepted: `entitlements: null` mints a **full** token, a list mints a **narrowed** one.
+`entitlements` and `entitlementsOnly` are accepted: `entitlements: null` mints a **full** token, a list mints a **narrowed** one. `integrationReach` / `integrationReachIds` set its [integration reach](#integration-reach) (default `all`: tokens minted through the API are unbound).
 
 ```typescript
 canAssign(permix, owner, owner, role, entitlements); // owner = { model: 'organization', record: { id: orgId } }
@@ -785,7 +848,7 @@ canAssign(permix, owner, owner, role, entitlements); // owner = { model: 'organi
 
 ### Token Editing
 
-`PATCH /api/v1/token/:id` (`tokenUpdate`) changes `name`, `role`, `entitlements` and `entitlementsOnly`, so a token can move between full and narrowed. It needs `token.create` on the editor, and a token can never change itself. Then either:
+`PATCH /api/v1/token/:id` (`tokenUpdate`) changes `name`, `role`, `entitlements`, `entitlementsOnly` and its integration reach, so a token can move between full and narrowed. Naming a reach other than `listed` clears `integrationReachIds`. It needs `token.create` on the editor, and a token can never change itself. Then either:
 - `assign` on the token at the new `assignLevel` (an org or space manager; organization, space and membership tokens), or
 - `leave` on it (its own user), plus `validateHeldGrant` for the new grant.
 
@@ -809,7 +872,7 @@ Additionally, org/space admins can delete tokens within their scope via delegati
 
 ## Frontend Checks
 
-The frontend runs the same ReBAC engine. `permissions.setup(me)` (`packages/ui/src/store/slices/permissions.ts`) loads the user's own, organization and space permissions from `/me`, mirroring the backend setup. A superadmin gets `permix.setSuperadmin(true)` and every check passes.
+The frontend runs the same ReBAC engine. `permissions.setup(me)` (`packages/ui/src/store/slices/permissions.ts`) sets the person's actor (`buildActor(me.id, 'User', null)`, the same builder the API uses) and loads the user's own, organization and space permissions from `/me`, mirroring the backend setup. A superadmin gets `permix.setSuperadmin(true)` and every check passes.
 
 | Layer | Entry point |
 |-------|-------------|

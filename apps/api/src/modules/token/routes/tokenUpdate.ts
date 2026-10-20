@@ -18,6 +18,6 @@ export const tokenUpdateRoute = updateRoute({
   bodySchema: tokenUpdateBodySchema,
   responseSchema: tokenReadResponseSchema,
   description:
-    'Changes a token: its name, role, and whether it is full (entitlements null) or narrowed. A token cannot change itself.',
+    'Changes a token: its name, role, whether it is full (entitlements null) or narrowed, and which integrations it reaches. A token cannot change itself.',
   middleware: [validateSelfPermission(SessionAction.createToken)],
 });

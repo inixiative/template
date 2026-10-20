@@ -5,7 +5,7 @@
  * @uses none
  */
 import type { UserWithRelations } from '@template/db';
-import type { EntitlementGrant, Entitlements } from '@template/permissions';
+import type { EntitlementGrant, Entitlements, IntegrationBinding } from '@template/permissions';
 import type { Context } from 'hono';
 import type { TokenWithRelations } from '#/lib/context/types';
 import { validateRole } from '#/lib/permissions/validateRole';
@@ -14,7 +14,7 @@ import type { AppEnv } from '#/types/appEnv';
 export type PermissionPrincipal = {
   user: UserWithRelations | null;
   token: TokenWithRelations | null;
-  grant: EntitlementGrant | null;
+  grant: (EntitlementGrant & IntegrationBinding) | null;
 };
 
 export const principalFromContext = (c: Context<AppEnv>): PermissionPrincipal => {
@@ -34,6 +34,9 @@ export const principalFromContext = (c: Context<AppEnv>): PermissionPrincipal =>
           role: validateRole(token.role),
           entitlements: token.entitlements as Entitlements,
           entitlementsOnly: token.entitlementsOnly,
+          integrationId: token.integrationId,
+          integrationReach: token.integrationReach,
+          integrationReachIds: token.integrationReachIds,
         }
       : c.get('entitlementGrant'),
   };

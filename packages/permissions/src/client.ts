@@ -4,9 +4,14 @@
  * @partOf primitive:authz
  * @uses none
  */
-import type { UserId } from '@template/db';
-import { castArray } from 'lodash-es';
-import { createPermix, type PermixRules } from 'permix';
+import {
+  createPermissions as createLibraryPermissions,
+  type ActionState as LibraryActionState,
+  type Entitlements as LibraryEntitlements,
+  type PermissionEntry as LibraryPermissionEntry,
+  type Permix as LibraryPermix,
+} from '@inixiative/permissions';
+import type { TemplateActor } from '@template/permissions/actor';
 
 // Base actions - most resources use these
 export const StandardAction = {
@@ -74,65 +79,9 @@ export type Action =
   | MembershipAction
   | CustomAction;
 
-export type Entitlements = Record<string, boolean> | null;
+export type Entitlements = LibraryEntitlements;
+export type ActionState = LibraryActionState<Action>;
+export type PermissionEntry = LibraryPermissionEntry<Action>;
+export type Permix = LibraryPermix<Action, TemplateActor>;
 
-export type ActionState = Partial<Record<Action, boolean | ((data?: unknown) => boolean)>>;
-export type PermissionEntry = { resource: string; id?: string; actions: ActionState };
-type PermissionDefinition = Record<string, { action: Action }>;
-
-const deniedActions: Record<StandardAction | InquiryAction, false> = {
-  read: false,
-  operate: false,
-  manage: false,
-  own: false,
-  send: false,
-  resolve: false,
-  revoke: false,
-};
-
-export type Permix = {
-  check: (resource: string, action: Action, id?: string, data?: unknown) => boolean;
-  setup: (
-    perms: PermissionEntry | PermissionEntry[],
-    options?: { replace?: boolean },
-  ) => Promise<void>;
-  setSuperadmin: (value: boolean) => void;
-  isSuperadmin: () => boolean;
-  setUserId: (id: UserId) => void;
-  getUserId: () => UserId | null;
-  getJSON: () => Record<string, Record<string, boolean>> | null;
-};
-
-export const createPermissions = (): Permix => {
-  const permix = createPermix<PermissionDefinition>();
-  let isSuperadmin = false;
-  let userId: UserId | null = null;
-  let accumulated: PermixRules<PermissionDefinition> = {};
-
-  return {
-    check: (resource, action, id, data) => {
-      if (isSuperadmin) return true;
-      const key = id ? `${resource}:${id}` : resource;
-      return permix.check(key, action, data);
-    },
-    setup: async (perms, options) => {
-      if (options?.replace) accumulated = {};
-
-      const entries = castArray(perms);
-      for (const { resource, id, actions } of entries) {
-        const key = id ? `${resource}:${id}` : resource;
-        accumulated[key] = { ...deniedActions, ...actions };
-      }
-      await permix.setup(accumulated);
-    },
-    setSuperadmin: (value) => {
-      isSuperadmin = value;
-    },
-    isSuperadmin: () => isSuperadmin,
-    setUserId: (id) => {
-      userId = id;
-    },
-    getUserId: () => userId,
-    getJSON: () => permix.dehydrate() as Record<string, Record<string, boolean>>,
-  };
-};
+export const createPermissions = (): Permix => createLibraryPermissions<Action, TemplateActor>();

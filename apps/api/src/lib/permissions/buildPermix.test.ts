@@ -127,6 +127,9 @@ describe('buildPermix: the same actor gives the same permix from a request or ca
         role: token.role,
         entitlements: { read: true, 'report.export': true },
         entitlementsOnly: true,
+        integrationId: token.integrationId,
+        integrationReach: token.integrationReach,
+        integrationReachIds: token.integrationReachIds,
       },
     });
     expect(permix.getJSON()).toEqual(viaToken as never);

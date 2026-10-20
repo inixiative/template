@@ -12,11 +12,7 @@ import { clientAddress } from '#/lib/clientIp';
 import { findOwnedIntegration } from '#/modules/integration/services/findOwnedIntegration';
 import type { AppEnv } from '#/types/appEnv';
 
-const resolveOriginIntegrationId = async (c: Context<AppEnv>): Promise<string | null> => {
-  const boundIntegrationId =
-    c.get('token')?.integrationId ?? c.get('entitlementGrant')?.integrationId ?? null;
-  if (boundIntegrationId) return boundIntegrationId;
-
+const assertedIntegrationId = async (c: Context<AppEnv>): Promise<string | null> => {
   const asserted = c.req.header('x-integration-id');
   if (!asserted) return null;
 
@@ -48,7 +44,7 @@ export const auditActorMiddleware = async (c: Context<AppEnv>, next: Next) => {
     ipAddress: clientAddress(c),
     userAgent: c.req.header('user-agent') ?? null,
     sourceInquiryId: null,
-    integrationId: await resolveOriginIntegrationId(c),
+    integrationId: c.get('permix').getActor()?.integrationId ?? (await assertedIntegrationId(c)),
     bypassSoftDeleteScope: false,
   };
 

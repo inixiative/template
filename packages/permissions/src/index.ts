@@ -1,4 +1,12 @@
 export { Role } from '@template/db/generated/client/enums';
+// Actor
+export {
+  ActorModel,
+  buildActor,
+  defaultIntegrationReach,
+  type IntegrationBinding,
+  type TemplateActor,
+} from './actor';
 // Client
 export {
   type Action,

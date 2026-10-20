@@ -27,6 +27,8 @@ export const meCreateTokenController = makeController(meCreateTokenRoute, async 
     entitlements: body.entitlements,
     entitlementsOnly: body.entitlementsOnly,
     expiresAt: body.expiresAt,
+    integrationReach: body.integrationReach,
+    integrationReachIds: body.integrationReachIds,
   });
 
   return respond.created(token);

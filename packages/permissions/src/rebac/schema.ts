@@ -5,7 +5,7 @@
  * @uses none
  */
 import { Operator } from '@inixiative/json-rules';
-import { membershipOwnerActions, ownerActions } from '@template/permissions/rebac/ownerActions';
+import { integrationActions, ownerActions } from '@template/permissions/rebac/ownerActions';
 import type { RebacSchema } from '@template/permissions/rebac/types';
 
 const highRoles = ['owner', 'admin'];
@@ -91,7 +91,7 @@ export const rebacSchema: RebacSchema = {
         read: { rel: 'segment', action: 'read' },
       },
     },
-    'db:integration': { actions: membershipOwnerActions() },
+    'db:integration': { actions: integrationActions() },
     'db:flow': { actions: ownerActions(['user']) },
 
     'db:organizationUser': {

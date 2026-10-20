@@ -154,6 +154,23 @@ describe('Contact CRUD', () => {
       expect(response.status).toBe(422);
     });
 
+    it('validates permissionRules with the permissions library schema', async () => {
+      const create = (read: unknown) =>
+        fetch(
+          post('/api/v1/me/contacts', {
+            type: 'email',
+            value: { address: `rule${getNextSeq()}@example.com` },
+            permissionRules: { read },
+          }),
+        );
+      expect((await create({ self: 'userId' })).status).toBe(422);
+      expect((await create({ rule: { field: 'id', operator: 'nope' } })).status).toBe(422);
+      expect((await create({ self: 'userId', action: 'read' })).status).toBe(201);
+      expect(
+        (await create({ actor: { field: 'model', operator: 'equals', value: 'User' } })).status,
+      ).toBe(201);
+    });
+
     // Note: same-owner duplicate detection via @@unique is currently a NO-OP
     // when the polymorphic FKs include NULLs (Postgres treats NULL as distinct).
     // Needs `NullsNotDistinct` or a per-ownerModel partial unique index — follow-up.

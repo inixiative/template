@@ -438,6 +438,10 @@ model Token {
 
   integrationId String?   // optional link to an Integration
 
+  // Which integrations it reaches (PERMISSIONS.md#integration-reach)
+  integrationReach    IntegrationReach @default(none)
+  integrationReachIds String[]
+
   // Rate limiting
   rateLimitPerSecond Int?
 
@@ -472,7 +476,8 @@ A person's JWT (self-issued or from the configured issuer, [Person JWT](#person-
 
 `jwtAuthMiddleware` sets `c.get('entitlementGrant')` (the grant, its inquiry id and the requesting integration) after the revocation check and before `setUserContext`, so the setup functions cap by it. Downstream:
 
-- **Audit:** the actor is the user (`actorUserId`), `actorTokenId` stays null; the requesting integration, if any, is the audit `integrationId`.
+- **Audit:** the actor is the user (`actorUserId`), `actorTokenId` stays null; the requesting integration, if any, is the audit `integrationId` (read from the permission actor, [The Actor](./PERMISSIONS.md#the-actor)).
+- **Reach:** the grant's `integrationReach` decides which integrations the JWT touches ([Integration Reach](./PERMISSIONS.md#integration-reach)).
 - **Batch:** `entitlementGrant` is cloned into sub-requests with the user.
 - **Superadmin:** a superadmin's JWT is superadmin, spoofing included.
 
