@@ -5,12 +5,14 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/lib.sh"
 ROOT_DIR="$(main_checkout_root "$SCRIPT_DIR")"
 MAIN_REAL="$(real_dir "$ROOT_DIR")"
+PROJECT_NAME="$(project_name "$ROOT_DIR")"
+load_registry_ports
 
-printf "\n%-6s %-35s %-40s %s\n" "Slot" "Name" "Branch" "Ports (web/admin/super/api)"
-printf "%-6s %-35s %-40s %s\n" "----" "----" "------" "----------------------------"
+printf "\n%-6s %-35s %-40s %s\n" "Slot" "Name" "Branch" "Ports (web/admin/super/api/http)"
+printf "%-6s %-35s %-40s %s\n" "----" "----" "------" "--------------------------------"
 
 print_row() {
-  local wt_path="$1" branch="$2" name slot ports
+  local wt_path="$1" branch="$2" name slot ports fix
   name="$(basename "$wt_path")"
   slot="$(env_value "$wt_path/.env.local" WORKTREE_SLOT)"
   if [ -z "$slot" ]; then
@@ -24,6 +26,10 @@ print_row() {
     fi
   else
     ports="$(slot_ports "$slot")"
+  fi
+  if [ "$slot" != "-" ] && ! env_ports_match "$wt_path" "$slot"; then
+    if [ "$slot" = "0" ]; then fix="bun run worktree:ports"; else fix="bun run worktree:ports $name"; fi
+    ports="${ports}  (env files are on other ports: ${fix})"
   fi
   printf "%-6s %-35s %-40s %s\n" "$slot" "$name" "$branch" "$ports"
 }

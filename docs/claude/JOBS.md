@@ -619,7 +619,7 @@ Web UI for monitoring and managing BullMQ jobs at `/bullBoard`.
 
 | Environment | Auth | URL |
 |-------------|------|-----|
-| Local | None required | `http://localhost:8000/bullBoard` |
+| Local | None required | `<API_URL>/bullBoard` |
 | Non-local | Basic auth required | Requires credentials |
 
 ### Configuration
