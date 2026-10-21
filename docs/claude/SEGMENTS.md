@@ -72,7 +72,7 @@ operators each field kind takes on the `toPrisma` target with the operand shape 
 every field `customerRefLens` exposes (dotted path from `CustomerRef`, kind, enum values, list
 relations, and `sourced` fields that take the id of a row the owner may name). It is built from the
 json-rules operator catalog (`ruleGrammar`) and `projectLens` (`lensFields`), both in
-`@template/shared/rules`, and its `examples` pass the save gate.
+`@template/shared/rules`.
 
 Reach accepts `{ conditions }` and returns `{ count }`, using the same rule and reference
 admission checks as saving. Existing route permissions govern each owner context.

@@ -9,7 +9,7 @@ import type { SpaceContent } from '@template/shared/inquiry';
 import { registerInquiryType } from '@template/ui/lib/inquiries/registry';
 
 const CreateSpaceSourceSummary = ({ inquiry }: { inquiry: InquirySentItem }) => {
-  const content = inquiry.content as Partial<SpaceContent> | null | undefined;
+  const content = inquiry.content as SpaceContent | null | undefined;
   return (
     <span>
       {content?.name ?? '—'}

@@ -10,15 +10,12 @@ const operatorsByKindSchema = z.record(z.string(), z.array(z.string()));
 
 export const segmentInfoResponseSchema = z.object({
   root: z.string(),
-  example: z.unknown(),
-  examples: z.array(z.unknown()),
   nodes: z.array(
     z.object({
       kind: z.enum(['all', 'any', 'ifThenElse', 'rule', 'date', 'array', 'aggregate', 'boolean']),
       required: z.array(z.string()),
       optional: z.array(z.string()),
       description: z.string(),
-      example: z.unknown(),
     }),
   ),
   operators: z.object({

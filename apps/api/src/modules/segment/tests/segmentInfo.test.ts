@@ -1,16 +1,13 @@
 import { describe, expect, it } from 'bun:test';
-import { type Condition, Operator } from '@inixiative/json-rules';
+import { Operator } from '@inixiative/json-rules';
 import { segmentRouter } from '#/modules/segment';
-import { segmentConditionExamples } from '#/modules/segment/lib/segmentConditionExamples';
 import { validateSegmentConditions } from '#/modules/segment/validations/validateSegmentConditions';
 import { createTestApp } from '#tests/createTestApp';
 import { get, json } from '#tests/utils/request';
 
 type SegmentInfo = {
   root: string;
-  example: Condition;
-  examples: Condition[];
-  nodes: { kind: string; example: Condition }[];
+  nodes: { kind: string }[];
   operators: { field: Record<string, string[]>; date: Record<string, string[]>; array: string[] };
   valueShapes: { field: Record<string, string> };
   fields: {
@@ -33,13 +30,9 @@ const loadInfo = async () => {
 };
 
 describe('GET /api/v1/segment/info', () => {
-  it('answers without a session with a minimal valid example', async () => {
+  it('answers without a session', async () => {
     const info = await loadInfo();
     expect(info.root).toBe('CustomerRef');
-    expect(info.example).toEqual({ all: [] });
-    expect(info.examples).toEqual(segmentConditionExamples);
-    for (const example of info.examples)
-      expect(validateSegmentConditions(example, 'Organization').valid).toBe(true);
   });
 
   it('lists every node kind and the operators each field kind takes', async () => {
