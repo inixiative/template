@@ -13,5 +13,5 @@ export const infoResponseSchema = <T extends z.ZodType>(types: T) =>
       .describe(
         'What each key under `types` means, by dotted path. `*` is any key, `[]` any item.',
       ),
-    types: types.describe('What this module accepts, per the guide.'),
+    types,
   });

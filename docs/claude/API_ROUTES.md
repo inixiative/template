@@ -1169,7 +1169,7 @@ A body field stored in a Prisma `Json` column (inquiry `content`, contact `value
 | `/webhookSubscription/info` | `webhookOwnerAllowedModels` | `models` per owner, `signature` key |
 | `/inquiry/info` | `inquiryHandlers` | per type: `sources`, `targets`, `content` / `resolutionInput` / `resolution` JSON Schema, `unique`, `defaultExpirationDays` |
 | `/contact/info` | `ContactRegistry` | per type: `input` and stored `value` JSON Schema, `subtype` rule, `uniqueness`, label and icon |
-| `/segment/info` | json-rules catalogs + `customerRefLens` | `conditionShapes` with their keys, operators per field kind, operand shapes, every readable field with its kind |
+| `/segment/info` | `customerRefLens` | every readable field with its kind; `conditions` is tagged `rule` and points at json-rules |
 
 Every info route answers `{ guide, types }`. `types` is what the table lists; `guide` maps each dotted path under it (`types.*.input`, `types.fields[].path`) to what that key means. The guide is generated: each key is described once with `.describe()` on the response schema, built with `infoResponseSchema(types)`, and `schemaGuide(responseSchema)` (`lib/jsonSchema/schemaGuide.ts`) reads those descriptions back through `z.toJSONSchema`. `schemaGuide.test.ts` fails on any key left undescribed.
 

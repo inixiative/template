@@ -1,15 +1,13 @@
 import { describe, expect, it } from 'bun:test';
-import { ConditionShape, getConditionShapeKeys, Operator } from '@inixiative/json-rules';
+import { Operator } from '@inixiative/json-rules';
 import { segmentRouter } from '#/modules/segment';
 import { validateSegmentConditions } from '#/modules/segment/validations/validateSegmentConditions';
 import { createTestApp } from '#tests/createTestApp';
 import { get, json } from '#tests/utils/request';
 
 type SegmentInfo = {
+  conditions: string;
   root: string;
-  conditionShapes: Record<string, { required: string[]; optional: string[] }>;
-  operators: { field: Record<string, string[]>; date: Record<string, string[]>; array: string[] };
-  valueShapes: { field: Record<string, string> };
   fields: {
     path: string;
     kind: string;
@@ -30,19 +28,10 @@ const loadInfo = async () => {
 };
 
 describe('GET /api/v1/segment/info', () => {
-  it('answers without a session', async () => {
+  it('answers without a session and tags conditions as a rule', async () => {
     const info = await loadInfo();
     expect(info.root).toBe('CustomerRef');
-  });
-
-  it('lists every condition shape and the operators each field kind takes', async () => {
-    const info = await loadInfo();
-    expect(Object.keys(info.conditionShapes)).toEqual(Object.values(ConditionShape));
-    expect(info.conditionShapes.array).toEqual(getConditionShapeKeys('array'));
-    expect(info.operators.field.Enum).toContain(Operator.in);
-    expect(info.operators.date.DateTime).toContain('within');
-    expect(info.operators.array).toContain('any');
-    expect(info.valueShapes.field[Operator.exists]).toBe('none');
+    expect(info.conditions).toBe('rule');
   });
 
   it('lists fields every one of which the save gate accepts', async () => {

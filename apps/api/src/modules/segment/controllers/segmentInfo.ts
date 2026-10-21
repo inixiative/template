@@ -4,8 +4,7 @@
  * @partOf feature:segment
  * @uses primitive:routeTemplates
  */
-import { RuleTarget } from '@inixiative/json-rules';
-import { lensFields, ruleGrammar } from '@template/shared/rules';
+import { lensFields } from '@template/shared/rules';
 import { schemaGuide } from '#/lib/jsonSchema/schemaGuide';
 import { makeController } from '#/lib/utils/makeController';
 import { customerRefLens } from '#/modules/customerRef/lib/customerRefLens';
@@ -18,8 +17,8 @@ export const segmentInfoController = makeController(segmentInfoRoute, async (_c,
   return respond.ok({
     guide,
     types: {
+      conditions: 'rule',
       root: 'CustomerRef',
-      ...ruleGrammar(RuleTarget.toPrisma),
       fields: lensFields(customerRefLens),
     },
   });
