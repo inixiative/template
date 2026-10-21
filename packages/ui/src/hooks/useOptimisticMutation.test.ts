@@ -63,4 +63,55 @@ describe('createOptimisticListTarget', () => {
       createOptimisticListTarget<Row>({ queryKey, operation: 'update' }).reconcile,
     ).toBeUndefined();
   });
+
+  describe('an infinite list', () => {
+    const infinite = {
+      pageParams: [1, 2],
+      pages: [{ data: [{ id: 'a', name: 'A' }] }, { data: [{ id: 'b', name: 'B' }] }],
+    };
+
+    it('a create appends to the last page, then reconciles in place', () => {
+      const target = createOptimisticListTarget<Row>({ queryKey, operation: 'create' });
+      const pending = target.optimisticUpdate(infinite, { body: { name: 'C' } });
+      expect(pending).toEqual({
+        pageParams: [1, 2],
+        pages: [
+          { data: [{ id: 'a', name: 'A' }] },
+          {
+            data: [
+              { id: 'b', name: 'B' },
+              { id: '__optimistic__', name: 'C' },
+            ],
+          },
+        ],
+      });
+      expect(target.reconcile?.(pending, { data: { id: 'c', name: 'C' } })).toEqual({
+        pageParams: [1, 2],
+        pages: [
+          { data: [{ id: 'a', name: 'A' }] },
+          {
+            data: [
+              { id: 'b', name: 'B' },
+              { id: 'c', name: 'C' },
+            ],
+          },
+        ],
+      });
+    });
+
+    it('an update and a delete reach the row on any page', () => {
+      const update = createOptimisticListTarget<Row>({ queryKey, operation: 'update' });
+      expect(
+        update.optimisticUpdate(infinite, { path: { id: 'a' }, body: { name: 'A2' } }),
+      ).toEqual({
+        pageParams: [1, 2],
+        pages: [{ data: [{ id: 'a', name: 'A2' }] }, { data: [{ id: 'b', name: 'B' }] }],
+      });
+      const remove = createOptimisticListTarget<Row>({ queryKey, operation: 'delete' });
+      expect(remove.optimisticUpdate(infinite, { path: { id: 'b' } })).toEqual({
+        pageParams: [1, 2],
+        pages: [{ data: [{ id: 'a', name: 'A' }] }, { data: [] }],
+      });
+    });
+  });
 });
