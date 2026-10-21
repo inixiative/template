@@ -416,6 +416,7 @@ createRoute({
   submodel: Modules.integration,
   bodySchema: z.object({
     ownerModel: z.enum(['User', 'Organization', 'Space']),
+    userId: z.string().optional(),
     organizationId: z.string().optional(),
     spaceId: z.string().optional(),
     provider: z.string(),
@@ -429,7 +430,11 @@ createRoute({
 // { ownerModel: 'Space', organizationId, spaceId, provider } passes
 // { ownerModel: 'Space', organizationId, provider } is a 400 at spaceId
 // { ownerModel: 'Organization', organizationId, spaceId, provider } is a 400: spaceId is unrecognized
+// { ownerModel: 'User', userId, provider } is a 400: userId is omitted, the server fills it
 ```
+
+An omitted column must still be declared in `bodySchema`: a plain `z.object` strips undeclared
+keys before the refinement runs, so an undeclared `userId` is dropped silently, not rejected.
 
 **In flow bindings.** Bindings never carry the caller (see [FLOWS.md](FLOWS.md)), so omit
 `userId` and take it from `steps`' context:
