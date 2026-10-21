@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { Operator } from '@inixiative/json-rules';
+import { ConditionShape, getConditionShapeKeys, Operator } from '@inixiative/json-rules';
 import { segmentRouter } from '#/modules/segment';
 import { validateSegmentConditions } from '#/modules/segment/validations/validateSegmentConditions';
 import { createTestApp } from '#tests/createTestApp';
@@ -7,7 +7,7 @@ import { get, json } from '#tests/utils/request';
 
 type SegmentInfo = {
   root: string;
-  nodes: { kind: string }[];
+  conditionShapes: Record<string, { required: string[]; optional: string[] }>;
   operators: { field: Record<string, string[]>; date: Record<string, string[]>; array: string[] };
   valueShapes: { field: Record<string, string> };
   fields: {
@@ -26,7 +26,7 @@ const { fetch } = createTestApp({
 const loadInfo = async () => {
   const response = await fetch(get('/api/v1/segment/info'));
   expect(response.status).toBe(200);
-  return (await json<SegmentInfo>(response)).data;
+  return (await json<{ guide: Record<string, string>; types: SegmentInfo }>(response)).data.types;
 };
 
 describe('GET /api/v1/segment/info', () => {
@@ -35,18 +35,10 @@ describe('GET /api/v1/segment/info', () => {
     expect(info.root).toBe('CustomerRef');
   });
 
-  it('lists every node kind and the operators each field kind takes', async () => {
+  it('lists every condition shape and the operators each field kind takes', async () => {
     const info = await loadInfo();
-    expect(info.nodes.map((node) => node.kind)).toEqual([
-      'all',
-      'any',
-      'ifThenElse',
-      'rule',
-      'date',
-      'array',
-      'aggregate',
-      'boolean',
-    ]);
+    expect(Object.keys(info.conditionShapes)).toEqual(Object.values(ConditionShape));
+    expect(info.conditionShapes.array).toEqual(getConditionShapeKeys('array'));
     expect(info.operators.field.Enum).toContain(Operator.in);
     expect(info.operators.date.DateTime).toContain('within');
     expect(info.operators.array).toContain('any');

@@ -1172,10 +1172,12 @@ A body field stored in a Prisma `Json` column (inquiry `content`, contact `value
 
 | Route | Generated from | Lists |
 |-------|---------------|-------|
-| `/webhookSubscription/info` | `webhookOwnerAllowedModels` | models per owner, signing key |
+| `/webhookSubscription/info` | `webhookOwnerAllowedModels` | `models` per owner, `signature` key |
 | `/inquiry/info` | `inquiryHandlers` | per type: `sources`, `targets`, `content` / `resolutionInput` / `resolution` JSON Schema, `unique`, `defaultExpirationDays` |
 | `/contact/info` | `ContactRegistry` | per type: `input` and stored `value` JSON Schema, `subtype` rule, `uniqueness`, label and icon |
-| `/segment/info` | json-rules operator catalog + `customerRefLens` | node kinds, operators per field kind, operand shapes, every readable field with its kind |
+| `/segment/info` | json-rules catalogs + `customerRefLens` | `conditionShapes` with their keys, operators per field kind, operand shapes, every readable field with its kind |
+
+Every info route answers `{ guide, types }`. `types` is what the table lists; `guide` maps each dotted path under it (`types.*.input`, `types.fields[].path`) to what that key means. The guide is generated: each key is described once with `.describe()` on the response schema, built with `infoResponseSchema(types)`, and `schemaGuide(responseSchema)` (`lib/jsonSchema/schemaGuide.ts`) reads those descriptions back through `z.toJSONSchema`. `schemaGuide.test.ts` fails on any key left undescribed.
 
 An info route is a `readRoute({ action: 'info', skipId: true })` mounted by hand before `validateActor` (see `modules/inquiry/index.ts`), so it answers without a session. Zod schemas become JSON Schema through `toJsonSchema` (`lib/jsonSchema/toJsonSchema.ts`, zod 4 `z.toJSONSchema`): `input` for what a caller sends, `output` for what is stored. The body field points at its route with `z.unknown().describe('… see GET /api/v1/<module>/info')`; `transformJsonFields` keeps that description on the JSON value it substitutes.
 

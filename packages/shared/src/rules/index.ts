@@ -1,7 +1,6 @@
 export { RuleDegradedError, RuleEvaluationError } from './errors';
 export { type LensField, lensFields } from './lensFields';
 export { type RuleGrammar, ruleGrammar } from './ruleGrammar';
-export { type RuleNode, ruleNodes } from './ruleNodes';
 export {
   type RuleArms,
   type RuleHealth,

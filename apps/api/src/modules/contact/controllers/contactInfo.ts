@@ -6,12 +6,17 @@
  */
 import { ContactRegistry } from '@template/shared/contact';
 import { mapValues } from 'lodash-es';
+import { schemaGuide } from '#/lib/jsonSchema/schemaGuide';
 import { toJsonSchema } from '#/lib/jsonSchema/toJsonSchema';
 import { makeController } from '#/lib/utils/makeController';
 import { contactInfoRoute } from '#/modules/contact/routes/contactInfo';
+import { contactInfoResponseSchema } from '#/modules/contact/schemas/contactInfoResponseSchema';
+
+const guide = schemaGuide(contactInfoResponseSchema);
 
 export const contactInfoController = makeController(contactInfoRoute, async (_c, respond) => {
   return respond.ok({
+    guide,
     types: mapValues(ContactRegistry, (def) => ({
       label: def.display.label,
       icon: def.display.icon,

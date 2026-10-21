@@ -7,20 +7,22 @@
 import {
   ALL_KINDS,
   ArrayOperator,
+  ConditionShape,
+  type ConditionShapeKeys,
   DateOperator,
   type FieldKind,
   getAggregateOperators,
   getArrayOperators,
+  getConditionShapeKeys,
   getOperatorsForKind,
   getValueShape,
   Operator,
   type RuleTarget,
   type ValueShape,
 } from '@inixiative/json-rules';
-import { type RuleNode, ruleNodes } from '@template/shared/rules/ruleNodes';
 
 export type RuleGrammar = {
-  nodes: RuleNode[];
+  conditionShapes: Record<ConditionShape, ConditionShapeKeys>;
   operators: {
     field: Record<FieldKind, Operator[]>;
     date: Record<FieldKind, DateOperator[]>;
@@ -48,7 +50,9 @@ const operatorsByKind = <TOperator>(
   Object.fromEntries(ALL_KINDS.map((kind) => [kind, pick(kind)])) as Record<FieldKind, TOperator[]>;
 
 export const ruleGrammar = (target: RuleTarget): RuleGrammar => ({
-  nodes: ruleNodes,
+  conditionShapes: Object.fromEntries(
+    Object.values(ConditionShape).map((shape) => [shape, getConditionShapeKeys(shape)]),
+  ) as Record<ConditionShape, ConditionShapeKeys>,
   operators: {
     field: operatorsByKind((kind) => getOperatorsForKind(kind, target).field),
     date: operatorsByKind((kind) => getOperatorsForKind(kind, target).date),
