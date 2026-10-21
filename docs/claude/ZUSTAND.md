@@ -188,8 +188,9 @@ re-identifies the websocket.
 
 #### logout()
 
-Revokes the server session, then (always) clears the token, auth state and permissions,
-calls `tenant.setPublic()` and navigates to `/login`. Throws if the server revoke failed.
+Signs out of this browser: clears the JWT, auth state, permissions and websocket identity,
+calls `tenant.setPublic()` and navigates to `/login`. It makes no server call; the API keeps no
+session to end. Ending every JWT on every device is `POST /api/v1/me/rotateJwts`.
 
 ### Usage Patterns
 
@@ -560,11 +561,6 @@ setTheme: (theme) => set((state) => ({ ui: { ...state.ui, theme } }))
 // ❌ Never do this
 useAppStore.getState().auth.user = newUser;
 ```
-
-**DON'T:** Add a second action that writes what an existing setter already writes. Loading saved
-or fetched values calls the setter (`setTheme(saved.theme)`); there is no `hydrateTheme` /
-`hydrateSettings` beside it. One writer per field keeps side effects (persistence, derived state)
-in one place. — fb: 2026-02-09
 
 ### 4. Type Safety
 

@@ -104,9 +104,15 @@ export const LaunchView: React.FC<LaunchViewProps> = ({ onComplete, onCancel }) 
               <Text color="cyan" bold>
                 All checks passed. Ready to launch.
               </Text>
-              <Text dimColor>This will set launched=true in project.config.ts.</Text>
-              <Text dimColor>After launch: db:push and db:seed are blocked in setup.sh.</Text>
-              <Text dimColor>Use db:migrate for schema changes instead.</Text>
+              <Text dimColor>
+                This creates the baseline migration (packages/db/prisma/migrations/0_init),
+              </Text>
+              <Text dimColor>
+                checks each deployed database matches it, records it as applied there,
+              </Text>
+              <Text dimColor>and sets launched=true in project.config.ts.</Text>
+              <Text dimColor>After launch: releases run migrate deploy, never db push;</Text>
+              <Text dimColor>db:push and db:seed are blocked in setup.sh.</Text>
               <Box marginTop={1}>
                 <Text dimColor>{prompt(['enter', 'cancel'])}</Text>
               </Box>
@@ -133,8 +139,12 @@ export const LaunchView: React.FC<LaunchViewProps> = ({ onComplete, onCancel }) 
         <Text color="green" bold>
           ✓ Launched!
         </Text>
+        <Text color="green"> Baseline migration 0_init created and recorded as applied</Text>
         <Text color="green"> project.config.ts updated: launched = true</Text>
         <Box marginTop={1}>
+          <Text dimColor>Commit packages/db/prisma/migrations and project.config.ts together.</Text>
+        </Box>
+        <Box>
           <Text dimColor>From now on, use db:migrate for schema changes.</Text>
         </Box>
         <Box marginTop={1}>

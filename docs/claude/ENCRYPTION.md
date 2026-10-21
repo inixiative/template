@@ -22,6 +22,7 @@
 - [Environment Variables](#environment-variables)
   - [Per Keyring (3 vars)](#per-keyring-3-vars)
   - [Example: Auth Provider Secrets](#example-auth-provider-secrets)
+  - [Example: Person-JWT Signing Keys](#example-person-jwt-signing-keys)
   - [Validation](#validation)
 - [Deploy-Time Validation](#deploy-time-validation)
   - [Validation Rules](#validation-rules)
@@ -99,8 +100,19 @@ export const ENCRYPTED_MODELS = {
       },
     },
   } satisfies EncryptedModelConfig<'authProvider'>,
+  jwks: {
+    model: 'jwks',
+    keys: {
+      privateKey: {
+        envPrefix: 'JWKS_PRIVATE_KEY',
+        buildAAD: (r: Pick<Jwks, 'id'>) => `jwks:${r.id}`,
+      },
+    },
+  } satisfies EncryptedModelConfig<'jwks'>,
 } as const;
 ```
+
+`jwks.privateKey` is the private half of each person-JWT signing key ([AUTH.md → What lives where](./AUTH.md#what-lives-where)). BetterAuth's `jwt()` plugin reads and writes keys through `apps/api/src/lib/auth/jwksStore.ts`, which encrypts with `encryptField` and decrypts with `decryptField`, so the key is covered by the same rotation job as every other secret. Why: one scheme for secrets at rest, instead of BetterAuth's own encryption keyed off `BETTER_AUTH_SECRET`, which nothing rotates.
 
 **AAD (Additional Authenticated Data)**: Only use **immutable** fields (id, organizationId). Never use mutable fields (name, provider, etc.) - changing them would make old ciphertext undecryptable.
 
@@ -269,6 +281,16 @@ AUTH_PROVIDER_SECRETS_ENCRYPTION_VERSION=2
 AUTH_PROVIDER_SECRETS_ENCRYPTION_KEY_CURRENT=dGhpcyBpcyBhIDMyIGJ5dGUga2V5IGZvciBBRVM=
 AUTH_PROVIDER_SECRETS_ENCRYPTION_KEY_PREVIOUS=b2xkIGtleSB0aGF0IHdhcyB1c2VkIGZvciB2ZXJzaW9uIDE=
 ```
+
+### Example: Person-JWT Signing Keys
+
+```env
+JWKS_PRIVATE_KEY_ENCRYPTION_VERSION=1
+JWKS_PRIVATE_KEY_ENCRYPTION_KEY_CURRENT=<base64-32-bytes>
+JWKS_PRIVATE_KEY_ENCRYPTION_KEY_PREVIOUS=
+```
+
+The API refuses to start without them, like every registered keyring.
 
 ### Validation
 

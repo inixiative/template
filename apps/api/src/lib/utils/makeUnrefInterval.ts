@@ -1,8 +1,9 @@
 /**
  * @atlas
- * @kind utils
+ * @kind constructor, utils
  * @partOf primitive:lifecycle
  * @uses none
+ * @constructs interval
  */
 
 type UnrefInterval = {

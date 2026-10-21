@@ -11,6 +11,8 @@
 //   - verify() is point-in-time; the race between verify-returns-true and the next op
 //     completing is microseconds but non-zero. For exactly-once semantics, fence at the resource.
 import { createClaim } from '@template/db/lock/createClaim';
+import { lockKeyOf } from '@template/db/lock/lockKeyOf';
+import { LockLostError } from '@template/db/lock/lockLostError';
 import { fencedDelete } from '@template/db/lock/queries/fencedDelete';
 import { fencedRefresh } from '@template/db/lock/queries/fencedRefresh';
 import type {
@@ -24,7 +26,6 @@ import type {
   LockReleaseResult,
 } from '@template/db/lock/types';
 import { getRedisClient } from '@template/db/redis/client';
-import { redisNamespace } from '@template/db/redis/namespaces';
 import { log } from '@template/shared/logger';
 import { heartbeat } from '@template/shared/utils';
 
@@ -35,8 +36,7 @@ export function createLock(opts: ClaimOptions): Claim;
 export function createLock(opts: LockOptions): Lock;
 export function createLock(opts: LockOptions | ClaimOptions): Lock | Claim {
   const redisClient = opts.redis ?? getRedisClient();
-  const lockKey =
-    'key' in opts ? opts.key : `${redisNamespace.lock}:${opts.service}:${opts.identifier}`;
+  const lockKey = lockKeyOf(opts);
   if (opts.heartbeat === false) return createClaim(opts, redisClient, lockKey);
   return createRenewingLock(opts, redisClient, lockKey);
 }
@@ -61,6 +61,9 @@ const createRenewingLock = (opts: LockOptions, redis: LockRedis, key: string): L
   let missed = 0;
   let hasDeclaredLoss = false;
   let hasReleased = false;
+  let hasAcquired = false;
+  let hasLostLease = false;
+  let leaseValidUntil = 0;
 
   const stopHeartbeat = () => {
     stop?.();
@@ -105,6 +108,7 @@ const createRenewingLock = (opts: LockOptions, redis: LockRedis, key: string): L
   // loss at once, and the heartbeat stops because there is nothing left to refresh.
   const tick = async () => {
     let renewed: unknown;
+    const sentAt = performance.now();
     try {
       renewed = await fencedRefresh(redis, key, processId, ttlMs);
     } catch (err) {
@@ -115,6 +119,7 @@ const createRenewingLock = (opts: LockOptions, redis: LockRedis, key: string): L
     }
     if (renewed === 1) {
       missed = 0;
+      leaseValidUntil = sentAt + ttlMs;
       return;
     }
     stopHeartbeat();
@@ -122,8 +127,11 @@ const createRenewingLock = (opts: LockOptions, redis: LockRedis, key: string): L
   };
 
   const tryAcquire = async (): Promise<boolean> => {
+    const sentAt = performance.now();
     const result = await redis.set(key, processId, 'PX', ttlMs, 'NX');
     if (result !== 'OK') return false;
+    hasAcquired = true;
+    leaseValidUntil = sentAt + ttlMs;
     stop = heartbeat(tick, heartbeatMs, {
       onError: (err) => log.error(`Lock heartbeat error: ${key}`, err),
     });
@@ -156,6 +164,20 @@ const createRenewingLock = (opts: LockOptions, redis: LockRedis, key: string): L
     return current === processId;
   };
 
+  // Timed from each SET/refresh send so a late reply never extends it; once lapsed it stays lapsed.
+  const isWithinLease = (): boolean => {
+    if (!hasAcquired || hasLostLease) return false;
+    if (hasReleased || hasDeclaredLoss || performance.now() >= leaseValidUntil) {
+      hasLostLease = true;
+      return false;
+    }
+    return true;
+  };
+
+  const assertHeld = (): void => {
+    if (!isWithinLease()) throw new LockLostError(key);
+  };
+
   // Always attempts the fenced delete, once, after the critical section — the only place the
   // key is ever deleted.
   const release = async (): Promise<LockReleaseResult> => {
@@ -164,5 +186,5 @@ const createRenewingLock = (opts: LockOptions, redis: LockRedis, key: string): L
     return compareAndDelete();
   };
 
-  return { acquire, verify, release };
+  return { acquire, verify, release, isWithinLease, assertHeld };
 };

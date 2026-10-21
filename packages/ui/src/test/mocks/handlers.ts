@@ -8,10 +8,6 @@ import { HttpResponse, http } from 'msw';
 
 const customHandlers = [
   // Auth endpoints (BetterAuth, not in OpenAPI spec)
-  http.post('*/auth/sign-out', () => {
-    return HttpResponse.json({ success: true });
-  }),
-
   http.post('*/auth/sign-in/email', async ({ request }) => {
     const body = await request.json();
     const { entity: user } = await buildUser({
@@ -20,12 +16,8 @@ const customHandlers = [
 
     return HttpResponse.json({
       user,
-      session: {
-        id: 'session-123',
-        userId: user.id,
-        token: 'test-token',
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-      },
+      token: 'test-jwt',
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
     });
   }),
 

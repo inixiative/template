@@ -6,6 +6,7 @@ import { cleanupTouchedTables } from '@template/db/test';
 import * as factories from '@template/db/test/factories';
 import { registeredDependencies } from '@template/db/test/factory';
 import type { ModelName } from '@template/db/test/factoryTypes';
+import { modelNames } from '@template/db/utils/modelNames';
 
 type CreateWithDefaults = () => Promise<{ entity: { id: string } }>;
 
@@ -28,6 +29,13 @@ const requiresDiscriminator = (modelName: ModelName, seen = new Set<ModelName>()
     (dependency) => dependency.required && requiresDiscriminator(dependency.modelName, seen),
   );
 };
+
+describe('every model', () => {
+  it('has a factory', () => {
+    const modelsWithFactory = new Set(creators.map(([name]) => name.slice('create'.length)));
+    expect(modelNames.filter((modelName) => !modelsWithFactory.has(modelName))).toEqual([]);
+  });
+});
 
 describe('every factory against the polymorphism registry', () => {
   afterAll(async () => {

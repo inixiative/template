@@ -1,8 +1,9 @@
 /**
  * @atlas
- * @kind service
+ * @kind constructor, service
  * @partOf primitive:jobs
  * @uses infrastructure:redis
+ * @constructs childJobEnqueuer
  */
 import { enqueueJob } from '#/jobs/enqueue';
 import type { EnqueueChildJob, WorkerContext } from '#/jobs/types';
@@ -19,12 +20,12 @@ export const makeEnqueueChildJob =
     { job }: WorkerContext,
     { childrenMustSupersede }: { childrenMustSupersede: boolean },
   ): EnqueueChildJob =>
-  async (handlerName, payload) => {
+  async (handlerName, payload, { delay } = {}) => {
     if (childrenMustSupersede) await validateChildJobHandler(handlerName);
     const parent = job.token && job.id ? { id: job.id, queue: job.queueQualifiedName } : undefined;
-    await enqueueJob(
-      handlerName,
-      payload,
-      parent ? { parent, ignoreDependencyOnFailure: true } : undefined,
-    );
+    const options = {
+      ...(parent && { parent, ignoreDependencyOnFailure: true }),
+      ...(delay && { delay }),
+    };
+    await enqueueJob(handlerName, payload, Object.keys(options).length ? options : undefined);
   };

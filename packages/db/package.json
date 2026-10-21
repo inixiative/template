@@ -31,6 +31,7 @@
     "db:push:force": "[ \"$ENV\" = 'test' ] || [ \"$ENV\" = 'local' ] && prisma db push --accept-data-loss || echo 'ERROR: db:push:force only allowed in test/local env'",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
+    "db:baseline": "bun run scripts/createBaselineMigration.ts",
     "db:studio": "prisma studio",
     "db:seed": "bun run --cwd ../../apps/api db:seed",
     "db:truncate:webhooks": "bun run scripts/truncateWebhookSubscriptions.ts",

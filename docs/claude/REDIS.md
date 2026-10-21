@@ -20,6 +20,7 @@
 - [Cache Utilities](#cache-utilities)
   - [cacheKey() Builder](#cachekey-builder)
   - [cache() Get-or-Set](#cache-get-or-set)
+  - [checkCache()](#checkcache)
   - [clearKey()](#clearkey)
   - [Automatic Invalidation](#automatic-invalidation)
     - [Invalidation conventions](#invalidation-conventions)
@@ -46,7 +47,7 @@ Located in `packages/db/src/redis/`.
 
 | Connection | Purpose | Notes |
 |------------|---------|-------|
-| Main (`getRedisClient`) | All regular operations | Cache, rate limits, sessions, OTP |
+| Main (`getRedisClient`) | All regular operations | Cache, rate limits, sign-in handshake sessions, OTP |
 | Subscriber (`getRedisSub`) | Pub/sub subscriptions | `SUBSCRIBE` is blocking, needs own connection |
 | Publisher (`getRedisPub`) | Pub/sub publishing | Shares main client (publish doesn't block) |
 | BullMQ | Job queues | Manages own connections via `createRedisConnection` |
@@ -98,10 +99,11 @@ const key = `cache:User:${id}`;  // Don't do this
 | `job` | `job:*` | Job-system state: overflow flags (`job:overflow`), the slow lane's deferral list and idle clock |
 | `ws` | `ws:*` | WebSocket pub/sub channels and data-stream seq counters (`ws:seq:{<stream>}`) |
 | `otp` | `otp:*` | One-time passwords / verification codes |
-| `session` | `session:*` | BetterAuth sessions (via secondaryStorage) |
+| `session` | `session:*` | BetterAuth sign-in handshake sessions and one-time tokens (via secondaryStorage) |
 | `limit` | `limit:*` | Rate limiting counters |
 | `lock` | `lock:*` | Distributed locks via `createLock` |
 | `lane` | `lane:*` | Supersede lane batons via `claimLane`/`watchLane`, and per-job tombstones (`lane:superseded:<jobId>`) |
+| `cacheWritten` | `cachewritten:*` | When the value under a `cache:` key was written (epoch ms); set and cleared with the value, read by `checkCache` |
 | `rollingCache` | `rollingcache:*` | Rolling-cache timers (`rollingcache:timer:<name>`), kept out of `cache:` so a flush never reschedules a refresh |
 
 ---
@@ -122,7 +124,7 @@ cacheKey('user', { email })            // → cache:user:email:foo@example.com
 
 ### Sessions (`session:*`)
 
-BetterAuth session storage via `secondaryStorage` config:
+BetterAuth's `secondaryStorage` (in `apps/api/src/lib/auth.ts`). It holds only the sign-in handshake: a session lives at most 10 minutes and `jwtHandoff` deletes it as soon as it hands out the person's JWT, plus the 1-minute OAuth one-time tokens. No request outside `/api/auth` reads it ([AUTH.md](./AUTH.md#what-lives-where)).
 
 ```typescript
 // In lib/auth.ts
@@ -130,6 +132,7 @@ secondaryStorage: {
   get: (key) => redis.get(`${redisNamespace.session}:${key}`),
   set: (key, value, ttl) => redis.setex(`${redisNamespace.session}:${key}`, ttl, JSON.stringify(value)),
   delete: (key) => redis.del(`${redisNamespace.session}:${key}`),
+  getAndDelete: (key) => redis.getdel(`${redisNamespace.session}:${key}`),
 }
 ```
 
@@ -258,6 +261,25 @@ Behavior:
 - **Negative caching**: `null`/`undefined` cached with 1 min TTL (prevents thundering herd, allows quick discovery of new records)
 - Real values cached with provided TTL (default 24 hours)
 
+### checkCache()
+
+Read a key without computing it. Every write (`cache`, `upsertCache`) stores the write time beside the
+value (`cachewritten:<key>`, same TTL, same Lua eval), and an exact `clearKey` deletes both:
+
+```typescript
+import { checkCache } from '@template/db';
+
+const check = await checkCache<Stats>(key, { freshForSeconds: 600 });
+// { state: 'empty' }        nothing written, nobody computing
+// { state: 'computing' }    nothing written yet, the key's single-flight lock is held
+// { state: 'fresh' | 'stale', value, writtenAt, isComputing }
+```
+
+`computedUnder` names a different single-flight lock to report `computing` from (a rolling cache
+passes its target's key, so every result of one target computes under one lock). `singleFlightLock(key)`
+is that lock, exported for a writer that computes outside `cache()`. A Redis failure throws rather
+than reading as empty, so a caller that queues work on a miss doesn't pile work onto an outage.
+
 ### clearKey()
 
 Clear cache entries - supports exact keys and wildcard patterns:
@@ -296,18 +318,35 @@ invalidation for every way its inputs change, and each one missed is a stale rea
 rolling cache recomputes on a fixed interval, and its entries outlive the longest a refresh can take,
 every retry included, so a read always hits. There is no invalidation to write.
 
+One definition declares its **input** (`targets`: what one refresh is for), its **outputs**
+(`results`: every entry a refresh fills, each a function returning that entry's key) and the **job**
+(`compute`: one pass that writes its results):
+
 ```typescript
 import { cacheKey, db, makeRollingCache } from '@template/db';
+import { WS_CHANNELS } from '@template/shared/ws';
 
-export const spaceCounts = makeRollingCache({
-  name: 'spaceCounts',                          // unique; a second registration throws
+export const spaceStats = makeRollingCache({
+  name: 'spaceStats',                           // unique; a second registration throws
   intervalSeconds: 3600,                        // at least 300 (five coordinator ticks)
-  key: ({ id }) => cacheKey('spaceCounts', id),
-  compute: ({ id }) => db.space.count({ where: { organizationId: id } }),
   targets: { model: 'Organization', args: { select: { id: true } } },
+  results: {
+    total: ({ id }) => cacheKey('spaceStats', id, ['total']),
+    byName: ({ id, name }: { id: string; name: string }) =>
+      cacheKey('spaceStats', { organizationId: id, name }, ['byName']),
+  },
+  compute: async ({ id }, { results, write, signal }) => {
+    const spaces = await db.space.findMany({ where: { organizationId: id } });
+    signal?.throwIfAborted();
+    await write(results.total({ id }), spaces.length);
+    for (const { name } of spaces) await write(results.byName({ id, name }), 1);
+  },
+  channel: ({ id }) => WS_CHANNELS.someRead.name(id), // optional: announce refreshes
 });
 
-const count = await spaceCounts.read({ id: organizationId });
+// api (apps/api/src/jobs/checkRollingCache.ts): name the result and pass its params; never build a key
+const check = await checkRollingCache(spaceStats, 'total', { id: organizationId });
+// → { state: 'empty' | 'computing' | 'fresh' | 'stale', value?, writtenAt?, isComputing?, channel? }
 ```
 
 - **Define it inline**, in the module that owns the data (`packages/db/src/redis/makeRollingCache.ts`
@@ -316,22 +355,35 @@ const count = await spaceCounts.read({ id: organizationId });
   that barrel and its coordinator refreshes every registered cache; the `rolling-cache-registered`
   CI rule fails a definition missing from it.
 - **`targets` is `{ model, args }`**, where `args` is that model's own Prisma `findMany` args — no
-  shorthand of our own. Each returned row is one refresh job's payload and the argument to `key` and
+  shorthand of our own. Each returned row is one refresh job's payload and the argument to
   `compute`, typed by your `select`; select JSON-scalar columns, since the row crosses the queue as
   JSON (a BigInt throws, a Date arrives as a string). `distinct` is a real `DISTINCT` on Postgres.
   Resolution fails closed above `MAX_ROLLING_CACHE_TARGETS` (10,000) rather than refreshing a
-  partial list. A cache with one value for the whole system omits `targets`; `read()` takes no
-  argument.
-- **Three times.** `intervalSeconds` is how often a target is refreshed. `timeoutSeconds` (default:
-  one interval) is how long one leaf attempt may run before it reports itself stuck. `ttlSeconds`
-  (default: interval × (`ROLLING_CACHE_LEAF_ATTEMPTS` + 2)) is how long an entry lives; registration
-  throws unless it is longer than interval + every attempt × timeout + one tick.
-- **`read`** serves the cached value; a cold miss (first read after a deploy) computes through
-  `cache()`, so concurrent readers share one computation. **`refresh`** recomputes one target and
-  overwrites the entry (`force`); a refresh whose signal aborted while it computed writes nothing, and
-  a write that fails throws so the leaf retries.
-- **`compute` never returns null or undefined**: `cache()` keeps null for only a minute and reads
-  undefined as a miss. Return an empty value of the shape instead.
+  partial list. A cache with one value for the whole system omits `targets`; its result functions
+  take no params.
+- **Result params are one object** holding the target's selected fields plus whatever names the
+  entry. `targetOf(params)` picks the `select: true` fields back out, so a reader can queue the
+  target's refresh from what it already has. `targetKey(target)` (cache name + sorted target fields)
+  is the target's identity: the leaf's supersede key and its single-flight lock.
+- **Every result of a target is computed by one job, under one lock.** Don't split a pass that reads
+  the same rows into two caches; give one cache two results.
+- **Four times.** `intervalSeconds` is how often a target is refreshed. `spreadSeconds` (default: half
+  the interval, whole, less than the interval) is the window a branch spreads its leaves' starts
+  across. `timeoutSeconds` (default: one interval) is how long one leaf attempt may run before it
+  reports itself stuck. `ttlSeconds` (default: interval × (`ROLLING_CACHE_LEAF_ATTEMPTS` + 2)) is how
+  long an entry lives; registration throws unless it is longer than interval + spread + every
+  attempt × timeout + one tick.
+- **A read never computes.** `read(result, params)` is `checkCache` on that result's key: `empty`,
+  `computing` (the target's lock is held), `fresh`, or `stale` (older than one scheduled refresh,
+  with `isComputing` beside it). `checkRollingCache` (`apps/api/src/jobs/checkRollingCache.ts`) is the
+  api read: on `empty`, or `stale` with nothing computing, it enqueues the target's leaf and reads
+  again, and it returns the cache's `channel` so a client knows where to wait.
+- **`refresh(target)`** waits up to `timeoutSeconds` for the target's lock (else returns false), runs
+  `compute` once, and holds the lock until the last write lands. `write` is `upsertCache` with
+  `force` and the cache's TTL; a write after `signal` aborted is dropped, and a failed write throws so
+  the leaf retries. `compute` gets the signal: check it between batches.
+- **A written value is never null or undefined**: `cache()` keeps null for only a minute and reads
+  undefined as a miss. Write an empty value of the shape instead.
 - `getRollingCache(name)` throws for a name nothing registered; tests that define their own cache
   remove it with `unregisterRollingCache`.
 

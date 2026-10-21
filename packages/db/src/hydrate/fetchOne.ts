@@ -6,6 +6,7 @@
  */
 import { db } from '@template/db/client';
 import type { HydratedRecord } from '@template/db/hydrate/types';
+import { auditActorContext } from '@template/db/lib/auditActorContext';
 import { cache, cacheKey } from '@template/db/redis';
 import type { AccessorName } from '@template/db/utils/modelNames';
 import type { Identifier } from '@template/db/utils/prismaMapRelations';
@@ -20,12 +21,10 @@ export const fetchOne = async <T extends HydratedRecord>(
   const key = cacheKey(accessor, identifier);
   const delegate = db.delegate(accessor);
 
-  return cache<T | null>(
-    key,
-    async () => {
-      const where = typeof identifier === 'string' ? { id: identifier } : identifier;
-      return delegate.findFirst({ where }) as Promise<T | null>;
-    },
-    ttl,
-  );
+  const where = typeof identifier === 'string' ? { id: identifier } : identifier;
+  const read = () => delegate.findFirst({ where }) as Promise<T | null>;
+
+  // why: a withDeleted read may return a tombstone, which must never land under the shared live key.
+  if (auditActorContext.isSoftDeleteBypassed()) return read();
+  return cache<T | null>(key, read, ttl);
 };

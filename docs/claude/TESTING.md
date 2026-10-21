@@ -6,6 +6,7 @@
 
 - [Running Tests](#running-tests)
   - [Concurrency](#concurrency)
+  - [Real Redis](#real-redis)
   - [Environment Composition](#environment-composition)
 - [Test Structure](#test-structure)
   - [Basic Test](#basic-test)
@@ -48,6 +49,13 @@ DB-backed tests must run with `--max-concurrency=1` to prevent cross-file interf
 "test": "bun run --cwd ../.. with test api bun test --max-concurrency=1"
 ```
 
+### Real Redis
+
+Tests use the in-memory Redis mock, so one process stands in for every instance. Behaviour that
+only exists across processes (shared counters, one subscriber per instance) runs through
+`startWsCluster` (`apps/api/tests/wsInstance/`): it starts a throwaway `redis:7-alpine` container
+and spawns each instance as its own `bun` process. Those tests need Docker and fail without it.
+
 ### Environment Composition
 
 Each package's test script uses the `with` script to load environment variables from `.env.test`. When adding a new package with DB-backed tests, follow this pattern and include `--max-concurrency=1`.
@@ -67,17 +75,6 @@ modules/user/
     ├── userRead.test.ts
     └── userReadMany.test.ts
 ```
-
-**Test the real thing.** A test exercises production code against real rows: create them with
-factories in setup (`createUser()` before each test), call the real route or function, assert on
-what it did. Module mocks are banned outright (`no-module-mocks` CI rule; external services go
-through [VCR](#vcr-external-services)). A fake you wrote (a hand-built store, a stub service) and a
-test that asserts on that fake prove nothing about the code: delete both and test the real one
-(the real store via `createTestStore`, the real route via the test app). — fb: 2026-01-25, 2026-02-10
-
-Signs you're bypassing it: a test file defining its own implementation of the thing under test;
-assertions on a mock's call count as the only check; `if (...) mockReturnValue(...)` chains standing in
-for data the factories could create.
 
 ### Basic Test
 
@@ -108,12 +105,9 @@ describe('userRead', () => {
 
 Located in `packages/db/src/test/factories/`.
 
-Use a factory whenever one exists; never hand-build a DB record a factory covers.
+**Every model has a factory, and every test row is made with one.** A model gets its factory when the model is added; if you find one without, adding it is part of your change. `everyFactory.test.ts` fails while any model lacks one. A test never writes a row through the client (`db.<model>.create`); `scripts/ci/rules/no-direct-prisma-in-tests.sh` fails a changed test file that does.
 
-Every factory injects the bookkeeping columns a model has: `id` (`Bun.randomUUIDv7()`, the same v7
-format as the schema default), `createdAt`, `updatedAt` and `deletedAt: null` (`packages/db/src/test/factory.ts`).
-Don't pass them; override one only when the test is about it (an explicit past `createdAt` for
-ordering). — fb: 2026-01-25
+Why: the dependency inference depends on it. A factory infers a dependency from every foreign-key relation on its model and builds it from the target model's factory, so a model without a factory breaks every factory that points at it (see [FK Auto-Inference](#fk-auto-inference)). The factories are also the one place that knows how to make a valid row: they reuse what the context already holds and record the touched tables for cleanup, which a raw create skips.
 
 ### build vs create
 
@@ -193,6 +187,8 @@ context.organizationUser  // Now exists
 context.user              // Also created
 context.organization      // Also created
 ```
+
+An optional relation is not built by default, but its target model's factory is still required: the engine resolves it for every relation before deciding whether to build it.
 
 ### Context Keys
 
@@ -361,13 +357,11 @@ const authProviderFactory = createFactory('AuthProvider', {
 });
 ```
 
-**When to Create a New Factory:**
+**Adding a Factory:**
 
-Before writing test data manually:
-1. Check if factory exists: `/packages/db/src/test/factories/`
-2. If not, create factory following existing patterns
-3. Export from `/packages/db/src/test/factories/index.ts`
-4. Use in tests with minimal overrides
+1. Add `<model>Factory.ts` in `packages/db/src/test/factories/` with `createFactory`, following the pattern below.
+2. Export it from `packages/db/src/test/factories/index.ts`.
+3. Use it in tests with minimal overrides.
 
 **Factory Creation Pattern:**
 

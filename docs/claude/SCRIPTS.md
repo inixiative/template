@@ -65,7 +65,8 @@ scripts/
     ├── create.sh           # Provision an isolated worktree on a slot (DBs, buckets, env, deps, artifacts)
     ├── destroy.sh          # Tear a worktree down and free its slot
     ├── list.sh             # Worktrees with slot, branch, ports
-    └── lib.sh              # Shared helpers (sourced by the three above)
+    ├── ports.sh            # Re-apply this checkout's registry ports to its env files (setup runs it)
+    └── lib.sh              # Shared helpers (sourced by the scripts above)
 
 init/
 ├── index.tsx                    # bun run init entrypoint
@@ -259,6 +260,36 @@ Each `pass`/`fail` folder can contain one or more case subfolders (run alphabeti
 - Fails on Vitest dependencies in `package.json`
 - Fails on Vitest imports in source and tests
 
+**doc-freshness.sh:**
+- Fails when `docs/claude/**`, `AI/ENTRYPOINT.md`, `FEATURES.md` or `apps/*/CLAUDE.md` names a repo path that doesn't exist, a `path:line` / `path#La-Lb` past the end of the file, a `<doc>.md#<heading>` with no such heading, or a backticked camelCase/PascalCase name that appears nowhere in the code (comments don't count)
+- Skips fenced code and sections headed "Under construction" or "Migrations in progress"
+- External or illustrative names: `scripts/ci/doc-freshness/allow.txt` (`<doc>\t<value>` scopes one to a doc). References that were stale before the rule: `scripts/ci/doc-freshness/baseline.txt`, reported but not failed; an entry that stops occurring fails until its line is deleted
+- Warns, never fails, when the branch changes code whose `@atlas` `@partOf` concept lists docs in `.atlas/concepts.ts` and touches none of them
+
+**Fence rules** (`uuidv7-ids`, `one-middleware-chain`, `no-raw-locks`, `no-db-params`, `bearer-only-auth`) scan the whole tree through `scripts/ci/rules/lib/fence.ts`. Each keeps its data in `scripts/ci/<rule>/`:
+- `exempt.txt`: `<key>\t<reason>`, a named, deliberate exception. The reason is required, and an entry that no longer matches fails.
+- `baseline.txt`: the violations that predate the rule, written by `bun scripts/ci/rules/lib/<detector>.ts --write-baseline`. Listed violations are reported, not failed, so the rule fences new code at once while the old is burned down. Keys name a violation by content (model, mount path, function and parameter, SQL text), not by line, so a new violation in a listed file fails; an identical repeat is `<key>#2`. An entry that stops occurring fails until its line is deleted, and in a git checkout a line the merge base's baseline lacks fails, so the baseline only shrinks. A rule that takes no exemptions fails on an `exempt.txt`. Template has no baselines; downstream repos start with one.
+
+**uuidv7-ids.sh:**
+- Fails on a Prisma model whose primary key is not exactly `id String @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)` (attribute order free), including a composite `@@id`
+- Why: ids are time-ordered, and `paginate()`'s `{ id: desc }` tiebreaker and cursors depend on it
+
+**one-middleware-chain.sh:**
+- Fails unless `apps/api/src/routes/api.ts` runs `corsMiddleware → prepareRequest → jwtAuthMiddleware → tokenAuthMiddleware → spoofMiddleware → auditActorMiddleware → apiRateLimit` in order, and every router is mounted after it
+- A mount (`.route`, `.get`, `.all`, `.doc31`, …, chained or across lines, or a `.use` on a path with an inline handler) before the chain completes, on `routes` other than `/api`, on `app` other than `/`, or on `app`/`routes`/`apiRouter` from any other file fails unless its full path is in `scripts/ci/one-middleware-chain/exempt.txt` with a reason (template: `/health`, `/bullBoard`, `/test`, `/openapi/docs`, `/api/telemetry/browser`, `/api/internal`, `/api/auth/*`, `/api/unsubscribe`)
+
+**no-raw-locks.sh:**
+- Fails on `FOR UPDATE` / `FOR NO KEY UPDATE` in non-test source outside `packages/db/src/client.ts` (`db.findForUpdate`), and on `FOR SHARE` / `FOR KEY SHARE` / `LOCK IN SHARE MODE` anywhere: there is no shared mode ([CONCURRENCY.md § Row Locks](./CONCURRENCY.md#row-locks-dbfindforupdate))
+- Reads string and template-literal text only (comments never count); lower-case keywords count only in a string that also says `select`
+
+**no-db-params.sh:**
+- Fails on a function or method parameter (signatures in types included) named or destructuring `db`/`txn`/`tx`/`prisma` (or `_db`, …), or whose type mentions `Db`, `PrismaClient`, `TransactionClient` or `typeof db`, outside tests and `packages/db`
+- Use the scoped client, `import { db } from '@template/db'`, which resolves to the open `db.txn()` through AsyncLocalStorage. The only code that takes a client is the client itself and json-rules' Prisma planner, which lives outside the app
+
+**bearer-only-auth.sh:**
+- Fails, in non-test source under `apps/` and `packages/`, on `cookieCache`, `credentials` set to `'include'`, `withCredentials`, `document.cookie`, any session lookup (a `getSession(...)` or `findSession(...)` call, or a read of the `session` table: `<x>.session.findUnique`, `findUniqueOrThrow`, `findFirst`, `findFirstOrThrow`, `findMany` or `count`), and importing BetterAuth's `bearer` plugin. Takes no exemptions
+- Why: API auth is bearer-only and session-free ([AUTH.md](./AUTH.md#overview)). A person presents a JWT; a session exists only inside BetterAuth's `/api/auth/*` handler for the sign-in handshake, and `jwtHandoff` swaps it for a JWT. A cookie path was a second way in, a session lookup is a second way to resolve a person, and the `bearer` plugin turns a session token into a credential
+
 **ui-serialized-factories.sh:**
 - For UI tests importing `@template/db/test`, requires `__serialize()` usage
 - Fails on `__serialize() as any` casts
@@ -325,10 +356,11 @@ bun run worktree:create <base-branch> <new-branch>             # Fork a new bran
 bun run worktree:create <existing-branch>                      # Attach an existing branch
 bun run worktree:create <base-branch> <new-branch> --skip-db   # Docs/skills only: no databases, buckets, or schema push; Docker not required
 bun run worktree:list
+bun run worktree:ports [<name>]                                # Re-apply registry ports to this checkout's (or .worktrees/<name>'s) env files
 bun run worktree:destroy <name> [--force]                      # --force: destroy despite uncommitted or untracked changes
 ```
 
-Each worktree owns a slot (1–9), recorded in `.worktrees/.slots/<N>` and as `WORKTREE_SLOT=<N>` on the first line of its `.env.local` / `.env.test`: ports, `${PROJECT_NAME}_wt_<N>` / `${PROJECT_NAME}_test_wt_<N>` Postgres databases, MinIO buckets, a Redis logical DB, slot-specific env files synced against the branch's `.env.*.example` (multi-line quoted values included), its own `node_modules`, and the gitignored artifacts (route trees, Prisma client, SDK). Create fails fast when Docker/Postgres is down, refuses to fork onto a branch that already exists, warns about worktrees whose branch is merged (including branches checked out in a worktree), reclaims a slot lock whose owner is gone (dead pid, or no pid file and older than 60s; `stat -c`/`stat -f` chosen per platform), counts a registry entry as a claim even before its directory exists and prunes it only when the directory is missing, no lock is held, and it is older than 120s, prints the `worktree:destroy <name> --force` cleanup line on any failure or signal after the worktree exists (and releases the slot before it), reclaims a dead-pid lock and its directory-less registry entry with a notice while skipping a live one, aborts when the database inventory query fails, requires `DATABASE_URL` for both sides unless `--skip-db`, and drops a leftover slot database only when no registered worktree references that slot. Destroy requires a worktree whose git common dir is this repository's `.git` (or a half-created directory whose `.git` file points under this repository's `.git/worktrees/` at a gitdir that is gone; a `.git` file whose gitdir still exists, here or elsewhere, gets a `git worktree repair` hint and nothing is deleted), normalises the name to its on-disk spelling, prints whether the branch is merged into the default branch, refuses a dirty worktree unless `--force`, requires a registered worktree (or a half-created one with a `.git` file — never `.locks`/`.slots`), validates the slot, refuses when the worktree's env files name more than one slot, skips the DB/bucket/Redis cleanup when another worktree shares the slot, and kills every listener on the slot's ports (reporting each pid; a survivor is a warning). Green **ready** means every step landed; yellow **WITH GAPS** lists what to rerun. The `bashMainCheckoutGuard` hook (`.claude/hooks/`, PreToolUse on Bash + SessionStart) enforces two rules. (1) `git worktree add/remove/move/prune` is denied in every session — use the scripts. (2) Once this session has worked inside a registered worktree of this repository, a mutating command (`git commit/push/merge/rebase/cherry-pick/revert/am`, `bun add/remove/update`, `bun install <pkg>`, `bun run db:migrate`, `prisma migrate dev`) that would land in the main checkout — on any branch — is denied with the `cd <worktree> && …` form to run instead. A leading `cd`, `git -C`, or `bun --cwd` moves where a command lands; naming the main checkout by its absolute path is an explicit choice and is allowed. Full guide: `.claude/skills/worktrees/SKILL.md`.
+Each worktree owns a slot (1–9), recorded in `.worktrees/.slots/<N>` and as `WORKTREE_SLOT=<N>` on the first line of its `.env.local` / `.env.test`: ports from the `@inixiative/config` port registry: the project's base (`bunx @inixiative/config ports <project>`; the main checkout runs on it) plus 10 × the slot (the `PORT`s, `*_URL`s and `VITE_*_URL`s in the root and `apps/*` env files; each app's `PORT` is the registry service named after it, or `http`; each Vite dev server takes its port from its own `VITE_<APP>_URL`), `${PROJECT_NAME}_wt_<N>` / `${PROJECT_NAME}_test_wt_<N>` Postgres databases, MinIO buckets, a Redis logical DB, slot-specific env files synced against the branch's `.env.*.example` (multi-line quoted values included), its own `node_modules`, and the gitignored artifacts (route trees, Prisma client, SDK). Create fails fast when Docker/Postgres is down, refuses to fork onto a branch that already exists, warns about worktrees whose branch is merged (including branches checked out in a worktree), reclaims a slot lock whose owner is gone (dead pid, or no pid file and older than 60s; `stat -c`/`stat -f` chosen per platform), counts a registry entry as a claim even before its directory exists and prunes it only when the directory is missing, no lock is held, and it is older than 120s, prints the `worktree:destroy <name> --force` cleanup line on any failure or signal after the worktree exists (and releases the slot before it), reclaims a dead-pid lock and its directory-less registry entry with a notice while skipping a live one, aborts when the database inventory query fails, requires `DATABASE_URL` for both sides unless `--skip-db`, and drops a leftover slot database only when no registered worktree references that slot. Destroy requires a worktree whose git common dir is this repository's `.git` (or a half-created directory whose `.git` file points under this repository's `.git/worktrees/` at a gitdir that is gone; a `.git` file whose gitdir still exists, here or elsewhere, gets a `git worktree repair` hint and nothing is deleted), normalises the name to its on-disk spelling, prints whether the branch is merged into the default branch, refuses a dirty worktree unless `--force`, requires a registered worktree (or a half-created one with a `.git` file — never `.locks`/`.slots`), validates the slot, refuses when the worktree's env files name more than one slot, skips the DB/bucket/Redis cleanup when another worktree shares the slot, and kills every listener on the slot's ports (reporting each pid; a survivor is a warning). Green **ready** means every step landed; yellow **WITH GAPS** lists what to rerun. The `bashMainCheckoutGuard` hook (`.claude/hooks/`, PreToolUse on Bash + SessionStart) enforces two rules. (1) `git worktree add/remove/move/prune` is denied in every session — use the scripts. (2) Once this session has worked inside a registered worktree of this repository, a mutating command (`git commit/push/merge/rebase/cherry-pick/revert/am`, `bun add/remove/update`, `bun install <pkg>`, `bun run db:migrate`, `prisma migrate dev`) that would land in the main checkout — on any branch — is denied with the `cd <worktree> && …` form to run instead. A leading `cd`, `git -C`, or `bun --cwd` moves where a command lands; naming the main checkout by its absolute path is an explicit choice and is allowed. Full guide: `.claude/skills/worktrees/SKILL.md`.
 
 ---
 
@@ -339,14 +371,6 @@ Each worktree owns a slot (1–9), recorded in `.worktrees/.slots/<N>` and as `W
 **TypeScript scripts**: Can use `bun run scripts/path/to/script.ts` directly.
 
 **Temporary/experimental**: Use `tmp/` directory (gitignored).
-
-**Run in another directory with `--cwd`**: package scripts and commands target a workspace with
-`bun --cwd <dir>` / `bun run --cwd <dir>` (as the root `package.json` does), never `cd <dir> && …`.
-A `cd` changes where every later command lands and hides that from the reader. — fb: 2026-02-01
-
-**End the process**: a TS script that opens connections (Prisma, Redis, a queue) ends with
-`process.exit(code)` once its work is done (`scripts/checkLaunched.ts`), or the open handles keep it
-alive and a background run hangs. — fb: 2026-02-05
 
 ---
 

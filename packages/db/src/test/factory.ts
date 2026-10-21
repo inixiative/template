@@ -1,7 +1,9 @@
 /**
  * @atlas
- * @partOf infrastructure:prisma
+ * @kind constructor, registry
+ * @partOf infrastructure:prisma, primitive:testFactories
  * @uses none
+ * @constructs factory
  */
 import { db } from '@template/db/client';
 import { prismaMap } from '@template/db/generated/prismaMap';

@@ -1,0 +1,3 @@
+# Entry
+
+Call `ghostName()`.

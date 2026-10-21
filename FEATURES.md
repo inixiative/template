@@ -7,8 +7,8 @@
 - [How to Read This](#how-to-read-this)
 - [Core Platform](#core-platform)
 - [API Architecture & Routing](#api-architecture--routing)
-- [Authentication & Sessions](#authentication--sessions)
-  - [Session Authentication (BetterAuth)](#session-authentication-betterauth)
+- [Authentication](#authentication)
+  - [Person JWT (BetterAuth sign-in)](#person-jwt-betterauth-sign-in)
   - [Multi-Provider Auth (AuthProvider)](#multi-provider-auth-authprovider)
   - [Token Authentication](#token-authentication)
   - [User Impersonation](#user-impersonation)
@@ -120,17 +120,20 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 ---
 
-## Authentication & Sessions
+## Authentication
 
-### Session Authentication (BetterAuth)
+### Person JWT (BetterAuth sign-in)
 
-- ✅ **BetterAuth Integration** - Session auth via BetterAuth ^1.6. Handles email/password, OAuth, verification flows, and session lifecycle out of the box
-- ✅ **Email/Password Auth** - Password hashing via BetterAuth. Sign-in returns a session token; the SPAs store it in localStorage via `setToken()` and send it as `Authorization: Bearer <token>`. Email verification is required before sign-in
-- ✅ **OAuth Flow → Bearer Token** - The provider redirects to the API, which appends a single-use one-time token to `/auth/callback#ott=…` (fragment, never logged). The callback page exchanges it for the session token and stores it via `setToken()`. The session token never appears in a URL
-- ✅ **Redis-Backed Bearer Sessions** - The web apps send BetterAuth's session token as `Authorization: Bearer` (`apiFetchInternal`). It is an opaque token, not a JWT (only the `bearer()` plugin, no `jwt()`); its record lives in Redis (`secondaryStorage`, 7-day sliding TTL), so deleting the key revokes the session at once. BetterAuth's encrypted (JWE) cookie cache applies only to cookie-based clients. Details: [AUTH.md](docs/claude/AUTH.md#session-storage-strategy)
-- ✅ **Redis Secondary Storage** - BetterAuth's `secondaryStorage` is Redis: session records, each user's active-session list, and the OAuth one-time tokens (consumed atomically with `GETDEL`)
-- ✅ **OAuth Social Providers** - Google wired via BetterAuth social plugin (callback handling, account linking, token issuance). Microsoft/GitHub are scaffolded in `platformProviders` but not yet configured in the BetterAuth client — adding them is config, not code
-- ✅ **BetterAuth Models** - Verification (email verification tokens) and Account (OAuth provider linkage) models in Prisma. `Session` is BetterAuth's default model and is unused: sessions live in Redis
+- ✅ **BetterAuth Sign-in** - BetterAuth ^1.6 runs email/password, email verification and OAuth. Its session exists only for the sign-in handshake (10 minutes at most, in Redis); `jwtHandoff` swaps it for a JWT before the response leaves the API and deletes it
+- ✅ **Person JWT** - Sign-in answers with `{ token, expiresAt, user }`: an ES256 JWT (`sub` = user, `iss` = `aud` = `API_URL`, 30 days). The SPAs store it in localStorage and send it as `Authorization: Bearer <jwt>`. `jwtAuthMiddleware` verifies it from its signature; no session lookup. Details: [AUTH.md](docs/claude/AUTH.md#person-jwt)
+- ✅ **Email/Password Auth** - Password hashing via BetterAuth. Email verification is required before sign-in
+- ✅ **OAuth Flow → JWT** - The provider redirects to the API, which appends a single-use one-time token to `/auth/callback#ott=…` (fragment, never logged). The callback page exchanges it for the JWT. Neither the JWT nor a session token appears in a URL
+- ✅ **Signing Keys** - BetterAuth `jwt()` plugin keys, rotated every 90 days with a 30-day grace, published at `/api/auth/jwks`. Private keys are encrypted by the template field encryption (`jwks.privateKey`) and rotated by the same job as every other secret
+- ✅ **One Verification Path** - `verifyIssuerJwt` trusts this API's own keys and, when `AUTH_ISSUER` / `AUTH_JWKS_URL` / `AUTH_AUDIENCE` are set, one external issuer, so a JWT from a hub that issues for several apps works the same way
+- ✅ **Revocation** - Every person JWT carries the user's `jwtVersion` as `ver`; incrementing it refuses every JWT signed before, with no extra lookup (the user row is already loaded): `rotateUserJwts` from `POST /api/v1/me/rotateJwts`, the superadmin `POST /api/admin/user/:id/rotateJwts`, account deletion and password reset. `jwtVersion` is never returned in a response. Signing out of one browser drops the JWT there. Revocation is the control, not short expiry, so there is no refresh token
+- ✅ **No Session Endpoints** - Every BetterAuth endpoint that acts on a live session (`/get-session`, `/sign-out`, `/token`, `/change-password`, …) is disabled (404)
+- ✅ **OAuth Social Providers** - Google wired via BetterAuth social plugin (callback handling, token issuance). Microsoft/GitHub are scaffolded in `platformProviders` but not yet configured in the BetterAuth client — adding them is config, not code
+- ✅ **BetterAuth Models** - Verification (email verification tokens), Account (OAuth provider linkage) and Jwks (signing keys) models in Prisma. `Session` is BetterAuth's schema and holds no rows: handshake sessions live in Redis
 
 ### Multi-Provider Auth (AuthProvider)
 
@@ -142,7 +145,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 ### Token Authentication
 
 - ✅ **Bearer Token Auth** - `Authorization: Bearer <key>` header for API access. SHA-256 hashed at rest. 10-minute Redis cache for frequently-used tokens avoids DB lookup per request
-- ✅ **URL Token Fallback** - `?token=<key>` query param for contexts that can't set headers (WebSocket upgrades, email links). Same validation pipeline as Bearer tokens
+- ✅ **URL Token Fallback** - `?token=<key>` query param for contexts that can't set headers (email links, downloads). Same validation pipeline as Bearer tokens. API tokens only; a person JWT is never read from a URL
 - ✅ **Hierarchical Token Scopes** - Tokens scoped to User (cross-org), Organization (all spaces in org), or Space (single space only). Scope determines which resources the token can access
 - ✅ **Personal Access Tokens** - Users create named tokens with optional expiry dates. Token value shown once at creation, only hash stored. `lastUsedAt` is touched on token-cache misses only (about every 10 minutes per token), keeping a write off every request
 - ✅ **Token CRUD** - Full lifecycle management. List tokens (with last-used metadata), create with name+expiry, delete by ID. Tokens scoped to the owning User/Org/Space
@@ -155,7 +158,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 ### Roadmap
 
-- 🟡 **Session Refresh** - Silent re-authentication when session expires. Token refresh flow and auto-retry on 401 not yet implemented
+- 🟡 **Password Change and Account Linking** - BetterAuth's change-password and link-social endpoints need a session, so they are disabled; JWT-authenticated routes for them are not built yet
 - 🟣 **SAML/SSO** (ticket AUTH-001) - Schema and encryption infrastructure ready. Awaiting BetterAuth SAML plugin maturity for production-ready SAML 2.0 support
 
 ---
@@ -247,7 +250,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **DB-Backed Test Isolation** - Tests write real rows through the real client (factories). The db client registers a test tracker in every test process; `cleanupTouchedTables()` empties the tables a file wrote. Files run one at a time (`--max-concurrency=1`). [Learn more: TESTING.md](docs/claude/TESTING.md#cleanup)
 
-- ✅ **23 Database Models** - user, account, session, verification, authProvider, organization, organizationUser, space, spaceUser, token, webhookSubscription, webhookEvent, inquiry, customerRef, cronJob, emailTemplate, emailComponent, auditLog, contact, appEvent, tag, tagAttachment, tagCategory
+- ✅ **24 Database Models** - user, account, session, verification, jwks, authProvider, organization, organizationUser, space, spaceUser, token, webhookSubscription, webhookEvent, inquiry, customerRef, cronJob, emailTemplate, emailComponent, auditLog, contact, appEvent, tag, tagAttachment, tagCategory
 
 - ✅ **Zod Schema Generation** - Auto-generated Zod schemas from Prisma models for request/response validation with full type inference
 
@@ -269,7 +272,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 ## Admin Operations
 
-- ✅ **Cache Clearing** - `POST /admin/cache/clear` flushes Redis caches (permissions, tokens, sessions) without server restart. Essential for invalidating stale permission caches after role changes
+- ✅ **Cache Clearing** - `POST /admin/cache/clear` flushes Redis caches (permissions, tokens, user lookups) without server restart. Essential for invalidating stale permission caches after role changes
 - ✅ **Cron Job CRUD** - Full create/read/update/delete for scheduled jobs. Persist schedule, description, and enabled state. Admin can view all registered crons, their last/next run times, and current status
 - ✅ **Manual Cron Triggering** - `POST /admin/cron/:name/trigger` runs any cron immediately regardless of schedule. Critical for one-off executions (key rotation, cache warming) without waiting for next scheduled run
 - ✅ **Job Enqueueing** - `POST /admin/jobs/enqueue` manually enqueues any registered job with custom payload. Useful for reprocessing failed records or triggering background work on demand
@@ -293,7 +296,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **Staged jobs (fan out and wait)** - Every constructor takes `{ stages, finish }` in place of a handler: each stage adds children with `ctx.enqueueChildJob`, the job parks in BullMQ's `waiting-children` (holding no worker slot) until they report, and `finish` runs once after the last stage. The stage index lives on the job, so a resumed run never repeats a stage. Children keep their retries and then count as done (`ignoreDependencyOnFailure`). The `no-hand-rolled-flows` CI rule keeps the flow machinery in the primitive; `apps/api/scripts/jobFlowCheck.ts` proves it against real Redis
 
-- ✅ **Rolling caches** - `makeRollingCache({ name, intervalSeconds, key, compute, targets })` keeps a computed value warm on a timer with no invalidation to write. Targets are a model plus its own Prisma `findMany` args. One seeded cron root (`coordinateRollingCaches`, every minute) enqueues a staged singleton branch per due cache, which fans out a superseding slow-lane leaf per target under a per-attempt timeout (`rollingCache.leafStuck` app event when it runs over). Entries outlive every retry, so a read always hits; the `rolling-cache-registered` CI rule keeps every definition imported by the worker
+- ✅ **Rolling caches** - `makeRollingCache({ name, intervalSeconds, targets, results, compute, channel })` keeps computed values warm on a timer with no invalidation to write. Targets are a model plus its own Prisma `findMany` args; `results` are key functions over one params object, all filled by one `compute` pass per target under one single-flight lock. Reads never compute: `checkCache` reports empty / computing / fresh / stale from a write time stored beside each value, and `checkRollingCache` queues the target's leaf on a miss and returns the channel to wait on. One seeded cron root (`coordinateRollingCaches`, every minute) enqueues a staged singleton branch per due cache, which fans out superseding slow-lane leaves spread over `spreadSeconds`, each under a per-attempt timeout (`rollingCache.leafStuck` when it runs over, `rollingCache.refreshed` with a websocket refetch hint when it lands). Entries outlive every retry; the `rolling-cache-registered` CI rule keeps every definition imported by the worker
 
 - ✅ **BullMQ Integration** - Redis-backed persistent queue with automatic retries (3 attempts, exponential backoff 5s base). Jobs survive server restarts. One `jobs` queue serves registered handlers; `REDIS_BULLMQ_URL` can isolate it from cache Redis (fallback: `REDIS_URL`)
 
@@ -323,9 +326,9 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **RSA Signature Verification** - Each webhook includes `x-webhook-signature` header with an RSA-SHA256 signature (base64). Signed with a server-held private key; receivers verify with the public key exposed at `/webhookSubscription/info`. Asymmetric — no shared secret to leak. Signed body includes a unix `timestamp` so receivers can reject replays. Prevents webhook spoofing and tampering
 
-- ✅ **Async Delivery via Jobs** - Webhooks enqueued as BullMQ jobs on the shared `jobs` queue. Never blocks request processing. Failed deliveries retry automatically (3 attempts, exponential backoff). Webhook jobs run outside transaction to avoid timeouts
+- ✅ **Async Delivery via Jobs** - Webhooks enqueued as BullMQ jobs on the shared `jobs` queue. Never blocks request processing. Transient failures (network, timeout, 5xx, 404, 429) retry automatically (3 attempts, exponential backoff); the circuit breaker counts a retry cycle once. Webhook jobs run outside transaction to avoid timeouts
 
-- ✅ **Delivery Tracking** - WebhookEvent model records every delivery attempt with status (pending, sent, failed), response code, response body, error message. Superadmins can inspect delivery history and debug integration issues
+- ✅ **Delivery Tracking** - WebhookEvent model records every delivery attempt with status (`retrying` while it will be retried, then `success`, `error` or `unreachable`), response code and error message. Superadmins can inspect delivery history and debug integration issues
 
 - ✅ **Automatic Cleanup** - Cron job removes old webhook events (90+ days) to prevent unbounded table growth. Configurable retention period
 
@@ -383,8 +386,8 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 ### General Security
 
-- ✅ **HTTP-Only Session Cookies** - BetterAuth also sets HTTP-only cookies on the API origin (a signed session-token cookie and the encrypted JWE cookie cache). The SPAs don't rely on them; they authenticate with the bearer token
-- ✅ **Bearer Session Token** - Both email/password and OAuth sign-ins store the opaque session token in localStorage and send it as `Authorization: Bearer <token>`. No cookie, so CSRF is not a risk, but XSS is (localStorage is JS-accessible). Trade-off accepted for cross-origin SPAs
+- ✅ **Cookies and Sessions Never Authenticate the API** - BetterAuth's cookies on the API origin are used only inside `/api/auth/*` (OAuth state); `jwtHandoff` expires the session cookie on every sign-in response. The CI rule `bearer-only-auth` fences cookie and session auth (cookie cache, `credentials: 'include'`, `withCredentials`, `document.cookie`, any `getSession` / `findSession` / session-table read, the BetterAuth `bearer` plugin)
+- ✅ **Bearer JWT** - Both email/password and OAuth sign-ins store the person JWT in localStorage and send it as `Authorization: Bearer <jwt>`. No cookie, so CSRF is not a risk, but XSS is (localStorage is JS-accessible); revocation ends a stolen JWT. Trade-off accepted for cross-origin SPAs
 - ✅ **SQL Injection Prevention** - Prisma uses parameterized queries exclusively. No string interpolation in queries. Raw SQL escape hatches disabled by convention
 - ✅ **XSS Prevention** - React escapes all interpolated values by default. No `dangerouslySetInnerHTML` usage. Content Security Policy headers configurable via Hono middleware
 - ✅ **Password Hashing** - scrypt via BetterAuth (`node:crypto`). Passwords never stored or logged in plaintext
@@ -502,11 +505,11 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **Context-Aware Routing** - Routes automatically include current context params (`?org=`, `?space=`). Navigate to organization settings and URL becomes `/settings?org=orgId`. Switch organizations and all links update automatically. `getContextParams()` generates params for any route based on current state
 
-- ✅ **Zustand State Management** - Six slices manage different concerns: **auth** (user/session), **tenant** (org/space), **permissions** (RBAC/ReBAC cache), **navigation** (breadcrumbs/menu state), **ui** (theme/modals/toasts), **client** (API base URL/headers). Slice factories enable testing without circular dependencies
+- ✅ **Zustand State Management** - Six slices manage different concerns: **auth** (user/JWT), **tenant** (org/space), **permissions** (RBAC/ReBAC cache), **navigation** (breadcrumbs/menu state), **ui** (theme/modals/toasts), **client** (API base URL/headers). Slice factories enable testing without circular dependencies
 
 - ✅ **Server State Caching** - TanStack Query v5 handles API response caching with smart invalidation. Auto-refetch on window focus, configurable stale times, request deduplication. Optimistic updates with automatic rollback on error maintain UI consistency
 
-- ✅ **API Client Wrappers** - `apiQuery()` for GET requests unwraps nested `data.data` for clean usage. `apiMutation()` for mutations returns full response enabling optimistic update patterns. Both handle auth headers (session/token) and spoof headers (`x-spoof-user-email`) automatically
+- ✅ **API Client Wrappers** - `apiQuery()` for GET requests unwraps nested `data.data` for clean usage. `apiMutation()` for mutations returns full response enabling optimistic update patterns. Both handle auth headers (JWT/token) and spoof headers (`x-spoof-user-email`) automatically
 
 - ✅ **Route Guards** - `requireAuth()` redirects unauthenticated users to `/login?redirectTo=currentPath`. `requirePublic()` redirects authenticated users away from login/signup. Guards preserve context params across redirects. Execute in route `beforeLoad` for instant feedback before component renders
 
@@ -665,11 +668,11 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 ### Caching & Performance
 
-- ✅ **Redis with IORedis** - Distributed caching layer (Redis 7 alpine). Singleton connections with automatic reconnection, error handling, and connection pooling. Tests get one shared in-memory `ioredis-mock` client (`createRedisConnection` in test); a test that needs real Redis (BullMQ repeatables) opens its own connection
+- ✅ **Redis with IORedis** - Distributed caching layer (Redis 7 alpine). Singleton connections with automatic reconnection, error handling, and connection pooling. Tests get one shared in-memory `ioredis-mock` client (`createRedisConnection` in test); a test that needs real Redis (BullMQ job schedulers) opens its own connection
 
-- ✅ **Redis Use Cases** - Session store (BetterAuth `secondaryStorage`, 7-day sliding TTL), cached reads via `cache()` (API tokens 10min, user lookups, permission hydration), BullMQ job queue persistence, WebSocket pub/sub for multi-server broadcasting, rate-limit windows, locks
+- ✅ **Redis Use Cases** - Sign-in handshake sessions and one-time tokens (BetterAuth `secondaryStorage`, 10 minutes), cached reads via `cache()` (API tokens 10min, user lookups, permission hydration), BullMQ job queue persistence, WebSocket pub/sub for multi-server broadcasting, rate-limit windows, locks
 
-- ✅ **Namespace Support** - Redis keys prefixed by use case (`redisNamespace`: bull, cache, job, ws, otp, session, limit, lock, lane) preventing collisions and enabling selective cache clearing
+- ✅ **Namespace Support** - Redis keys prefixed by use case (`redisNamespace`: bull, cache, cacheWritten, job, ws, otp, session, limit, lock, lane, rollingCache) preventing collisions and enabling selective cache clearing
 
 - ✅ **Multiple Redis Connections** - Main client (general operations), dedicated subscriber (pub/sub is blocking), separate BullMQ connections per queue/worker. Prevents blocking operations from interfering
 
@@ -702,7 +705,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 ## Architectural Patterns
 
 - ✅ **Context Isolation in Batch API** - Each request in a batch gets its own isolated AppEnv (db, auth, permissions). Prevents one batch operation from leaking context into another. Transaction strategies (transactionAll, transactionPerRound) wrap operations without sharing mutable state
-- ✅ **Multi-Strategy Authentication** - Single middleware chain handles session cookies, Bearer tokens, and URL token params. Strategy auto-detected from request headers — no route-level branching. Spoof header (`x-spoof-user-email`) layered on top for superadmin impersonation
+- ✅ **Multi-Strategy Authentication** - Single middleware chain handles person JWTs, Bearer API tokens, and API-token URL params (never cookies or sessions). Strategy auto-detected from request headers — no route-level branching. Spoof header (`x-spoof-user-email`) layered on top for superadmin impersonation
 - ✅ **False Polymorphism** - Polymorphic relationships (Token owner, CustomerRef) use explicit FK columns instead of type + ID string pairs. Each possible owner type has its own nullable FK. Prisma enforces referential integrity per FK. PolymorphismRegistry centralizes constraints, validation, and FK resolution
 - ✅ **Dynamic Schema Generation** - Prisma schema split across one file per model in `prisma/schema/`. Build step concatenates files before generation. Reduces merge conflicts, enables per-model organization, and makes large schemas navigable
 - ✅ **Permission-Based Menu Rendering** - Navigation config declares required permissions per item. Menu rendered by evaluating each item's permission against the Permix client. Items hidden (not just disabled) if user lacks permission. Re-evaluated on context switch (org/space change)

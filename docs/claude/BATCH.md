@@ -29,6 +29,7 @@
   - [Pattern: Type-Safe Constants](#pattern-type-safe-constants)
   - [Pattern: Strategy Implementation](#pattern-strategy-implementation)
   - [Pattern: Batch Context](#pattern-batch-context)
+  - [Pattern: Locks and Transactions](#pattern-locks-and-transactions)
 - [Testing](#testing)
 - [Known Limitations](#known-limitations)
 - [See Also](#see-also)
@@ -462,7 +463,7 @@ type StrategyExecutor = (
 ```
 
 **Common structure:**
-1. Initialize batch registry with `registerBatch(batchId, db, baseContext)`
+1. Initialize batch registry with `registerBatch(batchId, baseContext)`
 2. Execute rounds (transaction or non-transaction)
 3. Track success/failure counts
 4. Calculate status based on strategy semantics
@@ -475,7 +476,7 @@ Internal requests inherit authentication from parent request:
 ```typescript
 // Parent request authenticated → all batch requests use same auth
 const batchId = crypto.randomUUID();
-registerBatch(batchId, db, parentContext);
+registerBatch(batchId, parentContext);
 
 // Internal requests detect batch via X-Batch-Id header
 const internalRequest = new Request(url, {
@@ -496,7 +497,7 @@ if (batchContext) {
   c.set('app', batchContext.baseContext.get('app'));
 
   // Deep clone mutable state (isolated per request)
-  const keysToClone = ['user', 'session', 'organizationUsers', 'organizations',
+  const keysToClone = ['user', 'organizationUsers', 'organizations',
                        'spaceUsers', 'spaces', 'token', 'spoofedBy'];
   for (const key of keysToClone) {
     const value = batchContext.baseContext.get(key);
@@ -510,6 +511,27 @@ if (batchContext) {
 - Each request has its own isolated copy of user data, memberships, etc.
 - Array/object mutations during request processing don't leak
 - Fresh `permix` instance created per request (already isolated)
+
+### Pattern: Locks and Transactions
+
+Under `transactionAll` every sub-request writes into the batch's one transaction, and under
+`transactionPerRound` into its round's. A lock a sub-request takes inside that transaction
+(`withOwnerLock`, upserting `findForUpdate`) is held until the transaction settles — the batch's
+commit or rollback, or the round's — never released when the sub-request returns, because its writes
+are not yet visible to anyone else. Taking the same lock again later in the batch, or from parallel
+sub-requests of one round, joins the batch's hold and runs after the holders before it instead of
+waiting on itself. A lock wait past its `waitMs` fails that sub-request, which rolls the batch (or
+round) back. See [DATABASE.md](./DATABASE.md#redis-locks-held-until-the-transaction-ends).
+
+A round under `transactionAll` or `transactionPerRound` waits for every one of its sub-requests to
+settle before a failure rolls the transaction back; a sub-request that throws (an absolute URL, a bad
+interpolation) is recorded as a failed result rather than rejecting the round while its siblings
+still run, which would let them finish outside the rolled-back transaction.
+
+`allowFailures` and `failOnRound` run each round's sub-requests through `db.parallel` (capped by
+`getConcurrency([ConcurrencyType.db])`), so each sub-request gets its own scope and its own
+transaction; without that, parallel sub-requests sharing the parent request's scope joined whichever
+transaction a sibling had open.
 
 **Key files:**
 - `apps/api/src/modules/batch/services/batchRegistry.ts` - In-memory storage

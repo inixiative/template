@@ -11,7 +11,6 @@
 - [Request validation](#request-validation)
 - [Status conventions](#status-conventions)
 - [Shared packages can't use makeError](#shared-packages-cant-use-makeerror)
-- [Never swallow an error](#never-swallow-an-error)
 
 <!-- toc:end -->
 
@@ -66,6 +65,7 @@ unless overridden.
 | `ResponseValidationError` | 500 (response failed its own schema) |
 | `Prisma.PrismaClientValidationError` | 400 "Invalid query parameters" |
 | `Prisma P2002` | 409 "Resource already exists: …" |
+| `LockLostError` (`@template/db`, from `lock.assertHeld()`) | 409 "Lost the lock guarding this write; please retry" |
 | `Prisma P2025` | 404 "Resource not found" |
 | `AppError` | its body |
 | plain `HTTPException` | `toAppError`: same status and message (status name when empty), label and guidance from `HTTP_ERROR_MAP` (by class, 400/500, for an unmapped status), its response headers kept, body always JSON |
@@ -115,23 +115,3 @@ keeps the library's 400.
 (`db`, `permissions`, `shared`) throw plain errors; the handler **translates at
 the boundary** (the Prisma rows above are exactly this). Do not import `makeError`
 into a package — it would couple the package to the API.
-
-## Never swallow an error
-
-An error either reaches something that reports it or fails the operation visibly. Nothing catches
-an error and carries on as if it succeeded. — fb: 2026-02-13, 2026-02-14, 2026-02-15, 2026-03-02
-
-| Where | The error goes to | So you don't write |
-|---|---|---|
-| API request path | `errorHandlerMiddleware` (throw `makeError` for caller errors) | a `try/catch` that logs and returns 200 or a default |
-| Frontend query/mutation | the query client's `onError` → `handleApiError` toast ([API_CLIENT.md](FRONTEND/API_CLIENT.md#error-toasts)) | a component `try/catch` that toasts by hand |
-| Job | BullMQ's failure + retry path ([JOBS.md](JOBS.md)) | a catch that marks the job done |
-| Init / setup step | the step fails: `setError(section, message)`, no `markComplete`, the view returns to status and shows it ([INIT_SCRIPT_PATTERNS.md](INIT_SCRIPT_PATTERNS.md#13-atomic-progress-flags--idempotent-api-calls)) | a catch that sets the progress flag anyway |
-
-A `catch` is right only when it does something specific with that error: translates it to the
-right status at a boundary (as the global handler does for Prisma errors), retries it, or adds
-context and rethrows.
-
-Signs you're bypassing it: `catch {}` or `catch (e) { console.error(e) }`; a fallback value
-returned from a catch; a step shown as ✓ right after a ✗ error line; "covering" an error so a
-flow can continue.

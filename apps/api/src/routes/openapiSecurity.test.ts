@@ -13,7 +13,7 @@ type Spec = {
 
 const METHODS = ['get', 'post', 'put', 'patch', 'delete'] as const;
 
-const SESSION_ONLY = new Set([
+const PERSON_ONLY = new Set([
   'meCreateToken',
   'organizationCreateToken',
   'organizationUserCreateToken',
@@ -21,12 +21,13 @@ const SESSION_ONLY = new Set([
   'spaceUserCreateToken',
   'organizationDelete',
   'tokenDelete',
+  'meRotateJwts',
 ]);
 
 const expectedSchemes = (path: string, operationId: string | undefined): string[] => {
   if (path.startsWith('/api/internal')) return ['internalSecret'];
-  if (operationId && SESSION_ONLY.has(operationId)) return ['sessionToken'];
-  return ['sessionToken', 'apiToken'];
+  if (operationId && PERSON_ONLY.has(operationId)) return ['userJwt'];
+  return ['userJwt', 'apiToken'];
 };
 
 const loadSpec = async (): Promise<Spec> => {
@@ -49,8 +50,8 @@ describe('OpenAPI security', () => {
     const spec = await loadSpec();
     const schemes = spec.components?.securitySchemes ?? {};
 
-    expect(Object.keys(schemes).sort()).toEqual(['apiToken', 'internalSecret', 'sessionToken']);
-    expect(schemes.sessionToken).toMatchObject({ type: 'http', scheme: 'bearer' });
+    expect(Object.keys(schemes).sort()).toEqual(['apiToken', 'internalSecret', 'userJwt']);
+    expect(schemes.userJwt).toMatchObject({ type: 'http', scheme: 'bearer' });
     expect(schemes.apiToken).toMatchObject({ type: 'http', scheme: 'bearer' });
     expect(schemes.internalSecret).toMatchObject({
       type: 'apiKey',
@@ -96,9 +97,9 @@ describe('OpenAPI security', () => {
   it('publishes session-only auth where a token is refused, and both credentials elsewhere', async () => {
     const spec = await loadSpec();
 
-    expect(spec.paths?.['/api/v1/me/tokens']?.post?.security).toEqual([{ sessionToken: [] }]);
+    expect(spec.paths?.['/api/v1/me/tokens']?.post?.security).toEqual([{ userJwt: [] }]);
     expect(spec.paths?.['/api/v1/me/contacts']?.post?.security).toEqual([
-      { sessionToken: [] },
+      { userJwt: [] },
       { apiToken: [] },
     ]);
   });

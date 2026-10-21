@@ -144,8 +144,6 @@ type TableProps<T> = {
 };
 ```
 
-A row that opens something is clickable as a whole row through `onRowClick` (`OrganizationsPage`), not through a separate "View" button in a column; only controls with their own action (delete, a menu) sit inside the row. — fb: 2026-02-12
-
 Empty data renders an `EmptyState` (`empty.title` → `emptyMessage` → "Nothing here yet"). Pagination, infinite scroll and section hashes: [API_CLIENT.md](API_CLIENT.md#table-and-pagination).
 
 ### Avatar

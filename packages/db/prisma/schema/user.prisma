@@ -14,9 +14,11 @@ model User {
   displayName   String?
   image         String?
 
-  // Stamped on sign-in by the lastLoginAt hook (off Session create). Operational, not
+  // Stamped on sign-in by jwtHandoff when it issues the JWT. Operational, not
   // versioned — see registries/ignoreFields.
   lastLoginAt DateTime?
+  // Every person JWT carries it as `ver`; incrementing it signs the user out everywhere.
+  jwtVersion  Int       @default(0)
 
   // Platform-level role (for superadmin access)
   platformRole PlatformRole @default(user)

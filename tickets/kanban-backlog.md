@@ -40,6 +40,7 @@ kanban
     INFRA-010-cloudflare-waf-and-asset-serving
     INFRA-033-segment-reconcile-perf-budget
     INFRA-036-clock-sensitive-rule-tick
+    INFRA-038-ws-channel-tenancy
     DOC-001-scalar-api-docs-ui
     DOC-002-ai-discoverable-api-metadata
     FE-002-editor-slice-pattern
@@ -84,6 +85,7 @@ kanban
 - [INFRA-010: Cloudflare WAF & Asset Serving](./INFRA-010-cloudflare-waf-and-asset-serving.md) - WAF rules, DDoS protection, CDN, init script integration
 - [INFRA-033: Segment Reconcile Perf Budget](./INFRA-033-segment-reconcile-perf-budget.md) - Measure DB load of both reconcile rails; set the scale threshold for field-level trigger narrowing
 - [INFRA-036: Clock-Sensitive Rule Tick](./INFRA-036-clock-sensitive-rule-tick.md) - `Segment.clockUnit` (hour/day/week/month) derived at save by a json-rules fold; one sweep cron row per unit
+- [INFRA-038: WS Channel Tenancy](./INFRA-038-ws-channel-tenancy.md) - Tenancy query on channel names + probe-reported tenant, deferred until a route resolves its tenant outside its path
 
 **Audit & Compliance:**
 - [FEAT-017: Audit Log Hardening, Inquiry Lineage, and Explorer](./FEAT-017-audit-log-hardening-lineage-and-explorer.md) - Durable audit writes, inquiry causality, and admin audit browsing
@@ -139,7 +141,7 @@ kanban
 
 ## Quick Stats
 
-- **Total Backlog Items**: 35
+- **Total Backlog Items**: 36
 - **Polish**: 3
 - **Enterprise**: 2
 - **Financial**: 2
@@ -168,4 +170,4 @@ These features are valuable but not critical for MVP or initial production launc
 
 ---
 
-_Last Updated: 2026-10-05_
+_Last Updated: 2026-10-20_

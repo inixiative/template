@@ -16,7 +16,7 @@
       },
       "devDependencies": {
         "@biomejs/biome": "2.5.2",
-        "@inixiative/atlas": "^0.2.0",
+        "@inixiative/atlas": "^0.4.0",
         "@inixiative/config": "^0.5.121",
         "@lightpanda/browser": "^1.2.0",
         "@mendable/firecrawl-js": "^4.18.1",
@@ -88,6 +88,7 @@
         "consola": "^3.4.2",
         "hono": "^4.12.25",
         "ioredis": "^5.10.0",
+        "jose": "^6.2.3",
         "lodash-es": "^4.18.1",
         "mjml": "^5.3.0",
         "pluralize": "^8.0.0",
@@ -621,7 +622,7 @@
 
     "@img/sharp-win32-x64": ["@img/sharp-win32-x64@0.33.5", "", { "os": "win32", "cpu": "x64" }, "sha512-MpY/o8/8kj+EcnxwvrP4aTJSWw/aZ7JIGR4aBeZkZw5B7/Jn+tY9/VNwtcoGmdT7GfggGIU4kygOMSbYnOrAbg=="],
 
-    "@inixiative/atlas": ["@inixiative/atlas@0.2.0", "", { "dependencies": { "@inixiative/json-rules": "^3.3.1" }, "bin": { "atlas": "bin/atlas.ts" } }, "sha512-Lko2EMwJu64I+6minHob8+vsjZVLHX84nrR3lVZqAAw1jn/gAfrenVMpHkPzLAjyAgPk5LQ4o+5cvrdY1uXpAw=="],
+    "@inixiative/atlas": ["@inixiative/atlas@0.4.0", "", { "dependencies": { "@inixiative/json-rules": "^3.5.4" }, "bin": { "atlas": "bin/atlas.ts" } }, "sha512-1o2HE4VCW6Crpl9S8SahtlBUO5QFBO0wiXaZH3vzzNkttynKulmogXISzeUvN3Exh0ebJz0JEZTF0h5ql2AqQQ=="],
 
     "@inixiative/config": ["@inixiative/config@0.5.121", "", { "peerDependencies": { "@biomejs/biome": ">=2.5.0", "tsup": ">=8.5.0", "typescript": ">=6.0.0" }, "optionalPeers": ["@biomejs/biome", "tsup", "typescript"], "bin": { "inixiative-config": "dist/cli.js" } }, "sha512-1li7pml2LJ6Luys7DmW7D/W2IvWxZpQE0Vlk6sq//9JSQ9JIC857ilSo+YossbDwEt8tCjiUsNGMi1qMVkz7ng=="],
 

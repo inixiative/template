@@ -124,7 +124,9 @@ const main = async (): Promise<void> => {
   const enqueue = (handler: string, payload: unknown) =>
     enqueueJob(handler as never, payload as never);
 
-  const workerRedis = createRedisConnection('check:jobFlowWorker', resolveBullmqRedisUrl());
+  const workerRedis = createRedisConnection('check:jobFlowWorker', resolveBullmqRedisUrl(), {
+    isBlocking: true,
+  });
   const worker = new Worker(
     queue.name,
     (job: Job) => processJob(job, { slowSlots: createSlowSlotPool(10) }),

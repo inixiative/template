@@ -49,8 +49,6 @@ concluding that something is missing — it is usually present and documented.
 - **NEVER use `git -c <key>=<value>` to bypass any rule** — this includes (but is not limited to) bypassing the stash ban, signing requirements, hook execution (`--no-verify`), or any other guardrail. If a command requires bypassing config, stop and ask.
 - **ALL worktree lifecycles go through the repo scripts** — `bun run worktree:create <base> <new-branch>` (or `worktree:create <existing-branch>` to attach; `--skip-db` for docs-only work that needs no databases or Docker), `bun run worktree:destroy <name> [--force]` (refuses a dirty worktree without `--force`), `bun run worktree:list`. NEVER `git worktree add`/`remove` by hand: the scripts provision and tear down the whole slot environment (Docker pre-flight, slot registry under `.worktrees/.slots/<N>`, ports, `.env.local`/`.env.test` synced against the branch's examples, per-slot databases and buckets, dependency install, generated artifacts, schema push) — a hand-rolled worktree is a broken half-environment plus orphaned state. Create fails fast when Docker/Postgres is down and ends green **ready** only when every env file sources, every artifact exists, and the schema push landed; yellow **WITH GAPS** lists what to rerun. If all slots are in use, ask which worktree to destroy; verify it is merged and clean first. The `bashMainCheckoutGuard` hook (`.claude/hooks/`, PreToolUse on Bash + SessionStart) enforces two rules. (1) `git worktree add/remove/move/prune` is denied in every session — use the scripts. (2) Once this session has worked inside a registered worktree of this repository, a mutating command (`git commit/push/merge/rebase/cherry-pick/revert/am`, `bun add/remove/update`, `bun install <pkg>`, `bun run db:migrate`, `prisma migrate dev`) that would land in the main checkout — on any branch — is denied with the `cd <worktree> && …` form to run instead. A leading `cd`, `git -C`, or `bun --cwd` moves where a command lands; naming the main checkout by its absolute path is an explicit choice and is allowed. See `.claude/skills/worktrees/SKILL.md`.
 - **If something is broken, just fix it.** Don't stash-to-bisect, don't "let me see if reverting my changes makes it go away" — read the code, find the cause, fix the cause.
-- **Leave work you didn't make.** Changes in the tree that you didn't author belong to the user or another agent working alongside you: don't revert, delete or "clean up" them, even when they break your build. Delete a file or resource only when asked. A move is a move (`git mv`, then fix the imports and doc links), never delete-and-recreate. Signs you're bypassing it: `git checkout -- <file>` on a file you never edited; a diff that removes code you didn't write; a "moved" file whose history starts today. — fb: 2026-01-31, 2026-02-09, 2026-02-16, 2026-10-15
-- **Edit files with a structured editor, never stream edits over files.** Source and docs change through exact, targeted edits, never `sed -i`, `perl -pi` or regex rewrites over files: an exact edit fails loudly when the text has drifted, a stream edit silently rewrites the wrong match. The same holds in code: a config file is updated through its structured writer (init: `updateConfigField` / `updateConfigFields`), never by regex over its text. — fb: 2026-02-15, 2026-10-15
 
 ## 0.1. Understand the Why First
 
@@ -95,8 +93,6 @@ Never merge distinct concerns into one place for convenience — the convenience
 - A second helper file for one current caller + "future" callers
 - Re-exports / barrels that nothing imports
 - Comments explaining what well-named code already says
-- Starting work the user parked ("later", "X to come", "add it to the ticket"): parked work goes in the ticket only — no stub model, placeholder field or early permission check in code — fb: 2026-01-26, 2026-02-01, 2026-02-09
-- Leftovers you generated while working (unrequested index files, stub routes, debug `console.log`): delete them before hand-back, don't keep them "in case" — fb: 2026-01-25, 2026-03-01
 
 **Underbuild (trimming real completion).** When the work IS "build primitive X," all the features that make X actually usable are in scope. Symptoms of *wrongly* trimming:
 
@@ -130,7 +126,6 @@ Rigor comes from evidence and gates, not goodwill. Each rule below closes a fail
 - **Verify before you assert.** Any claim about existing behavior — a bug, a regression, "this is unsound," "this drops rows" — must be backed by a reproduction: a probe, a failing test, or a traced execution path. "I read it and it looks like X" is a hypothesis, not a finding — do not state it as one. A claim relayed from a subagent, a review tool, or a prior assumption is **unverified until you reproduce it yourself.** Adversarial claims about *working* code carry the highest burden of proof, especially when you're contradicting the author — run the probe before you say it.
 - **No deferral as an escape hatch.** "Ticket it," "not reachable yet," "good enough for now" are honest only when the work is genuinely out of scope. They are **not** a way to dodge in-scope work that is correct to do. If it's correct and in scope, do it now; if it's a real scope fork, surface it per §0.4 — never bury the decision behind a convenient defer. "Defer" is a recommendation you justify, not a reflex you reach for when the work turns fiddly.
 - **Exhaust validation before caveating.** "Couldn't run it here" is a last resort *after* genuinely trying to make it run — crack the env, find the gate, run the thing. A caveat is what remains when the work is *actually* blocked, not when running it is inconvenient. Scoped checks passing is not "validated" (§10), and "typecheck-clean" is not "it works."
-- **Run it yourself before handing it over.** A command you are able to run, you run; you don't hand it to the user to paste. A flow you built (init, setup, a migration, a deploy step) is exercised end to end — init in a scratch copy under `tmp/` — until you have *watched* it succeed. "Done" means observed working, not "this should work now". Signs you're bypassing it: a reply that ends "run `bun run …` and tell me what you see"; a step marked complete that you never saw succeed; success declared on a plan that needs a token or connection nobody created. — fb: 2026-02-16, 2026-03-01, 2026-03-02, 2026-10-15
 
 ## 1. Mandatory Task Intake (Always)
 
@@ -155,8 +150,6 @@ If critical info is missing, ask one short clarification question.
 3. Run only agreed validations.
 4. If blocked, stop and ask; do not branch into redesigns.
 5. Report exact files changed and validation output.
-
-**Explain the design before you build it, and stop when questioned.** For anything beyond a mechanical fix, say the design in plain words (what changes, where, why) and take the parts one at a time. When the user questions what you're doing ("what's going on?", "slow down", "are you sure?"), stop editing: explain, and continue only on their go. A change the user rejects is reverted at once, before anything else. Signs you're bypassing it: a dozen files changed after one terse instruction; a second round of edits after "undo that". — fb: 2026-01-25, 2026-02-14, 2026-03-02, 2026-10-15
 
 Calibration default:
 
@@ -183,8 +176,6 @@ When tripped, provide:
 2. Options `A/B/C` with tradeoffs.
 3. Recommended next patch.
 
-**Two failed attempts means stop guessing, not try a third variation.** Find out instead: read the library source or docs, search for how others solved it, or probe the external API directly (a one-off script in `tmp/` calling the endpoint) until the call that works is known. When a check contradicts what the user can see (they are logged in, the check says not), the check is the suspect. When the approach itself is wrong, restart it from the top rather than patching piecemeal. — fb: 2026-01-29, 2026-02-15, 2026-02-16
-
 ## 4. Pattern Discovery Before Implementation
 
 Before writing new code (especially non-trivial tasks):
@@ -193,6 +184,14 @@ Before writing new code (especially non-trivial tasks):
 2. Extract concrete local patterns (types, access, validation, errors, permissions).
 3. Confirm pattern choice with user when uncertain/high-impact.
 4. Then implement.
+
+Every plan, ticket and PR names, for each concern it touches (auth, permissions, db access, requests, locks, jobs, events, errors), the existing primitive it uses with its path, or says why none fits.
+
+"Why none fits" shows the bridge: what would make the existing primitive fit (extend it, add a parameter, compose two), what was tried, and why that bridge is wrong if it is. "It doesn't match exactly" is not a reason. Adversarially review the bridge analysis before building.
+
+Every adversarial review checks the diff for parallel machinery first.
+
+Why: parallel machinery multiplies the cost of every later fix.
 
 Tests use the factories in `packages/db/src/test/factories` (`docs/claude/TESTING.md#factories`).
 
@@ -214,6 +213,9 @@ Business logic NEVER calls email, SMS, analytics, or notification services direc
 - Security defaults: auth checks, permission checks, tenant boundaries.
 - Secrets: encrypted at rest; never returned in API responses.
 - Type safety: avoid `any`; import canonical types from source modules.
+- **A catch that doesn't rethrow is a bug unless it acts on the failure.** Logging and carrying on is not acting: it hides the failure from the error boundary and from your caller, and the next step runs on a broken state. Acting means a state change the caller needs — turning off a row that failed validation, translating a library's plain `Error` into a `makeError`. Cleanup runs in `finally`, never in a `catch` that swallows. If you can't name the action, don't catch; let it fail. Never wrap a call in try/catch, or chain `.catch(log)`, just to log it.
+- **Validators throw.** A validator throws `makeError` (or a domain error); it never returns a problem string or `undefined` for the caller to inspect. A caller that must survive a bad record — a boot-time reconcile turning the row off — catches it at that one site.
+- **Check once, at the entry point.** Validate in the validator the controller, hook or job entry runs; the services below trust their input instead of re-checking the same fact. Duplicated checks drift apart and leave you unsure which one is load-bearing.
 
 Top-tier feature bar (auth/permissions/CRUD/nav/forms/notifications/settings):
 
@@ -265,7 +267,6 @@ This repo is mapped by **atlas** (`.atlas/` config + `@atlas` annotations + `MAP
 
 - Tickets: `tickets/README.md`
 - Put deep analysis/reports in the repo's `tmp/AI_WORKSPACE/` (gitignored except its README; see `docs/claude/SCRIPTS.md`) to keep chat concise.
-- A review or cleanup of a large change is a checklist, not a skim: list every changed file, walk them one by one, and record each finding (and the work done) in the task's `notes/` (`docs/claude/SCRIPTS.md#ai-workspace`) so nothing is fixed twice or lost. — fb: 2026-01-25, 2026-02-08
 
 ## 13. Change Checklist
 
@@ -273,6 +274,6 @@ This repo is mapped by **atlas** (`.atlas/` config + `@atlas` annotations + `MAP
 2. Implement minimal fix with existing utilities/types.
 3. Keep imports aligned with alias rules.
 4. Remove stale/duplicate logic/exports.
-5. Code you bring in from elsewhere (another module, package or repo) is moved into place: update every import and doc reference to the new path; no import reaching back into the old location and no re-export shim. — fb: 2026-01-25
-6. Run targeted validation.
+5. Run targeted validation.
+6. Before pushing, run the cleanup scan (`.claude/skills/cleanup-scan/SKILL.md`): duplicates and parallel machinery, in-flight branches and PRs, doctrine drift, template parity, leftovers. The `cleanupScanGate` hook refuses `git push` until the commit being pushed has been scanned.
 7. Summarize exactly what changed and why.

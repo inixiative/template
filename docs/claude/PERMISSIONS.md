@@ -281,7 +281,7 @@ export const setupSpacePermissions = async (c: Context<AppEnv>) => {
     return;
   }
 
-  // Session or User token → all spaces the user belongs to
+  // Person JWT or User token → all spaces the user belongs to
   for (const spaceUser of spaceUsers ?? []) {
     const role = token ? lesserRole(spaceUser.role, token.role) : spaceUser.role;
     await setupSpaceContext(permix, { role, spaceId: spaceUser.spaceId, entitlements });
@@ -837,7 +837,7 @@ middleware: [validateOwnerPermission({ action: 'read' })]
 
 ### validateNotToken
 
-Blocks token-based auth for sensitive operations. Session-only.
+Blocks token-based auth for sensitive operations. Person-only: a person's JWT holds these actions, an API token does not.
 
 ```typescript
 // Tokens cannot: create other tokens, delete orgs, delete themselves (a superadmin's token can)
@@ -856,10 +856,10 @@ Usage:
 // tokenDelete.ts - prevent token from deleting itself
 middleware: [validateNotToken, validateOwnerPermission({ action: 'manage' })]
 
-// meCreateToken.ts - only sessions can create tokens
+// meCreateToken.ts - only a person (JWT) can create tokens
 middleware: [validateNotToken]
 
-// organizationDelete.ts - destructive action requires session
+// organizationDelete.ts - destructive action requires the person
 middleware: [validateNotToken, validatePermission('own')]
 ```
 

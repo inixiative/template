@@ -41,6 +41,7 @@ export {
   createLock,
   FindForUpdateLockTimeoutError,
   type Lock,
+  LockLostError,
   type LockLostReason,
   type LockOptions,
   type LockRedis,
@@ -49,8 +50,11 @@ export {
 } from './lock';
 // Redis client and cache utilities
 export {
+  type CacheCheck,
+  COMMAND_TIMEOUT_MS,
   cache,
   cacheKey,
+  checkCache,
   clearKey,
   createRedisConnection,
   flushRedis,
@@ -68,11 +72,17 @@ export {
   ROLLING_CACHE_LEAF_ATTEMPTS,
   ROLLING_CACHE_TICK_SECONDS,
   type RollingCache,
+  type RollingCacheComputeContext,
   type RollingCacheConfig,
   type RollingCacheFindManyArgs,
+  type RollingCacheResultParams,
+  type RollingCacheResults,
   type RollingCacheTarget,
   type RollingCacheTargets,
+  type RollingCacheValue,
+  type RollingCacheWrite,
   redisNamespace,
+  singleFlightLock,
   unregisterRollingCache,
   upsertCache,
 } from './redis';
@@ -97,6 +107,16 @@ export {
   polymorphicKeyColumn,
   polymorphicTarget,
 } from './registries/polymorphicIs';
+export { polymorphicSchema } from './registries/polymorphicSchema';
+export type {
+  PolymorphicAxisField,
+  PolymorphicAxisValue,
+  PolymorphicFkColumn,
+  PolymorphicModel,
+  PolymorphicSchema,
+  PolymorphicSchemaOptions,
+  PolymorphicTarget,
+} from './registries/polymorphicSchemaTypes';
 // User with relations type and schema
 export type { UserWithRelations } from './types/userWithRelations';
 export { UserWithRelationsSchema } from './types/userWithRelations';

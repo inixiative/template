@@ -143,21 +143,6 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 };
 ```
 
-**Which config file.** `project.config.ts` is the committed config a project created from the
-template fills in. Template maintainers run init against `project.config.template-internal.ts`
-instead, by setting `USE_INTERNAL_CONFIG=true`: it is gitignored, so the template's own
-infrastructure IDs and progress never land in the public config. `getProjectConfig` picks the file
-(and falls back to `project.config.ts` when the internal one is absent), and every reader and
-writer goes through it: `scripts/deployment/locate-config.sh` and `scripts/checkLaunched.ts` follow
-the same switch. Never commit IDs from a maintainer run into `project.config.ts`, and never read the
-config file by path. — fb: 2026-02-15, 2026-03-02
-
-**Writes go through the writers.** A config value is written with `updateConfigField(section, key,
-value)` / `updateConfigFields(section, fields)` (`init/utils/configHelpers.ts`), and progress with
-`markComplete(section, action)` / `clearProgress(section)` (`init/utils/progressTracking.ts`). No
-regex over the file, no per-field helper. A default a step relies on is written to the config, not
-left as an in-code fallback. — fb: 2026-02-15
-
 ### 2. Manual Sync Triggers (No Polling)
 
 **Pattern:** Tasks call `syncConfig()` after each step completes. No automatic polling.
@@ -292,12 +277,6 @@ export function prompt(commands: Command[]): string {
 ### 6. Clean Status Lists
 
 **Pattern:** Show ALL steps upfront with status indicators, not streaming logs.
-
-The menu opens on the first step that isn't completed (`MainMenu`'s `initialIndex`), not on a fixed
-row. Status and prerequisite checks run once each, in order, with no fixed delay before or after a
-check, and none after a check that failed; waiting on a provider that is still provisioning is a
-retry on its state (section 9), not a sleep. A step that makes a network call after the user presses
-Enter shows a processing line at once. — fb: 2026-02-15, 2026-02-16, 2026-03-01
 
 **Why:**
 - ✅ User sees full picture before starting
@@ -676,10 +655,6 @@ const handleTokenSubmit = async () => {
 - ✅ The view layer must reflect the underlying config — don't create visual groupings that don't correspond to persisted state
 - ✅ If a step can partially succeed, split it before marking progress
 - ❌ Don't store umbrella flags like "create passwords" or "configure everything" when they hide multiple remote writes
-- ✅ A flag is set only after its action succeeded. A step that throws records `setError(section, message)`, sets no flag, and the view returns to the status list showing the error ([ERRORS.md](ERRORS.md#never-swallow-an-error)). A step is never shown ✓ after an ✗. — fb: 2026-02-15, 2026-03-02
-- ✅ **Continue** resumes at the first incomplete flag, in the section's declared order. **Restart** clears the section's config fields, `clearProgress(section)` and `clearError(section)`, then runs from the first step (`VercelSetupView`'s `handleAction('restart')`). — fb: 2026-02-15
-- ✅ Steps that need a human (connecting GitHub to Railway, pasting a token) always stop and prompt before the step that depends on them, even when the connection looks present: Railway setup throws `GITHUB_SETUP_REQUIRED` until `promptedForGithub` is set, and clears that error once it is. — fb: 2026-03-02
-- ✅ Every provider resource is created in the organization, workspace or team recorded in the project config (selected through `OrgSelector`), never a personal account the CLI happens to be logged into. — fb: 2026-02-15
 
 **Implementation:**
 ```typescript

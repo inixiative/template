@@ -1,5 +1,4 @@
 import { afterEach, describe, expect, it } from 'bun:test';
-import { db } from '@template/db';
 import { type Job, WaitingChildrenError } from 'bullmq';
 import type { CleanStaleDataPayload } from '#/jobs/handlers/cleanStaleData';
 import { makeJob } from '#/jobs/makeJob';
@@ -34,7 +33,7 @@ const flowParent = (token: string | undefined): FlowParent => {
   return job;
 };
 
-const contextFor = (job: Job): WorkerContext => ({ db, queue, job });
+const contextFor = (job: Job): WorkerContext => ({ queue, job });
 
 describe('{ stages, finish } (runJobStages)', () => {
   afterEach(async () => {

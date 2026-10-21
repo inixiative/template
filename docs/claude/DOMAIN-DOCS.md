@@ -158,7 +158,7 @@ Source these from the doc's own Direction sections, from FEATURES.md status mark
 
 Open work an agent cannot use yet, with the ticket or PR, so it neither builds against it nor rebuilds it:
 
-- Session refresh (silent re-authentication, auto-retry on 401) is not implemented — FEATURES.md § Authentication & Sessions (🟡 Session Refresh)
+- Password change and account linking for a signed-in person need JWT-authenticated routes, not built yet — FEATURES.md § Authentication (🟡 Password Change and Account Linking)
 - Cursor (keyset) pagination mode: core landed, signing and the remaining pieces in progress — ticket API-003
 
 - Good: the thing, its state, and the reference that will change when it lands.

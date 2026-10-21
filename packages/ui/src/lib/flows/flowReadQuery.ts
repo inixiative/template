@@ -1,6 +1,7 @@
 /**
  * @atlas
- * @kind factory
+ * @kind constructor
+ * @constructs queryOptions
  * @partOf primitive:flows
  * @uses primitive:sdk
  */

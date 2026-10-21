@@ -5,7 +5,6 @@ import { registerCronJobSyncHook } from '#/hooks/cronJobSync/hook';
 import { registerEmailTemplateSlugReservationHook } from '#/hooks/emailTemplateSlugReservation/hook';
 import { registerEmailVersioningHook } from '#/hooks/emailVersioning/hook';
 import { registerImmutableFieldsHook } from '#/hooks/immutableFields/hook';
-import { registerLastLoginAtHook } from '#/hooks/lastLoginAt/hook';
 import { registerOrderedListHook } from '#/hooks/orderedList/hook';
 import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
 import { registerRuleReferenceTargetHook } from '#/hooks/ruleReference/targetHook';
@@ -29,7 +28,6 @@ export const registerHooks = () => {
   registerContactRulesHook();
   registerCronJobSyncHook();
   registerImmutableFieldsHook();
-  registerLastLoginAtHook();
   registerOrderedListHook();
   registerPreventHardDeleteHook();
   registerRuleReferenceTargetHook();

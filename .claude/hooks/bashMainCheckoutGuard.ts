@@ -39,13 +39,31 @@ const BUN_OPTIONS_WITH_VALUE = new Set([
   '-c',
   '--env-file',
 ]);
-const PASS_THROUGH = new Set(['rtk', 'proxy', 'env', 'command', 'sudo', 'time', 'nohup', 'bunx', 'npx']);
+const PASS_THROUGH = new Set([
+  'rtk',
+  'proxy',
+  'env',
+  'command',
+  'sudo',
+  'time',
+  'nohup',
+  'bunx',
+  'npx',
+  'timeout',
+  'nice',
+  'exec',
+  'xargs',
+  'stdbuf',
+]);
+const SHELLS = new Set(['bash', 'sh', 'zsh']);
 
 export type Landing = {
   command: string;
   directory?: string;
   absolute: boolean;
   lifecycle: boolean;
+  subcommand?: string;
+  args?: string[];
 };
 
 const unquote = (token: string) => token.replace(/^(['"])(.*)\1$/s, '$2');
@@ -81,8 +99,13 @@ const commandWords = (segment: string): string[] => {
     .split(/\s+/)
     .filter(Boolean);
   let start = 0;
-  while (start < words.length && (/^[A-Za-z_]\w*=/.test(words[start]) || PASS_THROUGH.has(basename(words[start]))))
+  let wrapped = false;
+  while (start < words.length) {
+    const word = words[start];
+    if (PASS_THROUGH.has(basename(word))) wrapped = true;
+    else if (!/^[A-Za-z_]\w*=/.test(word) && !(wrapped && /^(-|\d)/.test(word))) break;
     start += 1;
+  }
   return words.slice(start).map((word, i) => (i === 0 ? basename(unquote(unmask(word))) : unmask(word)));
 };
 
@@ -91,11 +114,14 @@ const gitLanding = (words: string[], cursor: Cursor): Omit<Landing, 'command'> |
   let i = 1;
   while (i < words.length && words[i].startsWith('-')) {
     if (words[i] === '-C') here = moveTo(here, words[i + 1]);
+    if (/^--(git-dir|work-tree)/.test(words[i])) here = { absolute: false };
     i += GIT_OPTIONS_WITH_VALUE.has(words[i]) ? 2 : 1;
   }
   const subcommand = words[i];
   if (subcommand === 'worktree' && GIT_WORKTREE_LIFECYCLE.has(words[i + 1] ?? '')) return { ...here, lifecycle: true };
-  return GIT_MUTATING.has(subcommand ?? '') ? { ...here, lifecycle: false } : undefined;
+  return GIT_MUTATING.has(subcommand ?? '')
+    ? { ...here, lifecycle: false, subcommand, args: words.slice(i + 1) }
+    : undefined;
 };
 
 const isPrismaMigrateDev = (words: string[]) => words.join(' ').match(/(^|\s)prisma migrate dev(\s|$)/) !== null;
@@ -125,9 +151,9 @@ const landingOf = (words: string[], cursor: Cursor): Omit<Landing, 'command'> | 
   return words[0] === 'prisma' && isPrismaMigrateDev(words) ? { ...cursor, lifecycle: false } : undefined;
 };
 
-export const landingsIn = (command: string, cwd: string): Landing[] => {
+const walk = (command: string, start: Cursor): Landing[] => {
   const landings: Landing[] = [];
-  let cursor: Cursor = { directory: realOrResolved(cwd), absolute: false };
+  let cursor = start;
   const subshells: Cursor[] = [];
   for (const segment of maskQuoted(withoutHeredocBodies(command)).split(/&&|\|\||[;|\n]/)) {
     const opens = segment.match(/^\s*\(+/)?.[0].trim().length ?? 0;
@@ -139,14 +165,20 @@ export const landingsIn = (command: string, cwd: string): Landing[] => {
         cursor,
         words.find((word, i) => i > 0 && !word.startsWith('-')),
       );
+    } else if (SHELLS.has(words[0] ?? '') && words.includes('-c')) {
+      landings.push(...walk(unquote(words[words.indexOf('-c') + 1] ?? ''), cursor));
     } else {
-      const landing = words.length > 0 ? landingOf(words, cursor) : undefined;
+      const here = /(^|\s)GIT_(DIR|WORK_TREE)=/.test(segment) ? { absolute: false } : cursor;
+      const landing = words.length > 0 ? landingOf(words, here) : undefined;
       if (landing) landings.push({ command: unmask(segment).trim(), ...landing });
     }
     for (let i = 0; i < closes && subshells.length > 0; i += 1) cursor = subshells.pop() as Cursor;
   }
   return landings;
 };
+
+export const landingsIn = (command: string, cwd: string): Landing[] =>
+  walk(command, { directory: realOrResolved(cwd), absolute: false });
 
 type Checkout = { root: string; mainRoot: string };
 

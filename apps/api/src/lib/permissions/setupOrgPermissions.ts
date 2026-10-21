@@ -53,7 +53,7 @@ export const setupOrgPermissions = async (c: Context<AppEnv>) => {
   // No org memberships → nothing to set up
   if (!orgUsers?.length) return;
 
-  // User token or session → all orgs (with token restrictions if present)
+  // User token or person JWT → all orgs (with token restrictions if present)
   for (const orgUser of orgUsers) {
     const orgId = orgUser.organizationId as OrganizationId;
     const role = token

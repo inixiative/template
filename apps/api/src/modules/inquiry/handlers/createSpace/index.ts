@@ -1,4 +1,4 @@
-import type { Db, OrganizationId } from '@template/db';
+import { db, type OrganizationId } from '@template/db';
 import { InquiryResourceModel, InquiryType } from '@template/db/generated/client/enums';
 import {
   baseResolutionInputSchema,
@@ -13,11 +13,7 @@ import { inquiryTerminalStatuses } from '#/modules/inquiry/validations/validateI
 
 type CreateSpaceContent = SpaceContent;
 
-const validate = async (
-  db: Db,
-  inquiry: Partial<Inquiry>,
-  content: CreateSpaceContent,
-): Promise<void> => {
+const validate = async (inquiry: Partial<Inquiry>, content: CreateSpaceContent): Promise<void> => {
   const organizationId = inquiry.sourceOrganizationId as OrganizationId;
   const { slug } = content;
 
@@ -53,7 +49,7 @@ export const createSpaceHandler: InquiryHandler<CreateSpaceContent, CreateSpaceR
   validate,
   autoApprove: async () => false,
 
-  handleApprove: async (db, inquiry, content) => {
+  handleApprove: async (inquiry, content) => {
     const space = await db.space.create({
       data: { ...content, organizationId: inquiry.sourceOrganizationId as OrganizationId },
     });

@@ -7,6 +7,7 @@ Mechanisms for coordinating async operations. Different concerns, different tool
 | Cap parallelism (don't open 1000 DB connections at once) | `getConcurrency` + `ConcurrencyType` | in-process |
 | Run a batch with a concurrency cap, get ordered results | `resolveAll` | in-process |
 | Serialize writes to one resource (no interleaving) | `createSerializedQueue` | in-process |
+| Lock rows you read and then write inside a transaction | `db.findForUpdate` | in-transaction (Postgres row lock) |
 | Only one process owns this resource | `createLock` | cross-process (Redis) |
 | Newest job for a key wins; older ones bow out | `claimLane` / `watchLane` | cross-process (Redis) |
 | Background work yields to foreground work in one shared queue | job lanes (`withLanePriority`) | cross-process (BullMQ priority) |
@@ -135,6 +136,8 @@ try {
 
 Use when multiple processes can race for the same resource (multiple golem instances both wanting to own the same bot session, multiple workers wanting to run a singleton cron, etc.).
 
+**Inside a transaction, release at the end of the transaction, not the critical section.** A lock that guards a check-then-write must stay held until that write commits, or the next holder checks against state from before it. `db.withLockUntilSettled(lockOptions, fn)` holds a `createLock` lock until the open transaction settles, joins a key the transaction already holds instead of waiting on itself, and runs the transaction's own holders of the key one at a time (the lock + serialized-queue pair above, scoped to the transaction). `withOwnerLock` switches to it whenever it runs inside a transaction, which is how a `transactionAll` batch's sub-requests keep the owner lock until the batch commits. See [DATABASE.md](./DATABASE.md#redis-locks-held-until-the-transaction-ends).
+
 ---
 
 ## Supersede Lanes (`claimLane` / `watchLane`)
@@ -181,6 +184,16 @@ stop();
 ```
 
 This is the primitive under both `createLock` (lease renewal) and `watchLane` (usurp polling). Reach for it directly when you need a non-overlapping recurring task you can cleanly stop — prefer it over a bare `setInterval`, which fires regardless of whether the prior async run finished.
+
+---
+
+## Row Locks (`db.findForUpdate`)
+
+The one way to lock rows. `db.findForUpdate(model, where, { upserting? })` runs `SELECT * ... FOR UPDATE` inside `db.txn()`; `upserting: true` also fences a row that does not exist yet. Full contract: [DATABASE.md § Row Locks and Create-If-Missing](./DATABASE.md#row-locks-and-create-if-missing).
+
+**Exclusive only; there is no shared mode.** No `FOR SHARE`, `FOR KEY SHARE` or `LOCK IN SHARE MODE`, in the primitive or around it. The `no-raw-locks` CI rule fails on raw row-lock SQL anywhere but the primitive, and on a shared lock anywhere ([SCRIPTS.md § CI Rule Scripts](./SCRIPTS.md#ci-rule-scripts)).
+
+**Why.** Zealot tried a shared mode and Aron removed it in review ([Zealot-Monorepo #2808](https://github.com/userevidence/Zealot-Monorepo/pull/2808), comment of 2026-10-14). To let parallel creates share an IntegrationMap row while blocking its delete, the PR added a `shared` option to `findForUpdate` that emitted `FOR SHARE` (`84e0a227e`), plus a call-site helper to hold the map. Review bots then found a lock-order deadlock between that shared hold and the identity locks. Each fix opened a new hole. Aron's ruling: drop the fast path, the helper and the `shared` / `FOR SHARE` option, and keep the exclusive upsert. "Letting creates share a map while blocking deletes needs a read/write lock we don't have, and holdLiveMap patches that gap at the call site. With a bigger pool, creates queue on the map row instead of failing, and at this scale that's fine." The shared mode was removed in `7db1fd20e` and never reached Zealot main. The real cause was connection-pool size: the fix was a larger connection_limit and a longer maxWait. So when exclusive locks queue, size the pool. Don't add a lock mode: a shared lock sits beside exclusive ones and creates lock orders nobody reasons about.
 
 ---
 

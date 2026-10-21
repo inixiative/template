@@ -1,0 +1,44 @@
+{
+  "id": "observability-lifecycle",
+  "title": "Logging, telemetry, shutdown",
+  "routing": "Is this about emitting or shipping logs, traces, metrics or errors, or about process start/stop: the log facade (log, withLogContext, logScope, ctx.log in jobs, frontend loggers, redaction), OpenTelemetry (withSpan, recordDuration, incrementCounter, traceJob, captureTraceContext/withRemoteTrace, telemetryMiddleware, telemetryExtension, browser telemetry, OTEL_* settings), the error reporter (Sentry/console), health checks, or graceful shutdown and in-process loops (initGracefulShutdown, onShutdown, sleepUnlessShuttingDown, makeUnrefInterval)?",
+  "concepts": ["logging", "telemetry", "process-lifecycle"],
+  "tokens": 16905,
+  "tokenMethod": "chars/4",
+  "files": {
+    "recognise": {
+      "path": "recognise.md",
+      "tokens": 3105,
+      "experimental": true,
+      "note": "recognise/pick split under test (model round); not the standard"
+    },
+    "knowledge": {
+      "path": "knowledge.md",
+      "tokens": 16905
+    }
+  },
+  "runsAgreed": 3,
+  "sources": {
+    "docs": ["FEATURES.md", "docs/claude/LOGGING.md"],
+    "docUnits": [
+      "doc:docs/claude/LOGGING.md#structured-logging",
+      "doc:docs/claude/LOGGING.md#setup",
+      "doc:docs/claude/LOGGING.md#inspect-locally-without-any-provider",
+      "doc:docs/claude/LOGGING.md#coverage-and-limits",
+      "doc:docs/claude/LOGGING.md#following-an-incident-across-two-services",
+      "doc:FEATURES.md#infrastructure-devops"
+    ],
+    "catalogClusters": [
+      "audit-logging",
+      "dev-setup-scripts",
+      "environment-config",
+      "graceful-shutdown-lifecycle",
+      "observability-telemetry",
+      "structured-logging"
+    ],
+    "codeEntries": 61,
+    "docMembers": 31
+  },
+  "bypassLines": 20,
+  "glossaryTerms": 30
+}

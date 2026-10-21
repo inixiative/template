@@ -1,5 +1,4 @@
-/// BetterAuth Session - required for authentication
-/// Even with JWT/stateless cookies, BetterAuth uses this table
+/// BetterAuth's default Session schema. Session records live in Redis (secondaryStorage); this table is unused.
 model Session {
   id        String   @id @default(dbgenerated("uuidv7()")) @db.VarChar(36)
   userId    String   @db.VarChar(36)

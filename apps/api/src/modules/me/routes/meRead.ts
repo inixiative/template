@@ -10,13 +10,13 @@ import {
   OrganizationUserScalarSchema,
   SpaceScalarSchema,
   SpaceUserScalarSchema,
-  UserScalarSchema,
 } from '@template/db';
 import { readRoute } from '#/lib/routeTemplates';
 import { Modules } from '#/modules/modules';
 import { Tags } from '#/modules/tags';
+import { userResponseSchema } from '#/modules/user/schemas/userResponseSchema';
 
-const responseSchema = UserScalarSchema.extend({
+const responseSchema = userResponseSchema.extend({
   organizationUsers: z.array(OrganizationUserScalarSchema),
   spaceUsers: z.array(SpaceUserScalarSchema),
   organizations: z.array(OrganizationScalarSchema),

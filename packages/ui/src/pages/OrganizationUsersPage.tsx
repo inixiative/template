@@ -5,7 +5,6 @@
  * @uses primitive:sdk
  */
 import { Icon } from '@iconify/react';
-import { useMutation } from '@tanstack/react-query';
 import type { HydratedRecord } from '@template/db';
 import { Role } from '@template/db/generated/client/enums';
 import {
@@ -24,6 +23,7 @@ import {
   useQuery,
   useSectionOpen,
 } from '@template/ui/hooks';
+import { useCreateInquiryMutation } from '@template/ui/hooks/inquiry/useCreateInquiryMutation';
 import { checkPermission } from '@template/ui/hooks/usePermission';
 import { apiMutation } from '@template/ui/lib/apiMutation';
 import { apiQuery } from '@template/ui/lib/apiQuery';
@@ -79,12 +79,7 @@ export const OrganizationUsersPage = ({ organizationId }: OrganizationUsersPageP
     ],
   });
 
-  const inviteMutation = useMutation({
-    mutationFn: apiMutation((vars: Parameters<typeof organizationCreateInquiry>[0]) =>
-      organizationCreateInquiry(vars),
-    ),
-    onSuccess: () => setIsInviteModalOpen(false),
-  });
+  const inviteMutation = useCreateInquiryMutation();
 
   const columns = [
     {
@@ -134,16 +129,29 @@ export const OrganizationUsersPage = ({ organizationId }: OrganizationUsersPageP
   ];
 
   const handleInvite = (email: string, role: string) => {
-    inviteMutation.mutate({
-      path: { id: organizationId },
-      body: {
-        type: 'inviteOrganizationUser',
-        status: 'sent',
-        content: { role },
-        targetModel: 'User',
-        targetEmail: email,
+    inviteMutation.mutate(
+      {
+        inquiry: {
+          type: 'inviteOrganizationUser',
+          sourceOrganizationId: organizationId,
+          sourceSpaceId: null,
+          targetOrganizationId: null,
+        },
+        call: () =>
+          apiMutation(organizationCreateInquiry)({
+            path: { id: organizationId },
+            body: {
+              type: 'inviteOrganizationUser',
+              status: 'sent',
+              content: { role },
+              targetModel: 'User',
+              targetEmail: email,
+            },
+          }),
+        optimisticItem: { type: 'inviteOrganizationUser', status: 'sent', targetEmail: email },
       },
-    });
+      { onSuccess: () => setIsInviteModalOpen(false) },
+    );
   };
 
   const _organization = tenant.context.organization;

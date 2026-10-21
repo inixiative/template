@@ -1,0 +1,50 @@
+{
+  "id": "data-modeling",
+  "title": "Schema conventions and reference data",
+  "routing": "Is this about how the schema is shaped rather than how it is queried: split schema files per model as source of truth, UUIDv7 primary keys and typed model ids (ModelIdType, userId, Typed model IDs), VarChar(36) FKs, createdAt/updatedAt, enum vs row and enum suffix naming, false polymorphism (PolymorphismRegistry / FalsePolymorphismRegistry, getPolymorphismConfig, resolveFalsePolymorphismRef, ownerModel / sourceModel / targetModel / resourceModel, special owner values default and admin), Tag / TagCategory / TagAttachment, or static reference data: COUNTRIES, CURRENCIES, LANGUAGES, TIMEZONE_IDS and their zod schemas and lookups (countryByCode, decimalsFor, symbolFor, callingCodeFor)?",
+  "concepts": ["data-modeling", "reference-data"],
+  "tokens": 11844,
+  "tokenMethod": "chars/4",
+  "files": {
+    "recognise": {
+      "path": "recognise.md",
+      "tokens": 1960,
+      "experimental": true,
+      "note": "recognise/pick split under test (model round); not the standard"
+    },
+    "knowledge": {
+      "path": "knowledge.md",
+      "tokens": 11844
+    }
+  },
+  "runsAgreed": 0,
+  "sources": {
+    "docs": ["FEATURES.md", "docs/claude/DATABASE.md", "docs/claude/HOOKS.md"],
+    "docUnits": [
+      "doc:docs/claude/DATABASE.md#prisma",
+      "doc:docs/claude/DATABASE.md#schema-conventions",
+      "doc:docs/claude/DATABASE.md#typed-model-ids",
+      "doc:docs/claude/DATABASE.md#false-polymorphism",
+      "doc:docs/claude/DATABASE.md#registries",
+      "doc:docs/claude/DATABASE.md#schema-reference",
+      "doc:docs/claude/HOOKS.md#false-polymorphism",
+      "doc:FEATURES.md#database-orm"
+    ],
+    "catalogClusters": [
+      "contact-channel-definitions",
+      "data-models",
+      "documentation-process",
+      "email-composition-rendering",
+      "integrations-records",
+      "naming-vocabulary",
+      "prisma-schema-introspection",
+      "request-response-schemas",
+      "segments-membership",
+      "superadmin-operations"
+    ],
+    "codeEntries": 50,
+    "docMembers": 12
+  },
+  "bypassLines": 21,
+  "glossaryTerms": 13
+}

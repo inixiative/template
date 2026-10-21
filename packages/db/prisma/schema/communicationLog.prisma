@@ -33,7 +33,7 @@ model CommunicationLog {
   // Typed render issues the send proceeded past (the registry entry opted into degrade). Null = clean.
   renderIssues Json?
 
-  idempotencyKey    String    @unique
+  idempotencyKey    String                   @unique
   providerMessageId String?
   error             String?
   reasonCode        CommunicationReasonCode?

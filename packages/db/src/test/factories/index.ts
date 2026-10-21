@@ -1,6 +1,8 @@
 export * from './accountFactory';
+export * from './appEventFactory';
 export * from './auditLogFactory';
 export * from './authProviderFactory';
+export * from './communicationComponentVersionFactory';
 export * from './communicationLogFactory';
 export * from './contactFactory';
 export * from './cronJobFactory';
@@ -12,6 +14,7 @@ export * from './inquiryFactory';
 export * from './integrationFactory';
 export * from './integrationRecordFactory';
 export * from './jobOutboxFactory';
+export * from './jwksFactory';
 export * from './organizationFactory';
 export * from './organizationUserFactory';
 export * from './ruleReferenceFactory';
