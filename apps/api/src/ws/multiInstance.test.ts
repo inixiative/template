@@ -44,7 +44,7 @@ describe('ws data streams across API instances (real Redis, one process per inst
       cluster.instance('api-b'),
       cluster.instance('worker', { subscribes: false }),
     ]);
-  }, 30_000);
+  }, 120_000);
 
   afterAll(() => cluster?.stop());
 
@@ -109,10 +109,9 @@ describe('ws data streams across API instances (real Redis, one process per inst
       apiB.send({ op: 'hold', connectionId: 'b-reconnect', stream }),
     ]);
 
-    const dropped = apiA.send({ op: 'dropSubscriber', downMs: 500 });
-    await Bun.sleep(100);
+    await apiA.send({ op: 'dropSubscriber', downMs: 500 });
     await apiB.send({ op: 'append', stream, ids: ids('during-outage', 5) });
-    await dropped;
+    await apiA.send({ op: 'awaitSubscriber' });
 
     const aFrames = await waitForFrames(apiA, 'a-reconnect', 1);
     expect(aFrames).toEqual([{ type: 'resync', stream }]);
@@ -121,21 +120,28 @@ describe('ws data streams across API instances (real Redis, one process per inst
     expectContiguous(appendSeqs(bFrames));
   }, 30_000);
 
-  it('an append Redis cannot sequence resyncs that stream on every instance', async () => {
-    const stream = `unsequenced:${crypto.randomUUID()}`;
-    await Promise.all([
-      apiA.send({ op: 'hold', connectionId: 'a-unsequenced', stream }),
-      apiB.send({ op: 'hold', connectionId: 'b-unsequenced', stream }),
-    ]);
+  it.each([
+    ['the instance holding the stream', () => apiA],
+    ['a worker with no sockets', () => worker],
+  ])(
+    'an append Redis cannot sequence on %s resyncs that stream on every instance',
+    async (_, origin) => {
+      const stream = `unsequenced:${crypto.randomUUID()}`;
+      await Promise.all([
+        apiA.send({ op: 'hold', connectionId: `a-${stream}`, stream }),
+        apiB.send({ op: 'hold', connectionId: `b-${stream}`, stream }),
+      ]);
 
-    await worker.send({ op: 'failAppends', count: 1 });
-    await worker.send({ op: 'append', stream, ids: ['lost'] });
+      await origin().send({ op: 'failAppends', count: 1 });
+      await origin().send({ op: 'append', stream, ids: ['lost'] });
 
-    const [aFrames, bFrames] = await Promise.all([
-      waitForFrames(apiA, 'a-unsequenced', 1),
-      waitForFrames(apiB, 'b-unsequenced', 1),
-    ]);
-    expect(aFrames).toEqual([{ type: 'resync', stream }]);
-    expect(bFrames).toEqual([{ type: 'resync', stream }]);
-  }, 30_000);
+      const [aFrames, bFrames] = await Promise.all([
+        waitForFrames(apiA, `a-${stream}`, 1),
+        waitForFrames(apiB, `b-${stream}`, 1),
+      ]);
+      expect(aFrames).toEqual([{ type: 'resync', stream }]);
+      expect(bFrames).toEqual([{ type: 'resync', stream }]);
+    },
+    30_000,
+  );
 });

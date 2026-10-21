@@ -55,6 +55,8 @@ Tests use the in-memory Redis mock, so one process stands in for every instance.
 only exists across processes (shared counters, one subscriber per instance) runs through
 `startWsCluster` (`apps/api/tests/wsInstance/`): it starts a throwaway `redis:7-alpine` container
 and spawns each instance as its own `bun` process. Those tests need Docker and fail without it.
+The container is labelled with the test run's pid; a later run removes any whose run has died, so
+an interrupted run leaves nothing behind.
 
 ### Environment Composition
 
