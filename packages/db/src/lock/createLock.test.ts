@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { createLock } from '@template/db/lock/createLock';
+import { LockLostError } from '@template/db/lock/lockLostError';
 import { maxSafeHeartbeatMs } from '@template/db/lock/maxSafeHeartbeatMs';
 import type { LockRedis } from '@template/db/lock/types';
 import { getRedisClient } from '@template/db/redis/client';
@@ -304,6 +305,17 @@ describe('createLock', () => {
       expect(await acquiring).toBe(true);
       expect(lock.isWithinLease()).toBe(false);
       await lock.release();
+    });
+  });
+
+  describe('assertHeld', () => {
+    it('passes while the lease holds and throws LockLostError once it is gone', async () => {
+      const lock = createLock({ service: 's', identifier: newId(), ...fastOpts });
+      expect(() => lock.assertHeld()).toThrow(LockLostError);
+      await lock.acquire();
+      expect(() => lock.assertHeld()).not.toThrow();
+      await lock.release();
+      expect(() => lock.assertHeld()).toThrow(LockLostError);
     });
   });
 

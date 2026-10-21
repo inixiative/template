@@ -10,11 +10,10 @@ import type { CronJob } from '@template/db/generated/client/client';
 import { ConcurrencyType } from '@template/shared/utils';
 import { queue } from '#/jobs/queue';
 import { withCronJobsLock } from '#/jobs/withCronJobsLock';
-import { makeError } from '#/lib/errors';
 
 const removeSchedulerBeforeDelete = (jobId: string): Promise<void> =>
-  withCronJobsLock(async (assertHeld) => {
-    assertHeld();
+  withCronJobsLock(async (lock) => {
+    lock.assertHeld();
     await queue.removeJobScheduler(jobId);
   });
 
@@ -26,7 +25,9 @@ export const registerCronJobSyncHook = () => {
     [DbAction.create, DbAction.update, DbAction.upsert, DbAction.delete],
     async (options: HookOptions) => {
       // Lazy: the handler registry imports handlers that emit through hooks — a static import cycles.
-      const { cronJobScheduleProblem } = await import('#/jobs/cronJobScheduleProblem');
+      const { validateCronJob } = await import(
+        '#/modules/admin/cronJob/validations/validateCronJob'
+      );
       const { syncCronJobScheduler } = await import('#/jobs/syncCronJobScheduler');
       const previous = (options.previous ?? null) as CronJob | null;
 
@@ -41,8 +42,7 @@ export const registerCronJobSyncHook = () => {
       }
 
       const current = options.result as CronJob;
-      const problem = current.enabled ? cronJobScheduleProblem(current) : undefined;
-      if (problem) throw makeError({ status: 422, message: problem });
+      if (current.enabled) validateCronJob(current);
       db.onCommit([() => syncCronJobScheduler(current.id, previous?.jobId)], ConcurrencyType.queue);
     },
   );

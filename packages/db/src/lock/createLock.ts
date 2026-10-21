@@ -12,6 +12,7 @@
 //     completing is microseconds but non-zero. For exactly-once semantics, fence at the resource.
 import { createClaim } from '@template/db/lock/createClaim';
 import { lockKeyOf } from '@template/db/lock/lockKeyOf';
+import { LockLostError } from '@template/db/lock/lockLostError';
 import { fencedDelete } from '@template/db/lock/queries/fencedDelete';
 import { fencedRefresh } from '@template/db/lock/queries/fencedRefresh';
 import type {
@@ -173,6 +174,10 @@ const createRenewingLock = (opts: LockOptions, redis: LockRedis, key: string): L
     return true;
   };
 
+  const assertHeld = (): void => {
+    if (!isWithinLease()) throw new LockLostError(key);
+  };
+
   // Always attempts the fenced delete, once, after the critical section — the only place the
   // key is ever deleted.
   const release = async (): Promise<LockReleaseResult> => {
@@ -181,5 +186,5 @@ const createRenewingLock = (opts: LockOptions, redis: LockRedis, key: string): L
     return compareAndDelete();
   };
 
-  return { acquire, verify, release, isWithinLease };
+  return { acquire, verify, release, isWithinLease, assertHeld };
 };

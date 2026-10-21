@@ -73,15 +73,22 @@ describe('registerCronJobs reconciles the schedulers with the enabled rows', () 
     expect(turnedOff).toEqual([{ enabled: false }, { enabled: false }]);
   });
 
-  it('keeps a row whose upsert fails in the live set, so its existing scheduler survives', async () => {
+  it('throws before the sweep when an upsert fails, so a working legacy repeatable stays', async () => {
     const cronJob = await createScheduledCronJob();
+    await jobs.realQueue.removeJobScheduler(cronJob.jobId);
+    const legacy = await jobs.realQueue.add(
+      handler,
+      {},
+      { repeat: { pattern: patterns[0], jobId: cronJob.jobId } },
+    );
     jobs.upsertJobScheduler.mockImplementationOnce(() =>
       Promise.reject(new Error('Redis unavailable')),
     );
 
-    await registerCronJobs();
+    await expect(registerCronJobs()).rejects.toThrow('Redis unavailable');
 
-    expect(await jobs.schedulerOf(cronJob.jobId)).toEqual({ name: handler, pattern: patterns[0] });
+    const keys = (await jobs.realQueue.getJobSchedulers()).map((scheduler) => scheduler.key);
+    expect(keys).toContain(legacy.repeatJobKey as string);
   });
 
   it('does not touch the schedulers while an admin write holds the cron-jobs lock', async () => {

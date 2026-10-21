@@ -41,6 +41,7 @@ export {
   createLock,
   FindForUpdateLockTimeoutError,
   type Lock,
+  LockLostError,
   type LockLostReason,
   type LockOptions,
   type LockRedis,

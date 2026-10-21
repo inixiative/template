@@ -46,6 +46,7 @@ export type Lock = {
   verify: () => Promise<boolean>;
   release: () => Promise<LockReleaseResult>;
   isWithinLease: () => boolean;
+  assertHeld: () => void;
 };
 
 export type Claim = {
