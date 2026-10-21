@@ -51,6 +51,7 @@ export {
 // Redis client and cache utilities
 export {
   type CacheCheck,
+  COMMAND_TIMEOUT_MS,
   cache,
   cacheKey,
   checkCache,

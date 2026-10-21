@@ -67,6 +67,7 @@ describe('createLock', () => {
       expect(maxSafeHeartbeatMs({ ttlMs: 300_000, maxMissed: 2, commandTimeoutMs: 5_000 })).toBe(
         93_333,
       );
+      expect(maxSafeHeartbeatMs({ ttlMs: 30_000 })).toBe(7_499);
       expect(() => maxSafeHeartbeatMs({ ttlMs: 10_000, commandTimeoutMs: 5_000 })).toThrow(
         'createLock: ttlMs 10000 leaves no room for a heartbeat with a 5000 ms command timeout',
       );

@@ -4,14 +4,15 @@
  * @partOf primitive:jobs, feature:cronJob, mutex
  * @uses infrastructure:redis
  */
-import { createLock, type Lock } from '@template/db';
+import { createLock, type Lock, maxSafeHeartbeatMs } from '@template/db';
 import { makeError } from '#/lib/errors';
 
+const CRON_JOBS_LOCK_TTL_MS = 30_000;
 const CRON_JOBS_LOCK = {
   service: 'cronJobs',
   identifier: 'schedulers',
-  ttlMs: 30_000,
-  heartbeatMs: 10_000,
+  ttlMs: CRON_JOBS_LOCK_TTL_MS,
+  heartbeatMs: maxSafeHeartbeatMs({ ttlMs: CRON_JOBS_LOCK_TTL_MS }),
 };
 export const CRON_JOBS_ADMIN_WAIT_MS = 5_000;
 

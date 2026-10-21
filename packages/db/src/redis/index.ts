@@ -8,6 +8,7 @@ export {
   upsertCache,
 } from './cache';
 export {
+  COMMAND_TIMEOUT_MS,
   createRedisConnection,
   flushRedis,
   getRedisClient,
