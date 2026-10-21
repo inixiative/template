@@ -1,6 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
-import { OpenAPIHono } from '@hono/zod-openapi';
 import { cacheKey, db, fetchOne, getRedisClient, unregisterDbHook } from '@template/db';
 import type {
   Organization,
@@ -22,8 +21,7 @@ import {
 import { app } from '#/app';
 import { registerClearCacheHook } from '#/hooks/cache/hook';
 import { tokenAuthMiddleware } from '#/middleware/auth/tokenAuthMiddleware';
-import { prepareRequest } from '#/middleware/prepareRequest';
-import type { AppEnv } from '#/types/appEnv';
+import { createTestApp } from '#tests/createTestApp';
 
 // Membership and user changes reach the next request through the cache hooks the app registers.
 beforeAll(() => registerClearCacheHook());
@@ -78,16 +76,20 @@ const spaceUserToken = async (spaceUser: SpaceUser) => {
 
 const readMe = (headers: Record<string, string>) => app.request('/api/v1/me', { headers });
 
-const tokenApp = new OpenAPIHono<AppEnv>();
-tokenApp.use('*', prepareRequest);
-tokenApp.use('*', tokenAuthMiddleware);
-tokenApp.get('/echo', (c) =>
-  c.json({
-    tokenId: c.get('token')?.id ?? null,
-    organizationUsers: c.get('organizationUsers') ?? [],
-    spaces: c.get('spaces') ?? [],
-  }),
-);
+const { app: tokenApp } = createTestApp({
+  mount: [
+    (app) => {
+      app.use('*', tokenAuthMiddleware);
+      app.get('/echo', (c) =>
+        c.json({
+          tokenId: c.get('token')?.id ?? null,
+          organizationUsers: c.get('organizationUsers') ?? [],
+          spaces: c.get('spaces') ?? [],
+        }),
+      );
+    },
+  ],
+});
 
 const authenticatedTokenId = async (headers: Record<string, string>) => {
   const response = await tokenApp.request('/echo', { headers });

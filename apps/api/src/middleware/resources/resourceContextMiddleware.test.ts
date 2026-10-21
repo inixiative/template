@@ -1,5 +1,4 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { OpenAPIHono } from '@hono/zod-openapi';
 import { CronJobScalarSchema, OrganizationScalarSchema } from '@template/db';
 import type { CronJob, Organization, User } from '@template/db/generated/client/client';
 import {
@@ -13,7 +12,6 @@ import { readRoute, updateRoute } from '#/lib/routeTemplates';
 import { makeController } from '#/lib/utils/makeController';
 import { validateSuperadmin } from '#/middleware/validations/validateSuperadmin';
 import { Modules } from '#/modules/modules';
-import type { AppEnv } from '#/types/appEnv';
 import { createTestApp, type MountFn } from '#tests/createTestApp';
 import { get, json, patch } from '#tests/utils/request';
 
@@ -73,22 +71,16 @@ const orgReviveController = makeController(orgReviveRoute, async (c, respond) =>
 });
 
 const mountRoutes: MountFn = (app) => {
-  const orgRouter = new OpenAPIHono<AppEnv>();
+  const orgRouter = app.basePath('/api/v1/organization');
   orgRouter.openapi(orgReadRoute, orgReadController);
   orgRouter.openapi(orgHistoryRoute, orgHistoryController);
   orgRouter.openapi(orgReviveRoute, orgReviveController);
-  app.route('/api/v1/organization', orgRouter);
 
-  const cronJobRouter = new OpenAPIHono<AppEnv>();
-  cronJobRouter.openapi(cronJobReadRoute, cronJobReadController);
-  app.route('/api/v1/cronJob', cronJobRouter);
+  app.basePath('/api/v1/cronJob').openapi(cronJobReadRoute, cronJobReadController);
 
-  const adminOrgRouter = new OpenAPIHono<AppEnv>();
-  adminOrgRouter.openapi(orgReadRoute, orgReadController);
-  const adminRouter = new OpenAPIHono<AppEnv>();
+  const adminRouter = app.basePath('/api/admin');
   adminRouter.use('*', validateSuperadmin);
-  adminRouter.route('/organization', adminOrgRouter);
-  app.route('/api/admin', adminRouter);
+  adminRouter.basePath('/organization').openapi(orgReadRoute, orgReadController);
 };
 
 describe('resourceContextMiddleware', () => {

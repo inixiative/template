@@ -1,24 +1,17 @@
 import { afterAll, describe, expect, it } from 'bun:test';
-import { OpenAPIHono } from '@hono/zod-openapi';
 import { db } from '@template/db';
 import type { Token, User } from '@template/db/generated/client/client';
 import { cleanupTouchedTables, createToken, createUser } from '@template/db/test';
 import type { TokenWithRelations } from '#/lib/context/types';
-import { prepareRequest } from '#/middleware/prepareRequest';
 import { validateNotToken } from '#/middleware/validations/validateNotToken';
-import type { AppEnv } from '#/types/appEnv';
+import { createTestApp } from '#tests/createTestApp';
 
-const buildApp = (initial: { user?: User; token?: Token } = {}) => {
-  const app = new OpenAPIHono<AppEnv>();
-  app.use('*', prepareRequest);
-  app.use('*', async (c, next) => {
-    if (initial.user) c.set('user', initial.user);
-    if (initial.token) c.set('token', initial.token as TokenWithRelations);
-    await next();
+const buildApp = (initial: { user?: User; token?: Token } = {}) =>
+  createTestApp({
+    mockUser: initial.user,
+    mockToken: initial.token as TokenWithRelations | undefined,
+    mount: [(app) => app.get('/protected', validateNotToken, (c) => c.json({ ok: true }))],
   });
-  app.get('/protected', validateNotToken, (c) => c.json({ ok: true }));
-  return app;
-};
 
 describe('validateNotToken', () => {
   afterAll(async () => {
