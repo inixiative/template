@@ -214,7 +214,7 @@ Business logic NEVER calls email, SMS, analytics, or notification services direc
 - Secrets: encrypted at rest; never returned in API responses.
 - Type safety: avoid `any`; import canonical types from source modules.
 - **A catch that doesn't rethrow is a bug unless it acts on the failure.** Logging and carrying on is not acting: it hides the failure from the error boundary and from your caller, and the next step runs on a broken state. Acting means a state change the caller needs — turning off a row that failed validation, translating a library's plain `Error` into a `makeError`. Cleanup runs in `finally`, never in a `catch` that swallows. If you can't name the action, don't catch; let it fail. Never wrap a call in try/catch, or chain `.catch(log)`, just to log it.
-- **Validators throw.** A `validateX` throws `makeError` (or a domain error); it never returns a problem string or `undefined` for the caller to inspect. A caller that must survive a bad record — a boot-time reconcile turning the row off — catches it at that one site.
+- **Validators throw.** A validator throws `makeError` (or a domain error); it never returns a problem string or `undefined` for the caller to inspect. A caller that must survive a bad record — a boot-time reconcile turning the row off — catches it at that one site.
 - **Check once, at the entry point.** Validate in the validator the controller, hook or job entry runs; the services below trust their input instead of re-checking the same fact. Duplicated checks drift apart and leave you unsure which one is load-bearing.
 
 Top-tier feature bar (auth/permissions/CRUD/nav/forms/notifications/settings):
