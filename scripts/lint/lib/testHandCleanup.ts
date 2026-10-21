@@ -2,7 +2,7 @@
 // Finds row cleanup in test cleanup hooks (beforeEach/afterEach/afterAll, test.afterEach included) by
 // parsing each file, so comments never match and a delete that is the subject of a test body is outside
 // every hook. A hook passed a function by name, or calling a helper, is judged by that function.
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import ts from 'typescript';
 
@@ -60,14 +60,39 @@ const calleeName = (callee: ts.Expression): string | undefined => {
   return undefined;
 };
 
-const resolveRelative = (from: string, specifier: string): string | undefined => {
-  const base = resolve(dirname(from), specifier);
-  return [base, `${base}.ts`, `${base}.tsx`, join(base, 'index.ts')].find(
-    (candidate) => /\.tsx?$/.test(candidate) && existsSync(candidate),
-  );
+const compilerOptionsByConfig = new Map<string, ts.CompilerOptions>();
+
+const compilerOptionsFor = (file: string): ts.CompilerOptions => {
+  const config = ts.findConfigFile(dirname(file), ts.sys.fileExists);
+  if (!config) return {};
+  const cached = compilerOptionsByConfig.get(config);
+  if (cached) return cached;
+  const { config: raw } = ts.readConfigFile(config, ts.sys.readFile);
+  const { options } = ts.parseJsonConfigFileContent(raw, ts.sys, dirname(config));
+  compilerOptionsByConfig.set(config, options);
+  return options;
 };
 
-// A name resolves to the function bound to it in the same file, or to a named relative import.
+// The rule polices test code deleting rows; production code deleting rows is doing its job, and a hook
+// that registers a db hook must not be judged by what that db hook does later.
+const TEST_CODE = /\.test\.tsx?$|(^|\/)tests?\//;
+
+// Resolved the way the compiler does (nearest tsconfig's paths), so @template/* aliases land on the same
+// file a relative import would. Only test code is followed.
+const resolveImport = (from: string, specifier: string): string | undefined => {
+  const { resolvedModule } = ts.resolveModuleName(
+    specifier,
+    from,
+    compilerOptionsFor(from),
+    ts.sys,
+  );
+  const file = resolvedModule?.resolvedFileName;
+  if (!file || !TEST_CODE.test(file) || file.includes('/node_modules/') || !/\.tsx?$/.test(file))
+    return undefined;
+  return file;
+};
+
+// A name resolves to the function bound to it in the same file, or to a named import.
 const findDeclaration = (source: ts.SourceFile, name: string): Declaration | undefined => {
   let found: Declaration | undefined;
   let imported: { file: string; name: string } | undefined;
@@ -88,11 +113,10 @@ const findDeclaration = (source: ts.SourceFile, name: string): Declaration | und
       return;
     }
     if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
-      const specifier = node.moduleSpecifier.text;
       const bindings = node.importClause?.namedBindings;
-      if (specifier.startsWith('.') && bindings && ts.isNamedImports(bindings)) {
+      if (bindings && ts.isNamedImports(bindings)) {
         const binding = bindings.elements.find((element) => element.name.text === name);
-        const file = binding && resolveRelative(source.fileName, specifier);
+        const file = binding && resolveImport(source.fileName, node.moduleSpecifier.text);
         if (binding && file) imported = { file, name: (binding.propertyName ?? binding.name).text };
       }
     }
@@ -109,7 +133,7 @@ const scanForCleanup = (
   delegates: Set<string>,
   visited: Set<ts.Node>,
 ): { node: ts.Node; source: ts.SourceFile } | undefined => {
-  if (visited.has(start.node) || start.source.fileName === TRACKER) return undefined;
+  if (visited.has(start.node) || resolve(start.source.fileName) === TRACKER) return undefined;
   visited.add(start.node);
 
   const { source } = start;

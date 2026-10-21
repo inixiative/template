@@ -33,6 +33,34 @@ describe('modelDelegates', () => {
 });
 
 describe('findHandCleanup', () => {
+  test('follows a helper imported through a tsconfig path alias', () => {
+    fs.mkdirSync(path.join(sandbox, 'test'));
+    fs.writeFileSync(
+      path.join(sandbox, 'tsconfig.json'),
+      JSON.stringify({ compilerOptions: { baseUrl: '.', paths: { '@helpers/*': ['test/*'] } } }),
+    );
+    write(
+      'export const clearRows = async () => {\n  await db.emailTemplate.deleteMany({});\n};\n',
+      'test/clearRows.ts',
+    );
+    const file = write(
+      "import { clearRows } from '@helpers/clearRows';\n\nbeforeEach(async () => {\n  await clearRows();\n});\n",
+    );
+    expect(findHandCleanup(file, delegates)).toHaveLength(1);
+  });
+
+  test('does not follow into production code', () => {
+    fs.mkdirSync(path.join(sandbox, 'hooks'));
+    write(
+      "export const registerHook = () => {\n  registerDbHook('x', 'EmailTemplate', 'after', ['delete'], async () => {\n    await db.emailTemplate.deleteMany({});\n  });\n};\n",
+      'hooks/registerHook.ts',
+    );
+    const file = write(
+      "import { registerHook } from './hooks/registerHook';\n\nbeforeEach(() => {\n  registerHook();\n});\n",
+    );
+    expect(findHandCleanup(file, delegates)).toEqual([]);
+  });
+
   test('ignores a delete that only appears in a comment', () => {
     const file = write(
       'afterEach(async () => {\n  // await db.emailTemplate.deleteMany({});\n  /* db.organizationUser.delete() */\n  await cleanupTouchedTables();\n});\n',
