@@ -49,8 +49,10 @@ export {
 } from './lock';
 // Redis client and cache utilities
 export {
+  type CacheCheck,
   cache,
   cacheKey,
+  checkCache,
   clearKey,
   createRedisConnection,
   flushRedis,
@@ -68,11 +70,17 @@ export {
   ROLLING_CACHE_LEAF_ATTEMPTS,
   ROLLING_CACHE_TICK_SECONDS,
   type RollingCache,
+  type RollingCacheComputeContext,
   type RollingCacheConfig,
   type RollingCacheFindManyArgs,
+  type RollingCacheResultParams,
+  type RollingCacheResults,
   type RollingCacheTarget,
   type RollingCacheTargets,
+  type RollingCacheValue,
+  type RollingCacheWrite,
   redisNamespace,
+  singleFlightLock,
   unregisterRollingCache,
   upsertCache,
 } from './redis';
