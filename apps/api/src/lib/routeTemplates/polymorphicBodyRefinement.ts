@@ -12,7 +12,7 @@ import {
   polymorphicAxis,
   polymorphicSchema,
 } from '@template/db';
-import { pick } from 'lodash-es';
+import { isNil, omitBy, pick } from 'lodash-es';
 import type { z } from 'zod';
 
 type PolymorphicBodyRefinementOptions<
@@ -35,7 +35,7 @@ export const polymorphicBodyRefinement = <
   const axisColumns = [axisField, ...Object.values(polymorphicAxis(model, axisField).fkMap).flat()];
 
   return (body: Record<string, unknown>, ctx: z.RefinementCtx) => {
-    const result = schema.safeParse(pick(body, axisColumns));
+    const result = schema.safeParse(omitBy(pick(body, axisColumns), isNil));
     if (!result.success) for (const issue of result.error.issues) ctx.addIssue({ ...issue });
   };
 };

@@ -1,13 +1,12 @@
 import { afterAll, describe, expect, it } from 'bun:test';
-import { OpenAPIHono, z } from '@hono/zod-openapi';
+import { z } from '@hono/zod-openapi';
 import { db } from '@template/db';
 import { cleanupTouchedTables, createUser } from '@template/db/test';
 import { app as productionApp } from '#/app';
 import { validationDefaultHook } from '#/lib/openapi/validationDefaultHook';
 import { actionRoute, readRoute } from '#/lib/routeTemplates';
 import { Modules } from '#/modules/modules';
-import type { AppEnv } from '#/types/appEnv';
-import { createTestApp } from '#tests/createTestApp';
+import { createTestApp, type MountFn } from '#tests/createTestApp';
 import { createBearerToken } from '#tests/utils/createBearerToken';
 import { get, jsonError, post } from '#tests/utils/request';
 
@@ -28,7 +27,7 @@ const queryProbeRoute = readRoute({
   responseSchema: probeResponse,
 });
 
-const mountProbes = (router: OpenAPIHono<AppEnv>) => {
+const mountProbes: MountFn = (router) => {
   router.openapi(bodyProbeRoute, (c) => c.json({ data: { accepted: true } }, 200));
   router.openapi(queryProbeRoute, (c) => c.json({ data: { accepted: true } }, 200));
 };
@@ -88,25 +87,5 @@ describe('validationDefaultHook', () => {
     const { fetch } = createTestApp({ mount: [mountProbes] });
 
     await expectValidationEnvelope(await fetch(get('/?email=nope')));
-  });
-
-  it('reaches routes registered on sub-apps mounted two levels below the root', async () => {
-    const inner = new OpenAPIHono<AppEnv>();
-    mountProbes(inner);
-    const outer = new OpenAPIHono<AppEnv>();
-    outer.route('/inner', inner);
-    const { fetch } = createTestApp({ mount: [(root) => root.route('/outer', outer)] });
-
-    await expectValidationEnvelope(await fetch(post('/outer/inner/probeBody', { email: 'nope' })));
-  });
-
-  it('leaves a router that is never mounted under a hooked root on the library default', async () => {
-    const unmounted = new OpenAPIHono<AppEnv>();
-    mountProbes(unmounted);
-
-    const response = await unmounted.request(post('/probeBody', { email: 'nope' }));
-
-    expect(response.status).toBe(400);
-    expect(await response.json()).toMatchObject({ success: false });
   });
 });

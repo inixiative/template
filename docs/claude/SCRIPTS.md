@@ -260,6 +260,9 @@ Each `pass`/`fail` folder can contain one or more case subfolders (run alphabeti
 - Fails on Vitest dependencies in `package.json`
 - Fails on Vitest imports in source and tests
 
+**no-bare-test-app.sh:**
+- Fails on `new OpenAPIHono` / `new Hono` in any `*.test.ts(x)`; tests mount routes and middleware through `createTestApp`, so a response carries the production validation hook, error envelope and request context
+
 **doc-freshness.sh:**
 - Fails when `docs/claude/**`, `AI/ENTRYPOINT.md`, `FEATURES.md` or `apps/*/CLAUDE.md` names a repo path that doesn't exist, a `path:line` / `path#La-Lb` past the end of the file, a `<doc>.md#<heading>` with no such heading, or a backticked camelCase/PascalCase name that appears nowhere in the code (comments don't count)
 - Skips fenced code and sections headed "Under construction" or "Migrations in progress"
