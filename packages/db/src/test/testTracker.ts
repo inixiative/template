@@ -37,8 +37,10 @@ export const cleanupTouchedTables = async (db: Db) => {
 
   // Mock-model tests register names that have no table.
   const tables = Array.from(touchedTables).filter(isModelName);
-  touchedTables.clear();
-  if (!tables.length) return;
+  if (!tables.length) {
+    touchedTables.clear();
+    return;
+  }
 
   // One transaction: SET LOCAL pins the FK bypass to this connection and ends with it. Every write is
   // tracked (nested writes are refused), so DELETE needs no CASCADE, and it is far cheaper than TRUNCATE.
@@ -46,6 +48,8 @@ export const cleanupTouchedTables = async (db: Db) => {
     await tx.$executeRawUnsafe(`SET LOCAL session_replication_role = 'replica'`);
     await tx.$executeRawUnsafe(tables.map((table) => `DELETE FROM "${table}"`).join('; '));
   });
+  // Forget the tables only once the delete commits, so a rolled-back cleanup is retried next time.
+  touchedTables.clear();
 };
 
 export const resetTouchedTables = () => {
