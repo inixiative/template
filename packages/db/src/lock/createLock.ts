@@ -60,6 +60,9 @@ const createRenewingLock = (opts: LockOptions, redis: LockRedis, key: string): L
   let missed = 0;
   let hasDeclaredLoss = false;
   let hasReleased = false;
+  let hasAcquired = false;
+  let hasLostLease = false;
+  let leaseValidUntil = 0;
 
   const stopHeartbeat = () => {
     stop?.();
@@ -104,6 +107,7 @@ const createRenewingLock = (opts: LockOptions, redis: LockRedis, key: string): L
   // loss at once, and the heartbeat stops because there is nothing left to refresh.
   const tick = async () => {
     let renewed: unknown;
+    const sentAt = performance.now();
     try {
       renewed = await fencedRefresh(redis, key, processId, ttlMs);
     } catch (err) {
@@ -114,6 +118,7 @@ const createRenewingLock = (opts: LockOptions, redis: LockRedis, key: string): L
     }
     if (renewed === 1) {
       missed = 0;
+      leaseValidUntil = sentAt + ttlMs;
       return;
     }
     stopHeartbeat();
@@ -121,8 +126,11 @@ const createRenewingLock = (opts: LockOptions, redis: LockRedis, key: string): L
   };
 
   const tryAcquire = async (): Promise<boolean> => {
+    const sentAt = performance.now();
     const result = await redis.set(key, processId, 'PX', ttlMs, 'NX');
     if (result !== 'OK') return false;
+    hasAcquired = true;
+    leaseValidUntil = sentAt + ttlMs;
     stop = heartbeat(tick, heartbeatMs, {
       onError: (err) => log.error(`Lock heartbeat error: ${key}`, err),
     });
@@ -155,6 +163,16 @@ const createRenewingLock = (opts: LockOptions, redis: LockRedis, key: string): L
     return current === processId;
   };
 
+  // Timed from each SET/refresh send so a late reply never extends it; once lapsed it stays lapsed.
+  const isWithinLease = (): boolean => {
+    if (!hasAcquired || hasLostLease) return false;
+    if (hasReleased || hasDeclaredLoss || performance.now() >= leaseValidUntil) {
+      hasLostLease = true;
+      return false;
+    }
+    return true;
+  };
+
   // Always attempts the fenced delete, once, after the critical section — the only place the
   // key is ever deleted.
   const release = async (): Promise<LockReleaseResult> => {
@@ -163,5 +181,5 @@ const createRenewingLock = (opts: LockOptions, redis: LockRedis, key: string): L
     return compareAndDelete();
   };
 
-  return { acquire, verify, release };
+  return { acquire, verify, release, isWithinLease };
 };

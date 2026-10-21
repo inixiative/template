@@ -8,46 +8,15 @@ import type { HookOptions } from '@template/db';
 import { DbAction, db, HookTiming, registerDbHook } from '@template/db';
 import type { CronJob } from '@template/db/generated/client/client';
 import { ConcurrencyType } from '@template/shared/utils';
-import { isEqual, pick } from 'lodash-es';
-import { buildJobData } from '#/jobs/buildJobData';
-import { withLanePriority } from '#/jobs/lanePriority';
 import { queue } from '#/jobs/queue';
-import { JobType } from '#/jobs/types';
+import { withCronJobsLock } from '#/jobs/withCronJobsLock';
+import { makeError } from '#/lib/errors';
 
-// Reflect CronJob row changes into BullMQ so admin edits apply without a worker
-// restart. Runs after commit via db.onCommit — if BullMQ work fails, the DB
-// write isn't poisoned (per webhooks / cache hook convention).
-
-const repeatableFields = [
-  'handler',
-  'jobId',
-  'pattern',
-  'enabled',
-  'payload',
-  'maxAttempts',
-  'backoffMs',
-] as const;
-
-const syncToBullMQ = (prev: CronJob | null, curr: CronJob | null) => async () => {
-  if (prev && curr && isEqual(pick(prev, repeatableFields), pick(curr, repeatableFields))) return;
-  if (prev) await queue.removeRepeatable(prev.handler, { pattern: prev.pattern }, prev.jobId);
-  if (curr?.enabled) {
-    // Lazy: the handler registry imports handlers that emit through hooks — a static import cycles.
-    const { isValidHandlerName, jobHandlers } = await import('#/jobs/handlers');
-    const handler = isValidHandlerName(curr.handler) ? jobHandlers[curr.handler] : {};
-    const data = buildJobData(handler, { id: curr.id, type: JobType.cron, payload: curr.payload });
-    await queue.add(
-      curr.handler,
-      data,
-      withLanePriority(data, {
-        jobId: curr.jobId,
-        repeat: { pattern: curr.pattern },
-        attempts: curr.maxAttempts,
-        backoff: { type: 'exponential', delay: curr.backoffMs },
-      }),
-    );
-  }
-};
+const removeSchedulerBeforeDelete = (jobId: string): Promise<void> =>
+  withCronJobsLock(async (assertHeld) => {
+    assertHeld();
+    await queue.removeJobScheduler(jobId);
+  });
 
 export const registerCronJobSyncHook = () => {
   registerDbHook(
@@ -56,10 +25,25 @@ export const registerCronJobSyncHook = () => {
     HookTiming.after,
     [DbAction.create, DbAction.update, DbAction.upsert, DbAction.delete],
     async (options: HookOptions) => {
-      const prev = (options.previous ?? null) as CronJob | null;
-      const curr =
-        options.action === DbAction.delete ? null : ((options.result ?? null) as CronJob | null);
-      db.onCommit([syncToBullMQ(prev, curr)], ConcurrencyType.queue);
+      // Lazy: the handler registry imports handlers that emit through hooks — a static import cycles.
+      const { cronJobScheduleProblem } = await import('#/jobs/cronJobScheduleProblem');
+      const { syncCronJobScheduler } = await import('#/jobs/syncCronJobScheduler');
+      const previous = (options.previous ?? null) as CronJob | null;
+
+      if (options.action === DbAction.delete) {
+        if (!previous) return;
+        await removeSchedulerBeforeDelete(previous.jobId);
+        db.onCommit(
+          [() => syncCronJobScheduler(previous.id, previous.jobId)],
+          ConcurrencyType.queue,
+        );
+        return;
+      }
+
+      const current = options.result as CronJob;
+      const problem = current.enabled ? cronJobScheduleProblem(current) : undefined;
+      if (problem) throw makeError({ status: 422, message: problem });
+      db.onCommit([() => syncCronJobScheduler(current.id, previous?.jobId)], ConcurrencyType.queue);
     },
   );
 };

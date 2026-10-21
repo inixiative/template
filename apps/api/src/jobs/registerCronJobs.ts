@@ -1,76 +1,65 @@
 /**
  * @atlas
  * @kind service
- * @partOf primitive:jobs
- * @uses infrastructure:prisma
+ * @partOf primitive:jobs, feature:cronJob
+ * @uses infrastructure:prisma, infrastructure:redis
  */
 import { db } from '@template/db';
+import type { CronJob } from '@template/db/generated/client/client';
 import { LogScope, log } from '@template/shared/logger';
-import { buildJobData } from '#/jobs/buildJobData';
-import { isValidHandlerName, jobHandlers } from '#/jobs/handlers';
-import { withLanePriority } from '#/jobs/lanePriority';
-import { queue as defaultQueue } from '#/jobs/queue';
-import { type JobsQueue, JobType } from '#/jobs/types';
+import { cronJobScheduleProblem } from '#/jobs/cronJobScheduleProblem';
+import { queue } from '#/jobs/queue';
+import { upsertCronJobScheduler } from '#/jobs/upsertCronJobScheduler';
+import { withCronJobsLock } from '#/jobs/withCronJobsLock';
 
-export const registerCronJobs = async (queue: JobsQueue = defaultQueue): Promise<void> => {
-  const cronJobs = await db.cronJob.findMany({
-    where: { enabled: true },
-  });
+const STARTUP_LOCK_WAIT_MS = 30_000;
 
-  log.info(`Registering ${cronJobs.length} enabled cron jobs...`, LogScope.job);
+const reconcileSchedulers = (): Promise<CronJob[]> =>
+  withCronJobsLock(async (assertHeld) => {
+    const cronJobs = await db.cronJob.findMany({ where: { enabled: true } });
+    log.info(`Registering ${cronJobs.length} enabled cron jobs...`, LogScope.job);
 
-  const registeredKeys = new Set<string>();
-  let failed = false;
-
-  for (const cronJob of cronJobs) {
-    if (!isValidHandlerName(cronJob.handler)) {
-      log.warn(
-        `Cron job "${cronJob.name}" has unknown handler: ${cronJob.handler} - skipping`,
-        LogScope.job,
-      );
-      continue;
+    const unschedulable: CronJob[] = [];
+    const liveJobIds = new Set<string>();
+    for (const cronJob of cronJobs) {
+      const problem = cronJobScheduleProblem(cronJob);
+      if (problem) {
+        log.error(
+          `Turning off unschedulable cron "${cronJob.name}": ${problem} - fix the row and re-enable it`,
+          LogScope.job,
+        );
+        unschedulable.push(cronJob);
+        continue;
+      }
+      liveJobIds.add(cronJob.jobId);
+      try {
+        assertHeld();
+        await upsertCronJobScheduler(cronJob);
+        log.info(
+          `Registered cron: ${cronJob.name} (${cronJob.handler}) - ${cronJob.pattern}`,
+          LogScope.job,
+        );
+      } catch (error) {
+        log.error(`Failed to register cron "${cronJob.name}": ${error}`, LogScope.job);
+      }
     }
 
-    try {
-      const data = buildJobData(jobHandlers[cronJob.handler], {
-        id: cronJob.id,
-        type: JobType.cron,
-        payload: cronJob.payload,
-      });
-      const job = await queue.add(
-        cronJob.handler,
-        data,
-        withLanePriority(data, {
-          repeat: { pattern: cronJob.pattern, jobId: cronJob.jobId },
-          attempts: cronJob.maxAttempts,
-          backoff: { type: 'exponential', delay: cronJob.backoffMs },
-        }),
-      );
-      if (job?.repeatJobKey) registeredKeys.add(job.repeatJobKey);
+    // Also clears pre-scheduler md5-keyed repeatables; rolling back past this change double-fires until a worker on it boots.
+    for (const scheduler of await queue.getJobSchedulers()) {
+      if (liveJobIds.has(scheduler.key)) continue;
+      assertHeld();
+      await queue.removeJobScheduler(scheduler.key);
       log.info(
-        `Registered cron: ${cronJob.name} (${cronJob.handler}) - ${cronJob.pattern}`,
+        `Removed orphaned cron scheduler: ${scheduler.name} - ${scheduler.pattern}`,
         LogScope.job,
       );
-    } catch (error) {
-      failed = true;
-      log.error(`Failed to register cron "${cronJob.name}": ${error}`, LogScope.job);
     }
-  }
+    return unschedulable;
+  }, STARTUP_LOCK_WAIT_MS);
 
-  if (failed) return;
-  await removeOrphanedRepeatables(queue, registeredKeys);
-};
-
-const removeOrphanedRepeatables = async (
-  queue: JobsQueue,
-  registeredKeys: Set<string>,
-): Promise<void> => {
-  for (const repeatable of await queue.getRepeatableJobs()) {
-    if (registeredKeys.has(repeatable.key)) continue;
-    await queue.removeRepeatableByKey(repeatable.key);
-    log.info(
-      `Removed orphaned cron repeatable: ${repeatable.name} - ${repeatable.pattern}`,
-      LogScope.job,
-    );
-  }
+export const registerCronJobs = async (): Promise<void> => {
+  const unschedulable = await reconcileSchedulers();
+  // After the lock is released: each update's cronJobSync hook takes the same lock to sync the row.
+  for (const cronJob of unschedulable)
+    await db.cronJob.update({ where: { id: cronJob.id }, data: { enabled: false } });
 };

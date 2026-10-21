@@ -68,7 +68,13 @@ export const initializeWorker = async (): Promise<void> => {
 
   log.info('Job worker initialized', LogScope.worker);
 
-  await registerCronJobs();
+  await registerCronJobs().catch((err) =>
+    log.error(
+      'Cron reconcile failed; existing schedules keep firing until the next worker start',
+      err,
+      LogScope.worker,
+    ),
+  );
 
   // Per-worker in-process drain, not a queued cron — see outbox/drain/loop.ts.
   startOutboxDrainLoop();

@@ -113,7 +113,7 @@ jobs/
 |----------|-------|-----------------|
 | Ad-hoc / superseding | `jobOptions.jobId ?? uuidv7()` | the logical `id` is data-only (the singleton-lock identity) — never the jobId |
 | Superseding | (as above) | supersession is by `dedupeKey` → a per-lane claim (`claimLane`/`watchLane`, last-wins), not the jobId |
-| Cron tick | `cronJob.jobId` (repeatable scheduler key) | `cronJob.id`; the tick only enqueues the real run (see [Cron Jobs](#cron-jobs)) |
+| Cron tick | `cronJob.jobId` (job scheduler key) | `cronJob.id`; the tick only enqueues the real run (see [Cron Jobs](#cron-jobs)) |
 | Cron run (`cronTrigger`) | `uuidv7()` | `cronJob.id` — the singleton key (lock and deduplication) |
 
 Scope ID format for logging: `[worker][{handlerName}:{jobId}]`
@@ -414,7 +414,7 @@ A lane is a label on the job envelope (`JobData.lane`, next to `type`), not a ki
 export const bulkThing = makeJob<Payload>(async (ctx, payload) => { ... }, { lane: JobLane.slow });
 ```
 
-A producer that knows the work's size sets the lane per enqueue instead — `sendEmail` puts its per-recipient `deliverEmail` fan-out on the slow lane when it has more than `EMAIL_SLOW_LANE_MIN_RECIPIENTS` recipients (`fanOutLane`), and keeps smaller sends fast. Every `queue.add` site stamps the lane (and the slow lane's priority): `enqueueJob`, `registerCronJobs`, the `cronJobSync` hook, and the drain. The superadmin enqueue (`options.lane`) and cron trigger (`{ lane }` body) accept an override. The worker reads only `job.data.lane`; an envelope with no lane (queued before lanes existed) is fast everywhere.
+A producer that knows the work's size sets the lane per enqueue instead — `sendEmail` puts its per-recipient `deliverEmail` fan-out on the slow lane when it has more than `EMAIL_SLOW_LANE_MIN_RECIPIENTS` recipients (`fanOutLane`), and keeps smaller sends fast. Every `queue.add` site stamps the lane (and the slow lane's priority): `enqueueJob`, `upsertCronJobScheduler` (used by `registerCronJobs` and the `cronJobSync` hook), and the drain. The superadmin enqueue (`options.lane`) and cron trigger (`{ lane }` body) accept an override. The worker reads only `job.data.lane`; an envelope with no lane (queued before lanes existed) is fast everywhere.
 
 `makeSingletonJob` and `makeSupersedingJob` carry the wrapped handler's declared lane.
 
@@ -556,11 +556,19 @@ Defined in the env schema (`apps/api/src/config/env.ts`), read lazily through `o
 
 ## Cron Jobs
 
-Stored in DB, registered on worker startup. **A tick never runs its handler:** `processJob` hands a `cron` job to `enqueueCronRun`, which enqueues the real run through `enqueueJob` as a `cronTrigger` job carrying the row's `id`, with the row's attempts and backoff. The admin trigger (`triggerCronJob`) goes through the same `enqueueCronRun`. So a scheduled run and a manual trigger collide like any two enqueues (a singleton is deduplicated on the row; a superseding job takes over). A repeatable's job template cannot carry a deduplication id, which is why the tick hands off. On startup `registerCronJobs` also removes any BullMQ repeatable no enabled row registered (a renamed or disabled job left behind), unless a row failed to register. The `cronJobSync` hook moves the BullMQ repeatable whenever a row's handler, jobId, pattern, enabled, payload or retry policy changes (create, update, upsert, delete inside `db.txn`). BullMQ's `removeRepeatable(name, repeat, jobId)` takes the job id as its third argument: a `jobId` inside `repeat` is overwritten, so the key never matches.
+Stored in DB, scheduled as BullMQ job schedulers keyed by the row's `jobId` (`queue.upsertJobScheduler` / `removeJobScheduler`, never the deprecated `add({ repeat })` repeatable API). **A tick never runs its handler:** `processJob` hands a `cron` job to `enqueueCronRun`, which enqueues the real run through `enqueueJob` as a `cronTrigger` job carrying the row's `id`, with the tick's attempts and backoff (the row's `maxAttempts` / `backoffMs`, set on the scheduler template). The admin trigger (`triggerCronJob`) goes through the same `enqueueCronRun`. So a scheduled run and a manual trigger collide like any two enqueues (a singleton is deduplicated on the row; a superseding job takes over). A scheduler's job template cannot carry a deduplication id, which is why the tick hands off.
+
+**Validation.** `cronJobScheduleProblem` is the one answer to "can BullMQ schedule this row": the `jobId` passes `validateJobId` (a key with `:` is read as a legacy repeatable), the handler is registered, and BullMQ's own `defaultRepeatStrategy` computes a next run for the pattern. Only a row that ends up enabled is checked, so turning a row off always works. The `cronJobSync` after-hook checks the written row (Prisma defaults included) and throws a 422, which rolls the write back.
+
+**Sync.** Every scheduler write holds one Redis lock (`withCronJobsLock`, a `createLock` with a wait; admin writes answer 409 when it times out) and calls `assertHeld()` before each Redis write, which throws once `lock.isWithinLease()` is false. After a create, update or upsert commits, the hook's `db.onCommit` sync re-reads the row under the lock and makes its scheduler match it (enabled upserts, disabled removes, a changed `jobId` removes the old key). There is no did-anything-change check: the sync is idempotent and always runs. A delete removes the scheduler inside the transaction before it commits, so a failed removal rolls the delete back. A failed sync throws out of `db.onCommit`, so the request errors; re-sending the same request repairs it (admin create is an upsert on `jobId`, and an update re-syncs even when nothing changed).
+
+**Worker start.** `registerCronJobs` reconciles under the same lock (longer wait): it upserts every enabled row's scheduler (a row whose upsert throws stays in the live set, so a Redis blip never deletes the schedule it had), then removes every scheduler whose key is not a live row's `jobId` — schedulers left by deleted, disabled or renamed rows, and the md5-keyed repeatables older code registered. An enabled row that fails validation is turned off (`enabled: false`, after the lock is released) with an error log: fix it and re-enable it. `initializeWorker` logs a failed reconcile and keeps processing. Rolling back past the scheduler change double-fires every cron (md5 and `jobId` keys do not dedupe) until a worker on the newer code boots and sweeps.
+
+The scheduler tests (`apps/api/src/jobs/tests/cronJobSchedulers.test.ts`, `apps/api/src/modules/admin/cronJob/tests/cronJobSchedulers.test.ts`) need a real Redis at `REDIS_BULLMQ_URL` (BullMQ's Lua cannot run on the in-memory mock); `connectRealJobsQueue` points the `queue` singleton's scheduler methods at a randomly named queue there, and throws rather than skips when the URL is missing.
 
 ### System Cron Jobs (seeded)
 
-The system's own jobs are rows in `packages/db/prisma/seeds/cronJob.seed.ts` with stable ids. The seed runner writes each record inside `db.txn`, so with the api seed (`bun run db:seed`, hooks registered) every deploy's seed brings `name`, `jobId`, `handler` and `description` back in line with the code and the hook swaps the repeatable: renaming a handler is a code change plus a seed. `pattern`, `enabled`, `payload`, `maxAttempts` and `backoffMs` are admin-tunable in superadmin, so the seed sets them on insert only (`updateOmitFields`).
+The system's own jobs are rows in `packages/db/prisma/seeds/cronJob.seed.ts` with stable ids. The seed runner writes each record inside `db.txn`, so with the api seed (`bun run db:seed`, hooks registered) every deploy's seed brings `name`, `jobId`, `handler` and `description` back in line with the code and the hook moves the scheduler: renaming a handler is a code change plus a seed. `pattern`, `enabled`, `payload`, `maxAttempts` and `backoffMs` are admin-tunable in superadmin, so the seed sets them on insert only (`updateOmitFields`).
 
 ### Cron Patterns (UTC)
 
@@ -607,7 +615,7 @@ POST   /api/admin/cronJob/:id/trigger  # Run immediately (optional body { lane }
 
 | Type | Description |
 |------|-------------|
-| `cron` | The BullMQ repeatable tick; it only enqueues a `cronTrigger` run |
+| `cron` | The BullMQ job scheduler tick; it only enqueues a `cronTrigger` run |
 | `cronTrigger` | A cron row's real run, scheduled (from a tick) or manual (admin trigger) |
 | `adhoc` | One-off job |
 

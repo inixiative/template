@@ -232,6 +232,81 @@ describe('createLock', () => {
     });
   });
 
+  describe('isWithinLease', () => {
+    it('is false before acquire and after release', async () => {
+      const lock = createLock({ service: 's', identifier: newId(), ...fastOpts });
+      expect(lock.isWithinLease()).toBe(false);
+      await lock.acquire();
+      expect(lock.isWithinLease()).toBe(true);
+      await lock.release();
+      expect(lock.isWithinLease()).toBe(false);
+    });
+
+    it('stays true past ttlMs while refreshes succeed', async () => {
+      const lock = createLock({
+        key: 'lock:test:lease-renewed',
+        redis: stubRedis(async () => 1),
+        ...fastOpts,
+      });
+      await lock.acquire();
+      await sleep(fastOpts.ttlMs + 50);
+      expect(lock.isWithinLease()).toBe(true);
+      await lock.release();
+    });
+
+    it('lapses when refreshes fail and stays lapsed after one succeeds again', async () => {
+      let mayRefresh = false;
+      let refreshes = 0;
+      const lock = createLock({
+        key: 'lock:test:lease-lapsed',
+        redis: stubRedis(async (...args) => {
+          if (!isRefresh(args)) return 1;
+          refreshes++;
+          if (!mayRefresh) throw new Error('refresh unavailable');
+          return 1;
+        }),
+        ttlMs: 300,
+        heartbeatMs: 100,
+        maxMissed: 1,
+      });
+      await lock.acquire();
+      await sleep(350);
+      expect(lock.isWithinLease()).toBe(false);
+      mayRefresh = true;
+      const failed = refreshes;
+      await waitFor(() => refreshes > failed);
+      expect(lock.isWithinLease()).toBe(false);
+      await lock.release();
+    });
+
+    it('times the lease from when the SET was sent, not when it replied', async () => {
+      let replySet = (): void => {};
+      const pending = new Promise<void>((resolve) => {
+        replySet = resolve;
+      });
+      const redis = {
+        set: async () => {
+          await pending;
+          return 'OK';
+        },
+        get: async () => null,
+        eval: async () => 1,
+      } as unknown as LockRedis;
+      const lock = createLock({
+        key: 'lock:test:lease-late-set',
+        redis,
+        ttlMs: 300,
+        heartbeatMs: 100,
+      });
+      const acquiring = lock.acquire();
+      await sleep(350);
+      replySet();
+      expect(await acquiring).toBe(true);
+      expect(lock.isWithinLease()).toBe(false);
+      await lock.release();
+    });
+  });
+
   describe('release', () => {
     it('deletes the key when held and reports released', async () => {
       const id = newId();

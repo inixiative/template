@@ -45,6 +45,7 @@ export type Lock = {
   acquire: (options?: AcquireOptions) => Promise<boolean>;
   verify: () => Promise<boolean>;
   release: () => Promise<LockReleaseResult>;
+  isWithinLease: () => boolean;
 };
 
 export type Claim = {
