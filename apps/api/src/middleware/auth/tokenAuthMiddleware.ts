@@ -11,7 +11,7 @@ import type { Context, Next } from 'hono';
 import { setUserContext } from '#/lib/context/setUserContext';
 import type { TokenWithRelations } from '#/lib/context/types';
 import { buildPermix } from '#/lib/permissions/buildPermix';
-import { principalFromContext } from '#/lib/permissions/permissionPrincipal';
+import { principalFromContext } from '#/lib/permissions/principalContext';
 import { findUserWithRelations } from '#/modules/user/services/find';
 import type { AppEnv } from '#/types/appEnv';
 
@@ -59,6 +59,7 @@ export const tokenAuthMiddleware = async (c: Context<AppEnv>, next: Next) => {
                 space: true,
               },
             },
+            integration: { include: { organizationUser: true, spaceUser: true } },
           },
         });
         // Touch lastUsedAt on cache-miss only (≈ TTL granularity): keeps it off the request

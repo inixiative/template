@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { createHash, randomUUID } from 'node:crypto';
-import { db } from '@template/db';
+import { db, Prisma } from '@template/db';
 import type {
   Organization,
   OrganizationUser,
@@ -16,7 +16,6 @@ import {
   createToken,
   createUser,
 } from '@template/db/test';
-import type { Entitlements } from '@template/permissions/client';
 import { tokenAuthMiddleware } from '#/middleware/auth/tokenAuthMiddleware';
 import { meRouter } from '#/modules/me';
 import { organizationRouter } from '#/modules/organization';
@@ -54,17 +53,17 @@ describe('actions on the user itself', () => {
   const mint = async (
     owner: User,
     role: Role,
-    entitlements: Entitlements = null,
+    actions: Record<string, boolean> | null = null,
     ownerModel: TokenOwnerModel = 'User',
-    entitlementsOnly = false,
   ) => {
     const key = randomUUID();
     await createToken(
       {
         ownerModel,
         role,
-        entitlements: entitlements ?? undefined,
-        entitlementsOnly,
+        entitlements: (actions ? { 'db:user:self': actions } : undefined) as
+          | Prisma.InputJsonValue
+          | undefined,
         keyHash: createHash('sha256').update(key).digest('hex'),
       },
       ownerModel === 'OrganizationUser'
@@ -116,7 +115,7 @@ describe('actions on the user itself', () => {
   });
 
   it('a token holds a session action its entitlements name, and nothing else', async () => {
-    const key = await mint(user, 'viewer', { 'user.rotateJwts': true, read: true });
+    const key = await mint(user, 'owner', { 'user.rotateJwts': true, read: true });
     expect((await call(key, 'POST', '/me/rotateJwts')).status).toBe(204);
     expect((await call(key, 'POST', '/me/redact')).status).toBe(403);
   });
@@ -135,7 +134,7 @@ describe('actions on the user itself', () => {
           await call(key, 'POST', '/me/tokens', {
             name: 't',
             role: 'viewer',
-            entitlements: { read: true },
+            entitlements: { 'db:user:self': { read: true } },
           })
         ).status,
       ).toBe(403);
@@ -237,7 +236,7 @@ describe('actions on the user itself', () => {
   });
 
   it('a minter cannot mint a role above its own: { token.create } only cannot mint an owner token', async () => {
-    const key = await mint(user, 'owner', { 'token.create': true }, 'User', true);
+    const key = await mint(user, 'owner', { 'token.create': true });
     expect((await call(key, 'POST', '/me/tokens', { name: 't', role: 'owner' })).status).toBe(403);
   });
 
@@ -266,7 +265,7 @@ describe('actions on the user itself', () => {
         await call(key, 'POST', '/me/tokens', {
           name: 't',
           role: 'viewer',
-          entitlements: { read: true },
+          entitlements: { 'db:user:self': { read: true } },
         })
       ).status,
     ).toBe(403);
@@ -319,15 +318,20 @@ describe('actions on the user itself', () => {
     const path = `/organizationUser/${issuerMembership.id}/tokens`;
     expect((await call(key, 'POST', path, { name: 't', role: 'member' })).status).toBe(403);
     expect(
-      (await call(key, 'POST', path, { name: 't', role: 'member', entitlements: { read: true } }))
-        .status,
+      (
+        await call(key, 'POST', path, {
+          name: 't',
+          role: 'member',
+          entitlements: { 'db:organizationUser:self': { read: true } },
+        })
+      ).status,
     ).toBe(403);
 
     const { entity: narrowedToken } = await createToken(
       {
         ownerModel: 'OrganizationUser',
         role: 'member',
-        entitlements: { read: true },
+        entitlements: { 'db:organizationUser:self': { read: true } },
         keyHash: createHash('sha256').update(randomUUID()).digest('hex'),
       },
       { ...context, organizationUser: issuerMembership },
@@ -337,20 +341,12 @@ describe('actions on the user itself', () => {
     ).toBe(403);
   });
 
-  it('a person cannot grant an action they do not hold', async () => {
-    const response = await session(user).fetch(
-      post('/me/tokens', { name: 't', role: 'viewer', entitlements: { 'artifact.create': true } }),
-    );
-    expect(response.status).toBe(403);
-  });
-
   it('a session mints an entitlement-only token that holds only what it names', async () => {
     const response = await session(user).fetch(
       post('/me/tokens', {
         name: 'entitlementGrant',
         role: 'owner',
-        entitlements: { read: true },
-        entitlementsOnly: true,
+        entitlements: { [`db:organization:${organization.id}`]: { read: true } },
       }),
     );
     expect(response.status).toBe(201);

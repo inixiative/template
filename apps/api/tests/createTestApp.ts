@@ -5,7 +5,7 @@ import { auth } from '#/lib/auth';
 import type { TokenWithRelations } from '#/lib/context/types';
 import { validationDefaultHook } from '#/lib/openapi/validationDefaultHook';
 import { buildPermix } from '#/lib/permissions/buildPermix';
-import { principalFromContext } from '#/lib/permissions/permissionPrincipal';
+import { principalFromContext } from '#/lib/permissions/principalContext';
 import { errorHandlerMiddleware } from '#/middleware/error/errorHandlerMiddleware';
 import { notFoundHandlerMiddleware } from '#/middleware/error/notFoundHandlerMiddleware';
 import { prepareRequest } from '#/middleware/prepareRequest';

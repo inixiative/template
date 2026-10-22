@@ -7,6 +7,7 @@
 import type { Prisma } from '@template/db';
 import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
+import { bindIntegrationEntitlements } from '#/modules/integration/services/bindIntegrationEntitlements';
 import { validateReachableIntegration } from '#/modules/integration/validations/validateReachableIntegration';
 import { organizationCreateIntegrationRoute } from '#/modules/organization/routes/organizationCreateIntegration';
 
@@ -20,14 +21,12 @@ export const organizationCreateIntegrationController = makeController(
       ownerModel: 'Organization',
       organizationId: organization.id,
     });
-
-    const integration = await db.integration.create({
-      data: {
-        ...body,
-        ownerModel: 'Organization',
-        organizationId: organization.id,
-      } as Prisma.IntegrationUncheckedCreateInput,
-    });
+    const draft = bindIntegrationEntitlements({
+      ...body,
+      ownerModel: 'Organization',
+      organizationId: organization.id,
+    } as Prisma.IntegrationUncheckedCreateInput);
+    const integration = await db.integration.create({ data: draft });
 
     return respond.created(integration);
   },

@@ -14,6 +14,7 @@ type Spec = {
 const METHODS = ['get', 'post', 'put', 'patch', 'delete'] as const;
 
 const PERSON_ONLY = new Set([
+  'integrationCreateToken',
   'meCreateToken',
   'meRedact',
   'organizationCreateToken',

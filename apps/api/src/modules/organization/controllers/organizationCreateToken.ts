@@ -19,7 +19,7 @@ export const organizationCreateTokenController = makeController(
     const body = c.req.valid('json');
 
     const owner = { model: 'organization' as const, record: org };
-    if (!canAssign(permix, owner, owner, body.role, body.entitlements)) {
+    if (!canAssign(permix, owner, owner, body.role, undefined)) {
       throw makeError({ status: 403, message: `Cannot create ${body.role} token` });
     }
 
@@ -29,10 +29,7 @@ export const organizationCreateTokenController = makeController(
       organizationId: org.id,
       role: body.role,
       entitlements: body.entitlements,
-      entitlementsOnly: body.entitlementsOnly,
       expiresAt: body.expiresAt,
-      integrationReach: body.integrationReach,
-      integrationReachIds: body.integrationReachIds,
     });
 
     return respond.created(token);

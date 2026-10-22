@@ -1,12 +1,6 @@
 export { Role } from '@template/db/generated/client/enums';
 // Actor
-export {
-  ActorModel,
-  buildActor,
-  defaultIntegrationReach,
-  type IntegrationBinding,
-  type TemplateActor,
-} from './actor';
+export { ActorModel, buildActor, inPerson, type TemplateActor } from './actor';
 // Client
 export {
   type Action,
@@ -19,21 +13,27 @@ export {
   OrganizationAction,
   type PermissionEntry,
   type Permix,
-  personOnlyActions,
   SessionAction,
   SpaceAction,
   StandardAction,
   UserAction,
 } from './client';
-// Grants
+// Holders
 export {
-  capGrant,
-  type EntitlementGrant,
-  type Grant,
+  BindError,
+  type BindRoots,
+  createInterpolator,
+  entitlementEntries,
   type GrantResource,
-  grantReaches,
-  userLoginGrant,
-} from './grant';
+  isFlatEntitlements,
+  normalizeEntitlements,
+  parseGrantKey,
+  resolveSelfKeys,
+  roleReaches,
+  SELF,
+  type SelfIds,
+  type SelfModel,
+} from './holder';
 // ReBAC
 export { check as rebacCheck } from './rebac/check';
 export { rebacSchema } from './rebac/schema';
@@ -55,7 +55,6 @@ export { getOrgPermissions, organizationRoles } from './roles/organization';
 // Shared role utilities
 export {
   allTrue,
-  grantActions,
   greaterRole,
   isSuperadmin,
   lesserRole,

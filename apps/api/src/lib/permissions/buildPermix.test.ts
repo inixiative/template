@@ -26,7 +26,7 @@ describe('buildPermix: the same actor gives the same permix from a request or ca
   let spaceId: string;
 
   const direct = async (userId: string) =>
-    buildPermix({ user: await findUserWithRelations(userId), token: null, grant: null });
+    buildPermix({ user: await findUserWithRelations(userId), token: null, jwtGrant: null });
 
   const requestPath = (userId: string) =>
     createTestApp({
@@ -91,12 +91,12 @@ describe('buildPermix: the same actor gives the same permix from a request or ca
 
   it('a principal carrying a narrowed token matches the token request path', async () => {
     const key = randomUUID();
+    const entitlements = { [`db:user:${user.id}`]: { read: true, 'report.export': true } };
     const { entity: token } = await createToken(
       {
         ownerModel: 'User',
         role: 'owner',
-        entitlements: { read: true, 'report.export': true },
-        entitlementsOnly: true,
+        entitlements,
         keyHash: createHash('sha256').update(key).digest('hex'),
       },
       { user },
@@ -122,15 +122,9 @@ describe('buildPermix: the same actor gives the same permix from a request or ca
         organizationUser: null,
         space: null,
         spaceUser: null,
+        integration: null,
       },
-      grant: {
-        role: token.role,
-        entitlements: { read: true, 'report.export': true },
-        entitlementsOnly: true,
-        integrationId: token.integrationId,
-        integrationReach: token.integrationReach,
-        integrationReachIds: token.integrationReachIds,
-      },
+      jwtGrant: null,
     });
     expect(permix.getJSON()).toEqual(viaToken as never);
   });

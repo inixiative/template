@@ -39,7 +39,7 @@ const validatedActionRule = z.unknown().superRefine((value, context) => {
 const withOpenApiRef = validatedActionRule as z.ZodType & {
   openapi?: (name: string, metadata: { description: string }) => z.ZodType;
 };
-const actionRuleSchema: z.ZodType =
+export const actionRuleSchema: z.ZodType =
   withOpenApiRef.openapi?.('ActionRule', {
     description:
       'A serialized @inixiative/permissions ActionRule: a delegated action, { rel, action }, { self, action }, { rule }, { actor }, { any }, { all }, a boolean or null',

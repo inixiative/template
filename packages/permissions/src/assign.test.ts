@@ -1,16 +1,17 @@
 import { describe, expect, it } from 'bun:test';
 import type { OrganizationId } from '@template/db';
 import { assignLevel, canAssign } from '@template/permissions/assign';
-import { createPermissions, type Entitlements } from '@template/permissions/client';
+import { createPermissions } from '@template/permissions/client';
 import { getOrgPermissions } from '@template/permissions/roles/organization';
 import type { Role } from '@template/permissions/types';
 
 const orgId = 'org-1' as OrganizationId;
 const owner = { model: 'organization' as const, record: { id: orgId } };
 
-const assigner = async (role: Role, entitlements: Entitlements = null) => {
+const assigner = async (role: Role, held: Record<string, boolean> = {}) => {
   const permix = createPermissions();
-  await permix.setup(getOrgPermissions(role, orgId, entitlements));
+  await permix.setup(getOrgPermissions(role, orgId));
+  await permix.setup({ resource: 'db:organization', id: orgId, actions: held });
   return permix;
 };
 

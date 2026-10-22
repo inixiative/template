@@ -6,7 +6,7 @@
  */
 import type { User } from '@template/db/generated/client/client';
 import { PlatformRole, Role } from '@template/db/generated/client/enums';
-import type { Action, ActionState, Entitlements } from '@template/permissions/client';
+import type { Action } from '@template/permissions/client';
 import { compact } from 'lodash-es';
 
 export const isSuperadmin = (user?: Pick<User, 'platformRole'> | null) =>
@@ -47,9 +47,3 @@ export const rolesAtOrAbove = (role: Role | string): Role[] => {
   if (idx === -1) return [role as Role];
   return roleHierarchy.slice(idx) as unknown as Role[];
 };
-
-export const grantActions = (
-  baseActions: ActionState,
-  entitlements?: Entitlements,
-  entitlementsOnly = false,
-): ActionState => (entitlementsOnly ? { ...entitlements } : { ...baseActions, ...entitlements });

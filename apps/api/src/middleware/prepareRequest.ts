@@ -9,7 +9,7 @@ import { createPermissions } from '@template/permissions';
 import { logScope, withLogContext } from '@template/shared/logger';
 import type { Context, Next } from 'hono';
 import { buildPermix } from '#/lib/permissions/buildPermix';
-import { principalFromContext } from '#/lib/permissions/permissionPrincipal';
+import { principalFromContext } from '#/lib/permissions/principalContext';
 import { parseBracketNotation } from '#/lib/utils/parseBracketNotation';
 import type { getBatchContext as getBatchContextFn } from '#/modules/batch/services/batchRegistry';
 import type { AppEnv } from '#/types/appEnv';

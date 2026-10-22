@@ -23,7 +23,7 @@ export const spaceCreateTokenController = makeController(
     const hydrated = await hydrate('space', space);
 
     const owner = { model: 'space' as const, record: hydrated };
-    if (!canAssign(permix, owner, owner, body.role, body.entitlements)) {
+    if (!canAssign(permix, owner, owner, body.role, undefined)) {
       throw makeError({ status: 403, message: `Cannot create ${body.role} token` });
     }
 
@@ -34,10 +34,7 @@ export const spaceCreateTokenController = makeController(
       spaceId: space.id,
       role: body.role,
       entitlements: body.entitlements,
-      entitlementsOnly: body.entitlementsOnly,
       expiresAt: body.expiresAt,
-      integrationReach: body.integrationReach,
-      integrationReachIds: body.integrationReachIds,
     });
 
     return respond.created(token);

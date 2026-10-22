@@ -191,6 +191,7 @@ describe('auditLog hook', () => {
       organizationUser: null,
       space: null,
       spaceUser: null,
+      integration: null,
     };
     const ts = Date.now();
 
@@ -232,6 +233,7 @@ describe('auditLog hook', () => {
       organizationUser: null,
       space: null,
       spaceUser: null,
+      integration: null,
     };
     const ts = Date.now();
 
@@ -267,7 +269,7 @@ describe('auditLog hook', () => {
 
   it('records actorJobName when set in context', async () => {
     const ts = Date.now();
-    let userId: string;
+    let userId: string | undefined;
 
     await db.scope(
       'test-worker:test',
@@ -283,7 +285,7 @@ describe('auditLog hook', () => {
     );
 
     const log = await db.auditLog.findFirst({
-      where: { subjectUserId: userId!, action: AuditAction.create },
+      where: { subjectUserId: userId, action: AuditAction.create },
       orderBy: { id: 'desc' },
     });
 
@@ -486,7 +488,9 @@ describe('auditLog hook', () => {
         () => saveEmailTemplate(emailTemplate(`actor-bridged-${Date.now()}`)),
       );
 
-      const logs = await auditRowsFor(template.id, components[0]!.id);
+      const [component] = components;
+      if (!component) throw new Error('expected a component');
+      const logs = await auditRowsFor(template.id, component.id);
 
       expect(logs.length).toBeGreaterThan(0);
       expect(logs.every((log) => log.actorJobName === 'bridgedActor')).toBe(true);
@@ -497,7 +501,9 @@ describe('auditLog hook', () => {
         emailTemplate(`actor-absent-${Date.now()}`),
       );
 
-      const logs = await auditRowsFor(template.id, components[0]!.id);
+      const [component] = components;
+      if (!component) throw new Error('expected a component');
+      const logs = await auditRowsFor(template.id, component.id);
 
       expect(logs.length).toBeGreaterThan(0);
       expect(logs.every((log) => log.actorJobName === null)).toBe(true);

@@ -8,8 +8,6 @@ import { roleToStandardAction } from '@template/permissions';
 import { check, rebacSchema } from '@template/permissions/rebac';
 import { getResource } from '#/lib/context/getResource';
 import { makeError } from '#/lib/errors';
-import { validateFullGrantIssuer } from '#/lib/permissions/validateFullGrantIssuer';
-import { validateHeldActions } from '#/lib/permissions/validateHeldActions';
 import { makeController } from '#/lib/utils/makeController';
 import { createToken } from '#/modules/me/services/createToken';
 import { organizationUserCreateTokenRoute } from '#/modules/organizationUser/routes/organizationUserCreateToken';
@@ -22,7 +20,6 @@ export const organizationUserCreateTokenController = makeController(
     const body = c.req.valid('json');
 
     const checkLeave = check(permix, rebacSchema, 'organizationUser', orgUser, 'leave');
-    // Option A: User can create tokens at or below their own role level
     const checkOrg = check(
       permix,
       rebacSchema,
@@ -30,21 +27,8 @@ export const organizationUserCreateTokenController = makeController(
       { id: orgUser.organizationId },
       roleToStandardAction(body.role),
     );
-    // Option B: Only admins+ can create tokens (uses 'assign' rules)
-    // const checkOrg = check(permix, rebacSchema, 'organization', { id: orgUser.organizationId, role: body.role }, 'assign');
     if (!checkLeave || !checkOrg)
       throw makeError({ status: 403, message: `Cannot create ${body.role} token` });
-
-    validateHeldActions(
-      permix,
-      [{ model: 'organization', record: { id: orgUser.organizationId } }],
-      body.entitlements,
-    );
-
-    validateFullGrantIssuer(c, {
-      entitlements: body.entitlements ?? null,
-      entitlementsOnly: body.entitlementsOnly ?? false,
-    });
 
     const token = await createToken(c, {
       name: body.name,
@@ -53,10 +37,7 @@ export const organizationUserCreateTokenController = makeController(
       organizationId: orgUser.organizationId,
       role: body.role,
       entitlements: body.entitlements,
-      entitlementsOnly: body.entitlementsOnly,
       expiresAt: body.expiresAt,
-      integrationReach: body.integrationReach,
-      integrationReachIds: body.integrationReachIds,
     });
 
     return respond.created(token);

@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, it } from 'bun:test';
 import { createHash, randomUUID } from 'node:crypto';
-import { db } from '@template/db';
+import { db, type Prisma } from '@template/db';
 import type { User } from '@template/db/generated/client/client';
 import {
   InquiryResourceModel,
@@ -16,7 +16,6 @@ import {
   createToken,
   createUser,
 } from '@template/db/test';
-import type { Entitlements } from '@template/permissions/client';
 import { tokenAuthMiddleware } from '#/middleware/auth/tokenAuthMiddleware';
 import { inquiryRouter } from '#/modules/inquiry';
 import { organizationUserRouter } from '#/modules/organizationUser';
@@ -46,14 +45,15 @@ describe('a self arm needs the action on the actor itself', () => {
       }),
     );
 
-  const userToken = async (user: User, entitlements: Entitlements, entitlementsOnly = true) => {
+  const userToken = async (user: User, actions: Record<string, boolean> | null) => {
     const key = randomUUID();
     const { entity } = await createToken(
       {
         ownerModel: 'User',
         role: 'owner',
-        entitlements: entitlements ?? undefined,
-        entitlementsOnly,
+        entitlements: (actions ? { 'db:user:self': actions } : undefined) as
+          | Prisma.InputJsonValue
+          | undefined,
         keyHash: createHash('sha256').update(key).digest('hex'),
       },
       { user },
@@ -160,7 +160,7 @@ describe('a self arm needs the action on the actor itself', () => {
 
   it('a full token leaves as before', async () => {
     const { user, membership } = await member();
-    const { key } = await userToken(user, null, false);
+    const { key } = await userToken(user, null);
     expect((await call(key, 'DELETE', `/organizationUser/${membership.id}`)).status).toBe(204);
   });
 });

@@ -6,8 +6,8 @@
  */
 import type { AccessorName, HydratedRecord } from '@template/db';
 import type { Role } from '@template/db/generated/client/enums';
-import type { Entitlements, Permix } from '@template/permissions/client';
-import { type GrantResource, grantReaches } from '@template/permissions/grant';
+import type { Permix } from '@template/permissions/client';
+import { type GrantResource, roleReaches } from '@template/permissions/holder';
 import { check } from '@template/permissions/rebac/check';
 import { rebacSchema } from '@template/permissions/rebac/schema';
 import {
@@ -17,19 +17,19 @@ import {
 } from '@template/permissions/roles/shared';
 
 const actionLevel = (resource: GrantResource, action: string): Role => {
-  const reachedBy = roleHierarchy.find((role) =>
-    grantReaches(resource, { role, entitlements: null }, action),
-  );
+  const reachedBy = roleHierarchy.find((role) => roleReaches(resource, role, action));
   if (reachedBy) return reachedBy;
   return rebacSchema.permissions[resource]?.actions[action] === undefined ? 'member' : 'owner';
 };
 
-const namedActions = (entitlements: Entitlements | undefined) =>
+export type NamedEntitlements = Record<string, boolean> | null | undefined;
+
+const namedActions = (entitlements: NamedEntitlements) =>
   Object.keys(entitlements ?? {}).filter((action) => entitlements?.[action] === true);
 
 export const assignLevel = (
   role: Role | null,
-  entitlements: Entitlements | undefined,
+  entitlements: NamedEntitlements,
   resource: GrantResource = 'db:organization',
 ): Role =>
   greaterRole(role, ...namedActions(entitlements).map((action) => actionLevel(resource, action)));
@@ -42,7 +42,7 @@ export const canAssign = (
   target: AssignTarget,
   owner: AssignOwner,
   role: Role | null,
-  entitlements: Entitlements | undefined,
+  entitlements: NamedEntitlements,
 ): boolean => {
   const level = assignLevel(role, entitlements, `db:${owner.model}`);
   const holds = (action: string) => check(permix, rebacSchema, owner.model, owner.record, action);

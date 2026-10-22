@@ -5,45 +5,54 @@
  * @uses infrastructure:prisma
  */
 
-import { db, type HydratedRecord, hydrate, type Prisma, type UserId } from '@template/db';
-import { InquiryResourceModel, IntegrationReach, Role } from '@template/db/generated/client/enums';
-import { type Entitlements, SessionAction } from '@template/permissions';
+import { db, type HydratedRecord, hydrate, Prisma } from '@template/db';
+import { InquiryResourceModel, Role } from '@template/db/generated/client/enums';
+import {
+  type BindRoots,
+  createInterpolator,
+  type Entitlements,
+  isFlatEntitlements,
+  normalizeEntitlements,
+  SessionAction,
+} from '@template/permissions';
 import { canAssign } from '@template/permissions/assign';
+import { entitlementsSchema } from '@template/permissions/entitlementsSchema';
 import { check, rebacSchema } from '@template/permissions/rebac';
 import { z } from 'zod';
 import { makeError } from '#/lib/errors';
-import { findActionsUserLacks } from '#/lib/permissions/findActionsUserLacks';
-import { findUnheldGrant } from '#/lib/permissions/findUnheldGrant';
-import { resolveIntegrationReach } from '#/lib/permissions/resolveIntegrationReach';
+import { interpolateOr422 } from '#/lib/permissions/interpolateOr422';
+import { validateEntitlementsWithin } from '#/lib/permissions/validateEntitlementsWithin';
 import { autoApproveOwnRequest } from '#/modules/inquiry/handlers/autoApproveOwnRequest';
 import { baseResolutionInputSchema } from '#/modules/inquiry/handlers/schemas';
 import type { Inquiry, InquiryHandler } from '#/modules/inquiry/handlers/types';
-import { findUserWithRelations } from '#/modules/user/services/find';
 
-export const entitlementGrantSchema = z.object({
+const membershipEntitlementsSchema = z.record(z.string(), z.boolean()).nullable();
+
+const inquiryGrant = createInterpolator(['source', 'target', 'content']);
+
+export const grantSchema = z.object({
   role: z.nativeEnum(Role),
-  entitlements: z.record(z.string(), z.boolean()).nullable(),
-  entitlementsOnly: z.boolean(),
-  integrationReach: z.nativeEnum(IntegrationReach),
-  integrationReachIds: z.array(z.string()),
+  entitlements: entitlementsSchema,
 });
 
-const contentSchema = entitlementGrantSchema.extend({
+const contentSchema = z.object({
   purpose: z.string().min(1).max(500),
   role: z.nativeEnum(Role).default(Role.viewer),
-  entitlements: z.record(z.string(), z.boolean()).nullable().default(null),
-  entitlementsOnly: z.boolean().default(false),
-  integrationReach: z.nativeEnum(IntegrationReach).optional(),
-  integrationReachIds: z.array(z.string()).optional(),
+  entitlements: z.union([entitlementsSchema, membershipEntitlementsSchema]).default(null),
 });
 
-const resolutionSchema = baseResolutionInputSchema.extend({
-  grant: entitlementGrantSchema.optional(),
+const resolutionInputSchema = baseResolutionInputSchema.extend({
+  entitlements: entitlementsSchema.optional(),
+});
+
+const resolutionSchema = resolutionInputSchema.extend({
+  grant: grantSchema.optional(),
   addedEntitlements: z.array(z.string()).optional(),
 });
 
 type GrantUserEntitlementsContent = z.infer<typeof contentSchema>;
 type GrantUserEntitlementsResolution = z.infer<typeof resolutionSchema>;
+type GrantUserEntitlementsResolutionInput = z.infer<typeof resolutionInputSchema>;
 
 const findMembership = (inquiry: Partial<Inquiry>) => {
   if (inquiry.targetModel === InquiryResourceModel.Organization)
@@ -55,27 +64,66 @@ const findMembership = (inquiry: Partial<Inquiry>) => {
   });
 };
 
+const ownerKeyOf = (inquiry: Inquiry) =>
+  inquiry.targetModel === InquiryResourceModel.Organization
+    ? `db:organization:${inquiry.targetOrganizationId}`
+    : `db:space:${inquiry.targetSpaceId}`;
+
 const writeMembershipEntitlements = async (
   inquiry: Inquiry,
-  update: (current: Entitlements) => Entitlements,
+  update: (current: Record<string, boolean> | null) => Record<string, boolean>,
 ) => {
   const membership = await findMembership(inquiry);
   if (!membership) throw makeError({ status: 422, message: 'The requester is not a member' });
-  const entitlements = update(membership.entitlements as Entitlements) as Prisma.InputJsonValue;
+  const ownerKey = ownerKeyOf(inquiry);
+  const keyed = normalizeEntitlements(membership.entitlements, ownerKey) ?? {};
+  const owned = Object.fromEntries(
+    Object.entries(keyed[ownerKey] ?? {}).filter(([, value]) => value === true),
+  ) as Record<string, boolean>;
+  const next = update(Object.keys(owned).length ? owned : null);
+  const ownerActions = Object.fromEntries(
+    Object.entries(next)
+      .filter(([, held]) => held)
+      .map(([action]) => [action, true as const]),
+  );
+  const entitlements = {
+    ...keyed,
+    ...(Object.keys(ownerActions).length ? { [ownerKey]: ownerActions } : {}),
+  };
+  if (!Object.keys(ownerActions).length) delete entitlements[ownerKey];
+  const data = {
+    entitlements: Object.keys(entitlements).length
+      ? (entitlements as Prisma.InputJsonValue)
+      : Prisma.DbNull,
+  };
   if (inquiry.targetModel === InquiryResourceModel.Organization)
-    await db.organizationUser.update({ where: { id: membership.id }, data: { entitlements } });
-  else await db.spaceUser.update({ where: { id: membership.id }, data: { entitlements } });
+    await db.organizationUser.update({ where: { id: membership.id }, data });
+  else await db.spaceUser.update({ where: { id: membership.id }, data });
 };
 
 const isMembershipTarget = (inquiry: Partial<Inquiry>) =>
   inquiry.targetModel === InquiryResourceModel.Organization ||
   inquiry.targetModel === InquiryResourceModel.Space;
 
-const resolveGrantReach = (inquiry: Partial<Inquiry>, content: GrantUserEntitlementsContent) =>
-  resolveIntegrationReach(content, inquiry.sourceIntegrationId ?? null, {
-    ownerModel: 'User',
-    userId: inquiry.targetUserId,
-  });
+const membershipEntitlements = (content: GrantUserEntitlementsContent) =>
+  isFlatEntitlements(content.entitlements) ? content.entitlements : null;
+
+const bindRoots = async (
+  inquiry: Partial<Inquiry>,
+  content: GrantUserEntitlementsContent,
+): Promise<BindRoots> => {
+  const source = inquiry.sourceIntegrationId
+    ? await db.integration.findUniqueOrThrow({ where: { id: inquiry.sourceIntegrationId } })
+    : await db.user.findUniqueOrThrow({ where: { id: inquiry.sourceUserId! } });
+  const target = await db.user.findUniqueOrThrow({ where: { id: inquiry.targetUserId! } });
+  return { source, target, content };
+};
+
+const bindGrant = async (
+  inquiry: Partial<Inquiry>,
+  content: GrantUserEntitlementsContent,
+  entitlements: Entitlements,
+) => interpolateOr422(inquiryGrant, entitlements, await bindRoots(inquiry, content));
 
 const validate = async (
   inquiry: Partial<Inquiry>,
@@ -84,12 +132,10 @@ const validate = async (
   if (isMembershipTarget(inquiry)) {
     if (inquiry.sourceModel !== InquiryResourceModel.User)
       throw makeError({ status: 422, message: 'Only a member can ask its organization or space' });
-    if (!Object.values(content.entitlements ?? {}).some(Boolean))
+    if (!Object.values(membershipEntitlements(content) ?? {}).some(Boolean))
       throw makeError({ status: 422, message: 'Name the entitlements to grant' });
     if (!(await findMembership(inquiry)))
       throw makeError({ status: 422, message: 'The requester is not a member' });
-    if (content.integrationReach !== undefined || content.integrationReachIds !== undefined)
-      throw makeError({ status: 422, message: 'integrationReach applies to a grant to a user' });
     return;
   }
 
@@ -98,21 +144,25 @@ const validate = async (
     inquiry.sourceUserId !== inquiry.targetUserId
   )
     throw makeError({ status: 422, message: 'A user can only grant their own entitlements' });
-
-  const targetUser = await findUserWithRelations(inquiry.targetUserId as UserId);
-  if (!targetUser) throw makeError({ status: 404, message: 'Target user not found' });
-  const lacking = findActionsUserLacks(targetUser, content.entitlements);
-  if (lacking.length)
+  if (isFlatEntitlements(content.entitlements))
     throw makeError({
       status: 422,
-      message: `The user does not hold these actions: ${lacking.join(', ')}`,
+      message: 'A grant to a user keys its entitlements by resource',
     });
-  await resolveGrantReach(inquiry, content);
+  if (content.entitlements && !Object.keys(content.entitlements).length)
+    throw makeError({
+      status: 422,
+      message: 'Name at least one grant key, or null for everything',
+    });
+  if (!(await db.user.findUnique({ where: { id: inquiry.targetUserId! } })))
+    throw makeError({ status: 404, message: 'Target user not found' });
+  await bindGrant(inquiry, content, content.entitlements);
 };
 
 export const grantUserEntitlementsHandler: InquiryHandler<
   GrantUserEntitlementsContent,
-  GrantUserEntitlementsResolution
+  GrantUserEntitlementsResolution,
+  GrantUserEntitlementsResolutionInput
 > = {
   sources: [
     { sourceModel: InquiryResourceModel.User },
@@ -124,7 +174,7 @@ export const grantUserEntitlementsHandler: InquiryHandler<
     { targetModel: InquiryResourceModel.Space },
   ],
   contentSchema,
-  resolutionInputSchema: baseResolutionInputSchema,
+  resolutionInputSchema,
   resolutionSchema,
   defaultExpirationDays: 7,
   validate,
@@ -138,36 +188,36 @@ export const grantUserEntitlementsHandler: InquiryHandler<
         model: 'organization' as const,
         record: { id: inquiry.targetOrganizationId! },
       };
-      return canAssign(permix, owner, owner, null, content.entitlements);
+      return canAssign(permix, owner, owner, null, membershipEntitlements(content));
     }
     if (inquiry.targetModel === InquiryResourceModel.Space) {
       const space = await hydrate('space', { id: inquiry.targetSpaceId! } as HydratedRecord);
       const owner = { model: 'space' as const, record: space };
-      return canAssign(permix, owner, owner, null, content.entitlements);
+      return canAssign(permix, owner, owner, null, membershipEntitlements(content));
     }
     const user = c.get('user');
-    return (
-      !!user &&
-      check(permix, rebacSchema, 'user', user, SessionAction.createToken) &&
-      !(await findUnheldGrant(c, content)).length
-    );
+    return !!user && check(permix, rebacSchema, 'user', user, SessionAction.createToken);
   },
 
   handleApprove: async (inquiry, content) => {
     await validate(inquiry, content);
     if (isMembershipTarget(inquiry)) {
+      const granted = membershipEntitlements(content) ?? {};
       let addedEntitlements: string[] = [];
       await writeMembershipEntitlements(inquiry, (current) => {
-        addedEntitlements = Object.keys(content.entitlements ?? {}).filter(
-          (action) => content.entitlements?.[action] === true && current?.[action] !== true,
+        addedEntitlements = Object.keys(granted).filter(
+          (action) => granted[action] === true && current?.[action] !== true,
         );
-        return { ...current, ...content.entitlements };
+        return { ...current, ...granted };
       });
       return { addedEntitlements };
     }
-    const { role, entitlements, entitlementsOnly } = content;
-    const reach = await resolveGrantReach(inquiry, content);
-    return { grant: { role, entitlements, entitlementsOnly, ...reach } };
+    const asked = contentSchema.parse(inquiry.content).entitlements as Entitlements;
+    const entitlements = content.entitlements as Entitlements;
+    validateEntitlementsWithin(entitlements, asked);
+    return {
+      grant: { role: content.role, entitlements: await bindGrant(inquiry, content, entitlements) },
+    };
   },
 
   handleRevoke: async (inquiry) => {

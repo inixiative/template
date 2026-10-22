@@ -45,6 +45,7 @@ const bareRelations = {
   organizationUser: null,
   space: null,
   spaceUser: null,
+  integration: null,
 };
 
 describe('rate limit identities', () => {

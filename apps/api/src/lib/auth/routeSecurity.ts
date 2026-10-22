@@ -5,16 +5,14 @@
  * @uses none
  */
 import type { RouteConfig } from '@hono/zod-openapi';
-import { personOnlyActions } from '@template/permissions/client';
+import { isInPersonAction } from '@template/permissions/rebac/inPersonActions';
 import { castArray } from 'lodash-es';
 import { securityRequirements } from '#/lib/auth/securitySchemes';
 import type { RouteArgs } from '#/lib/routeTemplates/types';
 
-const personOnly = new Set<string>(personOnlyActions);
-
 const checksPersonOnlyAction = (middleware: RouteArgs['middleware']) =>
   castArray(middleware ?? []).some(
-    (handler) => 'selfAction' in handler && personOnly.has(String(handler.selfAction)),
+    (handler) => 'selfAction' in handler && isInPersonAction(String(handler.selfAction)),
   );
 
 export const securityForRoute = ({

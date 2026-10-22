@@ -9,8 +9,6 @@ import { roleToStandardAction } from '@template/permissions';
 import { check, rebacSchema } from '@template/permissions/rebac';
 import { getResource } from '#/lib/context/getResource';
 import { makeError } from '#/lib/errors';
-import { validateFullGrantIssuer } from '#/lib/permissions/validateFullGrantIssuer';
-import { validateHeldActions } from '#/lib/permissions/validateHeldActions';
 import { makeController } from '#/lib/utils/makeController';
 import { createToken } from '#/modules/me/services/createToken';
 import { spaceUserCreateTokenRoute } from '#/modules/spaceUser/routes/spaceUserCreateToken';
@@ -24,20 +22,10 @@ export const spaceUserCreateTokenController = makeController(
 
     const hydrated = await hydrate('spaceUser', spaceUser);
     const checkLeave = check(permix, rebacSchema, 'spaceUser', spaceUser, 'leave');
-    // Option A: User can create tokens at or below their own role level
     const space = hydrated.space as HydratedRecord;
     const checkSpace = check(permix, rebacSchema, 'space', space, roleToStandardAction(body.role));
-    // Option B: Only admins+ can create tokens (uses 'assign' rules)
-    // const checkSpace = check(permix, rebacSchema, 'space', { ...hydrated.space, role: body.role }, 'assign');
     if (!checkLeave || !checkSpace)
       throw makeError({ status: 403, message: `Cannot create ${body.role} token` });
-
-    validateHeldActions(permix, [{ model: 'space', record: space }], body.entitlements);
-
-    validateFullGrantIssuer(c, {
-      entitlements: body.entitlements ?? null,
-      entitlementsOnly: body.entitlementsOnly ?? false,
-    });
 
     const token = await createToken(c, {
       name: body.name,
@@ -47,10 +35,7 @@ export const spaceUserCreateTokenController = makeController(
       spaceId: spaceUser.spaceId,
       role: body.role,
       entitlements: body.entitlements,
-      entitlementsOnly: body.entitlementsOnly,
       expiresAt: body.expiresAt,
-      integrationReach: body.integrationReach,
-      integrationReachIds: body.integrationReachIds,
     });
 
     return respond.created(token);

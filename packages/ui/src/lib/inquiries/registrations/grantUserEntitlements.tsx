@@ -10,15 +10,12 @@ import { registerInquiryType } from '@template/ui/lib/inquiries/registry';
 type EntitlementGrantContent = {
   purpose?: string;
   role?: string;
-  entitlements?: Record<string, boolean> | null;
-  entitlementsOnly?: boolean;
+  entitlements?: Record<string, unknown> | null;
 };
 
 const describeEntitlementGrant = (content: EntitlementGrantContent | null | undefined) => {
-  const actions = Object.keys(content?.entitlements ?? {}).filter(
-    (action) => content?.entitlements?.[action],
-  );
-  const scope = content?.entitlementsOnly ? actions.join(', ') || 'nothing' : content?.role;
+  const keys = Object.keys(content?.entitlements ?? {});
+  const scope = [content?.role, keys.length ? keys.join(', ') : null].filter(Boolean).join(': ');
   return [content?.purpose, scope && `(${scope})`].filter(Boolean).join(' ');
 };
 

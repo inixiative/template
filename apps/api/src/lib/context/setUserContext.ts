@@ -7,7 +7,7 @@
 import type { UserWithRelations } from '@template/db';
 import type { Context } from 'hono';
 import { buildPermix } from '#/lib/permissions/buildPermix';
-import { principalFromContext } from '#/lib/permissions/permissionPrincipal';
+import { principalFromContext } from '#/lib/permissions/principalContext';
 import type { AppEnv } from '#/types/appEnv';
 
 export const setUserContext = async (c: Context<AppEnv>, userWithRelations: UserWithRelations) => {

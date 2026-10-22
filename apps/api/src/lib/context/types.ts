@@ -5,6 +5,7 @@
  * @uses infrastructure:prisma
  */
 import type {
+  Integration,
   Organization,
   OrganizationUser,
   Space,
@@ -12,7 +13,13 @@ import type {
   Token,
   User,
 } from '@template/db/generated/client/client';
-import type { EntitlementGrant, IntegrationBinding } from '@template/permissions';
+import type { Role } from '@template/db/generated/client/enums';
+import type { Entitlements } from '@template/permissions';
+
+export type IntegrationWithOwners = Integration & {
+  organizationUser: OrganizationUser | null;
+  spaceUser: SpaceUser | null;
+};
 
 export type TokenWithRelations = Token & {
   user: User | null;
@@ -27,9 +34,13 @@ export type TokenWithRelations = Token & {
         user: User;
       })
     | null;
+  integration: IntegrationWithOwners | null;
 };
 
-export type GrantedEntitlements = EntitlementGrant &
-  IntegrationBinding & {
-    inquiryId: string;
-  };
+export type CredentialGrant = {
+  role: Role | null;
+  entitlements: Entitlements;
+  integrationId: string | null;
+};
+
+export type GrantedEntitlements = CredentialGrant & { inquiryId: string };

@@ -6,16 +6,14 @@
  */
 import { z } from '@hono/zod-openapi';
 import { TokenScalarSchema } from '@template/db';
-import { IntegrationReach, Role } from '@template/db/generated/client/enums';
+import { Role } from '@template/db/generated/client/enums';
+import { entitlementsSchema } from '@template/permissions/entitlementsSchema';
 
 export const tokenCreateBodySchema = z.object({
   name: z.string().min(1).max(100),
   role: z.nativeEnum(Role),
-  entitlements: z.record(z.string(), z.boolean()).nullable().optional(),
-  entitlementsOnly: z.boolean().optional(),
+  entitlements: entitlementsSchema.optional(),
   expiresAt: z.coerce.date().optional(),
-  integrationReach: z.nativeEnum(IntegrationReach).optional(),
-  integrationReachIds: z.array(z.string()).optional(),
 });
 
 export const tokenUpdateBodySchema = tokenCreateBodySchema.omit({ expiresAt: true }).partial();

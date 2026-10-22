@@ -7,8 +7,8 @@
 
 import type { OrganizationId } from '@template/db';
 import { Role } from '@template/db/generated/client/enums';
-import { type Entitlements, greaterRole } from '@template/permissions';
-import { canAssign } from '@template/permissions/assign';
+import { greaterRole, isFlatEntitlements } from '@template/permissions';
+import { canAssign, type NamedEntitlements } from '@template/permissions/assign';
 import { getResource } from '#/lib/context/getResource';
 import { makeError } from '#/lib/errors';
 import { makeController } from '#/lib/utils/makeController';
@@ -24,13 +24,14 @@ export const organizationUserUpdateController = makeController(
     const permix = c.get('permix');
 
     const owner = { model: 'organization' as const, record: { id: orgUser.organizationId } };
+    const flat = isFlatEntitlements(body.entitlements) ? body.entitlements : null;
     if (
       !canAssign(
         permix,
         owner,
         owner,
         greaterRole(orgUser.role, body.role),
-        (body.entitlements ?? null) as Entitlements,
+        flat as NamedEntitlements,
       )
     )
       throw makeError({ status: 403, message: 'Access denied' });

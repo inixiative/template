@@ -4,29 +4,27 @@
  * @partOf primitive:authz
  * @uses none
  */
-import {
-  ActorModel,
-  buildActor,
-  createPermissions,
-  isSuperadmin,
-  type Permix,
-} from '@template/permissions';
-import type { PermissionPrincipal } from '#/lib/permissions/permissionPrincipal';
-import { setupOrgPermissions } from '#/lib/permissions/setupOrgPermissions';
-import { setupSpacePermissions } from '#/lib/permissions/setupSpacePermissions';
-import { setupUserPermissions } from '#/lib/permissions/setupUserPermissions';
+import { ActorModel, buildActor, type Permix } from '@template/permissions';
+import { buildUserPermix } from '#/lib/permissions/buildUserPermix';
+import { ownerPermix } from '#/lib/permissions/ownerPermix';
+import type { PrincipalContext } from '#/lib/permissions/principalContext';
 
-export const buildPermix = async (principal: PermissionPrincipal): Promise<Permix> => {
-  const permix = createPermissions();
-  const { user, token, grant } = principal;
-  const actorId = user?.id ?? token?.id;
-  if (actorId) {
-    const model = token ? ActorModel.Token : grant ? ActorModel.Inquiry : ActorModel.User;
-    permix.setActor(buildActor(actorId, model, grant));
-  }
-  if (user) permix.setSuperadmin(isSuperadmin(user));
-  await setupUserPermissions(permix, principal);
-  await setupOrgPermissions(permix, principal);
-  await setupSpacePermissions(permix, principal);
+const principalPermix = ({ user, token, jwtGrant }: PrincipalContext): Promise<Permix> => {
+  if (!token) return buildUserPermix(user, jwtGrant);
+  return ownerPermix(token, user);
+};
+
+const actorOf = ({ user, token, jwtGrant }: PrincipalContext) => {
+  if (token) return buildActor(user?.id ?? token.id, ActorModel.Token, token.integrationId);
+  if (!user) return null;
+  if (jwtGrant?.integrationId)
+    return buildActor(user.id, ActorModel.Integration, jwtGrant.integrationId);
+  return buildActor(user.id, ActorModel.User);
+};
+
+export const buildPermix = async (principal: PrincipalContext): Promise<Permix> => {
+  const permix = await principalPermix(principal);
+  const actor = actorOf(principal);
+  if (actor) permix.setActor(actor);
   return permix;
 };

@@ -17,7 +17,6 @@ import {
   createSpaceUser,
   createUser,
 } from '@template/db/test';
-import type { Entitlements } from '@template/permissions/client';
 import { inquiryRouter } from '#/modules/inquiry';
 import { integrationRouter } from '#/modules/integration';
 import { meRouter } from '#/modules/me';
@@ -59,14 +58,14 @@ describe('handler: grantUserEntitlements', () => {
       ],
     });
 
-  const requestFromOrganization = async (entitlements: Entitlements) => {
+  const requestFromOrganization = async (entitlements: Record<string, boolean>) => {
     const response = await appFor(requester, [requesterMembership]).fetch(
       post('/api/v1/me/inquiries', {
         type: 'grantUserEntitlements',
         targetModel: 'Organization',
         targetOrganizationId: organization.id,
         status: 'sent',
-        content: { purpose: 'need more', entitlements, entitlementsOnly: true },
+        content: { purpose: 'need more', entitlements },
       }),
     );
     expect(response.status).toBe(201);
@@ -86,7 +85,7 @@ describe('handler: grantUserEntitlements', () => {
 
   const membershipEntitlements = async () =>
     (await db.organizationUser.findUniqueOrThrow({ where: { id: requesterMembership.id } }))
-      .entitlements as Entitlements;
+      .entitlements as Record<string, boolean> | null;
 
   beforeAll(async () => {
     organization = (await createOrganization()).entity;
@@ -208,7 +207,7 @@ describe('handler: grantUserEntitlements', () => {
           targetModel: 'Organization',
           targetOrganizationId: other.id,
           status: 'sent',
-          content: { purpose: 'x', entitlements: { read: true }, entitlementsOnly: true },
+          content: { purpose: 'x', entitlements: { read: true } },
         }),
       );
       expect(response.status).toBe(422);
@@ -227,7 +226,7 @@ describe('handler: grantUserEntitlements', () => {
           targetModel: 'Space',
           targetSpaceId: space.id,
           status: 'sent',
-          content: { purpose: 'x', entitlements: { operate: true }, entitlementsOnly: true },
+          content: { purpose: 'x', entitlements: { operate: true } },
         }),
       );
       expect(response.status).toBe(201);
@@ -260,8 +259,7 @@ describe('handler: grantUserEntitlements', () => {
           status: 'sent',
           content: {
             purpose: 'artifactory login',
-            entitlements: { read: true },
-            entitlementsOnly: true,
+            entitlements: { 'db:user:$target': { read: true } },
           },
         }),
       );
@@ -279,7 +277,7 @@ describe('handler: grantUserEntitlements', () => {
           targetModel: 'User',
           targetUserId: requester.id,
           status: 'sent',
-          content: { purpose: 'sync', entitlements: { read: true }, entitlementsOnly: true },
+          content: { purpose: 'sync', entitlements: { 'db:user:$target': { read: true } } },
         }),
       );
       expect((await json<InquiryBody>(response)).data.status).toBe('sent');

@@ -15,6 +15,9 @@ model Integration {
   provider Provider?
 
   // Owner (fake polymorphism: User, OrganizationUser, Organization, Space, or SpaceUser)
+  role         Role?
+  entitlements Json?
+
   ownerModel     IntegrationOwnerModel
   userId         String?               @db.VarChar(36)
   organizationId String?               @db.VarChar(36)
@@ -58,13 +61,6 @@ enum IntegrationOwnerModel {
   SpaceUser
 }
 
-// A credential's reach over integrations: its bound one, none, all its roles allow, or a list
-enum IntegrationReach {
-  own
-  none
-  all
-  listed
-}
 
 enum Provider {
   slack

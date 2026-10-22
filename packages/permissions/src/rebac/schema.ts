@@ -5,7 +5,8 @@
  * @uses none
  */
 import { Operator } from '@inixiative/json-rules';
-import { integrationActions, ownerActions } from '@template/permissions/rebac/ownerActions';
+import { inPerson } from '@template/permissions/actor';
+import { membershipOwnerActions, ownerActions } from '@template/permissions/rebac/ownerActions';
 import type { RebacSchema } from '@template/permissions/rebac/types';
 
 const highRoles = ['owner', 'admin'];
@@ -21,6 +22,11 @@ export const rebacSchema: RebacSchema = {
         read: 'operate',
         'user.identify': 'read',
         'organization.create': 'operate',
+        'token.delete': 'own',
+        'user.rotateJwts': 'own',
+        'token.create': { all: [inPerson, 'own'] },
+        'user.redact': { all: [inPerson, 'own'] },
+        'organization.delete': { all: [inPerson, 'own'] },
       },
     },
 
@@ -91,7 +97,7 @@ export const rebacSchema: RebacSchema = {
         read: { rel: 'segment', action: 'read' },
       },
     },
-    'db:integration': { actions: integrationActions() },
+    'db:integration': { actions: membershipOwnerActions() },
     'db:flow': { actions: ownerActions(['user']) },
 
     'db:organizationUser': {
@@ -249,7 +255,7 @@ export const rebacSchema: RebacSchema = {
                 {
                   any: [
                     { self: 'sourceUserId', action: 'operate' },
-                    { rel: 'sourceIntegration', action: 'manage' },
+                    { rel: 'sourceIntegration', action: 'operate' },
                   ],
                 },
               ],
@@ -313,7 +319,7 @@ export const rebacSchema: RebacSchema = {
               any: [
                 { self: 'sourceUserId', action: 'operate' },
                 { self: 'targetUserId', action: 'operate' },
-                { rel: 'sourceIntegration', action: 'manage' },
+                { rel: 'sourceIntegration', action: 'operate' },
                 { rel: 'targetOrganization', action: 'manage' },
                 { rel: 'targetSpace', action: 'manage' },
               ],

@@ -6,8 +6,7 @@
  */
 import type { UserId } from '@template/db';
 import type { Role } from '@template/db/generated/client/client';
-import type { Entitlements, PermissionEntry } from '@template/permissions/client';
-import { grantActions } from '@template/permissions/roles/shared';
+import type { PermissionEntry } from '@template/permissions/client';
 
 export const userRoles = {
   owner: { user: { own: true } },
@@ -16,16 +15,11 @@ export const userRoles = {
   viewer: { user: { read: true } },
 } as const;
 
-export const getUserPermissions = (
-  userId: UserId,
-  role: Role = 'owner',
-  entitlements?: Entitlements,
-  entitlementsOnly = false,
-): PermissionEntry => {
+export const getUserPermissions = (userId: UserId, role: Role = 'owner'): PermissionEntry => {
   const baseActions = userRoles[role].user;
   return {
     resource: 'db:user',
     id: userId,
-    actions: grantActions(baseActions, entitlements, entitlementsOnly),
+    actions: baseActions,
   };
 };

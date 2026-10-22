@@ -9,10 +9,6 @@ import type { Prisma } from '@template/db';
 import type { Role, TokenOwnerModel } from '@template/db/generated/client/enums';
 import type { Entitlements } from '@template/permissions';
 import type { Context } from 'hono';
-import {
-  type RequestedIntegrationReach,
-  resolveIntegrationReach,
-} from '#/lib/permissions/resolveIntegrationReach';
 import type { AppEnv } from '#/types/appEnv';
 
 const MODEL_PREFIXES: Record<TokenOwnerModel, string> = {
@@ -21,23 +17,23 @@ const MODEL_PREFIXES: Record<TokenOwnerModel, string> = {
   OrganizationUser: 'orgUser',
   Space: 'space',
   SpaceUser: 'spaceUser',
+  Integration: 'integration',
 };
 
-type CreateTokenParams = RequestedIntegrationReach & {
+type CreateTokenParams = {
   name: string;
   ownerModel: TokenOwnerModel;
   userId?: string;
   organizationId?: string;
   spaceId?: string;
+  integrationId?: string;
   role: Role;
   entitlements?: Entitlements;
-  entitlementsOnly?: boolean;
   expiresAt?: Date;
 };
 
 export const createToken = async (c: Context<AppEnv>, params: CreateTokenParams) => {
   const db = c.get('db');
-  const reach = await resolveIntegrationReach(params, null, params);
   const hex = randomBytes(24).toString('hex');
   const modelPrefix = MODEL_PREFIXES[params.ownerModel];
   const rawKey = `${process.env.ENVIRONMENT}_${modelPrefix}_${hex}`;
@@ -53,11 +49,10 @@ export const createToken = async (c: Context<AppEnv>, params: CreateTokenParams)
       userId: params.userId,
       organizationId: params.organizationId,
       spaceId: params.spaceId,
+      integrationId: params.integrationId,
       role: params.role,
       entitlements: (params.entitlements ?? undefined) as Prisma.InputJsonValue | undefined,
-      entitlementsOnly: params.entitlementsOnly,
       expiresAt: params.expiresAt,
-      ...reach,
     },
   });
 

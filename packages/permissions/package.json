@@ -12,7 +12,6 @@
     "./actor": "./src/actor.ts",
     "./assign": "./src/assign.ts",
     "./client": "./src/client.ts",
-    "./grant": "./src/grant.ts",
     "./rebac/*": "./src/rebac/*",
     "./roles/*": "./src/roles/*",
     "./types": "./src/types.ts"

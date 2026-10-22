@@ -20,6 +20,6 @@ export const integrationCreateInquiryRoute = createRoute({
   bodySchema: inquiryCreateBodySchema,
   responseSchema: inquirySentResponseSchema,
   sanitizeKeys: inquiryCreateSanitizeKeys,
-  middleware: [validatePermission('manage')],
+  middleware: [validatePermission('operate')],
   tags: [Tags.integration, Tags.inquiry],
 });

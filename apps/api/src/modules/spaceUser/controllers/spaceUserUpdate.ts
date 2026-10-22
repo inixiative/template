@@ -24,9 +24,8 @@ export const spaceUserUpdateController = makeController(
     const targetRole = greaterRole(spaceUser.role, body.role);
 
     const owner = { model: 'space' as const, record: space };
-    if (!canAssign(permix, owner, owner, targetRole, null)) {
+    if (!canAssign(permix, owner, owner, targetRole, null))
       throw makeError({ status: 403, message: `Cannot assign ${targetRole} role` });
-    }
 
     const updated = await db.spaceUser.update({
       where: { id: spaceUser.id },

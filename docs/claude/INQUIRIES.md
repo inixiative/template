@@ -320,7 +320,7 @@ const { role } = resolvedContent; // always from original inquiry.content
 | `createSpace` | org `own` | Owner only |
 | `updateSpace` | space `own` | Space owner or org owner (via `space.own → org.own` delegation) |
 | `transferSpace` | org `own` (explicit 2-hop) | Org owner only — space owner alone is not enough |
-| `grantUserEntitlements` | the source user (self), or integration `manage` (behind the [integration reach fence](./PERMISSIONS.md#integration-reach), so an integration's own credential needs reach `own`) | Asking needs nothing; the approver needs authority to assign (`assign` on the target org/space at the entitlements' level, or the user holding `token.create`, which is person-only, so only the person's JWT or a superadmin, and the grant) |
+| `grantUserEntitlements` | the source user (self + `operate`), or `operate` on the source integration (an integration operates itself by default, so its own credential can ask) | Asking needs nothing; the approver needs authority to assign (`assign` on the target org/space at the entitlements' level, or the user holding `token.create`, which is in person only). Entitlements name rows by `$source` / `$target` placeholders, never literal ids; the approver may only drop entries ([Granting User Entitlements](./PERMISSIONS.md#granting-user-entitlements)) |
 
 `updateSpace` and `transferSpace` differ intentionally: `updateSpace` uses `{ rel: 'sourceSpace', action: 'own' }` which delegates through to org.own, so both direct space owners and org owners can update. `transferSpace` uses `{ rel: 'sourceSpace.organization', action: 'own' }` — dot-path traversal that explicitly resolves to the owning organization, bypassing any direct space.own check, ensuring only org owners can initiate a transfer.
 

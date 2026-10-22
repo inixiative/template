@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { createHash, randomUUID } from 'node:crypto';
-import { clearHookRegistry } from '@template/db';
+import { clearHookRegistry, Prisma } from '@template/db';
 import type {
   Organization,
   OrganizationUser,
@@ -14,7 +14,6 @@ import {
   createToken,
   createUser,
 } from '@template/db/test';
-import type { Entitlements } from '@template/permissions/client';
 import { registerClearCacheHook } from '#/hooks/cache/hook';
 import { tokenAuthMiddleware } from '#/middleware/auth/tokenAuthMiddleware';
 import { organizationRouter } from '#/modules/organization';
@@ -60,18 +59,15 @@ describe('PATCH /token/:id — a token is full or narrowed, and either can chang
       }),
     );
 
-  const userToken = async (
-    role: Role,
-    entitlements: Entitlements = null,
-    entitlementsOnly = false,
-  ) => {
+  const userToken = async (role: Role, actions: Record<string, boolean> | null = null) => {
     const key = randomUUID();
     const { entity } = await createToken(
       {
         ownerModel: 'User',
         role,
-        entitlements: entitlements ?? undefined,
-        entitlementsOnly,
+        entitlements: (actions ? { 'db:user:self': actions } : undefined) as
+          | Prisma.InputJsonValue
+          | undefined,
         keyHash: createHash('sha256').update(key).digest('hex'),
       },
       { user },
@@ -109,13 +105,13 @@ describe('PATCH /token/:id — a token is full or narrowed, and either can chang
     expect((await rename(key)).status).toBe(200);
 
     const narrowed = await asSession(user, [membership])(
-      patch(`/api/v1/token/${token.id}`, { entitlements: { read: true }, entitlementsOnly: true }),
+      patch(`/api/v1/token/${token.id}`, { entitlements: { 'db:organization': { read: true } } }),
     );
     expect(narrowed.status).toBe(200);
     expect((await rename(key)).status).toBe(403);
 
     const full = await asSession(user, [membership])(
-      patch(`/api/v1/token/${token.id}`, { entitlements: null, entitlementsOnly: false }),
+      patch(`/api/v1/token/${token.id}`, { entitlements: null }),
     );
     expect(full.status).toBe(200);
     expect((await rename(key)).status).toBe(200);
@@ -124,17 +120,16 @@ describe('PATCH /token/:id — a token is full or narrowed, and either can chang
   it('a token cannot change itself', async () => {
     const { key, token } = await userToken('owner', { 'token.create': true, read: true });
     const response = await withKey(key, 'PATCH', `/token/${token.id}`, {
-      entitlements: { read: true },
+      entitlements: { 'db:user:self': { read: true } },
     });
     expect(response.status).toBe(403);
   });
 
   it('a narrowed editor cannot make a token full', async () => {
     const { key } = await userToken('owner', { 'token.create': true, own: true });
-    const { token: other } = await userToken('owner', { read: true }, true);
+    const { token: other } = await userToken('owner', { read: true });
     const response = await withKey(key, 'PATCH', `/token/${other.id}`, {
       entitlements: null,
-      entitlementsOnly: false,
     });
     expect(response.status).toBe(403);
   });
@@ -142,7 +137,7 @@ describe('PATCH /token/:id — a token is full or narrowed, and either can chang
   it('another user cannot change my token', async () => {
     const { token } = await userToken('owner');
     const response = await asSession(viewer, [viewerMembership])(
-      patch(`/api/v1/token/${token.id}`, { entitlements: { read: true } }),
+      patch(`/api/v1/token/${token.id}`, { entitlements: { 'db:user:self': { read: true } } }),
     );
     expect(response.status).toBe(403);
   });
@@ -151,37 +146,19 @@ describe('PATCH /token/:id — a token is full or narrowed, and either can chang
     const orgToken = async () =>
       (await createToken({ ownerModel: 'Organization', role: 'member' }, { organization })).entity;
 
-    it('an admin cannot assign a custom key it does not hold itself', async () => {
+    it('an admin assigns any keyed entitlements on a token it may assign (keys only narrow, they are not validated as held)', async () => {
       const token = await orgToken();
       const response = await asSession(admin, [adminMembership])(
-        patch(`/api/v1/token/${token.id}`, { entitlements: { 'report.export': true } }),
-      );
-      expect(response.status).toBe(403);
-    });
-
-    it('an admin holding the key assigns it, or less', async () => {
-      const holder = (await createUser()).entity;
-      const { entity: holderMembership } = await createOrganizationUser(
-        { role: 'admin', entitlements: { 'report.export': true } },
-        { user: holder, organization },
-      );
-      const token = await orgToken();
-      const response = await asSession(holder, [holderMembership])(
-        patch(`/api/v1/token/${token.id}`, { entitlements: { 'report.export': true } }),
+        patch(`/api/v1/token/${token.id}`, {
+          entitlements: { 'db:organization:self': { 'report.export': true } },
+        }),
       );
       expect(response.status).toBe(200);
       const saved = await db.token.findUniqueOrThrow({ where: { id: token.id } });
-      expect(saved.entitlements).toEqual({ 'report.export': true });
-      expect(
-        (
-          await asSession(holder, [holderMembership])(
-            patch(`/api/v1/token/${token.id}`, { entitlements: { read: true } }),
-          )
-        ).status,
-      ).toBe(200);
+      expect(saved.entitlements).toEqual({ 'db:organization:self': { 'report.export': true } });
     });
 
-    it('an admin cannot raise it to owner or grant own', async () => {
+    it('an admin cannot raise it to owner', async () => {
       const token = await orgToken();
       expect(
         (
@@ -190,19 +167,14 @@ describe('PATCH /token/:id — a token is full or narrowed, and either can chang
           )
         ).status,
       ).toBe(403);
-      expect(
-        (
-          await asSession(admin, [adminMembership])(
-            patch(`/api/v1/token/${token.id}`, { entitlements: { own: true } }),
-          )
-        ).status,
-      ).toBe(403);
     });
 
     it('a viewer cannot change it at all', async () => {
       const token = await orgToken();
       const response = await asSession(viewer, [viewerMembership])(
-        patch(`/api/v1/token/${token.id}`, { entitlements: { read: true } }),
+        patch(`/api/v1/token/${token.id}`, {
+          entitlements: { 'db:organization:self': { read: true } },
+        }),
       );
       expect(response.status).toBe(403);
     });

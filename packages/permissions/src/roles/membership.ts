@@ -5,8 +5,7 @@
  * @uses feature:tenancy
  */
 import type { Role } from '@template/db/generated/client/enums';
-import type { Entitlements, PermissionEntry } from '@template/permissions/client';
-import { grantActions } from '@template/permissions/roles/shared';
+import type { PermissionEntry } from '@template/permissions/client';
 
 export type MembershipResource = 'db:organizationUser' | 'db:spaceUser';
 
@@ -21,10 +20,8 @@ export const getMembershipPermissions = (
   resource: MembershipResource,
   role: Role,
   membershipId: string,
-  entitlements?: Entitlements,
-  entitlementsOnly = false,
 ): PermissionEntry => ({
   resource,
   id: membershipId,
-  actions: grantActions(membershipRoles[role].membership, entitlements, entitlementsOnly),
+  actions: membershipRoles[role].membership,
 });

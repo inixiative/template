@@ -38,7 +38,7 @@ const stored = async (userId: string) => {
 };
 
 const personPermix = async (user: User) =>
-  buildPermix({ user: await stored(user.id), token: null, grant: null });
+  buildPermix({ user: await stored(user.id), token: null, jwtGrant: null });
 
 const reaches = async (
   permix: Awaited<ReturnType<typeof buildPermix>>,
@@ -86,7 +86,6 @@ describe('a membership token manages what its own membership owns (Aron, 2026-10
       {
         ownerModel: held.spaceUser ? 'SpaceUser' : 'OrganizationUser',
         role,
-        integrationReach: 'all',
         keyHash: createHash('sha256').update(key).digest('hex'),
       },
       held.spaceUser
@@ -101,7 +100,6 @@ describe('a membership token manages what its own membership owns (Aron, 2026-10
       {
         ownerModel: held.spaceUser ? 'SpaceUser' : 'OrganizationUser',
         role,
-        integrationReach: 'all',
         keyHash: createHash('sha256').update(randomUUID()).digest('hex'),
       },
       held.spaceUser
@@ -118,15 +116,9 @@ describe('a membership token manages what its own membership owns (Aron, 2026-10
         organizationUser: null,
         space: null,
         spaceUser: null,
+        integration: null,
       },
-      grant: {
-        role: token.role,
-        entitlements: null,
-        entitlementsOnly: false,
-        integrationId: token.integrationId,
-        integrationReach: token.integrationReach,
-        integrationReachIds: token.integrationReachIds,
-      },
+      jwtGrant: null,
     });
   };
 

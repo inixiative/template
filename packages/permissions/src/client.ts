@@ -38,13 +38,6 @@ export const SessionAction = {
 } as const;
 export type SessionAction = (typeof SessionAction)[keyof typeof SessionAction];
 
-// why: no token or JWT grant holds these, even when it names them (Aron, 2026-10-18)
-export const personOnlyActions: readonly SessionAction[] = [
-  SessionAction.createToken,
-  SessionAction.redactUser,
-  SessionAction.deleteOrganization,
-];
-
 export const MembershipAction = {
   own: 'membership.own',
   manage: 'membership.manage',

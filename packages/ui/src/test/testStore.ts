@@ -24,6 +24,7 @@ const createTestPermissionsSlice: StateCreator<AppStore, [], [], PermissionsSlic
     isSuperadmin: () => false,
     setActor: () => {},
     getActor: () => null,
+    rules: () => [],
     getJSON: () => null,
   });
 

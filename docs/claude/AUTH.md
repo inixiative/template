@@ -32,6 +32,7 @@
   - [OrganizationUser Token](#organizationuser-token)
   - [Space Token](#space-token)
   - [SpaceUser Token](#spaceuser-token)
+  - [Integration Token](#integration-token)
   - [Token Schema](#token-schema)
 - [Entitlement grants on a JWT](#entitlement-grants-on-a-jwt)
   - [Claims](#claims)
@@ -409,6 +410,18 @@ spaceId: set
 - Permissions are the token's grant capped by the space membership
 - Used for scoped access to a single space
 
+### Integration Token
+
+```
+ownerModel: 'Integration'
+userId: null
+integrationId: set
+```
+
+- Acts as the integration itself, not its owner: its role on its owner ([Member-Owned Models](./PERMISSIONS.md#member-owned-models)), `operate` on its own `db:integration:<id>` entry (`read` when the token's role is `viewer`), plus the integration's own widening `entitlements`, all narrowed by the token's own `entitlements`
+- `POST /integration/:id/tokens` mints it (`manage` on the integration, plus `token.create` in person); see [Granting User Entitlements](./PERMISSIONS.md#granting-user-entitlements) and [Issuing](./PERMISSIONS.md#issuing)
+- Used for integration-to-API access (webhooks, sync jobs) scoped to one integration
+
 ### Token Schema
 
 ```prisma
@@ -431,16 +444,12 @@ model Token {
   space            Space?
   spaceUser        SpaceUser?
 
-  // Permissions: full (entitlements null) or narrowed, capped per request by the owner's grant
-  role             Role    @default(member)
-  entitlements     Json?
-  entitlementsOnly Boolean @default(false)
+  // Permissions: unkeyed (entitlements null, not narrowed anywhere) or keyed (narrows by
+  // grant key, PERMISSIONS.md#grant-keys); the role is a ceiling on every anchor, not a grant
+  role         Role    @default(member)
+  entitlements Json?
 
-  integrationId String?   // optional link to an Integration
-
-  // Which integrations it reaches (PERMISSIONS.md#integration-reach)
-  integrationReach    IntegrationReach @default(none)
-  integrationReachIds String[]
+  integrationId String?   // bound integration; ownerModel 'Integration' means it acts as this one
 
   // Rate limiting
   rateLimitPerSecond Int?
@@ -457,6 +466,7 @@ enum TokenOwnerModel {
   OrganizationUser
   Space
   SpaceUser
+  Integration
 }
 ```
 
@@ -477,13 +487,13 @@ A person's JWT (self-issued or from the configured issuer, [Person JWT](#person-
 `jwtAuthMiddleware` sets `c.get('entitlementGrant')` (the grant, its inquiry id and the requesting integration) after the revocation check and before `setUserContext`, so the setup functions cap by it. Downstream:
 
 - **Audit:** the actor is the user (`actorUserId`), `actorTokenId` stays null; the requesting integration, if any, is the audit `integrationId` (read from the permission actor, [The Actor](./PERMISSIONS.md#the-actor)).
-- **Reach:** the grant's `integrationReach` decides which integrations the JWT touches ([Integration Reach](./PERMISSIONS.md#integration-reach)).
+- **Reach:** the grant's `entitlements` are the narrowing ([Widen vs. Narrow](./PERMISSIONS.md#widen-vs-narrow)); a `db:integration` key decides which integrations the JWT touches, same as any other resource. The integration that raised the grant, if any, contributes none of its own entitlements while it acts for the user — only the grant's own (`holders.test.ts` #18).
 - **Batch:** `entitlementGrant` is cloned into sub-requests with the user.
 - **Superadmin:** a superadmin's JWT is superadmin, spoofing included.
 
 ### What Kingdom Adds
 
-Template signs and verifies its own JWTs. Kingdom is also the issuer other apps trust (`AUTH_ISSUER` pointing at it). Left for the Kingdom change: the embed login that mints a JWT for another app's audience (AUTH-008), and Kingdom's owner-authority code that still assumes a Token row (owner routes that re-hash the bearer, the actor-authority loader, and the org/space manage checks that cap memberships by hand and must move to `capGrant`).
+Template signs and verifies its own JWTs. Kingdom is also the issuer other apps trust (`AUTH_ISSUER` pointing at it). Left for the Kingdom change: the embed login that mints a JWT for another app's audience (AUTH-008), and Kingdom's owner-authority code that still assumes a Token row (owner routes that re-hash the bearer, the actor-authority loader, and the org/space manage checks that cap memberships by hand and must move to the shared narrowing path, `permix.setNarrowing` / `resolveSelfKeys`).
 
 ---
 
@@ -609,7 +619,7 @@ router.get('/resource', validateActor, handler);  // 401 if no user from getActo
 
 ### Session-Only Actions
 
-There is no "tokens forbidden" guard. Token minting, token deletion, account redaction, organization deletion and rotating every JWT (`POST /api/v1/me/rotateJwts`) are `SessionAction`s, checked with `validateSelfPermission` ([PERMISSIONS.md](./PERMISSIONS.md#validateselfpermission)). A person's JWT with no grant holds them all; a token or grant holds one only when its entitlements name it. `token.create`, `user.redact` and `organization.delete` are person-only (`personOnlyActions`): `capGrant` drops them, so no API token or JWT grant holds them even when it names them, and their operations publish only `userJwt` in OpenAPI (`securityForRoute` reads the action off `validateSelfPermission`). A superadmin still passes on any credential (Aron, 2026-10-18: "put the same user check that we have in place on that one… we can revisit if things need to be more agentic"; 2026-10-19: "super admin is super admin").
+There is no "tokens forbidden" guard. Token minting, token deletion, account redaction, organization deletion and rotating every JWT (`POST /api/v1/me/rotateJwts`) are `SessionAction`s, checked with `validateSelfPermission` ([PERMISSIONS.md](./PERMISSIONS.md#validateselfpermission)). A person's JWT with no grant holds them all; a token or grant holds one only when its entitlements name it. `token.create`, `user.redact` and `organization.delete` also carry an **in-person** arm in the rebac schema (`{ all: [inPerson, 'own'] }`, [The Actor](./PERMISSIONS.md#the-actor)): no API token or JWT grant holds them even when it names them, because only a session's actor is `model: 'User'`, and their operations publish only `userJwt` in OpenAPI (`securityForRoute` reads `isInPersonAction` off the action passed to `validateSelfPermission`). A superadmin still passes on any credential (Aron, 2026-10-18: "put the same user check that we have in place on that one… we can revisit if things need to be more agentic"; 2026-10-19: "super admin is super admin").
 
 ```typescript
 middleware: [validateSelfPermission(SessionAction.createToken)]

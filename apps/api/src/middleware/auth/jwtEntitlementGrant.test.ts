@@ -89,7 +89,7 @@ describe('JWT from a configured issuer, with and without a grant', () => {
 
   const requestGrant = async (
     jwt: string,
-    content: { role?: string; entitlements?: Entitlements; entitlementsOnly?: boolean },
+    content: { role?: string; entitlements?: Entitlements },
   ) =>
     call(jwt, 'POST', '/me/inquiries', {
       type: 'grantUserEntitlements',
@@ -225,7 +225,7 @@ describe('JWT from a configured issuer, with and without a grant', () => {
 
   describe('a scoped JWT carries approved entitlements', () => {
     it('entitlement-only { read }: reads, writes nothing, mints nothing', async () => {
-      const { jwt } = await grantJwt({ entitlements: { read: true }, entitlementsOnly: true });
+      const { jwt } = await grantJwt({ entitlements: { 'db:user:$target': { read: true } } });
       expect((await call(jwt, 'GET', '/me')).status).toBe(200);
       expect((await call(jwt, 'GET', `/organization/${ownedOrganization.id}/users`)).status).toBe(
         200,
@@ -245,44 +245,28 @@ describe('JWT from a configured issuer, with and without a grant', () => {
     });
 
     it('a read-only grant cannot ask for a wider one', async () => {
-      const { jwt } = await grantJwt({ entitlements: { read: true }, entitlementsOnly: true });
+      const { jwt } = await grantJwt({ entitlements: { 'db:user:$target': { read: true } } });
       expect((await requestGrant(jwt, { role: 'owner' })).status).toBe(403);
-    });
-
-    it('default mode viewer + { manage }: capped by each membership', async () => {
-      const { jwt } = await grantJwt({ role: 'viewer', entitlements: { manage: true } });
-      expect((await rename(jwt, ownedOrganization)).status).toBe(200);
-      expect((await rename(jwt, viewedOrganization)).status).toBe(403);
     });
 
     it('a grant naming token.create still cannot mint (Aron, 2026-10-18)', async () => {
       const { jwt } = await grantJwt({
-        entitlements: { read: true, 'token.create': true },
-        entitlementsOnly: true,
+        entitlements: { 'db:user:$target': { read: true, 'token.create': true } },
       });
       expect(
         (
           await call(jwt, 'POST', '/me/tokens', {
             name: 'm',
             role: 'viewer',
-            entitlements: { read: true },
+            entitlements: { 'db:user:self': { read: true } },
           })
         ).status,
       ).toBe(403);
     });
 
-    it('the user cannot be asked for an action they do not hold', async () => {
-      const response = await requestGrant(await sign({}), {
-        entitlements: { 'artifact.create': true },
-        entitlementsOnly: true,
-      });
-      expect(response.status).toBe(422);
-    });
-
     it('revoking the inquiry kills the JWT', async () => {
       const { jwt, inquiryId } = await grantJwt({
-        entitlements: { read: true },
-        entitlementsOnly: true,
+        entitlements: { 'db:user:$target': { read: true } },
       });
       expect((await call(jwt, 'GET', '/me')).status).toBe(200);
       expect(
@@ -297,8 +281,7 @@ describe('JWT from a configured issuer, with and without a grant', () => {
 
     it('a grant for another user does not apply', async () => {
       const { inquiryId } = await grantJwt({
-        entitlements: { read: true },
-        entitlementsOnly: true,
+        entitlements: { 'db:user:$target': { read: true } },
       });
       expect(
         (await call(await sign({ sub: otherUser.id, grant: inquiryId }), 'GET', '/me')).status,
@@ -308,10 +291,13 @@ describe('JWT from a configured issuer, with and without a grant', () => {
 
   describe('issuing is capped by the principal that issues', () => {
     it('a grant never approves a grant for its own user, even naming token.create; the person does', async () => {
-      const { jwt } = await grantJwt({ role: 'member', entitlements: { 'token.create': true } });
+      const { jwt } = await grantJwt({
+        role: 'member',
+        entitlements: { 'db:user:$target': { operate: true, 'token.create': true } },
+      });
       const response = await requestGrant(jwt, {
         role: 'owner',
-        entitlements: { 'token.create': true, 'user.redact': true },
+        entitlements: { 'db:user:$target': { 'token.create': true, 'user.redact': true } },
       });
       expect(response.status).toBe(201);
       const { data } = (await response.json()) as { data: { id: string; status: string } };
@@ -342,7 +328,11 @@ describe('JWT from a configured issuer, with and without a grant', () => {
         targetModel: 'User',
         targetUserId: user.id,
         status: 'sent',
-        content: { purpose: 'escalate', role: 'owner', entitlements: { 'token.create': true } },
+        content: {
+          purpose: 'escalate',
+          role: 'owner',
+          entitlements: { 'db:user:$target': { 'token.create': true } },
+        },
       });
       expect(response.status).toBe(201);
       const { data } = (await response.json()) as { data: { status: string } };
@@ -373,7 +363,11 @@ describe('JWT from a configured issuer, with and without a grant', () => {
           targetModel: 'User',
           targetUserId: user.id,
           status: 'sent',
-          content: { purpose: 'takeover', role: 'owner', entitlements: { 'token.create': true } },
+          content: {
+            purpose: 'takeover',
+            role: 'owner',
+            entitlements: { 'db:user:$target': { 'token.create': true } },
+          },
         });
       expect((await ask(admin.id)).status).toBe(403);
       const response = await ask(orgOwner.id);
@@ -400,7 +394,7 @@ describe('JWT from a configured issuer, with and without a grant', () => {
           targetModel: 'User',
           targetUserId: user.id,
           status: 'sent',
-          content: { purpose: 'artifactory', entitlements: { read: true }, entitlementsOnly: true },
+          content: { purpose: 'artifactory', entitlements: { 'db:user:$target': { read: true } } },
         },
       );
       expect(response.status).toBe(201);
@@ -429,7 +423,7 @@ describe('JWT from a configured issuer, with and without a grant', () => {
           targetModel: 'User',
           targetUserId: user.id,
           status: 'sent',
-          content: { purpose: 'artifactory', entitlements: { read: true }, entitlementsOnly: true },
+          content: { purpose: 'artifactory', entitlements: { 'db:user:$target': { read: true } } },
         },
       );
       const { data } = (await response.json()) as { data: { status: string } };

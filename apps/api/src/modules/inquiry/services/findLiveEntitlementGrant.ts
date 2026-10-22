@@ -11,7 +11,7 @@ import {
   InquiryType,
 } from '@template/db/generated/client/enums';
 import type { GrantedEntitlements } from '#/lib/context/types';
-import { entitlementGrantSchema } from '#/modules/inquiry/handlers/grantUserEntitlements';
+import { grantSchema } from '#/modules/inquiry/handlers/grantUserEntitlements';
 
 export const findLiveEntitlementGrant = async (
   inquiryId: string,
@@ -28,7 +28,7 @@ export const findLiveEntitlementGrant = async (
   });
   if (!inquiry) return null;
   const resolution = inquiry.resolution as { grant?: unknown };
-  const grant = entitlementGrantSchema.safeParse(resolution.grant);
+  const grant = grantSchema.safeParse(resolution.grant);
   if (!grant.success) return null;
   return { ...grant.data, inquiryId: inquiry.id, integrationId: inquiry.sourceIntegrationId };
 };
