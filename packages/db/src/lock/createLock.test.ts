@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { createLock } from '@template/db/lock/createLock';
+import { LockLostError } from '@template/db/lock/lockLostError';
 import { maxSafeHeartbeatMs } from '@template/db/lock/maxSafeHeartbeatMs';
 import type { LockRedis } from '@template/db/lock/types';
 import { getRedisClient } from '@template/db/redis/client';
@@ -66,6 +67,7 @@ describe('createLock', () => {
       expect(maxSafeHeartbeatMs({ ttlMs: 300_000, maxMissed: 2, commandTimeoutMs: 5_000 })).toBe(
         93_333,
       );
+      expect(maxSafeHeartbeatMs({ ttlMs: 30_000 })).toBe(7_499);
       expect(() => maxSafeHeartbeatMs({ ttlMs: 10_000, commandTimeoutMs: 5_000 })).toThrow(
         'createLock: ttlMs 10000 leaves no room for a heartbeat with a 5000 ms command timeout',
       );
@@ -229,6 +231,92 @@ describe('createLock', () => {
       await getRedisClient().set(keyFor(id), 'someone-else');
       expect(await lock.verify()).toBe(false);
       await lock.release();
+    });
+  });
+
+  describe('isWithinLease', () => {
+    it('is false before acquire and after release', async () => {
+      const lock = createLock({ service: 's', identifier: newId(), ...fastOpts });
+      expect(lock.isWithinLease()).toBe(false);
+      await lock.acquire();
+      expect(lock.isWithinLease()).toBe(true);
+      await lock.release();
+      expect(lock.isWithinLease()).toBe(false);
+    });
+
+    it('stays true past ttlMs while refreshes succeed', async () => {
+      const lock = createLock({
+        key: 'lock:test:lease-renewed',
+        redis: stubRedis(async () => 1),
+        ...fastOpts,
+      });
+      await lock.acquire();
+      await sleep(fastOpts.ttlMs + 50);
+      expect(lock.isWithinLease()).toBe(true);
+      await lock.release();
+    });
+
+    it('lapses when refreshes fail and stays lapsed after one succeeds again', async () => {
+      let mayRefresh = false;
+      let refreshes = 0;
+      const lock = createLock({
+        key: 'lock:test:lease-lapsed',
+        redis: stubRedis(async (...args) => {
+          if (!isRefresh(args)) return 1;
+          refreshes++;
+          if (!mayRefresh) throw new Error('refresh unavailable');
+          return 1;
+        }),
+        ttlMs: 300,
+        heartbeatMs: 100,
+        maxMissed: 1,
+      });
+      await lock.acquire();
+      await sleep(350);
+      expect(lock.isWithinLease()).toBe(false);
+      mayRefresh = true;
+      const failed = refreshes;
+      await waitFor(() => refreshes > failed);
+      expect(lock.isWithinLease()).toBe(false);
+      await lock.release();
+    });
+
+    it('times the lease from when the SET was sent, not when it replied', async () => {
+      let replySet = (): void => {};
+      const pending = new Promise<void>((resolve) => {
+        replySet = resolve;
+      });
+      const redis = {
+        set: async () => {
+          await pending;
+          return 'OK';
+        },
+        get: async () => null,
+        eval: async () => 1,
+      } as unknown as LockRedis;
+      const lock = createLock({
+        key: 'lock:test:lease-late-set',
+        redis,
+        ttlMs: 300,
+        heartbeatMs: 100,
+      });
+      const acquiring = lock.acquire();
+      await sleep(350);
+      replySet();
+      expect(await acquiring).toBe(true);
+      expect(lock.isWithinLease()).toBe(false);
+      await lock.release();
+    });
+  });
+
+  describe('assertHeld', () => {
+    it('passes while the lease holds and throws LockLostError once it is gone', async () => {
+      const lock = createLock({ service: 's', identifier: newId(), ...fastOpts });
+      expect(() => lock.assertHeld()).toThrow(LockLostError);
+      await lock.acquire();
+      expect(() => lock.assertHeld()).not.toThrow();
+      await lock.release();
+      expect(() => lock.assertHeld()).toThrow(LockLostError);
     });
   });
 

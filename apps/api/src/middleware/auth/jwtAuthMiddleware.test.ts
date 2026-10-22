@@ -92,6 +92,23 @@ describe('a person authenticates with a JWT, never a session', () => {
     expect(me.data).not.toHaveProperty('jwtVersion');
   });
 
+  it('a sign-up waiting for email verification does not return jwtVersion', async () => {
+    const response = await app.request('/api/auth/sign-up/email', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        name: 'Pending Person',
+        email: `pending-${Bun.randomUUIDv7()}@example.com`,
+        password: 'synthetic-pending-password',
+      }),
+    });
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { token: null; user: Record<string, unknown> };
+    expect(body.token).toBeNull();
+    expect(body.user).toHaveProperty('id');
+    expect(body.user).not.toHaveProperty('jwtVersion');
+  });
+
   it('the JWT authenticates API requests as the person', async () => {
     const response = await readMe(bearer(handoff.token));
     expect(response.status).toBe(200);

@@ -416,8 +416,8 @@ is built:
 **In a route body.** Route templates take a plain `ZodObject` `bodySchema`, so the route
 declares the axis field and every FK as optional, and `polymorphicBodyRefinement`
 (`#/lib/routeTemplates`) runs the strict per-arm check as its `bodyRefinement`. It takes the
-same `only` and `omit`, checks only the axis columns, and fails with the standard validation
-400:
+same `only` and `omit`, checks only the axis columns, reads a `null` FK as absent (as the
+write rule does), and fails with the standard validation 422:
 
 ```typescript
 createRoute({
@@ -436,8 +436,9 @@ createRoute({
   responseSchema,
 });
 // { ownerModel: 'Space', organizationId, spaceId, provider } passes
-// { ownerModel: 'Space', organizationId, provider } is a 400 at spaceId
-// { ownerModel: 'Organization', organizationId, spaceId, provider } is a 400: spaceId is unrecognized
+// { ownerModel: 'Space', organizationId, spaceId: null, provider } is a 422 at spaceId
+// { ownerModel: 'Organization', organizationId, spaceId, provider } is a 422: spaceId is unrecognized
+// { ownerModel: 'Organization', organizationId, spaceId: null, provider } passes
 ```
 
 **In flow bindings.** Bindings never carry the caller (see [FLOWS.md](FLOWS.md)), so omit

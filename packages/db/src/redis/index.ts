@@ -1,5 +1,14 @@
-export { cache, cacheKey, clearKey, upsertCache } from './cache';
 export {
+  type CacheCheck,
+  cache,
+  cacheKey,
+  checkCache,
+  clearKey,
+  singleFlightLock,
+  upsertCache,
+} from './cache';
+export {
+  COMMAND_TIMEOUT_MS,
   createRedisConnection,
   flushRedis,
   getRedisClient,
@@ -20,9 +29,14 @@ export {
   ROLLING_CACHE_LEAF_ATTEMPTS,
   ROLLING_CACHE_TICK_SECONDS,
   type RollingCache,
+  type RollingCacheComputeContext,
   type RollingCacheConfig,
   type RollingCacheFindManyArgs,
+  type RollingCacheResultParams,
+  type RollingCacheResults,
   type RollingCacheTarget,
   type RollingCacheTargets,
+  type RollingCacheValue,
+  type RollingCacheWrite,
 } from './rollingCacheTypes';
 export type { RedisEval } from './types';

@@ -61,13 +61,26 @@ export type JobHandler<TPayload = void> = ((
 };
 
 // Adds a child of the running job. Exists only on a stage's context: only a job can have children.
-// A superseding job may only add superseding children (validateChildJobHandler).
+// A superseding job may only add superseding children (validateChildJobHandler). `delay` holds the
+// child back that many ms before it starts; the parent still waits for it.
 export type EnqueueChildJob = <K extends keyof JobPayloads>(
   handlerName: K,
   payload: JobPayloads[K],
+  options?: { delay?: number },
 ) => Promise<void>;
 
-export type StageContext = WorkerContext & { enqueueChildJob: EnqueueChildJob };
+// The fan-out spacer: one child per payload, their starts spread evenly across `spreadSeconds`
+// (makeEnqueueChildJobs). Without a spread every child starts at once.
+export type EnqueueChildJobs = <K extends keyof JobPayloads>(
+  handlerName: K,
+  payloads: JobPayloads[K][],
+  options?: { spreadSeconds?: number },
+) => Promise<void>;
+
+export type StageContext = WorkerContext & {
+  enqueueChildJob: EnqueueChildJob;
+  enqueueChildJobs: EnqueueChildJobs;
+};
 
 export type JobStage<TPayload = void> = (
   ctx: StageContext,

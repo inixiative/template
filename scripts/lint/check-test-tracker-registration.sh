@@ -8,15 +8,12 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT_DIR"
 
-VIOLATIONS="$(git grep -nE 'registerTestTracker[[:space:]]*\(' -- 'apps/**/*.ts' 'apps/**/*.tsx' 'packages/**/*.ts' 'tests/**/*.ts' \
-  | grep -v '^packages/db/src/client\.ts:' \
-  | grep -v '^packages/db/src/test/testTracker\.ts:' \
-  | grep -v ':[[:space:]]*//' || true)"
+FILES=()
+while IFS= read -r file; do
+  FILES+=("$file")
+done < <(git grep -l 'registerTestTracker' -- 'apps/**/*.ts' 'apps/**/*.tsx' 'packages/**/*.ts' 'tests/**/*.ts' \
+  | grep -v -e '^packages/db/src/client\.ts$' -e '^packages/db/src/test/testTracker\.ts$' || true)
 
-[[ -z "$VIOLATIONS" ]] && exit 0
+[[ "${#FILES[@]}" -eq 0 ]] && exit 0
 
-echo "Found in-file registerTestTracker() calls."
-echo "The db client registers the test tracker in every test process; remove the call."
-echo
-echo "$VIOLATIONS" | sed 's/^/  /'
-exit 1
+bun scripts/lint/lib/testTrackerRegistration.ts "${FILES[@]}"

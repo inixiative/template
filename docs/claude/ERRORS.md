@@ -65,6 +65,7 @@ unless overridden.
 | `ResponseValidationError` | 500 (response failed its own schema) |
 | `Prisma.PrismaClientValidationError` | 400 "Invalid query parameters" |
 | `Prisma P2002` | 409 "Resource already exists: …" |
+| `LockLostError` (`@template/db`, from `lock.assertHeld()`) | 409 "Lost the lock guarding this write; please retry" |
 | `Prisma P2025` | 404 "Resource not found" |
 | `AppError` | its body |
 | plain `HTTPException` | `toAppError`: same status and message (status name when empty), label and guidance from `HTTP_ERROR_MAP` (by class, 400/500, for an unmapped status), its response headers kept, body always JSON |

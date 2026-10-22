@@ -1,66 +1,56 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it, spyOn } from 'bun:test';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
 import { clearHookRegistry, db } from '@template/db';
-import { cleanupTouchedTables, createCronJob, getNextSeq } from '@template/db/test';
+import { cleanupTouchedTables, createCronJob } from '@template/db/test';
 import { registerCronJobSyncHook } from '#/hooks/cronJobSync/hook';
-import { queue } from '#/jobs/queue';
 import { registerCronJobs } from '#/jobs/registerCronJobs';
-import { type JobData, JobLane, type JobsQueue, JobType } from '#/jobs/types';
+import { JobLane, JobType } from '#/jobs/types';
+import { connectRealJobsQueue } from '#tests/utils/realJobsQueue';
 
-describe('cron add sites stamp the resolved lane', () => {
-  const added: Array<{ name: string; data: JobData }> = [];
-  let restore = (): void => {};
+describe('cron schedulers stamp the resolved lane and the row retry settings', () => {
+  let jobs: Awaited<ReturnType<typeof connectRealJobsQueue>>;
 
-  beforeAll(() => {
+  const templateOf = async (jobId: string) =>
+    (await jobs.realQueue.getJobScheduler(jobId))?.template;
+
+  beforeAll(async () => {
     registerCronJobSyncHook();
-    const add = spyOn(queue, 'add').mockImplementation((async (name: string, data: JobData) => {
-      added.push({ name, data });
-      return { id: name };
-    }) as never);
-    const removeRepeatable = spyOn(queue, 'removeRepeatable').mockImplementation(
-      (async () => true) as never,
-    );
-    restore = () => {
-      add.mockRestore();
-      removeRepeatable.mockRestore();
-    };
+    jobs = await connectRealJobsQueue();
   });
 
   afterEach(async () => {
-    added.length = 0;
+    await jobs.realQueue.obliterate({ force: true });
     await cleanupTouchedTables(db);
   });
 
   afterAll(async () => {
-    restore();
     clearHookRegistry();
-    await cleanupTouchedTables(db);
+    await jobs.close();
   });
 
-  it('registerCronJobs builds the same envelope as enqueue, lane included', async () => {
-    await createCronJob({
-      name: `register-${getNextSeq()}`,
+  it('the cronJobSync hook builds the same envelope as enqueue, lane included', async () => {
+    const { entity } = await createCronJob({
       handler: 'sweepSegments',
-      enabled: true,
+      maxAttempts: 2,
+      backoffMs: 1234,
     });
-    added.length = 0;
-    const recorded: Array<{ name: string; data: JobData }> = [];
-    const recordingQueue = {
-      add: async (name: string, data: JobData) => {
-        recorded.push({ name, data });
-      },
-      getRepeatableJobs: async () => [],
-    } as unknown as JobsQueue;
 
-    await registerCronJobs(recordingQueue);
-
-    expect(recorded).toHaveLength(1);
-    expect(recorded[0]?.data).toMatchObject({ type: JobType.cron, lane: JobLane.fast });
+    const template = await templateOf(entity.jobId);
+    expect(template?.data).toMatchObject({ id: entity.id, type: JobType.cron, lane: JobLane.fast });
+    expect(template?.opts).toMatchObject({
+      attempts: 2,
+      backoff: { type: 'exponential', delay: 1234 },
+    });
   });
 
-  it('the cronJobSync hook stamps the lane when a row is created', async () => {
-    await createCronJob({ name: `sync-${getNextSeq()}`, handler: 'sweepSegments', enabled: true });
+  it('registerCronJobs builds the same envelope', async () => {
+    const { entity } = await createCronJob({ handler: 'sweepSegments' });
+    await jobs.realQueue.removeJobScheduler(entity.jobId);
 
-    expect(added).toHaveLength(1);
-    expect(added[0]?.data).toMatchObject({ type: JobType.cron, lane: JobLane.fast });
+    await registerCronJobs();
+
+    expect((await templateOf(entity.jobId))?.data).toMatchObject({
+      type: JobType.cron,
+      lane: JobLane.fast,
+    });
   });
 });

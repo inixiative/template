@@ -5,6 +5,7 @@
  * @uses infrastructure:redis
  */
 import { makeEnqueueChildJob } from '#/jobs/makeEnqueueChildJob';
+import { makeEnqueueChildJobs } from '#/jobs/makeEnqueueChildJobs';
 import { parkOnUnfinishedChildren } from '#/jobs/parkOnUnfinishedChildren';
 import type { JobData, JobHandler, JobHandlerArgs, StagedJob, WorkerContext } from '#/jobs/types';
 
@@ -37,8 +38,9 @@ export const runJobStages = <TPayload>(
     const resumeAt = (job.data as JobData).stage ?? 0;
     if (token && resumeAt > 0) await parkOnUnfinishedChildren(job, token);
     const enqueueChildJob = makeEnqueueChildJob(ctx, options);
+    const enqueueChildJobs = makeEnqueueChildJobs(enqueueChildJob);
     for (const [offset, runStage] of stages.slice(resumeAt).entries()) {
-      await runStage({ ...ctx, enqueueChildJob }, ...args);
+      await runStage({ ...ctx, enqueueChildJob, enqueueChildJobs }, ...args);
       if (!token) continue;
       await job.updateData({ ...job.data, stage: resumeAt + offset + 1 });
       await parkOnUnfinishedChildren(job, token);

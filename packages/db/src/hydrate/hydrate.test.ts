@@ -3,6 +3,8 @@ import { db } from '@template/db';
 import { TokenOwnerModel } from '@template/db/generated/client/enums';
 import { fetchOne } from '@template/db/hydrate/fetchOne';
 import { hydrate } from '@template/db/hydrate/hydrate';
+import { cacheKey } from '@template/db/redis/cache';
+import { getRedisClient } from '@template/db/redis/client';
 import {
   cleanupTouchedTables,
   createOrganizationUser,
@@ -129,5 +131,16 @@ describe('fetchOne', () => {
   it('returns null for missing record', async () => {
     const result = await fetchOne('user', 'nonexistent-id');
     expect(result).toBeNull();
+  });
+
+  it('a withDeleted read returns a tombstone without caching it under the live key', async () => {
+    const { entity: user } = await createUser();
+    await db.user.update({ where: { id: user.id }, data: { deletedAt: new Date() } });
+
+    const tombstone = await db.withDeleted(() => fetchOne('user', user.id));
+
+    expect(tombstone?.id).toBe(user.id);
+    expect(await getRedisClient().exists(cacheKey('user', user.id))).toBe(0);
+    expect(await fetchOne('user', user.id)).toBeNull();
   });
 });

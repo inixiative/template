@@ -89,10 +89,10 @@ export const makeController = <R extends RouteConfig, T>(
     if (isAuthProbe(c)) return c.body(null, 204) as unknown as TypedResponse;
 
     for (const { target, schema } of requestRefinements) {
+      if (target === 'json' && !c.req.header('content-type')) continue;
       const value = (c.req as ValidatedRequest).valid(target);
-      if (value === undefined) continue;
       const result = await (Array.isArray(value) ? z.array(schema) : schema).safeParseAsync(value);
-      if (!result.success) return c.json(result, 400) as unknown as TypedResponse;
+      if (!result.success) throw result.error;
     }
 
     const statusCodes = Object.keys(route.responses || {}).map(Number);

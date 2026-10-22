@@ -13,10 +13,8 @@ export const isManyAction = (action: DbAction): action is ManyAction =>
   action === DbAction.updateManyAndReturn ||
   action === DbAction.deleteMany;
 
-// What the write itself carries, per row, with no pre-image merged in: `data` for create, update
-// and the *AndReturn forms, both arms for upsert. A guard that judges only the values being
-// written reads these.
-export const writtenPatches = ({ action, args }: HookOptions): HookRow[] => {
+// The rows a write sets, coalesced: `data` for create and update (single or bulk), both arms of an upsert.
+export const writeData = ({ action, args }: HookOptions): HookRow[] => {
   const { data, create, update } = (args ?? {}) as {
     data?: unknown;
     create?: unknown;

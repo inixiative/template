@@ -30,12 +30,17 @@ export const cacheReference: CacheReference = {
 
   Space: (r) => [
     cacheKey('space', r.id),
+    cacheKey('space', { organizationId: r.organizationId, id: r.id }),
     cacheKey('space', { organizationId: r.organizationId, slug: r.slug }),
     cacheKey('organization', r.organizationId, ['spaces']),
   ],
 
   SpaceUser: (r) => [
-    cacheKey('spaceUser', { spaceId: r.spaceId, userId: r.userId }),
+    cacheKey('spaceUser', {
+      organizationId: r.organizationId,
+      spaceId: r.spaceId,
+      userId: r.userId,
+    }),
     cacheKey('user', r.userId, ['spaceUsers']),
     cacheKey('space', r.spaceId, ['spaceUsers']),
     cacheKey('user', r.userId, ['relations']),

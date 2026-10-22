@@ -1,7 +1,17 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
-import { createSpaceUser } from '@template/db/test';
+import { createSpaceUser, createUser } from '@template/db/test';
 import { cleanupTouchedTables, getTouchedTables } from '@template/db/test/testTracker';
+
+const writeInChildProcess = (env: Record<string, string | undefined>) =>
+  Bun.spawnSync(
+    [
+      'bun',
+      '-e',
+      "const { db } = await import('@template/db'); await db.user.deleteMany({ where: { id: 'none' } });",
+    ],
+    { cwd: `${import.meta.dir}/../..`, env, stdout: 'pipe', stderr: 'pipe' },
+  );
 
 describe('cleanupTouchedTables', () => {
   afterEach(async () => {
@@ -42,4 +52,37 @@ describe('cleanupTouchedTables', () => {
 
     expect(await db.spaceUser.count()).toBe(0);
   });
+});
+
+describe('clearing the database once per process', () => {
+  afterEach(async () => {
+    await cleanupTouchedTables(db);
+  });
+
+  it('clears every table before the first write of a process', async () => {
+    const { entity: user } = await createUser();
+
+    const run = writeInChildProcess({ ...process.env, TEST_DB_CLEARED: undefined });
+
+    expect(run.exitCode).toBe(0);
+    expect(await db.user.count({ where: { id: user.id } })).toBe(0);
+  }, 30_000);
+
+  it('leaves the parent test rows alone in a child process it spawns', async () => {
+    const { entity: user } = await createUser();
+
+    const run = writeInChildProcess(process.env);
+
+    expect(run.exitCode).toBe(0);
+    expect(await db.user.count({ where: { id: user.id } })).toBe(1);
+  }, 30_000);
+
+  it('skips the clear in an E2E process', async () => {
+    const { entity: user } = await createUser();
+
+    const run = writeInChildProcess({ ...process.env, TEST_DB_CLEARED: undefined, IS_E2E: '1' });
+
+    expect(run.exitCode).toBe(0);
+    expect(await db.user.count({ where: { id: user.id } })).toBe(1);
+  }, 30_000);
 });
