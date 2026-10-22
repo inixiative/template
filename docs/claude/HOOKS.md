@@ -72,7 +72,7 @@ All Prisma mutations wrapped with before/after hooks via `mutationLifeCycle` ext
 | `model` | string | Prisma model name |
 | `action` | DbAction | create, update, delete, etc. |
 | `args` | object | Prisma query args |
-| `result` | object/array | Mutation result (after only) |
+| `result` | object/array | Mutation result projected onto the model's columns (after only). An `include` on the write never reaches hooks, so `result` and `previous` have the same shape |
 | `previous` | object/array | Previous state (if fetched) |
 
 ### Action Types
@@ -146,7 +146,7 @@ export const AUDIT_ENABLED_MODELS: AuditSubjectModel[] = [
 |-------|-------------|
 | `action` | `create`, `update`, or `delete` |
 | `subjectModel` | Which model was mutated |
-| `before` / `after` | Full record state (filtered + redacted) |
+| `before` / `after` | The record's own columns (filtered + redacted). Never its relations: an `include` on the write is dropped, so a snapshot never embeds related rows or earlier audit history |
 | `changes` | Field-level diff for updates only |
 | `actorUserId` | Who triggered the mutation |
 | `actorSpoofUserId` | Admin acting on behalf of a user |
@@ -158,13 +158,14 @@ export const AUDIT_ENABLED_MODELS: AuditSubjectModel[] = [
 
 ### Field Processing Pipeline
 
-Before storing, each record goes through:
+`buildAuditEntry` (`apps/api/src/hooks/auditLog/hook.ts`) runs each record through:
 
-1. **Ignore fields** — strip noise fields (`updatedAt`, `lastLoginAt`, `lastUsedAt`) that don't represent meaningful changes
-2. **Redact fields** — replace sensitive values with `[REDACTED]` (passwords, token hashes, auth secrets)
-3. **Diff** — for updates, compute which fields actually changed (after filtering/redacting)
+1. **Filter** (`filterForAudit` → `filterFields`) — strip noop fields (`updatedAt`, `lastLoginAt`, `lastUsedAt`, ordered-list positions). Both sides are already column-only: the mutation lifecycle projects `result` through `pickColumns`.
+2. **Diff** — for updates, `computeDiff` compares the filtered, **unredacted** before/after, so a change to a sensitive column is still detected.
+3. **Empty-diff guard** — an update whose diff is empty (only noop fields changed) writes no audit log.
+4. **Redact** — `redactSensitiveFields` masks sensitive columns (passwords, token hashes, encrypted columns) in `before`/`after` with `[REDACTED]`, and `redactChangeDiff` masks both sides of a changed sensitive field in `changes`.
 
-If an update produces an empty diff (only ignored/redacted fields changed), no audit log is written.
+`processAuditData` (filter + redact) builds the same column-only snapshot for the email-versioning hook.
 
 ### Soft Delete Detection
 
@@ -234,8 +235,8 @@ A subscription receives a CustomerRef change when its owner (User, Organization 
   model: 'User',
   action: 'create' | 'update' | 'delete',
   resourceId: '...',
-  data: { ...fields },
-  previousData: { ...fields },  // For updates only
+  data: { ...columns },
+  previousData: { ...columns },  // For updates only
   timestamp: '2024-01-15T12:00:00.000Z'
 }
 ```

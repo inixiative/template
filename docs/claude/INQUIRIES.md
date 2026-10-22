@@ -316,11 +316,11 @@ Defined in `modules/inquiry/schemas/inquiryResponseSchemas.ts`:
 
 | Schema | Relations included | Used on |
 |--------|--------------------|---------|
-| `inquiryResponseSchema` | All 6 (sources + targets) + `auditLogsAsSubject` | Single read (`GET /inquiry/:id`), admin list |
-| `inquirySentResponseSchema` | Targets only + `auditLogsAsSubject` | Sent lists, create response, update, send |
-| `inquiryReceivedResponseSchema` | Sources only + `auditLogsAsSubject` | Received lists, resolve |
+| `inquiryResponseSchema` | All 6 (sources + targets) | Single read (`GET /inquiry/:id`), admin list |
+| `inquirySentResponseSchema` | Targets only | Sent lists, create response, update, send |
+| `inquiryReceivedResponseSchema` | Sources only | Received lists, resolve |
 
-The schemas are chosen to return only the relations the current side needs — source-side mutations (update, send) include target data; target-side mutations (resolve) include source data; admin/read endpoints include all 6.
+No schema returns the inquiry's audit history: that has its own route, `GET /api/admin/auditLog`. The schemas are chosen to return only the relations the current side needs — source-side mutations (update, send) include target data; target-side mutations (resolve) include source data; admin/read endpoints include all 6.
 
 ### Standardized includes
 
@@ -332,7 +332,7 @@ Each mutation uses the include that matches what its caller needs:
 | `POST /inquiry/:id/send` | `includeInquirySent` | Source is sending; only targets relevant |
 | `POST /inquiry/:id/resolve` | `includeInquiryReceived` | Target is resolving; only sources relevant |
 | `GET /inquiry/:id` | `includeInquiryResponse` | Preloaded by resource context middleware — no extra DB call |
-| Admin list | `includeInquiryResponse` | All relations for full audit view |
+| Admin list | `includeInquiryResponse` | All source and target relations |
 
 ## Permissions (ReBAC)
 
