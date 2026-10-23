@@ -461,7 +461,7 @@ export const setUserContext = async (c: Context<AppEnv>, userWithOrgs: UserWithO
 
   // Set up permissions
   const permix = c.get('permix');
-  permix.setUserId(user.id);
+  permix.setActor(buildActor(user.id, ActorModel.User, null));
   if (isSuperadmin(user)) permix.setSuperadmin(true);
   await setupUserPermissions(c);
   await setupOrgPermissions(c);

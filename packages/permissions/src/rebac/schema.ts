@@ -5,7 +5,7 @@
  * @uses none
  */
 import { Operator } from '@inixiative/json-rules';
-import { ownerActions } from '@template/permissions/rebac/ownerActions';
+import { integrationActions, ownerActions } from '@template/permissions/rebac/ownerActions';
 import type { RebacSchema } from '@template/permissions/rebac/types';
 
 const highRoles = ['owner', 'admin'];
@@ -19,6 +19,8 @@ export const rebacSchema: RebacSchema = {
         manage: 'own',
         operate: 'manage',
         read: 'operate',
+        'user.identify': 'read',
+        'organization.create': 'operate',
       },
     },
 
@@ -89,24 +91,42 @@ export const rebacSchema: RebacSchema = {
         read: { rel: 'segment', action: 'read' },
       },
     },
-    'db:integration': { actions: ownerActions() },
+    'db:integration': { actions: integrationActions() },
     'db:flow': { actions: ownerActions(['user']) },
 
     'db:organizationUser': {
       actions: {
-        read: { any: [{ self: 'userId' }, { rel: 'organization', action: 'read' }] },
-        leave: { self: 'userId' },
+        read: {
+          any: [
+            { self: 'userId', action: 'read' },
+            { rel: 'organization', action: 'read' },
+          ],
+        },
+        leave: { any: [{ self: 'userId', action: 'operate' }, 'membership.operate'] },
         manage: { rel: 'organization', action: 'manage' },
         own: { rel: 'organization', action: 'own' },
+        'membership.own': null,
+        'membership.manage': 'membership.own',
+        'membership.operate': 'membership.manage',
+        'membership.read': 'membership.operate',
       },
     },
 
     'db:spaceUser': {
       actions: {
-        read: { any: [{ self: 'userId' }, { rel: 'space', action: 'read' }] },
-        leave: { self: 'userId' },
+        read: {
+          any: [
+            { self: 'userId', action: 'read' },
+            { rel: 'space', action: 'read' },
+          ],
+        },
+        leave: { any: [{ self: 'userId', action: 'operate' }, 'membership.operate'] },
         manage: { rel: 'space', action: 'manage' },
         own: { rel: 'space', action: 'own' },
+        'membership.own': null,
+        'membership.manage': 'membership.own',
+        'membership.operate': 'membership.manage',
+        'membership.read': 'membership.operate',
       },
     },
 
@@ -117,7 +137,7 @@ export const rebacSchema: RebacSchema = {
     'db:token': {
       actions: {
         // Self-delete for tokens with a userId (User, OrgUser, SpaceUser).
-        leave: { self: 'userId' },
+        leave: { self: 'userId', action: 'operate' },
         // Owner-side assign, role-aware.
         assign: {
           any: [
@@ -159,10 +179,10 @@ export const rebacSchema: RebacSchema = {
         // Read: source or target can read their own inquiry
         read: {
           any: [
-            { self: 'sourceUserId' },
+            { self: 'sourceUserId', action: 'read' },
             { rel: 'sourceOrganization', action: 'manage' },
             { rel: 'sourceSpace', action: 'manage' },
-            { self: 'targetUserId' },
+            { self: 'targetUserId', action: 'read' },
             { rel: 'targetOrganization', action: 'manage' },
             { rel: 'targetSpace', action: 'manage' },
           ],
@@ -176,7 +196,7 @@ export const rebacSchema: RebacSchema = {
             {
               all: [
                 { rule: { field: 'type', operator: Operator.in, value: [] } },
-                { self: 'sourceUserId' },
+                { self: 'sourceUserId', action: 'operate' },
               ],
             },
             // inviteOrganizationUser: high roles (owner/admin) require own
@@ -220,6 +240,20 @@ export const rebacSchema: RebacSchema = {
                 { rel: 'sourceSpace.organization', action: 'own' },
               ],
             },
+            // grantUserEntitlements — asking needs nothing; the approver needs authority to assign it
+            {
+              all: [
+                {
+                  rule: { field: 'type', operator: Operator.in, value: ['grantUserEntitlements'] },
+                },
+                {
+                  any: [
+                    { self: 'sourceUserId', action: 'operate' },
+                    { rel: 'sourceIntegration', action: 'manage' },
+                  ],
+                },
+              ],
+            },
           ],
         },
 
@@ -228,7 +262,27 @@ export const rebacSchema: RebacSchema = {
         // self check fails for regular users — superadmin bypass handles it.
         resolve: {
           any: [
-            { self: 'targetUserId' },
+            {
+              all: [
+                {
+                  rule: {
+                    field: 'type',
+                    operator: Operator.notIn,
+                    value: ['grantUserEntitlements'],
+                  },
+                },
+                { self: 'targetUserId', action: 'operate' },
+              ],
+            },
+            {
+              all: [
+                {
+                  rule: { field: 'type', operator: Operator.in, value: ['grantUserEntitlements'] },
+                },
+                { self: 'targetUserId', action: 'operate' },
+                { rel: 'targetUser', action: 'token.create' },
+              ],
+            },
             {
               any: [
                 // transferSpace — target org owner only
@@ -248,6 +302,22 @@ export const rebacSchema: RebacSchema = {
               ],
             },
             { rel: 'targetSpace', action: 'manage' },
+          ],
+        },
+
+        // Revoke: either party withdraws a standing grant
+        revoke: {
+          all: [
+            { rule: { field: 'type', operator: Operator.in, value: ['grantUserEntitlements'] } },
+            {
+              any: [
+                { self: 'sourceUserId', action: 'operate' },
+                { self: 'targetUserId', action: 'operate' },
+                { rel: 'sourceIntegration', action: 'manage' },
+                { rel: 'targetOrganization', action: 'manage' },
+                { rel: 'targetSpace', action: 'manage' },
+              ],
+            },
           ],
         },
       },

@@ -58,6 +58,14 @@ enum IntegrationOwnerModel {
   SpaceUser
 }
 
+// A credential's reach over integrations: its bound one, none, all its roles allow, or a list
+enum IntegrationReach {
+  own
+  none
+  all
+  listed
+}
+
 enum Provider {
   slack
   teams

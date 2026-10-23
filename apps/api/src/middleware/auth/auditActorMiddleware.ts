@@ -5,17 +5,16 @@
  * @uses primitive:appEvents, feature:integrations
  */
 
+import { hydrate } from '@template/db';
 import { auditActorContext } from '@template/db/lib/auditActorContext';
+import { check, rebacSchema } from '@template/permissions/rebac';
 import { log } from '@template/shared/logger';
 import type { Context, Next } from 'hono';
 import { clientAddress } from '#/lib/clientIp';
 import { findOwnedIntegration } from '#/modules/integration/services/findOwnedIntegration';
 import type { AppEnv } from '#/types/appEnv';
 
-const resolveOriginIntegrationId = async (c: Context<AppEnv>): Promise<string | null> => {
-  const boundIntegrationId = c.get('token')?.integrationId ?? null;
-  if (boundIntegrationId) return boundIntegrationId;
-
+const assertedIntegrationId = async (c: Context<AppEnv>): Promise<string | null> => {
   const asserted = c.req.header('x-integration-id');
   if (!asserted) return null;
 
@@ -24,9 +23,13 @@ const resolveOriginIntegrationId = async (c: Context<AppEnv>): Promise<string | 
     organizationIds: (c.get('organizations') ?? []).map((o) => o.id),
     spaceIds: (c.get('spaces') ?? []).map((s) => s.id),
   });
-  if (owned) return owned.id;
+  if (
+    owned &&
+    check(c.get('permix'), rebacSchema, 'integration', await hydrate('integration', owned), 'read')
+  )
+    return owned.id;
 
-  log.warn('x-integration-id not owned by the request principal — ignoring', {
+  log.warn('x-integration-id not owned or not reached by the request principal — ignoring', {
     assertedIntegrationId: asserted,
   });
   return null;
@@ -47,7 +50,7 @@ export const auditActorMiddleware = async (c: Context<AppEnv>, next: Next) => {
     ipAddress: clientAddress(c),
     userAgent: c.req.header('user-agent') ?? null,
     sourceInquiryId: null,
-    integrationId: await resolveOriginIntegrationId(c),
+    integrationId: c.get('permix').getActor()?.integrationId ?? (await assertedIntegrationId(c)),
     bypassSoftDeleteScope: false,
   };
 

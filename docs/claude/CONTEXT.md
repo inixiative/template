@@ -83,7 +83,7 @@ resourceContextMiddleware (per-route)
   - Enforces 404 (0 results) or 409 (>1 results)
   - Sets resource, resourceType
     ↓
-Validation middleware (validatePermission, validateNotToken, etc.)
+Validation middleware (validatePermission, validateSelfPermission, etc.)
     ↓
 Route handler
   - Access context via getters
@@ -206,19 +206,16 @@ export const prepareRequest = async (c: Context<AppEnv>, next: Next) => {
 Located in `apps/api/src/lib/context/setUserContext.ts`. Called by auth middleware after successful authentication.
 
 ```typescript
-export const setUserContext = async (c: Context<AppEnv>, userWithOrgs: UserWithOrganizationUsers) => {
-  const { organizationUsers, ...user } = userWithOrgs;
+export const setUserContext = async (c: Context<AppEnv>, userWithRelations: UserWithRelations) => {
+  const { organizationUsers, organizations, spaceUsers, spaces, ...user } = userWithRelations;
 
-  // Set user data
   c.set('user', user);
   c.set('organizationUsers', organizationUsers);
+  c.set('organizations', organizations);
+  c.set('spaceUsers', spaceUsers);
+  c.set('spaces', spaces);
 
-  // Set up permissions
-  const permix = c.get('permix');
-  permix.setUserId(user.id);
-  if (isSuperadmin(user)) permix.setSuperadmin(true);
-  await setupUserPermissions(c);
-  await setupOrgPermissions(c);
+  c.set('permix', await buildPermix(principalFromContext(c)));
 };
 ```
 
@@ -227,7 +224,7 @@ export const setUserContext = async (c: Context<AppEnv>, userWithOrgs: UserWithO
 ### What It Does
 
 1. **Splits user from org memberships** - Separates for individual access
-2. **Sets user ID on permix** - Links permissions to the authenticated user
+2. **Sets the actor on permix** - `buildPermix` builds it from the principal ([The Actor](PERMISSIONS.md#the-actor))
 3. **Sets superadmin flag** - Bypasses all permission checks
 4. **Sets up user permissions** - For user-owned resources
 5. **Sets up org permissions** - For each org the user belongs to

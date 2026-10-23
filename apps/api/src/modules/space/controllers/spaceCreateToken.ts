@@ -4,8 +4,9 @@
  * @partOf feature:tenancy
  * @uses primitive:authz, primitive:routeTemplates, feature:auth
  */
+
 import { hydrate } from '@template/db';
-import { check, rebacSchema } from '@template/permissions/rebac';
+import { canAssign } from '@template/permissions/assign';
 import { getResource } from '#/lib/context/getResource';
 import { makeError } from '#/lib/errors';
 import { makeController } from '#/lib/utils/makeController';
@@ -21,7 +22,8 @@ export const spaceCreateTokenController = makeController(
 
     const hydrated = await hydrate('space', space);
 
-    if (!check(permix, rebacSchema, 'space', { ...hydrated, role: body.role }, 'assign')) {
+    const owner = { model: 'space' as const, record: hydrated };
+    if (!canAssign(permix, owner, owner, body.role, body.entitlements)) {
       throw makeError({ status: 403, message: `Cannot create ${body.role} token` });
     }
 
@@ -31,7 +33,11 @@ export const spaceCreateTokenController = makeController(
       organizationId: space.organizationId,
       spaceId: space.id,
       role: body.role,
+      entitlements: body.entitlements,
+      entitlementsOnly: body.entitlementsOnly,
       expiresAt: body.expiresAt,
+      integrationReach: body.integrationReach,
+      integrationReachIds: body.integrationReachIds,
     });
 
     return respond.created(token);

@@ -15,13 +15,13 @@ const METHODS = ['get', 'post', 'put', 'patch', 'delete'] as const;
 
 const PERSON_ONLY = new Set([
   'meCreateToken',
+  'meRedact',
   'organizationCreateToken',
+  'organizationDelete',
   'organizationUserCreateToken',
   'spaceCreateToken',
   'spaceUserCreateToken',
-  'organizationDelete',
-  'tokenDelete',
-  'meRotateJwts',
+  'tokenUpdate',
 ]);
 
 const expectedSchemes = (path: string, operationId: string | undefined): string[] => {
@@ -46,13 +46,14 @@ const operations = (spec: Spec) =>
   );
 
 describe('OpenAPI security', () => {
-  it('publishes the three credential schemes the API accepts', async () => {
+  it('publishes the four credential schemes the API accepts', async () => {
     const spec = await loadSpec();
     const schemes = spec.components?.securitySchemes ?? {};
 
     expect(Object.keys(schemes).sort()).toEqual(['apiToken', 'internalSecret', 'userJwt']);
     expect(schemes.userJwt).toMatchObject({ type: 'http', scheme: 'bearer' });
     expect(schemes.apiToken).toMatchObject({ type: 'http', scheme: 'bearer' });
+    expect(schemes.userJwt).toMatchObject({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' });
     expect(schemes.internalSecret).toMatchObject({
       type: 'apiKey',
       in: 'header',
@@ -94,13 +95,13 @@ describe('OpenAPI security', () => {
     expect(unregistered).toEqual([]);
   });
 
-  it('publishes session-only auth where a token is refused, and both credentials elsewhere', async () => {
+  it('person-only operations publish only userJwt; other session actions accept every credential', async () => {
     const spec = await loadSpec();
+    const everyCredential = [{ userJwt: [] }, { apiToken: [] }];
 
     expect(spec.paths?.['/api/v1/me/tokens']?.post?.security).toEqual([{ userJwt: [] }]);
-    expect(spec.paths?.['/api/v1/me/contacts']?.post?.security).toEqual([
-      { userJwt: [] },
-      { apiToken: [] },
-    ]);
+    expect(spec.paths?.['/api/v1/me/redact']?.post?.security).toEqual([{ userJwt: [] }]);
+    expect(spec.paths?.['/api/v1/me/rotateJwts']?.post?.security).toEqual(everyCredential);
+    expect(spec.paths?.['/api/v1/me/contacts']?.post?.security).toEqual(everyCredential);
   });
 });

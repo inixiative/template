@@ -4,7 +4,7 @@
  * @partOf feature:tenancy
  * @uses primitive:authz, primitive:routeTemplates, feature:auth
  */
-import { check, rebacSchema } from '@template/permissions/rebac';
+import { canAssign } from '@template/permissions/assign';
 import { getResource } from '#/lib/context/getResource';
 import { makeError } from '#/lib/errors';
 import { makeController } from '#/lib/utils/makeController';
@@ -18,7 +18,8 @@ export const organizationCreateTokenController = makeController(
     const org = getResource<'organization'>(c);
     const body = c.req.valid('json');
 
-    if (!check(permix, rebacSchema, 'organization', { ...org, role: body.role }, 'assign')) {
+    const owner = { model: 'organization' as const, record: org };
+    if (!canAssign(permix, owner, owner, body.role, body.entitlements)) {
       throw makeError({ status: 403, message: `Cannot create ${body.role} token` });
     }
 
@@ -27,7 +28,11 @@ export const organizationCreateTokenController = makeController(
       ownerModel: 'Organization',
       organizationId: org.id,
       role: body.role,
+      entitlements: body.entitlements,
+      entitlementsOnly: body.entitlementsOnly,
       expiresAt: body.expiresAt,
+      integrationReach: body.integrationReach,
+      integrationReachIds: body.integrationReachIds,
     });
 
     return respond.created(token);

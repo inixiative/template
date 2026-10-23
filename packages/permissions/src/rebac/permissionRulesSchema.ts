@@ -4,34 +4,46 @@
  * @partOf primitive:authz
  * @uses none
  */
+
+import { type Condition, listBindings } from '@inixiative/json-rules';
+import { actionRuleSchema as libraryActionRuleSchema } from '@inixiative/permissions/actionRuleSchema';
 import type { AccessorName } from '@template/db';
+import { actorBindNames } from '@template/permissions/actor';
 import { rebacSchema } from '@template/permissions/rebac/schema';
 import { z } from 'zod';
 
-// Recursive Zod schema for an `ActionRule` envelope. Validates the SHAPE only:
-// - delegation strings, { rel, action }, { self }, { any }, { all } structures
-// - the inner json-rules Condition under `{ rule: ... }` is passed through as
-//   unknown — runtime json-rules `check()` validates it when the rule fires.
-const actionRuleBase: z.ZodType = z.lazy(() =>
-  z.union([
-    z.string(), // delegate to another action on the same model
-    z.null(),
-    z.object({ rel: z.string(), action: z.string() }).strict(),
-    z.object({ self: z.string() }).strict(),
-    z.object({ rule: z.unknown() }).strict(),
-    z.object({ any: z.array(actionRuleBase) }).strict(),
-    z.object({ all: z.array(actionRuleBase) }).strict(),
-  ]),
-);
-
-// Register a $ref name so zod-to-openapi can break the recursion when api
-// boots and serializes its OpenAPI spec. The `.openapi()` method is patched
-// onto zod's prototype by @hono/zod-openapi at runtime; we cast to access it
-// without forcing this package to depend on @hono/zod-openapi.
-const withOpenApiRef = actionRuleBase as z.ZodType & {
-  openapi?: (name: string) => z.ZodType;
+// why: the library schema's condition arms are z.custom, which OpenAPI cannot render; it validates, OpenAPI shows a named ActionRule
+const ruleConditions = (rule: unknown): Condition[] => {
+  if (!rule || typeof rule !== 'object') return [];
+  if ('rule' in rule) return [rule.rule as Condition];
+  if ('any' in rule && Array.isArray(rule.any)) return rule.any.flatMap(ruleConditions);
+  if ('all' in rule && Array.isArray(rule.all)) return rule.all.flatMap(ruleConditions);
+  return [];
 };
-const actionRuleSchema: z.ZodType = withOpenApiRef.openapi?.('ActionRule') ?? actionRuleBase;
+
+const validatedActionRule = z.unknown().superRefine((value, context) => {
+  const parsed = libraryActionRuleSchema.safeParse(value);
+  if (!parsed.success) {
+    for (const issue of parsed.error.issues) context.addIssue({ ...issue });
+    return;
+  }
+  const unknownBinds = ruleConditions(value)
+    .flatMap((condition) => listBindings(condition))
+    .filter((name) => name.startsWith('actor.') && !actorBindNames.has(name));
+  if (unknownBinds.length)
+    context.addIssue({
+      code: 'custom',
+      message: `The actor has no ${unknownBinds.join(', ')}; it carries ${[...actorBindNames].join(', ')}`,
+    });
+});
+const withOpenApiRef = validatedActionRule as z.ZodType & {
+  openapi?: (name: string, metadata: { description: string }) => z.ZodType;
+};
+const actionRuleSchema: z.ZodType =
+  withOpenApiRef.openapi?.('ActionRule', {
+    description:
+      'A serialized @inixiative/permissions ActionRule: a delegated action, { rel, action }, { self, action }, { rule }, { actor }, { any }, { all }, a boolean or null',
+  }) ?? validatedActionRule;
 
 export const buildPermissionRulesSchema = (model: AccessorName, pick?: readonly string[]) => {
   const schemaActions = Object.keys(rebacSchema.permissions[`db:${model}`]?.actions ?? {});

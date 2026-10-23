@@ -4,8 +4,9 @@
  * @partOf feature:users
  * @uses primitive:routeTemplates, feature:auth
  */
+import { SessionAction } from '@template/permissions/client';
 import { createRoute } from '#/lib/routeTemplates';
-import { validateNotToken } from '#/middleware/validations/validateNotToken';
+import { validateSelfPermission } from '#/middleware/validations/validateSelfPermission';
 import { Modules } from '#/modules/modules';
 import { Tags } from '#/modules/tags';
 import {
@@ -19,6 +20,6 @@ export const meCreateTokenRoute = createRoute({
   skipId: true,
   bodySchema: tokenCreateBodySchema,
   responseSchema: tokenCreateResponseSchema,
-  middleware: [validateNotToken],
+  middleware: [validateSelfPermission(SessionAction.createToken)],
   tags: [Tags.me, Tags.token],
 });

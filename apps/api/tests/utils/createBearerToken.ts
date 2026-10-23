@@ -1,16 +1,22 @@
 import { createHash, randomBytes } from 'node:crypto';
 import type { User } from '@template/db/generated/client/client';
 import { createToken } from '@template/db/test';
+import { defaultIntegrationReach } from '@template/permissions';
 
 // A real Token row plus its raw key — the credential external callers (MCP, integrations)
 // present. The factory only stores the hash, so the raw key is minted here.
-export const createBearerToken = async (user: User) => {
+export const createBearerToken = async (
+  user: User,
+  overrides: Parameters<typeof createToken>[0] = {},
+) => {
   const rawKey = randomBytes(24).toString('hex');
   const { entity: token } = await createToken(
     {
       ownerModel: 'User',
       keyHash: createHash('sha256').update(rawKey).digest('hex'),
       keyPrefix: rawKey.slice(0, 16),
+      integrationReach: defaultIntegrationReach(overrides.integrationId ?? null),
+      ...overrides,
     },
     { user },
   );

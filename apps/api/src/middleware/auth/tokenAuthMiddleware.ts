@@ -18,8 +18,8 @@ import { LogScope, log } from '@template/shared/logger';
 import type { Context, Next } from 'hono';
 import { setUserContext } from '#/lib/context/setUserContext';
 import type { TokenWithRelations } from '#/lib/context/types';
-import { setupOrgPermissions } from '#/lib/permissions/setupOrgPermissions';
-import { setupSpacePermissions } from '#/lib/permissions/setupSpacePermissions';
+import { buildPermix } from '#/lib/permissions/buildPermix';
+import { principalFromContext } from '#/lib/permissions/permissionPrincipal';
 import { findUserWithRelations } from '#/modules/user/services/find';
 import type { AppEnv } from '#/types/appEnv';
 
@@ -140,8 +140,7 @@ const authenticateToken = async (c: Context<AppEnv>): Promise<void> => {
       spaces: [space],
     });
   } else {
-    await setupOrgPermissions(c);
-    await setupSpacePermissions(c);
+    c.set('permix', await buildPermix(principalFromContext(c)));
   }
 };
 

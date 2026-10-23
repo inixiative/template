@@ -8,6 +8,7 @@ import type { QueryKey } from '@tanstack/react-query';
 import type { InquiryItem, InquiryResolveData } from '@template/sdk';
 import {
   meReceivedManyInquiriesQueryKey,
+  meSentManyInquiriesQueryKey,
   organizationReceivedManyInquiriesQueryKey,
   organizationSentManyInquiriesQueryKey,
   spaceSentManyInquiriesQueryKey,
@@ -22,6 +23,7 @@ export const INQUIRY_TYPE_LABELS: Record<InquiryType, string> = {
   createSpace: 'Space Request',
   updateSpace: 'Space Update',
   transferSpace: 'Space Transfer',
+  grantUserEntitlements: 'Access Grant',
 };
 
 export const INQUIRY_STATUS_COLORS: Record<InquiryStatus | 'expired', string> = {
@@ -31,10 +33,16 @@ export const INQUIRY_STATUS_COLORS: Record<InquiryStatus | 'expired', string> = 
   approved: 'bg-green-100 text-green-700',
   denied: 'bg-red-100 text-red-700',
   canceled: 'bg-gray-100 text-gray-700',
+  revoked: 'bg-gray-100 text-gray-700',
   expired: 'bg-gray-100 text-gray-700',
 };
 
-export const INQUIRY_TERMINAL_STATUSES: InquiryStatus[] = ['approved', 'denied', 'canceled'];
+export const INQUIRY_TERMINAL_STATUSES: InquiryStatus[] = [
+  'approved',
+  'denied',
+  'canceled',
+  'revoked',
+];
 
 export const isTerminalInquiry = (inq: {
   status: InquiryStatus;
@@ -107,6 +115,7 @@ export const inquiryFiltersToSearchFields = (
 
 export type InquiryMeta = {
   id: string;
+  updatedAt: string;
   type: InquiryType;
   sourceOrganizationId: string | null;
   sourceSpaceId: string | null;
@@ -123,6 +132,7 @@ export const sourceMutations: Record<InquiryType, (inq: InquiryMeta) => QueryKey
   ],
   updateSpace: (inq) => [spaceSentManyInquiriesQueryKey({ path: { id: inq.sourceSpaceId! } })],
   transferSpace: (inq) => [spaceSentManyInquiriesQueryKey({ path: { id: inq.sourceSpaceId! } })],
+  grantUserEntitlements: (_inq) => [meSentManyInquiriesQueryKey()],
 };
 
 // Query keys affected when the TARGET side mutates (resolve/approve/deny)
@@ -133,4 +143,5 @@ export const targetMutations: Record<InquiryType, (inq: InquiryMeta) => QueryKey
   transferSpace: (inq) => [
     organizationReceivedManyInquiriesQueryKey({ path: { id: inq.targetOrganizationId! } }),
   ],
+  grantUserEntitlements: (_inq) => [meReceivedManyInquiriesQueryKey()],
 };

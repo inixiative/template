@@ -3,18 +3,30 @@ import { db } from '@template/db';
 import type { User } from '@template/db/generated/client/client';
 import { IntegrationOwnerModel } from '@template/db/generated/client/enums';
 import { auditActorContext } from '@template/db/lib/auditActorContext';
-import { cleanupTouchedTables, createIntegration, createUser } from '@template/db/test';
+import {
+  cleanupTouchedTables,
+  createIntegration,
+  createOrganization,
+  createOrganizationUser,
+  createUser,
+} from '@template/db/test';
+import { setUserContext } from '#/lib/context/setUserContext';
 import { auditActorMiddleware } from '#/middleware/auth/auditActorMiddleware';
 import { spoofMiddleware } from '#/middleware/auth/spoofMiddleware';
+import { findUserWithRelations } from '#/modules/user/services/find';
 import { createTestApp } from '#tests/createTestApp';
 
 type Echo = { integrationId: string | null; actorUserId: string | null };
 
 const buildApp = (user: User) =>
   createTestApp({
-    mockUser: user,
     mount: [
       (app) => {
+        app.use('*', async (c, next) => {
+          const found = await findUserWithRelations(user.id);
+          if (found) await setUserContext(c, found);
+          await next();
+        });
         app.use('*', spoofMiddleware);
         app.use('*', auditActorMiddleware);
         app.get('/echo', (c) => {
@@ -62,6 +74,25 @@ describe('auditActorMiddleware x-integration-id', () => {
     const body = await echo(admin, { 'x-integration-id': integration.id });
 
     expect(body.actorUserId).toBe(admin.id);
+    expect(body.integrationId).toBeNull();
+  });
+
+  it("ignores an organization member asserting another member's integration", async () => {
+    const { entity: organization } = await createOrganization();
+    const { entity: member } = await createUser();
+    const { entity: otherMember } = await createUser();
+    await createOrganizationUser({ role: 'admin' }, { user: member, organization });
+    const { entity: otherMembership } = await createOrganizationUser(
+      { role: 'member' },
+      { user: otherMember, organization },
+    );
+    const { entity: integration } = await createIntegration(
+      { ownerModel: IntegrationOwnerModel.OrganizationUser },
+      { user: otherMember, organization, organizationUser: otherMembership },
+    );
+
+    const body = await echo(member, { 'x-integration-id': integration.id });
+
     expect(body.integrationId).toBeNull();
   });
 

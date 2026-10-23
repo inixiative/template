@@ -12,6 +12,7 @@ import type {
   Token,
   User,
 } from '@template/db/generated/client/client';
+import type { EntitlementGrant, IntegrationBinding } from '@template/permissions';
 
 export type TokenWithRelations = Token & {
   user: User | null;
@@ -27,3 +28,8 @@ export type TokenWithRelations = Token & {
       })
     | null;
 };
+
+export type GrantedEntitlements = EntitlementGrant &
+  IntegrationBinding & {
+    inquiryId: string;
+  };

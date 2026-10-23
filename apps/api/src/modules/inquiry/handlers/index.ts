@@ -1,5 +1,6 @@
 import type { InquiryType } from '@template/db/generated/client/enums';
 import { createSpaceHandler } from '#/modules/inquiry/handlers/createSpace';
+import { grantUserEntitlementsHandler } from '#/modules/inquiry/handlers/grantUserEntitlements';
 import { inviteOrganizationUserHandler } from '#/modules/inquiry/handlers/inviteOrganizationUser';
 import { transferSpaceHandler } from '#/modules/inquiry/handlers/transferSpace';
 import type { InquiryHandler } from '#/modules/inquiry/handlers/types';
@@ -10,4 +11,5 @@ export const inquiryHandlers: Record<InquiryType, InquiryHandler> = {
   createSpace: createSpaceHandler,
   updateSpace: updateSpaceHandler,
   transferSpace: transferSpaceHandler,
+  grantUserEntitlements: grantUserEntitlementsHandler,
 };

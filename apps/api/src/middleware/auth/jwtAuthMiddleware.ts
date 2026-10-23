@@ -2,7 +2,7 @@
  * @atlas
  * @kind middleware
  * @partOf feature:auth
- * @uses infrastructure:prisma, primitive:errors
+ * @uses infrastructure:prisma, primitive:authz, primitive:errors
  */
 import type { Context, Next } from 'hono';
 import { errors, type JWTPayload } from 'jose';
@@ -10,6 +10,7 @@ import { selfIssuer } from '#/lib/auth/personJwt';
 import { verifyIssuerJwt } from '#/lib/auth/verifyIssuerJwt';
 import { setUserContext } from '#/lib/context/setUserContext';
 import { makeError } from '#/lib/errors';
+import { findLiveEntitlementGrant } from '#/modules/inquiry/services/findLiveEntitlementGrant';
 import { findUserWithRelations } from '#/modules/user/services/find';
 import type { AppEnv } from '#/types/appEnv';
 
@@ -38,6 +39,13 @@ export const jwtAuthMiddleware = async (c: Context<AppEnv>, next: Next) => {
   const user = await findUserWithRelations(claims.sub);
   if (!user || user.deletedAt) throw unauthorized();
   if (claims.iss === selfIssuer() && claims.ver !== user.jwtVersion) throw unauthorized();
+
+  if (claims.grant !== undefined) {
+    if (typeof claims.grant !== 'string') throw unauthorized();
+    const grantedEntitlements = await findLiveEntitlementGrant(claims.grant, user.id);
+    if (!grantedEntitlements) throw unauthorized();
+    c.set('entitlementGrant', grantedEntitlements);
+  }
 
   await setUserContext(c, user);
   await next();

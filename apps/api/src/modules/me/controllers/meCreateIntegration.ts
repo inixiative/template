@@ -6,6 +6,7 @@
  */
 import type { Prisma } from '@template/db';
 import { makeController } from '#/lib/utils/makeController';
+import { validateReachableIntegration } from '#/modules/integration/validations/validateReachableIntegration';
 import { meCreateIntegrationRoute } from '#/modules/me/routes/meCreateIntegration';
 
 export const meCreateIntegrationController = makeController(
@@ -14,6 +15,7 @@ export const meCreateIntegrationController = makeController(
     const user = c.get('user')!;
     const db = c.get('db');
     const body = c.req.valid('json');
+    await validateReachableIntegration(c, { ownerModel: 'User', userId: user.id });
 
     const integration = await db.integration.create({
       data: {
