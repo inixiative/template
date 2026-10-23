@@ -5,6 +5,7 @@
  * @uses infrastructure:redis, infrastructure:prisma
  */
 import '#/config/env';
+import '#/lib/rollingCaches';
 import { createRedisConnection, db } from '@template/db';
 import { LogScope, log } from '@template/shared/logger';
 import { metrics } from '@template/shared/telemetry';
@@ -36,7 +37,9 @@ export const initializeWorker = async (): Promise<void> => {
   }
 
   // BullMQ Worker needs its own connection (separate from Queue)
-  workerRedis = createRedisConnection('Redis:BullMQ:Worker', resolveBullmqRedisUrl());
+  workerRedis = createRedisConnection('Redis:BullMQ:Worker', resolveBullmqRedisUrl(), {
+    isBlocking: true,
+  });
 
   const slowSlots = createSlowSlotPool(process.env.JOBS_WORKER_CONCURRENCY);
   jobsWorker = new Worker('jobs', (job: Job) => processJob(job, { slowSlots }), {

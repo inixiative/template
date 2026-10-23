@@ -29,8 +29,8 @@
 bun run local
 
 # Individual services
-turbo watch local#api          # API on :8000
-turbo watch local#web          # Web on :3000
+turbo watch local#api          # API on the registry api port (bunx @inixiative/config ports <project>)
+turbo watch local#web          # Web on the registry web port
 turbo watch local:worker#api   # Background jobs
 ```
 
@@ -128,4 +128,4 @@ docker exec -it ${PROJECT_NAME:-template}_redis redis-cli
 
 ### Network
 
-BullBoard UI at `http://localhost:8000/bullBoard` for job inspection.
+BullBoard UI at `<API_URL>/bullBoard` for job inspection.

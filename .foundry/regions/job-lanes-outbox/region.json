@@ -1,0 +1,53 @@
+{
+  "id": "job-lanes-outbox",
+  "title": "Job lanes and overflow outbox",
+  "routing": "Is this about how background jobs share the queue under load: fast vs slow lanes (JobData.lane, a handler's lane default, lane on an enqueue, fanOutLane), job priority (withLanePriority, SLOW_LANE_PRIORITY), slow slot shares (SlowSlotPool, claimSlotOrRequeue, parking), the queue depth budget (JOBS_MAX_QUEUE_DEPTH, queueDepths), overflow flags, spilling to and draining the JobOutbox (shouldSpill, spillToOutbox, runDrainOutboxPass, runOnOutboxQueue), slow-lane gauges (jobs.slow.*), or slowLaneCheck.ts? Not the supersede lanes (claimLane / watchLane), which are concurrency-locks.",
+  "concepts": ["job-lanes", "job-outbox"],
+  "tokens": 14889,
+  "tokenMethod": "chars/4",
+  "files": {
+    "recognise": {
+      "path": "recognise.md",
+      "tokens": 2349,
+      "experimental": true,
+      "note": "recognise/pick split under test (model round); not the standard"
+    },
+    "knowledge": {
+      "path": "knowledge.md",
+      "tokens": 14889
+    }
+  },
+  "runsAgreed": 0,
+  "sources": {
+    "docs": ["docs/claude/CONCURRENCY.md", "docs/claude/JOBS.md"],
+    "docUnits": [
+      "doc:docs/claude/CONCURRENCY.md#job-lanes-withlanepriority",
+      "doc:docs/claude/JOBS.md#fast-and-slow-lanes",
+      "doc:docs/claude/JOBS.md#fast-and-slow-lanes/choosing-a-lane",
+      "doc:docs/claude/JOBS.md#fast-and-slow-lanes/priority-fast-work-is-always-picked-first",
+      "doc:docs/claude/JOBS.md#fast-and-slow-lanes/slots-slow-work-uses-at-most-its-share",
+      "doc:docs/claude/JOBS.md#fast-and-slow-lanes/pressure-one-budget-divided-by-lane",
+      "doc:docs/claude/JOBS.md#fast-and-slow-lanes/lane-configuration",
+      "doc:docs/claude/JOBS.md#fast-and-slow-lanes/validating-against-real-infrastructure",
+      "doc:docs/claude/JOBS.md#overflow-buffer"
+    ],
+    "catalogClusters": [
+      "cron-and-recurring-work",
+      "dev-setup-scripts",
+      "email-delivery-senders",
+      "environment-config",
+      "error-handling",
+      "graceful-shutdown-lifecycle",
+      "job-definition-and-enqueue",
+      "job-overflow-outbox",
+      "locks-and-serialization",
+      "observability-telemetry",
+      "supersede-lanes",
+      "testing-helpers"
+    ],
+    "codeEntries": 54,
+    "docMembers": 45
+  },
+  "bypassLines": 11,
+  "glossaryTerms": 27
+}

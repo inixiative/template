@@ -8,16 +8,17 @@ import type { CronJob } from '../../src/generated/client/client';
 import type { SeedFile } from '../seed';
 
 // Cron schedules live in the DB (registerCronJobs.ts loads enabled rows on
-// startup; the CronJob sync hook keeps BullMQ in step on live updates). Seed
-// inserts each row once with `createOnly: true` — admin can later edit pattern
-// or payload via the admin UI without the seed clobbering changes.
+// startup; the CronJob sync hook keeps BullMQ in step). Each seed run syncs a
+// system row's name, jobId, handler and description from code, so a rename lands
+// on deploy; the fields admins edit (pattern, enabled, payload, retry policy) are
+// set on insert only.
 //
 // Multiple stale-data cleanups share one handler (cleanStaleData) — model +
 // retentionDays + optional filters are baked into the payload. Add a row to
 // schedule a new model's cleanup; no new handler needed.
 export const cronJobSeeds: SeedFile<CronJob> = {
   model: 'cronJob',
-  createOnly: true,
+  updateOmitFields: ['pattern', 'enabled', 'payload', 'maxAttempts', 'backoffMs'],
   records: [
     {
       id: '01900000-0000-7000-8000-000000000001',
@@ -65,6 +66,20 @@ export const cronJobSeeds: SeedFile<CronJob> = {
       enabled: true,
       handler: 'cleanStaleData',
       payload: { model: 'Flow', retentionDays: 15 / (24 * 60), dateField: 'updatedAt' },
+      maxAttempts: 3,
+      backoffMs: 5000,
+    },
+    {
+      id: '01900000-0000-7000-8000-000000000005',
+      name: 'coordinateRollingCaches',
+      jobId: 'coordinateRollingCaches',
+      description:
+        'Rolling-cache root: enqueues the refresh branch of every cache whose timer is about to run out.',
+      // Every minute: must match ROLLING_CACHE_TICK_SECONDS (packages/db/src/redis/rollingCacheTypes.ts).
+      pattern: '* * * * *',
+      enabled: true,
+      handler: 'coordinateRollingCaches',
+      payload: null,
       maxAttempts: 3,
       backoffMs: 5000,
     },

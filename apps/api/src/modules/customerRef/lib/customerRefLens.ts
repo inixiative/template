@@ -5,6 +5,7 @@
  * @uses infrastructure:prisma
  */
 import {
+  andWhere,
   bindLens,
   type Condition,
   describeRuleSources,
@@ -106,7 +107,7 @@ export const ownedSegments = async (
     (query) => query.model === 'Segment' && query.field === 'id',
   )!;
   return db.segment.findMany({
-    where: { AND: [(await sourceQueryWhere(source, { lens })) as Prisma.SegmentWhereInput, where] },
+    where: andWhere([await sourceQueryWhere(source, { lens }), where]) as Prisma.SegmentWhereInput,
   });
 };
 

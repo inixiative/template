@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it } from 'bun:test';
-import { db } from '@template/db';
 import { type Job, WaitingChildrenError } from 'bullmq';
-import { enqueueJob } from '#/jobs/enqueue';
 import type { CleanStaleDataPayload } from '#/jobs/handlers/cleanStaleData';
 import { makeJob } from '#/jobs/makeJob';
+import { makeSingletonJob } from '#/jobs/makeSingletonJob';
+import { makeSupersedingJob } from '#/jobs/makeSupersedingJob';
 import { queue } from '#/jobs/queue';
 import { type JobData, JobLane, JobType, type WorkerContext } from '#/jobs/types';
 import { createMockJob } from '#tests/createTestWorker';
@@ -33,9 +33,9 @@ const flowParent = (token: string | undefined): FlowParent => {
   return job;
 };
 
-const contextFor = (job: Job): WorkerContext => ({ db, queue, job });
+const contextFor = (job: Job): WorkerContext => ({ queue, job });
 
-describe('makeJob({ stages, finish })', () => {
+describe('{ stages, finish } (runJobStages)', () => {
   afterEach(async () => {
     await queue.redis.flushdb();
   });
@@ -72,7 +72,7 @@ describe('makeJob({ stages, finish })', () => {
     expect(job.data.stage).toBe(2);
   });
 
-  it('runs straight through when no stage adds children', async () => {
+  it('runs straight through when a stage adds no children', async () => {
     const ran: string[] = [];
     const job = flowParent('worker-token');
     const staged = makeJob<Record<string, never>>({
@@ -96,22 +96,15 @@ describe('makeJob({ stages, finish })', () => {
     expect(job.data.stage).toBe(2);
   });
 
-  it('runs every stage and finish in order inline, and a failing child does not fail its parent', async () => {
-    const failingChild: CleanStaleDataPayload = {
-      model: 'User',
-      retentionDays: 1,
-      archive: { target: 's3' },
-    };
-    await expect(enqueueJob('cleanStaleData', failingChild)).rejects.toThrow('Archive not yet');
-
+  it('a resumed run parks before the next stage while the previous stage still has unfinished children', async () => {
     const ran: string[] = [];
-    const job = flowParent(undefined);
+    const job = flowParent('worker-token');
+    job.data = { ...job.data, stage: 1 };
+    job.hasUnfinishedChildren = true;
     const staged = makeJob<Record<string, never>>({
       stages: [
-        async (ctx) => {
+        async () => {
           ran.push('first');
-          await ctx.enqueueChildJob('cleanStaleData', failingChild);
-          job.hasUnfinishedChildren = true;
         },
         async () => {
           ran.push('second');
@@ -122,10 +115,100 @@ describe('makeJob({ stages, finish })', () => {
       },
     });
 
+    await expect(staged(contextFor(job), {})).rejects.toBeInstanceOf(WaitingChildrenError);
+    expect(ran).toEqual([]);
+    expect(job.state).toBe('waiting-children');
+  });
+
+  it('inline, a child that throws fails its parent', async () => {
+    const failingChild: CleanStaleDataPayload = {
+      model: 'User',
+      retentionDays: 1,
+      archive: { target: 's3' },
+    };
+
+    const ran: string[] = [];
+    const job = flowParent(undefined);
+    const staged = makeJob<Record<string, never>>({
+      stages: [
+        async (ctx) => {
+          ran.push('first');
+          await ctx.enqueueChildJob('cleanStaleData', failingChild);
+        },
+        async () => {
+          ran.push('second');
+        },
+      ],
+      finish: async () => {
+        ran.push('finish');
+      },
+    });
+
+    await expect(staged(contextFor(job), {})).rejects.toThrow('Archive not yet');
+    expect(ran).toEqual(['first']);
+  });
+
+  it('a singleton takes stages too, and runs them under its lock', async () => {
+    const ran: string[] = [];
+    const job = flowParent(undefined);
+    const staged = makeSingletonJob<{ key: string }>(
+      {
+        stages: [
+          async () => {
+            ran.push('stage');
+          },
+        ],
+        finish: async () => {
+          ran.push('finish');
+        },
+      },
+      { lockKey: ({ key }) => key },
+    );
+
+    await staged(contextFor(job), { key: 'one' });
+
+    expect(ran).toEqual(['stage', 'finish']);
+  });
+
+  it('a superseding job refuses a child that cannot be superseded, before adding it', async () => {
+    const job = flowParent(undefined);
+    const staged = makeSupersedingJob<Record<string, never>>(
+      {
+        stages: [
+          async (ctx) => {
+            await ctx.enqueueChildJob('cleanStaleData', { model: 'User', retentionDays: 1 });
+          },
+        ],
+        finish: async () => {},
+      },
+      () => 'one-lane',
+    );
+
+    await expect(staged(contextFor(job), {})).rejects.toThrow(
+      `A superseding job's children must be superseding jobs, and "cleanStaleData" is not`,
+    );
+  });
+
+  it('a superseding job may add superseding children', async () => {
+    const ran: string[] = [];
+    const job = flowParent(undefined);
+    const staged = makeSupersedingJob<Record<string, never>>(
+      {
+        stages: [
+          async (ctx) => {
+            await ctx.enqueueChildJob('reconcileSegment', { segmentId: Bun.randomUUIDv7() });
+            ran.push('stage');
+          },
+        ],
+        finish: async () => {
+          ran.push('finish');
+        },
+      },
+      () => 'superseding-children-lane',
+    );
+
     await staged(contextFor(job), {});
 
-    expect(ran).toEqual(['first', 'second', 'finish']);
-    expect(job.data.stage).toBeUndefined();
-    expect(job.state).toBe('active');
+    expect(ran).toEqual(['stage', 'finish']);
   });
 });

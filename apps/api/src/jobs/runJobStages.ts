@@ -4,66 +4,48 @@
  * @partOf primitive:jobs
  * @uses infrastructure:redis
  */
-import { LogScope, log } from '@template/shared/logger';
-import { type Job, WaitingChildrenError } from 'bullmq';
-import { enqueueJob } from '#/jobs/enqueue';
-import type {
-  EnqueueChildJob,
-  JobData,
-  JobHandler,
-  JobHandlerArgs,
-  StagedJob,
-  WorkerContext,
-} from '#/jobs/types';
+import { makeEnqueueChildJob } from '#/jobs/makeEnqueueChildJob';
+import { makeEnqueueChildJobs } from '#/jobs/makeEnqueueChildJobs';
+import { parkOnUnfinishedChildren } from '#/jobs/parkOnUnfinishedChildren';
+import type { JobData, JobHandler, JobHandlerArgs, StagedJob, WorkerContext } from '#/jobs/types';
 
-// Under a worker (the job holds a token) each child is added with this job as its BullMQ parent and
-// `ignoreDependencyOnFailure`: the child keeps the queue's retries, and only once its last attempt
-// fails does it count as done, so a dead child never holds its parent open. An inline run has no
-// token and no parent: the child runs inside the call, and one that throws is logged and swallowed,
-// which is what `ignoreDependencyOnFailure` does under a worker.
-const childJobEnqueuer = (job: Job, onAdded: () => void): EnqueueChildJob => {
-  const parent = job.token && job.id ? { id: job.id, queue: job.queueQualifiedName } : undefined;
-  return async (handlerName, payload) => {
-    onAdded();
-    if (parent) {
-      await enqueueJob(handlerName, payload, { parent, ignoreDependencyOnFailure: true });
-      return;
-    }
-    try {
-      await enqueueJob(handlerName, payload);
-    } catch (err) {
-      log.warn(
-        `Child job ${handlerName} failed; its parent ${job.name} (${job.id}) carries on`,
-        { err },
-        LogScope.job,
-      );
-    }
-  };
-};
-
-// The handler makeJob builds from `{ stages, finish }`: a BullMQ flow parent run as a step job. The
-// next stage lives on the job envelope (`stage`), so a resumed run starts there and an earlier stage
-// never reruns. After a stage that added children the job parks in `waiting-children`, holding no
-// worker slot, and BullMQ runs it again once the last child has reported; a stage that added none
-// runs straight into the next. A worker that dies mid-stage leaves `stage` unchanged, so the retry
-// reruns that stage and may add its children twice: children must be idempotent.
-// An inline run (no token) runs every stage and `finish` in order within one call.
-export const runJobStages =
-  <TPayload>({ stages, finish }: StagedJob<TPayload>): JobHandler<TPayload> =>
-  async (ctx: WorkerContext, ...args: JobHandlerArgs<TPayload>) => {
+// The handler every job constructor builds from `{ stages, finish }` (via toJobHandler): a BullMQ flow
+// parent run as a step job. The current stage lives on the job envelope (`stage`), so each run starts
+// where the last one stopped and code in an earlier stage never runs twice.
+//
+// After a stage the job records `stage + 1` and parks if any child is unfinished
+// (parkOnUnfinishedChildren); BullMQ runs it again once the last child has reported. With nothing
+// unfinished the next stage runs straight away in the same run. `finish` runs once, after the last
+// stage's children have reported.
+//
+// A run that resumes past stage 0 parks first if children are still unfinished: a worker that died
+// between recording the stage and parking would otherwise retry straight into the next stage while the
+// previous stage's children were still running. A worker that dies mid-stage leaves `stage` unchanged,
+// so the retry runs that stage again and may add its children twice: children must be idempotent.
+//
+// An inline test run has no token: children run inline as they are added, so the stages and `finish`
+// simply run in order within one call.
+export const runJobStages = <TPayload>(
+  { stages, finish }: StagedJob<TPayload>,
+  options: { childrenMustSupersede: boolean } = { childrenMustSupersede: false },
+): JobHandler<TPayload> => {
+  const handler: JobHandler<TPayload> = async (
+    ctx: WorkerContext,
+    ...args: JobHandlerArgs<TPayload>
+  ) => {
     const { job } = ctx;
     const { token } = job;
     const resumeAt = (job.data as JobData).stage ?? 0;
+    if (token && resumeAt > 0) await parkOnUnfinishedChildren(job, token);
+    const enqueueChildJob = makeEnqueueChildJob(ctx, options);
+    const enqueueChildJobs = makeEnqueueChildJobs(enqueueChildJob);
     for (const [offset, runStage] of stages.slice(resumeAt).entries()) {
-      let hasAddedChildren = false;
-      const enqueueChildJob = childJobEnqueuer(job, () => {
-        hasAddedChildren = true;
-      });
-      await runStage({ ...ctx, enqueueChildJob }, ...args);
+      await runStage({ ...ctx, enqueueChildJob, enqueueChildJobs }, ...args);
       if (!token) continue;
       await job.updateData({ ...job.data, stage: resumeAt + offset + 1 });
-      if (hasAddedChildren && (await job.moveToWaitingChildren(token)))
-        throw new WaitingChildrenError();
+      await parkOnUnfinishedChildren(job, token);
     }
     await finish(ctx, ...args);
   };
+  return handler;
+};

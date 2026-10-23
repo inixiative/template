@@ -5,6 +5,7 @@
  * @uses primitive:shared
  */
 import type { ApiErrorBody } from '@template/shared/errors';
+import { formatFieldErrors } from '@template/ui/lib/formatFieldErrors';
 import { navigateToLogin } from '@template/ui/lib/routeRedirect';
 import { toast } from '@template/ui/lib/toast';
 import { useAppStore } from '@template/ui/store';
@@ -22,13 +23,19 @@ export const handleApiError = (error: unknown) => {
     if ('message' in error && typeof error.message === 'string') message = error.message;
     if ('guidance' in error && typeof error.guidance === 'string')
       guidance = error.guidance as ApiErrorBody['guidance'];
+    if ('fieldErrors' in error && error.fieldErrors && typeof error.fieldErrors === 'object') {
+      const details = formatFieldErrors(
+        error.fieldErrors as NonNullable<ApiErrorBody['fieldErrors']>,
+      );
+      if (details) message = details;
+    }
   }
 
   const handlers = {
     fixInput: () => toast.error(`${message}. Please double check your data.`),
     tryAgain: () => toast.error(`${message}. Please try again.`),
     reauthenticate: () =>
-      toast.error('Session expired. Please log in again.', {
+      toast.error('Your sign-in has ended. Please log in again.', {
         action: { label: 'Login', onClick: () => navigateToLogin(useAppStore.getState) },
       }),
     requestPermission: () => toast.error(`${message}. Contact an administrator to request access.`),

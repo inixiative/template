@@ -1,0 +1,47 @@
+{
+  "id": "ws-data-streams",
+  "title": "WebSocket data streams",
+  "routing": "Is this about pushing incremental data (not a hint) over the socket: defineStream and STREAM_DEFINITIONS (streamDefinitionFor / streamDefinitionOf), stream kind list vs log and ordering, the required audience (shared vs perRecipient, expectStreamAudience, isPerCallerScope), openDataStream / closeDataStream / rejectDataStream and the snapshot (fetchStreamSnapshot, resolveStreamRoute), re-authorization sweeps (startStreamReauthorizeSweep, reauthorizeOpenStreams, reprobeStreamAccess, x-auth-probe), ordering and sequence numbers (streamSeqKeyFor, seq gap \u2192 streamResync, no replay), producing appends (streamAppend, routeRow, appendToStream, deliverWSHandoffs, sendToStreamLocal), the frames (streamSnapshotFrame, streamAppendFrame), or the frontend (useStream, useStreamAction, STREAM_FOLDS, listStream / logStream, dataStreamQueryKey, addStreamListener)?",
+  "concepts": ["ws-data-streams"],
+  "tokens": 14564,
+  "tokenMethod": "chars/4",
+  "files": {
+    "recognise": {
+      "path": "recognise.md",
+      "tokens": 2687,
+      "experimental": true,
+      "note": "recognise/pick split under test (model round); not the standard"
+    },
+    "knowledge": {
+      "path": "knowledge.md",
+      "tokens": 14564
+    }
+  },
+  "runsAgreed": 0,
+  "sources": {
+    "docs": ["docs/claude/WEBSOCKETS.md"],
+    "docUnits": [
+      "doc:docs/claude/WEBSOCKETS.md#data-streams",
+      "doc:docs/claude/WEBSOCKETS.md#data-streams/stream-definitions",
+      "doc:docs/claude/WEBSOCKETS.md#data-streams/audience",
+      "doc:docs/claude/WEBSOCKETS.md#data-streams/authorization-and-re-authorization",
+      "doc:docs/claude/WEBSOCKETS.md#data-streams/ordering",
+      "doc:docs/claude/WEBSOCKETS.md#data-streams/sequence-numbers",
+      "doc:docs/claude/WEBSOCKETS.md#data-streams/producing-appends",
+      "doc:docs/claude/WEBSOCKETS.md#data-streams/frontend"
+    ],
+    "catalogClusters": [
+      "app-events-side-effects",
+      "auth-middleware-validation",
+      "locks-and-serialization",
+      "rate-limiting",
+      "redis-infrastructure",
+      "websocket-connection-management",
+      "websocket-realtime-delivery"
+    ],
+    "codeEntries": 43,
+    "docMembers": 27
+  },
+  "bypassLines": 21,
+  "glossaryTerms": 22
+}

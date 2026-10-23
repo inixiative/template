@@ -5,13 +5,14 @@
  * @uses infrastructure:prisma, feature:webhooks
  */
 import crypto from 'node:crypto';
-import type { Db, Prisma } from '@template/db';
+import { db, type Prisma } from '@template/db';
 import type {
   WebhookEvent,
   WebhookEventAction,
   WebhookEventStatus,
 } from '@template/db/generated/client/client';
 import { log } from '@template/shared/logger';
+import { isFinalAttempt } from '#/jobs/isFinalAttempt';
 import type { JobHandler } from '#/jobs/types';
 import { isIntegrationRecordPoisoned } from '#/modules/integration/services/isIntegrationRecordPoisoned';
 import { poisonIntegrationRecord } from '#/modules/integration/services/poisonIntegrationRecord';
@@ -26,7 +27,6 @@ export type SendWebhookPayload = {
 
 export const sendWebhook: JobHandler<SendWebhookPayload> = async (ctx, payload) => {
   const { subscriptionId, action, resourceId, data, timestamp } = payload;
-  const { db } = ctx;
 
   const subscription = await db.webhookSubscription.findUnique({ where: { id: subscriptionId } });
   if (!subscription?.isActive) {
@@ -62,6 +62,7 @@ export const sendWebhook: JobHandler<SendWebhookPayload> = async (ctx, payload) 
   let status: WebhookEventStatus = 'success';
   let error: string | undefined;
   let httpStatus: number | undefined;
+  let cause: unknown;
 
   try {
     const response = await fetch(subscription.url, {
@@ -84,13 +85,17 @@ export const sendWebhook: JobHandler<SendWebhookPayload> = async (ctx, payload) 
       status = response.status >= 500 || response.status === 404 ? 'unreachable' : 'error';
     }
   } catch (e) {
+    cause = e;
     error = e instanceof Error ? e.message : String(e);
     status = 'unreachable';
   }
 
+  const settled =
+    status === 'success' || !isRetryable({ status, httpStatus }) || isFinalAttempt(ctx.job);
+
   await db.webhookEvent.create({
     data: {
-      status,
+      status: settled ? status : 'retrying',
       action,
       resourceId,
       error,
@@ -105,12 +110,19 @@ export const sendWebhook: JobHandler<SendWebhookPayload> = async (ctx, payload) 
     return;
   }
 
+  if (!settled) {
+    throw new Error(
+      `Webhook delivery to subscription ${subscriptionId} failed on attempt ${ctx.job.attemptsMade + 1}, retrying: ${error}`,
+      { cause },
+    );
+  }
+
   log.info(`Webhook delivery failed: ${error}`);
 
   if (
     subscription.integrationId &&
     isRecordRejection({ status, httpStatus }) &&
-    (await isRecordRejected(db, subscriptionId, resourceId))
+    (await isRecordRejected(subscriptionId, resourceId))
   ) {
     await poisonIntegrationRecord({
       integrationId: subscription.integrationId,
@@ -124,7 +136,7 @@ export const sendWebhook: JobHandler<SendWebhookPayload> = async (ctx, payload) 
   // Circuit breaker: disable subscription if last N deliveries all failed
   const FAILURE_THRESHOLD = 5;
   const recentEvents = await db.webhookEvent.findMany({
-    where: { webhookSubscriptionId: subscriptionId },
+    where: { webhookSubscriptionId: subscriptionId, status: { not: 'retrying' } },
     orderBy: { createdAt: 'desc' },
     take: FAILURE_THRESHOLD,
     select: { status: true },
@@ -144,6 +156,9 @@ export const sendWebhook: JobHandler<SendWebhookPayload> = async (ctx, payload) 
   }
 };
 
+const isRetryable = (event: { status: WebhookEventStatus; httpStatus?: number }): boolean =>
+  event.status === 'unreachable' || event.httpStatus === 429;
+
 const RECORD_FAILURE_THRESHOLD = 3;
 
 // Only a refusal of the record's content counts; redirects, auth, conflicts and rate limits say nothing about the record.
@@ -158,11 +173,7 @@ const isRecordRejection = (event: { status: WebhookEventStatus; httpStatus?: num
   RECORD_REJECTION.httpStatus.in.includes(event.httpStatus);
 
 // Ordered by id, not createdAt: ids are uuidv7, so events in the same millisecond still order exactly.
-const isRecordRejected = async (
-  db: Db,
-  subscriptionId: string,
-  resourceId: string,
-): Promise<boolean> => {
+const isRecordRejected = async (subscriptionId: string, resourceId: string): Promise<boolean> => {
   const lastSuccess = await db.webhookEvent.findFirst({
     where: { webhookSubscriptionId: subscriptionId, resourceId, status: 'success' },
     orderBy: { id: 'desc' },

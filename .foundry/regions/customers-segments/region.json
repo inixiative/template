@@ -1,0 +1,53 @@
+{
+  "id": "customers-segments",
+  "title": "Customers and segments",
+  "routing": "Is this about provider/customer relationships or audiences built over them: CustomerRef (customer/provider pairs, includeCustomer/includeProvider, customerRefLens), Segment / SegmentMember, segment conditions and their reach, membership reconciliation (reconcileSegment, reconcileCustomerRefSegments, sweepSegments, RECONCILE_TRIGGERS, applyMembershipDiff), segment rule health (soundSegments, withSegmentsRuleIssues), or segment membership events and pages?",
+  "concepts": ["customers", "segments"],
+  "tokens": 14648,
+  "tokenMethod": "chars/4",
+  "files": {
+    "recognise": {
+      "path": "recognise.md",
+      "tokens": 3227,
+      "experimental": true,
+      "note": "recognise/pick split under test (model round); not the standard"
+    },
+    "knowledge": {
+      "path": "knowledge.md",
+      "tokens": 14648
+    }
+  },
+  "runsAgreed": 3,
+  "sources": {
+    "docs": ["FEATURES.md", "docs/claude/SEGMENTS.md"],
+    "docUnits": [
+      "doc:FEATURES.md#customer-management",
+      "doc:docs/claude/SEGMENTS.md#purpose-and-ownership",
+      "doc:docs/claude/SEGMENTS.md#static-and-dynamic-membership",
+      "doc:docs/claude/SEGMENTS.md#rule-health-and-references",
+      "doc:docs/claude/SEGMENTS.md#api",
+      "doc:docs/claude/SEGMENTS.md#web-navigation",
+      "doc:docs/claude/SEGMENTS.md#events-and-email-integration",
+      "doc:docs/claude/SEGMENTS.md#remaining-work",
+      "doc:docs/claude/SEGMENTS.md#source-map",
+      "doc:FEATURES.md#segments"
+    ],
+    "catalogClusters": [
+      "app-events-side-effects",
+      "customers-providers",
+      "error-handling",
+      "filtering-search-ordering",
+      "frontend-navigation-context",
+      "immutable-fields",
+      "request-response-schemas",
+      "route-registration-openapi",
+      "rule-references-registry",
+      "segments-membership",
+      "websocket-realtime-delivery"
+    ],
+    "codeEntries": 67,
+    "docMembers": 15
+  },
+  "bypassLines": 17,
+  "glossaryTerms": 26
+}

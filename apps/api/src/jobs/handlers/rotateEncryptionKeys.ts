@@ -4,6 +4,7 @@
  * @partOf primitive:jobs
  * @uses infrastructure:prisma
  */
+import { db } from '@template/db';
 import type { DecryptFieldInput } from '@template/db/lib/encryption/helpers';
 import { decryptField, encryptField } from '@template/db/lib/encryption/helpers';
 import { ENCRYPTED_MODELS, getFieldNames } from '@template/db/lib/encryption/registry';
@@ -14,9 +15,7 @@ import { ConcurrencyType, getConcurrency, resolveAll } from '@template/shared/ut
 import { makeSingletonJob } from '#/jobs/makeSingletonJob';
 import type { JobHandler } from '#/jobs/types';
 
-export const rotateEncryptionKeys: JobHandler<void> = makeSingletonJob(async (ctx) => {
-  const { db } = ctx;
-
+export const rotateEncryptionKeys: JobHandler<void> = makeSingletonJob(async () => {
   const rotations = await Promise.all(
     (Object.keys(ENCRYPTED_MODELS) as Array<keyof typeof ENCRYPTED_MODELS>).flatMap((modelName) => {
       const modelConfig = ENCRYPTED_MODELS[modelName];

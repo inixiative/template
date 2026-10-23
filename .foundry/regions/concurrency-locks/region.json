@@ -1,0 +1,57 @@
+{
+  "id": "concurrency-locks",
+  "title": "Concurrency, locks and lanes",
+  "routing": "Is this about two things running at once and who goes first: a race between processes or transactions (createLock, withOwnerLock, db.findForUpdate / upserting: true, find-then-create, upsert or unique-violation catches), ordering in-process writes (createSerializedQueue), capping parallelism (getConcurrency, resolveAll, Promise.all over many items), newest-wins jobs (claimLane / watchLane, makeSupersedingJob, SupersededError), singleton jobs (makeSingletonJob), a recurring timer (heartbeat instead of setInterval), or debouncing a backend-hitting input (useDebounce / useDebouncedCallback)?",
+  "concepts": ["locks", "concurrency-limits", "supersede-lanes", "recurring-timers", "debounce"],
+  "tokens": 13678,
+  "tokenMethod": "chars/4",
+  "files": {
+    "recognise": {
+      "path": "recognise.md",
+      "tokens": 2461,
+      "experimental": true,
+      "note": "recognise/pick split under test (model round); not the standard"
+    },
+    "knowledge": {
+      "path": "knowledge.md",
+      "tokens": 13678
+    }
+  },
+  "runsAgreed": 2,
+  "sources": {
+    "docs": [
+      "docs/claude/CONCURRENCY.md",
+      "docs/claude/DATABASE.md",
+      "docs/claude/FRONTEND/API_CLIENT.md",
+      "docs/claude/JOBS.md"
+    ],
+    "docUnits": [
+      "doc:docs/claude/CONCURRENCY.md#distributed-lock-createlock",
+      "doc:docs/claude/DATABASE.md#transactions",
+      "doc:docs/claude/CONCURRENCY.md#preface",
+      "doc:docs/claude/CONCURRENCY.md#serialized-queue-createserializedqueue",
+      "doc:docs/claude/CONCURRENCY.md#concurrency-limits-getconcurrency",
+      "doc:docs/claude/CONCURRENCY.md#bounded-batch-resolveall",
+      "doc:docs/claude/CONCURRENCY.md#supersede-lanes-claimlane-watchlane",
+      "doc:docs/claude/JOBS.md#handler-patterns",
+      "doc:docs/claude/JOBS.md#handler-patterns/superseding-job",
+      "doc:docs/claude/CONCURRENCY.md#recurring-beat-heartbeat",
+      "doc:docs/claude/FRONTEND/API_CLIENT.md#form-helpers"
+    ],
+    "catalogClusters": [
+      "batch-request-execution",
+      "code-map-atlas",
+      "cron-and-recurring-work",
+      "error-handling",
+      "job-definition-and-enqueue",
+      "locks-and-serialization",
+      "supersede-lanes",
+      "ui-components",
+      "websocket-realtime-delivery"
+    ],
+    "codeEntries": 40,
+    "docMembers": 12
+  },
+  "bypassLines": 18,
+  "glossaryTerms": 28
+}

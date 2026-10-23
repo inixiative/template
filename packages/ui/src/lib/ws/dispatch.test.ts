@@ -129,7 +129,7 @@ describe('dispatchMessage', () => {
       expect(heard).toEqual([removal]);
     });
 
-    it('keeps tombstones across a fresh snapshot, so a late upsert still cannot resurrect a row', async () => {
+    it('keeps removed ids across a fresh snapshot, so a late upsert still cannot resurrect a row', async () => {
       const removed = await contactStreamRow({ id: '0002' });
       const kept = await contactStreamRow({ id: '0001' });
       dispatchMessage({

@@ -4,7 +4,7 @@
  * @partOf feature:segment
  * @uses infrastructure:prisma, primitive:shared
  */
-import { type Condition, executePrismaPlan, toPrisma } from '@inixiative/json-rules';
+import { andWhere, type Condition, executePrismaPlan, toPrisma } from '@inixiative/json-rules';
 import { db, Prisma } from '@template/db';
 import type { Segment } from '@template/db/generated/client/client';
 import type { ProviderModel } from '@template/db/generated/client/enums';
@@ -27,7 +27,7 @@ export const compileSegmentWhere = async (
     now: new Date(),
   });
   const where = await executePrismaPlan(plan, db as never);
-  return { AND: [where, { [customerRefProviderFk(ownerModel)]: ownerId }] };
+  return andWhere([where, { [customerRefProviderFk(ownerModel)]: ownerId }]);
 };
 
 const segmentWhere = async (segment: Segment): Promise<Record<string, unknown>> => {

@@ -4,8 +4,11 @@
  * @uses infrastructure:observability
  */
 import { createLock } from '@template/db/lock/createLock';
+import { lockKeyOf } from '@template/db/lock/lockKeyOf';
 import { getRedisClient } from '@template/db/redis/client';
 import { redisNamespace } from '@template/db/redis/namespaces';
+import { clearCacheEntry } from '@template/db/redis/queries/clearCacheEntry';
+import { writeCacheEntry } from '@template/db/redis/queries/writeCacheEntry';
 import {
   type AccessorName,
   isModelName,
@@ -122,6 +125,60 @@ const SINGLE_FLIGHT_MAX_WAIT_MS = 20_000;
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
+// When the value under a key was written, in epoch ms. Every write sets it beside the value with the
+// same TTL and an exact clear deletes it with the value. A pattern clear leaves it to expire: a write
+// time with no value reads as empty.
+const writtenKey = (key: string): string => `${redisNamespace.cacheWritten}:${key}`;
+
+const entryOf = (key: string) => ({ key, writtenKey: writtenKey(key) });
+
+const SINGLE_FLIGHT_SERVICE = 'cache-singleflight';
+
+// The per-key lock `cache` takes while it computes a miss. It is also the cache-wide marker for "a
+// compute of this key is running": a rolling cache's refresh holds the same lock, and `checkCache`
+// reads it to report computing.
+export const singleFlightLock = (key: string) =>
+  createLock({
+    service: SINGLE_FLIGHT_SERVICE,
+    identifier: key,
+    ttlMs: SINGLE_FLIGHT_LOCK_TTL_MS,
+    heartbeatMs: SINGLE_FLIGHT_HEARTBEAT_MS,
+    maxMissed: 1,
+  });
+
+export type CacheCheck<T> =
+  | { state: 'empty' | 'computing' }
+  | { state: 'fresh' | 'stale'; value: T; writtenAt?: Date; isComputing: boolean };
+
+// Reads a key without computing it: the value, its write time and whether a compute holds the
+// single-flight lock of `computedUnder` (default: the key itself), in one MGET. With
+// `freshForSeconds`, a value older than the window, or with no write time, is stale; without it any
+// value is fresh. A Redis failure throws rather than reading as empty: a caller that queues work on
+// a miss would otherwise pile work onto an outage.
+export const checkCache = async <T>(
+  key: string,
+  {
+    freshForSeconds,
+    computedUnder = key,
+  }: { freshForSeconds?: number; computedUnder?: string } = {},
+): Promise<CacheCheck<T>> => {
+  validateKey(key);
+  const [payload, written, lock] = await getRedisClient().mget(
+    key,
+    writtenKey(key),
+    lockKeyOf({ service: SINGLE_FLIGHT_SERVICE, identifier: computedUnder }),
+  );
+  const isComputing = lock !== null;
+  const value = payload == null ? undefined : superjson.parse<T>(payload);
+  if (value === undefined) return { state: isComputing ? 'computing' : 'empty' };
+
+  const writtenAt = written ? new Date(Number(written)) : undefined;
+  const isStale =
+    freshForSeconds !== undefined &&
+    (!writtenAt || Date.now() - writtenAt.getTime() > freshForSeconds * 1000);
+  return { state: isStale ? 'stale' : 'fresh', value, writtenAt, isComputing };
+};
+
 type CacheRead<T> = { hit: true; value: T } | { hit: false };
 
 const readCached = async <T>(
@@ -169,13 +226,7 @@ export const cache = async <T>(
   const cached = await readCached<T>(redis, key);
   if (cached.hit) return cached.value;
 
-  const lock = createLock({
-    service: 'cache-singleflight',
-    identifier: key,
-    ttlMs: SINGLE_FLIGHT_LOCK_TTL_MS,
-    heartbeatMs: SINGLE_FLIGHT_HEARTBEAT_MS,
-    maxMissed: 1,
-  });
+  const lock = singleFlightLock(key);
 
   let holdsLock = false;
   let lockUnavailable = false;
@@ -213,7 +264,7 @@ export const cache = async <T>(
     if (effectiveTtl > 0) {
       const payload = superjson.stringify(value);
       meterLargeWrite(key, payload, effectiveTtl, 'cache');
-      const write = redis.setex(key, effectiveTtl, payload).catch((error) => {
+      const write = writeCacheEntry(redis, entryOf(key), effectiveTtl, payload).catch((error) => {
         log.error(`Cache write error for key ${key}:`, error);
       });
       // Awaited only while holding the lock: waiters poll the value key, so releasing before
@@ -244,7 +295,7 @@ export const upsertCache = async <T>(
     if (!force && (await redis.exists(key))) return false;
     const payload = superjson.stringify(value);
     meterLargeWrite(key, payload, ttl, 'upsertCache');
-    await redis.setex(key, ttl, payload);
+    await writeCacheEntry(redis, entryOf(key), ttl, payload);
     return true;
   } catch {
     return false;
@@ -259,7 +310,7 @@ export const clearKey = async (pattern: string): Promise<number> => {
 
     // No wildcard = exact key, just delete directly
     if (!pattern.includes('*')) {
-      const deleted = await redis.del(pattern);
+      const deleted = await clearCacheEntry(redis, entryOf(pattern));
       if (deleted) log.debug(`Cleared cache key: ${pattern}`);
       return deleted;
     }

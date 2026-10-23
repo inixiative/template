@@ -1,0 +1,48 @@
+{
+  "id": "lib-rules-builder",
+  "title": "rules-builder library README",
+  "routing": "Is this about what the @inixiative/rules-builder library itself documents: quick start and install, headless builder with your own renderers, sourced field options, filtering a collection in hand, array (list/relation) rules and nested array nodes, Decoration (hoisting, relabeling, aliasing, two wheres, tagged sources), preset facets and variable placement (FacetCondition, facetId, normalizeGroups), scope refs, coercion to real types, serialization and persisting rules with their binding, or the README's API reference?",
+  "concepts": ["lib-rules-builder"],
+  "tokens": 12318,
+  "tokenMethod": "chars/4",
+  "files": {
+    "recognise": {
+      "path": "recognise.md",
+      "tokens": 1774,
+      "experimental": true,
+      "note": "recognise/pick split under test (model round); not the standard"
+    },
+    "knowledge": {
+      "path": "knowledge.md",
+      "tokens": 12318
+    }
+  },
+  "runsAgreed": 0,
+  "sources": {
+    "docs": ["@inixiative/rules-builder/README.md"],
+    "docUnits": [
+      "doc:@inixiative/rules-builder/README.md#preface",
+      "doc:@inixiative/rules-builder/README.md#install",
+      "doc:@inixiative/rules-builder/README.md#quick-start",
+      "doc:@inixiative/rules-builder/README.md#sourced-fields-data-backed-options",
+      "doc:@inixiative/rules-builder/README.md#filtering-a-collection-in-hand",
+      "doc:@inixiative/rules-builder/README.md#array-list-relation-rules",
+      "doc:@inixiative/rules-builder/README.md#decoration-hoisting-relabeling-aliasing",
+      "doc:@inixiative/rules-builder/README.md#decoration-hoisting-relabeling-aliasing/two-where-s",
+      "doc:@inixiative/rules-builder/README.md#decoration-hoisting-relabeling-aliasing/splitting-one-relation-into-tagged-sources",
+      "doc:@inixiative/rules-builder/README.md#serialization",
+      "doc:@inixiative/rules-builder/README.md#api",
+      "doc:@inixiative/rules-builder/README.md#related"
+    ],
+    "catalogClusters": [
+      "json-rules-engine",
+      "lenses-multi-source",
+      "rule-builder-ui-model",
+      "rule-references-registry"
+    ],
+    "codeEntries": 0,
+    "docMembers": 30
+  },
+  "bypassLines": 19,
+  "glossaryTerms": 19
+}

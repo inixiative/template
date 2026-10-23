@@ -1,6 +1,7 @@
 /**
  * @atlas
- * @kind factory
+ * @kind constructor
+ * @constructs dataConfig
  * @partOf primitive:ui
  * @uses none
  */

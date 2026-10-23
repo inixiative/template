@@ -1,6 +1,7 @@
 /**
  * @atlas
- * @kind factory
+ * @kind constructor
+ * @constructs broadcastRegistry
  * @partOf primitive:shared
  * @uses none
  */

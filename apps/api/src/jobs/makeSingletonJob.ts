@@ -7,7 +7,8 @@
  */
 import { createLock, type LockLostReason } from '@template/db';
 import { log } from '@template/shared/logger';
-import type { JobHandler, JobHandlerArgs } from '#/jobs/types';
+import { toJobHandler } from '#/jobs/toJobHandler';
+import type { JobData, JobHandler, JobHandlerArgs, StagedJob } from '#/jobs/types';
 
 const SINGLETON_LOCK_TTL_MS = 300_000;
 const SINGLETON_LOCK_HEARTBEAT_MS = 60_000;
@@ -17,11 +18,24 @@ export type SingletonJobOptions<TPayload> = {
   lockKey?: (payload: TPayload) => string;
 };
 
+// `singletonKey` exposes a run's key to enqueueJob: the `lockKey` result, or the cron row's id for a
+// cron run. A job with neither (an ad hoc run of an unkeyed singleton) has no key and is not
+// deduplicated at enqueue; its run still takes the per-handler lock below.
+export type SingletonJobHandler<TPayload = void> = JobHandler<TPayload> & {
+  singletonKey?: (payload: TPayload, data: Pick<JobData, 'id'>) => string | undefined;
+};
+
+// Takes a plain handler or `{ stages, finish }`. Collision policy is binary: a busy key skips the new
+// run (here, and at enqueue through `singletonKey`), superseding takes over, and nothing parks.
 export const makeSingletonJob = <TPayload = void>(
-  handler: JobHandler<TPayload>,
+  definition: JobHandler<TPayload> | StagedJob<TPayload>,
   { lockKey }: SingletonJobOptions<TPayload> = {},
-): JobHandler<TPayload> => {
-  const singleton: JobHandler<TPayload> = async (ctx, ...args: JobHandlerArgs<TPayload>) => {
+): SingletonJobHandler<TPayload> => {
+  const handler = toJobHandler(definition);
+  const singleton: SingletonJobHandler<TPayload> = async (
+    ctx,
+    ...args: JobHandlerArgs<TPayload>
+  ) => {
     // With `lockKey`, the lane is (handler name, key from the payload), so one handler is a
     // singleton per payload key and two handlers sharing a key never collide. Without it the
     // lane prefers `data.id` (cron path: row's uuidv7) so one handler can serve multiple
@@ -81,6 +95,7 @@ export const makeSingletonJob = <TPayload = void>(
       }
     }
   };
+  singleton.singletonKey = (payload, { id }) => (lockKey ? lockKey(payload) : id);
   singleton.lane = handler.lane;
   return singleton;
 };

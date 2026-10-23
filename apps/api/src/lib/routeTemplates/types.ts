@@ -12,6 +12,10 @@ export type ZodSchema = z.ZodObject<Record<string, z.ZodType>>;
 
 export type ZodResponseSchema = z.ZodType;
 
+export type RequestRefinement = {
+  bivarianceHack(value: unknown, ctx: z.RefinementCtx): void | Promise<void>;
+}['bivarianceHack'];
+
 export type RouteArgs = Omit<RouteConfig, 'path' | 'method' | 'responses' | 'request'> & {
   model: Module;
   submodel?: Module;
@@ -21,6 +25,9 @@ export type RouteArgs = Omit<RouteConfig, 'path' | 'method' | 'responses' | 'req
   responseSchema?: ZodResponseSchema;
   bodySchema?: ZodSchema;
   bodyRequired?: boolean;
+  bodyRefinement?: RequestRefinement;
+  queryRefinement?: RequestRefinement;
+  paramsRefinement?: RequestRefinement;
   sanitizeKeys?: readonly string[];
   skipId?: boolean;
   many?: boolean;

@@ -14,7 +14,12 @@ import type {
 } from '@template/sdk';
 import { Badge, Button, Card, Page } from '@template/ui/components';
 import { CreateIntegrationModal } from '@template/ui/components/settings/CreateIntegrationModal';
-import { useInfiniteDataQuery, useInfiniteScrollTrigger, useMutation } from '@template/ui/hooks';
+import {
+  createOptimisticListTarget,
+  useInfiniteDataQuery,
+  useInfiniteScrollTrigger,
+  useOptimisticMutation,
+} from '@template/ui/hooks';
 import { getContextParams } from '@template/ui/lib/getContextParams';
 import {
   type IntegrationListQuery,
@@ -47,6 +52,11 @@ const statusBadges: Record<
 };
 
 const BUCKET_PAGE_SIZE = 100;
+
+const bucketQueryFor = (provider: IntegrationProvider | null): IntegrationListQuery => ({
+  searchFields: { provider: { equals: provider } },
+  pageSize: BUCKET_PAGE_SIZE,
+});
 
 export type IntegrationConnectFlowProps = {
   context: AuthenticatedContext;
@@ -90,10 +100,7 @@ const IntegrationBucket = ({
   onDelete,
 }: IntegrationBucketProps) => {
   const integrationQueries = integrationContextQueries(context);
-  const bucketQuery: IntegrationListQuery = {
-    searchFields: { provider: { equals: provider } },
-    pageSize: BUCKET_PAGE_SIZE,
-  };
+  const bucketQuery = bucketQueryFor(provider);
 
   const bucket = useInfiniteDataQuery<Integration>({
     queryKey: integrationQueries.readManyQueryKey(bucketQuery),
@@ -195,14 +202,27 @@ export const IntegrationsPage = ({ connectFlows = {} }: IntegrationsPageProps) =
   const refreshIntegrations = () =>
     queryClient.invalidateQueries({ queryKey: integrationQueries.readManyQueryKey() });
 
-  const createMutation = useMutation({
+  const bucketQueryKeyFor = (provider: IntegrationProvider | null) =>
+    integrationQueries.readManyQueryKey(bucketQueryFor(provider));
+
+  const createMutation = useOptimisticMutation({
     mutationFn: integrationQueries.create.mutationFn,
-    onSuccess: refreshIntegrations,
+    targets: (variables) => [
+      createOptimisticListTarget<Integration>({
+        queryKey: bucketQueryKeyFor(variables?.body.provider ?? null),
+        operation: 'create',
+      }),
+    ],
   });
 
-  const deleteMutation = useMutation({
+  const deleteMutation = useOptimisticMutation({
     mutationFn: integrationQueries.delete.mutationFn,
-    onSuccess: refreshIntegrations,
+    targets: [...integrationProviderValues, null].map((provider) =>
+      createOptimisticListTarget<Integration>({
+        queryKey: bucketQueryKeyFor(provider),
+        operation: 'delete',
+      }),
+    ),
   });
 
   const handleCreate = (body: Pick<MeCreateIntegrationData['body'], 'name' | 'provider'>) => {

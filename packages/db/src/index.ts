@@ -27,10 +27,12 @@ export { fetchOne, hydrate } from './hydrate';
 export {
   claimLane,
   getJobSupersededBy,
+  holdLaneWhileParked,
   laneKey,
   reclaimLane,
   releaseLane,
   supersededKey,
+  tombstoneJob,
   watchLane,
 } from './lanes';
 // Distributed lock
@@ -39,6 +41,7 @@ export {
   createLock,
   FindForUpdateLockTimeoutError,
   type Lock,
+  LockLostError,
   type LockLostReason,
   type LockOptions,
   type LockRedis,
@@ -47,17 +50,40 @@ export {
 } from './lock';
 // Redis client and cache utilities
 export {
+  type CacheCheck,
+  COMMAND_TIMEOUT_MS,
   cache,
   cacheKey,
+  checkCache,
   clearKey,
   createRedisConnection,
   flushRedis,
   getRedisClient,
   getRedisPub,
   getRedisSub,
+  getRollingCache,
+  listRollingCaches,
+  MAX_ROLLING_CACHE_TARGETS,
+  MIN_ROLLING_CACHE_INTERVAL_SECONDS,
+  makeRollingCache,
   type RedisEval,
   type RedisNamespace,
+  type RegisteredRollingCache,
+  ROLLING_CACHE_LEAF_ATTEMPTS,
+  ROLLING_CACHE_TICK_SECONDS,
+  type RollingCache,
+  type RollingCacheComputeContext,
+  type RollingCacheConfig,
+  type RollingCacheFindManyArgs,
+  type RollingCacheResultParams,
+  type RollingCacheResults,
+  type RollingCacheTarget,
+  type RollingCacheTargets,
+  type RollingCacheValue,
+  type RollingCacheWrite,
   redisNamespace,
+  singleFlightLock,
+  unregisterRollingCache,
   upsertCache,
 } from './redis';
 // Registries (schema-level configuration)
@@ -81,6 +107,16 @@ export {
   polymorphicKeyColumn,
   polymorphicTarget,
 } from './registries/polymorphicIs';
+export { polymorphicSchema } from './registries/polymorphicSchema';
+export type {
+  PolymorphicAxisField,
+  PolymorphicAxisValue,
+  PolymorphicFkColumn,
+  PolymorphicModel,
+  PolymorphicSchema,
+  PolymorphicSchemaOptions,
+  PolymorphicTarget,
+} from './registries/polymorphicSchemaTypes';
 // User with relations type and schema
 export type { UserWithRelations } from './types/userWithRelations';
 export { UserWithRelationsSchema } from './types/userWithRelations';

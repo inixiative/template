@@ -1,7 +1,7 @@
 /**
  * @atlas
  * @kind factory
- * @partOf infrastructure:prisma
+ * @partOf infrastructure:prisma, primitive:testFactories
  * @uses none
  */
 import { faker } from '@faker-js/faker';
@@ -10,7 +10,7 @@ import { createFactory } from '@template/db/test/factory';
 
 const webhookEventFactory = createFactory('WebhookEvent', {
   defaults: () => ({
-    status: WebhookEventStatus.pending,
+    status: WebhookEventStatus.success,
     action: WebhookEventAction.create,
     payload: { test: true },
     error: null,

@@ -18,19 +18,19 @@
 
 <!-- toc:end -->
 
-Sign-in, sign-up, OAuth callback, guards and the auth slice in `@template/ui`. Backend sessions, tokens and middleware: [AUTH.md](../AUTH.md). Permission checks: [PERMISSIONS.md](../PERMISSIONS.md#frontend-checks).
+Sign-in, sign-up, OAuth callback, guards and the auth slice in `@template/ui`. Backend sign-in handshake, person JWTs, tokens and middleware: [AUTH.md](../AUTH.md). Permission checks: [PERMISSIONS.md](../PERMISSIONS.md#frontend-checks).
 
 ## Architecture
 
 - **BetterAuth client** (`better-auth/client`) talks to the API's `/api/auth/*` routes.
-- **Bearer token in localStorage.** Email sign-in and the OAuth callback both end in `setToken(token, expiresAt)` (`auth_token` / `auth_token_expiry`). Every API call sends `Authorization: Bearer <token>`.
+- **Person JWT in localStorage.** Email sign-in, sign-up without verification and the OAuth callback all answer with `{ token, expiresAt, user }`; `storeJwtHandoff` (`packages/ui/src/lib/auth/storeJwtHandoff.ts`) checks that shape and calls `setToken(token, expiresAt)` (`auth_token` / `auth_token_expiry`). Every API call and the websocket `authenticate` frame send `Authorization: Bearer <jwt>`. The client never holds a session.
 - **`/me` hydrates the store.** `fetchAndHydrateMe` loads the user, organizations, spaces and space memberships, then runs `permissions.setup(me)`.
 
 **Email/password:**
 ```
 signIn({ type: 'email', email, password })
   ↓
-client.signIn.email → session token → setToken()
+client.signIn.email → { token: jwt, expiresAt } → storeJwtHandoff()
   ↓
 fetchAndHydrateMe() → permissions.setup()
   ↓
@@ -45,12 +45,12 @@ client.signIn.social → provider → API callback
   ↓
 API redirects to /auth/callback#ott=<one-time token>
   ↓
-AuthCallbackPage: completeOAuthSignIn(ott) → setToken()
+AuthCallbackPage: completeOAuthSignIn(ott) → { token: jwt, expiresAt } → storeJwtHandoff()
   ↓
 fetchAndHydrateMe() → navigate(localStorage.authRedirectTo || '/dashboard')
 ```
 
-The session token never travels in a URL; only the single-use `ott` does, in the fragment. See [AUTH.md → Bearer Token Handoff](../AUTH.md#bearer-token-handoff).
+The JWT never travels in a URL; only the single-use `ott` does, in the fragment. See [AUTH.md → One-Time Token Handoff](../AUTH.md#one-time-token-handoff).
 
 ---
 
@@ -136,7 +136,7 @@ const { providers, isLoading, error } = useAuthProviders();
 **Location:** `packages/ui/src/pages/AuthCallbackPage.tsx`, mounted by `apps/{web,admin,superadmin}/app/routes/_public/auth.callback.tsx`.
 
 1. Read `ott` from the URL fragment, then strip the fragment with `history.replaceState`.
-2. `completeOAuthSignIn(ott)` → `client.oneTimeToken.verify` → `setToken(session.token, session.expiresAt)`.
+2. `completeOAuthSignIn(ott)` → `client.oneTimeToken.verify` → `storeJwtHandoff(data)` (the API has already deleted the handshake session).
 3. `fetchAndHydrateMe(useAppStore.setState, useAppStore.getState)`.
 4. Navigate to `localStorage.authRedirectTo` (then remove it) or `/dashboard`.
 5. On failure: log, then navigate to `/login?error=<message>`.
@@ -178,7 +178,7 @@ Initialization errors are swallowed; the redirect handles the unauthenticated ca
 | `signUp(method)` | Calls `lib/auth/signUp`; hydrates on `authenticated`, clears local auth on `verification-pending`; returns the result |
 | `refreshMe()` | Re-hydrate `/me` |
 | `setSpoof(email \| null)` | Sets `spoofUserEmail`, re-hydrates `/me` (sent as `x-spoof-user-email`), spoofs/unspoofs the websocket |
-| `logout()` | `client.signOut` with the bearer token; always clears token, user, permissions, tenant (→ public) and navigates to `/login`; rethrows a sign-out error |
+| `logout()` | Signs out of this browser: clears the JWT, user, permissions, websocket identity and tenant (→ public) and navigates to `/login`. No server call: the API keeps no session to end. Ending every JWT on every device is `POST /api/v1/me/rotateJwts` ([AUTH.md → Revocation and sign-out](../AUTH.md#revocation-and-sign-out)) |
 | `setStrategy(strategy)` | `{ type: 'login' }` or `{ type: 'embed', parentOrigin? }`; sets `isEmbedded` |
 
 State: `user`, `organizations`, `spaces`, `spaceUsers` (dicts by id / spaceId), `spoofUserEmail`, `spoofingUserEmail` (from the `x-spoofing-user-email` response header), `isAuthenticated`, `isInitialized`, `strategy`, `client`.
@@ -231,7 +231,7 @@ GITHUB_CLIENT_ID=<id>          # listed by platformProviders.ts when set
 GITHUB_CLIENT_SECRET=<secret>
 
 # Frontends
-VITE_API_URL=http://localhost:8000
+VITE_API_URL=http://localhost:<api port>   # locally: the registry api port, written by setup / worktree:create
 ```
 
 ---

@@ -1,0 +1,35 @@
+{
+  "id": "rules-builder",
+  "title": "Rule builder: template usage",
+  "routing": "Is this about editing a rule in the UI with @inixiative/rules-builder as the template uses it: useRuleBuilder / usePermissionBuilder / useTransitionBuilder / useActionRuleBuilder, useFilteredCollection for in-memory filtering, views (createView, rawView, resolve, builderSource / RuleBuilderSource, LensBuilderSource), composeNarrowed, Decoration and facets (describeFacets, matchFacet, presetSeed, Variable, variableSlots), the descriptor tree (GroupNode, LeafNode, ArrayNode, ValueControl, VariableControl), lens scope surfaces and value pickers (useLensScopeSurface, useLensValuePicker), or saved rules (parseSavedRule, stringifySavedRule, SavedRule)?",
+  "concepts": ["rules-builder"],
+  "tokens": 16729,
+  "tokenMethod": "chars/4",
+  "files": {
+    "recognise": {
+      "path": "recognise.md",
+      "tokens": 2966,
+      "experimental": true,
+      "note": "recognise/pick split under test (model round); not the standard"
+    },
+    "knowledge": {
+      "path": "knowledge.md",
+      "tokens": 16729
+    }
+  },
+  "runsAgreed": 1,
+  "sources": {
+    "docs": [],
+    "docUnits": [],
+    "catalogClusters": [
+      "json-rules-engine",
+      "lenses-multi-source",
+      "rule-builder-ui-model",
+      "rule-references-registry"
+    ],
+    "codeEntries": 163,
+    "docMembers": 29
+  },
+  "bypassLines": 19,
+  "glossaryTerms": 26
+}

@@ -36,21 +36,29 @@ export const transactionPerRound: StrategyExecutor = async (
       const roundResult = await db.txn(
         async () => {
           const batchId = crypto.randomUUID();
-          registerBatch(batchId, db, baseContext);
+          registerBatch(batchId, baseContext);
 
           try {
-            const roundPromises = round.map(async (request) => {
-              const interpolatedRequest = interpolateRequest(request, {
-                results,
-                currentRound: roundIndex,
-              });
-              return await executeRequest(
-                app,
-                interpolatedRequest,
-                batchId,
-                sharedHeaders,
-                baseRequest,
-              );
+            const roundPromises = round.map(async (request): Promise<RequestResult> => {
+              try {
+                const interpolatedRequest = interpolateRequest(request, {
+                  results,
+                  currentRound: roundIndex,
+                });
+                return await executeRequest(
+                  app,
+                  interpolatedRequest,
+                  batchId,
+                  sharedHeaders,
+                  baseRequest,
+                );
+              } catch (error) {
+                return {
+                  status: 500,
+                  body: null,
+                  error: error instanceof Error ? error.message : 'Unknown error',
+                };
+              }
             });
 
             const roundResults = await Promise.all(roundPromises);
@@ -76,7 +84,7 @@ export const transactionPerRound: StrategyExecutor = async (
 
       if (roundIndex < rounds.length - 1) {
         const batchId = crypto.randomUUID();
-        registerBatch(batchId, db, baseContext);
+        registerBatch(batchId, baseContext);
         await refreshBatchContext(batchId);
         unregisterBatch(batchId);
       }

@@ -152,7 +152,7 @@ describe('POST /api/admin/emailTemplate/preflight', () => {
   it('rejects a body without mjml', async () => {
     const res = await fetch(post('/api/admin/emailTemplate/preflight', { subject: 'Digest' }));
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(422);
   });
 });
 

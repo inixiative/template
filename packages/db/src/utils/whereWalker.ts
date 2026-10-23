@@ -4,6 +4,7 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
+import { andWhere, orWhere } from '@inixiative/json-rules';
 import type { ModelField } from '@inixiative/prisma-map';
 import { lookupField } from '@template/db/utils/fieldMetadata';
 import { isRelationOperator } from '@template/shared/bracketQuery';
@@ -26,11 +27,10 @@ const merge = (
   if (!clauses.length) return node;
   if (clauses.length === 1 && !Object.keys(clauses[0]).some((key) => key in node))
     return { ...node, ...clauses[0] };
-  return { AND: [node, ...clauses] };
+  return andWhere([node, ...clauses]);
 };
 
-const asOne = (clauses: Record<string, unknown>[]): Record<string, unknown> =>
-  clauses.length === 1 ? clauses[0] : { AND: clauses };
+const asOne = (clauses: Record<string, unknown>[]): Record<string, unknown> => andWhere(clauses);
 
 // Walks a composed Prisma where, applying `scopeAt`'s clauses at the root and
 // at every relation traversal. Boolean combinators stay on their model; each
@@ -100,7 +100,7 @@ const hop = (
     } else if (op === 'every') {
       const walked = walkEntries(ctx, opValue, scopeAt);
       const clauses = scopeAt(ctx, walked);
-      out[op] = clauses.length ? { OR: [{ NOT: asOne(clauses) }, walked] } : walked;
+      out[op] = clauses.length ? orWhere([{ NOT: asOne(clauses) }, walked]) : walked;
     } else {
       out[op] = scopeNode(ctx, opValue, scopeAt);
     }

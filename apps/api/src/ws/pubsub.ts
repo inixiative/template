@@ -15,7 +15,7 @@ import {
 } from '#/ws/delivery';
 import { publishStreamAppend } from '#/ws/queries/publishStreamAppend';
 import { byId, byStream } from '#/ws/registry';
-import { rejectDataStream } from '#/ws/rejectDataStream';
+import { resyncDataStream } from '#/ws/resyncDataStream';
 import { inStreamOrder } from '#/ws/streamPublishOrder';
 import { streamSeqKey } from '#/ws/streamSeq';
 import type { WSOutbound } from '#/ws/types';
@@ -39,9 +39,30 @@ const resyncLocalHolders = (stream: string): void => {
     const ws = byId.get(id);
     if (!ws) continue;
     void ws.data.queue.run(async () => {
-      if (byId.has(id) && ws.data.streams.has(stream)) rejectDataStream(ws, stream, 'retryable');
+      if (byId.has(id) && ws.data.streams.has(stream)) resyncDataStream(ws, stream);
     });
   }
+};
+
+const resyncEveryLocalStream = (): void => {
+  for (const stream of [...byStream.keys()]) resyncLocalHolders(stream);
+};
+
+// Appends published while the subscriber was down never reached this instance, and a quiet stream
+// would never show the gap. The subscribe reply proves the channel is live before the resync.
+const resyncAfterSubscriberReconnect = (sub: ReturnType<typeof getRedisSub>): void => {
+  let dropped = false;
+  sub.on('close', () => {
+    dropped = true;
+  });
+  sub.on('ready', () => {
+    if (!dropped) return;
+    dropped = false;
+    sub.subscribe(WS_CHANNEL).then(resyncEveryLocalStream, (err: unknown) => {
+      dropped = true;
+      log.error('Failed to resubscribe after a Redis reconnect:', err);
+    });
+  });
 };
 
 const deliverStreamAppend = ({
@@ -100,6 +121,7 @@ export const initWebSocketPubSub = async (): Promise<void> => {
         log.error('Failed to process pub/sub message:', err);
       }
     });
+    resyncAfterSubscriberReconnect(sub);
 
     pubsubEnabled = true;
     // Only a successful subscription marks init done — a failure leaves it retryable.

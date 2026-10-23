@@ -200,7 +200,7 @@ describe('POST /api/v1/organization/:id/inquiries — create and send with autoA
       const rejected = await fetch(
         post(`/api/v1/organization/${org.id}/inquiries`, { ...body, ...spoofed }),
       );
-      expect(rejected.status).toBe(400);
+      expect(rejected.status).toBe(422);
     }
 
     const response = await fetch(post(`/api/v1/organization/${org.id}/inquiries`, body));

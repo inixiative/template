@@ -1,0 +1,45 @@
+{
+  "id": "ui-components",
+  "title": "UI components and shared pages",
+  "routing": "Is this about building a screen from the shared pieces: @template/ui primitives (Button, Input, PasswordInput, SlugInput, Select, SearchableSelect, Table, Card, Badge, Avatar, Breadcrumb, DropdownMenu, Label, EmptyState, NotFound / RootNotFound, Unauthorized, ComingSoon, CopyButton, ShareButton, ThemeToggle, toast / Toaster), the show and disabledText props, cn and buttonVariants, enumToSelectOptions / formatEnumLabel, modals (InviteUserModal, SecretRevealModal), settings (SettingsLayout, ProfileFormCard, settings as nested routes), shared pages in @template/ui/pages and the list page shape, organizing components by domain, useBreakpoint / useMediaQuery / useDarkMode / useSpaceTheme, or the no-radix rule?",
+  "concepts": ["ui-components"],
+  "tokens": 14896,
+  "tokenMethod": "chars/4",
+  "files": {
+    "recognise": {
+      "path": "recognise.md",
+      "tokens": 2288,
+      "experimental": true,
+      "note": "recognise/pick split under test (model round); not the standard"
+    },
+    "knowledge": {
+      "path": "knowledge.md",
+      "tokens": 14896
+    }
+  },
+  "runsAgreed": 2,
+  "sources": {
+    "docs": ["FEATURES.md", "docs/claude/FRONTEND/COMPONENTS.md"],
+    "docUnits": [
+      "doc:docs/claude/FRONTEND/COMPONENTS.md#package-organization",
+      "doc:docs/claude/FRONTEND/COMPONENTS.md#standard-conditional-props",
+      "doc:docs/claude/FRONTEND/COMPONENTS.md#ui-primitives",
+      "doc:docs/claude/FRONTEND/COMPONENTS.md#settings",
+      "doc:docs/claude/FRONTEND/COMPONENTS.md#modals-and-pages",
+      "doc:docs/claude/FRONTEND/COMPONENTS.md#key-files",
+      "doc:FEATURES.md#ui-components",
+      "doc:FEATURES.md#frontend-hooks"
+    ],
+    "catalogClusters": [
+      "frontend-app-shells-routes",
+      "frontend-navigation-context",
+      "integrations-records",
+      "module-layout-monorepo",
+      "ui-components"
+    ],
+    "codeEntries": 62,
+    "docMembers": 13
+  },
+  "bypassLines": 32,
+  "glossaryTerms": 20
+}

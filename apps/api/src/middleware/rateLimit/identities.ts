@@ -11,7 +11,7 @@ import type { AppEnv } from '#/types/appEnv';
 
 export const ipIdentity = (c: Context<AppEnv>): string => `ip:${clientIp(c)}`;
 
-// A session and every token owned by or through the user share one bucket: minting tokens buys nothing.
+// A person's JWT and every token owned by or through the user share one bucket: minting tokens buys nothing.
 export const userIdentity = (c: Context<AppEnv>): string | null => {
   const { user } = getActor(c);
   return user ? `user:${user.id}` : null;

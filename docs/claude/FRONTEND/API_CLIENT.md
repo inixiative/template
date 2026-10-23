@@ -105,6 +105,10 @@ A context with no entry throws. Existing maps: `lib/{token,webhook,integration,s
 
 **Location:** `packages/ui/src/hooks/useOptimisticMutation.ts`
 
+**Every mutation is optimistic by default.** A create, update, delete or request (an inquiry) from the UI goes through `useOptimisticMutation`, so the screen changes at once and rolls back on error. A plain `useMutation` needs a stated reason, for example a mutation whose result can't be predicted before the server answers. Write the reason beside it in the PR, not in a comment. Inquiry mutations have their own optimistic hooks in `packages/ui/src/hooks/inquiry/` (`useCreateInquiryMutation`, `useResolveInquiryMutation`, …).
+
+Why: the user sees the change instantly, and one wrapper owns snapshot, rollback, reconcile and invalidation, so pages don't each hand-roll `onSuccess: invalidate`.
+
 `useOptimisticMutation({ mutationFn, targets, mutationOptions? })` applies each target's `optimisticUpdate` to its query on mutate, rolls back on error, runs the target's `reconcile` with the response on success, and invalidates the target query on settle (unless `invalidateOnSettled: false`). `targets` can be a function of the variables.
 
 For list queries, `createOptimisticListTarget({ queryKey, operation, optimisticExtras?, itemFromResponse? })` builds the target. `operation` is `'create' | 'update' | 'delete'`; the item id comes from `variables.path.id`, the fields from `variables.body`. A create inserts a placeholder row and replaces it with the response item.

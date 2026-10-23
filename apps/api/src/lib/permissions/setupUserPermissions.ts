@@ -35,6 +35,6 @@ export const setupUserPermissions = async (c: Context<AppEnv>) => {
     return;
   }
 
-  // Session auth → owner (full permissions)
+  // Person JWT → owner (full permissions)
   await permix.setup(getUserPermissions(user.id as UserId));
 };

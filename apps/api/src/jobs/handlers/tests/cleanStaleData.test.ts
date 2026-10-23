@@ -1,4 +1,5 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { db } from '@template/db';
 import type { User } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
@@ -17,19 +18,14 @@ describe('cleanStaleData handler', () => {
   let ctx: WorkerContext;
   let user: User;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     const { entity } = await createUser();
     user = entity;
     ctx = createTestWorker({ name: 'cleanStaleData', data: { id: 'cleanStaleData' } });
   });
 
-  afterAll(async () => {
-    await cleanupTouchedTables(ctx.db);
-    await ctx.queue.redis.flushdb();
-  });
-
-  beforeEach(async () => {
-    await ctx.db.webhookEvent.deleteMany({});
+  afterEach(async () => {
+    await cleanupTouchedTables(db);
     await ctx.queue.redis.flushdb();
   });
 
@@ -47,7 +43,7 @@ describe('cleanStaleData handler', () => {
 
     await cleanStaleData(ctx, { model: 'WebhookEvent', retentionDays: 90 });
 
-    expect(await ctx.db.webhookEvent.findUnique({ where: { id: oldEvent.id } })).toBeNull();
+    expect(await db.webhookEvent.findUnique({ where: { id: oldEvent.id } })).toBeNull();
   });
 
   it('deletes flows untouched for 15 minutes, keyed on updatedAt', async () => {
@@ -67,8 +63,8 @@ describe('cleanStaleData handler', () => {
       dateField: 'updatedAt',
     });
 
-    expect(await ctx.db.flow.findUnique({ where: { id: stale.id } })).toBeNull();
-    expect(await ctx.db.flow.findUnique({ where: { id: active.id } })).not.toBeNull();
+    expect(await db.flow.findUnique({ where: { id: stale.id } })).toBeNull();
+    expect(await db.flow.findUnique({ where: { id: active.id } })).not.toBeNull();
   });
 
   it('preserves rows within retentionDays', async () => {
@@ -85,7 +81,7 @@ describe('cleanStaleData handler', () => {
 
     await cleanStaleData(ctx, { model: 'WebhookEvent', retentionDays: 90 });
 
-    expect(await ctx.db.webhookEvent.findUnique({ where: { id: recent.id } })).not.toBeNull();
+    expect(await db.webhookEvent.findUnique({ where: { id: recent.id } })).not.toBeNull();
   });
 
   it('respects extra filters in addition to the age cutoff', async () => {
@@ -111,8 +107,8 @@ describe('cleanStaleData handler', () => {
       filters: { status: 'success' },
     });
 
-    expect(await ctx.db.webhookEvent.findUnique({ where: { id: oldSuccess.id } })).toBeNull();
-    expect(await ctx.db.webhookEvent.findUnique({ where: { id: oldError.id } })).not.toBeNull();
+    expect(await db.webhookEvent.findUnique({ where: { id: oldSuccess.id } })).toBeNull();
+    expect(await db.webhookEvent.findUnique({ where: { id: oldError.id } })).not.toBeNull();
   });
 
   it('handles empty result set without error', async () => {
@@ -146,6 +142,6 @@ describe('cleanStaleData handler', () => {
       cleanStaleData(ctx, { model: 'WebhookEvent', retentionDays: 90 }),
     ]);
 
-    expect(await ctx.db.webhookEvent.count()).toBe(0);
+    expect(await db.webhookEvent.count()).toBe(0);
   });
 });

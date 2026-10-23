@@ -14,6 +14,7 @@ export type WSData = {
   channels: Set<string>; // subscribed channels (normalized query keys)
   streams: Set<string>;
   heldAppends: Map<string, string[]>;
+  latestStreamFrames: Map<string, StreamFrame>; // newest queued open/close per stream
   connectedAt: number;
   lastPing: number; // staleness detection
   queue: SerializedQueue; // serializes this connection's async message handling
@@ -29,6 +30,8 @@ export type WSMessage =
   | { action: 'open'; stream: string }
   | { action: 'close'; stream: string }
   | { action: 'ping' };
+
+export type StreamFrame = Extract<WSMessage, { action: 'open' | 'close' }>;
 
 export type WSSocket = ServerWebSocket<WSData>;
 

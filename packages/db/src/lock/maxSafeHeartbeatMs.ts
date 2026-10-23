@@ -10,16 +10,17 @@
 // `(maxMissed + 1) * heartbeatMs < ttlMs` check is the looser bound — an interval above this
 // ceiling passes it and still lets the lease lapse after one timed-out beat. Strictly inside the
 // budget: at the boundary the recovery beat's PEXPIRE can land in the millisecond the key expires.
-// No connection this package creates sets a command timeout yet, so the caller passes the timeout
-// of the connection the lock runs on; a connection without one can hang a beat forever.
+// Defaults to the command timeout every non-blocking connection from createRedisConnection sets.
+import { COMMAND_TIMEOUT_MS } from '@template/db/redis/client';
+
 export const maxSafeHeartbeatMs = ({
   ttlMs,
   maxMissed = 1,
-  commandTimeoutMs,
+  commandTimeoutMs = COMMAND_TIMEOUT_MS,
 }: {
   ttlMs: number;
   maxMissed?: number;
-  commandTimeoutMs: number;
+  commandTimeoutMs?: number;
 }): number => {
   const heartbeatMs =
     Math.ceil((ttlMs - commandTimeoutMs) / (maxMissed + 1) - commandTimeoutMs) - 1;

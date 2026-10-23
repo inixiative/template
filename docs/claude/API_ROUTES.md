@@ -100,7 +100,8 @@ import { readRoute, createRoute, updateRoute, deleteRoute, actionRoute } from '#
 | `paginate` | boolean | Add pagination query params (requires `many`) |
 | `admin` | boolean | Adds 'Admin' prefix to operationId and tag |
 | `skipId` | boolean | Omit `:id` param from path |
-| `bodySchema` | ZodSchema | Request body validation |
+| `bodySchema` | ZodSchema | Request body validation (no object-level `.refine()`; route build throws) |
+| `bodyRefinement` / `queryRefinement` / `paramsRefinement` | `(value, ctx) => void` | Cross-field checks on the validated body/query/params, run before the controller; not in OpenAPI/SDK |
 | `responseSchema` | ZodSchema | Response shape |
 | `query` | ZodSchema | Query params (merged with pagination if enabled) |
 | `params` | ZodSchema | Path params (merged with id if not skipped) |
@@ -175,7 +176,7 @@ export const userReadController = makeController(userReadRoute, async (c, respon
   const { id } = c.req.valid('param');
 
   const user = await db.user.findUnique({ where: { id } });
-  if (!user) throw new HTTPException(404, { message: 'User not found' });
+  if (!user) throw makeError({ status: 404, message: 'User not found' });
 
   return respond.ok(user);
 });
@@ -920,7 +921,7 @@ const { search, setSearch, orderBy, toggleOrderBy, query } = useDataFilters(conf
 
 ## Error Responses
 
-All routes return standardized error responses. Use `makeError` to throw structured errors, or let the error handler normalize unexpected errors.
+All routes return standardized error responses: throw `makeError` for caller errors, and let the error handler normalize everything else. The few responses outside the envelope (better-auth's `/api/auth/*`, the telemetry beacon, a failed WebSocket upgrade) are listed in [ERRORS.md](ERRORS.md#the-global-handler).
 
 **Contract:**
 
@@ -990,10 +991,10 @@ throw makeError({
 
 **How it works:**
 
-- `makeError` returns an `HTTPException` with a pre-built JSON response
-- Error handler middleware catches and returns `err.getResponse()` for HTTPException
+- `makeError` returns an `AppError` (an `HTTPException`) with a pre-built JSON body
+- The error handler stamps `requestId` and returns that body; a plain `HTTPException` (from Hono middleware or a library) is wrapped in the same envelope with its status, message and headers
 - Unknown errors are normalized to 500 with standardized body
-- Zod validation errors automatically map to 422 with fieldErrors
+- Request validation failures (body, query, path, headers) are **422** with `fieldErrors`: the root app's `validationDefaultHook` rethrows the `ZodError`, and the handler formats it. There is no `{"success":false,"error":{"name":"ZodError"}}` shape. Set `defaultHook` only on a root app (`app.ts`, `createTestApp`); every router mounted under it inherits it (`@hono/zod-openapi` ≥ 1.6)
 - Prisma errors (P2002, P2025) map to 409/404 with standardized body
 
 Types are defined in `@template/shared/errors` and derived from `HTTP_ERROR_MAP` to prevent drift.
@@ -1002,14 +1003,7 @@ Default guidance for unknown/internal errors: `contactSupport`.
 
 `type` is optional and not required by default. In most cases, `status + guidance` is enough to drive frontend behavior.
 
-Throw `HTTPException` to return errors:
-
-```typescript
-import { HTTPException } from 'hono/http-exception';
-
-throw new HTTPException(404, { message: 'User not found' });
-throw new HTTPException(403, { message: 'Not authorized' });
-```
+Never throw `new HTTPException` in API code; throw `makeError` (the `no-raw-http-exception` CI rule enforces it).
 
 ---
 
@@ -1083,7 +1077,7 @@ updateRoute({
   responseSchema,
 });
 
-// Forbid token auth (session only)
+// Forbid token auth (person JWT only)
 createRoute({
   model: 'token',
   middleware: [validateNotToken],
@@ -1126,27 +1120,24 @@ export const userBodySchema = z.object({ ... });
 
 ### Cross-Field Validations
 
-**Don't use `.refine()` on route schemas** - it creates `ZodEffects` types that break hono-zod-openapi.
-
-Instead, create validation files and call `.parse()` manually in controller:
+Route build throws on a `bodySchema` that carries an object-level `.refine()`/`.superRefine()`: sanitizing rebuilds its shape and would drop them silently. Pass cross-field checks as `bodyRefinement`, `queryRefinement` or `paramsRefinement`: optional `superRefine` callbacks on the route args, annotated with the value's type. `makeController` runs each on the validated value before the handler; a failure throws its `ZodError` into the same 422 `VALIDATION_ERROR` envelope as a schema failure. With `many`, the body refinement runs per item. An omitted optional body skips it. None of them reach the OpenAPI document or SDK.
 
 ```typescript
-// validations/organizationCreateUserBody.ts
-const schema = z.object({
-  userId: z.string().uuid().optional(),
-  email: z.string().email().optional(),
-}).refine((data) => data.userId || data.email, {
-  message: 'Either userId or email is required',
+createRoute({
+  model: Modules.organization,
+  submodel: Modules.organizationUser,
+  bodySchema,
+  bodyRefinement: (body: z.infer<typeof bodySchema>, ctx) => {
+    if (!body.userId && !body.email)
+      ctx.addIssue({ code: 'custom', message: 'Either userId or email is required' });
+  },
+  responseSchema,
 });
-
-export const validateOrganizationCreateUserBody = (body: unknown) => schema.parse(body);
 ```
 
-```typescript
-// In controller
-const body = c.req.valid('json');
-validateOrganizationCreateUserBody(body);  // Throws ZodError if invalid
-```
+Field-level refinements (inside the shape) stay on the schema.
+
+A body that names a false-polymorphic target uses `polymorphicBodyRefinement` as its `bodyRefinement`; see [HOOKS.md#request-validation](HOOKS.md#request-validation).
 
 ---
 
@@ -1190,7 +1181,7 @@ modules/<resource>/
 | `services/` | Complex business logic |
 | `schemas/` | Shared Zod schemas (when not colocated) |
 | `transformers/` | Data transformation functions |
-| `validations/` | Cross-field validation with `.refine()` |
+| `validations/` | Validation helpers that need the DB or context |
 | `utils/` | Module-specific utilities |
 | `handlers/` | Job handlers (in jobs module) |
 | `tests/` | Test files |

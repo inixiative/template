@@ -1,0 +1,33 @@
+{
+  "id": "lenses",
+  "title": "Template lenses",
+  "routing": "Is this about the template's own lenses and where it wires them in \u2014 lensFor as a Prisma model's base lens, a route's filterLens and the scopeNarrowing middleware, lensWhere folding lens clauses into paginate's where, the redactLens / omitForeignKeys mapDefaults wrappers, fetchLens, sourceQueryValues / sourceQueryWhere, lensFromOperation / lensFromSchema for frontend filter lenses, customerRefLens / resolvedCustomerRefLens and segmentLensFor, the template's walkLensPath / lensPathFields helpers, or the no-lens-spread CI rule?",
+  "concepts": ["lenses"],
+  "tokens": 12288,
+  "tokenMethod": "chars/4",
+  "files": {
+    "recognise": {
+      "path": "recognise.md",
+      "tokens": 2490,
+      "experimental": true,
+      "note": "recognise/pick split under test (model round); not the standard"
+    },
+    "knowledge": {
+      "path": "knowledge.md",
+      "tokens": 12288
+    }
+  },
+  "runsAgreed": 0,
+  "sources": {
+    "docs": ["docs/claude/API_ROUTES.md", "docs/claude/COMMUNICATIONS.md"],
+    "docUnits": [
+      "doc:docs/claude/API_ROUTES.md#lens-wheres",
+      "doc:docs/claude/COMMUNICATIONS.md#email/the-email-lens"
+    ],
+    "catalogClusters": ["lenses-multi-source", "request-response-schemas"],
+    "codeEntries": 26,
+    "docMembers": 36
+  },
+  "bypassLines": 23,
+  "glossaryTerms": 21
+}

@@ -1,6 +1,7 @@
 /**
  * @atlas
- * @kind factory
+ * @kind constructor
+ * @constructs adapterRouter
  * @partOf primitive:shared
  * @uses none
  */

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import type { LensNarrowing } from '@inixiative/json-rules';
+import { type LensNarrowing, matchNothing } from '@inixiative/json-rules';
 import type { AnyDelegate } from '@template/db';
 import { lensFor } from '@template/db/lens';
 import { AppError } from '#/lib/errors';
@@ -38,10 +38,7 @@ describe('paginate — lens bindings', () => {
 
     await paginate(makeContext(lens), makeDelegate(captured), { bindings: { who: 'aron' } });
 
-    expect(captured.findManyArgs?.where).toEqual({
-      AND: [{}, {}],
-      name: { equals: 'aron' },
-    });
+    expect(captured.findManyArgs?.where).toEqual({ name: { equals: 'aron' } });
   });
 
   it('throws 500 when the lens requires a binding that was not provided', async () => {
@@ -61,7 +58,7 @@ describe('paginate — lens bindings', () => {
 
     const result = await paginate(makeContext(lens), makeDelegate(captured));
 
-    expect(captured.findManyArgs?.where).toEqual({ AND: [{}, {}] });
+    expect(captured.findManyArgs?.where).toEqual({});
     expect(result.pagination).toEqual({ page: 1, pageSize: 20, total: 0, totalPages: 0 });
   });
 });
@@ -73,8 +70,9 @@ type Row = { id: string };
 const makeSeekDelegate = (rows: Row[]): AnyDelegate =>
   ({
     findMany: async (args: Record<string, unknown>) => {
-      const keyset = (args.where as { AND?: [unknown, { OR?: { id?: { gt?: string } }[] }] })
-        .AND?.[1]?.OR?.[0]?.id?.gt;
+      type Seek = { OR?: { id?: { gt?: string } }[] };
+      const where = args.where as Seek & { AND?: [unknown, Seek] };
+      const keyset = (where.OR ?? where.AND?.[1]?.OR)?.[0]?.id?.gt;
       const after = keyset ? rows.filter((row) => row.id > keyset) : rows;
       return after.slice(0, args.take as number);
     },
@@ -105,6 +103,21 @@ describe('cursorPaginate — filter binding', () => {
       { where: { name: 'aron' } },
     );
     expect(second.data).toEqual([{ id: 'u-3' }, { id: 'u-4' }]);
+  });
+
+  it('a where that matches nothing still matches nothing on page two', async () => {
+    const first = await cursorPaginate<AnyDelegate, Row>(
+      cursorContext(userLens, { pageSize: 2 }),
+      makeSeekDelegate(rows),
+      { where: matchNothing() },
+    );
+    const captured: Captured = {};
+    await cursorPaginate(
+      cursorContext(userLens, { pageSize: 2, cursor: first.pagination.nextCursor }),
+      makeDelegate(captured),
+      { where: matchNothing() },
+    );
+    expect(captured.findManyArgs?.where).toEqual(matchNothing());
   });
 
   // why: the cursor is only meaningful inside the sequence it was minted from. Replaying it

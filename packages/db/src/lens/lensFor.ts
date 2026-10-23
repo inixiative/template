@@ -1,6 +1,7 @@
 /**
  * @atlas
- * @kind factory
+ * @kind constructor
+ * @constructs lens
  * @partOf infrastructure:prisma
  * @uses none
  */
