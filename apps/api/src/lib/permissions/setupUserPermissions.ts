@@ -18,10 +18,7 @@ export const setupUserPermissions = async (c: Context<AppEnv>) => {
   // No user → no user permissions
   if (!user) return;
 
-  // Org or OrgUser tokens are org-scoped, don't get user permissions
-  if (token?.ownerModel === 'Organization' || token?.ownerModel === 'OrganizationUser') {
-    return;
-  }
+  if (token && token.ownerModel !== 'User') return;
 
   // User token → restricted by token role
   if (token?.ownerModel === 'User') {

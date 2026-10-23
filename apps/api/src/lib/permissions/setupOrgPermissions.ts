@@ -32,6 +32,8 @@ export const setupOrgPermissions = async (c: Context<AppEnv>) => {
     return;
   }
 
+  if (token?.ownerModel === 'Space' || token?.ownerModel === 'SpaceUser') return;
+
   // OrgUser token → single org, lesser of orgUser + token
   if (token?.ownerModel === 'OrganizationUser' && token.organizationId) {
     const orgUser = orgUsers?.find((ou) => ou.organizationId === token.organizationId);
