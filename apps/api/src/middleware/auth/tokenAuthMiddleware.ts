@@ -5,7 +5,15 @@
  * @uses infrastructure:redis, infrastructure:prisma, primitive:authz
  */
 import { createHash } from 'node:crypto';
-import { cache, cacheKey, upsertCache } from '@template/db';
+import { cache, cacheKey, fetchOne } from '@template/db';
+import type {
+  Organization,
+  OrganizationUser,
+  Space,
+  SpaceUser,
+  Token,
+  User,
+} from '@template/db/generated/client/client';
 import { LogScope, log } from '@template/shared/logger';
 import type { Context, Next } from 'hono';
 import { setUserContext } from '#/lib/context/setUserContext';
@@ -17,128 +25,134 @@ import type { AppEnv } from '#/types/appEnv';
 
 const TOKEN_CACHE_TTL = 60 * 10;
 
-export const tokenAuthMiddleware = async (c: Context<AppEnv>, next: Next) => {
+const ownerExists = (token: TokenWithRelations): boolean => {
+  switch (token.ownerModel) {
+    case 'User':
+      return Boolean(token.user);
+    case 'Organization':
+      return Boolean(token.organization);
+    case 'Space':
+      return Boolean(token.space);
+    case 'OrganizationUser':
+      return Boolean(token.organizationUser);
+    case 'SpaceUser':
+      return Boolean(token.spaceUser);
+  }
+};
+
+// why: owners load under their own keys, which the cache hook clears; the token's key does not.
+const loadOwners = async (token: Token): Promise<TokenWithRelations> => {
+  const { organizationId, spaceId, userId } = token;
+  const [user, organization, space, organizationUser, spaceUser] = await Promise.all([
+    userId ? fetchOne<User>('user', userId) : null,
+    organizationId ? fetchOne<Organization>('organization', organizationId) : null,
+    spaceId ? fetchOne<Space>('space', spaceId) : null,
+    organizationId && userId
+      ? fetchOne<OrganizationUser>('organizationUser', { organizationId, userId })
+      : null,
+    organizationId && spaceId && userId
+      ? fetchOne<SpaceUser>('spaceUser', { organizationId, spaceId, userId })
+      : null,
+  ]);
+  const hasMembership = organizationUser && user && organization;
+  return {
+    ...token,
+    user,
+    organization,
+    space,
+    organizationUser: hasMembership ? { ...organizationUser, user, organization } : null,
+    spaceUser:
+      spaceUser && hasMembership && space
+        ? { ...spaceUser, user, organization, organizationUser, space }
+        : null,
+  };
+};
+
+const authenticateToken = async (c: Context<AppEnv>): Promise<void> => {
   const db = c.get('db');
 
-  if (c.get('user')) return next();
+  // Check header first, then URL query param (for WebSocket, email links, etc.)
+  const authorization = c.req.header('authorization');
+  const urlToken = new URL(c.req.url).searchParams.get('token');
 
-  try {
-    // Check header first, then URL query param (for WebSocket, email links, etc.)
-    const authorization = c.req.header('authorization');
-    const urlToken = new URL(c.req.url).searchParams.get('token');
+  const apiKey = authorization?.startsWith('Bearer ') ? authorization.slice(7) : urlToken;
 
-    const apiKey = authorization?.startsWith('Bearer ') ? authorization.slice(7) : urlToken;
+  if (!apiKey) return;
+  const keyHash = createHash('sha256').update(apiKey).digest('hex');
 
-    if (!apiKey) return next();
-    const keyHash = createHash('sha256').update(apiKey).digest('hex');
-
-    const token = await cache<TokenWithRelations | null>(
-      cacheKey('Token', { keyHash }),
-      async () => {
-        const found = await db.token.findUnique({
-          where: {
-            keyHash,
-            isActive: true,
-            OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
-          },
-          include: {
-            user: true,
-            organization: true,
-            organizationUser: {
-              include: {
-                user: true,
-                organization: true,
-              },
-            },
-            space: true,
-            spaceUser: {
-              include: {
-                user: true,
-                organization: true,
-                organizationUser: true,
-                space: true,
-              },
-            },
-          },
-        });
-        // Touch lastUsedAt on cache-miss only (≈ TTL granularity): keeps it off the request
-        // hot path and avoids a fire-and-forget write racing the later batch reads (P2028).
-        if (found)
-          await db.token.update({ where: { id: found.id }, data: { lastUsedAt: new Date() } });
-        return found;
-      },
-      TOKEN_CACHE_TTL, // 10-minute TTL to balance performance with security (revoked tokens re-checked)
-    );
-
-    if (!token) return next();
-
-    if (token.user)
-      upsertCache(cacheKey('user', token.user.id), token.user, { ttl: TOKEN_CACHE_TTL });
-    if (token.organization)
-      upsertCache(cacheKey('organization', token.organization.id), token.organization, {
-        ttl: TOKEN_CACHE_TTL,
+  const tokenRow = await cache<Token | null>(
+    cacheKey('Token', { keyHash }),
+    async () => {
+      const found = await db.token.findUnique({
+        where: {
+          keyHash,
+          isActive: true,
+          OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+        },
       });
-    if (token.organizationUser)
-      upsertCache(
-        cacheKey('organizationUser', {
-          organizationId: token.organizationUser.organizationId,
-          userId: token.organizationUser.userId,
-        }),
-        token.organizationUser,
-        { ttl: TOKEN_CACHE_TTL },
-      );
-    if (token.space)
-      upsertCache(cacheKey('space', token.space.id), token.space, { ttl: TOKEN_CACHE_TTL });
-    if (token.spaceUser)
-      upsertCache(
-        cacheKey('spaceUser', {
-          organizationId: token.spaceUser.organizationId,
-          spaceId: token.spaceUser.spaceId,
-          userId: token.spaceUser.userId,
-        }),
-        token.spaceUser,
-        { ttl: TOKEN_CACHE_TTL },
-      );
+      // Touch lastUsedAt on cache-miss only (≈ TTL granularity): keeps it off the request
+      // hot path and avoids a fire-and-forget write racing the later batch reads (P2028).
+      if (found)
+        await db.token.update({ where: { id: found.id }, data: { lastUsedAt: new Date() } });
+      return found;
+    },
+    TOKEN_CACHE_TTL,
+  );
 
+  if (!tokenRow) return;
+  if (tokenRow.expiresAt && tokenRow.expiresAt <= new Date()) return;
+
+  const token = await loadOwners(tokenRow);
+  if (!ownerExists(token)) return;
+
+  if (token.ownerModel === 'User' && token.user) {
+    const userWithOrgs = await findUserWithRelations(token.user.id);
+    if (!userWithOrgs) return;
     c.set('token', token);
+    await setUserContext(c, userWithOrgs);
+    return;
+  }
 
-    if (token.ownerModel === 'User' && token.user) {
-      // User token → load user with all org memberships
-      const userWithOrgs = await findUserWithRelations(token.user.id);
-      if (userWithOrgs) await setUserContext(c, userWithOrgs);
-    } else if (token.ownerModel === 'OrganizationUser' && token.organizationUser) {
-      // OrgUser token → use token data directly (scoped to single org)
-      const { user: orgUserUser, organization, ...orgUserFields } = token.organizationUser;
-      await setUserContext(c, {
-        ...orgUserUser,
-        organizationUsers: [orgUserFields],
-        organizations: organization ? [organization] : [],
-        spaceUsers: [],
-        spaces: [],
-      });
-    } else if (token.ownerModel === 'SpaceUser' && token.spaceUser) {
-      // SpaceUser token → use token data directly (scoped to single space)
-      const {
-        user: spaceUserUser,
-        organization,
-        organizationUser,
-        space,
-        ...spaceUserFields
-      } = token.spaceUser;
-      await setUserContext(c, {
-        ...spaceUserUser,
-        organizationUsers: organizationUser ? [organizationUser] : [],
-        organizations: organization ? [organization] : [],
-        spaceUsers: [spaceUserFields],
-        spaces: space ? [space] : [],
-      });
-    } else {
-      c.set('permix', await buildPermix(principalFromContext(c)));
+  c.set('token', token);
+
+  if (token.ownerModel === 'OrganizationUser' && token.organizationUser) {
+    const { user: orgUserUser, organization, ...orgUserFields } = token.organizationUser;
+    await setUserContext(c, {
+      ...orgUserUser,
+      organizationUsers: [orgUserFields],
+      organizations: [organization],
+      spaceUsers: [],
+      spaces: [],
+    });
+  } else if (token.ownerModel === 'SpaceUser' && token.spaceUser) {
+    const {
+      user: spaceUserUser,
+      organization,
+      organizationUser,
+      space,
+      ...spaceUserFields
+    } = token.spaceUser;
+    await setUserContext(c, {
+      ...spaceUserUser,
+      organizationUsers: [organizationUser],
+      organizations: [organization],
+      spaceUsers: [spaceUserFields],
+      spaces: [space],
+    });
+  } else {
+    c.set('permix', await buildPermix(principalFromContext(c)));
+  }
+};
+
+export const tokenAuthMiddleware = async (c: Context<AppEnv>, next: Next) => {
+  if (!c.get('user')) {
+    try {
+      await authenticateToken(c);
+    } catch (err) {
+      // Invalid token, lookup failure, or cache miss. Log so failure modes like
+      // Redis-down or DB-down don't silently masquerade as "no token".
+      log.warn('token auth lookup failed', { err }, LogScope.auth);
     }
-  } catch (err) {
-    // Invalid token, lookup failure, or cache miss. Log so failure modes like
-    // Redis-down or DB-down don't silently masquerade as "no token".
-    log.warn('token auth lookup failed', { err }, LogScope.auth);
   }
 
   await next();

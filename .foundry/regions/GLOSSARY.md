@@ -4401,7 +4401,7 @@ A number 1-9 in .worktrees/.slots/<N> and WORKTREE_SLOT that owns a worktree's p
 **worktrees**  
 Class: worktree lifecycle through the repo scripts, with slots and per-slot DBs/ports. *Region:* [Dev setup and worktrees](dx-setup/knowledge.md)
 
-**writtenPatches**  
+**writeData**  
 Extracts the written rows from hook args across single, bulk and upsert actions. *Region:* [Mutation hooks, immutable fields, ordered lists](mutation-hooks/knowledge.md)
 
 **ws-channels**  

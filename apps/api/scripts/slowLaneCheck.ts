@@ -111,7 +111,9 @@ const startWorker = (concurrency: number, handlers: (job: Job) => Handlers): Wor
     'jobs',
     (job: Job) => processJob(job, { handlers: handlers(job) as never, slowSlots }),
     {
-      connection: createRedisConnection('check:worker', resolveBullmqRedisUrl()),
+      connection: createRedisConnection('check:worker', resolveBullmqRedisUrl(), {
+        isBlocking: true,
+      }),
       concurrency,
     },
   );
@@ -212,7 +214,9 @@ const checkSendLargerThanShare = async () => {
   for (const worker of workers)
     worker.on('failed', (job, err) => failedJobs.push(`${job?.id}: ${err.message}`));
   const events = new QueueEvents('jobs', {
-    connection: createRedisConnection('check:events', resolveBullmqRedisUrl()),
+    connection: createRedisConnection('check:events', resolveBullmqRedisUrl(), {
+      isBlocking: true,
+    }),
   });
   let parks = 0;
   events.on('delayed', () => {

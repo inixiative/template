@@ -231,7 +231,7 @@ GITHUB_CLIENT_ID=<id>          # listed by platformProviders.ts when set
 GITHUB_CLIENT_SECRET=<secret>
 
 # Frontends
-VITE_API_URL=http://localhost:8000
+VITE_API_URL=http://localhost:<api port>   # locally: the registry api port, written by setup / worktree:create
 ```
 
 ---

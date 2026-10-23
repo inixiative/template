@@ -27,14 +27,22 @@ const coordinate = () => coordinateRollingCaches(createTestWorker());
 const makeDue = (name: string) => getRedisClient().pexpire(rollingCacheTimerKey(name), 1_000);
 
 // One target per organization that has a space named after the cache: `distinct` over Space.
-const makeSpaceCountCache = (name: string, failingOrganizationId: () => string = () => '') =>
+const makeSpaceCountCache = (
+  name: string,
+  failingOrganizationId: () => string = () => '',
+  spreadSeconds = 0,
+) =>
   makeRollingCache({
     name,
     intervalSeconds: INTERVAL_SECONDS,
-    key: ({ organizationId }) => cacheKey(name, organizationId),
-    compute: async ({ organizationId }) => {
+    spreadSeconds,
+    results: { value: ({ organizationId }) => cacheKey(name, organizationId) },
+    compute: async ({ organizationId }, { results, write }) => {
       if (organizationId === failingOrganizationId()) throw new Error('compute failed');
-      return db.space.count({ where: { organizationId, name: { startsWith: name } } });
+      await write(
+        results.value({ organizationId }),
+        await db.space.count({ where: { organizationId, name: { startsWith: name } } }),
+      );
     },
     targets: {
       model: 'Space',
@@ -70,11 +78,34 @@ describe('coordinateRollingCaches', () => {
     await coordinate();
 
     expect(await getRedisClient().exists(cacheKey(name, acme.id))).toBe(1);
-    expect(await rollingCache.read({ organizationId: acme.id })).toBe(2);
-    expect(await rollingCache.read({ organizationId: globex.id })).toBe(1);
+    expect(await rollingCache.read('value', { organizationId: acme.id })).toMatchObject({
+      state: 'fresh',
+      value: 2,
+    });
+    expect(await rollingCache.read('value', { organizationId: globex.id })).toMatchObject({
+      value: 1,
+    });
     expect(await getRedisClient().ttl(rollingCacheTimerKey(name))).toBeGreaterThan(
       INTERVAL_SECONDS - 5,
     );
+  });
+
+  it('spaces a cache’s leaves across its spread, so only the first starts at once', async () => {
+    const name = uniqueName('Spread');
+    const { entity: acme } = await createOrganization();
+    const { entity: globex } = await createOrganization();
+    await createSpace({ name: `${name} a` }, { organization: acme });
+    await createSpace({ name: `${name} b` }, { organization: globex });
+    const rollingCache = makeSpaceCountCache(name, () => '', INTERVAL_SECONDS / 2);
+
+    await coordinate();
+
+    const states = await Promise.all(
+      [acme, globex].map(
+        async ({ id }) => (await rollingCache.read('value', { organizationId: id })).state,
+      ),
+    );
+    expect(states.sort()).toEqual(['empty', 'fresh']);
   });
 
   it('leaves a cache alone while its timer has more than a tick left, and refreshes it once it runs out', async () => {
@@ -86,11 +117,15 @@ describe('coordinateRollingCaches', () => {
     await createSpace({ name: `${name} b` }, { organization: acme });
 
     await coordinate();
-    expect(await rollingCache.read({ organizationId: acme.id })).toBe(1);
+    expect(await rollingCache.read('value', { organizationId: acme.id })).toMatchObject({
+      value: 1,
+    });
 
     await makeDue(name);
     await coordinate();
-    expect(await rollingCache.read({ organizationId: acme.id })).toBe(2);
+    expect(await rollingCache.read('value', { organizationId: acme.id })).toMatchObject({
+      value: 2,
+    });
   });
 
   it('targets are the rows of the selector’s own findMany args', async () => {
@@ -100,8 +135,9 @@ describe('coordinateRollingCaches', () => {
     const rollingCache = makeRollingCache({
       name,
       intervalSeconds: INTERVAL_SECONDS,
-      key: ({ id }) => cacheKey(name, id),
-      compute: async ({ name: organizationName }) => organizationName,
+      spreadSeconds: 0,
+      results: { value: ({ id }) => cacheKey(name, id) },
+      compute: async (target, { results, write }) => write(results.value(target), target.name),
       targets: {
         model: 'Organization',
         args: { where: { name: { startsWith: name } }, select: { id: true, name: true } },
@@ -110,8 +146,12 @@ describe('coordinateRollingCaches', () => {
 
     await coordinate();
 
-    expect(await rollingCache.read({ id: acme.id, name: 'ignored' })).toBe(`${name} Acme`);
-    expect(await rollingCache.read({ id: globex.id, name: 'ignored' })).toBe(`${name} Globex`);
+    expect(await rollingCache.read('value', { id: acme.id, name: 'ignored' })).toMatchObject({
+      value: `${name} Acme`,
+    });
+    expect(await rollingCache.read('value', { id: globex.id, name: 'ignored' })).toMatchObject({
+      value: `${name} Globex`,
+    });
   });
 
   it('a leaf that fails keeps its last good value, and inline its failure fails the tick', async () => {
@@ -127,6 +167,8 @@ describe('coordinateRollingCaches', () => {
     await makeDue(name);
     await expect(coordinate()).rejects.toThrow('compute failed');
 
-    expect(await rollingCache.read({ organizationId: broken.id })).toBe(1);
+    expect(await rollingCache.read('value', { organizationId: broken.id })).toMatchObject({
+      value: 1,
+    });
   });
 });

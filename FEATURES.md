@@ -296,7 +296,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **Staged jobs (fan out and wait)** - Every constructor takes `{ stages, finish }` in place of a handler: each stage adds children with `ctx.enqueueChildJob`, the job parks in BullMQ's `waiting-children` (holding no worker slot) until they report, and `finish` runs once after the last stage. The stage index lives on the job, so a resumed run never repeats a stage. Children keep their retries and then count as done (`ignoreDependencyOnFailure`). The `no-hand-rolled-flows` CI rule keeps the flow machinery in the primitive; `apps/api/scripts/jobFlowCheck.ts` proves it against real Redis
 
-- ✅ **Rolling caches** - `makeRollingCache({ name, intervalSeconds, key, compute, targets })` keeps a computed value warm on a timer with no invalidation to write. Targets are a model plus its own Prisma `findMany` args. One seeded cron root (`coordinateRollingCaches`, every minute) enqueues a staged singleton branch per due cache, which fans out a superseding slow-lane leaf per target under a per-attempt timeout (`rollingCache.leafStuck` app event when it runs over). Entries outlive every retry, so a read always hits; the `rolling-cache-registered` CI rule keeps every definition imported by the worker
+- ✅ **Rolling caches** - `makeRollingCache({ name, intervalSeconds, targets, results, compute, channel })` keeps computed values warm on a timer with no invalidation to write. Targets are a model plus its own Prisma `findMany` args; `results` are key functions over one params object, all filled by one `compute` pass per target under one single-flight lock. Reads never compute: `checkCache` reports empty / computing / fresh / stale from a write time stored beside each value, and `checkRollingCache` queues the target's leaf on a miss and returns the channel to wait on. One seeded cron root (`coordinateRollingCaches`, every minute) enqueues a staged singleton branch per due cache, which fans out superseding slow-lane leaves spread over `spreadSeconds`, each under a per-attempt timeout (`rollingCache.leafStuck` when it runs over, `rollingCache.refreshed` with a websocket refetch hint when it lands). Entries outlive every retry; the `rolling-cache-registered` CI rule keeps every definition imported by the worker
 
 - ✅ **BullMQ Integration** - Redis-backed persistent queue with automatic retries (3 attempts, exponential backoff 5s base). Jobs survive server restarts. One `jobs` queue serves registered handlers; `REDIS_BULLMQ_URL` can isolate it from cache Redis (fallback: `REDIS_URL`)
 
@@ -668,11 +668,11 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 ### Caching & Performance
 
-- ✅ **Redis with IORedis** - Distributed caching layer (Redis 7 alpine). Singleton connections with automatic reconnection, error handling, and connection pooling. Tests get one shared in-memory `ioredis-mock` client (`createRedisConnection` in test); a test that needs real Redis (BullMQ repeatables) opens its own connection
+- ✅ **Redis with IORedis** - Distributed caching layer (Redis 7 alpine). Singleton connections with automatic reconnection, error handling, and connection pooling. Tests get one shared in-memory `ioredis-mock` client (`createRedisConnection` in test); a test that needs real Redis (BullMQ job schedulers) opens its own connection
 
 - ✅ **Redis Use Cases** - Sign-in handshake sessions and one-time tokens (BetterAuth `secondaryStorage`, 10 minutes), cached reads via `cache()` (API tokens 10min, user lookups, permission hydration), BullMQ job queue persistence, WebSocket pub/sub for multi-server broadcasting, rate-limit windows, locks
 
-- ✅ **Namespace Support** - Redis keys prefixed by use case (`redisNamespace`: bull, cache, job, ws, otp, session, limit, lock, lane, rollingCache) preventing collisions and enabling selective cache clearing
+- ✅ **Namespace Support** - Redis keys prefixed by use case (`redisNamespace`: bull, cache, cacheWritten, job, ws, otp, session, limit, lock, lane, rollingCache) preventing collisions and enabling selective cache clearing
 
 - ✅ **Multiple Redis Connections** - Main client (general operations), dedicated subscriber (pub/sub is blocking), separate BullMQ connections per queue/worker. Prevents blocking operations from interfering
 

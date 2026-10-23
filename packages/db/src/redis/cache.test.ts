@@ -1,6 +1,7 @@
-import { beforeEach, describe, expect, it } from 'bun:test';
-import { cache, cacheKey, clearKey, upsertCache } from '@template/db/redis/cache';
+import { beforeEach, describe, expect, it, spyOn } from 'bun:test';
+import { cache, cacheKey, checkCache, clearKey, upsertCache } from '@template/db/redis/cache';
 import { getRedisClient } from '@template/db/redis/client';
+import { redisNamespace } from '@template/db/redis/namespaces';
 import { log } from '@template/shared/logger';
 import { type LogRecord, observeLogRecords } from '@template/shared/logger/records';
 
@@ -331,5 +332,77 @@ describe('large cache writes', () => {
     expect(
       await largeWrites(() => cache(cacheKey('user', 'small'), async () => ({ n: 1 }))),
     ).toHaveLength(0);
+  });
+});
+
+describe('checkCache', () => {
+  const writtenKeyOf = (key: string) => `${redisNamespace.cacheWritten}:${key}`;
+
+  it('reports empty for a key nothing wrote and nobody is computing', async () => {
+    expect(await checkCache(cacheKey('check', 'nothing'))).toEqual({ state: 'empty' });
+  });
+
+  it('reports computing while cache() holds the key, then fresh with the value it wrote', async () => {
+    const key = cacheKey('check', 'computing');
+    let release: () => void = () => {};
+    const filling = cache(
+      key,
+      () => new Promise<string>((resolve) => (release = () => resolve('filled'))),
+    );
+    await Bun.sleep(20);
+
+    expect(await checkCache(key)).toEqual({ state: 'computing' });
+
+    release();
+    await filling;
+    expect(await checkCache(key)).toMatchObject({
+      state: 'fresh',
+      value: 'filled',
+      isComputing: false,
+    });
+  });
+
+  it('reports stale once the value is older than the freshness window, and fresh without one', async () => {
+    const key = cacheKey('check', 'stale');
+    await upsertCache(key, 'value');
+    await getRedisClient().set(writtenKeyOf(key), String(Date.now() - 120_000));
+
+    expect(await checkCache(key, { freshForSeconds: 60 })).toMatchObject({
+      state: 'stale',
+      value: 'value',
+    });
+    expect(await checkCache(key, { freshForSeconds: 600 })).toMatchObject({
+      state: 'fresh',
+      value: 'value',
+    });
+    expect(await checkCache(key)).toMatchObject({ state: 'fresh', value: 'value' });
+  });
+
+  it('a write stamps the write time with the value and its ttl', async () => {
+    const key = cacheKey('check', 'stamped');
+    const before = Date.now();
+    await upsertCache(key, 'value', { ttl: 120 });
+
+    const check = await checkCache(key);
+    expect(check.state === 'fresh' && check.writtenAt?.getTime()).toBeGreaterThanOrEqual(before);
+    expect(await getRedisClient().ttl(writtenKeyOf(key))).toBe(await getRedisClient().ttl(key));
+  });
+
+  it('a cleared key goes back to empty, its write time with it', async () => {
+    const key = cacheKey('check', 'cleared');
+    await upsertCache(key, 'value');
+    await clearKey(key);
+
+    expect(await checkCache(key, { freshForSeconds: 60 })).toEqual({ state: 'empty' });
+    expect(await getRedisClient().exists(writtenKeyOf(key))).toBe(0);
+  });
+
+  it('throws when Redis cannot answer, instead of reporting a miss', async () => {
+    const mget = spyOn(getRedisClient(), 'mget').mockRejectedValueOnce(new Error('down'));
+    try {
+      await expect(checkCache(cacheKey('check', 'down'))).rejects.toThrow('down');
+    } finally {
+      mget.mockRestore();
+    }
   });
 });

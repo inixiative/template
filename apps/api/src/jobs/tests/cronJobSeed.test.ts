@@ -1,61 +1,53 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it, spyOn } from 'bun:test';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
 import { clearHookRegistry, db } from '@template/db';
 import { type SeedFile, seedTable } from '@template/db/prisma/seed';
 import { seeds } from '@template/db/prisma/seeds';
 import { cleanupTouchedTables, createCronJob } from '@template/db/test';
 import { registerCronJobSyncHook } from '#/hooks/cronJobSync/hook';
-import { queue } from '#/jobs/queue';
+import { isValidJobId } from '#/jobs/validateJobId';
+import { connectRealJobsQueue } from '#tests/utils/realJobsQueue';
 
 const cronJobSeeds = seeds.find((file) => file.model === 'cronJob')!;
 const systemSeed = cronJobSeeds.records.find((record) => record.handler === 'sweepSegments')!;
 const seedFile: SeedFile = { ...cronJobSeeds, records: [systemSeed] };
 
 describe('cron job seeds sync system rows', () => {
-  const added: string[] = [];
-  const removed: Array<{ name: string; jobId: unknown }> = [];
-  let restore = (): void => {};
+  let jobs: Awaited<ReturnType<typeof connectRealJobsQueue>>;
 
-  beforeAll(() => {
+  beforeAll(async () => {
     registerCronJobSyncHook();
-    const add = spyOn(queue, 'add').mockImplementation((async (name: string) => {
-      added.push(name);
-      return { id: name };
-    }) as never);
-    const removeRepeatable = spyOn(queue, 'removeRepeatable').mockImplementation((async (
-      name: string,
-      _repeat: unknown,
-      jobId: string,
-    ) => {
-      removed.push({ name, jobId });
-      return true;
-    }) as never);
-    restore = () => {
-      add.mockRestore();
-      removeRepeatable.mockRestore();
-    };
+    jobs = await connectRealJobsQueue();
   });
 
   afterEach(async () => {
-    added.length = 0;
-    removed.length = 0;
+    await jobs.realQueue.obliterate({ force: true });
     await cleanupTouchedTables(db);
   });
 
-  afterAll(() => {
-    restore();
+  afterAll(async () => {
     clearHookRegistry();
+    await jobs.close();
   });
 
-  it('renames a system row on re-seed and moves its repeatable', async () => {
+  it('gives every seeded row a jobId BullMQ accepts as a scheduler key', () => {
+    expect(cronJobSeeds.records.filter((record) => !isValidJobId(record.jobId as string))).toEqual(
+      [],
+    );
+  });
+
+  it('renames a system row on re-seed and moves its scheduler', async () => {
     await createCronJob({
       id: systemSeed.id,
       name: 'sweepSegmentsLegacy',
       jobId: 'sweepSegmentsLegacy',
-      handler: 'sweepSegmentsLegacy',
+      handler: 'cleanStaleData',
       description: 'Legacy description.',
       pattern: '0 4 * * *',
     });
-    added.length = 0;
+    expect(await jobs.schedulerOf('sweepSegmentsLegacy')).toEqual({
+      name: 'cleanStaleData',
+      pattern: '0 4 * * *',
+    });
 
     await seedTable(seedFile);
 
@@ -66,8 +58,11 @@ describe('cron job seeds sync system rows', () => {
       handler: 'sweepSegments',
       description: systemSeed.description,
     });
-    expect(removed).toEqual([{ name: 'sweepSegmentsLegacy', jobId: 'sweepSegmentsLegacy' }]);
-    expect(added).toEqual(['sweepSegments']);
+    expect(await jobs.schedulerOf('sweepSegmentsLegacy')).toBeNull();
+    expect(await jobs.schedulerOf('sweepSegments')).toEqual({
+      name: 'sweepSegments',
+      pattern: '0 4 * * *',
+    });
   });
 
   it('keeps the fields an admin edited', async () => {
@@ -75,7 +70,7 @@ describe('cron job seeds sync system rows', () => {
       id: systemSeed.id,
       name: 'sweepSegmentsLegacy',
       jobId: 'sweepSegmentsLegacy',
-      handler: 'sweepSegmentsLegacy',
+      handler: 'cleanStaleData',
       pattern: '*/5 * * * *',
       enabled: false,
       payload: { batch: 10 },
@@ -94,18 +89,16 @@ describe('cron job seeds sync system rows', () => {
       maxAttempts: 7,
       backoffMs: 1234,
     });
-    expect(added).toEqual([]);
+    expect(await jobs.schedulerOf('sweepSegments')).toBeNull();
   });
 
-  it('inserts a missing row and leaves BullMQ alone on an unchanged re-seed', async () => {
+  it('inserts a missing row and leaves one scheduler on an unchanged re-seed', async () => {
     await seedTable(seedFile);
-    expect(added).toEqual(['sweepSegments']);
-    expect(removed).toEqual([]);
-
-    added.length = 0;
     await seedTable(seedFile);
 
-    expect(added).toEqual([]);
-    expect(removed).toEqual([]);
+    const schedulers = await jobs.realQueue.getJobSchedulers();
+    expect(schedulers.map(({ key, pattern }) => ({ key, pattern }))).toEqual([
+      { key: 'sweepSegments', pattern: systemSeed.pattern as string },
+    ]);
   });
 });

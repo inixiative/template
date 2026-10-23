@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'bun:test';
-import { OpenAPIHono } from '@hono/zod-openapi';
 import { type Condition, type LensNarrowing, projectLens } from '@inixiative/json-rules';
 import { lensFor } from '@template/db/lens';
 import { scopeNarrowing } from '#/middleware/resources/scopeNarrowing';
-import type { AppEnv } from '#/types/appEnv';
+import { createTestApp } from '#tests/createTestApp';
 
 const inquiryNarrowing = (): LensNarrowing => ({
   parent: lensFor('Inquiry'),
@@ -26,17 +25,22 @@ const runMiddlewares = async (
   path = '/check',
 ): Promise<LensNarrowing | undefined> => {
   let captured: LensNarrowing | undefined;
-  const app = new OpenAPIHono<AppEnv>();
-  app.use('*', async (c, next) => {
-    c.set('filterLens', inquiryNarrowing());
-    await next();
+  const { fetch } = createTestApp({
+    mount: [
+      (app) => {
+        app.use('*', async (c, next) => {
+          c.set('filterLens', inquiryNarrowing());
+          await next();
+        });
+        app.use(path, ...middlewares);
+        app.get(path, (c) => {
+          captured = c.get('filterLens') ?? undefined;
+          return c.json({ ok: true });
+        });
+      },
+    ],
   });
-  app.use(path, ...middlewares);
-  app.get(path, (c) => {
-    captured = c.get('filterLens') ?? undefined;
-    return c.json({ ok: true });
-  });
-  await app.fetch(new Request(`http://test${path}`));
+  await fetch(new Request(`http://test${path}`));
   return captured;
 };
 

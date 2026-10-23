@@ -1,5 +1,4 @@
 import { afterAll, describe, expect, it } from 'bun:test';
-import { OpenAPIHono } from '@hono/zod-openapi';
 import { db } from '@template/db';
 import type { User } from '@template/db/generated/client/client';
 import { IntegrationOwnerModel } from '@template/db/generated/client/enums';
@@ -14,31 +13,32 @@ import {
 import { setUserContext } from '#/lib/context/setUserContext';
 import { auditActorMiddleware } from '#/middleware/auth/auditActorMiddleware';
 import { spoofMiddleware } from '#/middleware/auth/spoofMiddleware';
-import { prepareRequest } from '#/middleware/prepareRequest';
 import { findUserWithRelations } from '#/modules/user/services/find';
-import type { AppEnv } from '#/types/appEnv';
+import { createTestApp } from '#tests/createTestApp';
 
 type Echo = { integrationId: string | null; actorUserId: string | null };
 
-const buildApp = (user: User) => {
-  const app = new OpenAPIHono<AppEnv>();
-  app.use('*', prepareRequest);
-  app.use('*', async (c, next) => {
-    const found = await findUserWithRelations(user.id);
-    if (found) await setUserContext(c, found);
-    await next();
+const buildApp = (user: User) =>
+  createTestApp({
+    mount: [
+      (app) => {
+        app.use('*', async (c, next) => {
+          const found = await findUserWithRelations(user.id);
+          if (found) await setUserContext(c, found);
+          await next();
+        });
+        app.use('*', spoofMiddleware);
+        app.use('*', auditActorMiddleware);
+        app.get('/echo', (c) => {
+          const actor = auditActorContext.getScope();
+          return c.json({
+            integrationId: actor?.integrationId ?? null,
+            actorUserId: actor?.actorUserId ?? null,
+          });
+        });
+      },
+    ],
   });
-  app.use('*', spoofMiddleware);
-  app.use('*', auditActorMiddleware);
-  app.get('/echo', (c) => {
-    const actor = auditActorContext.getScope();
-    return c.json({
-      integrationId: actor?.integrationId ?? null,
-      actorUserId: actor?.actorUserId ?? null,
-    });
-  });
-  return app;
-};
 
 const echo = async (user: User, headers: Record<string, string>) => {
   const res = await buildApp(user).fetch(new Request('http://test/echo', { headers }));

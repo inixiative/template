@@ -1,19 +1,15 @@
-import { beforeEach, describe, expect, it } from 'bun:test';
-import { OpenAPIHono, z } from '@hono/zod-openapi';
+import { describe, expect, it } from 'bun:test';
+import { z } from '@hono/zod-openapi';
 import { actionRoute, createRoute, readRoute } from '#/lib/routeTemplates';
 import { makeController } from '#/lib/utils/makeController';
 import { Modules } from '#/modules/modules';
-import type { AppEnv } from '#/types/appEnv';
-import { json, jsonValidationFailure, post } from '#tests/utils/request';
+import { createTestApp } from '#tests/createTestApp';
+import { get, json, jsonError, post } from '#tests/utils/request';
+
+const ranResponse = z.object({ ran: z.boolean() });
 
 describe('makeController', () => {
   describe('response validation', () => {
-    let app: OpenAPIHono<AppEnv>;
-
-    beforeEach(() => {
-      app = new OpenAPIHono<AppEnv>();
-    });
-
     it('strips extra fields not in response schema', async () => {
       const testRoute = readRoute({
         model: Modules.user,
@@ -33,9 +29,9 @@ describe('makeController', () => {
         });
       });
 
-      app.openapi(testRoute, controller);
+      const { fetch } = createTestApp({ mount: [(app) => app.openapi(testRoute, controller)] });
 
-      const response = await app.request('/', { method: 'GET' });
+      const response = await fetch(get('/'));
       const { data } = await json<Record<string, unknown>>(response);
 
       expect(response.status).toBe(200);
@@ -62,9 +58,9 @@ describe('makeController', () => {
         ]);
       });
 
-      app.openapi(testRoute, controller);
+      const { fetch } = createTestApp({ mount: [(app) => app.openapi(testRoute, controller)] });
 
-      const response = await app.request('/', { method: 'GET' });
+      const response = await fetch(get('/'));
       const { data } = await json<Record<string, unknown>[]>(response);
 
       expect(response.status).toBe(200);
@@ -96,9 +92,9 @@ describe('makeController', () => {
         });
       });
 
-      app.openapi(testRoute, controller);
+      const { fetch } = createTestApp({ mount: [(app) => app.openapi(testRoute, controller)] });
 
-      const response = await app.request('/', { method: 'GET' });
+      const response = await fetch(get('/'));
       const { data } = await json<{ id: string; profile: Record<string, unknown> }>(response);
 
       expect(response.status).toBe(200);
@@ -114,7 +110,7 @@ describe('makeController', () => {
         ctx.addIssue({ code: 'custom', path: ['min'], message: 'min must not exceed max' });
     };
 
-    const mountRange = (bodyRequired?: boolean) => {
+    const rangeRoute = (bodyRequired?: boolean) => {
       const route = actionRoute({
         model: Modules.user,
         action: 'range',
@@ -122,44 +118,68 @@ describe('makeController', () => {
         bodySchema: rangeSchema,
         bodyRequired,
         bodyRefinement: rangeRefinement,
-        responseSchema: z.object({ ran: z.boolean() }),
+        responseSchema: ranResponse,
       });
-      const app = new OpenAPIHono<AppEnv>();
-      app.openapi(
-        route,
-        makeController(route, (_c, respond) => respond.ok({ ran: true })),
-      );
-      return app;
+      return createTestApp({
+        mount: [
+          (app) =>
+            app.openapi(
+              route,
+              makeController(route, (_c, respond) => respond.ok({ ran: true })),
+            ),
+        ],
+      }).fetch;
     };
 
-    it('rejects a body that fails the refinement with the schema-failure 400', async () => {
-      const app = mountRange();
+    it('answers a failed refinement with the same 422 envelope as a schema failure', async () => {
+      const fetch = rangeRoute();
 
-      const refinementResponse = await app.request(post('/range', { min: 5, max: 1 }));
-      const schemaResponse = await app.request(post('/range', { min: 'five', max: 1 }));
-      const refinementBody = await jsonValidationFailure(refinementResponse);
-      const schemaBody = await jsonValidationFailure(schemaResponse);
+      const refinementResponse = await fetch(post('/range', { min: 5, max: 1 }));
+      const schemaResponse = await fetch(post('/range', { min: 'five', max: 1 }));
+      const refinementBody = await jsonError(refinementResponse);
+      const schemaBody = await jsonError(schemaResponse);
 
-      expect(refinementResponse.status).toBe(400);
-      expect(schemaResponse.status).toBe(400);
+      expect(refinementResponse.status).toBe(422);
+      expect(schemaResponse.status).toBe(422);
       expect(Object.keys(refinementBody).sort()).toEqual(Object.keys(schemaBody).sort());
-      expect(refinementBody.success).toBe(false);
-      expect(refinementBody.error.name).toBe(schemaBody.error.name);
-      expect(refinementBody.error.message).toContain('min must not exceed max');
+      expect(refinementBody).toMatchObject({
+        error: 'VALIDATION_ERROR',
+        fieldErrors: { min: ['min must not exceed max'] },
+      });
     });
 
     it('runs the controller when the refinement passes', async () => {
-      const response = await mountRange().request(post('/range', { min: 1, max: 5 }));
+      const response = await rangeRoute()(post('/range', { min: 1, max: 5 }));
       const { data } = await json<{ ran: boolean }>(response);
 
       expect(response.status).toBe(200);
       expect(data.ran).toBe(true);
     });
 
-    it('skips the refinement when an optional body is omitted', async () => {
-      const response = await mountRange(false).request(
-        new Request('http://t/range', { method: 'POST' }),
-      );
+    it('skips the body refinement when an optional body is omitted', async () => {
+      const route = actionRoute({
+        model: Modules.user,
+        action: 'range',
+        skipId: true,
+        bodySchema: rangeSchema.partial(),
+        bodyRequired: false,
+        bodyRefinement: (range: Partial<z.infer<typeof rangeSchema>>, ctx) => {
+          if (range.min === undefined) ctx.addIssue({ code: 'custom', message: 'refinement ran' });
+        },
+        responseSchema: ranResponse,
+      });
+
+      const { fetch } = createTestApp({
+        mount: [
+          (app) =>
+            app.openapi(
+              route,
+              makeController(route, (_c, respond) => respond.ok({ ran: true })),
+            ),
+        ],
+      });
+
+      const response = await fetch(new Request('http://t/range', { method: 'POST' }));
 
       expect(response.status).toBe(200);
     });
@@ -174,20 +194,25 @@ describe('makeController', () => {
           await Promise.resolve();
           rangeRefinement(range, ctx);
         },
-        responseSchema: z.object({ ran: z.boolean() }),
+        responseSchema: ranResponse,
       });
-      const app = new OpenAPIHono<AppEnv>();
-      app.openapi(
-        route,
-        makeController(route, (_c, respond) => respond.ok({ ran: true })),
-      );
+      const { fetch } = createTestApp({
+        mount: [
+          (app) =>
+            app.openapi(
+              route,
+              makeController(route, (_c, respond) => respond.ok({ ran: true })),
+            ),
+        ],
+      });
 
-      const rejected = await app.request(post('/range', { min: 5, max: 1 }));
-      const accepted = await app.request(post('/range', { min: 1, max: 5 }));
-      const body = await jsonValidationFailure(rejected);
+      const rejected = await fetch(post('/range', { min: 5, max: 1 }));
+      const accepted = await fetch(post('/range', { min: 1, max: 5 }));
 
-      expect(rejected.status).toBe(400);
-      expect(body.error.message).toContain('min must not exceed max');
+      expect(rejected.status).toBe(422);
+      expect((await jsonError(rejected)).fieldErrors).toEqual({
+        min: ['min must not exceed max'],
+      });
       expect(accepted.status).toBe(200);
     });
 
@@ -197,26 +222,29 @@ describe('makeController', () => {
         many: true,
         bodySchema: rangeSchema,
         bodyRefinement: rangeRefinement,
-        responseSchema: z.object({ ran: z.boolean() }),
+        responseSchema: ranResponse,
       });
-      const app = new OpenAPIHono<AppEnv>();
-      app.openapi(
-        route,
-        makeController(route, (_c, respond) => respond.created({ ran: true })),
-      );
+      const { fetch } = createTestApp({
+        mount: [
+          (app) =>
+            app.openapi(
+              route,
+              makeController(route, (_c, respond) => respond.created({ ran: true })),
+            ),
+        ],
+      });
 
-      const response = await app.request(
+      const response = await fetch(
         post('/', [
           { min: 1, max: 5 },
           { min: 9, max: 2 },
         ]),
       );
-      const body = await jsonValidationFailure(response);
 
-      const issues = JSON.parse(body.error.message) as { path: (string | number)[] }[];
-
-      expect(response.status).toBe(400);
-      expect(issues.map((issue) => issue.path)).toEqual([[1, 'min']]);
+      expect(response.status).toBe(422);
+      expect((await jsonError(response)).fieldErrors).toEqual({
+        '1.min': ['min must not exceed max'],
+      });
     });
 
     it('refuses to build a route whose body schema carries a refinement', () => {
@@ -226,7 +254,7 @@ describe('makeController', () => {
           action: 'range',
           skipId: true,
           bodySchema: rangeSchema.refine((range) => range.min <= range.max),
-          responseSchema: z.object({ ran: z.boolean() }),
+          responseSchema: ranResponse,
         }),
       ).toThrow('pass them as bodyRefinement instead');
     });
@@ -238,20 +266,25 @@ describe('makeController', () => {
         skipId: true,
         query: z.object({ min: z.coerce.number(), max: z.coerce.number() }),
         queryRefinement: rangeRefinement,
-        responseSchema: z.object({ ran: z.boolean() }),
+        responseSchema: ranResponse,
       });
-      const app = new OpenAPIHono<AppEnv>();
-      app.openapi(
-        route,
-        makeController(route, (_c, respond) => respond.ok({ ran: true })),
-      );
+      const { fetch } = createTestApp({
+        mount: [
+          (app) =>
+            app.openapi(
+              route,
+              makeController(route, (_c, respond) => respond.ok({ ran: true })),
+            ),
+        ],
+      });
 
-      const rejected = await app.request('/range?min=5&max=1');
-      const accepted = await app.request('/range?min=1&max=5');
-      const body = await jsonValidationFailure(rejected);
+      const rejected = await fetch(get('/range?min=5&max=1'));
+      const accepted = await fetch(get('/range?min=1&max=5'));
 
-      expect(rejected.status).toBe(400);
-      expect(body.error.message).toContain('min must not exceed max');
+      expect(rejected.status).toBe(422);
+      expect((await jsonError(rejected)).fieldErrors).toEqual({
+        min: ['min must not exceed max'],
+      });
       expect(accepted.status).toBe(200);
     });
 
@@ -261,7 +294,7 @@ describe('makeController', () => {
         action: 'range',
         skipId: true,
         bodyRefinement: () => undefined,
-        responseSchema: z.object({ ran: z.boolean() }),
+        responseSchema: ranResponse,
       });
 
       expect(() => makeController(route, (_c, respond) => respond.ok({ ran: true }))).toThrow(

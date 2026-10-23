@@ -1122,7 +1122,7 @@ export const userBodySchema = z.object({ ... });
 
 ### Cross-Field Validations
 
-Route build throws on a `bodySchema` that carries an object-level `.refine()`/`.superRefine()`: sanitizing rebuilds its shape and would drop them silently. Pass cross-field checks as `bodyRefinement`, `queryRefinement` or `paramsRefinement`: optional `superRefine` callbacks on the route args, annotated with the value's type. `makeController` runs each on the validated value before the handler; a failure returns the same 400 as a schema failure. With `many`, the body refinement runs per item. An omitted optional body skips it. None of them reach the OpenAPI document or SDK.
+Route build throws on a `bodySchema` that carries an object-level `.refine()`/`.superRefine()`: sanitizing rebuilds its shape and would drop them silently. Pass cross-field checks as `bodyRefinement`, `queryRefinement` or `paramsRefinement`: optional `superRefine` callbacks on the route args, annotated with the value's type. `makeController` runs each on the validated value before the handler; a failure throws its `ZodError` into the same 422 `VALIDATION_ERROR` envelope as a schema failure. With `many`, the body refinement runs per item. An omitted optional body skips it. None of them reach the OpenAPI document or SDK.
 
 ```typescript
 createRoute({
