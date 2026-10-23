@@ -8,6 +8,7 @@ import { createFactory } from '@template/db/test/factory';
 
 const ruleReferenceFactory = createFactory('RuleReference', {
   defaults: () => ({
+    sourceId: '',
     targetId: '',
   }),
   dependencies: {

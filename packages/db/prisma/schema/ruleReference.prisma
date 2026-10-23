@@ -26,6 +26,10 @@ model RuleReference {
   createdAt DateTime @default(now())
 
   sourceModel            RuleReferenceSourceModel
+  // True poly beside the false, as on the target side: the edge's identity is
+  // (sourceModel, sourceId, targetModel, targetId), one unique for every source model. The typed
+  // FK below is the relation; written from the same value, so the two agree by construction.
+  sourceId               String                   @db.VarChar(36)
   sourceEmailTemplateId  String?                  @db.VarChar(36)
   sourceEmailComponentId String?                  @db.VarChar(36)
   sourceSegmentId        String?                  @db.VarChar(36)
@@ -55,11 +59,9 @@ model RuleReference {
   targetSpace          Space?          @relation("RuleReferenceTarget", fields: [targetSpaceId], references: [id])
   targetSegment        Segment?        @relation("RuleReferenceTarget", fields: [targetSegmentId], references: [id])
 
-  // Edge identity. The discriminator is inside the key, so this needs no partial predicate: one
-  // unique per source column.
-  @@unique([sourceEmailTemplateId, targetModel, targetId], map: "RuleReference_sourceEmailTemplate_target_key")
-  @@unique([sourceEmailComponentId, targetModel, targetId], map: "RuleReference_sourceEmailComponent_target_key")
-  @@unique([sourceSegmentId, targetModel, targetId], map: "RuleReference_sourceSegment_target_key")
+  // Edge identity, on the plain columns: one unique whatever the source model, so a new source
+  // model needs no new constraint.
+  @@unique([sourceModel, sourceId, targetModel, targetId])
   @@index([targetModel, targetId])
   @@index([sourceEmailTemplateId])
   @@index([sourceEmailComponentId])

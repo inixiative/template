@@ -40,6 +40,7 @@ const edgeKey = (edge: Edge): string =>
 
 const edgeData = (source: RuleReferenceSource, ref: RuleReference, state: TargetState) => ({
   sourceModel: source.model,
+  sourceId: source.id,
   [fkColumn('sourceModel', source.model)]: source.id,
   targetModel: ref.model,
   targetId: ref.id,
@@ -86,7 +87,7 @@ export const syncRuleReferenceEdges = async (
   gate: RuleReferenceGate,
 ): Promise<void> => {
   const existing = (await db.ruleReference.findMany({
-    where: { [fkColumn('sourceModel', source.model)]: source.id } as Prisma.RuleReferenceWhereInput,
+    where: { sourceModel: source.model, sourceId: source.id } as Prisma.RuleReferenceWhereInput,
   })) as Edge[];
 
   const named = new Map(references.map((ref) => [referenceKey(ref), ref]));
