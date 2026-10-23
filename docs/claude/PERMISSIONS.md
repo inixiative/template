@@ -157,6 +157,8 @@ export type Action = UserAction | OrganizationAction | SpaceAction | InquiryActi
 
 An action maps to a role through the rebac schema: `'organization.create': 'operate'` on `db:user` means every principal holding `operate` on itself holds it. A custom key is a real action only once the schema maps it (`'artifact.create': 'operate'` on `db:organization`); an unmapped key is held only by a principal whose entitlements grant it, so a session never holds it and a grant cannot be capped to it. Any action can also be granted directly through entitlements.
 
+`MembershipAction` is held on one membership row by that membership's own token (`membershipSelfGrant` in `setupOrgPermissions` / `setupSpacePermissions`), never by a person. `leave` on `db:organizationUser` and `db:spaceUser` is `{ any: [{ self: 'userId', action: 'operate' }, 'membership.operate'] }`: a person leaves any seat of theirs through self, a membership token leaves only the membership it belongs to, and nothing reaches a peer's row or the same user's seat in another organization except `manage` through the org (`membershipLeave.test.ts`).
+
 Which routes check what:
 
 | Routes | Action | On |
