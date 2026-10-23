@@ -10,9 +10,9 @@ import {
   createSpace,
 } from '@template/db/test';
 import { RuleDegradedError } from '@template/shared/rules';
+import { registerRuleReferenceHook } from '#/hooks/ruleReference/hook';
 import { registerRuleReferenceTargetHook } from '#/hooks/ruleReference/targetHook';
 import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
-import { registerSegmentRuleReferencesHook } from '#/hooks/segmentRuleReferences/hook';
 import { evaluateSegment } from '#/modules/segment/services/evaluateSegment';
 import { withSegmentRuleIssues } from '#/modules/segment/services/withSegmentRuleIssues';
 
@@ -32,7 +32,7 @@ describe('segment rule health — the segments a rule names, as edges', () => {
 
   beforeAll(async () => {
     registerSegmentConditionsHook();
-    registerSegmentRuleReferencesHook();
+    registerRuleReferenceHook();
     registerRuleReferenceTargetHook();
     const { context } = await createOrganizationUser({ role: 'admin' });
     space = (await createSpace({}, { organization: context.organization })).entity;
@@ -163,7 +163,7 @@ describe('segment rule health — edge upkeep', () => {
 
   beforeAll(async () => {
     registerSegmentConditionsHook();
-    registerSegmentRuleReferencesHook();
+    registerRuleReferenceHook();
     registerRuleReferenceTargetHook();
     const { context } = await createOrganizationUser({ role: 'admin' });
     space = (await createSpace({}, { organization: context.organization })).entity;

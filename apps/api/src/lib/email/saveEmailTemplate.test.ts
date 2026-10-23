@@ -8,6 +8,7 @@ import {
   createTag,
   createTagCategory,
 } from '@template/db/test';
+import { registerRuleReferenceHook } from '#/hooks/ruleReference/hook';
 import { registerRulesHook } from '#/hooks/rules/hook';
 import { saveEmailTemplate } from '#/lib/email/saveEmailTemplate';
 
@@ -55,6 +56,7 @@ describe('saveEmailTemplate — a rule may only name what its owner can see', ()
 
   beforeAll(async () => {
     registerRulesHook();
+    registerRuleReferenceHook();
     mine = (await createOrganization()).entity;
     theirs = (await createOrganization()).entity;
     platformTag = (await createTag()).entity;

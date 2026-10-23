@@ -5,7 +5,7 @@
  * @uses none
  */
 import type { HardDeletedOnTombstone } from '@template/db';
-import { regenerateRuleReferences } from '#/hooks/ruleReference/regenerate';
+import { regenerateRuleReferences } from '#/hooks/ruleReference/hook';
 
 type Row = Record<string, unknown>;
 

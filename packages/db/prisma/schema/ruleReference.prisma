@@ -3,8 +3,8 @@
 // ============================================================================
 // One row per (source row → target row) edge, recomputed by
 // syncRuleReferenceEdges (packages/db/src/utils) inside the transaction of every
-// save of a rule-bearing column; email calls it from its save path, segments from
-// an after-write hook. Both ends are false-polymorphic (exactly one FK matches each
+// save of a rule-bearing column, from the ruleReference after-hook over
+// RULE_REFERENCE_SURFACES (apps/api/src/hooks/ruleReference/surfaces.ts). Both ends are false-polymorphic (exactly one FK matches each
 // discriminator; config in registries/falsePolymorphism.ts) so either end can be
 // included. The source side cascades — a source's edges die with it. The target
 // side does not.
@@ -26,9 +26,7 @@ model RuleReference {
   createdAt DateTime @default(now())
 
   sourceModel            RuleReferenceSourceModel
-  // True poly beside the false, as on the target side: the edge's identity is
-  // (sourceModel, sourceId, targetModel, targetId), one unique for every source model. The typed
-  // FK below is the relation; written from the same value, so the two agree by construction.
+  // True poly beside the false, as on the target side; written from the same value as the FK.
   sourceId               String                   @db.VarChar(36)
   sourceEmailTemplateId  String?                  @db.VarChar(36)
   sourceEmailComponentId String?                  @db.VarChar(36)

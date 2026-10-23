@@ -16,9 +16,9 @@ import {
 } from '@template/db/test';
 import { emitAppEvent } from '#/appEvents/emit';
 import { AppEventName } from '#/appEvents/handlers';
+import { registerRuleReferenceHook } from '#/hooks/ruleReference/hook';
 import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
 import { registerSegmentMemberOwnerHook } from '#/hooks/segmentMemberOwner/hook';
-import { registerSegmentRuleReferencesHook } from '#/hooks/segmentRuleReferences/hook';
 import { registerSoftDeleteCascadeHook } from '#/hooks/softDeleteCascade/hook';
 import { customerRefReachedModels } from '#/modules/customerRef/lib/customerRefLens';
 import { RECONCILE_TRIGGERS } from '#/modules/segment/lib/reconcileTriggers';
@@ -70,7 +70,7 @@ describe('reconcile triggers — membership follows the events', () => {
   beforeAll(async () => {
     registerSegmentConditionsHook();
     registerSegmentMemberOwnerHook();
-    registerSegmentRuleReferencesHook();
+    registerRuleReferenceHook();
     registerSoftDeleteCascadeHook();
     const { context } = await createOrganizationUser({ role: 'admin' });
     space = (await createSpace({}, { organization: context.organization })).entity;

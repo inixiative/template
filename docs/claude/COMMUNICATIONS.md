@@ -761,20 +761,20 @@ edges are persisted so that "who references X" is an index and a stale rule is n
   resolve — an FK spelling or typo path is a 422, never a silently unregistered rule; `withRule`
   asks the same question at render through `ruleVocabularyIssues`. With no lens there is nothing
   to decide and only extraction runs.
-- **Edges are written by the save path, not a hook.** The writer is
-  `syncRuleReferenceEdges(owner, references, gate)` in `packages/db` — set-diff (survivors
-  keep their row), a newly added missing or soft-deleted target refused as a delta (a pre-existing
-  dead reference stays editable), referenced rows locked with `db.findForUpdate` while the gate
-  reads them, and every kept edge restamped against its target. With `gate: { lenses }` (each
-  lens's `toSourceQueries`), a newly added reference the
-  source's composed `where` does not admit is refused too (`admitRuleReferences`): that is how
-  an Organization template cannot name another organization's tag or segment. Throws
-  `RuleReferenceError`. Adding a rule-bearing column = a `syncRuleReferenceEdges`
-  call from its save path. Email's `syncRuleReferences(source, contents, lens, mode)` is the
-  content-shaped front: it collects the rules out of MJML and subject (`contentRuleReferences`)
-  and hands the references down. `saveEmailTemplate` calls it inside
-  its transaction for the template and each saved component; it is the only writer of
-  `mjml`/`subject`, so nothing bypasses it.
+- **Edges are written by one hook over one declaration table.** `RULE_REFERENCE_SURFACES`
+  (`apps/api/src/hooks/ruleReference/surfaces.ts`) declares each rule-bearing model: its rule
+  columns, a label, the lens a row's rules are read under (`emailLensFor` for email rows, the
+  owner-bound customer-ref lens for segments) and the storage wrapper that reads rules out of the
+  stored value (MJML and subject for email, a condition tree for segments). The `ruleReference`
+  after-hook runs on every write to those models, and when a row's rule columns differ from the
+  pre-image it calls `syncRuleReferenceEdges(source, references, gate)` in `packages/db`, the one
+  edge writer. That writer set-diffs (survivors keep their row), locks the referenced rows with
+  `db.findForUpdate`, refuses a missing, soft-deleted or out-of-view target
+  (`admitRuleReferences` under each scope's lens), and restamps every kept edge against its
+  target. That is how an Organization template cannot name another organization's tag or segment.
+  It throws `RuleReferenceError`. Revive regenerates through the same table
+  (`regenerateRuleReferences`, mode `rebuild`, no refusals). Adding a rule-bearing column means
+  adding a declaration entry and a source FK on `RuleReference`.
 - **Staleness lives on the edge, as two signals rather than a computed flag.** A soft delete of a
   referenced row is copied onto every edge naming it by `ruleReference:target` (one
   `updateManyAndReturn`, matched on `(targetModel, targetId)`, cleared on undelete); a

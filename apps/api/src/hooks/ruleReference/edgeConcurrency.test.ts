@@ -9,10 +9,10 @@ import {
   createSpace,
 } from '@template/db/test';
 import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
+import { registerRuleReferenceHook } from '#/hooks/ruleReference/hook';
 import { registerRuleReferenceTargetHook } from '#/hooks/ruleReference/targetHook';
 import { registerRulesHook } from '#/hooks/rules/hook';
 import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
-import { registerSegmentRuleReferencesHook } from '#/hooks/segmentRuleReferences/hook';
 import { registerSoftDeleteCascadeHook } from '#/hooks/softDeleteCascade/hook';
 import { withOwnerLock } from '#/lib/locks/withOwnerLock';
 import { customerRefLens } from '#/modules/customerRef/lib/customerRefLens';
@@ -74,7 +74,7 @@ describe('ruleReference — edges under concurrency and repair', () => {
     registerPreventHardDeleteHook();
     registerRulesHook();
     registerSegmentConditionsHook();
-    registerSegmentRuleReferencesHook();
+    registerRuleReferenceHook();
     registerRuleReferenceTargetHook();
     registerSoftDeleteCascadeHook();
   });

@@ -31,9 +31,9 @@ import {
   getNextSeq,
 } from '@template/db/test';
 import { emitAppEvent } from '#/appEvents/emit';
+import { registerRuleReferenceHook } from '#/hooks/ruleReference/hook';
 import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
 import { registerSegmentMemberOwnerHook } from '#/hooks/segmentMemberOwner/hook';
-import { registerSegmentRuleReferencesHook } from '#/hooks/segmentRuleReferences/hook';
 import { enqueueJob } from '#/jobs/enqueue';
 import { evaluateSegment } from '#/modules/segment/services/evaluateSegment';
 import { reconcileCustomerRef } from '#/modules/segment/services/reconcileCustomerRef';
@@ -85,7 +85,7 @@ describe('segment reconcile', () => {
   beforeAll(async () => {
     registerSegmentConditionsHook();
     registerSegmentMemberOwnerHook();
-    registerSegmentRuleReferencesHook();
+    registerRuleReferenceHook();
 
     const { context } = await createOrganizationUser({ role: 'admin' });
     organization = context.organization;

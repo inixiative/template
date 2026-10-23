@@ -9,9 +9,9 @@ import {
   createSegment,
   createSpace,
 } from '@template/db/test';
+import { registerRuleReferenceHook } from '#/hooks/ruleReference/hook';
 import { registerRuleReferenceTargetHook } from '#/hooks/ruleReference/targetHook';
 import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
-import { registerSegmentRuleReferencesHook } from '#/hooks/segmentRuleReferences/hook';
 import { sweepableSegments } from '#/modules/segment/services/sweepableSegments';
 
 const acmeRule = { field: 'customerUser.email', operator: Operator.endsWith, value: '@acme.test' };
@@ -27,7 +27,7 @@ describe('sweepable segments — what the nightly sweep enqueues', () => {
 
   beforeAll(async () => {
     registerSegmentConditionsHook();
-    registerSegmentRuleReferencesHook();
+    registerRuleReferenceHook();
     registerRuleReferenceTargetHook();
     const { context } = await createOrganizationUser({ role: 'admin' });
     space = (await createSpace({}, { organization: context.organization })).entity;

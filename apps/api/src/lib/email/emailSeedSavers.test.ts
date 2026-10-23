@@ -1,5 +1,5 @@
-import { afterAll, describe, expect, it } from 'bun:test';
-import { db } from '@template/db';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { clearHookRegistry, db } from '@template/db';
 import { type SeedFile, seedTable } from '@template/db/prisma/seed';
 import { seeds } from '@template/db/prisma/seeds';
 import {
@@ -9,6 +9,7 @@ import {
   createTagCategory,
 } from '@template/db/test';
 import { TokenValidationError } from '@template/email/errors/TokenValidationError';
+import { registerRuleReferenceHook } from '#/hooks/ruleReference/hook';
 import { emailSeedSavers } from '#/lib/email/emailSeedSavers';
 
 const emailSeeds = seeds.filter((file) => file.savedByApp);
@@ -30,7 +31,12 @@ const invalidTemplate: SeedFile = {
   ],
 };
 
+beforeAll(() => {
+  registerRuleReferenceHook();
+});
+
 afterAll(async () => {
+  clearHookRegistry();
   await cleanupTouchedTables(db);
 });
 

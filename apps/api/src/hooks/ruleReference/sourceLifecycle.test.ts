@@ -11,10 +11,10 @@ import {
 } from '@template/db/test';
 import { referenceKey } from '@template/shared/rules';
 import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
+import { registerRuleReferenceHook } from '#/hooks/ruleReference/hook';
 import { registerRuleReferenceTargetHook } from '#/hooks/ruleReference/targetHook';
 import { registerRulesHook } from '#/hooks/rules/hook';
 import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
-import { registerSegmentRuleReferencesHook } from '#/hooks/segmentRuleReferences/hook';
 import { registerSoftDeleteCascadeHook } from '#/hooks/softDeleteCascade/hook';
 import { saveEmailTemplate } from '#/lib/email/saveEmailTemplate';
 
@@ -70,7 +70,7 @@ describe('ruleReference — a source takes its edges with it and brings them bac
     registerPreventHardDeleteHook();
     registerRulesHook();
     registerSegmentConditionsHook();
-    registerSegmentRuleReferencesHook();
+    registerRuleReferenceHook();
     registerRuleReferenceTargetHook();
     registerSoftDeleteCascadeHook();
   });

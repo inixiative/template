@@ -15,6 +15,7 @@ import type { EmailClient, SendEmailOptions } from '@template/email/client/types
 import { fieldsLens } from '@template/email/rules';
 import { registerContactRulesHook } from '#/hooks/contactRules/hook';
 import { registerOrderedListHook } from '#/hooks/orderedList/hook';
+import { registerRuleReferenceHook } from '#/hooks/ruleReference/hook';
 import { registerRulesHook } from '#/hooks/rules/hook';
 import { registerUserEmailContactHook } from '#/hooks/userEmailContact/hook';
 import { sendEmail } from '#/jobs/handlers/sendEmail';
@@ -24,6 +25,8 @@ import { saveEmailTemplate } from '#/lib/email/saveEmailTemplate';
 import { createTestApp } from '#tests/createTestApp';
 
 registerRulesHook();
+
+registerRuleReferenceHook();
 registerContactRulesHook();
 registerOrderedListHook();
 registerUserEmailContactHook();

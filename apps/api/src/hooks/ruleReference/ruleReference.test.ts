@@ -9,6 +9,7 @@ import {
 } from '@template/db/test';
 import { ConditionValidationError } from '@template/email/errors';
 import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
+import { registerRuleReferenceHook } from '#/hooks/ruleReference/hook';
 import { registerRuleReferenceTargetHook } from '#/hooks/ruleReference/targetHook';
 import { registerRulesHook } from '#/hooks/rules/hook';
 import { saveEmailTemplate } from '#/lib/email/saveEmailTemplate';
@@ -58,6 +59,7 @@ describe('ruleReference — the save path writes edges, the target side stamps t
   beforeAll(() => {
     registerPreventHardDeleteHook();
     registerRulesHook();
+    registerRuleReferenceHook();
     registerRuleReferenceTargetHook();
   });
 
