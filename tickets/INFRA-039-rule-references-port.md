@@ -20,11 +20,14 @@ template level with it.
 1. **Plain ids beside the false polymorphism.** `RuleReference` keeps its typed FKs and relations
    on both axes, and also carries plain `sourceId` and `targetId`. Edge identity is one unique,
    `(sourceModel, sourceId, targetModel, targetId)`, whatever the source model.
-2. **Touching an invalid rule fails until it is valid.** A write to a rule column that names a dead
-   or out-of-view row is refused, including a row the rule already named. The refusal lists each
-   reference as `<model> '<label>' (deleted|missing)`. The `held` exemption in
-   `assertSegmentReferencesOwned` is gone. A write that leaves the rule column alone is not a
-   touch and still goes through.
+2. **Touching an invalid rule fails until it is valid.** A write that changes a rule tree (a
+   segment's conditions, an email template's subject or MJML body, a component's MJML) is refused
+   while the changed tree names a dead or out-of-view row, including a row the stored tree already
+   named. The refusal lists each reference as `<model> '<label>' (deleted|missing)`. The `held`
+   exemption in `assertSegmentReferencesOwned` is gone. A save that resends a stored tree unchanged
+   is not judged, so a subject-only edit or a segment rename that carries the stored conditions
+   still goes through. The comparison is per rule column, against the pre-image the hook already
+   has.
 3. **Reads carry their references.** The segment read returns
    `ruleReferences: [{ targetModel, targetId, targetLabel, targetDeletedAt }]` so the UI can say why
    a rule is degraded.

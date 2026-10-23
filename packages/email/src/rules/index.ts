@@ -53,7 +53,7 @@ export {
   type RailProvidedSystemField,
 } from './railProvidedSystemFields';
 export { type BindingChain, resolveBindingPath } from './resolveBindingPath';
-export { componentRuleContents, templateRuleContents } from './ruleContents';
+export { componentRuleContents, type RuleContents, templateRuleContents } from './ruleContents';
 export {
   contentDynamicRuleReferences,
   contentReferenceScopes,

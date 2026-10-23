@@ -20,6 +20,7 @@ import {
   contentReferenceScopes,
   contentRuleReferences,
   type EmailLens,
+  type RuleContents,
   templateRuleContents,
 } from '@template/email/rules';
 import type { RuleLens, RuleReference } from '@template/shared/rules';
@@ -35,7 +36,11 @@ export type RuleReferenceReading = {
   dynamic: DynamicRuleReference[];
 };
 
-type RuleColumnStorage<Lens> = (row: Row, lens: Lens) => RuleReferenceReading;
+type RuleColumnStorage<Lens> = (
+  row: Row,
+  lens: Lens,
+  columns: readonly string[],
+) => RuleReferenceReading;
 
 type RuleReferenceDeclaration<Lens> = {
   columns: readonly string[];
@@ -45,13 +50,16 @@ type RuleReferenceDeclaration<Lens> = {
 };
 
 export type RuleReferenceSurface = Pick<RuleReferenceDeclaration<unknown>, 'columns' | 'label'> & {
-  read: (row: Row) => Promise<RuleReferenceReading>;
+  read: (
+    row: Row,
+    judged: readonly string[],
+  ) => Promise<{ references: RuleReference[]; judged: RuleReferenceReading }>;
 };
 
 const storedAsMjml =
-  (contents: (row: Row) => string[]): RuleColumnStorage<EmailLens> =>
-  (row, lens) => {
-    const stored = contents(row);
+  (contents: RuleContents<never>): RuleColumnStorage<EmailLens> =>
+  (row, lens, columns) => {
+    const stored = columns.flatMap((column) => contents[column]?.(row as never) ?? []);
     return {
       references: contentRuleReferences(lens, ...stored),
       scopes: contentReferenceScopes(lens, ...stored),
@@ -59,8 +67,10 @@ const storedAsMjml =
     };
   };
 
-const storedAsCondition: RuleColumnStorage<RuleLens> = (row, lens) => {
-  const tree = row.conditions as Condition | null | undefined;
+const storedAsCondition: RuleColumnStorage<RuleLens> = (row, lens, columns) => {
+  const tree = columns.includes('conditions')
+    ? (row.conditions as Condition | null | undefined)
+    : undefined;
   const references = tree ? ruleReferences(lens, tree) : [];
   return {
     references,
@@ -72,7 +82,13 @@ const storedAsCondition: RuleColumnStorage<RuleLens> = (row, lens) => {
 const declare = <Lens>(declaration: RuleReferenceDeclaration<Lens>): RuleReferenceSurface => ({
   columns: declaration.columns,
   label: declaration.label,
-  read: async (row) => declaration.storage(row, await declaration.lens(row)),
+  read: async (row, judged) => {
+    const lens = await declaration.lens(row);
+    return {
+      references: declaration.storage(row, lens, declaration.columns).references,
+      judged: declaration.storage(row, lens, judged),
+    };
+  },
 });
 
 export const RULE_REFERENCE_SURFACES: Record<RuleReferenceSourceModel, RuleReferenceSurface> = {
@@ -87,13 +103,13 @@ export const RULE_REFERENCE_SURFACES: Record<RuleReferenceSourceModel, RuleRefer
         await templateLens(template.slug, template),
       );
     },
-    storage: storedAsMjml((row) => templateRuleContents(row as EmailTemplate)),
+    storage: storedAsMjml(templateRuleContents),
   }),
   EmailComponent: declare({
     columns: ['mjml'],
     label: (row) => `email component '${row.slug}'`,
     lens: (row) => emailLensFor(undefined, rowOwner(row as EmailComponent)),
-    storage: storedAsMjml((row) => componentRuleContents(row as EmailComponent)),
+    storage: storedAsMjml(componentRuleContents),
   }),
   Segment: declare({
     columns: ['conditions'],

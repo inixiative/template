@@ -20,7 +20,7 @@ import { groupBy } from 'lodash-es';
 
 export type RuleReferenceSource = { model: ModelName; id: string };
 
-export type RuleReferenceGate = ReferenceScopes | 'rebuild';
+export type RuleReferenceGate = (ReferenceScopes & { references: RuleReference[] }) | 'rebuild';
 
 type Edge = {
   id: string;
@@ -73,8 +73,9 @@ export const syncRuleReferenceEdges = async (
   const states = named.size ? await lockedTargetStates([...named.values()]) : new Map();
   if (gate !== 'rebuild') {
     const refusals = await ruleReferenceRefusals({
-      ...gate,
-      references: [...named.values()],
+      scopes: gate.scopes,
+      farSide: gate.farSide,
+      references: gate.references,
       source,
       states,
     });

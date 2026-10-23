@@ -771,8 +771,9 @@ edges are persisted so that "who references X" is an index and a stale rule is n
   edge writer. That writer set-diffs (survivors keep their row), locks the referenced rows with
   `db.findForUpdate`, refuses a missing, soft-deleted or out-of-view target
   (`ruleReferenceRefusals`, admission by `admitRuleReferences` under each scope's lens), and
-  restamps every kept edge against its target. A touch is refused while the rule names any such
-  row, including one it already named, and the refusal lists each as
+  restamps every kept edge against its target. A changed rule column is refused while it names any
+  such row, including one the stored value already named (a column resent unchanged is not
+  judged, so a subject-only edit passes over a body naming a dead tag), and the refusal lists each as
   `<model> '<label>' (deleted|missing)`; only a row the source already held is labelled, any other
   is named by id. That is how an Organization template cannot name another organization's tag or segment.
   It throws `RuleReferenceError`. Revive regenerates through the same table

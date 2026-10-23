@@ -38,6 +38,7 @@ export const validateSegmentReferences = async (
     ownerId: segmentOwnerId(owner as Segment),
     conditions,
     segmentId: previous?.id,
+    stored: previous?.conditions as Condition | undefined,
   });
   if (previous)
     assertNoReferenceCycle({ ...previous, conditions: conditions as Segment['conditions'] }, owned);

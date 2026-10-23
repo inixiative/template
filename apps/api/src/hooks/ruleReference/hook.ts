@@ -14,6 +14,7 @@ import {
   syncRuleReferenceEdges,
 } from '@template/db';
 import type { RuleReferenceSourceModel } from '@template/db/generated/client/enums';
+import type { RuleReference } from '@template/shared/rules';
 import { castArray, compact, isEqual, keyBy } from 'lodash-es';
 import {
   isRuleReferenceSourceModel,
@@ -32,7 +33,10 @@ const WRITE_ACTIONS = [
   DbAction.upsert,
 ];
 
-const UNREFERENCED: RuleReferenceReading = { references: [], scopes: [], dynamic: [] };
+const UNREFERENCED: { references: RuleReference[]; judged: RuleReferenceReading } = {
+  references: [],
+  judged: { references: [], scopes: [], dynamic: [] },
+};
 
 const rowsOf = (value: unknown): SourceRow[] =>
   compact(castArray(value) as (HookRow | undefined)[]).filter(
@@ -41,6 +45,12 @@ const rowsOf = (value: unknown): SourceRow[] =>
 
 const holdsColumns = (row: HookRow, columns: readonly string[]): boolean =>
   columns.every((column) => column in row);
+
+const changedColumns = (
+  row: HookRow,
+  before: HookRow | undefined,
+  columns: readonly string[],
+): string[] => columns.filter((column) => !before || !isEqual(before[column], row[column]));
 
 const touchedRows = (
   previous: unknown,
@@ -75,12 +85,16 @@ export const syncRuleReferences = async (
   model: RuleReferenceSourceModel,
   rows: SourceRow[],
   mode: 'save' | 'rebuild',
+  previous: HookRow[] = [],
 ): Promise<void> => {
   const surface = RULE_REFERENCE_SURFACES[model];
+  const before = keyBy(previous, 'id');
   for (const row of await withColumns(model, rows)) {
-    const { references, scopes, dynamic } =
-      row.deletedAt == null ? await surface.read(row) : UNREFERENCED;
-    const [unchecked] = dynamic;
+    const { references, judged } =
+      row.deletedAt == null
+        ? await surface.read(row, changedColumns(row, before[row.id], surface.columns))
+        : UNREFERENCED;
+    const [unchecked] = judged.dynamic;
     if (mode === 'save' && unchecked)
       throw new RuleReferenceError(
         `rule names a ${unchecked.model} by a value read at evaluation (${unchecked.path}); name it by id`,
@@ -88,7 +102,7 @@ export const syncRuleReferences = async (
     await syncRuleReferenceEdges(
       { model, id: row.id },
       references,
-      mode === 'rebuild' ? 'rebuild' : { scopes },
+      mode === 'rebuild' ? 'rebuild' : judged,
     );
   }
 };
@@ -112,7 +126,7 @@ export const registerRuleReferenceHook = () => {
     async ({ model, previous, result }: HookOptions) => {
       if (!isRuleReferenceSourceModel(model)) return;
       const touched = touchedRows(previous, result, RULE_REFERENCE_SURFACES[model].columns);
-      if (touched.length) await syncRuleReferences(model, touched, 'save');
+      if (touched.length) await syncRuleReferences(model, touched, 'save', rowsOf(previous));
     },
   );
 };

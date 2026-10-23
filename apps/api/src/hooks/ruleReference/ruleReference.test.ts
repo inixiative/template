@@ -250,13 +250,19 @@ describe('ruleReference — the save path writes edges, the target side stamps t
     expect(ruleReferenceIssues(edges).map((issue) => issue.reason)).toEqual(['purged']);
   });
 
-  it('an edit that keeps a dead reference is refused, naming the reference and why', async () => {
-    const { entity: tag } = await createTag();
+  it('a subject-only edit passes while the unchanged body names a dead tag; a changed body naming it is refused', async () => {
+    const [{ entity: tag }, { entity: other }] = await Promise.all([createTag(), createTag()]);
     await save(mjml(taggedBlock(tag.id)), { slug: 'edit' });
     await db.tag.update({ where: { id: tag.id }, data: { deletedAt: new Date() } });
 
+    const { template: edited } = await save(mjml(taggedBlock(tag.id)), {
+      slug: 'edit',
+      subject: 'Typo fixed',
+    });
+    expect(edited.subject).toBe('Typo fixed');
+
     await expect(
-      save(mjml(taggedBlock(tag.id)), { slug: 'edit', subject: 'Typo fixed' }),
+      save(mjml(taggedBlock(tag.id, other.id)), { slug: 'edit', subject: 'Typo fixed' }),
     ).rejects.toThrow(`Tag '${tag.name}' (deleted)`);
   });
 

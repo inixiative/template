@@ -8,6 +8,7 @@ import type { Condition } from '@inixiative/json-rules';
 import { describeRuleReferenceRefusals, ruleReferenceRefusals, ruleReferences } from '@template/db';
 import type { Segment } from '@template/db/generated/client/client';
 import type { ProviderModel } from '@template/db/generated/client/enums';
+import { isEqual } from 'lodash-es';
 import {
   customerRefLens,
   ownedSegments,
@@ -20,15 +21,19 @@ type Candidate = {
   ownerId: string;
   conditions: Condition;
   segmentId?: string;
+  stored?: Condition;
 };
 
-/** Refuses a rule naming rows the owner's lens does not admit, or rows that are gone; returns the owner's live segments for the cycle check. */
+/** Refuses a changed rule naming rows the owner's lens does not admit, or rows that are gone; returns the owner's live segments for the cycle check. */
 export const assertSegmentReferencesOwned = async ({
   ownerModel,
   ownerId,
   conditions,
   segmentId,
+  stored,
 }: Candidate): Promise<Segment[]> => {
+  if (stored !== undefined && isEqual(stored, conditions))
+    return ownedSegments(ownerModel, ownerId);
   const references = ruleReferences(customerRefLens, conditions);
   const refusals = await ruleReferenceRefusals({
     references,

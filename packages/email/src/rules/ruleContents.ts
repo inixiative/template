@@ -7,10 +7,13 @@
 import type { EmailComponent, EmailTemplate } from '@template/db/generated/client/client';
 import { stripComponentBodies } from '@template/email/render/stripComponentBodies';
 
-export const templateRuleContents = (
-  template: Pick<EmailTemplate, 'subject' | 'mjml'>,
-): string[] => [template.subject ?? '', stripComponentBodies(template.mjml)];
+export type RuleContents<Row> = Record<string, (row: Row) => string[]>;
 
-export const componentRuleContents = (component: Pick<EmailComponent, 'mjml'>): string[] => [
-  component.mjml,
-];
+export const templateRuleContents: RuleContents<Pick<EmailTemplate, 'subject' | 'mjml'>> = {
+  subject: (template) => [template.subject ?? ''],
+  mjml: (template) => [stripComponentBodies(template.mjml)],
+};
+
+export const componentRuleContents: RuleContents<Pick<EmailComponent, 'mjml'>> = {
+  mjml: (component) => [component.mjml],
+};
