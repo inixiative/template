@@ -4,7 +4,7 @@
  * @partOf feature:tenancy
  * @uses primitive:authz, primitive:routeTemplates, infrastructure:prisma
  */
-import type { OrganizationId } from '@template/db';
+import { hydrate, type OrganizationId } from '@template/db';
 import { Role } from '@template/db/generated/client/enums';
 import { check, rebacSchema } from '@template/permissions/rebac';
 import { getResource } from '#/lib/context/getResource';
@@ -20,7 +20,13 @@ export const organizationUserDeleteController = makeController(
     const orgUser = getResource<'organizationUser'>(c);
     const permix = c.get('permix');
 
-    const canLeave = check(permix, rebacSchema, 'organizationUser', orgUser, 'leave');
+    const canLeave = check(
+      permix,
+      rebacSchema,
+      'organizationUser',
+      await hydrate('organizationUser', orgUser),
+      'leave',
+    );
     const canAssign = check(
       permix,
       rebacSchema,

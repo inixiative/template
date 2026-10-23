@@ -20,7 +20,7 @@ export const spaceUserDeleteController = makeController(
     const hydrated = await hydrate('spaceUser', spaceUser);
     const space = hydrated.space as HydratedRecord;
 
-    const canLeave = check(permix, rebacSchema, 'spaceUser', spaceUser, 'leave');
+    const canLeave = check(permix, rebacSchema, 'spaceUser', hydrated, 'leave');
     const canAssign = check(
       permix,
       rebacSchema,

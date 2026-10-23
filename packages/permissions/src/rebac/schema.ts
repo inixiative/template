@@ -94,8 +94,13 @@ export const rebacSchema: RebacSchema = {
 
     'db:organizationUser': {
       actions: {
-        read: { any: [{ self: 'userId' }, { rel: 'organization', action: 'read' }] },
-        leave: { self: 'userId' },
+        read: {
+          any: [
+            { rel: 'user', action: 'read' },
+            { rel: 'organization', action: 'read' },
+          ],
+        },
+        leave: { rel: 'user', action: 'operate' },
         manage: { rel: 'organization', action: 'manage' },
         own: { rel: 'organization', action: 'own' },
       },
@@ -103,8 +108,13 @@ export const rebacSchema: RebacSchema = {
 
     'db:spaceUser': {
       actions: {
-        read: { any: [{ self: 'userId' }, { rel: 'space', action: 'read' }] },
-        leave: { self: 'userId' },
+        read: {
+          any: [
+            { rel: 'user', action: 'read' },
+            { rel: 'space', action: 'read' },
+          ],
+        },
+        leave: { rel: 'user', action: 'operate' },
         manage: { rel: 'space', action: 'manage' },
         own: { rel: 'space', action: 'own' },
       },
@@ -116,8 +126,7 @@ export const rebacSchema: RebacSchema = {
     // locally and only the seat check walks to the owner.
     'db:token': {
       actions: {
-        // Self-delete for tokens with a userId (User, OrgUser, SpaceUser).
-        leave: { self: 'userId' },
+        leave: { rel: 'user', action: 'operate' },
         // Owner-side assign, role-aware.
         assign: {
           any: [
@@ -159,10 +168,10 @@ export const rebacSchema: RebacSchema = {
         // Read: source or target can read their own inquiry
         read: {
           any: [
-            { self: 'sourceUserId' },
+            { rel: 'sourceUser', action: 'read' },
             { rel: 'sourceOrganization', action: 'manage' },
             { rel: 'sourceSpace', action: 'manage' },
-            { self: 'targetUserId' },
+            { rel: 'targetUser', action: 'read' },
             { rel: 'targetOrganization', action: 'manage' },
             { rel: 'targetSpace', action: 'manage' },
           ],
@@ -176,7 +185,7 @@ export const rebacSchema: RebacSchema = {
             {
               all: [
                 { rule: { field: 'type', operator: Operator.in, value: [] } },
-                { self: 'sourceUserId' },
+                { rel: 'sourceUser', action: 'operate' },
               ],
             },
             // inviteOrganizationUser: high roles (owner/admin) require own
@@ -228,7 +237,7 @@ export const rebacSchema: RebacSchema = {
         // self check fails for regular users — superadmin bypass handles it.
         resolve: {
           any: [
-            { self: 'targetUserId' },
+            { rel: 'targetUser', action: 'operate' },
             {
               any: [
                 // transferSpace — target org owner only

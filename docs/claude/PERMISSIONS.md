@@ -518,8 +518,8 @@ export const rebacSchema: RebacSchema = {
 
   organizationUser: {
     actions: {
-      read: { any: [{ self: 'userId' }, { rel: 'organization', action: 'read' }] },
-      leave: { self: 'userId' },  // Users can leave orgs themselves
+      read: { any: [{ rel: 'user', action: 'read' }, { rel: 'organization', action: 'read' }] },
+      leave: { rel: 'user', action: 'operate' },  // the person, holding operate on their own user
       manage: { rel: 'organization', action: 'manage' },
       own: { rel: 'organization', action: 'own' },
     },
@@ -527,8 +527,8 @@ export const rebacSchema: RebacSchema = {
 
   spaceUser: {
     actions: {
-      read: { any: [{ self: 'userId' }, { rel: 'space', action: 'read' }] },
-      leave: { self: 'userId' },  // Users can leave spaces themselves
+      read: { any: [{ rel: 'user', action: 'read' }, { rel: 'space', action: 'read' }] },
+      leave: { rel: 'user', action: 'operate' },
       manage: { rel: 'space', action: 'manage' },
       own: { rel: 'space', action: 'own' },
     },
@@ -536,7 +536,7 @@ export const rebacSchema: RebacSchema = {
 
   token: {
     actions: {
-      leave: { self: 'userId' },  // Users can delete their own tokens
+      leave: { rel: 'user', action: 'operate' },  // the person deletes their own tokens
     },
   },
 
@@ -551,10 +551,10 @@ export const rebacSchema: RebacSchema = {
       // Source or target can read their own inquiry
       read: {
         any: [
-          { self: 'sourceUserId' },
+          { rel: 'sourceUser', action: 'read' },
           { rel: 'sourceOrganization', action: 'manage' },
           { rel: 'sourceSpace', action: 'manage' },
-          { self: 'targetUserId' },
+          { rel: 'targetUser', action: 'read' },
           { rel: 'targetOrganization', action: 'manage' },
           { rel: 'targetSpace', action: 'manage' },
         ],
@@ -565,7 +565,7 @@ export const rebacSchema: RebacSchema = {
         any: [
           // Source user can act on their own inquiry (cancel, edit, re-send)
           // Add type strings here when user-sourced inquiry types exist
-          { all: [{ rule: { field: 'type', operator: 'in', value: [] } }, { self: 'sourceUserId' }] },
+          { all: [{ rule: { field: 'type', operator: 'in', value: [] } }, { rel: 'sourceUser', action: 'operate' }] },
           // inviteOrganizationUser: high roles require own
           { all: [{ rule: { field: 'type', operator: 'in', value: ['inviteOrganizationUser'] } }, { rule: { field: 'content.role', operator: 'in', value: highRoles } }, { rel: 'sourceOrganization', action: 'own' }] },
           // inviteOrganizationUser: normal roles require manage
@@ -582,7 +582,7 @@ export const rebacSchema: RebacSchema = {
       // Resolve: target decides (approve/deny/requestChanges)
       resolve: {
         any: [
-          { self: 'targetUserId' },
+          { rel: 'targetUser', action: 'operate' },
           // transferSpace — target org owner only
           { all: [{ rule: { field: 'type', operator: 'in', value: ['transferSpace'] } }, { rel: 'targetOrganization', action: 'own' }] },
           // all other types — target org manager
@@ -601,11 +601,12 @@ export const rebacSchema: RebacSchema = {
 |------|---------|---------|
 | `string` | Inherit action from same resource | `manage: 'own'` → check `own` on same resource |
 | `{ rel, action }` | Delegate to related resource (supports dot-path) | `{ rel: 'organization', action: 'own' }` |
-| `{ self: field }` | Current user owns the record | `{ self: 'userId' }` → user.id === record.userId |
 | `{ rule: Condition }` | JSON rule condition | `{ rule: { field: 'role', operator: 'in', value: ['owner'] } }` |
-| `{ any: ActionRule[] }` | At least one must pass | `{ any: [{ self: 'userId' }, 'read'] }` |
+| `{ any: ActionRule[] }` | At least one must pass | `{ any: [{ rel: 'user', action: 'read' }, 'read'] }` |
 | `{ all: ActionRule[] }` | All must pass | `{ all: [{ rule: ... }, 'own'] }` |
 | `null` | Always false (terminal) | `own: null` |
+
+There is no `self` arm. Acting on your own record is a walk to your own user: `{ rel: 'user', action: 'operate' }` passes when the record's `user` is the acting user **and** the credential holds `operate` on that user row. Identity lives in the permix table (a principal holds grants only on its own user row), so the walk carries both who you are and what you hold; a credential narrowed to `read` on its user cannot leave, delete a sibling token or accept an invite on identity alone. The record must arrive with `user` hydrated; a bare foreign key is denied, never guessed (`principals.test.ts`).
 
 ### How It Works
 
@@ -711,7 +712,7 @@ export const contactCreateBodySchema = ContactScalarInputSchema.omit({ ... }).ex
 });
 ```
 
-The schema validates the recursive `ActionRule` envelope (delegations, `{ rel, action }`, `{ self }`, `{ rule }`, `{ any }`, `{ all }`) but passes the inner json-rules `Condition` through as `unknown` — runtime `check()` validates it when the rule fires.
+The schema validates the recursive `ActionRule` envelope (delegations, `{ rel, action }`, `{ rule }`, `{ any }`, `{ all }`) but passes the inner json-rules `Condition` through as `unknown` — runtime `check()` validates it when the rule fires.
 
 ### When to use it
 
@@ -915,7 +916,7 @@ The ReBAC schema allows users to delete their own tokens via `leave`:
 ```typescript
 token: {
   actions: {
-    leave: { self: 'userId' },  // User can delete if token.userId === user.id
+    leave: { rel: 'user', action: 'operate' },  // the person, holding operate on their own user
   },
 },
 ```
