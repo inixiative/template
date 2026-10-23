@@ -1,6 +1,6 @@
 # INFRA-039: Rule references — port Zealot's declaration table, plain sourceId, refusals that say why
 
-**Status**: 🚧 In Progress
+**Status**: 👀 Review
 **Assignee**: Aron
 **Priority**: Medium
 **Created**: 2026-10-23
@@ -35,15 +35,22 @@ template level with it.
 
 ## Items
 
-- [ ] **Schema**: `sourceId` on `RuleReference`, one unique replacing the three per-source uniques.
-- [ ] **Declaration table + generic hook**: `hooks/ruleReference/surfaces.ts` + `hook.ts`;
+- [x] **Schema**: `sourceId` on `RuleReference`, one unique replacing the three per-source uniques.
+- [x] **Declaration table + generic hook**: `hooks/ruleReference/surfaces.ts` + `hook.ts`;
   `syncRuleReferenceEdges` stays the one edge writer.
-- [ ] **Target hook**: no `create` registration; `ruleReference.stale` app event deleted.
-- [ ] **Refuse with reasons**: no `held`; refusal names model, label and reason.
-- [ ] **Reads include references**: segment read returns `ruleReferences`.
-- [ ] **Agreement test**: lens identity models and `RuleReference` target columns agree.
+- [x] **Target hook**: no `create` registration; `ruleReference.stale` app event deleted.
+- [x] **Refuse with reasons**: no `held`; refusal names model, label and reason.
+- [x] **Reads include references**: every segment response returns `ruleReferences`, with labels
+  read through the label the customer-ref lens declares and batched per model.
+- [x] **Agreement test**: lens identity models and `RuleReference` target columns agree
+  (`hooks/ruleReference/registryAgreement.test.ts`). Every target column is reachable today, so
+  there is no edge-free list.
 
 ## Notes
+
+- **Labels in a refusal.** A reference the source already held, which was in view when it was
+  saved, is named by its label. Any other reference is named by id, so a refusal never shows what
+  another owner's row is called.
 
 - **The degraded signal is read from edges, not published.** `ruleReference.stale` had no consumer.
   Its handler was empty. A reader that needs "which rules are degraded" asks the edges:
