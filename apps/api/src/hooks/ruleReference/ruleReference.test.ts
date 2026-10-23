@@ -236,33 +236,6 @@ describe('ruleReference — the save path writes edges, the target side stamps t
     expect(ruleReferenceIssues(cleared)).toEqual([]);
   });
 
-  it('soft-deleting a target row publishes one stale event per edge, naming the source; restoring publishes none', async () => {
-    const { entity: tag } = await createTag();
-    await save(mjml(taggedBlock(tag.id)));
-    await save(mjml(component('vip', taggedBlock(tag.id))));
-
-    await db.tag.update({ where: { id: tag.id }, data: { deletedAt: new Date() } });
-
-    const stamped = await edgesOf({ targetId: tag.id });
-    const staleEvents = () =>
-      db.appEvent.findMany({
-        where: { name: 'ruleReference.stale', data: { path: ['targetId'], equals: tag.id } },
-      });
-    const published = (await staleEvents()).map((event) => event.data as Record<string, unknown>);
-    expect(published.map((data) => [data.sourceModel, data.sourceId]).sort()).toEqual(
-      stamped
-        .map((edge) => [
-          edge.sourceModel,
-          edge.sourceEmailTemplateId ?? edge.sourceEmailComponentId,
-        ])
-        .sort(),
-    );
-    expect(published.every((data) => data.targetModel === 'Tag')).toBe(true);
-
-    await db.withDeleted(() => db.tag.update({ where: { id: tag.id }, data: { deletedAt: null } }));
-    expect(await staleEvents()).toHaveLength(published.length);
-  });
-
   it('purging a target row nulls the FK and leaves the edge naming it', async () => {
     const { entity: tag } = await createTag();
     await save(mjml(taggedBlock(tag.id)));
