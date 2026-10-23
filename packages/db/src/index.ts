@@ -177,6 +177,12 @@ export {
   ruleHealthFromEdges,
   ruleReferenceIssues,
 } from './utils/ruleReferenceHealth';
+export { ruleReferenceLabels } from './utils/ruleReferenceLabels';
+export {
+  describeRuleReferenceRefusals,
+  type RuleReferenceRefusal,
+  ruleReferenceRefusals,
+} from './utils/ruleReferenceRefusals';
 export {
   type DynamicRuleReference,
   dynamicRuleReferences,

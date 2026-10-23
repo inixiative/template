@@ -142,7 +142,7 @@ describe('segmentConditions hook', () => {
         { ownerModel: 'Space', conditions: membersOf('00000000-0000-7000-8000-00000000dead') },
         { space },
       ),
-    ).rejects.toThrow('does not own');
+    ).rejects.toThrow("Segment '00000000-0000-7000-8000-00000000dead' (missing)");
 
     const { context } = await createOrganizationUser();
     const elsewhere = (await createSpace({}, { organization: context.organization })).entity;
@@ -152,7 +152,7 @@ describe('segmentConditions hook', () => {
     );
     await expect(
       createSegment({ ownerModel: 'Space', conditions: membersOf(foreign.id) }, { space }),
-    ).rejects.toThrow('does not own');
+    ).rejects.toThrow(`Segment '${foreign.id}' (missing)`);
 
     const { entity: own } = await createSegment(
       { ownerModel: 'Space', conditions: acmeRule },

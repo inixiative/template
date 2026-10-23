@@ -5,10 +5,9 @@
  * @uses infrastructure:prisma
  */
 import type { Condition } from '@inixiative/json-rules';
-import { admitRuleReferences, ruleReferences } from '@template/db';
+import { describeRuleReferenceRefusals, ruleReferenceRefusals, ruleReferences } from '@template/db';
 import type { Segment } from '@template/db/generated/client/client';
 import type { ProviderModel } from '@template/db/generated/client/enums';
-import { referenceKey } from '@template/shared/rules';
 import {
   customerRefLens,
   ownedSegments,
@@ -20,31 +19,22 @@ type Candidate = {
   ownerModel: ProviderModel;
   ownerId: string;
   conditions: Condition;
-  held?: string[];
+  segmentId?: string;
 };
 
-/** Refuses a rule naming rows the owner's lens does not admit; returns the owner's live segments for the cycle check. */
+/** Refuses a rule naming rows the owner's lens does not admit, or rows that are gone; returns the owner's live segments for the cycle check. */
 export const assertSegmentReferencesOwned = async ({
   ownerModel,
   ownerId,
   conditions,
-  held = [],
+  segmentId,
 }: Candidate): Promise<Segment[]> => {
-  const added = ruleReferences(customerRefLens, conditions).filter(
-    (reference) => !held.includes(referenceKey(reference)),
-  );
-  if (added.length) {
-    const { unadmitted } = await admitRuleReferences({
-      scopes: [{ lens: resolvedCustomerRefLens(ownerModel, ownerId), references: added }],
-    });
-    if (unadmitted.length) {
-      throw invalidSegmentConditions(
-        unadmitted.map(
-          (reference) =>
-            `references a ${reference.model} this ${ownerModel} does not own: ${reference.id}`,
-        ),
-      );
-    }
-  }
+  const references = ruleReferences(customerRefLens, conditions);
+  const refusals = await ruleReferenceRefusals({
+    references,
+    scopes: [{ lens: resolvedCustomerRefLens(ownerModel, ownerId), references }],
+    source: segmentId ? { model: 'Segment', id: segmentId } : undefined,
+  });
+  if (refusals.length) throw invalidSegmentConditions(describeRuleReferenceRefusals(refusals));
   return ownedSegments(ownerModel, ownerId);
 };

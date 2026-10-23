@@ -250,21 +250,19 @@ describe('ruleReference — the save path writes edges, the target side stamps t
     expect(ruleReferenceIssues(edges).map((issue) => issue.reason)).toEqual(['purged']);
   });
 
-  it('an edit that keeps a pre-existing dead reference is allowed; adding a new dead one is not', async () => {
-    const [{ entity: tag }, { entity: other }] = await Promise.all([createTag(), createTag()]);
+  it('an edit that keeps a dead reference is refused, naming the reference and why', async () => {
+    const { entity: tag } = await createTag();
     await save(mjml(taggedBlock(tag.id)), { slug: 'edit' });
     await db.tag.update({ where: { id: tag.id }, data: { deletedAt: new Date() } });
 
-    const { template: edited } = await save(mjml(taggedBlock(tag.id)), {
-      slug: 'edit',
-      subject: 'Typo fixed',
-    });
-    expect(edited.subject).toBe('Typo fixed');
-
-    await db.tag.update({ where: { id: other.id }, data: { deletedAt: new Date() } });
     await expect(
-      save(mjml(taggedBlock(tag.id, other.id)), { slug: 'edit' }),
-    ).rejects.toBeInstanceOf(RuleReferenceError);
+      save(mjml(taggedBlock(tag.id)), { slug: 'edit', subject: 'Typo fixed' }),
+    ).rejects.toThrow(`Tag '${tag.name}' (deleted)`);
+  });
+
+  it('naming a row that never existed is refused as missing, by id', async () => {
+    const id = '01900000-0000-7000-8000-000000000000';
+    await expect(save(mjml(taggedBlock(id)))).rejects.toThrow(`Tag '${id}' (missing)`);
   });
 
   it('a save that removes the dead reference removes its edge', async () => {

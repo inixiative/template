@@ -192,7 +192,7 @@ describe('segment rule health — edge upkeep', () => {
     expect(await edgesOf(dependent.id)).toHaveLength(1);
   });
 
-  it('a save that keeps a reference that has since died is allowed; a new dead reference is not', async () => {
+  it('a save that touches a rule naming a dead reference is refused with the reason; a save that leaves the rule alone is not', async () => {
     const { entity: target } = await createSegment(
       { ownerModel: 'Space', conditions: acmeRule },
       { space },
@@ -203,9 +203,16 @@ describe('segment rule health — edge upkeep', () => {
     );
     await db.segment.update({ where: { id: target.id }, data: { deletedAt: new Date() } });
 
+    await expect(
+      db.segment.update({
+        where: { id: dependent.id },
+        data: { name: 'renamed', conditions: membersOf(target.id) },
+      }),
+    ).rejects.toThrow(`Segment '${target.name}' (deleted)`);
+
     const renamed = await db.segment.update({
       where: { id: dependent.id },
-      data: { name: 'renamed', conditions: membersOf(target.id) },
+      data: { name: 'renamed' },
     });
     expect(renamed.name).toBe('renamed');
 
@@ -216,6 +223,6 @@ describe('segment rule health — edge upkeep', () => {
     await db.segment.update({ where: { id: other.id }, data: { deletedAt: new Date() } });
     await expect(
       db.segment.update({ where: { id: dependent.id }, data: { conditions: membersOf(other.id) } }),
-    ).rejects.toThrow('does not own');
+    ).rejects.toThrow(`Segment '${other.id}' (deleted)`);
   });
 });

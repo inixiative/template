@@ -101,7 +101,7 @@ describe('email seeds persist through the app save', () => {
     };
 
     await expect(seedTable(component, emailSeedSavers)).rejects.toThrow(
-      /outside this source's view/,
+      `Tag '${tag.id}' (missing)`,
     );
     expect(await db.emailComponent.findFirst({ where: { slug: 'seed-org-tag' } })).toBeNull();
   });

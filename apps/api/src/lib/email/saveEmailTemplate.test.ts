@@ -110,6 +110,9 @@ describe('saveEmailTemplate — a rule may only name what its owner can see', ()
     await expect(saveFor(mine.id, taggedBlock(theirTag.id))).rejects.toBeInstanceOf(
       RuleReferenceError,
     );
+    await expect(saveFor(mine.id, taggedBlock(theirTag.id))).rejects.toThrow(
+      `Tag '${theirTag.id}' (missing)`,
+    );
   });
 
   it("another owner's segment is refused", async () => {
