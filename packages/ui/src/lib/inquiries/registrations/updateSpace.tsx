@@ -5,10 +5,11 @@
  * @uses primitive:sdk
  */
 import type { InquiryReceivedItem, InquirySentItem } from '@template/sdk';
+import type { UpdateSpaceContent } from '@template/shared/inquiry';
 import { registerInquiryType } from '@template/ui/lib/inquiries/registry';
 
 const UpdateSpaceSourceSummary = ({ inquiry }: { inquiry: InquirySentItem }) => {
-  const content = inquiry.content as { name?: string; slug?: string } | null | undefined;
+  const content = inquiry.content as UpdateSpaceContent | null | undefined;
   const changes = [
     content?.name && `name -> ${content.name}`,
     content?.slug && `slug -> ${content.slug}`,

@@ -1,16 +1,14 @@
 import { db, type SpaceId } from '@template/db';
 import { InquiryResourceModel, InquiryType } from '@template/db/generated/client/enums';
-import type { z } from 'zod';
+import {
+  baseResolutionInputSchema,
+  type UpdateSpaceContent,
+  updateSpaceContentSchema,
+} from '@template/shared/inquiry';
 import { emitAppEvent } from '#/appEvents/emit';
 import { makeError } from '#/lib/errors';
-import { spaceContentSchema } from '#/modules/inquiry/handlers/createSpace';
-import { baseResolutionInputSchema } from '#/modules/inquiry/handlers/schemas';
 import type { Inquiry, InquiryHandler } from '#/modules/inquiry/handlers/types';
 import { inquiryTerminalStatuses } from '#/modules/inquiry/validations/validateInquiryStatus';
-
-const contentSchema = spaceContentSchema.partial();
-
-type UpdateSpaceContent = z.infer<typeof contentSchema>;
 
 const validate = async (inquiry: Partial<Inquiry>, content: UpdateSpaceContent): Promise<void> => {
   const { slug } = content;
@@ -46,7 +44,7 @@ const validate = async (inquiry: Partial<Inquiry>, content: UpdateSpaceContent):
 export const updateSpaceHandler: InquiryHandler<UpdateSpaceContent> = {
   sources: [{ sourceModel: InquiryResourceModel.Space }],
   targets: [{ targetModel: InquiryResourceModel.admin }],
-  contentSchema,
+  contentSchema: updateSpaceContentSchema,
   resolutionInputSchema: baseResolutionInputSchema,
   resolutionSchema: baseResolutionInputSchema,
   defaultExpirationDays: 90,

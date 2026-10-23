@@ -137,6 +137,8 @@ Who may create is the type's `send` rule (see [Permissions](#permissions-rebac))
 
 **Response:** `inquirySentResponseSchema` — includes `targetUser`, `targetOrganization`, `targetSpace`.
 
+**Which `targetModel` and `content` a type takes:** `GET /api/v1/inquiry/info` (public) lists, for every registered handler, its `sources`, `targets`, the JSON Schema of `content`, of the extra resolve-body fields (`resolutionInput`) and of the stored `resolution`, plus `unique` and `defaultExpirationDays`. It is generated from `inquiryHandlers`, so a new handler appears there without route changes. A `targetModel` outside `targets` answers 422 (`validateInquiryHandler`); content that fails `contentSchema` answers 422 too.
+
 ### Lifecycle — on the inquiry resource directly
 
 | Method | Path | Permission | Description |
@@ -345,7 +347,7 @@ Each mutation uses the include that matches what its caller needs:
 ## Adding a New Handler
 
 1. Create `handlers/<type>/index.ts` implementing `InquiryHandler<TContent, TResolution>`
-2. Define `contentSchema` (stored on create) and `resolutionInputSchema` / `resolutionSchema` (validated on resolve)
+2. Define `contentSchema` (stored on create) and `resolutionInputSchema` / `resolutionSchema` (validated on resolve) in `packages/shared/src/inquiry/<type>.ts`, so web/admin type `inquiry.content` with the same schema the API parses; `baseResolutionInputSchema` lives there too
    - `resolutionInputSchema` — what the resolver submits; fields here (except `explanation`) can override content
    - `resolutionSchema` — full stored shape; extend `resolutionInputSchema` with any computed fields returned by `handleApprove`
    - If no computed fields, both can be the same schema
