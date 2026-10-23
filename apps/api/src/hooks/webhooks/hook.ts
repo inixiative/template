@@ -4,18 +4,18 @@ import {
   db,
   filterFields,
   HookTiming,
-  isFalsePolymorphismRef,
   isNoOpUpdate,
   registerDbHook,
   WEBHOOK_NOOP_FIELDS,
-  webhookEnabledModels,
-  webhookRelatedModels,
 } from '@template/db';
-import type { WebhookModel, WebhookSubscription } from '@template/db/generated/client/client';
+import type { WebhookSubscription } from '@template/db/generated/client/client';
 import { auditActorContext, auditActorStore } from '@template/db/lib/auditActorContext';
 import { ConcurrencyType } from '@template/shared/utils';
 import { keyBy } from 'lodash-es';
 import { isManyAction } from '#/hooks/shared/hookRows';
+import { isSoftDeleteTransition } from '#/hooks/shared/softDeleteTransition';
+import { recordAudiences, type WebhookRow } from '#/hooks/webhooks/parties';
+import { findPartySubscriptions, isPartyTo } from '#/hooks/webhooks/subscriptions';
 import { enqueueJob } from '#/jobs/enqueue';
 
 export enum WebhookAction {
@@ -45,14 +45,17 @@ const getWebhookCallbacks = (subscriptions: WebhookSubscription[], payload: Webh
   });
 };
 
-const dbActionToWebhookAction = (dbAction: DbAction, hasPrevious: boolean): WebhookAction => {
-  if (dbAction === DbAction.upsert) {
-    return hasPrevious ? WebhookAction.update : WebhookAction.create;
+const dbActionToWebhookAction = (
+  dbAction: DbAction,
+  record: Record<string, unknown>,
+  previous?: Record<string, unknown>,
+): WebhookAction => {
+  if (dbAction === DbAction.createManyAndReturn || dbAction === DbAction.create) {
+    return WebhookAction.create;
   }
-  if (dbAction === DbAction.createManyAndReturn) return WebhookAction.create;
-  if (dbAction === DbAction.updateManyAndReturn) return WebhookAction.update;
-  if (dbAction === DbAction.deleteMany) return WebhookAction.delete;
-  return dbAction as unknown as WebhookAction;
+  if (dbAction === DbAction.delete || dbAction === DbAction.deleteMany) return WebhookAction.delete;
+  if (dbAction === DbAction.upsert && !previous) return WebhookAction.create;
+  return isSoftDeleteTransition(previous, record) ? WebhookAction.delete : WebhookAction.update;
 };
 
 const processSingleRecord = (
@@ -60,7 +63,7 @@ const processSingleRecord = (
   webhookModel: string,
   model: string,
   webhookAction: WebhookAction,
-  resultData: Record<string, unknown> & { id: string },
+  resultData: WebhookRow,
   previousData?: Record<string, unknown>,
 ) => {
   if (
@@ -107,62 +110,42 @@ export const registerWebhookHook = () => {
     async (options: HookOptions) => {
       const { model, action: dbAction } = options;
 
-      const relatedRefs = webhookRelatedModels[model];
-      const webhookTargets: string[] = relatedRefs?.length
-        ? relatedRefs.map((ref) => (isFalsePolymorphismRef(ref) ? ref.model : ref))
-        : [model];
+      const records: { resultData: WebhookRow; previousData?: Record<string, unknown> }[] = [];
+      if (isManyAction(dbAction)) {
+        const { result, previous } = options as HookOptions & { action: ManyAction };
+        const previousById = keyBy(previous, 'id');
+        for (const resultData of (result ?? []) as WebhookRow[]) {
+          records.push({ resultData, previousData: previousById[resultData.id] });
+        }
+      } else {
+        const { result, previous } = options as HookOptions & { action: SingleAction };
+        records.push({
+          resultData: result as WebhookRow,
+          previousData: previous as Record<string, unknown> | undefined,
+        });
+      }
 
-      const enabledTargets = webhookTargets.filter((m) =>
-        (webhookEnabledModels as readonly string[]).includes(m),
+      const audiences = await recordAudiences(
+        model,
+        records.map(({ resultData }) => resultData),
       );
-      if (enabledTargets.length === 0) return;
 
       let allCallbacks: (() => Promise<void>)[] = [];
 
-      // Prefetch all subscriptions for enabled models in one query, then group.
-      const allSubscriptions = await db.webhookSubscription.findMany({
-        where: { model: { in: enabledTargets as WebhookModel[] }, isActive: true },
-      });
-      const subscriptionsByModel = new Map<string, WebhookSubscription[]>();
-      for (const target of enabledTargets) subscriptionsByModel.set(target, []);
-      for (const sub of allSubscriptions) {
-        const bucket = subscriptionsByModel.get(sub.model);
-        if (bucket) bucket.push(sub);
-      }
-
-      // Process for each enabled target model
-      for (const webhookModel of enabledTargets) {
-        const subscriptions = subscriptionsByModel.get(webhookModel) ?? [];
+      for (const [webhookModel, partiesByRowId] of audiences) {
+        const subscriptions = await findPartySubscriptions(
+          webhookModel,
+          Object.values(partiesByRowId).flat(),
+        );
         if (subscriptions.length === 0) continue;
 
-        if (isManyAction(dbAction)) {
-          const { result, previous } = options as HookOptions & { action: ManyAction };
-          const results = (result ?? []) as (Record<string, unknown> & { id: string })[];
-          const previousById = keyBy(previous, 'id');
-
-          for (const resultData of results) {
-            const previousData = previousById[resultData.id];
-            const webhookAction = dbActionToWebhookAction(dbAction, previousData !== undefined);
-            const callbacks = processSingleRecord(
-              subscriptions,
-              webhookModel,
-              model,
-              webhookAction,
-              resultData,
-              previousData,
-            );
-            allCallbacks = allCallbacks.concat(callbacks);
-          }
-        } else {
-          const { result, previous } = options as HookOptions & { action: SingleAction };
-          const resultData = result as Record<string, unknown> & { id: string };
-          const previousData = previous as Record<string, unknown> | undefined;
-          const webhookAction = dbActionToWebhookAction(dbAction, !!previousData);
+        for (const { resultData, previousData } of records) {
+          const parties = partiesByRowId[resultData.id] ?? [];
           const callbacks = processSingleRecord(
-            subscriptions,
+            subscriptions.filter((sub) => isPartyTo(sub, parties)),
             webhookModel,
             model,
-            webhookAction,
+            dbActionToWebhookAction(dbAction, resultData, previousData),
             resultData,
             previousData,
           );

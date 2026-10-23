@@ -19,11 +19,7 @@ import {
   filterForAudit,
 } from '#/hooks/auditLog/utils';
 import { isManyAction } from '#/hooks/shared/hookRows';
-
-const isSoftDeleteTransition = (
-  previous?: Record<string, unknown>,
-  record?: Record<string, unknown>,
-): boolean => previous?.deletedAt == null && record?.deletedAt != null;
+import { isSoftDeleteTransition } from '#/hooks/shared/softDeleteTransition';
 
 const dbActionToAuditAction = (
   dbAction: DbAction,
