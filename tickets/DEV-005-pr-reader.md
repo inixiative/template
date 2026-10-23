@@ -20,7 +20,8 @@ What we have today only hides. Template `main` `2c665cdf` marks `.gloss/**`, `*.
 `**/tests/fixtures/**` `linguist-generated=true`, so GitHub folds them behind "Load diff". Geld
 (geld.sh) does the same client-side with a toggle. Neither changes how the rest is read.
 
-This ticket is the better reading tool (Aron, 2026-10-23).
+This ticket is the better reading tool (Aron, 2026-10-23): purely a visualizer over a GitHub PR.
+The PR, its commits and its comments stay on GitHub; the reader holds no state of its own.
 
 ## What it looks like
 
@@ -58,7 +59,8 @@ alone and reuses the same `@inixiative/gloss` library.
 - Standalone tool or an extension of Foundry's gloss viewer?
 - Is a cheaper intermediate worth shipping first: CI runs `gloss diff` and posts the per-symbol gloss
   delta as GitHub Checks annotations, inline in Files changed, no viewer at all?
-- Does the reader also carry review comments, or is it reading only with comments left on GitHub?
+- Comments: reading only, with comments left on GitHub, or post review comments through the GitHub
+  API so the reader is never left at the moment of attention? Either way nothing is stored locally.
 
 ## Related
 
