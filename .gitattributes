@@ -1,0 +1,4 @@
+.gloss/** linguist-generated=true
+*.test.ts linguist-generated=true
+*.test.tsx linguist-generated=true
+**/tests/fixtures/** linguist-generated=true
