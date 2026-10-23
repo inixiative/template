@@ -7,11 +7,6 @@ import type { PaginationMetadata } from '#/lib/routeTemplates';
 type SuccessResponse<T> = { data: T; pagination?: PaginationMetadata };
 type ErrorResponse = ApiErrorBody;
 
-type ValidationFailureResponse = {
-  success: false;
-  error: { name: string; message: string };
-};
-
 export type ApiResponse<T = unknown> = SuccessResponse<T> | ErrorResponse;
 
 export const json = async <T = unknown>(response: Response): Promise<SuccessResponse<T>> => {
@@ -22,12 +17,6 @@ export const json = async <T = unknown>(response: Response): Promise<SuccessResp
 
 export const jsonError = async (response: Response): Promise<ErrorResponse> => {
   return response.json() as Promise<ErrorResponse>;
-};
-
-export const jsonValidationFailure = async (
-  response: Response,
-): Promise<ValidationFailureResponse> => {
-  return response.json() as Promise<ValidationFailureResponse>;
 };
 
 export const createRequest = (

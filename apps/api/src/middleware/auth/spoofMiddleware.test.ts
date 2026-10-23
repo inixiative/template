@@ -1,33 +1,30 @@
 import { afterAll, describe, expect, it } from 'bun:test';
-import { OpenAPIHono } from '@hono/zod-openapi';
 import { db } from '@template/db';
 import type { Token, User } from '@template/db/generated/client/client';
 import { cleanupTouchedTables, createToken, createUser } from '@template/db/test';
 import type { TokenWithRelations } from '#/lib/context/types';
 import { spoofMiddleware } from '#/middleware/auth/spoofMiddleware';
-import { prepareRequest } from '#/middleware/prepareRequest';
-import type { AppEnv } from '#/types/appEnv';
+import { createTestApp } from '#tests/createTestApp';
 
 type Echo = { userId: string | null; spoofedById: string | null; tokenId: string | null };
 
-const buildApp = (initial: { user: User; token?: Token }) => {
-  const app = new OpenAPIHono<AppEnv>();
-  app.use('*', prepareRequest);
-  app.use('*', async (c, next) => {
-    c.set('user', initial.user);
-    if (initial.token) c.set('token', initial.token as TokenWithRelations);
-    await next();
+const buildApp = (initial: { user: User; token?: Token }) =>
+  createTestApp({
+    mockUser: initial.user,
+    mockToken: initial.token as TokenWithRelations | undefined,
+    mount: [
+      (app) => {
+        app.use('*', spoofMiddleware);
+        app.get('/echo', (c) =>
+          c.json({
+            userId: c.get('user')?.id ?? null,
+            spoofedById: c.get('spoofedBy')?.id ?? null,
+            tokenId: c.get('token')?.id ?? null,
+          }),
+        );
+      },
+    ],
   });
-  app.use('*', spoofMiddleware);
-  app.get('/echo', (c) =>
-    c.json({
-      userId: c.get('user')?.id ?? null,
-      spoofedById: c.get('spoofedBy')?.id ?? null,
-      tokenId: c.get('token')?.id ?? null,
-    }),
-  );
-  return app;
-};
 
 describe('spoofMiddleware via token auth', () => {
   afterAll(async () => {

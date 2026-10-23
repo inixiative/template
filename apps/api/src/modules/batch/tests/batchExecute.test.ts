@@ -8,7 +8,7 @@ import { meRouter } from '#/modules/me';
 import { organizationRouter } from '#/modules/organization';
 import { tokenRouter } from '#/modules/token';
 import { createTestApp } from '#tests/createTestApp';
-import { json, jsonValidationFailure, post } from '#tests/utils/request';
+import { json, jsonError, post } from '#tests/utils/request';
 
 type BatchExecuteResponse = z.infer<typeof batchExecuteRoute.responseSchema>;
 
@@ -569,12 +569,13 @@ describe('POST /api/v1/batch/execute', () => {
           strategy: 'allowFailures',
         }),
       );
-      const body = await jsonValidationFailure(response);
+      const body = await jsonError(response);
 
-      expect(response.status).toBe(400);
-      expect(body.success).toBe(false);
-      expect(body.error.name).toBe('ZodError');
-      expect(body.error.message).toContain('Maximum 50 requests per round');
+      expect(response.status).toBe(422);
+      expect(body).toMatchObject({
+        error: 'VALIDATION_ERROR',
+        fieldErrors: { requests: ['Maximum 50 requests per round'] },
+      });
     });
 
     it('enforces maximum total requests limit', async () => {
@@ -586,11 +587,13 @@ describe('POST /api/v1/batch/execute', () => {
           strategy: 'allowFailures',
         }),
       );
-      const body = await jsonValidationFailure(response);
+      const body = await jsonError(response);
 
-      expect(response.status).toBe(400);
-      expect(body.error.name).toBe('ZodError');
-      expect(body.error.message).toContain('Maximum 100 total requests');
+      expect(response.status).toBe(422);
+      expect(body).toMatchObject({
+        error: 'VALIDATION_ERROR',
+        fieldErrors: { requests: ['Maximum 100 total requests'] },
+      });
     });
   });
 });

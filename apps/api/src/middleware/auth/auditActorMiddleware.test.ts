@@ -1,5 +1,4 @@
 import { afterAll, describe, expect, it } from 'bun:test';
-import { OpenAPIHono } from '@hono/zod-openapi';
 import { db } from '@template/db';
 import type { User } from '@template/db/generated/client/client';
 import { IntegrationOwnerModel } from '@template/db/generated/client/enums';
@@ -7,29 +6,27 @@ import { auditActorContext } from '@template/db/lib/auditActorContext';
 import { cleanupTouchedTables, createIntegration, createUser } from '@template/db/test';
 import { auditActorMiddleware } from '#/middleware/auth/auditActorMiddleware';
 import { spoofMiddleware } from '#/middleware/auth/spoofMiddleware';
-import { prepareRequest } from '#/middleware/prepareRequest';
-import type { AppEnv } from '#/types/appEnv';
+import { createTestApp } from '#tests/createTestApp';
 
 type Echo = { integrationId: string | null; actorUserId: string | null };
 
-const buildApp = (user: User) => {
-  const app = new OpenAPIHono<AppEnv>();
-  app.use('*', prepareRequest);
-  app.use('*', async (c, next) => {
-    c.set('user', user);
-    await next();
+const buildApp = (user: User) =>
+  createTestApp({
+    mockUser: user,
+    mount: [
+      (app) => {
+        app.use('*', spoofMiddleware);
+        app.use('*', auditActorMiddleware);
+        app.get('/echo', (c) => {
+          const actor = auditActorContext.getScope();
+          return c.json({
+            integrationId: actor?.integrationId ?? null,
+            actorUserId: actor?.actorUserId ?? null,
+          });
+        });
+      },
+    ],
   });
-  app.use('*', spoofMiddleware);
-  app.use('*', auditActorMiddleware);
-  app.get('/echo', (c) => {
-    const actor = auditActorContext.getScope();
-    return c.json({
-      integrationId: actor?.integrationId ?? null,
-      actorUserId: actor?.actorUserId ?? null,
-    });
-  });
-  return app;
-};
 
 const echo = async (user: User, headers: Record<string, string>) => {
   const res = await buildApp(user).fetch(new Request('http://test/echo', { headers }));
