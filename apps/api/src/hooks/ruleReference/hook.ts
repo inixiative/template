@@ -7,7 +7,6 @@
 import {
   assertRuleReferencesExist,
   DbAction,
-  db,
   type HookOptions,
   HookTiming,
   RuleReferenceError,
