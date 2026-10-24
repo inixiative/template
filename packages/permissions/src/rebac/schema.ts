@@ -6,9 +6,10 @@
  */
 import { Operator } from '@inixiative/json-rules';
 import { ownerActions } from '@template/permissions/rebac/ownerActions';
-import type { RebacSchema } from '@template/permissions/rebac/types';
+import type { ActionRule, RebacSchema } from '@template/permissions/rebac/types';
 
 const highRoles = ['owner', 'admin'];
+const person: ActionRule = { actor: { field: 'model', operator: Operator.equals, value: 'User' } };
 
 export const rebacSchema: RebacSchema = {
   bridges: [],
@@ -19,6 +20,13 @@ export const rebacSchema: RebacSchema = {
         manage: 'own',
         operate: 'manage',
         read: 'operate',
+        'user.identify': 'read',
+        'organization.create': 'operate',
+        'token.create': { all: [person, 'operate'] },
+        'token.delete': { all: [person, 'operate'] },
+        'user.rotateJwts': { all: [person, 'operate'] },
+        'user.redact': { all: [person, 'own'] },
+        'organization.delete': { all: [person, 'own'] },
       },
     },
 

@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'bun:test';
 import type { HydratedRecord } from '@template/db';
-import { createPermissions, type PermissionEntry } from '@template/permissions/client';
+import {
+  ActorModel,
+  createPermissions,
+  type PermissionEntry,
+  personOnlyActions,
+  SessionAction,
+  UserAction,
+} from '@template/permissions/client';
 import { check } from '@template/permissions/rebac/check';
 import { rebacSchema } from '@template/permissions/rebac/schema';
 
@@ -66,6 +73,11 @@ const can = (
   record: object,
   action: string,
 ) => check(permix, rebacSchema, model, record as HydratedRecord, action);
+
+const acting = (permix: Awaited<ReturnType<typeof table>>, model: ActorModel, id = 'who') => {
+  permix.setActor({ id, model });
+  return permix;
+};
 
 describe('no self arm: the person reaches their own rows through rel user (Aron, 2026-10-23)', () => {
   describe('the user and their relation', () => {
@@ -261,6 +273,55 @@ describe('no self arm: the person reaches their own rows through rel user (Aron,
       expect(can(onI1, 'integration', integration('i1'), 'manage')).toBe(true);
       expect(can(onI1, 'integration', integration('i2'), 'read')).toBe(false);
       expect(can(onI1, 'user', u1, 'read')).toBe(false);
+    });
+  });
+
+  describe('the actor: who is acting, beside what they hold (Aron, 2026-10-23)', () => {
+    it('a person holding operate on their user mints a token; a token holding own does not', async () => {
+      const person = acting(await table(grant('db:user', 'u1', 'operate')), ActorModel.User, 'u1');
+      expect(can(person, 'user', u1, SessionAction.createToken)).toBe(true);
+      const token = acting(await table(grant('db:user', 'u1', 'own')), ActorModel.Token, 't1');
+      expect(can(token, 'user', u1, SessionAction.createToken)).toBe(false);
+    });
+
+    it('every person-only action is refused to a token holding own on the user', async () => {
+      const token = acting(await table(grant('db:user', 'u1', 'own')), ActorModel.Token, 't1');
+      const person = acting(await table(grant('db:user', 'u1', 'own')), ActorModel.User, 'u1');
+      for (const action of personOnlyActions) {
+        expect(can(token, 'user', u1, action)).toBe(false);
+        expect(can(person, 'user', u1, action)).toBe(true);
+      }
+    });
+
+    it('redacting the account and deleting an organization take own; a member does neither', async () => {
+      const member = acting(await table(grant('db:user', 'u1', 'operate')), ActorModel.User, 'u1');
+      expect(can(member, 'user', u1, SessionAction.redactUser)).toBe(false);
+      expect(can(member, 'user', u1, SessionAction.deleteOrganization)).toBe(false);
+      expect(can(member, 'user', u1, SessionAction.rotateUserJwts)).toBe(true);
+    });
+
+    it('with nobody acting a person-only action denies; the table still answers the rest', async () => {
+      const nobody = await table(grant('db:user', 'u1', 'own'));
+      expect(can(nobody, 'user', u1, SessionAction.createToken)).toBe(false);
+      expect(can(nobody, 'user', u1, 'own')).toBe(true);
+    });
+
+    it('identify and create-organization follow the table, not the actor', async () => {
+      const readToken = acting(await table(grant('db:user', 'u1', 'read')), ActorModel.Token, 't1');
+      expect(can(readToken, 'user', u1, UserAction.identify)).toBe(true);
+      expect(can(readToken, 'user', u1, UserAction.createOrganization)).toBe(false);
+      const memberToken = acting(
+        await table(grant('db:user', 'u1', 'operate')),
+        ActorModel.Token,
+        't1',
+      );
+      expect(can(memberToken, 'user', u1, UserAction.createOrganization)).toBe(true);
+    });
+
+    it('a superadmin passes a person-only check on any credential', async () => {
+      const token = acting(await table(), ActorModel.Token, 't1');
+      token.setSuperadmin(true);
+      expect(can(token, 'user', u1, SessionAction.createToken)).toBe(true);
     });
   });
 });

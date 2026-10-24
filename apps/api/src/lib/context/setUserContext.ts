@@ -5,8 +5,7 @@
  * @uses infrastructure:prisma, primitive:authz
  */
 import type { UserWithRelations } from '@template/db';
-import type { UserId } from '@template/db/typedModelIds';
-import { isSuperadmin } from '@template/permissions';
+import { ActorModel, isSuperadmin } from '@template/permissions';
 import type { Context } from 'hono';
 import { setupOrgPermissions } from '#/lib/permissions/setupOrgPermissions';
 import { setupSpacePermissions } from '#/lib/permissions/setupSpacePermissions';
@@ -23,7 +22,10 @@ export const setUserContext = async (c: Context<AppEnv>, userWithRelations: User
   c.set('spaces', spaces);
 
   const permix = c.get('permix');
-  permix.setUserId(user.id as UserId);
+  const token = c.get('token');
+  permix.setActor(
+    token ? { id: token.id, model: ActorModel.Token } : { id: user.id, model: ActorModel.User },
+  );
   // Set both ways: a superadmin spoofing a normal user must not retain the flag.
   permix.setSuperadmin(isSuperadmin(user));
   await setupUserPermissions(c);

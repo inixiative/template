@@ -1,6 +1,7 @@
 import { OpenAPIHono } from '@hono/zod-openapi';
-import { type Db, db, type UserId } from '@template/db';
+import { type Db, db } from '@template/db';
 import type { OrganizationUser, SpaceUser, User } from '@template/db/generated/client/client';
+import { ActorModel } from '@template/permissions';
 import { auth } from '#/lib/auth';
 import type { TokenWithRelations } from '#/lib/context/types';
 import { validationDefaultHook } from '#/lib/openapi/validationDefaultHook';
@@ -37,7 +38,11 @@ export const createTestApp = (options?: CreateTestAppOptions) => {
   app.use('*', async (c, next) => {
     if (options?.mockUser) {
       c.set('user', options.mockUser);
-      c.get('permix').setUserId(options.mockUser.id as UserId);
+      c.get('permix').setActor(
+        options.mockToken
+          ? { id: options.mockToken.id, model: ActorModel.Token }
+          : { id: options.mockUser.id, model: ActorModel.User },
+      );
       if (options.mockUser.platformRole === 'superadmin') c.get('permix').setSuperadmin(true);
     }
     if (options?.mockOrganizationUsers) {

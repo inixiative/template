@@ -3,12 +3,16 @@ export { Role } from '@template/db/generated/client/enums';
 export {
   type Action,
   type ActionState,
+  type Actor,
+  ActorModel,
   createPermissions,
   type Entitlements,
   InquiryAction,
   OrganizationAction,
   type PermissionEntry,
   type Permix,
+  personOnlyActions,
+  SessionAction,
   SpaceAction,
   StandardAction,
   UserAction,
@@ -18,6 +22,7 @@ export { check as rebacCheck } from './rebac/check';
 export { rebacSchema } from './rebac/schema';
 export type {
   ActionRule,
+  ActorCheck,
   RebacSchema,
   RelationCheck,
   ResourcePermission,

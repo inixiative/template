@@ -4,9 +4,12 @@
  * @partOf primitive:authz
  * @uses none
  */
-import type { UserId } from '@template/db';
-import { castArray } from 'lodash-es';
-import { createPermix, type PermixRules } from 'permix';
+import {
+  createPermissions as createEnginePermissions,
+  type ActionState as EngineActionState,
+  type PermissionEntry as EnginePermissionEntry,
+  type Permix as EnginePermix,
+} from '@inixiative/permissions';
 
 // Base actions - most resources use these
 export const StandardAction = {
@@ -24,7 +27,32 @@ export type OrganizationAction = (typeof OrganizationAction)[keyof typeof Organi
 export const SpaceAction = { ...StandardAction } as const;
 export type SpaceAction = (typeof SpaceAction)[keyof typeof SpaceAction];
 
-export const UserAction = { ...StandardAction } as const;
+// Actions on the person's own account. Held on the user's row like the standard four.
+export const SessionAction = {
+  createToken: 'token.create',
+  deleteToken: 'token.delete',
+  redactUser: 'user.redact',
+  rotateUserJwts: 'user.rotateJwts',
+  deleteOrganization: 'organization.delete',
+} as const;
+export type SessionAction = (typeof SessionAction)[keyof typeof SessionAction];
+
+// Only a person performs these: the schema gates each on the actor being a User. The list
+// exists for OpenAPI, which publishes userJwt alone on their operations.
+export const personOnlyActions: readonly SessionAction[] = [
+  SessionAction.createToken,
+  SessionAction.deleteToken,
+  SessionAction.redactUser,
+  SessionAction.rotateUserJwts,
+  SessionAction.deleteOrganization,
+];
+
+export const UserAction = {
+  ...StandardAction,
+  ...SessionAction,
+  identify: 'user.identify',
+  createOrganization: 'organization.create',
+} as const;
 export type UserAction = (typeof UserAction)[keyof typeof UserAction];
 
 export const InquiryAction = {
@@ -38,62 +66,14 @@ export type Action = UserAction | OrganizationAction | SpaceAction | InquiryActi
 
 export type Entitlements = Record<string, boolean> | null;
 
-export type ActionState = Partial<Record<Action, boolean | ((data?: unknown) => boolean)>>;
-export type PermissionEntry = { resource: string; id?: string; actions: ActionState };
-type PermissionDefinition = Record<string, { action: Action }>;
+export const ActorModel = { User: 'User', Token: 'Token' } as const;
+export type ActorModel = (typeof ActorModel)[keyof typeof ActorModel];
 
-const deniedActions: Record<Action, false> = {
-  read: false,
-  operate: false,
-  manage: false,
-  own: false,
-  send: false,
-  resolve: false,
-};
+// Who is acting, beside what they hold: a person, or a token. The table carries identity.
+export type Actor = { id: string; model: ActorModel };
 
-export type Permix = {
-  check: (resource: string, action: Action, id?: string, data?: unknown) => boolean;
-  setup: (
-    perms: PermissionEntry | PermissionEntry[],
-    options?: { replace?: boolean },
-  ) => Promise<void>;
-  setSuperadmin: (value: boolean) => void;
-  isSuperadmin: () => boolean;
-  setUserId: (id: UserId) => void;
-  getUserId: () => UserId | null;
-  getJSON: () => Record<string, Record<string, boolean>> | null;
-};
+export type ActionState = EngineActionState<Action>;
+export type PermissionEntry = EnginePermissionEntry<Action>;
+export type Permix = EnginePermix<Action, Actor>;
 
-export const createPermissions = (): Permix => {
-  const permix = createPermix<PermissionDefinition>();
-  let isSuperadmin = false;
-  let userId: UserId | null = null;
-  let accumulated: PermixRules<PermissionDefinition> = {};
-
-  return {
-    check: (resource, action, id, data) => {
-      if (isSuperadmin) return true;
-      const key = id ? `${resource}:${id}` : resource;
-      return permix.check(key, action, data);
-    },
-    setup: async (perms, options) => {
-      if (options?.replace) accumulated = {};
-
-      const entries = castArray(perms);
-      for (const { resource, id, actions } of entries) {
-        const key = id ? `${resource}:${id}` : resource;
-        accumulated[key] = { ...deniedActions, ...actions };
-      }
-      await permix.setup(accumulated);
-    },
-    setSuperadmin: (value) => {
-      isSuperadmin = value;
-    },
-    isSuperadmin: () => isSuperadmin,
-    setUserId: (id) => {
-      userId = id;
-    },
-    getUserId: () => userId,
-    getJSON: () => permix.dehydrate() as Record<string, Record<string, boolean>>,
-  };
-};
+export const createPermissions = (): Permix => createEnginePermissions<Action, Actor>();
