@@ -13,6 +13,7 @@ import {
   registerDbHook,
   syncRuleReferenceEdges,
 } from '@template/db';
+import type { RuleReferenceSourceModel } from '@template/db/generated/client/enums';
 import type { RuleReference } from '@template/shared/rules';
 import { castArray, compact, isEqual, keyBy } from 'lodash-es';
 import {
@@ -59,35 +60,35 @@ const touchedRows = (
   );
 };
 
-/**
- * Makes each source's edges match its rule, from the rows as written. With a pre-image (a save),
- * the rule columns that changed are checked first; without one (a revive), nothing is.
- */
-export const syncRuleReferences = async (
-  model: string,
-  rows: HookRow[],
-  previous?: HookRow[],
-): Promise<void> => {
+/** Makes each source's edges match the rule in its row as written. Mirrors only; never refuses. */
+export const syncRuleReferences = async (model: string, rows: HookRow[]): Promise<void> => {
   if (!isRuleReferenceSourceModel(model)) return;
   const surface = RULE_REFERENCE_SURFACES[model];
-  const before = keyBy(previous ?? [], 'id');
   for (const row of rowsOf(rows)) {
-    const { references, judged } =
-      row.deletedAt == null
-        ? await surface.read(
-            row,
-            previous ? changedColumns(row, before[row.id], surface.columns) : [],
-          )
-        : UNREFERENCED;
-    if (previous) {
-      const [unchecked] = judged.dynamic;
-      if (unchecked)
-        throw new RuleReferenceError(
-          `rule names a ${unchecked.model} by a value read at evaluation (${unchecked.path}); name it by id`,
-        );
-      await assertRuleReferencesExist(judged.scopes, judged.references);
-    }
+    const { references } = row.deletedAt == null ? await surface.read(row, []) : UNREFERENCED;
     await syncRuleReferenceEdges({ model, id: row.id }, references);
+  }
+};
+
+const assertChangedRuleReferencesExist = async (
+  model: RuleReferenceSourceModel,
+  rows: SourceRow[],
+  previous: SourceRow[],
+): Promise<void> => {
+  const surface = RULE_REFERENCE_SURFACES[model];
+  const before = keyBy(previous, 'id');
+  for (const row of rows) {
+    if (row.deletedAt != null) continue;
+    const { judged } = await surface.read(
+      row,
+      changedColumns(row, before[row.id], surface.columns),
+    );
+    const [unchecked] = judged.dynamic;
+    if (unchecked)
+      throw new RuleReferenceError(
+        `rule names a ${unchecked.model} by a value read at evaluation (${unchecked.path}); name it by id`,
+      );
+    await assertRuleReferencesExist(judged.scopes, judged.references);
   }
 };
 
@@ -115,7 +116,9 @@ export const registerRuleReferenceHook = () => {
     async ({ model, previous, result }: HookOptions) => {
       if (!isRuleReferenceSourceModel(model)) return;
       const touched = touchedRows(previous, result, RULE_REFERENCE_SURFACES[model].columns);
-      if (touched.length) await syncRuleReferences(model, touched, rowsOf(previous));
+      if (!touched.length) return;
+      await assertChangedRuleReferencesExist(model, touched, rowsOf(previous));
+      await syncRuleReferences(model, touched);
     },
   );
 };

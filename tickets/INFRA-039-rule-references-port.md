@@ -84,11 +84,13 @@ template level with it.
 
 `apps/api/src/hooks/ruleReference/` (edge code only):
 - `RULE_REFERENCE_SURFACES` / `isRuleReferenceSourceModel`: the declaration table.
-- `syncRuleReferences(model, rows, previous?)`: syncs each source's edges from the rows as
-  written, with no re-read. With a pre-image (a save) it first runs `assertRuleReferencesExist` on
-  the changed rule columns. Writes to a declared model return full rows: the
-  `ruleReference:fullRows` before-hook refuses `select` or `omit` on them.
-- `registerRuleReferenceHook()`: the after-hook over the declared models.
+- `syncRuleReferences(model, rows)`: makes each source's edges match the rule in its row as
+  written, with no re-read. It only mirrors and has no mode. Writes to a declared model return
+  full rows: the `ruleReference:fullRows` before-hook refuses `select` or `omit` on them.
+- `registerRuleReferenceHook()`: the full-rows guard plus the after-hook. When a write changed
+  a rule column (compared with the pre-image), the after-hook runs `assertRuleReferencesExist` on
+  that column's references, then `syncRuleReferences`. Revive calls `syncRuleReferences`
+  directly.
 - `registerRuleReferenceTargetHook()`: copies a target's delete or restore onto its edges.
 
 Segment and email callers:
