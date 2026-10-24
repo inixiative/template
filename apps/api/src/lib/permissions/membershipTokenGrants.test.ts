@@ -11,6 +11,7 @@ import {
   createToken,
 } from '@template/db/test';
 import { tokenAuthMiddleware } from '#/middleware/auth/tokenAuthMiddleware';
+import { meRouter } from '#/modules/me';
 import { createTestApp } from '#tests/createTestApp';
 
 const mintKey = () => {
@@ -29,6 +30,7 @@ const { app: tokenApp } = createTestApp({
     (app) => {
       app.use('*', tokenAuthMiddleware);
       app.get('/grants', (c) => c.json(c.get('permix').getJSON()));
+      app.route('/api/v1/me', meRouter);
     },
   ],
 });
@@ -99,5 +101,27 @@ describe('a membership token holds its membership and knows who it is, never the
       [`db:user:${context.user.id}`]: ['user.identify'],
       [`db:space:${space.id}`]: ['read'],
     });
+  });
+
+  it("a SpaceUser token's context carries its space seat and no organization seat", async () => {
+    const { context } = await createOrganizationUser({ role: 'owner' }, { organization });
+    const { entity: spaceUser } = await createSpaceUser({ role: 'member' }, { ...context, space });
+    const { rawKey, fields } = mintKey();
+    await createToken({ ownerModel: 'SpaceUser', role: 'member', ...fields }, { spaceUser });
+
+    const response = await tokenApp.request('/api/v1/me', {
+      headers: { authorization: `Bearer ${rawKey}` },
+    });
+    expect(response.status).toBe(200);
+    const { data } = (await response.json()) as {
+      data: {
+        organizationUsers: unknown[];
+        organizations: unknown[];
+        spaceUsers: { id: string }[];
+      };
+    };
+    expect(data.spaceUsers.map((seat) => seat.id)).toEqual([spaceUser.id]);
+    expect(data.organizationUsers).toEqual([]);
+    expect(data.organizations).toEqual([]);
   });
 });
