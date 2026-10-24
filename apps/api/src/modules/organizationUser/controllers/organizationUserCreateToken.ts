@@ -4,6 +4,7 @@
  * @partOf feature:tenancy
  * @uses primitive:authz, primitive:routeTemplates, feature:auth
  */
+import { hydrate } from '@template/db';
 import { roleToStandardAction } from '@template/permissions';
 import { check, rebacSchema } from '@template/permissions/rebac';
 import { getResource } from '#/lib/context/getResource';
@@ -19,7 +20,13 @@ export const organizationUserCreateTokenController = makeController(
     const orgUser = getResource<'organizationUser'>(c);
     const body = c.req.valid('json');
 
-    const checkLeave = check(permix, rebacSchema, 'organizationUser', orgUser, 'leave');
+    const checkLeave = check(
+      permix,
+      rebacSchema,
+      'organizationUser',
+      await hydrate('organizationUser', orgUser),
+      'leave',
+    );
     // Option A: User can create tokens at or below their own role level
     const checkOrg = check(
       permix,

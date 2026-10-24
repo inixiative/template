@@ -22,6 +22,7 @@ const PERSON_ONLY = new Set([
   'organizationDelete',
   'tokenDelete',
   'meRotateJwts',
+  'meRedact',
 ]);
 
 const expectedSchemes = (path: string, operationId: string | undefined): string[] => {

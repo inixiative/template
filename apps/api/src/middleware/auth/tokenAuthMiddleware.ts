@@ -125,17 +125,18 @@ const authenticateToken = async (c: Context<AppEnv>): Promise<void> => {
       spaces: [],
     });
   } else if (token.ownerModel === 'SpaceUser' && token.spaceUser) {
+    // The token is the space seat's: the organization above it is not its context.
     const {
       user: spaceUserUser,
-      organization,
-      organizationUser,
+      organization: _organization,
+      organizationUser: _organizationUser,
       space,
       ...spaceUserFields
     } = token.spaceUser;
     await setUserContext(c, {
       ...spaceUserUser,
-      organizationUsers: [organizationUser],
-      organizations: [organization],
+      organizationUsers: [],
+      organizations: [],
       spaceUsers: [spaceUserFields],
       spaces: [space],
     });

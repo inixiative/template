@@ -83,7 +83,7 @@ resourceContextMiddleware (per-route)
   - Enforces 404 (0 results) or 409 (>1 results)
   - Sets resource, resourceType
     ↓
-Validation middleware (validatePermission, validateNotToken, etc.)
+Validation middleware (validatePermission, validateSelfPermission, etc.)
     ↓
 Route handler
   - Access context via getters
@@ -215,7 +215,7 @@ export const setUserContext = async (c: Context<AppEnv>, userWithOrgs: UserWithO
 
   // Set up permissions
   const permix = c.get('permix');
-  permix.setUserId(user.id);
+  permix.setActor({ id: user.id, model: ActorModel.User });
   if (isSuperadmin(user)) permix.setSuperadmin(true);
   await setupUserPermissions(c);
   await setupOrgPermissions(c);

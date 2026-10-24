@@ -84,6 +84,7 @@ const { app: tokenApp } = createTestApp({
         c.json({
           tokenId: c.get('token')?.id ?? null,
           organizationUsers: c.get('organizationUsers') ?? [],
+          spaceUsers: c.get('spaceUsers') ?? [],
           spaces: c.get('spaces') ?? [],
         }),
       );
@@ -199,14 +200,20 @@ describe('a SpaceUser token follows its membership, not the cached token', () =>
     expect((await rename(spacePath, headers)).status).toBe(403);
   });
 
-  it("the space token's context holds the membership rows, not their relations", async () => {
+  it("the space token's context holds its space seat without relations, and no organization seat", async () => {
     const { spaceUser } = await spaceMember('owner');
     const response = await tokenApp.request('/echo', { headers: await spaceUserToken(spaceUser) });
-    const context = (await response.json()) as { organizationUsers: object[]; spaces: object[] };
+    const context = (await response.json()) as {
+      organizationUsers: object[];
+      spaceUsers: object[];
+      spaces: object[];
+    };
 
-    expect(context.organizationUsers).toHaveLength(1);
-    expect(context.organizationUsers[0]).not.toHaveProperty('user');
-    expect(context.organizationUsers[0]).not.toHaveProperty('organization');
+    expect(context.organizationUsers).toHaveLength(0);
+    expect(context.spaceUsers).toHaveLength(1);
+    expect(context.spaceUsers[0]).not.toHaveProperty('user');
+    expect(context.spaceUsers[0]).not.toHaveProperty('organization');
+    expect(context.spaceUsers[0]).not.toHaveProperty('space');
     expect(context.spaces).toHaveLength(1);
     expect(context.spaces[0]).not.toHaveProperty('organization');
   });

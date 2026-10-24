@@ -6,7 +6,7 @@
  */
 import type { OrganizationId, SpaceId, UserId } from '@template/db';
 import type { Role } from '@template/db/generated/client/enums';
-import { createPermissions, type Entitlements } from '@template/permissions/client';
+import { ActorModel, createPermissions, type Entitlements } from '@template/permissions/client';
 import { check as rebacCheck } from '@template/permissions/rebac/check';
 import { rebacSchema } from '@template/permissions/rebac/schema';
 import { getOrgPermissions } from '@template/permissions/roles/organization';
@@ -43,7 +43,7 @@ export const createPermissionsSlice: StateCreator<AppStore, [], [], PermissionsS
       },
       setup: async (me: UserWithRelations) => {
         const { permix } = get().permissions;
-        permix.setUserId(me.id as UserId);
+        permix.setActor({ id: me.id, model: ActorModel.User });
         if (isSuperadmin(me)) {
           permix.setSuperadmin(true);
           return;

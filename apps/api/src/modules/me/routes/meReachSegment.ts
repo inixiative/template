@@ -5,6 +5,7 @@
  * @uses primitive:routeTemplates, feature:segment
  */
 import { actionRoute } from '#/lib/routeTemplates';
+import { validateSelfPermission } from '#/middleware/validations/validateSelfPermission';
 import { Modules } from '#/modules/modules';
 import {
   segmentReachBodySchema,
@@ -14,6 +15,7 @@ import { Tags } from '#/modules/tags';
 
 export const meReachSegmentRoute = actionRoute({
   model: Modules.me,
+  middleware: [validateSelfPermission('operate')],
   submodel: Modules.segment,
   action: 'reach',
   skipId: true,

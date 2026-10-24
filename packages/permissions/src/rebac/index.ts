@@ -6,5 +6,4 @@ export type {
   RelationCheck,
   ResourcePermission,
   RuleCheck,
-  SelfCheck,
 } from './types';

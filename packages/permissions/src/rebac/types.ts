@@ -8,10 +8,10 @@ import type { RebacSchema as EngineRebacSchema } from '@inixiative/permissions';
 
 export type {
   ActionRule,
+  ActorCheck,
   RelationCheck,
   ResourcePermission,
   RuleCheck,
-  SelfCheck,
 } from '@inixiative/permissions';
 
 export type RebacSchema = EngineRebacSchema;

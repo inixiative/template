@@ -4,12 +4,14 @@
  * @partOf feature:tenancy
  * @uses primitive:routeTemplates
  */
+
+import { SessionAction } from '@template/permissions/client';
 import { deleteRoute } from '#/lib/routeTemplates';
-import { validateNotToken } from '#/middleware/validations/validateNotToken';
 import { validatePermission } from '#/middleware/validations/validatePermission';
+import { validateSelfPermission } from '#/middleware/validations/validateSelfPermission';
 import { Modules } from '#/modules/modules';
 
 export const organizationDeleteRoute = deleteRoute({
   model: Modules.organization,
-  middleware: [validateNotToken, validatePermission('own')],
+  middleware: [validateSelfPermission(SessionAction.deleteOrganization), validatePermission('own')],
 });

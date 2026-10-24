@@ -21,7 +21,7 @@ export const spaceUserCreateTokenController = makeController(
     const body = c.req.valid('json');
 
     const hydrated = await hydrate('spaceUser', spaceUser);
-    const checkLeave = check(permix, rebacSchema, 'spaceUser', spaceUser, 'leave');
+    const checkLeave = check(permix, rebacSchema, 'spaceUser', hydrated, 'leave');
     // Option A: User can create tokens at or below their own role level
     const space = hydrated.space as HydratedRecord;
     const checkSpace = check(permix, rebacSchema, 'space', space, roleToStandardAction(body.role));

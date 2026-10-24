@@ -20,7 +20,7 @@
   - [setupOrgContext](#setuporgcontext)
   - [setupUserContext](#setupusercontext)
   - [setupSpacePermissions](#setupspacepermissions)
-  - [Token Permission Restriction](#token-permission-restriction)
+  - [A Credential Never Exceeds Its Holder](#a-credential-never-exceeds-its-holder)
   - [Role Validation](#role-validation)
 - [Permission Checks](#permission-checks)
   - [In Controllers](#in-controllers)
@@ -28,7 +28,6 @@
     - [Resource Lookup Runs Before Authorization](#resource-lookup-runs-before-authorization)
 - [Entitlements](#entitlements)
   - [How Entitlements Are Applied](#how-entitlements-are-applied)
-  - [Intersecting Entitlements](#intersecting-entitlements)
 - [REBAC](#rebac)
   - [Schema](#schema)
   - [ActionRule Types](#actionrule-types)
@@ -49,7 +48,7 @@
 - [Validation Middleware](#validation-middleware)
   - [validatePermission](#validatepermission)
   - [validateOwnerPermission](#validateownerpermission)
-  - [validateNotToken](#validatenottoken)
+  - [validateSelfPermission](#validateselfpermission)
 - [Role Assignment](#role-assignment)
   - [Role Assignment Rules](#role-assignment-rules)
 - [Token Permissions](#token-permissions)
@@ -115,9 +114,8 @@ export const roleHierarchy = ['viewer', 'member', 'admin', 'owner'] as const;
 ```
 
 Higher index = more permissions. Used for:
-- `lesserRole(a, b)` - Returns the lower of two roles
 - `greaterRole(a, b)` - Returns the higher of two roles
-- Token permission restriction (token can't exceed user's role)
+- `narrowing(...)` - a token's role claims every action at or below it ([A Credential Never Exceeds Its Holder](#a-credential-never-exceeds-its-holder))
 
 ---
 
@@ -134,6 +132,34 @@ export const StandardAction = {
   own: 'own',         // Full control, delete, transfer ownership
 } as const;
 ```
+
+### Session Actions
+
+Actions on the person's own account sit on `db:user` beside the standard four, and every route that acts as the person names one (`validateSelfPermission`, below):
+
+```typescript
+// packages/permissions/src/client.ts
+export const SessionAction = {
+  createToken: 'token.create',              // every token create route
+  deleteToken: 'token.delete',              // tokenDelete
+  redactUser: 'user.redact',                // meRedact
+  rotateUserJwts: 'user.rotateJwts',        // meRotateJwts
+  deleteOrganization: 'organization.delete', // organizationDelete, with `own` on the organization
+} as const;
+
+export const UserAction = {
+  ...StandardAction,
+  ...SessionAction,
+  identify: 'user.identify',               // meRead: who am I
+  createOrganization: 'organization.create', // organizationCreate
+};
+```
+
+The schema maps each to a standard action: `'user.identify': 'read'`, `'organization.create': 'operate'`. The five session actions are person-only, written as `{ all: [{ actor: model equals User }, 'operate' | 'own'] }`, so a token holding `own` on its user still cannot mint, delete tokens, redact, rotate or delete an organization. A superadmin passes on any credential. `personOnlyActions` lists them for OpenAPI, where their operations publish `userJwt` alone.
+
+### The Actor
+
+The table says what a principal holds. The actor says only who is acting: `permix.setActor({ id, model })`, with `model` `User` for a person and `Token` for any API token. Identity never comes from the actor; acting on your own row is `{ rel: 'user', action }`, a walk to your own user entry. The actor exists for the `{ actor }` arm, which reads it as a json-rules condition. With nobody acting, an actor arm denies and the table still answers everything else.
 
 ### Role → Action Mapping
 
@@ -254,82 +280,59 @@ export async function setupUserContext(permix: Permix, params: {
 
 ### setupSpacePermissions
 
-Called by auth middleware to set space permissions. Located in `apps/api/src/lib/permissions/setupSpacePermissions.ts`.
+Installs a space grant per SpaceUser seat, or, for a token, the token's claim on the seats it holds, owned by the holder's table (the seats plus the person's organization seats, since a space walks to its organization):
 
 ```typescript
+// apps/api/src/lib/permissions/setupSpacePermissions.ts
 export const setupSpacePermissions = async (c: Context<AppEnv>) => {
   const permix = c.get('permix');
   const token = c.get('token');
   const spaceUsers = c.get('spaceUsers');
 
-  // Space token → single space, token permissions only
+  // A space's own token: the space holds everything on itself, so the role stands.
   if (token?.ownerModel === 'Space' && token.spaceId) {
-    await setupSpaceContext(permix, { role, spaceId, entitlements });
+    await permix.setup(getSpacePermissions(token.role, token.spaceId, token.entitlements));
     return;
   }
 
-  // SpaceUser token → single space, lesser of spaceUser + token
-  if (token?.ownerModel === 'SpaceUser' && token.spaceId) {
-    const spaceUser = spaceUsers?.find((su) => su.spaceId === token.spaceId);
-    if (spaceUser) {
-      await setupSpaceContext(permix, {
-        role: lesserRole(spaceUser.role, token.role),
-        spaceId,
-        entitlements: intersectEntitlements(spaceUser.entitlements, token.entitlements),
-      });
-    }
+  if (!spaceUsers?.length) return;
+  const seats = spaceUsers.map((su) => getSpacePermissions(su.role, su.spaceId, su.entitlements));
+
+  if (!token) {
+    await permix.setup(seats);
     return;
   }
 
-  // Person JWT or User token → all spaces the user belongs to
-  for (const spaceUser of spaceUsers ?? []) {
-    const role = token ? lesserRole(spaceUser.role, token.role) : spaceUser.role;
-    await setupSpaceContext(permix, { role, spaceId: spaceUser.spaceId, entitlements });
-  }
+  // A SpaceUser token narrows that one seat; a User token narrows every seat the person holds.
+  const held = token.ownerModel === 'SpaceUser'
+    ? spaceUsers.filter((su) => su.spaceId === token.spaceId)
+    : spaceUsers;
+  const owner = createPermissions();
+  await owner.setup([...seats, ...organizationSeats]);
+  await permix.setup(
+    held.map((su) => narrowing('db:space', su.spaceId, token.role, token.entitlements, su.entitlements)),
+    { owner },
+  );
 };
 ```
 
-### Token Permission Restriction
+### A Credential Never Exceeds Its Holder
 
-Tokens have their own `role` field that restricts permissions below the user's actual role. This applies to both org and user contexts.
-
-```typescript
-// Token schema (simplified)
-{
-  role: Role,    // 'owner' | 'admin' | 'member' | 'viewer'
-  entitlements: Entitlements // Optional custom grants
-}
-```
-
-**Organization context** - token restricts per-org role:
+A token has its own `role` and `entitlements`, and they are a claim, not a grant. The installers (`setupUserPermissions`, `setupOrgPermissions`, `setupSpacePermissions`) build the holder's table and install the token's claim as entitlements owned by it:
 
 ```typescript
 // apps/api/src/lib/permissions/setupOrgPermissions.ts
-for (const orgUser of orgUsers) {
-  const role = token
-    ? lesserRole(orgUser.role, token.role)  // Token can't exceed user's role
-    : orgUser.role;
-  const entitlements = token
-    ? intersectEntitlements(orgUser.entitlements, token.entitlements)
-    : orgUser.entitlements;
-
-  await setupOrgContext(permix, { role, orgId, entitlements });
-}
+const owner = createPermissions();
+await owner.setup(seats);                          // the person's organization seats, as grants
+await permix.setup(
+  held.map((orgUser) =>
+    narrowing('db:organization', orgUser.organizationId, token.role, token.entitlements, orgUser.entitlements),
+  ),
+  { owner },
+);
 ```
 
-**User context** - token restricts what user can do to themselves:
-
-```typescript
-// apps/api/src/lib/permissions/setupUserPermissions.ts
-const role = token?.role ?? 'owner';  // Default: full control
-const entitlements = token
-  ? intersectEntitlements(user.entitlements, token.entitlements)
-  : user.entitlements;
-
-await setupUserContext(permix, { user, role, entitlements });
-```
-
-A read-only token (`role: 'viewer'`) can't modify user profile even though the user owns it.
+`narrowing` (`packages/permissions/src/roles/narrowing.ts`) claims every action at or below the token's role plus whatever its entitlements name; with no entitlements of its own it names the seat's. At check time the engine consults the claim only after the token's own table and the schema both miss, and it holds only if the owner's table, walked from that record through the normal schema, allows the action. So a viewer's token naming `{ manage: true }` reads the organization and does not manage it, an admin's owner-role token manages and does not own, and a space is reached exactly as far as the seat reaches its organization. Nothing is intersected ahead of time; the cap is live. A User token is a narrowing of the person on every seat; an OrganizationUser or SpaceUser token of that one seat; an Organization or Space token holds its role outright, since the organization holds everything on itself. Situations: `apps/api/src/lib/permissions/tokenNeverExceedsHolder.test.ts`.
 
 ### Role Validation
 
@@ -384,7 +387,7 @@ if (!permix.check('organization', 'manage', orgId)) {
 
 ### Via Validation Middleware
 
-Authentication gates run first: `validateUser` (needs `c.get('user')`) or `validateActor` (needs `getActor(c).user`; Organization and Space tokens carry no user and fail both). Which to pick: [AUTH.md](./AUTH.md#choosing-between-validateuser-and-validateactor).
+Authentication gates run first: `validateUser` (needs `c.get('user')`) or `validateActor` (needs `getActor(c).user`; Organization and Space tokens carry no user and fail both). Which to pick: [AUTH.md](./AUTH.md#choosing-between-validateuser-and-validateactor). A route that loads no resource and acts as the person checks its action on the user with `validateSelfPermission` ([below](#validateselfpermission)).
 
 The template uses a unified `validatePermission` middleware that leverages ReBAC for permission checks:
 
@@ -444,25 +447,7 @@ export function getOrgPermissions(role, orgId, entitlements): PermissionEntry {
 }
 ```
 
-**Override behavior**: Allow override means a viewer with `{ manage: true }` entitlement CAN manage. Alternative would be deny override where role caps permissions.
-
-| Strategy | Viewer + `{ manage: true }` | Use Case |
-|----------|----------------------------|----------|
-| Allow override (current) | Can manage | Grant specific powers to limited roles |
-| Deny override | Cannot manage | Role is hard ceiling |
-
-### Intersecting Entitlements
-
-When a token has entitlements, they're intersected with user's entitlements:
-
-```typescript
-// Only keys true in BOTH are kept
-intersectEntitlements(
-  { canExport: true, canInvite: true },
-  { canExport: true, canInvite: false }
-);
-// Result: { canExport: true }
-```
+**Override behavior**: Allow override means a viewer with `{ manage: true }` entitlement CAN manage. The role is not a ceiling on the seat itself; the ceiling is the holder, above ([A Credential Never Exceeds Its Holder](#a-credential-never-exceeds-its-holder)): a token naming `{ manage: true }` on a viewer's seat holds nothing the viewer does not.
 
 ---
 
@@ -518,8 +503,8 @@ export const rebacSchema: RebacSchema = {
 
   organizationUser: {
     actions: {
-      read: { any: [{ self: 'userId' }, { rel: 'organization', action: 'read' }] },
-      leave: { self: 'userId' },  // Users can leave orgs themselves
+      read: { any: [{ rel: 'user', action: 'read' }, { rel: 'organization', action: 'read' }] },
+      leave: { rel: 'user', action: 'operate' },  // the person, holding operate on their own user
       manage: { rel: 'organization', action: 'manage' },
       own: { rel: 'organization', action: 'own' },
     },
@@ -527,8 +512,8 @@ export const rebacSchema: RebacSchema = {
 
   spaceUser: {
     actions: {
-      read: { any: [{ self: 'userId' }, { rel: 'space', action: 'read' }] },
-      leave: { self: 'userId' },  // Users can leave spaces themselves
+      read: { any: [{ rel: 'user', action: 'read' }, { rel: 'space', action: 'read' }] },
+      leave: { rel: 'user', action: 'operate' },
       manage: { rel: 'space', action: 'manage' },
       own: { rel: 'space', action: 'own' },
     },
@@ -536,7 +521,7 @@ export const rebacSchema: RebacSchema = {
 
   token: {
     actions: {
-      leave: { self: 'userId' },  // Users can delete their own tokens
+      leave: { rel: 'user', action: 'operate' },  // the person deletes their own tokens
     },
   },
 
@@ -551,10 +536,10 @@ export const rebacSchema: RebacSchema = {
       // Source or target can read their own inquiry
       read: {
         any: [
-          { self: 'sourceUserId' },
+          { rel: 'sourceUser', action: 'read' },
           { rel: 'sourceOrganization', action: 'manage' },
           { rel: 'sourceSpace', action: 'manage' },
-          { self: 'targetUserId' },
+          { rel: 'targetUser', action: 'read' },
           { rel: 'targetOrganization', action: 'manage' },
           { rel: 'targetSpace', action: 'manage' },
         ],
@@ -565,7 +550,7 @@ export const rebacSchema: RebacSchema = {
         any: [
           // Source user can act on their own inquiry (cancel, edit, re-send)
           // Add type strings here when user-sourced inquiry types exist
-          { all: [{ rule: { field: 'type', operator: 'in', value: [] } }, { self: 'sourceUserId' }] },
+          { all: [{ rule: { field: 'type', operator: 'in', value: [] } }, { rel: 'sourceUser', action: 'operate' }] },
           // inviteOrganizationUser: high roles require own
           { all: [{ rule: { field: 'type', operator: 'in', value: ['inviteOrganizationUser'] } }, { rule: { field: 'content.role', operator: 'in', value: highRoles } }, { rel: 'sourceOrganization', action: 'own' }] },
           // inviteOrganizationUser: normal roles require manage
@@ -582,7 +567,7 @@ export const rebacSchema: RebacSchema = {
       // Resolve: target decides (approve/deny/requestChanges)
       resolve: {
         any: [
-          { self: 'targetUserId' },
+          { rel: 'targetUser', action: 'operate' },
           // transferSpace — target org owner only
           { all: [{ rule: { field: 'type', operator: 'in', value: ['transferSpace'] } }, { rel: 'targetOrganization', action: 'own' }] },
           // all other types — target org manager
@@ -601,11 +586,12 @@ export const rebacSchema: RebacSchema = {
 |------|---------|---------|
 | `string` | Inherit action from same resource | `manage: 'own'` → check `own` on same resource |
 | `{ rel, action }` | Delegate to related resource (supports dot-path) | `{ rel: 'organization', action: 'own' }` |
-| `{ self: field }` | Current user owns the record | `{ self: 'userId' }` → user.id === record.userId |
 | `{ rule: Condition }` | JSON rule condition | `{ rule: { field: 'role', operator: 'in', value: ['owner'] } }` |
-| `{ any: ActionRule[] }` | At least one must pass | `{ any: [{ self: 'userId' }, 'read'] }` |
+| `{ any: ActionRule[] }` | At least one must pass | `{ any: [{ rel: 'user', action: 'read' }, 'read'] }` |
 | `{ all: ActionRule[] }` | All must pass | `{ all: [{ rule: ... }, 'own'] }` |
 | `null` | Always false (terminal) | `own: null` |
+
+There is no `self` arm. Acting on your own record is a walk to your own user: `{ rel: 'user', action: 'operate' }` passes when the record's `user` is the acting user **and** the credential holds `operate` on that user row. Identity lives in the permix table (a principal holds grants only on its own user row), so the walk carries both who you are and what you hold; a credential narrowed to `read` on its user cannot leave, delete a sibling token or accept an invite on identity alone. The record must arrive with `user` hydrated; a bare foreign key is denied, never guessed (`principals.test.ts`).
 
 ### How It Works
 
@@ -711,7 +697,7 @@ export const contactCreateBodySchema = ContactScalarInputSchema.omit({ ... }).ex
 });
 ```
 
-The schema validates the recursive `ActionRule` envelope (delegations, `{ rel, action }`, `{ self }`, `{ rule }`, `{ any }`, `{ all }`) but passes the inner json-rules `Condition` through as `unknown` — runtime `check()` validates it when the rule fires.
+The schema validates the recursive `ActionRule` envelope (delegations, `{ rel, action }`, `{ rule }`, `{ any }`, `{ all }`) but passes the inner json-rules `Condition` through as `unknown` — runtime `check()` validates it when the rule fires.
 
 ### When to use it
 
@@ -835,33 +821,21 @@ middleware: [validateOwnerPermission({ action: 'manage' })]
 middleware: [validateOwnerPermission({ action: 'read' })]
 ```
 
-### validateNotToken
+### validateSelfPermission
 
-Blocks token-based auth for sensitive operations. Person-only: a person's JWT holds these actions, an API token does not.
-
-```typescript
-// Tokens cannot: create other tokens, delete orgs, delete themselves (a superadmin's token can)
-export const validateNotToken = async (c, next) => {
-  if (!c.get('user')) throw makeError({ status: 401, message: 'Authentication required' });
-  if (c.get('token') && !isSuperadmin(c)) {
-    throw makeError({ status: 403, message: 'Tokens cannot perform this action' });
-  }
-  await next();
-};
-```
-
-Usage:
+Checks an action on the current user's own `db:user` entry. It is the rail for every route that acts as the person: `/me/*`, `organizationCreate`, and the session actions.
 
 ```typescript
-// tokenDelete.ts - prevent token from deleting itself
-middleware: [validateNotToken, validateOwnerPermission({ action: 'manage' })]
+import { validateSelfPermission } from '#/middleware/validations/validateSelfPermission';
 
-// meCreateToken.ts - only a person (JWT) can create tokens
-middleware: [validateNotToken]
-
-// organizationDelete.ts - destructive action requires the person
-middleware: [validateNotToken, validatePermission('own')]
+middleware: [validateSelfPermission(UserAction.identify)]                 // meRead
+middleware: [validateSelfPermission('read')]                              // every meReadMany*
+middleware: [validateSelfPermission('operate')]                           // every meCreate*, meReachSegment
+middleware: [validateSelfPermission(SessionAction.createToken)]           // meCreateToken and the four owner token routes
+middleware: [validateSelfPermission(SessionAction.deleteOrganization), validatePermission('own')] // organizationDelete
 ```
+
+401 without a user, 403 when the user entry lacks the action. "A token can't do this" is not a middleware any more: it is the action's rule. A viewer User token reads the person and creates nothing; a member token creates; no token holds a person-only action; an OrganizationUser or SpaceUser token holds only `user.identify` on its user, so it answers `GET /me` and nothing else there; Organization and Space tokens have no user and stop at `validateUser`. `securityForRoute` reads the action off the middleware (`selfAction`) and publishes `userJwt` alone when it is person-only. Situations: `apps/api/src/middleware/validations/validateSelfPermission.test.ts`.
 
 ---
 
@@ -915,7 +889,7 @@ The ReBAC schema allows users to delete their own tokens via `leave`:
 ```typescript
 token: {
   actions: {
-    leave: { self: 'userId' },  // User can delete if token.userId === user.id
+    leave: { rel: 'user', action: 'operate' },  // the person, holding operate on their own user
   },
 },
 ```

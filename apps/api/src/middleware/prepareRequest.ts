@@ -5,8 +5,7 @@
  * @uses primitive:batch
  */
 import { db } from '@template/db';
-import type { UserId } from '@template/db/typedModelIds';
-import { createPermissions } from '@template/permissions';
+import { ActorModel, createPermissions } from '@template/permissions';
 import { logScope, withLogContext } from '@template/shared/logger';
 import type { Context, Next } from 'hono';
 import { isSuperadmin } from '#/lib/context/isSuperadmin';
@@ -54,7 +53,10 @@ export const prepareRequest = async (c: Context<AppEnv>, next: Next) => {
     const user = batchContext.baseContext.get('user');
     if (user) {
       const permix = c.get('permix');
-      permix.setUserId(user.id as UserId);
+      const token = c.get('token');
+      permix.setActor(
+        token ? { id: token.id, model: ActorModel.Token } : { id: user.id, model: ActorModel.User },
+      );
       if (isSuperadmin(c)) permix.setSuperadmin(true);
 
       await setupUserPermissions(c);
