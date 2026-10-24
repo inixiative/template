@@ -12,6 +12,7 @@ export {
   type ManyAction,
   registerDbHook,
   type SingleAction,
+  snapshotHookRegistry,
   unregisterDbHook,
 } from './extensions/hookRegistry';
 // Prisma namespace for advanced types (Prisma.UserWhereInput, etc.)

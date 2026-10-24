@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db, withMaterializedIds } from '@template/db';
+import { db, snapshotHookRegistry, withMaterializedIds } from '@template/db';
 import type { EmailComponent, Tag } from '@template/db/generated/client/client';
 import { cleanupTouchedTables, createEmailComponent, createTag } from '@template/db/test';
 import { registerImmutableFieldsHook } from '#/hooks/immutableFields/hook';
@@ -9,8 +9,10 @@ describe('materialized ids on a false-polymorphic axis', () => {
   let component: EmailComponent;
   let tag: Tag;
   let other: Tag;
+  let restoreHooks: () => void;
 
   beforeAll(async () => {
+    restoreHooks = snapshotHookRegistry();
     registerRulesHook();
     registerImmutableFieldsHook();
     component = (await createEmailComponent()).entity;
@@ -19,7 +21,7 @@ describe('materialized ids on a false-polymorphic axis', () => {
   });
 
   afterAll(async () => {
-    clearHookRegistry();
+    restoreHooks();
     await cleanupTouchedTables(db);
   });
 
