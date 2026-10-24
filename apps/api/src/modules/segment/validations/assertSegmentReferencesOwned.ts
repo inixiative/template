@@ -5,9 +5,8 @@
  * @uses infrastructure:prisma
  */
 import type { Condition } from '@inixiative/json-rules';
-import { deadRuleReferences, ruleReferences } from '@template/db';
+import { assertRuleReferencesExist, ruleReferences } from '@template/db';
 import type { ProviderModel } from '@template/db/generated/client/enums';
-import { deadReferencesError } from '#/hooks/ruleReference/deadReferencesError';
 import {
   customerRefLens,
   resolvedCustomerRefLens,
@@ -26,8 +25,7 @@ export const assertSegmentReferencesOwned = async ({
   conditions,
 }: Candidate): Promise<void> => {
   const references = ruleReferences(customerRefLens, conditions);
-  const dead = await deadRuleReferences([
+  await assertRuleReferencesExist([
     { lens: resolvedCustomerRefLens(ownerModel, ownerId), references },
   ]);
-  if (dead.length) throw deadReferencesError(dead);
 };

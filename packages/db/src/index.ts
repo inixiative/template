@@ -123,11 +123,6 @@ export type { UserWithRelations } from './types/userWithRelations';
 export { UserWithRelationsSchema } from './types/userWithRelations';
 // SQL utilities
 export { aliasColumns } from './utils/aliasColumns';
-export {
-  type DeadRuleReference,
-  deadRuleReferences,
-  type ReferenceScope,
-} from './utils/deadRuleReferences';
 // Type-safe delegate helpers (pass-the-delegate pattern)
 export {
   type AnyCrudDelegate,
@@ -190,6 +185,12 @@ export {
 export { sourceQueryWhere } from './utils/sourceQueryWhere';
 export { type RuleReferenceSource, syncRuleReferenceEdges } from './utils/syncRuleReferenceEdges';
 export { type NodeContext, type NodeScope, walkWhere } from './utils/whereWalker';
+export { assertRuleReferencesExist } from './validations/assertRuleReferencesExist';
+export {
+  type DeadRuleReference,
+  deadRuleReferences,
+  type ReferenceScope,
+} from './validations/deadRuleReferences';
 export {
   type RuleValidation,
   type ValidateRuleForLensOptions,

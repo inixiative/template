@@ -19,9 +19,9 @@ import {
   createTagAttachment,
   createUser,
 } from '@template/db/test';
-import { deadRuleReferences } from '@template/db/utils/deadRuleReferences';
 import { sourceQueryValues } from '@template/db/utils/sourceQueryValues';
 import { sourceQueryWhere } from '@template/db/utils/sourceQueryWhere';
+import { deadRuleReferences } from '@template/db/validations/deadRuleReferences';
 
 const busyTags: LensNarrowing = {
   parent: lensFor('Tag'),

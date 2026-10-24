@@ -5,9 +5,9 @@
  * @uses feature:email, feature:segment
  */
 import {
+  assertRuleReferencesExist,
   DbAction,
   db,
-  deadRuleReferences,
   type HookOptions,
   HookTiming,
   RuleReferenceError,
@@ -17,7 +17,6 @@ import {
 import type { RuleReferenceSourceModel } from '@template/db/generated/client/enums';
 import type { RuleReference } from '@template/shared/rules';
 import { castArray, compact, isEqual, keyBy } from 'lodash-es';
-import { deadReferencesError } from '#/hooks/ruleReference/deadReferencesError';
 import {
   isRuleReferenceSourceModel,
   RULE_REFERENCE_SURFACES,
@@ -117,8 +116,7 @@ export const syncRuleReferences = async (
         throw new RuleReferenceError(
           `rule names a ${unchecked.model} by a value read at evaluation (${unchecked.path}); name it by id`,
         );
-      const dead = await deadRuleReferences(judged.scopes, judged.references);
-      if (dead.length) throw deadReferencesError(dead);
+      await assertRuleReferencesExist(judged.scopes, judged.references);
     }
     await syncRuleReferenceEdges({ model, id: row.id }, references);
   }

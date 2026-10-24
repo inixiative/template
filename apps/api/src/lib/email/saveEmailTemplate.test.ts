@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db } from '@template/db';
+import { clearHookRegistry, db, RuleReferenceError } from '@template/db';
 import type { Organization, Segment, Tag } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
@@ -140,7 +140,7 @@ describe('saveEmailTemplate — a rule may only name what its owner can see', ()
         mjml: mjml(taggedBlock(myTag.id)),
         ownerModel: 'default',
       }),
-    ).rejects.toMatchObject({ status: 422 });
+    ).rejects.toBeInstanceOf(RuleReferenceError);
   });
 });
 

@@ -770,7 +770,8 @@ edges are persisted so that "who references X" is an index and a stale rule is n
   pre-image, it first checks the changed columns: `deadRuleReferences` (`packages/db`) reads the
   rows they reference and reports each one that is soft-deleted, or absent from its scope's owner
   scope (the lens's id source), as `{ model, id, state: 'deleted' | 'missing' }`. Any such row
-  refuses the write with a 422 carrying that list in `details`. A column resent unchanged is not
+  refuses the write: `assertRuleReferencesExist` (`packages/db/src/validations`) throws a
+  `RuleReferenceError` carrying that list, which the API error handler answers as a 422 with `details`. A column resent unchanged is not
   checked, so a subject-only edit passes over a body naming a dead tag. That is how an Organization
   template cannot name another organization's tag or segment. Then it calls
   `syncRuleReferenceEdges(source, references)`, the one edge writer, which mirrors exactly what the
