@@ -15,6 +15,7 @@ import { registerRuleReferenceTargetHook } from '#/hooks/ruleReference/targetHoo
 import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
 import { evaluateSegment } from '#/modules/segment/services/evaluateSegment';
 import { withSegmentRuleIssues } from '#/modules/segment/services/withSegmentRuleIssues';
+import { deadReferencesOf } from '#tests/utils/deadReferences';
 
 const acmeRule = { field: 'customerUser.email', operator: Operator.endsWith, value: '@acme.test' };
 
@@ -209,20 +210,27 @@ describe('segment rule health — edge upkeep', () => {
     });
     expect(renamed.name).toBe('renamed');
 
-    await expect(
-      db.segment.update({
-        where: { id: dependent.id },
-        data: { conditions: { all: [membersOf(target.id), acmeRule] } },
-      }),
-    ).rejects.toThrow(`Segment '${target.name}' (deleted)`);
+    expect(
+      await deadReferencesOf(
+        db.segment.update({
+          where: { id: dependent.id },
+          data: { conditions: { all: [membersOf(target.id), acmeRule] } },
+        }),
+      ),
+    ).toEqual([{ model: 'Segment', id: target.id, state: 'deleted' }]);
 
     const { entity: other } = await createSegment(
       { ownerModel: 'Space', conditions: acmeRule },
       { space },
     );
     await db.segment.update({ where: { id: other.id }, data: { deletedAt: new Date() } });
-    await expect(
-      db.segment.update({ where: { id: dependent.id }, data: { conditions: membersOf(other.id) } }),
-    ).rejects.toThrow(`Segment '${other.id}' (deleted)`);
+    expect(
+      await deadReferencesOf(
+        db.segment.update({
+          where: { id: dependent.id },
+          data: { conditions: membersOf(other.id) },
+        }),
+      ),
+    ).toEqual([{ model: 'Segment', id: other.id, state: 'deleted' }]);
   });
 });

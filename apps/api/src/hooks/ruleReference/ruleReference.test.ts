@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db, RuleReferenceError, ruleReferenceIssues } from '@template/db';
+import { clearHookRegistry, db, ruleReferenceIssues } from '@template/db';
 import {
   cleanupTouchedTables,
   createEmailComponent,
@@ -13,6 +13,7 @@ import { registerRuleReferenceHook } from '#/hooks/ruleReference/hook';
 import { registerRuleReferenceTargetHook } from '#/hooks/ruleReference/targetHook';
 import { registerRulesHook } from '#/hooks/rules/hook';
 import { saveEmailTemplate } from '#/lib/email/saveEmailTemplate';
+import { deadReferencesOf } from '#tests/utils/deadReferences';
 
 const mjml = (content: string) =>
   `<mjml><mj-body><mj-section><mj-column><mj-text>${content}</mj-text></mj-column></mj-section></mj-body></mjml>`;
@@ -178,16 +179,19 @@ describe('ruleReference — the save path writes edges, the target side stamps t
   });
 
   it('naming a row that does not exist is refused at save', async () => {
-    await expect(
-      save(mjml(taggedBlock('01900000-0000-7000-8000-000000000000'))),
-    ).rejects.toBeInstanceOf(RuleReferenceError);
+    const id = '01900000-0000-7000-8000-000000000000';
+    expect(await deadReferencesOf(save(mjml(taggedBlock(id))))).toEqual([
+      { model: 'Tag', id, state: 'missing' },
+    ]);
   });
 
   it('naming a soft-deleted row is refused at save', async () => {
     const { entity: tag } = await createTag();
     await db.tag.update({ where: { id: tag.id }, data: { deletedAt: new Date() } });
 
-    await expect(save(mjml(taggedBlock(tag.id)))).rejects.toBeInstanceOf(RuleReferenceError);
+    expect(await deadReferencesOf(save(mjml(taggedBlock(tag.id))))).toEqual([
+      { model: 'Tag', id: tag.id, state: 'deleted' },
+    ]);
   });
 
   it('a rule that reads the row from path names no checkable row: save refuses it', async () => {
@@ -261,14 +265,11 @@ describe('ruleReference — the save path writes edges, the target side stamps t
     });
     expect(edited.subject).toBe('Typo fixed');
 
-    await expect(
-      save(mjml(taggedBlock(tag.id, other.id)), { slug: 'edit', subject: 'Typo fixed' }),
-    ).rejects.toThrow(`Tag '${tag.name}' (deleted)`);
-  });
-
-  it('naming a row that never existed is refused as missing, by id', async () => {
-    const id = '01900000-0000-7000-8000-000000000000';
-    await expect(save(mjml(taggedBlock(id)))).rejects.toThrow(`Tag '${id}' (missing)`);
+    expect(
+      await deadReferencesOf(
+        save(mjml(taggedBlock(tag.id, other.id)), { slug: 'edit', subject: 'Typo fixed' }),
+      ),
+    ).toEqual([{ model: 'Tag', id: tag.id, state: 'deleted' }]);
   });
 
   it('a save that removes the dead reference removes its edge', async () => {

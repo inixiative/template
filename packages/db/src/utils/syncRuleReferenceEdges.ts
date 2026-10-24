@@ -7,20 +7,12 @@
 import { db } from '@template/db/client';
 import type { Prisma } from '@template/db/generated/client/client';
 import { resolveFalsePolymorphismRef } from '@template/db/registries/falsePolymorphism';
-import type { ReferenceScopes } from '@template/db/utils/admitRuleReferences';
 import { lockedTargetStates, type TargetState } from '@template/db/utils/lockedTargetStates';
 import type { ModelName } from '@template/db/utils/modelNames';
-import { RuleReferenceError } from '@template/db/utils/ruleReferenceError';
-import {
-  describeRuleReferenceRefusals,
-  ruleReferenceRefusals,
-} from '@template/db/utils/ruleReferenceRefusals';
 import { type RuleReference, referenceKey } from '@template/shared/rules';
 import { groupBy } from 'lodash-es';
 
 export type RuleReferenceSource = { model: ModelName; id: string };
-
-export type RuleReferenceGate = (ReferenceScopes & { references: RuleReference[] }) | 'rebuild';
 
 type Edge = {
   id: string;
@@ -55,11 +47,10 @@ const edgeData = (source: RuleReferenceSource, ref: RuleReference, state: Target
 const stampOf = (state: TargetState | undefined): number | null =>
   state?.deletedAt ? state.deletedAt.getTime() : null;
 
-// Targets are read FOR UPDATE so an edge is never written live against an uncommitted delete.
+// Targets are read FOR UPDATE so an edge is never written unstamped against an uncommitted delete.
 export const syncRuleReferenceEdges = async (
   source: RuleReferenceSource,
   references: RuleReference[],
-  gate: RuleReferenceGate,
 ): Promise<void> => {
   const existing = (await db.ruleReference.findMany({
     where: { sourceModel: source.model, sourceId: source.id } as Prisma.RuleReferenceWhereInput,
@@ -71,19 +62,6 @@ export const syncRuleReferenceEdges = async (
   );
   const added = [...referenced.values()].filter((ref) => !held.has(referenceKey(ref)));
   const states = referenced.size ? await lockedTargetStates([...referenced.values()]) : new Map();
-  if (gate !== 'rebuild') {
-    const refusals = await ruleReferenceRefusals({
-      scopes: gate.scopes,
-      farSide: gate.farSide,
-      references: gate.references,
-      source,
-      states,
-    });
-    if (refusals.length)
-      throw new RuleReferenceError(
-        `rule names rows that are deleted or out of view: ${describeRuleReferenceRefusals(refusals).join(', ')}`,
-      );
-  }
 
   const toDelete = existing.filter((edge) => !referenced.has(edgeKey(edge)));
   if (toDelete.length)

@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db, RuleReferenceError } from '@template/db';
+import { clearHookRegistry, db } from '@template/db';
 import type { Organization, Segment, Tag } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
@@ -11,6 +11,7 @@ import {
 import { registerRuleReferenceHook } from '#/hooks/ruleReference/hook';
 import { registerRulesHook } from '#/hooks/rules/hook';
 import { saveEmailTemplate } from '#/lib/email/saveEmailTemplate';
+import { deadReferencesOf } from '#tests/utils/deadReferences';
 
 const mjml = (content: string) =>
   `<mjml><mj-body><mj-section><mj-column><mj-text>${content}</mj-text></mj-column></mj-section></mj-body></mjml>`;
@@ -107,18 +108,15 @@ describe('saveEmailTemplate — a rule may only name what its owner can see', ()
   });
 
   it("another owner's tag is refused", async () => {
-    await expect(saveFor(mine.id, taggedBlock(theirTag.id))).rejects.toBeInstanceOf(
-      RuleReferenceError,
-    );
-    await expect(saveFor(mine.id, taggedBlock(theirTag.id))).rejects.toThrow(
-      `Tag '${theirTag.id}' (missing)`,
-    );
+    expect(await deadReferencesOf(saveFor(mine.id, taggedBlock(theirTag.id)))).toEqual([
+      { model: 'Tag', id: theirTag.id, state: 'missing' },
+    ]);
   });
 
   it("another owner's segment is refused", async () => {
-    await expect(saveFor(mine.id, inSegmentBlock(theirSegment.id))).rejects.toBeInstanceOf(
-      RuleReferenceError,
-    );
+    expect(await deadReferencesOf(saveFor(mine.id, inSegmentBlock(theirSegment.id)))).toEqual([
+      { model: 'Segment', id: theirSegment.id, state: 'missing' },
+    ]);
   });
 
   it('a tag named by a value read at evaluation is refused: no save can check which rows it names', async () => {
@@ -142,7 +140,7 @@ describe('saveEmailTemplate — a rule may only name what its owner can see', ()
         mjml: mjml(taggedBlock(myTag.id)),
         ownerModel: 'default',
       }),
-    ).rejects.toBeInstanceOf(RuleReferenceError);
+    ).rejects.toMatchObject({ status: 422 });
   });
 });
 

@@ -19,7 +19,7 @@ import {
   createTagAttachment,
   createUser,
 } from '@template/db/test';
-import { admitRuleReferences } from '@template/db/utils/admitRuleReferences';
+import { deadRuleReferences } from '@template/db/utils/deadRuleReferences';
 import { sourceQueryValues } from '@template/db/utils/sourceQueryValues';
 import { sourceQueryWhere } from '@template/db/utils/sourceQueryWhere';
 
@@ -39,7 +39,7 @@ afterAll(async () => {
 });
 
 describe('a stepped source — a count the where resolves to an id set first', () => {
-  it('compiles to steps, and admits exactly the rows its count holds for', async () => {
+  it('compiles to steps, and a reference outside the rows its count holds for is missing', async () => {
     const sources = toSourceQueries(busyTags);
     expect(sources[0]?.prisma.steps?.length).toBeGreaterThan(0);
 
@@ -50,19 +50,16 @@ describe('a stepped source — a count the where resolves to an id set first', (
       await createTagAttachment({ resourceModel: 'User', tagId: busy.id, userId: user.id });
     }
 
-    const { admitted, unadmitted } = await admitRuleReferences({
-      scopes: [
-        {
-          lens: busyTags,
-          references: [
-            { model: 'Tag', id: busy.id },
-            { model: 'Tag', id: idle.id },
-          ],
-        },
-      ],
-    });
-    expect(admitted).toEqual([{ model: 'Tag', id: busy.id }]);
-    expect(unadmitted).toEqual([{ model: 'Tag', id: idle.id }]);
+    const dead = await deadRuleReferences([
+      {
+        lens: busyTags,
+        references: [
+          { model: 'Tag', id: busy.id },
+          { model: 'Tag', id: idle.id },
+        ],
+      },
+    ]);
+    expect(dead).toEqual([{ model: 'Tag', id: idle.id, state: 'missing' }]);
   });
 });
 
@@ -135,54 +132,33 @@ describe('a source across a bridge — its rows are candidates, re-checked with 
     expect(rows).toEqual([{ id: gold.id }]);
   });
 
-  it('admits a reference only when the far side holds', async () => {
-    const { gold, silver, farSide } = await fixture();
-    const { admitted, unadmitted } = await admitRuleReferences({
-      scopes: [
-        {
-          lens: goldTags,
-          references: [
-            { model: 'Tag', id: gold.id },
-            { model: 'Tag', id: silver.id },
-          ],
-        },
-      ],
-      farSide,
-    });
-    expect(admitted).toEqual([{ model: 'Tag', id: gold.id }]);
-    expect(unadmitted).toEqual([{ model: 'Tag', id: silver.id }]);
-  });
-
   it('refuses candidates with no far side loaded rather than offer them', async () => {
     const { query } = await fixture();
     await expect(sourceQueryValues(query, { lens: goldTags })).rejects.toBeInstanceOf(UsageError);
   });
 });
 
-describe('a reference is admitted by the lens it was named through, not the first one that has the model', () => {
-  const named = (value: string): LensNarrowing => ({
+describe('a reference is checked under the lens of the scope that holds it, not the first one that has the model', () => {
+  const byName = (value: string): LensNarrowing => ({
     parent: lensFor('Tag'),
     root: { sources: { id: { where: { field: 'name', operator: 'equals', value } } } },
   });
 
-  it("a row one slot's source admits is still refused when another slot named it", async () => {
+  it("a row one slot's source holds is still missing in another slot that references it", async () => {
     const a = (await createTag({ name: 'slot-a' })).entity;
     const b = (await createTag({ name: 'slot-b' })).entity;
 
-    const { admitted, unadmitted } = await admitRuleReferences({
-      scopes: [
-        { lens: named('slot-a'), references: [{ model: 'Tag', id: a.id }] },
-        {
-          lens: named('slot-b'),
-          references: [
-            { model: 'Tag', id: a.id },
-            { model: 'Tag', id: b.id },
-          ],
-        },
-      ],
-    });
+    const dead = await deadRuleReferences([
+      { lens: byName('slot-a'), references: [{ model: 'Tag', id: a.id }] },
+      {
+        lens: byName('slot-b'),
+        references: [
+          { model: 'Tag', id: a.id },
+          { model: 'Tag', id: b.id },
+        ],
+      },
+    ]);
 
-    expect(admitted).toEqual([{ model: 'Tag', id: b.id }]);
-    expect(unadmitted).toEqual([{ model: 'Tag', id: a.id }]);
+    expect(dead).toEqual([{ model: 'Tag', id: a.id, state: 'missing' }]);
   });
 });

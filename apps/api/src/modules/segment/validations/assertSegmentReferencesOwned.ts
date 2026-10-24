@@ -5,41 +5,29 @@
  * @uses infrastructure:prisma
  */
 import type { Condition } from '@inixiative/json-rules';
-import { describeRuleReferenceRefusals, ruleReferenceRefusals, ruleReferences } from '@template/db';
-import type { Segment } from '@template/db/generated/client/client';
+import { deadRuleReferences, ruleReferences } from '@template/db';
 import type { ProviderModel } from '@template/db/generated/client/enums';
-import { isEqual } from 'lodash-es';
+import { deadReferencesError } from '#/hooks/ruleReference/deadReferencesError';
 import {
   customerRefLens,
-  ownedSegments,
   resolvedCustomerRefLens,
 } from '#/modules/customerRef/lib/customerRefLens';
-import { invalidSegmentConditions } from '#/modules/segment/lib/invalidSegmentConditions';
 
 type Candidate = {
   ownerModel: ProviderModel;
   ownerId: string;
   conditions: Condition;
-  segmentId?: string;
-  stored?: Condition;
 };
 
-/** Refuses a changed rule naming rows the owner's lens does not admit, or rows that are gone; returns the owner's live segments for the cycle check. */
+/** Refuses a rule that references rows that are deleted or outside the owner's scope. */
 export const assertSegmentReferencesOwned = async ({
   ownerModel,
   ownerId,
   conditions,
-  segmentId,
-  stored,
-}: Candidate): Promise<Segment[]> => {
-  if (stored !== undefined && isEqual(stored, conditions))
-    return ownedSegments(ownerModel, ownerId);
+}: Candidate): Promise<void> => {
   const references = ruleReferences(customerRefLens, conditions);
-  const refusals = await ruleReferenceRefusals({
-    references,
-    scopes: [{ lens: resolvedCustomerRefLens(ownerModel, ownerId), references }],
-    source: segmentId ? { model: 'Segment', id: segmentId } : undefined,
-  });
-  if (refusals.length) throw invalidSegmentConditions(describeRuleReferenceRefusals(refusals));
-  return ownedSegments(ownerModel, ownerId);
+  const dead = await deadRuleReferences([
+    { lens: resolvedCustomerRefLens(ownerModel, ownerId), references },
+  ]);
+  if (dead.length) throw deadReferencesError(dead);
 };

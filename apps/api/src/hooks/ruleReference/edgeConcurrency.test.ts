@@ -95,7 +95,7 @@ describe('ruleReference — edges under concurrency and repair', () => {
   });
 
   describe('a save racing the delete of the row it names', () => {
-    it('waits for the delete to commit and is then refused, never written unstamped against a deleted row', async () => {
+    it('waits for the delete to commit and writes the edge stamped, never unstamped against a deleted row', async () => {
       const { entity: target } = await createSegment(
         { ownerModel: 'Space', conditions: acmeRule },
         { space },
@@ -133,12 +133,10 @@ describe('ruleReference — edges under concurrency and repair', () => {
         await holder;
       }
 
-      expect(await outcome).toBe('refused');
-      expect(await edgesOf(other.id)).toEqual([]);
-      expect(
-        (await db.withDeleted(() => db.segment.findUnique({ where: { id: other.id } })))
-          ?.conditions,
-      ).toEqual(acmeRule);
+      expect(await outcome).toBe('saved');
+      const [edge] = await edgesOf(other.id);
+      expect(edge?.targetId).toBe(target.id);
+      expect(edge?.targetDeletedAt).not.toBeNull();
     });
   });
 
@@ -148,7 +146,6 @@ describe('ruleReference — edges under concurrency and repair', () => {
         syncRuleReferenceEdges(
           { model: 'Segment', id: segment.id },
           ruleReferences(customerRefLens, segment.conditions as Condition),
-          'rebuild',
         ),
       );
 

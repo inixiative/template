@@ -8,12 +8,12 @@ import type { Condition } from '@inixiative/json-rules';
 import type { Segment } from '@template/db/generated/client/client';
 import type { ProviderModel } from '@template/db/generated/client/enums';
 import { makeError } from '#/lib/errors';
+import { ownedSegments } from '#/modules/customerRef/lib/customerRefLens';
 import { segmentOwnerId } from '#/modules/segment/lib/segmentOwner';
 import {
   buildReferenceMap,
   findReferenceCycle,
 } from '#/modules/segment/services/segmentReferenceGraph';
-import { assertSegmentReferencesOwned } from '#/modules/segment/validations/assertSegmentReferencesOwned';
 
 type Owner = { ownerModel: ProviderModel } & Record<string, unknown>;
 
@@ -33,13 +33,7 @@ export const validateSegmentReferences = async (
   conditions: Condition,
   previous?: Segment,
 ): Promise<void> => {
-  const owned = await assertSegmentReferencesOwned({
-    ownerModel: owner.ownerModel,
-    ownerId: segmentOwnerId(owner as Segment),
-    conditions,
-    segmentId: previous?.id,
-    stored: previous?.conditions as Condition | undefined,
-  });
-  if (previous)
-    assertNoReferenceCycle({ ...previous, conditions: conditions as Segment['conditions'] }, owned);
+  if (!previous) return;
+  const owned = await ownedSegments(owner.ownerModel, segmentOwnerId(owner as Segment));
+  assertNoReferenceCycle({ ...previous, conditions: conditions as Segment['conditions'] }, owned);
 };

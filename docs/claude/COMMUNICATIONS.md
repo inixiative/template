@@ -766,19 +766,18 @@ edges are persisted so that "who references X" is an index and a stale rule is n
   columns, a label, the lens a row's rules are read under (`emailLensFor` for email rows, the
   owner-bound customer-ref lens for segments) and the storage wrapper that reads rules out of the
   stored value (MJML and subject for email, a condition tree for segments). The `ruleReference`
-  after-hook runs on every write to those models, and when a row's rule columns differ from the
-  pre-image it calls `syncRuleReferenceEdges(source, references, gate)` in `packages/db`, the one
-  edge writer. That writer set-diffs (survivors keep their row), locks the referenced rows with
-  `db.findForUpdate`, refuses a missing, soft-deleted or out-of-view target
-  (`ruleReferenceRefusals`, admission by `admitRuleReferences` under each scope's lens), and
-  restamps every kept edge against its target. A changed rule column is refused while it names any
-  such row, including one the stored value already named (a column resent unchanged is not
-  judged, so a subject-only edit passes over a body naming a dead tag), and the refusal lists each as
-  `<model> '<label>' (deleted|missing)`; only a row the source already held is labelled, any other
-  is named by id. That is how an Organization template cannot name another organization's tag or segment.
-  It throws `RuleReferenceError`. Revive regenerates through the same table
-  (`regenerateRuleReferences`, mode `rebuild`, no refusals). Adding a rule-bearing column means
-  adding a declaration entry and a source FK on `RuleReference`.
+  after-hook runs on every write to those models. When a row's rule columns differ from the
+  pre-image, it first checks the changed columns: `deadRuleReferences` (`packages/db`) reads the
+  rows they reference and reports each one that is soft-deleted, or absent from its scope's owner
+  scope (the lens's id source), as `{ model, id, state: 'deleted' | 'missing' }`. Any such row
+  refuses the write with a 422 carrying that list in `details`. A column resent unchanged is not
+  checked, so a subject-only edit passes over a body naming a dead tag. That is how an Organization
+  template cannot name another organization's tag or segment. Then it calls
+  `syncRuleReferenceEdges(source, references)`, the one edge writer, which mirrors exactly what the
+  rule references: it set-diffs (survivors keep their row), locks the referenced rows with
+  `db.findForUpdate`, stamps each edge with its target's `deletedAt`, and never refuses. Revive
+  regenerates through the same table (`regenerateRuleReferences`, no check). Adding a rule-bearing
+  column means adding a declaration entry and a source FK on `RuleReference`.
 - **Staleness lives on the edge, as two signals rather than a computed flag.** A soft delete of a
   referenced row is copied onto every edge naming it by `ruleReference:target` (one
   `updateManyAndReturn`, matched on `(targetModel, targetId)`, cleared on undelete); a

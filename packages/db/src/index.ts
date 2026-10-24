@@ -120,14 +120,13 @@ export type {
 // User with relations type and schema
 export type { UserWithRelations } from './types/userWithRelations';
 export { UserWithRelationsSchema } from './types/userWithRelations';
-export {
-  admitRuleReferences,
-  type ReferenceScope,
-  type ReferenceScopes,
-  type RuleReferenceAdmission,
-} from './utils/admitRuleReferences';
 // SQL utilities
 export { aliasColumns } from './utils/aliasColumns';
+export {
+  type DeadRuleReference,
+  deadRuleReferences,
+  type ReferenceScope,
+} from './utils/deadRuleReferences';
 // Type-safe delegate helpers (pass-the-delegate pattern)
 export {
   type AnyCrudDelegate,
@@ -179,11 +178,6 @@ export {
 } from './utils/ruleReferenceHealth';
 export { ruleReferenceLabels } from './utils/ruleReferenceLabels';
 export {
-  describeRuleReferenceRefusals,
-  type RuleReferenceRefusal,
-  ruleReferenceRefusals,
-} from './utils/ruleReferenceRefusals';
-export {
   type DynamicRuleReference,
   dynamicRuleReferences,
   ruleReferences,
@@ -194,11 +188,7 @@ export {
   sourceQueryValues,
 } from './utils/sourceQueryValues';
 export { sourceQueryWhere } from './utils/sourceQueryWhere';
-export {
-  type RuleReferenceGate,
-  type RuleReferenceSource,
-  syncRuleReferenceEdges,
-} from './utils/syncRuleReferenceEdges';
+export { type RuleReferenceSource, syncRuleReferenceEdges } from './utils/syncRuleReferenceEdges';
 export { type NodeContext, type NodeScope, walkWhere } from './utils/whereWalker';
 export {
   type RuleValidation,

@@ -7,6 +7,7 @@
 import {
   DbAction,
   db,
+  deadRuleReferences,
   type HookOptions,
   HookTiming,
   RuleReferenceError,
@@ -16,6 +17,7 @@ import {
 import type { RuleReferenceSourceModel } from '@template/db/generated/client/enums';
 import type { RuleReference } from '@template/shared/rules';
 import { castArray, compact, isEqual, keyBy } from 'lodash-es';
+import { deadReferencesError } from '#/hooks/ruleReference/deadReferencesError';
 import {
   isRuleReferenceSourceModel,
   RULE_REFERENCE_SURFACES,
@@ -94,16 +96,16 @@ export const syncRuleReferences = async (
       row.deletedAt == null
         ? await surface.read(row, changedColumns(row, before[row.id], surface.columns))
         : UNREFERENCED;
-    const [unchecked] = judged.dynamic;
-    if (mode === 'save' && unchecked)
-      throw new RuleReferenceError(
-        `rule names a ${unchecked.model} by a value read at evaluation (${unchecked.path}); name it by id`,
-      );
-    await syncRuleReferenceEdges(
-      { model, id: row.id },
-      references,
-      mode === 'rebuild' ? 'rebuild' : judged,
-    );
+    if (mode === 'save') {
+      const [unchecked] = judged.dynamic;
+      if (unchecked)
+        throw new RuleReferenceError(
+          `rule names a ${unchecked.model} by a value read at evaluation (${unchecked.path}); name it by id`,
+        );
+      const dead = await deadRuleReferences(judged.scopes, judged.references);
+      if (dead.length) throw deadReferencesError(dead);
+    }
+    await syncRuleReferenceEdges({ model, id: row.id }, references);
   }
 };
 

@@ -4,7 +4,7 @@
  * @partOf feature:email
  * @uses infrastructure:prisma, primitive:shared
  */
-import { admitRuleReferences } from '@template/db';
+import { deadRuleReferences } from '@template/db';
 import { type PreflightResult, runPreflight } from '@template/email/preflight';
 import { decompose } from '@template/email/render/decompose';
 import { expandWith } from '@template/email/render/expand';
@@ -19,6 +19,7 @@ import { emptyRowFor } from '@template/email/rules/emptyRowFor';
 import { contentReferenceScopes } from '@template/email/rules/ruleReferences';
 import { assertValidConditions } from '@template/email/validations/validateConditions';
 import type { RuleReference } from '@template/shared/rules';
+import { referenceKey } from '@template/shared/rules';
 import mjml2html from 'mjml';
 import { emailLensAt, emailLensFor } from '#/lib/email/emailLensFor';
 import { withoutDegradedSegments } from '#/lib/email/withoutDegradedSegments';
@@ -54,11 +55,16 @@ const expandDraft = (mjml: string, ctx: OwnerScope): Promise<string> => {
   });
 };
 
-const admittedReferences = async (
+const existingReferences = async (
   lens: EmailLens,
   ...contents: string[]
-): Promise<RuleReference[]> =>
-  (await admitRuleReferences({ scopes: contentReferenceScopes(lens, ...contents) })).admitted;
+): Promise<RuleReference[]> => {
+  const scopes = contentReferenceScopes(lens, ...contents);
+  const dead = new Set((await deadRuleReferences(scopes)).map(referenceKey));
+  return scopes
+    .flatMap((scope) => scope.references)
+    .filter((reference) => !dead.has(referenceKey(reference)));
+};
 
 const sampleVariables = (lens: EmailLens): Variables => ({
   ...SAMPLE_VARIABLES,
@@ -90,7 +96,7 @@ export const emailTemplatePreflight = async (
 
   const expandedMjml = await expandDraft(input.mjml, ctx);
   const existingTargets = await withoutDegradedSegments(
-    await admittedReferences(lens, expandedMjml, input.subject ?? ''),
+    await existingReferences(lens, expandedMjml, input.subject ?? ''),
   );
   const options = { locale, lens, existingTargets };
   const interpolatedMjml = interpolate(expandedMjml, variables, onRenderWarning, options);
