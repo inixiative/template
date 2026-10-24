@@ -1,10 +1,10 @@
-# INFRA-039: Rule references — port Zealot's declaration table, plain sourceId, refusals that say why
+# INFRA-039: Rule references — port Zealot's declaration table and plain ids, edges that mirror the rule
 
 **Status**: 👀 Review
 **Assignee**: Aron
 **Priority**: Medium
 **Created**: 2026-10-23
-**Updated**: 2026-10-23
+**Updated**: 2026-10-24
 **Related**: ZLT-6030, INFRA-030
 
 ---
@@ -15,73 +15,66 @@ INFRA-030 built the edge table. Zealot (ZLT-5978) has since moved past it: one d
 of rule-bearing columns, one generic after-hook, and edges that read on their own. This brings the
 template level with it.
 
-## Rulings (Aron, 2026-10-23)
+## Rulings (Aron, 2026-10-23 / 24)
 
 1. **Plain ids beside the false polymorphism.** `RuleReference` keeps its typed FKs and relations
    on both axes, and also carries plain `sourceId` and `targetId`. Edge identity is one unique,
-   `(sourceModel, sourceId, targetModel, targetId)`, whatever the source model.
-2. **Touching an invalid rule fails until it is valid.** A write that changes a rule tree (a
-   segment's conditions, an email template's subject or MJML body, a component's MJML) is refused
-   while the changed tree names a dead or out-of-view row, including a row the stored tree already
-   named. The refusal lists each reference as `<model> '<label>' (deleted|missing)`. The `held`
-   exemption in `assertSegmentReferencesOwned` is gone. A save that resends a stored tree unchanged
-   is not judged, so a subject-only edit or a segment rename that carries the stored conditions
-   still goes through. The comparison is per rule column, against the pre-image the hook already
-   has.
-3. **Reads carry their references.** The segment read returns
-   `ruleReferences: [{ targetModel, targetId, targetLabel, targetDeletedAt }]` so the UI can say why
-   a rule is degraded.
-4. **One declaration table, one hook.** `RULE_REFERENCE_SURFACES` declares each storing model's
-   columns, label, storage wrapper and lens. A single after-hook syncs edges for every model in it;
-   revive regenerates by looping the same table. There are no per-source sync calls and no
-   per-model switch.
+   `(sourceModel, sourceId, targetModel, targetId)`. The false-polymorphism primitive writes the
+   plain ids, not the edge writer. An axis declares `materialized` (the column holding the one id
+   its set typed FK points at). The rules hook writes that column on create, createMany and an
+   upsert's create arm, and refuses a row where they disagree.
+2. **An edge's ends never change.** The typed FKs and materialized ids are immutable after
+   create. The immutable-fields hook refuses an update that touches them. The only updatable
+   column on an edge is the `targetDeletedAt` stamp. A different target is a different edge.
+3. **The sync mirrors the rule; the save path checks.** `syncRuleReferenceEdges` writes exactly
+   the edges the rule references, stamped from locked target states, and never refuses. There is
+   no admission. The one check runs on the save path: when a rule column changes, the
+   `ruleReference` hook calls `deadRuleReferences`. That is a plain read of the referenced rows
+   and of each scope's owner-scope id set. Any deleted or missing row refuses the write with a 422
+   whose `details` are `[{ model, id, state: 'deleted' | 'missing' }]`. A column resent unchanged
+   is not checked, so a subject-only edit or a segment rename passes over a dead reference.
+4. **Health reads edges.** A reference is dead when its edge has `targetDeletedAt`, its typed FK
+   is NULL (purged), or the rule references a row with no edge. Segment health closes over the
+   Segment edges it reaches, not over an owner query through the lens.
+5. **No labels on the backend.** Segment responses carry `ruleReferences` as the edge rows'
+   `targetModel`, `targetId` and `targetDeletedAt`. The frontend labels them.
+6. **One declaration table, one hook.** `RULE_REFERENCE_SURFACES` declares each storing model's
+   columns, label, storage wrapper and lens. A single after-hook syncs edges for every model in it,
+   and revive regenerates by looping the same table.
+7. **Lenses are static.** Nothing narrows, rewrites or re-derives a lens at call time. Email owner
+   and sender scopes are static per kind (`EMAIL_OWNER_SCOPES`, `EMAIL_SENDER_SCOPES`, one
+   recipient narrowing per sender kind), with every owner id written as a bind token. A row only
+   supplies `emailLensBindings(owner, sender)` to `bindLens`. A template's stored lens stays a
+   serialized input. `ownedSegments` takes no caller where, and dynamic segments are filtered in
+   memory.
+8. **Names say what they return.** No exported name carries "admit", "live", "named" or
+   "identity" (`existingRuleReferenceTargets`, `RuleHealth.existingTargets`).
 
 ## Items
 
-- [x] **Schema**: `sourceId` on `RuleReference`, one unique replacing the three per-source uniques.
-- [x] **Declaration table + generic hook**: `hooks/ruleReference/surfaces.ts` + `hook.ts`;
-  `syncRuleReferenceEdges` stays the one edge writer.
-- [x] **Target hook**: no `create` registration; `ruleReference.stale` app event deleted.
-- [x] **Refuse with reasons**: no `held`; refusal names model, label and reason.
-- [x] **Reads include references**: every segment response returns `ruleReferences`, with labels
-  read through the label the customer-ref lens declares and batched per model.
-- [x] **Agreement test**: lens identity models and `RuleReference` target columns agree
-  (`hooks/ruleReference/registryAgreement.test.ts`). Every target column is reachable today, so
-  there is no edge-free list.
+- [x] Schema: `sourceId`, one unique.
+- [x] Declaration table + generic hook.
+- [x] Target hook: no `create`; `ruleReference.stale` deleted.
+- [x] Changed-tree-only refusals.
+- [x] Reads carry the edge rows.
+- [x] Agreement test (`hooks/ruleReference/registryAgreement.test.ts`), no edge-free list.
+- [x] Names; admission deleted; health over edges; labels deleted.
+- [x] Materialized ids in the polymorphism registry; immutable edge ends.
+- [x] Static email scopes; `ownedSegments` without a caller where.
 
 ## Notes
 
-- **Lenses are static (ruling 2026-10-23).** Nothing narrows, rewrites or re-derives a lens at
-  call time. Audit of this change:
-  - Fixed: `admitRuleReferences` asked the source query with an extra `{ id: { in } }` ANDed onto
-    the lens source's where. It now takes the lens's option set as the lens states it and checks
-    membership. `sourceQueryValues` loses its `where` parameter.
-  - Clean: `ruleReferenceRefusals`, `ruleReferenceLabels` (reads the label the lens declares, then
-    primary-key reads), the segment read's `sourceRuleReferences` include, and health from edges
-    (`ruleHealthFromEdges` over the static `customerRefLens`).
-  - Segment surface lens: `bindLens(customerRefLens, owner bindings)`. This is the static lens with
-    its declared bind tokens filled, not a rewrite.
-  - Open: `emailLensFor` is assembled per row from runtime data. `scopeEmailLens` writes the
-    owner's ids into literal wheres and clamps the slots with owner-built `mapDefaults`, and
-    `defaultRecipientNarrowing` embeds the space id. The static shape would be one exported email
-    lens per owner model whose wheres name `bind` tokens, with only `bindLens(lens,
-    polymorphicBindings(owner))` per row, which is how segments work today. The row's stored
-    narrowing (`EmailTemplate.lens`) stays a serialized input. Not changed here.
-  - Open, outside rule references: `ownedSegments(ownerModel, ownerId, where)` ANDs a caller
-    where onto the Segment source's where (`reconcileCustomerRef` passes `{ type: 'dynamic' }`).
-    The rule-reference callers pass none. The static shape is a named dynamic-segments lens, or
-    filtering the owned set.
-
-- **Labels in a refusal.** A reference the source already held, which was in view when it was
-  saved, is named by its label. Any other reference is named by id, so a refusal never shows what
-  another owner's row is called.
-
 - **The degraded signal is read from edges, not published.** `ruleReference.stale` had no consumer.
-  Its handler was empty. A reader that needs "which rules are degraded" asks the edges:
-  `targetDeletedAt` set means the target was soft-deleted, and a null typed FK with `targetId` still
-  set means it was purged (`ruleReferenceIssues`). An alert or a job counts those rows. It does not
-  subscribe to an event.
-- **No migration file.** The template has no migration history yet. The schema is applied with
+  A reader asks the edges (`ruleReferenceIssues`), and an alert or a job counts those rows.
+- **Lens use left in health.** `ruleHealthFromEdges` still extracts which ids the stored tree
+  references through the static `customerRefLens`. That is a pure walk with no query, and it is
+  how a reference with no edge is seen. `ruleIssues` also checks the tree's vocabulary against that
+  lens. Removing both would mean health cannot see a missing edge.
+- **A save that races a target's delete.** The edge writer still locks the target rows. With no
+  gate it no longer refuses: the edge is written stamped with the committed `deletedAt`.
+- **Out-of-scope `state`.** A row outside the owner's scope reads as `missing`. A deleted row
+  reads as `deleted` whoever owns it, so the state shows that a deleted row exists under that id.
+- **No migration file.** The template has no migration history yet: the schema is applied with
   `db push`, and `db:baseline` refuses to run once any migration exists. A fork that has already
   cut its baseline migrates in three steps:
 
