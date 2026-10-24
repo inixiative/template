@@ -95,7 +95,7 @@ describe('ruleReference — edges under concurrency and repair', () => {
   });
 
   describe('a save racing the delete of the row it names', () => {
-    it('waits for the delete to commit and is then refused, never written live against a dead row', async () => {
+    it('waits for the delete to commit and is then refused, never written unstamped against a deleted row', async () => {
       const { entity: target } = await createSegment(
         { ownerModel: 'Space', conditions: acmeRule },
         { space },

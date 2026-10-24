@@ -59,18 +59,18 @@ const closeOverOwner = (
       segment.conditions as Condition,
       edges[segment.id] ?? [],
     );
-    const { references, live } = base;
+    const { references, existingTargets } = base;
     const degraded = new Set<string>();
     for (const reference of references) {
-      if (reference.model !== 'Segment' || !live.has(referenceKey(reference))) continue;
-      const named = byId[reference.id];
-      if (!named || visiting.has(named.id)) continue;
-      if (stateOf(named).issues.length) degraded.add(segmentKey(named.id));
+      if (reference.model !== 'Segment' || !existingTargets.has(referenceKey(reference))) continue;
+      const referencedSegment = byId[reference.id];
+      if (!referencedSegment || visiting.has(referencedSegment.id)) continue;
+      if (stateOf(referencedSegment).issues.length) degraded.add(segmentKey(referencedSegment.id));
     }
 
     const health: RuleHealth = {
       ...base,
-      live: new Set([...live].filter((key) => !degraded.has(key))),
+      existingTargets: new Set([...existingTargets].filter((key) => !degraded.has(key))),
     };
     const state = {
       segment,
@@ -107,7 +107,7 @@ export const segmentRuleStates = async (
 export const segmentRuleState = async (segment: Segment): Promise<SegmentRuleState> =>
   (await segmentRuleStates([segment])).get(segment.id)!;
 
-/** Issues read off the row's own edges; null when a live segment reference means the owner closure decides. */
+/** Issues read off the row's own edges; null when an existing segment reference means the owner closure decides. */
 export const segmentRuleIssuesFromEdges = (segment: SegmentWithEdges): RuleIssue[] | null => {
   if (!segment.sourceRuleReferences) return null;
   const health = ruleHealthFromEdges(
@@ -117,7 +117,8 @@ export const segmentRuleIssuesFromEdges = (segment: SegmentWithEdges): RuleIssue
   );
   if (
     health.references.some(
-      (reference) => reference.model === 'Segment' && health.live.has(referenceKey(reference)),
+      (reference) =>
+        reference.model === 'Segment' && health.existingTargets.has(referenceKey(reference)),
     )
   )
     return null;

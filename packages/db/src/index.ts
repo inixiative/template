@@ -170,8 +170,8 @@ export { revive } from './utils/revive';
 export { RULE_REFERENCEABLE_MODELS } from './utils/ruleReferenceable';
 export { RuleReferenceError } from './utils/ruleReferenceError';
 export {
-  liveRuleReferenceKeys,
-  liveRuleReferences,
+  existingRuleReferenceTargetKeys,
+  existingRuleReferenceTargets,
   type RuleReferenceIssue,
   type RuleReferenceRow,
   ruleHealthFromEdges,

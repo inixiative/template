@@ -15,7 +15,7 @@ import {
 } from '@template/email/rules/emailLens';
 import { type RuleReference, referenceKey } from '@template/shared/rules';
 
-const namedThrough = (
+const referencesUnder = (
   lens: EmailLens,
   root: ScopeRoot | undefined,
   contents: string[],
@@ -36,12 +36,12 @@ const namedThrough = (
 };
 
 export const contentRuleReferences = (lens: EmailLens, ...contents: string[]): RuleReference[] =>
-  namedThrough(lens, undefined, contents);
+  referencesUnder(lens, undefined, contents);
 
 export const contentReferenceScopes = (lens: EmailLens, ...contents: string[]): ReferenceScope[] =>
   emailSlotLenses(lens).map(([root, slot]) => ({
     lens: slot,
-    references: namedThrough(lens, root, contents),
+    references: referencesUnder(lens, root, contents),
   }));
 
 export const contentDynamicRuleReferences = (

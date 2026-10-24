@@ -337,7 +337,7 @@ describe("settleTemplate — rules evaluate through the owner's lens", () => {
     expect(foreign.issues).toEqual([]);
   });
 
-  it('a segment whose own rule is degraded leaves the live set, so the branch degrades', async () => {
+  it('a segment whose own rule is degraded leaves the existing-target set, so the branch degrades', async () => {
     const settled = await settleTemplate(
       'scoped-segment',
       sender(),

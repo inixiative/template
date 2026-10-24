@@ -65,12 +65,12 @@ export const syncRuleReferenceEdges = async (
     where: { sourceModel: source.model, sourceId: source.id } as Prisma.RuleReferenceWhereInput,
   })) as Edge[];
 
-  const named = new Map(references.map((ref) => [referenceKey(ref), ref]));
+  const referenced = new Map(references.map((ref) => [referenceKey(ref), ref]));
   const held = new Map(
-    existing.filter((edge) => named.has(edgeKey(edge))).map((edge) => [edgeKey(edge), edge]),
+    existing.filter((edge) => referenced.has(edgeKey(edge))).map((edge) => [edgeKey(edge), edge]),
   );
-  const added = [...named.values()].filter((ref) => !held.has(referenceKey(ref)));
-  const states = named.size ? await lockedTargetStates([...named.values()]) : new Map();
+  const added = [...referenced.values()].filter((ref) => !held.has(referenceKey(ref)));
+  const states = referenced.size ? await lockedTargetStates([...referenced.values()]) : new Map();
   if (gate !== 'rebuild') {
     const refusals = await ruleReferenceRefusals({
       scopes: gate.scopes,
@@ -85,7 +85,7 @@ export const syncRuleReferenceEdges = async (
       );
   }
 
-  const toDelete = existing.filter((edge) => !named.has(edgeKey(edge)));
+  const toDelete = existing.filter((edge) => !referenced.has(edgeKey(edge)));
   if (toDelete.length)
     await db.ruleReference.deleteMany({ where: { id: { in: toDelete.map((edge) => edge.id) } } });
 

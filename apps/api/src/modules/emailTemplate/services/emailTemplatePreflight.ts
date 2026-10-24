@@ -89,10 +89,10 @@ export const emailTemplatePreflight = async (
   };
 
   const expandedMjml = await expandDraft(input.mjml, ctx);
-  const liveRefs = await withoutDegradedSegments(
+  const existingTargets = await withoutDegradedSegments(
     await admittedReferences(lens, expandedMjml, input.subject ?? ''),
   );
-  const options = { locale, lens, liveRefs };
+  const options = { locale, lens, existingTargets };
   const interpolatedMjml = interpolate(expandedMjml, variables, onRenderWarning, options);
   const subject = input.subject
     ? interpolate(input.subject, variables, onRenderWarning, options)

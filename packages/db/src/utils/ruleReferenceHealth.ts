@@ -63,31 +63,31 @@ export const ruleReferenceIssues = (edges: RuleReferenceRow[]): RuleReferenceIss
   });
 
 /** The references these edges name that are still usable — absence is the answer, so callers fail closed. */
-export const liveRuleReferences = (edges: RuleReferenceRow[]): RuleReference[] => {
+export const existingRuleReferenceTargets = (edges: RuleReferenceRow[]): RuleReference[] => {
   const broken = new Set(ruleReferenceIssues(edges).map((issue) => issue.key));
   const seen = new Set<string>();
-  const live: RuleReference[] = [];
+  const existing: RuleReference[] = [];
   for (const edge of edges) {
     const reference = { model: edge.targetModel, id: edge.targetId };
     const key = referenceKey(reference);
     if (broken.has(key) || seen.has(key)) continue;
     seen.add(key);
-    live.push(reference);
+    existing.push(reference);
   }
-  return live;
+  return existing;
 };
 
-export const liveRuleReferenceKeys = (edges: RuleReferenceRow[]): Set<string> =>
-  new Set(liveRuleReferences(edges).map(referenceKey));
+export const existingRuleReferenceTargetKeys = (edges: RuleReferenceRow[]): Set<string> =>
+  new Set(existingRuleReferenceTargets(edges).map(referenceKey));
 
 /** A rule's health as its own edges tell it: the rows it names, and which of them still resolve. */
 export const ruleHealthFromEdges = (
   lens: RuleLens,
   rule: Condition,
   edges: RuleReferenceRow[],
-): RuleHealth & { live: Set<string> } => ({
+): RuleHealth & { existingTargets: Set<string> } => ({
   lens,
   rule,
   references: ruleReferences(lens, rule),
-  live: liveRuleReferenceKeys(edges),
+  existingTargets: existingRuleReferenceTargetKeys(edges),
 });

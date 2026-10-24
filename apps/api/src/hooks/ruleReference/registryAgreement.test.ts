@@ -35,7 +35,7 @@ const AUTHORED_UNDER = {
   Segment: [customerRefLens],
 } satisfies Record<keyof typeof RULE_REFERENCE_SURFACES, RuleLens[]>;
 
-const identityModels = (lens: RuleLens): Set<string> => {
+const idSourceModels = (lens: RuleLens): Set<string> => {
   const models = new Set<string>();
   for (const visit of Object.values(projectLens(lens)))
     for (const field of Object.keys(visit.sources))
@@ -47,22 +47,24 @@ const identityModels = (lens: RuleLens): Set<string> => {
   return models;
 };
 
-const nameable = (source: keyof typeof AUTHORED_UNDER): Set<string> =>
-  new Set(AUTHORED_UNDER[source].flatMap((lens) => [...identityModels(lens)]));
+const referenceableModels = (source: keyof typeof AUTHORED_UNDER): Set<string> =>
+  new Set(AUTHORED_UNDER[source].flatMap((lens) => [...idSourceModels(lens)]));
 
 describe('lens and registry agree on what a rule can reference', () => {
   const registered = new Set<string>(RULE_REFERENCEABLE_MODELS);
 
   for (const source of Object.keys(AUTHORED_UNDER) as (keyof typeof AUTHORED_UNDER)[]) {
     test(`every model a ${source} rule can name by id has a target column`, () => {
-      expect([...nameable(source)].filter((model) => !registered.has(model))).toEqual([]);
+      expect([...referenceableModels(source)].filter((model) => !registered.has(model))).toEqual(
+        [],
+      );
     });
   }
 
-  test('every target column is named by some lens', () => {
+  test('every target column is referenceable under some lens', () => {
     const reachable = new Set(
       (Object.keys(AUTHORED_UNDER) as (keyof typeof AUTHORED_UNDER)[]).flatMap((source) => [
-        ...nameable(source),
+        ...referenceableModels(source),
       ]),
     );
     expect([...registered].filter((model) => !reachable.has(model))).toEqual([]);

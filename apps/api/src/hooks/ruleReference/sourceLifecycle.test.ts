@@ -1,6 +1,11 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
 import { Operator } from '@inixiative/json-rules';
-import { clearHookRegistry, db, liveRuleReferenceKeys, ruleReferenceIssues } from '@template/db';
+import {
+  clearHookRegistry,
+  db,
+  existingRuleReferenceTargetKeys,
+  ruleReferenceIssues,
+} from '@template/db';
 import type { Space } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
@@ -130,7 +135,7 @@ describe('ruleReference — a source takes its edges with it and brings them bac
       expect(ruleReferenceIssues(edges).map((issue) => issue.reason)).toEqual(['deleted']);
     });
 
-    it('comes back with no edge for a tag purged while it was away, so the tag never reads as live', async () => {
+    it('comes back with no edge for a tag purged while it was away, so the tag never reads as existing', async () => {
       const { entity: tag } = await createTag();
       const { template } = await saveTemplateNaming(tag.id);
       await tombstone('emailTemplate', template.id);
@@ -142,9 +147,9 @@ describe('ruleReference — a source takes its edges with it and brings them bac
         where: { sourceEmailTemplateId: template.id },
       });
       expect(edges).toEqual([]);
-      expect(liveRuleReferenceKeys(edges).has(referenceKey({ model: 'Tag', id: tag.id }))).toBe(
-        false,
-      );
+      expect(
+        existingRuleReferenceTargetKeys(edges).has(referenceKey({ model: 'Tag', id: tag.id })),
+      ).toBe(false);
     });
   });
 
