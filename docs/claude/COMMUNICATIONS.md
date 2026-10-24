@@ -788,7 +788,7 @@ edges are persisted so that "who references X" is an index and a stale rule is n
   and `targetId` from the set typed FK on create (`materialized` on the registry axis), refuses a
   row where they disagree, and the immutable-fields hook refuses any update to an edge's typed FKs
   or materialized ids, so the only updatable column on an edge is its `targetDeletedAt` stamp.
-  `ruleReferenceIssues(edges)` reads both from the edge rows alone, so consumers
+  `ruleReferenceTargets(edges)` reads both from the edge rows alone (each target as `existing`, `deleted` or `purged`), so consumers
   write `include: { sourceRuleReferences: true }` and never grow that include as models become
   referenceable. At render, `composeTemplate` reads the template's edges plus those of the
   components the cascade resolved into one live set, and every branch goes through **`withRule`**

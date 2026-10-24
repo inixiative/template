@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db, ruleReferenceIssues } from '@template/db';
+import { clearHookRegistry, db, type RuleReferenceRow, ruleReferenceTargets } from '@template/db';
 import {
   cleanupTouchedTables,
   createEmailComponent,
@@ -14,6 +14,9 @@ import { registerRuleReferenceTargetHook } from '#/hooks/ruleReference/targetHoo
 import { registerRulesHook } from '#/hooks/rules/hook';
 import { saveEmailTemplate } from '#/lib/email/saveEmailTemplate';
 import { deadReferencesOf } from '#tests/utils/deadReferences';
+
+const deadTargets = (edges: RuleReferenceRow[]) =>
+  ruleReferenceTargets(edges).filter((target) => target.state !== 'existing');
 
 const mjml = (content: string) =>
   `<mjml><mj-body><mj-section><mj-column><mj-text>${content}</mj-text></mj-column></mj-section></mj-body></mjml>`;
@@ -223,13 +226,13 @@ describe('ruleReference — the save path writes edges, the target side stamps t
     await save(mjml(taggedBlock(tag.id)));
     await save(mjml(component('vip', taggedBlock(tag.id))));
 
-    expect(ruleReferenceIssues(await edgesOf({ targetId: tag.id }))).toEqual([]);
+    expect(deadTargets(await edgesOf({ targetId: tag.id }))).toEqual([]);
 
     await db.tag.update({ where: { id: tag.id }, data: { deletedAt: new Date() } });
     const stamped = await edgesOf({ targetId: tag.id });
     expect(stamped).toHaveLength(2);
     expect(stamped.every((edge) => edge.targetDeletedAt != null)).toBe(true);
-    expect(ruleReferenceIssues(stamped).map((issue) => [issue.key, issue.reason])).toEqual([
+    expect(deadTargets(stamped).map((issue) => [issue.key, issue.state])).toEqual([
       [refKey('Tag', tag.id), 'deleted'],
       [refKey('Tag', tag.id), 'deleted'],
     ]);
@@ -237,7 +240,7 @@ describe('ruleReference — the save path writes edges, the target side stamps t
     await db.withDeleted(() => db.tag.update({ where: { id: tag.id }, data: { deletedAt: null } }));
     const cleared = await edgesOf({ targetId: tag.id });
     expect(cleared.every((edge) => edge.targetDeletedAt == null)).toBe(true);
-    expect(ruleReferenceIssues(cleared)).toEqual([]);
+    expect(deadTargets(cleared)).toEqual([]);
   });
 
   it('purging a target row nulls the FK and leaves the edge naming it', async () => {
@@ -251,7 +254,7 @@ describe('ruleReference — the save path writes edges, the target side stamps t
     expect(edges).toHaveLength(1);
     expect(edges[0]!.targetTagId).toBeNull();
     expect(edges[0]!.targetId).toBe(tag.id);
-    expect(ruleReferenceIssues(edges).map((issue) => issue.reason)).toEqual(['purged']);
+    expect(deadTargets(edges).map((issue) => issue.state)).toEqual(['purged']);
   });
 
   it('a subject-only edit passes while the unchanged body names a dead tag; a changed body naming it is refused', async () => {

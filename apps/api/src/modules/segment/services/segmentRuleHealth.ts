@@ -5,7 +5,7 @@
  * @uses infrastructure:prisma, primitive:shared
  */
 import type { Condition } from '@inixiative/json-rules';
-import { db, type RuleReferenceRow, ruleHealthFromEdges } from '@template/db';
+import { db, type RuleReferenceRow, ruleReferences, ruleReferenceTargets } from '@template/db';
 import type { Segment } from '@template/db/generated/client/client';
 import { type RuleHealth, type RuleIssue, referenceKey, ruleIssues } from '@template/shared/rules';
 import { groupBy, keyBy } from 'lodash-es';
@@ -14,6 +14,22 @@ import { customerRefLens } from '#/modules/customerRef/lib/customerRefLens';
 export type SegmentRuleState = { segment: Segment; health: RuleHealth; issues: RuleIssue[] };
 
 export type SegmentWithEdges = Segment & { sourceRuleReferences?: RuleReferenceRow[] };
+
+const healthOf = (
+  segment: Segment,
+  edges: RuleReferenceRow[],
+): RuleHealth & {
+  existingTargets: Set<string>;
+} => ({
+  lens: customerRefLens,
+  rule: segment.conditions as Condition,
+  references: ruleReferences(customerRefLens, segment.conditions as Condition),
+  existingTargets: new Set(
+    ruleReferenceTargets(edges)
+      .filter((target) => target.state === 'existing')
+      .map((target) => target.key),
+  ),
+});
 
 const segmentKey = (id: string): string => referenceKey({ model: 'Segment', id });
 
@@ -48,11 +64,7 @@ const closeOverEdges = (
     if (known) return known;
     visiting.add(segment.id);
 
-    const base = ruleHealthFromEdges(
-      customerRefLens,
-      segment.conditions as Condition,
-      edges[segment.id] ?? [],
-    );
+    const base = healthOf(segment, edges[segment.id] ?? []);
     const { references, existingTargets } = base;
     const degraded = new Set<string>();
     for (const reference of references) {
@@ -114,11 +126,7 @@ export const segmentRuleState = async (segment: Segment): Promise<SegmentRuleSta
 /** Issues read off the row's own edges; null when an existing segment reference means the edge closure decides. */
 export const segmentRuleIssuesFromEdges = (segment: SegmentWithEdges): RuleIssue[] | null => {
   if (!segment.sourceRuleReferences) return null;
-  const health = ruleHealthFromEdges(
-    customerRefLens,
-    segment.conditions as Condition,
-    segment.sourceRuleReferences,
-  );
+  const health = healthOf(segment, segment.sourceRuleReferences);
   if (
     health.references.some(
       (reference) =>

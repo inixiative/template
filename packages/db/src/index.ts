@@ -165,12 +165,9 @@ export { revive } from './utils/revive';
 export { RULE_REFERENCEABLE_MODELS } from './utils/ruleReferenceable';
 export { RuleReferenceError } from './utils/ruleReferenceError';
 export {
-  existingRuleReferenceTargetKeys,
-  existingRuleReferenceTargets,
-  type RuleReferenceIssue,
   type RuleReferenceRow,
-  ruleHealthFromEdges,
-  ruleReferenceIssues,
+  type RuleReferenceTarget,
+  ruleReferenceTargets,
 } from './utils/ruleReferenceHealth';
 export {
   type DynamicRuleReference,

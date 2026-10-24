@@ -4,7 +4,7 @@
  * @partOf feature:email
  * @uses infrastructure:prisma
  */
-import { db, existingRuleReferenceTargets, type RuleReferenceRow } from '@template/db';
+import { db, type RuleReferenceRow, ruleReferenceTargets } from '@template/db';
 import type { CommunicationKind, EmailOwnerModel } from '@template/db/generated/client/client';
 import { EmailRenderError } from '@template/email/errors/EmailRenderError';
 import { expand, expandWith } from '@template/email/render/expand';
@@ -17,6 +17,7 @@ import {
 import { rowOwner } from '@template/email/render/owner';
 import type { OwnerScope } from '@template/email/render/types';
 import type { RuleReference } from '@template/shared/rules';
+import { uniqBy } from 'lodash-es';
 
 export type ComposeTemplateResult = {
   id: string;
@@ -47,7 +48,10 @@ const existingTargetsOf = async (
       ],
     },
   })) as RuleReferenceRow[];
-  return existingRuleReferenceTargets(edges);
+  return uniqBy(
+    ruleReferenceTargets(edges).filter((target) => target.state === 'existing'),
+    'key',
+  ).map(({ model, id }) => ({ model, id }));
 };
 
 export const composeTemplate = async (
