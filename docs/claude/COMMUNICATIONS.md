@@ -776,7 +776,7 @@ edges are persisted so that "who references X" is an index and a stale rule is n
   `syncRuleReferenceEdges(source, references)`, the one edge writer, which mirrors exactly what the
   rule references: it set-diffs (survivors keep their row), locks the referenced rows with
   `db.findForUpdate`, stamps each edge with its target's `deletedAt`, and never refuses. Revive
-  regenerates through the same table (`regenerateRuleReferences`, no check). Adding a rule-bearing
+  regenerates through `syncRuleReferences({ model, ids }, 'rebuild')`, no check. Adding a rule-bearing
   column means adding a declaration entry and a source FK on `RuleReference`.
 - **Staleness lives on the edge, as two signals rather than a computed flag.** A soft delete of a
   referenced row is copied onto every edge naming it by `ruleReference:target` (one

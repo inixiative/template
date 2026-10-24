@@ -83,15 +83,30 @@ const withColumns = async (
   return rows.map((row) => reread[row.id] ?? row);
 };
 
-export const syncRuleReferences = async (
+export type RuleReferenceSources = { model: string } & ({ rows: HookRow[] } | { ids: string[] });
+
+const sourceRows = async (
   model: RuleReferenceSourceModel,
-  rows: SourceRow[],
+  sources: RuleReferenceSources,
+): Promise<SourceRow[]> => {
+  if ('rows' in sources) return withColumns(model, rowsOf(sources.rows));
+  if (!sources.ids.length) return [];
+  return (await db.withDeleted(() =>
+    db.delegate(model).findMany({ where: { id: { in: sources.ids } } }),
+  )) as SourceRow[];
+};
+
+/** Makes each source's edges match its rule; in save mode a changed rule column is checked first. */
+export const syncRuleReferences = async (
+  sources: RuleReferenceSources,
   mode: 'save' | 'rebuild',
   previous: HookRow[] = [],
 ): Promise<void> => {
+  const { model } = sources;
+  if (!isRuleReferenceSourceModel(model)) return;
   const surface = RULE_REFERENCE_SURFACES[model];
   const before = keyBy(previous, 'id');
-  for (const row of await withColumns(model, rows)) {
+  for (const row of await sourceRows(model, sources)) {
     const { references, judged } =
       row.deletedAt == null
         ? await surface.read(row, changedColumns(row, before[row.id], surface.columns))
@@ -109,16 +124,6 @@ export const syncRuleReferences = async (
   }
 };
 
-export const regenerateRuleReferences = async (model: string, rows: HookRow[]): Promise<void> => {
-  if (!isRuleReferenceSourceModel(model)) return;
-  const ids = rowsOf(rows).map((row) => row.id);
-  if (!ids.length) return;
-  const sources = (await db
-    .delegate(model)
-    .findMany({ where: { id: { in: ids } } })) as SourceRow[];
-  await syncRuleReferences(model, sources, 'rebuild');
-};
-
 export const registerRuleReferenceHook = () => {
   registerDbHook(
     'ruleReference',
@@ -128,7 +133,8 @@ export const registerRuleReferenceHook = () => {
     async ({ model, previous, result }: HookOptions) => {
       if (!isRuleReferenceSourceModel(model)) return;
       const touched = touchedRows(previous, result, RULE_REFERENCE_SURFACES[model].columns);
-      if (touched.length) await syncRuleReferences(model, touched, 'save', rowsOf(previous));
+      if (touched.length)
+        await syncRuleReferences({ model, rows: touched }, 'save', rowsOf(previous));
     },
   );
 };

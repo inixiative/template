@@ -5,7 +5,7 @@
  * @uses none
  */
 import type { HardDeletedOnTombstone } from '@template/db';
-import { regenerateRuleReferences } from '#/hooks/ruleReference/hook';
+import { syncRuleReferences } from '#/hooks/ruleReference/hook';
 
 type Row = Record<string, unknown>;
 
@@ -17,5 +17,9 @@ type Row = Record<string, unknown>;
 export const REGENERATE_ON_REVIVE: Partial<
   Record<HardDeletedOnTombstone, (parentModel: string, rows: Row[]) => Promise<void>>
 > = {
-  RuleReference: regenerateRuleReferences,
+  RuleReference: (model, rows) =>
+    syncRuleReferences(
+      { model, ids: rows.flatMap((row) => (typeof row.id === 'string' ? [row.id] : [])) },
+      'rebuild',
+    ),
 };
