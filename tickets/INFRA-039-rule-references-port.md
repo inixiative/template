@@ -48,7 +48,8 @@ template level with it.
    serialized input. `ownedSegments` takes no caller where, and dynamic segments are filtered in
    memory.
 8. **Names say what they return.** No exported name carries "admit", "live", "named" or
-   "identity" (`existingRuleReferenceTargets`, `RuleHealth.existingTargets`).
+   "identity". One edge reader, `ruleReferenceTargets`, returns each target's state, and callers
+   adapt it. Revive goes through `syncRuleReferences({ model, ids }, 'rebuild')`.
 
 ## Items
 
@@ -61,12 +62,46 @@ template level with it.
 - [x] Names; admission deleted; health over edges; labels deleted.
 - [x] Materialized ids in the polymorphism registry; immutable edge ends.
 - [x] Static email scopes; `ownedSegments` without a caller where.
+- [x] One sync entry for save and revive; save-gate helpers in `validations/`; one edge reader.
+
+## Exported surface
+
+`packages/db`:
+- `syncRuleReferenceEdges(source, references)`: makes a source's edges exactly its references,
+  each stamped with its target's `deletedAt`. The one edge writer; it never refuses.
+- `ruleReferences(lens, rule)` / `dynamicRuleReferences(lens, rule)`: the ids a stored rule
+  references through id sources, and the id sources it reads at evaluation.
+- `ruleReferenceTargets(edges)`: each edge's target with its state (`existing`, `deleted`,
+  `purged`). The one edge reader.
+- `lockedTargetStates(references)`: each referenced row's `deletedAt`, read `FOR UPDATE`.
+- `validations/deadRuleReferences(scopes, references?)`: the references whose row is deleted or
+  outside its scope's owner scope, as `{ model, id, state }`.
+- `validations/assertRuleReferencesExist(scopes, references?)`: throws a `RuleReferenceError` with
+  those as `details`, which the API answers with a 422.
+- `materializedIdConflicts`, `withMaterializedIds`, `materializedColumns`: the polymorphism
+  registry's materialized-id step, applied by the rules hook and the factories.
+- `snapshotHookRegistry()`: for tests; restores the hook registry to the snapshot.
+
+`apps/api/src/hooks/ruleReference/` (edge code only):
+- `RULE_REFERENCE_SURFACES` / `isRuleReferenceSourceModel`: the declaration table.
+- `syncRuleReferences({ model, rows } | { model, ids }, mode, previous?)`: syncs each source's
+  edges. In save mode it first runs `assertRuleReferencesExist` on the changed rule columns.
+- `registerRuleReferenceHook()`: the after-hook over the declared models.
+- `registerRuleReferenceTargetHook()`: copies a target's delete or restore onto its edges.
+
+Segment and email callers:
+- `assertSegmentReferencesOwned` (reach).
+- `segmentRuleStates` / `segmentRuleIssuesFromEdges`, which build the rule's health from
+  `ruleReferenceTargets` in a local adapter.
+- `withSegmentsRuleIssues`, whose reads carry the edge rows.
+- `dynamicSegmentsOf`.
+- `EMAIL_OWNER_SCOPES` / `EMAIL_SENDER_SCOPES` / `emailLensBindings` / `scopeEmailLens`.
 
 ## Notes
 
 - **The degraded signal is read from edges, not published.** `ruleReference.stale` had no consumer.
-  A reader asks the edges (`ruleReferenceIssues`), and an alert or a job counts those rows.
-- **Lens use left in health.** `ruleHealthFromEdges` still extracts which ids the stored tree
+  A reader asks the edges (`ruleReferenceTargets`), and an alert or a job counts those rows.
+- **Lens use left in health.** Segment health still extracts which ids the stored tree
   references through the static `customerRefLens`. That is a pure walk with no query, and it is
   how a reference with no edge is seen. `ruleIssues` also checks the tree's vocabulary against that
   lens. Removing both would mean health cannot see a missing edge.
