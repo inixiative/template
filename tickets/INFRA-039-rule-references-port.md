@@ -51,6 +51,27 @@ template level with it.
 
 ## Notes
 
+- **Lenses are static (ruling 2026-10-23).** Nothing narrows, rewrites or re-derives a lens at
+  call time. Audit of this change:
+  - Fixed: `admitRuleReferences` asked the source query with an extra `{ id: { in } }` ANDed onto
+    the lens source's where. It now takes the lens's option set as the lens states it and checks
+    membership. `sourceQueryValues` loses its `where` parameter.
+  - Clean: `ruleReferenceRefusals`, `ruleReferenceLabels` (reads the label the lens declares, then
+    primary-key reads), the segment read's `sourceRuleReferences` include, and health from edges
+    (`ruleHealthFromEdges` over the static `customerRefLens`).
+  - Segment surface lens: `bindLens(customerRefLens, owner bindings)`. This is the static lens with
+    its declared bind tokens filled, not a rewrite.
+  - Open: `emailLensFor` is assembled per row from runtime data. `scopeEmailLens` writes the
+    owner's ids into literal wheres and clamps the slots with owner-built `mapDefaults`, and
+    `defaultRecipientNarrowing` embeds the space id. The static shape would be one exported email
+    lens per owner model whose wheres name `bind` tokens, with only `bindLens(lens,
+    polymorphicBindings(owner))` per row, which is how segments work today. The row's stored
+    narrowing (`EmailTemplate.lens`) stays a serialized input. Not changed here.
+  - Open, outside rule references: `ownedSegments(ownerModel, ownerId, where)` ANDs a caller
+    where onto the Segment source's where (`reconcileCustomerRef` passes `{ type: 'dynamic' }`).
+    The rule-reference callers pass none. The static shape is a named dynamic-segments lens, or
+    filtering the owned set.
+
 - **Labels in a refusal.** A reference the source already held, which was in view when it was
   saved, is named by its label. Any other reference is named by id, so a refusal never shows what
   another owner's row is called.

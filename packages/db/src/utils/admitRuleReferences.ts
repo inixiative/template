@@ -30,11 +30,7 @@ const refusedIn = async (
       refused.push(...refs);
       continue;
     }
-    const { options } = await sourceQueryValues(
-      source,
-      { lens, farSide },
-      { id: { in: refs.map((ref) => ref.id) } },
-    );
+    const { options } = await sourceQueryValues(source, { lens, farSide });
     const ids = new Set(options.map((option) => option.value));
     refused.push(...refs.filter((ref) => !ids.has(ref.id)));
   }

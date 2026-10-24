@@ -121,9 +121,11 @@ describe('a source across a bridge — its rows are candidates, re-checked with 
   });
 
   it('offers only the candidates the recheck holds for', async () => {
-    const { gold, farSide, query, ours } = await fixture();
-    const { options } = await sourceQueryValues(query, { lens: goldTags, farSide }, ours);
-    expect(options.map((option) => option.value)).toEqual([gold.id]);
+    const { gold, silver, farSide, query } = await fixture();
+    const { options } = await sourceQueryValues(query, { lens: goldTags, farSide });
+    const offered = options.map((option) => option.value);
+    expect(offered).toContain(gold.id);
+    expect(offered).not.toContain(silver.id);
   });
 
   it('pins a where to the re-checked rows', async () => {
@@ -152,10 +154,8 @@ describe('a source across a bridge — its rows are candidates, re-checked with 
   });
 
   it('refuses candidates with no far side loaded rather than offer them', async () => {
-    const { query, ours } = await fixture();
-    await expect(sourceQueryValues(query, { lens: goldTags }, ours)).rejects.toBeInstanceOf(
-      UsageError,
-    );
+    const { query } = await fixture();
+    await expect(sourceQueryValues(query, { lens: goldTags })).rejects.toBeInstanceOf(UsageError);
   });
 });
 
