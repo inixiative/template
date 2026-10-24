@@ -37,7 +37,10 @@ import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
 import { registerSegmentMemberOwnerHook } from '#/hooks/segmentMemberOwner/hook';
 import { enqueueJob } from '#/jobs/enqueue';
 import { evaluateSegment } from '#/modules/segment/services/evaluateSegment';
-import { reconcileCustomerRef } from '#/modules/segment/services/reconcileCustomerRef';
+import {
+  dynamicSegmentsOf,
+  reconcileCustomerRef,
+} from '#/modules/segment/services/reconcileCustomerRef';
 import { acmeRule, memberIds } from '#/modules/segment/tests/fixtures';
 
 const idsRule = (ids: string[]) => ({ field: 'id', operator: Operator.in, value: ids });
@@ -426,5 +429,20 @@ describe('segment reconcile', () => {
 
     await updateSegment(frozen, { type: SegmentType.dynamic });
     expect(await memberIds(segment.id)).toEqual([acmeRef.id, newcomerRef.id].sort());
+  });
+
+  it("the owner's dynamic segments are its owned segments filtered to dynamic", async () => {
+    const rule = { field: 'customerUser.email', operator: Operator.endsWith, value: '@acme.test' };
+    const { entity: live } = await createSegment(
+      { ownerModel: ProviderModel.Space, type: SegmentType.dynamic, conditions: rule },
+      { space },
+    );
+    const { entity: frozen } = await createSegment(
+      { ownerModel: ProviderModel.Space, type: SegmentType.static, conditions: rule },
+      { space },
+    );
+    const ids = (await dynamicSegmentsOf(ProviderModel.Space, space.id)).map(({ id }) => id);
+    expect(ids).toContain(live.id);
+    expect(ids).not.toContain(frozen.id);
   });
 });
