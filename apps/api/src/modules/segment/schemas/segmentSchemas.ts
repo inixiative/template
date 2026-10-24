@@ -45,7 +45,7 @@ export const segmentRuleReferenceSchema = RuleReferenceScalarSchema.pick({
   targetModel: true,
   targetId: true,
   targetDeletedAt: true,
-}).extend({ targetLabel: z.string().nullable() });
+});
 
 export const segmentReadResponseSchema = SegmentScalarSchema.extend({
   ruleIssues: z.array(ruleIssueSchema),

@@ -166,14 +166,13 @@ describe('segment routes', () => {
       {
         targetModel: 'Segment',
         targetId: target.id,
-        targetLabel: target.name,
         targetDeletedAt: null,
       },
     ]);
 
     await db.segment.update({ where: { id: target.id }, data: { deletedAt: new Date() } });
     const [degraded] = await read();
-    expect(degraded).toMatchObject({ targetId: target.id, targetLabel: target.name });
+    expect(degraded).toMatchObject({ targetModel: 'Segment', targetId: target.id });
     expect(degraded?.targetDeletedAt).toBeTruthy();
   });
 

@@ -4,12 +4,11 @@
  * @partOf feature:segment
  * @uses infrastructure:prisma
  */
-import { db, type RuleReferenceRow, ruleReferenceLabels } from '@template/db';
+import { db, type RuleReferenceRow } from '@template/db';
 import type { Segment } from '@template/db/generated/client/client';
 import type { RuleReferenceTargetModel } from '@template/db/generated/client/enums';
-import { type RuleIssue, referenceKey } from '@template/shared/rules';
+import type { RuleIssue } from '@template/shared/rules';
 import { groupBy, omit } from 'lodash-es';
-import { customerRefLens } from '#/modules/customerRef/lib/customerRefLens';
 import {
   type SegmentRuleState,
   type SegmentWithEdges,
@@ -20,7 +19,6 @@ import {
 export type SegmentRuleReference = {
   targetModel: RuleReferenceTargetModel;
   targetId: string;
-  targetLabel: string | null;
   targetDeletedAt: Date | null;
 };
 
@@ -66,25 +64,17 @@ const edgesOf = async (segments: SegmentWithEdges[]): Promise<Map<string, RuleRe
 
 const ruleReferencesOf = async (
   segments: SegmentWithEdges[],
-): Promise<Map<string, SegmentRuleReference[]>> => {
-  const edges = await edgesOf(segments);
-  const labels = await ruleReferenceLabels(
-    [customerRefLens],
-    [...edges.values()].flat().map((edge) => ({ model: edge.targetModel, id: edge.targetId })),
-  );
-  return new Map(
-    [...edges].map(([id, rows]) => [
+): Promise<Map<string, SegmentRuleReference[]>> =>
+  new Map(
+    [...(await edgesOf(segments))].map(([id, rows]) => [
       id,
       rows.map((edge) => ({
         targetModel: edge.targetModel as RuleReferenceTargetModel,
         targetId: edge.targetId,
-        targetLabel:
-          labels.get(referenceKey({ model: edge.targetModel, id: edge.targetId })) ?? null,
         targetDeletedAt: edge.targetDeletedAt ?? null,
       })),
     ]),
   );
-};
 
 export const withSegmentsRuleIssues = async (
   segments: SegmentWithEdges[],
