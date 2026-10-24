@@ -178,7 +178,7 @@ describe('segment rule health — edge upkeep', () => {
     clearHookRegistry();
   });
 
-  it('a narrowed update still resyncs the edges', async () => {
+  it('a write that narrows its result is refused, so the edge sync always sees the full row', async () => {
     const { entity: target } = await createSegment(
       { ownerModel: 'Space', conditions: acmeRule },
       { space },
@@ -188,12 +188,14 @@ describe('segment rule health — edge upkeep', () => {
       { space },
     );
 
-    await db.segment.update({
-      where: { id: dependent.id },
-      data: { conditions: membersOf(target.id) },
-      select: { id: true },
-    });
-    expect(await edgesOf(dependent.id)).toHaveLength(1);
+    await expect(
+      db.segment.update({
+        where: { id: dependent.id },
+        data: { conditions: membersOf(target.id) },
+        select: { id: true },
+      }),
+    ).rejects.toThrow('may not pass select or omit');
+    expect(await edgesOf(dependent.id)).toEqual([]);
   });
 
   it('a save resending the stored rule passes while it names a dead reference; a changed rule naming it is refused', async () => {

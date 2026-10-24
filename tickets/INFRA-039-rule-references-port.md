@@ -49,7 +49,7 @@ template level with it.
    memory.
 8. **Names say what they return.** No exported name carries "admit", "live", "named" or
    "identity". One edge reader, `ruleReferenceTargets`, returns each target's state, and callers
-   adapt it. Revive goes through `syncRuleReferences({ model, ids }, 'rebuild')`.
+   adapt it. Revive reads the revived rows whole and passes them to `syncRuleReferences(model, rows)`.
 
 ## Items
 
@@ -84,8 +84,10 @@ template level with it.
 
 `apps/api/src/hooks/ruleReference/` (edge code only):
 - `RULE_REFERENCE_SURFACES` / `isRuleReferenceSourceModel`: the declaration table.
-- `syncRuleReferences({ model, rows } | { model, ids }, mode, previous?)`: syncs each source's
-  edges. In save mode it first runs `assertRuleReferencesExist` on the changed rule columns.
+- `syncRuleReferences(model, rows, previous?)`: syncs each source's edges from the rows as
+  written, with no re-read. With a pre-image (a save) it first runs `assertRuleReferencesExist` on
+  the changed rule columns. Writes to a declared model return full rows: the
+  `ruleReference:fullRows` before-hook refuses `select` or `omit` on them.
 - `registerRuleReferenceHook()`: the after-hook over the declared models.
 - `registerRuleReferenceTargetHook()`: copies a target's delete or restore onto its edges.
 

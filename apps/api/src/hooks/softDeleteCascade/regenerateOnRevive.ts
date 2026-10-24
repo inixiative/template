@@ -4,7 +4,7 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
-import type { HardDeletedOnTombstone } from '@template/db';
+import { db, type HardDeletedOnTombstone } from '@template/db';
 import { syncRuleReferences } from '#/hooks/ruleReference/hook';
 
 type Row = Record<string, unknown>;
@@ -17,9 +17,12 @@ type Row = Record<string, unknown>;
 export const REGENERATE_ON_REVIVE: Partial<
   Record<HardDeletedOnTombstone, (parentModel: string, rows: Row[]) => Promise<void>>
 > = {
-  RuleReference: (model, rows) =>
-    syncRuleReferences(
-      { model, ids: rows.flatMap((row) => (typeof row.id === 'string' ? [row.id] : [])) },
-      'rebuild',
-    ),
+  RuleReference: async (model, rows) => {
+    const ids = rows.flatMap((row) => (typeof row.id === 'string' ? [row.id] : []));
+    if (!ids.length) return;
+    await syncRuleReferences(
+      model,
+      (await db.delegate(model).findMany({ where: { id: { in: ids } } })) as Row[],
+    );
+  },
 };
