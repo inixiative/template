@@ -10,11 +10,13 @@ import {
   createSpace,
 } from '@template/db/test';
 import { RuleDegradedError } from '@template/shared/rules';
+import { registerRuleReferenceHook } from '#/hooks/ruleReference/hook';
 import { registerRuleReferenceTargetHook } from '#/hooks/ruleReference/targetHook';
+import { registerRulesHook } from '#/hooks/rules/hook';
 import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
-import { registerSegmentRuleReferencesHook } from '#/hooks/segmentRuleReferences/hook';
 import { evaluateSegment } from '#/modules/segment/services/evaluateSegment';
 import { withSegmentRuleIssues } from '#/modules/segment/services/withSegmentRuleIssues';
+import { deadReferencesOf } from '#tests/utils/deadReferences';
 
 const acmeRule = { field: 'customerUser.email', operator: Operator.endsWith, value: '@acme.test' };
 
@@ -32,7 +34,8 @@ describe('segment rule health — the segments a rule names, as edges', () => {
 
   beforeAll(async () => {
     registerSegmentConditionsHook();
-    registerSegmentRuleReferencesHook();
+    registerRulesHook();
+    registerRuleReferenceHook();
     registerRuleReferenceTargetHook();
     const { context } = await createOrganizationUser({ role: 'admin' });
     space = (await createSpace({}, { organization: context.organization })).entity;
@@ -163,7 +166,8 @@ describe('segment rule health — edge upkeep', () => {
 
   beforeAll(async () => {
     registerSegmentConditionsHook();
-    registerSegmentRuleReferencesHook();
+    registerRulesHook();
+    registerRuleReferenceHook();
     registerRuleReferenceTargetHook();
     const { context } = await createOrganizationUser({ role: 'admin' });
     space = (await createSpace({}, { organization: context.organization })).entity;
@@ -174,7 +178,7 @@ describe('segment rule health — edge upkeep', () => {
     clearHookRegistry();
   });
 
-  it('a narrowed update still resyncs the edges', async () => {
+  it('a write that narrows its result is refused, so the edge sync always sees the full row', async () => {
     const { entity: target } = await createSegment(
       { ownerModel: 'Space', conditions: acmeRule },
       { space },
@@ -184,15 +188,17 @@ describe('segment rule health — edge upkeep', () => {
       { space },
     );
 
-    await db.segment.update({
-      where: { id: dependent.id },
-      data: { conditions: membersOf(target.id) },
-      select: { id: true },
-    });
-    expect(await edgesOf(dependent.id)).toHaveLength(1);
+    await expect(
+      db.segment.update({
+        where: { id: dependent.id },
+        data: { conditions: membersOf(target.id) },
+        select: { id: true },
+      }),
+    ).rejects.toThrow('may not pass select or omit');
+    expect(await edgesOf(dependent.id)).toEqual([]);
   });
 
-  it('a save that keeps a reference that has since died is allowed; a new dead reference is not', async () => {
+  it('a save resending the stored rule passes while it names a dead reference; a changed rule naming it is refused', async () => {
     const { entity: target } = await createSegment(
       { ownerModel: 'Space', conditions: acmeRule },
       { space },
@@ -209,13 +215,27 @@ describe('segment rule health — edge upkeep', () => {
     });
     expect(renamed.name).toBe('renamed');
 
+    expect(
+      await deadReferencesOf(
+        db.segment.update({
+          where: { id: dependent.id },
+          data: { conditions: { all: [membersOf(target.id), acmeRule] } },
+        }),
+      ),
+    ).toEqual([{ model: 'Segment', id: target.id, state: 'deleted' }]);
+
     const { entity: other } = await createSegment(
       { ownerModel: 'Space', conditions: acmeRule },
       { space },
     );
     await db.segment.update({ where: { id: other.id }, data: { deletedAt: new Date() } });
-    await expect(
-      db.segment.update({ where: { id: dependent.id }, data: { conditions: membersOf(other.id) } }),
-    ).rejects.toThrow('does not own');
+    expect(
+      await deadReferencesOf(
+        db.segment.update({
+          where: { id: dependent.id },
+          data: { conditions: membersOf(other.id) },
+        }),
+      ),
+    ).toEqual([{ model: 'Segment', id: other.id, state: 'deleted' }]);
   });
 });

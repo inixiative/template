@@ -12,6 +12,8 @@ import {
 } from '@template/db/test';
 import { EmailRenderError } from '@template/email/errors/EmailRenderError';
 import { saveEmailTemplate } from '@template/email/render';
+import { registerRuleReferenceHook } from '#/hooks/ruleReference/hook';
+import { registerRuleReferenceTargetHook } from '#/hooks/ruleReference/targetHook';
 import { registerRulesHook } from '#/hooks/rules/hook';
 import { settleTemplate } from '#/lib/emailTemplate';
 
@@ -54,6 +56,8 @@ describe('settleTemplate — the registry entry decides what an issue does', () 
 
   beforeAll(async () => {
     registerRulesHook();
+    registerRuleReferenceHook();
+    registerRuleReferenceTargetHook();
     organization = (await createOrganization()).entity;
     await save('clean', 'Hi {{recipient.name}}');
     await save('holey', 'Hi {{recipient.name}} {{data.missing}}');
@@ -256,6 +260,8 @@ describe("settleTemplate — rules evaluate through the owner's lens", () => {
 
   beforeAll(async () => {
     registerRulesHook();
+    registerRuleReferenceHook();
+    registerRuleReferenceTargetHook();
     organization = (await createOrganization()).entity;
     other = (await createOrganization()).entity;
     myTag = (
@@ -331,7 +337,7 @@ describe("settleTemplate — rules evaluate through the owner's lens", () => {
     expect(foreign.issues).toEqual([]);
   });
 
-  it('a segment whose own rule is degraded leaves the live set, so the branch degrades', async () => {
+  it('a segment whose own rule is degraded leaves the existing-target set, so the branch degrades', async () => {
     const settled = await settleTemplate(
       'scoped-segment',
       sender(),

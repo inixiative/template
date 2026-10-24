@@ -4,9 +4,12 @@ import {
   type HookOptions,
   HookTiming,
   type ModelName,
+  materializedColumns,
+  materializedIdConflicts,
   registerDbHook,
   type SingleAction,
   withDiscriminatorDefaults,
+  withMaterializedIds,
 } from '@template/db';
 import { castArray, without } from 'lodash-es';
 import { getRule, RulesRegistry } from '#/hooks/rules/registry';
@@ -25,8 +28,15 @@ const validateData = (data: Record<string, unknown>, model: ModelName): void => 
 const processCreateArgs = (args: unknown, model: ModelName): void => {
   const data = (args as Record<string, unknown>)?.data ?? (args as Record<string, unknown>)?.create;
   if (!data || typeof data !== 'object') return;
-  for (const row of castArray(data) as Record<string, unknown>[])
-    validateData(withDiscriminatorDefaults(model, row), model);
+  for (const row of castArray(data) as Record<string, unknown>[]) {
+    const defaulted = withDiscriminatorDefaults(model, row);
+    validateData(defaulted, model);
+    const [conflict] = materializedIdConflicts(model, defaulted);
+    if (conflict) throw makeError({ status: 422, message: conflict });
+    const materialized = withMaterializedIds(model, defaulted);
+    for (const column of materializedColumns(model))
+      if (materialized[column] != null) row[column] = materialized[column];
+  }
 };
 
 const processUpdateArgs = (

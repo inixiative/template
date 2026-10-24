@@ -761,27 +761,34 @@ edges are persisted so that "who references X" is an index and a stale rule is n
   resolve — an FK spelling or typo path is a 422, never a silently unregistered rule; `withRule`
   asks the same question at render through `ruleVocabularyIssues`. With no lens there is nothing
   to decide and only extraction runs.
-- **Edges are written by the save path, not a hook.** The writer is
-  `syncRuleReferenceEdges(owner, references, gate)` in `packages/db` — set-diff (survivors
-  keep their row), a newly added missing or soft-deleted target refused as a delta (a pre-existing
-  dead reference stays editable), referenced rows locked with `db.findForUpdate` while the gate
-  reads them, and every kept edge restamped against its target. With `gate: { lenses }` (each
-  lens's `toSourceQueries`), a newly added reference the
-  source's composed `where` does not admit is refused too (`admitRuleReferences`): that is how
-  an Organization template cannot name another organization's tag or segment. Throws
-  `RuleReferenceError`. Adding a rule-bearing column = a `syncRuleReferenceEdges`
-  call from its save path. Email's `syncRuleReferences(source, contents, lens, mode)` is the
-  content-shaped front: it collects the rules out of MJML and subject (`contentRuleReferences`)
-  and hands the references down. `saveEmailTemplate` calls it inside
-  its transaction for the template and each saved component; it is the only writer of
-  `mjml`/`subject`, so nothing bypasses it.
+- **Edges are written by one hook over one declaration table.** `RULE_REFERENCE_SURFACES`
+  (`apps/api/src/hooks/ruleReference/surfaces.ts`) declares each rule-bearing model: its rule
+  columns, a label, the lens a row's rules are read under (`emailLensFor` for email rows, the
+  owner-bound customer-ref lens for segments) and the storage wrapper that reads rules out of the
+  stored value (MJML and subject for email, a condition tree for segments). The `ruleReference`
+  after-hook runs on every write to those models. When a row's rule columns differ from the
+  pre-image, it first checks the changed columns: `deadRuleReferences` (`packages/db`) reads the
+  rows they reference and reports each one that is soft-deleted, or absent from its scope's owner
+  scope (the lens's id source), as `{ model, id, state: 'deleted' | 'missing' }`. Any such row
+  refuses the write: `assertRuleReferencesExist` (`packages/db/src/validations`) throws a
+  `RuleReferenceError` carrying that list, which the API error handler answers as a 422 with `details`. A column resent unchanged is not
+  checked, so a subject-only edit passes over a body naming a dead tag. That is how an Organization
+  template cannot name another organization's tag or segment. Then it calls
+  `syncRuleReferenceEdges(source, references)`, the one edge writer, which mirrors exactly what the
+  rule references: it set-diffs (survivors keep their row), locks the referenced rows with
+  `db.findForUpdate`, stamps each edge with its target's `deletedAt`, and never refuses. Revive
+  regenerates through `syncRuleReferences(model, rows)` with the revived rows read whole, no check. Adding a rule-bearing
+  column means adding a declaration entry and a source FK on `RuleReference`.
 - **Staleness lives on the edge, as two signals rather than a computed flag.** A soft delete of a
   referenced row is copied onto every edge naming it by `ruleReference:target` (one
   `updateManyAndReturn`, matched on `(targetModel, targetId)`, cleared on undelete); a
   purge `SET NULL`s the typed FK and leaves `targetId` naming the row that went. The referenced
   axis therefore carries true polymorphism beside the false — the FK is the relation and may go
-  null, `targetId` is the name and never changes, and the sync writes both from one value.
-  `ruleReferenceIssues(edges)` reads both from the edge rows alone, so consumers
+  null, `targetId` is the name and never changes. The false-polymorphism rules hook writes `sourceId`
+  and `targetId` from the set typed FK on create (`materialized` on the registry axis), refuses a
+  row where they disagree, and the immutable-fields hook refuses any update to an edge's typed FKs
+  or materialized ids, so the only updatable column on an edge is its `targetDeletedAt` stamp.
+  `ruleReferenceTargets(edges)` reads both from the edge rows alone (each target as `existing`, `deleted` or `purged`), so consumers
   write `include: { sourceRuleReferences: true }` and never grow that include as models become
   referenceable. At render, `composeTemplate` reads the template's edges plus those of the
   components the cascade resolved into one live set, and every branch goes through **`withRule`**

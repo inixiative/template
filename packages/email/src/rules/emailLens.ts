@@ -30,6 +30,7 @@ import {
   RULE_REFERENCEABLE_MODELS,
   ruleReferences,
 } from '@template/db';
+import type { ProviderModel } from '@template/db/generated/client/enums';
 import { lensFor, live, omitForeignKeys } from '@template/db/lens';
 import { redactLens } from '@template/db/lens/redactLens';
 import {
@@ -107,24 +108,21 @@ const withMemberships = (memberships: {
   return { ...DEFAULT_RECIPIENT_VIEW, relations: { ...relations, ...memberships } };
 };
 
-export const defaultRecipientNarrowing = (sender: EmailLensOwner): ModelNarrowing | undefined => {
-  const { organizationUsers, spaceUsers } = DEFAULT_RECIPIENT_VIEW.relations!;
-  switch (sender?.ownerModel) {
-    case 'Organization':
-      return withMemberships({ organizationUsers });
-    case 'Space':
-      return withMemberships({
-        spaceUsers: {
-          ...spaceUsers,
-          where: { field: 'space.id', operator: Operator.equals, value: sender.ownerId },
-        },
-      });
-    case undefined:
-      return undefined;
-    default:
-      return withMemberships({});
-  }
+const RECIPIENT_NARROWING_BY_SENDER: Record<ProviderModel, ModelNarrowing> = {
+  Organization: withMemberships({
+    organizationUsers: DEFAULT_RECIPIENT_VIEW.relations!.organizationUsers!,
+  }),
+  Space: withMemberships({
+    spaceUsers: {
+      ...DEFAULT_RECIPIENT_VIEW.relations!.spaceUsers!,
+      where: { field: 'space.id', operator: Operator.equals, bind: 'senderSpaceId' },
+    },
+  }),
+  User: withMemberships({}),
 };
+
+export const defaultRecipientNarrowing = (sender: EmailLensOwner): ModelNarrowing | undefined =>
+  sender ? RECIPIENT_NARROWING_BY_SENDER[sender.ownerModel] : undefined;
 
 const referenceableSources = Object.fromEntries(
   RULE_REFERENCEABLE_MODELS.map((model) => [model, { sources: { id: { label: 'name' } } }]),

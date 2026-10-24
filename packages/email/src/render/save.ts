@@ -20,12 +20,7 @@ import { saveComponents } from '@template/email/render/saveComponents';
 import { saveTemplate } from '@template/email/render/saveTemplate';
 import type { OwnerScope } from '@template/email/render/types';
 import { validateDependents } from '@template/email/render/validateDependents';
-import {
-  componentRuleContents,
-  type EmailLens,
-  syncRuleReferences,
-  templateRuleContents,
-} from '@template/email/rules';
+import type { EmailLens } from '@template/email/rules';
 import { assertValidConditions } from '@template/email/validations/validateConditions';
 import { validateMjml } from '@template/email/validations/validateMjml';
 import { validateNoCycle } from '@template/email/validations/validateNoCycle';
@@ -80,22 +75,11 @@ export const ownerScopeOf = (input: SaveTemplateInput): OwnerScope => ({
   locale: input.locale ?? 'en',
 });
 
-/** Components saved and their rule references synced, inside the caller's transaction. */
-export const saveEmailComponents = async (
+export const saveEmailComponents = (
   inputs: EmailComponent[],
   ctx: OwnerScope,
   lens?: EmailLens,
-): Promise<EmailComponent[]> => {
-  const components = await saveComponents(inputs, ctx, lens);
-  for (const component of components) {
-    await syncRuleReferences(
-      { model: 'EmailComponent', id: component.id },
-      componentRuleContents(component),
-      lens,
-    );
-  }
-  return components;
-};
+): Promise<EmailComponent[]> => saveComponents(inputs, ctx, lens);
 
 export const saveEmailTemplate = async (
   input: SaveTemplateInput,
@@ -137,12 +121,6 @@ export const saveEmailTemplate = async (
         ? await saveEmailComponents(finalComponents, ctx, options.lens)
         : [];
       const template = await saveTemplate(finalTemplate, ctx);
-
-      await syncRuleReferences(
-        { model: 'EmailTemplate', id: template.id },
-        templateRuleContents(template),
-        options.lens,
-      );
 
       const composed = await expand(template.mjml, ctx);
       assertValidConditions(composed, { lens: options.lens });

@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
-import { clearHookRegistry, db, RuleReferenceError, ruleReferenceIssues } from '@template/db';
+import { clearHookRegistry, db, type RuleReferenceRow, ruleReferenceTargets } from '@template/db';
 import {
   cleanupTouchedTables,
   createEmailComponent,
@@ -9,9 +9,14 @@ import {
 } from '@template/db/test';
 import { ConditionValidationError } from '@template/email/errors';
 import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
+import { registerRuleReferenceHook } from '#/hooks/ruleReference/hook';
 import { registerRuleReferenceTargetHook } from '#/hooks/ruleReference/targetHook';
 import { registerRulesHook } from '#/hooks/rules/hook';
 import { saveEmailTemplate } from '#/lib/email/saveEmailTemplate';
+import { deadReferencesOf } from '#tests/utils/deadReferences';
+
+const deadTargets = (edges: RuleReferenceRow[]) =>
+  ruleReferenceTargets(edges).filter((target) => target.state !== 'existing');
 
 const mjml = (content: string) =>
   `<mjml><mj-body><mj-section><mj-column><mj-text>${content}</mj-text></mj-column></mj-section></mj-body></mjml>`;
@@ -58,6 +63,7 @@ describe('ruleReference — the save path writes edges, the target side stamps t
   beforeAll(() => {
     registerPreventHardDeleteHook();
     registerRulesHook();
+    registerRuleReferenceHook();
     registerRuleReferenceTargetHook();
   });
 
@@ -176,16 +182,19 @@ describe('ruleReference — the save path writes edges, the target side stamps t
   });
 
   it('naming a row that does not exist is refused at save', async () => {
-    await expect(
-      save(mjml(taggedBlock('01900000-0000-7000-8000-000000000000'))),
-    ).rejects.toBeInstanceOf(RuleReferenceError);
+    const id = '01900000-0000-7000-8000-000000000000';
+    expect(await deadReferencesOf(save(mjml(taggedBlock(id))))).toEqual([
+      { model: 'Tag', id, state: 'missing' },
+    ]);
   });
 
   it('naming a soft-deleted row is refused at save', async () => {
     const { entity: tag } = await createTag();
     await db.tag.update({ where: { id: tag.id }, data: { deletedAt: new Date() } });
 
-    await expect(save(mjml(taggedBlock(tag.id)))).rejects.toBeInstanceOf(RuleReferenceError);
+    expect(await deadReferencesOf(save(mjml(taggedBlock(tag.id))))).toEqual([
+      { model: 'Tag', id: tag.id, state: 'deleted' },
+    ]);
   });
 
   it('a rule that reads the row from path names no checkable row: save refuses it', async () => {
@@ -217,13 +226,13 @@ describe('ruleReference — the save path writes edges, the target side stamps t
     await save(mjml(taggedBlock(tag.id)));
     await save(mjml(component('vip', taggedBlock(tag.id))));
 
-    expect(ruleReferenceIssues(await edgesOf({ targetId: tag.id }))).toEqual([]);
+    expect(deadTargets(await edgesOf({ targetId: tag.id }))).toEqual([]);
 
     await db.tag.update({ where: { id: tag.id }, data: { deletedAt: new Date() } });
     const stamped = await edgesOf({ targetId: tag.id });
     expect(stamped).toHaveLength(2);
     expect(stamped.every((edge) => edge.targetDeletedAt != null)).toBe(true);
-    expect(ruleReferenceIssues(stamped).map((issue) => [issue.key, issue.reason])).toEqual([
+    expect(deadTargets(stamped).map((issue) => [issue.key, issue.state])).toEqual([
       [refKey('Tag', tag.id), 'deleted'],
       [refKey('Tag', tag.id), 'deleted'],
     ]);
@@ -231,34 +240,7 @@ describe('ruleReference — the save path writes edges, the target side stamps t
     await db.withDeleted(() => db.tag.update({ where: { id: tag.id }, data: { deletedAt: null } }));
     const cleared = await edgesOf({ targetId: tag.id });
     expect(cleared.every((edge) => edge.targetDeletedAt == null)).toBe(true);
-    expect(ruleReferenceIssues(cleared)).toEqual([]);
-  });
-
-  it('soft-deleting a target row publishes one stale event per edge, naming the source; restoring publishes none', async () => {
-    const { entity: tag } = await createTag();
-    await save(mjml(taggedBlock(tag.id)));
-    await save(mjml(component('vip', taggedBlock(tag.id))));
-
-    await db.tag.update({ where: { id: tag.id }, data: { deletedAt: new Date() } });
-
-    const stamped = await edgesOf({ targetId: tag.id });
-    const staleEvents = () =>
-      db.appEvent.findMany({
-        where: { name: 'ruleReference.stale', data: { path: ['targetId'], equals: tag.id } },
-      });
-    const published = (await staleEvents()).map((event) => event.data as Record<string, unknown>);
-    expect(published.map((data) => [data.sourceModel, data.sourceId]).sort()).toEqual(
-      stamped
-        .map((edge) => [
-          edge.sourceModel,
-          edge.sourceEmailTemplateId ?? edge.sourceEmailComponentId,
-        ])
-        .sort(),
-    );
-    expect(published.every((data) => data.targetModel === 'Tag')).toBe(true);
-
-    await db.withDeleted(() => db.tag.update({ where: { id: tag.id }, data: { deletedAt: null } }));
-    expect(await staleEvents()).toHaveLength(published.length);
+    expect(deadTargets(cleared)).toEqual([]);
   });
 
   it('purging a target row nulls the FK and leaves the edge naming it', async () => {
@@ -272,10 +254,10 @@ describe('ruleReference — the save path writes edges, the target side stamps t
     expect(edges).toHaveLength(1);
     expect(edges[0]!.targetTagId).toBeNull();
     expect(edges[0]!.targetId).toBe(tag.id);
-    expect(ruleReferenceIssues(edges).map((issue) => issue.reason)).toEqual(['purged']);
+    expect(deadTargets(edges).map((issue) => issue.state)).toEqual(['purged']);
   });
 
-  it('an edit that keeps a pre-existing dead reference is allowed; adding a new dead one is not', async () => {
+  it('a subject-only edit passes while the unchanged body names a dead tag; a changed body naming it is refused', async () => {
     const [{ entity: tag }, { entity: other }] = await Promise.all([createTag(), createTag()]);
     await save(mjml(taggedBlock(tag.id)), { slug: 'edit' });
     await db.tag.update({ where: { id: tag.id }, data: { deletedAt: new Date() } });
@@ -286,10 +268,11 @@ describe('ruleReference — the save path writes edges, the target side stamps t
     });
     expect(edited.subject).toBe('Typo fixed');
 
-    await db.tag.update({ where: { id: other.id }, data: { deletedAt: new Date() } });
-    await expect(
-      save(mjml(taggedBlock(tag.id, other.id)), { slug: 'edit' }),
-    ).rejects.toBeInstanceOf(RuleReferenceError);
+    expect(
+      await deadReferencesOf(
+        save(mjml(taggedBlock(tag.id, other.id)), { slug: 'edit', subject: 'Typo fixed' }),
+      ),
+    ).toEqual([{ model: 'Tag', id: tag.id, state: 'deleted' }]);
   });
 
   it('a save that removes the dead reference removes its edge', async () => {

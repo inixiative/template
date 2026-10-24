@@ -87,13 +87,13 @@ const renderComposed = (
   vars: Variables,
   scope: OwnerScope,
   lens: EmailLens,
-  liveRefs: ReadonlySet<string>,
+  existingTargets: ReadonlySet<string>,
 ): Rendered => {
   const issues: RenderIssue[] = [];
   const subjectIssues: RenderIssue[] = [];
   const bodySink: RuleErrorSink = (issue) => issues.push(issue);
   const subjectSink: RuleErrorSink = (issue) => subjectIssues.push(issue);
-  const options = { locale: scope.locale, liveRefs };
+  const options = { locale: scope.locale, existingTargets };
   const mjml = renderForRecipient(composed.mjml, vars, lens, { ...options, onError: bodySink });
   const subject = renderForRecipient(composed.subject, vars, lens, {
     ...options,
@@ -151,8 +151,8 @@ export const settleTemplate = async (
     const vars: Variables = systemVarsForKind
       ? { ...variables, system: { ...variables.system, ...systemVarsForKind(composed.kind) } }
       : variables;
-    const liveRefs = await withoutDegradedSegments(composed.liveRuleRefs);
-    return renderComposed(slug, composed, vars, at, lens, liveRefs);
+    const existingTargets = await withoutDegradedSegments(composed.existingTargets);
+    return renderComposed(slug, composed, vars, at, lens, existingTargets);
   };
 
   const clean = (rendered: Rendered): boolean =>

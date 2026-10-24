@@ -14,7 +14,7 @@ export type Variables = Partial<Record<ScopeRoot, Record<string, unknown>>>;
 
 export type InterpolateOptions = {
   locale?: string;
-  liveRefs?: ReadonlySet<string>;
+  existingTargets?: ReadonlySet<string>;
   lens: EmailLens;
 };
 
@@ -60,7 +60,7 @@ export const interpolate = (
   return settle(
     resolveSystemTokens(template, options),
     scope,
-    { substitute: true, liveRefs: options.liveRefs, lens, ruleScope },
+    { substitute: true, existingTargets: options.existingTargets, lens, ruleScope },
     onError,
   );
 };

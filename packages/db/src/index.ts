@@ -12,6 +12,7 @@ export {
   type ManyAction,
   registerDbHook,
   type SingleAction,
+  snapshotHookRegistry,
   unregisterDbHook,
 } from './extensions/hookRegistry';
 // Prisma namespace for advanced types (Prisma.UserWhereInput, etc.)
@@ -120,12 +121,6 @@ export type {
 // User with relations type and schema
 export type { UserWithRelations } from './types/userWithRelations';
 export { UserWithRelationsSchema } from './types/userWithRelations';
-export {
-  admitRuleReferences,
-  type ReferenceScope,
-  type ReferenceScopes,
-  type RuleReferenceAdmission,
-} from './utils/admitRuleReferences';
 // SQL utilities
 export { aliasColumns } from './utils/aliasColumns';
 // Type-safe delegate helpers (pass-the-delegate pattern)
@@ -170,12 +165,9 @@ export { revive } from './utils/revive';
 export { RULE_REFERENCEABLE_MODELS } from './utils/ruleReferenceable';
 export { RuleReferenceError } from './utils/ruleReferenceError';
 export {
-  liveRuleReferenceKeys,
-  liveRuleReferences,
-  type RuleReferenceIssue,
   type RuleReferenceRow,
-  ruleHealthFromEdges,
-  ruleReferenceIssues,
+  type RuleReferenceTarget,
+  ruleReferenceTargets,
 } from './utils/ruleReferenceHealth';
 export {
   type DynamicRuleReference,
@@ -188,12 +180,14 @@ export {
   sourceQueryValues,
 } from './utils/sourceQueryValues';
 export { sourceQueryWhere } from './utils/sourceQueryWhere';
-export {
-  type RuleReferenceGate,
-  type RuleReferenceSource,
-  syncRuleReferenceEdges,
-} from './utils/syncRuleReferenceEdges';
+export { type RuleReferenceSource, syncRuleReferenceEdges } from './utils/syncRuleReferenceEdges';
 export { type NodeContext, type NodeScope, walkWhere } from './utils/whereWalker';
+export { assertRuleReferencesExist } from './validations/assertRuleReferencesExist';
+export {
+  type DeadRuleReference,
+  deadRuleReferences,
+  type ReferenceScope,
+} from './validations/deadRuleReferences';
 export {
   type RuleValidation,
   type ValidateRuleForLensOptions,

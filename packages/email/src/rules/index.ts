@@ -53,13 +53,13 @@ export {
   type RailProvidedSystemField,
 } from './railProvidedSystemFields';
 export { type BindingChain, resolveBindingPath } from './resolveBindingPath';
-export { contentReferenceScopes, contentRuleReferences } from './ruleReferences';
+export { componentRuleContents, type RuleContents, templateRuleContents } from './ruleContents';
+export {
+  contentDynamicRuleReferences,
+  contentReferenceScopes,
+  contentRuleReferences,
+} from './ruleReferences';
 export { type LoopFrame, loopFrames, narrowToElements, scopedRule } from './scopedRule';
 export { type EmailLensOwner, scopeEmailLens } from './scopeEmailLens';
-export {
-  componentRuleContents,
-  syncRuleReferences,
-  templateRuleContents,
-} from './syncRuleReferences';
 export { type ConditionTreeChild, walkConditionTree } from './walkConditionTree';
 export { type LensPathWalk, lensPathFields, walkLensPath } from './walkLensPath';

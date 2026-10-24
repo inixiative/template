@@ -3,8 +3,8 @@
 // ============================================================================
 // One row per (source row → target row) edge, recomputed by
 // syncRuleReferenceEdges (packages/db/src/utils) inside the transaction of every
-// save of a rule-bearing column; email calls it from its save path, segments from
-// an after-write hook. Both ends are false-polymorphic (exactly one FK matches each
+// save of a rule-bearing column, from the ruleReference after-hook over
+// RULE_REFERENCE_SURFACES (apps/api/src/hooks/ruleReference/surfaces.ts). Both ends are false-polymorphic (exactly one FK matches each
 // discriminator; config in registries/falsePolymorphism.ts) so either end can be
 // included. The source side cascades — a source's edges die with it. The target
 // side does not.
@@ -26,6 +26,8 @@ model RuleReference {
   createdAt DateTime @default(now())
 
   sourceModel            RuleReferenceSourceModel
+  // True poly beside the false, materialized from the typed FK on create by the polymorphism registry.
+  sourceId               String                   @db.VarChar(36)
   sourceEmailTemplateId  String?                  @db.VarChar(36)
   sourceEmailComponentId String?                  @db.VarChar(36)
   sourceSegmentId        String?                  @db.VarChar(36)
@@ -33,7 +35,7 @@ model RuleReference {
   targetModel          RuleReferenceTargetModel
   // True poly beside the false: the name, written once and never updated. The typed FK below is the
   // relation, and the database nulls it when the row is purged - this is what still says which row
-  // the rule meant. Written from the same value as the FK, so the two agree by construction.
+  // the rule meant. Materialized from the typed FK on create by the polymorphism registry.
   targetId             String                   @db.VarChar(36)
   targetTagId          String?                  @db.VarChar(36)
   targetOrganizationId String?                  @db.VarChar(36)
@@ -55,11 +57,9 @@ model RuleReference {
   targetSpace          Space?          @relation("RuleReferenceTarget", fields: [targetSpaceId], references: [id])
   targetSegment        Segment?        @relation("RuleReferenceTarget", fields: [targetSegmentId], references: [id])
 
-  // Edge identity. The discriminator is inside the key, so this needs no partial predicate: one
-  // unique per source column.
-  @@unique([sourceEmailTemplateId, targetModel, targetId], map: "RuleReference_sourceEmailTemplate_target_key")
-  @@unique([sourceEmailComponentId, targetModel, targetId], map: "RuleReference_sourceEmailComponent_target_key")
-  @@unique([sourceSegmentId, targetModel, targetId], map: "RuleReference_sourceSegment_target_key")
+  // Edge identity, on the plain columns: one unique whatever the source model, so a new source
+  // model needs no new constraint.
+  @@unique([sourceModel, sourceId, targetModel, targetId])
   @@index([targetModel, targetId])
   @@index([sourceEmailTemplateId])
   @@index([sourceEmailComponentId])
