@@ -47,7 +47,7 @@ const grantsFor = async (rawKey: string) => {
   );
 };
 
-describe('a membership token holds its membership, never the user (template #210 7f651bcc)', () => {
+describe('a membership token holds its membership and knows who it is, never the user (template #210 7f651bcc)', () => {
   let organization: Organization;
   let space: Space;
 
@@ -61,7 +61,7 @@ describe('a membership token holds its membership, never the user (template #210
   });
 
   it('an OrganizationUser token: its org at its role, and nothing else', async () => {
-    const { entity: organizationUser } = await createOrganizationUser(
+    const { entity: organizationUser, context } = await createOrganizationUser(
       { role: 'admin' },
       { organization },
     );
@@ -72,6 +72,7 @@ describe('a membership token holds its membership, never the user (template #210
     );
 
     expect(await grantsFor(rawKey)).toEqual({
+      [`db:user:${context.user.id}`]: ['user.identify'],
       [`db:organization:${organization.id}`]: ['manage'],
     });
   });
@@ -82,7 +83,10 @@ describe('a membership token holds its membership, never the user (template #210
     const { rawKey, fields } = mintKey();
     await createToken({ ownerModel: 'SpaceUser', role: 'owner', ...fields }, { spaceUser });
 
-    expect(await grantsFor(rawKey)).toEqual({ [`db:space:${space.id}`]: ['own'] });
+    expect(await grantsFor(rawKey)).toEqual({
+      [`db:user:${context.user.id}`]: ['user.identify'],
+      [`db:space:${space.id}`]: ['own'],
+    });
   });
 
   it('a SpaceUser token below its membership holds the lesser role', async () => {
@@ -91,6 +95,9 @@ describe('a membership token holds its membership, never the user (template #210
     const { rawKey, fields } = mintKey();
     await createToken({ ownerModel: 'SpaceUser', role: 'viewer', ...fields }, { spaceUser });
 
-    expect(await grantsFor(rawKey)).toEqual({ [`db:space:${space.id}`]: ['read'] });
+    expect(await grantsFor(rawKey)).toEqual({
+      [`db:user:${context.user.id}`]: ['user.identify'],
+      [`db:space:${space.id}`]: ['read'],
+    });
   });
 });

@@ -5,10 +5,17 @@
  * @uses none
  */
 import type { RouteConfig } from '@hono/zod-openapi';
+import { personOnlyActions } from '@template/permissions/client';
 import { castArray } from 'lodash-es';
 import { securityRequirements } from '#/lib/auth/securitySchemes';
 import type { RouteArgs } from '#/lib/routeTemplates/types';
-import { validateNotToken } from '#/middleware/validations/validateNotToken';
+
+const personOnly = new Set<string>(personOnlyActions);
+
+const checksPersonOnlyAction = (middleware: RouteArgs['middleware']) =>
+  castArray(middleware ?? []).some(
+    (handler) => 'selfAction' in handler && personOnly.has(String(handler.selfAction)),
+  );
 
 export const securityForRoute = ({
   internal,
@@ -19,7 +26,6 @@ export const securityForRoute = ({
 > => {
   if (security) return security;
   if (internal) return securityRequirements('internalSecret');
-  if (castArray(middleware ?? []).includes(validateNotToken))
-    return securityRequirements('userJwt');
+  if (checksPersonOnlyAction(middleware)) return securityRequirements('userJwt');
   return securityRequirements('userJwt', 'apiToken');
 };

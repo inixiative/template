@@ -41,7 +41,7 @@
 - [Validation Middleware](#validation-middleware)
   - [validateUser](#validateuser)
   - [validateActor](#validateactor)
-  - [validateNotToken](#validatenottoken)
+  - [validateSelfPermission](#validateselfpermission)
   - [validateSuperadmin](#validatesuperadmin)
 - [Choosing Between validateUser and validateActor](#choosing-between-validateuser-and-validateactor)
 
@@ -171,7 +171,7 @@ The token's `iss` picks the issuer; an unknown `iss` is refused. `algorithms: ['
 | What | Revokes |
 |---|---|
 | Sign out of one browser | Nothing on the server: the SPA drops its JWT |
-| `POST /api/v1/me/rotateJwts` | Every JWT this API signed for the caller, on every device: the nuclear option, not a sign-out of one device. Person-only (`validateNotToken`): an API token cannot rotate its user's JWTs |
+| `POST /api/v1/me/rotateJwts` | Every JWT this API signed for the caller, on every device: the nuclear option, not a sign-out of one device. Person-only (`validateSelfPermission(SessionAction.rotateUserJwts)`, an actor arm in the schema): an API token cannot rotate its user's JWTs |
 | `POST /api/admin/user/:id/rotateJwts` | Every JWT this API signed for that user (superadmin) |
 | `redactUser` (`POST /api/v1/me/redact`, `POST /api/admin/user/:id/redact`) | Every JWT of the deleted account (`rotateUserJwts`; the soft-deleted user is refused too) |
 | Password reset (BetterAuth `onPasswordReset`) | Every JWT this API signed for that user |
@@ -574,14 +574,14 @@ router.get('/resource', validateActor, handler);  // 401 if no user from getActo
 
 `getActor(c).user` falls back from `c.get('user')` to the organizationUser / spaceUser / token user. Token auth already calls `setUserContext` for User, OrganizationUser and SpaceUser tokens, so in practice both validators admit the same callers.
 
-### validateNotToken
+### validateSelfPermission
 
-Person-only actions: a person's JWT holds them, an API token does not. Token minting, token deletion, organization deletion and `POST /api/v1/me/rotateJwts` use it. A superadmin's token passes.
+Checks an action on the caller's own user entry; every `/me/*` route and every session action declares one. The person-only actions (token minting and deletion, redaction, JWT rotation, organization deletion) are actor arms in the schema, so an API token never holds them and a superadmin's token passes. See [PERMISSIONS.md](./PERMISSIONS.md#validateselfpermission).
 
 ```typescript
-import { validateNotToken } from '#/middleware/validations/validateNotToken';
+import { validateSelfPermission } from '#/middleware/validations/validateSelfPermission';
 
-router.post('/sensitive', validateNotToken, handler);  // 403 if using token
+middleware: [validateSelfPermission(SessionAction.rotateUserJwts)]  // 403 for any token
 ```
 
 ### validateSuperadmin
@@ -607,4 +607,4 @@ router.get('/admin/users', validateSuperadmin, handler);  // 403 if not superadm
 | Organization token | ❌ (no user) | ❌ 401 | ❌ 401 |
 | Space token | ❌ (no user) | ❌ 401 | ❌ 401 |
 
-Organization and Space tokens are created without a `userId` (`organizationCreateToken`, `spaceCreateToken`); token auth only sets up their permissions. A route meant for them must skip both validators and rely on `validatePermission`. Use `validateUser` for `/me/*` and anything that acts as a person; `validateNotToken` where a token must never be enough.
+Organization and Space tokens are created without a `userId` (`organizationCreateToken`, `spaceCreateToken`); token auth only sets up their permissions. A route meant for them must skip both validators and rely on `validatePermission`. Use `validateUser` for `/me/*` and anything that acts as a person, then `validateSelfPermission(action)` to name what it does; the person-only actions are schema rules, not middleware.
