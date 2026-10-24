@@ -55,6 +55,7 @@ describe('POST /api/v1/inquiry/:id/resolve (changesRequested)', () => {
 
     const response = await fetch(
       post(`/api/v1/inquiry/${inquiry.id}/resolve`, {
+        expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
         status: InquiryStatus.changesRequested,
         explanation: 'Please change the role',
       }),
@@ -79,6 +80,7 @@ describe('POST /api/v1/inquiry/:id/resolve (changesRequested)', () => {
 
     const response = await fetch(
       post(`/api/v1/inquiry/${inquiry.id}/resolve`, {
+        expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
         status: InquiryStatus.changesRequested,
         explanation: 'Too late',
       }),
@@ -100,6 +102,7 @@ describe('POST /api/v1/inquiry/:id/resolve (changesRequested)', () => {
 
     const response = await fetch(
       post(`/api/v1/inquiry/${inquiry.id}/resolve`, {
+        expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
         status: InquiryStatus.changesRequested,
         explanation: 'Needs review',
       }),

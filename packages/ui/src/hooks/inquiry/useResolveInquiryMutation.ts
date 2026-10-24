@@ -21,7 +21,10 @@ export const useResolveInquiryMutation = () => {
 
   return useOptimisticMutation<unknown, Error, ResolveVars>({
     mutationFn: apiMutation(({ inquiry, status }: ResolveVars) =>
-      inquiryResolve({ path: { id: inquiry.id }, body: { status } }),
+      inquiryResolve({
+        path: { id: inquiry.id },
+        body: { status, expectedUpdatedAt: inquiry.updatedAt },
+      }),
     ),
     targets: ({ inquiry, status }) =>
       targetMutations[inquiry.type](inquiry).map((queryKey) => ({

@@ -147,10 +147,13 @@ Who may create is the type's `send` rule (see [Permissions](#permissions-rebac))
 | `POST` | `/api/v1/inquiry/:id/resolve` | `resolve` | Approve, deny, or request changes |
 | `DELETE` | `/api/v1/inquiry/:id/cancel` | `send` | Cancel (source only): sets `canceled`, clears `expiresAt`, soft-deletes |
 
+**Every state-changing action carries the version the actor saw.** `expectedUpdatedAt` is the inquiry's `updatedAt` as the actor read it: in the body of `PATCH`, `/send` and `/resolve`, and as a query parameter on `DELETE /cancel`. `lockInquiryAtVersion` row-locks the inquiry (`db.findForUpdate`, inside the action's `db.txn`) and answers **409** when the version moved, so an edit between reading and approving fails the approval instead of approving something nobody looked at. The status checks run on the locked row. The UI hooks send `inquiry.updatedAt` on every mutation.
+
 **Resolve body:**
 ```typescript
 {
   status: 'approved' | 'denied' | 'changesRequested';
+  expectedUpdatedAt: string;   // the updatedAt you read
   explanation?: string;
 }
 ```
