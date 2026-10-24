@@ -8,17 +8,14 @@ import type { Condition } from '@inixiative/json-rules';
 import { db, type RuleReferenceRow, ruleHealthFromEdges } from '@template/db';
 import type { Segment } from '@template/db/generated/client/client';
 import { type RuleHealth, type RuleIssue, referenceKey, ruleIssues } from '@template/shared/rules';
-import { groupBy, keyBy, uniqBy } from 'lodash-es';
-import { customerRefLens, ownedSegments } from '#/modules/customerRef/lib/customerRefLens';
-import { segmentOwnerId } from '#/modules/segment/lib/segmentOwner';
+import { groupBy, keyBy } from 'lodash-es';
+import { customerRefLens } from '#/modules/customerRef/lib/customerRefLens';
 
 export type SegmentRuleState = { segment: Segment; health: RuleHealth; issues: RuleIssue[] };
 
 export type SegmentWithEdges = Segment & { sourceRuleReferences?: RuleReferenceRow[] };
 
 const segmentKey = (id: string): string => referenceKey({ model: 'Segment', id });
-
-const ownerKey = (segment: Segment): string => `${segment.ownerModel}:${segmentOwnerId(segment)}`;
 
 const degradedReferenceDetail = (issue: RuleIssue, degraded: ReadonlySet<string>): RuleIssue =>
   issue.kind === 'reference' && degraded.has(referenceKey(issue.reference))
@@ -27,9 +24,6 @@ const degradedReferenceDetail = (issue: RuleIssue, degraded: ReadonlySet<string>
         detail: `rule names a ${issue.reference.model} whose own rule is degraded: ${issue.reference.id}`,
       }
     : issue;
-
-const ownerSegments = (sample: Segment): Promise<Segment[]> =>
-  ownedSegments(sample.ownerModel, segmentOwnerId(sample));
 
 const edgesFor = async (segmentIds: string[]): Promise<Record<string, RuleReferenceRow[]>> =>
   groupBy(
@@ -41,7 +35,7 @@ const edgesFor = async (segmentIds: string[]): Promise<Record<string, RuleRefere
     'sourceSegmentId',
   );
 
-const closeOverOwner = (
+const closeOverEdges = (
   segments: Segment[],
   edges: Record<string, RuleReferenceRow[]>,
 ): Map<string, SegmentRuleState> => {
@@ -86,28 +80,38 @@ const closeOverOwner = (
   return states;
 };
 
+const referencedSegmentIds = (edges: RuleReferenceRow[]): string[] =>
+  edges.flatMap((edge) =>
+    edge.targetModel === 'Segment' && edge.targetSegmentId != null && edge.targetDeletedAt == null
+      ? [edge.targetSegmentId as string]
+      : [],
+  );
+
+/** Each segment's rule state, closed over the segments its edges reference, transitively. */
 export const segmentRuleStates = async (
   segments: Segment[],
 ): Promise<Map<string, SegmentRuleState>> => {
-  const states = new Map<string, SegmentRuleState>();
-  for (const sample of uniqBy(segments, ownerKey)) {
-    const owned = uniqBy(
-      [
-        ...(await ownerSegments(sample)),
-        ...segments.filter((s) => ownerKey(s) === ownerKey(sample)),
-      ],
-      'id',
-    );
-    const edges = await edgesFor(owned.map((segment) => segment.id));
-    for (const [id, state] of closeOverOwner(owned, edges)) states.set(id, state);
+  const reached = new Map(segments.map((segment) => [segment.id, segment]));
+  const edges: Record<string, RuleReferenceRow[]> = {};
+  let frontier = [...reached.keys()];
+  while (frontier.length) {
+    Object.assign(edges, await edgesFor(frontier));
+    const next = [
+      ...new Set(frontier.flatMap((id) => referencedSegmentIds(edges[id] ?? []))),
+    ].filter((id) => !reached.has(id));
+    for (const segment of next.length
+      ? await db.segment.findMany({ where: { id: { in: next } } })
+      : [])
+      reached.set(segment.id, segment);
+    frontier = next.filter((id) => reached.has(id));
   }
-  return states;
+  return closeOverEdges([...reached.values()], edges);
 };
 
 export const segmentRuleState = async (segment: Segment): Promise<SegmentRuleState> =>
   (await segmentRuleStates([segment])).get(segment.id)!;
 
-/** Issues read off the row's own edges; null when an existing segment reference means the owner closure decides. */
+/** Issues read off the row's own edges; null when an existing segment reference means the edge closure decides. */
 export const segmentRuleIssuesFromEdges = (segment: SegmentWithEdges): RuleIssue[] | null => {
   if (!segment.sourceRuleReferences) return null;
   const health = ruleHealthFromEdges(
