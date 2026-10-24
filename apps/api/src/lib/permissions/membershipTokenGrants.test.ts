@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { createHash, randomBytes } from 'node:crypto';
-import { db } from '@template/db';
+import { type AccessorName, db, fetchOne, hydrate } from '@template/db';
 import type { Organization, Space } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
@@ -10,6 +10,7 @@ import {
   createSpaceUser,
   createToken,
 } from '@template/db/test';
+import { check, rebacSchema } from '@template/permissions/rebac';
 import { tokenAuthMiddleware } from '#/middleware/auth/tokenAuthMiddleware';
 import { meRouter } from '#/modules/me';
 import { createTestApp } from '#tests/createTestApp';
@@ -30,6 +31,17 @@ const { app: tokenApp } = createTestApp({
     (app) => {
       app.use('*', tokenAuthMiddleware);
       app.get('/grants', (c) => c.json(c.get('permix').getJSON()));
+      app.post('/holds', async (c) => {
+        const { model, id, action } = (await c.req.json()) as {
+          model: AccessorName;
+          id: string;
+          action: string;
+        };
+        const row = await fetchOne<{ id: string }>(model, id);
+        if (!row) return c.json({ holds: false });
+        const record = await hydrate(model, row);
+        return c.json({ holds: check(c.get('permix'), rebacSchema, model, record, action) });
+      });
       app.route('/api/v1/me', meRouter);
     },
   ],
@@ -49,6 +61,16 @@ const grantsFor = async (rawKey: string) => {
   );
 };
 
+const holds = async (rawKey: string, model: AccessorName, id: string, action: string) => {
+  const response = await tokenApp.request('/holds', {
+    method: 'POST',
+    headers: { authorization: `Bearer ${rawKey}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ model, id, action }),
+  });
+  expect(response.status).toBe(200);
+  return ((await response.json()) as { holds: boolean }).holds;
+};
+
 describe('a membership token holds its membership and knows who it is, never the user (template #210 7f651bcc)', () => {
   let organization: Organization;
   let space: Space;
@@ -62,7 +84,7 @@ describe('a membership token holds its membership and knows who it is, never the
     await cleanupTouchedTables(db);
   });
 
-  it('an OrganizationUser token: its org at its role, and nothing else', async () => {
+  it('an OrganizationUser token: its org at its role, its own name, and nothing else', async () => {
     const { entity: organizationUser, context } = await createOrganizationUser(
       { role: 'admin' },
       { organization },
@@ -75,11 +97,13 @@ describe('a membership token holds its membership and knows who it is, never the
 
     expect(await grantsFor(rawKey)).toEqual({
       [`db:user:${context.user.id}`]: ['user.identify'],
-      [`db:organization:${organization.id}`]: ['manage'],
     });
+    expect(await holds(rawKey, 'organization', organization.id, 'manage')).toBe(true);
+    expect(await holds(rawKey, 'organization', organization.id, 'own')).toBe(false);
+    expect(await holds(rawKey, 'user', context.user.id, 'read')).toBe(false);
   });
 
-  it('a SpaceUser token: its space at its role, and nothing else', async () => {
+  it('a SpaceUser token: its space at its role, its own name, and not the organization', async () => {
     const { context } = await createOrganizationUser({ role: 'admin' }, { organization });
     const { entity: spaceUser } = await createSpaceUser({ role: 'owner' }, { ...context, space });
     const { rawKey, fields } = mintKey();
@@ -87,8 +111,9 @@ describe('a membership token holds its membership and knows who it is, never the
 
     expect(await grantsFor(rawKey)).toEqual({
       [`db:user:${context.user.id}`]: ['user.identify'],
-      [`db:space:${space.id}`]: ['own'],
     });
+    expect(await holds(rawKey, 'space', space.id, 'own')).toBe(true);
+    expect(await holds(rawKey, 'organization', organization.id, 'read')).toBe(false);
   });
 
   it('a SpaceUser token below its membership holds the lesser role', async () => {
@@ -97,10 +122,8 @@ describe('a membership token holds its membership and knows who it is, never the
     const { rawKey, fields } = mintKey();
     await createToken({ ownerModel: 'SpaceUser', role: 'viewer', ...fields }, { spaceUser });
 
-    expect(await grantsFor(rawKey)).toEqual({
-      [`db:user:${context.user.id}`]: ['user.identify'],
-      [`db:space:${space.id}`]: ['read'],
-    });
+    expect(await holds(rawKey, 'space', space.id, 'read')).toBe(true);
+    expect(await holds(rawKey, 'space', space.id, 'operate')).toBe(false);
   });
 
   it("a SpaceUser token's context carries its space seat and no organization seat", async () => {

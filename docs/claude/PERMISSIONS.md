@@ -20,7 +20,7 @@
   - [setupOrgContext](#setuporgcontext)
   - [setupUserContext](#setupusercontext)
   - [setupSpacePermissions](#setupspacepermissions)
-  - [Token Permission Restriction](#token-permission-restriction)
+  - [A Credential Never Exceeds Its Holder](#a-credential-never-exceeds-its-holder)
   - [Role Validation](#role-validation)
 - [Permission Checks](#permission-checks)
   - [In Controllers](#in-controllers)
@@ -28,7 +28,6 @@
     - [Resource Lookup Runs Before Authorization](#resource-lookup-runs-before-authorization)
 - [Entitlements](#entitlements)
   - [How Entitlements Are Applied](#how-entitlements-are-applied)
-  - [Intersecting Entitlements](#intersecting-entitlements)
 - [REBAC](#rebac)
   - [Schema](#schema)
   - [ActionRule Types](#actionrule-types)
@@ -115,9 +114,8 @@ export const roleHierarchy = ['viewer', 'member', 'admin', 'owner'] as const;
 ```
 
 Higher index = more permissions. Used for:
-- `lesserRole(a, b)` - Returns the lower of two roles
 - `greaterRole(a, b)` - Returns the higher of two roles
-- Token permission restriction (token can't exceed user's role)
+- `narrowing(...)` - a token's role claims every action at or below it ([A Credential Never Exceeds Its Holder](#a-credential-never-exceeds-its-holder))
 
 ---
 
@@ -282,82 +280,59 @@ export async function setupUserContext(permix: Permix, params: {
 
 ### setupSpacePermissions
 
-Called by auth middleware to set space permissions. Located in `apps/api/src/lib/permissions/setupSpacePermissions.ts`.
+Installs a space grant per SpaceUser seat, or, for a token, the token's claim on the seats it holds, owned by the holder's table (the seats plus the person's organization seats, since a space walks to its organization):
 
 ```typescript
+// apps/api/src/lib/permissions/setupSpacePermissions.ts
 export const setupSpacePermissions = async (c: Context<AppEnv>) => {
   const permix = c.get('permix');
   const token = c.get('token');
   const spaceUsers = c.get('spaceUsers');
 
-  // Space token → single space, token permissions only
+  // A space's own token: the space holds everything on itself, so the role stands.
   if (token?.ownerModel === 'Space' && token.spaceId) {
-    await setupSpaceContext(permix, { role, spaceId, entitlements });
+    await permix.setup(getSpacePermissions(token.role, token.spaceId, token.entitlements));
     return;
   }
 
-  // SpaceUser token → single space, lesser of spaceUser + token
-  if (token?.ownerModel === 'SpaceUser' && token.spaceId) {
-    const spaceUser = spaceUsers?.find((su) => su.spaceId === token.spaceId);
-    if (spaceUser) {
-      await setupSpaceContext(permix, {
-        role: lesserRole(spaceUser.role, token.role),
-        spaceId,
-        entitlements: intersectEntitlements(spaceUser.entitlements, token.entitlements),
-      });
-    }
+  if (!spaceUsers?.length) return;
+  const seats = spaceUsers.map((su) => getSpacePermissions(su.role, su.spaceId, su.entitlements));
+
+  if (!token) {
+    await permix.setup(seats);
     return;
   }
 
-  // Person JWT or User token → all spaces the user belongs to
-  for (const spaceUser of spaceUsers ?? []) {
-    const role = token ? lesserRole(spaceUser.role, token.role) : spaceUser.role;
-    await setupSpaceContext(permix, { role, spaceId: spaceUser.spaceId, entitlements });
-  }
+  // A SpaceUser token narrows that one seat; a User token narrows every seat the person holds.
+  const held = token.ownerModel === 'SpaceUser'
+    ? spaceUsers.filter((su) => su.spaceId === token.spaceId)
+    : spaceUsers;
+  const owner = createPermissions();
+  await owner.setup([...seats, ...organizationSeats]);
+  await permix.setup(
+    held.map((su) => narrowing('db:space', su.spaceId, token.role, token.entitlements, su.entitlements)),
+    { owner },
+  );
 };
 ```
 
-### Token Permission Restriction
+### A Credential Never Exceeds Its Holder
 
-Tokens have their own `role` field that restricts permissions below the user's actual role. This applies to both org and user contexts.
-
-```typescript
-// Token schema (simplified)
-{
-  role: Role,    // 'owner' | 'admin' | 'member' | 'viewer'
-  entitlements: Entitlements // Optional custom grants
-}
-```
-
-**Organization context** - token restricts per-org role:
+A token has its own `role` and `entitlements`, and they are a claim, not a grant. The installers (`setupUserPermissions`, `setupOrgPermissions`, `setupSpacePermissions`) build the holder's table and install the token's claim as entitlements owned by it:
 
 ```typescript
 // apps/api/src/lib/permissions/setupOrgPermissions.ts
-for (const orgUser of orgUsers) {
-  const role = token
-    ? lesserRole(orgUser.role, token.role)  // Token can't exceed user's role
-    : orgUser.role;
-  const entitlements = token
-    ? intersectEntitlements(orgUser.entitlements, token.entitlements)
-    : orgUser.entitlements;
-
-  await setupOrgContext(permix, { role, orgId, entitlements });
-}
+const owner = createPermissions();
+await owner.setup(seats);                          // the person's organization seats, as grants
+await permix.setup(
+  held.map((orgUser) =>
+    narrowing('db:organization', orgUser.organizationId, token.role, token.entitlements, orgUser.entitlements),
+  ),
+  { owner },
+);
 ```
 
-**User context** - token restricts what user can do to themselves:
-
-```typescript
-// apps/api/src/lib/permissions/setupUserPermissions.ts
-const role = token?.role ?? 'owner';  // Default: full control
-const entitlements = token
-  ? intersectEntitlements(user.entitlements, token.entitlements)
-  : user.entitlements;
-
-await setupUserContext(permix, { user, role, entitlements });
-```
-
-A read-only token (`role: 'viewer'`) can't modify user profile even though the user owns it.
+`narrowing` (`packages/permissions/src/roles/narrowing.ts`) claims every action at or below the token's role plus whatever its entitlements name; with no entitlements of its own it names the seat's. At check time the engine consults the claim only after the token's own table and the schema both miss, and it holds only if the owner's table, walked from that record through the normal schema, allows the action. So a viewer's token naming `{ manage: true }` reads the organization and does not manage it, an admin's owner-role token manages and does not own, and a space is reached exactly as far as the seat reaches its organization. Nothing is intersected ahead of time; the cap is live. A User token is a narrowing of the person on every seat; an OrganizationUser or SpaceUser token of that one seat; an Organization or Space token holds its role outright, since the organization holds everything on itself. Situations: `apps/api/src/lib/permissions/tokenNeverExceedsHolder.test.ts`.
 
 ### Role Validation
 
@@ -472,25 +447,7 @@ export function getOrgPermissions(role, orgId, entitlements): PermissionEntry {
 }
 ```
 
-**Override behavior**: Allow override means a viewer with `{ manage: true }` entitlement CAN manage. Alternative would be deny override where role caps permissions.
-
-| Strategy | Viewer + `{ manage: true }` | Use Case |
-|----------|----------------------------|----------|
-| Allow override (current) | Can manage | Grant specific powers to limited roles |
-| Deny override | Cannot manage | Role is hard ceiling |
-
-### Intersecting Entitlements
-
-When a token has entitlements, they're intersected with user's entitlements:
-
-```typescript
-// Only keys true in BOTH are kept
-intersectEntitlements(
-  { canExport: true, canInvite: true },
-  { canExport: true, canInvite: false }
-);
-// Result: { canExport: true }
-```
+**Override behavior**: Allow override means a viewer with `{ manage: true }` entitlement CAN manage. The role is not a ceiling on the seat itself; the ceiling is the holder, above ([A Credential Never Exceeds Its Holder](#a-credential-never-exceeds-its-holder)): a token naming `{ manage: true }` on a viewer's seat holds nothing the viewer does not.
 
 ---
 

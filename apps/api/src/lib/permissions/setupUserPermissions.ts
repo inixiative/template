@@ -5,7 +5,13 @@
  * @uses infrastructure:prisma
  */
 import type { UserId } from '@template/db';
-import { type Entitlements, getUserPermissions, UserAction } from '@template/permissions';
+import {
+  createPermissions,
+  type Entitlements,
+  getUserPermissions,
+  narrowing,
+  UserAction,
+} from '@template/permissions';
 import type { Context } from 'hono';
 import { validateRole } from '#/lib/permissions/validateRole';
 import type { AppEnv } from '#/types/appEnv';
@@ -15,7 +21,6 @@ export const setupUserPermissions = async (c: Context<AppEnv>) => {
   const user = c.get('user');
   const token = c.get('token');
 
-  // No user → no user permissions
   if (!user) return;
 
   // A membership's token knows who it is, and holds nothing else on the person.
@@ -29,18 +34,24 @@ export const setupUserPermissions = async (c: Context<AppEnv>) => {
     return;
   }
 
-  // User token → restricted by token role
-  if (token?.ownerModel === 'User') {
+  const person = getUserPermissions(user.id as UserId);
+
+  // A User token is a narrowing of the person: its claim on the user, owned by the person's table.
+  if (token) {
+    const owner = createPermissions();
+    await owner.setup(person);
     await permix.setup(
-      getUserPermissions(
-        user.id as UserId,
+      narrowing(
+        'db:user',
+        user.id,
         validateRole(token.role),
         token.entitlements as Entitlements,
+        null,
       ),
+      { owner },
     );
     return;
   }
 
-  // Person JWT → owner (full permissions)
-  await permix.setup(getUserPermissions(user.id as UserId));
+  await permix.setup(person);
 };

@@ -6,10 +6,10 @@
  */
 import type { OrganizationId } from '@template/db';
 import {
+  createPermissions,
   type Entitlements,
   getOrgPermissions,
-  intersectEntitlements,
-  lesserRole,
+  narrowing,
 } from '@template/permissions';
 import type { Context } from 'hono';
 import { validateRole } from '#/lib/permissions/validateRole';
@@ -20,7 +20,7 @@ export const setupOrgPermissions = async (c: Context<AppEnv>) => {
   const token = c.get('token');
   const orgUsers = c.get('organizationUsers');
 
-  // Org token → single org, token permissions only
+  // An organization's own token: the organization holds everything on itself, so the role stands.
   if (token?.ownerModel === 'Organization' && token.organizationId) {
     await permix.setup(
       getOrgPermissions(
@@ -32,40 +32,40 @@ export const setupOrgPermissions = async (c: Context<AppEnv>) => {
     return;
   }
 
-  // OrgUser token → single org, lesser of orgUser + token
-  if (token?.ownerModel === 'OrganizationUser' && token.organizationId) {
-    const orgUser = orgUsers?.find((ou) => ou.organizationId === token.organizationId);
-    if (orgUser) {
-      await permix.setup(
-        getOrgPermissions(
-          lesserRole(validateRole(orgUser.role), validateRole(token.role)),
-          token.organizationId as OrganizationId,
-          intersectEntitlements(
-            orgUser.entitlements as Entitlements,
-            token.entitlements as Entitlements,
-          ),
-        ),
-      );
-    }
+  if (!orgUsers?.length) return;
+
+  const seats = orgUsers.map((orgUser) =>
+    getOrgPermissions(
+      validateRole(orgUser.role),
+      orgUser.organizationId as OrganizationId,
+      orgUser.entitlements as Entitlements,
+    ),
+  );
+
+  if (!token) {
+    await permix.setup(seats);
     return;
   }
 
-  // No org memberships → nothing to set up
-  if (!orgUsers?.length) return;
-
-  // User token or person JWT → all orgs (with token restrictions if present)
-  for (const orgUser of orgUsers) {
-    const orgId = orgUser.organizationId as OrganizationId;
-    const role = token
-      ? lesserRole(validateRole(orgUser.role), validateRole(token.role))
-      : validateRole(orgUser.role);
-    const entitlements = token
-      ? intersectEntitlements(
-          orgUser.entitlements as Entitlements,
-          token.entitlements as Entitlements,
-        )
-      : (orgUser.entitlements as Entitlements);
-
-    await permix.setup(getOrgPermissions(role, orgId, entitlements));
-  }
+  // A token is a narrowing of its holder: a membership's token of that seat, a User token of every
+  // seat the person holds. The holder's table owns the claim and the walk caps it live.
+  const held =
+    token.ownerModel === 'OrganizationUser'
+      ? orgUsers.filter((orgUser) => orgUser.organizationId === token.organizationId)
+      : orgUsers;
+  if (!held.length) return;
+  const owner = createPermissions();
+  await owner.setup(seats);
+  await permix.setup(
+    held.map((orgUser) =>
+      narrowing(
+        'db:organization',
+        orgUser.organizationId,
+        validateRole(token.role),
+        token.entitlements as Entitlements,
+        orgUser.entitlements as Entitlements,
+      ),
+    ),
+    { owner },
+  );
 };

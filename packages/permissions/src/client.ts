@@ -9,6 +9,7 @@ import {
   type ActionState as EngineActionState,
   type PermissionEntry as EnginePermissionEntry,
   type Permix as EnginePermix,
+  type PermixLike,
 } from '@inixiative/permissions';
 
 // Base actions - most resources use these
@@ -74,6 +75,7 @@ export type Actor = { id: string; model: ActorModel };
 
 export type ActionState = EngineActionState<Action>;
 export type PermissionEntry = EnginePermissionEntry<Action>;
-export type Permix = EnginePermix<Action, Actor>;
+// The engine reads any permix back through PermixLike (string actions); ours narrows them to Action.
+export type Permix = EnginePermix<Action, Actor> & PermixLike;
 
-export const createPermissions = (): Permix => createEnginePermissions<Action, Actor>();
+export const createPermissions = (): Permix => createEnginePermissions<Action, Actor>() as Permix;

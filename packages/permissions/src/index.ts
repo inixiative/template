@@ -28,20 +28,19 @@ export type {
   ResourcePermission,
   RuleCheck,
 } from './rebac/types';
+// Space permissions
+export { narrowing } from './roles/narrowing';
 // Organization permissions
 export { getOrgPermissions, organizationRoles } from './roles/organization';
 // Shared role utilities
 export {
   allTrue,
   greaterRole,
-  intersectEntitlements,
   isSuperadmin,
-  lesserRole,
   roleHierarchy,
   rolesAtOrAbove,
   roleToStandardAction,
 } from './roles/shared';
-// Space permissions
 export { getSpacePermissions, spaceRoles } from './roles/space';
 // User permissions
 export { getUserPermissions, userRoles } from './roles/user';

@@ -4,7 +4,7 @@
  * @partOf primitive:authz
  * @uses infrastructure:prisma
  */
-import { createRebacCheck, type PermixLike, type ResolveRelation } from '@inixiative/permissions';
+import { createRebacCheck, type ResolveRelation } from '@inixiative/permissions';
 import type { AccessorName, HydratedRecord } from '@template/db';
 import { prismaMap } from '@template/db/generated/prismaMap';
 import type { Permix } from '@template/permissions/client';
@@ -36,10 +36,4 @@ export const check = (
   data?: Record<string, HydratedRecord[]>,
   visited?: Set<string>,
 ): boolean =>
-  rebacCheck(
-    permix as PermixLike,
-    schema,
-    { resource: `db:${model}`, record, data },
-    actionOrRule,
-    visited,
-  );
+  rebacCheck(permix, schema, { resource: `db:${model}`, record, data }, actionOrRule, visited);
