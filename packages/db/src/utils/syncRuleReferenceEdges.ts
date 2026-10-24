@@ -36,10 +36,8 @@ const edgeKey = (edge: Edge): string =>
 
 const edgeData = (source: RuleReferenceSource, ref: RuleReference, state: TargetState) => ({
   sourceModel: source.model,
-  sourceId: source.id,
   [fkColumn('sourceModel', source.model)]: source.id,
   targetModel: ref.model,
-  targetId: ref.id,
   [fkColumn('targetModel', ref.model)]: ref.id,
   targetDeletedAt: state.deletedAt,
 });

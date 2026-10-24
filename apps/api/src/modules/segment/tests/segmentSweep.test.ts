@@ -11,6 +11,7 @@ import {
 } from '@template/db/test';
 import { registerRuleReferenceHook } from '#/hooks/ruleReference/hook';
 import { registerRuleReferenceTargetHook } from '#/hooks/ruleReference/targetHook';
+import { registerRulesHook } from '#/hooks/rules/hook';
 import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
 import { sweepableSegments } from '#/modules/segment/services/sweepableSegments';
 
@@ -27,6 +28,7 @@ describe('sweepable segments — what the nightly sweep enqueues', () => {
 
   beforeAll(async () => {
     registerSegmentConditionsHook();
+    registerRulesHook();
     registerRuleReferenceHook();
     registerRuleReferenceTargetHook();
     const { context } = await createOrganizationUser({ role: 'admin' });

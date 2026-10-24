@@ -23,6 +23,7 @@ import {
 } from '@template/db/test';
 import { registerRuleReferenceHook } from '#/hooks/ruleReference/hook';
 import { registerRuleReferenceTargetHook } from '#/hooks/ruleReference/targetHook';
+import { registerRulesHook } from '#/hooks/rules/hook';
 import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
 import { registerSegmentMemberOwnerHook } from '#/hooks/segmentMemberOwner/hook';
 import { meRouter } from '#/modules/me';
@@ -61,6 +62,7 @@ describe('segment routes', () => {
   beforeAll(async () => {
     registerSegmentConditionsHook();
     registerSegmentMemberOwnerHook();
+    registerRulesHook();
     registerRuleReferenceHook();
     registerRuleReferenceTargetHook();
 

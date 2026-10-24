@@ -17,6 +17,7 @@ import {
 import { emitAppEvent } from '#/appEvents/emit';
 import { AppEventName } from '#/appEvents/handlers';
 import { registerRuleReferenceHook } from '#/hooks/ruleReference/hook';
+import { registerRulesHook } from '#/hooks/rules/hook';
 import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
 import { registerSegmentMemberOwnerHook } from '#/hooks/segmentMemberOwner/hook';
 import { registerSoftDeleteCascadeHook } from '#/hooks/softDeleteCascade/hook';
@@ -70,6 +71,7 @@ describe('reconcile triggers — membership follows the events', () => {
   beforeAll(async () => {
     registerSegmentConditionsHook();
     registerSegmentMemberOwnerHook();
+    registerRulesHook();
     registerRuleReferenceHook();
     registerSoftDeleteCascadeHook();
     const { context } = await createOrganizationUser({ role: 'admin' });

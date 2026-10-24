@@ -10,6 +10,7 @@ import {
   createSpace,
 } from '@template/db/test';
 import { registerRuleReferenceHook } from '#/hooks/ruleReference/hook';
+import { registerRulesHook } from '#/hooks/rules/hook';
 import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
 import { deadReferencesOf } from '#tests/utils/deadReferences';
 
@@ -22,6 +23,7 @@ describe('segmentConditions hook', () => {
 
   beforeAll(async () => {
     registerSegmentConditionsHook();
+    registerRulesHook();
     registerRuleReferenceHook();
     const { context } = await createOrganizationUser({ role: 'admin' });
     user = context.user;

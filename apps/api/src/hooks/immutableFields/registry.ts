@@ -12,6 +12,7 @@ const GLOBAL_IMMUTABLE_FIELDS = ['id', 'createdAt'] as const;
 type ImmutableFieldsOverride = {
   exclude?: string[];
   include?: string[];
+  refuse?: string[];
 };
 
 export const ImmutableFieldsOverrides: Partial<Record<ModelName, ImmutableFieldsOverride>> = {
@@ -62,3 +63,6 @@ export const getImmutableFields = (model: ModelName): readonly string[] => {
   immutableFieldsCache.set(model, result);
   return result;
 };
+
+export const getRefusedFields = (model: ModelName): readonly string[] =>
+  ImmutableFieldsOverrides[model]?.refuse ?? [];

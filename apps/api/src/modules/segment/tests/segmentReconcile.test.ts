@@ -32,6 +32,7 @@ import {
 } from '@template/db/test';
 import { emitAppEvent } from '#/appEvents/emit';
 import { registerRuleReferenceHook } from '#/hooks/ruleReference/hook';
+import { registerRulesHook } from '#/hooks/rules/hook';
 import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
 import { registerSegmentMemberOwnerHook } from '#/hooks/segmentMemberOwner/hook';
 import { enqueueJob } from '#/jobs/enqueue';
@@ -85,6 +86,7 @@ describe('segment reconcile', () => {
   beforeAll(async () => {
     registerSegmentConditionsHook();
     registerSegmentMemberOwnerHook();
+    registerRulesHook();
     registerRuleReferenceHook();
 
     const { context } = await createOrganizationUser({ role: 'admin' });

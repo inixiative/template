@@ -12,6 +12,7 @@ import {
 import { RuleDegradedError } from '@template/shared/rules';
 import { registerRuleReferenceHook } from '#/hooks/ruleReference/hook';
 import { registerRuleReferenceTargetHook } from '#/hooks/ruleReference/targetHook';
+import { registerRulesHook } from '#/hooks/rules/hook';
 import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
 import { evaluateSegment } from '#/modules/segment/services/evaluateSegment';
 import { withSegmentRuleIssues } from '#/modules/segment/services/withSegmentRuleIssues';
@@ -33,6 +34,7 @@ describe('segment rule health — the segments a rule names, as edges', () => {
 
   beforeAll(async () => {
     registerSegmentConditionsHook();
+    registerRulesHook();
     registerRuleReferenceHook();
     registerRuleReferenceTargetHook();
     const { context } = await createOrganizationUser({ role: 'admin' });
@@ -164,6 +166,7 @@ describe('segment rule health — edge upkeep', () => {
 
   beforeAll(async () => {
     registerSegmentConditionsHook();
+    registerRulesHook();
     registerRuleReferenceHook();
     registerRuleReferenceTargetHook();
     const { context } = await createOrganizationUser({ role: 'admin' });

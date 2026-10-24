@@ -10,6 +10,7 @@ import {
 } from '@template/db/test';
 import { TokenValidationError } from '@template/email/errors/TokenValidationError';
 import { registerRuleReferenceHook } from '#/hooks/ruleReference/hook';
+import { registerRulesHook } from '#/hooks/rules/hook';
 import { emailSeedSavers } from '#/lib/email/emailSeedSavers';
 import { deadReferencesOf } from '#tests/utils/deadReferences';
 
@@ -33,6 +34,7 @@ const invalidTemplate: SeedFile = {
 };
 
 beforeAll(() => {
+  registerRulesHook();
   registerRuleReferenceHook();
 });
 
