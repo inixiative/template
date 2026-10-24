@@ -34,61 +34,92 @@ const platformDefaults: NarrowingDefaults['models'] = {
   CustomerRef: { where: customerRef },
 };
 
-const is = (field: string, value: string): Condition => ({
+const boundTo = (field: string, bind: string): Condition => ({
   field,
   operator: Operator.equals,
-  value,
+  bind,
+  bindOptional: true,
 });
+
+const scopedTo = (where: Condition) => ({ where, sources: { id: { where } } });
+
+/** The owner-side model defaults per owner kind; every owner id is a bind token. */
+export const EMAIL_OWNER_SCOPES: Record<ProviderModel, NarrowingDefaults['models']> = {
+  Organization: {
+    Organization: scopedTo(boundTo('id', 'organizationId')),
+    Space: scopedTo(boundTo('organizationId', 'organizationId')),
+  },
+  Space: {
+    Organization: scopedTo(boundTo('id', 'ownerOrganizationId')),
+    Space: scopedTo(boundTo('id', 'spaceId')),
+  },
+  User: {
+    Organization: scopedTo(boundTo('id', 'ownerOrganizationId')),
+    Space: scopedTo(false),
+  },
+};
+
+/** The membership defaults per sender kind; the sender's organization is a bind token. */
+export const EMAIL_SENDER_SCOPES: Record<ProviderModel, NarrowingDefaults['models']> = {
+  Organization: {
+    OrganizationUser: { where: boundTo('organizationId', 'senderOrganizationId') },
+    SpaceUser: { where: boundTo('organizationId', 'senderOrganizationId') },
+  },
+  Space: {
+    OrganizationUser: { where: boundTo('organizationId', 'senderOrganizationId') },
+    SpaceUser: { where: boundTo('organizationId', 'senderOrganizationId') },
+  },
+  User: { OrganizationUser: { where: false }, SpaceUser: { where: false } },
+};
 
 type Owner = NonNullable<EmailLensOwner>;
 
-const organizationScope = (owner: Owner): Condition =>
-  owner.ownerModel === 'Organization'
-    ? is('id', owner.ownerId)
-    : owner.organizationId
-      ? is('id', owner.organizationId)
-      : false;
-
-const spaceScope = (owner: Owner): Condition =>
-  owner.ownerModel === 'Space'
-    ? is('id', owner.ownerId)
-    : owner.ownerModel === 'Organization'
-      ? is('organizationId', owner.ownerId)
-      : false;
-
-const ownerDefaults = (owner: Owner): NarrowingDefaults['models'] => ({
-  Organization: {
-    where: organizationScope(owner),
-    sources: { id: { where: organizationScope(owner) } },
-  },
-  Space: { where: spaceScope(owner), sources: { id: { where: spaceScope(owner) } } },
+/** The values an owner and a sender supply to the static scopes' bind tokens. */
+export const emailLensBindings = (
+  owner: EmailLensOwner,
+  sender: EmailLensOwner,
+): Record<string, string> => ({
+  ...(owner ? polymorphicBindings(owner.ownerModel, owner.ownerId) : {}),
+  ...(owner?.organizationId ? { ownerOrganizationId: owner.organizationId } : {}),
+  ...(sender && senderOrganizationId(sender)
+    ? { senderOrganizationId: senderOrganizationId(sender)! }
+    : {}),
+  ...(sender?.ownerModel === 'Space' ? { senderSpaceId: sender.ownerId } : {}),
 });
 
-const senderOrganization = (sender: Owner): Condition =>
+const senderOrganizationId = (sender: Owner): string | null | undefined =>
   sender.ownerModel === 'Organization'
-    ? is('organizationId', sender.ownerId)
-    : sender.ownerModel === 'Space' && sender.organizationId
-      ? is('organizationId', sender.organizationId)
-      : false;
+    ? sender.ownerId
+    : sender.ownerModel === 'Space'
+      ? sender.organizationId
+      : null;
 
-const membershipDefaults = (sender: Owner): NarrowingDefaults['models'] => ({
-  OrganizationUser: { where: senderOrganization(sender) },
-  SpaceUser: { where: senderOrganization(sender) },
-});
+const clampedByKind = new WeakMap<RuleLens, Map<string, RuleLens>>();
+
+const clampByKind = (slot: RuleLens, owner: EmailLensOwner, sender: EmailLensOwner): RuleLens => {
+  const key = `${owner?.ownerModel ?? '-'}:${sender?.ownerModel ?? '-'}`;
+  const byKind = clampedByKind.get(slot) ?? new Map<string, RuleLens>();
+  clampedByKind.set(slot, byKind);
+  const known = byKind.get(key);
+  if (known) return known;
+  const models = {
+    ...platformDefaults,
+    ...(owner ? EMAIL_OWNER_SCOPES[owner.ownerModel] : {}),
+    ...(sender ? EMAIL_SENDER_SCOPES[sender.ownerModel] : {}),
+  };
+  const clamped: RuleLens = clampLens(slot, { mapDefaults: { prisma: { models } } });
+  byKind.set(key, clamped);
+  return clamped;
+};
 
 export const scopeEmailLens = (
   lens: EmailLens,
   owner: EmailLensOwner,
   sender: EmailLensOwner = owner,
-): EmailLens =>
-  narrowEmailLens(lens, (_root, slot) => {
-    const models = {
-      ...platformDefaults,
-      ...(owner ? ownerDefaults(owner) : {}),
-      ...(sender ? membershipDefaults(sender) : {}),
-    };
-    const scoped: RuleLens = clampLens(slot, { mapDefaults: { prisma: { models } } });
-    return owner
-      ? (bindLens(scoped, polymorphicBindings(owner.ownerModel, owner.ownerId)) as RuleLens)
-      : scoped;
-  });
+): EmailLens => {
+  const bindings = emailLensBindings(owner, sender);
+  return narrowEmailLens(
+    lens,
+    (_root, slot) => bindLens(clampByKind(slot, owner, sender), bindings) as RuleLens,
+  );
+};
