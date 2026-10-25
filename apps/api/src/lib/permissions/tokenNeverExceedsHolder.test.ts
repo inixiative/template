@@ -66,6 +66,17 @@ describe('a credential never exceeds its holder (Aron, 2026-10-23)', () => {
   const seat = (role: Role, entitlements: Entitlements = null) =>
     createOrganizationUser({ role, entitlements: entitlements ?? undefined }, { organization });
 
+  const onOrganization = (actions: Entitlements) =>
+    actions
+      ? [
+          {
+            resource: 'db:organization',
+            from: { resource: 'db:organization', id: organization.id },
+            actions,
+          },
+        ]
+      : undefined;
+
   const userToken = async (
     membership: Awaited<ReturnType<typeof seat>>,
     role: Role,
@@ -73,7 +84,7 @@ describe('a credential never exceeds its holder (Aron, 2026-10-23)', () => {
   ) => {
     const { rawKey, fields } = mintKey();
     await createToken(
-      { ownerModel: 'User', role, entitlements: entitlements ?? undefined, ...fields },
+      { ownerModel: 'User', role, entitlements: onOrganization(entitlements), ...fields },
       { user: membership.context.user },
     );
     return rawKey;
@@ -86,7 +97,12 @@ describe('a credential never exceeds its holder (Aron, 2026-10-23)', () => {
   ) => {
     const { rawKey, fields } = mintKey();
     await createToken(
-      { ownerModel: 'OrganizationUser', role, entitlements: entitlements ?? undefined, ...fields },
+      {
+        ownerModel: 'OrganizationUser',
+        role,
+        entitlements: onOrganization(entitlements),
+        ...fields,
+      },
       { organizationUser: membership.entity },
     );
     return rawKey;
@@ -117,7 +133,7 @@ describe('a credential never exceeds its holder (Aron, 2026-10-23)', () => {
     expect(await holds(key, 'organization', organization.id, 'own')).toBe(false);
   });
 
-  it("a token naming nothing of its own inherits the member's entitlements, and only those", async () => {
+  it("a token's role is capped by its seat, the seat's entitlements included", async () => {
     const key = await userToken(await seat('viewer', { operate: true }), 'owner');
     expect(await holds(key, 'organization', organization.id, 'operate')).toBe(true);
     expect(await holds(key, 'organization', organization.id, 'manage')).toBe(false);

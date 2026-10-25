@@ -10,16 +10,9 @@ import { createToken } from '#/modules/me/services/createToken';
 
 export const meCreateTokenController = makeController(meCreateTokenRoute, async (c, respond) => {
   const user = c.get('user')!;
-  const _db = c.get('db');
   const body = c.req.valid('json');
 
-  const token = await createToken(c, {
-    name: body.name,
-    ownerModel: 'User',
-    userId: user.id,
-    role: body.role,
-    expiresAt: body.expiresAt,
-  });
+  const token = await createToken(c, { ...body, ownerModel: 'User', userId: user.id });
 
   return respond.created(token);
 });

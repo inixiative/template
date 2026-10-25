@@ -26,12 +26,13 @@ model Token {
   space              Space?            @relation(fields: [organizationId, spaceId], references: [organizationId, id], onDelete: Cascade)
   spaceUser          SpaceUser?        @relation(fields: [organizationId, spaceId, userId], references: [organizationId, spaceId, userId], onDelete: Cascade)
   integrationId      String?           @db.VarChar(36)
-  integration        Integration?      @relation(fields: [integrationId], references: [id], onDelete: SetNull)
+  integration        Integration?      @relation(fields: [integrationId], references: [id], onDelete: Cascade)
   auditLogsAsActor   AuditLog[]        @relation("AuditLogActorToken")
   auditLogsAsSubject AuditLog[]        @relation("AuditLogSubjectToken")
 
-  // Permissions: a claim, capped live by the owner
-  role         Role  @default(member)
+  // Permissions: a claim, capped live by the holder; full passes the holder through whole
+  role         Role?
+  full         Boolean @default(false)
   entitlements Json?
 
   // TODO: Replace with a proper rate limiting system (tiers, quotas, etc.)

@@ -140,7 +140,12 @@ export const rebacSchema: RebacSchema = {
           any: [
             {
               all: [
-                { rule: { field: 'role', operator: Operator.in, value: highRoles } },
+                {
+                  any: [
+                    { rule: { field: 'role', operator: Operator.in, value: highRoles } },
+                    { rule: { field: 'full', operator: Operator.equals, value: true } },
+                  ],
+                },
                 {
                   any: [
                     { rel: 'organization', action: 'own' },
@@ -152,6 +157,7 @@ export const rebacSchema: RebacSchema = {
             {
               all: [
                 { rule: { field: 'role', operator: Operator.notIn, value: highRoles } },
+                { rule: { field: 'full', operator: Operator.notEquals, value: true } },
                 {
                   any: [
                     { rel: 'organization', action: 'manage' },

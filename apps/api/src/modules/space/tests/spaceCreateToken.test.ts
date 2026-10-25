@@ -64,7 +64,7 @@ describe('POST /api/v1/space/:id/tokens', () => {
     expect(data.key).toBeDefined();
   });
 
-  it('returns 403 for non-admin user', async () => {
+  it('a member mints a member token and nothing above it', async () => {
     const { entity: memberOrgUser, context: memberCtx } = await createOrganizationUser(
       { role: 'member' },
       { organization: org },
@@ -85,9 +85,9 @@ describe('POST /api/v1/space/:id/tokens', () => {
       mount: [(app) => app.route('/api/v1/space', spaceRouter)],
     });
 
-    const response = await memberHarness.fetch(
-      post(`/api/v1/space/${space.id}/tokens`, { name: 'Token', role: 'member' }),
-    );
-    expect(response.status).toBe(403);
+    const asMember = (role: string) =>
+      memberHarness.fetch(post(`/api/v1/space/${space.id}/tokens`, { name: 'Token', role }));
+    expect((await asMember('member')).status).toBe(201);
+    expect((await asMember('admin')).status).toBe(403);
   });
 });

@@ -78,6 +78,7 @@ describe('every route names its action; a token is never a person (Aron, 2026-10
   it('a person mints a token; an owner-role token holding own on its user does not', async () => {
     const person = createTestApp({
       mockUser: user,
+      mockOrganizationUsers: [membership],
       mount: [(app) => app.route('/api/v1/me', meRouter)],
     });
     expect(

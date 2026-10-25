@@ -321,7 +321,7 @@ const authenticateToken = async (c: Context<AppEnv>) => {
   c.set('token', token);
   // User → findUserWithRelations → setUserContext
   // OrganizationUser / SpaceUser → setUserContext from the one membership
-  // Organization / Space → setupOrgPermissions + setupSpacePermissions
+  // Organization / Space / Integration → setupTokenPermissions (the holder's table caps the claim)
 };
 
 export const tokenAuthMiddleware = async (c: Context<AppEnv>, next: Next) => {

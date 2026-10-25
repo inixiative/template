@@ -276,18 +276,33 @@ describe('an integration holds entitlements and acts for its direct owner (Aron,
       expect((await grant('owner', elsewhere)).status).toBe(403);
     });
 
-    it('a role is granted like its actions', async () => {
+    it("a role is a ceiling: another seat's admin cannot raise an owner's integration to owner", async () => {
+      const { entity: owner } = await createUser();
+      const ownerSeat = await seatOf('owner', organization, owner);
+      const integration = await seatIntegration(ownerSeat, null);
+      const { entity: admin } = await createUser();
+      const adminSeat = await seatOf('admin', organization, admin);
+      const raise = (by: User, seat: OrganizationUser, role: Role) =>
+        personApp(by, [seat]).fetch(patch(`/api/v1/integration/${integration.id}`, { role }));
+      expect((await raise(admin, adminSeat, 'admin')).status).toBe(200);
+      expect((await raise(admin, adminSeat, 'owner')).status).toBe(403);
+      expect((await raise(owner, ownerSeat, 'owner')).status).toBe(200);
+    });
+
+    it('a role above the seat holds only what the seat holds', async () => {
       const { entity: writer } = await createUser();
       const seat = await seatOf('member', organization, writer);
       const integration = await seatIntegration(seat, null);
-      const app = personApp(writer, [seat]);
-      expect(
-        (await app.fetch(patch(`/api/v1/integration/${integration.id}`, { role: 'member' })))
-          .status,
-      ).toBe(200);
-      expect(
-        (await app.fetch(patch(`/api/v1/integration/${integration.id}`, { role: 'admin' }))).status,
-      ).toBe(403);
+      const response = await personApp(writer, [seat]).fetch(
+        patch(`/api/v1/integration/${integration.id}`, { role: 'admin' }),
+      );
+      expect(response.status).toBe(200);
+      const key = await tokenFor(
+        await db.integration.findUniqueOrThrow({ where: { id: integration.id } }),
+        'owner',
+      );
+      expect(await holds(key, 'organization', organization.id, 'operate')).toBe(true);
+      expect(await holds(key, 'organization', organization.id, 'manage')).toBe(false);
     });
 
     it('entitlements must be well formed', async () => {

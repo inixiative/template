@@ -52,7 +52,6 @@ export const createPermissionsSlice: StateCreator<AppStore, [], [], PermissionsS
         // Set up user permissions (user is always owner of themselves)
         await permix.setup(getUserPermissions(me.id as UserId));
 
-        // Set up org permissions (matches backend setupOrgPermissions)
         if (me.organizationUsers) {
           for (const orgUser of me.organizationUsers) {
             await permix.setup(
@@ -65,7 +64,6 @@ export const createPermissionsSlice: StateCreator<AppStore, [], [], PermissionsS
           }
         }
 
-        // Set up space permissions (matches backend setupSpacePermissions)
         if (me.spaceUsers) {
           for (const spaceUser of me.spaceUsers) {
             await permix.setup(

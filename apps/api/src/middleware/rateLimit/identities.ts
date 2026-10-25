@@ -13,8 +13,8 @@ export const ipIdentity = (c: Context<AppEnv>): string => `ip:${clientIp(c)}`;
 
 // A person's JWT and every token owned by or through the user share one bucket: minting tokens buys nothing.
 export const userIdentity = (c: Context<AppEnv>): string | null => {
-  const { user } = getActor(c);
-  return user ? `user:${user.id}` : null;
+  const userId = getActor(c).user?.id ?? c.get('token')?.userId;
+  return userId ? `user:${userId}` : null;
 };
 
 export const principalIdentity = (c: Context<AppEnv>): string => userIdentity(c) ?? ipIdentity(c);

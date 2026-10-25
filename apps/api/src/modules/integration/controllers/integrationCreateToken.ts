@@ -16,11 +16,9 @@ export const integrationCreateTokenController = makeController(
     const body = c.req.valid('json');
 
     const token = await createToken(c, {
-      name: body.name,
+      ...body,
       ownerModel: 'Integration',
       integrationId: integration.id,
-      role: body.role,
-      expiresAt: body.expiresAt,
     });
 
     return respond.created(token);

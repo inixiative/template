@@ -7,6 +7,7 @@
 import {
   createPermissions as createEnginePermissions,
   type ActionState as EngineActionState,
+  type EntitlementEntry as EngineEntitlementEntry,
   type PermissionEntry as EnginePermissionEntry,
   type Permix as EnginePermix,
   type PermixLike,
@@ -75,6 +76,7 @@ export type Actor = { id: string; model: ActorModel };
 
 export type ActionState = EngineActionState<Action>;
 export type PermissionEntry = EnginePermissionEntry<Action>;
+export type EntitlementEntry = EngineEntitlementEntry<Action>;
 // The engine reads any permix back through PermixLike (string actions); ours narrows them to Action.
 export type Permix = EnginePermix<Action, Actor> & PermixLike;
 

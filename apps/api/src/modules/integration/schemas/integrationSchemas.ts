@@ -22,12 +22,14 @@ export const integrationCreateBodySchema = IntegrationScalarInputSchema.omit({
   organizationId: true,
   spaceId: true,
   role: true,
+  full: true,
   entitlements: true,
 });
 
 export const integrationUpdateBodySchema = integrationCreateBodySchema
   .extend({
     role: z.nativeEnum(Role).nullable(),
+    full: z.boolean(),
     entitlements: entitlementEntriesSchema.nullable(),
   })
   .partial();

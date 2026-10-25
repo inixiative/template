@@ -24,7 +24,7 @@ export const getActor = (c: Context<AppEnv>) => {
 
   const organization =
     orgUser?.organization ?? spcUser?.organization ?? token?.organization ?? null;
-  const user = c.get('user') ?? orgUser?.user ?? spcUser?.user ?? token?.user ?? null;
+  const user = c.get('user') ?? null;
   const space = spcUser?.space ?? token?.space ?? null;
 
   let organizationUser: OrgUserWithoutRelations | null = null;

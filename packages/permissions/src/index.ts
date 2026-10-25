@@ -6,6 +6,7 @@ export {
   type Actor,
   ActorModel,
   createPermissions,
+  type EntitlementEntry,
   type Entitlements,
   InquiryAction,
   OrganizationAction,
@@ -28,7 +29,11 @@ export type {
   ResourcePermission,
   RuleCheck,
 } from './rebac/types';
-// Space permissions
+export {
+  type DelegateClaim,
+  delegateClaimEntries,
+  holderPositions,
+} from './roles/delegateClaim';
 export { narrowing } from './roles/narrowing';
 // Organization permissions
 export { getOrgPermissions, organizationRoles } from './roles/organization';

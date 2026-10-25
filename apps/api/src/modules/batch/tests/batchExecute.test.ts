@@ -7,10 +7,20 @@ import type { batchExecuteRoute } from '#/modules/batch/routes/batchExecute';
 import { meRouter } from '#/modules/me';
 import { organizationRouter } from '#/modules/organization';
 import { tokenRouter } from '#/modules/token';
-import { createTestApp } from '#tests/createTestApp';
+import { createTestApp, type MountFn } from '#tests/createTestApp';
 import { json, jsonError, post } from '#tests/utils/request';
 
 type BatchExecuteResponse = z.infer<typeof batchExecuteRoute.responseSchema>;
+
+const routers: MountFn[] = [
+  (app) => app.route('/api/v1/batch', batchRouter),
+  (app) => app.route('/api/v1/me', meRouter),
+  (app) => app.route('/api/v1/organization', organizationRouter),
+  (app) => app.route('/api/v1/token', tokenRouter),
+];
+
+const seatlessPersonFetch = async () =>
+  createTestApp({ mockUser: (await createUser()).entity, mount: routers }).fetch;
 
 describe('POST /api/v1/batch/execute', () => {
   let fetch: ReturnType<typeof createTestApp>['fetch'];
@@ -21,15 +31,7 @@ describe('POST /api/v1/batch/execute', () => {
     const { entity } = await createUser();
     user = entity;
 
-    const harness = createTestApp({
-      mockUser: user,
-      mount: [
-        (app) => app.route('/api/v1/batch', batchRouter),
-        (app) => app.route('/api/v1/me', meRouter),
-        (app) => app.route('/api/v1/organization', organizationRouter),
-        (app) => app.route('/api/v1/token', tokenRouter),
-      ],
-    });
+    const harness = createTestApp({ mockUser: user, mount: routers });
     fetch = harness.fetch;
     db = harness.db;
   });
@@ -108,7 +110,7 @@ describe('POST /api/v1/batch/execute', () => {
     });
 
     it('treats 204 responses as successful empty results', async () => {
-      const response = await fetch(
+      const response = await (await seatlessPersonFetch())(
         post('/api/v1/batch/execute', {
           requests: [
             [
@@ -509,7 +511,7 @@ describe('POST /api/v1/batch/execute', () => {
     });
 
     it('rejects interpolation that targets an empty 204 body', async () => {
-      const response = await fetch(
+      const response = await (await seatlessPersonFetch())(
         post('/api/v1/batch/execute', {
           requests: [
             [

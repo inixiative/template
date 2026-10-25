@@ -21,7 +21,7 @@
 - [Permission Setup](#permission-setup)
   - [setupOrgContext](#setuporgcontext)
   - [setupUserContext](#setupusercontext)
-  - [setupSpacePermissions](#setupspacepermissions)
+  - [Delegates and Their Holders](#delegates-and-their-holders)
   - [A Credential Never Exceeds Its Holder](#a-credential-never-exceeds-its-holder)
   - [Integrations Are Holders](#integrations-are-holders)
   - [Granting an Entitlement](#granting-an-entitlement)
@@ -282,80 +282,41 @@ export async function setupUserContext(permix: Permix, params: {
 
 **Note**: User context uses the same `Role` enum - a user is effectively "owner" of themselves by default, but tokens can restrict this.
 
-### setupSpacePermissions
+### Delegates and Their Holders
 
-Installs a space grant per SpaceUser seat, or, for a token, the token's claim on the seats it holds, owned by the holder's table (the seats plus the person's organization seats, since a space walks to its organization):
+A token or an integration is a delegate: it holds a claim, capped live by its holder. `installPermissions` installs a person's own table (`setupPersonPermissions`: the user grant plus one grant per organization and space seat) or, for a token, the token's claim (`setupTokenPermissions`). `delegateHolder` (`apps/api/src/lib/permissions/delegateHolder.ts`) builds the holder's table from the owner model:
 
-```typescript
-// apps/api/src/lib/permissions/setupSpacePermissions.ts
-export const setupSpacePermissions = async (c: Context<AppEnv>) => {
-  const permix = c.get('permix');
-  const token = c.get('token');
-  const spaceUsers = c.get('spaceUsers');
+| Owner model | Holder table |
+|---|---|
+| `User` | the person: the user grant and every seat |
+| `OrganizationUser` / `SpaceUser` | that one seat |
+| `Organization` / `Space` | `owner` on itself |
+| `Integration` | the integration's claim, capped by its own owner's table |
 
-  // A space's own token: the space holds everything on itself, so the role stands.
-  if (token?.ownerModel === 'Space' && token.spaceId) {
-    await permix.setup(getSpacePermissions(token.role, token.spaceId, token.entitlements));
-    return;
-  }
+A claim is `{ role, full, entitlements }`, expanded by `delegateClaimEntries` (`packages/permissions/src/roles/delegateClaim.ts`):
 
-  if (!spaceUsers?.length) return;
-  const seats = spaceUsers.map((su) => getSpacePermissions(su.role, su.spaceId, su.entitlements));
+- `role` applies at every position the holder has (`narrowing(resource, id, role)` per position), so a User token's role reaches each of the person's organizations, capped by the seat there; an integration's role reaches whatever its owner reaches.
+- `entitlements` are entries `{ resource, from, actions }`, held as written. "Only this user's own things" is no role plus one entry from `db:user`.
+- `full` passes the holder's table through whole, resolved on every request. It takes no role and no entitlements beside it, and only exists on a delegation chain: an `Organization` or `Space` token or integration cannot be `full` (it holds itself; give it a role).
 
-  if (!token) {
-    await permix.setup(seats);
-    return;
-  }
-
-  // A SpaceUser token narrows that one seat; a User token narrows every seat the person holds.
-  const held = token.ownerModel === 'SpaceUser'
-    ? spaceUsers.filter((su) => su.spaceId === token.spaceId)
-    : spaceUsers;
-  const owner = createPermissions();
-  await owner.setup([...seats, ...organizationSeats]);
-  await permix.setup(
-    held.map((su) => narrowing('db:space', su.spaceId, token.role, token.entitlements, su.entitlements)),
-    { owner },
-  );
-};
-```
+Nothing is inherited: a token holds only what it claims, never its holder's entitlements by default. The claim is installed with the holder's table as owner, so at check time each action holds only if the holder still allows it on that record through the normal walk. Demote the seat and its tokens lose it on the next request. A spoofed request (`spoofedBy` set) is capped by the spoofed person.
 
 ### A Credential Never Exceeds Its Holder
 
-A token has its own `role` and `entitlements`, and they are a claim, not a grant. The installers (`setupUserPermissions`, `setupOrgPermissions`, `setupSpacePermissions`) build the holder's table and install the token's claim as entitlements owned by it:
-
-```typescript
-// apps/api/src/lib/permissions/setupOrgPermissions.ts
-const owner = createPermissions();
-await owner.setup(seats);                          // the person's organization seats, as grants
-await permix.setup(
-  held.map((orgUser) =>
-    narrowing('db:organization', orgUser.organizationId, token.role, token.entitlements, orgUser.entitlements),
-  ),
-  { owner },
-);
-```
-
-`narrowing` (`packages/permissions/src/roles/narrowing.ts`) claims every action at or below the token's role plus whatever its entitlements name; with no entitlements of its own it names the seat's. At check time the engine consults the claim only after the token's own table and the schema both miss, and it holds only if the owner's table, walked from that record through the normal schema, allows the action. So a viewer's token naming `{ manage: true }` reads the organization and does not manage it, an admin's owner-role token manages and does not own, and a space is reached exactly as far as the seat reaches its organization. Nothing is intersected ahead of time; the cap is live. A User token is a narrowing of the person on every seat; an OrganizationUser or SpaceUser token of that one seat; an Organization or Space token holds its role outright, since the organization holds everything on itself. Situations: `apps/api/src/lib/permissions/tokenNeverExceedsHolder.test.ts`.
+So a viewer member's token naming `manage` on the organization reads it and does not manage it, an admin's owner-role token manages and does not own, and a space is reached exactly as far as the seat reaches its organization. Situations: `apps/api/src/lib/permissions/tokenNeverExceedsHolder.test.ts`, `delegateClaims.test.ts`.
 
 ### Integrations Are Holders
 
-An integration has a nullable `role` and `entitlements`, like a token, and can own tokens (`ownerModel: Integration`, keyed by `integrationId` alone). It acts from its direct owner: a seat's integration from that seat's organization, an organization's or space's from itself, a user's from the person. `setupIntegrationPermissions` builds three links, each owned by the one above it:
-
-1. the direct owner's table, as it stands on this request (the seat's role and entitlements, the organization's `own`, the person's seats);
-2. the integration's claim: its role on its anchor (`narrowing`) plus its stored entitlement entries (`{ resource, from, actions }`), owned by (1);
-3. the token's claim: its role on the anchor plus the integration's entries, owned by (2).
-
-Each link holds only what the one above still allows, live: demote the seat and the integration's token loses it on the next request. An integration entitled to one space reaches that space and no other, even when its seat owns the organization. Situations: `apps/api/src/lib/permissions/integrationHolder.test.ts` (through the API) and `packages/permissions/src/rebac/delegation.test.ts` (the chain on the real schema). `POST /integration/:id/tokens` mints a token for an integration; it is person-only.
+An integration has a nullable `role`, `full` and `entitlements`, capped live by its direct owner (a person, a seat, an organization or a space), and can own tokens. An integration's token (`ownerModel: Integration`) carries `integrationId` as its owner key plus its integration's own owner keys, copied at create by the `falsePolymorphism:delegatedKeys` hook (the registry's `delegates` entry): the keys are tenancy, for scans, list routes, revocation and rate-limit buckets, never identity. An integration's token is never a person, so routes that require one refuse it. If you need an integration as the actor, use its token; a person's token tagged with an integration does not exist. Situations: `integrationHolder.test.ts` and `packages/permissions/src/rebac/delegation.test.ts`.
 
 ### Granting an Entitlement
 
 A grant is an action: the writer must be able to take every action the holder would hold, from where it would act. `canGrantEntitlement(permix, entry, position)` (`packages/permissions/src/rebac/canGrantEntitlement.ts`, over the library's `createCanGrantEntitlement`) judges each action through the ordinary check on a stand-in record of the entry's resource placed under the hydrated position. The writer's own claims and owner chain apply, so a token grants no more than its holder could. A granted action skips its rule, so an action whose rule reads the record or the actor (`assign`, person-only actions) is granted at its strongest: the writer must also hold the resource's terminal actions (`own`). A custom action is granted only by a writer who holds it.
 
 - `PATCH /organizationUser/:id` with `entitlements` checks each action as an entry from the organization: an admin grants `operate` and `manage`, not `own` or `assign`.
-- `PATCH /integration/:id` with `role` or `entitlements` checks the role's claim on the integration's anchor and each entry at its own position.
+- A delegate's claim is the writer's permissions or less: `canGrantDelegateClaim` (`apps/api/src/lib/permissions/canGrantDelegateClaim.ts`) is the one check for every token mint (inside `createToken`) and for `PATCH /integration/:id`. A role or `full` is a ceiling over the holder's positions, so only what the holder would really pass on is checked (a person with an owner seat and a viewer seat mints a member token); named entries are checked as written. An admin cannot mint an owner token, or set an owner role, on an owner's integration.
 
-Situations: `apps/api/src/modules/organizationUser/tests/organizationUserUpdate.test.ts`, `integrationHolder.test.ts`.
+Situations: `organizationUserUpdate.test.ts`, `integrationHolder.test.ts`, `delegateClaims.test.ts`.
 
 ### Role Validation
 
@@ -892,34 +853,22 @@ if (!permix.check('organization', action, orgId)) {
 
 ## Token Permissions
 
-Tokens use the `leave` action for self-deletion and the `assign` action (via parent) for creation.
-
 ### Token Creation
 
-Token creation checks if the user can assign the token's role:
-- Creating an owner-role token requires `own` permission
-- Creating a member-role token requires `manage` permission
-
-```typescript
-// Check via parent resource (orgUser, spaceUser, etc.)
-check(permix, rebacSchema, 'organization', { id: orgId, role: tokenRole }, 'assign');
-```
+Every create-token route calls `createToken`, which validates the claim (`validateDelegateClaim`) and runs `canGrantDelegateClaim` against the token's holder: a token is your permissions or less. Seat token routes also require the seat's own person (`leave` on the seat). Minting is person-only (`SessionAction.createToken`).
 
 ### Token Deletion
-
-The ReBAC schema allows users to delete their own tokens via `leave`:
 
 ```typescript
 token: {
   actions: {
-    leave: { rel: 'user', action: 'operate' },  // the person, holding operate on their own user
+    leave: { rel: 'user', action: 'operate' },
+    assign: /* owner/admin role or full → own on the organization or space; otherwise manage */,
   },
 },
 ```
 
-Additionally, org/space admins can delete tokens within their scope via delegation:
-- Org admins can delete OrgUser tokens (via `manage` on organization)
-- Space admins can delete SpaceUser tokens (via `manage` on space)
+The person deletes their own tokens and their integrations' tokens (`leave`, through the copied `userId`); organization and space admins delete tokens in their scope, but a `full` or high-role token needs `own`.
 
 ---
 
