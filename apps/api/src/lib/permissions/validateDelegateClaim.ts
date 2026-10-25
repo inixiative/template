@@ -19,3 +19,12 @@ export const validateDelegateClaim = (ownerModel: string, claim: DelegateClaim):
       message: `full passes a holder through; an ${ownerModel} holds itself, so give it a role`,
     });
 };
+
+export const validateTokenClaim = (ownerModel: string, claim: DelegateClaim): void => {
+  validateDelegateClaim(ownerModel, claim);
+  if (!claim.full && !claim.role && !claim.entitlements?.length)
+    throw makeError({
+      status: 422,
+      message: 'A token claims a role, entitlements or both, or is full',
+    });
+};

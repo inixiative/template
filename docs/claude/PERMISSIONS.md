@@ -297,7 +297,7 @@ A claim is `{ role, full, entitlements }`, expanded by `delegateClaimEntries` (`
 
 - `role` applies at every position the holder has (`narrowing(resource, id, role)` per position), so a User token's role reaches each of the person's organizations, capped by the seat there; an integration's role reaches whatever its owner reaches.
 - `entitlements` are entries `{ resource, from, actions }`, held as written. "Only this user's own things" is no role plus one entry from `db:user`.
-- `full` passes the holder's table through whole, resolved on every request. It takes no role and no entitlements beside it, and only exists on a delegation chain: an `Organization` or `Space` token or integration cannot be `full` (it holds itself; give it a role).
+- `full` passes the holder's table through whole, resolved on every request. A token that is not `full` claims a role, entitlements or both. `full` takes no role and no entitlements beside it, and only exists on a delegation chain: an `Organization` or `Space` token or integration cannot be `full` (it holds itself; give it a role).
 
 Nothing is inherited: a token holds only what it claims, never its holder's entitlements by default. The claim is installed with the holder's table as owner, so at check time each action holds only if the holder still allows it on that record through the normal walk. Demote the seat and its tokens lose it on the next request. A spoofed request (`spoofedBy` set) is capped by the spoofed person.
 

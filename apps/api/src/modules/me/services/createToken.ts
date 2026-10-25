@@ -12,7 +12,7 @@ import type { Context } from 'hono';
 import { makeError } from '#/lib/errors';
 import { canGrantDelegateClaim } from '#/lib/permissions/canGrantDelegateClaim';
 import { delegateHolder } from '#/lib/permissions/delegateHolder';
-import { validateDelegateClaim } from '#/lib/permissions/validateDelegateClaim';
+import { validateTokenClaim } from '#/lib/permissions/validateDelegateClaim';
 import type { AppEnv } from '#/types/appEnv';
 
 const MODEL_PREFIXES: Record<TokenOwnerModel, string> = {
@@ -37,7 +37,7 @@ type CreateTokenParams = DelegateClaim & {
 export const createToken = async (c: Context<AppEnv>, params: CreateTokenParams) => {
   const db = c.get('db');
   const claim = { role: params.role, full: params.full, entitlements: params.entitlements };
-  validateDelegateClaim(params.ownerModel, claim);
+  validateTokenClaim(params.ownerModel, claim);
   const holder = await delegateHolder({
     ownerModel: params.ownerModel,
     userId: params.userId ?? null,

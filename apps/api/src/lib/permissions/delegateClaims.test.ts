@@ -187,6 +187,14 @@ describe('a delegate holds what it claims, and no more than whoever grants it (A
       expect(await holds(key!, 'organization', otherOrganization.id, 'read')).toBe(false);
     });
 
+    it('a token that is not full claims a role, entitlements or both', async () => {
+      const { user, seat } = await seated('owner');
+      const integration = await seatIntegration(seat, { role: 'owner' });
+      expect((await mintOn(integration, user, [seat], {})).status).toBe(422);
+      expect((await mintOn(integration, user, [seat], { entitlements: [] })).status).toBe(422);
+      expect((await mintOn(integration, user, [seat], { role: 'viewer' })).status).toBe(201);
+    });
+
     it('full takes no role and no entitlements beside it', async () => {
       const { user, seat } = await seated('owner');
       const integration = await seatIntegration(seat, { role: 'owner' });

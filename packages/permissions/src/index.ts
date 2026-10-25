@@ -29,11 +29,7 @@ export type {
   ResourcePermission,
   RuleCheck,
 } from './rebac/types';
-export {
-  type DelegateClaim,
-  delegateClaimEntries,
-  holderPositions,
-} from './roles/delegateClaim';
+export { type DelegateClaim, delegateClaimEntries } from './roles/delegateClaim';
 export { narrowing } from './roles/narrowing';
 // Organization permissions
 export { getOrgPermissions, organizationRoles } from './roles/organization';

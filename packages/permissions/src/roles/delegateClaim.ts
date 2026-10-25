@@ -22,7 +22,7 @@ const positionOf = (entry: PermissionEntry): Position | null => {
   return entry.id ? { resource: entry.resource, id: entry.id } : null;
 };
 
-export const holderPositions = (holder: PermissionEntry[]): Position[] =>
+const holderPositions = (holder: PermissionEntry[]): Position[] =>
   uniqBy(
     holder.map(positionOf).filter((position): position is Position => position !== null),
     (position) => `${position.resource}:${position.id}`,
