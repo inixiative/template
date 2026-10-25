@@ -326,15 +326,19 @@ describe('no self arm: the person reaches their own rows through rel user (Aron,
       expect(can(blind, 'user', u1, UserAction.me)).toBe(false);
     });
 
-    it('create-organization follows the table, not the actor', async () => {
-      const readToken = acting(await table(grant('db:user', 'u1', 'read')), ActorModel.Token, 't1');
-      expect(can(readToken, 'user', u1, UserAction.createOrganization)).toBe(false);
-      const memberToken = acting(
-        await table(grant('db:user', 'u1', 'operate')),
+    it('create-organization: the person or their own token, holding operate', async () => {
+      const operate = () => table(grant('db:user', 'u1', 'operate'));
+      const theirs = acting(await operate(), ActorModel.Token, 't1', 'User');
+      expect(can(theirs, 'user', u1, UserAction.createOrganization)).toBe(true);
+      const reader = acting(
+        await table(grant('db:user', 'u1', 'read')),
         ActorModel.Token,
         't1',
+        'User',
       );
-      expect(can(memberToken, 'user', u1, UserAction.createOrganization)).toBe(true);
+      expect(can(reader, 'user', u1, UserAction.createOrganization)).toBe(false);
+      const integration = acting(await operate(), ActorModel.Token, 't1', 'Integration');
+      expect(can(integration, 'user', u1, UserAction.createOrganization)).toBe(false);
     });
 
     it('a superadmin passes a person-only check on any credential', async () => {

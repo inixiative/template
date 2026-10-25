@@ -9,14 +9,21 @@ import type { Context } from 'hono';
 import { installPermissions } from '#/lib/context/installPermissions';
 import type { AppEnv } from '#/types/appEnv';
 
+type Seats = Pick<
+  UserWithRelations,
+  'organizationUsers' | 'organizations' | 'spaceUsers' | 'spaces'
+>;
+
+export const setSeatContext = (c: Context<AppEnv>, seats: Seats | null) => {
+  c.set('organizationUsers', seats?.organizationUsers ?? []);
+  c.set('organizations', seats?.organizations ?? []);
+  c.set('spaceUsers', seats?.spaceUsers ?? []);
+  c.set('spaces', seats?.spaces ?? []);
+};
+
 export const setUserContext = async (c: Context<AppEnv>, userWithRelations: UserWithRelations) => {
   const { organizationUsers, organizations, spaceUsers, spaces, ...user } = userWithRelations;
-
   c.set('user', user);
-  c.set('organizationUsers', organizationUsers);
-  c.set('organizations', organizations);
-  c.set('spaceUsers', spaceUsers);
-  c.set('spaces', spaces);
-
+  setSeatContext(c, { organizationUsers, organizations, spaceUsers, spaces });
   await installPermissions(c);
 };

@@ -29,7 +29,7 @@ export const rebacSchema: RebacSchema = {
         operate: 'manage',
         read: 'operate',
         'user.me': { all: [personOrTheirToken, 'read'] },
-        'organization.create': 'operate',
+        'organization.create': { all: [personOrTheirToken, 'operate'] },
         'token.create': { all: [person, 'operate'] },
         'token.delete': { all: [person, 'operate'] },
         'user.rotateJwts': { all: [person, 'operate'] },

@@ -219,7 +219,7 @@ export const setUserContext = async (c: Context<AppEnv>, userWithRelations: User
 };
 ```
 
-`installPermissions` (`apps/api/src/lib/context/installPermissions.ts`) is the one place a request's table is built, for every credential: login, token sign-in, spoof, batch sub-requests and batch refresh. It replaces whatever the table held, sets the actor (`{ id: token.id, model: Token }` when a token is present, otherwise `{ id: user.id, model: User }`), sets the superadmin flag both ways, and runs the user, organization, space and integration installers. Each installer decides what a token holds by its owner model alone. A token with no person (Organization, Space, Integration) goes through `setTokenContext`, which installs without a user.
+`installPermissions` (`apps/api/src/lib/context/installPermissions.ts`) is the one place a request's table is built, for every credential: login, token sign-in, spoof, batch sub-requests and batch refresh. It replaces whatever the table held, sets the actor (`{ id: token.id, model: Token, ownerModel }` when a token is present, otherwise `{ id: user.id, model: User }`), sets the superadmin flag (from the request's person, or the person behind a User, OrganizationUser or SpaceUser token), and installs either the person's table or the token's claim over its holder. Every token goes through `setTokenContext`, which never sets a user: a User token carries its person's seats as context, any other token none.
 
 ### What It Does
 

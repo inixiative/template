@@ -19,7 +19,7 @@ export const organizationCreateController = makeController(
     const { organization, organizationUser } = await db.txn(async () => {
       const organization = await db.organization.create({ data: body });
       const organizationUser = await db.organizationUser.create({
-        data: { organizationId: organization.id, userId: user!.id, role: 'owner' },
+        data: { organizationId: organization.id, userId: user.id, role: 'owner' },
       });
       return { organization, organizationUser };
     });

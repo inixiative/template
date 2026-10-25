@@ -18,6 +18,7 @@ import {
 import { registerDelegatedKeysHook } from '#/hooks/falsePolymorphism/delegatedKeysHook';
 import { spoofMiddleware } from '#/middleware/auth/spoofMiddleware';
 import { tokenAuthMiddleware } from '#/middleware/auth/tokenAuthMiddleware';
+import { validateSuperadmin } from '#/middleware/validations/validateSuperadmin';
 import { batchRouter } from '#/modules/batch';
 import { meRouter } from '#/modules/me';
 import { organizationRouter } from '#/modules/organization';
@@ -31,6 +32,7 @@ const { app } = createTestApp({
       hono.route('/api/v1/me', meRouter);
       hono.route('/api/v1/organization', organizationRouter);
       hono.route('/api/v1/batch', batchRouter);
+      hono.get('/api/v1/probe/admin', validateSuperadmin, (c) => c.json({ ok: true }));
       hono.get('/api/v1/probe/who', (c) =>
         c.json({
           person: c.get('user')?.id ?? null,
@@ -118,7 +120,27 @@ describe('only a person acts directly: a JWT or a spoof (Aron, 2026-10-25)', () 
     );
   });
 
+  it("an integration's token cannot make its person an organization owner", async () => {
+    const { entity: integration } = await createIntegration({
+      ownerModel: 'User',
+      userId: person.id,
+      role: 'owner',
+    });
+    const key = await mint('Integration', { integration });
+    const response = await asKey(key, '/api/v1/organization', {
+      method: 'POST',
+      body: JSON.stringify({ name: 'Taken', slug: randomUUID() }),
+    });
+    expect(response.status).toBe(403);
+  });
+
   describe('a superadmin', () => {
+    it("a superadmin's token passes the superadmin gate", async () => {
+      const { entity: admin } = await createUser({ platformRole: 'superadmin' });
+      const key = await mint('User', { user: admin });
+      expect((await asKey(key, '/api/v1/probe/admin')).status).toBe(200);
+    });
+
     it("a superadmin's token is superadmin and spoofs into the person", async () => {
       const { entity: admin } = await createUser({ platformRole: 'superadmin' });
       const key = await mint('User', { user: admin });
