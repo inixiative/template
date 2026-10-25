@@ -41,6 +41,7 @@ kanban
     INFRA-033-segment-reconcile-perf-budget
     INFRA-036-clock-sensitive-rule-tick
     INFRA-038-ws-channel-tenancy
+    INFRA-039-ws-identity-addressed-delivery
     DOC-001-scalar-api-docs-ui
     DOC-002-ai-discoverable-api-metadata
     FE-002-editor-slice-pattern
@@ -87,6 +88,7 @@ kanban
 - [INFRA-033: Segment Reconcile Perf Budget](./INFRA-033-segment-reconcile-perf-budget.md) - Measure DB load of both reconcile rails; set the scale threshold for field-level trigger narrowing
 - [INFRA-036: Clock-Sensitive Rule Tick](./INFRA-036-clock-sensitive-rule-tick.md) - `Segment.clockUnit` (hour/day/week/month) derived at save by a json-rules fold; one sweep cron row per unit
 - [INFRA-038: WS Channel Tenancy](./INFRA-038-ws-channel-tenancy.md) - Tenancy query on channel names + probe-reported tenant, deferred until a route resolves its tenant outside its path
+- [INFRA-039: WS Identity-Addressed Delivery](./INFRA-039-ws-identity-addressed-delivery.md) - Push to User / Token / Integration recipients, not only users; audiences stay channels
 
 **Audit & Compliance:**
 - [FEAT-017: Audit Log Hardening, Inquiry Lineage, and Explorer](./FEAT-017-audit-log-hardening-lineage-and-explorer.md) - Durable audit writes, inquiry causality, and admin audit browsing
