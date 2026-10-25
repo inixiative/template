@@ -10,14 +10,6 @@ import type { ActionRule, RebacSchema } from '@template/permissions/rebac/types'
 
 const highRoles = ['owner', 'admin'];
 const person: ActionRule = { actor: { field: 'model', operator: Operator.equals, value: 'User' } };
-const personOrTheirToken: ActionRule = {
-  actor: {
-    any: [
-      { field: 'model', operator: Operator.equals, value: 'User' },
-      { field: 'ownerModel', operator: Operator.equals, value: 'User' },
-    ],
-  },
-};
 
 export const rebacSchema: RebacSchema = {
   bridges: [],
@@ -28,13 +20,10 @@ export const rebacSchema: RebacSchema = {
         manage: 'own',
         operate: 'manage',
         read: 'operate',
-        'user.me': { all: [personOrTheirToken, 'read'] },
-        'organization.create': { all: [personOrTheirToken, 'operate'] },
+        'organization.create': 'operate',
         'token.create': { all: [person, 'operate'] },
-        'token.delete': { all: [person, 'operate'] },
         'user.rotateJwts': { all: [person, 'operate'] },
         'user.redact': { all: [person, 'own'] },
-        'organization.delete': { all: [person, 'own'] },
       },
     },
 
@@ -44,6 +33,8 @@ export const rebacSchema: RebacSchema = {
         manage: 'own',
         operate: 'manage',
         read: 'operate',
+        'token.create': { all: [person, 'operate'] },
+        'organization.delete': { all: [person, 'own'] },
         // Role assignment: high roles need own, others need manage
         assign: {
           any: [
@@ -65,6 +56,7 @@ export const rebacSchema: RebacSchema = {
         manage: 'own',
         operate: 'manage',
         read: 'operate',
+        'token.create': { all: [person, 'operate'] },
         assign: {
           any: [
             { all: [{ rule: { field: 'role', operator: Operator.in, value: highRoles } }, 'own'] },
@@ -105,7 +97,9 @@ export const rebacSchema: RebacSchema = {
         read: { rel: 'segment', action: 'read' },
       },
     },
-    'db:integration': { actions: ownerActions() },
+    'db:integration': {
+      actions: { ...ownerActions(), 'token.create': { all: [person, 'manage'] } },
+    },
     'db:flow': { actions: ownerActions(['user']) },
 
     'db:organizationUser': {
@@ -116,6 +110,7 @@ export const rebacSchema: RebacSchema = {
             { rel: 'organization', action: 'read' },
           ],
         },
+        'token.create': { all: [person, 'leave'] },
         leave: { rel: 'user', action: 'operate' },
         manage: { rel: 'organization', action: 'manage' },
         own: { rel: 'organization', action: 'own' },
@@ -130,6 +125,7 @@ export const rebacSchema: RebacSchema = {
             { rel: 'space', action: 'read' },
           ],
         },
+        'token.create': { all: [person, 'leave'] },
         leave: { rel: 'user', action: 'operate' },
         manage: { rel: 'space', action: 'manage' },
         own: { rel: 'space', action: 'own' },
@@ -142,6 +138,7 @@ export const rebacSchema: RebacSchema = {
     // locally and only the seat check walks to the owner.
     'db:token': {
       actions: {
+        'token.delete': { all: [person, { any: ['leave', 'assign'] }] },
         leave: { rel: 'user', action: 'operate' },
         // Owner-side assign, role-aware.
         assign: {

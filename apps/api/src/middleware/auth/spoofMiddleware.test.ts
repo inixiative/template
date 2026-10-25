@@ -36,7 +36,7 @@ describe('spoofMiddleware via token auth', () => {
     await cleanupTouchedTables(db);
   });
 
-  it('superadmin authenticated via token can spoof another user', async () => {
+  it('a superadmin on a token spoofs and becomes the user, the token set aside', async () => {
     const { entity: admin } = await createUser({ platformRole: 'superadmin' });
     const { entity: target } = await createUser();
     const { entity: token } = await createToken({ ownerModel: 'User' }, { user: admin });
@@ -49,7 +49,7 @@ describe('spoofMiddleware via token auth', () => {
     const body = (await res.json()) as Echo;
     expect(body.userId).toBe(target.id);
     expect(body.spoofedById).toBe(admin.id);
-    expect(body.tokenId).toBe(token.id);
+    expect(body.tokenId).toBeNull();
   });
 
   it('non-superadmin with token cannot spoof — header is ignored', async () => {

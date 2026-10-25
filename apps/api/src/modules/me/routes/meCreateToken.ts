@@ -7,7 +7,7 @@
 
 import { SessionAction } from '@template/permissions/client';
 import { createRoute } from '#/lib/routeTemplates';
-import { validateSelfPermission } from '#/middleware/validations/validateSelfPermission';
+import { validatePermission } from '#/middleware/validations/validatePermission';
 import { Modules } from '#/modules/modules';
 import { Tags } from '#/modules/tags';
 import {
@@ -21,6 +21,6 @@ export const meCreateTokenRoute = createRoute({
   skipId: true,
   bodySchema: tokenCreateBodySchema,
   responseSchema: tokenCreateResponseSchema,
-  middleware: [validateSelfPermission(SessionAction.createToken)],
+  middleware: [validatePermission(SessionAction.createToken)],
   tags: [Tags.me, Tags.token],
 });

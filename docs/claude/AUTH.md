@@ -39,7 +39,6 @@
   - [Usage](#usage)
   - [Requirements](#requirements)
 - [Validation Middleware](#validation-middleware)
-  - [validateSelfPermission](#validateselfpermission)
   - [validateSuperadmin](#validatesuperadmin)
 - [Who Is a Person](#who-is-a-person)
 
@@ -169,7 +168,7 @@ The token's `iss` picks the issuer; an unknown `iss` is refused. `algorithms: ['
 | What | Revokes |
 |---|---|
 | Sign out of one browser | Nothing on the server: the SPA drops its JWT |
-| `POST /api/v1/me/rotateJwts` | Every JWT this API signed for the caller, on every device: the nuclear option, not a sign-out of one device. Person-only (`validateSelfPermission(SessionAction.rotateUserJwts)`, an actor arm in the schema): an API token cannot rotate its user's JWTs |
+| `POST /api/v1/me/rotateJwts` | Every JWT this API signed for the caller, on every device: the nuclear option, not a sign-out of one device. Person-only (`validatePermission(SessionAction.rotateUserJwts)` on the person, an actor arm in the schema): an API token cannot rotate its user's JWTs |
 | `POST /api/admin/user/:id/rotateJwts` | Every JWT this API signed for that user (superadmin) |
 | `redactUser` (`POST /api/v1/me/redact`, `POST /api/admin/user/:id/redact`) | Every JWT of the deleted account (`rotateUserJwts`; the soft-deleted user is refused too) |
 | Password reset (BetterAuth `onPasswordReset`) | Every JWT this API signed for that user |
@@ -550,16 +549,6 @@ curl -H "Authorization: Bearer <jwt>" \
 
 Use these after auth to enforce requirements:
 
-### validateSelfPermission
-
-Checks an action on the caller's own user entry; every `/me/*` route and every session action declares one. The person-only actions (token minting and deletion, redaction, JWT rotation, organization deletion) are actor arms in the schema, so an API token never holds them and a superadmin's token passes. See [PERMISSIONS.md](./PERMISSIONS.md#validateselfpermission).
-
-```typescript
-import { validateSelfPermission } from '#/middleware/validations/validateSelfPermission';
-
-middleware: [validateSelfPermission(SessionAction.rotateUserJwts)]  // 403 for any token
-```
-
 ### validateSuperadmin
 
 Requires superadmin:
@@ -576,13 +565,11 @@ router.get('/admin/users', validateSuperadmin, handler);  // 403 if not superadm
 
 Only a JWT session or a superadmin spoof makes the request a person (`c.get('user')`). A token never does: it is a Token actor `{ id, model: 'Token', ownerModel }`, and what it may do is its claim over its holder's table. Routes name their action; there is no "is there a user" middleware.
 
-| Credential | `c.get('user')` | `me(c)` | `/me` (`user.me`) |
-|------------|-----------------|---------|-------------------|
-| Person JWT | the person | the person | ✅ |
-| Spoof (superadmin JWT or token) | the spoofed person | the spoofed person | ✅ |
-| User token | none | its person | ✅ within its claim |
-| OrganizationUser / SpaceUser token | none | its seat's person | ❌ 403 |
-| Integration token | none | its integration's person, if any | ❌ 403 |
-| Organization / Space token | none | none | ❌ 401 |
+| Credential | `c.get('user')` | `me(c)` (the `/me` resource) |
+|------------|-----------------|-------------------------------|
+| Person JWT | the person | the person |
+| Spoof (a superadmin on any credential) | the spoofed person, token set aside | the spoofed person |
+| User token | none | its person |
+| Any other token | none | none: `/me` answers 401 |
 
-A token held by a person (User, OrganizationUser, SpaceUser) is superadmin when its person is, and can spoof.
+A token held by a person (User, OrganizationUser, SpaceUser) is superadmin when its person is, and can spoof. A spoof is a superadmin and an email: the request becomes that person and the token is set aside; `spoofedBy` records who.

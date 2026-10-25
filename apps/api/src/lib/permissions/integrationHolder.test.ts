@@ -339,7 +339,7 @@ describe('an integration holds entitlements and acts for its direct owner (Aron,
         headers: { authorization: `Bearer ${data.key}`, 'content-type': 'application/json' },
         body: JSON.stringify({ name: 'k', role: 'member' }),
       });
-      expect(again.status).toBe(401);
+      expect(again.status).toBe(403);
     });
   });
 });

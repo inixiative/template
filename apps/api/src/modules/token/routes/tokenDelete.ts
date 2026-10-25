@@ -7,7 +7,7 @@
 
 import { SessionAction } from '@template/permissions/client';
 import { deleteRoute } from '#/lib/routeTemplates';
-import { validateSelfPermission } from '#/middleware/validations/validateSelfPermission';
+import { validatePermission } from '#/middleware/validations/validatePermission';
 import { Modules } from '#/modules/modules';
 
 export const tokenDeleteRoute = deleteRoute({
@@ -15,5 +15,5 @@ export const tokenDeleteRoute = deleteRoute({
   // Permission check happens in the controller — `leave` (self deletes own
   // token) and `manage` (owner deletes scoped token) are both valid; the
   // route-level middleware only takes a single action.
-  middleware: [validateSelfPermission(SessionAction.deleteToken)],
+  middleware: [validatePermission(SessionAction.deleteToken)],
 });

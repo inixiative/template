@@ -14,7 +14,7 @@ const personOnly = new Set<string>(personOnlyActions);
 
 const checksPersonOnlyAction = (middleware: RouteArgs['middleware']) =>
   castArray(middleware ?? []).some(
-    (handler) => 'selfAction' in handler && personOnly.has(String(handler.selfAction)),
+    (handler) => 'permission' in handler && personOnly.has(String(handler.permission)),
   );
 
 export const securityForRoute = ({

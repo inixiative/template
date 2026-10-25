@@ -7,7 +7,7 @@
 import { OrganizationScalarSchema, OrganizationUserScalarSchema } from '@template/db';
 import { lensFor } from '@template/db/lens';
 import { readRoute } from '#/lib/routeTemplates';
-import { validateSelfPermission } from '#/middleware/validations/validateSelfPermission';
+import { validatePermission } from '#/middleware/validations/validatePermission';
 import { Modules } from '#/modules/modules';
 import { Tags } from '#/modules/tags';
 
@@ -17,7 +17,7 @@ const responseSchema = OrganizationScalarSchema.extend({
 
 export const meReadManyOrganizationsRoute = readRoute({
   model: Modules.me,
-  middleware: [validateSelfPermission('read')],
+  middleware: [validatePermission('read')],
   submodel: Modules.organization,
   many: true,
   skipId: true,

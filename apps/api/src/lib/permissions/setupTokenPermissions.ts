@@ -6,13 +6,7 @@
  */
 import { delegateClaimEntries } from '@template/permissions';
 import type { Context } from 'hono';
-import {
-  type DelegateHolder,
-  delegateClaimOf,
-  delegateHolder,
-  holderPermix,
-} from '#/lib/permissions/delegateHolder';
-import { requestPersonEntries } from '#/lib/permissions/setupPersonPermissions';
+import { delegateClaimOf, delegateHolder, holderPermix } from '#/lib/permissions/delegateHolder';
 import type { AppEnv } from '#/types/appEnv';
 
 export const setupTokenPermissions = async (c: Context<AppEnv>) => {
@@ -20,9 +14,7 @@ export const setupTokenPermissions = async (c: Context<AppEnv>) => {
   const token = c.get('token');
   if (!token) return;
 
-  const holder: DelegateHolder = c.get('spoofedBy')
-    ? { entries: requestPersonEntries(c) }
-    : await delegateHolder(token);
+  const holder = await delegateHolder(token);
   await permix.setup(delegateClaimEntries(delegateClaimOf(token), holder.entries), {
     owner: await holderPermix(holder),
   });

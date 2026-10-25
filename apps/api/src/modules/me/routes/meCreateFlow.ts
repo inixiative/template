@@ -5,14 +5,14 @@
  * @uses primitive:routeTemplates, primitive:flows
  */
 import { createRoute } from '#/lib/routeTemplates';
-import { validateSelfPermission } from '#/middleware/validations/validateSelfPermission';
+import { validatePermission } from '#/middleware/validations/validatePermission';
 import { flowCreateBodySchema, flowResponseSchema } from '#/modules/flow/schemas/flowSchemas';
 import { Modules } from '#/modules/modules';
 import { Tags } from '#/modules/tags';
 
 export const meCreateFlowRoute = createRoute({
   model: Modules.me,
-  middleware: [validateSelfPermission('operate')],
+  middleware: [validatePermission('operate')],
   submodel: Modules.flow,
   skipId: true,
   description:

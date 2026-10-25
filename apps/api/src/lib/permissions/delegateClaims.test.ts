@@ -331,7 +331,7 @@ describe('a delegate holds what it claims, and no more than whoever grants it (A
         userId: user.id,
         spaceId: null,
       });
-      expect((await asToken(key!, 'GET', '/api/v1/me')).status).toBe(403);
+      expect((await asToken(key!, 'GET', '/api/v1/me')).status).toBe(401);
       expect(
         (await asToken(key!, 'GET', `/api/v1/organization/${organization.id}/protected`)).status,
       ).toBe(200);

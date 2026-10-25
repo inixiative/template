@@ -5,7 +5,7 @@
  * @uses primitive:routeTemplates, feature:webhooks
  */
 import { createRoute } from '#/lib/routeTemplates';
-import { validateSelfPermission } from '#/middleware/validations/validateSelfPermission';
+import { validatePermission } from '#/middleware/validations/validatePermission';
 import { Modules } from '#/modules/modules';
 import { Tags } from '#/modules/tags';
 import {
@@ -15,7 +15,7 @@ import {
 
 export const meCreateWebhookSubscriptionRoute = createRoute({
   model: Modules.me,
-  middleware: [validateSelfPermission('operate')],
+  middleware: [validatePermission('operate')],
   submodel: Modules.webhookSubscription,
   skipId: true,
   bodySchema: webhookSubscriptionCreateBodySchema,

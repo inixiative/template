@@ -6,7 +6,7 @@
  */
 import { lensFor } from '@template/db/lens';
 import { readRoute } from '#/lib/routeTemplates';
-import { validateSelfPermission } from '#/middleware/validations/validateSelfPermission';
+import { validatePermission } from '#/middleware/validations/validatePermission';
 import { providerFilterSchema } from '#/modules/customerRef/schemas/customerRefQuerySchemas';
 import {
   customerRefAsCustomerSchema,
@@ -17,7 +17,7 @@ import { Tags } from '#/modules/tags';
 
 export const meReadManyProvidersRoute = readRoute({
   model: Modules.me,
-  middleware: [validateSelfPermission('read')],
+  middleware: [validatePermission('read')],
   submodel: Modules.provider,
   many: true,
   skipId: true,

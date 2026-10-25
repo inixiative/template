@@ -28,6 +28,7 @@ export const spoofMiddleware = async (c: Context<AppEnv>, next: Next) => {
   if (!spoofedUser) return next();
 
   c.set('spoofedBy', spoofer);
+  c.set('token', null);
   await setUserContext(c, spoofedUser);
   c.header('x-spoofing-user-email', spoofer.email);
   c.header('x-spoofed-user-email', spoofEmail);

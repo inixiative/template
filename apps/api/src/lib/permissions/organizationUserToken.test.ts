@@ -92,7 +92,7 @@ describe('a token of an organization seat acts as that seat, never as the person
   });
 
   it('acts on its organization as its seat does', async () => {
-    expect(await status('GET', '/me')).toBe(403);
+    expect(await status('GET', '/me')).toBe(401);
     expect(await status('GET', `/organization/${organization.id}/protected`)).toBe(200);
     expect(await status('GET', `/organization/${organization.id}`)).toBe(200);
     expect(await status('PATCH', `/organization/${organization.id}`, { name: 'Renamed' })).toBe(
@@ -102,12 +102,12 @@ describe('a token of an organization seat acts as that seat, never as the person
   });
 
   it('does nothing only the person may do', async () => {
-    expect(await status('GET', '/me/organizations')).toBe(403);
-    expect(await status('GET', '/me/tokens')).toBe(403);
-    expect(await status('POST', '/me/tokens', { name: 'k', role: 'viewer' })).toBe(403);
-    expect(await status('POST', '/me/rotateJwts')).toBe(403);
-    expect(await status('POST', '/me/redact')).toBe(403);
-    expect(await status('POST', '/organization', { name: 'o', slug: randomUUID() })).toBe(403);
+    expect(await status('GET', '/me/organizations')).toBe(401);
+    expect(await status('GET', '/me/tokens')).toBe(401);
+    expect(await status('POST', '/me/tokens', { name: 'k', role: 'viewer' })).toBe(401);
+    expect(await status('POST', '/me/rotateJwts')).toBe(401);
+    expect(await status('POST', '/me/redact')).toBe(401);
+    expect(await status('POST', '/organization', { name: 'o', slug: randomUUID() })).toBe(401);
     expect(await status('DELETE', `/token/${personToken.id}`)).toBe(403);
 
     expect(await db.token.findUnique({ where: { id: personToken.id } })).not.toBeNull();

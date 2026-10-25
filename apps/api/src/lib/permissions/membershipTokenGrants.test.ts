@@ -122,7 +122,7 @@ describe('a membership token holds its membership, never the user (template #210
     expect(await holds(rawKey, 'space', space.id, 'operate')).toBe(false);
   });
 
-  it('a SpaceUser token is not its person: /me refuses it', async () => {
+  it('a SpaceUser token has no me: /me answers 401', async () => {
     const { context } = await createOrganizationUser({ role: 'owner' }, { organization });
     const { entity: spaceUser } = await createSpaceUser({ role: 'member' }, { ...context, space });
     const { rawKey, fields } = mintKey();
@@ -131,6 +131,6 @@ describe('a membership token holds its membership, never the user (template #210
     const response = await tokenApp.request('/api/v1/me', {
       headers: { authorization: `Bearer ${rawKey}` },
     });
-    expect(response.status).toBe(403);
+    expect(response.status).toBe(401);
   });
 });

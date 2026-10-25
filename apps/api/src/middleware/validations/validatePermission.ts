@@ -1,10 +1,11 @@
 import { hydrate } from '@template/db';
 import type { Action } from '@template/permissions/client';
 import { check, rebacSchema } from '@template/permissions/rebac';
+import type { MiddlewareHandler } from 'hono';
 import { makeError } from '#/lib/errors';
 import { makeMiddleware } from '#/lib/utils/makeMiddleware';
 
-export const validatePermission = makeMiddleware<Action>((action) => async (c, next) => {
+const checkPermission = makeMiddleware<Action>((action) => async (c, next) => {
   const resource = c.get('resource');
   const resourceType = c.get('resourceType');
   const permix = c.get('permix');
@@ -21,3 +22,8 @@ export const validatePermission = makeMiddleware<Action>((action) => async (c, n
 
   await next();
 });
+
+export type PermissionMiddleware = MiddlewareHandler & { permission: Action };
+
+export const validatePermission = (action: Action): PermissionMiddleware =>
+  Object.assign(checkPermission(action), { permission: action });

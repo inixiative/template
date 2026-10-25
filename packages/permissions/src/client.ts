@@ -52,7 +52,6 @@ export const personOnlyActions: readonly SessionAction[] = [
 export const UserAction = {
   ...StandardAction,
   ...SessionAction,
-  me: 'user.me',
   createOrganization: 'organization.create',
 } as const;
 export type UserAction = (typeof UserAction)[keyof typeof UserAction];
@@ -72,7 +71,7 @@ export const ActorModel = { User: 'User', Token: 'Token' } as const;
 export type ActorModel = (typeof ActorModel)[keyof typeof ActorModel];
 
 // Who is acting, beside what they hold: a person, or a token. The table carries identity.
-export type Actor = { id: string; model: ActorModel; ownerModel?: string | null };
+export type Actor = { id: string; model: ActorModel };
 
 export type ActionState = EngineActionState<Action>;
 export type PermissionEntry = EnginePermissionEntry<Action>;

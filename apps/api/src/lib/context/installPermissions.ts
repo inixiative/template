@@ -18,8 +18,7 @@ export const installPermissions = async (c: Context<AppEnv>) => {
   const token = c.get('token');
 
   await permix.setup([], { replace: true });
-  if (token)
-    permix.setActor({ id: token.id, model: ActorModel.Token, ownerModel: token.ownerModel });
+  if (token) permix.setActor({ id: token.id, model: ActorModel.Token });
   else if (user) permix.setActor({ id: user.id, model: ActorModel.User });
   const heldByPerson = token && personHeld.includes(token.ownerModel) ? token.user : null;
   permix.setSuperadmin(isSuperadmin(user ?? heldByPerson));

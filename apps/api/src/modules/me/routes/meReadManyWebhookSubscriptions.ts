@@ -7,13 +7,13 @@
 import { WebhookSubscriptionScalarSchema } from '@template/db';
 import { lensFor } from '@template/db/lens';
 import { readRoute } from '#/lib/routeTemplates';
-import { validateSelfPermission } from '#/middleware/validations/validateSelfPermission';
+import { validatePermission } from '#/middleware/validations/validatePermission';
 import { Modules } from '#/modules/modules';
 import { Tags } from '#/modules/tags';
 
 export const meReadManyWebhookSubscriptionsRoute = readRoute({
   model: Modules.me,
-  middleware: [validateSelfPermission('read')],
+  middleware: [validatePermission('read')],
   submodel: Modules.webhookSubscription,
   many: true,
   skipId: true,

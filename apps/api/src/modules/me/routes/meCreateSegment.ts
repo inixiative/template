@@ -5,7 +5,7 @@
  * @uses primitive:routeTemplates, feature:segment
  */
 import { createRoute } from '#/lib/routeTemplates';
-import { validateSelfPermission } from '#/middleware/validations/validateSelfPermission';
+import { validatePermission } from '#/middleware/validations/validatePermission';
 import { Modules } from '#/modules/modules';
 import {
   SEGMENT_CREATE_IMMUTABLE_FIELDS,
@@ -16,7 +16,7 @@ import { Tags } from '#/modules/tags';
 
 export const meCreateSegmentRoute = createRoute({
   model: Modules.me,
-  middleware: [validateSelfPermission('operate')],
+  middleware: [validatePermission('operate')],
   submodel: Modules.segment,
   skipId: true,
   bodySchema: segmentCreateBodySchema,

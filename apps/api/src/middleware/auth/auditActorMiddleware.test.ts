@@ -1,83 +1,76 @@
-import { afterAll, describe, expect, it } from 'bun:test';
-import { db } from '@template/db';
-import type { User } from '@template/db/generated/client/client';
-import { IntegrationOwnerModel } from '@template/db/generated/client/enums';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { createHash, randomUUID } from 'node:crypto';
+import { db, unregisterDbHook } from '@template/db';
 import { auditActorContext } from '@template/db/lib/auditActorContext';
-import { cleanupTouchedTables, createIntegration, createUser } from '@template/db/test';
+import {
+  cleanupTouchedTables,
+  createIntegration,
+  createToken,
+  createUser,
+} from '@template/db/test';
+import { registerDelegatedKeysHook } from '#/hooks/falsePolymorphism/delegatedKeysHook';
 import { auditActorMiddleware } from '#/middleware/auth/auditActorMiddleware';
-import { spoofMiddleware } from '#/middleware/auth/spoofMiddleware';
+import { tokenAuthMiddleware } from '#/middleware/auth/tokenAuthMiddleware';
 import { createTestApp } from '#tests/createTestApp';
 
-type Echo = { integrationId: string | null; actorUserId: string | null };
+type Echo = { integrationId: string | null; actorTokenId: string | null };
 
-const buildApp = (user: User) =>
-  createTestApp({
-    mockUser: user,
-    mount: [
-      (app) => {
-        app.use('*', spoofMiddleware);
-        app.use('*', auditActorMiddleware);
-        app.get('/echo', (c) => {
-          const actor = auditActorContext.getScope();
-          return c.json({
-            integrationId: actor?.integrationId ?? null,
-            actorUserId: actor?.actorUserId ?? null,
-          });
+const { app } = createTestApp({
+  mount: [
+    (hono) => {
+      hono.use('*', tokenAuthMiddleware);
+      hono.use('*', auditActorMiddleware);
+      hono.get('/echo', (c) => {
+        const actor = auditActorContext.getScope();
+        return c.json({
+          integrationId: actor?.integrationId ?? null,
+          actorTokenId: actor?.actorTokenId ?? null,
         });
-      },
-    ],
-  });
+      });
+    },
+  ],
+});
 
-const echo = async (user: User, headers: Record<string, string>) => {
-  const res = await buildApp(user).fetch(new Request('http://test/echo', { headers }));
-  expect(res.status).toBe(200);
-  return (await res.json()) as Echo;
-};
+const echo = async (key: string, headers: Record<string, string> = {}) =>
+  (await (
+    await app.request('/echo', { headers: { authorization: `Bearer ${key}`, ...headers } })
+  ).json()) as Echo;
 
-describe('auditActorMiddleware x-integration-id', () => {
+describe('an integration acts through its token, and the audit names it (Aron, 2026-10-25)', () => {
+  beforeAll(() => registerDelegatedKeysHook());
+
   afterAll(async () => {
+    unregisterDbHook('falsePolymorphism:delegatedKeys');
+    unregisterDbHook('falsePolymorphism:delegatedKeys:upsert');
     await cleanupTouchedTables(db);
   });
 
-  it('carries an integration the caller owns', async () => {
-    const { entity: owner, context } = await createUser();
-    const { entity: integration } = await createIntegration(
-      { ownerModel: IntegrationOwnerModel.User, userId: owner.id },
+  const mint = async (fields: Record<string, unknown>, context: Record<string, unknown>) => {
+    const key = randomUUID();
+    const { entity } = await createToken(
+      { role: 'owner', keyHash: createHash('sha256').update(key).digest('hex'), ...fields },
       context,
     );
+    return { key, token: entity };
+  };
 
-    const body = await echo(owner, { 'x-integration-id': integration.id });
-
-    expect(body.integrationId).toBe(integration.id);
-  });
-
-  it('ignores a superadmin asserting an integration they do not own', async () => {
-    const { entity: admin } = await createUser({ platformRole: 'superadmin' });
-    const { entity: owner, context } = await createUser();
-    const { entity: integration } = await createIntegration(
-      { ownerModel: IntegrationOwnerModel.User, userId: owner.id },
-      context,
-    );
-
-    const body = await echo(admin, { 'x-integration-id': integration.id });
-
-    expect(body.actorUserId).toBe(admin.id);
-    expect(body.integrationId).toBeNull();
-  });
-
-  it('carries the spoofed user integration for a spoofing superadmin', async () => {
-    const { entity: admin } = await createUser({ platformRole: 'superadmin' });
-    const { entity: owner, context } = await createUser();
-    const { entity: integration } = await createIntegration(
-      { ownerModel: IntegrationOwnerModel.User, userId: owner.id },
-      context,
-    );
-
-    const body = await echo(admin, {
-      'x-spoof-user-email': owner.email,
-      'x-integration-id': integration.id,
+  it("an integration's token carries its integration onto the audit", async () => {
+    const { entity: user } = await createUser();
+    const { entity: integration } = await createIntegration({
+      ownerModel: 'User',
+      userId: user.id,
     });
+    const { key, token } = await mint({ ownerModel: 'Integration' }, { integration });
+    expect(await echo(key)).toEqual({ integrationId: integration.id, actorTokenId: token.id });
+  });
 
-    expect(body.integrationId).toBe(integration.id);
+  it('a header cannot name an integration', async () => {
+    const { entity: user } = await createUser();
+    const { entity: integration } = await createIntegration({
+      ownerModel: 'User',
+      userId: user.id,
+    });
+    const { key } = await mint({ ownerModel: 'User' }, { user });
+    expect((await echo(key, { 'x-integration-id': integration.id })).integrationId).toBeNull();
   });
 });

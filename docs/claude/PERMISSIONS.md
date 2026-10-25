@@ -52,7 +52,7 @@
 - [Validation Middleware](#validation-middleware)
   - [validatePermission](#validatepermission)
   - [validateOwnerPermission](#validateownerpermission)
-  - [validateSelfPermission](#validateselfpermission)
+  - [The person as a resource](#the-person-as-a-resource)
 - [Role Assignment](#role-assignment)
   - [Role Assignment Rules](#role-assignment-rules)
 - [Token Permissions](#token-permissions)
@@ -139,7 +139,7 @@ export const StandardAction = {
 
 ### Session Actions
 
-Actions on the person's own account sit on `db:user` beside the standard four, and every route that acts as the person names one (`validateSelfPermission`, below):
+Actions on the person's own account and the person-only acts on other records; every route names one ([The person as a resource](#the-person-as-a-resource)):
 
 ```typescript
 // packages/permissions/src/client.ts
@@ -154,12 +154,11 @@ export const SessionAction = {
 export const UserAction = {
   ...StandardAction,
   ...SessionAction,
-  me: 'user.me',                           // the /me router: the person, or a token the person owns
   createOrganization: 'organization.create', // organizationCreate
 };
 ```
 
-The schema maps each to a standard action: `'organization.create': 'operate'`, and `'user.me'` is `{ all: [{ actor: model equals User, or ownerModel equals User }, 'read'] }`: `/me` serves a person, or a token whose owner is the person, never a seat's, organization's, space's or integration's token. The five session actions are person-only, written as `{ all: [{ actor: model equals User }, 'operate' | 'own'] }`, so a token holding `own` on its user still cannot mint, delete tokens, redact, rotate or delete an organization. A superadmin passes on any credential. `personOnlyActions` lists them for OpenAPI, where their operations publish `userJwt` alone.
+The schema maps `'organization.create'` to `'operate'` on the user. The session actions are person-only, written as `{ all: [{ actor: model equals User }, 'operate' | 'own'] }`, so a token holding `own` still cannot mint, delete tokens, redact, rotate or delete an organization. They sit on the record each acts on (below). A superadmin passes on any credential. `personOnlyActions` lists them for OpenAPI, where their operations publish `userJwt` alone.
 
 ### The Actor
 
@@ -371,7 +370,7 @@ if (!permix.check('organization', 'manage', orgId)) {
 
 ### Via Validation Middleware
 
-There is no "is there a user" gate: every route names its action, and the action's rule decides who may take it. Only a JWT session or a spoof makes the request a person (`c.get('user')`); a token is a Token actor `{ id, model, ownerModel }` and acts within its claim. A route that loads no resource and acts as the person checks its action on the user with `validateSelfPermission` ([below](#validateselfpermission)).
+There is no "is there a user" gate: every route names its action, and the action's rule decides who may take it. Only a JWT session or a spoof makes the request a person (`c.get('user')`); a token is a Token actor `{ id, model }` and acts within its claim. `/me` routes act on the person as their resource ([The person as a resource](#the-person-as-a-resource)).
 
 The template uses a unified `validatePermission` middleware that leverages ReBAC for permission checks:
 
@@ -805,21 +804,19 @@ middleware: [validateOwnerPermission({ action: 'manage' })]
 middleware: [validateOwnerPermission({ action: 'read' })]
 ```
 
-### validateSelfPermission
+### The person as a resource
 
-Checks an action on the current user's own `db:user` entry. It is the rail for every route that acts as the person: `/me/*`, `organizationCreate`, and the session actions.
+`/me/*` routes check their action with `validatePermission` like any other route; `meResourceMiddleware` (on the `/me` router) loads `me(c)` as the resource, typed `user`. `me(c)` is the request's person (a JWT session or a spoof), or the user of a User-owned token; anything else has no me and gets 401. `organizationCreate` loads the same resource for `organization.create`.
 
 ```typescript
-import { validateSelfPermission } from '#/middleware/validations/validateSelfPermission';
-
-meRouter.use('*', validateSelfPermission(UserAction.me))                  // every /me route
-middleware: [validateSelfPermission('read')]                              // every meReadMany*
-middleware: [validateSelfPermission('operate')]                           // every meCreate*, meReachSegment
-middleware: [validateSelfPermission(SessionAction.createToken)]           // meCreateToken and the four owner token routes
-middleware: [validateSelfPermission(SessionAction.deleteOrganization), validatePermission('own')] // organizationDelete
+meRouter.use('*', meResourceMiddleware)                                   // every /me route
+middleware: [validatePermission('read')]                                  // every meReadMany*
+middleware: [validatePermission('operate')]                               // every meCreate*, meReachSegment
+middleware: [validatePermission(SessionAction.createToken)]               // meCreateToken, and on the org / space / seat / integration token routes
+middleware: [validatePermission(SessionAction.deleteOrganization)]        // organizationDelete
 ```
 
-The user it checks is `me(c)`: the request's person, or else the person a token's key columns name. 401 when there is none, 403 when the action's rule refuses. "A token can't do this" is not a middleware: it is the action's rule. A viewer User token reads the person and creates nothing; a member token creates; no token holds a person-only action; a seat's or an integration's token is refused `/me` by `user.me`. `securityForRoute` reads the action off the middleware (`selfAction`) and publishes `userJwt` alone when it is person-only. Situations: `apps/api/src/middleware/validations/validateSelfPermission.test.ts`.
+Person-only is the action's rule on whichever record the route acts on (`{ all: [{ actor: model equals User }, …] }`): `token.create` on the user, an organization, a space, a seat or an integration (the record stands in for the collection); `token.delete` on the token; `organization.delete` on the organization; `user.redact` and `user.rotateJwts` on the user. A superadmin passes on any credential. `validatePermission` carries its action (`permission`), and `securityForRoute` publishes `userJwt` alone when the action is person-only. Situations: `apps/api/src/middleware/validations/personOnlyActions.test.ts`, `apps/api/src/lib/context/personActsDirectly.test.ts`.
 
 ---
 
@@ -878,7 +875,7 @@ The frontend runs the same ReBAC engine. `permissions.setup(me)` (`packages/ui/s
 
 | Layer | Entry point |
 |-------|-------------|
-| Route | `validatePermission` / `validateSelfPermission`, naming the action ([Validation Middleware](#validation-middleware)) |
+| Route | `validatePermission`, naming the action ([Validation Middleware](#validation-middleware)) |
 | Page | `_authenticated.tsx` → `useAuthenticatedRouting` → `checkContextPermission`: the nav item's `access` decides "can view"; on failure it falls back to the org (from a space), then user, then public context, else renders `Unauthorized` |
 | Nav item | `access(permissions, context, page?)` on `NavItem`; the Sidebar hides items that fail it |
 | Component | `checkPermission(permissions, model, record, action)` / `permissions.check(model, record, action)` |

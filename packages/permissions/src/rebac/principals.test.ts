@@ -74,13 +74,8 @@ const can = (
   action: string,
 ) => check(permix, rebacSchema, model, record as HydratedRecord, action);
 
-const acting = (
-  permix: Awaited<ReturnType<typeof table>>,
-  model: ActorModel,
-  id = 'who',
-  ownerModel: string | null = null,
-) => {
-  permix.setActor({ id, model, ownerModel });
+const acting = (permix: Awaited<ReturnType<typeof table>>, model: ActorModel, id = 'who') => {
+  permix.setActor({ id, model });
   return permix;
 };
 
@@ -292,7 +287,12 @@ describe('no self arm: the person reaches their own rows through rel user (Aron,
     it('every person-only action is refused to a token holding own on the user', async () => {
       const token = acting(await table(grant('db:user', 'u1', 'own')), ActorModel.Token, 't1');
       const person = acting(await table(grant('db:user', 'u1', 'own')), ActorModel.User, 'u1');
-      for (const action of personOnlyActions) {
+      const onTheUser = [
+        SessionAction.createToken,
+        SessionAction.redactUser,
+        SessionAction.rotateUserJwts,
+      ];
+      for (const action of onTheUser) {
         expect(can(token, 'user', u1, action)).toBe(false);
         expect(can(person, 'user', u1, action)).toBe(true);
       }
@@ -311,34 +311,22 @@ describe('no self arm: the person reaches their own rows through rel user (Aron,
       expect(can(nobody, 'user', u1, 'own')).toBe(true);
     });
 
-    it("/me is the person or a token the person owns, reading the person's row", async () => {
-      const readTable = () => table(grant('db:user', 'u1', 'read'));
-      expect(can(acting(await readTable(), ActorModel.User, 'u1'), 'user', u1, UserAction.me)).toBe(
-        true,
-      );
-      const theirs = acting(await readTable(), ActorModel.Token, 't1', 'User');
-      expect(can(theirs, 'user', u1, UserAction.me)).toBe(true);
-      const seats = acting(await readTable(), ActorModel.Token, 't1', 'OrganizationUser');
-      expect(can(seats, 'user', u1, UserAction.me)).toBe(false);
-      const integration = acting(await readTable(), ActorModel.Token, 't1', 'Integration');
-      expect(can(integration, 'user', u1, UserAction.me)).toBe(false);
-      const blind = acting(await table(), ActorModel.Token, 't1', 'User');
-      expect(can(blind, 'user', u1, UserAction.me)).toBe(false);
+    it('create-organization follows the table, not the actor', async () => {
+      const reader = acting(await table(grant('db:user', 'u1', 'read')), ActorModel.Token, 't1');
+      expect(can(reader, 'user', u1, UserAction.createOrganization)).toBe(false);
+      const member = acting(await table(grant('db:user', 'u1', 'operate')), ActorModel.Token, 't1');
+      expect(can(member, 'user', u1, UserAction.createOrganization)).toBe(true);
     });
 
-    it('create-organization: the person or their own token, holding operate', async () => {
-      const operate = () => table(grant('db:user', 'u1', 'operate'));
-      const theirs = acting(await operate(), ActorModel.Token, 't1', 'User');
-      expect(can(theirs, 'user', u1, UserAction.createOrganization)).toBe(true);
-      const reader = acting(
-        await table(grant('db:user', 'u1', 'read')),
-        ActorModel.Token,
-        't1',
-        'User',
-      );
-      expect(can(reader, 'user', u1, UserAction.createOrganization)).toBe(false);
-      const integration = acting(await operate(), ActorModel.Token, 't1', 'Integration');
-      expect(can(integration, 'user', u1, UserAction.createOrganization)).toBe(false);
+    it("minting and deleting tokens, and deleting an organization, are a person's acts on that record", async () => {
+      const owner = () => table(grant('db:organization', 'o1', 'own'));
+      const org = { id: 'o1' };
+      const asPerson = acting(await owner(), ActorModel.User, 'u1');
+      const asToken = acting(await owner(), ActorModel.Token, 't1');
+      for (const action of [SessionAction.createToken, SessionAction.deleteOrganization]) {
+        expect(can(asPerson, 'organization', org, action)).toBe(true);
+        expect(can(asToken, 'organization', org, action)).toBe(false);
+      }
     });
 
     it('a superadmin passes a person-only check on any credential', async () => {

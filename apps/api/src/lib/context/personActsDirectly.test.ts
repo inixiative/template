@@ -99,7 +99,7 @@ describe('only a person acts directly: a JWT or a spoof (Aron, 2026-10-25)', () 
 
     it("a seat's token does not", async () => {
       const key = await mint('OrganizationUser', { organizationUser: seat });
-      expect((await asKey(key, '/api/v1/me')).status).toBe(403);
+      expect((await asKey(key, '/api/v1/me')).status).toBe(401);
     });
 
     it("a person's integration's token does not", async () => {
@@ -109,7 +109,7 @@ describe('only a person acts directly: a JWT or a spoof (Aron, 2026-10-25)', () 
         role: 'owner',
       });
       const key = await mint('Integration', { integration });
-      expect((await asKey(key, '/api/v1/me')).status).toBe(403);
+      expect((await asKey(key, '/api/v1/me')).status).toBe(401);
     });
   });
 
@@ -131,7 +131,7 @@ describe('only a person acts directly: a JWT or a spoof (Aron, 2026-10-25)', () 
       method: 'POST',
       body: JSON.stringify({ name: 'Taken', slug: randomUUID() }),
     });
-    expect(response.status).toBe(403);
+    expect(response.status).toBe(401);
   });
 
   describe('a superadmin', () => {

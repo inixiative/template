@@ -1060,7 +1060,6 @@ Add route-level middleware via the `middleware` option:
 ```typescript
 import { validatePermission } from '#/middleware/validations/validatePermission';
 import { validateOwnerPermission } from '#/middleware/validations/validateOwnerPermission';
-import { validateSelfPermission } from '#/middleware/validations/validateSelfPermission';
 
 // ReBAC permission check on loaded resource
 readRoute({
@@ -1077,12 +1076,12 @@ updateRoute({
   responseSchema,
 });
 
-// An action on the person (no resource loaded); person-only actions are schema rules
+// An action on the person: the /me router loads me(c) as the resource; person-only is the schema rule
 createRoute({
   model: 'me',
   submodel: 'token',
   skipId: true,
-  middleware: [validateSelfPermission(SessionAction.createToken)],
+  middleware: [validatePermission(SessionAction.createToken)],
   bodySchema,
   responseSchema,
 });
