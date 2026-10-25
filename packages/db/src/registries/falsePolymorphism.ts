@@ -74,6 +74,7 @@ export const PolymorphismRegistry = {
           OrganizationUser: ['organizationId', 'userId'],
           Space: ['organizationId', 'spaceId'],
           SpaceUser: ['organizationId', 'spaceId', 'userId'],
+          Integration: [],
         },
       },
     ],

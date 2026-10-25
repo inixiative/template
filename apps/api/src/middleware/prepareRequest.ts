@@ -5,13 +5,10 @@
  * @uses primitive:batch
  */
 import { db } from '@template/db';
-import { ActorModel, createPermissions } from '@template/permissions';
+import { createPermissions } from '@template/permissions';
 import { logScope, withLogContext } from '@template/shared/logger';
 import type { Context, Next } from 'hono';
-import { isSuperadmin } from '#/lib/context/isSuperadmin';
-import { setupOrgPermissions } from '#/lib/permissions/setupOrgPermissions';
-import { setupSpacePermissions } from '#/lib/permissions/setupSpacePermissions';
-import { setupUserPermissions } from '#/lib/permissions/setupUserPermissions';
+import { installPermissions } from '#/lib/context/installPermissions';
 import { parseBracketNotation } from '#/lib/utils/parseBracketNotation';
 import type { getBatchContext as getBatchContextFn } from '#/modules/batch/services/batchRegistry';
 import type { AppEnv } from '#/types/appEnv';
@@ -50,19 +47,7 @@ export const prepareRequest = async (c: Context<AppEnv>, next: Next) => {
       c.set(key, value ? structuredClone(value) : null);
     }
 
-    const user = batchContext.baseContext.get('user');
-    if (user) {
-      const permix = c.get('permix');
-      const token = c.get('token');
-      permix.setActor(
-        token ? { id: token.id, model: ActorModel.Token } : { id: user.id, model: ActorModel.User },
-      );
-      if (isSuperadmin(c)) permix.setSuperadmin(true);
-
-      await setupUserPermissions(c);
-      await setupOrgPermissions(c);
-      await setupSpacePermissions(c);
-    }
+    if (c.get('user') || c.get('token')) await installPermissions(c);
   } else {
     c.set('user', null);
     c.set('organizationUsers', null);

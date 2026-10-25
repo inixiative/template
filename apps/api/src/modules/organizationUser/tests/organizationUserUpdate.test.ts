@@ -1,7 +1,14 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { createHash, randomUUID } from 'node:crypto';
 import type { z } from '@hono/zod-openapi';
-import type { Organization, OrganizationUser, User } from '@template/db/generated/client/client';
-import { cleanupTouchedTables, createOrganizationUser } from '@template/db/test';
+import type {
+  Organization,
+  OrganizationUser,
+  Role,
+  User,
+} from '@template/db/generated/client/client';
+import { cleanupTouchedTables, createOrganizationUser, createToken } from '@template/db/test';
+import { tokenAuthMiddleware } from '#/middleware/auth/tokenAuthMiddleware';
 import { organizationUserRouter } from '#/modules/organizationUser';
 import type { organizationUserUpdateRoute } from '#/modules/organizationUser/routes/organizationUserUpdate';
 import { createTestApp } from '#tests/createTestApp';
@@ -48,5 +55,153 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
 
     expect(response.status).toBe(200);
     expect(data.role).toBe('viewer');
+  });
+
+  describe('a grant is an action: the writer could take every action the seat would hold (Aron, 2026-10-25)', () => {
+    const memberSeat = async () =>
+      (await createOrganizationUser({ role: 'member' }, { organization: org })).entity;
+
+    const writer = async (role: Role, entitlements?: Record<string, boolean>) => {
+      const { entity, context } = await createOrganizationUser(
+        { role, entitlements },
+        { organization: org },
+      );
+      return createTestApp({
+        mockUser: context.user,
+        mockOrganizationUsers: [entity],
+        mount: [(app) => app.route('/api/v1/organizationUser', organizationUserRouter)],
+      });
+    };
+
+    const grant = async (
+      app: ReturnType<typeof createTestApp>,
+      entitlements: Record<string, boolean>,
+    ) => {
+      const target = await memberSeat();
+      const response = await app.fetch(
+        patch(`/api/v1/organizationUser/${target.id}`, { entitlements }),
+      );
+      const stored = await db.organizationUser.findUniqueOrThrow({ where: { id: target.id } });
+      return { status: response.status, stored: stored.entitlements };
+    };
+
+    it('an admin grants a member operate', async () => {
+      expect(await grant(await writer('admin'), { operate: true })).toEqual({
+        status: 200,
+        stored: { operate: true },
+      });
+    });
+
+    it('an admin cannot grant a member own, and the seat is unchanged', async () => {
+      expect(await grant(await writer('admin'), { own: true })).toEqual({
+        status: 403,
+        stored: null,
+      });
+    });
+
+    it('an admin cannot grant assign: the seat could then assign owners', async () => {
+      expect(await grant(await writer('admin'), { assign: true })).toEqual({
+        status: 403,
+        stored: null,
+      });
+    });
+
+    it('an owner grants assign', async () => {
+      expect(await grant(await writer('owner'), { assign: true })).toEqual({
+        status: 200,
+        stored: { assign: true },
+      });
+    });
+
+    it('a custom action only by a writer who holds it, owner or not', async () => {
+      expect((await grant(await writer('owner'), { 'report.export': true })).status).toBe(403);
+      expect((await grant(await writer('admin'), { 'report.export': true })).status).toBe(403);
+      expect(
+        (await grant(await writer('admin', { 'report.export': true }), { 'report.export': true }))
+          .status,
+      ).toBe(200);
+    });
+
+    it('an admin clears a member seat of its entitlements', async () => {
+      const { entity: target } = await createOrganizationUser(
+        { role: 'member', entitlements: { operate: true } },
+        { organization: org },
+      );
+      const response = await fetch(
+        patch(`/api/v1/organizationUser/${target.id}`, { entitlements: null }),
+      );
+      expect(response.status).toBe(200);
+      const stored = await db.organizationUser.findUniqueOrThrow({ where: { id: target.id } });
+      expect(stored.entitlements).toBeNull();
+    });
+
+    it('entitlements are a map of actions to booleans', async () => {
+      const target = await memberSeat();
+      const response = await fetch(
+        patch(`/api/v1/organizationUser/${target.id}`, { entitlements: { own: 'yes' } }),
+      );
+      expect(response.status).toBe(422);
+    });
+  });
+
+  describe("an organization seat's token grants as its seat, capped by its own role", () => {
+    const tokenApp = createTestApp({
+      mount: [
+        (app) => {
+          app.use('*', tokenAuthMiddleware);
+          app.route('/api/v1/organizationUser', organizationUserRouter);
+        },
+      ],
+    });
+
+    const seatToken = async (seatRole: Role, tokenRole: Role) => {
+      const { entity: holder } = await createOrganizationUser(
+        { role: seatRole },
+        { organization: org },
+      );
+      const key = randomUUID();
+      await createToken(
+        {
+          ownerModel: 'OrganizationUser',
+          role: tokenRole,
+          keyHash: createHash('sha256').update(key).digest('hex'),
+        },
+        { organizationUser: holder },
+      );
+      return key;
+    };
+
+    const grantAs = async (key: string, entitlements: Record<string, boolean>) => {
+      const { entity: target } = await createOrganizationUser(
+        { role: 'member' },
+        { organization: org },
+      );
+      const response = await tokenApp.fetch(
+        new Request(`http://test/api/v1/organizationUser/${target.id}`, {
+          method: 'PATCH',
+          headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
+          body: JSON.stringify({ entitlements }),
+        }),
+      );
+      return response.status;
+    };
+
+    it('an owner-role token on an owner seat grants what the seat could', async () => {
+      const key = await seatToken('owner', 'owner');
+      expect(await grantAs(key, { operate: true })).toBe(200);
+      expect(await grantAs(key, { assign: true })).toBe(200);
+    });
+
+    it('an owner-role token on an admin seat grants no more than the admin', async () => {
+      const key = await seatToken('admin', 'owner');
+      expect(await grantAs(key, { operate: true })).toBe(200);
+      expect(await grantAs(key, { own: true })).toBe(403);
+      expect(await grantAs(key, { assign: true })).toBe(403);
+    });
+
+    it('a viewer-role token on an owner seat grants nothing above read', async () => {
+      const key = await seatToken('owner', 'viewer');
+      expect(await grantAs(key, { operate: true })).toBe(403);
+    });
   });
 });

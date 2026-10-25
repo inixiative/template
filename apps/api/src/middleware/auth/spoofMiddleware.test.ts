@@ -1,7 +1,12 @@
 import { afterAll, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import type { Token, User } from '@template/db/generated/client/client';
-import { cleanupTouchedTables, createToken, createUser } from '@template/db/test';
+import {
+  cleanupTouchedTables,
+  createOrganizationUser,
+  createToken,
+  createUser,
+} from '@template/db/test';
 import type { TokenWithRelations } from '#/lib/context/types';
 import { spoofMiddleware } from '#/middleware/auth/spoofMiddleware';
 import { createTestApp } from '#tests/createTestApp';
@@ -60,5 +65,36 @@ describe('spoofMiddleware via token auth', () => {
     const body = (await res.json()) as Echo;
     expect(body.userId).toBe(caller.id);
     expect(body.spoofedById).toBeNull();
+  });
+
+  it("spoofing replaces the superadmin's table with the spoofed user's", async () => {
+    const { entity: adminSeat, context } = await createOrganizationUser(
+      { role: 'owner' },
+      { user: (await createUser({ platformRole: 'superadmin' })).entity },
+    );
+    const { entity: target } = await createUser();
+    const app = createTestApp({
+      mockUser: context.user,
+      mockOrganizationUsers: [adminSeat],
+      mount: [
+        (hono) => {
+          hono.use('*', spoofMiddleware);
+          hono.get('/table', (c) =>
+            c.json({
+              grants: Object.keys(c.get('permix').getJSON() ?? {}),
+              superadmin: c.get('permix').isSuperadmin(),
+            }),
+          );
+        },
+      ],
+    });
+
+    const res = await app.fetch(
+      new Request('http://test/table', { headers: { 'x-spoof-user-email': target.email } }),
+    );
+
+    const body = (await res.json()) as { grants: string[]; superadmin: boolean };
+    expect(body.superadmin).toBe(false);
+    expect(body.grants).toEqual([`db:user:${target.id}`]);
   });
 });

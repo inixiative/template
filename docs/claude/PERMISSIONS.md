@@ -10,6 +10,8 @@
   - [Role](#role)
   - [Role Hierarchy](#role-hierarchy)
 - [Actions](#actions)
+  - [Session Actions](#session-actions)
+  - [The Actor](#the-actor)
   - [Role → Action Mapping](#role--action-mapping)
   - [roleToStandardAction](#roletostandardaction)
 - [Permix](#permix)
@@ -21,6 +23,8 @@
   - [setupUserContext](#setupusercontext)
   - [setupSpacePermissions](#setupspacepermissions)
   - [A Credential Never Exceeds Its Holder](#a-credential-never-exceeds-its-holder)
+  - [Integrations Are Holders](#integrations-are-holders)
+  - [Granting an Entitlement](#granting-an-entitlement)
   - [Role Validation](#role-validation)
 - [Permission Checks](#permission-checks)
   - [In Controllers](#in-controllers)
@@ -334,6 +338,25 @@ await permix.setup(
 
 `narrowing` (`packages/permissions/src/roles/narrowing.ts`) claims every action at or below the token's role plus whatever its entitlements name; with no entitlements of its own it names the seat's. At check time the engine consults the claim only after the token's own table and the schema both miss, and it holds only if the owner's table, walked from that record through the normal schema, allows the action. So a viewer's token naming `{ manage: true }` reads the organization and does not manage it, an admin's owner-role token manages and does not own, and a space is reached exactly as far as the seat reaches its organization. Nothing is intersected ahead of time; the cap is live. A User token is a narrowing of the person on every seat; an OrganizationUser or SpaceUser token of that one seat; an Organization or Space token holds its role outright, since the organization holds everything on itself. Situations: `apps/api/src/lib/permissions/tokenNeverExceedsHolder.test.ts`.
 
+### Integrations Are Holders
+
+An integration has a nullable `role` and `entitlements`, like a token, and can own tokens (`ownerModel: Integration`, keyed by `integrationId` alone). It acts from its direct owner: a seat's integration from that seat's organization, an organization's or space's from itself, a user's from the person. `setupIntegrationPermissions` builds three links, each owned by the one above it:
+
+1. the direct owner's table, as it stands on this request (the seat's role and entitlements, the organization's `own`, the person's seats);
+2. the integration's claim: its role on its anchor (`narrowing`) plus its stored entitlement entries (`{ resource, from, actions }`), owned by (1);
+3. the token's claim: its role on the anchor plus the integration's entries, owned by (2).
+
+Each link holds only what the one above still allows, live: demote the seat and the integration's token loses it on the next request. An integration entitled to one space reaches that space and no other, even when its seat owns the organization. Situations: `apps/api/src/lib/permissions/integrationHolder.test.ts` (through the API) and `packages/permissions/src/rebac/delegation.test.ts` (the chain on the real schema). `POST /integration/:id/tokens` mints a token for an integration; it is person-only.
+
+### Granting an Entitlement
+
+A grant is an action: the writer must be able to take every action the holder would hold, from where it would act. `canGrantEntitlement(permix, entry, position)` (`packages/permissions/src/rebac/canGrantEntitlement.ts`, over the library's `createCanGrantEntitlement`) judges each action through the ordinary check on a stand-in record of the entry's resource placed under the hydrated position. The writer's own claims and owner chain apply, so a token grants no more than its holder could. A granted action skips its rule, so an action whose rule reads the record or the actor (`assign`, person-only actions) is granted at its strongest: the writer must also hold the resource's terminal actions (`own`). A custom action is granted only by a writer who holds it.
+
+- `PATCH /organizationUser/:id` with `entitlements` checks each action as an entry from the organization: an admin grants `operate` and `manage`, not `own` or `assign`.
+- `PATCH /integration/:id` with `role` or `entitlements` checks the role's claim on the integration's anchor and each entry at its own position.
+
+Situations: `apps/api/src/modules/organizationUser/tests/organizationUserUpdate.test.ts`, `integrationHolder.test.ts`.
+
 ### Role Validation
 
 All permission setup functions validate role values before use to prevent permission bypass from corrupted database data.
@@ -447,7 +470,7 @@ export function getOrgPermissions(role, orgId, entitlements): PermissionEntry {
 }
 ```
 
-**Override behavior**: Allow override means a viewer with `{ manage: true }` entitlement CAN manage. The role is not a ceiling on the seat itself; the ceiling is the holder, above ([A Credential Never Exceeds Its Holder](#a-credential-never-exceeds-its-holder)): a token naming `{ manage: true }` on a viewer's seat holds nothing the viewer does not.
+**Override behavior**: Allow override means a viewer with `{ manage: true }` entitlement CAN manage, which is why writing one is itself checked ([Granting an Entitlement](#granting-an-entitlement)). The role is not a ceiling on the seat itself; the ceiling is the holder, above ([A Credential Never Exceeds Its Holder](#a-credential-never-exceeds-its-holder)): a token naming `{ manage: true }` on a viewer's seat holds nothing the viewer does not.
 
 ---
 

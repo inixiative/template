@@ -51,9 +51,11 @@ export const setupSpacePermissions = async (c: Context<AppEnv>) => {
 
   // The holder's table includes the person's organization seats: a space walks to its organization.
   const held =
-    token.ownerModel === 'SpaceUser'
-      ? spaceUsers.filter((spaceUser) => spaceUser.spaceId === token.spaceId)
-      : spaceUsers;
+    token.ownerModel === 'User'
+      ? spaceUsers
+      : token.ownerModel === 'SpaceUser'
+        ? spaceUsers.filter((spaceUser) => spaceUser.spaceId === token.spaceId)
+        : [];
   if (!held.length) return;
   const owner = createPermissions();
   await owner.setup([

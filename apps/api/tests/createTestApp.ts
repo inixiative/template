@@ -1,13 +1,10 @@
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { type Db, db } from '@template/db';
 import type { OrganizationUser, SpaceUser, User } from '@template/db/generated/client/client';
-import { ActorModel } from '@template/permissions';
 import { auth } from '#/lib/auth';
+import { installPermissions } from '#/lib/context/installPermissions';
 import type { TokenWithRelations } from '#/lib/context/types';
 import { validationDefaultHook } from '#/lib/openapi/validationDefaultHook';
-import { setupOrgPermissions } from '#/lib/permissions/setupOrgPermissions';
-import { setupSpacePermissions } from '#/lib/permissions/setupSpacePermissions';
-import { setupUserPermissions } from '#/lib/permissions/setupUserPermissions';
 import { errorHandlerMiddleware } from '#/middleware/error/errorHandlerMiddleware';
 import { notFoundHandlerMiddleware } from '#/middleware/error/notFoundHandlerMiddleware';
 import { prepareRequest } from '#/middleware/prepareRequest';
@@ -35,16 +32,15 @@ export const createTestApp = (options?: CreateTestAppOptions) => {
 
   app.use('*', prepareRequest);
 
+  const mocksCredential = Boolean(
+    options?.mockUser ||
+      options?.mockOrganizationUsers ||
+      options?.mockSpaceUsers ||
+      options?.mockToken,
+  );
+
   app.use('*', async (c, next) => {
-    if (options?.mockUser) {
-      c.set('user', options.mockUser);
-      c.get('permix').setActor(
-        options.mockToken
-          ? { id: options.mockToken.id, model: ActorModel.Token }
-          : { id: options.mockUser.id, model: ActorModel.User },
-      );
-      if (options.mockUser.platformRole === 'superadmin') c.get('permix').setSuperadmin(true);
-    }
+    if (options?.mockUser) c.set('user', options.mockUser);
     if (options?.mockOrganizationUsers) {
       c.set('organizationUsers', options.mockOrganizationUsers);
       const orgIds = options.mockOrganizationUsers.map((ou) => ou.organizationId);
@@ -62,9 +58,7 @@ export const createTestApp = (options?: CreateTestAppOptions) => {
       c.set('spaces', spaces);
     }
     if (options?.mockToken) c.set('token', options.mockToken);
-    await setupOrgPermissions(c);
-    await setupSpacePermissions(c);
-    await setupUserPermissions(c);
+    if (mocksCredential) await installPermissions(c);
     await next();
   });
 

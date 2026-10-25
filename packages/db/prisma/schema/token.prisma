@@ -30,7 +30,7 @@ model Token {
   auditLogsAsActor   AuditLog[]        @relation("AuditLogActorToken")
   auditLogsAsSubject AuditLog[]        @relation("AuditLogSubjectToken")
 
-  // Permissions (for org-owned tokens)
+  // Permissions: a claim, capped live by the owner
   role         Role  @default(member)
   entitlements Json?
 
@@ -59,4 +59,5 @@ enum TokenOwnerModel {
   OrganizationUser
   Space
   SpaceUser
+  Integration
 }

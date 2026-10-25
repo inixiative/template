@@ -191,6 +191,7 @@ describe('auditLog hook', () => {
       organizationUser: null,
       space: null,
       spaceUser: null,
+      integration: null,
     };
     const ts = Date.now();
 
@@ -232,6 +233,7 @@ describe('auditLog hook', () => {
       organizationUser: null,
       space: null,
       spaceUser: null,
+      integration: null,
     };
     const ts = Date.now();
 

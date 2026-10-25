@@ -837,8 +837,6 @@ describe('rebac check', () => {
     });
 
     it('grants when only schema rule passes (row rule does not match)', async () => {
-      // Schema grants via direct permission. Row rule is a self-check that
-      // would fail (different userId), but additive merge keeps schema floor.
       await permix.setup({ resource: 'db:contact', id: 'c-1', actions: { own: true } });
       await permix.setup({ resource: 'db:user', id: 'different-user', actions: { read: true } });
       const record = {
@@ -920,9 +918,6 @@ describe('rebac check', () => {
     });
 
     it('schema floor: row rule cannot restrict below the schema default', async () => {
-      // Schema grants read via own (direct permission). Row rule says self
-      // must equal userId — but the requesting user is different. Additive
-      // merge keeps the schema path open.
       await permix.setup({ resource: 'db:contact', id: 'c-1', actions: { own: true } });
       await permix.setup({ resource: 'db:user', id: 'different-user', actions: { read: true } });
       const record = {

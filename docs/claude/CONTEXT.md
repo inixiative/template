@@ -206,23 +206,20 @@ export const prepareRequest = async (c: Context<AppEnv>, next: Next) => {
 Located in `apps/api/src/lib/context/setUserContext.ts`. Called by auth middleware after successful authentication.
 
 ```typescript
-export const setUserContext = async (c: Context<AppEnv>, userWithOrgs: UserWithOrganizationUsers) => {
-  const { organizationUsers, ...user } = userWithOrgs;
+export const setUserContext = async (c: Context<AppEnv>, userWithRelations: UserWithRelations) => {
+  const { organizationUsers, organizations, spaceUsers, spaces, ...user } = userWithRelations;
 
-  // Set user data
   c.set('user', user);
   c.set('organizationUsers', organizationUsers);
+  c.set('organizations', organizations);
+  c.set('spaceUsers', spaceUsers);
+  c.set('spaces', spaces);
 
-  // Set up permissions
-  const permix = c.get('permix');
-  permix.setActor({ id: user.id, model: ActorModel.User });
-  if (isSuperadmin(user)) permix.setSuperadmin(true);
-  await setupUserPermissions(c);
-  await setupOrgPermissions(c);
+  await installPermissions(c);
 };
 ```
 
-**Note**: Space users are nested within `organizationUsers` (as `OrganizationUserWithSpaceUsers`). The `spaceUsers` context variable is set separately when needed for permission checks.
+`installPermissions` (`apps/api/src/lib/context/installPermissions.ts`) is the one place a request's table is built, for every credential: login, token sign-in, spoof, batch sub-requests and batch refresh. It replaces whatever the table held, sets the actor (`{ id: token.id, model: Token }` when a token is present, otherwise `{ id: user.id, model: User }`), sets the superadmin flag both ways, and runs the user, organization, space and integration installers. Each installer decides what a token holds by its owner model alone. A token with no person (Organization, Space, Integration) goes through `setTokenContext`, which installs without a user.
 
 ### What It Does
 
@@ -428,9 +425,9 @@ await refreshUserContext(c);
 ```
 
 **What it does:**
-1. Clears existing permissions (prevents stale permission data)
-2. Reloads user with all relations via cached `findUserWithRelations`
-3. Updates context using `setUserContext` (user, orgs, spaces, permissions)
+1. With a token: rereads the token row and its owners (`loadTokenContext`) and rebuilds through `setTokenContext`, so a membership token keeps exactly its own seat and a revoked token stops with a 401
+2. With a person: reloads the user with all relations via cached `findUserWithRelations` and rebuilds through `setUserContext`
+3. Either way the table is replaced, never added to
 
 **When to use:**
 - After adding/removing user from org or space

@@ -19,6 +19,7 @@ const PERSON_ONLY = new Set([
   'organizationUserCreateToken',
   'spaceCreateToken',
   'spaceUserCreateToken',
+  'integrationCreateToken',
   'organizationDelete',
   'tokenDelete',
   'meRotateJwts',

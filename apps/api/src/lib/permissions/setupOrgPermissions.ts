@@ -47,12 +47,12 @@ export const setupOrgPermissions = async (c: Context<AppEnv>) => {
     return;
   }
 
-  // A token is a narrowing of its holder: a membership's token of that seat, a User token of every
-  // seat the person holds. The holder's table owns the claim and the walk caps it live.
   const held =
-    token.ownerModel === 'OrganizationUser'
-      ? orgUsers.filter((orgUser) => orgUser.organizationId === token.organizationId)
-      : orgUsers;
+    token.ownerModel === 'User'
+      ? orgUsers
+      : token.ownerModel === 'OrganizationUser'
+        ? orgUsers.filter((orgUser) => orgUser.organizationId === token.organizationId)
+        : [];
   if (!held.length) return;
   const owner = createPermissions();
   await owner.setup(seats);

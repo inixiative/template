@@ -15,6 +15,7 @@ const MODEL_PREFIXES: Record<TokenOwnerModel, string> = {
   OrganizationUser: 'orgUser',
   Space: 'space',
   SpaceUser: 'spaceUser',
+  Integration: 'integration',
 };
 
 type CreateTokenParams = {
@@ -23,6 +24,7 @@ type CreateTokenParams = {
   userId?: string;
   organizationId?: string;
   spaceId?: string;
+  integrationId?: string;
   role: Role;
   expiresAt?: Date;
 };
@@ -44,6 +46,7 @@ export const createToken = async (c: Context<AppEnv>, params: CreateTokenParams)
       userId: params.userId,
       organizationId: params.organizationId,
       spaceId: params.spaceId,
+      integrationId: params.integrationId,
       role: params.role,
       expiresAt: params.expiresAt,
     },
