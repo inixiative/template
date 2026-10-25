@@ -128,7 +128,7 @@ describe('websocketHandler', () => {
     expect(lastFrame(sent)).toEqual({ type: 'pong' });
   });
 
-  it('authenticate resolves identity as provenance of the credential (/me)', async () => {
+  it('authenticate keeps a token as its credential, with no person (/identify)', async () => {
     const { entity: user } = await createUser();
     const { authorization } = await createBearerToken(user);
 
@@ -138,8 +138,9 @@ describe('websocketHandler', () => {
       socket,
       JSON.stringify({ action: 'authenticate', headers: { authorization } }),
     );
-    expect(socket.data.userId).toBe(user.id);
-    expect(lastFrame(sent)).toEqual({ type: 'identity', userId: user.id });
+    expect(socket.data.userId).toBeNull();
+    expect(socket.data.headers.authorization).toBe(authorization);
+    expect(lastFrame(sent)).toEqual({ type: 'identity', userId: null });
   });
 
   it('authenticate with a rejected token resolves to a null identity', async () => {

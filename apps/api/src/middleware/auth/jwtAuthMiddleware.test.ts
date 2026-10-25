@@ -389,7 +389,7 @@ describe('revocation: a new jwtVersion refuses every JWT signed with the old one
     expect(((await spoofed.json()) as { data: { id: string } }).data.id).toBe(user.id);
 
     const identity = await resolveIdentity(admin);
-    expect(identity).toMatchObject({ status: 'resolved', id: superadmin.id });
+    expect(identity).toMatchObject({ status: 'resolved', model: 'User', userId: superadmin.id });
     await rotateUserJwts(superadmin.id);
     expect(await resolveIdentity(admin)).toEqual({ status: 'anonymous' });
   });

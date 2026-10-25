@@ -595,13 +595,13 @@ describe('data streams (real app)', () => {
     });
   });
   describe('adversarial review', () => {
-    const withMeStatus = async (
+    const withIdentifyStatus = async (
       status: number,
       run: () => Promise<unknown> | undefined,
     ): Promise<void> => {
       const realRequest = app.request.bind(app);
       const spy = spyOn(app, 'request').mockImplementation(((input: string, init?: RequestInit) =>
-        String(input).endsWith('/api/v1/me')
+        String(input).endsWith('/api/v1/identify')
           ? Promise.resolve(new Response('busy', { status }))
           : realRequest(input, init)) as never);
       try {
@@ -611,7 +611,7 @@ describe('data streams (real app)', () => {
       }
     };
 
-    it('a transient /me failure keeps the identity and its streams and answers a retryable error', async () => {
+    it('a transient /identify failure keeps the identity and its streams and answers a retryable error', async () => {
       const { entity: user } = await createUser();
       await createOrganizationUser({ role: 'member' }, { organization, user });
       const { authorization } = await createBearerToken(user);
@@ -625,18 +625,18 @@ describe('data streams (real app)', () => {
       await websocketHandler.message(socket, openFrame(stream));
       sent.length = 0;
 
-      await withMeStatus(429, authenticate);
+      await withIdentifyStatus(429, authenticate);
 
       expect(frames(sent)).toEqual([{ type: 'error', action: 'authenticate', retryable: true }]);
-      expect(socket.data.userId).toBe(user.id);
+      expect(socket.data.headers.authorization).toBe(authorization);
       expect(byStream.has(stream)).toBe(true);
     });
 
-    it('a transient /me failure during a spoof is not a spoof rejection', async () => {
+    it('a transient /identify failure during a spoof is not a spoof rejection', async () => {
       const { entity: admin } = await createUser({ platformRole: PlatformRole.superadmin });
       const { authorization } = await createBearerToken(admin);
       const { socket, sent } = connect();
-      await withMeStatus(503, () =>
+      await withIdentifyStatus(503, () =>
         websocketHandler.message(
           socket,
           JSON.stringify({

@@ -184,7 +184,7 @@ The token's `iss` picks the issuer; an unknown `iss` is refused. `algorithms: ['
 
 ### Spoofing and WebSockets
 
-A superadmin's JWT is superadmin, so spoofing rides it ([Spoof Middleware](#spoof-middleware)). A WebSocket's `authenticate` frame carries the JWT as its `authorization` header; `apps/api/src/ws/probe.ts` replays `/api/v1/me` with it, and the reauthorize sweep drops an identity whose JWT was revoked or expired.
+A superadmin's JWT is superadmin, so spoofing rides it ([Spoof Middleware](#spoof-middleware)). A WebSocket's `authenticate` frame carries the JWT as its `authorization` header; `apps/api/src/ws/probe.ts` replays `/api/v1/identify` with it (any credential identifies; a token is a token, with no person), and the reauthorize sweep drops an identity whose JWT was revoked or expired.
 
 ---
 
@@ -571,5 +571,7 @@ Only a JWT session or a superadmin spoof makes the request a person (`c.get('use
 | Spoof (a superadmin on any credential) | the spoofed person, token set aside | the spoofed person |
 | User token | none | its person |
 | Any other token | none | none: `/me` answers 401 |
+
+`GET /api/v1/identify` answers for any credential: the actor `{ model, record }` the rules see, the record being the user, or the token's own columns, without the model's redact fields.
 
 A token held by a person (User, OrganizationUser, SpaceUser) is superadmin when its person is, and can spoof. A spoof is a superadmin and an email: the request becomes that person and the token is set aside; `spoofedBy` records who.
