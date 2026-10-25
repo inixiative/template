@@ -16,11 +16,23 @@ export const auditActorMiddleware = async (c: Context<AppEnv>, next: Next) => {
   const token = c.get('token');
 
   const actor = {
-    actorUserId: user?.id ?? null,
+    actorUserId: (user ?? token?.user)?.id ?? null,
     actorSpoofUserId: spoofedBy?.id ?? null,
     actorTokenId: token?.id ?? null,
-    actorTokenName: token?.name ?? null,
-    actorTokenKeyPrefix: token?.keyPrefix ?? null,
+    actor: token
+      ? {
+          token: {
+            id: token.id,
+            name: token.name,
+            keyPrefix: token.keyPrefix,
+            ownerModel: token.ownerModel,
+            userId: token.userId,
+            organizationId: token.organizationId,
+            spaceId: token.spaceId,
+            integrationId: token.integrationId,
+          },
+        }
+      : null,
     actorJobName: null,
     ipAddress: clientAddress(c),
     userAgent: c.req.header('user-agent') ?? null,

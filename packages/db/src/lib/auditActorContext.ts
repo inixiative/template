@@ -6,12 +6,24 @@
  */
 import { AsyncLocalStorage } from 'node:async_hooks';
 
+export type ActorSnapshot = {
+  token?: {
+    id: string;
+    name: string;
+    keyPrefix: string;
+    ownerModel: string;
+    userId: string | null;
+    organizationId: string | null;
+    spaceId: string | null;
+    integrationId: string | null;
+  };
+};
+
 export type AuditActor = {
   actorUserId: string | null;
   actorSpoofUserId: string | null;
   actorTokenId: string | null;
-  actorTokenName: string | null;
-  actorTokenKeyPrefix: string | null;
+  actor: ActorSnapshot | null;
   actorJobName: string | null;
   ipAddress: string | null;
   userAgent: string | null;
@@ -24,8 +36,7 @@ export const nullAuditActor: AuditActor = {
   actorUserId: null,
   actorSpoofUserId: null,
   actorTokenId: null,
-  actorTokenName: null,
-  actorTokenKeyPrefix: null,
+  actor: null,
   actorJobName: null,
   ipAddress: null,
   userAgent: null,

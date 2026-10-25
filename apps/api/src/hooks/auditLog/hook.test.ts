@@ -218,8 +218,15 @@ describe('auditLog hook', () => {
     });
 
     expect(log?.actorTokenId).toBe(token.id);
-    expect(log?.actorTokenName).toBe(token.name);
-    expect(log?.actorTokenKeyPrefix).toBe(token.keyPrefix);
+    expect(log?.actor).toMatchObject({
+      token: {
+        id: token.id,
+        name: token.name,
+        keyPrefix: token.keyPrefix,
+        ownerModel: 'User',
+        userId: tokenOwner.id,
+      },
+    });
     expect(log?.actorUserId).toBe(tokenOwner.id);
   });
 
@@ -263,8 +270,9 @@ describe('auditLog hook', () => {
     });
 
     expect(log?.actorTokenId).toBeNull();
-    expect(log?.actorTokenName).toBe(token.name);
-    expect(log?.actorTokenKeyPrefix).toBe(token.keyPrefix);
+    expect(log?.actor).toMatchObject({
+      token: { id: token.id, name: token.name, keyPrefix: token.keyPrefix },
+    });
   });
 
   it('records actorJobName when set in context', async () => {
