@@ -5,14 +5,14 @@
  * @uses none
  */
 import type { Context } from 'hono';
-import { personEntries } from '#/lib/permissions/delegateHolder';
+import { userEntries } from '#/lib/permissions/ownerTable';
 import type { AppEnv } from '#/types/appEnv';
 
-export const setupPersonPermissions = async (c: Context<AppEnv>) => {
+export const setupUserPermissions = async (c: Context<AppEnv>) => {
   await c
     .get('permix')
     .setup(
-      personEntries(
+      userEntries(
         c.get('user')?.id ?? null,
         c.get('organizationUsers') ?? [],
         c.get('spaceUsers') ?? [],

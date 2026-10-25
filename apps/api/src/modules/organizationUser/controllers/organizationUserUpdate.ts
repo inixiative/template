@@ -37,7 +37,7 @@ export const organizationUserUpdateController = makeController(
     const organization = { id: orgUser.organizationId as OrganizationId };
     const granted = body.entitlements && {
       resource: 'db:organization',
-      from: { resource: 'db:organization', id: organization.id },
+      anchor: { resource: 'db:organization', id: organization.id },
       actions: body.entitlements,
     };
     if (granted && !canGrantEntitlement(permix, granted, organization))

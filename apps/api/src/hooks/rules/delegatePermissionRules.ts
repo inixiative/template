@@ -23,7 +23,7 @@ const fullPassesAHolderThrough: Condition[] = [
   ),
 ];
 
-export const delegateClaimRules = {
+export const delegatePermissionRules = {
   Integration: { all: fullPassesAHolderThrough },
   Token: {
     all: [
@@ -34,7 +34,7 @@ export const delegateClaimRules = {
           { field: 'role', operator: Operator.notEmpty, value: true },
           { field: 'entitlements', operator: Operator.notEmpty, value: true },
         ],
-        error: 'a token that is not full claims a role, entitlements or both',
+        error: 'a token that is not full has a role, entitlements or both',
       },
     ],
   },

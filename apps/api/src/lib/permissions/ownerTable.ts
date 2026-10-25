@@ -15,8 +15,8 @@ import type {
 } from '@template/db/generated/client/client';
 import {
   createPermissions,
-  type DelegateClaim,
-  delegateClaimEntries,
+  type DelegatePermissions,
+  delegateEntries,
   type Entitlements,
   getOrgPermissions,
   getSpacePermissions,
@@ -28,7 +28,7 @@ import { entitlementEntriesSchema } from '@template/permissions/rebac';
 import { validateRole } from '#/lib/permissions/validateRole';
 import { findUserWithRelations } from '#/modules/user/services/find';
 
-export type DelegateHolder = { entries: PermissionEntry[]; owner?: Permix };
+export type OwnerTable = { entries: PermissionEntry[]; owner?: Permix };
 
 type Delegated = {
   ownerModel: TokenOwnerModel | IntegrationOwnerModel;
@@ -38,56 +38,56 @@ type Delegated = {
   integrationId?: string | null;
 };
 
-type ClaimRow = { role?: Role | null; full?: boolean; entitlements?: unknown };
+type PermissionsRow = { role?: Role | null; full?: boolean; entitlements?: unknown };
 
-const seatEntry = (seat: OrganizationUser): PermissionEntry =>
+const memberEntry = (seat: OrganizationUser): PermissionEntry =>
   getOrgPermissions(
     validateRole(seat.role),
     seat.organizationId as OrganizationId,
     seat.entitlements as Entitlements,
   );
 
-const spaceSeatEntry = (seat: SpaceUser): PermissionEntry =>
+const spaceMemberEntry = (seat: SpaceUser): PermissionEntry =>
   getSpacePermissions(
     validateRole(seat.role),
     seat.spaceId as SpaceId,
     seat.entitlements as Entitlements,
   );
 
-export const personEntries = (
+export const userEntries = (
   userId: string | null,
   seats: OrganizationUser[],
   spaceSeats: SpaceUser[],
 ): PermissionEntry[] => [
   ...(userId ? [getUserPermissions(userId as UserId)] : []),
-  ...seats.map(seatEntry),
-  ...spaceSeats.map(spaceSeatEntry),
+  ...seats.map(memberEntry),
+  ...spaceSeats.map(spaceMemberEntry),
 ];
 
-export const delegateClaimOf = (row: ClaimRow): DelegateClaim => ({
+export const delegatePermissionsOf = (row: PermissionsRow): DelegatePermissions => ({
   role: row.role ? validateRole(row.role) : null,
   full: row.full ?? false,
   entitlements:
     row.entitlements === null || row.entitlements === undefined
       ? null
-      : (entitlementEntriesSchema.parse(row.entitlements) as DelegateClaim['entitlements']),
+      : (entitlementEntriesSchema.parse(row.entitlements) as DelegatePermissions['entitlements']),
 });
 
-export const holderPermix = async (holder: DelegateHolder): Promise<Permix> => {
+export const ownerPermix = async (table: OwnerTable): Promise<Permix> => {
   const permix = createPermissions();
-  await permix.setup(holder.entries, holder.owner ? { owner: holder.owner } : undefined);
+  await permix.setup(table.entries, table.owner ? { owner: table.owner } : undefined);
   return permix;
 };
 
-const nobody: DelegateHolder = { entries: [] };
+const nobody: OwnerTable = { entries: [] };
 
-export const delegateHolder = async (delegated: Delegated): Promise<DelegateHolder> => {
+export const ownerTable = async (delegated: Delegated): Promise<OwnerTable> => {
   const { organizationId, spaceId, userId, integrationId } = delegated;
   switch (delegated.ownerModel) {
     case 'User': {
       const person = userId ? await findUserWithRelations(userId) : null;
       return person
-        ? { entries: personEntries(person.id, person.organizationUsers, person.spaceUsers) }
+        ? { entries: userEntries(person.id, person.organizationUsers, person.spaceUsers) }
         : nobody;
     }
     case 'OrganizationUser': {
@@ -95,14 +95,14 @@ export const delegateHolder = async (delegated: Delegated): Promise<DelegateHold
         organizationId && userId
           ? await fetchOne<OrganizationUser>('organizationUser', { organizationId, userId })
           : null;
-      return seat ? { entries: [seatEntry(seat)] } : nobody;
+      return seat ? { entries: [memberEntry(seat)] } : nobody;
     }
     case 'SpaceUser': {
       const seat =
         organizationId && spaceId && userId
           ? await fetchOne<SpaceUser>('spaceUser', { organizationId, spaceId, userId })
           : null;
-      return seat ? { entries: [spaceSeatEntry(seat)] } : nobody;
+      return seat ? { entries: [spaceMemberEntry(seat)] } : nobody;
     }
     case 'Organization':
       return organizationId
@@ -115,10 +115,10 @@ export const delegateHolder = async (delegated: Delegated): Promise<DelegateHold
         ? await fetchOne<Integration>('integration', integrationId)
         : null;
       if (!integration) return nobody;
-      const owner = await delegateHolder(integration);
+      const owner = await ownerTable(integration);
       return {
-        entries: delegateClaimEntries(delegateClaimOf(integration), owner.entries),
-        owner: await holderPermix(owner),
+        entries: delegateEntries(delegatePermissionsOf(integration), owner.entries),
+        owner: await ownerPermix(owner),
       };
     }
   }

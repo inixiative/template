@@ -32,9 +32,9 @@ const on = (resource: string, id: string) => ({ resource, id });
 
 const entitle = (
   resource: string,
-  from: { resource: string; id: string },
+  anchor: { resource: string; id: string },
   actions: readonly string[],
-): PermissionEntry => ({ resource, from, actions: all(actions) }) as PermissionEntry;
+): PermissionEntry => ({ resource, anchor, actions: all(actions) }) as PermissionEntry;
 
 const organization = async (org = o1) => {
   const permix = createPermissions();

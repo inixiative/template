@@ -9,11 +9,11 @@ import { z } from 'zod';
 
 const resources = Object.keys(rebacSchema.permissions) as [string, ...string[]];
 
-/** A stored entitlement: actions on a resource, from a position. Its owner is the holder's owner. */
+/** A stored entitlement: actions on a resource, from an anchor. Its owner is the delegate's owner. */
 export const entitlementEntrySchema = z
   .object({
     resource: z.enum(resources),
-    from: z.object({ resource: z.enum(resources), id: z.string().min(1) }).strict(),
+    anchor: z.object({ resource: z.enum(resources), id: z.string().min(1) }).strict(),
     actions: z.record(z.string(), z.boolean()),
   })
   .strict();

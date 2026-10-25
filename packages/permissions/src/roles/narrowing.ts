@@ -19,6 +19,6 @@ const roleActions = (role: Role): Record<string, true> =>
 
 export const narrowing = (resource: string, id: string, role: Role): EntitlementEntry => ({
   resource,
-  from: { resource, id },
+  anchor: { resource, id },
   actions: roleActions(role),
 });

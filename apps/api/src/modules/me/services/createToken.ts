@@ -7,10 +7,10 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { Prisma } from '@template/db';
 import type { TokenOwnerModel } from '@template/db/generated/client/enums';
-import type { DelegateClaim } from '@template/permissions';
+import type { DelegatePermissions } from '@template/permissions';
 import type { Context } from 'hono';
 import { validateRules } from '#/hooks/rules/hook';
-import { delegateHolder } from '#/lib/permissions/delegateHolder';
+import { ownerTable } from '#/lib/permissions/ownerTable';
 import { validateDelegateGrant } from '#/lib/permissions/validateDelegateGrant';
 import type { AppEnv } from '#/types/appEnv';
 
@@ -23,7 +23,7 @@ const MODEL_PREFIXES: Record<TokenOwnerModel, string> = {
   Integration: 'integration',
 };
 
-type CreateTokenParams = DelegateClaim & {
+type CreateTokenParams = DelegatePermissions & {
   name: string;
   ownerModel: TokenOwnerModel;
   userId?: string;
@@ -39,7 +39,7 @@ export const createToken = async (c: Context<AppEnv>, params: CreateTokenParams)
   validateRules(row, 'Token');
   await validateDelegateGrant(
     c.get('permix'),
-    await delegateHolder({
+    await ownerTable({
       ownerModel: params.ownerModel,
       userId: params.userId ?? null,
       organizationId: params.organizationId ?? null,

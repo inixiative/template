@@ -14,7 +14,7 @@ type Seats = Pick<
   'organizationUsers' | 'organizations' | 'spaceUsers' | 'spaces'
 >;
 
-export const setSeatContext = (c: Context<AppEnv>, seats: Seats | null) => {
+export const setMemberContext = (c: Context<AppEnv>, seats: Seats | null) => {
   c.set('organizationUsers', seats?.organizationUsers ?? []);
   c.set('organizations', seats?.organizations ?? []);
   c.set('spaceUsers', seats?.spaceUsers ?? []);
@@ -24,6 +24,6 @@ export const setSeatContext = (c: Context<AppEnv>, seats: Seats | null) => {
 export const setUserContext = async (c: Context<AppEnv>, userWithRelations: UserWithRelations) => {
   const { organizationUsers, organizations, spaceUsers, spaces, ...user } = userWithRelations;
   c.set('user', user);
-  setSeatContext(c, { organizationUsers, organizations, spaceUsers, spaces });
+  setMemberContext(c, { organizationUsers, organizations, spaceUsers, spaces });
   await installPermissions(c);
 };

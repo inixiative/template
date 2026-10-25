@@ -7,7 +7,7 @@
 import { Prisma } from '@template/db';
 import { validateRules } from '#/hooks/rules/hook';
 import { getResource } from '#/lib/context/getResource';
-import { delegateClaimOf, delegateHolder } from '#/lib/permissions/delegateHolder';
+import { delegatePermissionsOf, ownerTable } from '#/lib/permissions/ownerTable';
 import { validateDelegateGrant } from '#/lib/permissions/validateDelegateGrant';
 import { makeController } from '#/lib/utils/makeController';
 import { integrationUpdateRoute } from '#/modules/integration/routes/integrationUpdate';
@@ -26,8 +26,8 @@ export const integrationUpdateController = makeController(
       validateRules(claimed, 'Integration');
       await validateDelegateGrant(
         c.get('permix'),
-        await delegateHolder(integration),
-        delegateClaimOf(claimed),
+        await ownerTable(integration),
+        delegatePermissionsOf(claimed),
       );
     }
 

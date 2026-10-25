@@ -318,7 +318,7 @@ const authenticateToken = async (c: Context<AppEnv>) => {
   c.set('token', token);
   // User → findUserWithRelations → setUserContext
   // OrganizationUser / SpaceUser → setUserContext from the one membership
-  // Organization / Space / Integration → setupTokenPermissions (the holder's table caps the claim)
+  // Organization / Space / Integration → setupTokenPermissions (the owner's table caps its permissions)
 };
 
 export const tokenAuthMiddleware = async (c: Context<AppEnv>, next: Next) => {
@@ -563,7 +563,7 @@ router.get('/admin/users', validateSuperadmin, handler);  // 403 if not superadm
 
 ## Who Is a Person
 
-Only a JWT session or a superadmin spoof makes the request a person (`c.get('user')`). A token never does: it is a Token actor `{ id, model: 'Token', ownerModel }`, and what it may do is its claim over its holder's table. Routes name their action; there is no "is there a user" middleware.
+Only a JWT session or a superadmin spoof makes the request a person (`c.get('user')`). A token never does: it is a Token actor `{ model: 'Token', record }`, and what it may do is its permissions over its owner's table. Routes name their action; there is no "is there a user" middleware.
 
 | Credential | `c.get('user')` | `me(c)` (the `/me` resource) |
 |------------|-----------------|-------------------------------|

@@ -21,9 +21,10 @@
 - [Permission Setup](#permission-setup)
   - [setupOrgContext](#setuporgcontext)
   - [setupUserContext](#setupusercontext)
-  - [Delegates and Their Holders](#delegates-and-their-holders)
-  - [A Credential Never Exceeds Its Holder](#a-credential-never-exceeds-its-holder)
-  - [Integrations Are Holders](#integrations-are-holders)
+  - [Vocabulary](#vocabulary)
+  - [Delegates and Their Owners](#delegates-and-their-owners)
+  - [A Token Never Exceeds Its Owner](#a-token-never-exceeds-its-owner)
+  - [Integrations Are Delegates](#integrations-are-delegates)
   - [Granting an Entitlement](#granting-an-entitlement)
   - [Role Validation](#role-validation)
 - [Permission Checks](#permission-checks)
@@ -119,7 +120,7 @@ export const roleHierarchy = ['viewer', 'member', 'admin', 'owner'] as const;
 
 Higher index = more permissions. Used for:
 - `greaterRole(a, b)` - Returns the higher of two roles
-- `narrowing(...)` - a token's role claims every action at or below it ([A Credential Never Exceeds Its Holder](#a-credential-never-exceeds-its-holder))
+- `narrowing(...)` - a token's role claims every action at or below it ([A Token Never Exceeds Its Owner](#a-token-never-exceeds-its-owner))
 
 ---
 
@@ -281,41 +282,59 @@ export async function setupUserContext(permix: Permix, params: {
 
 **Note**: User context uses the same `Role` enum - a user is effectively "owner" of themselves by default, but tokens can restrict this.
 
-### Delegates and Their Holders
+### Vocabulary
 
-A token or an integration is a delegate: it holds a claim, capped live by its holder. `installPermissions` installs a person's own table (`setupPersonPermissions`: the user grant plus one grant per organization and space seat) or, for a token, the token's claim (`setupTokenPermissions`). `delegateHolder` (`apps/api/src/lib/permissions/delegateHolder.ts`) builds the holder's table from the owner model:
+One word per party, used in code and prose alike:
 
-| Owner model | Holder table |
+| Word | Means |
 |---|---|
-| `User` | the person: the user grant and every seat |
-| `OrganizationUser` / `SpaceUser` | that one seat |
+| **user** | the `User` row |
+| **tenant** | a user, organization or space: what things belong to |
+| **member** | what connects a user to an organization or space (`OrganizationUser`, `SpaceUser`) |
+| **JWT** / **token** | how a request authenticates |
+| **actor** | who is acting this request: `{ model: 'User' \| 'Token', record }` |
+| **owner** | the row a token or integration belongs to (its `ownerModel`); a chain is owners all the way down |
+| **delegate** | a token or an integration |
+| **permissions** | a delegate's `{ role, full, entitlements }` |
+| **anchor** | where an entitlement acts from |
+| **entitlement** | `{ resource, anchor, where?, actions }` |
+| **me** | the user when the actor is a user, or a User token's user (`me(c)`) |
+
+### Delegates and Their Owners
+
+A delegate holds its permissions, capped live by its owner. `installPermissions` installs a user's own table (`setupUserPermissions`: the user grant plus one grant per member row) or, for a token, the token's permissions (`setupTokenPermissions`). `ownerTable` (`apps/api/src/lib/permissions/ownerTable.ts`) builds the owner's table from the owner model:
+
+| Owner model | Owner table |
+|---|---|
+| `User` | the user: the user grant and every member row |
+| `OrganizationUser` / `SpaceUser` | that one member row |
 | `Organization` / `Space` | `owner` on itself |
-| `Integration` | the integration's claim, capped by its own owner's table |
+| `Integration` | the integration's permissions, capped by its own owner's table |
 
-A claim is `{ role, full, entitlements }`, expanded by `delegateClaimEntries` (`packages/permissions/src/roles/delegateClaim.ts`):
+Permissions expand through `delegateEntries` (`packages/permissions/src/roles/delegatePermissions.ts`):
 
-- `role` applies at every position the holder has (`narrowing(resource, id, role)` per position), so a User token's role reaches each of the person's organizations, capped by the seat there; an integration's role reaches whatever its owner reaches.
-- `entitlements` are entries `{ resource, from, actions }`, held as written. "Only this user's own things" is no role plus one entry from `db:user`.
-- `full` passes the holder's table through whole, resolved on every request. A token that is not `full` claims a role, entitlements or both. `full` takes no role and no entitlements beside it, and only exists on a delegation chain: an `Organization` or `Space` token or integration cannot be `full` (it holds itself; give it a role).
+- `role` applies at every anchor the owner has (`narrowing(resource, id, role)` per anchor), so a User token's role reaches each of the user's organizations, capped by the member row there; an integration's role reaches whatever its owner reaches.
+- `entitlements` are entries `{ resource, anchor, actions }`, held as written. "Only the user's own things" is no role plus one entry anchored on `db:user`.
+- `full` passes the owner's table through whole, resolved on every request. A token that is not `full` has a role, entitlements or both; `full` takes neither, and only exists on a delegation chain: an `Organization` or `Space` token or integration cannot be `full`.
 
-Nothing is inherited: a token holds only what it claims, never its holder's entitlements by default. The claim is installed with the holder's table as owner, so at check time each action holds only if the holder still allows it on that record through the normal walk. Demote the seat and its tokens lose it on the next request. A spoofed request (`spoofedBy` set) is capped by the spoofed person.
+Nothing is inherited: a token holds only its own permissions. They are installed with the owner's table as owner, so at check time each action holds only if the owner still allows it on that record through the normal walk. Demote the member and its tokens lose it on the next request.
 
-### A Credential Never Exceeds Its Holder
+### A Token Never Exceeds Its Owner
 
-So a viewer member's token naming `manage` on the organization reads it and does not manage it, an admin's owner-role token manages and does not own, and a space is reached exactly as far as the seat reaches its organization. Situations: `apps/api/src/lib/permissions/tokenNeverExceedsHolder.test.ts`, `delegateClaims.test.ts`.
+So a viewer member's token naming `manage` on the organization reads it and does not manage it, an admin's owner-role token manages and does not own, and a space is reached exactly as far as the member reaches its organization. Situations: `apps/api/src/lib/permissions/tokenNeverExceedsOwner.test.ts`, `delegatePermissions.test.ts`.
 
-### Integrations Are Holders
+### Integrations Are Delegates
 
-An integration has a nullable `role`, `full` and `entitlements`, capped live by its direct owner (a person, a seat, an organization or a space), and can own tokens. An integration's token (`ownerModel: Integration`) carries `integrationId` as its owner key plus its integration's own owner keys, copied at create by the `falsePolymorphism:delegatedKeys` hook (the registry's `delegates` entry): the keys are tenancy, for scans, list routes, revocation and rate-limit buckets, never identity. An integration's token is never a person, so routes that require one refuse it. If you need an integration as the actor, use its token; a person's token tagged with an integration does not exist. Situations: `integrationHolder.test.ts` and `packages/permissions/src/rebac/delegation.test.ts`.
+An integration has a nullable `role`, `full` and `entitlements`, capped live by its owner (a user, a member, an organization or a space), and can own tokens. An integration's token (`ownerModel: Integration`) carries `integrationId` as its owner key plus its integration's own owner keys, copied at create by the `falsePolymorphism:delegatedKeys` hook: the keys are tenancy, for scans, list routes, revocation and rate-limit buckets. An integration acts only through its token. Situations: `integrationDelegate.test.ts` and `packages/permissions/src/rebac/delegation.test.ts`.
 
 ### Granting an Entitlement
 
-A grant is an action: the writer must be able to take every action the holder would hold, from where it would act. `canGrantEntitlement(permix, entry, position)` (`packages/permissions/src/rebac/canGrantEntitlement.ts`, over the library's `createCanGrantEntitlement`) judges each action through the ordinary check on a stand-in record of the entry's resource placed under the hydrated position. The writer's own claims and owner chain apply, so a token grants no more than its holder could. A granted action skips its rule, so an action whose rule reads the record or the actor (`assign`, person-only actions) is granted at its strongest: the writer must also hold the resource's terminal actions (`own`). A custom action is granted only by a writer who holds it.
+A grant is an action: the writer must be able to take every action the delegate would hold, from its anchor. `canGrantEntitlement(permix, entry, anchor)` (`packages/permissions/src/rebac/canGrantEntitlement.ts`, over the library's `createCanGrantEntitlement`) judges each action through the ordinary check on a stand-in record of the entry's resource placed under the hydrated anchor. A granted action skips the ABAC in its rule, so an action whose rule reads the record or `__actor` is granted at its strongest: the writer must also hold the resource's terminal actions (`own`).
 
-- `PATCH /organizationUser/:id` with `entitlements` checks each action as an entry from the organization: an admin grants `operate` and `manage`, not `own` or `assign`.
-- A delegate's claim is the writer's permissions or less: `validateDelegateGrant` (`apps/api/src/lib/permissions/validateDelegateGrant.ts`) is the one check, run after the claim shape passes the write rule (422 before 403), for every token mint (inside `createToken`) and for `PATCH /integration/:id`. A role or `full` is a ceiling over the holder's positions, so only what the holder would really pass on is checked (a person with an owner seat and a viewer seat mints a member token); named entries are checked as written. An admin cannot mint an owner token, or set an owner role, on an owner's integration.
+- `PATCH /organizationUser/:id` with `entitlements` checks each action as an entry anchored on the organization: an admin grants `operate` and `manage`, not `own` or `assign`.
+- A delegate's permissions are the writer's permissions or less: `validateDelegateGrant` (`apps/api/src/lib/permissions/validateDelegateGrant.ts`) is the one check, run after the permissions' shape passes the write rule (422 before 403), for every token mint (inside `createToken`) and for `PATCH /integration/:id`. A role or `full` is a ceiling over the owner's anchors, so only what the owner would really pass on is checked; named entitlements are checked as written.
 
-Situations: `organizationUserUpdate.test.ts`, `integrationHolder.test.ts`, `delegateClaims.test.ts`.
+Situations: `organizationUserUpdate.test.ts`, `integrationDelegate.test.ts`, `delegatePermissions.test.ts`.
 
 ### Role Validation
 
@@ -370,7 +389,7 @@ if (!permix.check('organization', 'manage', orgId)) {
 
 ### Via Validation Middleware
 
-There is no "is there a user" gate: every route names its action, and the action's rule decides who may take it. Only a JWT session or a spoof makes the request a person (`c.get('user')`); a token is a Token actor `{ id, model }` and acts within its claim. `/me` routes act on the person as their resource ([The person as a resource](#the-person-as-a-resource)).
+There is no "is there a user" gate: every route names its action, and the action's rule decides who may take it. Only a JWT or a spoof makes the request a user (`c.get('user')`); a token is a Token actor `{ id, model }` and acts within its claim. `/me` routes act on the person as their resource ([The person as a resource](#the-person-as-a-resource)).
 
 The template uses a unified `validatePermission` middleware that leverages ReBAC for permission checks:
 
@@ -430,7 +449,7 @@ export function getOrgPermissions(role, orgId, entitlements): PermissionEntry {
 }
 ```
 
-**Override behavior**: Allow override means a viewer with `{ manage: true }` entitlement CAN manage, which is why writing one is itself checked ([Granting an Entitlement](#granting-an-entitlement)). The role is not a ceiling on the seat itself; the ceiling is the holder, above ([A Credential Never Exceeds Its Holder](#a-credential-never-exceeds-its-holder)): a token naming `{ manage: true }` on a viewer's seat holds nothing the viewer does not.
+**Override behavior**: Allow override means a viewer with `{ manage: true }` entitlement CAN manage, which is why writing one is itself checked ([Granting an Entitlement](#granting-an-entitlement)). The role is not a ceiling on the seat itself; the ceiling is the holder, above ([A Token Never Exceeds Its Owner](#a-token-never-exceeds-its-owner)): a token naming `{ manage: true }` on a viewer's seat holds nothing the viewer does not.
 
 ---
 
@@ -812,11 +831,11 @@ middleware: [validateOwnerPermission({ action: 'read' })]
 meRouter.use('*', meResourceMiddleware)                                   // every /me route
 middleware: [validatePermission('read')]                                  // every meReadMany*
 middleware: [validatePermission('operate')]                               // every meCreate*, meReachSegment
-middleware: [validatePermission(SessionAction.createToken)]               // meCreateToken, and on the org / space / seat / integration token routes
+middleware: [validatePermission(SessionAction.createToken)]               // meCreateToken, and on the org / space / member / integration token routes
 middleware: [validatePermission(SessionAction.deleteOrganization)]        // organizationDelete
 ```
 
-Person-only is the action's rule on whichever record the route acts on (`{ all: [{ actor: model equals User }, …] }`): `token.create` on the user, an organization, a space, a seat or an integration (the record stands in for the collection); `token.delete` on the token; `organization.delete` on the organization; `user.redact` and `user.rotateJwts` on the user. A superadmin passes on any credential. Situations: `apps/api/src/middleware/validations/personOnlyActions.test.ts`, `apps/api/src/lib/context/personActsDirectly.test.ts`.
+User-only is the action's rule on whichever record the route acts on (`{ all: [{ actor: model equals User }, …] }`): `token.create` on the user, an organization, a space, a member or an integration (the record stands in for the collection); `token.delete` on the token; `organization.delete` on the organization; `user.redact` and `user.rotateJwts` on the user. A superadmin passes on any credential. Situations: `apps/api/src/middleware/validations/personOnlyActions.test.ts`, `apps/api/src/lib/context/userActsDirectly.test.ts`.
 
 ---
 
@@ -852,7 +871,7 @@ if (!permix.check('organization', action, orgId)) {
 
 ### Token Creation
 
-Every create-token route calls `createToken`, which runs `validateDelegateGrant` against the token's holder; the claim's shape (`full` blocks a role and entitlements, otherwise a role, entitlements or both; no `full` for Organization or Space) is a write rule in `RulesRegistry` (`apps/api/src/hooks/rules/delegateClaimRules.ts`): a token is your permissions or less. Seat token routes also require the seat's own person (`leave` on the seat). Minting is person-only (`SessionAction.createToken`).
+Every create-token route calls `createToken`, which runs `validateDelegateGrant` against the token's owner; the permissions' shape (`full` blocks a role and entitlements, otherwise a role, entitlements or both; no `full` for Organization or Space) is a write rule in `RulesRegistry` (`apps/api/src/hooks/rules/delegatePermissionRules.ts`): a token is your permissions or less. Seat token routes also require the seat's own person (`leave` on the seat). Minting is person-only (`SessionAction.createToken`).
 
 ### Token Deletion
 

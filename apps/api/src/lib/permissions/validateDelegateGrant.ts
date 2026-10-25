@@ -6,16 +6,16 @@
  */
 import { type AccessorName, fetchOne, hydrate } from '@template/db';
 import {
-  type DelegateClaim,
-  delegateClaimEntries,
+  type DelegatePermissions,
+  delegateEntries,
   type EntitlementEntry,
   type Permix,
 } from '@template/permissions';
 import { canGrantEntitlement } from '@template/permissions/rebac';
 import { makeError } from '#/lib/errors';
-import { type DelegateHolder, holderPermix } from '#/lib/permissions/delegateHolder';
+import { type OwnerTable, ownerPermix } from '#/lib/permissions/ownerTable';
 
-const positionRecord = async ({ resource, id }: EntitlementEntry['from']) => {
+const anchorRecord = async ({ resource, id }: EntitlementEntry['anchor']) => {
   const model = resource.slice('db:'.length) as AccessorName;
   const row = await fetchOne<{ id: string }>(model, id);
   return row ? hydrate(model, row) : null;
@@ -31,29 +31,29 @@ const grantable = async (
   entry: EntitlementEntry,
   held: Permix | null,
 ): Promise<boolean> => {
-  const position = await positionRecord(entry.from);
-  if (!position)
+  const anchor = await anchorRecord(entry.anchor);
+  if (!anchor)
     throw makeError({
       status: 422,
-      message: `No ${entry.from.resource} ${entry.from.id} to grant from`,
+      message: `No ${entry.anchor.resource} ${entry.anchor.id} to grant from`,
     });
   const claimed = Object.keys(entry.actions as Record<string, boolean | undefined>).filter(
     (action) => (entry.actions as Record<string, boolean | undefined>)[action] === true,
   );
   const wouldHold = held
-    ? claimed.filter((action) => canGrantEntitlement(held, only(entry, [action]), position))
+    ? claimed.filter((action) => canGrantEntitlement(held, only(entry, [action]), anchor))
     : claimed;
-  return !wouldHold.length || canGrantEntitlement(writer, only(entry, wouldHold), position);
+  return !wouldHold.length || canGrantEntitlement(writer, only(entry, wouldHold), anchor);
 };
 
 export const validateDelegateGrant = async (
   writer: Permix,
-  holder: DelegateHolder,
-  claim: DelegateClaim,
+  table: OwnerTable,
+  permissions: DelegatePermissions,
 ): Promise<void> => {
-  const held = await holderPermix(holder);
-  const ceiling = delegateClaimEntries({ ...claim, entitlements: null }, holder.entries);
-  const named = claim.entitlements ?? [];
+  const held = await ownerPermix(table);
+  const ceiling = delegateEntries({ ...permissions, entitlements: null }, table.entries);
+  const named = permissions.entitlements ?? [];
   const within = async () => {
     for (const entry of ceiling) if (!(await grantable(writer, entry, held))) return false;
     for (const entry of named) if (!(await grantable(writer, entry, null))) return false;

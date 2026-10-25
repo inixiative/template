@@ -12,9 +12,9 @@ import { rebacSchema } from '@template/permissions/rebac/schema';
 
 const canGrant = createCanGrantEntitlement(resolveRelation);
 
-/** A grant is an action: the writer could take every action `entry` names, from `position`. */
+/** A grant is an action: the writer could take every action `entry` names, from its anchor. */
 export const canGrantEntitlement = (
   permix: Permix,
   entry: EntitlementEntry,
-  position: HydratedRecord,
-): boolean => canGrant(permix, rebacSchema, entry, position);
+  anchor: HydratedRecord,
+): boolean => canGrant(permix, rebacSchema, entry, anchor);

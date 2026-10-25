@@ -71,7 +71,7 @@ describe('a credential never exceeds its holder (Aron, 2026-10-23)', () => {
       ? [
           {
             resource: 'db:organization',
-            from: { resource: 'db:organization', id: organization.id },
+            anchor: { resource: 'db:organization', id: organization.id },
             actions,
           },
         ]

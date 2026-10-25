@@ -48,6 +48,7 @@
   - [Path Notation Utilities](#path-notation-utilities)
 - [False Polymorphism](#false-polymorphism)
   - [Special Owner Values (No FK)](#special-owner-values-no-fk)
+  - [Delegated Keys](#delegated-keys)
 - [Registries](#registries)
 - [Schema Reference](#schema-reference)
 

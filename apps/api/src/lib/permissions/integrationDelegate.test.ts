@@ -30,13 +30,13 @@ import { patch, post } from '#tests/utils/request';
 
 type Entry = {
   resource: string;
-  from: { resource: string; id: string };
+  anchor: { resource: string; id: string };
   actions: Record<string, boolean>;
 };
 
-const entry = (resource: string, from: [string, string], actions: string[]): Entry => ({
+const entry = (resource: string, anchor: [string, string], actions: string[]): Entry => ({
   resource,
-  from: { resource: from[0], id: from[1] },
+  anchor: { resource: anchor[0], id: anchor[1] },
   actions: Object.fromEntries(actions.map((action) => [action, true])),
 });
 
