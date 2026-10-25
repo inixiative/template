@@ -5,10 +5,10 @@
  * @uses primitive:authz, primitive:routeTemplates, infrastructure:prisma
  */
 import { Prisma } from '@template/db';
+import { validateRules } from '#/hooks/rules/hook';
 import { getResource } from '#/lib/context/getResource';
-import { makeError } from '#/lib/errors';
-import { canGrantDelegateClaim } from '#/lib/permissions/canGrantDelegateClaim';
 import { delegateClaimOf, delegateHolder } from '#/lib/permissions/delegateHolder';
+import { validateDelegateGrant } from '#/lib/permissions/validateDelegateGrant';
 import { makeController } from '#/lib/utils/makeController';
 import { integrationUpdateRoute } from '#/modules/integration/routes/integrationUpdate';
 
@@ -22,10 +22,13 @@ export const integrationUpdateController = makeController(
     const body = c.req.valid('json');
 
     if (claimFields.some((field) => field in body)) {
-      const claim = delegateClaimOf({ ...integration, ...body });
-      const holder = await delegateHolder(integration);
-      if (!(await canGrantDelegateClaim(c.get('permix'), holder, claim)))
-        throw makeError({ status: 403, message: 'An integration holds your permissions or less' });
+      const claimed = { ...integration, ...body };
+      validateRules(claimed, 'Integration');
+      await validateDelegateGrant(
+        c.get('permix'),
+        await delegateHolder(integration),
+        delegateClaimOf(claimed),
+      );
     }
 
     const updated = await db.integration.update({

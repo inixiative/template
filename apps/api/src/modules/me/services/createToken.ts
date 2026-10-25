@@ -9,9 +9,9 @@ import { Prisma } from '@template/db';
 import type { TokenOwnerModel } from '@template/db/generated/client/enums';
 import type { DelegateClaim } from '@template/permissions';
 import type { Context } from 'hono';
-import { makeError } from '#/lib/errors';
-import { canGrantDelegateClaim } from '#/lib/permissions/canGrantDelegateClaim';
+import { validateRules } from '#/hooks/rules/hook';
 import { delegateHolder } from '#/lib/permissions/delegateHolder';
+import { validateDelegateGrant } from '#/lib/permissions/validateDelegateGrant';
 import type { AppEnv } from '#/types/appEnv';
 
 const MODEL_PREFIXES: Record<TokenOwnerModel, string> = {
@@ -35,16 +35,19 @@ type CreateTokenParams = DelegateClaim & {
 
 export const createToken = async (c: Context<AppEnv>, params: CreateTokenParams) => {
   const db = c.get('db');
-  const claim = { role: params.role, full: params.full, entitlements: params.entitlements };
-  const holder = await delegateHolder({
-    ownerModel: params.ownerModel,
-    userId: params.userId ?? null,
-    organizationId: params.organizationId ?? null,
-    spaceId: params.spaceId ?? null,
-    integrationId: params.integrationId ?? null,
-  });
-  if (!(await canGrantDelegateClaim(c.get('permix'), holder, claim)))
-    throw makeError({ status: 403, message: 'A token holds your permissions or less' });
+  const { name: _name, expiresAt: _expiresAt, ...row } = params;
+  validateRules(row, 'Token');
+  await validateDelegateGrant(
+    c.get('permix'),
+    await delegateHolder({
+      ownerModel: params.ownerModel,
+      userId: params.userId ?? null,
+      organizationId: params.organizationId ?? null,
+      spaceId: params.spaceId ?? null,
+      integrationId: params.integrationId ?? null,
+    }),
+    { role: params.role, full: params.full, entitlements: params.entitlements },
+  );
 
   const hex = randomBytes(24).toString('hex');
   const modelPrefix = MODEL_PREFIXES[params.ownerModel];

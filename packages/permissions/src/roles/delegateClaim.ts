@@ -38,7 +38,6 @@ const asEntitlement = (entry: PermissionEntry): EntitlementEntry | null => {
   return { resource: entry.resource, from: position, actions };
 };
 
-/** What a delegate holds, as entitlements over its holder's table: full passes the table through. */
 export const delegateClaimEntries = (
   claim: DelegateClaim,
   holder: PermissionEntry[],

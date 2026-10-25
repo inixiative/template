@@ -23,7 +23,6 @@ export type PolymorphicValue = ModelName | SpecialOwner;
 export type PolymorphicAxis = {
   field: string; // e.g., 'customerModel', 'ownerModel'
   fkMap: Partial<Record<PolymorphicValue, readonly string[]>>; // typeValue → required FK fields
-  // typeValue → the parent whose own keys on this axis the row also carries
   delegates?: Partial<Record<PolymorphicValue, ModelName>>;
 };
 
@@ -373,27 +372,9 @@ export const polymorphicAxis = (model: ModelName, axisField: string): Polymorphi
   return axis;
 };
 
-export const delegatedParent = (axis: PolymorphicAxis, value: unknown): ModelName | null =>
-  axis.delegates?.[value as PolymorphicValue] ?? null;
-
 export const delegatedKeys = (axis: PolymorphicAxis, value: unknown): string[] => {
-  const parent = delegatedParent(axis, value);
+  const parent = axis.delegates?.[value as PolymorphicValue];
   if (!parent) return [];
   const parentAxis = polymorphicAxis(parent, axis.field);
   return [...new Set(Object.values(parentAxis.fkMap).flat())] as string[];
-};
-
-export const keysFromParent = (
-  axis: PolymorphicAxis,
-  value: unknown,
-  parentRow: Record<string, unknown>,
-): Record<string, unknown> => {
-  const parent = delegatedParent(axis, value);
-  if (!parent) return {};
-  const parentAxis = polymorphicAxis(parent, axis.field);
-  const parentValue = parentRow[parentAxis.field] as PolymorphicValue;
-  const carried = (parentAxis.fkMap[parentValue] ?? []) as readonly string[];
-  return Object.fromEntries(
-    delegatedKeys(axis, value).map((key) => [key, carried.includes(key) ? parentRow[key] : null]),
-  );
 };

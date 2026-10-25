@@ -16,9 +16,6 @@ export const tokenDeleteController = makeController(tokenDeleteRoute, async (c, 
   const token = getResource<'token'>(c);
   const permix = c.get('permix');
 
-  // `leave` covers self-delete (any userId-bearing token); `assign` covers
-  // owner-side delete with the token's role baked in. Both paths live in
-  // rebac — see token's entry in packages/permissions/src/rebac/schema.ts.
   const hydrated = await hydrate('token', token);
   const canDelete =
     check(permix, rebacSchema, 'token', hydrated, 'leave') ||

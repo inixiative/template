@@ -197,6 +197,19 @@ describe('a delegate holds what it claims, and no more than whoever grants it (A
       expect((await mintOn(integration, user, [seat], { role: 'viewer' })).status).toBe(201);
     });
 
+    it('an entitlement from a record that does not exist is malformed, not forbidden', async () => {
+      const { user, seat } = await seated('owner');
+      const integration = await seatIntegration(seat, { role: 'owner' });
+      const nowhere = entry(
+        'db:space',
+        ['db:space', '01a17393-0000-7000-8000-000000000000'],
+        ['read'],
+      );
+      expect((await mintOn(integration, user, [seat], { entitlements: [nowhere] })).status).toBe(
+        422,
+      );
+    });
+
     it('full takes no role and no entitlements beside it', async () => {
       const { user, seat } = await seated('owner');
       const integration = await seatIntegration(seat, { role: 'owner' });
@@ -279,6 +292,19 @@ describe('a delegate holds what it claims, and no more than whoever grants it (A
       const { key } = await mintOn(integration, user, [seat], { role: 'member' });
       expect(await holds(key!, 'organization', organization.id, 'operate')).toBe(true);
       expect(await holds(key!, 'organization', organization.id, 'manage')).toBe(false);
+    });
+
+    it("full all the way down reaches each of the person's organizations at its seat", async () => {
+      const { user, seat } = await seated('owner');
+      const { entity: viewerSeat } = await createOrganizationUser(
+        { role: 'viewer' },
+        { user, organization: otherOrganization },
+      );
+      const integration = await personIntegration(user, { full: true });
+      const { key } = await mintOn(integration, user, [seat, viewerSeat], { full: true });
+      expect(await holds(key!, 'organization', organization.id, 'own')).toBe(true);
+      expect(await holds(key!, 'organization', otherOrganization.id, 'read')).toBe(true);
+      expect(await holds(key!, 'organization', otherOrganization.id, 'operate')).toBe(false);
     });
 
     it("only the person's own things: no role, one entry from the person", async () => {

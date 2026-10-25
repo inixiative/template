@@ -1,6 +1,6 @@
 /**
  * @atlas
- * @kind service
+ * @kind validator
  * @partOf primitive:authz
  * @uses infrastructure:prisma
  */
@@ -12,6 +12,7 @@ import {
   type Permix,
 } from '@template/permissions';
 import { canGrantEntitlement } from '@template/permissions/rebac';
+import { makeError } from '#/lib/errors';
 import { type DelegateHolder, holderPermix } from '#/lib/permissions/delegateHolder';
 
 const positionRecord = async ({ resource, id }: EntitlementEntry['from']) => {
@@ -31,7 +32,11 @@ const grantable = async (
   held: Permix | null,
 ): Promise<boolean> => {
   const position = await positionRecord(entry.from);
-  if (!position) return false;
+  if (!position)
+    throw makeError({
+      status: 422,
+      message: `No ${entry.from.resource} ${entry.from.id} to grant from`,
+    });
   const claimed = Object.keys(entry.actions as Record<string, boolean | undefined>).filter(
     (action) => (entry.actions as Record<string, boolean | undefined>)[action] === true,
   );
@@ -41,20 +46,19 @@ const grantable = async (
   return !wouldHold.length || canGrantEntitlement(writer, only(entry, wouldHold), position);
 };
 
-/**
- * A delegate is the writer's permissions or less. A role or full is a ceiling over every position
- * the holder has, so only what the holder would really pass on is checked; named entries are
- * checked as written.
- */
-export const canGrantDelegateClaim = async (
+export const validateDelegateGrant = async (
   writer: Permix,
   holder: DelegateHolder,
   claim: DelegateClaim,
-): Promise<boolean> => {
+): Promise<void> => {
   const held = await holderPermix(holder);
   const ceiling = delegateClaimEntries({ ...claim, entitlements: null }, holder.entries);
-  for (const entry of ceiling) if (!(await grantable(writer, entry, held))) return false;
-  for (const entry of claim.entitlements ?? [])
-    if (!(await grantable(writer, entry, null))) return false;
-  return true;
+  const named = claim.entitlements ?? [];
+  const within = async () => {
+    for (const entry of ceiling) if (!(await grantable(writer, entry, held))) return false;
+    for (const entry of named) if (!(await grantable(writer, entry, null))) return false;
+    return true;
+  };
+  if (!(await within()))
+    throw makeError({ status: 403, message: 'A delegate holds your permissions or less' });
 };

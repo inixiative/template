@@ -2,12 +2,10 @@ export * from './auditEnabledModels';
 export * from './discriminatorDefaults';
 export {
   delegatedKeys,
-  delegatedParent,
   type FalsePolymorphismRef,
   type FlexibleRef,
   getPolymorphismConfig,
   isFalsePolymorphismRef,
-  keysFromParent,
   type PolymorphicAxis,
   type PolymorphicConfig,
   type PolymorphicValue,

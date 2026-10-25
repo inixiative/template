@@ -314,7 +314,7 @@ An integration has a nullable `role`, `full` and `entitlements`, capped live by 
 A grant is an action: the writer must be able to take every action the holder would hold, from where it would act. `canGrantEntitlement(permix, entry, position)` (`packages/permissions/src/rebac/canGrantEntitlement.ts`, over the library's `createCanGrantEntitlement`) judges each action through the ordinary check on a stand-in record of the entry's resource placed under the hydrated position. The writer's own claims and owner chain apply, so a token grants no more than its holder could. A granted action skips its rule, so an action whose rule reads the record or the actor (`assign`, person-only actions) is granted at its strongest: the writer must also hold the resource's terminal actions (`own`). A custom action is granted only by a writer who holds it.
 
 - `PATCH /organizationUser/:id` with `entitlements` checks each action as an entry from the organization: an admin grants `operate` and `manage`, not `own` or `assign`.
-- A delegate's claim is the writer's permissions or less: `canGrantDelegateClaim` (`apps/api/src/lib/permissions/canGrantDelegateClaim.ts`) is the one check for every token mint (inside `createToken`) and for `PATCH /integration/:id`. A role or `full` is a ceiling over the holder's positions, so only what the holder would really pass on is checked (a person with an owner seat and a viewer seat mints a member token); named entries are checked as written. An admin cannot mint an owner token, or set an owner role, on an owner's integration.
+- A delegate's claim is the writer's permissions or less: `validateDelegateGrant` (`apps/api/src/lib/permissions/validateDelegateGrant.ts`) is the one check, run after the claim shape passes the write rule (422 before 403), for every token mint (inside `createToken`) and for `PATCH /integration/:id`. A role or `full` is a ceiling over the holder's positions, so only what the holder would really pass on is checked (a person with an owner seat and a viewer seat mints a member token); named entries are checked as written. An admin cannot mint an owner token, or set an owner role, on an owner's integration.
 
 Situations: `organizationUserUpdate.test.ts`, `integrationHolder.test.ts`, `delegateClaims.test.ts`.
 
@@ -855,7 +855,7 @@ if (!permix.check('organization', action, orgId)) {
 
 ### Token Creation
 
-Every create-token route calls `createToken`, which runs `canGrantDelegateClaim` against the token's holder; the claim's shape (`full` blocks a role and entitlements, otherwise a role, entitlements or both; no `full` for Organization or Space) is a write rule in `RulesRegistry` (`apps/api/src/hooks/rules/delegateClaimRules.ts`): a token is your permissions or less. Seat token routes also require the seat's own person (`leave` on the seat). Minting is person-only (`SessionAction.createToken`).
+Every create-token route calls `createToken`, which runs `validateDelegateGrant` against the token's holder; the claim's shape (`full` blocks a role and entitlements, otherwise a role, entitlements or both; no `full` for Organization or Space) is a write rule in `RulesRegistry` (`apps/api/src/hooks/rules/delegateClaimRules.ts`): a token is your permissions or less. Seat token routes also require the seat's own person (`leave` on the seat). Minting is person-only (`SessionAction.createToken`).
 
 ### Token Deletion
 

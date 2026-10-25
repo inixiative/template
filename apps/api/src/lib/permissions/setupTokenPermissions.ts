@@ -11,8 +11,8 @@ import {
   delegateClaimOf,
   delegateHolder,
   holderPermix,
-  personEntries,
 } from '#/lib/permissions/delegateHolder';
+import { requestPersonEntries } from '#/lib/permissions/setupPersonPermissions';
 import type { AppEnv } from '#/types/appEnv';
 
 const knowsWhoItIs = ['OrganizationUser', 'SpaceUser'];
@@ -23,13 +23,7 @@ export const setupTokenPermissions = async (c: Context<AppEnv>) => {
   if (!token) return;
 
   const holder: DelegateHolder = c.get('spoofedBy')
-    ? {
-        entries: personEntries(
-          c.get('user')?.id ?? null,
-          c.get('organizationUsers') ?? [],
-          c.get('spaceUsers') ?? [],
-        ),
-      }
+    ? { entries: requestPersonEntries(c) }
     : await delegateHolder(token);
   await permix.setup(delegateClaimEntries(delegateClaimOf(token), holder.entries), {
     owner: await holderPermix(holder),

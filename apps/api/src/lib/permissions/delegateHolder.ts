@@ -7,9 +7,11 @@
 import { fetchOne, type OrganizationId, type SpaceId, type UserId } from '@template/db';
 import type {
   Integration,
+  IntegrationOwnerModel,
   OrganizationUser,
   Role,
   SpaceUser,
+  TokenOwnerModel,
 } from '@template/db/generated/client/client';
 import {
   createPermissions,
@@ -29,7 +31,7 @@ import { findUserWithRelations } from '#/modules/user/services/find';
 export type DelegateHolder = { entries: PermissionEntry[]; owner?: Permix };
 
 type Delegated = {
-  ownerModel: string;
+  ownerModel: TokenOwnerModel | IntegrationOwnerModel;
   userId: string | null;
   organizationId: string | null;
   spaceId: string | null;
@@ -79,7 +81,6 @@ export const holderPermix = async (holder: DelegateHolder): Promise<Permix> => {
 
 const nobody: DelegateHolder = { entries: [] };
 
-/** The table a delegate is capped by: whatever its owner model says it acts for. */
 export const delegateHolder = async (delegated: Delegated): Promise<DelegateHolder> => {
   const { organizationId, spaceId, userId, integrationId } = delegated;
   switch (delegated.ownerModel) {
@@ -113,14 +114,12 @@ export const delegateHolder = async (delegated: Delegated): Promise<DelegateHold
       const integration = integrationId
         ? await fetchOne<Integration>('integration', integrationId)
         : null;
-      if (!integration || integration.deletedAt) return nobody;
+      if (!integration) return nobody;
       const owner = await delegateHolder(integration);
       return {
         entries: delegateClaimEntries(delegateClaimOf(integration), owner.entries),
         owner: await holderPermix(owner),
       };
     }
-    default:
-      return nobody;
   }
 };

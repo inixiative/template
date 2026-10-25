@@ -14,13 +14,13 @@ import { getRule, RulesRegistry } from '#/hooks/rules/registry';
 import { shadowMerge } from '#/hooks/rules/shadowMerge';
 import { makeError } from '#/lib/errors';
 
-const withPlainNulls = (data: Record<string, unknown>): Record<string, unknown> =>
-  Object.fromEntries(
-    Object.entries(data).map(([field, value]) => [field, isPrismaNull(value) ? null : value]),
+export const validateRules = (data: Record<string, unknown>, model: ModelName): void => {
+  const result = check(
+    getRule(model),
+    Object.fromEntries(
+      Object.entries(data).map(([field, value]) => [field, isPrismaNull(value) ? null : value]),
+    ),
   );
-
-const validateData = (data: Record<string, unknown>, model: ModelName): void => {
-  const result = check(getRule(model), withPlainNulls(data));
   if (result !== true)
     throw makeError({
       status: 422,
@@ -32,7 +32,7 @@ const processCreateArgs = (args: unknown, model: ModelName): void => {
   const data = (args as Record<string, unknown>)?.data ?? (args as Record<string, unknown>)?.create;
   if (!data || typeof data !== 'object') return;
   for (const row of castArray(data) as Record<string, unknown>[])
-    validateData(withDiscriminatorDefaults(model, row), model);
+    validateRules(withDiscriminatorDefaults(model, row), model);
 };
 
 const processUpdateArgs = (
@@ -43,7 +43,7 @@ const processUpdateArgs = (
   const data = ((args as Record<string, unknown>)?.data ??
     (args as Record<string, unknown>)?.update) as Record<string, unknown> | undefined;
   if (data && typeof data === 'object' && !Array.isArray(data))
-    validateData(shadowMerge(previous, data), model);
+    validateRules(shadowMerge(previous, data), model);
 };
 
 export const registerRulesHook = () => {
@@ -82,7 +82,7 @@ export const registerRulesHook = () => {
       if (rule === true) return;
 
       for (const record of result as Record<string, unknown>[]) {
-        validateData(record, model);
+        validateRules(record, model);
       }
     },
   );

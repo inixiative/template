@@ -8,11 +8,7 @@
 import { db } from '@template/db/client';
 import { prismaMap } from '@template/db/generated/prismaMap';
 import { withDiscriminatorDefaults } from '@template/db/registries/discriminatorDefaults';
-import {
-  delegatedParent,
-  getPolymorphismConfig,
-  keysFromParent,
-} from '@template/db/registries/falsePolymorphism';
+import { getPolymorphismConfig } from '@template/db/registries/falsePolymorphism';
 import { mergeDependencies } from '@template/db/test/dependencyInference';
 import {
   assertDiscriminatorsChosen,
@@ -32,6 +28,7 @@ import type {
   Serialized,
   WhereUniqueOf,
 } from '@template/db/test/factoryTypes';
+import { carryDelegatedKeys } from '@template/db/utils/carryDelegatedKeys';
 import { toAccessor } from '@template/db/utils/modelNames';
 
 const serializeEntity = <T>(obj: T): Serialized<T> => {
@@ -216,15 +213,7 @@ export const createFactory = <K extends ModelName>(
       }
     }
 
-    for (const axis of getPolymorphismConfig(modelName)?.axes ?? []) {
-      const parent = delegatedParent(axis, merged[axis.field]);
-      const parentEntity = parent ? (ctx[toAccessor(parent)] as Record<string, unknown>) : null;
-      if (!parentEntity) continue;
-      for (const [key, value] of Object.entries(
-        keysFromParent(axis, merged[axis.field], parentEntity),
-      ))
-        if (!(key in scalarFields)) merged[key] = value;
-    }
+    await carryDelegatedKeys(modelName, merged);
 
     assertSelectedForeignKeys(modelName, merged);
 
