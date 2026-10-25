@@ -78,7 +78,7 @@ const acting = (permix: Awaited<ReturnType<typeof table>>, model: ActorModel, id
   return permix;
 };
 
-describe('no self arm: the person reaches their own rows through rel user (Aron, 2026-10-23)', () => {
+describe('no self arm: the user reaches their own rows through rel user (Aron, 2026-10-23)', () => {
   describe('the user and their relation', () => {
     it('the user leaves their own relation', async () => {
       expect(can(await session(u1, 'operate'), 'organizationUser', r1, 'leave')).toBe(true);
@@ -130,7 +130,7 @@ describe('no self arm: the person reaches their own rows through rel user (Aron,
   });
 
   describe("a relation's token holds nothing on the user", () => {
-    it('cannot leave its relation, a peer, or the same user’s seat elsewhere', async () => {
+    it('cannot leave its relation, a peer, or the same user’s member row elsewhere', async () => {
       const token = await relationToken(r1, 'operate');
       expect(can(token, 'organizationUser', r1, 'leave')).toBe(false);
       expect(can(token, 'organizationUser', r2, 'leave')).toBe(false);
@@ -276,14 +276,14 @@ describe('no self arm: the person reaches their own rows through rel user (Aron,
   });
 
   describe('the actor: who is acting, beside what they hold (Aron, 2026-10-23)', () => {
-    it('a person holding operate on their user mints a token; a token holding own does not', async () => {
+    it('a user holding operate on their user mints a token; a token holding own does not', async () => {
       const person = acting(await table(grant('db:user', 'u1', 'operate')), ActorModel.User, 'u1');
       expect(can(person, 'user', u1, SessionAction.createToken)).toBe(true);
       const token = acting(await table(grant('db:user', 'u1', 'own')), ActorModel.Token, 't1');
       expect(can(token, 'user', u1, SessionAction.createToken)).toBe(false);
     });
 
-    it('every person-only action is refused to a token holding own on the user', async () => {
+    it('every user-only action is refused to a token holding own on the user', async () => {
       const token = acting(await table(grant('db:user', 'u1', 'own')), ActorModel.Token, 't1');
       const person = acting(await table(grant('db:user', 'u1', 'own')), ActorModel.User, 'u1');
       const onTheUser = [
@@ -304,7 +304,7 @@ describe('no self arm: the person reaches their own rows through rel user (Aron,
       expect(can(member, 'user', u1, SessionAction.rotateUserJwts)).toBe(true);
     });
 
-    it('with nobody acting a person-only action denies; the table still answers the rest', async () => {
+    it('with nobody acting a user-only action denies; the table still answers the rest', async () => {
       const nobody = await table(grant('db:user', 'u1', 'own'));
       expect(can(nobody, 'user', u1, SessionAction.createToken)).toBe(false);
       expect(can(nobody, 'user', u1, 'own')).toBe(true);
@@ -317,7 +317,7 @@ describe('no self arm: the person reaches their own rows through rel user (Aron,
       expect(can(member, 'user', u1, UserAction.createOrganization)).toBe(true);
     });
 
-    it("minting and deleting tokens, and deleting an organization, are a person's acts on that record", async () => {
+    it("minting and deleting tokens, and deleting an organization, are a user's acts on that record", async () => {
       const owner = () => table(grant('db:organization', 'o1', 'own'));
       const org = { id: 'o1' };
       const asPerson = acting(await owner(), ActorModel.User, 'u1');
@@ -328,7 +328,7 @@ describe('no self arm: the person reaches their own rows through rel user (Aron,
       }
     });
 
-    it('a superadmin passes a person-only check on any credential', async () => {
+    it('a superadmin passes a user-only check on any credential', async () => {
       const token = acting(await table(), ActorModel.Token, 't1');
       token.setSuperadmin(true);
       expect(can(token, 'user', u1, SessionAction.createToken)).toBe(true);

@@ -63,7 +63,7 @@ const mint = async (ownerModel: TokenOwnerModel, context: Record<string, unknown
   return key;
 };
 
-describe('only a person acts directly: a JWT or a spoof (Aron, 2026-10-25)', () => {
+describe('only a user acts directly: a JWT or a spoof (Aron, 2026-10-25)', () => {
   let person: User;
   let organization: Organization;
   let seat: OrganizationUser;
@@ -95,26 +95,26 @@ describe('only a person acts directly: a JWT or a spoof (Aron, 2026-10-25)', () 
     expect(actor.record).not.toHaveProperty('keyHash');
   });
 
-  it('a token never makes the request a person', async () => {
+  it('a token never makes the request a user', async () => {
     const key = await mint('User', { user: person });
     const who = (await (await asKey(key, '/api/v1/probe/who')).json()) as { person: string | null };
     expect(who.person).toBeNull();
   });
 
-  describe('/me is the person a User token belongs to, and nobody else', () => {
-    it("a person's own token reads /me", async () => {
+  describe('/me is the user a User token belongs to, and nobody else', () => {
+    it("a user's own token reads /me", async () => {
       const key = await mint('User', { user: person });
       const response = await asKey(key, '/api/v1/me');
       expect(response.status).toBe(200);
       expect(((await response.json()) as { data: { id: string } }).data.id).toBe(person.id);
     });
 
-    it("a seat's token does not", async () => {
+    it("a member's token does not", async () => {
       const key = await mint('OrganizationUser', { organizationUser: seat });
       expect((await asKey(key, '/api/v1/me')).status).toBe(401);
     });
 
-    it("a person's integration's token does not", async () => {
+    it("a user's integration's token does not", async () => {
       const { entity: integration } = await createIntegration({
         ownerModel: 'User',
         userId: person.id,
@@ -132,7 +132,7 @@ describe('only a person acts directly: a JWT or a spoof (Aron, 2026-10-25)', () 
     );
   });
 
-  it("an integration's token cannot make its person an organization owner", async () => {
+  it("an integration's token cannot make its user an organization owner", async () => {
     const { entity: integration } = await createIntegration({
       ownerModel: 'User',
       userId: person.id,
@@ -147,7 +147,7 @@ describe('only a person acts directly: a JWT or a spoof (Aron, 2026-10-25)', () 
   });
 
   describe('a superadmin', () => {
-    it("only a person is a superadmin: a superadmin's seat token is not", async () => {
+    it("only a user is a superadmin: a superadmin's member token is not", async () => {
       const { entity: admin } = await createUser({ platformRole: 'superadmin' });
       const { entity: adminSeat } = await createOrganizationUser(
         { role: 'owner' },
@@ -165,7 +165,7 @@ describe('only a person acts directly: a JWT or a spoof (Aron, 2026-10-25)', () 
       expect((await asKey(key, '/api/v1/probe/admin')).status).toBe(200);
     });
 
-    it("a superadmin's token is superadmin and spoofs into the person", async () => {
+    it("a superadmin's token is superadmin and spoofs into the user", async () => {
       const { entity: admin } = await createUser({ platformRole: 'superadmin' });
       const key = await mint('User', { user: admin });
       const spoofed = (await (

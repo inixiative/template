@@ -53,7 +53,7 @@ describe("an integration's token carries its integration's keys (Aron, 2026-10-2
     expect(await db.token.findUniqueOrThrow({ where: { id: created.id } })).toMatchObject(carried);
   });
 
-  it("an organization's integration gives its tokens the organization and no person", async () => {
+  it("an organization's integration gives its tokens the organization and no user", async () => {
     const { entity: organization } = await createOrganization();
     const { entity: integration } = await createIntegration({
       ownerModel: 'Organization',

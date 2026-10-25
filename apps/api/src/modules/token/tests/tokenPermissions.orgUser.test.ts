@@ -120,7 +120,7 @@ describe('OrganizationUser Token Permissions', () => {
       expect(response.status).toBe(201);
     });
 
-    it("an admin's owner-role token is created; its seat caps it at admin", async () => {
+    it("an admin's owner-role token is created; its member caps it at admin", async () => {
       const { fetch } = createApp(adminUser, [adminOrgUser]);
       const response = await fetch(
         post(`/api/v1/organizationUser/${adminOrgUser.id}/tokens`, {
@@ -142,7 +142,7 @@ describe('OrganizationUser Token Permissions', () => {
       expect(response.status).toBe(201);
     });
 
-    it("a member's admin-role token is created; its seat caps it at member", async () => {
+    it("a member's admin-role token is created; its member caps it at member", async () => {
       const { fetch } = createApp(memberUser, [memberOrgUser]);
       const response = await fetch(
         post(`/api/v1/organizationUser/${memberOrgUser.id}/tokens`, {

@@ -24,7 +24,7 @@ export const meReadManyOrganizationsController = makeController(
       c,
       db.organization,
       {
-        // Live-row scope on the membership itself (caller where subtrees are outside
+        // Live-row scope on the member row itself (caller where subtrees are outside
         // paginate's injected scope) — a soft-deleted organizationUser must not keep
         // the org visible.
         where: {

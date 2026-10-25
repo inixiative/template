@@ -48,7 +48,7 @@ export const redactUser = async (c: Context<AppEnv>, userId: string) => {
   await db.account.deleteMany({ where: { userId } });
   await db.webhookSubscription.deleteMany({ where: { userId, ownerModel: 'User' } });
 
-  // Memberships, attachments — soft delete. (AuthProvider is org-scoped.)
+  // Members, attachments — soft delete. (AuthProvider is org-scoped.)
   await db.organizationUser.updateManyAndReturn({
     where: { userId, deletedAt: null },
     data: { deletedAt: now },

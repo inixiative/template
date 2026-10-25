@@ -53,7 +53,7 @@
 - [Validation Middleware](#validation-middleware)
   - [validatePermission](#validatepermission)
   - [validateOwnerPermission](#validateownerpermission)
-  - [The person as a resource](#the-person-as-a-resource)
+  - [The user as a resource](#the-user-as-a-resource)
 - [Role Assignment](#role-assignment)
   - [Role Assignment Rules](#role-assignment-rules)
 - [Token Permissions](#token-permissions)
@@ -140,7 +140,7 @@ export const StandardAction = {
 
 ### Session Actions
 
-Actions on the person's own account and the person-only acts on other records; every route names one ([The person as a resource](#the-person-as-a-resource)):
+Actions on the user's own account and the user-only acts on other records; every route names one ([The user as a resource](#the-user-as-a-resource)):
 
 ```typescript
 // packages/permissions/src/client.ts
@@ -159,11 +159,11 @@ export const UserAction = {
 };
 ```
 
-The schema maps `'organization.create'` to `'operate'` on the user. The session actions are person-only, written as `{ all: [{ actor: model equals User }, 'operate' | 'own'] }`, so a token holding `own` still cannot mint, delete tokens, redact, rotate or delete an organization. They sit on the record each acts on (below). A superadmin passes on any credential.
+The schema maps `'organization.create'` to `'operate'` on the user. The session actions are user-only, written as `{ all: [{ actor: model equals User }, 'operate' | 'own'] }`, so a token holding `own` still cannot mint, delete tokens, redact, rotate or delete an organization. They sit on the record each acts on (below). A superadmin passes on any credential.
 
 ### The Actor
 
-The table says what a principal holds. The actor says only who is acting: `permix.setActor({ id, model })`, with `model` `User` for a person and `Token` for any API token. Identity never comes from the actor; acting on your own row is `{ rel: 'user', action }`, a walk to your own user entry. The actor exists for the `{ actor }` arm, which reads it as a json-rules condition. With nobody acting, an actor arm denies and the table still answers everything else.
+The table says what a principal holds. The actor says only who is acting: `permix.setActor({ id, model })`, with `model` `User` for a user and `Token` for any API token. Identity never comes from the actor; acting on your own row is `{ rel: 'user', action }`, a walk to your own user entry. The actor exists for the `{ actor }` arm, which reads it as a json-rules condition. With nobody acting, an actor arm denies and the table still answers everything else.
 
 ### Role → Action Mapping
 
@@ -389,7 +389,7 @@ if (!permix.check('organization', 'manage', orgId)) {
 
 ### Via Validation Middleware
 
-There is no "is there a user" gate: every route names its action, and the action's rule decides who may take it. Only a JWT or a spoof makes the request a user (`c.get('user')`); a token is a Token actor `{ id, model }` and acts within its claim. `/me` routes act on the person as their resource ([The person as a resource](#the-person-as-a-resource)).
+There is no "is there a user" gate: every route names its action, and the action's rule decides who may take it. Only a JWT or a spoof makes the request a user (`c.get('user')`); a token is a Token actor `{ id, model }` and acts within its permissions. `/me` routes act on the user as their resource ([The user as a resource](#the-user-as-a-resource)).
 
 The template uses a unified `validatePermission` middleware that leverages ReBAC for permission checks:
 
@@ -449,7 +449,7 @@ export function getOrgPermissions(role, orgId, entitlements): PermissionEntry {
 }
 ```
 
-**Override behavior**: Allow override means a viewer with `{ manage: true }` entitlement CAN manage, which is why writing one is itself checked ([Granting an Entitlement](#granting-an-entitlement)). The role is not a ceiling on the seat itself; the ceiling is the holder, above ([A Token Never Exceeds Its Owner](#a-token-never-exceeds-its-owner)): a token naming `{ manage: true }` on a viewer's seat holds nothing the viewer does not.
+**Override behavior**: Allow override means a viewer with `{ manage: true }` entitlement CAN manage, which is why writing one is itself checked ([Granting an Entitlement](#granting-an-entitlement)). The role is not a ceiling on the member itself; the ceiling is the owner, above ([A Token Never Exceeds Its Owner](#a-token-never-exceeds-its-owner)): a token naming `{ manage: true }` on a viewer-role member holds nothing the viewer does not.
 
 ---
 
@@ -506,7 +506,7 @@ export const rebacSchema: RebacSchema = {
   organizationUser: {
     actions: {
       read: { any: [{ rel: 'user', action: 'read' }, { rel: 'organization', action: 'read' }] },
-      leave: { rel: 'user', action: 'operate' },  // the person, holding operate on their own user
+      leave: { rel: 'user', action: 'operate' },  // the user, holding operate on their own user
       manage: { rel: 'organization', action: 'manage' },
       own: { rel: 'organization', action: 'own' },
     },
@@ -523,7 +523,7 @@ export const rebacSchema: RebacSchema = {
 
   token: {
     actions: {
-      leave: { rel: 'user', action: 'operate' },  // the person deletes their own tokens
+      leave: { rel: 'user', action: 'operate' },  // the user deletes their own tokens
     },
   },
 
@@ -823,9 +823,9 @@ middleware: [validateOwnerPermission({ action: 'manage' })]
 middleware: [validateOwnerPermission({ action: 'read' })]
 ```
 
-### The person as a resource
+### The user as a resource
 
-`/me/*` routes check their action with `validatePermission` like any other route; `meResourceMiddleware` (on the `/me` router) loads `me(c)` as the resource, typed `user`. `me(c)` is the request's person (a JWT session or a spoof), or the user of a User-owned token; anything else has no me and gets 401. `organizationCreate` loads the same resource for `organization.create`.
+`/me/*` routes check their action with `validatePermission` like any other route; `meResourceMiddleware` (on the `/me` router) loads `me(c)` as the resource, typed `user`. `me(c)` is the request's user (a JWT session or a spoof), or the user of a User-owned token; anything else has no me and gets 401. `organizationCreate` loads the same resource for `organization.create`.
 
 ```typescript
 meRouter.use('*', meResourceMiddleware)                                   // every /me route
@@ -871,7 +871,7 @@ if (!permix.check('organization', action, orgId)) {
 
 ### Token Creation
 
-Every create-token route calls `createToken`, which runs `validateDelegateGrant` against the token's owner; the permissions' shape (`full` blocks a role and entitlements, otherwise a role, entitlements or both; no `full` for Organization or Space) is a write rule in `RulesRegistry` (`apps/api/src/hooks/rules/delegatePermissionRules.ts`): a token is your permissions or less. Seat token routes also require the seat's own person (`leave` on the seat). Minting is person-only (`SessionAction.createToken`).
+Every create-token route calls `createToken`, which runs `validateDelegateGrant` against the token's owner; the permissions' shape (`full` blocks a role and entitlements, otherwise a role, entitlements or both; no `full` for Organization or Space) is a write rule in `RulesRegistry` (`apps/api/src/hooks/rules/delegatePermissionRules.ts`): a token is your permissions or less. Member token routes also require the member's own user (`leave` on the member). Minting is user-only (`SessionAction.createToken`).
 
 ### Token Deletion
 
@@ -884,7 +884,7 @@ token: {
 },
 ```
 
-The person deletes their own tokens and their integrations' tokens (`leave`, through the copied `userId`); organization and space admins delete tokens in their scope, but a `full` or high-role token needs `own`.
+The user deletes their own tokens and their integrations' tokens (`leave`, through the copied `userId`); organization and space admins delete tokens in their scope, but a `full` or high-role token needs `own`.
 
 ---
 

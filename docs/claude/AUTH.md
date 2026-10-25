@@ -10,7 +10,7 @@
   - [What lives where](#what-lives-where)
   - [jwtHandoff](#jwthandoff)
   - [Auth Routes](#auth-routes)
-- [Person JWT](#person-jwt)
+- [User JWT](#user-jwt)
   - [Verification](#verification)
   - [jwtAuthMiddleware](#jwtauthmiddleware)
   - [Revocation and sign-out](#revocation-and-sign-out)
@@ -40,11 +40,11 @@
   - [Requirements](#requirements)
 - [Validation Middleware](#validation-middleware)
   - [validateSuperadmin](#validatesuperadmin)
-- [Who Is a Person](#who-is-a-person)
+- [Who Is a User](#who-is-a-user)
 
 <!-- toc:end -->
 
-Who is the caller: person JWTs, API tokens, the sign-in handshake, OAuth, spoofing, and the middleware that enforces them. What they can do: [PERMISSIONS.md](./PERMISSIONS.md). Client side (forms, guards, auth slice): [FRONTEND/AUTH.md](./FRONTEND/AUTH.md).
+Who is the caller: user JWTs, API tokens, the sign-in handshake, OAuth, spoofing, and the middleware that enforces them. What they can do: [PERMISSIONS.md](./PERMISSIONS.md). Client side (forms, guards, auth slice): [FRONTEND/AUTH.md](./FRONTEND/AUTH.md).
 
 ## Overview
 
@@ -52,12 +52,12 @@ Two credentials, both populate the same context. Both are bearer-only, and neith
 
 | Credential | Who presents it | Header | Middleware |
 |--------|----------|---------------|------------|
-| Person JWT | A signed-in person (web, admin and superadmin apps, or anything holding their JWT) | `Authorization: Bearer <jwt>` | `jwtAuthMiddleware` |
+| User JWT | A signed-in user (web, admin and superadmin apps, or anything holding their JWT) | `Authorization: Bearer <jwt>` | `jwtAuthMiddleware` |
 | API token | A program (MCP, integrations, CI) | `Authorization: Bearer <key>` or `?token=<key>` | `tokenAuthMiddleware` |
 
 Both set `user`, `organizationUsers`, and configure `permix`.
 
-Why no sessions: a session is server state that every request must look up, and a session cookie is a second way in. Sessions lived on as the real credential under an earlier JWE cookie cache, and a revoked session stayed valid in that cache for up to 7 days. A person JWT is verified from its signature, and revocation is a per-user check in Redis ([Revocation and sign-out](#revocation-and-sign-out)).
+Why no sessions: a session is server state that every request must look up, and a session cookie is a second way in. Sessions lived on as the real credential under an earlier JWE cookie cache, and a revoked session stayed valid in that cache for up to 7 days. A user JWT is verified from its signature, and revocation is a per-user check in Redis ([Revocation and sign-out](#revocation-and-sign-out)).
 
 ---
 
@@ -100,15 +100,15 @@ The plugin list lives in `apps/api/src/lib/auth/authPlugins.ts`. Its order matte
 
 | Piece | What it is | Where it lives |
 |-------|-----------|----------------|
-| **Person JWT** | ES256 JWT, `sub` = `User.id`, `iss` = `aud` = `API_URL`, `iat`, `exp` 30 days | The client. Web apps keep it in localStorage (`packages/ui/src/lib/auth/token.ts`) and send `Authorization: Bearer <jwt>` on every call |
+| **User JWT** | ES256 JWT, `sub` = `User.id`, `iss` = `aud` = `API_URL`, `iat`, `exp` 30 days | The client. Web apps keep it in localStorage (`packages/ui/src/lib/auth/token.ts`) and send `Authorization: Bearer <jwt>` on every call |
 | **Signing keys** | BetterAuth `jwt()` plugin keys, ES256, rotated every 90 days; a retired key stays published for 30 days so JWTs it signed keep verifying | `Jwks` table; the private key is encrypted by the template field encryption (`jwks.privateKey`, [ENCRYPTION.md](./ENCRYPTION.md)) through `apps/api/src/lib/auth/jwksStore.ts`. Public keys at `GET /api/auth/jwks` |
 | **Handshake session** | BetterAuth's session for one sign-in. Lives 10 minutes at most; `jwtHandoff` deletes it as soon as it hands out the JWT | Redis (`secondaryStorage`, `redisNamespace.session`). `storeSessionInDatabase` is off; the Prisma `Session` model is BetterAuth's schema and holds no rows |
 | **OAuth one-time token** | Single-use, 1 minute, stored hashed; consumed with Redis `GETDEL` (`getAndDelete`) | Redis |
-| **JWT version** | `User.jwtVersion`; every person JWT carries it as `ver`, and a JWT whose `ver` differs is refused. Incrementing it signs the user out everywhere | Postgres, on the `User` row `jwtAuthMiddleware` already loads |
+| **JWT version** | `User.jwtVersion`; every user JWT carries it as `ver`, and a JWT whose `ver` differs is refused. Incrementing it signs the user out everywhere | Postgres, on the `User` row `jwtAuthMiddleware` already loads |
 
 - **Why the signing keys use the template field encryption:** one scheme for secrets at rest, rotated by the existing `rotateEncryptionKeys` job, instead of a second scheme keyed off `BETTER_AUTH_SECRET`.
-- **Why 30 days and no refresh token:** revocation is the control, not short expiry. A refresh token would be a second long-lived credential to store, rotate and revoke; incrementing `User.jwtVersion` already ends every JWT a person holds.
-- **Email verification is required** for email/password sign-up; the verification email goes out through the `user.verificationRequested` app event. Verifying does not sign the person in; they sign in afterwards.
+- **Why 30 days and no refresh token:** revocation is the control, not short expiry. A refresh token would be a second long-lived credential to store, rotate and revoke; incrementing `User.jwtVersion` already ends every JWT a user holds.
+- **Email verification is required** for email/password sign-up; the verification email goes out through the `user.verificationRequested` app event. Verifying does not sign the user in; they sign in afterwards.
 
 ### jwtHandoff
 
@@ -116,7 +116,7 @@ The plugin list lives in `apps/api/src/lib/auth/authPlugins.ts`. Its order matte
 
 1. expires the session cookie on the response;
 2. on `/callback/*` (the OAuth redirect) stops there, because the one-time token must still resolve to that session;
-3. otherwise signs the person's JWT (`signJWT` with `personJwtOptions()` from `apps/api/src/lib/auth/personJwt.ts`), deletes the session, and replaces the response body with:
+3. otherwise signs the user's JWT (`signJWT` with `personJwtOptions()` from `apps/api/src/lib/auth/personJwt.ts`), deletes the session, and replaces the response body with:
 
 ```json
 { "token": "<jwt>", "expiresAt": "<ISO time>", "user": { "...": "..." } }
@@ -142,7 +142,7 @@ GET  /api/auth/jwks                    # public signing keys
 
 ---
 
-## Person JWT
+## User JWT
 
 ### Verification
 
@@ -163,12 +163,12 @@ The token's `iss` picks the issuer; an unknown `iss` is refused. `algorithms: ['
 
 ### Revocation and sign-out
 
-`rotateUserJwts(userId)` (`apps/api/src/modules/user/services/rotateUserJwts.ts`) is the one writer of `User.jwtVersion`: it increments it through the scoped db client, inside the caller's transaction. Every caller below goes through it; the cache hooks drop the cached user, so the next request with an older JWT is a 401. No Redis lookup and no extra query: the version rides on the user row each request already loads. Why a version, not a timestamp: it needs no clock comparison and no second store (Aron, 2026-10-18: "the token just carries the version on the user… we just rotate that"). Permissions are not on the JWT, so a role or membership change applies on the next request without revoking anything. `jwtVerify` enforces `maxTokenAge` (30 days), so no JWT, external ones included, lives longer than that. A JWT from the configured external issuer carries that issuer's version, not ours, so the version check does not apply to it: rotating here (`/me/rotateJwts`, the admin rotation, password reset) does not end it. It ends when it expires (30 days at most), when the user is deleted here, when the issuer stops publishing its key, or, for a `grant` JWT, when the grant inquiry is revoked (read live). Signing out at the issuer is the issuer's job. The cached user row (`findUserWithRelations`, 10 minutes) is dropped by the cache hooks on the version bump; if that clear fails (the hook logs Redis errors), an old JWT can work until the cache entry expires, the same bound a role change has.
+`rotateUserJwts(userId)` (`apps/api/src/modules/user/services/rotateUserJwts.ts`) is the one writer of `User.jwtVersion`: it increments it through the scoped db client, inside the caller's transaction. Every caller below goes through it; the cache hooks drop the cached user, so the next request with an older JWT is a 401. No Redis lookup and no extra query: the version rides on the user row each request already loads. Why a version, not a timestamp: it needs no clock comparison and no second store (Aron, 2026-10-18: "the token just carries the version on the user… we just rotate that"). Permissions are not on the JWT, so a role or member change applies on the next request without revoking anything. `jwtVerify` enforces `maxTokenAge` (30 days), so no JWT, external ones included, lives longer than that. A JWT from the configured external issuer carries that issuer's version, not ours, so the version check does not apply to it: rotating here (`/me/rotateJwts`, the admin rotation, password reset) does not end it. It ends when it expires (30 days at most), when the user is deleted here, when the issuer stops publishing its key, or, for a `grant` JWT, when the grant inquiry is revoked (read live). Signing out at the issuer is the issuer's job. The cached user row (`findUserWithRelations`, 10 minutes) is dropped by the cache hooks on the version bump; if that clear fails (the hook logs Redis errors), an old JWT can work until the cache entry expires, the same bound a role change has.
 
 | What | Revokes |
 |---|---|
 | Sign out of one browser | Nothing on the server: the SPA drops its JWT |
-| `POST /api/v1/me/rotateJwts` | Every JWT this API signed for the caller, on every device: the nuclear option, not a sign-out of one device. Person-only (`validatePermission(SessionAction.rotateUserJwts)` on the person, an actor arm in the schema): an API token cannot rotate its user's JWTs |
+| `POST /api/v1/me/rotateJwts` | Every JWT this API signed for the caller, on every device: the nuclear option, not a sign-out of one device. User-only (`validatePermission(SessionAction.rotateUserJwts)` on the user, an actor arm in the schema): an API token cannot rotate its user's JWTs |
 | `POST /api/admin/user/:id/rotateJwts` | Every JWT this API signed for that user (superadmin) |
 | `redactUser` (`POST /api/v1/me/redact`, `POST /api/admin/user/:id/redact`) | Every JWT of the deleted account (`rotateUserJwts`; the soft-deleted user is refused too) |
 | Password reset (BetterAuth `onPasswordReset`) | Every JWT this API signed for that user |
@@ -184,7 +184,7 @@ The token's `iss` picks the issuer; an unknown `iss` is refused. `algorithms: ['
 
 ### Spoofing and WebSockets
 
-A superadmin's JWT is superadmin, so spoofing rides it ([Spoof Middleware](#spoof-middleware)). A WebSocket's `authenticate` frame carries the JWT as its `authorization` header; `apps/api/src/ws/probe.ts` replays `/api/v1/identify` with it (any credential identifies; a token is a token, with no person), and the reauthorize sweep drops an identity whose JWT was revoked or expired.
+A superadmin's JWT is superadmin, so spoofing rides it ([Spoof Middleware](#spoof-middleware)). A WebSocket's `authenticate` frame carries the JWT as its `authorization` header; `apps/api/src/ws/probe.ts` replays `/api/v1/identify` with it (any credential identifies; a token is a token, with no user), and the reauthorize sweep drops an identity whose JWT was revoked or expired.
 
 ---
 
@@ -294,10 +294,10 @@ Located in `apps/api/src/middleware/auth/tokenAuthMiddleware.ts`. API key authen
 3. Look up the token row by hash (cached in Redis with 10-minute TTL; the row alone, no relations)
 4. Validate: `isActive`, not expired
 5. Read the owner records (user, organization, space, `OrganizationUser`, `SpaceUser`) with `fetchOne`, each under its own cache key (not `hydrate`, whose recursive walk nests relations past the owners' one level)
-6. Refuse when the owner is gone: a removed or soft-deleted membership, or a deleted user, org or space, authenticates no one
+6. Refuse when the owner is gone: a removed or soft-deleted member, or a deleted user, org or space, authenticates no one
 7. Set context based on token type
 
-URL token is useful for email links and file downloads (where headers can't be set). Only API tokens are read from the URL; a person JWT never is.
+URL token is useful for email links and file downloads (where headers can't be set). Only API tokens are read from the URL; a user JWT never is.
 
 **Security:** The token row is cached for 10 minutes and its key clears on every Token write, so a revoked token stops working on the next request. The owner records are never copied into the token's entry: the cache hook (`cacheReference`) clears their keys when they change, so a demoted member, a removed member and a revoked superadmin take effect on the next request. `lastUsedAt` is touched on cache miss only.
 
@@ -317,7 +317,7 @@ const authenticateToken = async (c: Context<AppEnv>) => {
 
   c.set('token', token);
   // User → findUserWithRelations → setUserContext
-  // OrganizationUser / SpaceUser → setUserContext from the one membership
+  // OrganizationUser / SpaceUser → setUserContext from the one member
   // Organization / Space / Integration → setupTokenPermissions (the owner's table caps its permissions)
 };
 
@@ -374,7 +374,7 @@ userId: set
 organizationId: set
 ```
 
-- Tied to a user's membership in a specific org
+- Tied to a user's member row in a specific org
 - Has access only to that org
 - Permissions are intersection of user's role AND token's role
 - Used for scoped access to a single org
@@ -402,7 +402,7 @@ organizationId: set
 spaceId: set
 ```
 
-- Tied to a user's membership in a specific space
+- Tied to a user's member row in a specific space
 - Has access only to that space
 - Permissions are intersection of user's space role AND token's role
 - Used for scoped access to a single space
@@ -467,14 +467,14 @@ apiRouter.route('/internal', internalRouter);    // Shared-secret auth only
 apiRouter.use('/auth/*', authRateLimit);         // BetterAuth: the sign-in handshake
 apiRouter.all('/auth/*', (c) => auth.handler(c.req.raw));
 apiRouter.route('/unsubscribe', …);              // Public, signed link
-apiRouter.use('*', jwtAuthMiddleware);           // 2. Person JWT
+apiRouter.use('*', jwtAuthMiddleware);           // 2. User JWT
 apiRouter.use('*', tokenAuthMiddleware);         // 3. API token
 apiRouter.use('*', spoofMiddleware);             // 4. Superadmin spoofing (after user is resolved)
 apiRouter.use('*', auditActorMiddleware);        // 5. Actor context for audit logs
 apiRouter.use('*', apiRateLimit);
 ```
 
-A JWT-shaped bearer is the person's JWT; any other bearer is looked up as an API token.
+A JWT-shaped bearer is the user's JWT; any other bearer is looked up as an API token.
 Spoof runs last so a superadmin can spoof through either credential.
 
 ### Flow
@@ -561,17 +561,17 @@ router.get('/admin/users', validateSuperadmin, handler);  // 403 if not superadm
 
 ---
 
-## Who Is a Person
+## Who Is a User
 
-Only a JWT session or a superadmin spoof makes the request a person (`c.get('user')`). A token never does: it is a Token actor `{ model: 'Token', record }`, and what it may do is its permissions over its owner's table. Routes name their action; there is no "is there a user" middleware.
+Only a JWT session or a superadmin spoof makes the request a user (`c.get('user')`). A token never does: it is a Token actor `{ model: 'Token', record }`, and what it may do is its permissions over its owner's table. Routes name their action; there is no "is there a user" middleware.
 
 | Credential | `c.get('user')` | `me(c)` (the `/me` resource) |
 |------------|-----------------|-------------------------------|
-| Person JWT | the person | the person |
-| Spoof (a superadmin on any credential) | the spoofed person, token set aside | the spoofed person |
-| User token | none | its person |
+| User JWT | the user | the user |
+| Spoof (a superadmin on any credential) | the spoofed user, token set aside | the spoofed user |
+| User token | none | its user |
 | Any other token | none | none: `/me` answers 401 |
 
 `GET /api/v1/identify` answers for any credential: the actor `{ model, record }` the rules see, the record being the user, or the token's own columns, without the model's redact fields.
 
-A token held by a person (User, OrganizationUser, SpaceUser) is superadmin when its person is, and can spoof. A spoof is a superadmin and an email: the request becomes that person and the token is set aside; `spoofedBy` records who.
+A token held by a user (User, OrganizationUser, SpaceUser) is superadmin when its user is, and can spoof. A spoof is a superadmin and an email: the request becomes that user and the token is set aside; `spoofedBy` records who.

@@ -125,7 +125,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 ### Person JWT (BetterAuth sign-in)
 
 - ✅ **BetterAuth Sign-in** - BetterAuth ^1.6 runs email/password, email verification and OAuth. Its session exists only for the sign-in handshake (10 minutes at most, in Redis); `jwtHandoff` swaps it for a JWT before the response leaves the API and deletes it
-- ✅ **Person JWT** - Sign-in answers with `{ token, expiresAt, user }`: an ES256 JWT (`sub` = user, `iss` = `aud` = `API_URL`, 30 days). The SPAs store it in localStorage and send it as `Authorization: Bearer <jwt>`. `jwtAuthMiddleware` verifies it from its signature; no session lookup. Details: [AUTH.md](docs/claude/AUTH.md#person-jwt)
+- ✅ **Person JWT** - Sign-in answers with `{ token, expiresAt, user }`: an ES256 JWT (`sub` = user, `iss` = `aud` = `API_URL`, 30 days). The SPAs store it in localStorage and send it as `Authorization: Bearer <jwt>`. `jwtAuthMiddleware` verifies it from its signature; no session lookup. Details: [AUTH.md](docs/claude/AUTH.md#user-jwt)
 - ✅ **Email/Password Auth** - Password hashing via BetterAuth. Email verification is required before sign-in
 - ✅ **OAuth Flow → JWT** - The provider redirects to the API, which appends a single-use one-time token to `/auth/callback#ott=…` (fragment, never logged). The callback page exchanges it for the JWT. Neither the JWT nor a session token appears in a URL
 - ✅ **Signing Keys** - BetterAuth `jwt()` plugin keys, rotated every 90 days with a 30-day grace, published at `/api/auth/jwks`. Private keys are encrypted by the template field encryption (`jwks.privateKey`) and rotated by the same job as every other secret

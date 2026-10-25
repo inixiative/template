@@ -26,7 +26,7 @@ describe('resolveSender', () => {
     ).toBe(false);
   });
 
-  it('is the sending membership, found by its user and organization', async () => {
+  it('is the sending member, found by its user and organization', async () => {
     const { entity: membership } = await createOrganizationUser();
     const sender = await resolveSender({
       type: 'OrganizationUser',

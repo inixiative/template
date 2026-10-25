@@ -56,7 +56,7 @@ describe('ws subscribe probe (real app)', () => {
     organizationBearer = { authorization: `Bearer ${key}` };
   });
 
-  it("an organization's token is identified as a token, with no person", async () => {
+  it("an organization's token is identified as a token, with no user", async () => {
     expect(await resolveIdentity(organizationBearer)).toMatchObject({
       status: 'resolved',
       model: 'Token',
@@ -64,7 +64,7 @@ describe('ws subscribe probe (real app)', () => {
     });
   });
 
-  it("an organization's token subscribes to what its claim reads", async () => {
+  it("an organization's token subscribes to what its permissions read", async () => {
     expect(await canSubscribe(organizationBearer, WS_CHANNELS.inquiryRead.name(inquiryId))).toBe(
       true,
     );
@@ -113,7 +113,7 @@ describe('ws subscribe probe (real app)', () => {
     expect(await canSubscribe(adminBearer, 'inquiryRead')).toBe(false);
   });
 
-  it('resolveIdentity answers a token as a token, with no person', async () => {
+  it('resolveIdentity answers a token as a token, with no user', async () => {
     expect(await resolveIdentity(adminBearer)).toMatchObject({
       status: 'resolved',
       model: 'Token',

@@ -59,7 +59,7 @@ const holds = async (key: string, model: AccessorName, id: string, action: strin
   return ((await response.json()) as { holds: boolean }).holds;
 };
 
-describe('a credential never exceeds its holder (Aron, 2026-10-23)', () => {
+describe('a credential never exceeds its owner (Aron, 2026-10-23)', () => {
   let organization: Organization;
   let space: Space;
 
@@ -133,25 +133,25 @@ describe('a credential never exceeds its holder (Aron, 2026-10-23)', () => {
     expect(await holds(key, 'organization', organization.id, 'own')).toBe(false);
   });
 
-  it("a token's role is capped by its seat, the seat's entitlements included", async () => {
+  it("a token's role is capped by its member, the member's entitlements included", async () => {
     const key = await userToken(await seat('viewer', { operate: true }), 'owner');
     expect(await holds(key, 'organization', organization.id, 'operate')).toBe(true);
     expect(await holds(key, 'organization', organization.id, 'manage')).toBe(false);
   });
 
-  it('the cap follows the walk: a space is reached only as far as the seat reaches its organization', async () => {
+  it('the cap follows the walk: a space is reached only as far as the member reaches its organization', async () => {
     const owner = await seat('owner');
     expect(await holds(await userToken(owner, 'owner'), 'space', space.id, 'manage')).toBe(true);
     expect(await holds(await userToken(owner, 'viewer'), 'space', space.id, 'read')).toBe(false);
   });
 
-  it("a membership's owner-role token on an admin seat manages and does not own", async () => {
+  it("a member's owner-role token on an admin member manages and does not own", async () => {
     const key = await membershipToken(await seat('admin'), 'owner', { own: true });
     expect(await holds(key, 'organization', organization.id, 'manage')).toBe(true);
     expect(await holds(key, 'organization', organization.id, 'own')).toBe(false);
   });
 
-  it('a member token below its seat holds the lesser', async () => {
+  it('a member token below its member row holds the lesser', async () => {
     const key = await userToken(await seat('owner'), 'viewer');
     expect(await holds(key, 'organization', organization.id, 'read')).toBe(true);
     expect(await holds(key, 'organization', organization.id, 'operate')).toBe(false);

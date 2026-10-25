@@ -54,7 +54,7 @@ apiRouter.all('/auth/*', (c) => auth.handler(c.req.raw));
 // One-click unsubscribe — public (no JWT or token); authorized by its own signed link.
 apiRouter.route('/unsubscribe', unsubscribeRouter);
 
-// A person presents a JWT, a program an API token; sessions never reach past /auth.
+// A user presents a JWT, a program an API token; sessions never reach past /auth.
 // Spoof runs last so it applies whichever credential resolved the user.
 apiRouter.use('*', jwtAuthMiddleware);
 apiRouter.use('*', tokenAuthMiddleware);

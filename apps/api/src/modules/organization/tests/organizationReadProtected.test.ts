@@ -39,7 +39,7 @@ describe('GET /api/v1/organization/:id/protected', () => {
     expect(data.id).toBe(org.id);
   });
 
-  it('returns 403 for user without org membership', async () => {
+  it('returns 403 for user without being an org member', async () => {
     const { entity: otherUser } = await createUser();
 
     const otherHarness = createTestApp({

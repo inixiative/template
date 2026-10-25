@@ -137,7 +137,7 @@ export const rebacSchema: RebacSchema = {
     // Tokens carry a `role` field — assigning/revoking one inherits the
     // org/space `assign` semantics: high roles need own on the owner, others
     // need manage. Encoded against the token's row so the role rule resolves
-    // locally and only the seat check walks to the owner.
+    // locally and only the member check walks to the owner.
     'db:token': {
       actions: {
         'token.delete': { all: [person, { any: ['leave', 'assign'] }] },

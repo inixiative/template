@@ -57,7 +57,7 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
     expect(data.role).toBe('viewer');
   });
 
-  describe('a grant is an action: the writer could take every action the seat would hold (Aron, 2026-10-25)', () => {
+  describe('a grant is an action: the writer could take every action the member would hold (Aron, 2026-10-25)', () => {
     const memberSeat = async () =>
       (await createOrganizationUser({ role: 'member' }, { organization: org })).entity;
 
@@ -92,14 +92,14 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
       });
     });
 
-    it('an admin cannot grant a member own, and the seat is unchanged', async () => {
+    it('an admin cannot grant a member own, and the member is unchanged', async () => {
       expect(await grant(await writer('admin'), { own: true })).toEqual({
         status: 403,
         stored: null,
       });
     });
 
-    it('an admin cannot grant assign: the seat could then assign owners', async () => {
+    it('an admin cannot grant assign: the member could then assign owners', async () => {
       expect(await grant(await writer('admin'), { assign: true })).toEqual({
         status: 403,
         stored: null,
@@ -122,7 +122,7 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
       ).toBe(200);
     });
 
-    it('an admin clears a member seat of its entitlements', async () => {
+    it("an admin clears a member's entitlements", async () => {
       const { entity: target } = await createOrganizationUser(
         { role: 'member', entitlements: { operate: true } },
         { organization: org },
@@ -144,7 +144,7 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
     });
   });
 
-  describe("an organization seat's token grants as its seat, capped by its own role", () => {
+  describe("an organization member's token grants as its member, capped by its own role", () => {
     const tokenApp = createTestApp({
       mount: [
         (app) => {
@@ -186,20 +186,20 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
       return response.status;
     };
 
-    it('an owner-role token on an owner seat grants what the seat could', async () => {
+    it('an owner-role token on an owner member grants what the member could', async () => {
       const key = await seatToken('owner', 'owner');
       expect(await grantAs(key, { operate: true })).toBe(200);
       expect(await grantAs(key, { assign: true })).toBe(200);
     });
 
-    it('an owner-role token on an admin seat grants no more than the admin', async () => {
+    it('an owner-role token on an admin member grants no more than the admin', async () => {
       const key = await seatToken('admin', 'owner');
       expect(await grantAs(key, { operate: true })).toBe(200);
       expect(await grantAs(key, { own: true })).toBe(403);
       expect(await grantAs(key, { assign: true })).toBe(403);
     });
 
-    it('a viewer-role token on an owner seat grants nothing above read', async () => {
+    it('a viewer-role token on an owner member grants nothing above read', async () => {
       const key = await seatToken('owner', 'viewer');
       expect(await grantAs(key, { operate: true })).toBe(403);
     });

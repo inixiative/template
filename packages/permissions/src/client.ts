@@ -29,7 +29,7 @@ export type OrganizationAction = (typeof OrganizationAction)[keyof typeof Organi
 export const SpaceAction = { ...StandardAction } as const;
 export type SpaceAction = (typeof SpaceAction)[keyof typeof SpaceAction];
 
-// Actions on the person's own account. Held on the user's row like the standard four.
+// Actions on the user's own account. Held on the user's row like the standard four.
 export const SessionAction = {
   createToken: 'token.create',
   deleteToken: 'token.delete',
@@ -60,7 +60,7 @@ export type Entitlements = Record<string, boolean> | null;
 export const ActorModel = { User: 'User', Token: 'Token' } as const;
 export type ActorModel = (typeof ActorModel)[keyof typeof ActorModel];
 
-// Who is acting: a person or a token, and its row. A rule reads it as `__actor`.
+// Who is acting: a user or a token, and its row. A rule reads it as `__actor`.
 export type Actor = { model: ActorModel; record: Record<string, unknown> };
 
 export type ActionState = EngineActionState<Action>;

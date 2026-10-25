@@ -24,7 +24,7 @@ import { spaceRouter } from '#/modules/space';
 import { tokenRouter } from '#/modules/token';
 import { createTestApp } from '#tests/createTestApp';
 
-describe('a token of an organization seat acts as that seat, never as the person or the organization (Aron, 2026-10-25)', () => {
+describe('a token of an organization member acts as that member, never as the user or the organization (Aron, 2026-10-25)', () => {
   let person: User;
   let organization: Organization;
   let otherOrganization: Organization;
@@ -91,7 +91,7 @@ describe('a token of an organization seat acts as that seat, never as the person
     await cleanupTouchedTables(db);
   });
 
-  it('acts on its organization as its seat does', async () => {
+  it('acts on its organization as its member does', async () => {
     expect(await status('GET', '/me')).toBe(401);
     expect(await status('GET', `/organization/${organization.id}/protected`)).toBe(200);
     expect(await status('GET', `/organization/${organization.id}`)).toBe(200);
@@ -101,7 +101,7 @@ describe('a token of an organization seat acts as that seat, never as the person
     expect(await status('GET', `/space/${space.id}`)).toBe(200);
   });
 
-  it('does nothing only the person may do', async () => {
+  it('does nothing only the user may do', async () => {
     expect(await status('GET', '/me/organizations')).toBe(401);
     expect(await status('GET', '/me/tokens')).toBe(401);
     expect(await status('POST', '/me/tokens', { name: 'k', role: 'viewer' })).toBe(401);
@@ -116,7 +116,7 @@ describe('a token of an organization seat acts as that seat, never as the person
     );
   });
 
-  it('does nothing only a person over the organization may do, though its seat owns it', async () => {
+  it('does nothing only a user over the organization may do, though its member owns it', async () => {
     expect(
       await status('POST', `/organization/${organization.id}/tokens`, {
         name: 'k',
@@ -136,7 +136,7 @@ describe('a token of an organization seat acts as that seat, never as the person
     ).toBe(0);
   });
 
-  it('reaches no other organization its person sits in', async () => {
+  it('reaches no other organization its user sits in', async () => {
     expect(await status('GET', `/organization/${otherOrganization.id}/protected`)).toBe(403);
     expect(await status('PATCH', `/organization/${otherOrganization.id}`, { name: 'Taken' })).toBe(
       403,

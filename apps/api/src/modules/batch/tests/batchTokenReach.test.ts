@@ -101,7 +101,7 @@ describe('a batch keeps every round inside its credential (Aron, 2026-10-25)', (
     await cleanupTouchedTables(db);
   });
 
-  it('an organization seat token reaches no space of another organization in a later round', async () => {
+  it('an organization member token reaches no space of another organization in a later round', async () => {
     const key = await mint({ ownerModel: 'OrganizationUser' }, { organizationUser: seatA.entity });
     const otherSpace = holdsRequest({ model: 'space', id: spaceB.id, action: 'own' });
     const ownOrg = holdsRequest({ model: 'organization', id: orgA.id, action: 'own' });
@@ -113,7 +113,7 @@ describe('a batch keeps every round inside its credential (Aron, 2026-10-25)', (
     expect(held(second[1])).toBe(true);
   });
 
-  it('a space seat token reaches no organization in a later round', async () => {
+  it('a space member token reaches no organization in a later round', async () => {
     const key = await mint({ ownerModel: 'SpaceUser' }, { spaceUser: spaceSeatA.entity });
     const own = holdsRequest({ model: 'space', id: spaceA.id, action: 'own' });
     const [, second] = await batch(key, [
@@ -129,7 +129,7 @@ describe('a batch keeps every round inside its credential (Aron, 2026-10-25)', (
     expect(second.map(held)).toEqual([false, false, false, true]);
   });
 
-  it('a user token keeps every seat of its person across rounds', async () => {
+  it('a user token keeps every member of its user across rounds', async () => {
     const key = await mint({ ownerModel: 'User' }, { user: person });
     const both = [
       holdsRequest({ model: 'organization', id: orgA.id, action: 'own' }),

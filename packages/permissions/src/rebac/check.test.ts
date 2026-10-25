@@ -503,7 +503,7 @@ describe('rebac check', () => {
       },
     };
 
-    it('a person holding the action passes an actor-gated arm', async () => {
+    it('a user holding the action passes an actor-gated arm', async () => {
       await permix.setup({ resource: 'db:user', id: 'user-123', actions: { own: true } });
       permix.setActor({ model: 'User', record: { id: 'user-123' } });
       expect(check(permix, schema, 'user', { id: 'user-123' }, 'mint')).toBe(true);

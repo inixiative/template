@@ -6,7 +6,7 @@
  */
 import { db } from '@template/db';
 
-// The one writer of jwtVersion: every person JWT carries it, so a new version refuses all of them.
+// The one writer of jwtVersion: every user JWT carries it, so a new version refuses all of them.
 export const rotateUserJwts = async (userId: string): Promise<void> => {
   await db.user.update({ where: { id: userId }, data: { jwtVersion: { increment: 1 } } });
 };

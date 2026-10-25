@@ -27,7 +27,7 @@ export const meReadManySpacesController = makeController(
       c,
       db.space,
       {
-        // The membership filter needs its own live-row scope: paginate injects
+        // The member filter needs its own live-row scope: paginate injects
         // `deletedAt: null` into the lens visits and the include tree, but caller
         // where subtrees are the caller's own — without it a soft-deleted spaceUser
         // would match `some` while the include filters it out.

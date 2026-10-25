@@ -107,7 +107,7 @@ const mint = async (
   return { status: 201, key: data.key, id: data.id };
 };
 
-describe('a delegate holds what it claims, and no more than whoever grants it (Aron, 2026-10-25)', () => {
+describe('a delegate holds its permissions, and no more than whoever grants it (Aron, 2026-10-25)', () => {
   let organization: Organization;
   let otherOrganization: Organization;
   let space: Space;
@@ -150,8 +150,8 @@ describe('a delegate holds what it claims, and no more than whoever grants it (A
     await cleanupTouchedTables(db);
   });
 
-  describe('a token holds only what it claims', () => {
-    it('an integration entitled to two spaces mints a token that claims one', async () => {
+  describe('a token holds only its permissions', () => {
+    it('an integration entitled to two spaces mints a token entitled to one', async () => {
       const { user, seat } = await seated('owner');
       const integration = await seatIntegration(seat, {
         entitlements: [
@@ -180,7 +180,7 @@ describe('a delegate holds what it claims, and no more than whoever grants it (A
       expect(await holds(key!, 'organization', organization.id, 'read')).toBe(false);
     });
 
-    it('a full integration passes its seat through, capped by the seat', async () => {
+    it('a full integration passes its member through, capped by the member', async () => {
       const { user, seat } = await seated('member');
       const integration = await seatIntegration(seat, { full: true });
       const { key } = await mintOn(integration, user, [seat], { full: true });
@@ -189,7 +189,7 @@ describe('a delegate holds what it claims, and no more than whoever grants it (A
       expect(await holds(key!, 'organization', otherOrganization.id, 'read')).toBe(false);
     });
 
-    it('a token that is not full claims a role, entitlements or both', async () => {
+    it('a token that is not full has a role, entitlements or both', async () => {
       const { user, seat } = await seated('owner');
       const integration = await seatIntegration(seat, { role: 'owner' });
       expect((await mintOn(integration, user, [seat], {})).status).toBe(422);
@@ -249,7 +249,7 @@ describe('a delegate holds what it claims, and no more than whoever grants it (A
       expect((await mint(user, [seat], path, { role: 'owner' })).status).toBe(403);
     });
 
-    it("an admin cannot mint an owner's token on an owner's seat integration", async () => {
+    it("an admin cannot mint an owner's token on an owner-role member's integration", async () => {
       const { user: owner, seat: ownerSeat } = await seated('owner');
       const integration = await seatIntegration(ownerSeat, { role: 'owner' });
       const { user: admin, seat: adminSeat } = await seated('admin');
@@ -258,7 +258,7 @@ describe('a delegate holds what it claims, and no more than whoever grants it (A
       expect((await mintOn(integration, owner, [ownerSeat], { role: 'owner' })).status).toBe(201);
     });
 
-    it('a person with an owner seat and a viewer seat mints a member token', async () => {
+    it('a user with an owner-role member and a viewer-role member mints a member token', async () => {
       const { user, seat } = await seated('owner');
       const { entity: viewerSeat } = await createOrganizationUser(
         { role: 'viewer' },
@@ -274,7 +274,7 @@ describe('a delegate holds what it claims, and no more than whoever grants it (A
     });
   });
 
-  describe("a person's integration: a role means what it means for the person's own token", () => {
+  describe("a user's integration: a role means what it means for the user's own token", () => {
     const personIntegration = async (user: User, claim: Claim) =>
       (
         await createIntegration({
@@ -286,7 +286,7 @@ describe('a delegate holds what it claims, and no more than whoever grants it (A
         })
       ).entity;
 
-    it('a member role reaches every organization the person sits in, capped by the seat', async () => {
+    it('a member role reaches every organization the user sits in, capped by the member', async () => {
       const { user, seat } = await seated('member');
       const integration = await personIntegration(user, { role: 'member' });
       const { key } = await mintOn(integration, user, [seat], { role: 'member' });
@@ -294,7 +294,7 @@ describe('a delegate holds what it claims, and no more than whoever grants it (A
       expect(await holds(key!, 'organization', organization.id, 'manage')).toBe(false);
     });
 
-    it("full all the way down reaches each of the person's organizations at its seat", async () => {
+    it("full all the way down reaches each of the user's organizations at its member", async () => {
       const { user, seat } = await seated('owner');
       const { entity: viewerSeat } = await createOrganizationUser(
         { role: 'viewer' },
@@ -307,7 +307,7 @@ describe('a delegate holds what it claims, and no more than whoever grants it (A
       expect(await holds(key!, 'organization', otherOrganization.id, 'operate')).toBe(false);
     });
 
-    it("only the person's own things: no role, one entry from the person", async () => {
+    it("only the user's own things: no role, one entry from the user", async () => {
       const { user, seat } = await seated('owner');
       const integration = await personIntegration(user, {
         entitlements: [entry('db:user', ['db:user', user.id], ['read', 'operate'])],
@@ -319,7 +319,7 @@ describe('a delegate holds what it claims, and no more than whoever grants it (A
   });
 
   describe("an integration's token", () => {
-    it("carries its integration's tenancy, is not a person, and acts within its claim", async () => {
+    it("carries its integration's tenancy, is not a user, and acts within its permissions", async () => {
       const { user, seat } = await seated('owner');
       const integration = await seatIntegration(seat, { role: 'owner' });
       const { key, id } = await mintOn(integration, user, [seat], { role: 'member' });
@@ -337,7 +337,7 @@ describe('a delegate holds what it claims, and no more than whoever grants it (A
       ).toBe(200);
     });
 
-    it('its person revokes it; an admin revokes a member token but not a full one', async () => {
+    it('its user revokes it; an admin revokes a member token but not a full one', async () => {
       const { user, seat } = await seated('owner');
       const integration = await seatIntegration(seat, { full: true });
       const member = await mintOn(integration, user, [seat], { role: 'member' });
@@ -353,7 +353,7 @@ describe('a delegate holds what it claims, and no more than whoever grants it (A
     });
   });
 
-  it('a seat token does not inherit its seat entitlements unless it claims them', async () => {
+  it('a member token does not inherit its member entitlements unless it has them', async () => {
     const { entity: user } = await createUser();
     const { entity: seat } = await createOrganizationUser(
       { role: 'member', entitlements: { manage: true } },

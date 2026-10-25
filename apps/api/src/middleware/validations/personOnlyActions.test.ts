@@ -22,7 +22,7 @@ import { tokenRouter } from '#/modules/token';
 import { createTestApp } from '#tests/createTestApp';
 import { post } from '#tests/utils/request';
 
-describe('every route names its action; a token is never a person (Aron, 2026-10-23)', () => {
+describe('every route names its action; a token is never a user (Aron, 2026-10-23)', () => {
   let user: User;
   let superadmin: User;
   let organization: Organization;
@@ -75,7 +75,7 @@ describe('every route names its action; a token is never a person (Aron, 2026-10
     await cleanupTouchedTables(db);
   });
 
-  it('a person mints a token; an owner-role token holding own on its user does not', async () => {
+  it('a user mints a token; an owner-role token holding own on its user does not', async () => {
     const person = createTestApp({
       mockUser: user,
       mockOrganizationUsers: [membership],
@@ -89,7 +89,7 @@ describe('every route names its action; a token is never a person (Aron, 2026-10
     expect((await call(key, 'POST', '/me/tokens', { name: 'k', role: 'viewer' })).status).toBe(403);
   });
 
-  it('the person-only operations refuse every token and leave the rows in place', async () => {
+  it('the user-only operations refuse every token and leave the rows in place', async () => {
     const { key } = await mint(user, 'owner');
     const { token: sibling } = await mint(user, 'viewer');
 
@@ -103,12 +103,12 @@ describe('every route names its action; a token is never a person (Aron, 2026-10
     expect((await db.user.findUniqueOrThrow({ where: { id: user.id } })).email).toBe(user.email);
   });
 
-  it("a superadmin's token passes a person-only check", async () => {
+  it("a superadmin's token passes a user-only check", async () => {
     const { key } = await mint(superadmin, 'owner');
     expect((await call(key, 'POST', '/me/tokens', { name: 'k', role: 'viewer' })).status).toBe(201);
   });
 
-  it('a viewer token reads the person and creates nothing on them', async () => {
+  it('a viewer token reads the user and creates nothing on them', async () => {
     const { key } = await mint(user, 'viewer');
     expect((await call(key, 'GET', '/me')).status).toBe(200);
     expect((await call(key, 'GET', '/me/organizations')).status).toBe(200);
@@ -118,7 +118,7 @@ describe('every route names its action; a token is never a person (Aron, 2026-10
     ).toBe(403);
   });
 
-  it('a member token creates on the person, including an organization', async () => {
+  it('a member token creates on the user, including an organization', async () => {
     const { key } = await mint(user, 'member');
     expect((await call(key, 'POST', '/me/webhookSubscriptions', webhook())).status).toBe(201);
     expect(

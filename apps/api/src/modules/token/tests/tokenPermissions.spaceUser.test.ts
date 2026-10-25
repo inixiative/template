@@ -146,7 +146,7 @@ describe('SpaceUser Token Permissions', () => {
       expect(response.status).toBe(201);
     });
 
-    it("an admin's owner-role token is created; its seat caps it at admin", async () => {
+    it("an admin's owner-role token is created; its member caps it at admin", async () => {
       const { fetch } = createApp(adminUser, [adminOrgUser], [adminSpaceUser]);
       const response = await fetch(
         post(`/api/v1/spaceUser/${adminSpaceUser.id}/tokens`, {
@@ -168,7 +168,7 @@ describe('SpaceUser Token Permissions', () => {
       expect(response.status).toBe(201);
     });
 
-    it("a member's admin-role token is created; its seat caps it at member", async () => {
+    it("a member's admin-role token is created; its member caps it at member", async () => {
       const { fetch } = createApp(memberUser, [memberOrgUser], [memberSpaceUser]);
       const response = await fetch(
         post(`/api/v1/spaceUser/${memberSpaceUser.id}/tokens`, {

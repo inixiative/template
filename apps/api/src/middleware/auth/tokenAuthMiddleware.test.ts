@@ -23,7 +23,7 @@ import { registerClearCacheHook } from '#/hooks/cache/hook';
 import { tokenAuthMiddleware } from '#/middleware/auth/tokenAuthMiddleware';
 import { createTestApp } from '#tests/createTestApp';
 
-// Membership and user changes reach the next request through the cache hooks the app registers.
+// Member and user changes reach the next request through the cache hooks the app registers.
 beforeAll(() => registerClearCacheHook());
 afterAll(async () => {
   unregisterDbHook('clearCache');
@@ -104,7 +104,7 @@ const rename = (path: string, headers: Record<string, string>) =>
     body: JSON.stringify({ name: `renamed-${randomUUID().slice(0, 6)}` }),
   });
 
-describe('an OrganizationUser token follows its membership, not the cached token', () => {
+describe('an OrganizationUser token follows its member row, not the cached token', () => {
   let organization: Organization;
   let organizationPath: string;
 
@@ -149,7 +149,7 @@ describe('an OrganizationUser token follows its membership, not the cached token
     expect((await readMe(headers)).status).toBe(401);
   });
 
-  it('a soft-deleted membership is refused', async () => {
+  it('a soft-deleted member row is refused', async () => {
     const membership = await member('owner');
     const headers = await organizationUserToken(membership);
     expect((await rename(organizationPath, headers)).status).toBe(200);
@@ -161,7 +161,7 @@ describe('an OrganizationUser token follows its membership, not the cached token
     expect((await readMe(headers)).status).toBe(401);
   });
 
-  it("a superadmin's seat token is not superadmin; their own token is, until revoked", async () => {
+  it("a superadmin's member token is not superadmin; their own token is, until revoked", async () => {
     const { entity: user } = await createUser({ platformRole: PlatformRole.superadmin });
     const seatHeaders = await organizationUserToken(await member('viewer', user));
     expect((await rename(organizationPath, seatHeaders)).status).toBe(403);
@@ -174,7 +174,7 @@ describe('an OrganizationUser token follows its membership, not the cached token
   });
 });
 
-describe('a SpaceUser token follows its membership, not the cached token', () => {
+describe('a SpaceUser token follows its member row, not the cached token', () => {
   let organization: Organization;
   let space: Space;
   let spacePath: string;
@@ -203,7 +203,7 @@ describe('a SpaceUser token follows its membership, not the cached token', () =>
     expect((await rename(spacePath, headers)).status).toBe(403);
   });
 
-  it("the space token's context names no seats: it reaches its space through its seat's table", async () => {
+  it("the space token's context names no members: it reaches its space through its member's table", async () => {
     const { spaceUser } = await spaceMember('owner');
     const headers = await spaceUserToken(spaceUser);
     const context = (await (await tokenApp.request('/echo', { headers })).json()) as {
@@ -225,7 +225,7 @@ describe('a SpaceUser token follows its membership, not the cached token', () =>
     expect((await readMe(headers)).status).toBe(401);
   });
 
-  it('removing the org membership refuses the space token', async () => {
+  it('removing the org member row refuses the space token', async () => {
     const { organizationUser, spaceUser } = await spaceMember('owner');
     const headers = await spaceUserToken(spaceUser);
     expect((await rename(spacePath, headers)).status).toBe(200);
@@ -238,7 +238,7 @@ describe('a SpaceUser token follows its membership, not the cached token', () =>
   });
 });
 
-describe('the cache hook clears the keys membership records are read under', () => {
+describe('the cache hook clears the keys member records are read under', () => {
   it('a SpaceUser write clears its full unique key', async () => {
     const { entity: organization } = await createOrganization();
     const { entity: space } = await createSpace({}, { organization });
@@ -269,7 +269,7 @@ describe('the cache hook clears the keys membership records are read under', () 
 });
 
 describe('every token type is refused once its owner is gone', () => {
-  it("a User token follows the user's memberships on the next request", async () => {
+  it("a User token follows the user's members on the next request", async () => {
     const { entity: organization } = await createOrganization();
     const { entity: membership, context } = await createOrganizationUser(
       { role: 'owner' },

@@ -128,7 +128,7 @@ describe('websocketHandler', () => {
     expect(lastFrame(sent)).toEqual({ type: 'pong' });
   });
 
-  it('authenticate keeps a token as its credential, with no person (/identify)', async () => {
+  it('authenticate keeps a token as its credential, with no user (/identify)', async () => {
     const { entity: user } = await createUser();
     const { authorization } = await createBearerToken(user);
 

@@ -140,8 +140,8 @@ describe('an integration holds entitlements and acts for its direct owner (Aron,
     await cleanupTouchedTables(db);
   });
 
-  describe("a token of a seat's integration", () => {
-    it('holds what the integration holds there, capped by the seat', async () => {
+  describe("a token of a member's integration", () => {
+    it('holds what the integration holds there, capped by the member', async () => {
       const seat = await seatOf('member', organization, (await createUser()).entity);
       const key = await tokenFor(await seatIntegration(seat, 'owner'), 'owner');
       expect(await holds(key, 'organization', organization.id, 'operate')).toBe(true);
@@ -173,12 +173,12 @@ describe('an integration holds entitlements and acts for its direct owner (Aron,
       expect(await holds(key, 'organization', organization.id, 'read')).toBe(false);
     });
 
-    it("reaches no other organization its seat's person sits in", async () => {
+    it("reaches no other organization its member's user sits in", async () => {
       const key = await tokenFor(await seatIntegration(await seatOf('member'), 'owner'), 'owner');
       expect(await holds(key, 'organization', otherOrganization.id, 'read')).toBe(false);
     });
 
-    it('acts as a token and does nothing only a person may do', async () => {
+    it('acts as a token and does nothing only a user may do', async () => {
       const seat = await seatOf('owner', organization, (await createUser()).entity);
       const key = await tokenFor(await seatIntegration(seat, 'owner'), 'owner');
       const actor = await request(key, 'GET', '/api/v1/probe/actor');
@@ -190,7 +190,7 @@ describe('an integration holds entitlements and acts for its direct owner (Aron,
       ).not.toBe(201);
     });
 
-    it('the seat demoted: the token loses it on the next request', async () => {
+    it('the member demoted: the token loses it on the next request', async () => {
       const seat = await seatOf('member', organization, (await createUser()).entity);
       const key = await tokenFor(await seatIntegration(seat, 'owner'), 'owner');
       expect(await holds(key, 'organization', organization.id, 'operate')).toBe(true);
@@ -256,27 +256,27 @@ describe('an integration holds entitlements and acts for its direct owner (Aron,
       return { status: response.status, stored: stored.entitlements };
     };
 
-    it('a member seat gives its integration operate on its organization, not manage', async () => {
+    it('a member with role member gives its integration operate on its organization, not manage', async () => {
       const operate = [entry('db:organization', ['db:organization', organization.id], ['operate'])];
       expect(await grant('member', operate)).toEqual({ status: 200, stored: operate });
       const manage = [entry('db:organization', ['db:organization', organization.id], ['manage'])];
       expect(await grant('member', manage)).toEqual({ status: 403, stored: null });
     });
 
-    it('an owner seat gives manage on one space, an admin seat cannot', async () => {
+    it('an owner-role member gives manage on one space, an admin-role member cannot', async () => {
       const manageSpace = [entry('db:space', ['db:space', space.id], ['manage'])];
       expect((await grant('owner', manageSpace)).status).toBe(200);
       expect((await grant('admin', manageSpace)).status).toBe(403);
     });
 
-    it('nobody grants from an organization they hold no seat in', async () => {
+    it('nobody grants from an organization they hold no member row in', async () => {
       const elsewhere = [
         entry('db:organization', ['db:organization', otherOrganization.id], ['read']),
       ];
       expect((await grant('owner', elsewhere)).status).toBe(403);
     });
 
-    it("a role is a ceiling: another seat's admin cannot raise an owner's integration to owner", async () => {
+    it("a role is a ceiling: another member's admin cannot raise an owner's integration to owner", async () => {
       const { entity: owner } = await createUser();
       const ownerSeat = await seatOf('owner', organization, owner);
       const integration = await seatIntegration(ownerSeat, null);
@@ -289,7 +289,7 @@ describe('an integration holds entitlements and acts for its direct owner (Aron,
       expect((await raise(owner, ownerSeat, 'owner')).status).toBe(200);
     });
 
-    it('a role above the seat holds only what the seat holds', async () => {
+    it('a role above the member holds only what the member holds', async () => {
       const { entity: writer } = await createUser();
       const seat = await seatOf('member', organization, writer);
       const integration = await seatIntegration(seat, null);
@@ -314,7 +314,7 @@ describe('an integration holds entitlements and acts for its direct owner (Aron,
   });
 
   describe('minting a token for an integration', () => {
-    it('a person who manages the integration mints one; its token, with no person, cannot', async () => {
+    it('a user who manages the integration mints one; its token, with no user, cannot', async () => {
       const { entity: writer } = await createUser();
       const seat = await seatOf('member', organization, writer);
       const integration = await seatIntegration(seat, 'member');

@@ -136,7 +136,7 @@ describe('GET /api/v1/me/inquiries/received', () => {
     expect(data.every((i) => i.status !== InquiryStatus.draft)).toBe(true);
   });
 
-  it('includes inquiries addressed to my organization and space memberships', async () => {
+  it('includes inquiries addressed to my organization and space members', async () => {
     const { entity: sender } = await createUser();
     const { entity: org } = await createOrganization();
     const { entity: space } = await createSpace({}, { organization: org });

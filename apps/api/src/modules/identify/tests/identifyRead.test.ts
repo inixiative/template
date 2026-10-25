@@ -25,7 +25,7 @@ describe('GET /identify: who the credential is, for any actor (Aron, 2026-10-26)
     },
   ];
 
-  it('a person is a User actor', async () => {
+  it('a user is a User actor', async () => {
     const { entity: user } = await createUser();
     const { fetch } = createTestApp({
       mockUser: user,

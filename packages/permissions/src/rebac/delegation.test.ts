@@ -64,8 +64,8 @@ const fromS1 = on('db:space', 's1');
 const fromSeat = on('db:organizationUser', 'r1');
 
 describe('delegation: an integration acts for its direct owner, never past it (Aron, 2026-10-25)', () => {
-  describe('an integration of an organization seat, granted against the organization by the seat', () => {
-    it('holds what the seat holds there', async () => {
+  describe('an integration of an organization member, granted against the organization by the member', () => {
+    it('holds what the member holds there', async () => {
       const integration = await heldBy(await seat('member'), [
         entitle('db:organization', fromO1, ['read', 'operate']),
       ]);
@@ -73,7 +73,7 @@ describe('delegation: an integration acts for its direct owner, never past it (A
       expect(can(integration, 'organization', o1, 'read')).toBe(true);
     });
 
-    it('holds nothing above the seat, whatever it was given', async () => {
+    it('holds nothing above the member, whatever it was given', async () => {
       const integration = await heldBy(await seat('member'), [
         entitle('db:organization', fromO1, ['manage', 'own']),
       ]);
@@ -81,7 +81,7 @@ describe('delegation: an integration acts for its direct owner, never past it (A
       expect(can(integration, 'organization', o1, 'own')).toBe(false);
     });
 
-    it("an admin seat's integration manages and does not own", async () => {
+    it("an admin member's integration manages and does not own", async () => {
       const integration = await heldBy(await seat('admin'), [
         entitle('db:organization', fromO1, ['manage', 'own']),
       ]);
@@ -89,7 +89,7 @@ describe('delegation: an integration acts for its direct owner, never past it (A
       expect(can(integration, 'organization', o1, 'own')).toBe(false);
     });
 
-    it('holds only the actions it was given, though the seat holds more', async () => {
+    it('holds only the actions it was given, though the member holds more', async () => {
       const integration = await heldBy(await seat('admin'), [
         entitle('db:organization', fromO1, ['read']),
       ]);
@@ -97,7 +97,7 @@ describe('delegation: an integration acts for its direct owner, never past it (A
       expect(can(integration, 'organization', o1, 'operate')).toBe(false);
     });
 
-    it('reaches no other organization, even one its person sits in', async () => {
+    it('reaches no other organization, even one its user sits in', async () => {
       const integration = await heldBy(await seat('owner'), [
         entitle('db:organization', fromO1, ['read']),
         entitle('db:organization', fromO9, ['read']),
@@ -106,16 +106,16 @@ describe('delegation: an integration acts for its direct owner, never past it (A
     });
   });
 
-  describe("two sources: the seat's own entitlement from the organization, and the seat's grant to its integration", () => {
+  describe("two sources: the member's own entitlement from the organization, and the member's grant to its integration", () => {
     const manageS1 = entitle('db:space', fromS1, ['read', 'operate', 'manage']);
 
-    it('a member seat the organization let manage s1 passes that on to its integration', async () => {
+    it('a member the organization let manage s1 passes that on to its integration', async () => {
       const integration = await heldBy(await seat('member', [manageS1]), [manageS1]);
       expect(can(integration, 'space', s1, 'manage')).toBe(true);
       expect(can(integration, 'space', s2, 'manage')).toBe(false);
     });
 
-    it('the seat without that entitlement passes on nothing on s1, its role still stands on the organization', async () => {
+    it('the member without that entitlement passes on nothing on s1, its role still stands on the organization', async () => {
       const integration = await heldBy(await seat('member'), [
         manageS1,
         entitle('db:organization', fromO1, ['read', 'operate']),
@@ -124,19 +124,19 @@ describe('delegation: an integration acts for its direct owner, never past it (A
       expect(can(integration, 'organization', o1, 'operate')).toBe(true);
     });
 
-    it('an entitlement the seat got from someone who no longer holds it grounds nothing', async () => {
+    it('an entitlement the member got from someone who no longer holds it grounds nothing', async () => {
       const integration = await heldBy(await seat('member', [manageS1], createPermissions()), [
         manageS1,
       ]);
       expect(can(integration, 'space', s1, 'manage')).toBe(false);
     });
 
-    it('s1 moved to another organization: the chain stops at the seat, no fetch', async () => {
+    it('s1 moved to another organization: the chain stops at the member, no fetch', async () => {
       const integration = await heldBy(await seat('member', [manageS1]), [manageS1]);
       expect(can(integration, 'space', s1Moved, 'manage')).toBe(false);
     });
 
-    it('an entitlement on the seat itself reaches the seat row, not the organization', async () => {
+    it('an entitlement on the member itself reaches the member row, not the organization', async () => {
       const integration = await heldBy(await seat('member'), [
         entitle('db:organizationUser', fromSeat, ['read']),
       ]);
@@ -145,7 +145,7 @@ describe('delegation: an integration acts for its direct owner, never past it (A
     });
   });
 
-  describe('a token of the integration: token ← integration ← seat ← organization', () => {
+  describe('a token of the integration: token ← integration ← member ← organization', () => {
     const operateO1 = entitle('db:organization', fromO1, ['read', 'operate']);
     const readO1 = entitle('db:organization', fromO1, ['read']);
     const manageO1 = entitle('db:organization', fromO1, ['read', 'operate', 'manage']);
@@ -163,7 +163,7 @@ describe('delegation: an integration acts for its direct owner, never past it (A
       expect(can(token, 'organization', o1, 'manage')).toBe(false);
     });
 
-    it('the weakest link wins: an admin token through a member seat', async () => {
+    it('the weakest link wins: an admin token through a member', async () => {
       const token = await heldBy(await heldBy(await seat('member'), [manageO1]), [manageO1]);
       expect(can(token, 'organization', o1, 'operate')).toBe(true);
       expect(can(token, 'organization', o1, 'manage')).toBe(false);

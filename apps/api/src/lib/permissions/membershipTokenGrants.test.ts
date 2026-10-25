@@ -71,7 +71,7 @@ const holds = async (rawKey: string, model: AccessorName, id: string, action: st
   return ((await response.json()) as { holds: boolean }).holds;
 };
 
-describe('a membership token holds its membership, never the user (template #210 7f651bcc)', () => {
+describe('a member token holds its member row, never the user (template #210 7f651bcc)', () => {
   let organization: Organization;
   let space: Space;
 
@@ -112,7 +112,7 @@ describe('a membership token holds its membership, never the user (template #210
     expect(await holds(rawKey, 'organization', organization.id, 'read')).toBe(false);
   });
 
-  it('a SpaceUser token below its membership holds the lesser role', async () => {
+  it('a SpaceUser token below its member row holds the lesser role', async () => {
     const { context } = await createOrganizationUser({ role: 'owner' }, { organization });
     const { entity: spaceUser } = await createSpaceUser({ role: 'owner' }, { ...context, space });
     const { rawKey, fields } = mintKey();

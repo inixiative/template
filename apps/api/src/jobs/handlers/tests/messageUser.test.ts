@@ -270,7 +270,7 @@ describe('messageUser handler', () => {
       return dispatched.at(-1)?.content.text;
     };
 
-    it("renders only the viewer projection: a hidden column and another organization's membership never print", async () => {
+    it("renders only the viewer projection: a hidden column and another organization's member row never print", async () => {
       const { user, mine } = await member();
       expect(
         await send(

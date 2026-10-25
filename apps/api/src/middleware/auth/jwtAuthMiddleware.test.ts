@@ -47,7 +47,7 @@ const signInOverHttp = async (email: string, password: string) =>
     body: JSON.stringify({ email, password }),
   });
 
-describe('a person authenticates with a JWT, never a session', () => {
+describe('a user authenticates with a JWT, never a session', () => {
   let person: Awaited<ReturnType<typeof signUpVerified>>;
   let signIn: Response;
   let handoff: PersonJwtHandoff & { user: { id: string } };
@@ -109,7 +109,7 @@ describe('a person authenticates with a JWT, never a session', () => {
     expect(body.user).not.toHaveProperty('jwtVersion');
   });
 
-  it('the JWT authenticates API requests as the person', async () => {
+  it('the JWT authenticates API requests as the user', async () => {
     const response = await readMe(bearer(handoff.token));
     expect(response.status).toBe(200);
     expect(((await response.json()) as { data: { id: string } }).data.id).toBe(person.userId);

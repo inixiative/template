@@ -60,13 +60,13 @@ prepareRequest
   - Initializes all context vars to null
   - Wraps request in db.scope(requestId)
     ↓
-jwtAuthMiddleware (person JWT)
+jwtAuthMiddleware (user JWT)
   - Verifies a JWT-shaped `Authorization: Bearer` (never `?token=`); cookies are ignored
   - Refuses a revoked JWT (401); keys or Redis unreachable → 503
   - Loads user + organizationUsers, calls setUserContext → sets up permix
     ↓
 tokenAuthMiddleware (API token)
-  - Skips if user already set (a JWT resolved the person)
+  - Skips if user already set (a JWT resolved the user)
   - Parses Authorization header or ?token=
   - Validates token hash, expiry, isActive
   - Sets token, optionally user
@@ -123,11 +123,11 @@ type AppEnv = { Variables: AppVars };
 | `db` | `Db` | Prisma client for database access |
 | `txn` | `TransactionClient \| undefined` | Active transaction client (if in txn) |
 | `app` | `Hono<AppEnv>` | App instance (for internal routing in batch API) |
-| `user` | `User \| null` | Authenticated user (person JWT or token) |
-| `organizationUsers` | `OrganizationUser[] \| null` | User's org memberships |
+| `user` | `User \| null` | Authenticated user (user JWT or token) |
+| `organizationUsers` | `OrganizationUser[] \| null` | User's org members |
 | `organizations` | `Organization[] \| null` | All orgs user belongs to (flattened) |
-| `spaceUsers` | `SpaceUser[] \| null` | User's space memberships |
-| `spaces` | `Space[] \| null` | All spaces user has access to (membership + org owner) |
+| `spaceUsers` | `SpaceUser[] \| null` | User's space members |
+| `spaces` | `Space[] \| null` | All spaces user has access to (member + org owner) |
 | `token` | `TokenWithRelations \| null` | API token with relations |
 | `spoofedBy` | `User \| null` | Original admin when spoofing |
 | `bracketQuery` | `Record<string, any>` | Parsed URL search params (bracket notation) |
@@ -219,11 +219,11 @@ export const setUserContext = async (c: Context<AppEnv>, userWithRelations: User
 };
 ```
 
-`installPermissions` (`apps/api/src/lib/context/installPermissions.ts`) is the one place a request's table is built, for every credential: login, token sign-in, spoof, batch sub-requests and batch refresh. It replaces whatever the table held, sets the actor (`{ id: token.id, model: Token, ownerModel }` when a token is present, otherwise `{ id: user.id, model: User }`), sets the superadmin flag (from the request's person, or the person behind a User, OrganizationUser or SpaceUser token), and installs either the person's table or the token's claim over its holder. Every token goes through `setTokenContext`, which never sets a user: a User token carries its person's seats as context, any other token none.
+`installPermissions` (`apps/api/src/lib/context/installPermissions.ts`) is the one place a request's table is built, for every credential: login, token sign-in, spoof, batch sub-requests and batch refresh. It replaces whatever the table held, sets the actor (`{ id: token.id, model: Token, ownerModel }` when a token is present, otherwise `{ id: user.id, model: User }`), sets the superadmin flag (from the request's user, or the user behind a User, OrganizationUser or SpaceUser token), and installs either the user's table or the token's permissions over its owner. Every token goes through `setTokenContext`, which never sets a user: a User token carries its user's members as context, any other token none.
 
 ### What It Does
 
-1. **Splits user from org memberships** - Separates for individual access
+1. **Splits user from org members** - Separates for individual access
 2. **Sets user ID on permix** - Links permissions to the authenticated user
 3. **Sets superadmin flag** - Bypasses all permission checks
 4. **Sets up user permissions** - For user-owned resources
@@ -360,7 +360,7 @@ import { getActor } from '#/lib/context/getActor';
 const { user, organization, organizationUser, space, spaceUser, token } = getActor(c);
 ```
 
-Tenancy for the current credential. `user` is the request's person only (a JWT session or a spoof); a token never sets it. `organization`, `space`, `organizationUser` and `spaceUser` come from the token's key columns, for rate-limit buckets and the like, never identity. The person a token acts for is `me(c)` (`apps/api/src/lib/context/me.ts`).
+Tenancy for the current credential. `user` is the request's user only (a JWT session or a spoof); a token never sets it. `organization`, `space`, `organizationUser` and `spaceUser` come from the token's key columns, for rate-limit buckets and the like, never identity. The user a token acts for is `me(c)` (`apps/api/src/lib/context/me.ts`).
 
 **Returns stripped objects** (relations removed to prevent circular refs):
 ```typescript
@@ -410,7 +410,7 @@ if (isSuperadmin(user)) { /* ... */ }
 
 ### refreshUserContext
 
-Located in `apps/api/src/lib/context/refreshUserContext.ts`. Reloads user's memberships and permissions mid-request.
+Located in `apps/api/src/lib/context/refreshUserContext.ts`. Reloads user's members and permissions mid-request.
 
 ```typescript
 import { refreshUserContext } from '#/lib/context/refreshUserContext';
@@ -420,13 +420,13 @@ await refreshUserContext(c);
 
 **What it does:**
 1. With a token: rereads the token row and its owners (`loadTokenContext`) and rebuilds through `setTokenContext`, so a member's token keeps exactly its own member row and a revoked token stops with a 401
-2. With a person: reloads the user with all relations via cached `findUserWithRelations` and rebuilds through `setUserContext`
+2. With a user: reloads the user with all relations via cached `findUserWithRelations` and rebuilds through `setUserContext`
 3. Either way the table is replaced, never added to
 
 **When to use:**
 - After adding/removing user from org or space
 - After changing user's role in org or space
-- When you need fresh membership data mid-request
+- When you need fresh member data mid-request
 - In batch operations between rounds (data may have changed)
 
 **Implementation:**
@@ -453,7 +453,7 @@ export const refreshUserContext = async (c: Context<AppEnv>): Promise<void> => {
 - Optimized queries: 1 query with include + 3 parallel queries
 - Much faster than sequential queries
 
-**Note:** Refreshes ALL permissions (user, org, space) to ensure consistency after membership changes.
+**Note:** Refreshes ALL permissions (user, org, space) to ensure consistency after member changes.
 
 ---
 
