@@ -10,7 +10,7 @@ import { z } from 'zod';
 
 // Recursive Zod schema for an `ActionRule` envelope. Validates the SHAPE only:
 // - delegation strings, { rel, action }, { any }, { all } structures
-// - the inner json-rules Condition under `{ rule: ... }` and `{ actor: ... }` is passed
+// - the inner json-rules Condition under `{ rule: ... }` is passed
 //   through as unknown — runtime json-rules `check()` validates it when the rule fires.
 const actionRuleBase: z.ZodType = z.lazy(() =>
   z.union([
@@ -18,7 +18,6 @@ const actionRuleBase: z.ZodType = z.lazy(() =>
     z.null(),
     z.object({ rel: z.string(), action: z.string() }).strict(),
     z.object({ rule: z.unknown() }).strict(),
-    z.object({ actor: z.unknown() }).strict(),
     z.object({ any: z.array(actionRuleBase) }).strict(),
     z.object({ all: z.array(actionRuleBase) }).strict(),
   ]),

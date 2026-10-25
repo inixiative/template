@@ -70,8 +70,8 @@ export type Entitlements = Record<string, boolean> | null;
 export const ActorModel = { User: 'User', Token: 'Token' } as const;
 export type ActorModel = (typeof ActorModel)[keyof typeof ActorModel];
 
-// Who is acting, beside what they hold: a person, or a token. The table carries identity.
-export type Actor = { id: string; model: ActorModel };
+// Who is acting: a person or a token, and its row. A rule reads it as `__actor`.
+export type Actor = { model: ActorModel; record: Record<string, unknown> };
 
 export type ActionState = EngineActionState<Action>;
 export type PermissionEntry = EnginePermissionEntry<Action>;

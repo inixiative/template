@@ -473,9 +473,9 @@ describe('rebac check', () => {
     });
   });
 
-  describe('the actor arm and the user relation', () => {
+  describe('a rule on __actor and the user relation', () => {
     const person: ActionRule = {
-      actor: { field: 'model', operator: Operator.equals, value: 'User' },
+      rule: { field: '__actor.model', operator: Operator.equals, value: 'User' },
     };
     const schema: RebacSchema = {
       permissions: {
@@ -505,13 +505,13 @@ describe('rebac check', () => {
 
     it('a person holding the action passes an actor-gated arm', async () => {
       await permix.setup({ resource: 'db:user', id: 'user-123', actions: { own: true } });
-      permix.setActor({ id: 'user-123', model: 'User' });
+      permix.setActor({ model: 'User', record: { id: 'user-123' } });
       expect(check(permix, schema, 'user', { id: 'user-123' }, 'mint')).toBe(true);
     });
 
     it('a token holding the same grant does not', async () => {
       await permix.setup({ resource: 'db:user', id: 'user-123', actions: { own: true } });
-      permix.setActor({ id: 't-1', model: 'Token' });
+      permix.setActor({ model: 'Token', record: { id: 't-1' } });
       expect(check(permix, schema, 'user', { id: 'user-123' }, 'mint')).toBe(false);
       expect(check(permix, schema, 'user', { id: 'user-123' }, 'own')).toBe(true);
     });

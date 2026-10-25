@@ -23,7 +23,6 @@ export { check as rebacCheck } from './rebac/check';
 export { rebacSchema } from './rebac/schema';
 export type {
   ActionRule,
-  ActorCheck,
   RebacSchema,
   RelationCheck,
   ResourcePermission,

@@ -4,13 +4,20 @@
  * @partOf primitive:authz, primitive:requestContext
  * @uses primitive:authz
  */
-import { ActorModel, isSuperadmin } from '@template/permissions';
+import { getRedactFields } from '@template/db';
+import { type Actor, ActorModel, isSuperadmin } from '@template/permissions';
 import type { Context } from 'hono';
+import { omit } from 'lodash-es';
 import { setupPersonPermissions } from '#/lib/permissions/setupPersonPermissions';
 import { setupTokenPermissions } from '#/lib/permissions/setupTokenPermissions';
 import type { AppEnv } from '#/types/appEnv';
 
 const personHeld = ['User', 'OrganizationUser', 'SpaceUser'];
+
+const actorOf = (model: ActorModel, record: Record<string, unknown>): Actor => ({
+  model,
+  record: omit(record, getRedactFields(model)),
+});
 
 export const installPermissions = async (c: Context<AppEnv>) => {
   const permix = c.get('permix');
@@ -18,8 +25,8 @@ export const installPermissions = async (c: Context<AppEnv>) => {
   const token = c.get('token');
 
   await permix.setup([], { replace: true });
-  if (token) permix.setActor({ id: token.id, model: ActorModel.Token });
-  else if (user) permix.setActor({ id: user.id, model: ActorModel.User });
+  if (token) permix.setActor(actorOf(ActorModel.Token, token));
+  else if (user) permix.setActor(actorOf(ActorModel.User, user));
   const heldByPerson = token && personHeld.includes(token.ownerModel) ? token.user : null;
   permix.setSuperadmin(isSuperadmin(user ?? heldByPerson));
 

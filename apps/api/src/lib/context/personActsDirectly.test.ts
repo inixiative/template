@@ -33,6 +33,7 @@ const { app } = createTestApp({
       hono.route('/api/v1/organization', organizationRouter);
       hono.route('/api/v1/batch', batchRouter);
       hono.get('/api/v1/probe/admin', validateSuperadmin, (c) => c.json({ ok: true }));
+      hono.get('/api/v1/probe/actor', (c) => c.json(c.get('permix').getActor()));
       hono.get('/api/v1/probe/who', (c) =>
         c.json({
           person: c.get('user')?.id ?? null,
@@ -81,6 +82,17 @@ describe('only a person acts directly: a JWT or a spoof (Aron, 2026-10-25)', () 
     unregisterDbHook('falsePolymorphism:delegatedKeys');
     unregisterDbHook('falsePolymorphism:delegatedKeys:upsert');
     await cleanupTouchedTables(db);
+  });
+
+  it("a token's actor is its row, minus what the redact registry hides", async () => {
+    const key = await mint('User', { user: person });
+    const actor = (await (await asKey(key, '/api/v1/probe/actor')).json()) as {
+      model: string;
+      record: Record<string, unknown>;
+    };
+    expect(actor.model).toBe('Token');
+    expect(actor.record.userId).toBe(person.id);
+    expect(actor.record).not.toHaveProperty('keyHash');
   });
 
   it('a token never makes the request a person', async () => {

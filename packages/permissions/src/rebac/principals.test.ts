@@ -75,7 +75,7 @@ const can = (
 ) => check(permix, rebacSchema, model, record as HydratedRecord, action);
 
 const acting = (permix: Awaited<ReturnType<typeof table>>, model: ActorModel, id = 'who') => {
-  permix.setActor({ id, model });
+  permix.setActor({ model, record: { id } });
   return permix;
 };
 

@@ -9,7 +9,9 @@ import { ownerActions } from '@template/permissions/rebac/ownerActions';
 import type { ActionRule, RebacSchema } from '@template/permissions/rebac/types';
 
 const highRoles = ['owner', 'admin'];
-const person: ActionRule = { actor: { field: 'model', operator: Operator.equals, value: 'User' } };
+const person: ActionRule = {
+  rule: { field: '__actor.model', operator: Operator.equals, value: 'User' },
+};
 
 export const rebacSchema: RebacSchema = {
   bridges: [],
