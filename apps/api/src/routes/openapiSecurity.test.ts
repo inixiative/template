@@ -13,22 +13,8 @@ type Spec = {
 
 const METHODS = ['get', 'post', 'put', 'patch', 'delete'] as const;
 
-const PERSON_ONLY = new Set([
-  'meCreateToken',
-  'organizationCreateToken',
-  'organizationUserCreateToken',
-  'spaceCreateToken',
-  'spaceUserCreateToken',
-  'integrationCreateToken',
-  'organizationDelete',
-  'tokenDelete',
-  'meRotateJwts',
-  'meRedact',
-]);
-
-const expectedSchemes = (path: string, operationId: string | undefined): string[] => {
+const expectedSchemes = (path: string): string[] => {
   if (path.startsWith('/api/internal')) return ['internalSecret'];
-  if (operationId && PERSON_ONLY.has(operationId)) return ['userJwt'];
   return ['userJwt', 'apiToken'];
 };
 
@@ -71,7 +57,7 @@ describe('OpenAPI security', () => {
 
     const wrong = all
       .map(({ path, method, op }) => {
-        const expectedSecurity = expectedSchemes(path, op.operationId).map((name) => ({
+        const expectedSecurity = expectedSchemes(path).map((name) => ({
           [name]: [],
         }));
         const ok =
@@ -94,15 +80,5 @@ describe('OpenAPI security', () => {
       .filter(({ name }) => !registered.includes(name));
 
     expect(unregistered).toEqual([]);
-  });
-
-  it('publishes session-only auth where a token is refused, and both credentials elsewhere', async () => {
-    const spec = await loadSpec();
-
-    expect(spec.paths?.['/api/v1/me/tokens']?.post?.security).toEqual([{ userJwt: [] }]);
-    expect(spec.paths?.['/api/v1/me/contacts']?.post?.security).toEqual([
-      { userJwt: [] },
-      { apiToken: [] },
-    ]);
   });
 });

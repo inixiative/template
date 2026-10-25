@@ -8,11 +8,11 @@ import { TokenScalarSchema } from '@template/db';
 import { ActorModel, actorOf, isSuperadmin } from '@template/permissions';
 import type { Context } from 'hono';
 import { pick } from 'lodash-es';
+import { me } from '#/lib/context/me';
 import { setupPersonPermissions } from '#/lib/permissions/setupPersonPermissions';
 import { setupTokenPermissions } from '#/lib/permissions/setupTokenPermissions';
 import type { AppEnv } from '#/types/appEnv';
 
-const personHeld = ['User', 'OrganizationUser', 'SpaceUser'];
 const tokenColumns = Object.keys(TokenScalarSchema.shape);
 
 export const installPermissions = async (c: Context<AppEnv>) => {
@@ -23,8 +23,7 @@ export const installPermissions = async (c: Context<AppEnv>) => {
   await permix.setup([], { replace: true });
   if (token) permix.setActor(actorOf(ActorModel.Token, pick(token, tokenColumns)));
   else if (user) permix.setActor(actorOf(ActorModel.User, user));
-  const heldByPerson = token && personHeld.includes(token.ownerModel) ? token.user : null;
-  permix.setSuperadmin(isSuperadmin(user ?? heldByPerson));
+  permix.setSuperadmin(isSuperadmin(me(c)));
 
   if (token) await setupTokenPermissions(c);
   else await setupPersonPermissions(c);

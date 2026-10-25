@@ -147,6 +147,18 @@ describe('only a person acts directly: a JWT or a spoof (Aron, 2026-10-25)', () 
   });
 
   describe('a superadmin', () => {
+    it("only a person is a superadmin: a superadmin's seat token is not", async () => {
+      const { entity: admin } = await createUser({ platformRole: 'superadmin' });
+      const { entity: adminSeat } = await createOrganizationUser(
+        { role: 'owner' },
+        { user: admin, organization },
+      );
+      const key = await mint('OrganizationUser', { organizationUser: adminSeat });
+      expect((await asKey(key, '/api/v1/probe/admin')).status).toBe(403);
+      const who = (await (await asKey(key, '/api/v1/probe/who')).json()) as { superadmin: boolean };
+      expect(who.superadmin).toBe(false);
+    });
+
     it("a superadmin's token passes the superadmin gate", async () => {
       const { entity: admin } = await createUser({ platformRole: 'superadmin' });
       const key = await mint('User', { user: admin });

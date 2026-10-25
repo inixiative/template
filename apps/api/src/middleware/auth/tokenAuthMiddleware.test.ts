@@ -161,9 +161,12 @@ describe('an OrganizationUser token follows its membership, not the cached token
     expect((await readMe(headers)).status).toBe(401);
   });
 
-  it('a revoked superadmin loses the reach on the next request', async () => {
+  it("a superadmin's seat token is not superadmin; their own token is, until revoked", async () => {
     const { entity: user } = await createUser({ platformRole: PlatformRole.superadmin });
-    const headers = await organizationUserToken(await member('viewer', user));
+    const seatHeaders = await organizationUserToken(await member('viewer', user));
+    expect((await rename(organizationPath, seatHeaders)).status).toBe(403);
+
+    const headers = await userToken(user);
     expect((await rename(organizationPath, headers)).status).toBe(200);
 
     await db.user.update({ where: { id: user.id }, data: { platformRole: PlatformRole.user } });

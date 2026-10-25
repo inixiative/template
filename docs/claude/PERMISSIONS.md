@@ -158,7 +158,7 @@ export const UserAction = {
 };
 ```
 
-The schema maps `'organization.create'` to `'operate'` on the user. The session actions are person-only, written as `{ all: [{ actor: model equals User }, 'operate' | 'own'] }`, so a token holding `own` still cannot mint, delete tokens, redact, rotate or delete an organization. They sit on the record each acts on (below). A superadmin passes on any credential. `personOnlyActions` lists them for OpenAPI, where their operations publish `userJwt` alone.
+The schema maps `'organization.create'` to `'operate'` on the user. The session actions are person-only, written as `{ all: [{ actor: model equals User }, 'operate' | 'own'] }`, so a token holding `own` still cannot mint, delete tokens, redact, rotate or delete an organization. They sit on the record each acts on (below). A superadmin passes on any credential.
 
 ### The Actor
 
@@ -816,7 +816,7 @@ middleware: [validatePermission(SessionAction.createToken)]               // meC
 middleware: [validatePermission(SessionAction.deleteOrganization)]        // organizationDelete
 ```
 
-Person-only is the action's rule on whichever record the route acts on (`{ all: [{ actor: model equals User }, …] }`): `token.create` on the user, an organization, a space, a seat or an integration (the record stands in for the collection); `token.delete` on the token; `organization.delete` on the organization; `user.redact` and `user.rotateJwts` on the user. A superadmin passes on any credential. `validatePermission` carries its action (`permission`), and `securityForRoute` publishes `userJwt` alone when the action is person-only. Situations: `apps/api/src/middleware/validations/personOnlyActions.test.ts`, `apps/api/src/lib/context/personActsDirectly.test.ts`.
+Person-only is the action's rule on whichever record the route acts on (`{ all: [{ actor: model equals User }, …] }`): `token.create` on the user, an organization, a space, a seat or an integration (the record stands in for the collection); `token.delete` on the token; `organization.delete` on the organization; `user.redact` and `user.rotateJwts` on the user. A superadmin passes on any credential. Situations: `apps/api/src/middleware/validations/personOnlyActions.test.ts`, `apps/api/src/lib/context/personActsDirectly.test.ts`.
 
 ---
 

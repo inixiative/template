@@ -5,27 +5,14 @@
  * @uses none
  */
 import type { RouteConfig } from '@hono/zod-openapi';
-import { personOnlyActions } from '@template/permissions/client';
-import { castArray } from 'lodash-es';
 import { securityRequirements } from '#/lib/auth/securitySchemes';
 import type { RouteArgs } from '#/lib/routeTemplates/types';
 
-const personOnly = new Set<string>(personOnlyActions);
-
-const checksPersonOnlyAction = (middleware: RouteArgs['middleware']) =>
-  castArray(middleware ?? []).some(
-    (handler) => 'permission' in handler && personOnly.has(String(handler.permission)),
-  );
-
 export const securityForRoute = ({
   internal,
-  middleware,
   security,
-}: Pick<RouteArgs, 'internal' | 'middleware' | 'security'>): NonNullable<
-  RouteConfig['security']
-> => {
+}: Pick<RouteArgs, 'internal' | 'security'>): NonNullable<RouteConfig['security']> => {
   if (security) return security;
   if (internal) return securityRequirements('internalSecret');
-  if (checksPersonOnlyAction(middleware)) return securityRequirements('userJwt');
   return securityRequirements('userJwt', 'apiToken');
 };

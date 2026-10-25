@@ -4,7 +4,6 @@ import {
   ActorModel,
   createPermissions,
   type PermissionEntry,
-  personOnlyActions,
   SessionAction,
   UserAction,
 } from '@template/permissions/client';

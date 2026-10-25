@@ -39,16 +39,6 @@ export const SessionAction = {
 } as const;
 export type SessionAction = (typeof SessionAction)[keyof typeof SessionAction];
 
-// Only a person performs these: the schema gates each on the actor being a User. The list
-// exists for OpenAPI, which publishes userJwt alone on their operations.
-export const personOnlyActions: readonly SessionAction[] = [
-  SessionAction.createToken,
-  SessionAction.deleteToken,
-  SessionAction.redactUser,
-  SessionAction.rotateUserJwts,
-  SessionAction.deleteOrganization,
-];
-
 export const UserAction = {
   ...StandardAction,
   ...SessionAction,
