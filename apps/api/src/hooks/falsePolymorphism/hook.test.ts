@@ -27,6 +27,7 @@ describe('falsePolymorphism hook', () => {
         keyHash: `h${seq}`,
         keyPrefix: `p${seq}`,
         ownerModel: 'User',
+        role: 'member',
         userId: user.id,
       },
     });
@@ -45,6 +46,7 @@ describe('falsePolymorphism hook', () => {
         keyHash: `h${seq}`,
         keyPrefix: `p${seq}`,
         ownerModel: 'Organization',
+        role: 'member',
         organizationId: org.id,
       },
     });
@@ -63,6 +65,7 @@ describe('falsePolymorphism hook', () => {
         keyHash: `h${seq}`,
         keyPrefix: `p${seq}`,
         ownerModel: 'OrganizationUser',
+        role: 'member',
         userId: orgUser.userId,
         organizationId: orgUser.organizationId,
       },
@@ -84,6 +87,7 @@ describe('falsePolymorphism hook', () => {
           keyHash: `h${seq}`,
           keyPrefix: `p${seq}`,
           ownerModel: 'User',
+          role: 'member',
           userId: user.id,
           organizationId: org.id,
         },
@@ -106,6 +110,7 @@ describe('falsePolymorphism hook', () => {
             keyHash: `h${seq1}`,
             keyPrefix: `p${seq1}`,
             ownerModel: 'User',
+            role: 'member',
             userId: user.id,
           },
           {
@@ -113,6 +118,7 @@ describe('falsePolymorphism hook', () => {
             keyHash: `h${seq2}`,
             keyPrefix: `p${seq2}`,
             ownerModel: 'User',
+            role: 'member',
             userId: user.id,
             organizationId: org.id,
           },
@@ -134,6 +140,7 @@ describe('falsePolymorphism hook', () => {
           keyHash: `h${seq}`,
           keyPrefix: `p${seq}`,
           ownerModel: 'User',
+          role: 'member',
           userId: user.id,
         },
         update: { name: 'wont-use' },
@@ -155,6 +162,7 @@ describe('falsePolymorphism hook', () => {
             keyHash: `h${seq}`,
             keyPrefix: `p${seq}`,
             ownerModel: 'User',
+            role: 'member',
             userId: user.id,
             organizationId: org.id, // Invalid - User owner can't have orgId
           },
@@ -174,6 +182,7 @@ describe('falsePolymorphism hook', () => {
           keyHash: `h${seq}`,
           keyPrefix: `p${seq}`,
           ownerModel: 'User',
+          role: 'member',
           userId: user.id,
         },
       });

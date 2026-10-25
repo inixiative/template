@@ -6,9 +6,15 @@
 import type { Condition } from '@inixiative/json-rules';
 import type { ModelName } from '@template/db';
 import { polymorphismRules } from '#/hooks/falsePolymorphism/toRules';
+import { delegateClaimRules } from '#/hooks/rules/delegateClaimRules';
+
+const both = (model: ModelName, rule: Condition): Condition =>
+  polymorphismRules[model] ? { all: [polymorphismRules[model], rule] } : rule;
 
 export const RulesRegistry: Partial<Record<ModelName, Condition>> = {
   ...polymorphismRules,
+  Integration: both('Integration', delegateClaimRules.Integration),
+  Token: both('Token', delegateClaimRules.Token),
   // Add additional rules here:
   // User: { field: 'name', operator: 'notEmpty', value: true, error: 'name required' },
 };

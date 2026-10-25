@@ -855,7 +855,7 @@ if (!permix.check('organization', action, orgId)) {
 
 ### Token Creation
 
-Every create-token route calls `createToken`, which validates the claim (`validateDelegateClaim`) and runs `canGrantDelegateClaim` against the token's holder: a token is your permissions or less. Seat token routes also require the seat's own person (`leave` on the seat). Minting is person-only (`SessionAction.createToken`).
+Every create-token route calls `createToken`, which runs `canGrantDelegateClaim` against the token's holder; the claim's shape (`full` blocks a role and entitlements, otherwise a role, entitlements or both; no `full` for Organization or Space) is a write rule in `RulesRegistry` (`apps/api/src/hooks/rules/delegateClaimRules.ts`): a token is your permissions or less. Seat token routes also require the seat's own person (`leave` on the seat). Minting is person-only (`SessionAction.createToken`).
 
 ### Token Deletion
 

@@ -3,6 +3,7 @@ import {
   DbAction,
   type HookOptions,
   HookTiming,
+  isPrismaNull,
   type ModelName,
   registerDbHook,
   type SingleAction,
@@ -13,8 +14,13 @@ import { getRule, RulesRegistry } from '#/hooks/rules/registry';
 import { shadowMerge } from '#/hooks/rules/shadowMerge';
 import { makeError } from '#/lib/errors';
 
+const withPlainNulls = (data: Record<string, unknown>): Record<string, unknown> =>
+  Object.fromEntries(
+    Object.entries(data).map(([field, value]) => [field, isPrismaNull(value) ? null : value]),
+  );
+
 const validateData = (data: Record<string, unknown>, model: ModelName): void => {
-  const result = check(getRule(model), data);
+  const result = check(getRule(model), withPlainNulls(data));
   if (result !== true)
     throw makeError({
       status: 422,

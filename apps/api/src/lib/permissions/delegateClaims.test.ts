@@ -19,6 +19,7 @@ import {
 import { check, rebacSchema } from '@template/permissions/rebac';
 import { registerClearCacheHook } from '#/hooks/cache/hook';
 import { registerDelegatedKeysHook } from '#/hooks/falsePolymorphism/delegatedKeysHook';
+import { registerRulesHook } from '#/hooks/rules/hook';
 import { tokenAuthMiddleware } from '#/middleware/auth/tokenAuthMiddleware';
 import { integrationRouter } from '#/modules/integration';
 import { meRouter } from '#/modules/me';
@@ -136,6 +137,7 @@ describe('a delegate holds what it claims, and no more than whoever grants it (A
   beforeAll(async () => {
     registerClearCacheHook();
     registerDelegatedKeysHook();
+    registerRulesHook();
     ({ entity: organization } = await createOrganization());
     ({ entity: otherOrganization } = await createOrganization());
     ({ entity: space } = await createSpace({}, { organization }));

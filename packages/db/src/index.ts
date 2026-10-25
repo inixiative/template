@@ -145,7 +145,6 @@ export {
   update,
 } from './utils/delegates';
 export { hasDeletedAt, lookupField, modelFields, SOFT_DELETE_MODELS } from './utils/fieldMetadata';
-// Prisma error narrowing
 export { isUniqueConstraintError } from './utils/isUniqueConstraintError';
 export { isWriteConflictError } from './utils/isWriteConflictError';
 // Rule references: the rows a stored rule names, as edges
@@ -166,6 +165,8 @@ export {
 } from './utils/modelNames';
 // Relation introspection, derived from the generated prismaMap (single source of truth)
 export { getModelRelations } from './utils/prismaMapRelations';
+// Prisma error narrowing
+export { isCleared, isPrismaNull } from './utils/prismaNull';
 export { revive } from './utils/revive';
 export { RULE_REFERENCEABLE_MODELS } from './utils/ruleReferenceable';
 export { RuleReferenceError } from './utils/ruleReferenceError';
