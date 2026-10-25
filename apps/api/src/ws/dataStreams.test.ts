@@ -326,7 +326,7 @@ describe('data streams (real app)', () => {
     expect(byStream.has(stream)).toBe(true);
 
     await authenticate(`Bearer ${rawKey}`);
-    expect(socket.data.userId).toBe(member.id);
+    expect(socket.data.userId).toBeNull();
     expect(byStream.has(stream)).toBe(false);
 
     sent.length = 0;

@@ -11,7 +11,6 @@ import {
   SpaceScalarSchema,
   SpaceUserScalarSchema,
 } from '@template/db';
-import { UserAction } from '@template/permissions/client';
 import { readRoute } from '#/lib/routeTemplates';
 import { validateSelfPermission } from '#/middleware/validations/validateSelfPermission';
 import { Modules } from '#/modules/modules';
@@ -27,7 +26,7 @@ const responseSchema = userResponseSchema.extend({
 
 export const meReadRoute = readRoute({
   model: Modules.me,
-  middleware: [validateSelfPermission(UserAction.identify)],
+  middleware: [validateSelfPermission('read')],
   skipId: true,
   responseSchema,
   tags: [Tags.me, Tags.user],

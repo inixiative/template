@@ -4,7 +4,7 @@
  * @partOf primitive:authz
  * @uses infrastructure:prisma
  */
-import { delegateClaimEntries, UserAction } from '@template/permissions';
+import { delegateClaimEntries } from '@template/permissions';
 import type { Context } from 'hono';
 import {
   type DelegateHolder,
@@ -14,8 +14,6 @@ import {
 } from '#/lib/permissions/delegateHolder';
 import { requestPersonEntries } from '#/lib/permissions/setupPersonPermissions';
 import type { AppEnv } from '#/types/appEnv';
-
-const knowsWhoItIs = ['OrganizationUser', 'SpaceUser'];
 
 export const setupTokenPermissions = async (c: Context<AppEnv>) => {
   const permix = c.get('permix');
@@ -28,11 +26,4 @@ export const setupTokenPermissions = async (c: Context<AppEnv>) => {
   await permix.setup(delegateClaimEntries(delegateClaimOf(token), holder.entries), {
     owner: await holderPermix(holder),
   });
-
-  if (knowsWhoItIs.includes(token.ownerModel) && token.userId)
-    await permix.setup({
-      resource: 'db:user',
-      id: token.userId,
-      actions: { [UserAction.identify]: true },
-    });
 };

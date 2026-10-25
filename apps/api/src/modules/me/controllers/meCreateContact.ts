@@ -6,13 +6,14 @@
  */
 import type { Prisma } from '@template/db';
 import { emitAppEvent } from '#/appEvents/emit';
+import { me } from '#/lib/context/me';
 import { makeController } from '#/lib/utils/makeController';
 import { meCreateContactRoute } from '#/modules/me/routes/meCreateContact';
 
 export const meCreateContactController = makeController(
   meCreateContactRoute,
   async (c, respond) => {
-    const user = c.get('user')!;
+    const user = me(c)!;
     const db = c.get('db');
     const body = c.req.valid('json');
 

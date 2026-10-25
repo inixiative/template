@@ -115,21 +115,18 @@ describe('a batch keeps every round inside its credential (Aron, 2026-10-25)', (
 
   it('a space seat token reaches no organization in a later round', async () => {
     const key = await mint({ ownerModel: 'SpaceUser' }, { spaceUser: spaceSeatA.entity });
+    const own = holdsRequest({ model: 'space', id: spaceA.id, action: 'own' });
     const [, second] = await batch(key, [
-      [{ method: 'GET', path: '/api/v1/me' }],
+      [own],
       [
         holdsRequest({ model: 'organization', id: orgA.id, action: 'own' }),
         holdsRequest({ model: 'organization', id: orgB.id, action: 'own' }),
         holdsRequest({ model: 'space', id: spaceB.id, action: 'own' }),
-        holdsRequest({ model: 'space', id: spaceA.id, action: 'own' }),
-        { method: 'GET', path: '/api/v1/me' },
+        own,
       ],
     ]);
 
-    expect(second.slice(0, 4).map(held)).toEqual([false, false, false, true]);
-    const me = (second[4].body as { data: Record<string, { id: string }[]> }).data;
-    expect(me.spaceUsers.map((seat) => seat.id)).toEqual([spaceSeatA.entity.id]);
-    expect(me.organizationUsers).toEqual([]);
+    expect(second.map(held)).toEqual([false, false, false, true]);
   });
 
   it('a user token keeps every seat of its person across rounds', async () => {

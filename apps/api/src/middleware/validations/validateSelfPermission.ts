@@ -7,11 +7,12 @@
 import type { Action } from '@template/permissions/client';
 import { check, rebacSchema } from '@template/permissions/rebac';
 import type { MiddlewareHandler } from 'hono';
+import { me } from '#/lib/context/me';
 import { makeError } from '#/lib/errors';
 import { makeMiddleware } from '#/lib/utils/makeMiddleware';
 
 const checkSelfPermission = makeMiddleware<Action>((action) => async (c, next) => {
-  const user = c.get('user');
+  const user = me(c);
   if (!user) throw makeError({ status: 401, message: 'Authentication required' });
   if (!check(c.get('permix'), rebacSchema, 'user', user, action))
     throw makeError({ status: 403, message: 'Access denied' });

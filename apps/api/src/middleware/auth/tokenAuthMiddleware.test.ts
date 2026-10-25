@@ -200,22 +200,17 @@ describe('a SpaceUser token follows its membership, not the cached token', () =>
     expect((await rename(spacePath, headers)).status).toBe(403);
   });
 
-  it("the space token's context holds its space seat without relations, and no organization seat", async () => {
+  it("the space token's context names no seats: it reaches its space through its seat's table", async () => {
     const { spaceUser } = await spaceMember('owner');
-    const response = await tokenApp.request('/echo', { headers: await spaceUserToken(spaceUser) });
-    const context = (await response.json()) as {
+    const headers = await spaceUserToken(spaceUser);
+    const context = (await (await tokenApp.request('/echo', { headers })).json()) as {
       organizationUsers: object[];
       spaceUsers: object[];
-      spaces: object[];
     };
 
     expect(context.organizationUsers).toHaveLength(0);
-    expect(context.spaceUsers).toHaveLength(1);
-    expect(context.spaceUsers[0]).not.toHaveProperty('user');
-    expect(context.spaceUsers[0]).not.toHaveProperty('organization');
-    expect(context.spaceUsers[0]).not.toHaveProperty('space');
-    expect(context.spaces).toHaveLength(1);
-    expect(context.spaces[0]).not.toHaveProperty('organization');
+    expect(context.spaceUsers).toHaveLength(0);
+    expect((await rename(spacePath, headers)).status).toBe(200);
   });
 
   it('a removed space member is refused while the token row is still cached', async () => {

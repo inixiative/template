@@ -63,8 +63,9 @@ describe('Space token bearer authentication', () => {
     expect((await request(`/space/${unrelated.id}/customers`)).status).toBe(403);
   });
 
-  it('cannot enter organization routes that require a user identity', async () => {
-    expect((await request(`/organization/${space.organizationId}`)).status).toBe(401);
+  it('reads no more of its organization than anyone may', async () => {
+    expect((await request(`/organization/${space.organizationId}`)).status).toBe(200);
+    expect((await request(`/organization/${space.organizationId}/protected`)).status).toBe(403);
   });
 
   it('keeps the token role restriction on its own space', async () => {

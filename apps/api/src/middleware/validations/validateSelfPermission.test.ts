@@ -126,9 +126,9 @@ describe('every route names its action; a token is never a person (Aron, 2026-10
     ).toBe(201);
   });
 
-  it('an OrganizationUser token knows who it is and reads nothing else of the person', async () => {
+  it('an OrganizationUser token is not its person: /me refuses it', async () => {
     const { key } = await mint(user, 'owner', 'OrganizationUser');
-    expect((await call(key, 'GET', '/me')).status).toBe(200);
+    expect((await call(key, 'GET', '/me')).status).toBe(403);
     expect((await call(key, 'GET', '/me/organizations')).status).toBe(403);
     expect((await call(key, 'GET', '/me/tokens')).status).toBe(403);
     expect((await call(key, 'POST', '/me/webhookSubscriptions', webhook())).status).toBe(403);

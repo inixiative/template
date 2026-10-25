@@ -10,6 +10,14 @@ import type { ActionRule, RebacSchema } from '@template/permissions/rebac/types'
 
 const highRoles = ['owner', 'admin'];
 const person: ActionRule = { actor: { field: 'model', operator: Operator.equals, value: 'User' } };
+const personOrTheirToken: ActionRule = {
+  actor: {
+    any: [
+      { field: 'model', operator: Operator.equals, value: 'User' },
+      { field: 'ownerModel', operator: Operator.equals, value: 'User' },
+    ],
+  },
+};
 
 export const rebacSchema: RebacSchema = {
   bridges: [],
@@ -20,7 +28,7 @@ export const rebacSchema: RebacSchema = {
         manage: 'own',
         operate: 'manage',
         read: 'operate',
-        'user.identify': 'read',
+        'user.me': { all: [personOrTheirToken, 'read'] },
         'organization.create': 'operate',
         'token.create': { all: [person, 'operate'] },
         'token.delete': { all: [person, 'operate'] },

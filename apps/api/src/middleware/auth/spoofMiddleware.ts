@@ -13,8 +13,8 @@ import { normalizeEmail } from '#/modules/user/utils/normalizeEmail';
 import type { AppEnv } from '#/types/appEnv';
 
 export const spoofMiddleware = async (c: Context<AppEnv>, next: Next) => {
-  const user = c.get('user');
-  if (!user || !isSuperadmin(c)) return next();
+  const spoofer = c.get('user') ?? c.get('token')?.user;
+  if (!spoofer || !isSuperadmin(c)) return next();
 
   const rawEmail = c.req.header('x-spoof-user-email');
   if (!rawEmail) return next();
@@ -27,9 +27,9 @@ export const spoofMiddleware = async (c: Context<AppEnv>, next: Next) => {
   const spoofedUser = await findUserWithRelations(spoofedBasic.id);
   if (!spoofedUser) return next();
 
-  c.set('spoofedBy', user);
+  c.set('spoofedBy', spoofer);
   await setUserContext(c, spoofedUser);
-  c.header('x-spoofing-user-email', user.email);
+  c.header('x-spoofing-user-email', spoofer.email);
   c.header('x-spoofed-user-email', spoofEmail);
 
   await next();

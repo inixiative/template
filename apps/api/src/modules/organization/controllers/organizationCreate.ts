@@ -4,6 +4,8 @@
  * @partOf feature:tenancy
  * @uses primitive:routeTemplates, infrastructure:prisma
  */
+
+import { me } from '#/lib/context/me';
 import { makeController } from '#/lib/utils/makeController';
 import { organizationCreateRoute } from '#/modules/organization/routes/organizationCreate';
 
@@ -11,7 +13,7 @@ export const organizationCreateController = makeController(
   organizationCreateRoute,
   async (c, respond) => {
     const db = c.get('db');
-    const user = c.get('user')!;
+    const user = me(c)!;
     const body = c.req.valid('json');
 
     const { organization, organizationUser } = await db.txn(async () => {

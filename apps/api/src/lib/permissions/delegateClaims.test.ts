@@ -319,7 +319,7 @@ describe('a delegate holds what it claims, and no more than whoever grants it (A
   });
 
   describe("an integration's token", () => {
-    it("carries its integration's tenancy and is not a person", async () => {
+    it("carries its integration's tenancy, is not a person, and acts within its claim", async () => {
       const { user, seat } = await seated('owner');
       const integration = await seatIntegration(seat, { role: 'owner' });
       const { key, id } = await mintOn(integration, user, [seat], { role: 'member' });
@@ -331,10 +331,10 @@ describe('a delegate holds what it claims, and no more than whoever grants it (A
         userId: user.id,
         spaceId: null,
       });
-      expect((await asToken(key!, 'GET', '/api/v1/me')).status).toBe(401);
+      expect((await asToken(key!, 'GET', '/api/v1/me')).status).toBe(403);
       expect(
         (await asToken(key!, 'GET', `/api/v1/organization/${organization.id}/protected`)).status,
-      ).toBe(401);
+      ).toBe(200);
     });
 
     it('its person revokes it; an admin revokes a member token but not a full one', async () => {

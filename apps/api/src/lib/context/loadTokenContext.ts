@@ -17,7 +17,7 @@ import type {
 import type { TokenWithRelations } from '#/lib/context/types';
 import { findUserWithRelations } from '#/modules/user/services/find';
 
-export type TokenContext = { token: TokenWithRelations; holder: UserWithRelations | null };
+export type TokenContext = { token: TokenWithRelations; person: UserWithRelations | null };
 
 const ownerExists = (token: TokenWithRelations): boolean => {
   switch (token.ownerModel) {
@@ -66,44 +66,9 @@ const loadOwners = async (token: Token): Promise<TokenWithRelations> => {
   };
 };
 
-const holderOf = async (token: TokenWithRelations): Promise<UserWithRelations | null> => {
-  switch (token.ownerModel) {
-    case 'User':
-      return token.user ? findUserWithRelations(token.user.id) : null;
-    case 'OrganizationUser': {
-      if (!token.organizationUser) return null;
-      const { user, organization, ...seat } = token.organizationUser;
-      return {
-        ...user,
-        organizationUsers: [seat],
-        organizations: [organization],
-        spaceUsers: [],
-        spaces: [],
-      };
-    }
-    case 'SpaceUser': {
-      if (!token.spaceUser) return null;
-      const {
-        user,
-        organization: _organization,
-        organizationUser: _organizationUser,
-        space,
-        ...seat
-      } = token.spaceUser;
-      return {
-        ...user,
-        organizationUsers: [],
-        organizations: [],
-        spaceUsers: [seat],
-        spaces: [space],
-      };
-    }
-    default:
-      return null;
-  }
-};
+const personOf = async (token: TokenWithRelations): Promise<UserWithRelations | null> =>
+  token.ownerModel === 'User' && token.user ? findUserWithRelations(token.user.id) : null;
 
-/** The context a token acts in: the token with its owners, and the seats it holds. Null when it no longer may act. */
 export const loadTokenContext = async (row: Token): Promise<TokenContext | null> => {
   if (!row.isActive) return null;
   if (row.expiresAt && row.expiresAt <= new Date()) return null;
@@ -111,8 +76,7 @@ export const loadTokenContext = async (row: Token): Promise<TokenContext | null>
   const token = await loadOwners(row);
   if (!ownerExists(token)) return null;
 
-  const holder = await holderOf(token);
-  const actsAsPerson = ['User', 'OrganizationUser', 'SpaceUser'].includes(token.ownerModel);
-  if (!holder && actsAsPerson) return null;
-  return { token, holder };
+  const person = await personOf(token);
+  if (token.ownerModel === 'User' && !person) return null;
+  return { token, person };
 };

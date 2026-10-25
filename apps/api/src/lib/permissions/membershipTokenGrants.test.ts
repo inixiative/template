@@ -71,7 +71,7 @@ const holds = async (rawKey: string, model: AccessorName, id: string, action: st
   return ((await response.json()) as { holds: boolean }).holds;
 };
 
-describe('a membership token holds its membership and knows who it is, never the user (template #210 7f651bcc)', () => {
+describe('a membership token holds its membership, never the user (template #210 7f651bcc)', () => {
   let organization: Organization;
   let space: Space;
 
@@ -84,7 +84,7 @@ describe('a membership token holds its membership and knows who it is, never the
     await cleanupTouchedTables(db);
   });
 
-  it('an OrganizationUser token: its org at its role, its own name, and nothing else', async () => {
+  it('an OrganizationUser token: its org at its role, and nothing else', async () => {
     const { entity: organizationUser, context } = await createOrganizationUser(
       { role: 'admin' },
       { organization },
@@ -95,23 +95,19 @@ describe('a membership token holds its membership and knows who it is, never the
       { organizationUser },
     );
 
-    expect(await grantsFor(rawKey)).toEqual({
-      [`db:user:${context.user.id}`]: ['user.identify'],
-    });
+    expect(await grantsFor(rawKey)).toEqual({});
     expect(await holds(rawKey, 'organization', organization.id, 'manage')).toBe(true);
     expect(await holds(rawKey, 'organization', organization.id, 'own')).toBe(false);
     expect(await holds(rawKey, 'user', context.user.id, 'read')).toBe(false);
   });
 
-  it('a SpaceUser token: its space at its role, its own name, and not the organization', async () => {
+  it('a SpaceUser token: its space at its role, and not the organization', async () => {
     const { context } = await createOrganizationUser({ role: 'admin' }, { organization });
     const { entity: spaceUser } = await createSpaceUser({ role: 'owner' }, { ...context, space });
     const { rawKey, fields } = mintKey();
     await createToken({ ownerModel: 'SpaceUser', role: 'owner', ...fields }, { spaceUser });
 
-    expect(await grantsFor(rawKey)).toEqual({
-      [`db:user:${context.user.id}`]: ['user.identify'],
-    });
+    expect(await grantsFor(rawKey)).toEqual({});
     expect(await holds(rawKey, 'space', space.id, 'own')).toBe(true);
     expect(await holds(rawKey, 'organization', organization.id, 'read')).toBe(false);
   });
@@ -126,7 +122,7 @@ describe('a membership token holds its membership and knows who it is, never the
     expect(await holds(rawKey, 'space', space.id, 'operate')).toBe(false);
   });
 
-  it("a SpaceUser token's context carries its space seat and no organization seat", async () => {
+  it('a SpaceUser token is not its person: /me refuses it', async () => {
     const { context } = await createOrganizationUser({ role: 'owner' }, { organization });
     const { entity: spaceUser } = await createSpaceUser({ role: 'member' }, { ...context, space });
     const { rawKey, fields } = mintKey();
@@ -135,16 +131,6 @@ describe('a membership token holds its membership and knows who it is, never the
     const response = await tokenApp.request('/api/v1/me', {
       headers: { authorization: `Bearer ${rawKey}` },
     });
-    expect(response.status).toBe(200);
-    const { data } = (await response.json()) as {
-      data: {
-        organizationUsers: unknown[];
-        organizations: unknown[];
-        spaceUsers: { id: string }[];
-      };
-    };
-    expect(data.spaceUsers.map((seat) => seat.id)).toEqual([spaceUser.id]);
-    expect(data.organizationUsers).toEqual([]);
-    expect(data.organizations).toEqual([]);
+    expect(response.status).toBe(403);
   });
 });

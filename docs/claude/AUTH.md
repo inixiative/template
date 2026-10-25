@@ -39,11 +39,9 @@
   - [Usage](#usage)
   - [Requirements](#requirements)
 - [Validation Middleware](#validation-middleware)
-  - [validateUser](#validateuser)
-  - [validateActor](#validateactor)
   - [validateSelfPermission](#validateselfpermission)
   - [validateSuperadmin](#validatesuperadmin)
-- [Choosing Between validateUser and validateActor](#choosing-between-validateuser-and-validateactor)
+- [Who Is a Person](#who-is-a-person)
 
 <!-- toc:end -->
 
@@ -552,28 +550,6 @@ curl -H "Authorization: Bearer <jwt>" \
 
 Use these after auth to enforce requirements:
 
-### validateUser
-
-Requires any authenticated user (person JWT or token with user):
-
-```typescript
-import { validateUser } from '#/middleware/validations/validateUser';
-
-router.get('/me', validateUser, handler);  // 401 if no user
-```
-
-### validateActor
-
-Requires `getActor(c).user`:
-
-```typescript
-import { validateActor } from '#/middleware/validations/validateActor';
-
-router.get('/resource', validateActor, handler);  // 401 if no user from getActor()
-```
-
-`getActor(c).user` falls back from `c.get('user')` to the organizationUser / spaceUser / token user. Token auth already calls `setUserContext` for User, OrganizationUser and SpaceUser tokens, so in practice both validators admit the same callers.
-
 ### validateSelfPermission
 
 Checks an action on the caller's own user entry; every `/me/*` route and every session action declares one. The person-only actions (token minting and deletion, redaction, JWT rotation, organization deletion) are actor arms in the schema, so an API token never holds them and a superadmin's token passes. See [PERMISSIONS.md](./PERMISSIONS.md#validateselfpermission).
@@ -596,15 +572,17 @@ router.get('/admin/users', validateSuperadmin, handler);  // 403 if not superadm
 
 ---
 
-## Choosing Between validateUser and validateActor
+## Who Is a Person
 
-| Credential | `c.get('user')` | `validateUser` | `validateActor` |
-|------------|-----------------|----------------|-----------------|
-| Person JWT | ✅ | ✅ | ✅ |
-| User token | ✅ | ✅ | ✅ |
-| OrganizationUser token | ✅ (scoped to its org) | ✅ | ✅ |
-| SpaceUser token | ✅ (scoped to its space) | ✅ | ✅ |
-| Organization token | ❌ (no user) | ❌ 401 | ❌ 401 |
-| Space token | ❌ (no user) | ❌ 401 | ❌ 401 |
+Only a JWT session or a superadmin spoof makes the request a person (`c.get('user')`). A token never does: it is a Token actor `{ id, model: 'Token', ownerModel }`, and what it may do is its claim over its holder's table. Routes name their action; there is no "is there a user" middleware.
 
-Organization and Space tokens are created without a `userId` (`organizationCreateToken`, `spaceCreateToken`); token auth only sets up their permissions. A route meant for them must skip both validators and rely on `validatePermission`. Use `validateUser` for `/me/*` and anything that acts as a person, then `validateSelfPermission(action)` to name what it does; the person-only actions are schema rules, not middleware.
+| Credential | `c.get('user')` | `me(c)` | `/me` (`user.me`) |
+|------------|-----------------|---------|-------------------|
+| Person JWT | the person | the person | ✅ |
+| Spoof (superadmin JWT or token) | the spoofed person | the spoofed person | ✅ |
+| User token | none | its person | ✅ within its claim |
+| OrganizationUser / SpaceUser token | none | its seat's person | ❌ 403 |
+| Integration token | none | its integration's person, if any | ❌ 403 |
+| Organization / Space token | none | none | ❌ 401 |
+
+A token held by a person (User, OrganizationUser, SpaceUser) is superadmin when its person is, and can spoof.

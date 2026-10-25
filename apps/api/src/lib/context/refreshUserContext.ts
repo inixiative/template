@@ -20,8 +20,7 @@ export const refreshUserContext = async (c: Context<AppEnv>): Promise<void> => {
     const row = await fetchOne<Token>('token', token.id);
     const context = row ? await loadTokenContext(row) : null;
     if (!context) throw makeError({ status: 401, message: 'Token no longer valid' });
-    await setTokenContext(c, context);
-    return;
+    if (!c.get('spoofedBy')) return setTokenContext(c, context);
   }
 
   const user = c.get('user');

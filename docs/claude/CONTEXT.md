@@ -360,13 +360,7 @@ import { getActor } from '#/lib/context/getActor';
 const { user, organization, organizationUser, space, spaceUser, token } = getActor(c);
 ```
 
-Unified accessor that resolves the current actor from any auth method:
-- **Person JWT**: user only
-- **User token**: user from token
-- **OrgUser token**: user + org from token's organizationUser
-- **SpaceUser token**: user + org + space from token's spaceUser
-- **Org token**: org only (no user)
-- **Space token**: space + org (no user)
+Tenancy for the current credential. `user` is the request's person only (a JWT session or a spoof); a token never sets it. `organization`, `space`, `organizationUser` and `spaceUser` come from the token's key columns, for rate-limit buckets and the like, never identity. The person a token acts for is `me(c)` (`apps/api/src/lib/context/me.ts`).
 
 **Returns stripped objects** (relations removed to prevent circular refs):
 ```typescript

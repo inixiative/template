@@ -92,7 +92,7 @@ describe('a token of an organization seat acts as that seat, never as the person
   });
 
   it('acts on its organization as its seat does', async () => {
-    expect(await status('GET', '/me')).toBe(200);
+    expect(await status('GET', '/me')).toBe(403);
     expect(await status('GET', `/organization/${organization.id}/protected`)).toBe(200);
     expect(await status('GET', `/organization/${organization.id}`)).toBe(200);
     expect(await status('PATCH', `/organization/${organization.id}`, { name: 'Renamed' })).toBe(

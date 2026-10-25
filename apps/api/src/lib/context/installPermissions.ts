@@ -10,16 +10,19 @@ import { setupPersonPermissions } from '#/lib/permissions/setupPersonPermissions
 import { setupTokenPermissions } from '#/lib/permissions/setupTokenPermissions';
 import type { AppEnv } from '#/types/appEnv';
 
-/** Rebuilds the request's permission table from its credential, replacing whatever it held. */
+const personHeld = ['User', 'OrganizationUser', 'SpaceUser'];
+
 export const installPermissions = async (c: Context<AppEnv>) => {
   const permix = c.get('permix');
   const user = c.get('user');
   const token = c.get('token');
 
   await permix.setup([], { replace: true });
-  if (token) permix.setActor({ id: token.id, model: ActorModel.Token });
+  if (token)
+    permix.setActor({ id: token.id, model: ActorModel.Token, ownerModel: token.ownerModel });
   else if (user) permix.setActor({ id: user.id, model: ActorModel.User });
-  permix.setSuperadmin(user ? isSuperadmin(user) : false);
+  const heldByPerson = token && personHeld.includes(token.ownerModel) ? token.user : null;
+  permix.setSuperadmin(isSuperadmin(user ?? heldByPerson));
 
   if (token) await setupTokenPermissions(c);
   else await setupPersonPermissions(c);

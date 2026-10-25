@@ -74,8 +74,13 @@ const can = (
   action: string,
 ) => check(permix, rebacSchema, model, record as HydratedRecord, action);
 
-const acting = (permix: Awaited<ReturnType<typeof table>>, model: ActorModel, id = 'who') => {
-  permix.setActor({ id, model });
+const acting = (
+  permix: Awaited<ReturnType<typeof table>>,
+  model: ActorModel,
+  id = 'who',
+  ownerModel: string | null = null,
+) => {
+  permix.setActor({ id, model, ownerModel });
   return permix;
 };
 
@@ -306,9 +311,23 @@ describe('no self arm: the person reaches their own rows through rel user (Aron,
       expect(can(nobody, 'user', u1, 'own')).toBe(true);
     });
 
-    it('identify and create-organization follow the table, not the actor', async () => {
+    it("/me is the person or a token the person owns, reading the person's row", async () => {
+      const readTable = () => table(grant('db:user', 'u1', 'read'));
+      expect(can(acting(await readTable(), ActorModel.User, 'u1'), 'user', u1, UserAction.me)).toBe(
+        true,
+      );
+      const theirs = acting(await readTable(), ActorModel.Token, 't1', 'User');
+      expect(can(theirs, 'user', u1, UserAction.me)).toBe(true);
+      const seats = acting(await readTable(), ActorModel.Token, 't1', 'OrganizationUser');
+      expect(can(seats, 'user', u1, UserAction.me)).toBe(false);
+      const integration = acting(await readTable(), ActorModel.Token, 't1', 'Integration');
+      expect(can(integration, 'user', u1, UserAction.me)).toBe(false);
+      const blind = acting(await table(), ActorModel.Token, 't1', 'User');
+      expect(can(blind, 'user', u1, UserAction.me)).toBe(false);
+    });
+
+    it('create-organization follows the table, not the actor', async () => {
       const readToken = acting(await table(grant('db:user', 'u1', 'read')), ActorModel.Token, 't1');
-      expect(can(readToken, 'user', u1, UserAction.identify)).toBe(true);
       expect(can(readToken, 'user', u1, UserAction.createOrganization)).toBe(false);
       const memberToken = acting(
         await table(grant('db:user', 'u1', 'operate')),
