@@ -1,4 +1,5 @@
 export { Role } from '@template/db/generated/client/enums';
+export { actorOf } from './actorOf';
 // Client
 export {
   type Action,

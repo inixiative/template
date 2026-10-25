@@ -4,20 +4,13 @@
  * @partOf primitive:authz, primitive:requestContext
  * @uses primitive:authz
  */
-import { getRedactFields } from '@template/db';
-import { type Actor, ActorModel, isSuperadmin } from '@template/permissions';
+import { ActorModel, actorOf, isSuperadmin } from '@template/permissions';
 import type { Context } from 'hono';
-import { omit } from 'lodash-es';
 import { setupPersonPermissions } from '#/lib/permissions/setupPersonPermissions';
 import { setupTokenPermissions } from '#/lib/permissions/setupTokenPermissions';
 import type { AppEnv } from '#/types/appEnv';
 
 const personHeld = ['User', 'OrganizationUser', 'SpaceUser'];
-
-const actorOf = (model: ActorModel, record: Record<string, unknown>): Actor => ({
-  model,
-  record: omit(record, getRedactFields(model)),
-});
 
 export const installPermissions = async (c: Context<AppEnv>) => {
   const permix = c.get('permix');
