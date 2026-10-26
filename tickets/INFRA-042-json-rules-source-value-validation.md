@@ -1,4 +1,4 @@
-# INFRA-039 — json-rules validates a value against its source's options
+# INFRA-042 — json-rules validates a value against its source's options
 
 **Status:** 🆕 Not Started · **Line:** INFRA · **Priority:** Medium · **Related:** Zealot ZLT-5983 (item 3), ZLT-6030 (#3025), INFRA-024
 

@@ -1,4 +1,4 @@
-# INFRA-040 — A declared tag on a lens source, passed through `toSourceQueries`
+# INFRA-043 — A declared tag on a lens source, passed through `toSourceQueries`
 
 **Status:** 🆕 Not Started · **Line:** INFRA · **Priority:** Low · **Related:** Zealot ZLT-5983 (item 2), ZLT-5975 (#2987), INFRA-024
 
