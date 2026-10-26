@@ -116,6 +116,10 @@ const yoursOrOrganizationOrSpace = (at = ''): ActionRule => ({
   any: [ownedByOrganizationOrSpace(at), actorIsItsUser(at)],
 });
 
+const ownedByMember: ActionRule = {
+  rule: { field: 'ownerModel', operator: Operator.in, value: ['OrganizationUser', 'SpaceUser'] },
+};
+
 const ownedByUser: ActionRule = {
   rule: { field: 'ownerModel', operator: Operator.equals, value: 'User' },
 };
@@ -125,6 +129,7 @@ const integrationAdministering = {
     any: [
       { all: [ownedByUser, { rel: 'user', action: 'operate' }] },
       { all: [ownedByOrganizationOrSpace(), onOwner('manage')] },
+      { all: [ownedByMember, actorIsItsUser()] },
     ],
   },
   own: { any: [actorIsItsUser(), { all: [ownedByOrganizationOrSpace(), onOwner('own')] }] },

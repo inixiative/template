@@ -615,4 +615,43 @@ describe('a delegate holds its permissions, and no more than whoever grants it (
       expect(response.status).toBe(201);
     });
   });
+
+  describe("a member's integration is created on the member row (Aron, 2026-10-26)", () => {
+    const create = (
+      user: User,
+      organizationUsers: OrganizationUser[],
+      row: OrganizationUser,
+      body: object,
+    ) =>
+      userApp(user, organizationUsers).fetch(
+        post(`/api/v1/organizationUser/${row.id}/integrations`, { name: 'i', ...body }),
+      );
+
+    it('its user creates one at or below their role, owned by the member row', async () => {
+      const { user, organizationUser } = await asMember('member');
+      const response = await create(user, [organizationUser], organizationUser, { role: 'member' });
+      expect(response.status).toBe(201);
+      const { data } = (await response.json()) as { data: Integration };
+      expect(data).toMatchObject({
+        ownerModel: 'OrganizationUser',
+        organizationId: organization.id,
+        userId: user.id,
+      });
+    });
+
+    it('its user cannot give it a role above their own', async () => {
+      const { user, organizationUser } = await asMember('member');
+      expect(
+        (await create(user, [organizationUser], organizationUser, { role: 'admin' })).status,
+      ).toBe(403);
+    });
+
+    it("an owner of the organization cannot create one on another member's row", async () => {
+      const { organizationUser } = await asMember('member');
+      const { user: owner, organizationUser: ownerMember } = await asMember('owner');
+      expect(
+        (await create(owner, [ownerMember], organizationUser, { role: 'viewer' })).status,
+      ).toBe(403);
+    });
+  });
 });
