@@ -131,7 +131,7 @@ type AppEnv = { Variables: AppVars };
 | `token` | `TokenWithRelations \| null` | API token with relations |
 | `spoofedBy` | `User \| null` | Original admin when spoofing |
 | `bracketQuery` | `Record<string, any>` | Parsed URL search params (bracket notation) |
-| `filterLens` | `LensNarrowing \| null` | Lens narrowing — controls FILTER surface (picks, enumOmits, server-enforced where). Set by route's static narrowing + scopeNarrowing middleware. NOT response shape. |
+| `filterLens` | `LensNarrowing \| null` | Lens narrowing — controls FILTER surface (picks, enumOmits, server-enforced where). Set from the route's static narrowing. NOT response shape. |
 | `permix` | `Permix` | Permission checker instance |
 | `requestId` | `string` | UUID for request tracing |
 | `resource` | `unknown` | Loaded resource from `:id` param |
@@ -183,7 +183,7 @@ export const prepareRequest = async (c: Context<AppEnv>, next: Next) => {
   // Initialize resource context to null
   c.set('resource', null);
   c.set('resourceType', null);
-  c.set('filterLens', null);  // Set by prepareMiddleware (from route's filterLens) + scopeNarrowing
+  c.set('filterLens', null);  // Set by prepareMiddleware (from route's filterLens)
 
   // Wrap in database scope for logging/tracing
   await logScope('api', () => logScope(requestId, () => db.scope(requestId, next)));
@@ -295,7 +295,7 @@ const users = await db.user.findMany({
 
 **Set by:**
 - `prepareMiddleware` (`apps/api/src/lib/routeTemplates/utils/prepareMiddleware.ts`) — its `filterLensSetter` reads the route's static `filterLens` and sets it on context
-- `scopeNarrowing` middleware — merges per-request ctx-aware where conditions into the narrowing
+- Nothing narrows it per request. A per-request value (a tenant id, the caller) is a `bind` token in the static `filterLens`, supplied by the controller as `paginate(c, delegate, { bindings })`
 
 **Example:**
 ```typescript
@@ -307,18 +307,17 @@ export const usersReadMany = readRoute({
   responseSchema,
   filterLens: {
     parent: lensFor('User'),
-    root: { picks: ['name', 'email'] },
+    root: {
+      picks: ['name', 'email'],
+      where: { field: 'organizationId', operator: 'equals', bind: 'organizationId' },
+    },
   },
-  middleware: [
-    // Optional: per-request scope
-    scopeNarrowing((c) => ({
-      root: { where: { field: 'organizationId', operator: 'equals', value: c.get('user')!.organizationId } },
-    })),
-  ],
 });
 
-// Controller — typically nothing to read; paginate() handles it
-const { data, pagination } = await paginate(c, db.user);
+// Controller — supplies the lens's bind tokens; paginate() refuses a missing one
+const { data, pagination } = await paginate(c, db.user, {
+  bindings: { organizationId: getResource<'organization'>(c).id },
+});
 ```
 
 **Used by:** `paginate()` → `buildWhereClause()` — applies picks-based whitelist + AND-merges `filterLens.root.where` into the final Prisma where. Superadmin's `skipFieldValidation` bypasses picks but still translates the where.
