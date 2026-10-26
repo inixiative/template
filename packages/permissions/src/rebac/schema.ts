@@ -257,6 +257,7 @@ export const rebacSchema: RebacSchema = {
             { rel: 'organization', action: 'assign' },
           ],
         },
+        delete: { any: ['leave', 'assign'] },
       },
     },
 
@@ -278,6 +279,7 @@ export const rebacSchema: RebacSchema = {
             { rel: 'space', action: 'assign' },
           ],
         },
+        delete: { any: ['leave', 'assign'] },
       },
     },
 
