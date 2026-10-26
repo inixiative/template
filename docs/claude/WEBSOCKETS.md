@@ -93,8 +93,8 @@ token query parameter. Only `authorization` and `x-spoof-user-email` headers cro
 identity probe. `/api/v1/identify` resolves the effective actor through normal auth/spoof
 middleware, for any credential: the socket keeps the credential whenever it identifies, so a token
 of an organization, a space, a member or an integration subscribes to whatever each channel's route
-lets its permissions read. The socket's user (`userId`) is the actor when it is a `User`; a
-token has none. Spoof and unspoof are frontend
+lets its permissions read. The socket's user (`userId`) is its `me`: the user for a JWT or spoof, the token's user for a
+User-owned token, and none for any other token. Spoof and unspoof are frontend
 operations that send new authenticate frames; `logout` clears identity and credentials. A 429 or
 5xx from `/identify` is not treated as "no user": the server
 keeps the current identity and grants and answers `{ type: 'error', action: 'authenticate',
@@ -139,9 +139,10 @@ websocket: (data) => [{
 ```
 
 `makeAppEvent` calls `deliverWSHandoffs`, which publishes to channels. A customer's segment
-membership change refetches on its owner's channel (`userReadManySegmentMemberships`,
-`organizationReadManySegmentMemberships` or `spaceReadManySegmentMemberships`), which the route
-authorizes like any other channel.
+membership change refetches on the customer's channel: `organizationReadManySegmentMemberships` or
+`spaceReadManySegmentMemberships`, or for a User the `/me` channel `meReadManySegmentMemberships`.
+A channel marked `me` in `WS_CHANNELS` is subscribed through `/me` and filed under the
+subscriber's user (`meChannel(channel, userId)`), so publishers send it to one user by id.
 
 ## Data streams
 

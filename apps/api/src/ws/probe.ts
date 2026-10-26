@@ -30,7 +30,17 @@ export type IdentityResolution =
   | { status: 'anonymous' }
   | { status: 'retryable' };
 
-type Identified = { data?: { model: 'User' | 'Token'; record: { id: string; email?: string } } };
+type Identified = {
+  data?: {
+    model: 'User' | 'Token';
+    record: { id: string; email?: string; ownerModel?: string; userId?: string | null };
+  };
+};
+
+const meOf = ({ model, record }: NonNullable<Identified['data']>): string | null => {
+  if (model === 'User') return record.id;
+  return record.ownerModel === 'User' ? (record.userId ?? null) : null;
+};
 
 export const resolveIdentity = async (headers: WSHeaders): Promise<IdentityResolution> => {
   if (!headers.authorization) return { status: 'anonymous' };
@@ -44,7 +54,7 @@ export const resolveIdentity = async (headers: WSHeaders): Promise<IdentityResol
   return {
     status: 'resolved',
     model: data.model,
-    userId: isUser ? data.record.id : null,
+    userId: meOf(data),
     email: isUser ? (data.record.email ?? null) : null,
   };
 };

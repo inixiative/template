@@ -68,34 +68,10 @@ describe('ws subscribe probe (real app)', () => {
     await cleanupTouchedTables(db);
   });
 
-  it("a user subscribes to their own segment memberships, not someone else's", async () => {
+  it('a user subscribes to their own segment memberships through /me', async () => {
     const { entity: user } = await createUser();
     const bearer = { authorization: (await createBearerToken(user)).authorization };
-    expect(
-      await canSubscribe(bearer, WS_CHANNELS.userReadManySegmentMemberships.name(user.id)),
-    ).toBe(true);
-    expect(
-      await canSubscribe(bearer, WS_CHANNELS.userReadManySegmentMemberships.name(targetUser.id)),
-    ).toBe(false);
-  });
-
-  it("a user's token subscribes to that user's segment memberships", async () => {
-    const { entity: user } = await createUser();
-    const key = randomUUID();
-    await createToken(
-      {
-        ownerModel: 'User',
-        role: 'owner',
-        keyHash: createHash('sha256').update(key).digest('hex'),
-      },
-      { user },
-    );
-    expect(
-      await canSubscribe(
-        { authorization: `Bearer ${key}` },
-        WS_CHANNELS.userReadManySegmentMemberships.name(user.id),
-      ),
-    ).toBe(true);
+    expect(await canSubscribe(bearer, WS_CHANNELS.meReadManySegmentMemberships.name())).toBe(true);
   });
 
   it('allows a channel whose route the connection could GET', async () => {
@@ -137,11 +113,11 @@ describe('ws subscribe probe (real app)', () => {
     expect(await canSubscribe(adminBearer, 'inquiryRead')).toBe(false);
   });
 
-  it('resolveIdentity answers a token as a token, with no user', async () => {
+  it("resolveIdentity answers a user's token as a token acting for its user", async () => {
     expect(await resolveIdentity(adminBearer)).toMatchObject({
       status: 'resolved',
       model: 'Token',
-      userId: null,
+      userId: superadmin.id,
     });
   });
 

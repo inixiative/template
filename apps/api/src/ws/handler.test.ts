@@ -14,6 +14,7 @@ import {
 } from '@template/db/test';
 import { WS_CHANNELS } from '@template/shared/ws';
 import { websocketHandler } from '#/ws/handler';
+import { meChannel } from '#/ws/meChannel';
 import { byChannel, byId, clearRegistry } from '#/ws/registry';
 import { subscribeToChannel } from '#/ws/subscriptions';
 import { createTestSocket } from '#tests/createTestSocket';
@@ -76,6 +77,23 @@ describe('websocketHandler', () => {
     expect(lastFrame(sent)).toEqual({ type: 'subscribed', channel });
   });
 
+  it("a /me channel is filed under the subscriber's user and confirmed by its own name", async () => {
+    const { entity: user } = await createUser();
+    const { authorization } = await createBearerToken(user);
+    const channel = WS_CHANNELS.meReadManySegmentMemberships.name();
+
+    const { socket, sent } = createTestSocket({
+      connectionId: 'c1',
+      userId: user.id,
+      headers: { authorization },
+    });
+    websocketHandler.open(socket);
+    await websocketHandler.message(socket, JSON.stringify({ action: 'subscribe', channel }));
+    expect([...(byChannel.get(meChannel(channel, user.id)) ?? [])]).toEqual(['c1']);
+    expect(byChannel.has(channel)).toBe(false);
+    expect(lastFrame(sent)).toEqual({ type: 'subscribed', channel });
+  });
+
   it('rejects a subscribe from a connection without a credential', async () => {
     const inquiry = await createTestInquiry();
     const channel = WS_CHANNELS.inquiryRead.name(inquiry.id);
@@ -128,7 +146,7 @@ describe('websocketHandler', () => {
     expect(lastFrame(sent)).toEqual({ type: 'pong' });
   });
 
-  it('authenticate keeps a token as its credential, with no user (/identify)', async () => {
+  it("authenticate keeps a user's token as its credential, acting for its user (/identify)", async () => {
     const { entity: user } = await createUser();
     const { authorization } = await createBearerToken(user);
 
@@ -138,9 +156,9 @@ describe('websocketHandler', () => {
       socket,
       JSON.stringify({ action: 'authenticate', headers: { authorization } }),
     );
-    expect(socket.data.userId).toBeNull();
+    expect(socket.data.userId).toBe(user.id);
     expect(socket.data.headers.authorization).toBe(authorization);
-    expect(lastFrame(sent)).toEqual({ type: 'identity', userId: null });
+    expect(lastFrame(sent)).toEqual({ type: 'identity', userId: user.id });
   });
 
   it('authenticate with a rejected token resolves to a null identity', async () => {

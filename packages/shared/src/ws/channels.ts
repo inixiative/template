@@ -10,8 +10,9 @@ export const WS_CHANNELS = {
   inquiryRead: {
     name: (id: string) => channelKey({ _id: 'inquiryRead', path: { id } }),
   },
-  userReadManySegmentMemberships: {
-    name: (id: string) => channelKey({ _id: 'userReadManySegmentMemberships', path: { id } }),
+  meReadManySegmentMemberships: {
+    name: () => channelKey({ _id: 'meReadManySegmentMemberships' }),
+    me: true,
   },
   organizationReadManySegmentMemberships: {
     name: (id: string) =>
