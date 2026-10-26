@@ -494,8 +494,8 @@ for (const recipient of recipients) {
 }
 ```
 
-`interpolate(template, variables, onError?, { locale, liveRefs, lens })` and
-`evaluateConditions(template, variables, onError?, liveRefs?)` take an optional
+`interpolate(template, variables, onError?, { locale, existingTargets, lens })` and
+`evaluateConditions(template, variables, onError?, existingTargets?)` take an optional
 `onError: RuleErrorSink` (`(issue: RenderIssue) => void`, `RenderIssue = { kind:
 'rule' | 'token' | 'each', path?, detail }`). Render has one behaviour: a block whose
 rule is degraded (`withRule`: a required binding missing, the lens no longer admits

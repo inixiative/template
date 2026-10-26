@@ -7,10 +7,8 @@
 import type { Condition } from '@inixiative/json-rules';
 import { assertRuleReferencesExist, ruleReferences } from '@template/db';
 import type { ProviderModel } from '@template/db/generated/client/enums';
-import {
-  customerRefLens,
-  resolvedCustomerRefLens,
-} from '#/modules/customerRef/lib/customerRefLens';
+import { customerRefLens } from '#/modules/customerRef/lib/lenses/customerRefLens';
+import { resolvedCustomerRefLens } from '#/modules/customerRef/lib/resolvedCustomerRefLens';
 
 type Candidate = {
   ownerModel: ProviderModel;

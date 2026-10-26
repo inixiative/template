@@ -8,7 +8,7 @@ import type { Condition } from '@inixiative/json-rules';
 import type { Segment } from '@template/db/generated/client/client';
 import type { ProviderModel } from '@template/db/generated/client/enums';
 import { makeError } from '#/lib/errors';
-import { ownedSegments } from '#/modules/customerRef/lib/customerRefLens';
+import { ownedSegments } from '#/modules/customerRef/lib/ownedSegments';
 import { segmentOwnerId } from '#/modules/segment/lib/segmentOwner';
 import {
   buildReferenceMap,

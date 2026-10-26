@@ -4,30 +4,30 @@
  * @partOf feature:email
  * @uses infrastructure:prisma
  */
-import { type Condition, getLensRoot, Operator } from '@inixiative/json-rules';
-import type { ModelName } from '@template/db';
+import { bindLens, type LensNarrowing } from '@inixiative/json-rules';
 import { fetchLens } from '@template/db/hydrate';
-import { lensFor } from '@template/db/lens';
-import { scalarPicks } from '@template/email/rules';
+import { senderOrganizationLens } from '#/lib/email/lenses/senderOrganizationLens';
+import { senderOrganizationUserLens } from '#/lib/email/lenses/senderOrganizationUserLens';
+import { senderSpaceLens } from '#/lib/email/lenses/senderSpaceLens';
+import { senderSpaceUserLens } from '#/lib/email/lenses/senderSpaceUserLens';
+import { senderUserLens } from '#/lib/email/lenses/senderUserLens';
 import type { Sender } from '#/lib/email/sender';
 
-type SenderRow = { model: ModelName; key: Record<string, string> };
-
-const senderRow = (sender: Sender): SenderRow | null => {
+const senderRowLens = (sender: Sender): LensNarrowing | null => {
   switch (sender.type) {
     case 'User':
-      return { model: 'User', key: { id: sender.userId } };
+      return bindLens(senderUserLens, { userId: sender.userId });
     case 'Organization':
-      return { model: 'Organization', key: { id: sender.organizationId } };
+      return bindLens(senderOrganizationLens, { organizationId: sender.organizationId });
     case 'Space':
-      return { model: 'Space', key: { id: sender.spaceId } };
+      return bindLens(senderSpaceLens, { spaceId: sender.spaceId });
     case 'OrganizationUser':
-      return {
-        model: 'OrganizationUser',
-        key: { userId: sender.userId, organizationId: sender.organizationId },
-      };
+      return bindLens(senderOrganizationUserLens, {
+        userId: sender.userId,
+        organizationId: sender.organizationId,
+      });
     case 'SpaceUser':
-      return { model: 'SpaceUser', key: { userId: sender.userId, spaceId: sender.spaceId } };
+      return bindLens(senderSpaceUserLens, { userId: sender.userId, spaceId: sender.spaceId });
     default:
       return null;
   }
@@ -36,20 +36,8 @@ const senderRow = (sender: Sender): SenderRow | null => {
 export const resolveSender = async (
   sender: Sender,
 ): Promise<Record<string, unknown> | undefined> => {
-  const row = senderRow(sender);
-  if (!row) return undefined;
-  const lens = lensFor(row.model);
-  const base = getLensRoot(lens);
-  const where: Condition = {
-    all: Object.entries(row.key).map(([field, value]) => ({
-      field,
-      operator: Operator.equals,
-      value,
-    })),
-  };
-  const [found] = await fetchLens({
-    parent: lens,
-    root: { where, ...scalarPicks(base.maps[base.mapName]?.models[base.model]?.fields ?? {}) },
-  });
+  const lens = senderRowLens(sender);
+  if (!lens) return undefined;
+  const [found] = await fetchLens(lens);
   return found;
 };

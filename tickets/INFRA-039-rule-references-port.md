@@ -4,7 +4,7 @@
 **Assignee**: Aron
 **Priority**: Medium
 **Created**: 2026-10-23
-**Updated**: 2026-10-24
+**Updated**: 2026-10-26
 **Related**: ZLT-6030, INFRA-030
 
 ---
@@ -51,6 +51,15 @@ template level with it.
    "identity". One edge reader, `ruleReferenceTargets`, returns each target's state, and callers
    adapt it. Revive reads the revived rows whole and passes them to `syncRuleReferences(model, rows)`.
 
+9. **Each lens is a static file (2026-10-26).** A lens is a serializable literal in its own file,
+   beside the others in one folder, and a variant composes through `LensNarrowing.parent`. No
+   builder function takes options, and no lens is assembled or narrowed at call time: a row or a
+   request supplies bind values to `bindLens`, nothing else. A first narrowing spells every relation
+   it turns on; a relation left out is not there.
+10. **One source-values reader (2026-10-26).** Whatever asks which rows a lens's source offers reads
+    them through `sourceQueryValues`. The template has no lens source cache, so the save gate calls
+    the reader directly; a cache and its clearing are not added here.
+
 ## Items
 
 - [x] Schema: `sourceId`, one unique.
@@ -63,6 +72,10 @@ template level with it.
 - [x] Materialized ids in the polymorphism registry; immutable edge ends.
 - [x] Static email scopes; `ownedSegments` without a caller where.
 - [x] One sync entry for save and revive; save-gate helpers in `validations/`; one edge reader.
+- [x] Static lens files: `customerRef/lib/lenses/` (`customerRefLens`, `customerRefsByIdLens`),
+  `lib/email/lenses/` (one sender row lens per sender model); the email registry's user entity.
+- [ ] Email rule lenses (`emailLens`, `scopeEmailLens`, `emailLensFor`): still assembled per call.
+  See Notes.
 
 ## Exported surface
 
@@ -100,6 +113,9 @@ Segment and email callers:
 - `withSegmentsRuleIssues`, whose reads carry the edge rows.
 - `dynamicSegmentsOf`.
 - `EMAIL_OWNER_SCOPES` / `EMAIL_SENDER_SCOPES` / `emailLensBindings` / `scopeEmailLens`.
+- `customerRef/lib/lenses/customerRefLens`, `customerRef/lib/lenses/customerRefsByIdLens`: static;
+  `resolvedCustomerRefLens`, `ownedSegments` and `customerRefReachedModels` each in their own file
+  beside them.
 
 ## Notes
 
@@ -113,6 +129,20 @@ Segment and email callers:
   gate it no longer refuses: the edge is written stamped with the committed `deletedAt`.
 - **Out-of-scope `state`.** A row outside the owner's scope reads as `missing`. A deleted row
   reads as `deleted` whoever owns it, so the state shows that a deleted row exists under that id.
+- **Source values are read live.** `deadRuleReferences` reads each scope's owner-scope id set
+  through `sourceQueryValues`, which queries on every call. Nothing on the server caches a lens
+  source's option set: the rolling-cache registry (`apps/api/src/lib/rollingCaches.ts`) is empty and
+  `cacheReference` has no lens source entries. The only cache is the admin client's React Query entry
+  for the email rule surface (`useEmailRuleSurface`, `staleTime: Infinity`).
+- **The email rule lenses are not static yet.** Each slot's first narrowing is where its relations
+  turn on, and the owner and sender scopes read columns that layer hides from later ones (the
+  recipient slot shows only `role` on `OrganizationUser`, not `organizationId`). json-rules 3.5.4
+  refuses those clamps in any later layer ("a later layer's clamp reads what its parent does not
+  show"), which is why `clampLens` writes them into the first layer per call. A narrowing has one
+  `parent`, so the static form is one first-layer literal per slot base (recipient, five sender
+  models, each registry data lens) times owner kind times sender kind. For the recipient slot, a
+  first-layer literal per kind pair projects, sources and selects exactly as `clampLens` does today;
+  the number of literals is the open question.
 - **No migration file.** The template has no migration history yet: the schema is applied with
   `db push`, and `db:baseline` refuses to run once any migration exists. A fork that has already
   cut its baseline migrates in three steps:

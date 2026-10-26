@@ -40,7 +40,6 @@ export {
   OPAQUE_SLOT,
   parseSlotLenses,
   type SlotLens,
-  scalarPicks,
   slotOf,
   splitRoot,
   systemSlot,

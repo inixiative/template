@@ -21,7 +21,7 @@ import { registerRulesHook } from '#/hooks/rules/hook';
 import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
 import { registerSegmentMemberOwnerHook } from '#/hooks/segmentMemberOwner/hook';
 import { registerSoftDeleteCascadeHook } from '#/hooks/softDeleteCascade/hook';
-import { customerRefReachedModels } from '#/modules/customerRef/lib/customerRefLens';
+import { customerRefReachedModels } from '#/modules/customerRef/lib/customerRefReachedModels';
 import { RECONCILE_TRIGGERS } from '#/modules/segment/lib/reconcileTriggers';
 import { acmeRule, memberIds } from '#/modules/segment/tests/fixtures';
 

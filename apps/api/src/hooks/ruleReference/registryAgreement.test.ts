@@ -10,7 +10,7 @@ import type { RuleLens } from '@template/shared/rules';
 import type { RULE_REFERENCE_SURFACES } from '#/hooks/ruleReference/surfaces';
 import { emailLensFor } from '#/lib/email/emailLensFor';
 import { registry } from '#/lib/email/registry';
-import { customerRefLens } from '#/modules/customerRef/lib/customerRefLens';
+import { customerRefLens } from '#/modules/customerRef/lib/lenses/customerRefLens';
 
 type IdFields = Record<string, { fields: Record<string, { isId?: boolean }> }>;
 

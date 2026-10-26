@@ -9,7 +9,8 @@ import { db, polymorphicTarget } from '@template/db';
 import type { CustomerRef, Segment } from '@template/db/generated/client/client';
 import { type ProviderModel, SegmentType } from '@template/db/generated/client/enums';
 import { withRule } from '@template/shared/rules';
-import { ownedSegments, resolvedCustomerRefLens } from '#/modules/customerRef/lib/customerRefLens';
+import { ownedSegments } from '#/modules/customerRef/lib/ownedSegments';
+import { resolvedCustomerRefLens } from '#/modules/customerRef/lib/resolvedCustomerRefLens';
 import {
   applyMembershipDiff,
   type MembershipDiff,

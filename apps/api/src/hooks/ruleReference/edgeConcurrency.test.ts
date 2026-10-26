@@ -15,7 +15,7 @@ import { registerRulesHook } from '#/hooks/rules/hook';
 import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
 import { registerSoftDeleteCascadeHook } from '#/hooks/softDeleteCascade/hook';
 import { withOwnerLock } from '#/lib/locks/withOwnerLock';
-import { customerRefLens } from '#/modules/customerRef/lib/customerRefLens';
+import { customerRefLens } from '#/modules/customerRef/lib/lenses/customerRefLens';
 
 const acmeRule = { field: 'customerUser.email', operator: Operator.endsWith, value: '@acme.test' };
 

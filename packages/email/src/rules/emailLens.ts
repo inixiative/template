@@ -128,7 +128,7 @@ const referenceableSources = Object.fromEntries(
   RULE_REFERENCEABLE_MODELS.map((model) => [model, { sources: { id: { label: 'name' } } }]),
 );
 
-export const scalarPicks = (fields: Record<string, { kind: string }>): ModelNarrowing => ({
+const scalarPicks = (fields: Record<string, { kind: string }>): ModelNarrowing => ({
   picks: Object.entries(fields)
     .filter(([, field]) => field.kind !== 'object' && field.kind !== 'bridge')
     .map(([name]) => name),

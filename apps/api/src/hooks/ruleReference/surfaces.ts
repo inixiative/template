@@ -25,7 +25,7 @@ import {
 } from '@template/email/rules';
 import type { RuleLens, RuleReference } from '@template/shared/rules';
 import { emailLensFor } from '#/lib/email/emailLensFor';
-import { resolvedCustomerRefLens } from '#/modules/customerRef/lib/customerRefLens';
+import { resolvedCustomerRefLens } from '#/modules/customerRef/lib/resolvedCustomerRefLens';
 import { segmentOwnerId } from '#/modules/segment/lib/segmentOwner';
 
 type Row = Record<string, unknown>;
