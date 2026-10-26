@@ -110,15 +110,21 @@ export const OrganizationUsersPage = ({ organizationId }: OrganizationUsersPageP
       key: 'actions',
       label: '',
       render: (orgUser: OrganizationUser) => {
-        const orgUserRecord = { ...orgUser, organizationId };
+        const member = orgUser.organizationUser;
+        const memberRecord = {
+          ...member,
+          organization: { id: member.organizationId },
+          user: { id: member.userId },
+        } as unknown as HydratedRecord;
 
         return (
           <div className="flex justify-end gap-2">
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => deleteMutation.mutate({ path: { id: orgUser.id } })}
-              show={checkPermission(permissions, 'organizationUser', orgUserRecord, 'manage')}
+              aria-label="Remove member"
+              onClick={() => deleteMutation.mutate({ path: { id: member.id } })}
+              show={checkPermission(permissions, 'organizationUser', memberRecord, 'delete')}
             >
               <Icon icon="lucide:trash-2" className="h-4 w-4 text-destructive" />
             </Button>
