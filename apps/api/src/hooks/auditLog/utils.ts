@@ -7,9 +7,23 @@ import {
   filterFields,
   getPolymorphismConfig,
   NOOP_FIELDS,
+  Prisma,
   redactSensitiveFields,
 } from '@template/db';
+import type { AuditActor } from '@template/db/lib/auditActorContext';
 import { isEqual } from 'lodash-es';
+
+export const auditActorColumns = (actor: AuditActor | null) => ({
+  actorUserId: actor?.actorUserId ?? null,
+  actorSpoofUserId: actor?.actorSpoofUserId ?? null,
+  actorTokenId: actor?.actorTokenId ?? null,
+  actorJobName: actor?.actorJobName ?? null,
+  actorIntegrationId: actor?.integrationId ?? null,
+  actor: (actor?.actor as Prisma.InputJsonValue | null) ?? Prisma.JsonNull,
+  ipAddress: actor?.ipAddress ?? null,
+  userAgent: actor?.userAgent ?? null,
+  sourceInquiryId: actor?.sourceInquiryId ?? null,
+});
 
 const getSubjectFieldValue = (model: string, field: string, record: Record<string, unknown>) => {
   switch (field) {

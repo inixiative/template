@@ -4,6 +4,8 @@
  * @partOf feature:users
  * @uses primitive:routeTemplates, infrastructure:prisma, feature:integrations
  */
+
+import { me } from '#/lib/context/me';
 import { paginate } from '#/lib/prisma/paginate';
 import { makeController } from '#/lib/utils/makeController';
 import { meReadManyIntegrationsRoute } from '#/modules/me/routes/meReadManyIntegrations';
@@ -11,7 +13,7 @@ import { meReadManyIntegrationsRoute } from '#/modules/me/routes/meReadManyInteg
 export const meReadManyIntegrationsController = makeController(
   meReadManyIntegrationsRoute,
   async (c, respond) => {
-    const user = c.get('user')!;
+    const user = me(c)!;
     const db = c.get('db');
 
     const { data, pagination } = await paginate(c, db.integration, {

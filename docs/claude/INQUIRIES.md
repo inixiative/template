@@ -147,10 +147,13 @@ Who may create is the type's `send` rule (see [Permissions](#permissions-rebac))
 | `POST` | `/api/v1/inquiry/:id/resolve` | `resolve` | Approve, deny, or request changes |
 | `DELETE` | `/api/v1/inquiry/:id/cancel` | `send` | Cancel (source only): sets `canceled`, clears `expiresAt`, soft-deletes |
 
+**Every state-changing action carries the version the actor saw.** `expectedUpdatedAt` is the inquiry's `updatedAt` as the actor read it: in the body of `PATCH`, `/send` and `/resolve`, and as a query parameter on `DELETE /cancel`. `lockInquiryAtVersion` row-locks the inquiry (`db.findForUpdate`, inside the action's `db.txn`) and answers **409** when the version moved, so an edit between reading and approving fails the approval instead of approving something nobody looked at. The status checks run on the locked row. The UI hooks send `inquiry.updatedAt` on every mutation.
+
 **Resolve body:**
 ```typescript
 {
   status: 'approved' | 'denied' | 'changesRequested';
+  expectedUpdatedAt: string;   // the updatedAt you read
   explanation?: string;
 }
 ```
@@ -339,8 +342,8 @@ Each mutation uses the include that matches what its caller needs:
 | Action | Who can perform it |
 |--------|--------------------|
 | `read` | Source user/manage-on-source-org-or-space OR target user/manage-on-target-org-or-space |
-| `send` | Source-side permission (see handler table above). For user-sourced inquiry types, `{ self: 'sourceUserId' }` is also checked — add the type to that rule's `value: []` list in `schema.ts` when creating a user-sourced handler. |
-| `resolve` | Target user (self); target org `manage` (except `transferSpace` which requires `own`); target space `manage`; superadmin bypass for `admin` targets |
+| `send` | Source-side permission (see handler table above). For user-sourced inquiry types, `{ rel: 'sourceUser', action: 'operate' }` is also checked — add the type to that rule's `value: []` list in `schema.ts` when creating a user-sourced handler. |
+| `resolve` | Target user (`rel: 'targetUser'`); target org `manage` (except `transferSpace` which requires `own`); target space `manage`; superadmin bypass for `admin` targets |
 
 ## Adding a New Handler
 
@@ -357,7 +360,7 @@ Each mutation uses the include that matches what its caller needs:
 8. Register in `handlers/index.ts`
 9. Add the new type to `InquiryType` enum in `packages/db/prisma/schema/inquiry.prisma`
 10. Run `bun run db:generate` in `packages/db/`
-11. Add a `send` permission rule in `packages/permissions/src/rebac/schema.ts`. If the source is a `User` (not an org or space), add the type string to the `value: []` list in the existing `self: 'sourceUserId'` rule block so the source user can cancel/edit/re-send from any context.
+11. Add a `send` permission rule in `packages/permissions/src/rebac/schema.ts`. If the source is a `User` (not an org or space), add the type string to the `value: []` list in the existing `rel: 'sourceUser'` rule block so the source user can cancel/edit/re-send from any context.
 
 ### Status utilities (`validations/validateInquiryStatus.ts`)
 

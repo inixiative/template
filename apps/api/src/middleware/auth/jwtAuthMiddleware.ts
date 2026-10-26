@@ -6,7 +6,7 @@
  */
 import type { Context, Next } from 'hono';
 import { errors, type JWTPayload } from 'jose';
-import { selfIssuer } from '#/lib/auth/personJwt';
+import { selfIssuer } from '#/lib/auth/userJwt';
 import { verifyIssuerJwt } from '#/lib/auth/verifyIssuerJwt';
 import { setUserContext } from '#/lib/context/setUserContext';
 import { makeError } from '#/lib/errors';
@@ -36,7 +36,7 @@ export const jwtAuthMiddleware = async (c: Context<AppEnv>, next: Next) => {
   if (!claims?.sub) throw unauthorized();
 
   const user = await findUserWithRelations(claims.sub);
-  if (!user || user.deletedAt) throw unauthorized();
+  if (!user) throw unauthorized();
   if (claims.iss === selfIssuer() && claims.ver !== user.jwtVersion) throw unauthorized();
 
   await setUserContext(c, user);

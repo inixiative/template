@@ -6,12 +6,14 @@
 import { InquiryStatus } from '@template/db/generated/client/enums';
 import { lensFor } from '@template/db/lens';
 import { readRoute } from '#/lib/routeTemplates';
+import { validatePermission } from '#/middleware/validations/validatePermission';
 import { inquiryPicks } from '#/modules/inquiry/schemas/inquiryPicks';
 import { inquiryReceivedResponseSchema } from '#/modules/inquiry/schemas/inquiryResponseSchemas';
 import { Modules } from '#/modules/modules';
 
 export const meReadManyInquiriesReceivedRoute = readRoute({
   model: Modules.me,
+  middleware: [validatePermission('read')],
   submodel: Modules.inquiry,
   action: 'received',
   many: true,

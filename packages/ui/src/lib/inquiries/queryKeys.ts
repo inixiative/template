@@ -107,6 +107,7 @@ export const inquiryFiltersToSearchFields = (
 
 export type InquiryMeta = {
   id: string;
+  updatedAt: string;
   type: InquiryType;
   sourceOrganizationId: string | null;
   sourceSpaceId: string | null;

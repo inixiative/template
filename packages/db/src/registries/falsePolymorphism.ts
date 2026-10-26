@@ -23,6 +23,7 @@ export type PolymorphicValue = ModelName | SpecialOwner;
 export type PolymorphicAxis = {
   field: string; // e.g., 'customerModel', 'ownerModel'
   fkMap: Partial<Record<PolymorphicValue, readonly string[]>>; // typeValue → required FK fields
+  delegates?: Partial<Record<PolymorphicValue, ModelName>>;
 };
 
 export type PolymorphicConfig = {
@@ -74,7 +75,9 @@ export const PolymorphismRegistry = {
           OrganizationUser: ['organizationId', 'userId'],
           Space: ['organizationId', 'spaceId'],
           SpaceUser: ['organizationId', 'spaceId', 'userId'],
+          Integration: ['integrationId'],
         },
+        delegates: { Integration: 'Integration' },
       },
     ],
   },
@@ -367,4 +370,11 @@ export const polymorphicAxis = (model: ModelName, axisField: string): Polymorphi
   );
   if (!axis) throw new Error(`${model} has no false-polymorphic axis ${axisField}`);
   return axis;
+};
+
+export const delegatedKeys = (axis: PolymorphicAxis, value: unknown): string[] => {
+  const parent = axis.delegates?.[value as PolymorphicValue];
+  if (!parent) return [];
+  const parentAxis = polymorphicAxis(parent, axis.field);
+  return [...new Set(Object.values(parentAxis.fkMap).flat())] as string[];
 };

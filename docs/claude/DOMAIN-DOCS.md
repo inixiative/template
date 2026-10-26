@@ -206,8 +206,8 @@ Domain docs are read by a model with a fixed budget per region (about 20k tokens
 - **Narrative code walkthroughs in the row.** The row points; part 4 (the doc section itself) explains.
 - **Duplicates of a rule that already exists.** Sharpen the existing row; do not add a second one next to it.
 
-- Good: `| Guard a route on a polymorphic owner: "the resource is owned by whichever of user, org or space" | **validateOwnerPermission** · primitive `apps/api/src/middleware/validations/validateOwnerPermission.ts` — fixed owner chain is validatePermission | PERMISSIONS.md § Owner-Polymorphic Models | a switch on the owner kind testing each branch |`
-- Bad: `On 2026-10-11 Aron reminded Claude that owner-polymorphic resources should use the robust validateOwnerPermission middleware, which makes gating seamless.`
+- Good: `| Guard a create or a list under an owner: "may this caller add a contact to this organization" | **validateSubmodelPermission** · primitive `apps/api/src/middleware/validations/validateSubmodelPermission.ts` — an action on the loaded record itself is validatePermission | PERMISSIONS.md § validateSubmodelPermission | a validatePermission('manage') on the parent standing in for the child's rule |`
+- Bad: `On 2026-10-26 Aron reminded Claude that collection routes should use the robust validateSubmodelPermission middleware, which makes gating seamless.`
 
 ---
 

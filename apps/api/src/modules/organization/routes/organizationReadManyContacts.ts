@@ -7,7 +7,7 @@
 import { ContactScalarSchema } from '@template/db';
 import { lensFor } from '@template/db/lens';
 import { readRoute } from '#/lib/routeTemplates';
-import { validatePermission } from '#/middleware/validations/validatePermission';
+import { validateSubmodelPermission } from '#/middleware/validations/validateSubmodelPermission';
 import { contactPicks } from '#/modules/contact/schemas/contactPicks';
 import { Modules } from '#/modules/modules';
 
@@ -21,5 +21,5 @@ export const organizationReadManyContactsRoute = readRoute({
     root: { picks: contactPicks },
   },
   responseSchema: ContactScalarSchema,
-  middleware: [validatePermission('read')],
+  middleware: [validateSubmodelPermission('read')],
 });

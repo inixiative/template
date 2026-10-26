@@ -5,7 +5,7 @@
  * @uses none
  * @constructs route
  */
-import { createRoute } from '@hono/zod-openapi';
+import { createRoute, type RouteConfig } from '@hono/zod-openapi';
 import { securityForRoute } from '#/lib/auth/routeSecurity';
 import type { RouteArgs } from '#/lib/routeTemplates/types';
 import {
@@ -37,16 +37,25 @@ export const actionRoute = <const T extends RouteArgs>(args: T) => {
   const routePath = buildRoutePath({ submodel, action, skipId, operation: 'action' });
   const routeTags = buildTags({ model, submodel, tags, admin, internal });
 
-  return createRoute({
+  const route = createRoute({
     ...routeArgs,
+    model,
+    submodel,
     operationId: buildOperationId({ action, model, submodel, admin, internal }),
     method: 'post',
     path: routePath,
     tags: routeTags,
     security: securityForRoute(args),
     description: description ?? `Performs ${action} on a ${resourceName}.`,
-    middleware: prepareMiddleware(middleware, skipId, undefined, args.includeDeleted),
+    middleware: prepareMiddleware({
+      model,
+      middleware,
+      skipId: skipId,
+      includeDeleted: args.includeDeleted,
+      route: (): RouteConfig => route,
+    }),
     request: buildRequest(args),
     responses: buildResponses(args, 200),
   });
+  return route;
 };

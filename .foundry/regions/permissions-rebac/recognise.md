@@ -31,7 +31,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - the per-record override column
 - does the loaded grant list include this action
 - load role-derived grants into the client
-- tell the engine who the actor is for self rules
+- tell the engine who is acting
 - the minimal grant reader the engine needs
 - the values the owner-kind conditions refer to
 - match on which kind of owner a row has
@@ -48,12 +48,12 @@ A moment that says any of these, or something close, is this region's. Both voic
 - typos in resource names should fail to compile
 - the resource is owned by whichever of user, org or space
 - higher actions imply the lower ones
-- delegate, relation walk, self match or condition
+- delegate, relation walk, rel-to-user walk or condition
 - is this tenant-authored rule even well formed
 - pass far-side rows only when a rule reads them
 - join to a record from a different schema in the rule
 - which actions can an override mention
-- decide access using relations, self or conditions
+- decide access using relations, the actor's own row, or conditions
 - fetch the owning org and space before deciding
 - set up the grants object for a request
 - access that depends on the parent record
@@ -68,7 +68,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - widen access on one row
 - grant-only lookup, no relation walking
 - register what this request may do
-- set the current user id for self matches
+- set the actor for __actor rule conditions
 - the interface the check engine consumes
 - bind the ids for the polymorphic match
 - a condition keyed by the owner discriminator and matching foreign key

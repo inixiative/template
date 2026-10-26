@@ -85,7 +85,7 @@ a generic `${resource}:${id}` keyer. The engine is untouched.
   wrapper stays **generic** (no `db:` logic). `AccessorName` import dropped.
 - `roles/{user,organization,space}.ts` — grants are explicit: `resource: 'db:user'` / `'db:organization'`
   / `'db:space'` (covers backend setup *and* the frontend store, which use the same helpers).
-- `rebac/ownerActions.ts`, `rebac/permissionRulesSchema.ts` — type rename;
+- `rebac/schemaHelpers.ts`, `rebac/permissionRulesSchema.ts` — type rename;
   `rebacSchema.permissions[\`db:${model}\`]`.
 - `rebac/check.test.ts` — fixtures wrapped + `db:`-keyed; grant setups qualified; **+2 bridge tests**.
 

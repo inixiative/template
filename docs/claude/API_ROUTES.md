@@ -1059,8 +1059,7 @@ Add route-level middleware via the `middleware` option:
 
 ```typescript
 import { validatePermission } from '#/middleware/validations/validatePermission';
-import { validateOwnerPermission } from '#/middleware/validations/validateOwnerPermission';
-import { validateNotToken } from '#/middleware/validations/validateNotToken';
+import { validateSubmodelPermission } from '#/middleware/validations/validateSubmodelPermission';
 
 // ReBAC permission check on loaded resource
 readRoute({
@@ -1069,19 +1068,22 @@ readRoute({
   responseSchema,
 });
 
-// Polymorphic resource permission (User or Organization owner)
-updateRoute({
-  model: 'webhookSubscription',
-  middleware: [validateOwnerPermission({ action: 'operate' })],
+// A create or a list under an owner: the action on a pseudo record of the submodel under the owner
+createRoute({
+  model: 'organization',
+  submodel: 'contact',
+  middleware: [validateSubmodelPermission('create')],
   bodySchema,
   responseSchema,
 });
 
-// Forbid token auth (person JWT only)
-createRoute({
-  model: 'token',
-  middleware: [validateNotToken],
-  bodySchema,
+// The /me router loads me(c) as the owner
+readRoute({
+  model: 'me',
+  submodel: 'integration',
+  many: true,
+  skipId: true,
+  middleware: [validateSubmodelPermission('read')],
   responseSchema,
 });
 ```

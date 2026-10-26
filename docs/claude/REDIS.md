@@ -160,7 +160,7 @@ are not counted (the batch request paid once; the skip keys on the registry-reso
 transaction, not the spoofable `x-batch-id` header). A **cost** limit — AI calls, anything that bounds
 spend — is a separate detector that must still run inside a batch; it is not an `apiRateLimit` rule.
 
-Identity comes from `getActor` (session user, token owner, token scope), the IP from the trusted
+Identity comes from the session user or the token (its user, its organization and space keys), the IP from the trusted
 `x-forwarded-for` hop bucketed to /64 (`clientIp`). Maxes resolve through `rateLimitMax(tier, c)`,
 the seam for subscriptions / feature flags (INFRA-027) — never a column on Token, Organization or Space.
 

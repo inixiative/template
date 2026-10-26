@@ -45,6 +45,8 @@ bun run --cwd packages/db test     # Run DB package tests only
 
 DB-backed tests must run with `--max-concurrency=1` to prevent cross-file interference. Every test process tracks the tables it writes in one shared set (see [Cleanup](#cleanup)); concurrent file execution would let `cleanupTouchedTables` from one file clear tables another file is still using.
 
+One API test run per database: `apps/api/tests/globalSetup.ts` takes a Postgres advisory lock (`pg_try_advisory_lock`) on a dedicated connection before it truncates, and holds it until the process exits. A second run against the same slot database fails at once with `another test run is using <database>`.
+
 ```json
 "test": "bun run --cwd ../.. with test api bun test --max-concurrency=1"
 ```

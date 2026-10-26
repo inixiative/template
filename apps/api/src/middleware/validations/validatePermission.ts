@@ -1,18 +1,16 @@
 import { hydrate } from '@template/db';
-import type { Action } from '@template/permissions/client';
-import { check, rebacSchema } from '@template/permissions/rebac';
+import { type ActionRule, check, rebacSchema } from '@template/permissions/rebac';
 import { makeError } from '#/lib/errors';
 import { makeMiddleware } from '#/lib/utils/makeMiddleware';
 
-export const validatePermission = makeMiddleware<Action>((action) => async (c, next) => {
+export const validatePermission = makeMiddleware<ActionRule>((action) => async (c, next) => {
   const resource = c.get('resource');
   const resourceType = c.get('resourceType');
   const permix = c.get('permix');
 
-  // No resource loaded = nothing to check (let route handle it)
-  if (!resource || !resourceType) return next();
+  if (!resource || !resourceType)
+    throw new Error(`validatePermission(${JSON.stringify(action)}) needs a loaded resource`);
 
-  // Hydrate with relations for ReBAC traversal (org → space, etc.)
   const hydrated = await hydrate(resourceType, resource as { id: string });
 
   if (!check(permix, rebacSchema, resourceType, hydrated, action)) {

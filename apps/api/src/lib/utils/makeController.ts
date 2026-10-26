@@ -82,8 +82,6 @@ export const makeController = <R extends RouteConfig, T>(
   );
 
   const impl = async (c: RouteContext<R, AppEnv>) => {
-    c.set('routeConfig', route);
-
     // WS subscribe probe: reaching the controller means every auth middleware passed —
     // answer without running the handler.
     if (isAuthProbe(c)) return c.body(null, 204) as unknown as TypedResponse;

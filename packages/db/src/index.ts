@@ -129,6 +129,7 @@ export {
 } from './utils/admitRuleReferences';
 // SQL utilities
 export { aliasColumns } from './utils/aliasColumns';
+export { carryDelegatedKeys } from './utils/carryDelegatedKeys';
 // Type-safe delegate helpers (pass-the-delegate pattern)
 export {
   type AnyCrudDelegate,
@@ -165,8 +166,10 @@ export {
   toAccessor,
   toModelName,
 } from './utils/modelNames';
+export { ownerColumns } from './utils/ownerColumns';
 // Relation introspection, derived from the generated prismaMap (single source of truth)
 export { getModelRelations } from './utils/prismaMapRelations';
+export { isCleared, isPrismaNull } from './utils/prismaNull';
 export { revive } from './utils/revive';
 export { RULE_REFERENCEABLE_MODELS } from './utils/ruleReferenceable';
 export { RuleReferenceError } from './utils/ruleReferenceError';

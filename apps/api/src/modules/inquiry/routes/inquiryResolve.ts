@@ -9,13 +9,14 @@ import { actionRoute } from '#/lib/routeTemplates';
 import { validatePermission } from '#/middleware/validations/validatePermission';
 import { inquiryResolutionStatusSchema } from '#/modules/inquiry/schemas/inquiryResolutionStatusSchema';
 import { inquiryReceivedResponseSchema } from '#/modules/inquiry/schemas/inquiryResponseSchemas';
+import { inquiryVersionSchema } from '#/modules/inquiry/schemas/inquiryVersionSchema';
 import { Modules } from '#/modules/modules';
 
 // Per-handler resolution fields get validated downstream against
 // `handler.resolutionInputSchema` and filtered in `resolveContent`. Pass them
 // through here instead of stripping them.
-const bodySchema = z
-  .object({
+const bodySchema = inquiryVersionSchema
+  .extend({
     status: inquiryResolutionStatusSchema,
     explanation: z.string().optional(),
   })

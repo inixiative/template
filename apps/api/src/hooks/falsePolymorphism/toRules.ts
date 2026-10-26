@@ -1,6 +1,7 @@
 import type { Condition } from '@inixiative/json-rules';
 import { Operator } from '@inixiative/json-rules';
 import {
+  delegatedKeys,
   type ModelName,
   type PolymorphicAxis,
   type PolymorphicValue,
@@ -14,7 +15,8 @@ const buildAxisRule = (model: ModelName, axis: PolymorphicAxis): Condition => {
 
   const branches = typeValues.map((typeValue) => {
     const requiredFks = axis.fkMap[typeValue] ?? [];
-    const forbiddenFks = allFks.filter((fk: string) => !requiredFks.includes(fk));
+    const carriedFks = [...requiredFks, ...delegatedKeys(axis, typeValue)];
+    const forbiddenFks = allFks.filter((fk: string) => !carriedFks.includes(fk));
 
     const conditions: Condition[] = [
       { field: axis.field, operator: Operator.equals, value: typeValue },

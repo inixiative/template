@@ -27,7 +27,7 @@
 ## Glossary
 
 **#/**  
-Alias for imports inside the same app (e.g. #/lib/context/getActor).
+Alias for imports inside the same app (e.g. #/lib/context/installPermissions).
 
 **architecture**  
 Class: system overview, request and data flow, key architectural patterns.
@@ -172,10 +172,10 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 | run this after the transaction commits; the fact that this has to be manually deferred is the signal; I'll fire the webhook inside the transaction | **onCommit** · primitive docs/claude/ARCHITECTURE.md § Data Flow › Write Path — post-commit effects; in-transaction checks belong in before hooks | code `Flow`, `sendWebhook` | — |
 | cache prisma reads in redis; the client extension for cached reads; I'll wrap the query in my own cache | **Redis cache extension** · primitive packages/db (Extensions) — cache Prisma reads in Redis via a client extension | part 4 | — |
 | lint or test every package from the root; one command across all packages; I'll run the command in each package | **Root workspace scripts** · primitive FEATURES.md § Core Platform — Run from root instead of per-package commands. | code `typecheck` | — |
-| prepare org context before a permission check; set up the org for the permission engine; I'll pass the org id into the check manually | **setupOrgContext** · primitive @template/permissions — prepare organization context for permission checks | part 4 | — |
+| prepare the permix table before a permission check; set up permissions for the request; I'll pass the org id into the check manually | **installPermissions** · primitive apps/api/src/lib/context/installPermissions.ts — resets permix, sets the actor and superadmin bypass, then installs the user's or token's table | part 4 | — |
 | the tsconfig for frontend apps; which tsconfig does the web app extend; I'll extend the react preset directly from the app | **tsconfig.frontend.json** · primitive tsconfig.frontend.json — Frontend apps; packages/ui and sdk extend react.json directly. | part 4 | — |
 | run all the apps with reload; start the stack through turbo; I'll start each app individually | **turbo watch local** · primitive FEATURES.md § Core Platform — One app only: turbo watch local#api; against remote secrets wrap with bun run with <env> <app>. | code `typecheck` | — |
-| gate the route on a permission; check the actor may do this action; I'll load the resource and check permix in the handler; throw 403 by hand in the route | **validatePermission** · primitive docs/claude/ARCHITECTURE.md § Request Flow — permission gates; validateNotToken to reject API-token callers | code `Flow`, `prepareRequest`, `authMiddleware`, `Session` | a handler that loads the resource itself and calls permix.check / throws 403 by hand on a route where resourceContextMiddleware + validatePermission(action) would do it (docs/claude/PERMISSIONS.md § Validation Middleware). throws HTTPException (`caller-error`, request-context-errors, inferred); makeError 403 PERMISSION_DENIED (`permission-denied`, permissions-roles) |
+| gate the route on a permission; check the actor may do this action; I'll load the resource and check permix in the handler; throw 403 by hand in the route | **validatePermission** · primitive docs/claude/ARCHITECTURE.md § Request Flow — permission gates; validateSubmodelPermission for a submodel create or list under an owner | code `Flow`, `prepareRequest`, `authMiddleware`, `Session` | a handler that loads the resource itself and calls permix.check / throws 403 by hand on a route where resourceContextMiddleware + validatePermission(action) would do it (docs/claude/PERMISSIONS.md § Validation Middleware). throws HTTPException (`caller-error`, request-context-errors, inferred); makeError 403 PERMISSION_DENIED (`permission-denied`, permissions-roles) |
 | load env for a command; I'll source the env file; secrets come from the secret manager per environment; run a command with the right environment | **with-env.sh** · primitive with-env.sh — Any command needing secrets; never .env files. | part 4 | `source .env.local`, dotenv loading in a script, or `infisical run --env=prod -- ...` called directly instead of `bun run with` (docs/claude/ENVIRONMENTS.md § with-env Composition; FEATURES.md › Infisical Secrets Management) |
 | importing within an app, which prefix; hash for apps inside themselves; I'll use a relative path inside the api; the in-app import alias; dot-dot-slash imports inside an app | **App imports use #/ alias** · rule docs/claude/MONOREPO.md › Path Aliases — Within an app; cross-package imports use @template/ instead. | part 4 | `../../lib/...` relative imports inside apps/api or a frontend app (docs/claude/MONOREPO.md › Path Aliases › App Imports) |
 | can I add an index file here; I'll add an index file to re-export the folder; no nested barrels; import the source file, not the folder index | **Barrels only for top-level package API** · rule docs/claude/MONOREPO.md › Avoid Barrel Files — Any new index.ts or import; intermediate barrels are banned. | part 4 | a new nested index.ts re-exporting siblings, or imports from '#/lib' instead of the source file (docs/claude/MONOREPO.md › Avoid Barrel Files) |
@@ -509,7 +509,7 @@ See `docs/claude/COMMUNICATIONS.md` for details.
 
 | Context | Alias | Example |
 |---------|-------|---------|
-| Within an app | `#/` | `import { getActor } from '#/lib/context/getActor'` |
+| Within an app | `#/` | `import { installPermissions } from '#/lib/context/installPermissions'` |
 | Shared packages | `@template/` | `import { db } from '@template/db'` |
 | Within a shared package | `@template/` | `import { log } from '@template/shared/logger'` |
 | Top-level barrel exports | Relative | `export { foo } from './foo'` |
@@ -518,7 +518,7 @@ See `docs/claude/COMMUNICATIONS.md` for details.
 
 ```typescript
 // In apps/api - use #/ for internal imports
-import { getActor } from '#/lib/context/getActor';
+import { installPermissions } from '#/lib/context/installPermissions';
 import { authMiddleware } from '#/middleware/auth/authMiddleware';
 ```
 
@@ -528,7 +528,7 @@ import { authMiddleware } from '#/middleware/auth/authMiddleware';
 // Cross-package (from anywhere)
 import { db } from '@template/db';
 import { log } from '@template/shared/logger';
-import { setupOrgContext } from '@template/permissions';
+import { createPermissions } from '@template/permissions';
 
 // Within a shared package - ALSO use @template/
 // packages/db/src/extensions/mutationLifeCycle/mutationLifeCycleExtension.ts
@@ -691,11 +691,11 @@ bun add -d <package>
 
 ```typescript
 // Good - direct imports
-import { getActor } from '#/lib/context/getActor';
+import { installPermissions } from '#/lib/context/installPermissions';
 import { emailRegistry } from '#/lib/email';
 
 // Bad - intermediate barrel
-import { getActor, emailRegistry } from '#/lib';
+import { installPermissions, emailRegistry } from '#/lib';
 ```
 
 Direct imports:

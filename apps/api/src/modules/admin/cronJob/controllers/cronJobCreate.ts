@@ -5,12 +5,13 @@
  * @uses primitive:routeTemplates, infrastructure:prisma
  */
 import { omit } from 'lodash-es';
+import { me } from '#/lib/context/me';
 import { makeController } from '#/lib/utils/makeController';
 import { cronJobCreateRoute } from '#/modules/admin/cronJob/routes/cronJobCreate';
 
 export const cronJobCreateController = makeController(cronJobCreateRoute, async (c, respond) => {
   const db = c.get('db');
-  const user = c.get('user')!;
+  const user = me(c)!;
   const body = c.req.valid('json');
 
   const cronJob = await db.cronJob.upsert({
