@@ -12,6 +12,10 @@ Use rule references (`apps/api/src/hooks/ruleReference/`), the machinery segment
 
 Build on #218 (one declaration table and hook), not the current shape.
 
+## Alternative: entitlements as their own table
+
+Store each entitlement as a row — holder (Token, Integration, OrganizationUser, SpaceUser), `resource`, anchor (polymorphic foreign key), `where`, `actions` — instead of JSON on the holder. The database then enforces the shape, deleting an anchor cascades (or soft-deletes) its entitlement rows without rule references, and "who holds what on this record" becomes a query. Install reads the rows through the same cached hydration. Weigh against the rule-reference route above before building either.
+
 ## Open
 
 - Revive: restore the removed entry, or leave it gone.
