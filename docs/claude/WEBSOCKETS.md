@@ -90,9 +90,13 @@ changes. They carry hints, not data, so they are not re-authorized per message.
 
 The WebSocket upgrade starts anonymous; credentials are sent in an `authenticate` frame, not a
 token query parameter. Only `authorization` and `x-spoof-user-email` headers cross into the
-identity probe. `/api/v1/me` resolves the effective identity through normal auth/spoof
-middleware. Spoof and unspoof are frontend operations that send new authenticate frames; `logout`
-clears identity and credentials. A 429 or 5xx from `/me` is not treated as "no user": the server
+identity probe. `/api/v1/identify` resolves the effective actor through normal auth/spoof
+middleware, for any credential: the socket keeps the credential whenever it identifies, so a token
+of an organization, a space, a member or an integration subscribes to whatever each channel's route
+lets its permissions read. The socket's user (`userId`, for pushes addressed to a user) is the actor when it is a `User`; a
+token has none. Spoof and unspoof are frontend
+operations that send new authenticate frames; `logout` clears identity and credentials. A 429 or
+5xx from `/identify` is not treated as "no user": the server
 keeps the current identity and grants and answers `{ type: 'error', action: 'authenticate',
 retryable: true }`, and the client re-sends its identity with exponential backoff. Changing the user **or** the credential (for the same user, say
 a narrower token) drops every channel and stream on the connection; re-sending the identical

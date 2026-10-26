@@ -28,6 +28,7 @@ import type {
   Serialized,
   WhereUniqueOf,
 } from '@template/db/test/factoryTypes';
+import { carryDelegatedKeys } from '@template/db/utils/carryDelegatedKeys';
 import { toAccessor } from '@template/db/utils/modelNames';
 
 const serializeEntity = <T>(obj: T): Serialized<T> => {
@@ -211,6 +212,8 @@ export const createFactory = <K extends ModelName>(
         }
       }
     }
+
+    await carryDelegatedKeys(modelName, merged);
 
     assertSelectedForeignKeys(modelName, merged);
 

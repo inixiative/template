@@ -9,6 +9,7 @@ import { InquiryStatus } from '@template/db/generated/client/enums';
 import { updateRoute } from '#/lib/routeTemplates';
 import { validatePermission } from '#/middleware/validations/validatePermission';
 import { inquirySentResponseSchema } from '#/modules/inquiry/schemas/inquiryResponseSchemas';
+import { inquiryVersionSchema } from '#/modules/inquiry/schemas/inquiryVersionSchema';
 import { Modules } from '#/modules/modules';
 
 const bodySchema = z
@@ -18,7 +19,8 @@ const bodySchema = z
       .describe('Shape depends on `type`; see GET /api/v1/inquiry/info (`types.<type>.content`).'),
     status: z.enum([InquiryStatus.draft, InquiryStatus.sent]),
   })
-  .partial();
+  .partial()
+  .extend(inquiryVersionSchema.shape);
 
 export const inquiryUpdateRoute = updateRoute({
   model: Modules.inquiry,

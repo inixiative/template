@@ -4,9 +4,9 @@
  * @partOf feature:tenancy
  * @uses primitive:authz, primitive:routeTemplates, infrastructure:prisma
  */
-import { db, type HydratedRecord, hydrate } from '@template/db';
-import { greaterRole } from '@template/permissions';
+import { db, hydrate } from '@template/db';
 import { check, rebacSchema } from '@template/permissions/rebac';
+import { roleAssignment } from '@template/permissions/rebac/schemaHelpers';
 import { getResource } from '#/lib/context/getResource';
 import { makeError } from '#/lib/errors';
 import { makeController } from '#/lib/utils/makeController';
@@ -19,13 +19,13 @@ export const spaceUserUpdateController = makeController(
     const body = c.req.valid('json');
     const permix = c.get('permix');
 
-    const hydrated = await hydrate('spaceUser', spaceUser);
-    const space = hydrated.space as HydratedRecord;
-    const targetRole = greaterRole(spaceUser.role, body.role);
-
-    if (!check(permix, rebacSchema, 'space', { ...space, role: targetRole }, 'assign')) {
-      throw makeError({ status: 403, message: `Cannot assign ${targetRole} role` });
-    }
+    const before = await hydrate('spaceUser', spaceUser);
+    const after = await hydrate('spaceUser', { ...spaceUser, role: body.role ?? spaceUser.role });
+    if (
+      !check(permix, rebacSchema, 'spaceUser', before, roleAssignment) ||
+      !check(permix, rebacSchema, 'spaceUser', after, roleAssignment)
+    )
+      throw makeError({ status: 403, message: `Cannot assign ${after.role} role` });
 
     const updated = await db.spaceUser.update({
       where: { id: spaceUser.id },

@@ -8,6 +8,7 @@ import type { OrganizationId, SpaceId, UserId } from '@template/db';
 import { InquiryResourceModel } from '@template/db/generated/client/enums';
 import type { Context } from 'hono';
 import { getResource, getResourceType } from '#/lib/context/getResource';
+import { me } from '#/lib/context/me';
 import type { AppEnv } from '#/types/appEnv';
 
 const nullSourceFields = {
@@ -48,7 +49,7 @@ export const resolveInquirySource = (c: Context<AppEnv>): InquirySourceFields =>
     };
   }
 
-  const user = c.get('user')!;
+  const user = me(c)!;
   return {
     ...nullSourceFields,
     sourceModel: InquiryResourceModel.User,

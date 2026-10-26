@@ -5,7 +5,7 @@
  * @uses primitive:routeTemplates, feature:integrations
  */
 import { createRoute } from '#/lib/routeTemplates';
-import { validatePermission } from '#/middleware/validations/validatePermission';
+import { validateSubmodelPermission } from '#/middleware/validations/validateSubmodelPermission';
 import {
   INTEGRATION_IMMUTABLE_FIELDS,
   integrationCreateBodySchema,
@@ -18,6 +18,6 @@ export const spaceCreateIntegrationRoute = createRoute({
   submodel: Modules.integration,
   bodySchema: integrationCreateBodySchema,
   responseSchema: integrationReadResponseSchema,
-  middleware: [validatePermission('manage')],
+  middleware: [validateSubmodelPermission('create')],
   sanitizeKeys: INTEGRATION_IMMUTABLE_FIELDS,
 });

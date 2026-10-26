@@ -2,39 +2,15 @@
  * @atlas
  * @kind service
  * @partOf primitive:authz
- * @uses infrastructure:prisma
+ * @uses none
  */
-import type { UserId } from '@template/db';
-import { type Entitlements, getUserPermissions } from '@template/permissions';
+import { installGrants, userGrants } from '@template/permissions/roles/userGrants';
 import type { Context } from 'hono';
-import { validateRole } from '#/lib/permissions/validateRole';
 import type { AppEnv } from '#/types/appEnv';
 
+export const contextUserGrants = (c: Context<AppEnv>, userId: string | null) =>
+  userGrants(userId, c.get('organizationUsers') ?? [], c.get('spaceUsers') ?? []);
+
 export const setupUserPermissions = async (c: Context<AppEnv>) => {
-  const permix = c.get('permix');
-  const user = c.get('user');
-  const token = c.get('token');
-
-  // No user → no user permissions
-  if (!user) return;
-
-  // Org or OrgUser tokens are org-scoped, don't get user permissions
-  if (token?.ownerModel === 'Organization' || token?.ownerModel === 'OrganizationUser') {
-    return;
-  }
-
-  // User token → restricted by token role
-  if (token?.ownerModel === 'User') {
-    await permix.setup(
-      getUserPermissions(
-        user.id as UserId,
-        validateRole(token.role),
-        token.entitlements as Entitlements,
-      ),
-    );
-    return;
-  }
-
-  // Person JWT → owner (full permissions)
-  await permix.setup(getUserPermissions(user.id as UserId));
+  await installGrants(c.get('permix'), contextUserGrants(c, c.get('user')?.id ?? null));
 };

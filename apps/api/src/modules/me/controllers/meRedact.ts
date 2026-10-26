@@ -4,12 +4,14 @@
  * @partOf feature:users
  * @uses primitive:routeTemplates
  */
+
+import { me } from '#/lib/context/me';
 import { makeController } from '#/lib/utils/makeController';
 import { meRedactRoute } from '#/modules/me/routes/meRedact';
 import { redactUser } from '#/modules/user/services/redactUser';
 
 export const meRedactController = makeController(meRedactRoute, async (c, respond) => {
-  const user = c.get('user')!;
+  const user = me(c)!;
 
   await redactUser(c, user.id);
 

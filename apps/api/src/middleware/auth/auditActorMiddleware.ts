@@ -6,48 +6,29 @@
  */
 
 import { auditActorContext } from '@template/db/lib/auditActorContext';
-import { log } from '@template/shared/logger';
 import type { Context, Next } from 'hono';
+import { pick } from 'lodash-es';
 import { clientAddress } from '#/lib/clientIp';
-import { findOwnedIntegration } from '#/modules/integration/services/findOwnedIntegration';
+import { me } from '#/lib/context/me';
 import type { AppEnv } from '#/types/appEnv';
 
-const resolveOriginIntegrationId = async (c: Context<AppEnv>): Promise<string | null> => {
-  const boundIntegrationId = c.get('token')?.integrationId ?? null;
-  if (boundIntegrationId) return boundIntegrationId;
-
-  const asserted = c.req.header('x-integration-id');
-  if (!asserted) return null;
-
-  const owned = await findOwnedIntegration(asserted, {
-    userId: c.get('user')?.id ?? null,
-    organizationIds: (c.get('organizations') ?? []).map((o) => o.id),
-    spaceIds: (c.get('spaces') ?? []).map((s) => s.id),
-  });
-  if (owned) return owned.id;
-
-  log.warn('x-integration-id not owned by the request principal — ignoring', {
-    assertedIntegrationId: asserted,
-  });
-  return null;
-};
-
 export const auditActorMiddleware = async (c: Context<AppEnv>, next: Next) => {
-  const user = c.get('user');
-  const spoofedBy = c.get('spoofedBy');
   const token = c.get('token');
+  const acting = c.get('permix').getActor();
 
   const actor = {
-    actorUserId: user?.id ?? null,
-    actorSpoofUserId: spoofedBy?.id ?? null,
+    actorUserId: me(c)?.id ?? token?.userId ?? null,
+    actorSpoofUserId: c.get('spoofedBy')?.id ?? null,
     actorTokenId: token?.id ?? null,
-    actorTokenName: token?.name ?? null,
-    actorTokenKeyPrefix: token?.keyPrefix ?? null,
+    actor:
+      acting?.model === 'User'
+        ? { model: acting.model, record: pick(acting.record, ['id', 'platformRole']) }
+        : acting,
     actorJobName: null,
     ipAddress: clientAddress(c),
     userAgent: c.req.header('user-agent') ?? null,
     sourceInquiryId: null,
-    integrationId: await resolveOriginIntegrationId(c),
+    integrationId: token?.integrationId ?? null,
     bypassSoftDeleteScope: false,
   };
 

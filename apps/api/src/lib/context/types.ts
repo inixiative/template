@@ -5,6 +5,7 @@
  * @uses infrastructure:prisma
  */
 import type {
+  Integration,
   Organization,
   OrganizationUser,
   Space,
@@ -26,4 +27,5 @@ export type TokenWithRelations = Token & {
         user: User;
       })
     | null;
+  integration: Integration | null;
 };

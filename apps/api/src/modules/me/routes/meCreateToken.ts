@@ -4,8 +4,8 @@
  * @partOf feature:users
  * @uses primitive:routeTemplates, feature:auth
  */
+
 import { createRoute } from '#/lib/routeTemplates';
-import { validateNotToken } from '#/middleware/validations/validateNotToken';
 import { Modules } from '#/modules/modules';
 import { Tags } from '#/modules/tags';
 import {
@@ -19,6 +19,5 @@ export const meCreateTokenRoute = createRoute({
   skipId: true,
   bodySchema: tokenCreateBodySchema,
   responseSchema: tokenCreateResponseSchema,
-  middleware: [validateNotToken],
   tags: [Tags.me, Tags.token],
 });

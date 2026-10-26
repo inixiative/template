@@ -119,7 +119,7 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 | Member | Use when | Not when (use instead) |
 |---|---|---|
 
-**Job: gate a route on permission** (Route permission gates: validatePermission vs validateOwnerPermission vs validateNotToken vs check) — docs/claude/PERMISSIONS.md § Validation Middleware; docs/claude/API_ROUTES.md § Middleware
+**Job: gate a route on permission** (Route permission gates: validatePermission vs validateSubmodelPermission vs check) — docs/claude/PERMISSIONS.md § Validation Middleware; docs/claude/API_ROUTES.md § Middleware
 
 *Said as:* "only certain users should be able to call this", "which permission check goes on this route", "I'll check the role at the top of the controller", "block API tokens from this endpoint", "narrow the results by what the caller can see"
 
@@ -155,7 +155,7 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 | return 200 with the record; respond from a read or update; send the data back with pagination metadata beside it; just respond ok for everything and let the payload say what happened | **respond.ok** · primitive § /lib/utils/makeController — Reads/updates; creates use respond.created, deletes respond.noContent. | part 4 | — |
 | strip fields the client must not set from the body; I'll delete organizationId off the body in the controller; don't let the caller send ownerId or createdBy; deletedAt shouldn't be allowed in the body; drop the keys we don't want touched before saving | **sanitizeKeys** · primitive § /lib/routeTemplates template arg — strip listed keys from request body before it reaches Prisma | part 4 | delete body.organizationId / destructuring client-unsettable keys out of c.req.valid('json') in the controller before Prisma (docs/claude/API_ROUTES.md § Route Templates, Template Args) |
 | omit the :id path param from a templated route | **skipId** · primitive § /lib/routeTemplates template arg — omit the :id path param from a templated route | part 4 | — |
-| gate this route on a permission before the handler runs; I'll load the resource and check permissions at the top of the controller; only owners can hit this endpoint; throw 403 by hand if the user can't do this; check the action against the loaded resource as middleware | **validatePermission** · primitive § /middleware/validations/validatePermission — Resource with a direct ReBAC relation; polymorphic User/Organization-owned resources: validateOwnerPermission instead. | part 4 | a handler that loads the resource itself and calls permix.check / throws 403 by hand on a route where resourceContextMiddleware + validatePermission(action) would do it (docs/claude/PERMISSIONS.md § Validation Middleware). throws HTTPException (`caller-error`, request-context-errors, inferred); makeError 403 PERMISSION_DENIED (`permission-denied`, permissions-roles) |
+| gate this route on a permission before the handler runs; I'll load the resource and check permissions at the top of the controller; only owners can hit this endpoint; throw 403 by hand if the user can't do this; check the action against the loaded resource as middleware | **validatePermission** · primitive § /middleware/validations/validatePermission — Resource with a direct ReBAC relation; a submodel create or list under an owner: validateSubmodelPermission instead. | part 4 | a handler that loads the resource itself and calls permix.check / throws 403 by hand on a route where resourceContextMiddleware + validatePermission(action) would do it (docs/claude/PERMISSIONS.md § Validation Middleware). throws HTTPException (`caller-error`, request-context-errors, inferred); makeError 403 PERMISSION_DENIED (`permission-denied`, permissions-roles) |
 | never write a raw route definition; every new endpoint goes through a template; don't hand-roll routes | **Always use route templates** · rule § /lib/routeTemplates — Every API route definition. | part 4 | — |
 | how a resource module is organized; where do external service integrations go versus modules; the folder layout every module follows | **API module folder layout** · rule docs/claude/API_ROUTES.md — File Organization — Every API module; external service integrations go in apps/api/src/integrations/ instead. | part 4 | — |
 | Multi-request operations always return 200 OK with per-request results and a summary status in the payload. | **Batch operations return 200 with payload status** · rule docs/claude/API_ROUTES.md — Complex Operations & HTTP Status > Batch Operations — Batch, bulk, multi-step or partial-success operations; use 4xx/5xx for validation, auth, single-resource failures and security violations. | part 4 | a batch or bulk endpoint answering 207/4xx for partial failure instead of 200 with summary.status (docs/claude/API_ROUTES.md § Complex Operations & HTTP Status) |
@@ -588,8 +588,7 @@ Add route-level middleware via the `middleware` option:
 
 ```typescript
 import { validatePermission } from '#/middleware/validations/validatePermission';
-import { validateOwnerPermission } from '#/middleware/validations/validateOwnerPermission';
-import { validateNotToken } from '#/middleware/validations/validateNotToken';
+import { validateSubmodelPermission } from '#/middleware/validations/validateSubmodelPermission';
 
 // ReBAC permission check on loaded resource
 readRoute({
@@ -598,19 +597,22 @@ readRoute({
   responseSchema,
 });
 
-// Polymorphic resource permission (User or Organization owner)
-updateRoute({
-  model: 'webhookSubscription',
-  middleware: [validateOwnerPermission({ action: 'operate' })],
+// A create or a list under an owner: the action on a pseudo record of the submodel under the owner
+createRoute({
+  model: 'organization',
+  submodel: 'contact',
+  middleware: [validateSubmodelPermission('create')],
   bodySchema,
   responseSchema,
 });
 
-// Forbid token auth (session only)
-createRoute({
-  model: 'token',
-  middleware: [validateNotToken],
-  bodySchema,
+// The /me router loads me(c) as the owner
+readRoute({
+  model: 'me',
+  submodel: 'integration',
+  many: true,
+  skipId: true,
+  middleware: [validateSubmodelPermission('read')],
   responseSchema,
 });
 ```

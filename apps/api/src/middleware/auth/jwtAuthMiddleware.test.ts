@@ -14,8 +14,8 @@ import { exportJWK, generateKeyPair, type JWTPayload, SignJWT } from 'jose';
 import { app } from '#/app';
 import { registerClearCacheHook } from '#/hooks/cache/hook';
 import { auth } from '#/lib/auth';
-import type { PersonJwtHandoff } from '#/lib/auth/jwtHandoff';
-import { selfIssuer } from '#/lib/auth/personJwt';
+import type { UserJwtHandoff } from '#/lib/auth/jwtHandoff';
+import { selfIssuer } from '#/lib/auth/userJwt';
 import { rotateUserJwts } from '#/modules/user/services/rotateUserJwts';
 import { resolveIdentity } from '#/ws/probe';
 import { createBearerToken } from '#tests/utils/createBearerToken';
@@ -35,7 +35,7 @@ const bearer = (jwt: string) => ({ authorization: `Bearer ${jwt}` });
 const signUpVerified = async () => {
   const email = `jwt-${Bun.randomUUIDv7()}@example.com`;
   const password = 'synthetic-jwt-password';
-  const { user } = await auth.api.signUpEmail({ body: { name: 'JWT Person', email, password } });
+  const { user } = await auth.api.signUpEmail({ body: { name: 'JWT User', email, password } });
   await db.user.update({ where: { id: user.id }, data: { emailVerified: true } });
   return { userId: user.id, email, password };
 };
@@ -47,14 +47,14 @@ const signInOverHttp = async (email: string, password: string) =>
     body: JSON.stringify({ email, password }),
   });
 
-describe('a person authenticates with a JWT, never a session', () => {
-  let person: Awaited<ReturnType<typeof signUpVerified>>;
+describe('a user authenticates with a JWT, never a session', () => {
+  let verifiedUser: Awaited<ReturnType<typeof signUpVerified>>;
   let signIn: Response;
-  let handoff: PersonJwtHandoff & { user: { id: string } };
+  let handoff: UserJwtHandoff & { user: { id: string } };
 
   beforeAll(async () => {
-    person = await signUpVerified();
-    signIn = await signInOverHttp(person.email, person.password);
+    verifiedUser = await signUpVerified();
+    signIn = await signInOverHttp(verifiedUser.email, verifiedUser.password);
     handoff = (await signIn.clone().json()) as typeof handoff;
   });
 
@@ -73,7 +73,7 @@ describe('a person authenticates with a JWT, never a session', () => {
 
   it('sign-in leaves no session: none stored, and the session cookie is expired', async () => {
     const context = await auth.$context;
-    expect(await context.internalAdapter.listSessions(person.userId)).toEqual([]);
+    expect(await context.internalAdapter.listSessions(verifiedUser.userId)).toEqual([]);
     const sessionCookies = signIn.headers
       .getSetCookie()
       .filter((cookie) => cookie.includes('session_token='));
@@ -81,7 +81,7 @@ describe('a person authenticates with a JWT, never a session', () => {
   });
 
   it('sign-in stamps lastLoginAt', async () => {
-    const user = await db.user.findUniqueOrThrow({ where: { id: person.userId } });
+    const user = await db.user.findUniqueOrThrow({ where: { id: verifiedUser.userId } });
     expect(user.lastLoginAt).not.toBeNull();
   });
 
@@ -97,7 +97,7 @@ describe('a person authenticates with a JWT, never a session', () => {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
-        name: 'Pending Person',
+        name: 'Pending User',
         email: `pending-${Bun.randomUUIDv7()}@example.com`,
         password: 'synthetic-pending-password',
       }),
@@ -109,10 +109,10 @@ describe('a person authenticates with a JWT, never a session', () => {
     expect(body.user).not.toHaveProperty('jwtVersion');
   });
 
-  it('the JWT authenticates API requests as the person', async () => {
+  it('the JWT authenticates API requests as the user', async () => {
     const response = await readMe(bearer(handoff.token));
     expect(response.status).toBe(200);
-    expect(((await response.json()) as { data: { id: string } }).data.id).toBe(person.userId);
+    expect(((await response.json()) as { data: { id: string } }).data.id).toBe(verifiedUser.userId);
   });
 
   it('a JWT in the URL authenticates no one', async () => {
@@ -122,7 +122,7 @@ describe('a person authenticates with a JWT, never a session', () => {
 
   it('a Better Auth session token authenticates no one, as a bearer, a cookie or ?token=', async () => {
     const context = await auth.$context;
-    const session = await context.internalAdapter.createSession(person.userId);
+    const session = await context.internalAdapter.createSession(verifiedUser.userId);
     expect((await readMe(bearer(session.token))).status).toBe(401);
     expect((await readMe({ cookie: `better-auth.session_token=${session.token}` })).status).toBe(
       401,
@@ -133,7 +133,7 @@ describe('a person authenticates with a JWT, never a session', () => {
 
   it('no endpoint under /api/auth turns a session into a JWT or acts on one', async () => {
     const context = await auth.$context;
-    const session = await context.internalAdapter.createSession(person.userId);
+    const session = await context.internalAdapter.createSession(verifiedUser.userId);
     const headers = {
       authorization: `Bearer ${session.token}`,
       cookie: `better-auth.session_token=${session.token}`,
@@ -162,9 +162,9 @@ describe('a person authenticates with a JWT, never a session', () => {
   });
 
   it('a sign-in right after revoking every JWT gets a working JWT', async () => {
-    await rotateUserJwts(person.userId);
-    const again = await signInOverHttp(person.email, person.password);
-    const { token } = (await again.json()) as PersonJwtHandoff;
+    await rotateUserJwts(verifiedUser.userId);
+    const again = await signInOverHttp(verifiedUser.email, verifiedUser.password);
+    const { token } = (await again.json()) as UserJwtHandoff;
     expect((await readMe(bearer(token))).status).toBe(200);
   });
 
@@ -332,7 +332,7 @@ describe('revocation: a new jwtVersion refuses every JWT signed with the old one
     const target = await freshUser();
     const jwt = await createUserJwt(target);
     const { entity: organization } = await createOrganization();
-    const { entity: membership } = await createOrganizationUser(
+    const { entity: member } = await createOrganizationUser(
       { role: 'viewer' },
       { user: target, organization },
     );
@@ -343,7 +343,7 @@ describe('revocation: a new jwtVersion refuses every JWT signed with the old one
         body: JSON.stringify({ name: `renamed-${randomUUID().slice(0, 6)}` }),
       });
     expect((await rename()).status).toBe(403);
-    await db.organizationUser.update({ where: { id: membership.id }, data: { role: 'owner' } });
+    await db.organizationUser.update({ where: { id: member.id }, data: { role: 'owner' } });
     expect((await rename()).status).toBe(200);
   });
 
@@ -389,7 +389,7 @@ describe('revocation: a new jwtVersion refuses every JWT signed with the old one
     expect(((await spoofed.json()) as { data: { id: string } }).data.id).toBe(user.id);
 
     const identity = await resolveIdentity(admin);
-    expect(identity).toMatchObject({ status: 'resolved', id: superadmin.id });
+    expect(identity).toMatchObject({ status: 'resolved', model: 'User', userId: superadmin.id });
     await rotateUserJwts(superadmin.id);
     expect(await resolveIdentity(admin)).toEqual({ status: 'anonymous' });
   });
@@ -398,6 +398,15 @@ describe('revocation: a new jwtVersion refuses every JWT signed with the old one
 describe('account deletion revokes', () => {
   afterAll(async () => {
     await cleanupTouchedTables(db);
+  });
+
+  it("a soft-deleted user's JWT is refused", async () => {
+    const { entity: user } = await createUser();
+    const jwt = await createUserJwt(user);
+    expect((await readMe(jwt)).status).toBe(200);
+
+    await db.user.update({ where: { id: user.id }, data: { deletedAt: new Date() } });
+    expect((await readMe(jwt)).status).toBe(401);
   });
 
   it('redacting the account locks its JWTs out', async () => {

@@ -45,7 +45,7 @@ describe('GET /me/organizations', () => {
     expect(pagination!.total).toBe(0);
   });
 
-  it('returns user organizations with membership info', async () => {
+  it('returns user organizations with member info', async () => {
     const { entity: org } = await createOrganization();
     await createOrganizationUser(
       { role: Role.admin },
@@ -93,7 +93,7 @@ describe('GET /me/organizations', () => {
     expect(data.find((m) => m.id === org.id)).toBeUndefined();
   });
 
-  it('hides a soft-deleted membership row from the relation include', async () => {
+  it('hides a soft-deleted member row from the relation include', async () => {
     const { entity: org } = await createOrganization({ name: 'Stale Membership Org' });
     const { entity: membership } = await createOrganizationUser(
       { role: Role.member },

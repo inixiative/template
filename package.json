@@ -6,9 +6,9 @@
     "packages/*",
     "apps/*"
   ],
-  "packageManager": "bun@1.4.2",
+  "packageManager": "bun@1.4.4",
   "engines": {
-    "bun": "1.4.2"
+    "bun": "1.4.4"
   },
   "scripts": {
     "postinstall": "bash ./scripts/postinstall.sh",
@@ -67,13 +67,13 @@
   "devDependencies": {
     "@biomejs/biome": "2.5.2",
     "@inixiative/atlas": "^0.4.0",
-    "@inixiative/config": "^0.5.121",
+    "@inixiative/config": "^0.5.124",
     "@lightpanda/browser": "^1.2.0",
     "@mendable/firecrawl-js": "^4.18.1",
     "@tanstack/react-router": "^1.166.2",
     "@tanstack/router-generator": "^1.166.2",
     "@tanstack/router-plugin": "^1.166.2",
-    "@types/bun": "1.4.2",
+    "@types/bun": "1.4.4",
     "@types/lodash-es": "^4.17.12",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",

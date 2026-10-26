@@ -4,6 +4,8 @@
  * @partOf feature:users
  * @uses primitive:routeTemplates, infrastructure:prisma, feature:auth
  */
+
+import { me } from '#/lib/context/me';
 import { paginate } from '#/lib/prisma/paginate';
 import { makeController } from '#/lib/utils/makeController';
 import { meReadManyTokensRoute } from '#/modules/me/routes/meReadManyTokens';
@@ -11,7 +13,7 @@ import { meReadManyTokensRoute } from '#/modules/me/routes/meReadManyTokens';
 export const meReadManyTokensController = makeController(
   meReadManyTokensRoute,
   async (c, respond) => {
-    const user = c.get('user')!;
+    const user = me(c)!;
     const db = c.get('db');
 
     const { data, pagination } = await paginate(c, db.token, {

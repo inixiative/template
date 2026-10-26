@@ -6,12 +6,14 @@
  */
 import { lensFor } from '@template/db/lens';
 import { readRoute } from '#/lib/routeTemplates';
+import { validatePermission } from '#/middleware/validations/validatePermission';
 import { Modules } from '#/modules/modules';
 import { segmentReadResponseSchema } from '#/modules/segment/schemas/segmentSchemas';
 import { Tags } from '#/modules/tags';
 
 export const meReadManySegmentsRoute = readRoute({
   model: Modules.me,
+  middleware: [validatePermission('read')],
   submodel: Modules.segment,
   many: true,
   skipId: true,

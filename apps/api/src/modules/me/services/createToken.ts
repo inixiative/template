@@ -5,8 +5,14 @@
  * @uses infrastructure:prisma, feature:auth
  */
 import { createHash, randomBytes } from 'node:crypto';
-import type { Role, TokenOwnerModel } from '@template/db/generated/client/enums';
+import { type HydratedRecord, hydrate, Prisma } from '@template/db';
+import type { TokenOwnerModel } from '@template/db/generated/client/enums';
+import { type DelegatePermissions, TokenAction } from '@template/permissions';
+import { check, rebacSchema } from '@template/permissions/rebac';
 import type { Context } from 'hono';
+import { makeError } from '#/lib/errors';
+import { validateEntitlementGrants } from '#/lib/permissions/validateEntitlementGrants';
+import { validateFullGrant } from '#/lib/permissions/validateFullGrant';
 import type { AppEnv } from '#/types/appEnv';
 
 const MODEL_PREFIXES: Record<TokenOwnerModel, string> = {
@@ -15,20 +21,29 @@ const MODEL_PREFIXES: Record<TokenOwnerModel, string> = {
   OrganizationUser: 'orgUser',
   Space: 'space',
   SpaceUser: 'spaceUser',
+  Integration: 'integration',
 };
 
-type CreateTokenParams = {
+type CreateTokenParams = DelegatePermissions & {
   name: string;
   ownerModel: TokenOwnerModel;
   userId?: string;
   organizationId?: string;
   spaceId?: string;
-  role: Role;
+  integrationId?: string;
   expiresAt?: Date;
 };
 
 export const createToken = async (c: Context<AppEnv>, params: CreateTokenParams) => {
   const db = c.get('db');
+  const { name: _name, expiresAt: _expiresAt, ...row } = params;
+  const permix = c.get('permix');
+  const pseudo = await hydrate('token', { id: '', ...row } as HydratedRecord);
+  if (!check(permix, rebacSchema, 'token', pseudo, TokenAction.create))
+    throw makeError({ status: 403, message: 'Access denied' });
+  if (row.full) validateFullGrant(permix, 'token', pseudo);
+  await validateEntitlementGrants(permix, params.entitlements ?? []);
+
   const hex = randomBytes(24).toString('hex');
   const modelPrefix = MODEL_PREFIXES[params.ownerModel];
   const rawKey = `${process.env.ENVIRONMENT}_${modelPrefix}_${hex}`;
@@ -44,7 +59,10 @@ export const createToken = async (c: Context<AppEnv>, params: CreateTokenParams)
       userId: params.userId,
       organizationId: params.organizationId,
       spaceId: params.spaceId,
+      integrationId: params.integrationId,
       role: params.role,
+      full: params.full,
+      entitlements: (params.entitlements as Prisma.InputJsonValue | null) ?? Prisma.DbNull,
       expiresAt: params.expiresAt,
     },
   });

@@ -148,13 +148,16 @@ export const AUDIT_ENABLED_MODELS: AuditSubjectModel[] = [
 | `subjectModel` | Which model was mutated |
 | `before` / `after` | Full record state (filtered + redacted) |
 | `changes` | Field-level diff for updates only |
-| `actorUserId` | Who triggered the mutation |
-| `actorSpoofUserId` | Admin acting on behalf of a user |
-| `actorTokenId` | API token used |
+| `actorUserId` | `me(c)`: the JWT's or spoofed user, or the user of an acting User token (a member's, organization's, space's or integration's token names none) |
+| `actorSpoofUserId` | The superadmin spoofing, when spoofing |
+| `actorTokenId` | The acting token (nulled when the token is deleted) |
 | `actorJobName` | Background job name (if triggered by a job) |
+| `actorIntegrationId` | The integration the actor acted through (its token's owner key, or a job's payload) |
+| `actor` | The permission actor, `permix.getActor()`: `{ model: 'User' \| 'Token', record }`, the row `actorOf` sanitized (redact fields removed); survives the token's deletion |
 | `ipAddress` / `userAgent` | Request metadata |
 | `sourceInquiryId` | Inquiry that caused the mutation (if applicable) |
-| `contextOrganizationId` / `contextSpaceId` | Org/space context of the record |
+| `contextOrganizationId` / `contextSpaceId` / `contextUserId` | The mutated record's own tenancy, for filtering the log |
+| `subject*Id` | The mutated record, by `subjectModel` |
 
 ### Field Processing Pipeline
 
@@ -187,9 +190,11 @@ import { auditActorContext } from '@template/db/lib/auditActorContext';
 
 auditActorContext.scope(
   {
-    actorUserId: user.id,
-    actorSpoofUserId: spoofUser?.id,
+    actorUserId: (user ?? token?.user)?.id,
+    actorSpoofUserId: spoofedBy?.id,
     actorTokenId: token?.id,
+    actor: token ? { token: { id, name, keyPrefix, ownerModel, userId, organizationId, spaceId, integrationId } } : null,
+    integrationId: token?.integrationId,
     ipAddress: c.req.header('x-forwarded-for'),
     userAgent: c.req.header('user-agent'),
     sourceInquiryId: inquiry?.id,

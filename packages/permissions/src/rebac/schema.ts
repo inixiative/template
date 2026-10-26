@@ -5,10 +5,20 @@
  * @uses none
  */
 import { Operator } from '@inixiative/json-rules';
-import { ownerActions } from '@template/permissions/rebac/ownerActions';
+import {
+  actionOnOwner,
+  actorIsDelegateOfUser,
+  actorIsUser,
+  assignActions,
+  createdByItsUserOrManager,
+  highRoles,
+  integrationAccess,
+  integrationAdministering,
+  managedUpTheChain,
+  ownerActions,
+  tokenAccessIsYours,
+} from '@template/permissions/rebac/schemaHelpers';
 import type { RebacSchema } from '@template/permissions/rebac/types';
-
-const highRoles = ['owner', 'admin'];
 
 export const rebacSchema: RebacSchema = {
   bridges: [],
@@ -19,6 +29,8 @@ export const rebacSchema: RebacSchema = {
         manage: 'own',
         operate: 'manage',
         read: 'operate',
+        'user.rotateJwts': { all: [actorIsUser, 'operate'] },
+        'user.redact': { all: [actorIsUser, 'own'] },
       },
     },
 
@@ -28,18 +40,8 @@ export const rebacSchema: RebacSchema = {
         manage: 'own',
         operate: 'manage',
         read: 'operate',
-        // Role assignment: high roles need own, others need manage
-        assign: {
-          any: [
-            { all: [{ rule: { field: 'role', operator: Operator.in, value: highRoles } }, 'own'] },
-            {
-              all: [
-                { rule: { field: 'role', operator: Operator.notIn, value: highRoles } },
-                'manage',
-              ],
-            },
-          ],
-        },
+        create: { any: [actorIsUser, actorIsDelegateOfUser] },
+        delete: { all: [actorIsUser, 'own'] },
       },
     },
 
@@ -49,22 +51,11 @@ export const rebacSchema: RebacSchema = {
         manage: 'own',
         operate: 'manage',
         read: 'operate',
-        assign: {
-          any: [
-            { all: [{ rule: { field: 'role', operator: Operator.in, value: highRoles } }, 'own'] },
-            {
-              all: [
-                { rule: { field: 'role', operator: Operator.notIn, value: highRoles } },
-                'manage',
-              ],
-            },
-          ],
-        },
       },
     },
 
     // Owner-polymorphic models: per-row permissionRules are merged additively
-    // over the standard owner-walk by check() — see packages/permissions/src/rebac/ownerActions.ts.
+    // over the standard owner-walk by check() — see packages/permissions/src/rebac/schemaHelpers.ts.
     // Contact: the email mirroring the user's login (valueKey === user.email) is
     // locked against manage (update/delete both gate on manage) — it stays in sync
     // with auth, never edited directly. Every other contact takes the owner walk.
@@ -77,10 +68,19 @@ export const rebacSchema: RebacSchema = {
             ownerActions().manage,
           ],
         },
+        create: {
+          any: [
+            { rel: 'user', action: 'operate' },
+            { rel: 'organization', action: 'manage' },
+            { rel: 'space', action: 'manage' },
+          ],
+        },
       },
     },
-    'db:webhookSubscription': { actions: ownerActions() },
-    'db:segment': { actions: ownerActions() },
+    'db:webhookSubscription': { actions: { ...ownerActions(), create: 'operate' } },
+    'db:segment': {
+      actions: { ...ownerActions(), create: createdByItsUserOrManager },
+    },
     'db:segmentMember': {
       actions: {
         own: { rel: 'segment', action: 'own' },
@@ -89,68 +89,58 @@ export const rebacSchema: RebacSchema = {
         read: { rel: 'segment', action: 'read' },
       },
     },
-    'db:integration': { actions: ownerActions() },
-    'db:flow': { actions: ownerActions(['user']) },
+    'db:integration': { actions: { ...integrationAdministering, ...integrationAccess } },
+    'db:flow': { actions: { ...ownerActions(['user']), create: 'operate' } },
 
     'db:organizationUser': {
       actions: {
-        read: { any: [{ self: 'userId' }, { rel: 'organization', action: 'read' }] },
-        leave: { self: 'userId' },
+        read: {
+          any: [
+            { rel: 'user', action: 'read' },
+            { rel: 'organization', action: 'read' },
+          ],
+        },
+        leave: { rel: 'user', action: 'operate' },
+        operate: { rel: 'organization', action: 'operate' },
         manage: { rel: 'organization', action: 'manage' },
         own: { rel: 'organization', action: 'own' },
+        ...assignActions(
+          { rel: 'organization', action: 'own' },
+          { rel: 'organization', action: 'manage' },
+        ),
       },
     },
 
     'db:spaceUser': {
       actions: {
-        read: { any: [{ self: 'userId' }, { rel: 'space', action: 'read' }] },
-        leave: { self: 'userId' },
+        read: {
+          any: [
+            { rel: 'user', action: 'read' },
+            { rel: 'space', action: 'read' },
+          ],
+        },
+        leave: { rel: 'user', action: 'operate' },
+        operate: { rel: 'space', action: 'operate' },
         manage: { rel: 'space', action: 'manage' },
         own: { rel: 'space', action: 'own' },
+        ...assignActions({ rel: 'space', action: 'own' }, { rel: 'space', action: 'manage' }),
       },
     },
 
-    // Tokens carry a `role` field — assigning/revoking one inherits the
-    // org/space `assign` semantics: high roles need own on the owner, others
-    // need manage. Encoded against the token's row so the role rule resolves
-    // locally and only the seat check walks to the owner.
     'db:token': {
       actions: {
-        // Self-delete for tokens with a userId (User, OrgUser, SpaceUser).
-        leave: { self: 'userId' },
-        // Owner-side assign, role-aware.
-        assign: {
-          any: [
-            {
-              all: [
-                { rule: { field: 'role', operator: Operator.in, value: highRoles } },
-                {
-                  any: [
-                    { rel: 'organization', action: 'own' },
-                    { rel: 'space', action: 'own' },
-                  ],
-                },
-              ],
-            },
-            {
-              all: [
-                { rule: { field: 'role', operator: Operator.notIn, value: highRoles } },
-                {
-                  any: [
-                    { rel: 'organization', action: 'manage' },
-                    { rel: 'space', action: 'manage' },
-                  ],
-                },
-              ],
-            },
-          ],
-        },
+        leave: { rel: 'user', action: 'operate' },
+        own: actionOnOwner('own'),
+        read: 'own',
+        create: { all: [actorIsUser, tokenAccessIsYours] },
+        delete: { all: [actorIsUser, { any: ['leave', managedUpTheChain] }] },
       },
     },
 
     'db:authProvider': {
       actions: {
         own: { rel: 'organization', action: 'own' },
+        create: 'own',
       },
     },
 
@@ -159,10 +149,10 @@ export const rebacSchema: RebacSchema = {
         // Read: source or target can read their own inquiry
         read: {
           any: [
-            { self: 'sourceUserId' },
+            { rel: 'sourceUser', action: 'read' },
             { rel: 'sourceOrganization', action: 'manage' },
             { rel: 'sourceSpace', action: 'manage' },
-            { self: 'targetUserId' },
+            { rel: 'targetUser', action: 'read' },
             { rel: 'targetOrganization', action: 'manage' },
             { rel: 'targetSpace', action: 'manage' },
           ],
@@ -176,7 +166,7 @@ export const rebacSchema: RebacSchema = {
             {
               all: [
                 { rule: { field: 'type', operator: Operator.in, value: [] } },
-                { self: 'sourceUserId' },
+                { rel: 'sourceUser', action: 'operate' },
               ],
             },
             // inviteOrganizationUser: high roles (owner/admin) require own
@@ -224,11 +214,9 @@ export const rebacSchema: RebacSchema = {
         },
 
         // Resolve: target decides (approve/deny/requestChanges)
-        // For User targets: self check passes. For admin targets (targetModel === admin),
-        // self check fails for regular users — superadmin bypass handles it.
         resolve: {
           any: [
-            { self: 'targetUserId' },
+            { rel: 'targetUser', action: 'operate' },
             {
               any: [
                 // transferSpace — target org owner only

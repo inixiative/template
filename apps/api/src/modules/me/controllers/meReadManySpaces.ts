@@ -5,6 +5,7 @@
  * @uses primitive:routeTemplates, infrastructure:prisma, feature:tenancy
  */
 import type { Prisma } from '@template/db';
+import { me } from '#/lib/context/me';
 import { paginate } from '#/lib/prisma/paginate';
 import { makeController } from '#/lib/utils/makeController';
 import { meReadManySpacesRoute } from '#/modules/me/routes/meReadManySpaces';
@@ -19,14 +20,14 @@ type SpaceWithUsers = Prisma.SpaceGetPayload<{
 export const meReadManySpacesController = makeController(
   meReadManySpacesRoute,
   async (c, respond) => {
-    const user = c.get('user')!;
+    const user = me(c)!;
     const db = c.get('db');
 
     const { data: spaces, pagination } = await paginate<typeof db.space, SpaceWithUsers>(
       c,
       db.space,
       {
-        // The membership filter needs its own live-row scope: paginate injects
+        // The member filter needs its own live-row scope: paginate injects
         // `deletedAt: null` into the lens visits and the include tree, but caller
         // where subtrees are the caller's own — without it a soft-deleted spaceUser
         // would match `some` while the include filters it out.

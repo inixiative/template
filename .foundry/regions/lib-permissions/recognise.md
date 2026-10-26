@@ -42,11 +42,11 @@ A moment that says any of these, or something close, is this region's. Both voic
 - app-specific pieces don't go in the core
 - does the loaded grant list include this action
 - load role-derived grants into the client
-- tell the engine who the actor is for self rules
+- tell the engine who is acting
 - the minimal grant reader the engine needs
 - a per-record rule cannot revoke what the schema grants
 - typos in resource names should fail to compile
-- delegate, relation walk, self match, condition or composition
+- delegate, relation walk, condition or composition
 - is this tenant-authored permission rule well formed
 - pass far-side rows only when a rule reads them
 - join to a record from a different schema in a rule
@@ -61,7 +61,7 @@ A moment that says any of these, or something close, is this region's. Both voic
 - role mappings and action names live in the app package
 - grant-only lookup, no relation walking
 - register what this request may do
-- set the current user id for self matches
+- set the actor for __actor rule conditions
 - the interface the check engine consumes
 - restricting means changing the schema
 - typed resource keys for the engine

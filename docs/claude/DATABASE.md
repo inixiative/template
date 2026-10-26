@@ -48,6 +48,7 @@
   - [Path Notation Utilities](#path-notation-utilities)
 - [False Polymorphism](#false-polymorphism)
   - [Special Owner Values (No FK)](#special-owner-values-no-fk)
+  - [Delegated Keys](#delegated-keys)
 - [Registries](#registries)
 - [Schema Reference](#schema-reference)
 
@@ -781,6 +782,10 @@ enum EmailOwnerModel {
 2. Admin override (if super admin has customized)
 3. Default (seeded baseline)
 
+### Delegated Keys
+
+An axis value can name a parent in `delegates`: the row carries the parent's own owner keys beside its own. A Token with `ownerModel: Integration` requires `integrationId` and also carries its integration's `userId` / `organizationId` / `spaceId`, so tenancy scans stay plain column filters. The `falsePolymorphism:delegatedKeys` hook copies them from the parent on create and upsert through `carryDelegatedKeys`, which the test factory also calls, so the two never disagree; the write rule neither requires nor forbids them, and request bodies never carry them.
+
 See [HOOKS.md](HOOKS.md#false-polymorphism) for validation.
 
 ---
@@ -796,6 +801,7 @@ Schema-level configuration in `packages/db/src/registries/`:
 | Helper (`@template/db`) | Derives |
 |---|---|
 | `polymorphicAxis(model, axisField)` | The axis config; throws on an unknown model or axis |
+| `delegatedKeys(axis, value)` / `carryDelegatedKeys(model, row)` | The parent keys a delegating value carries; copy them from the parent row (the hook and the test factory both call it) |
 | `polymorphicKeyColumn` / `polymorphicTarget` | The key column for a value; the `{ kind, id }` a row points at |
 | `polymorphicIs(model, axisField)` | json-rules condition "this row's axis points at the bound row" |
 | `polymorphicSchema(model, axisField, { only?, omit?, extend? })` | Request-body Zod schema, one strict arm per value ([HOOKS.md](HOOKS.md#request-validation)) |

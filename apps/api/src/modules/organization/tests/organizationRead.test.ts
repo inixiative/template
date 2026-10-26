@@ -56,7 +56,7 @@ describe('GET /api/v1/organization/:id', () => {
     expect(data.name).toBe(org.name);
   });
 
-  it('is accessible without org membership (public)', async () => {
+  it('is accessible without being an org member (public)', async () => {
     const { entity: otherUser } = await createUser();
 
     const otherHarness = createTestApp({

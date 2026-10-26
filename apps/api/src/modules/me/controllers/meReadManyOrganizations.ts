@@ -5,6 +5,7 @@
  * @uses primitive:routeTemplates, infrastructure:prisma, feature:tenancy
  */
 import type { Prisma } from '@template/db';
+import { me } from '#/lib/context/me';
 import { paginate } from '#/lib/prisma/paginate';
 import { makeController } from '#/lib/utils/makeController';
 import { meReadManyOrganizationsRoute } from '#/modules/me/routes/meReadManyOrganizations';
@@ -16,14 +17,14 @@ type OrgWithUsers = Prisma.OrganizationGetPayload<{
 export const meReadManyOrganizationsController = makeController(
   meReadManyOrganizationsRoute,
   async (c, respond) => {
-    const user = c.get('user')!;
+    const user = me(c)!;
     const db = c.get('db');
 
     const { data: orgs, pagination } = await paginate<typeof db.organization, OrgWithUsers>(
       c,
       db.organization,
       {
-        // Live-row scope on the membership itself (caller where subtrees are outside
+        // Live-row scope on the member row itself (caller where subtrees are outside
         // paginate's injected scope) — a soft-deleted organizationUser must not keep
         // the org visible.
         where: {

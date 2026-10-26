@@ -1059,8 +1059,7 @@ Add route-level middleware via the `middleware` option:
 
 ```typescript
 import { validatePermission } from '#/middleware/validations/validatePermission';
-import { validateOwnerPermission } from '#/middleware/validations/validateOwnerPermission';
-import { validateNotToken } from '#/middleware/validations/validateNotToken';
+import { validateSubmodelPermission } from '#/middleware/validations/validateSubmodelPermission';
 
 // ReBAC permission check on loaded resource
 readRoute({
@@ -1069,19 +1068,22 @@ readRoute({
   responseSchema,
 });
 
-// Polymorphic resource permission (User or Organization owner)
-updateRoute({
-  model: 'webhookSubscription',
-  middleware: [validateOwnerPermission({ action: 'operate' })],
+// A create or a list under an owner: the action on a pseudo record of the submodel under the owner
+createRoute({
+  model: 'organization',
+  submodel: 'contact',
+  middleware: [validateSubmodelPermission('create')],
   bodySchema,
   responseSchema,
 });
 
-// Forbid token auth (person JWT only)
-createRoute({
-  model: 'token',
-  middleware: [validateNotToken],
-  bodySchema,
+// The /me router loads me(c) as the owner
+readRoute({
+  model: 'me',
+  submodel: 'integration',
+  many: true,
+  skipId: true,
+  middleware: [validateSubmodelPermission('read')],
   responseSchema,
 });
 ```
@@ -1173,7 +1175,7 @@ A body field stored in a Prisma `Json` column (inquiry `content`, contact `value
 
 Every info route answers `{ guide, types }`. `types` is what the table lists; `guide` maps each dotted path under it (`types.*.input`, `types.fields[].path`) to what that key means. The guide is generated: each key is described once with `.describe()` on the response schema, built with `infoResponseSchema(types)`, and `schemaGuide(responseSchema)` (`lib/jsonSchema/schemaGuide.ts`) reads those descriptions back through `z.toJSONSchema`. `schemaGuide.test.ts` fails on any key left undescribed.
 
-An info route is a `readRoute({ action: 'info', skipId: true })` mounted by hand before `validateActor` (see `modules/inquiry/index.ts`), so it answers without a session. Zod schemas become JSON Schema through `toJsonSchema` (`lib/jsonSchema/toJsonSchema.ts`, zod 4 `z.toJSONSchema`): `input` for what a caller sends, `output` for what is stored. The body field points at its route with `z.unknown().describe('… see GET /api/v1/<module>/info')`; `transformJsonFields` keeps that description on the JSON value it substitutes.
+An info route is a `readRoute({ action: 'info', skipId: true })` mounted by hand ahead of `autoRegisterRoutes` (see `modules/inquiry/index.ts`). It checks no action, so it answers without a session. Zod schemas become JSON Schema through `toJsonSchema` (`lib/jsonSchema/toJsonSchema.ts`, zod 4 `z.toJSONSchema`): `input` for what a caller sends, `output` for what is stored. The body field points at its route with `z.unknown().describe('… see GET /api/v1/<module>/info')`; `transformJsonFields` keeps that description on the JSON value it substitutes.
 
 ---
 

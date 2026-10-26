@@ -1,43 +1,28 @@
 export { Role } from '@template/db/generated/client/enums';
+export { actorOf } from './actorOf';
 // Client
 export {
   type Action,
-  type ActionState,
+  type Actor,
+  ActorModel,
   createPermissions,
-  type Entitlements,
-  InquiryAction,
+  type EntitlementEntry,
   OrganizationAction,
   type PermissionEntry,
   type Permix,
-  SpaceAction,
-  StandardAction,
+  TokenAction,
   UserAction,
 } from './client';
 // ReBAC
 export { check as rebacCheck } from './rebac/check';
 export { rebacSchema } from './rebac/schema';
-export type {
-  ActionRule,
-  RebacSchema,
-  RelationCheck,
-  ResourcePermission,
-  RuleCheck,
-} from './rebac/types';
+export type { ActionRule } from './rebac/types';
+export { type DelegatePermissions, delegateEntries } from './roles/delegatePermissions';
+export { narrowing } from './roles/narrowing';
 // Organization permissions
-export { getOrgPermissions, organizationRoles } from './roles/organization';
+export { getOrgPermissions } from './roles/organization';
 // Shared role utilities
-export {
-  allTrue,
-  greaterRole,
-  intersectEntitlements,
-  isSuperadmin,
-  lesserRole,
-  roleHierarchy,
-  rolesAtOrAbove,
-  roleToStandardAction,
-} from './roles/shared';
-// Space permissions
-export { getSpacePermissions, spaceRoles } from './roles/space';
-// User permissions
-export { getUserPermissions, userRoles } from './roles/user';
+export { isSuperadmin } from './roles/shared';
+export { getSpacePermissions } from './roles/space';
+export { type Grant, grantsPermix, installGrants, userGrants } from './roles/userGrants';
 export type { PermissionsCheck } from './types';

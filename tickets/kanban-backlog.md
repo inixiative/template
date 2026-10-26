@@ -41,12 +41,14 @@ kanban
     INFRA-033-segment-reconcile-perf-budget
     INFRA-036-clock-sensitive-rule-tick
     INFRA-038-ws-channel-tenancy
+    INFRA-039-ws-content-channels
     DOC-001-scalar-api-docs-ui
     DOC-002-ai-discoverable-api-metadata
     FE-002-editor-slice-pattern
     FE-006-conditional-form-v2
     COMM-009-component-slots-passthrough-children
     COMM-016-per-org-sending-domains
+    DEV-005-pr-reader
 ```
 
 ## Tickets
@@ -86,6 +88,7 @@ kanban
 - [INFRA-033: Segment Reconcile Perf Budget](./INFRA-033-segment-reconcile-perf-budget.md) - Measure DB load of both reconcile rails; set the scale threshold for field-level trigger narrowing
 - [INFRA-036: Clock-Sensitive Rule Tick](./INFRA-036-clock-sensitive-rule-tick.md) - `Segment.clockUnit` (hour/day/week/month) derived at save by a json-rules fold; one sweep cron row per unit
 - [INFRA-038: WS Channel Tenancy](./INFRA-038-ws-channel-tenancy.md) - Tenancy query on channel names + probe-reported tenant, deferred until a route resolves its tenant outside its path
+- [INFRA-039: WS Content Channels](./INFRA-039-ws-content-channels.md) - Every delivery is a channel named by content and authorized by its route; drops per-user addressing
 
 **Audit & Compliance:**
 - [FEAT-017: Audit Log Hardening, Inquiry Lineage, and Explorer](./FEAT-017-audit-log-hardening-lineage-and-explorer.md) - Durable audit writes, inquiry causality, and admin audit browsing
@@ -159,6 +162,9 @@ kanban
 **Why Backlog?**
 AUTH-006 is a confirmed isolation defect awaiting assignment and has High priority. It is distinct from the optional enhancements below.
 
+**Developer tooling:**
+- [DEV-005: PR reader](./DEV-005-pr-reader.md) - Review tool that groups changed files by atlas concept, hides gloss (toggle before/after per symbol) and replaces test code with an AI summary of the cases; home undecided
+
 These features are valuable but not critical for MVP or initial production launch. They're typical "v2.0" enhancements that add polish, enterprise appeal, or alternative monetization strategies.
 
 **Prioritization Triggers:**
@@ -170,4 +176,4 @@ These features are valuable but not critical for MVP or initial production launc
 
 ---
 
-_Last Updated: 2026-10-20_
+_Last Updated: 2026-10-23_

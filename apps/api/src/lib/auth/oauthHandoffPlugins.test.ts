@@ -4,7 +4,7 @@ import { cleanupTouchedTables } from '@template/db/test';
 import { betterAuth } from 'better-auth';
 import { memoryAdapter } from 'better-auth/adapters/memory';
 import { authPlugins } from '#/lib/auth/authPlugins';
-import type { PersonJwtHandoff } from '#/lib/auth/jwtHandoff';
+import type { UserJwtHandoff } from '#/lib/auth/jwtHandoff';
 import { verifyIssuerJwt } from '#/lib/auth/verifyIssuerJwt';
 
 const baseURL = 'http://api.test';
@@ -41,7 +41,7 @@ const createAuth = () =>
 
 const verifyOtt = (auth: ReturnType<typeof createAuth>, token: string) =>
   auth.api.verifyOneTimeToken({ body: { token } }) as unknown as Promise<
-    PersonJwtHandoff & { user: { id: string; email: string } }
+    UserJwtHandoff & { user: { id: string; email: string } }
   >;
 
 const sessionCookieOf = (response: Response) =>
@@ -160,7 +160,7 @@ describe('auth one-time token wiring', () => {
     await db.user.update({ where: { id: user.id }, data: { emailVerified: true } });
 
     const signIn = await auth.api.signInEmail({ body: { email, password }, asResponse: true });
-    const handoff = (await signIn.json()) as PersonJwtHandoff;
+    const handoff = (await signIn.json()) as UserJwtHandoff;
     expect((await verifyIssuerJwt(handoff.token)).sub).toBe(user.id);
     expect(sessionCookieOf(signIn) ?? 'Max-Age=0').toContain('Max-Age=0');
 
