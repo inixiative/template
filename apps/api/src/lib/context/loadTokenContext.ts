@@ -51,6 +51,5 @@ export const loadTokenContext = async (keyHash: string): Promise<TokenSignIn | n
 
   const user =
     token.ownerModel === 'User' && token.userId ? await findUserWithRelations(token.userId) : null;
-  if (token.ownerModel === 'User' && !user) return null;
   return { context: { token: token as unknown as TokenWithRelations, user }, fetched };
 };
