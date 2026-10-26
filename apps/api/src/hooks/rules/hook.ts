@@ -1,4 +1,4 @@
-import { check } from '@inixiative/json-rules';
+import { type Condition, check } from '@inixiative/json-rules';
 import {
   DbAction,
   type HookOptions,
@@ -14,8 +14,16 @@ import { getRule, RulesRegistry } from '#/hooks/rules/registry';
 import { shadowMerge } from '#/hooks/rules/shadowMerge';
 import { makeError } from '#/lib/errors';
 
+const evaluate = (rule: Condition, row: Record<string, unknown>): boolean | string => {
+  try {
+    return check(rule, row);
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error);
+  }
+};
+
 const validateRules = (data: Record<string, unknown>, model: ModelName): void => {
-  const result = check(
+  const result = evaluate(
     getRule(model),
     Object.fromEntries(
       Object.entries(data).map(([field, value]) => [field, isPrismaNull(value) ? null : value]),

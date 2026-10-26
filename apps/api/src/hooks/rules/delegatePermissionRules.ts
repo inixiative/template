@@ -4,7 +4,7 @@
  * @partOf primitive:authz
  * @uses none
  */
-import { type Condition, Operator } from '@inixiative/json-rules';
+import { ArrayOperator, type Condition, Operator } from '@inixiative/json-rules';
 
 const notFullOr = (condition: Condition, error: string): Condition => ({
   any: [{ field: 'full', operator: Operator.notEquals, value: true }, condition],
@@ -25,12 +25,44 @@ const fullOnlyOn = (owners: string[]): Condition =>
     `full only on a delegate of ${owners.join(', ')}`,
   );
 
+const filled = (field: string): Condition => ({
+  field,
+  operator: Operator.notEmpty,
+  value: true,
+});
+
+const entitlementsAreEntries: Condition = {
+  any: [
+    { field: 'entitlements', operator: Operator.isEmpty, value: true },
+    {
+      field: 'entitlements',
+      arrayOperator: ArrayOperator.all,
+      condition: {
+        all: [
+          filled('resource'),
+          filled('anchor.resource'),
+          filled('anchor.id'),
+          filled('actions'),
+        ],
+      },
+    },
+  ],
+  error: 'entitlements are entries: { resource, anchor, actions }',
+};
+
 export const delegatePermissionRules = {
   Integration: {
-    all: [...fullTakesNothingElse, fullOnlyOn(['User', 'OrganizationUser', 'SpaceUser'])],
+    all: [
+      entitlementsAreEntries,
+      ...fullTakesNothingElse,
+      fullOnlyOn(['User', 'OrganizationUser', 'SpaceUser']),
+    ],
   },
+  OrganizationUser: entitlementsAreEntries,
+  SpaceUser: entitlementsAreEntries,
   Token: {
     all: [
+      entitlementsAreEntries,
       ...fullTakesNothingElse,
       fullOnlyOn(['User', 'OrganizationUser', 'SpaceUser', 'Integration']),
       {

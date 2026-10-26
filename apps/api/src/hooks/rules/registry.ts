@@ -15,6 +15,8 @@ export const RulesRegistry: Partial<Record<ModelName, Condition>> = {
   ...polymorphismRules,
   Integration: both('Integration', delegatePermissionRules.Integration),
   Token: both('Token', delegatePermissionRules.Token),
+  OrganizationUser: both('OrganizationUser', delegatePermissionRules.OrganizationUser),
+  SpaceUser: both('SpaceUser', delegatePermissionRules.SpaceUser),
   // Add additional rules here:
   // User: { field: 'name', operator: 'notEmpty', value: true, error: 'name required' },
 };
