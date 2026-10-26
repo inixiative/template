@@ -118,6 +118,19 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
         mount: [(app) => app.route('/api/v1/organizationUser', organizationUserRouter)],
       });
 
+    const entitledMemberWith = async (granted: ReturnType<typeof entry>) => {
+      const { entity, context } = await createOrganizationUser(
+        { role: 'member' },
+        { organization: org },
+      );
+      const response = await (await writer('owner')).fetch(
+        patch(`/api/v1/organizationUser/${entity.id}`, { entitlements: [granted] }),
+      );
+      expect(response.status).toBe(200);
+      const row = await db.organizationUser.findUniqueOrThrow({ where: { id: entity.id } });
+      return { row, user: context.user };
+    };
+
     const entitledMember = async (actions: string[]) => {
       const { entity, context } = await createOrganizationUser(
         { role: 'member' },
@@ -132,6 +145,49 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
       const stored = await db.organizationUser.findUniqueOrThrow({ where: { id: entity.id } });
       return { row: stored, app: memberApp(context.user, stored) };
     };
+
+    describe('manage granted on the organization does every manage thing (Aron, 2026-10-26)', () => {
+      const managerByGrant = async () => {
+        const { row, user } = await entitledMemberWith(
+          entry('db:organization', ['db:organization', org.id], ['manage']),
+        );
+        return { row, user };
+      };
+
+      it('the holder sets low roles, not high ones, and removes a low member', async () => {
+        const { row, user } = await managerByGrant();
+        const app = memberApp(user, row);
+        const low = await newMember();
+        expect(
+          (await app.fetch(patch(`/api/v1/organizationUser/${low.id}`, { role: 'viewer' }))).status,
+        ).toBe(200);
+        expect(
+          (await app.fetch(patch(`/api/v1/organizationUser/${low.id}`, { role: 'admin' }))).status,
+        ).toBe(403);
+        expect((await app.fetch(del(`/api/v1/organizationUser/${low.id}`))).status).toBe(204);
+      });
+
+      it("the holder's owner-role user token does the same", async () => {
+        const { user } = await managerByGrant();
+        const { rawKey } = await createKeyedToken({ ownerModel: 'User', role: 'owner' }, { user });
+        const low = await newMember();
+        const response = await createTestApp({
+          mount: [
+            (app) => {
+              app.use('*', tokenAuthMiddleware);
+              app.route('/api/v1/organizationUser', organizationUserRouter);
+            },
+          ],
+        }).fetch(
+          new Request(`http://test/api/v1/organizationUser/${low.id}`, {
+            method: 'PATCH',
+            headers: { authorization: `Bearer ${rawKey}`, 'content-type': 'application/json' },
+            body: JSON.stringify({ role: 'viewer' }),
+          }),
+        );
+        expect(response.status).toBe(200);
+      });
+    });
 
     it('an admin grants assignLow; its holder cannot make themselves owner', async () => {
       const { entity: target, context } = await createOrganizationUser(
