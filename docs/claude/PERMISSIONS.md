@@ -398,8 +398,8 @@ Use dot-path when you want a stricter check that bypasses intermediate delegatio
 Models with nullable FKs to multiple owners (Contact, WebhookSubscription, etc.) use the `ownerActions()` helper instead of writing the same fan-out for every action:
 
 ```typescript
-// packages/permissions/src/rebac/ownerActions.ts
-import { ownerActions } from '@template/permissions/rebac/ownerActions';
+// packages/permissions/src/rebac/schemaHelpers.ts
+import { ownerActions } from '@template/permissions/rebac/schemaHelpers';
 
 // Default: fan out across user/organization/space
 contact: { actions: ownerActions() },

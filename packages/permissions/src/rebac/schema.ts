@@ -5,169 +5,19 @@
  * @uses none
  */
 import { Operator } from '@inixiative/json-rules';
-import { ownerActions } from '@template/permissions/rebac/ownerActions';
-import type { ActionRule, RebacSchema } from '@template/permissions/rebac/types';
-import { roleHierarchy, roleToStandardAction } from '@template/permissions/roles/shared';
-
-const highRoles = ['owner', 'admin'];
-const actorIsUser: ActionRule = {
-  rule: { field: '__actor.model', operator: Operator.equals, value: 'User' },
-};
-
-const actorIsDelegateOfUser: ActionRule = {
-  rule: { field: '__actor.record.ownerModel', operator: Operator.equals, value: 'User' },
-};
-
-const owners = [
-  ['User', 'user'],
-  ['Organization', 'organization'],
-  ['OrganizationUser', 'organizationUser'],
-  ['Space', 'space'],
-  ['SpaceUser', 'spaceUser'],
-  ['Integration', 'integration'],
-] as const;
-
-const onOwner = (action: string, at = ''): ActionRule => ({
-  any: owners.map(([ownerModel, rel]) => ({
-    all: [
-      { rule: { field: `${at}ownerModel`, operator: Operator.equals, value: ownerModel } },
-      { rel: `${at}${rel}`, action },
-    ],
-  })),
-});
-
-const actorIsItsUser = (at = ''): ActionRule => ({
-  all: [
-    { rule: { field: `${at}userId`, operator: Operator.notEmpty, value: true } },
-    {
-      any: [
-        {
-          all: [
-            actorIsUser,
-            {
-              rule: { field: `${at}userId`, operator: Operator.equals, path: '__actor.record.id' },
-            },
-          ],
-        },
-        {
-          all: [
-            actorIsDelegateOfUser,
-            {
-              rule: {
-                field: `${at}userId`,
-                operator: Operator.equals,
-                path: '__actor.record.userId',
-              },
-            },
-          ],
-        },
-      ],
-    },
-    { rel: `${at}user`, action: 'manage' },
-  ],
-});
-
-const ownedByOrganizationOrSpace = (at = ''): ActionRule => ({
-  rule: { field: `${at}ownerModel`, operator: Operator.in, value: ['Organization', 'Space'] },
-});
-
-const ownedByIntegration: ActionRule = {
-  rule: { field: 'ownerModel', operator: Operator.equals, value: 'Integration' },
-};
-
-const notOwnedByIntegration: ActionRule = {
-  rule: { field: 'ownerModel', operator: Operator.notEquals, value: 'Integration' },
-};
-
-const highRole: ActionRule = {
-  rule: { field: 'role', operator: Operator.in, value: highRoles },
-};
-
-const assignRole = (own: ActionRule, manage: ActionRule): ActionRule => ({
-  any: [
-    { all: [highRole, own] },
-    {
-      all: [
-        { rule: { field: 'role', operator: Operator.in, value: ['member', 'viewer'] } },
-        manage,
-      ],
-    },
-  ],
-});
-
-const heldAtOwner = (at = ''): ActionRule => ({
-  any: [
-    {
-      all: [
-        { rule: { field: 'role', operator: Operator.equals, value: null } },
-        onOwner('read', at),
-      ],
-    },
-    ...roleHierarchy.map((role) => ({
-      all: [
-        { rule: { field: 'role', operator: Operator.equals, value: role } },
-        onOwner(roleToStandardAction(role), at),
-      ],
-    })),
-  ],
-});
-
-const yoursOrOrganizationOrSpace = (at = ''): ActionRule => ({
-  any: [ownedByOrganizationOrSpace(at), actorIsItsUser(at)],
-});
-
-const ownedByMember: ActionRule = {
-  rule: { field: 'ownerModel', operator: Operator.in, value: ['OrganizationUser', 'SpaceUser'] },
-};
-
-const ownedByUser: ActionRule = {
-  rule: { field: 'ownerModel', operator: Operator.equals, value: 'User' },
-};
-
-const integrationAdministering = {
-  create: {
-    any: [
-      { all: [ownedByUser, { rel: 'user', action: 'operate' }] },
-      { all: [ownedByOrganizationOrSpace(), onOwner('manage')] },
-      { all: [ownedByMember, actorIsItsUser()] },
-    ],
-  },
-  own: { any: [actorIsItsUser(), { all: [ownedByOrganizationOrSpace(), onOwner('own')] }] },
-  manage: {
-    any: [actorIsItsUser(), { all: [ownedByOrganizationOrSpace(), onOwner('manage')] }],
-  },
-} satisfies Record<string, ActionRule>;
-
-const integrationAccess = {
-  operate: onOwner('operate'),
-  read: onOwner('read'),
-  assign: {
-    any: [
-      { all: [ownedByOrganizationOrSpace(), assignRole(onOwner('own'), onOwner('manage'))] },
-      { all: [actorIsItsUser(), heldAtOwner()] },
-    ],
-  },
-} satisfies Record<string, ActionRule>;
-
-const tokenAccessIsYours: ActionRule = {
-  any: [
-    { all: [notOwnedByIntegration, heldAtOwner(), yoursOrOrganizationOrSpace()] },
-    {
-      all: [
-        ownedByIntegration,
-        heldAtOwner('integration.'),
-        yoursOrOrganizationOrSpace('integration.'),
-      ],
-    },
-  ],
-};
-
-const managedUpTheChain: ActionRule = {
-  any: [
-    { all: [notOwnedByIntegration, onOwner('manage')] },
-    { all: [ownedByIntegration, onOwner('manage', 'integration.')] },
-  ],
-};
+import {
+  actorIsDelegateOfUser,
+  actorIsUser,
+  assignRole,
+  highRoles,
+  integrationAccess,
+  integrationAdministering,
+  managedUpTheChain,
+  onOwner,
+  ownerActions,
+  tokenAccessIsYours,
+} from '@template/permissions/rebac/schemaHelpers';
+import type { RebacSchema } from '@template/permissions/rebac/types';
 
 export const rebacSchema: RebacSchema = {
   bridges: [],
@@ -206,7 +56,7 @@ export const rebacSchema: RebacSchema = {
     },
 
     // Owner-polymorphic models: per-row permissionRules are merged additively
-    // over the standard owner-walk by check() — see packages/permissions/src/rebac/ownerActions.ts.
+    // over the standard owner-walk by check() — see packages/permissions/src/rebac/schemaHelpers.ts.
     // Contact: the email mirroring the user's login (valueKey === user.email) is
     // locked against manage (update/delete both gate on manage) — it stays in sync
     // with auth, never edited directly. Every other contact takes the owner walk.
