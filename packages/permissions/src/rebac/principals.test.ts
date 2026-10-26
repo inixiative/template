@@ -8,6 +8,7 @@ import {
 } from '@template/permissions/client';
 import { check } from '@template/permissions/rebac/check';
 import { rebacSchema } from '@template/permissions/rebac/schema';
+import { memberRemoval } from '@template/permissions/rebac/schemaHelpers';
 
 const o1 = { id: 'o1' };
 const o9 = { id: 'o9' };
@@ -69,7 +70,7 @@ const can = (
   permix: Awaited<ReturnType<typeof table>>,
   model: Parameters<typeof check>[2],
   record: object,
-  action: string,
+  action: Parameters<typeof check>[4],
 ) => check(permix, rebacSchema, model, record as HydratedRecord, action);
 
 const acting = (permix: Awaited<ReturnType<typeof table>>, model: ActorModel, id = 'who') => {
@@ -82,19 +83,21 @@ describe('no self arm: the user reaches their own rows through rel user (Aron, 2
     it('the user cannot evict a peer', async () => {
       const member = await session(u1, 'operate');
       expect(can(member, 'organizationUser', r2, 'leave')).toBe(false);
-      expect(can(member, 'organizationUser', r2, 'assign')).toBe(false);
+      expect(can(member, 'organizationUser', r2, memberRemoval)).toBe(false);
     });
 
     it('an admin evicts a member through the org, never through leave', async () => {
       const admin = await session(ua, 'manage');
-      expect(can(admin, 'organizationUser', r2, 'assign')).toBe(true);
+      expect(can(admin, 'organizationUser', r2, memberRemoval)).toBe(true);
       expect(can(admin, 'organizationUser', r2, 'leave')).toBe(false);
     });
 
     it('an admin cannot evict an owner, an owner can', async () => {
       const owner = { ...r2, role: 'owner' };
-      expect(can(await session(ua, 'manage'), 'organizationUser', owner, 'assign')).toBe(false);
-      expect(can(await session(uo, 'own'), 'organizationUser', owner, 'assign')).toBe(true);
+      expect(can(await session(ua, 'manage'), 'organizationUser', owner, memberRemoval)).toBe(
+        false,
+      );
+      expect(can(await session(uo, 'own'), 'organizationUser', owner, memberRemoval)).toBe(true);
     });
 
     it('a member reads their own relation and every relation of their org', async () => {

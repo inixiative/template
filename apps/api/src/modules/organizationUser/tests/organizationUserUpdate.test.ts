@@ -13,7 +13,7 @@ import type { organizationUserUpdateRoute } from '#/modules/organizationUser/rou
 import { createTestApp } from '#tests/createTestApp';
 import { createKeyedToken } from '#tests/utils/createKeyedToken';
 import { type Entry, entry } from '#tests/utils/entitlementEntry';
-import { json, patch } from '#tests/utils/request';
+import { del, json, patch } from '#tests/utils/request';
 
 type UpdateOrgUserResponse = z.infer<typeof organizationUserUpdateRoute.responseSchema>;
 
@@ -111,39 +111,101 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
       expect(stored.entitlements).toBeNull();
     });
 
-    it('an admin cannot let a member make themselves owner through an assign on their own row', async () => {
+    const memberApp = (user: User, organizationUser: OrganizationUser) =>
+      createTestApp({
+        mockUser: user,
+        mockOrganizationUsers: [organizationUser],
+        mount: [(app) => app.route('/api/v1/organizationUser', organizationUserRouter)],
+      });
+
+    const entitledMember = async (actions: string[]) => {
+      const { entity, context } = await createOrganizationUser(
+        { role: 'member' },
+        { organization: org },
+      );
+      const granted = await (await writer('owner')).fetch(
+        patch(`/api/v1/organizationUser/${entity.id}`, {
+          entitlements: [entry('db:organizationUser', ['db:organization', org.id], actions)],
+        }),
+      );
+      expect(granted.status).toBe(200);
+      const stored = await db.organizationUser.findUniqueOrThrow({ where: { id: entity.id } });
+      return { row: stored, app: memberApp(context.user, stored) };
+    };
+
+    it('an admin grants assignLow; its holder cannot make themselves owner', async () => {
       const { entity: target, context } = await createOrganizationUser(
         { role: 'member' },
         { organization: org },
       );
-      const assignOwnRow = [
-        entry('db:organizationUser', ['db:organizationUser', target.id], ['assign']),
-      ];
       const granted = await (await writer('admin')).fetch(
-        patch(`/api/v1/organizationUser/${target.id}`, { entitlements: assignOwnRow }),
-      );
-      const stored = await db.organizationUser.findUniqueOrThrow({ where: { id: target.id } });
-      const self = createTestApp({
-        mockUser: context.user,
-        mockOrganizationUsers: [stored],
-        mount: [(app) => app.route('/api/v1/organizationUser', organizationUserRouter)],
-      });
-      const promoted = await self.fetch(
-        patch(`/api/v1/organizationUser/${target.id}`, { role: 'owner' }),
-      );
-      expect(granted.status === 200 && promoted.status === 200).toBe(false);
-    });
-
-    it('an owner grants assign on a member row', async () => {
-      const target = await newMember();
-      const response = await (await writer('owner')).fetch(
         patch(`/api/v1/organizationUser/${target.id}`, {
           entitlements: [
-            entry('db:organizationUser', ['db:organizationUser', target.id], ['assign']),
+            entry('db:organizationUser', ['db:organizationUser', target.id], ['assignLow']),
           ],
         }),
       );
-      expect(response.status).toBe(200);
+      expect(granted.status).toBe(200);
+      const stored = await db.organizationUser.findUniqueOrThrow({ where: { id: target.id } });
+      const promoted = await memberApp(context.user, stored).fetch(
+        patch(`/api/v1/organizationUser/${target.id}`, { role: 'owner' }),
+      );
+      expect(promoted.status).toBe(403);
+    });
+
+    it('assignHigh: an owner grants it, an admin cannot', async () => {
+      const onRow = (target: OrganizationUser) => [
+        entry('db:organizationUser', ['db:organizationUser', target.id], ['assignHigh']),
+      ];
+      const forOwner = await newMember();
+      const forAdmin = await newMember();
+      expect(
+        (
+          await (
+            await writer('owner')
+          ).fetch(
+            patch(`/api/v1/organizationUser/${forOwner.id}`, { entitlements: onRow(forOwner) }),
+          )
+        ).status,
+      ).toBe(200);
+      expect(
+        (
+          await (
+            await writer('admin')
+          ).fetch(
+            patch(`/api/v1/organizationUser/${forAdmin.id}`, { entitlements: onRow(forAdmin) }),
+          )
+        ).status,
+      ).toBe(403);
+    });
+
+    it('an assignLow holder sets and removes low roles, never high ones', async () => {
+      const { app } = await entitledMember(['assignLow']);
+      const low = await newMember();
+      expect(
+        (await app.fetch(patch(`/api/v1/organizationUser/${low.id}`, { role: 'viewer' }))).status,
+      ).toBe(200);
+      expect(
+        (await app.fetch(patch(`/api/v1/organizationUser/${low.id}`, { role: 'admin' }))).status,
+      ).toBe(403);
+      const { entity: admin } = await createOrganizationUser(
+        { role: 'admin' },
+        { organization: org },
+      );
+      expect((await app.fetch(del(`/api/v1/organizationUser/${admin.id}`))).status).toBe(403);
+      expect((await app.fetch(del(`/api/v1/organizationUser/${low.id}`))).status).toBe(204);
+    });
+
+    it('an assignHigh holder also sets low roles and removes anyone below owner', async () => {
+      const { app } = await entitledMember(['assignHigh']);
+      const low = await newMember();
+      expect(
+        (await app.fetch(patch(`/api/v1/organizationUser/${low.id}`, { role: 'admin' }))).status,
+      ).toBe(200);
+      expect(
+        (await app.fetch(patch(`/api/v1/organizationUser/${low.id}`, { role: 'viewer' }))).status,
+      ).toBe(200);
+      expect((await app.fetch(del(`/api/v1/organizationUser/${low.id}`))).status).toBe(204);
     });
 
     it('an entitlement may carry a where; a malformed where is refused', async () => {

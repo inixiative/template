@@ -282,7 +282,7 @@ describe('a writer gives its permissions or less (Aron, 2026-10-25/26)', () => {
 
     it('an admin cannot give an organization integration the power to assign roles: its token could then make owners', async () => {
       const assignMembers = [
-        entry('db:organizationUser', ['db:organization', organization.id], ['assign']),
+        entry('db:organizationUser', ['db:organization', organization.id], ['assignHigh']),
       ];
       const integration = await orgIntegration('member');
       expect((await update(admin, integration, { entitlements: assignMembers })).status).toBe(403);

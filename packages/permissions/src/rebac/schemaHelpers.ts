@@ -82,17 +82,24 @@ export const roleIsHigh: ActionRule = {
   rule: { field: 'role', operator: Operator.in, value: highRoles },
 };
 
-export const assignRole = (own: ActionRule, manage: ActionRule): ActionRule => ({
+export const roleIsLowOrUnset: ActionRule = {
   any: [
-    { all: [roleIsHigh, own] },
-    {
-      all: [
-        { rule: { field: 'role', operator: Operator.in, value: ['member', 'viewer'] } },
-        manage,
-      ],
-    },
+    { rule: { field: 'role', operator: Operator.in, value: ['member', 'viewer'] } },
+    { rule: { field: 'role', operator: Operator.isEmpty, value: true } },
   ],
-});
+};
+
+export const assignActions = (own: ActionRule, manage: ActionRule) =>
+  ({
+    assignHigh: own,
+    assignLow: { all: [roleIsLowOrUnset, { any: [manage, 'assignHigh'] }] },
+  }) satisfies Record<string, ActionRule>;
+
+export const roleAssignment: ActionRule = {
+  any: [{ all: [roleIsHigh, 'assignHigh'] }, 'assignLow'],
+};
+
+export const memberRemoval: ActionRule = { any: ['leave', 'assignHigh', 'assignLow'] };
 
 export const roleHeldAtOwner = (at = ''): ActionRule => ({
   any: [
@@ -142,15 +149,22 @@ export const integrationAdministering = {
 export const integrationAccess = {
   operate: actionOnOwner('operate'),
   read: actionOnOwner('read'),
-  assign: {
+  assignHigh: {
     any: [
+      { all: [ownedByOrganizationOrSpace(), actionOnOwner('own')] },
+      { all: [actorIsItsUser(), roleIsHigh, roleHeldAtOwner()] },
+    ],
+  },
+  assignLow: {
+    all: [
+      roleIsLowOrUnset,
       {
-        all: [
-          ownedByOrganizationOrSpace(),
-          assignRole(actionOnOwner('own'), actionOnOwner('manage')),
+        any: [
+          { all: [ownedByOrganizationOrSpace(), actionOnOwner('manage')] },
+          { all: [actorIsItsUser(), roleHeldAtOwner()] },
+          'assignHigh',
         ],
       },
-      { all: [actorIsItsUser(), roleHeldAtOwner()] },
     ],
   },
 } satisfies Record<string, ActionRule>;

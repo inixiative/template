@@ -1,16 +1,15 @@
 import { hydrate } from '@template/db';
-import type { Action } from '@template/permissions/client';
-import { check, rebacSchema } from '@template/permissions/rebac';
+import { type ActionRule, check, rebacSchema } from '@template/permissions/rebac';
 import { makeError } from '#/lib/errors';
 import { makeMiddleware } from '#/lib/utils/makeMiddleware';
 
-export const validatePermission = makeMiddleware<Action>((action) => async (c, next) => {
+export const validatePermission = makeMiddleware<ActionRule>((action) => async (c, next) => {
   const resource = c.get('resource');
   const resourceType = c.get('resourceType');
   const permix = c.get('permix');
 
   if (!resource || !resourceType)
-    throw new Error(`validatePermission('${action}') needs a loaded resource`);
+    throw new Error(`validatePermission(${JSON.stringify(action)}) needs a loaded resource`);
 
   const hydrated = await hydrate(resourceType, resource as { id: string });
 

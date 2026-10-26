@@ -9,7 +9,7 @@ import {
   actionOnOwner,
   actorIsDelegateOfUser,
   actorIsUser,
-  assignRole,
+  assignActions,
   createdByItsUserOrManager,
   highRoles,
   integrationAccess,
@@ -104,11 +104,10 @@ export const rebacSchema: RebacSchema = {
         operate: { rel: 'organization', action: 'operate' },
         manage: { rel: 'organization', action: 'manage' },
         own: { rel: 'organization', action: 'own' },
-        assign: assignRole(
+        ...assignActions(
           { rel: 'organization', action: 'own' },
           { rel: 'organization', action: 'manage' },
         ),
-        delete: { any: ['leave', 'assign'] },
       },
     },
 
@@ -124,8 +123,7 @@ export const rebacSchema: RebacSchema = {
         operate: { rel: 'space', action: 'operate' },
         manage: { rel: 'space', action: 'manage' },
         own: { rel: 'space', action: 'own' },
-        assign: assignRole({ rel: 'space', action: 'own' }, { rel: 'space', action: 'manage' }),
-        delete: { any: ['leave', 'assign'] },
+        ...assignActions({ rel: 'space', action: 'own' }, { rel: 'space', action: 'manage' }),
       },
     },
 
