@@ -4,7 +4,8 @@
  * @partOf primitive:authz
  * @uses infrastructure:prisma
  */
-import type { OrganizationUser, SpaceUser, User } from '@template/db/generated/client/client';
+import type { UserWithRelations } from '@template/db';
+import type { User } from '@template/db/generated/client/client';
 import {
   ActorModel,
   actorOf,
@@ -15,7 +16,7 @@ import {
 import { createPermissions, type Permix } from '@template/permissions/client';
 import { findUserWithRelations } from '#/modules/user/services/find';
 
-type Members = { organizationUsers: OrganizationUser[]; spaceUsers: SpaceUser[] };
+type Members = Pick<UserWithRelations, 'organizationUsers' | 'spaceUsers'>;
 
 export const installUserPermissions = async (permix: Permix, user: User, members: Members) => {
   await permix.setup([], { replace: true });
