@@ -58,7 +58,7 @@ Shared pieces already in `schema.ts` — reuse, don't re-derive:
 - `assignActions(own, manage)`: `assignHigh` (= own at the tenant) and `assignLow` (role low or unset, and manage or `assignHigh`) — the role-write actions for members and integrations; `roleAssignment` and `memberRemoval` are the rules routes and controllers check, never named actions;
 - `actorIsItsUser(at)`: `${at}userId` is set and is the acting user (or a User-owned token of that user), narrowed by `manage` on that user;
 - `ownedByYouOrOrganizationOrSpace(at)`: owned by an organization or space, or `actorIsItsUser(at)`;
-- `ownedByIntegration` / `notOwnedByIntegration`, and `actionOnOwner(action, at)` with a path prefix (e.g. `'integration.'`).
+- `ownedBy(owners, at)` and `actionOnOwner(action, at, owners)` with a path prefix (e.g. `'integration.'`): the one per-owner expansion; pass the owner models a rule covers instead of a separate gate.
 
 Other parts of the system (use them, don't parallel them):
 - `canGrantEntitlement` — the only check for writing entitlements;
