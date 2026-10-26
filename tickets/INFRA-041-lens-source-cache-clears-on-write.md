@@ -25,12 +25,12 @@ their key is a hash of the compiled query, which a row cannot name.
    existing refresh job (singleton per key) on commit instead of deleting the key, so a reader never
    pays the cold miss.
 
-## Open question
+## Decided (Aron, 2026-10-26)
 
-Should a correctness gate read a cache at all? Between commit and the post-commit clear there is a
-window where the cache is stale. The picker can accept that window. A save gate that refuses a
-reference to a row created a moment ago cannot. Proposal: the gate keeps reading live through the
-same reader's uncached path, and this ticket fixes the picker and every other cached read.
+Zealot ships step 1 and step 2 now, in ZLT-6030 (#3025): a write clears the source caches, and the
+save gate reads through the one cached reader. The next read after a write is cold, and that is
+accepted. Step 3 (`rebuild`) and per-model keys, if Zealot shipped per-tenant keys, are the
+follow-up, and so is building all of it here first.
 
 ## Definition of done
 
