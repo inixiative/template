@@ -13,6 +13,7 @@ import { AuditAction, type AuditSubjectModel } from '@template/db/generated/clie
 import { auditActorContext, auditActorStore } from '@template/db/lib/auditActorContext';
 import { keyBy } from 'lodash-es';
 import {
+  auditActorColumns,
   buildContextFkFields,
   buildSubjectFkFields,
   computeDiff,
@@ -89,16 +90,7 @@ const buildAuditEntry = (
     before: (processedBefore as Prisma.InputJsonValue) ?? Prisma.JsonNull,
     after: (processedAfter as Prisma.InputJsonValue) ?? Prisma.JsonNull,
     changes: (processedChanges as Prisma.InputJsonValue) ?? Prisma.JsonNull,
-    actorUserId: actor?.actorUserId ?? null,
-    actorSpoofUserId: actor?.actorSpoofUserId ?? null,
-    actorTokenId: actor?.actorTokenId ?? null,
-    actorTokenName: actor?.actorTokenName ?? null,
-    actorTokenKeyPrefix: actor?.actorTokenKeyPrefix ?? null,
-    actorJobName: actor?.actorJobName ?? null,
-    ipAddress: actor?.ipAddress ?? null,
-    userAgent: actor?.userAgent ?? null,
-    sourceInquiryId: actor?.sourceInquiryId ?? null,
-    integrationId: actor?.integrationId ?? null,
+    ...auditActorColumns(actor),
     ...(withContextFkFields ? buildContextFkFields(model, record) : {}),
     ...(withSubjectFkFields ? buildSubjectFkFields(model, record) : {}),
   };

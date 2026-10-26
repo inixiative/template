@@ -18,12 +18,14 @@ import {
 import { STREAM_DEFINITIONS, WS_CHANNELS } from '@template/shared/ws';
 import { canSubscribe, resolveIdentity } from '#/ws/probe';
 import { createBearerToken } from '#tests/utils/createBearerToken';
+import { createKeyedToken } from '#tests/utils/createKeyedToken';
 
 describe('ws subscribe probe (real app)', () => {
   let superadmin: User;
   let targetUser: User;
   let adminBearer: { authorization: string };
   let inquiryId: string;
+  let organizationBearer: { authorization: string };
 
   beforeAll(async () => {
     ({ entity: superadmin } = await createUser({ platformRole: PlatformRole.superadmin }));
@@ -41,6 +43,25 @@ describe('ws subscribe probe (real app)', () => {
       content: { organizationId: sourceOrganization.id, role: 'member' },
     });
     inquiryId = inquiry.id;
+    const { rawKey } = await createKeyedToken(
+      { ownerModel: 'Organization', role: 'owner' },
+      { organization: sourceOrganization },
+    );
+    organizationBearer = { authorization: `Bearer ${rawKey}` };
+  });
+
+  it("an organization's token is identified as a token, with no user", async () => {
+    expect(await resolveIdentity(organizationBearer)).toMatchObject({
+      status: 'resolved',
+      model: 'Token',
+      userId: null,
+    });
+  });
+
+  it("an organization's token subscribes to what its permissions read", async () => {
+    expect(await canSubscribe(organizationBearer, WS_CHANNELS.inquiryRead.name(inquiryId))).toBe(
+      true,
+    );
   });
 
   afterAll(async () => {
@@ -86,14 +107,17 @@ describe('ws subscribe probe (real app)', () => {
     expect(await canSubscribe(adminBearer, 'inquiryRead')).toBe(false);
   });
 
-  it('resolveIdentity returns the token user as provenance of /me', async () => {
-    const me = await resolveIdentity(adminBearer);
-    expect(me).toMatchObject({ status: 'resolved', id: superadmin.id });
+  it('resolveIdentity answers a token as a token, with no user', async () => {
+    expect(await resolveIdentity(adminBearer)).toMatchObject({
+      status: 'resolved',
+      model: 'Token',
+      userId: null,
+    });
   });
 
   it('resolveIdentity honors the spoof header — identity becomes the target', async () => {
     const me = await resolveIdentity({ ...adminBearer, 'x-spoof-user-email': targetUser.email });
-    expect(me).toMatchObject({ status: 'resolved', id: targetUser.id });
+    expect(me).toMatchObject({ status: 'resolved', model: 'User', userId: targetUser.id });
   });
 
   it('a spoofed probe carries the TARGET authority, not the admin', async () => {

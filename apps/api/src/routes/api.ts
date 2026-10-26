@@ -17,6 +17,7 @@ import { authProviderRouter } from '#/modules/authProvider';
 import { batchRouter } from '#/modules/batch';
 import { contactRouter } from '#/modules/contact';
 import { flowRouter } from '#/modules/flow';
+import { identifyRouter } from '#/modules/identify';
 import { inquiryRouter } from '#/modules/inquiry';
 import { integrationRouter } from '#/modules/integration';
 import { meRouter } from '#/modules/me';
@@ -53,7 +54,7 @@ apiRouter.all('/auth/*', (c) => auth.handler(c.req.raw));
 // One-click unsubscribe — public (no JWT or token); authorized by its own signed link.
 apiRouter.route('/unsubscribe', unsubscribeRouter);
 
-// A person presents a JWT, a program an API token; sessions never reach past /auth.
+// A user presents a JWT, a program an API token; sessions never reach past /auth.
 // Spoof runs last so it applies whichever credential resolved the user.
 apiRouter.use('*', jwtAuthMiddleware);
 apiRouter.use('*', tokenAuthMiddleware);
@@ -69,6 +70,7 @@ apiRouter.route('/v1/authProvider', authProviderRouter);
 apiRouter.route('/v1/batch', batchRouter);
 apiRouter.route('/v1/contact', contactRouter);
 apiRouter.route('/v1/flow', flowRouter);
+apiRouter.route('/v1/identify', identifyRouter);
 apiRouter.route('/v1/integration', integrationRouter);
 apiRouter.route('/v1/me', meRouter);
 apiRouter.route('/v1/organization', organizationRouter);

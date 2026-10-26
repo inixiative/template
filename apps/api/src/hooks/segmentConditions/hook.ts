@@ -4,7 +4,8 @@ import {
   db,
   type HookOptions,
   HookTiming,
-  Prisma,
+  isCleared,
+  type Prisma,
   registerDbHook,
   type SingleAction,
 } from '@template/db';
@@ -16,9 +17,6 @@ import { validateSegmentConditions } from '#/modules/segment/validations/validat
 import { validateSegmentReferences } from '#/modules/segment/validations/validateSegmentReferences';
 
 type SegmentRow = Partial<Omit<Segment, 'conditions'>> & { conditions?: unknown };
-
-const isCleared = (value: unknown): boolean =>
-  value === undefined || value === null || value === Prisma.DbNull || value === Prisma.JsonNull;
 
 const validateRow = async (row: SegmentRow, previous?: Segment): Promise<void> => {
   if (row.conditions === undefined && previous) return;

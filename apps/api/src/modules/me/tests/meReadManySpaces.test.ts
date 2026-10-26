@@ -40,7 +40,7 @@ describe('GET /me/spaces', () => {
     expect(pagination!.total).toBe(0);
   });
 
-  it('returns user spaces with membership info', async () => {
+  it('returns user spaces with member info', async () => {
     // createSpaceUser auto-creates: User, Organization, OrganizationUser, Space
     const { entity: _spaceUser, context } = await createSpaceUser({ role: Role.admin }, { user });
     const space = context.space!;

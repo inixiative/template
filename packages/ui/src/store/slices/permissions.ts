@@ -4,15 +4,12 @@
  * @partOf primitive:ui
  * @uses primitive:sdk
  */
-import type { OrganizationId, SpaceId, UserId } from '@template/db';
-import type { Role } from '@template/db/generated/client/enums';
-import { createPermissions, type Entitlements } from '@template/permissions/client';
+import { actorOf } from '@template/permissions/actorOf';
+import { ActorModel, createPermissions } from '@template/permissions/client';
 import { check as rebacCheck } from '@template/permissions/rebac/check';
 import { rebacSchema } from '@template/permissions/rebac/schema';
-import { getOrgPermissions } from '@template/permissions/roles/organization';
 import { isSuperadmin } from '@template/permissions/roles/shared';
-import { getSpacePermissions } from '@template/permissions/roles/space';
-import { getUserPermissions } from '@template/permissions/roles/user';
+import { installGrants, userGrants } from '@template/permissions/roles/userGrants';
 import type { MeReadResponses } from '@template/sdk';
 import type { AppStore } from '@template/ui/store/types';
 import type { PermissionsSlice } from '@template/ui/store/types/permissions';
@@ -43,40 +40,17 @@ export const createPermissionsSlice: StateCreator<AppStore, [], [], PermissionsS
       },
       setup: async (me: UserWithRelations) => {
         const { permix } = get().permissions;
-        permix.setUserId(me.id as UserId);
+        await permix.setup([], { replace: true });
+        permix.setActor(actorOf(ActorModel.User, me));
         if (isSuperadmin(me)) {
           permix.setSuperadmin(true);
           return;
         }
 
-        // Set up user permissions (user is always owner of themselves)
-        await permix.setup(getUserPermissions(me.id as UserId));
-
-        // Set up org permissions (matches backend setupOrgPermissions)
-        if (me.organizationUsers) {
-          for (const orgUser of me.organizationUsers) {
-            await permix.setup(
-              getOrgPermissions(
-                orgUser.role as Role,
-                orgUser.organizationId as OrganizationId,
-                orgUser.entitlements as Entitlements,
-              ),
-            );
-          }
-        }
-
-        // Set up space permissions (matches backend setupSpacePermissions)
-        if (me.spaceUsers) {
-          for (const spaceUser of me.spaceUsers) {
-            await permix.setup(
-              getSpacePermissions(
-                spaceUser.role as Role,
-                spaceUser.spaceId as SpaceId,
-                spaceUser.entitlements as Entitlements,
-              ),
-            );
-          }
-        }
+        await installGrants(
+          permix,
+          userGrants(me.id, me.organizationUsers ?? [], me.spaceUsers ?? []),
+        );
       },
     },
   };

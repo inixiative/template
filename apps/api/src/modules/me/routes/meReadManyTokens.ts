@@ -12,6 +12,7 @@ import {
 } from '@template/db';
 import { lensFor } from '@template/db/lens';
 import { readRoute } from '#/lib/routeTemplates';
+import { validateSubmodelPermission } from '#/middleware/validations/validateSubmodelPermission';
 import { Modules } from '#/modules/modules';
 import { Tags } from '#/modules/tags';
 import { tokenReadResponseSchema } from '#/modules/token/schemas/tokenSchemas';
@@ -25,6 +26,7 @@ const responseSchema = tokenReadResponseSchema.extend({
 
 export const meReadManyTokensRoute = readRoute({
   model: Modules.me,
+  middleware: [validateSubmodelPermission('read')],
   submodel: Modules.token,
   many: true,
   skipId: true,

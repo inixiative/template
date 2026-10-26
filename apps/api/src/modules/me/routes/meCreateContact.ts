@@ -5,6 +5,7 @@
  * @uses primitive:routeTemplates, feature:contact
  */
 import { createRoute } from '#/lib/routeTemplates';
+import { validateSubmodelPermission } from '#/middleware/validations/validateSubmodelPermission';
 import {
   CONTACT_CREATE_IMMUTABLE_FIELDS,
   contactCreateBodySchema,
@@ -15,6 +16,7 @@ import { Tags } from '#/modules/tags';
 
 export const meCreateContactRoute = createRoute({
   model: Modules.me,
+  middleware: [validateSubmodelPermission('create')],
   submodel: Modules.contact,
   skipId: true,
   bodySchema: contactCreateBodySchema,

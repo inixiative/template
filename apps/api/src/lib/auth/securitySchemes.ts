@@ -13,7 +13,7 @@ export const securitySchemes = {
     scheme: 'bearer',
     bearerFormat: 'JWT',
     description:
-      'JWT of a signed-in person, returned by sign-in under `/api/auth` and sent as ' +
+      'JWT of a signed-in user, returned by sign-in under `/api/auth` and sent as ' +
       '`Authorization: Bearer <jwt>`. Signed ES256 by this API (keys at `/api/auth/jwks`) or by the ' +
       'configured issuer (`AUTH_ISSUER`, keys at `AUTH_JWKS_URL`); `sub` is the user. Sessions and ' +
       'cookies are never accepted. Operations under `/api/admin` additionally require the superadmin ' +

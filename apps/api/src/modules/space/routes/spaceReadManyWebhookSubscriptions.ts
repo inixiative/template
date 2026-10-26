@@ -7,7 +7,7 @@
 import { WebhookSubscriptionScalarSchema } from '@template/db';
 import { lensFor } from '@template/db/lens';
 import { readRoute } from '#/lib/routeTemplates';
-import { validatePermission } from '#/middleware/validations/validatePermission';
+import { validateSubmodelPermission } from '#/middleware/validations/validateSubmodelPermission';
 import { Modules } from '#/modules/modules';
 
 export const spaceReadManyWebhookSubscriptionsRoute = readRoute({
@@ -17,5 +17,5 @@ export const spaceReadManyWebhookSubscriptionsRoute = readRoute({
   paginate: true,
   filterLens: { parent: lensFor('WebhookSubscription') },
   responseSchema: WebhookSubscriptionScalarSchema,
-  middleware: [validatePermission('read')],
+  middleware: [validateSubmodelPermission('read')],
 });

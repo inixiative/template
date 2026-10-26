@@ -13,13 +13,13 @@ model AuditLog {
   actorSpoofUser      User?        @relation("AuditLogActorSpoofUser", fields: [actorSpoofUserId], references: [id], onDelete: SetNull)
   actorTokenId        String?      @db.VarChar(36)
   actorToken          Token?       @relation("AuditLogActorToken", fields: [actorTokenId], references: [id], onDelete: SetNull)
-  actorTokenName      String?
-  actorTokenKeyPrefix String?
   actorJobName        String?
+  actorIntegrationId  String?      @db.VarChar(36)
+  actorIntegration    Integration? @relation("AuditLogOriginIntegration", fields: [actorIntegrationId], references: [id], onDelete: SetNull)
+  // Non-PII snapshot of deletable actors (the acting token and its chain); survives SetNull on the FKs above
+  actor               Json?
   ipAddress           String?
   userAgent           String?
-  integrationId       String?      @db.VarChar(36)
-  integration         Integration? @relation("AuditLogOriginIntegration", fields: [integrationId], references: [id], onDelete: SetNull)
 
   // What happened
   action       AuditAction
@@ -110,7 +110,7 @@ model AuditLog {
   @@index([subjectEmailTemplateId])
   @@index([subjectEmailComponentId])
   @@index([subjectCustomerRefId])
-  @@index([integrationId])
+  @@index([actorIntegrationId])
   @@index([subjectIntegrationId])
   @@index([subjectSegmentId])
 }

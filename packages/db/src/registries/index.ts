@@ -1,6 +1,7 @@
 export * from './auditEnabledModels';
 export * from './discriminatorDefaults';
 export {
+  delegatedKeys,
   type FalsePolymorphismRef,
   type FlexibleRef,
   getPolymorphismConfig,

@@ -5,6 +5,7 @@
  * @uses primitive:routeTemplates, feature:integrations
  */
 import { createRoute } from '#/lib/routeTemplates';
+import { validateSubmodelPermission } from '#/middleware/validations/validateSubmodelPermission';
 import {
   INTEGRATION_IMMUTABLE_FIELDS,
   integrationCreateBodySchema,
@@ -15,6 +16,7 @@ import { Tags } from '#/modules/tags';
 
 export const meCreateIntegrationRoute = createRoute({
   model: Modules.me,
+  middleware: [validateSubmodelPermission('create')],
   submodel: Modules.integration,
   skipId: true,
   bodySchema: integrationCreateBodySchema,

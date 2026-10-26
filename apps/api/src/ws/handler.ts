@@ -85,15 +85,18 @@ const dispatch = async (ws: WSSocket, msg: WSMessage): Promise<void> => {
         sendTo(ws, frameError(msg));
         return;
       }
-      const me = identity.status === 'resolved' ? identity : null;
-      // A spoof header /me doesn't honor (non-superadmin) is a rejection, not a silent keep.
+      const actor = identity.status === 'resolved' ? identity : null;
+      // A spoof header /identify doesn't honor (non-superadmin) is a rejection, not a silent keep.
       const spoofEmail = headers['x-spoof-user-email'];
-      if (spoofEmail && (!me || normalizeEmail(me.email) !== normalizeEmail(spoofEmail))) {
+      if (
+        spoofEmail &&
+        (!actor?.email || normalizeEmail(actor.email) !== normalizeEmail(spoofEmail))
+      ) {
         sendTo(ws, { type: 'spoofRejected' });
         return;
       }
-      setIdentity(ws, me?.id ?? null, me ? headers : {});
-      sendTo(ws, { type: 'identity', userId: me?.id ?? null });
+      setIdentity(ws, actor?.userId ?? null, actor ? headers : {});
+      sendTo(ws, { type: 'identity', userId: actor?.userId ?? null });
       return;
     }
     case 'logout': {

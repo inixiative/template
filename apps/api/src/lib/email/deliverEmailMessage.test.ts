@@ -280,7 +280,7 @@ describe('deliverEmailMessage — the recipient is read through the lens at send
     expect(row.reasonCode).toBe(CommunicationReasonCode.not_found);
   });
 
-  it("an organization's send shows only its own membership of a recipient who belongs to two", async () => {
+  it("an organization's send shows only its own member row of a recipient who belongs to two", async () => {
     const { entity: mine } = await createOrganization({ name: 'Sending Org' });
     const { entity: theirs } = await createOrganization({ name: 'Other Org' });
     const { entity: user } = await createUser();
@@ -302,7 +302,7 @@ describe('deliverEmailMessage — the recipient is read through the lens at send
     expect(sent[0]?.html).not.toContain(':member]');
   });
 
-  it("an organization's default lens shows its memberships, and its spaces' only when the lens turns them on", async () => {
+  it("an organization's default lens shows its members, and its spaces' only when the lens turns them on", async () => {
     const { entity: organization } = await createOrganization({ name: 'Org Default' });
     const { entity: space } = await createSpace({ name: 'Org Space' }, { organization });
     const { entity: user } = await createUser();
@@ -329,7 +329,7 @@ describe('deliverEmailMessage — the recipient is read through the lens at send
     expect(sent[0]?.html).not.toContain('[Org Space]');
   });
 
-  it("a space sending with its organization's template shows that space's membership only", async () => {
+  it("a space sending with its organization's template shows that space's member row only", async () => {
     const { entity: organization } = await createOrganization({ name: 'Parent Org' });
     const { entity: space } = await createSpace({ name: 'Sending Space' }, { organization });
     const { entity: sibling } = await createSpace({ name: 'Sibling Space' }, { organization });
@@ -361,7 +361,7 @@ describe('deliverEmailMessage — the recipient is read through the lens at send
     expect(sent[0]?.html).not.toContain('Sibling Space');
   });
 
-  it("a space's default lens leaves organization memberships off, so a template reading them falls back to the platform's", async () => {
+  it("a space's default lens leaves organization members off, so a template reading them falls back to the platform's", async () => {
     const { entity: organization } = await createOrganization({ name: 'Default Org' });
     const { entity: space } = await createSpace({ name: 'Default Space' }, { organization });
     const { entity: user } = await createUser();
@@ -385,7 +385,7 @@ describe('deliverEmailMessage — the recipient is read through the lens at send
     expect(sent[0]?.html).not.toContain('[Default Org]');
   });
 
-  it("a space whose lens widens to its organization renders the organization's and sibling spaces' memberships, never another organization's", async () => {
+  it("a space whose lens widens to its organization renders the organization's and sibling spaces' members, never another organization's", async () => {
     const { entity: organization } = await createOrganization({ name: 'Parent Org' });
     const { entity: other } = await createOrganization({ name: 'Other Org' });
     const { entity: space } = await createSpace({ name: 'Lens Space' }, { organization });

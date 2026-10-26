@@ -19,7 +19,6 @@
   - [Context Types](#context-types)
     - [TokenWithRelations](#tokenwithrelations)
   - [Complex Getters](#complex-getters)
-    - [getActor](#getactor)
     - [getResource / getResourceType](#getresource--getresourcetype)
     - [getValidatedBody / getValidatedQuery](#getvalidatedbody--getvalidatedquery)
     - [isSuperadmin](#issuperadmin)
@@ -60,13 +59,13 @@ prepareRequest
   - Initializes all context vars to null
   - Wraps request in db.scope(requestId)
     ↓
-jwtAuthMiddleware (person JWT)
+jwtAuthMiddleware (user JWT)
   - Verifies a JWT-shaped `Authorization: Bearer` (never `?token=`); cookies are ignored
   - Refuses a revoked JWT (401); keys or Redis unreachable → 503
   - Loads user + organizationUsers, calls setUserContext → sets up permix
     ↓
 tokenAuthMiddleware (API token)
-  - Skips if user already set (a JWT resolved the person)
+  - Skips if user already set (a JWT resolved the user)
   - Parses Authorization header or ?token=
   - Validates token hash, expiry, isActive
   - Sets token, optionally user
@@ -83,7 +82,7 @@ resourceContextMiddleware (per-route)
   - Enforces 404 (0 results) or 409 (>1 results)
   - Sets resource, resourceType
     ↓
-Validation middleware (validatePermission, validateNotToken, etc.)
+Validation middleware (validatePermission, validateSubmodelPermission, etc.)
     ↓
 Route handler
   - Access context via getters
@@ -123,11 +122,11 @@ type AppEnv = { Variables: AppVars };
 | `db` | `Db` | Prisma client for database access |
 | `txn` | `TransactionClient \| undefined` | Active transaction client (if in txn) |
 | `app` | `Hono<AppEnv>` | App instance (for internal routing in batch API) |
-| `user` | `User \| null` | Authenticated user (person JWT or token) |
-| `organizationUsers` | `OrganizationUser[] \| null` | User's org memberships |
+| `user` | `User \| null` | Authenticated user (user JWT or token) |
+| `organizationUsers` | `OrganizationUser[] \| null` | User's org members |
 | `organizations` | `Organization[] \| null` | All orgs user belongs to (flattened) |
-| `spaceUsers` | `SpaceUser[] \| null` | User's space memberships |
-| `spaces` | `Space[] \| null` | All spaces user has access to (membership + org owner) |
+| `spaceUsers` | `SpaceUser[] \| null` | User's space members |
+| `spaces` | `Space[] \| null` | All spaces user has access to (member + org owner) |
 | `token` | `TokenWithRelations \| null` | API token with relations |
 | `spoofedBy` | `User \| null` | Original admin when spoofing |
 | `bracketQuery` | `Record<string, any>` | Parsed URL search params (bracket notation) |
@@ -206,27 +205,24 @@ export const prepareRequest = async (c: Context<AppEnv>, next: Next) => {
 Located in `apps/api/src/lib/context/setUserContext.ts`. Called by auth middleware after successful authentication.
 
 ```typescript
-export const setUserContext = async (c: Context<AppEnv>, userWithOrgs: UserWithOrganizationUsers) => {
-  const { organizationUsers, ...user } = userWithOrgs;
+export const setUserContext = async (c: Context<AppEnv>, userWithRelations: UserWithRelations) => {
+  const { organizationUsers, organizations, spaceUsers, spaces, ...user } = userWithRelations;
 
-  // Set user data
   c.set('user', user);
   c.set('organizationUsers', organizationUsers);
+  c.set('organizations', organizations);
+  c.set('spaceUsers', spaceUsers);
+  c.set('spaces', spaces);
 
-  // Set up permissions
-  const permix = c.get('permix');
-  permix.setUserId(user.id);
-  if (isSuperadmin(user)) permix.setSuperadmin(true);
-  await setupUserPermissions(c);
-  await setupOrgPermissions(c);
+  await installPermissions(c);
 };
 ```
 
-**Note**: Space users are nested within `organizationUsers` (as `OrganizationUserWithSpaceUsers`). The `spaceUsers` context variable is set separately when needed for permission checks.
+`installPermissions` (`apps/api/src/lib/context/installPermissions.ts`) is the one place a request's table is built, for every credential: login, token sign-in, spoof, batch sub-requests and batch refresh. It replaces whatever the table held, sets the actor (`{ id: token.id, model: Token, ownerModel }` when a token is present, otherwise `{ id: user.id, model: User }`), sets the superadmin flag (from the request's user, or the user behind a User, OrganizationUser or SpaceUser token), and installs either the user's table or the token's permissions over its owner. Every token goes through `setTokenContext`, which never sets a user: a User token carries its user's members as context, any other token none.
 
 ### What It Does
 
-1. **Splits user from org memberships** - Separates for individual access
+1. **Splits user from org members** - Separates for individual access
 2. **Sets user ID on permix** - Links permissions to the authenticated user
 3. **Sets superadmin flag** - Bypasses all permission checks
 4. **Sets up user permissions** - For user-owned resources
@@ -354,28 +350,6 @@ Loaded by `tokenAuthMiddleware` based on token's `ownerModel`.
 
 Some getters have logic and remain as functions in `apps/api/src/lib/context/`.
 
-#### getActor
-
-```typescript
-import { getActor } from '#/lib/context/getActor';
-
-const { user, organization, organizationUser, space, spaceUser, token } = getActor(c);
-```
-
-Unified accessor that resolves the current actor from any auth method:
-- **Person JWT**: user only
-- **User token**: user from token
-- **OrgUser token**: user + org from token's organizationUser
-- **SpaceUser token**: user + org + space from token's spaceUser
-- **Org token**: org only (no user)
-- **Space token**: space + org (no user)
-
-**Returns stripped objects** (relations removed to prevent circular refs):
-```typescript
-type OrgUserWithoutRelations = Omit<OrgUserFromToken, 'user' | 'organization'>;
-type SpaceUserWithoutRelations = Omit<SpaceUserFromToken, 'user' | 'organization' | 'organizationUser' | 'space'>;
-```
-
 #### getResource / getResourceType
 
 ```typescript
@@ -418,7 +392,7 @@ if (isSuperadmin(user)) { /* ... */ }
 
 ### refreshUserContext
 
-Located in `apps/api/src/lib/context/refreshUserContext.ts`. Reloads user's memberships and permissions mid-request.
+Located in `apps/api/src/lib/context/refreshUserContext.ts`. Reloads user's members and permissions mid-request.
 
 ```typescript
 import { refreshUserContext } from '#/lib/context/refreshUserContext';
@@ -427,14 +401,14 @@ await refreshUserContext(c);
 ```
 
 **What it does:**
-1. Clears existing permissions (prevents stale permission data)
-2. Reloads user with all relations via cached `findUserWithRelations`
-3. Updates context using `setUserContext` (user, orgs, spaces, permissions)
+1. With a token: re-runs the token sign-in (`loadTokenContext` with the token's `keyHash`) and rebuilds through `setTokenContext`, so a member's token keeps exactly its own member row and a revoked token stops with a 401
+2. With a user: reloads the user with all relations via cached `findUserWithRelations` and rebuilds through `setUserContext`
+3. Either way the table is replaced, never added to
 
 **When to use:**
 - After adding/removing user from org or space
 - After changing user's role in org or space
-- When you need fresh membership data mid-request
+- When you need fresh member data mid-request
 - In batch operations between rounds (data may have changed)
 
 **Implementation:**
@@ -461,7 +435,7 @@ export const refreshUserContext = async (c: Context<AppEnv>): Promise<void> => {
 - Optimized queries: 1 query with include + 3 parallel queries
 - Much faster than sequential queries
 
-**Note:** Refreshes ALL permissions (user, org, space) to ensure consistency after membership changes.
+**Note:** Refreshes ALL permissions (user, org, space) to ensure consistency after member changes.
 
 ---
 

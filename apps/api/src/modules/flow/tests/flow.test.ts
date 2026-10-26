@@ -26,10 +26,10 @@ import { del, get, json, jsonError, post } from '#tests/utils/request';
 
 type FlowResponse = z.infer<typeof flowResponseSchema>;
 
-const harnessFor = (user: User, seats: OrganizationUser[]) =>
+const harnessFor = (user: User, members: OrganizationUser[]) =>
   createTestApp({
     mockUser: user,
-    mockOrganizationUsers: seats,
+    mockOrganizationUsers: members,
     mount: [
       (app) => app.route('/api/v1/me', meRouter),
       (app) => app.route('/api/v1/flow', flowRouter),
@@ -70,11 +70,11 @@ describe('flows', () => {
 
   const ownedOrganization = async () => {
     const { entity: organization } = await createOrganization();
-    const { entity: seat } = await createOrganizationUser(
+    const { entity: member } = await createOrganizationUser(
       { role: 'owner' },
       { user: owner, organization },
     );
-    return { organization, seat, app: harnessFor(owner, [seat]) };
+    return { organization, member, app: harnessFor(owner, [member]) };
   };
 
   const startIn = (app: Harness, bindings: Record<string, unknown>) =>

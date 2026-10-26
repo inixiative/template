@@ -5,6 +5,7 @@
  * @uses primitive:routeTemplates, feature:inquiry
  */
 import { createRoute } from '#/lib/routeTemplates';
+import { validatePermission } from '#/middleware/validations/validatePermission';
 import {
   inquiryCreateBodySchema,
   inquiryCreateSanitizeKeys,
@@ -15,6 +16,7 @@ import { Tags } from '#/modules/tags';
 
 export const meCreateInquiryRoute = createRoute({
   model: Modules.me,
+  middleware: [validatePermission('operate')],
   submodel: Modules.inquiry,
   skipId: true,
   bodySchema: inquiryCreateBodySchema,

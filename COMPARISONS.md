@@ -537,11 +537,11 @@ OpenTelemetry instrumentation is the right 2025 approach — instrument once, ch
 | Request ID on every request + response header | **Yes** | Manual | Manual | Manual | Sometimes |
 | Permission middleware with ReBAC traversal | **Yes** | Manual | Custom guards | Manual | `if (user.role)` checks |
 | Polymorphic owner permission validation | **Yes** | No | No | No | No |
-| 6 validation middlewares (actor, user, superadmin, notToken, permission, ownerPermission) | **Yes** | Custom | Guards (similar) | Custom | 1-2 auth checks at most |
+| 3 validation middlewares (permission, submodel permission, superadmin) | **Yes** | Custom | Guards (similar) | Custom | 1-2 auth checks at most |
 | Graceful shutdown with handler registry | **Yes** (30s timeout) | Manual | `onModuleDestroy` | Manual | `process.on('SIGTERM', ...)` |
 
 ### Honest assessment
-The middleware stack is one of the template's strongest practical features. The defined execution order prevents the class of bugs where auth runs after resource loading, or rate limiting runs before the token is resolved. Batch context isolation (deep cloning mutable state per sub-request while sharing immutable app metadata) is essential for the batch API but invisible to most users. The 6 validation middleware factories mean route definitions read like declarations: `validateActor`, `validatePermission('manage')`, `validateOwnerPermission({ action: 'own' })`.
+The middleware stack is one of the template's strongest practical features. The defined execution order prevents the class of bugs where auth runs after resource loading, or rate limiting runs before the token is resolved. Batch context isolation (deep cloning mutable state per sub-request while sharing immutable app metadata) is essential for the batch API but invisible to most users. The validation middleware factories mean route definitions read like declarations: `validatePermission('manage')`, `validateSubmodelPermission('create')`, `validateSuperadmin`.
 
 ---
 

@@ -1,7 +1,12 @@
 import { afterAll, describe, expect, it } from 'bun:test';
 import { db } from '@template/db';
 import type { Token, User } from '@template/db/generated/client/client';
-import { cleanupTouchedTables, createToken, createUser } from '@template/db/test';
+import {
+  cleanupTouchedTables,
+  createOrganizationUser,
+  createToken,
+  createUser,
+} from '@template/db/test';
 import type { TokenWithRelations } from '#/lib/context/types';
 import { spoofMiddleware } from '#/middleware/auth/spoofMiddleware';
 import { createTestApp } from '#tests/createTestApp';
@@ -31,7 +36,7 @@ describe('spoofMiddleware via token auth', () => {
     await cleanupTouchedTables(db);
   });
 
-  it('superadmin authenticated via token can spoof another user', async () => {
+  it('a superadmin on a token spoofs and becomes the user, the token set aside', async () => {
     const { entity: admin } = await createUser({ platformRole: 'superadmin' });
     const { entity: target } = await createUser();
     const { entity: token } = await createToken({ ownerModel: 'User' }, { user: admin });
@@ -44,7 +49,7 @@ describe('spoofMiddleware via token auth', () => {
     const body = (await res.json()) as Echo;
     expect(body.userId).toBe(target.id);
     expect(body.spoofedById).toBe(admin.id);
-    expect(body.tokenId).toBe(token.id);
+    expect(body.tokenId).toBeNull();
   });
 
   it('non-superadmin with token cannot spoof — header is ignored', async () => {
@@ -60,5 +65,36 @@ describe('spoofMiddleware via token auth', () => {
     const body = (await res.json()) as Echo;
     expect(body.userId).toBe(caller.id);
     expect(body.spoofedById).toBeNull();
+  });
+
+  it("spoofing replaces the superadmin's table with the spoofed user's", async () => {
+    const { entity: adminMember, context } = await createOrganizationUser(
+      { role: 'owner' },
+      { user: (await createUser({ platformRole: 'superadmin' })).entity },
+    );
+    const { entity: target } = await createUser();
+    const app = createTestApp({
+      mockUser: context.user,
+      mockOrganizationUsers: [adminMember],
+      mount: [
+        (hono) => {
+          hono.use('*', spoofMiddleware);
+          hono.get('/table', (c) =>
+            c.json({
+              grants: Object.keys(c.get('permix').getJSON() ?? {}),
+              superadmin: c.get('permix').isSuperadmin(),
+            }),
+          );
+        },
+      ],
+    });
+
+    const res = await app.fetch(
+      new Request('http://test/table', { headers: { 'x-spoof-user-email': target.email } }),
+    );
+
+    const body = (await res.json()) as { grants: string[]; superadmin: boolean };
+    expect(body.superadmin).toBe(false);
+    expect(body.grants).toEqual([`db:user:${target.id}`]);
   });
 });

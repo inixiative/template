@@ -9,7 +9,7 @@
 ## #
 
 **#/**  
-Alias for imports inside the same app (e.g. #/lib/context/getActor). *Region:* [Monorepo layout and architecture](monorepo-architecture/knowledge.md)
+Alias for imports inside the same app (e.g. #/lib/context/installPermissions). *Region:* [Monorepo layout and architecture](monorepo-architecture/knowledge.md)
 
 ## A
 
@@ -50,10 +50,10 @@ useActionRuleBuilder with buildActionRoot / setSchemaAction / removeSchemaAction
 Route template for a custom non-CRUD verb, e.g. action: 'activate' → POST /:id/activate. *Region:* [API routes, controllers and modules](api-routes/knowledge.md)
 
 **ActionRule**  
-One permission expression: string delegation, { rel, action }, { self }, { rule }, { any }, { all }, or null. *Region:* [Permissions library (ReBAC engine)](lib-permissions/knowledge.md)
+One permission expression: string delegation, { rel, action }, { rule }, { any }, { all }, or null. *Region:* [Permissions library (ReBAC engine)](lib-permissions/knowledge.md)
 
 **ActionRule**  
-One rule: action string, { rel, action }, { self }, { rule }, { any }, { all }, or null. *Region:* [ReBAC, owner-polymorphic and row permissions](permissions-rebac/knowledge.md)
+One rule: action string, { rel, action }, { rule }, { any }, { all }, or null. *Region:* [ReBAC, owner-polymorphic and row permissions](permissions-rebac/knowledge.md)
 
 **actionRuleSchema**  
 Recursive Zod validator for a serialized ActionRule, on the @inixiative/permissions-roles / permissions-rebac/actionRuleSchema subpath. *Region:* [Permissions library (ReBAC engine)](lib-permissions/knowledge.md)
@@ -281,7 +281,7 @@ Store slice (packages/ui/src/store/slices/auth.ts) holding user, organizations, 
 Frontend choice between standalone (own login) and embedded (parent frame) authentication, detected by detectAuthStrategy. *Region:* [Authentication: sessions, providers, tokens](authentication/knowledge.md)
 
 **auth-middleware**  
-Class: the auth middleware chain, spoofing and the validateUser/validateActor gates. *Region:* [Auth middleware, validators and users](auth-middleware-users/knowledge.md)
+Class: the auth middleware chain and spoofing; no "is there a user" gate — every route names its action and the rule decides. *Region:* [Auth middleware, validators and users](auth-middleware-users/knowledge.md)
 
 **auth.initialize**  
 Once per load: if a token exists, hydrate /me and authenticate the websocket; sets isInitialized. *Region:* [Frontend Authentication](frontend-auth/knowledge.md)
@@ -1541,9 +1541,6 @@ Thrown when the create-if-missing fence is not acquired within waitMs (default 3
 **FindForUpdateLockTimeoutError**  
 Thrown when an `upserting` fence can't get its Redis lock within waitMs (default 3000ms); rolls the transaction back. *Region:* [Database client and transactions](database-client/knowledge.md)
 
-**findOwnedIntegration**  
-Loads an integration by id only if the caller's user or organization owns it. *Region:* [Adapters, integrations and storage](adapters-integrations/knowledge.md)
-
 **findRoute / findRouteAcrossContexts**  
 Match a path to its nav item within one context, or across contexts. *Region:* [Navigation config and tenant context](navigation/knowledge.md)
 
@@ -1632,12 +1629,6 @@ turbo dependsOn ordering db:generate → generate:openapi → generate:sdk, then
 
 **get / post / patch / del / json**  
 Request builders and typed response parser from #tests/utils/request; jsonError for error bodies. *Region:* [Test harness, request helpers and VCR](test-harness/knowledge.md)
-
-**getActor**  
-Returns the acting user, falling back from c.get('user') to the organizationUser / spaceUser / token user. *Region:* [Auth middleware, validators and users](auth-middleware-users/knowledge.md)
-
-**getActor**  
-Resolves the acting user, organization, organizationUser, space, spaceUser and token for any session or token kind. *Region:* [Request context and errors](request-context-errors/knowledge.md)
 
 **getConcurrency**  
 Returns the tightest predefined cap across the ConcurrencyType resources touched. *Region:* [Concurrency, locks and lanes](concurrency-locks/knowledge.md)
@@ -2043,7 +2034,7 @@ A scalar field condition row; exposes valid plus field.valid / value.valid and i
 A scalar field condition row; exposes valid plus field.valid / value.valid and its reachable scopes. *Region:* [Rule builder: template usage](rules-builder/knowledge.md)
 
 **leave**  
-Self action ({ self: 'userId' }) letting a user remove their own membership or token. *Region:* [Roles, actions and permission checks](permissions-roles/knowledge.md)
+Action ({ rel: 'user', action: 'operate' }) letting a user remove their own membership or token row. *Region:* [Roles, actions and permission checks](permissions-roles/knowledge.md)
 
 **lefthook**  
 Pre-commit hooks from @inixiative/config/lefthook/base.yml running typecheck and Biome on staged files. *Region:* [Scripts, lint and build tooling](dx-tools/knowledge.md)
@@ -2095,9 +2086,6 @@ One visit as projectLens would give it, resolved on demand at a relation path; n
 
 **lensWhere**  
 Folds a lens's non-root narrowing clauses into a composed Prisma where across relations. *Region:* [Template lenses](lenses/knowledge.md)
-
-**lesserRole**  
-Returns the lower role; caps a token's role at its user's membership role. *Region:* [Roles, actions and permission checks](permissions-roles/knowledge.md)
 
 **lib-atlas**  
 The @inixiative/atlas library: the code-map CLI, annotation model and .atlas/ config. *Region:* [Atlas code map (library + template usage)](lib-atlas/knowledge.md)
@@ -2665,8 +2653,8 @@ Makes every permix check pass for a superadmin. *Region:* [Tenancy and Superadmi
 **permix.setup**  
 Loads role-derived grants into permix. *Region:* [Permissions library (ReBAC engine)](lib-permissions/knowledge.md)
 
-**permix.setUserId**  
-Sets the actor id that { self } rules compare against. *Region:* [Permissions library (ReBAC engine)](lib-permissions/knowledge.md)
+**permix.setActor**  
+Sets the actor (model + record) that { rule } conditions read as __actor. *Region:* [Permissions library (ReBAC engine)](lib-permissions/knowledge.md)
 
 **PermixLike**  
 The grant-reading slice of permix the check engine consumes. *Region:* [Permissions library (ReBAC engine)](lib-permissions/knowledge.md)
@@ -3155,9 +3143,6 @@ Per-membership and per-token role: owner, admin, member, viewer, ordered by role
 **roleHierarchy**  
 ['viewer','member','admin','owner']; higher index means more permissions-roles / permissions-rebac. *Region:* [Roles, actions and permission checks](permissions-roles/knowledge.md)
 
-**rolesAtOrAbove**  
-Role list at or above a minimum, for minimum-role filters and queries. *Region:* [Roles, actions and permission checks](permissions-roles/knowledge.md)
-
 **rolling window**  
 An `ago`-shaped date expression (`rollingShift`, `rollingExpr` in dateExpr.ts) that moves with `now`. *Region:* [json-rules dates, windows and verbs](json-rules-dates/knowledge.md)
 
@@ -3433,9 +3418,6 @@ Class tag: provider-owned audiences with static/dynamic membership reconciliatio
 **SegmentType**  
 static (computed after create or rule change) or dynamic (also reacts to customer changes). *Region:* [Customers and segments](customers-segments/knowledge.md)
 
-**self**  
-{ self: field }: granted when record[field] equals the actor id. *Region:* [Permissions library (ReBAC engine)](lib-permissions/knowledge.md)
-
 **send / resolve / read**  
 The inquiry ReBAC actions: source-side send (create, edit, send, cancel), target-side resolve, either-side read. *Region:* [Inquiry model and handlers](inquiry-handlers/knowledge.md)
 
@@ -3483,12 +3465,6 @@ The settings pages' shared layout; settings are nested routes under it, not tabs
 
 **settleTemplate**  
 API entry that resolves a template through the cascade and renders subject and body with system tokens and RenderIssue collection. *Region:* [Email compose, render and save](email-render/knowledge.md)
-
-**setupOrgContext**  
-Loads one org's role-derived grants into permix (superadmin short-circuits). *Region:* [Roles, actions and permission checks](permissions-roles/knowledge.md)
-
-**setupOrgPermissions**  
-Request-level setup for every org membership (or Organization token), capped by the token. *Region:* [Roles, actions and permission checks](permissions-roles/knowledge.md)
 
 **setupState / SetupState**  
 'new' | 'stale' | 'incomplete' | 'complete', derived with useMemo via detectSetupState, never stored. *Region:* [Init script architecture and direction](init-architecture/knowledge.md)
@@ -4177,9 +4153,6 @@ The flow for every rule entering execution: validateRuleInLens, then narrowRule,
 **validate:encryption**  
 The CI script ENCRYPTION.md describes; it does not exist yet in template. *Region:* [Encryption and secrets](encryption/knowledge.md)
 
-**validateActor**  
-401 unless getActor(c).user resolves. *Region:* [Auth middleware, validators and users](auth-middleware-users/knowledge.md)
-
 **validateEncryptionVersions**  
 Pre-deploy check returning { valid, errors } for version downgrades, jumps, mixed-version bumps and bad keyrings; not yet wired into any script or CI. *Region:* [Encryption and secrets](encryption/knowledge.md)
 
@@ -4195,23 +4168,11 @@ Check a narrowing chain at construction; returns { ok, errors } with codes such 
 **validateNotLastOwner**  
 Blocks removing or demoting an organization's last owner. *Region:* [Tenancy and Superadmin](tenancy/knowledge.md)
 
-**validateNotToken**  
-Session-only gate: 403 for token-authenticated requests. *Region:* [Auth middleware, validators and users](auth-middleware-users/knowledge.md)
-
-**validateNotToken**  
-Session-only gate: 401 without a user, 403 for any token. *Region:* [Roles, actions and permission checks](permissions-roles/knowledge.md)
-
-**validateOwnerPermission**  
-Route middleware for owner-polymorphic resources: checks the action on the ownerModel's owner. *Region:* [ReBAC, owner-polymorphic and row permissions](permissions-rebac/knowledge.md)
-
 **validatePathNotation**  
 Rejects unsafe, snake_case, underscore-prefixed or too-deep (MAX_PATH_DEPTH 5) dotted paths. *Region:* [List filtering and search](filtering-search/knowledge.md)
 
 **validatePermission**  
 Route middleware: hydrate the loaded resource and run check for an action; 403 on failure. *Region:* [Roles, actions and permission checks](permissions-roles/knowledge.md)
-
-**validateRole**  
-Parses an unknown role value during permission setup; code throws 500 on invalid (doc says viewer). *Region:* [Roles, actions and permission checks](permissions-roles/knowledge.md)
 
 **validateRule / assertValidRule**  
 Check a rule shape and that it runs on a target; the first returns issues, the second throws. *Region:* [Running, validating and typing rules](json-rules-runtime/knowledge.md)
@@ -4227,9 +4188,6 @@ Middleware: 403 unless the user's platformRole is superadmin; mounted on the adm
 
 **validateTransition**  
 Authoring validation of predicates, merge and permission shape; returns ValidationResult and never throws. *Region:* [Transitions library (lifecycle guards)](lib-transitions/knowledge.md)
-
-**validateUser**  
-401 unless c.get('user') is set. *Region:* [Auth middleware, validators and users](auth-middleware-users/knowledge.md)
 
 **validateWebhookUrl**  
 Rejects unsafe user-supplied target URLs (private addresses; relaxed in non-enforced envs); isPrivateAddress and hostnameOf are its building blocks. *Region:* [App events and webhooks](app-events-webhooks/knowledge.md)
