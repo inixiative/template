@@ -9,10 +9,9 @@ export const validatePermission = makeMiddleware<Action>((action) => async (c, n
   const resourceType = c.get('resourceType');
   const permix = c.get('permix');
 
-  // No resource loaded = nothing to check (let route handle it)
-  if (!resource || !resourceType) return next();
+  if (!resource || !resourceType)
+    throw new Error(`validatePermission('${action}') needs a loaded resource`);
 
-  // Hydrate with relations for ReBAC traversal (org → space, etc.)
   const hydrated = await hydrate(resourceType, resource as { id: string });
 
   if (!check(permix, rebacSchema, resourceType, hydrated, action)) {
