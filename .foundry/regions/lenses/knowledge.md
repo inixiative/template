@@ -321,7 +321,7 @@ From the catalog (`.foundry/catalog/catalog.json`, extracted from the code). Eac
 #### Class `lenses`
 - **bindLens** `apps/api/src/lib/email/bindLens.ts#bindLens` [primitive] substitute bound values into a lens narrowing chain's tokens Use: const bound = bindLens(narrowing, values);
 - **customerRefLens** `apps/api/src/modules/customerRef/lib/customerRefLens.ts#customerRefLens` [primitive] declare which CustomerRef fields and relations segment rules may reach Use: import { customerRefLens } from '#/modules/customerRef/lib/customerRefLens'
-- **emailOwnerProvider** `packages/email/src/render/owner.ts#emailOwnerProvider` [primitive] convert an email owner reference into the lens owner used for data binding Use: const lensOwner = emailOwnerProvider(ownerRef)
+- **emailOwnerProvider** `packages/email/src/render/owner.ts#emailOwnerProvider` [primitive] convert an email owner reference into the lens owner used for data binding Use: const lensOwner = emailOwnerProvider(ownerColumns)
 - **fetchLens** `packages/db/src/hydrate/fetchLens.ts#fetchLens` [primitive] load all rows matching a lens or lens narrowing via its compiled Prisma where Use: const rows = await fetchLens<Row>(lens)
 - **lensFor** `packages/db/src/lens/lensFor.ts#lensFor` [primitive] build the base Prisma-column lens for a model Use: const lens = lensFor('User')
 - **lensFromOperation** `packages/sdk/src/lenses/lensFromOperation.ts#lensFromOperation` [primitive] derive an endpoint's filter lens from its OpenAPI 200 response data shape Use: const lens = lensFromOperation('meReceivedManyInquiries');

@@ -4,16 +4,15 @@
  * @partOf infrastructure:prisma
  * @uses none
  */
-import type { HydratedRecord } from '@template/db/hydrate/types';
 import { getPolymorphismConfig } from '@template/db/registries/falsePolymorphism';
 import { type AccessorName, toModelName } from '@template/db/utils/modelNames';
 import { getAccessorRelations } from '@template/db/utils/prismaMapRelations';
 
-export const ownerRef = (
+export const ownerColumns = (
   child: AccessorName,
   ownerAccessor: AccessorName,
   owner: Record<string, unknown>,
-): HydratedRecord => {
+): Record<string, string> => {
   const ownerModel = toModelName(ownerAccessor);
   const relations = getAccessorRelations(child).filter(
     (relation) => relation.targetAccessor === ownerAccessor && relation.foreignKey,
@@ -33,8 +32,8 @@ export const ownerRef = (
         );
 
   const config = getPolymorphismConfig(toModelName(child));
-  if (!config) return { id: '', ...keys };
+  if (!config) return keys;
   const axis = config.axes.find((candidate) => candidate.fkMap[ownerModel]);
   if (!axis) throw new Error(`${child} cannot be owned by ${ownerModel}`);
-  return { id: '', [axis.field]: ownerModel, ...keys };
+  return { [axis.field]: ownerModel, ...keys };
 };

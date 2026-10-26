@@ -4,7 +4,7 @@
  * @partOf feature:tenancy
  * @uses feature:integrations
  */
-import { ownerRef, Prisma } from '@template/db';
+import { ownerColumns, Prisma } from '@template/db';
 import { getResource } from '#/lib/context/getResource';
 import { makeController } from '#/lib/utils/makeController';
 import { validateIntegrationGrant } from '#/modules/integration/validations/validateIntegrationGrant';
@@ -14,7 +14,7 @@ export const organizationUserCreateIntegrationController = makeController(
   organizationUserCreateIntegrationRoute,
   async (c, respond) => {
     const db = c.get('db');
-    const { id: _id, ...owner } = ownerRef(
+    const owner = ownerColumns(
       'integration',
       'organizationUser',
       getResource<'organizationUser'>(c),

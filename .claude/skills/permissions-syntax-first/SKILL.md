@@ -53,12 +53,12 @@ The actor is `{ model: 'User' | 'Token', record }` (sanitized row). Rules read i
 
 Shared pieces already in `schema.ts` — reuse, don't re-derive:
 - `actorIsUser` (`__actor.model == User`), `actorIsDelegateOfUser` (`__actor.record.ownerModel == User`);
-- `onOwner(action)`: walk a delegate's direct owner by `ownerModel`;
-- `heldAtOwner`: the role on the row is one the actor holds at the direct owner (owner→own, admin→manage, member→operate, viewer→read via `roleToStandardAction`);
+- `actionOnOwner(action)`: walk a delegate's direct owner by `ownerModel`;
+- `roleHeldAtOwner`: the role on the row is one the actor holds at the direct owner (owner→own, admin→manage, member→operate, viewer→read via `roleToStandardAction`);
 - `assignRole(own, manage)`: high roles need `own`, others `manage` — the one role-assignment rule for members and integrations;
 - `actorIsItsUser(at)`: `${at}userId` is set and is the acting user (or a User-owned token of that user), narrowed by `manage` on that user;
-- `yoursOrOrganizationOrSpace(at)`: owned by an organization or space, or `actorIsItsUser(at)`;
-- `ownedByIntegration` / `notOwnedByIntegration`, and `onOwner(action, at)` with a path prefix (e.g. `'integration.'`).
+- `ownedByYouOrOrganizationOrSpace(at)`: owned by an organization or space, or `actorIsItsUser(at)`;
+- `ownedByIntegration` / `notOwnedByIntegration`, and `actionOnOwner(action, at)` with a path prefix (e.g. `'integration.'`).
 
 Other parts of the system (use them, don't parallel them):
 - `canGrantEntitlement` — the only check for writing entitlements;
@@ -76,7 +76,7 @@ An action on something that does not exist yet, or on a collection, is checked o
   check(permix, rebacSchema, 'token', standIn, TokenAction.create);
   ```
   The rule for creating a token lives on `db:token`, never on its owner (`token.create` on organization/space/user was the bug behind a bypass: stored actions on a member's organization entry satisfied it).
-- **Collections are pseudo records too** (user, 10-26): `validateSubmodelPermission(action)` checks the action on a pseudo record of the route's submodel under the loaded owner (`ownerRef`, from the polymorphism registry); it never reads the body. Lists that are really "which of these can I see" (spaces of an organization, member-shaped lists, customers, segment memberships, inquiries) stay a model check on the real owner until AUTH-008.
+- **Collections are pseudo records too** (user, 10-26): `validateSubmodelPermission(action)` checks the action on a pseudo record of the route's submodel under the loaded owner (`ownerColumns`, from the polymorphism registry); it never reads the body. Lists that are really "which of these can I see" (spaces of an organization, member-shaped lists, customers, segment memberships, inquiries) stay a model check on the real owner until AUTH-008.
 - **Role writes** (members, integrations) need the body, so they run in the controller: `assign` on the row as it is and on the row as it will be.
 - **Grants:** `canGrantEntitlement` itself checks each action on a pseudo record of the entry's resource under the anchor.
 
@@ -86,10 +86,10 @@ An action on something that does not exist yet, or on a collection, is checked o
 |---|---|
 | `token.create` copied onto six owner models | `create` on a pseudo record `db:token` |
 | actions named after other models (`organization.create` on user) | each action on its own model (test: a dotted action is named after its model) |
-| a `yours` action to hop to the integration | a path condition: `yoursOrOrganizationOrSpace('integration.')` |
+| a `yours` action to hop to the integration | a path condition: `ownedByYouOrOrganizationOrSpace('integration.')` |
 | `leave` as an alternative that skipped the role check | the role check always runs; "yours" is an extra requirement |
 | `full` arms in the schema | `full` is inheritance: skipped at install (`delegateTable`); setting it takes `own` on the owner. CI rule `no-full-in-rebac-schema` |
-| write-time "ceiling" with a trim in `validateDelegateGrant` | `heldAtOwner` + `assignRole` + `canGrantEntitlement` |
+| write-time "ceiling" with a trim in `validateDelegateGrant` | `roleHeldAtOwner` + `assignRole` + `canGrantEntitlement` |
 | copying delegated keys onto a pseudo record | hydrate the relation and read it |
 | explicit `validateRules` in controllers | the rules hook |
 | a library clause special-casing "conditional" actions | removed in 0.8: the owner walk already re-runs the rule's conditions |

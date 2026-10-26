@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { createHash, randomBytes } from 'node:crypto';
 import { z } from '@hono/zod-openapi';
-import { db, hydrate, ownerRef, unregisterDbHook } from '@template/db';
+import { db, hydrate, ownerColumns, unregisterDbHook } from '@template/db';
 import type { Organization, Role, Space, User } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
@@ -396,7 +396,10 @@ describe('submodel actions act on the submodel, under the owner (R38)', () => {
       );
       const permix = createPermissions();
       await permix.setup({ resource: 'db:contact', id: contact.id, actions: { create: true } });
-      const pseudo = await hydrate('contact', ownerRef('contact', 'organization', organization));
+      const pseudo = await hydrate('contact', {
+        id: '',
+        ...ownerColumns('contact', 'organization', organization),
+      });
       expect(pseudo.id).toBe('');
       expect(check(permix, rebacSchema, 'contact', pseudo, 'create')).toBe(false);
       expect(check(permix, rebacSchema, 'contact', { ...pseudo, id: contact.id }, 'create')).toBe(
@@ -406,35 +409,32 @@ describe('submodel actions act on the submodel, under the owner (R38)', () => {
   });
 });
 
-describe('ownerRef places a pseudo record of the child under its owner', () => {
+describe('ownerColumns gives a child the columns that place it under its owner', () => {
   it('a polymorphic child carries the discriminator and the owner keys', () => {
     const space = { id: 's1', organizationId: 'o1' };
-    expect(ownerRef('integration', 'space', space)).toEqual({
-      id: '',
+    expect(ownerColumns('integration', 'space', space)).toEqual({
       ownerModel: 'Space',
       organizationId: 'o1',
       spaceId: 's1',
     });
-    expect(ownerRef('contact', 'user', { id: 'u1' })).toEqual({
-      id: '',
+    expect(ownerColumns('contact', 'user', { id: 'u1' })).toEqual({
       ownerModel: 'User',
       userId: 'u1',
     });
     expect(
-      ownerRef('token', 'organizationUser', { id: 'm1', organizationId: 'o1', userId: 'u1' }),
-    ).toEqual({ id: '', ownerModel: 'OrganizationUser', organizationId: 'o1', userId: 'u1' });
+      ownerColumns('token', 'organizationUser', { id: 'm1', organizationId: 'o1', userId: 'u1' }),
+    ).toEqual({ ownerModel: 'OrganizationUser', organizationId: 'o1', userId: 'u1' });
   });
 
   it('a plain child carries the single relation to its owner', () => {
-    expect(ownerRef('authProvider', 'organization', { id: 'o1' })).toEqual({
-      id: '',
+    expect(ownerColumns('authProvider', 'organization', { id: 'o1' })).toEqual({
       organizationId: 'o1',
     });
   });
 
   it('an owner the child cannot have is an error', () => {
-    expect(() => ownerRef('flow', 'organization', { id: 'o1' })).toThrow();
-    expect(() => ownerRef('contact', 'integration', { id: 'i1' })).toThrow();
+    expect(() => ownerColumns('flow', 'organization', { id: 'o1' })).toThrow();
+    expect(() => ownerColumns('contact', 'integration', { id: 'i1' })).toThrow();
   });
 });
 

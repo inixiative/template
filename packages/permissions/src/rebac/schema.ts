@@ -6,6 +6,7 @@
  */
 import { Operator } from '@inixiative/json-rules';
 import {
+  actionOnOwner,
   actorIsDelegateOfUser,
   actorIsUser,
   assignRole,
@@ -13,7 +14,6 @@ import {
   integrationAccess,
   integrationAdministering,
   managedUpTheChain,
-  onOwner,
   ownerActions,
   tokenAccessIsYours,
 } from '@template/permissions/rebac/schemaHelpers';
@@ -141,7 +141,7 @@ export const rebacSchema: RebacSchema = {
     'db:token': {
       actions: {
         leave: { rel: 'user', action: 'operate' },
-        own: onOwner('own'),
+        own: actionOnOwner('own'),
         read: 'own',
         create: { all: [actorIsUser, tokenAccessIsYours] },
         delete: { all: [actorIsUser, { any: ['leave', managedUpTheChain] }] },

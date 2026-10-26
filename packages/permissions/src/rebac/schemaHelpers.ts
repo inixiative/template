@@ -17,7 +17,7 @@ export const actorIsDelegateOfUser: ActionRule = {
   rule: { field: '__actor.record.ownerModel', operator: Operator.equals, value: 'User' },
 };
 
-export const owners = [
+export const ownerRelations = [
   ['User', 'user'],
   ['Organization', 'organization'],
   ['OrganizationUser', 'organizationUser'],
@@ -26,8 +26,8 @@ export const owners = [
   ['Integration', 'integration'],
 ] as const;
 
-export const onOwner = (action: string, at = ''): ActionRule => ({
-  any: owners.map(([ownerModel, rel]) => ({
+export const actionOnOwner = (action: string, at = ''): ActionRule => ({
+  any: ownerRelations.map(([ownerModel, rel]) => ({
     all: [
       { rule: { field: `${at}ownerModel`, operator: Operator.equals, value: ownerModel } },
       { rel: `${at}${rel}`, action },
@@ -78,13 +78,13 @@ export const notOwnedByIntegration: ActionRule = {
   rule: { field: 'ownerModel', operator: Operator.notEquals, value: 'Integration' },
 };
 
-export const highRole: ActionRule = {
+export const roleIsHigh: ActionRule = {
   rule: { field: 'role', operator: Operator.in, value: highRoles },
 };
 
 export const assignRole = (own: ActionRule, manage: ActionRule): ActionRule => ({
   any: [
-    { all: [highRole, own] },
+    { all: [roleIsHigh, own] },
     {
       all: [
         { rule: { field: 'role', operator: Operator.in, value: ['member', 'viewer'] } },
@@ -94,24 +94,24 @@ export const assignRole = (own: ActionRule, manage: ActionRule): ActionRule => (
   ],
 });
 
-export const heldAtOwner = (at = ''): ActionRule => ({
+export const roleHeldAtOwner = (at = ''): ActionRule => ({
   any: [
     {
       all: [
         { rule: { field: 'role', operator: Operator.equals, value: null } },
-        onOwner('read', at),
+        actionOnOwner('read', at),
       ],
     },
     ...roleHierarchy.map((role) => ({
       all: [
         { rule: { field: 'role', operator: Operator.equals, value: role } },
-        onOwner(roleToStandardAction(role), at),
+        actionOnOwner(roleToStandardAction(role), at),
       ],
     })),
   ],
 });
 
-export const yoursOrOrganizationOrSpace = (at = ''): ActionRule => ({
+export const ownedByYouOrOrganizationOrSpace = (at = ''): ActionRule => ({
   any: [ownedByOrganizationOrSpace(at), actorIsItsUser(at)],
 });
 
@@ -127,35 +127,40 @@ export const integrationAdministering = {
   create: {
     any: [
       { all: [ownedByUser, { rel: 'user', action: 'operate' }] },
-      { all: [ownedByOrganizationOrSpace(), onOwner('manage')] },
+      { all: [ownedByOrganizationOrSpace(), actionOnOwner('manage')] },
       { all: [ownedByMember, actorIsItsUser()] },
     ],
   },
-  own: { any: [actorIsItsUser(), { all: [ownedByOrganizationOrSpace(), onOwner('own')] }] },
+  own: { any: [actorIsItsUser(), { all: [ownedByOrganizationOrSpace(), actionOnOwner('own')] }] },
   manage: {
-    any: [actorIsItsUser(), { all: [ownedByOrganizationOrSpace(), onOwner('manage')] }],
+    any: [actorIsItsUser(), { all: [ownedByOrganizationOrSpace(), actionOnOwner('manage')] }],
   },
 } satisfies Record<string, ActionRule>;
 
 export const integrationAccess = {
-  operate: onOwner('operate'),
-  read: onOwner('read'),
+  operate: actionOnOwner('operate'),
+  read: actionOnOwner('read'),
   assign: {
     any: [
-      { all: [ownedByOrganizationOrSpace(), assignRole(onOwner('own'), onOwner('manage'))] },
-      { all: [actorIsItsUser(), heldAtOwner()] },
+      {
+        all: [
+          ownedByOrganizationOrSpace(),
+          assignRole(actionOnOwner('own'), actionOnOwner('manage')),
+        ],
+      },
+      { all: [actorIsItsUser(), roleHeldAtOwner()] },
     ],
   },
 } satisfies Record<string, ActionRule>;
 
 export const tokenAccessIsYours: ActionRule = {
   any: [
-    { all: [notOwnedByIntegration, heldAtOwner(), yoursOrOrganizationOrSpace()] },
+    { all: [notOwnedByIntegration, roleHeldAtOwner(), ownedByYouOrOrganizationOrSpace()] },
     {
       all: [
         ownedByIntegration,
-        heldAtOwner('integration.'),
-        yoursOrOrganizationOrSpace('integration.'),
+        roleHeldAtOwner('integration.'),
+        ownedByYouOrOrganizationOrSpace('integration.'),
       ],
     },
   ],
@@ -163,8 +168,8 @@ export const tokenAccessIsYours: ActionRule = {
 
 export const managedUpTheChain: ActionRule = {
   any: [
-    { all: [notOwnedByIntegration, onOwner('manage')] },
-    { all: [ownedByIntegration, onOwner('manage', 'integration.')] },
+    { all: [notOwnedByIntegration, actionOnOwner('manage')] },
+    { all: [ownedByIntegration, actionOnOwner('manage', 'integration.')] },
   ],
 };
 
