@@ -4,7 +4,13 @@
  * @partOf primitive:errors
  * @uses infrastructure:prisma, primitive:shared, infrastructure:observability, primitive:routeTemplates
  */
-import { isUniqueConstraintError, isWriteConflictError, LockLostError, Prisma } from '@template/db';
+import {
+  isUniqueConstraintError,
+  isWriteConflictError,
+  LockLostError,
+  Prisma,
+  RuleReferenceError,
+} from '@template/db';
 import { log } from '@template/shared/logger';
 import { isTest } from '@template/shared/utils';
 import type { Context } from 'hono';
@@ -51,6 +57,12 @@ export const errorHandlerMiddleware = async (err: unknown, c: Context<AppEnv>) =
     return respondAppError(
       c,
       makeError({ status: 409, message: 'Lost the lock guarding this write; please retry' }),
+    );
+
+  if (err instanceof RuleReferenceError)
+    return respondAppError(
+      c,
+      makeError({ status: 422, message: err.message, details: err.details }),
     );
 
   if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {

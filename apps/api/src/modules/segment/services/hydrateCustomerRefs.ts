@@ -4,10 +4,11 @@
  * @partOf feature:segment
  * @uses infrastructure:prisma
  */
-import { type LensNarrowing, Operator } from '@inixiative/json-rules';
+import { bindLens } from '@inixiative/json-rules';
+import { polymorphicBindings } from '@template/db';
 import type { ProviderModel } from '@template/db/generated/client/enums';
 import { fetchLens } from '@template/db/hydrate/fetchLens';
-import { resolvedCustomerRefLens } from '#/modules/customerRef/lib/customerRefLens';
+import { customerRefsByIdLens } from '#/modules/customerRef/lib/lenses/customerRefsByIdLens';
 
 export type HydratedCustomerRef = Record<string, unknown> & {
   id: string;
@@ -20,9 +21,10 @@ export const hydrateCustomerRefs = async (
   customerRefIds: string[],
 ): Promise<HydratedCustomerRef[]> => {
   if (!customerRefIds.length) return [];
-  const lens: LensNarrowing = {
-    parent: resolvedCustomerRefLens(ownerModel, ownerId),
-    root: { where: { field: 'id', operator: Operator.in, value: customerRefIds } },
-  };
-  return fetchLens<HydratedCustomerRef>(lens);
+  return fetchLens<HydratedCustomerRef>(
+    bindLens(customerRefsByIdLens, {
+      ...polymorphicBindings(ownerModel, ownerId),
+      customerRefIds,
+    }),
+  );
 };

@@ -1,5 +1,5 @@
-import { afterAll, describe, expect, it } from 'bun:test';
-import { db } from '@template/db';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { clearHookRegistry, db } from '@template/db';
 import { type SeedFile, seedTable } from '@template/db/prisma/seed';
 import { seeds } from '@template/db/prisma/seeds';
 import {
@@ -9,7 +9,10 @@ import {
   createTagCategory,
 } from '@template/db/test';
 import { TokenValidationError } from '@template/email/errors/TokenValidationError';
+import { registerRuleReferenceHook } from '#/hooks/ruleReference/hook';
+import { registerRulesHook } from '#/hooks/rules/hook';
 import { emailSeedSavers } from '#/lib/email/emailSeedSavers';
+import { deadReferencesOf } from '#tests/utils/deadReferences';
 
 const emailSeeds = seeds.filter((file) => file.savedByApp);
 
@@ -30,7 +33,13 @@ const invalidTemplate: SeedFile = {
   ],
 };
 
+beforeAll(() => {
+  registerRulesHook();
+  registerRuleReferenceHook();
+});
+
 afterAll(async () => {
+  clearHookRegistry();
   await cleanupTouchedTables(db);
 });
 
@@ -94,9 +103,9 @@ describe('email seeds persist through the app save', () => {
       ],
     };
 
-    await expect(seedTable(component, emailSeedSavers)).rejects.toThrow(
-      /outside this source's view/,
-    );
+    expect(await deadReferencesOf(seedTable(component, emailSeedSavers))).toEqual([
+      { model: 'Tag', id: tag.id, state: 'missing' },
+    ]);
     expect(await db.emailComponent.findFirst({ where: { slug: 'seed-org-tag' } })).toBeNull();
   });
 });

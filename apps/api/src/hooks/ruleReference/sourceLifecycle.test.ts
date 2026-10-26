@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
 import { Operator } from '@inixiative/json-rules';
-import { clearHookRegistry, db, liveRuleReferenceKeys, ruleReferenceIssues } from '@template/db';
+import { clearHookRegistry, db, type RuleReferenceRow, ruleReferenceTargets } from '@template/db';
 import type { Space } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
@@ -11,12 +11,15 @@ import {
 } from '@template/db/test';
 import { referenceKey } from '@template/shared/rules';
 import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
+import { registerRuleReferenceHook } from '#/hooks/ruleReference/hook';
 import { registerRuleReferenceTargetHook } from '#/hooks/ruleReference/targetHook';
 import { registerRulesHook } from '#/hooks/rules/hook';
 import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
-import { registerSegmentRuleReferencesHook } from '#/hooks/segmentRuleReferences/hook';
 import { registerSoftDeleteCascadeHook } from '#/hooks/softDeleteCascade/hook';
 import { saveEmailTemplate } from '#/lib/email/saveEmailTemplate';
+
+const deadTargets = (edges: RuleReferenceRow[]) =>
+  ruleReferenceTargets(edges).filter((target) => target.state !== 'existing');
 
 const mjml = (content: string) =>
   `<mjml><mj-body><mj-section><mj-column><mj-text>${content}</mj-text></mj-column></mj-section></mj-body></mjml>`;
@@ -70,7 +73,7 @@ describe('ruleReference — a source takes its edges with it and brings them bac
     registerPreventHardDeleteHook();
     registerRulesHook();
     registerSegmentConditionsHook();
-    registerSegmentRuleReferencesHook();
+    registerRuleReferenceHook();
     registerRuleReferenceTargetHook();
     registerSoftDeleteCascadeHook();
   });
@@ -112,7 +115,7 @@ describe('ruleReference — a source takes its edges with it and brings them bac
         targetId: tag.id,
         targetTagId: tag.id,
       });
-      expect(ruleReferenceIssues(edges)).toEqual([]);
+      expect(deadTargets(edges)).toEqual([]);
     });
 
     it('comes back degraded, not refused, when the tag it names died while it was away', async () => {
@@ -127,10 +130,10 @@ describe('ruleReference — a source takes its edges with it and brings them bac
         where: { sourceEmailTemplateId: template.id },
       });
       expect(edges[0]?.targetDeletedAt?.toISOString()).toBe('2026-09-30T12:00:00.000Z');
-      expect(ruleReferenceIssues(edges).map((issue) => issue.reason)).toEqual(['deleted']);
+      expect(deadTargets(edges).map((issue) => issue.state)).toEqual(['deleted']);
     });
 
-    it('comes back with no edge for a tag purged while it was away, so the tag never reads as live', async () => {
+    it('comes back with no edge for a tag purged while it was away, so the tag never reads as existing', async () => {
       const { entity: tag } = await createTag();
       const { template } = await saveTemplateNaming(tag.id);
       await tombstone('emailTemplate', template.id);
@@ -142,9 +145,13 @@ describe('ruleReference — a source takes its edges with it and brings them bac
         where: { sourceEmailTemplateId: template.id },
       });
       expect(edges).toEqual([]);
-      expect(liveRuleReferenceKeys(edges).has(referenceKey({ model: 'Tag', id: tag.id }))).toBe(
-        false,
-      );
+      expect(
+        ruleReferenceTargets(edges).some(
+          (target) =>
+            target.state === 'existing' &&
+            target.key === referenceKey({ model: 'Tag', id: tag.id }),
+        ),
+      ).toBe(false);
     });
   });
 
@@ -163,7 +170,7 @@ describe('ruleReference — a source takes its edges with it and brings them bac
 
       const edges = await db.ruleReference.findMany({ where: { sourceSegmentId: dependent.id } });
       expect(edges).toHaveLength(1);
-      expect(ruleReferenceIssues(edges).map((issue) => issue.reason)).toEqual(['deleted']);
+      expect(deadTargets(edges).map((issue) => issue.state)).toEqual(['deleted']);
     });
 
     it('drops its own edges when it is tombstoned and regenerates them on revive', async () => {

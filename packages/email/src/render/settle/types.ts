@@ -18,7 +18,7 @@ export type Scope = Record<string, unknown>;
 export type SettleOptions = {
   substitute: boolean;
   eachDepth?: number;
-  liveRefs?: ReadonlySet<string>;
+  existingTargets?: ReadonlySet<string>;
   bindings?: BindingChain;
   lens: EmailLens;
   ruleScope?: Scope;

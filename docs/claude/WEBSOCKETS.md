@@ -204,8 +204,7 @@ appends fan out to every holder without regard to who they are. The promise is e
 just documented:
 
 - `apps/api/src/ws/streamAudience.test.ts` iterates `STREAM_DEFINITIONS`. For each family it
-  fails if a `'shared'` stream's route carries a per-request lens scope (`scopeNarrowing`
-  middleware, detected with `isPerCallerScope`), and it runs `expectStreamAudience`
+  runs `expectStreamAudience`
   (`apps/api/tests/expectStreamAudience.ts`) with a fixture of differently privileged callers
   (owner, admin, member, viewer for contacts), failing if their snapshots differ. The fixture map
   is typed over every family, so registering a stream without a fixture is a type error.

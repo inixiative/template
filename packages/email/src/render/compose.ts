@@ -4,7 +4,7 @@
  * @partOf feature:email
  * @uses infrastructure:prisma
  */
-import { db, liveRuleReferences, type RuleReferenceRow } from '@template/db';
+import { db, type RuleReferenceRow, ruleReferenceTargets } from '@template/db';
 import type { CommunicationKind, EmailOwnerModel } from '@template/db/generated/client/client';
 import { EmailRenderError } from '@template/email/errors/EmailRenderError';
 import { expand, expandWith } from '@template/email/render/expand';
@@ -17,6 +17,7 @@ import {
 import { rowOwner } from '@template/email/render/owner';
 import type { OwnerScope } from '@template/email/render/types';
 import type { RuleReference } from '@template/shared/rules';
+import { uniqBy } from 'lodash-es';
 
 export type ComposeTemplateResult = {
   id: string;
@@ -28,14 +29,14 @@ export type ComposeTemplateResult = {
   owner: OwnerScope;
   lens: unknown;
   componentResolutions: Record<string, string>;
-  liveRuleRefs: RuleReference[];
+  existingTargets: RuleReference[];
 };
 
 export type ComposeComponentResult = {
   mjml: string;
 };
 
-const liveRuleReferencesOf = async (
+const existingTargetsOf = async (
   templateId: string,
   componentIds: string[],
 ): Promise<RuleReference[]> => {
@@ -47,7 +48,10 @@ const liveRuleReferencesOf = async (
       ],
     },
   })) as RuleReferenceRow[];
-  return liveRuleReferences(edges);
+  return uniqBy(
+    ruleReferenceTargets(edges).filter((target) => target.state === 'existing'),
+    'key',
+  ).map(({ model, id }) => ({ model, id }));
 };
 
 export const composeTemplate = async (
@@ -66,7 +70,7 @@ export const composeTemplate = async (
     }
     return components;
   });
-  const liveRuleRefs = await liveRuleReferencesOf(template.id, [
+  const existingTargets = await existingTargetsOf(template.id, [
     ...new Set(Object.values(componentResolutions)),
   ]);
 
@@ -80,7 +84,7 @@ export const composeTemplate = async (
     owner: rowOwner(template),
     lens: await templateLens(slug, template),
     componentResolutions,
-    liveRuleRefs,
+    existingTargets,
   };
 };
 

@@ -7,16 +7,12 @@
 import { db } from '@template/db/client';
 import type { Prisma } from '@template/db/generated/client/client';
 import { resolveFalsePolymorphismRef } from '@template/db/registries/falsePolymorphism';
-import { admitRuleReferences, type ReferenceScopes } from '@template/db/utils/admitRuleReferences';
 import { lockedTargetStates, type TargetState } from '@template/db/utils/lockedTargetStates';
 import type { ModelName } from '@template/db/utils/modelNames';
-import { RuleReferenceError } from '@template/db/utils/ruleReferenceError';
 import { type RuleReference, referenceKey } from '@template/shared/rules';
 import { groupBy } from 'lodash-es';
 
 export type RuleReferenceSource = { model: ModelName; id: string };
-
-export type RuleReferenceGate = ReferenceScopes | 'rebuild';
 
 type Edge = {
   id: string;
@@ -42,7 +38,6 @@ const edgeData = (source: RuleReferenceSource, ref: RuleReference, state: Target
   sourceModel: source.model,
   [fkColumn('sourceModel', source.model)]: source.id,
   targetModel: ref.model,
-  targetId: ref.id,
   [fkColumn('targetModel', ref.model)]: ref.id,
   targetDeletedAt: state.deletedAt,
 });
@@ -50,54 +45,23 @@ const edgeData = (source: RuleReferenceSource, ref: RuleReference, state: Target
 const stampOf = (state: TargetState | undefined): number | null =>
   state?.deletedAt ? state.deletedAt.getTime() : null;
 
-const admit = async (
-  added: RuleReference[],
-  states: Map<string, TargetState>,
-  gate: ReferenceScopes,
-): Promise<void> => {
-  const dead = added.find((ref) => {
-    const target = states.get(referenceKey(ref));
-    return !target || target.deletedAt;
-  });
-  if (dead)
-    throw new RuleReferenceError(
-      `rule names a ${dead.model} that does not exist or is deleted: ${dead.id}`,
-    );
-  const keys = new Set(added.map(referenceKey));
-  const scopes = gate.scopes.map(({ lens, references }) => ({
-    lens,
-    references: references.filter((ref) => keys.has(referenceKey(ref))),
-  }));
-  const scoped = new Set(scopes.flatMap(({ references }) => references.map(referenceKey)));
-  const [outside] = [
-    ...added.filter((ref) => !scoped.has(referenceKey(ref))),
-    ...(await admitRuleReferences({ ...gate, scopes })).unadmitted,
-  ];
-  if (outside)
-    throw new RuleReferenceError(
-      `rule names a ${outside.model} outside this source's view: ${outside.id}`,
-    );
-};
-
-// Targets are read FOR UPDATE so an edge is never written live against an uncommitted delete.
+// Targets are read FOR UPDATE so an edge is never written unstamped against an uncommitted delete.
 export const syncRuleReferenceEdges = async (
   source: RuleReferenceSource,
   references: RuleReference[],
-  gate: RuleReferenceGate,
 ): Promise<void> => {
   const existing = (await db.ruleReference.findMany({
-    where: { [fkColumn('sourceModel', source.model)]: source.id } as Prisma.RuleReferenceWhereInput,
+    where: { sourceModel: source.model, sourceId: source.id } as Prisma.RuleReferenceWhereInput,
   })) as Edge[];
 
-  const named = new Map(references.map((ref) => [referenceKey(ref), ref]));
+  const referenced = new Map(references.map((ref) => [referenceKey(ref), ref]));
   const held = new Map(
-    existing.filter((edge) => named.has(edgeKey(edge))).map((edge) => [edgeKey(edge), edge]),
+    existing.filter((edge) => referenced.has(edgeKey(edge))).map((edge) => [edgeKey(edge), edge]),
   );
-  const added = [...named.values()].filter((ref) => !held.has(referenceKey(ref)));
-  const states = named.size ? await lockedTargetStates([...named.values()]) : new Map();
-  if (gate !== 'rebuild') await admit(added, states, gate);
+  const added = [...referenced.values()].filter((ref) => !held.has(referenceKey(ref)));
+  const states = referenced.size ? await lockedTargetStates([...referenced.values()]) : new Map();
 
-  const toDelete = existing.filter((edge) => !named.has(edgeKey(edge)));
+  const toDelete = existing.filter((edge) => !referenced.has(edgeKey(edge)));
   if (toDelete.length)
     await db.ruleReference.deleteMany({ where: { id: { in: toDelete.map((edge) => edge.id) } } });
 

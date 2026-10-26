@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
-import { db } from '@template/db';
+import { db, snapshotHookRegistry } from '@template/db';
 import { cleanupTouchedTables, createOrganizationUser } from '@template/db/test';
 import { registerImmutableFieldsHook } from '#/hooks/immutableFields/hook';
 import {
@@ -7,9 +7,15 @@ import {
   setImmutableFieldsCache,
 } from '#/hooks/immutableFields/registry';
 
-registerImmutableFieldsHook();
+let restoreHooks: () => void;
+
+beforeAll(() => {
+  restoreHooks = snapshotHookRegistry();
+  registerImmutableFieldsHook();
+});
 
 afterAll(async () => {
+  restoreHooks();
   await cleanupTouchedTables(db);
 });
 

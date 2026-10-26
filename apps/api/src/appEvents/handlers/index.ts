@@ -48,10 +48,6 @@ import {
   rollingCacheRefreshed,
 } from '#/appEvents/handlers/rollingCache/rollingCacheRefreshed';
 import {
-  type RuleReferenceStalePayload,
-  ruleReferenceStale,
-} from '#/appEvents/handlers/ruleReference/ruleReferenceStale';
-import {
   type SegmentCreatedPayload,
   segmentCreated,
 } from '#/appEvents/handlers/segment/segmentCreated';
@@ -105,7 +101,6 @@ export type AppEventPayloads = {
   'organization.deleted': OrganizationDeletedPayload;
   'rollingCache.leafStuck': RollingCacheLeafStuckPayload;
   'rollingCache.refreshed': RollingCacheRefreshedPayload;
-  'ruleReference.stale': RuleReferenceStalePayload;
   'segment.created': SegmentCreatedPayload;
   'segment.updated': SegmentUpdatedPayload;
   'segment.deleted': SegmentDeletedPayload;
@@ -136,7 +131,6 @@ export const AppEventName = {
   organizationDeleted: 'organization.deleted',
   rollingCacheLeafStuck: 'rollingCache.leafStuck',
   rollingCacheRefreshed: 'rollingCache.refreshed',
-  ruleReferenceStale: 'ruleReference.stale',
   segmentCreated: 'segment.created',
   segmentUpdated: 'segment.updated',
   segmentDeleted: 'segment.deleted',
@@ -169,7 +163,6 @@ export const appEventHandlers: Record<AppEventName, AppEventHandlerFn> = {
   'organization.deleted': organizationDeleted,
   'rollingCache.leafStuck': rollingCacheLeafStuck,
   'rollingCache.refreshed': rollingCacheRefreshed,
-  'ruleReference.stale': ruleReferenceStale,
   'segment.created': segmentCreated,
   'segment.updated': segmentUpdated,
   'segment.deleted': segmentDeleted,

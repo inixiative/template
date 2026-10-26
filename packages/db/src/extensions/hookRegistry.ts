@@ -171,6 +171,15 @@ export const runInBridgedContext = <TResult>(
 // once, so clearing a test's hooks must not take it with them or every later file stops tracking.
 const PROCESS_HOOKS = new Set(['testTracker']);
 
+/** Returns a restore that unregisters every hook added since, leaving hooks registered before untouched. */
+export const snapshotHookRegistry = (): (() => void) => {
+  const before = new Set(hookRegistry);
+  return () => {
+    for (const name of [...hookRegistry])
+      if (!before.has(name) && !PROCESS_HOOKS.has(name)) unregisterDbHook(name);
+  };
+};
+
 export const clearHookRegistry = () => {
   for (const name of [...hookRegistry]) {
     if (!PROCESS_HOOKS.has(name)) unregisterDbHook(name);

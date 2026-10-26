@@ -5,19 +5,13 @@
  * @uses infrastructure:prisma
  */
 import {
-  andWhere,
-  bindLens,
   type Condition,
   describeRuleSources,
   type LensNarrowing,
   type ModelNarrowing,
   Operator,
-  projectLens,
-  toSourceQueries,
 } from '@inixiative/json-rules';
-import { db, polymorphicBindings, polymorphicIs, sourceQueryWhere } from '@template/db';
-import type { Prisma, Segment } from '@template/db/generated/client/client';
-import type { ProviderModel } from '@template/db/generated/client/enums';
+import { polymorphicIs } from '@template/db';
 import { boundAndLive, lensFor, live, omitForeignKeys, platformOrBound } from '@template/db/lens';
 
 const tagOwned = platformOrBound('Tag', 'ownerModel');
@@ -55,15 +49,6 @@ const communicationsReceived: ModelNarrowing = {
   },
 };
 
-const customer = (
-  picks: string[],
-  relations: Record<string, ModelNarrowing> = {},
-): ModelNarrowing => ({
-  picks,
-  where: live,
-  relations: { contacts, tagAttachments, ...relations },
-});
-
 export const customerRefLens: LensNarrowing = omitForeignKeys({
   parent: lensFor('CustomerRef'),
   mapDefaults: {
@@ -78,11 +63,21 @@ export const customerRefLens: LensNarrowing = omitForeignKeys({
     picks: ['id', 'customerModel', 'acceptedKinds', 'createdAt', 'updatedAt'],
     where: polymorphicIs('CustomerRef', 'providerModel'),
     relations: {
-      customerUser: customer(['id', 'name', 'email', 'emailVerified', 'lastLoginAt', 'createdAt'], {
-        communicationsReceived,
-      }),
-      customerOrganization: customer(['id', 'name', 'createdAt']),
-      customerSpace: customer(['id', 'name', 'createdAt']),
+      customerUser: {
+        picks: ['id', 'name', 'email', 'emailVerified', 'lastLoginAt', 'createdAt'],
+        where: live,
+        relations: { contacts, tagAttachments, communicationsReceived },
+      },
+      customerOrganization: {
+        picks: ['id', 'name', 'createdAt'],
+        where: live,
+        relations: { contacts, tagAttachments },
+      },
+      customerSpace: {
+        picks: ['id', 'name', 'createdAt'],
+        where: live,
+        relations: { contacts, tagAttachments },
+      },
       segmentMembers: {
         picks: [],
         relations: { segment: { picks: ['id'], sources: { id: { from: 'mapDefaults' } } } },
@@ -90,29 +85,6 @@ export const customerRefLens: LensNarrowing = omitForeignKeys({
     },
   },
 });
-
-export const resolvedCustomerRefLens = (
-  ownerModel: ProviderModel,
-  ownerId: string,
-): LensNarrowing => bindLens(customerRefLens, polymorphicBindings(ownerModel, ownerId));
-
-/** The segments the lens lets this owner name — its own live ones — read through the Segment source it declares. */
-export const ownedSegments = async (
-  ownerModel: ProviderModel,
-  ownerId: string,
-  where: Prisma.SegmentWhereInput = {},
-): Promise<Segment[]> => {
-  const lens = resolvedCustomerRefLens(ownerModel, ownerId);
-  const source = toSourceQueries(lens).find(
-    (query) => query.model === 'Segment' && query.field === 'id',
-  )!;
-  return db.segment.findMany({
-    where: andWhere([await sourceQueryWhere(source, { lens }), where]) as Prisma.SegmentWhereInput,
-  });
-};
-
-export const customerRefReachedModels = (): Set<string> =>
-  new Set(Object.values(projectLens(customerRefLens)).map((visit) => visit.model));
 
 const membershipProbe = {
   field: 'segmentMembers',
