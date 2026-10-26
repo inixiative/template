@@ -97,7 +97,13 @@ export const roleIsHigh: ActionRule = {
 
 export const roleIsLowOrUnset: ActionRule = {
   any: [
-    { rule: { field: 'role', operator: Operator.in, value: ['member', 'viewer'] } },
+    {
+      rule: {
+        field: 'role',
+        operator: Operator.in,
+        value: roleHierarchy.filter((role) => !highRoles.includes(role)),
+      },
+    },
     { rule: { field: 'role', operator: Operator.isEmpty, value: true } },
   ],
 };

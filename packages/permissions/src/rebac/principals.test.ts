@@ -293,14 +293,21 @@ describe('no self arm: the user reaches their own rows through rel user (Aron, 2
       expect(can(nobody, 'user', u1, 'own')).toBe(true);
     });
 
-    it('a user creates an organization, and so does a token its user owns; no other token', async () => {
+    it('a user creates an organization, and so does a token its user owns that holds operate; no other token', async () => {
       const blank = { id: '' };
       expect(can(acting(await table(), ActorModel.User), 'organization', blank, 'create')).toBe(
         true,
       );
-      const userToken = await table();
-      userToken.setActor({ model: ActorModel.Token, record: { id: 't1', ownerModel: 'User' } });
-      expect(can(userToken, 'organization', blank, 'create')).toBe(true);
+      const userToken = async (role: string) => {
+        const permix = await table();
+        permix.setActor({
+          model: ActorModel.Token,
+          record: { id: 't1', ownerModel: 'User', role },
+        });
+        return permix;
+      };
+      expect(can(await userToken('member'), 'organization', blank, 'create')).toBe(true);
+      expect(can(await userToken('viewer'), 'organization', blank, 'create')).toBe(false);
       const orgToken = await table(grant('db:organization', 'o1', 'own'));
       orgToken.setActor({
         model: ActorModel.Token,

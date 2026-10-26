@@ -12,7 +12,7 @@ import {
   type PermissionEntry,
   type Permix,
 } from '@template/permissions/client';
-import { entitlementEntriesSchema } from '@template/permissions/rebac/entitlementEntrySchema';
+import { parseEntitlements } from '@template/permissions/rebac/entitlementEntrySchema';
 import { getOrgPermissions } from '@template/permissions/roles/organization';
 import { getSpacePermissions } from '@template/permissions/roles/space';
 import { getUserPermissions } from '@template/permissions/roles/user';
@@ -23,12 +23,18 @@ type OrganizationMember = { role: Role; organizationId: string; entitlements?: u
 type SpaceMember = { role: Role; spaceId: string; entitlements?: unknown };
 
 const entitlementsOf = (member: { entitlements?: unknown }): EntitlementEntry[] =>
-  member.entitlements == null
-    ? []
-    : (entitlementEntriesSchema.parse(member.entitlements) as EntitlementEntry[]);
+  (parseEntitlements(member.entitlements) ?? []) as EntitlementEntry[];
 
-const ownedBy = (entries: EntitlementEntry[], tenant: PermissionEntry): Grant[] =>
-  entries.length ? [{ entries, owner: [{ entries: [tenant] }] }] : [];
+export const organizationOwnerGrants = (organizationId: string): Grant[] => [
+  { entries: [getOrgPermissions('owner', organizationId as OrganizationId)] },
+];
+
+export const spaceOwnerGrants = (spaceId: string): Grant[] => [
+  { entries: [getSpacePermissions('owner', spaceId as SpaceId)] },
+];
+
+const ownedBy = (entries: EntitlementEntry[], owner: Grant[]): Grant[] =>
+  entries.length ? [{ entries, owner }] : [];
 
 export const userGrants = (
   userId: string | null,
@@ -45,13 +51,10 @@ export const userGrants = (
     ],
   },
   ...members.flatMap((member) =>
-    ownedBy(
-      entitlementsOf(member),
-      getOrgPermissions('owner', member.organizationId as OrganizationId),
-    ),
+    ownedBy(entitlementsOf(member), organizationOwnerGrants(member.organizationId)),
   ),
   ...spaceMembers.flatMap((member) =>
-    ownedBy(entitlementsOf(member), getSpacePermissions('owner', member.spaceId as SpaceId)),
+    ownedBy(entitlementsOf(member), spaceOwnerGrants(member.spaceId)),
   ),
 ];
 

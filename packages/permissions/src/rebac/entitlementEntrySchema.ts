@@ -25,3 +25,8 @@ const entitlementEntrySchema = z
   .strict();
 
 export const entitlementEntriesSchema = z.array(entitlementEntrySchema);
+
+export const parseEntitlements = (
+  stored: unknown,
+): z.infer<typeof entitlementEntriesSchema> | null =>
+  stored == null ? null : entitlementEntriesSchema.parse(stored);
