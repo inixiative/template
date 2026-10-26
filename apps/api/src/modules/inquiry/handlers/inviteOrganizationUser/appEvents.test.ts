@@ -31,6 +31,7 @@ const makeInquiry = (overrides = {}) => ({
   targetUser: { id: 'user-target', name: 'Bob', email: 'bob@example.com' },
   targetOrganization: null,
   targetSpace: null,
+  auditLogsAsSubject: [],
   resolution: {},
   createdAt: new Date(),
   updatedAt: new Date(),

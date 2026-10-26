@@ -75,7 +75,7 @@ describe('GET /api/v1/inquiry/:id', () => {
     expect(data.id).toBe(inquiry.id);
   });
 
-  it('returns the inquiry without its audit history', async () => {
+  it('returns the inquiry with its audit history', async () => {
     const { entity: invitee } = await createUser();
     const { entity: inquiry } = await createInquiry({
       type: InquiryType.inviteOrganizationUser,
@@ -86,16 +86,16 @@ describe('GET /api/v1/inquiry/:id', () => {
       targetUserId: invitee.id,
       content: { organizationId: org.id, role: 'member' },
     });
-    await createAuditLog({
+    const { entity: auditLog } = await createAuditLog({
       subjectModel: AuditSubjectModel.Inquiry,
       subjectInquiryId: inquiry.id,
     });
 
     const response = await fetch(get(`/api/v1/inquiry/${inquiry.id}`));
-    const { data } = await json<Record<string, unknown>>(response);
+    const { data } = await json<Inquiry & { auditLogsAsSubject: { id: string }[] }>(response);
 
     expect(response.status).toBe(200);
-    expect(data).not.toHaveProperty('auditLogsAsSubject');
+    expect(data.auditLogsAsSubject.map(({ id }) => id)).toEqual([auditLog.id]);
   });
 
   it('target can read inquiry sent to them', async () => {
