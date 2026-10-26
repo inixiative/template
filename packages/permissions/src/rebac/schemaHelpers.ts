@@ -135,6 +135,7 @@ export const integrationAdministering = {
   manage: {
     any: [actorIsItsUser(), { all: [ownedByOrganizationOrSpace(), actionOnOwner('manage')] }],
   },
+  delete: { any: ['manage', actionOnOwner('manage')] },
 } satisfies Record<string, ActionRule>;
 
 export const integrationAccess = {
