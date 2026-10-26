@@ -7,9 +7,11 @@
 import type { Context, Next } from 'hono';
 import { me } from '#/lib/context/me';
 import { makeError } from '#/lib/errors';
+import { Modules } from '#/modules/modules';
 import type { AppEnv } from '#/types/appEnv';
 
 export const meResourceMiddleware = async (c: Context<AppEnv>, next: Next) => {
+  if (c.req.path.split('/')[3] !== Modules.me) return next();
   const user = me(c);
   if (!user) throw makeError({ status: 401, message: 'Authentication required' });
   c.set('resource', user);

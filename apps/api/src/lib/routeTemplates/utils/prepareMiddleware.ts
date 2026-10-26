@@ -9,6 +9,7 @@ import type { LensNarrowing } from '@inixiative/json-rules';
 import type { MiddlewareHandler } from 'hono';
 import type { RouteArgs } from '#/lib/routeTemplates/types';
 import { includeDeletedMiddleware } from '#/middleware/resources/includeDeletedMiddleware';
+import { meResourceMiddleware } from '#/middleware/resources/meResourceMiddleware';
 import { resourceContextMiddleware } from '#/middleware/resources/resourceContextMiddleware';
 import { isSubmodelCheck } from '#/middleware/validations/validateSubmodelPermission';
 
@@ -50,6 +51,7 @@ export const prepareMiddleware = ({
   const filterMiddleware = filterLens ? [filterLensSetter(filterLens)] : [];
   const deletedMiddleware = includeDeleted ? [includeDeletedMiddleware()] : [];
   return [
+    meResourceMiddleware,
     routeConfigSetter(route),
     ...deletedMiddleware,
     ...resourceMiddleware,

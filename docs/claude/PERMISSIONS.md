@@ -775,10 +775,10 @@ Routes that still check an action on the owner (`validatePermission` on spaces, 
 
 ### The user as a resource
 
-`/me/*` routes check their action like any other route; `meResourceMiddleware` (on the `/me` router) loads `me(c)` as the resource, typed `user`. `me(c)` is the request's user (a JWT session or a spoof), or the user of a User-owned token; anything else has no me and gets 401. `organizationCreate` loads the same resource for `organization.create`.
+`/me/*` routes check their action like any other route; `meResourceMiddleware` loads `me(c)` as the resource, typed `user`. The route templates run it first on every route (`prepareMiddleware`), and it steps aside unless the path is a `/me` route. `me(c)` is the request's user (a JWT session or a spoof), or the user of a User-owned token; anything else has no me and gets 401.
 
 ```typescript
-meRouter.use('*', meResourceMiddleware)                                   // every /me route
+[meResourceMiddleware, ...routeMiddleware]                                // every templated route; a no-op off /me
 middleware: [validateSubmodelPermission('read')]                          // meReadManyContacts, -Integrations, -WebhookSubscriptions, -Tokens
 middleware: [validateSubmodelPermission('create')]                        // meCreateContact, -Flow, -Integration, -WebhookSubscription
 middleware: [validatePermission('read')]                                  // the other meReadMany*
