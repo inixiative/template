@@ -13,7 +13,7 @@ import {
 } from '@template/db/lib/encryption/helpers';
 import type { Jwk } from 'better-auth/plugins';
 import type { JSONWebKeySet } from 'jose';
-import { PERSON_JWT_TTL_SECONDS } from '#/lib/auth/personJwt';
+import { USER_JWT_TTL_SECONDS } from '#/lib/auth/userJwt';
 
 const decryptPrivateKey = async (row: Jwks): Promise<string> =>
   (await decryptField('jwks', 'privateKey', {
@@ -49,7 +49,7 @@ const toJwk = async (row: Jwks): Promise<Jwk> => ({
 const liveKeysWhere = () => ({
   OR: [
     { expiresAt: null },
-    { expiresAt: { gt: new Date(Date.now() - PERSON_JWT_TTL_SECONDS * 1000) } },
+    { expiresAt: { gt: new Date(Date.now() - USER_JWT_TTL_SECONDS * 1000) } },
   ],
 });
 

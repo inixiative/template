@@ -7,10 +7,10 @@
 import { jwt } from 'better-auth/plugins';
 import { jwtHandoff } from '#/lib/auth/jwtHandoff';
 import { oauthHandoffPlugins } from '#/lib/auth/oauthHandoffPlugins';
-import { personJwtOptions } from '#/lib/auth/personJwt';
+import { userJwtOptions } from '#/lib/auth/userJwt';
 
 // Order is load-bearing: jwtHandoff runs last, after the one-time-token hook has read the new session.
 export const authPlugins = () => {
   const [oneTimeToken, oauthCallbackToken] = oauthHandoffPlugins();
-  return [jwt(personJwtOptions()), oneTimeToken, oauthCallbackToken, jwtHandoff()];
+  return [jwt(userJwtOptions()), oneTimeToken, oauthCallbackToken, jwtHandoff()];
 };

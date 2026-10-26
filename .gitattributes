@@ -2,3 +2,5 @@
 *.test.ts linguist-generated=true
 *.test.tsx linguist-generated=true
 **/tests/fixtures/** linguist-generated=true
+.foundry/** linguist-documentation=true
+.claude/skills/** linguist-documentation=true

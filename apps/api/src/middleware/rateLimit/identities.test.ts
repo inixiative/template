@@ -3,6 +3,7 @@ import { db } from '@template/db';
 import { TokenOwnerModel } from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
+  createIntegration,
   createOrganization,
   createSpace,
   createToken,
@@ -45,6 +46,7 @@ const bareRelations = {
   organizationUser: null,
   space: null,
   spaceUser: null,
+  integration: null,
 };
 
 describe('rate limit identities', () => {
@@ -114,5 +116,26 @@ describe('rate limit identities', () => {
 
     expect(result.organization).toBe(`organization:${organization.id}`);
     expect(result.space).toBe(`space:${space.id}`);
+  });
+
+  it("an integration's token counts against its integration's owner", async () => {
+    const { entity: user } = await createUser();
+    const { entity: integration } = await createIntegration({
+      ownerModel: 'User',
+      userId: user.id,
+    });
+    const { entity: token } = await createToken(
+      { ownerModel: TokenOwnerModel.Integration },
+      { integration },
+    );
+
+    const result = await who(
+      createTestApp({
+        mockToken: { ...token, ...bareRelations, user, integration },
+        mount: [echo],
+      }).fetch,
+    );
+
+    expect(result.principal).toBe(`user:${user.id}`);
   });
 });

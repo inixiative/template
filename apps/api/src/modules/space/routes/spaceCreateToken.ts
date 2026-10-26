@@ -4,9 +4,8 @@
  * @partOf feature:tenancy
  * @uses primitive:routeTemplates, feature:auth
  */
+
 import { createRoute } from '#/lib/routeTemplates';
-import { validateNotToken } from '#/middleware/validations/validateNotToken';
-import { validatePermission } from '#/middleware/validations/validatePermission';
 import { Modules } from '#/modules/modules';
 import { Tags } from '#/modules/tags';
 import {
@@ -19,6 +18,5 @@ export const spaceCreateTokenRoute = createRoute({
   submodel: Modules.token,
   bodySchema: tokenCreateBodySchema,
   responseSchema: tokenCreateResponseSchema,
-  middleware: [validatePermission('operate'), validateNotToken],
   tags: [Tags.token],
 });

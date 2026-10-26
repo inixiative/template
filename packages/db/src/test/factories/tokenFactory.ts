@@ -49,6 +49,11 @@ const tokenFactory = createFactory('Token', {
       foreignKey: { organizationId: 'organizationId', spaceId: 'spaceId', userId: 'userId' },
       required: false,
     },
+    integration: {
+      modelName: 'Integration',
+      foreignKey: { id: 'integrationId' },
+      required: false,
+    },
   },
 });
 

@@ -4,9 +4,13 @@
  * @partOf feature:tenancy
  * @uses primitive:routeTemplates
  */
+
+import { memberRemoval } from '@template/permissions/rebac/schemaHelpers';
 import { deleteRoute } from '#/lib/routeTemplates';
+import { validatePermission } from '#/middleware/validations/validatePermission';
 import { Modules } from '#/modules/modules';
 
 export const spaceUserDeleteRoute = deleteRoute({
   model: Modules.spaceUser,
+  middleware: [validatePermission(memberRemoval)],
 });

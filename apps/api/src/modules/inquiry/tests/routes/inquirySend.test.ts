@@ -67,7 +67,11 @@ describe('POST /api/v1/inquiry/:id/send', () => {
       content: { organizationId: org.id, role: 'member' },
     });
 
-    const response = await fetch(post(`/api/v1/inquiry/${inquiry.id}/send`));
+    const response = await fetch(
+      post(`/api/v1/inquiry/${inquiry.id}/send`, {
+        expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
+      }),
+    );
     const { data } = await json<Inquiry>(response);
 
     expect(response.status).toBe(200);
@@ -87,7 +91,11 @@ describe('POST /api/v1/inquiry/:id/send', () => {
       content: { organizationId: org.id, role: 'member' },
     });
 
-    const response = await fetch(post(`/api/v1/inquiry/${inquiry.id}/send`));
+    const response = await fetch(
+      post(`/api/v1/inquiry/${inquiry.id}/send`, {
+        expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
+      }),
+    );
     const { data } = await json<Inquiry>(response);
 
     expect(response.status).toBe(200);
@@ -107,7 +115,11 @@ describe('POST /api/v1/inquiry/:id/send', () => {
       content: { organizationId: org.id, role: 'member' },
     });
 
-    const response = await fetch(post(`/api/v1/inquiry/${inquiry.id}/send`));
+    const response = await fetch(
+      post(`/api/v1/inquiry/${inquiry.id}/send`, {
+        expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
+      }),
+    );
     const { data } = await json<Record<string, unknown>>(response);
 
     expect(response.status).toBe(200);
@@ -131,7 +143,11 @@ describe('POST /api/v1/inquiry/:id/send', () => {
       content: { organizationId: org.id, role: 'member' },
     });
 
-    const response = await fetch(post(`/api/v1/inquiry/${inquiry.id}/send`));
+    const response = await fetch(
+      post(`/api/v1/inquiry/${inquiry.id}/send`, {
+        expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
+      }),
+    );
     const { data } = await json<Inquiry>(response);
 
     expect(response.status).toBe(200);
@@ -156,7 +172,11 @@ describe('POST /api/v1/inquiry/:id/send', () => {
       content: { organizationId: org.id, role: 'member' },
     });
 
-    const response = await fetch(post(`/api/v1/inquiry/${inquiry.id}/send`));
+    const response = await fetch(
+      post(`/api/v1/inquiry/${inquiry.id}/send`, {
+        expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
+      }),
+    );
     const { data } = await json<Inquiry>(response);
 
     expect(response.status).toBe(200);
@@ -177,7 +197,11 @@ describe('POST /api/v1/inquiry/:id/send', () => {
       content: { organizationId: org.id, role: 'member' },
     });
 
-    const response = await fetch(post(`/api/v1/inquiry/${inquiry.id}/send`));
+    const response = await fetch(
+      post(`/api/v1/inquiry/${inquiry.id}/send`, {
+        expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
+      }),
+    );
     expect(response.status).toBe(400);
   });
 });
@@ -234,7 +258,11 @@ describe('POST /api/v1/inquiry/:id/send — autoApprove', () => {
       content: { organizationId: org.id, role: 'member' },
     });
 
-    const response = await fetch(post(`/api/v1/inquiry/${inquiry.id}/send`));
+    const response = await fetch(
+      post(`/api/v1/inquiry/${inquiry.id}/send`, {
+        expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
+      }),
+    );
     const { data } = await json<Inquiry>(response);
 
     expect(response.status).toBe(200);
@@ -253,7 +281,11 @@ describe('POST /api/v1/inquiry/:id/send — autoApprove', () => {
       content: { organizationId: org.id, role: 'member' },
     });
 
-    await fetch(post(`/api/v1/inquiry/${inquiry.id}/send`));
+    await fetch(
+      post(`/api/v1/inquiry/${inquiry.id}/send`, {
+        expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
+      }),
+    );
 
     const record = await db.inquiry.findUniqueOrThrow({ where: { id: inquiry.id } });
     expect(record.status).toBe(InquiryStatus.approved);
@@ -272,7 +304,11 @@ describe('POST /api/v1/inquiry/:id/send — autoApprove', () => {
       content: { organizationId: org.id, role: 'member' },
     });
 
-    const response = await fetch(post(`/api/v1/inquiry/${inquiry.id}/send`));
+    const response = await fetch(
+      post(`/api/v1/inquiry/${inquiry.id}/send`, {
+        expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
+      }),
+    );
     expect(response.status).toBe(200);
 
     const membership = await db.organizationUser.findUnique({
@@ -294,7 +330,11 @@ describe('POST /api/v1/inquiry/:id/send — autoApprove', () => {
       content: { organizationId: org.id, role: 'member' },
     });
 
-    const response = await fetch(post(`/api/v1/inquiry/${inquiry.id}/send`));
+    const response = await fetch(
+      post(`/api/v1/inquiry/${inquiry.id}/send`, {
+        expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
+      }),
+    );
     const { data } = await json<Record<string, unknown>>(response);
 
     expect(data.targetUser).toBeDefined();
@@ -313,7 +353,11 @@ describe('POST /api/v1/inquiry/:id/send — autoApprove', () => {
       content: { organizationId: org.id, role: 'member' },
     });
 
-    const response = await fetch(post(`/api/v1/inquiry/${inquiry.id}/send`));
+    const response = await fetch(
+      post(`/api/v1/inquiry/${inquiry.id}/send`, {
+        expectedUpdatedAt: new Date(inquiry.updatedAt).toISOString(),
+      }),
+    );
     const { data } = await json<Record<string, unknown> & { auditLogsAsSubject?: unknown[] }>(
       response,
     );

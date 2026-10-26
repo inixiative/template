@@ -37,7 +37,7 @@ Its signature is a placeholder and will **change**: today it's per-recipient
 1. **Narrow with a Prisma `where`.** Push down everything serializable — role, in-DB relations — into
    one query to cut the candidate set down. The role MVP is the degenerate case: the narrow *is* the
    whole answer, no step 2. ("admin or above" → role set → `{ organizationUsers: { some: { organizationId: { in: targets }, role: { in: [...atOrAbove] } } } }`;
-   the permissions package owns the ladder ordering via `lesserRole`.)
+   the permissions package owns the ladder ordering via `roleHierarchy` in `packages/permissions/src/roles/shared.ts`.)
 2. **Evaluate the predicate on the narrowed set.** Predicates are lenses (json-rules) and can bridge
    data sources, so the cross-source parts can't be pushed to SQL — but run against the small,
    pre-narrowed candidate set they stay **performant** (small N, not the whole org). The narrow is

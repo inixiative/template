@@ -26,20 +26,27 @@ export const sanitizeWSHeaders = (headers: unknown): WSHeaders => {
 };
 
 export type IdentityResolution =
-  | { status: 'resolved'; id: string; email: string }
+  | { status: 'resolved'; model: 'User' | 'Token'; userId: string | null; email: string | null }
   | { status: 'anonymous' }
   | { status: 'retryable' };
 
+type Identified = { data?: { model: 'User' | 'Token'; record: { id: string; email?: string } } };
+
 export const resolveIdentity = async (headers: WSHeaders): Promise<IdentityResolution> => {
   if (!headers.authorization) return { status: 'anonymous' };
-  const res = await app.request('/api/v1/me', { headers });
+  const res = await app.request('/api/v1/identify', { headers });
   const access = routeAccessOf(res.status);
   if (access === 'retryable') return { status: 'retryable' };
   if (access === 'rejected') return { status: 'anonymous' };
-  const body = (await res.json()) as { data?: { id?: string; email?: string } };
-  return body.data?.id
-    ? { status: 'resolved', id: body.data.id, email: body.data.email ?? '' }
-    : { status: 'anonymous' };
+  const { data } = (await res.json()) as Identified;
+  if (!data) return { status: 'anonymous' };
+  const isUser = data.model === 'User';
+  return {
+    status: 'resolved',
+    model: data.model,
+    userId: isUser ? data.record.id : null,
+    email: isUser ? (data.record.email ?? null) : null,
+  };
 };
 
 export const canSubscribe = async (headers: WSHeaders, channel: string): Promise<boolean> => {

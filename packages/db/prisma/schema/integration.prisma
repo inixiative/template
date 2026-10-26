@@ -14,6 +14,11 @@ model Integration {
 
   provider Provider?
 
+  // A delegate: its permissions, capped live by its direct owner
+  role         Role?
+  full         Boolean @default(false)
+  entitlements Json?
+
   // Owner (fake polymorphism: User, OrganizationUser, Organization, Space, or SpaceUser)
   ownerModel     IntegrationOwnerModel
   userId         String?               @db.VarChar(36)

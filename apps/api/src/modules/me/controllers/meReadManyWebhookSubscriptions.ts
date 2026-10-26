@@ -4,6 +4,8 @@
  * @partOf feature:users
  * @uses primitive:routeTemplates, infrastructure:prisma, feature:webhooks
  */
+
+import { me } from '#/lib/context/me';
 import { paginate } from '#/lib/prisma/paginate';
 import { makeController } from '#/lib/utils/makeController';
 import { meReadManyWebhookSubscriptionsRoute } from '#/modules/me/routes/meReadManyWebhookSubscriptions';
@@ -11,7 +13,7 @@ import { meReadManyWebhookSubscriptionsRoute } from '#/modules/me/routes/meReadM
 export const meReadManyWebhookSubscriptionsController = makeController(
   meReadManyWebhookSubscriptionsRoute,
   async (c, respond) => {
-    const user = c.get('user')!;
+    const user = me(c)!;
     const db = c.get('db');
 
     const { data, pagination } = await paginate(c, db.webhookSubscription, {

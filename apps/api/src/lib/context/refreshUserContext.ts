@@ -5,17 +5,23 @@
  * @uses infrastructure:prisma, primitive:errors, feature:users
  */
 import type { Context } from 'hono';
+import { loadTokenContext } from '#/lib/context/loadTokenContext';
+import { setTokenContext } from '#/lib/context/setTokenContext';
 import { setUserContext } from '#/lib/context/setUserContext';
 import { makeError } from '#/lib/errors';
 import { findUserWithRelations } from '#/modules/user/services/find';
 import type { AppEnv } from '#/types/appEnv';
 
 export const refreshUserContext = async (c: Context<AppEnv>): Promise<void> => {
+  const token = c.get('token');
+  if (token) {
+    const signIn = await loadTokenContext(token.keyHash);
+    if (!signIn) throw makeError({ status: 401, message: 'Token no longer valid' });
+    return setTokenContext(c, signIn.context);
+  }
+
   const user = c.get('user');
   if (!user) return;
-
-  const permix = c.get('permix');
-  await permix.setup([], { replace: true });
 
   const userWithRelations = await findUserWithRelations(user.id);
   if (!userWithRelations) throw makeError({ status: 401, message: 'User no longer exists' });

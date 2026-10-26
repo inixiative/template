@@ -1,5 +1,4 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, spyOn } from 'bun:test';
-import { createHash, randomBytes } from 'node:crypto';
 import { db, getRedisClient, redisNamespace, unregisterDbHook } from '@template/db';
 import type { Contact, Organization, User } from '@template/db/generated/client/client';
 import { PlatformRole, TokenOwnerModel } from '@template/db/generated/client/enums';
@@ -7,7 +6,6 @@ import {
   cleanupTouchedTables,
   createContact,
   createOrganizationUser,
-  createToken,
   createUser,
 } from '@template/db/test';
 import {
@@ -28,6 +26,7 @@ import { reauthorizeOpenStreams } from '#/ws/streamReauthorizeSweep';
 import { streamSeqKey } from '#/ws/streamSeq';
 import { createTestSocket } from '#tests/createTestSocket';
 import { createBearerToken } from '#tests/utils/createBearerToken';
+import { createKeyedToken } from '#tests/utils/createKeyedToken';
 
 const frames = (sent: string[]) => sent.map((message) => JSON.parse(message));
 
@@ -305,13 +304,8 @@ describe('data streams (real app)', () => {
 
   it('switching the same user to a narrower credential closes streams it cannot read', async () => {
     const { context: other } = await createOrganizationUser({ role: 'member' }, { user: member });
-    const rawKey = randomBytes(24).toString('hex');
-    await createToken(
-      {
-        keyHash: createHash('sha256').update(rawKey).digest('hex'),
-        keyPrefix: rawKey.slice(0, 16),
-        ownerModel: TokenOwnerModel.OrganizationUser,
-      },
+    const { rawKey } = await createKeyedToken(
+      { ownerModel: TokenOwnerModel.OrganizationUser },
       { organizationUser: other.organizationUser },
     );
     const { socket, sent } = connect();
@@ -326,7 +320,7 @@ describe('data streams (real app)', () => {
     expect(byStream.has(stream)).toBe(true);
 
     await authenticate(`Bearer ${rawKey}`);
-    expect(socket.data.userId).toBe(member.id);
+    expect(socket.data.userId).toBeNull();
     expect(byStream.has(stream)).toBe(false);
 
     sent.length = 0;
@@ -595,13 +589,13 @@ describe('data streams (real app)', () => {
     });
   });
   describe('adversarial review', () => {
-    const withMeStatus = async (
+    const withIdentifyStatus = async (
       status: number,
       run: () => Promise<unknown> | undefined,
     ): Promise<void> => {
       const realRequest = app.request.bind(app);
       const spy = spyOn(app, 'request').mockImplementation(((input: string, init?: RequestInit) =>
-        String(input).endsWith('/api/v1/me')
+        String(input).endsWith('/api/v1/identify')
           ? Promise.resolve(new Response('busy', { status }))
           : realRequest(input, init)) as never);
       try {
@@ -611,7 +605,7 @@ describe('data streams (real app)', () => {
       }
     };
 
-    it('a transient /me failure keeps the identity and its streams and answers a retryable error', async () => {
+    it('a transient /identify failure keeps the identity and its streams and answers a retryable error', async () => {
       const { entity: user } = await createUser();
       await createOrganizationUser({ role: 'member' }, { organization, user });
       const { authorization } = await createBearerToken(user);
@@ -625,18 +619,18 @@ describe('data streams (real app)', () => {
       await websocketHandler.message(socket, openFrame(stream));
       sent.length = 0;
 
-      await withMeStatus(429, authenticate);
+      await withIdentifyStatus(429, authenticate);
 
       expect(frames(sent)).toEqual([{ type: 'error', action: 'authenticate', retryable: true }]);
-      expect(socket.data.userId).toBe(user.id);
+      expect(socket.data.headers.authorization).toBe(authorization);
       expect(byStream.has(stream)).toBe(true);
     });
 
-    it('a transient /me failure during a spoof is not a spoof rejection', async () => {
+    it('a transient /identify failure during a spoof is not a spoof rejection', async () => {
       const { entity: admin } = await createUser({ platformRole: PlatformRole.superadmin });
       const { authorization } = await createBearerToken(admin);
       const { socket, sent } = connect();
-      await withMeStatus(503, () =>
+      await withIdentifyStatus(503, () =>
         websocketHandler.message(
           socket,
           JSON.stringify({

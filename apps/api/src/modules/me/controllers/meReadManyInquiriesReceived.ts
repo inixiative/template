@@ -4,6 +4,7 @@
  * @partOf feature:users
  */
 import { InquiryResourceModel, InquiryStatus } from '@template/db/generated/client/enums';
+import { me } from '#/lib/context/me';
 import { paginate } from '#/lib/prisma/paginate';
 import { makeController } from '#/lib/utils/makeController';
 import { includeInquiryReceived } from '#/modules/inquiry/queries/inquiryIncludes';
@@ -22,7 +23,7 @@ export const meReadManyInquiriesReceivedController = makeController(
             InquiryResourceModel.SpaceUser,
           ],
         },
-        targetUserId: c.get('user')!.id,
+        targetUserId: me(c)!.id,
         status: { notIn: [InquiryStatus.draft, InquiryStatus.canceled] },
       },
       orNullFields: ['expiresAt'],

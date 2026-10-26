@@ -4,11 +4,13 @@
  * @partOf feature:users
  * @uses primitive:routeTemplates
  */
+
+import { me } from '#/lib/context/me';
 import { makeController } from '#/lib/utils/makeController';
 import { meReadRoute } from '#/modules/me/routes/meRead';
 
 export const meReadController = makeController(meReadRoute, async (c, respond) => {
-  const user = c.get('user')!;
+  const user = me(c)!;
   const organizationUsers = c.get('organizationUsers');
   const organizations = c.get('organizations');
   const spaceUsers = c.get('spaceUsers');

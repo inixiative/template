@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'bun:test';
 import { check } from '@inixiative/json-rules';
-import { type ModelName, PolymorphismRegistry, polymorphicSchema, toModelName } from '@template/db';
+import {
+  delegatedKeys,
+  type ModelName,
+  PolymorphismRegistry,
+  polymorphicSchema,
+  toModelName,
+} from '@template/db';
 import { polymorphismRules } from '#/hooks/falsePolymorphism/toRules';
 
 const id = '019a0000-0000-7000-8000-000000000001';
@@ -35,12 +41,13 @@ describe('polymorphicSchema matches the write rule', () => {
             rule: false,
           });
         }
+        const carried = delegatedKeys(axis, value);
         for (const fk of columns.filter((column) => !required.includes(column))) {
           expect({ value, fk, ...verdicts({ ...row, [fk]: id }) }).toEqual({
             value,
             fk,
             schema: false,
-            rule: false,
+            rule: carried.includes(fk),
           });
         }
       }
