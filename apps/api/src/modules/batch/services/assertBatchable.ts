@@ -56,7 +56,7 @@ export const assertBatchable = (app: OpenAPIHono<AppEnv>, rounds: BatchRequest[]
     if (route)
       throw makeError({
         status: 400,
-        message: `${route.method.toUpperCase()} ${route.path} cannot run in a batch`,
+        message: `${route.method === '*' ? '' : `${route.method.toUpperCase()} `}${route.path} cannot run in a batch`,
       });
   }
 };

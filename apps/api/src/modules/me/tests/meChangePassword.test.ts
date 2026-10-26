@@ -277,6 +277,7 @@ describe('POST /api/v1/me/changePassword', () => {
     expect((await signIn(person.email, currentPassword)).status).toBe(200);
     expect((await signIn(person.email, newPassword)).status).not.toBe(200);
     expect((await readMe(jwt)).status).toBe(200);
+    expect(await sessionsOf(person.userId)).toEqual([]);
   });
 
   it('cannot run in a batch: the whole batch is refused before anything runs', async () => {
