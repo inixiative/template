@@ -193,7 +193,7 @@ Cross-server WebSocket broadcasting:
 // Pub/sub channel for all WS messages
 const WS_CHANNEL = 'ws:broadcast';
 
-// Messages include type: 'user' | 'channel' | 'broadcast'
+// Messages include type: 'channel' | 'broadcast'
 await pub.publish(WS_CHANNEL, JSON.stringify({ type: 'channel', target: 'org:123', event }));
 ```
 

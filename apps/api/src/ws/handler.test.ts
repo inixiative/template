@@ -14,7 +14,7 @@ import {
 } from '@template/db/test';
 import { WS_CHANNELS } from '@template/shared/ws';
 import { websocketHandler } from '#/ws/handler';
-import { byChannel, byId, byUser, clearRegistry } from '#/ws/registry';
+import { byChannel, byId, clearRegistry } from '#/ws/registry';
 import { subscribeToChannel } from '#/ws/subscriptions';
 import { createTestSocket } from '#tests/createTestSocket';
 import { createBearerToken } from '#tests/utils/createBearerToken';
@@ -194,7 +194,6 @@ describe('websocketHandler', () => {
     await pending;
 
     expect(byId.has('c1')).toBe(false);
-    expect(byUser.has(user.id)).toBe(false);
   });
 
   it('a subscribe resolving after close does not re-index the dead connection', async () => {

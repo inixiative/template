@@ -39,7 +39,7 @@ on the push: query channels refetch on reconnect, and data streams re-open for a
 Data streams carry a per-stream `seq` so the client can *detect* a lost append and resync; nothing
 is ever re-sent (see [Sequence numbers](#sequence-numbers)).
 
-An app-event handler returns `WSHandoff[]`: a message handoff (`{ channels }` or `{ userIds }`
+An app-event handler returns `WSHandoff[]`: a message handoff (`{ channels }`
 target plus `message.data`) or a stream handoff built by `streamAppend`. Any further payload type
 needs its own authorization, frontend handling and recovery behavior.
 
@@ -58,7 +58,7 @@ append is authorized for every holder, shaped exactly like the route's response,
 other writers, and folded on the client by its kind. If a refetch per change is affordable, use a
 channel.
 
-Ephemeral signals (presence, typing) use user/channel events, which are lossy by design; data
+Ephemeral signals (presence, typing) use channel events, which are lossy by design; data
 streams are the reliable lane (seq + resync). The two lanes are the choice between "drop it if
 missed" and "detect the loss and repair it": pick the lane, not a per-stream delivery option.
 
@@ -93,7 +93,7 @@ token query parameter. Only `authorization` and `x-spoof-user-email` headers cro
 identity probe. `/api/v1/identify` resolves the effective actor through normal auth/spoof
 middleware, for any credential: the socket keeps the credential whenever it identifies, so a token
 of an organization, a space, a member or an integration subscribes to whatever each channel's route
-lets its permissions read. The socket's user (`userId`, for pushes addressed to a user) is the actor when it is a `User`; a
+lets its permissions read. The socket's user (`userId`) is the actor when it is a `User`; a
 token has none. Spoof and unspoof are frontend
 operations that send new authenticate frames; `logout` clears identity and credentials. A 429 or
 5xx from `/identify` is not treated as "no user": the server
@@ -138,9 +138,10 @@ websocket: (data) => [{
 }],
 ```
 
-`makeAppEvent` calls `deliverWSHandoffs`, which publishes to channels or user IDs. User-targeted
-membership changes instead send `meReadManySegmentMemberships` refetches to the affected User's
-sockets; those sends do not require adding that operation to the channel registry.
+`makeAppEvent` calls `deliverWSHandoffs`, which publishes to channels. A customer's segment
+membership change refetches on its owner's channel (`userReadManySegmentMemberships`,
+`organizationReadManySegmentMemberships` or `spaceReadManySegmentMemberships`), which the route
+authorizes like any other channel.
 
 ## Data streams
 
@@ -395,10 +396,10 @@ stream the client has not opened, has closed, or that was rejected, are ignored.
 and unsubscribes mounted queries gated by `LIVE_QUERIES`, and opens and closes streams for
 mounted stream queries; `setClient` wires the QueryClient and reconnect recovery.
 
-`sendToChannel`, `sendToUser`, `appendToStream` and `broadcast` publish through Redis
+`sendToChannel`, `appendToStream` and `broadcast` publish through Redis
 `ws:broadcast`. Each API instance delivers to its local registry. Stream snapshots are served by
 whichever instance holds the socket; appends reach streams open on any instance. Redis failure
-falls back to local delivery for channel, user and broadcast messages, so cross-instance delivery
+falls back to local delivery for channel and broadcast messages, so cross-instance delivery
 is unavailable during the outage; stream appends cannot be sequenced, so local holders resync.
 
 ## Source and verification

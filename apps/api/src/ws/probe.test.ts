@@ -68,6 +68,36 @@ describe('ws subscribe probe (real app)', () => {
     await cleanupTouchedTables(db);
   });
 
+  it("a user subscribes to their own segment memberships, not someone else's", async () => {
+    const { entity: user } = await createUser();
+    const bearer = { authorization: (await createBearerToken(user)).authorization };
+    expect(
+      await canSubscribe(bearer, WS_CHANNELS.userReadManySegmentMemberships.name(user.id)),
+    ).toBe(true);
+    expect(
+      await canSubscribe(bearer, WS_CHANNELS.userReadManySegmentMemberships.name(targetUser.id)),
+    ).toBe(false);
+  });
+
+  it("a user's token subscribes to that user's segment memberships", async () => {
+    const { entity: user } = await createUser();
+    const key = randomUUID();
+    await createToken(
+      {
+        ownerModel: 'User',
+        role: 'owner',
+        keyHash: createHash('sha256').update(key).digest('hex'),
+      },
+      { user },
+    );
+    expect(
+      await canSubscribe(
+        { authorization: `Bearer ${key}` },
+        WS_CHANNELS.userReadManySegmentMemberships.name(user.id),
+      ),
+    ).toBe(true);
+  });
+
   it('allows a channel whose route the connection could GET', async () => {
     expect(await canSubscribe(adminBearer, WS_CHANNELS.inquiryRead.name(inquiryId))).toBe(true);
   });

@@ -7,12 +7,7 @@
 import { getRedisPub, getRedisSub } from '@template/db';
 import { LogScope, log } from '@template/shared/logger';
 import { type StreamAppend, streamAppendFrame } from '#/ws/dataFrame';
-import {
-  broadcastLocal,
-  sendToChannelLocal,
-  sendToStreamLocal,
-  sendToUserLocal,
-} from '#/ws/delivery';
+import { broadcastLocal, sendToChannelLocal, sendToStreamLocal } from '#/ws/delivery';
 import { publishStreamAppend } from '#/ws/queries/publishStreamAppend';
 import { byId, byStream } from '#/ws/registry';
 import { resyncDataStream } from '#/ws/resyncDataStream';
@@ -23,7 +18,7 @@ import type { WSOutbound } from '#/ws/types';
 const WS_CHANNEL = 'ws:broadcast';
 
 type PubSubMessage =
-  | { type: 'user' | 'channel'; target: string; event: WSOutbound }
+  | { type: 'channel'; target: string; event: WSOutbound }
   | { type: 'broadcast'; event: WSOutbound }
   | { type: 'stream'; target: string; userIds?: string[]; seqs: number[]; append: StreamAppend }
   | { type: 'streamResync'; target: string; origin: string };
@@ -86,9 +81,6 @@ const deliverStreamAppend = ({
 
 const deliverLocal = (message: PubSubMessage): void => {
   switch (message.type) {
-    case 'user':
-      sendToUserLocal(message.target, message.event);
-      break;
     case 'channel':
       sendToChannelLocal(message.target, message.event);
       break;
@@ -143,9 +135,6 @@ const publish = async (
     deliverLocal(message);
   }
 };
-
-export const sendToUser = (userId: string, event: WSOutbound): Promise<void> =>
-  publish({ type: 'user', target: userId, event });
 
 export const sendToChannel = (channel: string, event: WSOutbound): Promise<void> =>
   publish({ type: 'channel', target: channel, event });

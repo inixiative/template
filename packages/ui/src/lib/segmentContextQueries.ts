@@ -5,8 +5,6 @@
  * @uses primitive:sdk
  */
 import {
-  meReadManySegmentMemberships,
-  meReadManySegmentMembershipsQueryKey,
   meReadManySegments,
   meReadManySegmentsQueryKey,
   organizationReadManySegmentMemberships,
@@ -17,12 +15,14 @@ import {
   spaceReadManySegmentMembershipsQueryKey,
   spaceReadManySegments,
   spaceReadManySegmentsQueryKey,
+  userReadManySegmentMemberships,
+  userReadManySegmentMembershipsQueryKey,
 } from '@template/sdk';
 import { apiQuery } from '@template/ui/lib/apiQuery';
 import { makeContextQueries, query } from '@template/ui/lib/makeContextQueries';
 
 export const segmentContextQueries = makeContextQueries()({
-  user: () => ({
+  user: ({ user }) => ({
     owned: query({
       queryKey: meReadManySegmentsQueryKey(),
       queryFn: apiQuery((opts: Parameters<typeof meReadManySegments>[0]) =>
@@ -30,9 +30,9 @@ export const segmentContextQueries = makeContextQueries()({
       ),
     }),
     memberships: query({
-      queryKey: meReadManySegmentMembershipsQueryKey(),
-      queryFn: apiQuery((opts: Parameters<typeof meReadManySegmentMemberships>[0]) =>
-        meReadManySegmentMemberships(opts),
+      queryKey: userReadManySegmentMembershipsQueryKey({ path: { id: user.id } }),
+      queryFn: apiQuery((opts: Parameters<typeof userReadManySegmentMemberships>[0]) =>
+        userReadManySegmentMemberships({ ...opts, path: { id: user.id } }),
       ),
     }),
   }),

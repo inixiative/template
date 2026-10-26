@@ -8,7 +8,6 @@ export {
   initWebSocketPubSub,
   isPubSubEnabled,
   sendToChannel,
-  sendToUser,
 } from '#/ws/pubsub';
 export { startStreamReauthorizeSweep } from '#/ws/streamReauthorizeSweep';
 export type { WSData, WSMessage, WSSocket } from '#/ws/types';
