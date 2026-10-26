@@ -4,6 +4,10 @@
  * @partOf primitive:ui
  * @uses none
  */
+import {
+  type ChangePasswordInput,
+  changePassword as changePasswordFn,
+} from '@template/ui/lib/auth/changePassword';
 import { fetchAndHydrateMe } from '@template/ui/lib/auth/fetchAndHydrateMe';
 import { signIn as signInFn } from '@template/ui/lib/auth/signin';
 import { signUp as signUpFn } from '@template/ui/lib/auth/signup';
@@ -95,6 +99,11 @@ export const createAuthSlice: StateCreator<AppStore, [], [], AuthSlice> = (set, 
           syncWsAuth();
         }
         return result;
+      },
+
+      changePassword: async (input: ChangePasswordInput) => {
+        await changePasswordFn(input);
+        syncWsAuth();
       },
 
       setStrategy: (strategy) =>

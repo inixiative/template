@@ -142,13 +142,13 @@ Every action lives on the model it acts on; a dotted action is named after its m
 ```typescript
 // packages/permissions/src/client.ts
 export const OrganizationAction = { ...StandardAction, create: 'create', delete: 'delete' };
-export const UserAction = { ...StandardAction, redactUser: 'user.redact', rotateUserJwts: 'user.rotateJwts' };
+export const UserAction = { ...StandardAction, redactUser: 'user.redact', rotateUserJwts: 'user.rotateJwts', changePassword: 'user.changePassword' };
 export const TokenAction = { create: 'create', delete: 'delete' };
 ```
 
 Creating checks `create` on a pseudo record of the model being created (token create in `createToken`, organization create in `organizationCreate`). User-only acts are rules on the actor: `actorIsUser` (`__actor.model == User`) and `actorIsDelegateOfUser` (`__actor.record.ownerModel == User`).
 
-Creating an organization is `create` on a pseudo organization: the actor is a user or a token its user owns. Minting and deleting tokens, redacting and rotating JWTs, and deleting an organization are user-only rules on the record each acts on, so a token holding `own` still cannot do them. A superadmin passes on any credential.
+Creating an organization is `create` on a pseudo organization: the actor is a user or a token its user owns. Minting and deleting tokens, redacting, rotating JWTs, changing the password, and deleting an organization are user-only rules on the record each acts on, so a token holding `own` still cannot do them. A superadmin passes on any credential.
 
 ### The Actor
 
@@ -581,7 +581,7 @@ middleware: [validatePermission('read')]                                  // the
 middleware: [validatePermission('operate')]                               // meCreateInquiry, meCreateSegment, meReachSegment
 ```
 
-User-only is `actorIsUser` in the rule of the record each action is on: `create` and `delete` on the token (create on a pseudo record of the token), `delete` on the organization, `user.redact` and `user.rotateJwts` on the user. A superadmin passes on any credential. Situations: `apps/api/src/middleware/validations/userOnlyActions.test.ts`, `apps/api/src/lib/context/userActsDirectly.test.ts`.
+User-only is `actorIsUser` in the rule of the record each action is on: `create` and `delete` on the token (create on a pseudo record of the token), `delete` on the organization, `user.redact`, `user.rotateJwts` and `user.changePassword` on the user. A superadmin passes on any credential. Situations: `apps/api/src/middleware/validations/userOnlyActions.test.ts`, `apps/api/src/lib/context/userActsDirectly.test.ts`.
 
 ---
 
