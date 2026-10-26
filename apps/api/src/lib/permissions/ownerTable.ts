@@ -4,9 +4,8 @@
  * @partOf primitive:authz
  * @uses infrastructure:prisma
  */
-import { fetchOne, type OrganizationId, type SpaceId } from '@template/db';
+import type { OrganizationId, SpaceId } from '@template/db';
 import type {
-  Integration,
   IntegrationOwnerModel,
   OrganizationUser,
   Role,
@@ -28,15 +27,17 @@ import { findUserWithRelations } from '#/modules/user/services/find';
 
 export type OwnerTable = { entries: PermissionEntry[]; owner?: Permix };
 
+type PermissionsRow = { role?: Role | null; full?: boolean; entitlements?: unknown };
+
 type Delegated = {
   ownerModel: TokenOwnerModel | IntegrationOwnerModel;
   userId: string | null;
   organizationId: string | null;
   spaceId: string | null;
-  integrationId?: string | null;
+  organizationUser?: OrganizationUser | null;
+  spaceUser?: SpaceUser | null;
+  integration?: (Delegated & PermissionsRow) | null;
 };
-
-type PermissionsRow = { role?: Role | null; full?: boolean; entitlements?: unknown };
 
 export const delegatePermissionsOf = (row: PermissionsRow): DelegatePermissions => ({
   role: row.role ?? null,
@@ -67,7 +68,7 @@ export const delegateTable = async (
       };
 
 export const ownerTable = async (delegated: Delegated): Promise<OwnerTable> => {
-  const { organizationId, spaceId, userId, integrationId } = delegated;
+  const { organizationId, spaceId, userId, organizationUser, spaceUser, integration } = delegated;
   switch (delegated.ownerModel) {
     case 'User': {
       const user = userId ? await findUserWithRelations(userId) : null;
@@ -75,32 +76,17 @@ export const ownerTable = async (delegated: Delegated): Promise<OwnerTable> => {
         ? { entries: userEntries(user.id, user.organizationUsers, user.spaceUsers) }
         : nobody;
     }
-    case 'OrganizationUser': {
-      const member =
-        organizationId && userId
-          ? await fetchOne<OrganizationUser>('organizationUser', { organizationId, userId })
-          : null;
-      return member ? { entries: userEntries(null, [member], []) } : nobody;
-    }
-    case 'SpaceUser': {
-      const member =
-        organizationId && spaceId && userId
-          ? await fetchOne<SpaceUser>('spaceUser', { organizationId, spaceId, userId })
-          : null;
-      return member ? { entries: userEntries(null, [], [member]) } : nobody;
-    }
+    case 'OrganizationUser':
+      return organizationUser ? { entries: userEntries(null, [organizationUser], []) } : nobody;
+    case 'SpaceUser':
+      return spaceUser ? { entries: userEntries(null, [], [spaceUser]) } : nobody;
     case 'Organization':
       return organizationId
         ? { entries: [getOrgPermissions('owner', organizationId as OrganizationId)] }
         : nobody;
     case 'Space':
       return spaceId ? { entries: [getSpacePermissions('owner', spaceId as SpaceId)] } : nobody;
-    case 'Integration': {
-      const integration = integrationId
-        ? await fetchOne<Integration>('integration', integrationId)
-        : null;
-      if (!integration) return nobody;
-      return delegateTable(integration, await ownerTable(integration));
-    }
+    case 'Integration':
+      return integration ? delegateTable(integration, await ownerTable(integration)) : nobody;
   }
 };

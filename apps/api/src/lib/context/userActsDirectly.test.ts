@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { createHash, randomUUID } from 'node:crypto';
-import { db, unregisterDbHook } from '@template/db';
+import { db, TokenScalarSchema, unregisterDbHook } from '@template/db';
 import type {
   Organization,
   OrganizationUser,
@@ -90,6 +90,11 @@ describe('only a user acts directly: a JWT or a spoof (Aron, 2026-10-25)', () =>
     expect(actor.model).toBe('Token');
     expect(actor.record.userId).toBe(user.id);
     expect(actor.record).not.toHaveProperty('keyHash');
+    expect(Object.keys(actor.record).sort()).toEqual(
+      Object.keys(TokenScalarSchema.shape)
+        .filter((column) => column !== 'keyHash')
+        .sort(),
+    );
   });
 
   it('a token never makes the request a user', async () => {

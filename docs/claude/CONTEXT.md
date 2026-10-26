@@ -419,7 +419,7 @@ await refreshUserContext(c);
 ```
 
 **What it does:**
-1. With a token: rereads the token row and its owners (`loadTokenContext`) and rebuilds through `setTokenContext`, so a member's token keeps exactly its own member row and a revoked token stops with a 401
+1. With a token: re-runs the token sign-in (`loadTokenContext` with the token's `keyHash`) and rebuilds through `setTokenContext`, so a member's token keeps exactly its own member row and a revoked token stops with a 401
 2. With a user: reloads the user with all relations via cached `findUserWithRelations` and rebuilds through `setUserContext`
 3. Either way the table is replaced, never added to
 

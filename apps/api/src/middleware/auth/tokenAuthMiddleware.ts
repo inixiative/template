@@ -2,18 +2,14 @@
  * @atlas
  * @kind middleware
  * @partOf feature:auth
- * @uses infrastructure:redis, infrastructure:prisma, primitive:authz
+ * @uses infrastructure:prisma, primitive:authz
  */
 import { createHash } from 'node:crypto';
-import { cache, cacheKey } from '@template/db';
-import type { Token } from '@template/db/generated/client/client';
 import { LogScope, log } from '@template/shared/logger';
 import type { Context, Next } from 'hono';
 import { loadTokenContext } from '#/lib/context/loadTokenContext';
 import { setTokenContext } from '#/lib/context/setTokenContext';
 import type { AppEnv } from '#/types/appEnv';
-
-const TOKEN_CACHE_TTL = 60 * 10;
 
 const authenticateToken = async (c: Context<AppEnv>): Promise<void> => {
   const db = c.get('db');
@@ -27,23 +23,14 @@ const authenticateToken = async (c: Context<AppEnv>): Promise<void> => {
   if (!apiKey) return;
   const keyHash = createHash('sha256').update(apiKey).digest('hex');
 
-  let fetched = false;
-  const tokenRow = await cache<Token | null>(
-    cacheKey('Token', { keyHash }),
-    async () => {
-      fetched = true;
-      return db.token.findUnique({ where: { keyHash } });
-    },
-    TOKEN_CACHE_TTL,
-  );
-
-  if (!tokenRow) return;
-
-  const context = await loadTokenContext(tokenRow);
-  if (!context) return;
-  if (fetched)
-    await db.token.update({ where: { id: tokenRow.id }, data: { lastUsedAt: new Date() } });
-  await setTokenContext(c, context);
+  const signIn = await loadTokenContext(keyHash);
+  if (!signIn) return;
+  if (signIn.fetched)
+    await db.token.update({
+      where: { id: signIn.context.token.id },
+      data: { lastUsedAt: new Date() },
+    });
+  await setTokenContext(c, signIn.context);
 };
 
 export const tokenAuthMiddleware = async (c: Context<AppEnv>, next: Next) => {

@@ -2,81 +2,55 @@
  * @atlas
  * @kind service
  * @partOf primitive:authz, primitive:requestContext
- * @uses infrastructure:prisma, feature:users
+ * @uses infrastructure:prisma, infrastructure:redis, feature:users
  */
-import { fetchOne, type UserWithRelations } from '@template/db';
-import type {
-  Integration,
-  Organization,
-  OrganizationUser,
-  Space,
-  SpaceUser,
-  Token,
-  User,
-} from '@template/db/generated/client/client';
+import {
+  cache,
+  cacheKey,
+  db,
+  type HydratedRecord,
+  hydrate,
+  toAccessor,
+  type UserWithRelations,
+} from '@template/db';
+import type { Token, TokenOwnerModel } from '@template/db/generated/client/client';
 import type { TokenWithRelations } from '#/lib/context/types';
 import { findUserWithRelations } from '#/modules/user/services/find';
 
 export type TokenContext = { token: TokenWithRelations; user: UserWithRelations | null };
+export type TokenSignIn = { context: TokenContext; fetched: boolean };
 
-const ownerExists = (token: TokenWithRelations): boolean => {
-  switch (token.ownerModel) {
-    case 'User':
-      return Boolean(token.user);
-    case 'Organization':
-      return Boolean(token.organization);
-    case 'Space':
-      return Boolean(token.space);
-    case 'OrganizationUser':
-      return Boolean(token.organizationUser);
-    case 'SpaceUser':
-      return Boolean(token.spaceUser);
-    case 'Integration':
-      return Boolean(token.integration);
-  }
+const TOKEN_CACHE_TTL = 60 * 10;
+
+const memberParts: Partial<Record<TokenOwnerModel, readonly string[]>> = {
+  OrganizationUser: ['organization', 'user'],
+  SpaceUser: ['organization', 'organizationUser', 'space', 'user'],
 };
 
-// why: owners load under their own keys, which the cache hook clears; the token's key does not.
-const loadOwners = async (token: Token): Promise<TokenWithRelations> => {
-  const { organizationId, spaceId, userId, integrationId } = token;
-  const [user, organization, space, organizationUser, spaceUser, integration] = await Promise.all([
-    userId ? fetchOne<User>('user', userId) : null,
-    organizationId ? fetchOne<Organization>('organization', organizationId) : null,
-    spaceId ? fetchOne<Space>('space', spaceId) : null,
-    organizationId && userId
-      ? fetchOne<OrganizationUser>('organizationUser', { organizationId, userId })
-      : null,
-    organizationId && spaceId && userId
-      ? fetchOne<SpaceUser>('spaceUser', { organizationId, spaceId, userId })
-      : null,
-    integrationId ? fetchOne<Integration>('integration', integrationId) : null,
-  ]);
-  const hasMember = organizationUser && user && organization;
-  return {
-    ...token,
-    user,
-    organization,
-    space,
-    integration,
-    organizationUser: hasMember ? { ...organizationUser, user, organization } : null,
-    spaceUser:
-      spaceUser && hasMember && space
-        ? { ...spaceUser, user, organization, organizationUser, space }
-        : null,
-  };
+const ownerIsPresent = (token: HydratedRecord & Token): boolean => {
+  const owner = token[toAccessor(token.ownerModel)] as HydratedRecord | undefined;
+  return Boolean(owner) && (memberParts[token.ownerModel] ?? []).every((part) => owner?.[part]);
 };
 
-const userOf = async (token: TokenWithRelations): Promise<UserWithRelations | null> =>
-  token.ownerModel === 'User' && token.user ? findUserWithRelations(token.user.id) : null;
+export const loadTokenContext = async (keyHash: string): Promise<TokenSignIn | null> => {
+  let fetched = false;
+  const row = await cache<Token | null>(
+    cacheKey('Token', { keyHash }),
+    async () => {
+      fetched = true;
+      return db.token.findUnique({ where: { keyHash } });
+    },
+    TOKEN_CACHE_TTL,
+  );
 
-export const loadTokenContext = async (row: Token): Promise<TokenContext | null> => {
-  if (!row.isActive) return null;
+  if (!row?.isActive) return null;
   if (row.expiresAt && row.expiresAt <= new Date()) return null;
 
-  const token = await loadOwners(row);
-  if (!ownerExists(token)) return null;
+  const token = await hydrate('token', row);
+  if (!ownerIsPresent(token)) return null;
 
-  const user = await userOf(token);
+  const user =
+    token.ownerModel === 'User' && token.userId ? await findUserWithRelations(token.userId) : null;
   if (token.ownerModel === 'User' && !user) return null;
-  return { token, user };
+  return { context: { token: token as unknown as TokenWithRelations, user }, fetched };
 };

@@ -1,6 +1,13 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
-import { cacheKey, db, fetchOne, getRedisClient, unregisterDbHook } from '@template/db';
+import {
+  type AccessorName,
+  cacheKey,
+  db,
+  fetchOne,
+  getRedisClient,
+  unregisterDbHook,
+} from '@template/db';
 import type {
   Organization,
   OrganizationUser,
@@ -378,4 +385,102 @@ describe('every token type is refused once its owner is gone', () => {
     await Bun.sleep(1600);
     expect(await authenticatedTokenId(headers)).toBeNull();
   });
+});
+
+describe('a token is refused once anything its owner stands on is gone, cached or not', () => {
+  type Owned = {
+    headers: Record<string, string>;
+    removals: Record<string, () => Promise<unknown>>;
+  };
+
+  const softDelete = (accessor: AccessorName, id: string) => () =>
+    db.delegate(accessor).update({ where: { id }, data: { deletedAt: new Date() } });
+
+  const owners: Record<string, () => Promise<Owned>> = {
+    User: async () => {
+      const { entity: user } = await createUser();
+      return { headers: await userToken(user), removals: { user: softDelete('user', user.id) } };
+    },
+    Organization: async () => {
+      const { entity: organization } = await createOrganization();
+      return {
+        headers: await organizationToken(organization),
+        removals: { organization: softDelete('organization', organization.id) },
+      };
+    },
+    Space: async () => {
+      const { entity: organization } = await createOrganization();
+      const { entity: space } = await createSpace({}, { organization });
+      return {
+        headers: await spaceToken(space),
+        removals: { space: softDelete('space', space.id) },
+      };
+    },
+    OrganizationUser: async () => {
+      const { entity: organizationUser, context } = await createOrganizationUser({ role: 'owner' });
+      return {
+        headers: await organizationUserToken(organizationUser),
+        removals: {
+          organizationUser: softDelete('organizationUser', organizationUser.id),
+          user: softDelete('user', context.user.id),
+          organization: softDelete('organization', context.organization.id),
+        },
+      };
+    },
+    SpaceUser: async () => {
+      const { entity: organizationUser, context } = await createOrganizationUser({
+        role: 'member',
+      });
+      const { entity: space } = await createSpace({}, { organization: context.organization });
+      const { entity: spaceUser } = await createSpaceUser({ role: 'owner' }, { ...context, space });
+      return {
+        headers: await spaceUserToken(spaceUser),
+        removals: {
+          spaceUser: softDelete('spaceUser', spaceUser.id),
+          organizationUser: softDelete('organizationUser', organizationUser.id),
+          space: softDelete('space', space.id),
+          user: softDelete('user', context.user.id),
+          organization: softDelete('organization', context.organization.id),
+        },
+      };
+    },
+    Integration: async () => {
+      const { entity: user } = await createUser();
+      const { entity: integration } = await createIntegration({
+        ownerModel: 'User',
+        userId: user.id,
+      });
+      const { rawKey, fields } = mintKey();
+      await createToken({ ownerModel: 'Integration', role: 'owner', ...fields }, { integration });
+      return {
+        headers: { authorization: `Bearer ${rawKey}` },
+        removals: { integration: softDelete('integration', integration.id) },
+      };
+    },
+  };
+
+  for (const [ownerModel, own] of Object.entries(owners)) {
+    it(`${ownerModel} token: refused after each removal while its row is cached`, async () => {
+      for (const removal of Object.keys((await own()).removals)) {
+        const { headers, removals } = await own();
+        expect(await authenticatedTokenId(headers)).not.toBeNull();
+        await removals[removal]?.();
+        expect({ removal, tokenId: await authenticatedTokenId(headers) }).toEqual({
+          removal,
+          tokenId: null,
+        });
+      }
+    });
+
+    it(`${ownerModel} token: refused after each removal before it was ever used`, async () => {
+      for (const removal of Object.keys((await own()).removals)) {
+        const { headers, removals } = await own();
+        await removals[removal]?.();
+        expect({ removal, tokenId: await authenticatedTokenId(headers) }).toEqual({
+          removal,
+          tokenId: null,
+        });
+      }
+    });
+  }
 });

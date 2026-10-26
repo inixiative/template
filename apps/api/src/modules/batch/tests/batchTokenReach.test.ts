@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { createHash, randomBytes } from 'node:crypto';
-import { type AccessorName, db, fetchOne, hydrate } from '@template/db';
+import { type AccessorName, db, fetchOne, hydrate, unregisterDbHook } from '@template/db';
 import type { Organization, Space, User } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
@@ -12,6 +12,7 @@ import {
   createUser,
 } from '@template/db/test';
 import { check, rebacSchema } from '@template/permissions/rebac';
+import { registerClearCacheHook } from '#/hooks/cache/hook';
 import { tokenAuthMiddleware } from '#/middleware/auth/tokenAuthMiddleware';
 import { batchRouter } from '#/modules/batch';
 import { meRouter } from '#/modules/me';
@@ -44,6 +45,17 @@ const { app } = createTestApp({
         if (!row) return c.json({ holds: false });
         const record = await hydrate(model, row);
         return c.json({ holds: check(c.get('permix'), rebacSchema, model, record, action) });
+      });
+      hono.post('/api/v1/probe/demote/:id', async (c) => {
+        await db.organizationUser.update({
+          where: { id: c.req.param('id') },
+          data: { role: 'viewer' },
+        });
+        return c.json({});
+      });
+      hono.post('/api/v1/probe/deactivate/:id', async (c) => {
+        await db.token.update({ where: { id: c.req.param('id') }, data: { isActive: false } });
+        return c.json({});
       });
     },
   ],
@@ -178,5 +190,54 @@ describe('a batch keeps every round inside its credential (Aron, 2026-10-25)', (
         body: { actor: expect.objectContaining({ model: 'Token' }) },
       });
     }
+  });
+});
+
+describe('a batch signs its token in again between rounds', () => {
+  beforeAll(() => registerClearCacheHook());
+  afterAll(async () => {
+    unregisterDbHook('clearCache');
+    await cleanupTouchedTables(db);
+  });
+
+  it('a member demoted in one round loses the role in the next', async () => {
+    const { entity: organizationUser, context } = await createOrganizationUser({ role: 'owner' });
+    const key = mintKey();
+    await createToken(
+      { ownerModel: 'OrganizationUser', role: 'owner', ...key.fields },
+      { organizationUser },
+    );
+    const own = holdsRequest({ model: 'organization', id: context.organization.id, action: 'own' });
+
+    const [first, second] = await batch(key.rawKey, [
+      [own, { method: 'POST', path: `/api/v1/probe/demote/${organizationUser.id}` }],
+      [own],
+    ]);
+
+    expect(held(first[0])).toBe(true);
+    expect(held(second[0])).toBe(false);
+  });
+
+  it('a token deactivated in one round ends the batch with 401', async () => {
+    const { entity: user } = await createUser();
+    const key = mintKey();
+    const { entity: token } = await createToken(
+      { ownerModel: 'User', role: 'owner', ...key.fields },
+      { user },
+    );
+
+    const response = await app.request('/api/v1/batch/execute', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${key.rawKey}`, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        requests: [
+          [{ method: 'POST', path: `/api/v1/probe/deactivate/${token.id}` }],
+          [{ method: 'GET', path: '/api/v1/probe/actor' }],
+        ],
+        strategy: 'allowFailures',
+      }),
+    });
+
+    expect(response.status).toBe(401);
   });
 });
