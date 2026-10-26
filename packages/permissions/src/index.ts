@@ -7,7 +7,6 @@ export {
   ActorModel,
   createPermissions,
   type EntitlementEntry,
-  type Entitlements,
   OrganizationAction,
   type PermissionEntry,
   type Permix,

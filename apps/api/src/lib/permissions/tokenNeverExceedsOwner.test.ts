@@ -9,7 +9,6 @@ import {
   createSpace,
   createToken,
 } from '@template/db/test';
-import type { Entitlements } from '@template/permissions';
 import { check, rebacSchema } from '@template/permissions/rebac';
 import { tokenAuthMiddleware } from '#/middleware/auth/tokenAuthMiddleware';
 import { organizationRouter } from '#/modules/organization';
@@ -59,11 +58,13 @@ const holds = async (key: string, model: AccessorName, id: string, action: strin
   return ((await response.json()) as { holds: boolean }).holds;
 };
 
+type Actions = Record<string, boolean> | null;
+
 describe('a credential never exceeds its owner (Aron, 2026-10-23)', () => {
   let organization: Organization;
   let space: Space;
 
-  const onOrganization = (actions: Entitlements) =>
+  const onOrganization = (actions: Actions) =>
     actions
       ? [
           {
@@ -74,13 +75,13 @@ describe('a credential never exceeds its owner (Aron, 2026-10-23)', () => {
         ]
       : undefined;
 
-  const member = (role: Role, entitlements: Entitlements = null) =>
+  const member = (role: Role, entitlements: Actions = null) =>
     createOrganizationUser({ role, entitlements: onOrganization(entitlements) }, { organization });
 
   const userToken = async (
     organizationUser: Awaited<ReturnType<typeof member>>,
     role: Role,
-    entitlements: Entitlements = null,
+    entitlements: Actions = null,
   ) => {
     const { rawKey, fields } = mintKey();
     await createToken(
@@ -93,7 +94,7 @@ describe('a credential never exceeds its owner (Aron, 2026-10-23)', () => {
   const memberToken = async (
     organizationUser: Awaited<ReturnType<typeof member>>,
     role: Role,
-    entitlements: Entitlements = null,
+    entitlements: Actions = null,
   ) => {
     const { rawKey, fields } = mintKey();
     await createToken(

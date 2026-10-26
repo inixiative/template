@@ -52,8 +52,6 @@ export type InquiryAction = (typeof InquiryAction)[keyof typeof InquiryAction];
 
 export type Action = UserAction | OrganizationAction | SpaceAction | TokenAction | InquiryAction;
 
-export type Entitlements = Record<string, boolean> | null;
-
 export const ActorModel = { User: 'User', Token: 'Token' } as const;
 export type ActorModel = (typeof ActorModel)[keyof typeof ActorModel];
 

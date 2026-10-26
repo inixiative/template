@@ -74,7 +74,7 @@ Three-layer permission system:
 |-------|-------|---------|---------|
 | PlatformRole | System-wide | `User.platformRole` | superadmin bypasses all |
 | Role | Per-org RBAC | `OrganizationUser.role` | owner, admin, member, viewer |
-| Entitlements | Grants beyond a role | JSON on members and delegates | `{ manage: true }` on a member; `{ resource, anchor, actions }` on a delegate |
+| Entitlements | Grants beyond a role | JSON on members and delegates | `{ resource, anchor, actions }` on members and delegates |
 
 ---
 
@@ -323,13 +323,11 @@ write a custom middleware that returns 404 when the permission check fails.
 
 ## Entitlements
 
-Grants beyond a role. Delegates (tokens, integrations) store library entries `{ resource, anchor, where?, actions }`, installed with their owner's table as owner ([Delegates and Their Owners](#delegates-and-their-owners)). Member rows (`OrganizationUser`, `SpaceUser`) store a flat action map (`Record<string, boolean>`) merged into the role's entry.
+Grants beyond a role, stored as library entries `{ resource, anchor, actions }` (`entitlementEntriesSchema`). Delegates (tokens, integrations) install theirs with their owner's table as owner ([Delegates and Their Owners](#delegates-and-their-owners)). Member rows (`OrganizationUser`, `SpaceUser`) install theirs with their tenant as owner: the organization's or the space's owner table. A flat action map is refused (422).
 
 ### How Entitlements Are Applied
 
-A member's map is spread over its role's actions (`getOrgPermissions`, `getSpacePermissions` in `packages/permissions/src/roles/`), so it can grant actions the role does not have.
-
-**Override behavior**: Allow override means a viewer with `{ manage: true }` entitlement CAN manage, which is why writing one is itself checked ([Granting an Entitlement](#granting-an-entitlement)). The role is not a ceiling on the member itself; the ceiling is the owner, above ([A Token Never Exceeds Its Owner](#a-token-never-exceeds-its-owner)): a token naming `{ manage: true }` on a viewer-role member holds nothing the viewer does not.
+`userGrants` (`packages/permissions/src/roles/userGrants.ts`, shared by the API and the UI) returns the grants to install: one with the user's and every member row's role entries, and one per member row with entitlements, owned by its tenant. `installGrants` sets each up with its owner. An entitlement holds on a record under its anchor only while the tenant's owner table still allows the action there, so a grant never reaches outside its organization or space. The role is not a ceiling on the member itself, which is why writing an entitlement is checked ([Granting an Entitlement](#granting-an-entitlement)): `validateEntitlementGrants` asks `canGrantEntitlement` whether the writer could take each action from the anchor.
 
 ---
 
