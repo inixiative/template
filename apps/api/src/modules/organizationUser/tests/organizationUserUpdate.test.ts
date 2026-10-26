@@ -57,15 +57,26 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
     expect(data.role).toBe('viewer');
   });
 
-  describe('a grant is an action: the writer could take every action the member would hold (Aron, 2026-10-25)', () => {
+  type Entry = {
+    resource: string;
+    anchor: { resource: string; id: string };
+    actions: Record<string, boolean>;
+  };
+
+  const onOrganization = (...actions: string[]): Entry[] => [
+    {
+      resource: 'db:organization',
+      anchor: { resource: 'db:organization', id: org.id },
+      actions: Object.fromEntries(actions.map((action) => [action, true])),
+    },
+  ];
+
+  describe("a member's entitlements are library entries the writer could grant (Aron, 2026-10-26)", () => {
     const newMember = async () =>
       (await createOrganizationUser({ role: 'member' }, { organization: org })).entity;
 
-    const writer = async (role: Role, entitlements?: Record<string, boolean>) => {
-      const { entity, context } = await createOrganizationUser(
-        { role, entitlements },
-        { organization: org },
-      );
+    const writer = async (role: Role) => {
+      const { entity, context } = await createOrganizationUser({ role }, { organization: org });
       return createTestApp({
         mockUser: context.user,
         mockOrganizationUsers: [entity],
@@ -73,10 +84,7 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
       });
     };
 
-    const grant = async (
-      app: ReturnType<typeof createTestApp>,
-      entitlements: Record<string, boolean>,
-    ) => {
+    const grant = async (app: ReturnType<typeof createTestApp>, entitlements: unknown) => {
       const target = await newMember();
       const response = await app.fetch(
         patch(`/api/v1/organizationUser/${target.id}`, { entitlements }),
@@ -85,46 +93,23 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
       return { status: response.status, stored: stored.entitlements };
     };
 
-    it('an admin grants a member operate', async () => {
-      expect(await grant(await writer('admin'), { operate: true })).toEqual({
+    it('an admin grants a member operate on the organization', async () => {
+      expect(await grant(await writer('admin'), onOrganization('operate'))).toEqual({
         status: 200,
-        stored: { operate: true },
+        stored: onOrganization('operate'),
       });
     });
 
     it('an admin cannot grant a member own, and the member is unchanged', async () => {
-      expect(await grant(await writer('admin'), { own: true })).toEqual({
+      expect(await grant(await writer('admin'), onOrganization('own'))).toEqual({
         status: 403,
         stored: null,
       });
-    });
-
-    it('an admin cannot grant assign: the member could then assign owners', async () => {
-      expect(await grant(await writer('admin'), { assign: true })).toEqual({
-        status: 403,
-        stored: null,
-      });
-    });
-
-    it('an owner grants assign', async () => {
-      expect(await grant(await writer('owner'), { assign: true })).toEqual({
-        status: 200,
-        stored: { assign: true },
-      });
-    });
-
-    it('a custom action only by a writer who holds it, owner or not', async () => {
-      expect((await grant(await writer('owner'), { 'report.export': true })).status).toBe(403);
-      expect((await grant(await writer('admin'), { 'report.export': true })).status).toBe(403);
-      expect(
-        (await grant(await writer('admin', { 'report.export': true }), { 'report.export': true }))
-          .status,
-      ).toBe(200);
     });
 
     it("an admin clears a member's entitlements", async () => {
       const { entity: target } = await createOrganizationUser(
-        { role: 'member', entitlements: { operate: true } },
+        { role: 'member', entitlements: onOrganization('operate') },
         { organization: org },
       );
       const response = await fetch(
@@ -135,12 +120,8 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
       expect(stored.entitlements).toBeNull();
     });
 
-    it('entitlements are a map of actions to booleans', async () => {
-      const target = await newMember();
-      const response = await fetch(
-        patch(`/api/v1/organizationUser/${target.id}`, { entitlements: { own: 'yes' } }),
-      );
-      expect(response.status).toBe(422);
+    it('a flat map of actions is not an entitlement', async () => {
+      expect((await grant(await writer('owner'), { operate: true })).status).toBe(422);
     });
   });
 
@@ -171,7 +152,7 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
       return key;
     };
 
-    const grantAs = async (key: string, entitlements: Record<string, boolean>) => {
+    const grantAs = async (key: string, entitlements: Entry[]) => {
       const { entity: target } = await createOrganizationUser(
         { role: 'member' },
         { organization: org },
@@ -188,20 +169,19 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
 
     it('an owner-role token on an owner member grants what the member could', async () => {
       const key = await memberToken('owner', 'owner');
-      expect(await grantAs(key, { operate: true })).toBe(200);
-      expect(await grantAs(key, { assign: true })).toBe(200);
+      expect(await grantAs(key, onOrganization('operate'))).toBe(200);
+      expect(await grantAs(key, onOrganization('own'))).toBe(200);
     });
 
     it('an owner-role token on an admin member grants no more than the admin', async () => {
       const key = await memberToken('admin', 'owner');
-      expect(await grantAs(key, { operate: true })).toBe(200);
-      expect(await grantAs(key, { own: true })).toBe(403);
-      expect(await grantAs(key, { assign: true })).toBe(403);
+      expect(await grantAs(key, onOrganization('operate'))).toBe(200);
+      expect(await grantAs(key, onOrganization('own'))).toBe(403);
     });
 
     it('a viewer-role token on an owner member grants nothing above read', async () => {
       const key = await memberToken('owner', 'viewer');
-      expect(await grantAs(key, { operate: true })).toBe(403);
+      expect(await grantAs(key, onOrganization('operate'))).toBe(403);
     });
   });
 });

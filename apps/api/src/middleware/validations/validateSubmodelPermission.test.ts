@@ -349,7 +349,13 @@ describe('submodel actions act on the submodel, under the owner (R38)', () => {
       const { context } = await createOrganizationUser(
         {
           role: 'viewer',
-          entitlements: { manage: true },
+          entitlements: [
+            {
+              resource: 'db:organization',
+              anchor: { resource: 'db:organization', id: other.id },
+              actions: { manage: true },
+            },
+          ],
         },
         { organization: other },
       );

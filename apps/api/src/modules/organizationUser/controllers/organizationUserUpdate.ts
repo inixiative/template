@@ -6,9 +6,10 @@
  */
 import { hydrate, type OrganizationId, Prisma } from '@template/db';
 import { Role } from '@template/db/generated/client/enums';
-import { canGrantEntitlement, check, rebacSchema } from '@template/permissions/rebac';
+import { check, rebacSchema } from '@template/permissions/rebac';
 import { getResource } from '#/lib/context/getResource';
 import { makeError } from '#/lib/errors';
+import { validateEntitlementGrants } from '#/lib/permissions/validateEntitlementGrants';
 import { makeController } from '#/lib/utils/makeController';
 import { validateNotLastOwner } from '#/modules/organization/validations/validateNotLastOwner';
 import { organizationUserUpdateRoute } from '#/modules/organizationUser/routes/organizationUserUpdate';
@@ -32,14 +33,7 @@ export const organizationUserUpdateController = makeController(
     )
       throw makeError({ status: 403, message: 'Access denied' });
 
-    const organization = { id: orgUser.organizationId as OrganizationId };
-    const granted = body.entitlements && {
-      resource: 'db:organization',
-      anchor: { resource: 'db:organization', id: organization.id },
-      actions: body.entitlements,
-    };
-    if (granted && !canGrantEntitlement(permix, granted, organization))
-      throw makeError({ status: 403, message: 'Access denied' });
+    await validateEntitlementGrants(permix, body.entitlements ?? []);
 
     if (orgUser.role === Role.owner && body.role !== undefined && body.role !== Role.owner) {
       await validateNotLastOwner(orgUser.organizationId as OrganizationId);
@@ -49,7 +43,10 @@ export const organizationUserUpdateController = makeController(
       where: { id: orgUser.id },
       data: {
         ...body,
-        entitlements: body.entitlements === null ? Prisma.DbNull : body.entitlements,
+        entitlements:
+          body.entitlements === null
+            ? Prisma.DbNull
+            : (body.entitlements as Prisma.InputJsonValue | undefined),
       },
     });
 

@@ -41,7 +41,6 @@ export const rebacSchema: RebacSchema = {
         read: 'operate',
         create: { any: [actorIsUser, actorIsDelegateOfUser] },
         delete: { all: [actorIsUser, 'own'] },
-        assign: 'own',
       },
     },
 
@@ -51,7 +50,6 @@ export const rebacSchema: RebacSchema = {
         manage: 'own',
         operate: 'manage',
         read: 'operate',
-        assign: 'own',
       },
     },
 
@@ -103,15 +101,10 @@ export const rebacSchema: RebacSchema = {
         operate: { rel: 'organization', action: 'operate' },
         manage: { rel: 'organization', action: 'manage' },
         own: { rel: 'organization', action: 'own' },
-        assign: {
-          any: [
-            assignRole(
-              { rel: 'organization', action: 'own' },
-              { rel: 'organization', action: 'manage' },
-            ),
-            { rel: 'organization', action: 'assign' },
-          ],
-        },
+        assign: assignRole(
+          { rel: 'organization', action: 'own' },
+          { rel: 'organization', action: 'manage' },
+        ),
         delete: { any: ['leave', 'assign'] },
       },
     },
@@ -128,12 +121,7 @@ export const rebacSchema: RebacSchema = {
         operate: { rel: 'space', action: 'operate' },
         manage: { rel: 'space', action: 'manage' },
         own: { rel: 'space', action: 'own' },
-        assign: {
-          any: [
-            assignRole({ rel: 'space', action: 'own' }, { rel: 'space', action: 'manage' }),
-            { rel: 'space', action: 'assign' },
-          ],
-        },
+        assign: assignRole({ rel: 'space', action: 'own' }, { rel: 'space', action: 'manage' }),
         delete: { any: ['leave', 'assign'] },
       },
     },

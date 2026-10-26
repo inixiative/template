@@ -13,19 +13,17 @@ import type {
   TokenOwnerModel,
 } from '@template/db/generated/client/client';
 import {
-  createPermissions,
   type DelegatePermissions,
   delegateEntries,
+  type Grant,
   getOrgPermissions,
   getSpacePermissions,
-  type PermissionEntry,
-  type Permix,
-  userEntries,
+  userGrants,
 } from '@template/permissions';
 import { entitlementEntriesSchema } from '@template/permissions/rebac';
 import { findUserWithRelations } from '#/modules/user/services/find';
 
-export type OwnerTable = { entries: PermissionEntry[]; owner?: Permix };
+export type OwnerTable = Grant[];
 
 type PermissionsRow = { role?: Role | null; full?: boolean; entitlements?: unknown };
 
@@ -48,44 +46,38 @@ export const delegatePermissionsOf = (row: PermissionsRow): DelegatePermissions 
       : (entitlementEntriesSchema.parse(row.entitlements) as DelegatePermissions['entitlements']),
 });
 
-const ownerPermix = async (table: OwnerTable): Promise<Permix> => {
-  const permix = createPermissions();
-  await permix.setup(table.entries, table.owner ? { owner: table.owner } : undefined);
-  return permix;
-};
+const nobody: OwnerTable = [];
 
-const nobody: OwnerTable = { entries: [] };
-
-export const delegateTable = async (
-  delegate: PermissionsRow,
-  owner: OwnerTable,
-): Promise<OwnerTable> =>
+export const delegateTable = (delegate: PermissionsRow, owner: OwnerTable): OwnerTable =>
   delegate.full
     ? owner
-    : {
-        entries: delegateEntries(delegatePermissionsOf(delegate), owner.entries),
-        owner: await ownerPermix(owner),
-      };
+    : [
+        {
+          entries: delegateEntries(
+            delegatePermissionsOf(delegate),
+            owner.flatMap((grant) => grant.entries),
+          ),
+          owner,
+        },
+      ];
 
 export const ownerTable = async (delegated: Delegated): Promise<OwnerTable> => {
   const { organizationId, spaceId, userId, organizationUser, spaceUser, integration } = delegated;
   switch (delegated.ownerModel) {
     case 'User': {
       const user = userId ? await findUserWithRelations(userId) : null;
-      return user
-        ? { entries: userEntries(user.id, user.organizationUsers, user.spaceUsers) }
-        : nobody;
+      return user ? userGrants(user.id, user.organizationUsers, user.spaceUsers) : nobody;
     }
     case 'OrganizationUser':
-      return organizationUser ? { entries: userEntries(null, [organizationUser], []) } : nobody;
+      return organizationUser ? userGrants(null, [organizationUser], []) : nobody;
     case 'SpaceUser':
-      return spaceUser ? { entries: userEntries(null, [], [spaceUser]) } : nobody;
+      return spaceUser ? userGrants(null, [], [spaceUser]) : nobody;
     case 'Organization':
       return organizationId
-        ? { entries: [getOrgPermissions('owner', organizationId as OrganizationId)] }
+        ? [{ entries: [getOrgPermissions('owner', organizationId as OrganizationId)] }]
         : nobody;
     case 'Space':
-      return spaceId ? { entries: [getSpacePermissions('owner', spaceId as SpaceId)] } : nobody;
+      return spaceId ? [{ entries: [getSpacePermissions('owner', spaceId as SpaceId)] }] : nobody;
     case 'Integration':
       return integration ? delegateTable(integration, await ownerTable(integration)) : nobody;
   }

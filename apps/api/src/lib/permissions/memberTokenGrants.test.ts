@@ -126,9 +126,18 @@ describe('a member token holds its member row, never the user (template #210 7f6
     expect(await holds(rawKey, 'space', space.id, 'operate')).toBe(false);
   });
 
-  it('a token.create stored on a member mints nothing: minting is create on a token, and only a user mints', async () => {
+  it('a token create stored on a member mints nothing: minting is create on a token, and only a user mints', async () => {
     const { entity: organizationUser } = await createOrganizationUser(
-      { role: 'member', entitlements: { 'token.create': true } },
+      {
+        role: 'member',
+        entitlements: [
+          {
+            resource: 'db:token',
+            anchor: { resource: 'db:organization', id: organization.id },
+            actions: { create: true },
+          },
+        ],
+      },
       { organization },
     );
     const { rawKey, fields } = mintKey();
@@ -244,5 +253,55 @@ describe('a member token follows its member row as soon as the row changes', () 
     });
 
     expect(await holds(rawKey, 'organization', organization.id, 'manage')).toBe(false);
+  });
+});
+
+describe("a member's entitlements are owned by its organization (Aron, 2026-10-26)", () => {
+  let organization: Organization;
+  let space: Space;
+  let otherSpace: Space;
+
+  beforeAll(async () => {
+    ({ entity: organization } = await createOrganization());
+    ({ entity: space } = await createSpace({}, { organization }));
+    const { entity: otherOrganization } = await createOrganization();
+    ({ entity: otherSpace } = await createSpace({}, { organization: otherOrganization }));
+  });
+
+  afterAll(async () => {
+    await cleanupTouchedTables(db);
+  });
+
+  const entitledMember = async (anchor: Space) => {
+    const { entity: organizationUser } = await createOrganizationUser(
+      {
+        role: 'viewer',
+        entitlements: [
+          {
+            resource: 'db:space',
+            anchor: { resource: 'db:space', id: anchor.id },
+            actions: { operate: true },
+          },
+        ],
+      },
+      { organization },
+    );
+    const { rawKey, fields } = mintKey();
+    await createToken(
+      { ownerModel: 'OrganizationUser', full: true, role: null, ...fields },
+      { organizationUser },
+    );
+    return rawKey;
+  };
+
+  it('an entitlement inside the organization holds', async () => {
+    const key = await entitledMember(space);
+    expect(await holds(key, 'space', space.id, 'operate')).toBe(true);
+    expect(await holds(key, 'space', space.id, 'manage')).toBe(false);
+  });
+
+  it('an entitlement anchored outside the organization holds nothing', async () => {
+    const key = await entitledMember(otherSpace);
+    expect(await holds(key, 'space', otherSpace.id, 'read')).toBe(false);
   });
 });

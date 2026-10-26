@@ -9,7 +9,7 @@ import { ActorModel, createPermissions } from '@template/permissions/client';
 import { check as rebacCheck } from '@template/permissions/rebac/check';
 import { rebacSchema } from '@template/permissions/rebac/schema';
 import { isSuperadmin } from '@template/permissions/roles/shared';
-import { userEntries } from '@template/permissions/roles/userEntries';
+import { installGrants, userGrants } from '@template/permissions/roles/userGrants';
 import type { MeReadResponses } from '@template/sdk';
 import type { AppStore } from '@template/ui/store/types';
 import type { PermissionsSlice } from '@template/ui/store/types/permissions';
@@ -46,7 +46,10 @@ export const createPermissionsSlice: StateCreator<AppStore, [], [], PermissionsS
           return;
         }
 
-        await permix.setup(userEntries(me.id, me.organizationUsers ?? [], me.spaceUsers ?? []));
+        await installGrants(
+          permix,
+          userGrants(me.id, me.organizationUsers ?? [], me.spaceUsers ?? []),
+        );
       },
     },
   };

@@ -381,7 +381,10 @@ describe('a delegate holds its permissions, and no more than whoever grants it (
   it('a member token does not inherit its member entitlements unless it is full; a full token on a member row takes own, a full user token is the user', async () => {
     const { entity: user } = await createUser();
     const { entity: organizationUser } = await createOrganizationUser(
-      { role: 'member', entitlements: { manage: true } },
+      {
+        role: 'member',
+        entitlements: [entry('db:organization', ['db:organization', organization.id], ['manage'])],
+      },
       { user, organization },
     );
     const plain = await mint(

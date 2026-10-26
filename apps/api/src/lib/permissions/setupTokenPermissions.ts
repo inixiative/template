@@ -4,9 +4,10 @@
  * @partOf primitive:authz
  * @uses infrastructure:prisma
  */
+import { installGrants } from '@template/permissions/roles/userGrants';
 import type { Context } from 'hono';
 import { delegateTable, ownerTable } from '#/lib/permissions/ownerTable';
-import { contextUserEntries } from '#/lib/permissions/setupUserPermissions';
+import { contextUserGrants } from '#/lib/permissions/setupUserPermissions';
 import type { AppEnv } from '#/types/appEnv';
 
 export const setupTokenPermissions = async (c: Context<AppEnv>) => {
@@ -15,9 +16,6 @@ export const setupTokenPermissions = async (c: Context<AppEnv>) => {
   if (!token) return;
 
   const owner =
-    token.ownerModel === 'User'
-      ? { entries: contextUserEntries(c, token.userId) }
-      : await ownerTable(token);
-  const table = await delegateTable(token, owner);
-  await permix.setup(table.entries, table.owner && { owner: table.owner });
+    token.ownerModel === 'User' ? contextUserGrants(c, token.userId) : await ownerTable(token);
+  await installGrants(permix, delegateTable(token, owner));
 };

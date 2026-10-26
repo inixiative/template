@@ -63,9 +63,6 @@ describe('a credential never exceeds its owner (Aron, 2026-10-23)', () => {
   let organization: Organization;
   let space: Space;
 
-  const member = (role: Role, entitlements: Entitlements = null) =>
-    createOrganizationUser({ role, entitlements: entitlements ?? undefined }, { organization });
-
   const onOrganization = (actions: Entitlements) =>
     actions
       ? [
@@ -76,6 +73,9 @@ describe('a credential never exceeds its owner (Aron, 2026-10-23)', () => {
           },
         ]
       : undefined;
+
+  const member = (role: Role, entitlements: Entitlements = null) =>
+    createOrganizationUser({ role, entitlements: onOrganization(entitlements) }, { organization });
 
   const userToken = async (
     organizationUser: Awaited<ReturnType<typeof member>>,

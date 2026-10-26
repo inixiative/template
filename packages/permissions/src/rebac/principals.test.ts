@@ -101,13 +101,6 @@ describe('no self arm: the user reaches their own rows through rel user (Aron, 2
       expect(can(await session(uo, 'own'), 'organizationUser', owner, 'assign')).toBe(true);
     });
 
-    it('a stored assign on the organization assigns any role, and nothing else', async () => {
-      const assigner = await table(grant('db:organization', 'o1', 'assign'));
-      expect(can(assigner, 'organizationUser', { ...r2, role: 'owner' }, 'assign')).toBe(true);
-      expect(can(assigner, 'organizationUser', r9, 'assign')).toBe(false);
-      expect(can(assigner, 'organization', o1, 'manage')).toBe(false);
-    });
-
     it('a member reads their own relation and every relation of their org', async () => {
       const member = await session(u1, 'operate');
       expect(can(member, 'organizationUser', r1, 'read')).toBe(true);
