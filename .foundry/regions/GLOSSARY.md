@@ -50,10 +50,10 @@ useActionRuleBuilder with buildActionRoot / setSchemaAction / removeSchemaAction
 Route template for a custom non-CRUD verb, e.g. action: 'activate' → POST /:id/activate. *Region:* [API routes, controllers and modules](api-routes/knowledge.md)
 
 **ActionRule**  
-One permission expression: string delegation, { rel, action }, { self }, { rule }, { any }, { all }, or null. *Region:* [Permissions library (ReBAC engine)](lib-permissions/knowledge.md)
+One permission expression: string delegation, { rel, action }, { rule }, { any }, { all }, or null. *Region:* [Permissions library (ReBAC engine)](lib-permissions/knowledge.md)
 
 **ActionRule**  
-One rule: action string, { rel, action }, { self }, { rule }, { any }, { all }, or null. *Region:* [ReBAC, owner-polymorphic and row permissions](permissions-rebac/knowledge.md)
+One rule: action string, { rel, action }, { rule }, { any }, { all }, or null. *Region:* [ReBAC, owner-polymorphic and row permissions](permissions-rebac/knowledge.md)
 
 **actionRuleSchema**  
 Recursive Zod validator for a serialized ActionRule, on the @inixiative/permissions-roles / permissions-rebac/actionRuleSchema subpath. *Region:* [Permissions library (ReBAC engine)](lib-permissions/knowledge.md)
@@ -2034,7 +2034,7 @@ A scalar field condition row; exposes valid plus field.valid / value.valid and i
 A scalar field condition row; exposes valid plus field.valid / value.valid and its reachable scopes. *Region:* [Rule builder: template usage](rules-builder/knowledge.md)
 
 **leave**  
-Self action ({ self: 'userId' }) letting a user remove their own membership or token. *Region:* [Roles, actions and permission checks](permissions-roles/knowledge.md)
+Action ({ rel: 'user', action: 'operate' }) letting a user remove their own membership or token row. *Region:* [Roles, actions and permission checks](permissions-roles/knowledge.md)
 
 **lefthook**  
 Pre-commit hooks from @inixiative/config/lefthook/base.yml running typecheck and Biome on staged files. *Region:* [Scripts, lint and build tooling](dx-tools/knowledge.md)
@@ -2653,8 +2653,8 @@ Makes every permix check pass for a superadmin. *Region:* [Tenancy and Superadmi
 **permix.setup**  
 Loads role-derived grants into permix. *Region:* [Permissions library (ReBAC engine)](lib-permissions/knowledge.md)
 
-**permix.setUserId**  
-Sets the actor id that { self } rules compare against. *Region:* [Permissions library (ReBAC engine)](lib-permissions/knowledge.md)
+**permix.setActor**  
+Sets the actor (model + record) that { rule } conditions read as __actor. *Region:* [Permissions library (ReBAC engine)](lib-permissions/knowledge.md)
 
 **PermixLike**  
 The grant-reading slice of permix the check engine consumes. *Region:* [Permissions library (ReBAC engine)](lib-permissions/knowledge.md)
@@ -3417,9 +3417,6 @@ Class tag: provider-owned audiences with static/dynamic membership reconciliatio
 
 **SegmentType**  
 static (computed after create or rule change) or dynamic (also reacts to customer changes). *Region:* [Customers and segments](customers-segments/knowledge.md)
-
-**self**  
-{ self: field }: granted when record[field] equals the actor id. *Region:* [Permissions library (ReBAC engine)](lib-permissions/knowledge.md)
 
 **send / resolve / read**  
 The inquiry ReBAC actions: source-side send (create, edit, send, cancel), target-side resolve, either-side read. *Region:* [Inquiry model and handlers](inquiry-handlers/knowledge.md)

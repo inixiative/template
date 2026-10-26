@@ -33,7 +33,7 @@ Grants beyond a role: a flat action map on OrganizationUser/SpaceUser merged ove
 Returns [model, record] for the current organization, space or user context.
 
 **leave**  
-Self action ({ self: 'userId' }) letting a user remove their own membership or token.
+Action ({ rel: 'user', action: 'operate' }) letting a user remove their own membership or token row.
 
 **permissions-roles**  
 Class tag: roles, actions, Permix setup and checks.
@@ -154,7 +154,7 @@ Find the problem in plain words, then point at the exact thing. Each class opens
 | creating a key with a role is assigning that role; minting a key checks assign on the org or space; I'll let anyone create a key with any role | **Token creation checks assign on parent** · rule docs/claude/PERMISSIONS.md — Token Creation — Creating tokens scoped to orgUser, spaceUser or similar parents. | part 4 | — |
 | a key can be deleted through the leave action; who may revoke this key; I'll let a key delete itself | **Token self-deletion via leave** · rule docs/claude/PERMISSIONS.md — Token Deletion — Authorizing token deletion. | part 4 | — |
 
-- *Also here, by name:* InquiryAction (`packages/permissions/src/client.ts`); OrganizationAction (`packages/permissions/src/client.ts`); SpaceAction (`packages/permissions/src/client.ts`); UserAction (`packages/permissions/src/client.ts`); allTrue (`packages/permissions/src/roles/shared.ts`); organizationRoles (`packages/permissions/src/roles/organization.ts`); roleHierarchy (`packages/permissions/src/roles/shared.ts`); roleToStandardAction (`packages/permissions/src/roles/shared.ts`); spaceRoles (`packages/permissions/src/roles/space.ts`); userRoles (`packages/permissions/src/roles/user.ts`)
+- *Also here, by name:* InquiryAction (`packages/permissions/src/client.ts`); OrganizationAction (`packages/permissions/src/client.ts`); SpaceAction (`packages/permissions/src/client.ts`); UserAction (`packages/permissions/src/client.ts`); organizationRoles (`packages/permissions/src/roles/organization.ts`); roleHierarchy (`packages/permissions/src/roles/shared.ts`); roleToStandardAction (`packages/permissions/src/roles/shared.ts`); spaceRoles (`packages/permissions/src/roles/space.ts`)
 
 ## 4. The specifics, in full
 
