@@ -45,6 +45,7 @@ export const updateRoute = <const T extends RouteArgs>(args: T) => {
     security: securityForRoute(args),
     description: description ?? `Updates an existing ${resourceName}.`,
     middleware: prepareMiddleware({
+      model,
       middleware,
       skipId: skipId,
       includeDeleted: args.includeDeleted,

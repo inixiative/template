@@ -69,6 +69,7 @@ export const readRoute = <const T extends RouteArgs>(args: T) => {
         ? `Retrieves a list of ${resourceName}${parentContext}.`
         : `Retrieves an existing ${resourceName}${parentContext}.`),
     middleware: prepareMiddleware({
+      model,
       middleware,
       skipId: skipResource,
       filterLens,

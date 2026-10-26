@@ -7,11 +7,14 @@
 import type { RouteConfig } from '@hono/zod-openapi';
 import type { LensNarrowing } from '@inixiative/json-rules';
 import type { MiddlewareHandler } from 'hono';
+import type { RouteArgs } from '#/lib/routeTemplates/types';
 import { includeDeletedMiddleware } from '#/middleware/resources/includeDeletedMiddleware';
 import { meResourceMiddleware } from '#/middleware/resources/meResourceMiddleware';
 import { resourceContextMiddleware } from '#/middleware/resources/resourceContextMiddleware';
+import { Modules } from '#/modules/modules';
 
 type PrepareMiddlewareArgs = {
+  model: RouteArgs['model'];
   middleware: MiddlewareHandler | MiddlewareHandler[] | undefined;
   skipId?: boolean;
   filterLens?: LensNarrowing;
@@ -34,6 +37,7 @@ const routeConfigSetter =
   };
 
 export const prepareMiddleware = ({
+  model,
   middleware,
   skipId = true,
   filterLens,
@@ -45,7 +49,7 @@ export const prepareMiddleware = ({
   const filterMiddleware = filterLens ? [filterLensSetter(filterLens)] : [];
   const deletedMiddleware = includeDeleted ? [includeDeletedMiddleware()] : [];
   return [
-    meResourceMiddleware,
+    ...(model === Modules.me ? [meResourceMiddleware] : []),
     routeConfigSetter(route),
     ...deletedMiddleware,
     ...resourceMiddleware,
