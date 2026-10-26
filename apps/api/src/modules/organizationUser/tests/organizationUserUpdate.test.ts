@@ -120,6 +120,60 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
       expect(stored.entitlements).toBeNull();
     });
 
+    it('an admin cannot let a member make themselves owner through an assign on their own row', async () => {
+      const { entity: target, context } = await createOrganizationUser(
+        { role: 'member' },
+        { organization: org },
+      );
+      const assignOwnRow: Entry[] = [
+        {
+          resource: 'db:organizationUser',
+          anchor: { resource: 'db:organizationUser', id: target.id },
+          actions: { assign: true },
+        },
+      ];
+      const granted = await (await writer('admin')).fetch(
+        patch(`/api/v1/organizationUser/${target.id}`, { entitlements: assignOwnRow }),
+      );
+      const stored = await db.organizationUser.findUniqueOrThrow({ where: { id: target.id } });
+      const self = createTestApp({
+        mockUser: context.user,
+        mockOrganizationUsers: [stored],
+        mount: [(app) => app.route('/api/v1/organizationUser', organizationUserRouter)],
+      });
+      const promoted = await self.fetch(
+        patch(`/api/v1/organizationUser/${target.id}`, { role: 'owner' }),
+      );
+      expect(granted.status === 200 && promoted.status === 200).toBe(false);
+    });
+
+    it('an owner grants assign on a member row', async () => {
+      const target = await newMember();
+      const response = await (await writer('owner')).fetch(
+        patch(`/api/v1/organizationUser/${target.id}`, {
+          entitlements: [
+            {
+              resource: 'db:organizationUser',
+              anchor: { resource: 'db:organizationUser', id: target.id },
+              actions: { assign: true },
+            },
+          ],
+        }),
+      );
+      expect(response.status).toBe(200);
+    });
+
+    it('an entitlement may carry a where; a malformed where is refused', async () => {
+      const app = await writer('admin');
+      const withWhere = (where: unknown) =>
+        grant(app, [{ ...onOrganization('operate')[0], where }]);
+      expect((await withWhere({ field: 'id', operator: 'equals', value: org.id })).status).toBe(
+        200,
+      );
+      expect((await withWhere({ field: 'id', operator: 'nonsense' })).status).toBe(422);
+      expect((await withWhere(null)).status).toBe(422);
+    });
+
     it('a flat map of actions is not an entitlement', async () => {
       expect((await grant(await writer('owner'), { operate: true })).status).toBe(422);
     });

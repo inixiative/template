@@ -17,8 +17,8 @@ const roleActions = (role: Role): Record<string, true> =>
       .map((held) => [roleToStandardAction(held), true as const]),
   );
 
-export const narrowing = (resource: string, id: string, role: Role): EntitlementEntry => ({
-  resource,
-  anchor: { resource, id },
-  actions: roleActions(role),
-});
+export const narrowing = (
+  resource: string,
+  anchor: EntitlementEntry['anchor'],
+  role: Role,
+): EntitlementEntry => ({ resource, anchor, actions: roleActions(role) });

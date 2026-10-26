@@ -305,3 +305,49 @@ describe("a member's entitlements are owned by its organization (Aron, 2026-10-2
     expect(await holds(key, 'space', otherSpace.id, 'read')).toBe(false);
   });
 });
+
+describe("a member token keeps its member's entitlement's resource and anchor, narrowed to its role", () => {
+  let organization: Organization;
+  let space: Space;
+
+  beforeAll(async () => {
+    ({ entity: organization } = await createOrganization());
+    ({ entity: space } = await createSpace({}, { organization }));
+  });
+
+  afterAll(async () => {
+    await cleanupTouchedTables(db);
+  });
+
+  const tokenOn = async (tokenRole: 'member' | 'viewer') => {
+    const { entity: organizationUser } = await createOrganizationUser(
+      {
+        role: 'viewer',
+        entitlements: [
+          {
+            resource: 'db:space',
+            anchor: { resource: 'db:organization', id: organization.id },
+            actions: { operate: true },
+          },
+        ],
+      },
+      { organization },
+    );
+    const { rawKey, fields } = mintKey();
+    await createToken(
+      { ownerModel: 'OrganizationUser', role: tokenRole, ...fields },
+      { organizationUser },
+    );
+    return rawKey;
+  };
+
+  it('a member-role token operates the spaces its member was entitled to', async () => {
+    expect(await holds(await tokenOn('member'), 'space', space.id, 'operate')).toBe(true);
+  });
+
+  it('a viewer-role token reads them and does not operate', async () => {
+    const key = await tokenOn('viewer');
+    expect(await holds(key, 'space', space.id, 'read')).toBe(true);
+    expect(await holds(key, 'space', space.id, 'operate')).toBe(false);
+  });
+});

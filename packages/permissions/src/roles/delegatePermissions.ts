@@ -15,17 +15,19 @@ export type DelegatePermissions = {
   entitlements: EntitlementEntry[] | null;
 };
 
-type Anchor = { resource: string; id: string };
+type Reach = { resource: string; anchor: { resource: string; id: string } };
 
-const anchorOf = (entry: PermissionEntry): Anchor | null => {
-  if ('anchor' in entry) return entry.anchor;
-  return entry.id ? { resource: entry.resource, id: entry.id } : null;
+const reachOf = (entry: PermissionEntry): Reach | null => {
+  if ('anchor' in entry) return { resource: entry.resource, anchor: entry.anchor };
+  return entry.id
+    ? { resource: entry.resource, anchor: { resource: entry.resource, id: entry.id } }
+    : null;
 };
 
-const ownerAnchors = (owner: PermissionEntry[]): Anchor[] =>
+const ownerReach = (owner: PermissionEntry[]): Reach[] =>
   uniqBy(
-    owner.map(anchorOf).filter((anchor): anchor is Anchor => anchor !== null),
-    (anchor) => `${anchor.resource}:${anchor.id}`,
+    owner.map(reachOf).filter((reach): reach is Reach => reach !== null),
+    ({ resource, anchor }) => `${resource}@${anchor.resource}:${anchor.id}`,
   );
 
 export const delegateEntries = (
@@ -34,7 +36,9 @@ export const delegateEntries = (
 ): EntitlementEntry[] => {
   const role = permissions.role;
   return [
-    ...(role ? ownerAnchors(owner).map(({ resource, id }) => narrowing(resource, id, role)) : []),
+    ...(role
+      ? ownerReach(owner).map(({ resource, anchor }) => narrowing(resource, anchor, role))
+      : []),
     ...(permissions.entitlements ?? []),
   ];
 };

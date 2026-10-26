@@ -5,6 +5,7 @@
  * @uses infrastructure:prisma
  */
 import { type AccessorName, fetchOne, hydrate } from '@template/db';
+import { Role } from '@template/db/generated/client/enums';
 import type { EntitlementEntry, Permix } from '@template/permissions';
 import { canGrantEntitlement } from '@template/permissions/rebac';
 import { makeError } from '#/lib/errors';
@@ -22,7 +23,10 @@ const grantable = async (writer: Permix, entry: EntitlementEntry): Promise<boole
       status: 422,
       message: `No ${entry.anchor.resource} ${entry.anchor.id} to grant from`,
     });
-  return canGrantEntitlement(writer, entry, anchor);
+  return (
+    canGrantEntitlement(writer, entry, anchor) &&
+    (!('role' in anchor) || canGrantEntitlement(writer, entry, { ...anchor, role: Role.owner }))
+  );
 };
 
 export const validateEntitlementGrants = async (
