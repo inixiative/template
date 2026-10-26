@@ -152,12 +152,13 @@ const sessionCredentialBuild: Check = (node, sourceFile) => {
 };
 
 const THROWAWAY_SESSION_CALLERS = new Set([
-  THROWAWAY_SESSION_HELPER,
   'apps/api/src/modules/me/controllers/meChangePassword.ts',
 ]);
 
 const isThrowawaySessionModule = (node: ts.Node | undefined): boolean =>
-  !!node && ts.isStringLiteralLike(node) && /(^|\/)withThrowawaySession(\.ts)?$/.test(node.text);
+  !!node &&
+  ts.isStringLiteralLike(node) &&
+  /(^|\/)withThrowawaySession(\.[cm]?[jt]sx?)?$/.test(node.text);
 
 const throwawaySessionImport: Check = (node, sourceFile) => {
   if (THROWAWAY_SESSION_CALLERS.has(sourceFile.fileName)) return null;
@@ -223,8 +224,13 @@ const CHECKS: Check[] = [
 
 const violations: Violation[] = [];
 
-for (const file of listFiles(['apps', 'packages'], /\.tsx?$/)) {
-  if (isTestFile(file)) continue;
+// Helpers under tests/ are not test files: they can carry the helper out to production code.
+const checksFor = (file: string): Check[] =>
+  /\.test\.[cm]?[jt]sx?$/.test(file) ? [] : isTestFile(file) ? [throwawaySessionImport] : CHECKS;
+
+for (const file of listFiles(['apps', 'packages'], /\.[cm]?[jt]sx?$/)) {
+  const checks = checksFor(file);
+  if (!checks.length) continue;
   const source = readSource(file);
   const sourceFile = ts.createSourceFile(
     file,
@@ -234,7 +240,7 @@ for (const file of listFiles(['apps', 'packages'], /\.tsx?$/)) {
     ts.ScriptKind.TSX,
   );
   const visit = (node: ts.Node) => {
-    for (const check of CHECKS) {
+    for (const check of checks) {
       const found = check(node, sourceFile);
       if (found)
         violations.push({

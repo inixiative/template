@@ -3,7 +3,7 @@
  * @kind type
  * @uses infrastructure:prisma, primitive:authz, feature:auth, feature:tenancy, feature:users
  */
-import type { RouteConfig } from '@hono/zod-openapi';
+import type { OpenAPIHono, RouteConfig } from '@hono/zod-openapi';
 import type { LensNarrowing } from '@inixiative/json-rules';
 import type { AccessorName, Db, Prisma } from '@template/db';
 import type {
@@ -14,13 +14,12 @@ import type {
   User,
 } from '@template/db/generated/client/client';
 import type { Permix } from '@template/permissions';
-import type { Hono } from 'hono';
 import type { TokenWithRelations } from '#/lib/context/types';
 import type { RouteArgs } from '#/lib/routeTemplates/types';
 import type { BracketQueryRecord } from '#/lib/utils/parseBracketNotation';
 
 export type AppVars = {
-  app: Hono<AppEnv>;
+  app: OpenAPIHono<AppEnv>;
   db: Db;
   txn: Prisma.TransactionClient | undefined;
   user: User | null;

@@ -137,6 +137,17 @@ describe('ChangePasswordCard', () => {
     expect(authenticate).not.toHaveBeenCalled();
   });
 
+  test('an answer without a JWT keeps the current one', async () => {
+    respond = () => Response.json({ data: { token: null, expiresAt: null } });
+    const view = render(<ChangePasswordCard />);
+    submit(view, 'current-password', 'brand-new-password');
+
+    await waitFor(() => expect(requests).toHaveLength(1));
+    await waitFor(() => expect(view.queryByRole('alert')).toBeNull());
+    expect(getToken()).toBe(oldToken);
+    expect(authenticate).not.toHaveBeenCalled();
+  });
+
   test('is shown while spoofing another user', () => {
     useAppStore.setState((state) => ({
       auth: { ...state.auth, spoofUserEmail: 'someone@example.test' },

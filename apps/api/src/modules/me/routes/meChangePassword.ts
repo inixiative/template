@@ -31,4 +31,5 @@ export const meChangePasswordRoute = actionRoute({
     'Changes your password after checking the current one. Every JWT signed for you before stops working; ' +
     'the response carries your new JWT, or nulls when a superadmin is spoofing you.',
   tags: [Tags.me, Tags.user],
+  'x-batch': false,
 });

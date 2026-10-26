@@ -4,6 +4,7 @@
  * @partOf feature:users, feature:auth
  * @uses primitive:routeTemplates
  */
+import { db } from '@template/db';
 import { auth } from '#/lib/auth';
 import { withThrowawaySession } from '#/lib/auth/withThrowawaySession';
 import { me } from '#/lib/context/me';
@@ -16,11 +17,13 @@ export const meChangePasswordController = makeController(
   meChangePasswordRoute,
   async (c, respond) => {
     const { currentPassword, newPassword } = c.req.valid('json');
-    const handoff = await withThrowawaySession(me(c)!.id, (headers) =>
-      auth.api.changePassword({
-        body: { currentPassword, newPassword, revokeOtherSessions: true },
-        headers,
-      }),
+    const handoff = await db.txn(() =>
+      withThrowawaySession(me(c)!.id, (headers) =>
+        auth.api.changePassword({
+          body: { currentPassword, newPassword, revokeOtherSessions: true },
+          headers,
+        }),
+      ),
     );
     const parsed = userJwtHandoffSchema.safeParse(handoff);
     if (!parsed.success) throw makeError({ status: 500 });

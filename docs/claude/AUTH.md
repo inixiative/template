@@ -212,11 +212,12 @@ Why not let the browser hold a short-lived session for one call (the first desig
 
 `POST /api/v1/me/changePassword` (`modules/me/routes/meChangePassword.ts`), body `{ currentPassword, newPassword }`, response `{ token, expiresAt }`:
 
-- **Who:** a user. `validatePermission(UserAction.changePassword)` on the user, `actorIsUser` in the schema: an API token cannot change its user's password, whatever it holds. A superadmin passes on any credential. A superadmin spoofing a user can change that user's password like any other action (no spoof guard; Aron, 2026-10-20: "Superadmin can do anything, always"); the response is then `{ token: null, expiresAt: null }`, so the spoofed user's new JWT never leaves the API, and the UI keeps the superadmin's own JWT while spoofing (Aron, 2026-10-26: both).
+- **Who:** a user. `validatePermission(UserAction.changePassword)` on the user, `actorIsUser` in the schema: an API token cannot change its user's password, whatever it holds. A superadmin passes on any credential. A superadmin spoofing a user can change that user's password like any other action (no spoof guard; Aron, 2026-10-20: "Superadmin can do anything, always"); the response is then `{ token: null, expiresAt: null }`, so the spoofed user's new JWT never leaves the API, and the UI keeps its own JWT while spoofing or when the answer has no JWT (Aron, 2026-10-26: both). A superadmin cannot be spoofed ([Spoof Middleware](#spoof-middleware)), so a superadmin never changes their own password through a spoof.
+- **Not in a batch:** the route is `'x-batch': false`; a batch that reaches it is refused before anything runs ([BATCH.md](./BATCH.md#routes-that-cannot-batch)).
 - **Limits:** `newPassword` length comes from `passwordLength` (`packages/shared/src/auth/passwordLength.ts`, also used by the web form), the same constants `auth.ts` gives BetterAuth as `minPasswordLength`/`maxPasswordLength`; outside them is a 422 before BetterAuth runs. Rate limits: the `/api/auth` IP bucket (`authRateLimit`, 60 a minute) first, and a per-user bucket (`credentialChangeRateLimit`, 5 a minute) after the permission checks, so a stolen JWT can't guess the current password from rotating IPs and a refused token can't use up its person's attempts.
 - **What runs:** `withThrowawaySession(user.id, (headers) => auth.api.changePassword({ body: { currentPassword, newPassword, revokeOtherSessions: true }, headers }))`. BetterAuth verifies the current password and hashes the new one; a wrong current password is its 400 `Invalid password`, and nothing changes. `revokeOtherSessions` deletes every BetterAuth session of the user and creates a new one; `jwtHandoff` sees `/change-password`, calls `rotateUserJwts` before signing (every older JWT is a 401 from now on), signs the new JWT through the same path sign-in uses, stamps `lastLoginAt` (the person just proved the password) and deletes that session.
 - **Response check:** the controller checks BetterAuth's answer is a JWT handoff (`safeParse`); if the hook ever did not run, BetterAuth's own body (which carries a session token) fails that check and the request is a plain 500, never a leak.
-- **Known limit:** the password is written before the rotation. If `rotateUserJwts` throws, the call is a 500 with the new password in place and older JWTs alive until the caller retries `/me/rotateJwts`. `jwtHandoff` deletes BetterAuth's new session in a `finally`, so a failed handoff leaves no session behind.
+- **One transaction:** the controller runs the whole call in `db.txn`. BetterAuth writes through `prismaAdapter(db)`, so the password, the sessions and `rotateUserJwts` share it: if the rotation or the signing throws, the call is a 500 and the old password stands. `jwtHandoff` deletes BetterAuth's new session in a `finally`, so a failed handoff leaves no session behind.
 - An account with no password (Google only) gets BetterAuth's 400 `Credential account not found`.
 
 ### The same pattern for the next account changes
@@ -555,6 +556,7 @@ export const spoofMiddleware = async (c: Context<AppEnv>, next: Next) => {
   const spoofEmail = normalizeEmail(rawEmail);
   const spoofedBasic = await findUserByEmail(spoofEmail);
   if (!spoofedBasic) return next();
+  if (isSuperadminUser(spoofedBasic)) throw makeError({ status: 403, message: 'A superadmin cannot be spoofed' });
   const spoofedUser = await findUserWithRelations(spoofedBasic.id);
   if (!spoofedUser) return next();
 
@@ -579,6 +581,7 @@ curl -H "Authorization: Bearer <jwt>" \
 
 - Caller must be authenticated as superadmin
 - Target user must exist
+- Target must not be a superadmin, the caller included (403)
 - Original admin tracked in `spoofedBy` for audit
 
 ---

@@ -1,5 +1,13 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
-import { db, getRedisClient, redisNamespace, unregisterDbHook } from '@template/db';
+import {
+  DbAction,
+  db,
+  getRedisClient,
+  HookTiming,
+  redisNamespace,
+  registerDbHook,
+  unregisterDbHook,
+} from '@template/db';
 import { PlatformRole } from '@template/db/generated/client/enums';
 import { cleanupTouchedTables, createUser } from '@template/db/test';
 import { passwordLength } from '@template/shared/auth/passwordLength';
@@ -59,6 +67,16 @@ const changePassword = (
     method: 'POST',
     headers: { ...json, ...bearer(credential), ...headers },
     body: JSON.stringify(body),
+  });
+
+const batch = (
+  credential: string,
+  requests: { method: string; path: string; body?: unknown }[][],
+) =>
+  app.request('/api/v1/batch/execute', {
+    method: 'POST',
+    headers: { ...json, ...bearer(credential) },
+    body: JSON.stringify({ requests, strategy: 'allowFailures' }),
   });
 
 const sessionsOf = async (userId: string) =>
@@ -237,5 +255,60 @@ describe('POST /api/v1/me/changePassword', () => {
     expect(statuses).not.toContain(401);
     expect(statuses.filter((status) => status === 200).length).toBeGreaterThanOrEqual(1);
     expect(await sessionsOf(person.userId)).toEqual([]);
+  });
+  it('a failed rotation rolls the new password back', async () => {
+    const person = await signUpVerified();
+    const jwt = await signedInJwt(person.email);
+    registerDbHook(
+      'test:failRotation',
+      'User',
+      HookTiming.before,
+      [DbAction.update],
+      async ({ args }) => {
+        if ((args as { data?: { jwtVersion?: unknown } }).data?.jwtVersion)
+          throw new Error('rotation failed');
+      },
+    );
+    try {
+      expect((await changePassword(jwt, { currentPassword, newPassword })).status).toBe(500);
+    } finally {
+      unregisterDbHook('test:failRotation');
+    }
+    expect((await signIn(person.email, currentPassword)).status).toBe(200);
+    expect((await signIn(person.email, newPassword)).status).not.toBe(200);
+    expect((await readMe(jwt)).status).toBe(200);
+  });
+
+  it('cannot run in a batch: the whole batch is refused before anything runs', async () => {
+    const person = await signUpVerified();
+    const jwt = await signedInJwt(person.email);
+    const response = await batch(jwt, [
+      [{ method: 'GET', path: '/api/v1/me' }],
+      [
+        {
+          method: 'POST',
+          path: '/api/v1/me/changePassword',
+          body: { currentPassword, newPassword },
+        },
+      ],
+    ]);
+    expect(response.status).toBe(400);
+    expect((await signIn(person.email, currentPassword)).status).toBe(200);
+  });
+
+  it('cannot run in a batch through an interpolated path either', async () => {
+    const person = await signUpVerified();
+    const jwt = await signedInJwt(person.email);
+    const response = await batch(jwt, [
+      [{ method: 'GET', path: '/api/v1/me' }],
+      [
+        {
+          method: 'POST',
+          path: '/api/v1/me/<<0.0.body.data.name>>',
+          body: { currentPassword, newPassword },
+        },
+      ],
+    ]);
+    expect(response.status).toBe(400);
   });
 });
