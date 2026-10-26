@@ -1,4 +1,4 @@
-# INFRA-045 — json-rules: a condition on a bound value ("bind conditional")
+# INFRA-045 — json-rules: `conditionalBind`, a condition on a bound value
 
 **Status:** 🆕 Not Started · **Line:** INFRA · **Priority:** Low · **Related:** template #218 (email lens scopes), INFRA-018, INFRA-023
 
@@ -24,10 +24,11 @@ workarounds exist today, and both are second-best:
 
 ## Shape
 
-A leaf whose subject is a binding rather than a field:
+A leaf whose subject is a binding rather than a field, named `conditionalBind` (Aron), alongside
+`bind` and `bindOptional`:
 
 ```ts
-{ bind: 'ownerModel', operator: 'equals', value: 'Space' }
+{ conditionalBind: 'ownerModel', operator: 'equals', value: 'Space' }
 ```
 
 - It compiles to a constant once bound (`matchAll` / `matchNothing`), so a branch whose kind does not
@@ -36,8 +37,8 @@ A leaf whose subject is a binding rather than a field:
 
   ```ts
   any: [
-    { all: [{ bind: 'ownerModel', operator: 'equals', value: 'platform' }] },
-    { all: [{ bind: 'ownerModel', operator: 'equals', value: 'Space' },
+    { all: [{ conditionalBind: 'ownerModel', operator: 'equals', value: 'platform' }] },
+    { all: [{ conditionalBind: 'ownerModel', operator: 'equals', value: 'Space' },
             { field: 'id', operator: 'equals', bind: 'ownerId' }] },
     …
   ]
@@ -45,7 +46,7 @@ A leaf whose subject is a binding rather than a field:
 
 - `ownerModel` and `ownerId` are always supplied, so both become required `bind`s. No
   `bindOptional`, no null guards, and one serializable lens per slot.
-- `listLensBindings` reports binding subjects like any other bind. `validateNarrowing` refuses a
+- `listLensBindings` reports `conditionalBind` names like any other bind. `validateNarrowing` refuses a
   binding subject compared with an operator that needs a field kind it cannot know (or it carries a
   declared kind).
 
@@ -56,7 +57,7 @@ helper goes. In Zealot: any lens that today picks between static variants by cal
 
 ## Definition of done
 
-- Binding-subject leaves in json-rules: compile, `check`, `toSql`, `listLensBindings`, and validation,
+- `conditionalBind` leaves in json-rules: compile, `check`, `toSql`, `listLensBindings`, and validation,
   with tests.
 - The template email scopes become one static lens. A real-DB test shows they reach the same rows for
   all owner × sender kinds, including platform.
