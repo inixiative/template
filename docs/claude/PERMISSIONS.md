@@ -213,8 +213,10 @@ The engine is `@inixiative/permissions`; `createPermissions` in `packages/permis
 
 `installPermissions(c)` (`apps/api/src/lib/context/installPermissions.ts`) resets the permix, sets the actor and the superadmin bypass, then installs the grants with `installGrants`:
 
-- a user (JWT or spoof): `setupUserPermissions` (`apps/api/src/lib/permissions/setupUserPermissions.ts`) installs `userGrants`: the user's and every member row's role entries, plus each member row's entitlements owned by its tenant.
+- a user (JWT or spoof): `installUserPermissions(permix, user, members)` (`apps/api/src/lib/permissions/userPermissions.ts`) sets the user as the actor and the bypass from their platform role, and installs `userGrants`: the user's and every member row's role entries, plus each member row's entitlements owned by its tenant.
 - a token: `setupTokenPermissions` (`apps/api/src/lib/permissions/setupTokenPermissions.ts`) installs `delegateTable(token, owner)` ([Delegates and Their Owners](#delegates-and-their-owners)), where `owner` is the user's table built from the members already in context for a User-owned token (`contextUserGrants`, shared with `setupUserPermissions`), and `ownerTable(token)` otherwise.
+
+A user who is not the requester (an issuer re-checking the user it acts for, a job acting as a user): `userPermissions(userId)` loads the user with `findUserWithRelations` and returns a fresh permix built by the same `installUserPermissions`, or `null` when the user does not exist. It answers what that user's own JWT request answers (`apps/api/src/lib/permissions/userPermissions.test.ts`).
 
 ### Vocabulary
 
