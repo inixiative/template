@@ -343,7 +343,7 @@ describe('every action lives on its own model (Aron, 2026-10-25)', () => {
     expect(strays).toEqual([]);
   });
 
-  it('minting is create on a stand-in token: an owner mints, a token holding own does not', async () => {
+  it('minting is create on a pseudo token: an owner mints, a token holding own does not', async () => {
     const asUser = acting(await table(grant('db:organization', 'o1', 'own')), ActorModel.User);
     const asToken = acting(await table(grant('db:organization', 'o1', 'own')), ActorModel.Token);
     expect(can(asUser, 'token', tokenUnder(o1), 'create')).toBe(true);

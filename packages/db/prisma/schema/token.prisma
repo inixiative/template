@@ -30,7 +30,7 @@ model Token {
   auditLogsAsActor   AuditLog[]        @relation("AuditLogActorToken")
   auditLogsAsSubject AuditLog[]        @relation("AuditLogSubjectToken")
 
-  // Permissions: a claim, capped live by the holder; full passes the holder through whole
+  // Permissions: capped live by the owner; full passes the owner through whole
   role         Role?
   full         Boolean @default(false)
   entitlements Json?

@@ -7,20 +7,11 @@
 import type { User } from '@template/db/generated/client/client';
 import { PlatformRole, Role } from '@template/db/generated/client/enums';
 import type { Action } from '@template/permissions/client';
-import { compact } from 'lodash-es';
 
 export const isSuperadmin = (user?: Pick<User, 'platformRole'> | null) =>
   user?.platformRole === PlatformRole.superadmin;
 
 export const roleHierarchy = ['viewer', 'member', 'admin', 'owner'] as const;
-
-export const greaterRole = (...roles: (Role | null | undefined)[]): Role => {
-  const valid = compact(roles);
-  if (!valid.length) return 'viewer';
-  return valid.reduce((max, role) =>
-    roleHierarchy.indexOf(role) > roleHierarchy.indexOf(max) ? role : max,
-  );
-};
 
 export const allTrue = <T extends Record<string, string>>(actions: T): Record<keyof T, boolean> =>
   Object.fromEntries(Object.keys(actions).map((k) => [k, true])) as Record<keyof T, boolean>;

@@ -118,7 +118,6 @@ export const roleHierarchy = ['viewer', 'member', 'admin', 'owner'] as const;
 ```
 
 Higher index = more permissions. Used for:
-- `greaterRole(a, b)` - Returns the higher of two roles
 - `narrowing(...)` - a token's role claims every action at or below it ([A Token Never Exceeds Its Owner](#a-token-never-exceeds-its-owner))
 
 ---
@@ -150,7 +149,7 @@ export const TokenAction = { create: 'create', delete: 'delete' };
 
 Creating checks `create` on a pseudo record of the model being created (token create in `createToken`, organization create in `organizationCreate`). User-only acts are rules on the actor: `actorIsUser` (`__actor.model == User`) and `actorIsDelegateOfUser` (`__actor.record.ownerModel == User`).
 
-The schema maps `'organization.create'` to `'operate'` on the user. The session actions are user-only, written as `{ all: [{ actor: model equals User }, 'operate' | 'own'] }`, so a token holding `own` still cannot mint, delete tokens, redact, rotate or delete an organization. They sit on the record each acts on (below). A superadmin passes on any credential.
+Creating an organization is `create` on a pseudo organization: the actor is a user or a token its user owns. Minting and deleting tokens, redacting and rotating JWTs, and deleting an organization are user-only rules on the record each acts on, so a token holding `own` still cannot do them. A superadmin passes on any credential.
 
 ### The Actor
 
@@ -320,7 +319,7 @@ An integration has a nullable `role`, `full` and `entitlements`, capped live by 
 
 ### Granting an Entitlement
 
-A grant is an action: the writer must be able to take every action the delegate would hold, from its anchor. `canGrantEntitlement(permix, entry, anchor)` (`packages/permissions/src/rebac/canGrantEntitlement.ts`, over the library's `createCanGrantEntitlement`) judges each action through the ordinary check on a pseudo record of the entry's resource placed under the hydrated anchor. The holder's read runs the action through the writer's walk on the real record, so the rule's conditions (on the record and on `__actor`) hold there.
+A grant is an action: the writer must be able to take every action the delegate would hold, from its anchor. `canGrantEntitlement(permix, entry, anchor)` (`packages/permissions/src/rebac/canGrantEntitlement.ts`, over the library's `createCanGrantEntitlement`) judges each action through the ordinary check on a pseudo record of the entry's resource placed under the hydrated anchor. The entitled delegate's read runs the action through the writer's walk on the real record, so the rule's conditions (on the record and on `__actor`) hold there.
 
 - `PATCH /organizationUser/:id` with `entitlements` checks each action as an entry anchored on the organization: an admin grants `operate` and `manage`, not `own` or `assign`.
 - A delegate's named entitlements go through `validateEntitlementGrants` (`apps/api/src/lib/permissions/validateEntitlementGrants.ts`: fetch the anchor, then `canGrantEntitlement`). A token's role is checked by `create` on `db:token`; an integration's role by `assign` on `db:integration` (`validateIntegrationGrant`), on the row before and after a change.
@@ -777,7 +776,7 @@ middleware: [validatePermission('read')]                                  // the
 middleware: [validatePermission('operate')]                               // meCreateInquiry, meCreateSegment, meReachSegment
 ```
 
-User-only is the action's rule on whichever record the route acts on (`{ all: [{ actor: model equals User }, …] }`): `token.create` on the user, an organization, a space, a member or an integration (the record stands in for the collection); `token.delete` on the token; `organization.delete` on the organization; `user.redact` and `user.rotateJwts` on the user. A superadmin passes on any credential. Situations: `apps/api/src/middleware/validations/userOnlyActions.test.ts`, `apps/api/src/lib/context/userActsDirectly.test.ts`.
+User-only is `actorIsUser` in the rule of the record each action is on: `create` and `delete` on the token (create on a pseudo record of the token), `delete` on the organization, `user.redact` and `user.rotateJwts` on the user. A superadmin passes on any credential. Situations: `apps/api/src/middleware/validations/userOnlyActions.test.ts`, `apps/api/src/lib/context/userActsDirectly.test.ts`.
 
 ---
 
@@ -788,14 +787,13 @@ Role assignment uses the `assign` action defined in the ReBAC schema. The schema
 - Assigning member/viewer requires `manage` permission
 
 ```typescript
-const assigned = await hydrate('organizationUser', {
-  ...organizationUser,
-  role: greaterRole(organizationUser.role, body.role),
-});
-check(permix, rebacSchema, 'organizationUser', assigned, 'assign');
+const before = await hydrate('organizationUser', organizationUser);
+const after = await hydrate('organizationUser', { ...organizationUser, role: body.role ?? organizationUser.role });
+check(permix, rebacSchema, 'organizationUser', before, 'assign') &&
+  check(permix, rebacSchema, 'organizationUser', after, 'assign');
 ```
 
-`assign` lives on the member row (`db:organizationUser`, `db:spaceUser`), checked on its pseudo record as it will be written; `greaterRole(old, new)` gates lowering a higher role too. Removing a member is `assign` on the row as it is, or `leave`. A stored `assign` on the organization or space assigns any role.
+`assign` lives on the member row (`db:organizationUser`, `db:spaceUser`) and is checked twice: on the row as it is and on the row as it will be. Its lower arm reads the role positively (`member` or `viewer`), so a record with no role passes neither arm. Removing a member is `assign` on the row as it is, or `leave`. A stored `assign` on the organization or space assigns any role (until member entitlements stop being stored flat).
 
 ### Role Assignment Rules
 

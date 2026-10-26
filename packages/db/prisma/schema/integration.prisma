@@ -14,7 +14,7 @@ model Integration {
 
   provider Provider?
 
-  // A holder: what its tokens may claim, capped live by its direct owner
+  // A delegate: its permissions, capped live by its direct owner
   role         Role?
   full         Boolean @default(false)
   entitlements Json?

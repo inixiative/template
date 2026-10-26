@@ -35,7 +35,6 @@ export { getOrgPermissions, organizationRoles } from './roles/organization';
 // Shared role utilities
 export {
   allTrue,
-  greaterRole,
   isSuperadmin,
   roleHierarchy,
   rolesAtOrAbove,

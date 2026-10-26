@@ -37,10 +37,10 @@ export const createToken = async (c: Context<AppEnv>, params: CreateTokenParams)
   const db = c.get('db');
   const { name: _name, expiresAt: _expiresAt, ...row } = params;
   const permix = c.get('permix');
-  const standIn = await hydrate('token', { id: '', ...row } as HydratedRecord);
+  const pseudo = await hydrate('token', { id: '', ...row } as HydratedRecord);
   if (
-    !check(permix, rebacSchema, 'token', standIn, TokenAction.create) ||
-    (row.full && !check(permix, rebacSchema, 'token', standIn, 'own'))
+    !check(permix, rebacSchema, 'token', pseudo, TokenAction.create) ||
+    (row.full && !check(permix, rebacSchema, 'token', pseudo, 'own'))
   )
     throw makeError({ status: 403, message: 'Access denied' });
   await validateEntitlementGrants(permix, params.entitlements ?? []);

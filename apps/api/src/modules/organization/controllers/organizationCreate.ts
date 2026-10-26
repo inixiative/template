@@ -18,8 +18,8 @@ export const organizationCreateController = makeController(
     const db = c.get('db');
     const user = me(c)!;
     const body = c.req.valid('json');
-    const standIn = await hydrate('organization', { id: '', ...body } as HydratedRecord);
-    if (!check(c.get('permix'), rebacSchema, 'organization', standIn, OrganizationAction.create))
+    const pseudo = await hydrate('organization', { id: '', ...body } as HydratedRecord);
+    if (!check(c.get('permix'), rebacSchema, 'organization', pseudo, OrganizationAction.create))
       throw makeError({ status: 403, message: 'Access denied' });
 
     const { organization, organizationUser } = await db.txn(async () => {

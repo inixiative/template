@@ -168,7 +168,7 @@ The token's `iss` picks the issuer; an unknown `iss` is refused. `algorithms: ['
 | What | Revokes |
 |---|---|
 | Sign out of one browser | Nothing on the server: the SPA drops its JWT |
-| `POST /api/v1/me/rotateJwts` | Every JWT this API signed for the caller, on every device: the nuclear option, not a sign-out of one device. User-only (`validatePermission(SessionAction.rotateUserJwts)` on the user, an actor arm in the schema): an API token cannot rotate its user's JWTs |
+| `POST /api/v1/me/rotateJwts` | Every JWT this API signed for the caller, on every device: the nuclear option, not a sign-out of one device. User-only (`validatePermission(UserAction.rotateUserJwts)` on the user, `actorIsUser` in the schema): an API token cannot rotate its user's JWTs |
 | `POST /api/admin/user/:id/rotateJwts` | Every JWT this API signed for that user (superadmin) |
 | `redactUser` (`POST /api/v1/me/redact`, `POST /api/admin/user/:id/redact`) | Every JWT of the deleted account (`rotateUserJwts`; the soft-deleted user is refused too) |
 | Password reset (BetterAuth `onPasswordReset`) | Every JWT this API signed for that user |
