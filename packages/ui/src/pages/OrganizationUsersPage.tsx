@@ -160,7 +160,7 @@ export const OrganizationUsersPage = ({ organizationId }: OrganizationUsersPageP
     <>
       <Page
         title="Members"
-        description="Manage who belongs to this organization and the role each person has."
+        description="Manage who belongs to this organization and the role each user has."
         actions={
           <Button onClick={() => setIsInviteModalOpen(true)} show={inviteRoles.length > 0}>
             <Icon icon="lucide:user-plus" className="h-4 w-4 mr-2" />

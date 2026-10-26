@@ -14,7 +14,7 @@ import {
   jwtVerify,
 } from 'jose';
 import { onSigningKeyCreated, publicJwks } from '#/lib/auth/jwksStore';
-import { PERSON_JWT_TTL_SECONDS, selfIssuer } from '#/lib/auth/personJwt';
+import { selfIssuer, USER_JWT_TTL_SECONDS } from '#/lib/auth/userJwt';
 
 type TrustedIssuer = { issuer: string; audience: string; keySet: JWTVerifyGetKey };
 
@@ -77,7 +77,7 @@ export const verifyIssuerJwt = async (jwt: string): Promise<JWTPayload> => {
     issuer: trusted.issuer,
     audience: trusted.audience,
     clockTolerance: 30,
-    maxTokenAge: PERSON_JWT_TTL_SECONDS,
+    maxTokenAge: USER_JWT_TTL_SECONDS,
     requiredClaims: ['sub', 'exp', 'iat'],
   });
   return payload;

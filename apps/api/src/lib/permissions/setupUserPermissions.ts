@@ -4,8 +4,8 @@
  * @partOf primitive:authz
  * @uses none
  */
+import { userEntries } from '@template/permissions/roles/userEntries';
 import type { Context } from 'hono';
-import { userEntries } from '#/lib/permissions/ownerTable';
 import type { AppEnv } from '#/types/appEnv';
 
 export const setupUserPermissions = async (c: Context<AppEnv>) => {

@@ -83,7 +83,7 @@ resourceContextMiddleware (per-route)
   - Enforces 404 (0 results) or 409 (>1 results)
   - Sets resource, resourceType
     ↓
-Validation middleware (validatePermission, validateOwnerPermission, etc.)
+Validation middleware (validatePermission, validateSubmodelPermission, etc.)
     ↓
 Route handler
   - Access context via getters

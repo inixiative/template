@@ -177,7 +177,7 @@ Comprehensive SaaS starter template with multi-tenancy, ReBAC permissions, and m
 
 - ✅ **Hierarchical Inheritance** - Space permissions automatically inherit from parent organization. Org owners automatically get owner access to all spaces
 
-- ✅ **Permission Middleware** - validatePermission() and validateOwnerPermission() enforce checks before controller execution. Routes declare required permissions in OpenAPI definitions
+- ✅ **Permission Middleware** - validatePermission() and validateSubmodelPermission() enforce checks before controller execution. Routes declare required permissions in OpenAPI definitions
 
 - ✅ **Superadmin Bypass** - Platform superadmins bypass all permission checks for support scenarios while maintaining audit trails
 

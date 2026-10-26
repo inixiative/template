@@ -4,9 +4,8 @@
  * @partOf primitive:authz
  * @uses infrastructure:prisma
  */
-import { delegateEntries } from '@template/permissions';
 import type { Context } from 'hono';
-import { delegatePermissionsOf, ownerPermix, ownerTable } from '#/lib/permissions/ownerTable';
+import { delegateTable, ownerTable } from '#/lib/permissions/ownerTable';
 import type { AppEnv } from '#/types/appEnv';
 
 export const setupTokenPermissions = async (c: Context<AppEnv>) => {
@@ -14,8 +13,6 @@ export const setupTokenPermissions = async (c: Context<AppEnv>) => {
   const token = c.get('token');
   if (!token) return;
 
-  const table = await ownerTable(token);
-  await permix.setup(delegateEntries(delegatePermissionsOf(token), table.entries), {
-    owner: await ownerPermix(table),
-  });
+  const table = await delegateTable(token, await ownerTable(token));
+  await permix.setup(table.entries, table.owner && { owner: table.owner });
 };

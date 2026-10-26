@@ -22,6 +22,6 @@ export const identifyReadRoute = readRoute({
   model: Modules.identify,
   skipId: true,
   responseSchema,
-  description: 'Who the credential is: the acting person or token, as the permission rules see it.',
+  description: 'Who the credential is: the acting user or token, as the permission rules see it.',
   tags: [Tags.identify],
 });

@@ -99,6 +99,7 @@ export {
   type RelationField,
   type ScalarField,
 } from '@inixiative/prisma-map';
+export { ownerRef } from './registries/ownerRef';
 export {
   POLYMORPHIC_BINDS,
   type PolymorphicKind,

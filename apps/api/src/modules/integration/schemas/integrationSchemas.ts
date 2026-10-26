@@ -21,9 +21,10 @@ export const integrationCreateBodySchema = IntegrationScalarInputSchema.omit({
   userId: true,
   organizationId: true,
   spaceId: true,
-  role: true,
-  full: true,
-  entitlements: true,
+}).extend({
+  role: z.nativeEnum(Role).nullable().default(null),
+  full: z.boolean().default(false),
+  entitlements: entitlementEntriesSchema.nullable().default(null),
 });
 
 export const integrationUpdateBodySchema = integrationCreateBodySchema

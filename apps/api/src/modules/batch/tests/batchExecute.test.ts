@@ -19,7 +19,7 @@ const routers: MountFn[] = [
   (app) => app.route('/api/v1/token', tokenRouter),
 ];
 
-const seatlessPersonFetch = async () =>
+const memberlessUserFetch = async () =>
   createTestApp({ mockUser: (await createUser()).entity, mount: routers }).fetch;
 
 describe('POST /api/v1/batch/execute', () => {
@@ -110,7 +110,7 @@ describe('POST /api/v1/batch/execute', () => {
     });
 
     it('treats 204 responses as successful empty results', async () => {
-      const response = await (await seatlessPersonFetch())(
+      const response = await (await memberlessUserFetch())(
         post('/api/v1/batch/execute', {
           requests: [
             [
@@ -511,7 +511,7 @@ describe('POST /api/v1/batch/execute', () => {
     });
 
     it('rejects interpolation that targets an empty 204 body', async () => {
-      const response = await (await seatlessPersonFetch())(
+      const response = await (await memberlessUserFetch())(
         post('/api/v1/batch/execute', {
           requests: [
             [

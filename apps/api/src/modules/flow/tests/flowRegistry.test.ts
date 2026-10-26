@@ -32,12 +32,12 @@ const callerFor: Record<
   setUpOrganization: async () => {
     const { entity: user } = await createUser();
     const { entity: organization } = await createOrganization();
-    const { entity: seat } = await createOrganizationUser(
+    const { entity: member } = await createOrganizationUser(
       { role: 'owner' },
       { user, organization },
     );
     return {
-      app: createTestApp({ mockUser: user as User, mockOrganizationUsers: [seat], mount }),
+      app: createTestApp({ mockUser: user as User, mockOrganizationUsers: [member], mount }),
       userId: user.id,
       bindings: { organizationId: organization.id },
     };

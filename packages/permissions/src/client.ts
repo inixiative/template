@@ -23,28 +23,25 @@ export const StandardAction = {
 export type StandardAction = (typeof StandardAction)[keyof typeof StandardAction];
 
 // Resource-specific actions (extend StandardAction, can add more)
-export const OrganizationAction = { ...StandardAction } as const;
+export const OrganizationAction = {
+  ...StandardAction,
+  create: 'create',
+  delete: 'delete',
+} as const;
 export type OrganizationAction = (typeof OrganizationAction)[keyof typeof OrganizationAction];
 
 export const SpaceAction = { ...StandardAction } as const;
 export type SpaceAction = (typeof SpaceAction)[keyof typeof SpaceAction];
 
-// Actions on the user's own account. Held on the user's row like the standard four.
-export const SessionAction = {
-  createToken: 'token.create',
-  deleteToken: 'token.delete',
-  redactUser: 'user.redact',
-  rotateUserJwts: 'user.rotateJwts',
-  deleteOrganization: 'organization.delete',
-} as const;
-export type SessionAction = (typeof SessionAction)[keyof typeof SessionAction];
-
 export const UserAction = {
   ...StandardAction,
-  ...SessionAction,
-  createOrganization: 'organization.create',
+  redactUser: 'user.redact',
+  rotateUserJwts: 'user.rotateJwts',
 } as const;
 export type UserAction = (typeof UserAction)[keyof typeof UserAction];
+
+export const TokenAction = { create: 'create', delete: 'delete' } as const;
+export type TokenAction = (typeof TokenAction)[keyof typeof TokenAction];
 
 export const InquiryAction = {
   read: 'read',
@@ -53,7 +50,7 @@ export const InquiryAction = {
 } as const;
 export type InquiryAction = (typeof InquiryAction)[keyof typeof InquiryAction];
 
-export type Action = UserAction | OrganizationAction | SpaceAction | InquiryAction;
+export type Action = UserAction | OrganizationAction | SpaceAction | TokenAction | InquiryAction;
 
 export type Entitlements = Record<string, boolean> | null;
 

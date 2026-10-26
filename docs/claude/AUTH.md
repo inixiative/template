@@ -116,7 +116,7 @@ The plugin list lives in `apps/api/src/lib/auth/authPlugins.ts`. Its order matte
 
 1. expires the session cookie on the response;
 2. on `/callback/*` (the OAuth redirect) stops there, because the one-time token must still resolve to that session;
-3. otherwise signs the user's JWT (`signJWT` with `personJwtOptions()` from `apps/api/src/lib/auth/personJwt.ts`), deletes the session, and replaces the response body with:
+3. otherwise signs the user's JWT (`signJWT` with `userJwtOptions()` from `apps/api/src/lib/auth/userJwt.ts`), deletes the session, and replaces the response body with:
 
 ```json
 { "token": "<jwt>", "expiresAt": "<ISO time>", "user": { "...": "..." } }

@@ -7,10 +7,158 @@
 import { Operator } from '@inixiative/json-rules';
 import { ownerActions } from '@template/permissions/rebac/ownerActions';
 import type { ActionRule, RebacSchema } from '@template/permissions/rebac/types';
+import { roleHierarchy, roleToStandardAction } from '@template/permissions/roles/shared';
 
 const highRoles = ['owner', 'admin'];
-const person: ActionRule = {
+const actorIsUser: ActionRule = {
   rule: { field: '__actor.model', operator: Operator.equals, value: 'User' },
+};
+
+const actorIsDelegateOfUser: ActionRule = {
+  rule: { field: '__actor.record.ownerModel', operator: Operator.equals, value: 'User' },
+};
+
+const owners = [
+  ['User', 'user'],
+  ['Organization', 'organization'],
+  ['OrganizationUser', 'organizationUser'],
+  ['Space', 'space'],
+  ['SpaceUser', 'spaceUser'],
+  ['Integration', 'integration'],
+] as const;
+
+const onOwner = (action: string, at = ''): ActionRule => ({
+  any: owners.map(([ownerModel, rel]) => ({
+    all: [
+      { rule: { field: `${at}ownerModel`, operator: Operator.equals, value: ownerModel } },
+      { rel: `${at}${rel}`, action },
+    ],
+  })),
+});
+
+const actorIsItsUser = (at = ''): ActionRule => ({
+  all: [
+    { rule: { field: `${at}userId`, operator: Operator.notEmpty, value: true } },
+    {
+      any: [
+        {
+          all: [
+            actorIsUser,
+            {
+              rule: { field: `${at}userId`, operator: Operator.equals, path: '__actor.record.id' },
+            },
+          ],
+        },
+        {
+          all: [
+            actorIsDelegateOfUser,
+            {
+              rule: {
+                field: `${at}userId`,
+                operator: Operator.equals,
+                path: '__actor.record.userId',
+              },
+            },
+          ],
+        },
+      ],
+    },
+    { rel: `${at}user`, action: 'manage' },
+  ],
+});
+
+const ownedByOrganizationOrSpace = (at = ''): ActionRule => ({
+  rule: { field: `${at}ownerModel`, operator: Operator.in, value: ['Organization', 'Space'] },
+});
+
+const ownedByIntegration: ActionRule = {
+  rule: { field: 'ownerModel', operator: Operator.equals, value: 'Integration' },
+};
+
+const notOwnedByIntegration: ActionRule = {
+  rule: { field: 'ownerModel', operator: Operator.notEquals, value: 'Integration' },
+};
+
+const highRole: ActionRule = {
+  rule: { field: 'role', operator: Operator.in, value: highRoles },
+};
+
+const assignRole = (own: ActionRule, manage: ActionRule): ActionRule => ({
+  any: [
+    { all: [highRole, own] },
+    {
+      all: [{ rule: { field: 'role', operator: Operator.notIn, value: highRoles } }, manage],
+    },
+  ],
+});
+
+const heldAtOwner = (at = ''): ActionRule => ({
+  any: [
+    {
+      all: [
+        { rule: { field: 'role', operator: Operator.equals, value: null } },
+        onOwner('read', at),
+      ],
+    },
+    ...roleHierarchy.map((role) => ({
+      all: [
+        { rule: { field: 'role', operator: Operator.equals, value: role } },
+        onOwner(roleToStandardAction(role), at),
+      ],
+    })),
+  ],
+});
+
+const yoursOrOrganizationOrSpace = (at = ''): ActionRule => ({
+  any: [ownedByOrganizationOrSpace(at), actorIsItsUser(at)],
+});
+
+const ownedByUser: ActionRule = {
+  rule: { field: 'ownerModel', operator: Operator.equals, value: 'User' },
+};
+
+const integrationAdministering = {
+  create: {
+    any: [
+      { all: [ownedByUser, { rel: 'user', action: 'operate' }] },
+      { all: [ownedByOrganizationOrSpace(), onOwner('manage')] },
+    ],
+  },
+  own: { any: [actorIsItsUser(), { all: [ownedByOrganizationOrSpace(), onOwner('own')] }] },
+  manage: {
+    any: [actorIsItsUser(), { all: [ownedByOrganizationOrSpace(), onOwner('manage')] }],
+  },
+} satisfies Record<string, ActionRule>;
+
+const integrationAccess = {
+  operate: onOwner('operate'),
+  read: onOwner('read'),
+  assign: {
+    any: [
+      { all: [ownedByOrganizationOrSpace(), assignRole(onOwner('own'), onOwner('manage'))] },
+      { all: [actorIsItsUser(), heldAtOwner()] },
+    ],
+  },
+} satisfies Record<string, ActionRule>;
+
+const tokenAccessIsYours: ActionRule = {
+  any: [
+    { all: [notOwnedByIntegration, heldAtOwner(), yoursOrOrganizationOrSpace()] },
+    {
+      all: [
+        ownedByIntegration,
+        heldAtOwner('integration.'),
+        yoursOrOrganizationOrSpace('integration.'),
+      ],
+    },
+  ],
+};
+
+const managedUpTheChain: ActionRule = {
+  any: [
+    { all: [notOwnedByIntegration, onOwner('manage')] },
+    { all: [ownedByIntegration, onOwner('manage', 'integration.')] },
+  ],
 };
 
 export const rebacSchema: RebacSchema = {
@@ -22,10 +170,8 @@ export const rebacSchema: RebacSchema = {
         manage: 'own',
         operate: 'manage',
         read: 'operate',
-        'organization.create': 'operate',
-        'token.create': { all: [person, 'operate'] },
-        'user.rotateJwts': { all: [person, 'operate'] },
-        'user.redact': { all: [person, 'own'] },
+        'user.rotateJwts': { all: [actorIsUser, 'operate'] },
+        'user.redact': { all: [actorIsUser, 'own'] },
       },
     },
 
@@ -35,20 +181,9 @@ export const rebacSchema: RebacSchema = {
         manage: 'own',
         operate: 'manage',
         read: 'operate',
-        'token.create': { all: [person, 'operate'] },
-        'organization.delete': { all: [person, 'own'] },
-        // Role assignment: high roles need own, others need manage
-        assign: {
-          any: [
-            { all: [{ rule: { field: 'role', operator: Operator.in, value: highRoles } }, 'own'] },
-            {
-              all: [
-                { rule: { field: 'role', operator: Operator.notIn, value: highRoles } },
-                'manage',
-              ],
-            },
-          ],
-        },
+        create: { any: [actorIsUser, actorIsDelegateOfUser] },
+        delete: { all: [actorIsUser, 'own'] },
+        assign: 'own',
       },
     },
 
@@ -58,18 +193,7 @@ export const rebacSchema: RebacSchema = {
         manage: 'own',
         operate: 'manage',
         read: 'operate',
-        'token.create': { all: [person, 'operate'] },
-        assign: {
-          any: [
-            { all: [{ rule: { field: 'role', operator: Operator.in, value: highRoles } }, 'own'] },
-            {
-              all: [
-                { rule: { field: 'role', operator: Operator.notIn, value: highRoles } },
-                'manage',
-              ],
-            },
-          ],
-        },
+        assign: 'own',
       },
     },
 
@@ -87,9 +211,16 @@ export const rebacSchema: RebacSchema = {
             ownerActions().manage,
           ],
         },
+        create: {
+          any: [
+            { rel: 'user', action: 'operate' },
+            { rel: 'organization', action: 'manage' },
+            { rel: 'space', action: 'manage' },
+          ],
+        },
       },
     },
-    'db:webhookSubscription': { actions: ownerActions() },
+    'db:webhookSubscription': { actions: { ...ownerActions(), create: 'operate' } },
     'db:segment': { actions: ownerActions() },
     'db:segmentMember': {
       actions: {
@@ -99,10 +230,8 @@ export const rebacSchema: RebacSchema = {
         read: { rel: 'segment', action: 'read' },
       },
     },
-    'db:integration': {
-      actions: { ...ownerActions(), 'token.create': { all: [person, 'manage'] } },
-    },
-    'db:flow': { actions: ownerActions(['user']) },
+    'db:integration': { actions: { ...integrationAdministering, ...integrationAccess } },
+    'db:flow': { actions: { ...ownerActions(['user']), create: 'operate' } },
 
     'db:organizationUser': {
       actions: {
@@ -112,10 +241,19 @@ export const rebacSchema: RebacSchema = {
             { rel: 'organization', action: 'read' },
           ],
         },
-        'token.create': { all: [person, 'leave'] },
         leave: { rel: 'user', action: 'operate' },
+        operate: { rel: 'organization', action: 'operate' },
         manage: { rel: 'organization', action: 'manage' },
         own: { rel: 'organization', action: 'own' },
+        assign: {
+          any: [
+            assignRole(
+              { rel: 'organization', action: 'own' },
+              { rel: 'organization', action: 'manage' },
+            ),
+            { rel: 'organization', action: 'assign' },
+          ],
+        },
       },
     },
 
@@ -127,60 +265,33 @@ export const rebacSchema: RebacSchema = {
             { rel: 'space', action: 'read' },
           ],
         },
-        'token.create': { all: [person, 'leave'] },
         leave: { rel: 'user', action: 'operate' },
+        operate: { rel: 'space', action: 'operate' },
         manage: { rel: 'space', action: 'manage' },
         own: { rel: 'space', action: 'own' },
+        assign: {
+          any: [
+            assignRole({ rel: 'space', action: 'own' }, { rel: 'space', action: 'manage' }),
+            { rel: 'space', action: 'assign' },
+          ],
+        },
       },
     },
 
-    // Tokens carry a `role` field — assigning/revoking one inherits the
-    // org/space `assign` semantics: high roles need own on the owner, others
-    // need manage. Encoded against the token's row so the role rule resolves
-    // locally and only the member check walks to the owner.
     'db:token': {
       actions: {
-        'token.delete': { all: [person, { any: ['leave', 'assign'] }] },
         leave: { rel: 'user', action: 'operate' },
-        // Owner-side assign, role-aware.
-        assign: {
-          any: [
-            {
-              all: [
-                {
-                  any: [
-                    { rule: { field: 'role', operator: Operator.in, value: highRoles } },
-                    { rule: { field: 'full', operator: Operator.equals, value: true } },
-                  ],
-                },
-                {
-                  any: [
-                    { rel: 'organization', action: 'own' },
-                    { rel: 'space', action: 'own' },
-                  ],
-                },
-              ],
-            },
-            {
-              all: [
-                { rule: { field: 'role', operator: Operator.notIn, value: highRoles } },
-                { rule: { field: 'full', operator: Operator.notEquals, value: true } },
-                {
-                  any: [
-                    { rel: 'organization', action: 'manage' },
-                    { rel: 'space', action: 'manage' },
-                  ],
-                },
-              ],
-            },
-          ],
-        },
+        own: onOwner('own'),
+        read: 'own',
+        create: { all: [actorIsUser, tokenAccessIsYours] },
+        delete: { all: [actorIsUser, { any: ['leave', managedUpTheChain] }] },
       },
     },
 
     'db:authProvider': {
       actions: {
         own: { rel: 'organization', action: 'own' },
+        create: 'own',
       },
     },
 

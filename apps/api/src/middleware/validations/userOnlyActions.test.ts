@@ -26,7 +26,7 @@ describe('every route names its action; a token is never a user (Aron, 2026-10-2
   let user: User;
   let superadmin: User;
   let organization: Organization;
-  let membership: OrganizationUser;
+  let member: OrganizationUser;
 
   const tokenApp = createTestApp({
     mount: [
@@ -53,7 +53,7 @@ describe('every route names its action; a token is never a user (Aron, 2026-10-2
     const { entity } = await createToken(
       { ownerModel, role, keyHash: createHash('sha256').update(key).digest('hex') },
       ownerModel === 'OrganizationUser'
-        ? { user: owner, organization, organizationUser: membership }
+        ? { user: owner, organization, organizationUser: member }
         : { user: owner },
     );
     return { key, token: entity };
@@ -65,10 +65,7 @@ describe('every route names its action; a token is never a user (Aron, 2026-10-2
     ({ entity: user } = await createUser());
     ({ entity: superadmin } = await createUser({ platformRole: 'superadmin' }));
     ({ entity: organization } = await createOrganization());
-    ({ entity: membership } = await createOrganizationUser(
-      { role: 'owner' },
-      { user, organization },
-    ));
+    ({ entity: member } = await createOrganizationUser({ role: 'owner' }, { user, organization }));
   });
 
   afterAll(async () => {
@@ -76,13 +73,13 @@ describe('every route names its action; a token is never a user (Aron, 2026-10-2
   });
 
   it('a user mints a token; an owner-role token holding own on its user does not', async () => {
-    const person = createTestApp({
+    const userApp = createTestApp({
       mockUser: user,
-      mockOrganizationUsers: [membership],
+      mockOrganizationUsers: [member],
       mount: [(app) => app.route('/api/v1/me', meRouter)],
     });
     expect(
-      (await person.fetch(post('/api/v1/me/tokens', { name: 'k', role: 'owner' }))).status,
+      (await userApp.fetch(post('/api/v1/me/tokens', { name: 'k', role: 'owner' }))).status,
     ).toBe(201);
 
     const { key } = await mint(user, 'owner');
@@ -113,9 +110,13 @@ describe('every route names its action; a token is never a user (Aron, 2026-10-2
     expect((await call(key, 'GET', '/me')).status).toBe(200);
     expect((await call(key, 'GET', '/me/organizations')).status).toBe(200);
     expect((await call(key, 'POST', '/me/webhookSubscriptions', webhook())).status).toBe(403);
+  });
+
+  it('any token its user owns creates an organization', async () => {
+    const { key } = await mint(user, 'viewer');
     expect(
       (await call(key, 'POST', '/organization', { name: 'o', slug: randomUUID() })).status,
-    ).toBe(403);
+    ).toBe(201);
   });
 
   it('a member token creates on the user, including an organization', async () => {

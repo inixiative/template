@@ -11,23 +11,28 @@ const notFullOr = (condition: Condition, error: string): Condition => ({
   error,
 });
 
-const fullPassesAHolderThrough: Condition[] = [
+const fullTakesNothingElse: Condition[] = [
   notFullOr({ field: 'role', operator: Operator.isEmpty, value: true }, 'full takes no role'),
   notFullOr(
     { field: 'entitlements', operator: Operator.isEmpty, value: true },
     'full takes no entitlements',
   ),
-  notFullOr(
-    { field: 'ownerModel', operator: Operator.notIn, value: ['Organization', 'Space'] },
-    'an Organization or Space holds itself; give it a role, not full',
-  ),
 ];
 
+const fullOnlyOn = (owners: string[]): Condition =>
+  notFullOr(
+    { field: 'ownerModel', operator: Operator.in, value: owners },
+    `full only on a delegate of ${owners.join(', ')}`,
+  );
+
 export const delegatePermissionRules = {
-  Integration: { all: fullPassesAHolderThrough },
+  Integration: {
+    all: [...fullTakesNothingElse, fullOnlyOn(['User', 'OrganizationUser', 'SpaceUser'])],
+  },
   Token: {
     all: [
-      ...fullPassesAHolderThrough,
+      ...fullTakesNothingElse,
+      fullOnlyOn(['User', 'OrganizationUser', 'SpaceUser', 'Integration']),
       {
         any: [
           { field: 'full', operator: Operator.equals, value: true },

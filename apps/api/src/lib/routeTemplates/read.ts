@@ -5,7 +5,7 @@
  * @uses none
  * @constructs route
  */
-import { createRoute } from '@hono/zod-openapi';
+import { createRoute, type RouteConfig } from '@hono/zod-openapi';
 import pluralize from 'pluralize';
 import { securityForRoute } from '#/lib/auth/routeSecurity';
 import type { RouteArgs } from '#/lib/routeTemplates/types';
@@ -49,7 +49,7 @@ export const readRoute = <const T extends RouteArgs>(args: T) => {
   const routeTags = buildTags({ model, submodel, tags, admin, internal });
   const skipResource = !hasIdParam(skipId, submodel, many);
 
-  return createRoute({
+  const route = createRoute({
     ...args,
     operationId: buildOperationId({
       action: action || 'read',
@@ -68,8 +68,16 @@ export const readRoute = <const T extends RouteArgs>(args: T) => {
       (many
         ? `Retrieves a list of ${resourceName}${parentContext}.`
         : `Retrieves an existing ${resourceName}${parentContext}.`),
-    middleware: prepareMiddleware(middleware, skipResource, filterLens, args.includeDeleted),
+    middleware: prepareMiddleware({
+      middleware,
+      skipId: skipResource,
+      filterLens,
+      includeDeleted: args.includeDeleted,
+      submodel,
+      route: (): RouteConfig => route,
+    }),
     request: buildRequest(args),
     responses: buildResponses(args, 200),
   });
+  return route;
 };

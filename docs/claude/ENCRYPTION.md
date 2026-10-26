@@ -22,7 +22,7 @@
 - [Environment Variables](#environment-variables)
   - [Per Keyring (3 vars)](#per-keyring-3-vars)
   - [Example: Auth Provider Secrets](#example-auth-provider-secrets)
-  - [Example: Person-JWT Signing Keys](#example-person-jwt-signing-keys)
+  - [Example: User-JWT Signing Keys](#example-user-jwt-signing-keys)
   - [Validation](#validation)
 - [Deploy-Time Validation](#deploy-time-validation)
   - [Validation Rules](#validation-rules)
@@ -112,7 +112,7 @@ export const ENCRYPTED_MODELS = {
 } as const;
 ```
 
-`jwks.privateKey` is the private half of each person-JWT signing key ([AUTH.md → What lives where](./AUTH.md#what-lives-where)). BetterAuth's `jwt()` plugin reads and writes keys through `apps/api/src/lib/auth/jwksStore.ts`, which encrypts with `encryptField` and decrypts with `decryptField`, so the key is covered by the same rotation job as every other secret. Why: one scheme for secrets at rest, instead of BetterAuth's own encryption keyed off `BETTER_AUTH_SECRET`, which nothing rotates.
+`jwks.privateKey` is the private half of each user-JWT signing key ([AUTH.md → What lives where](./AUTH.md#what-lives-where)). BetterAuth's `jwt()` plugin reads and writes keys through `apps/api/src/lib/auth/jwksStore.ts`, which encrypts with `encryptField` and decrypts with `decryptField`, so the key is covered by the same rotation job as every other secret. Why: one scheme for secrets at rest, instead of BetterAuth's own encryption keyed off `BETTER_AUTH_SECRET`, which nothing rotates.
 
 **AAD (Additional Authenticated Data)**: Only use **immutable** fields (id, organizationId). Never use mutable fields (name, provider, etc.) - changing them would make old ciphertext undecryptable.
 
@@ -282,7 +282,7 @@ AUTH_PROVIDER_SECRETS_ENCRYPTION_KEY_CURRENT=dGhpcyBpcyBhIDMyIGJ5dGUga2V5IGZvciB
 AUTH_PROVIDER_SECRETS_ENCRYPTION_KEY_PREVIOUS=b2xkIGtleSB0aGF0IHdhcyB1c2VkIGZvciB2ZXJzaW9uIDE=
 ```
 
-### Example: Person-JWT Signing Keys
+### Example: User-JWT Signing Keys
 
 ```env
 JWKS_PRIVATE_KEY_ENCRYPTION_VERSION=1

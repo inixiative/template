@@ -35,7 +35,7 @@ type Entry = {
   actions: Record<string, boolean>;
 };
 
-type Claim = { role?: Role | null; full?: boolean; entitlements?: Entry[] | null };
+type Permissions = { role?: Role | null; full?: boolean; entitlements?: Entry[] | null };
 
 const entry = (resource: string, anchor: [string, string], actions: string[]): Entry => ({
   resource,
@@ -78,10 +78,10 @@ const holds = async (key: string, model: AccessorName, id: string, action: strin
   return ((await response.json()) as { holds: boolean }).holds;
 };
 
-const personApp = (user: User, seats: OrganizationUser[]) =>
+const userApp = (user: User, organizationUsers: OrganizationUser[]) =>
   createTestApp({
     mockUser: user,
-    mockOrganizationUsers: seats,
+    mockOrganizationUsers: organizationUsers,
     mount: [
       (hono) => {
         hono.route('/api/v1/integration', integrationRouter);
@@ -97,11 +97,13 @@ type Minted = { status: number; key?: string; id?: string };
 
 const mint = async (
   user: User,
-  seats: OrganizationUser[],
+  organizationUsers: OrganizationUser[],
   path: string,
-  claim: Claim,
+  permissions: Permissions,
 ): Promise<Minted> => {
-  const response = await personApp(user, seats).fetch(post(path, { name: 'k', ...claim }));
+  const response = await userApp(user, organizationUsers).fetch(
+    post(path, { name: 'k', ...permissions }),
+  );
   if (response.status !== 201) return { status: response.status };
   const { data } = (await response.json()) as { data: { key: string; id: string } };
   return { status: 201, key: data.key, id: data.id };
@@ -113,26 +115,33 @@ describe('a delegate holds its permissions, and no more than whoever grants it (
   let space: Space;
   let otherSpace: Space;
 
-  const seated = async (role: Role, org = organization) => {
+  const asMember = async (role: Role, org = organization) => {
     const { entity: user } = await createUser();
-    const { entity: seat } = await createOrganizationUser({ role }, { user, organization: org });
-    return { user, seat };
+    const { entity: organizationUser } = await createOrganizationUser(
+      { role },
+      { user, organization: org },
+    );
+    return { user, organizationUser };
   };
 
-  const seatIntegration = async (seat: OrganizationUser, claim: Claim) =>
+  const memberIntegration = async (organizationUser: OrganizationUser, permissions: Permissions) =>
     (
       await createIntegration({
         ownerModel: 'OrganizationUser',
-        organizationId: seat.organizationId,
-        userId: seat.userId,
-        role: claim.role ?? null,
-        full: claim.full ?? false,
-        entitlements: claim.entitlements ?? undefined,
+        organizationId: organizationUser.organizationId,
+        userId: organizationUser.userId,
+        role: permissions.role ?? null,
+        full: permissions.full ?? false,
+        entitlements: permissions.entitlements ?? undefined,
       })
     ).entity;
 
-  const mintOn = (integration: Integration, user: User, seats: OrganizationUser[], claim: Claim) =>
-    mint(user, seats, `/api/v1/integration/${integration.id}/tokens`, claim);
+  const mintOn = (
+    integration: Integration,
+    user: User,
+    organizationUsers: OrganizationUser[],
+    permissions: Permissions,
+  ) => mint(user, organizationUsers, `/api/v1/integration/${integration.id}/tokens`, permissions);
 
   beforeAll(async () => {
     registerClearCacheHook();
@@ -152,14 +161,14 @@ describe('a delegate holds its permissions, and no more than whoever grants it (
 
   describe('a token holds only its permissions', () => {
     it('an integration entitled to two spaces mints a token entitled to one', async () => {
-      const { user, seat } = await seated('owner');
-      const integration = await seatIntegration(seat, {
+      const { user, organizationUser } = await asMember('owner');
+      const integration = await memberIntegration(organizationUser, {
         entitlements: [
           entry('db:space', ['db:space', space.id], ['read', 'operate', 'manage']),
           entry('db:space', ['db:space', otherSpace.id], ['read', 'operate', 'manage']),
         ],
       });
-      const { key } = await mintOn(integration, user, [seat], {
+      const { key } = await mintOn(integration, user, [organizationUser], {
         entitlements: [entry('db:space', ['db:space', space.id], ['read', 'operate', 'manage'])],
       });
       expect(await holds(key!, 'space', space.id, 'manage')).toBe(true);
@@ -167,74 +176,84 @@ describe('a delegate holds its permissions, and no more than whoever grants it (
     });
 
     it('a full token holds everything its integration holds', async () => {
-      const { user, seat } = await seated('owner');
-      const integration = await seatIntegration(seat, {
+      const { user, organizationUser } = await asMember('owner');
+      const integration = await memberIntegration(organizationUser, {
         entitlements: [
           entry('db:space', ['db:space', space.id], ['read']),
           entry('db:space', ['db:space', otherSpace.id], ['read']),
         ],
       });
-      const { key } = await mintOn(integration, user, [seat], { full: true });
+      const { key } = await mintOn(integration, user, [organizationUser], { full: true });
       expect(await holds(key!, 'space', space.id, 'read')).toBe(true);
       expect(await holds(key!, 'space', otherSpace.id, 'read')).toBe(true);
       expect(await holds(key!, 'organization', organization.id, 'read')).toBe(false);
     });
 
     it('a full integration passes its member through, capped by the member', async () => {
-      const { user, seat } = await seated('member');
-      const integration = await seatIntegration(seat, { full: true });
-      const { key } = await mintOn(integration, user, [seat], { full: true });
+      const { user, organizationUser } = await asMember('member');
+      const integration = await memberIntegration(organizationUser, { full: true });
+      const { key } = await mintOn(integration, user, [organizationUser], { full: true });
       expect(await holds(key!, 'organization', organization.id, 'operate')).toBe(true);
       expect(await holds(key!, 'organization', organization.id, 'manage')).toBe(false);
       expect(await holds(key!, 'organization', otherOrganization.id, 'read')).toBe(false);
     });
 
     it('a token that is not full has a role, entitlements or both', async () => {
-      const { user, seat } = await seated('owner');
-      const integration = await seatIntegration(seat, { role: 'owner' });
-      expect((await mintOn(integration, user, [seat], {})).status).toBe(422);
-      expect((await mintOn(integration, user, [seat], { entitlements: [] })).status).toBe(422);
-      expect((await mintOn(integration, user, [seat], { role: 'viewer' })).status).toBe(201);
+      const { user, organizationUser } = await asMember('owner');
+      const integration = await memberIntegration(organizationUser, { role: 'owner' });
+      expect((await mintOn(integration, user, [organizationUser], {})).status).toBe(422);
+      expect(
+        (await mintOn(integration, user, [organizationUser], { entitlements: [] })).status,
+      ).toBe(422);
+      expect((await mintOn(integration, user, [organizationUser], { role: 'viewer' })).status).toBe(
+        201,
+      );
     });
 
     it('an entitlement from a record that does not exist is malformed, not forbidden', async () => {
-      const { user, seat } = await seated('owner');
-      const integration = await seatIntegration(seat, { role: 'owner' });
+      const { user, organizationUser } = await asMember('owner');
+      const integration = await memberIntegration(organizationUser, { role: 'owner' });
       const nowhere = entry(
         'db:space',
         ['db:space', '01a17393-0000-7000-8000-000000000000'],
         ['read'],
       );
-      expect((await mintOn(integration, user, [seat], { entitlements: [nowhere] })).status).toBe(
-        422,
-      );
+      expect(
+        (await mintOn(integration, user, [organizationUser], { entitlements: [nowhere] })).status,
+      ).toBe(422);
     });
 
     it('full takes no role and no entitlements beside it', async () => {
-      const { user, seat } = await seated('owner');
-      const integration = await seatIntegration(seat, { role: 'owner' });
-      expect((await mintOn(integration, user, [seat], { full: true, role: 'member' })).status).toBe(
-        422,
-      );
+      const { user, organizationUser } = await asMember('owner');
+      const integration = await memberIntegration(organizationUser, { role: 'owner' });
+      expect(
+        (await mintOn(integration, user, [organizationUser], { full: true, role: 'member' }))
+          .status,
+      ).toBe(422);
     });
   });
 
   describe('full only means something on a delegation chain', () => {
     it("an organization's own token cannot be full", async () => {
-      const { user, seat } = await seated('owner');
-      const minted = await mint(user, [seat], `/api/v1/organization/${organization.id}/tokens`, {
-        full: true,
-      });
+      const { user, organizationUser } = await asMember('owner');
+      const minted = await mint(
+        user,
+        [organizationUser],
+        `/api/v1/organization/${organization.id}/tokens`,
+        {
+          full: true,
+        },
+      );
       expect(minted.status).toBe(422);
     });
 
     it("an organization's integration cannot be full", async () => {
-      const { user, seat } = await seated('owner');
+      const { user, organizationUser } = await asMember('owner');
       const { entity: integration } = await createIntegration({
         ownerModel: 'Organization',
         organizationId: organization.id,
       });
-      const response = await personApp(user, [seat]).fetch(
+      const response = await userApp(user, [organizationUser]).fetch(
         patch(`/api/v1/integration/${integration.id}`, { full: true }),
       );
       expect(response.status).toBe(422);
@@ -243,28 +262,28 @@ describe('a delegate holds its permissions, and no more than whoever grants it (
 
   describe('a token is your permissions or less', () => {
     it('an admin mints an admin organization token, not an owner one', async () => {
-      const { user, seat } = await seated('admin');
+      const { user, organizationUser } = await asMember('admin');
       const path = `/api/v1/organization/${organization.id}/tokens`;
-      expect((await mint(user, [seat], path, { role: 'admin' })).status).toBe(201);
-      expect((await mint(user, [seat], path, { role: 'owner' })).status).toBe(403);
+      expect((await mint(user, [organizationUser], path, { role: 'admin' })).status).toBe(201);
+      expect((await mint(user, [organizationUser], path, { role: 'owner' })).status).toBe(403);
     });
 
     it("an admin cannot mint an owner's token on an owner-role member's integration", async () => {
-      const { user: owner, seat: ownerSeat } = await seated('owner');
-      const integration = await seatIntegration(ownerSeat, { role: 'owner' });
-      const { user: admin, seat: adminSeat } = await seated('admin');
-      expect((await mintOn(integration, admin, [adminSeat], { role: 'owner' })).status).toBe(403);
-      expect((await mintOn(integration, admin, [adminSeat], { full: true })).status).toBe(403);
-      expect((await mintOn(integration, owner, [ownerSeat], { role: 'owner' })).status).toBe(201);
+      const { user: owner, organizationUser: ownerMember } = await asMember('owner');
+      const integration = await memberIntegration(ownerMember, { role: 'owner' });
+      const { user: admin, organizationUser: adminMember } = await asMember('admin');
+      expect((await mintOn(integration, admin, [adminMember], { role: 'owner' })).status).toBe(403);
+      expect((await mintOn(integration, admin, [adminMember], { full: true })).status).toBe(403);
+      expect((await mintOn(integration, owner, [ownerMember], { role: 'owner' })).status).toBe(201);
     });
 
     it('a user with an owner-role member and a viewer-role member mints a member token', async () => {
-      const { user, seat } = await seated('owner');
-      const { entity: viewerSeat } = await createOrganizationUser(
+      const { user, organizationUser } = await asMember('owner');
+      const { entity: viewerMember } = await createOrganizationUser(
         { role: 'viewer' },
         { user, organization: otherOrganization },
       );
-      const minted = await mint(user, [seat, viewerSeat], '/api/v1/me/tokens', {
+      const minted = await mint(user, [organizationUser, viewerMember], '/api/v1/me/tokens', {
         role: 'member',
       });
       expect(minted.status).toBe(201);
@@ -275,44 +294,46 @@ describe('a delegate holds its permissions, and no more than whoever grants it (
   });
 
   describe("a user's integration: a role means what it means for the user's own token", () => {
-    const personIntegration = async (user: User, claim: Claim) =>
+    const userIntegration = async (user: User, permissions: Permissions) =>
       (
         await createIntegration({
           ownerModel: 'User',
           userId: user.id,
-          role: claim.role ?? null,
-          full: claim.full ?? false,
-          entitlements: claim.entitlements ?? undefined,
+          role: permissions.role ?? null,
+          full: permissions.full ?? false,
+          entitlements: permissions.entitlements ?? undefined,
         })
       ).entity;
 
     it('a member role reaches every organization the user sits in, capped by the member', async () => {
-      const { user, seat } = await seated('member');
-      const integration = await personIntegration(user, { role: 'member' });
-      const { key } = await mintOn(integration, user, [seat], { role: 'member' });
+      const { user, organizationUser } = await asMember('member');
+      const integration = await userIntegration(user, { role: 'member' });
+      const { key } = await mintOn(integration, user, [organizationUser], { role: 'member' });
       expect(await holds(key!, 'organization', organization.id, 'operate')).toBe(true);
       expect(await holds(key!, 'organization', organization.id, 'manage')).toBe(false);
     });
 
     it("full all the way down reaches each of the user's organizations at its member", async () => {
-      const { user, seat } = await seated('owner');
-      const { entity: viewerSeat } = await createOrganizationUser(
+      const { user, organizationUser } = await asMember('owner');
+      const { entity: viewerMember } = await createOrganizationUser(
         { role: 'viewer' },
         { user, organization: otherOrganization },
       );
-      const integration = await personIntegration(user, { full: true });
-      const { key } = await mintOn(integration, user, [seat, viewerSeat], { full: true });
+      const integration = await userIntegration(user, { full: true });
+      const { key } = await mintOn(integration, user, [organizationUser, viewerMember], {
+        full: true,
+      });
       expect(await holds(key!, 'organization', organization.id, 'own')).toBe(true);
       expect(await holds(key!, 'organization', otherOrganization.id, 'read')).toBe(true);
       expect(await holds(key!, 'organization', otherOrganization.id, 'operate')).toBe(false);
     });
 
     it("only the user's own things: no role, one entry from the user", async () => {
-      const { user, seat } = await seated('owner');
-      const integration = await personIntegration(user, {
+      const { user, organizationUser } = await asMember('owner');
+      const integration = await userIntegration(user, {
         entitlements: [entry('db:user', ['db:user', user.id], ['read', 'operate'])],
       });
-      const { key } = await mintOn(integration, user, [seat], { full: true });
+      const { key } = await mintOn(integration, user, [organizationUser], { full: true });
       expect(await holds(key!, 'user', user.id, 'read')).toBe(true);
       expect(await holds(key!, 'organization', organization.id, 'read')).toBe(false);
     });
@@ -320,9 +341,9 @@ describe('a delegate holds its permissions, and no more than whoever grants it (
 
   describe("an integration's token", () => {
     it("carries its integration's tenancy, is not a user, and acts within its permissions", async () => {
-      const { user, seat } = await seated('owner');
-      const integration = await seatIntegration(seat, { role: 'owner' });
-      const { key, id } = await mintOn(integration, user, [seat], { role: 'member' });
+      const { user, organizationUser } = await asMember('owner');
+      const integration = await memberIntegration(organizationUser, { role: 'owner' });
+      const { key, id } = await mintOn(integration, user, [organizationUser], { role: 'member' });
       const stored = await db.token.findUniqueOrThrow({ where: { id: id! } });
       expect(stored).toMatchObject({
         ownerModel: 'Integration',
@@ -337,36 +358,48 @@ describe('a delegate holds its permissions, and no more than whoever grants it (
       ).toBe(200);
     });
 
-    it('its user revokes it; an admin revokes a member token but not a full one', async () => {
-      const { user, seat } = await seated('owner');
-      const integration = await seatIntegration(seat, { full: true });
-      const member = await mintOn(integration, user, [seat], { role: 'member' });
-      const full = await mintOn(integration, user, [seat], { full: true });
-      const mine = await mintOn(integration, user, [seat], { role: 'viewer' });
-      const { user: admin, seat: adminSeat } = await seated('admin');
-      const revoke = (by: User, seats: OrganizationUser[], id: string) =>
-        personApp(by, seats).fetch(del(`/api/v1/token/${id}`));
-      expect((await revoke(admin, [adminSeat], member.id!)).status).toBe(204);
-      expect((await revoke(admin, [adminSeat], full.id!)).status).toBe(403);
-      expect((await revoke(user, [seat], mine.id!)).status).toBe(204);
-      expect(await db.token.findUnique({ where: { id: full.id! } })).not.toBeNull();
+    it('its user revokes it; an admin up the chain revokes any token on it, even a full one', async () => {
+      const { user, organizationUser } = await asMember('owner');
+      const integration = await memberIntegration(organizationUser, { full: true });
+      const member = await mintOn(integration, user, [organizationUser], { role: 'member' });
+      const full = await mintOn(integration, user, [organizationUser], { full: true });
+      const mine = await mintOn(integration, user, [organizationUser], { role: 'viewer' });
+      const { user: admin, organizationUser: adminMember } = await asMember('admin');
+      const revoke = (by: User, organizationUsers: OrganizationUser[], id: string) =>
+        userApp(by, organizationUsers).fetch(del(`/api/v1/token/${id}`));
+      expect((await revoke(admin, [adminMember], member.id!)).status).toBe(204);
+      expect((await revoke(admin, [adminMember], full.id!)).status).toBe(204);
+      expect((await revoke(user, [organizationUser], mine.id!)).status).toBe(204);
     });
   });
 
-  it('a member token does not inherit its member entitlements unless it has them', async () => {
+  it('a member token does not inherit its member entitlements unless it is full; a full token on a member row takes own, a full user token is the user', async () => {
     const { entity: user } = await createUser();
-    const { entity: seat } = await createOrganizationUser(
+    const { entity: organizationUser } = await createOrganizationUser(
       { role: 'member', entitlements: { manage: true } },
       { user, organization },
     );
-    const plain = await mint(user, [seat], `/api/v1/organizationUser/${seat.id}/tokens`, {
-      role: 'member',
-    });
+    const plain = await mint(
+      user,
+      [organizationUser],
+      `/api/v1/organizationUser/${organizationUser.id}/tokens`,
+      {
+        role: 'member',
+      },
+    );
     expect(plain.status).toBe(201);
     expect(await holds(plain.key!, 'organization', organization.id, 'manage')).toBe(false);
-    const whole = await mint(user, [seat], `/api/v1/organizationUser/${seat.id}/tokens`, {
-      full: true,
-    });
+    const onRow = await mint(
+      user,
+      [organizationUser],
+      `/api/v1/organizationUser/${organizationUser.id}/tokens`,
+      {
+        full: true,
+      },
+    );
+    expect(onRow.status).toBe(403);
+    const whole = await mint(user, [organizationUser], '/api/v1/me/tokens', { full: true });
+    expect(whole.status).toBe(201);
     expect(await holds(whole.key!, 'organization', organization.id, 'manage')).toBe(true);
   });
 });

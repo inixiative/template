@@ -4,9 +4,8 @@
  * @partOf feature:tenancy
  * @uses primitive:authz, primitive:routeTemplates, infrastructure:prisma
  */
-import { type OrganizationId, Prisma } from '@template/db';
+import { hydrate, type OrganizationId, Prisma } from '@template/db';
 import { Role } from '@template/db/generated/client/enums';
-import { greaterRole } from '@template/permissions';
 import { canGrantEntitlement, check, rebacSchema } from '@template/permissions/rebac';
 import { getResource } from '#/lib/context/getResource';
 import { makeError } from '#/lib/errors';
@@ -22,15 +21,14 @@ export const organizationUserUpdateController = makeController(
     const body = c.req.valid('json');
     const permix = c.get('permix');
 
-    const role = greaterRole(orgUser.role, body.role);
+    const before = await hydrate('organizationUser', orgUser);
+    const after = await hydrate('organizationUser', {
+      ...orgUser,
+      role: body.role ?? orgUser.role,
+    });
     if (
-      !check(
-        permix,
-        rebacSchema,
-        'organization',
-        { id: orgUser.organizationId as OrganizationId, role },
-        'assign',
-      )
+      !check(permix, rebacSchema, 'organizationUser', before, 'assign') ||
+      !check(permix, rebacSchema, 'organizationUser', after, 'assign')
     )
       throw makeError({ status: 403, message: 'Access denied' });
 

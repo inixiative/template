@@ -17,7 +17,7 @@ import type {
 import type { TokenWithRelations } from '#/lib/context/types';
 import { findUserWithRelations } from '#/modules/user/services/find';
 
-export type TokenContext = { token: TokenWithRelations; person: UserWithRelations | null };
+export type TokenContext = { token: TokenWithRelations; user: UserWithRelations | null };
 
 const ownerExists = (token: TokenWithRelations): boolean => {
   switch (token.ownerModel) {
@@ -32,7 +32,7 @@ const ownerExists = (token: TokenWithRelations): boolean => {
     case 'SpaceUser':
       return Boolean(token.spaceUser);
     case 'Integration':
-      return Boolean(token.integration && !token.integration.deletedAt);
+      return Boolean(token.integration);
   }
 };
 
@@ -51,22 +51,22 @@ const loadOwners = async (token: Token): Promise<TokenWithRelations> => {
       : null,
     integrationId ? fetchOne<Integration>('integration', integrationId) : null,
   ]);
-  const hasMembership = organizationUser && user && organization;
+  const hasMember = organizationUser && user && organization;
   return {
     ...token,
     user,
     organization,
     space,
     integration,
-    organizationUser: hasMembership ? { ...organizationUser, user, organization } : null,
+    organizationUser: hasMember ? { ...organizationUser, user, organization } : null,
     spaceUser:
-      spaceUser && hasMembership && space
+      spaceUser && hasMember && space
         ? { ...spaceUser, user, organization, organizationUser, space }
         : null,
   };
 };
 
-const personOf = async (token: TokenWithRelations): Promise<UserWithRelations | null> =>
+const userOf = async (token: TokenWithRelations): Promise<UserWithRelations | null> =>
   token.ownerModel === 'User' && token.user ? findUserWithRelations(token.user.id) : null;
 
 export const loadTokenContext = async (row: Token): Promise<TokenContext | null> => {
@@ -76,7 +76,7 @@ export const loadTokenContext = async (row: Token): Promise<TokenContext | null>
   const token = await loadOwners(row);
   if (!ownerExists(token)) return null;
 
-  const person = await personOf(token);
-  if (token.ownerModel === 'User' && !person) return null;
-  return { token, person };
+  const user = await userOf(token);
+  if (token.ownerModel === 'User' && !user) return null;
+  return { token, user };
 };

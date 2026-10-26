@@ -63,7 +63,7 @@ describe('a credential never exceeds its owner (Aron, 2026-10-23)', () => {
   let organization: Organization;
   let space: Space;
 
-  const seat = (role: Role, entitlements: Entitlements = null) =>
+  const member = (role: Role, entitlements: Entitlements = null) =>
     createOrganizationUser({ role, entitlements: entitlements ?? undefined }, { organization });
 
   const onOrganization = (actions: Entitlements) =>
@@ -78,20 +78,20 @@ describe('a credential never exceeds its owner (Aron, 2026-10-23)', () => {
       : undefined;
 
   const userToken = async (
-    membership: Awaited<ReturnType<typeof seat>>,
+    organizationUser: Awaited<ReturnType<typeof member>>,
     role: Role,
     entitlements: Entitlements = null,
   ) => {
     const { rawKey, fields } = mintKey();
     await createToken(
       { ownerModel: 'User', role, entitlements: onOrganization(entitlements), ...fields },
-      { user: membership.context.user },
+      { user: organizationUser.context.user },
     );
     return rawKey;
   };
 
-  const membershipToken = async (
-    membership: Awaited<ReturnType<typeof seat>>,
+  const memberToken = async (
+    organizationUser: Awaited<ReturnType<typeof member>>,
     role: Role,
     entitlements: Entitlements = null,
   ) => {
@@ -103,7 +103,7 @@ describe('a credential never exceeds its owner (Aron, 2026-10-23)', () => {
         entitlements: onOrganization(entitlements),
         ...fields,
       },
-      { organizationUser: membership.entity },
+      { organizationUser: organizationUser.entity },
     );
     return rawKey;
   };
@@ -118,7 +118,7 @@ describe('a credential never exceeds its owner (Aron, 2026-10-23)', () => {
   });
 
   it("a viewer member's token naming manage still cannot manage the organization", async () => {
-    const key = await userToken(await seat('viewer'), 'owner', { manage: true });
+    const key = await userToken(await member('viewer'), 'owner', { manage: true });
     expect(await holds(key, 'organization', organization.id, 'read')).toBe(true);
     expect(await holds(key, 'organization', organization.id, 'manage')).toBe(false);
     expect(
@@ -128,31 +128,31 @@ describe('a credential never exceeds its owner (Aron, 2026-10-23)', () => {
   });
 
   it("an admin member's owner-role token manages the organization and does not own it", async () => {
-    const key = await userToken(await seat('admin'), 'owner');
+    const key = await userToken(await member('admin'), 'owner');
     expect(await holds(key, 'organization', organization.id, 'manage')).toBe(true);
     expect(await holds(key, 'organization', organization.id, 'own')).toBe(false);
   });
 
   it("a token's role is capped by its member, the member's entitlements included", async () => {
-    const key = await userToken(await seat('viewer', { operate: true }), 'owner');
+    const key = await userToken(await member('viewer', { operate: true }), 'owner');
     expect(await holds(key, 'organization', organization.id, 'operate')).toBe(true);
     expect(await holds(key, 'organization', organization.id, 'manage')).toBe(false);
   });
 
   it('the cap follows the walk: a space is reached only as far as the member reaches its organization', async () => {
-    const owner = await seat('owner');
+    const owner = await member('owner');
     expect(await holds(await userToken(owner, 'owner'), 'space', space.id, 'manage')).toBe(true);
     expect(await holds(await userToken(owner, 'viewer'), 'space', space.id, 'read')).toBe(false);
   });
 
   it("a member's owner-role token on an admin member manages and does not own", async () => {
-    const key = await membershipToken(await seat('admin'), 'owner', { own: true });
+    const key = await memberToken(await member('admin'), 'owner', { own: true });
     expect(await holds(key, 'organization', organization.id, 'manage')).toBe(true);
     expect(await holds(key, 'organization', organization.id, 'own')).toBe(false);
   });
 
   it('a member token below its member row holds the lesser', async () => {
-    const key = await userToken(await seat('owner'), 'viewer');
+    const key = await userToken(await member('owner'), 'viewer');
     expect(await holds(key, 'organization', organization.id, 'read')).toBe(true);
     expect(await holds(key, 'organization', organization.id, 'operate')).toBe(false);
   });

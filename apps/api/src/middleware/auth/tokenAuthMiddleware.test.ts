@@ -11,6 +11,7 @@ import type {
 import { PlatformRole } from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
+  createIntegration,
   createOrganization,
   createOrganizationUser,
   createSpace,
@@ -122,40 +123,46 @@ describe('an OrganizationUser token follows its member row, not the cached token
   });
 
   it('a demoted member loses the role on the next request', async () => {
-    const membership = await member('owner');
-    const headers = await organizationUserToken(membership);
+    const organizationUser = await member('owner');
+    const headers = await organizationUserToken(organizationUser);
     expect((await rename(organizationPath, headers)).status).toBe(200);
 
-    await db.organizationUser.update({ where: { id: membership.id }, data: { role: 'viewer' } });
+    await db.organizationUser.update({
+      where: { id: organizationUser.id },
+      data: { role: 'viewer' },
+    });
     expect((await rename(organizationPath, headers)).status).toBe(403);
   });
 
   it('a promoted member gains the role on the next request', async () => {
-    const membership = await member('viewer');
-    const headers = await organizationUserToken(membership);
+    const organizationUser = await member('viewer');
+    const headers = await organizationUserToken(organizationUser);
     expect((await rename(organizationPath, headers)).status).toBe(403);
 
-    await db.organizationUser.update({ where: { id: membership.id }, data: { role: 'owner' } });
+    await db.organizationUser.update({
+      where: { id: organizationUser.id },
+      data: { role: 'owner' },
+    });
     expect((await rename(organizationPath, headers)).status).toBe(200);
   });
 
   it('a removed member is refused while the token row is still cached', async () => {
-    const membership = await member('owner');
-    const headers = await organizationUserToken(membership);
+    const organizationUser = await member('owner');
+    const headers = await organizationUserToken(organizationUser);
     expect((await rename(organizationPath, headers)).status).toBe(200);
 
     // The FK cascade deletes the token with no Token hook firing, so its cache entry survives.
-    await db.organizationUser.delete({ where: { id: membership.id } });
+    await db.organizationUser.delete({ where: { id: organizationUser.id } });
     expect((await readMe(headers)).status).toBe(401);
   });
 
   it('a soft-deleted member row is refused', async () => {
-    const membership = await member('owner');
-    const headers = await organizationUserToken(membership);
+    const organizationUser = await member('owner');
+    const headers = await organizationUserToken(organizationUser);
     expect((await rename(organizationPath, headers)).status).toBe(200);
 
     await db.organizationUser.update({
-      where: { id: membership.id },
+      where: { id: organizationUser.id },
       data: { deletedAt: new Date() },
     });
     expect((await readMe(headers)).status).toBe(401);
@@ -163,8 +170,8 @@ describe('an OrganizationUser token follows its member row, not the cached token
 
   it("a superadmin's member token is not superadmin; their own token is, until revoked", async () => {
     const { entity: user } = await createUser({ platformRole: PlatformRole.superadmin });
-    const seatHeaders = await organizationUserToken(await member('viewer', user));
-    expect((await rename(organizationPath, seatHeaders)).status).toBe(403);
+    const memberHeaders = await organizationUserToken(await member('viewer', user));
+    expect((await rename(organizationPath, memberHeaders)).status).toBe(403);
 
     const headers = await userToken(user);
     expect((await rename(organizationPath, headers)).status).toBe(200);
@@ -271,7 +278,7 @@ describe('the cache hook clears the keys member records are read under', () => {
 describe('every token type is refused once its owner is gone', () => {
   it("a User token follows the user's members on the next request", async () => {
     const { entity: organization } = await createOrganization();
-    const { entity: membership, context } = await createOrganizationUser(
+    const { entity: organizationUser, context } = await createOrganizationUser(
       { role: 'owner' },
       { organization },
     );
@@ -279,7 +286,10 @@ describe('every token type is refused once its owner is gone', () => {
     const organizationPath = `/api/v1/organization/${organization.id}`;
     expect((await rename(organizationPath, headers)).status).toBe(200);
 
-    await db.organizationUser.update({ where: { id: membership.id }, data: { role: 'viewer' } });
+    await db.organizationUser.update({
+      where: { id: organizationUser.id },
+      data: { role: 'viewer' },
+    });
     expect((await rename(organizationPath, headers)).status).toBe(403);
   });
 
@@ -302,6 +312,61 @@ describe('every token type is refused once its owner is gone', () => {
     expect(await authenticatedTokenId(headers)).not.toBeNull();
 
     await db.space.update({ where: { id: space.id }, data: { deletedAt: new Date() } });
+    expect(await authenticatedTokenId(headers)).toBeNull();
+  });
+
+  it('an Integration token is refused once the integration is soft-deleted', async () => {
+    const { entity: user } = await createUser();
+    const { entity: integration } = await createIntegration({
+      ownerModel: 'User',
+      userId: user.id,
+    });
+    const { rawKey, fields } = mintKey();
+    await createToken({ ownerModel: 'Integration', role: 'owner', ...fields }, { integration });
+    const headers = { authorization: `Bearer ${rawKey}` };
+    expect(await authenticatedTokenId(headers)).not.toBeNull();
+
+    await db.integration.update({ where: { id: integration.id }, data: { deletedAt: new Date() } });
+    expect(await authenticatedTokenId(headers)).toBeNull();
+  });
+
+  it('a deactivated token is refused, cached or not', async () => {
+    const { entity: user } = await createUser();
+    const { rawKey, fields } = mintKey();
+    const { entity: token } = await createToken(
+      { ownerModel: 'User', role: 'owner', ...fields },
+      { user },
+    );
+    const headers = { authorization: `Bearer ${rawKey}` };
+    expect(await authenticatedTokenId(headers)).toBe(token.id);
+
+    await db.token.update({ where: { id: token.id }, data: { isActive: false } });
+    expect(await authenticatedTokenId(headers)).toBeNull();
+  });
+
+  it('lastUsedAt marks an accepted use: a refused token is not stamped', async () => {
+    const { entity: user } = await createUser();
+    const live = mintKey();
+    const { entity: accepted } = await createToken(
+      { ownerModel: 'User', role: 'owner', ...live.fields },
+      { user },
+    );
+    const dead = mintKey();
+    const { entity: refused } = await createToken(
+      { ownerModel: 'User', role: 'owner', expiresAt: new Date(Date.now() - 1000), ...dead.fields },
+      { user },
+    );
+    await authenticatedTokenId({ authorization: `Bearer ${live.rawKey}` });
+    await authenticatedTokenId({ authorization: `Bearer ${dead.rawKey}` });
+    expect(
+      (await db.token.findUniqueOrThrow({ where: { id: accepted.id } })).lastUsedAt,
+    ).not.toBeNull();
+    expect((await db.token.findUniqueOrThrow({ where: { id: refused.id } })).lastUsedAt).toBeNull();
+  });
+
+  it('a token minted already expired is refused', async () => {
+    const { entity: user } = await createUser();
+    const headers = await userToken(user, new Date(Date.now() - 1000));
     expect(await authenticatedTokenId(headers)).toBeNull();
   });
 

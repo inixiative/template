@@ -68,11 +68,11 @@
 Request
   │
   ├─► prepareRequest     # Initialize context (db, requestId, permix)
-  ├─► jwtAuthMiddleware  # Person JWT
+  ├─► jwtAuthMiddleware  # User JWT
   ├─► tokenAuthMiddleware # API token auth
   ├─► spoofMiddleware    # Superadmin impersonation
   │
-  ├─► Route middleware   # validatePermission, validateOwnerPermission, etc.
+  ├─► Route middleware   # validatePermission, validateSubmodelPermission, etc.
   ├─► Controller         # Business logic
   │     │
   │     └─► db.model.create/update/delete

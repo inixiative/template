@@ -58,7 +58,7 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
   });
 
   describe('a grant is an action: the writer could take every action the member would hold (Aron, 2026-10-25)', () => {
-    const memberSeat = async () =>
+    const newMember = async () =>
       (await createOrganizationUser({ role: 'member' }, { organization: org })).entity;
 
     const writer = async (role: Role, entitlements?: Record<string, boolean>) => {
@@ -77,7 +77,7 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
       app: ReturnType<typeof createTestApp>,
       entitlements: Record<string, boolean>,
     ) => {
-      const target = await memberSeat();
+      const target = await newMember();
       const response = await app.fetch(
         patch(`/api/v1/organizationUser/${target.id}`, { entitlements }),
       );
@@ -136,7 +136,7 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
     });
 
     it('entitlements are a map of actions to booleans', async () => {
-      const target = await memberSeat();
+      const target = await newMember();
       const response = await fetch(
         patch(`/api/v1/organizationUser/${target.id}`, { entitlements: { own: 'yes' } }),
       );
@@ -154,9 +154,9 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
       ],
     });
 
-    const seatToken = async (seatRole: Role, tokenRole: Role) => {
-      const { entity: holder } = await createOrganizationUser(
-        { role: seatRole },
+    const memberToken = async (memberRole: Role, tokenRole: Role) => {
+      const { entity: member } = await createOrganizationUser(
+        { role: memberRole },
         { organization: org },
       );
       const key = randomUUID();
@@ -166,7 +166,7 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
           role: tokenRole,
           keyHash: createHash('sha256').update(key).digest('hex'),
         },
-        { organizationUser: holder },
+        { organizationUser: member },
       );
       return key;
     };
@@ -187,20 +187,20 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
     };
 
     it('an owner-role token on an owner member grants what the member could', async () => {
-      const key = await seatToken('owner', 'owner');
+      const key = await memberToken('owner', 'owner');
       expect(await grantAs(key, { operate: true })).toBe(200);
       expect(await grantAs(key, { assign: true })).toBe(200);
     });
 
     it('an owner-role token on an admin member grants no more than the admin', async () => {
-      const key = await seatToken('admin', 'owner');
+      const key = await memberToken('admin', 'owner');
       expect(await grantAs(key, { operate: true })).toBe(200);
       expect(await grantAs(key, { own: true })).toBe(403);
       expect(await grantAs(key, { assign: true })).toBe(403);
     });
 
     it('a viewer-role token on an owner member grants nothing above read', async () => {
-      const key = await seatToken('owner', 'viewer');
+      const key = await memberToken('owner', 'viewer');
       expect(await grantAs(key, { operate: true })).toBe(403);
     });
   });

@@ -27,21 +27,12 @@ const authenticateToken = async (c: Context<AppEnv>): Promise<void> => {
   if (!apiKey) return;
   const keyHash = createHash('sha256').update(apiKey).digest('hex');
 
+  let fetched = false;
   const tokenRow = await cache<Token | null>(
     cacheKey('Token', { keyHash }),
     async () => {
-      const found = await db.token.findUnique({
-        where: {
-          keyHash,
-          isActive: true,
-          OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
-        },
-      });
-      // Touch lastUsedAt on cache-miss only (≈ TTL granularity): keeps it off the request
-      // hot path and avoids a fire-and-forget write racing the later batch reads (P2028).
-      if (found)
-        await db.token.update({ where: { id: found.id }, data: { lastUsedAt: new Date() } });
-      return found;
+      fetched = true;
+      return db.token.findUnique({ where: { keyHash } });
     },
     TOKEN_CACHE_TTL,
   );
@@ -49,7 +40,10 @@ const authenticateToken = async (c: Context<AppEnv>): Promise<void> => {
   if (!tokenRow) return;
 
   const context = await loadTokenContext(tokenRow);
-  if (context) await setTokenContext(c, context);
+  if (!context) return;
+  if (fetched)
+    await db.token.update({ where: { id: tokenRow.id }, data: { lastUsedAt: new Date() } });
+  await setTokenContext(c, context);
 };
 
 export const tokenAuthMiddleware = async (c: Context<AppEnv>, next: Next) => {

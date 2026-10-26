@@ -5,14 +5,12 @@
  * @uses primitive:authz, primitive:routeTemplates, infrastructure:prisma
  */
 import { Prisma } from '@template/db';
-import { validateRules } from '#/hooks/rules/hook';
 import { getResource } from '#/lib/context/getResource';
-import { delegatePermissionsOf, ownerTable } from '#/lib/permissions/ownerTable';
-import { validateDelegateGrant } from '#/lib/permissions/validateDelegateGrant';
 import { makeController } from '#/lib/utils/makeController';
 import { integrationUpdateRoute } from '#/modules/integration/routes/integrationUpdate';
+import { validateIntegrationGrant } from '#/modules/integration/validations/validateIntegrationGrant';
 
-const claimFields = ['role', 'full', 'entitlements'];
+const permissionFields = ['role', 'full', 'entitlements'];
 
 export const integrationUpdateController = makeController(
   integrationUpdateRoute,
@@ -21,14 +19,9 @@ export const integrationUpdateController = makeController(
     const integration = getResource<'integration'>(c);
     const body = c.req.valid('json');
 
-    if (claimFields.some((field) => field in body)) {
-      const claimed = { ...integration, ...body };
-      validateRules(claimed, 'Integration');
-      await validateDelegateGrant(
-        c.get('permix'),
-        await ownerTable(integration),
-        delegatePermissionsOf(claimed),
-      );
+    if (permissionFields.some((field) => field in body)) {
+      await validateIntegrationGrant(c.get('permix'), integration);
+      await validateIntegrationGrant(c.get('permix'), { ...integration, ...body });
     }
 
     const updated = await db.integration.update({

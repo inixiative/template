@@ -25,12 +25,12 @@ import { tokenRouter } from '#/modules/token';
 import { createTestApp } from '#tests/createTestApp';
 
 describe('a token of an organization member acts as that member, never as the user or the organization (Aron, 2026-10-25)', () => {
-  let person: User;
+  let user: User;
   let organization: Organization;
   let otherOrganization: Organization;
   let space: Space;
-  let seat: OrganizationUser;
-  let personToken: Token;
+  let member: OrganizationUser;
+  let userToken: Token;
   let key: string;
 
   const app = createTestApp({
@@ -59,21 +59,15 @@ describe('a token of an organization member acts as that member, never as the us
     (await call(method, path, body)).status;
 
   beforeAll(async () => {
-    ({ entity: person } = await createUser());
+    ({ entity: user } = await createUser());
     ({ entity: organization } = await createOrganization());
     ({ entity: otherOrganization } = await createOrganization());
     ({ entity: space } = await createSpace({}, { organization }));
-    ({ entity: seat } = await createOrganizationUser(
-      { role: 'owner' },
-      { user: person, organization },
-    ));
-    await createOrganizationUser(
-      { role: 'owner' },
-      { user: person, organization: otherOrganization },
-    );
-    ({ entity: personToken } = await createToken(
+    ({ entity: member } = await createOrganizationUser({ role: 'owner' }, { user, organization }));
+    await createOrganizationUser({ role: 'owner' }, { user, organization: otherOrganization });
+    ({ entity: userToken } = await createToken(
       { ownerModel: 'User', role: 'owner', keyHash: randomUUID() },
-      { user: person },
+      { user },
     ));
 
     key = randomUUID();
@@ -83,7 +77,7 @@ describe('a token of an organization member acts as that member, never as the us
         role: 'owner',
         keyHash: createHash('sha256').update(key).digest('hex'),
       },
-      { user: person, organization, organizationUser: seat },
+      { user, organization, organizationUser: member },
     );
   });
 
@@ -107,13 +101,11 @@ describe('a token of an organization member acts as that member, never as the us
     expect(await status('POST', '/me/tokens', { name: 'k', role: 'viewer' })).toBe(401);
     expect(await status('POST', '/me/rotateJwts')).toBe(401);
     expect(await status('POST', '/me/redact')).toBe(401);
-    expect(await status('POST', '/organization', { name: 'o', slug: randomUUID() })).toBe(401);
-    expect(await status('DELETE', `/token/${personToken.id}`)).toBe(403);
+    expect(await status('POST', '/organization', { name: 'o', slug: randomUUID() })).toBe(403);
+    expect(await status('DELETE', `/token/${userToken.id}`)).toBe(403);
 
-    expect(await db.token.findUnique({ where: { id: personToken.id } })).not.toBeNull();
-    expect((await db.user.findUniqueOrThrow({ where: { id: person.id } })).email).toBe(
-      person.email,
-    );
+    expect(await db.token.findUnique({ where: { id: userToken.id } })).not.toBeNull();
+    expect((await db.user.findUniqueOrThrow({ where: { id: user.id } })).email).toBe(user.email);
   });
 
   it('does nothing only a user over the organization may do, though its member owns it', async () => {
@@ -124,7 +116,7 @@ describe('a token of an organization member acts as that member, never as the us
       }),
     ).toBe(403);
     expect(
-      await status('POST', `/organizationUser/${seat.id}/tokens`, { name: 'k', role: 'viewer' }),
+      await status('POST', `/organizationUser/${member.id}/tokens`, { name: 'k', role: 'viewer' }),
     ).toBe(403);
     expect(await status('DELETE', `/organization/${organization.id}`)).toBe(403);
 

@@ -68,14 +68,14 @@ describe('spoofMiddleware via token auth', () => {
   });
 
   it("spoofing replaces the superadmin's table with the spoofed user's", async () => {
-    const { entity: adminSeat, context } = await createOrganizationUser(
+    const { entity: adminMember, context } = await createOrganizationUser(
       { role: 'owner' },
       { user: (await createUser({ platformRole: 'superadmin' })).entity },
     );
     const { entity: target } = await createUser();
     const app = createTestApp({
       mockUser: context.user,
-      mockOrganizationUsers: [adminSeat],
+      mockOrganizationUsers: [adminMember],
       mount: [
         (hono) => {
           hono.use('*', spoofMiddleware);

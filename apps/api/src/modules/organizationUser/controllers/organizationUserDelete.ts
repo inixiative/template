@@ -20,20 +20,9 @@ export const organizationUserDeleteController = makeController(
     const orgUser = getResource<'organizationUser'>(c);
     const permix = c.get('permix');
 
-    const canLeave = check(
-      permix,
-      rebacSchema,
-      'organizationUser',
-      await hydrate('organizationUser', orgUser),
-      'leave',
-    );
-    const canAssign = check(
-      permix,
-      rebacSchema,
-      'organization',
-      { id: orgUser.organizationId as OrganizationId, role: orgUser.role },
-      'assign',
-    );
+    const hydrated = await hydrate('organizationUser', orgUser);
+    const canLeave = check(permix, rebacSchema, 'organizationUser', hydrated, 'leave');
+    const canAssign = check(permix, rebacSchema, 'organizationUser', hydrated, 'assign');
     if (!canLeave && !canAssign) throw makeError({ status: 403, message: 'Access denied' });
     if (orgUser.role === Role.owner)
       await validateNotLastOwner(orgUser.organizationId as OrganizationId);

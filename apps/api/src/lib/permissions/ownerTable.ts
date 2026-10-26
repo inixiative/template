@@ -4,7 +4,7 @@
  * @partOf primitive:authz
  * @uses infrastructure:prisma
  */
-import { fetchOne, type OrganizationId, type SpaceId, type UserId } from '@template/db';
+import { fetchOne, type OrganizationId, type SpaceId } from '@template/db';
 import type {
   Integration,
   IntegrationOwnerModel,
@@ -17,15 +17,13 @@ import {
   createPermissions,
   type DelegatePermissions,
   delegateEntries,
-  type Entitlements,
   getOrgPermissions,
   getSpacePermissions,
-  getUserPermissions,
   type PermissionEntry,
   type Permix,
+  userEntries,
 } from '@template/permissions';
 import { entitlementEntriesSchema } from '@template/permissions/rebac';
-import { validateRole } from '#/lib/permissions/validateRole';
 import { findUserWithRelations } from '#/modules/user/services/find';
 
 export type OwnerTable = { entries: PermissionEntry[]; owner?: Permix };
@@ -40,32 +38,8 @@ type Delegated = {
 
 type PermissionsRow = { role?: Role | null; full?: boolean; entitlements?: unknown };
 
-const memberEntry = (seat: OrganizationUser): PermissionEntry =>
-  getOrgPermissions(
-    validateRole(seat.role),
-    seat.organizationId as OrganizationId,
-    seat.entitlements as Entitlements,
-  );
-
-const spaceMemberEntry = (seat: SpaceUser): PermissionEntry =>
-  getSpacePermissions(
-    validateRole(seat.role),
-    seat.spaceId as SpaceId,
-    seat.entitlements as Entitlements,
-  );
-
-export const userEntries = (
-  userId: string | null,
-  seats: OrganizationUser[],
-  spaceSeats: SpaceUser[],
-): PermissionEntry[] => [
-  ...(userId ? [getUserPermissions(userId as UserId)] : []),
-  ...seats.map(memberEntry),
-  ...spaceSeats.map(spaceMemberEntry),
-];
-
 export const delegatePermissionsOf = (row: PermissionsRow): DelegatePermissions => ({
-  role: row.role ? validateRole(row.role) : null,
+  role: row.role ?? null,
   full: row.full ?? false,
   entitlements:
     row.entitlements === null || row.entitlements === undefined
@@ -81,28 +55,39 @@ export const ownerPermix = async (table: OwnerTable): Promise<Permix> => {
 
 const nobody: OwnerTable = { entries: [] };
 
+export const delegateTable = async (
+  delegate: PermissionsRow,
+  owner: OwnerTable,
+): Promise<OwnerTable> =>
+  delegate.full
+    ? owner
+    : {
+        entries: delegateEntries(delegatePermissionsOf(delegate), owner.entries),
+        owner: await ownerPermix(owner),
+      };
+
 export const ownerTable = async (delegated: Delegated): Promise<OwnerTable> => {
   const { organizationId, spaceId, userId, integrationId } = delegated;
   switch (delegated.ownerModel) {
     case 'User': {
-      const person = userId ? await findUserWithRelations(userId) : null;
-      return person
-        ? { entries: userEntries(person.id, person.organizationUsers, person.spaceUsers) }
+      const user = userId ? await findUserWithRelations(userId) : null;
+      return user
+        ? { entries: userEntries(user.id, user.organizationUsers, user.spaceUsers) }
         : nobody;
     }
     case 'OrganizationUser': {
-      const seat =
+      const member =
         organizationId && userId
           ? await fetchOne<OrganizationUser>('organizationUser', { organizationId, userId })
           : null;
-      return seat ? { entries: [memberEntry(seat)] } : nobody;
+      return member ? { entries: userEntries(null, [member], []) } : nobody;
     }
     case 'SpaceUser': {
-      const seat =
+      const member =
         organizationId && spaceId && userId
           ? await fetchOne<SpaceUser>('spaceUser', { organizationId, spaceId, userId })
           : null;
-      return seat ? { entries: [spaceMemberEntry(seat)] } : nobody;
+      return member ? { entries: userEntries(null, [], [member]) } : nobody;
     }
     case 'Organization':
       return organizationId
@@ -115,11 +100,7 @@ export const ownerTable = async (delegated: Delegated): Promise<OwnerTable> => {
         ? await fetchOne<Integration>('integration', integrationId)
         : null;
       if (!integration) return nobody;
-      const owner = await ownerTable(integration);
-      return {
-        entries: delegateEntries(delegatePermissionsOf(integration), owner.entries),
-        owner: await ownerPermix(owner),
-      };
+      return delegateTable(integration, await ownerTable(integration));
     }
   }
 };

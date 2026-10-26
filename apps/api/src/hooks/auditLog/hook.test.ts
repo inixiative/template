@@ -145,6 +145,7 @@ describe('auditLog hook', () => {
     expect(log?.actorUserId).toBe(actor.id);
     expect(log?.actorSpoofUserId).toBeNull();
     expect(log?.actorTokenId).toBeNull();
+    expect(log?.actor).toMatchObject({ model: 'User', record: { id: actor.id } });
   });
 
   it('records actorSpoofUserId when spoofing', async () => {
@@ -219,7 +220,8 @@ describe('auditLog hook', () => {
 
     expect(log?.actorTokenId).toBe(token.id);
     expect(log?.actor).toMatchObject({
-      token: {
+      model: 'Token',
+      record: {
         id: token.id,
         name: token.name,
         keyPrefix: token.keyPrefix,
@@ -227,6 +229,7 @@ describe('auditLog hook', () => {
         userId: tokenOwner.id,
       },
     });
+    expect(log?.actor).not.toHaveProperty('record.keyHash');
     expect(log?.actorUserId).toBe(tokenOwner.id);
   });
 
@@ -271,7 +274,8 @@ describe('auditLog hook', () => {
 
     expect(log?.actorTokenId).toBeNull();
     expect(log?.actor).toMatchObject({
-      token: { id: token.id, name: token.name, keyPrefix: token.keyPrefix },
+      model: 'Token',
+      record: { id: token.id, name: token.name, keyPrefix: token.keyPrefix },
     });
   });
 

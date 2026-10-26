@@ -26,7 +26,6 @@
   - [A Token Never Exceeds Its Owner](#a-token-never-exceeds-its-owner)
   - [Integrations Are Delegates](#integrations-are-delegates)
   - [Granting an Entitlement](#granting-an-entitlement)
-  - [Role Validation](#role-validation)
 - [Permission Checks](#permission-checks)
   - [In Controllers](#in-controllers)
   - [Via Validation Middleware](#via-validation-middleware)
@@ -52,7 +51,7 @@
   - [Key Points](#key-points)
 - [Validation Middleware](#validation-middleware)
   - [validatePermission](#validatepermission)
-  - [validateOwnerPermission](#validateownerpermission)
+  - [validateSubmodelPermission](#validatesubmodelpermission)
   - [The user as a resource](#the-user-as-a-resource)
 - [Role Assignment](#role-assignment)
   - [Role Assignment Rules](#role-assignment-rules)
@@ -336,43 +335,6 @@ A grant is an action: the writer must be able to take every action the delegate 
 
 Situations: `organizationUserUpdate.test.ts`, `integrationDelegate.test.ts`, `delegatePermissions.test.ts`.
 
-### Role Validation
-
-All permission setup functions validate role values before use to prevent permission bypass from corrupted database data.
-
-**validateRole helper** (`apps/api/src/lib/permissions/validateRole.ts`):
-
-```typescript
-import { Role } from '@template/db/generated/client/enums';
-import { makeError } from '#/lib/errors';
-
-export const validateRole = (value: unknown): Role => {
-  if (typeof value === 'string' && Object.values(Role).includes(value as Role)) {
-    return value as Role;
-  }
-  throw makeError({
-    status: 500,
-    message: `Invalid role value: ${JSON.stringify(value)}. Expected one of: ${Object.values(Role).join(', ')}`,
-  });
-};
-```
-
-**Security principles:**
-- **Fail loud**: an invalid role is a 500 that names the bad value, not a silent downgrade to `viewer`; a corrupted row stops the request instead of running with a guessed role
-- **Runtime validation**: Type assertions alone don't protect against corrupted DB values
-- **Defense in depth**: Extra safety layer even though API validation should prevent invalid data
-
-**Usage in permission setup:**
-```typescript
-// Before: Trust type assertion
-role: token.role as Role
-
-// After: Validate before using
-role: validateRole(token.role)
-```
-
-This prevents scenarios where database corruption or bugs could result in invalid role values bypassing security checks.
-
 ---
 
 ## Permission Checks
@@ -483,13 +445,7 @@ export const rebacSchema: RebacSchema = {
       manage: 'own',       // manage → check own on same resource
       operate: 'manage',   // operate → check manage
       read: 'operate',     // read → check operate
-      // Role assignment: high roles need own, others need manage
-      assign: {
-        any: [
-          { all: [{ rule: { field: 'role', operator: 'in', value: highRoles } }, 'own'] },
-          { all: [{ rule: { field: 'role', operator: 'notIn', value: highRoles } }, 'manage'] },
-        ],
-      },
+      assign: 'own',       // a stored `assign` grant, or own: assign any member role
     },
   },
 
@@ -499,7 +455,7 @@ export const rebacSchema: RebacSchema = {
       manage: 'own',
       operate: 'manage',
       read: 'operate',
-      assign: { /* same as organization */ },
+      assign: 'own',
     },
   },
 
@@ -509,6 +465,13 @@ export const rebacSchema: RebacSchema = {
       leave: { rel: 'user', action: 'operate' },  // the user, holding operate on their own user
       manage: { rel: 'organization', action: 'manage' },
       own: { rel: 'organization', action: 'own' },
+      // the role on the row: high roles need own at the organization, others manage
+      assign: {
+        any: [
+          assignRole({ rel: 'organization', action: 'own' }, { rel: 'organization', action: 'manage' }),
+          { rel: 'organization', action: 'assign' },
+        ],
+      },
     },
   },
 
@@ -788,54 +751,41 @@ How it works:
 3. Checks permission via `check(permix, rebacSchema, resourceType, hydrated, action)`
 4. Throws 403 if check fails
 
-### validateOwnerPermission
+### validateSubmodelPermission
 
-For polymorphic resources owned by either User or Organization. Checks the `ownerModel` field to determine which permission to validate.
-
-```typescript
-// apps/api/src/middleware/validations/validateOwnerPermission.ts
-export const validateOwnerPermission = makeMiddleware<Options>((options) => async (c, next) => {
-  const resource = c.get('resource');
-  const permix = c.get('permix');
-  const ownerModel = resource?.ownerModel;  // 'User' | 'Organization' | 'OrganizationUser'
-
-  if (ownerModel === 'User' || ownerModel === 'OrganizationUser') {
-    const userId = resource?.userId;
-    if (userId && permix.check('user', action, userId)) return next();
-  }
-
-  if (ownerModel === 'Organization') {
-    const orgId = resource?.organizationId;
-    if (orgId && permix.check('organization', action, orgId)) return next();
-  }
-
-  throw makeError({ status: 403, message: 'Access denied' });
-});
-```
-
-Usage (Token/WebhookSubscription can be owned by user or org):
+A route on a submodel (a collection or a create under an owner: `/organization/:id/contacts`, `/me/integrations`) checks its action on a pseudo record of the **submodel**, placed under the loaded owner, so the rule lives with the child model and entitlements on the child apply:
 
 ```typescript
-// tokenDelete.ts - user deleting their own token
-middleware: [validateOwnerPermission({ action: 'manage' })]
-
-// webhookSubscriptionRead.ts - anyone with read access
-middleware: [validateOwnerPermission({ action: 'read' })]
+// apps/api/src/middleware/validations/validateSubmodelPermission.ts
+const pseudo = await hydrate(submodel, ownerRef(submodel, ownerType, owner));
+check(permix, rebacSchema, submodel, pseudo, action);
 ```
+
+- `ownerRef(child, ownerAccessor, owner)` (`packages/db/src/registries/ownerRef.ts`) builds the pseudo record: `id: ''`, the polymorphism registry's discriminator for that owner, and the owner keys from the child's single relation to it. An empty id never matches a grant keyed by a real row.
+- The route templates set `routeConfig` (with `model` / `submodel`) before route middleware runs, so the middleware reads the submodel there; the owner is `c.get('resource')` (`meResourceMiddleware` loads the user on `/me`).
+- It never reads the request body (route middleware runs before validation). Checks that depend on the body (a token's role / full, an integration's `assign`, an inquiry's `send`) stay in their services.
+- Using it on a route with no submodel throws when the route is built.
+
+```typescript
+middleware: [validateSubmodelPermission('create')]   // organizationCreateContact, meCreateIntegration, ...
+middleware: [validateSubmodelPermission('read')]     // organizationReadManyContacts, spaceReadManyTokens, ...
+```
+
+Routes that still check an action on the owner (`validatePermission` on spaces, members, inquiries, customer refs, segments) are not migrated yet.
 
 ### The user as a resource
 
-`/me/*` routes check their action with `validatePermission` like any other route; `meResourceMiddleware` (on the `/me` router) loads `me(c)` as the resource, typed `user`. `me(c)` is the request's user (a JWT session or a spoof), or the user of a User-owned token; anything else has no me and gets 401. `organizationCreate` loads the same resource for `organization.create`.
+`/me/*` routes check their action like any other route; `meResourceMiddleware` (on the `/me` router) loads `me(c)` as the resource, typed `user`. `me(c)` is the request's user (a JWT session or a spoof), or the user of a User-owned token; anything else has no me and gets 401. `organizationCreate` loads the same resource for `organization.create`.
 
 ```typescript
 meRouter.use('*', meResourceMiddleware)                                   // every /me route
-middleware: [validatePermission('read')]                                  // every meReadMany*
-middleware: [validatePermission('operate')]                               // every meCreate*, meReachSegment
-middleware: [validatePermission(SessionAction.createToken)]               // meCreateToken, and on the org / space / member / integration token routes
-middleware: [validatePermission(SessionAction.deleteOrganization)]        // organizationDelete
+middleware: [validateSubmodelPermission('read')]                          // meReadManyContacts, -Integrations, -WebhookSubscriptions, -Tokens
+middleware: [validateSubmodelPermission('create')]                        // meCreateContact, -Flow, -Integration, -WebhookSubscription
+middleware: [validatePermission('read')]                                  // the other meReadMany*
+middleware: [validatePermission('operate')]                               // meCreateInquiry, meCreateSegment, meReachSegment
 ```
 
-User-only is the action's rule on whichever record the route acts on (`{ all: [{ actor: model equals User }, …] }`): `token.create` on the user, an organization, a space, a member or an integration (the record stands in for the collection); `token.delete` on the token; `organization.delete` on the organization; `user.redact` and `user.rotateJwts` on the user. A superadmin passes on any credential. Situations: `apps/api/src/middleware/validations/personOnlyActions.test.ts`, `apps/api/src/lib/context/userActsDirectly.test.ts`.
+User-only is the action's rule on whichever record the route acts on (`{ all: [{ actor: model equals User }, …] }`): `token.create` on the user, an organization, a space, a member or an integration (the record stands in for the collection); `token.delete` on the token; `organization.delete` on the organization; `user.redact` and `user.rotateJwts` on the user. A superadmin passes on any credential. Situations: `apps/api/src/middleware/validations/userOnlyActions.test.ts`, `apps/api/src/lib/context/userActsDirectly.test.ts`.
 
 ---
 
@@ -846,15 +796,14 @@ Role assignment uses the `assign` action defined in the ReBAC schema. The schema
 - Assigning member/viewer requires `manage` permission
 
 ```typescript
-// ReBAC handles this automatically via the assign action
-check(permix, rebacSchema, 'organization', { id: orgId, role: targetRole }, 'assign');
-
-// Or inline in controller:
-const action = ['owner', 'admin'].includes(targetRole) ? 'own' : 'manage';
-if (!permix.check('organization', action, orgId)) {
-  throw makeError({ status: 403, message: `Cannot assign ${targetRole} role` });
-}
+const assigned = await hydrate('organizationUser', {
+  ...organizationUser,
+  role: greaterRole(organizationUser.role, body.role),
+});
+check(permix, rebacSchema, 'organizationUser', assigned, 'assign');
 ```
+
+`assign` lives on the member row (`db:organizationUser`, `db:spaceUser`), checked on its pseudo record as it will be written; `greaterRole(old, new)` gates lowering a higher role too. Removing a member is `assign` on the row as it is, or `leave`. A stored `assign` on the organization or space assigns any role.
 
 ### Role Assignment Rules
 

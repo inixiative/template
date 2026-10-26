@@ -6,18 +6,7 @@
  */
 import { AsyncLocalStorage } from 'node:async_hooks';
 
-export type ActorSnapshot = {
-  token?: {
-    id: string;
-    name: string;
-    keyPrefix: string;
-    ownerModel: string;
-    userId: string | null;
-    organizationId: string | null;
-    spaceId: string | null;
-    integrationId: string | null;
-  };
-};
+export type ActorSnapshot = { model: string; record: Record<string, unknown> };
 
 export type AuditActor = {
   actorUserId: string | null;

@@ -6,14 +6,14 @@
  */
 import { lensFor } from '@template/db/lens';
 import { readRoute } from '#/lib/routeTemplates';
-import { validatePermission } from '#/middleware/validations/validatePermission';
+import { validateSubmodelPermission } from '#/middleware/validations/validateSubmodelPermission';
 import { integrationReadResponseSchema } from '#/modules/integration/schemas/integrationSchemas';
 import { Modules } from '#/modules/modules';
 import { Tags } from '#/modules/tags';
 
 export const meReadManyIntegrationsRoute = readRoute({
   model: Modules.me,
-  middleware: [validatePermission('read')],
+  middleware: [validateSubmodelPermission('read')],
   submodel: Modules.integration,
   many: true,
   skipId: true,

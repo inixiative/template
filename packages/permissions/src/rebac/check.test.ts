@@ -474,7 +474,7 @@ describe('rebac check', () => {
   });
 
   describe('a rule on __actor and the user relation', () => {
-    const person: ActionRule = {
+    const isUser: ActionRule = {
       rule: { field: '__actor.model', operator: Operator.equals, value: 'User' },
     };
     const schema: RebacSchema = {
@@ -484,7 +484,7 @@ describe('rebac check', () => {
             own: null,
             operate: 'own',
             read: 'operate',
-            mint: { all: [person, 'operate'] },
+            mint: { all: [isUser, 'operate'] },
           },
         },
         'db:organizationUser': {
@@ -951,7 +951,10 @@ describe('rebac check', () => {
         },
       };
       await permix.setup({ resource: 'crm:account', id: 'acc-1', actions: { read: true } });
-      expect(check(permix, schema, 'user', { id: 'u-1', accountId: 'acc-1' }, 'read')).toBe(true);
+      const data = { 'crm:account': [{ id: 'acc-1' }] };
+      expect(check(permix, schema, 'user', { id: 'u-1', accountId: 'acc-1' }, 'read', data)).toBe(
+        true,
+      );
       expect(check(permix, schema, 'user', { id: 'u-1', accountId: 'other' }, 'read')).toBe(false);
       expect(check(permix, schema, 'user', { id: 'u-1', accountId: null }, 'read')).toBe(false);
     });

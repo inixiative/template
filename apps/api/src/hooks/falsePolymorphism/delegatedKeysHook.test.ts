@@ -19,18 +19,18 @@ describe("an integration's token carries its integration's keys (Aron, 2026-10-2
     await cleanupTouchedTables(db);
   });
 
-  const seatIntegration = async () => {
-    const { entity: seat } = await createOrganizationUser({ role: 'owner' });
+  const memberIntegration = async () => {
+    const { entity: member } = await createOrganizationUser({ role: 'owner' });
     const { entity: integration } = await createIntegration({
       ownerModel: 'OrganizationUser',
-      organizationId: seat.organizationId,
-      userId: seat.userId,
+      organizationId: member.organizationId,
+      userId: member.userId,
     });
     return integration;
   };
 
   it('the factory and the hook write the same keys, whatever the caller passed', async () => {
-    const integration = await seatIntegration();
+    const integration = await memberIntegration();
     const { entity: elsewhere } = await createOrganization();
     const carried = {
       integrationId: integration.id,

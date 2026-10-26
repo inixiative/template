@@ -68,13 +68,13 @@ const batch = async (rawKey: string, rounds: unknown[][]) => {
 const held = (result: SubResult) => (result.body as { holds: boolean }).holds;
 
 describe('a batch keeps every round inside its credential (Aron, 2026-10-25)', () => {
-  let person: User;
+  let user: User;
   let orgA: Organization;
   let orgB: Organization;
   let spaceA: Space;
   let spaceB: Space;
-  let seatA: Awaited<ReturnType<typeof createOrganizationUser>>;
-  let spaceSeatA: Awaited<ReturnType<typeof createSpaceUser>>;
+  let memberA: Awaited<ReturnType<typeof createOrganizationUser>>;
+  let spaceMemberA: Awaited<ReturnType<typeof createSpaceUser>>;
 
   const mint = async (fields: Record<string, unknown>, owners: Record<string, unknown>) => {
     const key = mintKey();
@@ -83,18 +83,15 @@ describe('a batch keeps every round inside its credential (Aron, 2026-10-25)', (
   };
 
   beforeAll(async () => {
-    ({ entity: person } = await createUser());
+    ({ entity: user } = await createUser());
     ({ entity: orgA } = await createOrganization());
     ({ entity: orgB } = await createOrganization());
     ({ entity: spaceA } = await createSpace({}, { organization: orgA }));
     ({ entity: spaceB } = await createSpace({}, { organization: orgB }));
-    seatA = await createOrganizationUser({ role: 'owner' }, { user: person, organization: orgA });
-    const seatB = await createOrganizationUser(
-      { role: 'owner' },
-      { user: person, organization: orgB },
-    );
-    spaceSeatA = await createSpaceUser({ role: 'owner' }, { ...seatA.context, space: spaceA });
-    await createSpaceUser({ role: 'owner' }, { ...seatB.context, space: spaceB });
+    memberA = await createOrganizationUser({ role: 'owner' }, { user, organization: orgA });
+    const memberB = await createOrganizationUser({ role: 'owner' }, { user, organization: orgB });
+    spaceMemberA = await createSpaceUser({ role: 'owner' }, { ...memberA.context, space: spaceA });
+    await createSpaceUser({ role: 'owner' }, { ...memberB.context, space: spaceB });
   });
 
   afterAll(async () => {
@@ -102,7 +99,10 @@ describe('a batch keeps every round inside its credential (Aron, 2026-10-25)', (
   });
 
   it('an organization member token reaches no space of another organization in a later round', async () => {
-    const key = await mint({ ownerModel: 'OrganizationUser' }, { organizationUser: seatA.entity });
+    const key = await mint(
+      { ownerModel: 'OrganizationUser' },
+      { organizationUser: memberA.entity },
+    );
     const otherSpace = holdsRequest({ model: 'space', id: spaceB.id, action: 'own' });
     const ownOrg = holdsRequest({ model: 'organization', id: orgA.id, action: 'own' });
 
@@ -114,7 +114,7 @@ describe('a batch keeps every round inside its credential (Aron, 2026-10-25)', (
   });
 
   it('a space member token reaches no organization in a later round', async () => {
-    const key = await mint({ ownerModel: 'SpaceUser' }, { spaceUser: spaceSeatA.entity });
+    const key = await mint({ ownerModel: 'SpaceUser' }, { spaceUser: spaceMemberA.entity });
     const own = holdsRequest({ model: 'space', id: spaceA.id, action: 'own' });
     const [, second] = await batch(key, [
       [own],
@@ -130,7 +130,7 @@ describe('a batch keeps every round inside its credential (Aron, 2026-10-25)', (
   });
 
   it('a user token keeps every member of its user across rounds', async () => {
-    const key = await mint({ ownerModel: 'User' }, { user: person });
+    const key = await mint({ ownerModel: 'User' }, { user });
     const both = [
       holdsRequest({ model: 'organization', id: orgA.id, action: 'own' }),
       holdsRequest({ model: 'organization', id: orgB.id, action: 'own' }),

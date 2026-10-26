@@ -40,12 +40,12 @@ export const resolveIdentity = async (headers: WSHeaders): Promise<IdentityResol
   if (access === 'rejected') return { status: 'anonymous' };
   const { data } = (await res.json()) as Identified;
   if (!data) return { status: 'anonymous' };
-  const person = data.model === 'User';
+  const isUser = data.model === 'User';
   return {
     status: 'resolved',
     model: data.model,
-    userId: person ? data.record.id : null,
-    email: person ? (data.record.email ?? null) : null,
+    userId: isUser ? data.record.id : null,
+    email: isUser ? (data.record.email ?? null) : null,
   };
 };
 

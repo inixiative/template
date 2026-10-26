@@ -13,9 +13,9 @@ export {
   OrganizationAction,
   type PermissionEntry,
   type Permix,
-  SessionAction,
   SpaceAction,
   StandardAction,
+  TokenAction,
   UserAction,
 } from './client';
 // ReBAC
@@ -44,4 +44,5 @@ export {
 export { getSpacePermissions, spaceRoles } from './roles/space';
 // User permissions
 export { getUserPermissions, userRoles } from './roles/user';
+export { userEntries } from './roles/userEntries';
 export type { PermissionsCheck } from './types';

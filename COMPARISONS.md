@@ -541,7 +541,7 @@ OpenTelemetry instrumentation is the right 2025 approach — instrument once, ch
 | Graceful shutdown with handler registry | **Yes** (30s timeout) | Manual | `onModuleDestroy` | Manual | `process.on('SIGTERM', ...)` |
 
 ### Honest assessment
-The middleware stack is one of the template's strongest practical features. The defined execution order prevents the class of bugs where auth runs after resource loading, or rate limiting runs before the token is resolved. Batch context isolation (deep cloning mutable state per sub-request while sharing immutable app metadata) is essential for the batch API but invisible to most users. The 6 validation middleware factories mean route definitions read like declarations: `validateActor`, `validatePermission('manage')`, `validateOwnerPermission({ action: 'own' })`.
+The middleware stack is one of the template's strongest practical features. The defined execution order prevents the class of bugs where auth runs after resource loading, or rate limiting runs before the token is resolved. Batch context isolation (deep cloning mutable state per sub-request while sharing immutable app metadata) is essential for the batch API but invisible to most users. The 6 validation middleware factories mean route definitions read like declarations: `validateActor`, `validatePermission('manage')`, `validateSubmodelPermission('create')`.
 
 ---
 

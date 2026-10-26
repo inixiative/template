@@ -9,9 +9,9 @@ import { createAuthMiddleware, isAPIError } from 'better-auth/api';
 import { deleteSessionCookie } from 'better-auth/cookies';
 import { signJWT } from 'better-auth/plugins';
 import { omit } from 'lodash-es';
-import { PERSON_JWT_TTL_SECONDS, personJwtOptions } from '#/lib/auth/personJwt';
+import { USER_JWT_TTL_SECONDS, userJwtOptions } from '#/lib/auth/userJwt';
 
-export type PersonJwtHandoff = { token: string; expiresAt: string };
+export type UserJwtHandoff = { token: string; expiresAt: string };
 
 // The OAuth callback's session must outlive its redirect: the one-time token resolves to it.
 const isOAuthCallback = (path: string | undefined) => !!path?.startsWith('/callback/');
@@ -35,14 +35,14 @@ export const jwtHandoff = (): BetterAuthPlugin => ({
           if (typeof signedIn?.jwtVersion !== 'number')
             throw new Error('Signed-in user has no jwtVersion to put on the JWT');
           const token = await signJWT(ctx, {
-            options: personJwtOptions(),
+            options: userJwtOptions(),
             payload: { sub: newSession.user.id, ver: signedIn.jwtVersion, iat },
           });
           await ctx.context.internalAdapter.deleteSession(newSession.session.token);
 
-          const handoff: PersonJwtHandoff & { user: Omit<typeof newSession.user, 'jwtVersion'> } = {
+          const handoff: UserJwtHandoff & { user: Omit<typeof newSession.user, 'jwtVersion'> } = {
             token,
-            expiresAt: new Date((iat + PERSON_JWT_TTL_SECONDS) * 1000).toISOString(),
+            expiresAt: new Date((iat + USER_JWT_TTL_SECONDS) * 1000).toISOString(),
             user: omit(newSession.user, 'jwtVersion'),
           };
           return ctx.json(handoff);

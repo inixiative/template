@@ -28,22 +28,10 @@ const ownerAnchors = (owner: PermissionEntry[]): Anchor[] =>
     (anchor) => `${anchor.resource}:${anchor.id}`,
   );
 
-const asEntitlement = (entry: PermissionEntry): EntitlementEntry | null => {
-  if ('anchor' in entry) return entry;
-  const anchor = anchorOf(entry);
-  if (!anchor) return null;
-  const actions = Object.fromEntries(
-    Object.entries(entry.actions).filter(([, held]) => held === true),
-  ) as Record<string, boolean>;
-  return { resource: entry.resource, anchor, actions };
-};
-
 export const delegateEntries = (
   permissions: DelegatePermissions,
   owner: PermissionEntry[],
 ): EntitlementEntry[] => {
-  if (permissions.full)
-    return owner.map(asEntitlement).filter((entry): entry is EntitlementEntry => entry !== null);
   const role = permissions.role;
   return [
     ...(role ? ownerAnchors(owner).map(({ resource, id }) => narrowing(resource, id, role)) : []),

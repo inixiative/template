@@ -14,7 +14,7 @@ import { getRule, RulesRegistry } from '#/hooks/rules/registry';
 import { shadowMerge } from '#/hooks/rules/shadowMerge';
 import { makeError } from '#/lib/errors';
 
-export const validateRules = (data: Record<string, unknown>, model: ModelName): void => {
+const validateRules = (data: Record<string, unknown>, model: ModelName): void => {
   const result = check(
     getRule(model),
     Object.fromEntries(

@@ -5,13 +5,13 @@
  * @uses infrastructure:prisma, feature:auth
  */
 import { createHash, randomBytes } from 'node:crypto';
-import { Prisma } from '@template/db';
+import { type HydratedRecord, hydrate, Prisma } from '@template/db';
 import type { TokenOwnerModel } from '@template/db/generated/client/enums';
-import type { DelegatePermissions } from '@template/permissions';
+import { type DelegatePermissions, TokenAction } from '@template/permissions';
+import { check, rebacSchema } from '@template/permissions/rebac';
 import type { Context } from 'hono';
-import { validateRules } from '#/hooks/rules/hook';
-import { ownerTable } from '#/lib/permissions/ownerTable';
-import { validateDelegateGrant } from '#/lib/permissions/validateDelegateGrant';
+import { makeError } from '#/lib/errors';
+import { validateEntitlementGrants } from '#/lib/permissions/validateEntitlementGrants';
 import type { AppEnv } from '#/types/appEnv';
 
 const MODEL_PREFIXES: Record<TokenOwnerModel, string> = {
@@ -36,18 +36,14 @@ type CreateTokenParams = DelegatePermissions & {
 export const createToken = async (c: Context<AppEnv>, params: CreateTokenParams) => {
   const db = c.get('db');
   const { name: _name, expiresAt: _expiresAt, ...row } = params;
-  validateRules(row, 'Token');
-  await validateDelegateGrant(
-    c.get('permix'),
-    await ownerTable({
-      ownerModel: params.ownerModel,
-      userId: params.userId ?? null,
-      organizationId: params.organizationId ?? null,
-      spaceId: params.spaceId ?? null,
-      integrationId: params.integrationId ?? null,
-    }),
-    { role: params.role, full: params.full, entitlements: params.entitlements },
-  );
+  const permix = c.get('permix');
+  const standIn = await hydrate('token', { id: '', ...row } as HydratedRecord);
+  if (
+    !check(permix, rebacSchema, 'token', standIn, TokenAction.create) ||
+    (row.full && !check(permix, rebacSchema, 'token', standIn, 'own'))
+  )
+    throw makeError({ status: 403, message: 'Access denied' });
+  await validateEntitlementGrants(permix, params.entitlements ?? []);
 
   const hex = randomBytes(24).toString('hex');
   const modelPrefix = MODEL_PREFIXES[params.ownerModel];

@@ -4,6 +4,7 @@ import { type AccessorName, db, fetchOne, hydrate } from '@template/db';
 import type { Organization, Space } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
+  createIntegration,
   createOrganization,
   createOrganizationUser,
   createSpace,
@@ -13,6 +14,7 @@ import {
 import { check, rebacSchema } from '@template/permissions/rebac';
 import { tokenAuthMiddleware } from '#/middleware/auth/tokenAuthMiddleware';
 import { meRouter } from '#/modules/me';
+import { organizationRouter } from '#/modules/organization';
 import { createTestApp } from '#tests/createTestApp';
 
 const mintKey = () => {
@@ -43,6 +45,7 @@ const { app: tokenApp } = createTestApp({
         return c.json({ holds: check(c.get('permix'), rebacSchema, model, record, action) });
       });
       app.route('/api/v1/me', meRouter);
+      app.route('/api/v1/organization', organizationRouter);
     },
   ],
 });
@@ -122,6 +125,25 @@ describe('a member token holds its member row, never the user (template #210 7f6
     expect(await holds(rawKey, 'space', space.id, 'operate')).toBe(false);
   });
 
+  it('a token.create stored on a member mints nothing: minting is create on a token, and only a user mints', async () => {
+    const { entity: organizationUser } = await createOrganizationUser(
+      { role: 'member', entitlements: { 'token.create': true } },
+      { organization },
+    );
+    const { rawKey, fields } = mintKey();
+    await createToken(
+      { ownerModel: 'OrganizationUser', full: true, role: null, ...fields },
+      { organizationUser },
+    );
+
+    const response = await tokenApp.request(`/api/v1/organization/${organization.id}/tokens`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${rawKey}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'k', role: 'viewer' }),
+    });
+    expect(response.status).toBe(403);
+  });
+
   it('a SpaceUser token has no me: /me answers 401', async () => {
     const { context } = await createOrganizationUser({ role: 'owner' }, { organization });
     const { entity: spaceUser } = await createSpaceUser({ role: 'member' }, { ...context, space });
@@ -132,5 +154,60 @@ describe('a member token holds its member row, never the user (template #210 7f6
       headers: { authorization: `Bearer ${rawKey}` },
     });
     expect(response.status).toBe(401);
+  });
+});
+
+describe('full skips one step at every link: token, integration, member (Aron, 2026-10-26)', () => {
+  let organization: Organization;
+
+  beforeAll(async () => {
+    ({ entity: organization } = await createOrganization());
+  });
+
+  afterAll(async () => {
+    await cleanupTouchedTables(db);
+  });
+
+  const chain = async (
+    integrationPermissions: { role: 'member' | null; full: boolean },
+    tokenPermissions: { role: 'viewer' | null; full: boolean },
+  ) => {
+    const { context } = await createOrganizationUser({ role: 'admin' }, { organization });
+    const { entity: integration } = await createIntegration({
+      ownerModel: 'OrganizationUser',
+      organizationId: organization.id,
+      userId: context.user.id,
+      ...integrationPermissions,
+    });
+    const { rawKey, fields } = mintKey();
+    await createToken(
+      { ownerModel: 'Integration', ...tokenPermissions, ...fields },
+      { integration },
+    );
+    return (action: string) => holds(rawKey, 'organization', organization.id, action);
+  };
+
+  it('full token, full integration: the member', async () => {
+    const may = await chain({ role: null, full: true }, { role: null, full: true });
+    expect(await may('manage')).toBe(true);
+    expect(await may('own')).toBe(false);
+  });
+
+  it('full token, member integration: the integration', async () => {
+    const may = await chain({ role: 'member', full: false }, { role: null, full: true });
+    expect(await may('operate')).toBe(true);
+    expect(await may('manage')).toBe(false);
+  });
+
+  it('viewer token, full integration: viewer under the member', async () => {
+    const may = await chain({ role: null, full: true }, { role: 'viewer', full: false });
+    expect(await may('read')).toBe(true);
+    expect(await may('operate')).toBe(false);
+  });
+
+  it('viewer token, member integration: viewer under member under the member', async () => {
+    const may = await chain({ role: 'member', full: false }, { role: 'viewer', full: false });
+    expect(await may('read')).toBe(true);
+    expect(await may('operate')).toBe(false);
   });
 });

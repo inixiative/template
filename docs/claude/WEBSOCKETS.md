@@ -92,8 +92,8 @@ The WebSocket upgrade starts anonymous; credentials are sent in an `authenticate
 token query parameter. Only `authorization` and `x-spoof-user-email` headers cross into the
 identity probe. `/api/v1/identify` resolves the effective actor through normal auth/spoof
 middleware, for any credential: the socket keeps the credential whenever it identifies, so a token
-of an organization, a space, a seat or an integration subscribes to whatever each channel's route
-lets its claim read. The socket's person (`userId`, for pushes addressed to a user) is the actor when it is a `User`; a
+of an organization, a space, a member or an integration subscribes to whatever each channel's route
+lets its permissions read. The socket's user (`userId`, for pushes addressed to a user) is the actor when it is a `User`; a
 token has none. Spoof and unspoof are frontend
 operations that send new authenticate frames; `logout` clears identity and credentials. A 429 or
 5xx from `/identify` is not treated as "no user": the server

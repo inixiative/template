@@ -5,6 +5,7 @@ import { auditActorContext } from '@template/db/lib/auditActorContext';
 import {
   cleanupTouchedTables,
   createIntegration,
+  createOrganizationUser,
   createToken,
   createUser,
 } from '@template/db/test';
@@ -13,7 +14,12 @@ import { auditActorMiddleware } from '#/middleware/auth/auditActorMiddleware';
 import { tokenAuthMiddleware } from '#/middleware/auth/tokenAuthMiddleware';
 import { createTestApp } from '#tests/createTestApp';
 
-type Echo = { integrationId: string | null; actorTokenId: string | null };
+type Echo = {
+  integrationId: string | null;
+  actorTokenId: string | null;
+  actorUserId: string | null;
+  actor: unknown;
+};
 
 const { app } = createTestApp({
   mount: [
@@ -25,6 +31,8 @@ const { app } = createTestApp({
         return c.json({
           integrationId: actor?.integrationId ?? null,
           actorTokenId: actor?.actorTokenId ?? null,
+          actorUserId: actor?.actorUserId ?? null,
+          actor: actor?.actor ?? null,
         });
       });
     },
@@ -61,7 +69,10 @@ describe('an integration acts through its token, and the audit names it (Aron, 2
       userId: user.id,
     });
     const { key, token } = await mint({ ownerModel: 'Integration' }, { integration });
-    expect(await echo(key)).toEqual({ integrationId: integration.id, actorTokenId: token.id });
+    expect(await echo(key)).toMatchObject({
+      integrationId: integration.id,
+      actorTokenId: token.id,
+    });
   });
 
   it('a header cannot name an integration', async () => {
@@ -72,5 +83,38 @@ describe('an integration acts through its token, and the audit names it (Aron, 2
     });
     const { key } = await mint({ ownerModel: 'User' }, { user });
     expect((await echo(key, { 'x-integration-id': integration.id })).integrationId).toBeNull();
+  });
+
+  it('the actor snapshot is the permission actor: the sanitized token row', async () => {
+    const { entity: user } = await createUser();
+    const { key, token } = await mint({ ownerModel: 'User' }, { user });
+    const echoed = await echo(key);
+    expect(echoed.actor).toMatchObject({ model: 'Token', record: { id: token.id } });
+    expect(echoed.actor).not.toHaveProperty('record.keyHash');
+    expect(echoed.actorUserId).toBe(user.id);
+  });
+
+  it("a member's token records the member's user", async () => {
+    const { entity: organizationUser, context } = await createOrganizationUser({ role: 'owner' });
+    const { key, token } = await mint({ ownerModel: 'OrganizationUser' }, { organizationUser });
+    expect(await echo(key)).toMatchObject({
+      actorTokenId: token.id,
+      actorUserId: context.user.id,
+    });
+  });
+
+  it("a user's snapshot names who acted and nothing personal", async () => {
+    const { entity: user } = await createUser({ platformRole: 'superadmin' });
+    const { app: userApp } = createTestApp({
+      mockUser: user,
+      mount: [
+        (hono) => {
+          hono.use('*', auditActorMiddleware);
+          hono.get('/echo', (c) => c.json({ actor: auditActorContext.getScope()?.actor ?? null }));
+        },
+      ],
+    });
+    const { actor } = (await (await userApp.request('/echo')).json()) as { actor: unknown };
+    expect(actor).toEqual({ model: 'User', record: { id: user.id, platformRole: 'superadmin' } });
   });
 });

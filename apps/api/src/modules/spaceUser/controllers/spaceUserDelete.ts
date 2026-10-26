@@ -4,7 +4,7 @@
  * @partOf feature:tenancy
  * @uses primitive:authz, primitive:routeTemplates, infrastructure:prisma
  */
-import { db, type HydratedRecord, hydrate } from '@template/db';
+import { db, hydrate } from '@template/db';
 import { check, rebacSchema } from '@template/permissions/rebac';
 import { getResource } from '#/lib/context/getResource';
 import { makeError } from '#/lib/errors';
@@ -18,16 +18,8 @@ export const spaceUserDeleteController = makeController(
     const permix = c.get('permix');
 
     const hydrated = await hydrate('spaceUser', spaceUser);
-    const space = hydrated.space as HydratedRecord;
-
     const canLeave = check(permix, rebacSchema, 'spaceUser', hydrated, 'leave');
-    const canAssign = check(
-      permix,
-      rebacSchema,
-      'space',
-      { ...space, role: spaceUser.role },
-      'assign',
-    );
+    const canAssign = check(permix, rebacSchema, 'spaceUser', hydrated, 'assign');
     if (!canLeave && !canAssign)
       throw makeError({ status: 403, message: 'Cannot remove this user' });
 

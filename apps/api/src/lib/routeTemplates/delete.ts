@@ -5,7 +5,7 @@
  * @uses none
  * @constructs route
  */
-import { createRoute } from '@hono/zod-openapi';
+import { createRoute, type RouteConfig } from '@hono/zod-openapi';
 import { securityForRoute } from '#/lib/auth/routeSecurity';
 import { errorResponses } from '#/lib/routeTemplates/errorResponses';
 import type { RouteArgs } from '#/lib/routeTemplates/types';
@@ -34,19 +34,28 @@ export const deleteRoute = <const T extends RouteArgs>(args: T) => {
   const routePath = skipId ? (action ? `/${action}` : '/') : action ? `/:id/${action}` : '/:id';
   const routeTags = buildTags({ model, submodel, tags, admin, internal });
 
-  return createRoute({
+  const route = createRoute({
     ...routeArgs,
+    model,
+    submodel,
     operationId: buildOperationId({ action: action ?? 'delete', model, submodel, admin, internal }),
     method: 'delete',
     path: routePath,
     tags: routeTags,
     security: securityForRoute(args),
     description: description ?? `Deletes an existing ${resourceName}.`,
-    middleware: prepareMiddleware(middleware, skipId, undefined, args.includeDeleted),
+    middleware: prepareMiddleware({
+      middleware,
+      skipId: skipId,
+      includeDeleted: args.includeDeleted,
+      submodel,
+      route: (): RouteConfig => route,
+    }),
     request: buildRequest(args),
     responses: {
       204: { description: 'Success' },
       ...errorResponses,
     },
   });
+  return route;
 };

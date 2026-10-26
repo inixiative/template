@@ -36,7 +36,7 @@ const { app } = createTestApp({
       hono.get('/api/v1/probe/actor', (c) => c.json(c.get('permix').getActor()));
       hono.get('/api/v1/probe/who', (c) =>
         c.json({
-          person: c.get('user')?.id ?? null,
+          user: c.get('user')?.id ?? null,
           superadmin: c.get('permix').isSuperadmin(),
         }),
       );
@@ -64,18 +64,15 @@ const mint = async (ownerModel: TokenOwnerModel, context: Record<string, unknown
 };
 
 describe('only a user acts directly: a JWT or a spoof (Aron, 2026-10-25)', () => {
-  let person: User;
+  let user: User;
   let organization: Organization;
-  let seat: OrganizationUser;
+  let member: OrganizationUser;
 
   beforeAll(async () => {
     registerDelegatedKeysHook();
-    ({ entity: person } = await createUser());
+    ({ entity: user } = await createUser());
     ({ entity: organization } = await createOrganization());
-    ({ entity: seat } = await createOrganizationUser(
-      { role: 'owner' },
-      { user: person, organization },
-    ));
+    ({ entity: member } = await createOrganizationUser({ role: 'owner' }, { user, organization }));
   });
 
   afterAll(async () => {
@@ -85,39 +82,39 @@ describe('only a user acts directly: a JWT or a spoof (Aron, 2026-10-25)', () =>
   });
 
   it("a token's actor is its row, minus what the redact registry hides", async () => {
-    const key = await mint('User', { user: person });
+    const key = await mint('User', { user });
     const actor = (await (await asKey(key, '/api/v1/probe/actor')).json()) as {
       model: string;
       record: Record<string, unknown>;
     };
     expect(actor.model).toBe('Token');
-    expect(actor.record.userId).toBe(person.id);
+    expect(actor.record.userId).toBe(user.id);
     expect(actor.record).not.toHaveProperty('keyHash');
   });
 
   it('a token never makes the request a user', async () => {
-    const key = await mint('User', { user: person });
-    const who = (await (await asKey(key, '/api/v1/probe/who')).json()) as { person: string | null };
-    expect(who.person).toBeNull();
+    const key = await mint('User', { user });
+    const who = (await (await asKey(key, '/api/v1/probe/who')).json()) as { user: string | null };
+    expect(who.user).toBeNull();
   });
 
   describe('/me is the user a User token belongs to, and nobody else', () => {
     it("a user's own token reads /me", async () => {
-      const key = await mint('User', { user: person });
+      const key = await mint('User', { user });
       const response = await asKey(key, '/api/v1/me');
       expect(response.status).toBe(200);
-      expect(((await response.json()) as { data: { id: string } }).data.id).toBe(person.id);
+      expect(((await response.json()) as { data: { id: string } }).data.id).toBe(user.id);
     });
 
     it("a member's token does not", async () => {
-      const key = await mint('OrganizationUser', { organizationUser: seat });
+      const key = await mint('OrganizationUser', { organizationUser: member });
       expect((await asKey(key, '/api/v1/me')).status).toBe(401);
     });
 
     it("a user's integration's token does not", async () => {
       const { entity: integration } = await createIntegration({
         ownerModel: 'User',
-        userId: person.id,
+        userId: user.id,
         role: 'owner',
       });
       const key = await mint('Integration', { integration });
@@ -135,7 +132,7 @@ describe('only a user acts directly: a JWT or a spoof (Aron, 2026-10-25)', () =>
   it("an integration's token cannot make its user an organization owner", async () => {
     const { entity: integration } = await createIntegration({
       ownerModel: 'User',
-      userId: person.id,
+      userId: user.id,
       role: 'owner',
     });
     const key = await mint('Integration', { integration });
@@ -143,17 +140,17 @@ describe('only a user acts directly: a JWT or a spoof (Aron, 2026-10-25)', () =>
       method: 'POST',
       body: JSON.stringify({ name: 'Taken', slug: randomUUID() }),
     });
-    expect(response.status).toBe(401);
+    expect(response.status).toBe(403);
   });
 
   describe('a superadmin', () => {
     it("only a user is a superadmin: a superadmin's member token is not", async () => {
       const { entity: admin } = await createUser({ platformRole: 'superadmin' });
-      const { entity: adminSeat } = await createOrganizationUser(
+      const { entity: adminMember } = await createOrganizationUser(
         { role: 'owner' },
         { user: admin, organization },
       );
-      const key = await mint('OrganizationUser', { organizationUser: adminSeat });
+      const key = await mint('OrganizationUser', { organizationUser: adminMember });
       expect((await asKey(key, '/api/v1/probe/admin')).status).toBe(403);
       const who = (await (await asKey(key, '/api/v1/probe/who')).json()) as { superadmin: boolean };
       expect(who.superadmin).toBe(false);
@@ -169,9 +166,9 @@ describe('only a user acts directly: a JWT or a spoof (Aron, 2026-10-25)', () =>
       const { entity: admin } = await createUser({ platformRole: 'superadmin' });
       const key = await mint('User', { user: admin });
       const spoofed = (await (
-        await asKey(key, '/api/v1/probe/who', { headers: { 'x-spoof-user-email': person.email } })
-      ).json()) as { person: string | null; superadmin: boolean };
-      expect(spoofed).toEqual({ person: person.id, superadmin: false });
+        await asKey(key, '/api/v1/probe/who', { headers: { 'x-spoof-user-email': user.email } })
+      ).json()) as { user: string | null; superadmin: boolean };
+      expect(spoofed).toEqual({ user: user.id, superadmin: false });
     });
 
     it('a spoof holds in every batch round', async () => {
@@ -180,14 +177,14 @@ describe('only a user acts directly: a JWT or a spoof (Aron, 2026-10-25)', () =>
       const round = [{ method: 'GET', path: '/api/v1/probe/who' }];
       const response = await asKey(key, '/api/v1/batch/execute', {
         method: 'POST',
-        headers: { 'x-spoof-user-email': person.email },
+        headers: { 'x-spoof-user-email': user.email },
         body: JSON.stringify({ requests: [round, round, round], strategy: 'allowFailures' }),
       });
       const { data } = (await response.json()) as {
-        data: { batch: { body: { person: string | null; superadmin: boolean } }[][] };
+        data: { batch: { body: { user: string | null; superadmin: boolean } }[][] };
       };
       for (const [result] of data.batch)
-        expect(result.body).toEqual({ person: person.id, superadmin: false });
+        expect(result.body).toEqual({ user: user.id, superadmin: false });
     });
   });
 });
