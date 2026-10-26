@@ -376,7 +376,7 @@ An integration has a nullable `role`, `full` and `entitlements`, capped live by 
 
 A grant is an action: the writer must be able to take every action the delegate would hold, from its anchor. `canGrantEntitlement(permix, entry, anchor)` (`packages/permissions/src/rebac/canGrantEntitlement.ts`, over the library's `createCanGrantEntitlement`) judges each action through the ordinary check on a pseudo record of the entry's resource placed under the hydrated anchor. The entitled delegate's read runs the action through the writer's walk on the real record, so the rule's conditions (on the record and on `__actor`) hold there.
 
-- `PATCH /organizationUser/:id` with `entitlements` checks each action as an entry anchored on the organization: an admin grants `operate` and `manage`, not `own` or `assign`.
+- `PATCH /organizationUser/:id` with `entitlements` checks each action as an entry anchored on the organization: an admin grants `operate`, `manage` and `assignLow`, not `own` or `assignHigh`.
 - A delegate's named entitlements go through `validateEntitlementGrants` (`apps/api/src/lib/permissions/validateEntitlementGrants.ts`: fetch the anchor, then `canGrantEntitlement`). A token's role is checked by `create` on `db:token`; an integration's role by `assign` on `db:integration` (`validateIntegrationGrant`), on the row before and after a change.
 
 Situations: `organizationUserUpdate.test.ts`, `integrationDelegate.test.ts`, `delegatePermissions.test.ts`.
@@ -520,20 +520,9 @@ User-only is `actorIsUser` in the rule of the record each action is on: `create`
 
 #### Role Assignment
 
-Role assignment uses the `assign` action defined in the ReBAC schema. The schema checks:
-- Assigning owner/admin (high roles) requires `own` permission
-- Assigning member/viewer requires `manage` permission
+Writing a role is `assignHigh` (own at the tenant, any role) or `assignLow` (role low or unset, and manage at the tenant or `assignHigh`), from `assignActions` in `packages/permissions/src/rebac/schemaHelpers.ts`. Role writes check the rule `roleAssignment` on the row before and after; member removal checks the rule `memberRemoval` (`leave`, `assignHigh` or `assignLow`) at the route. Neither rule is a named action, so neither can be granted as an entitlement. See docs/claude/PERMISSIONS.md § Role Assignment.
 
-```typescript
-const before = await hydrate('organizationUser', organizationUser);
-const after = await hydrate('organizationUser', { ...organizationUser, role: body.role ?? organizationUser.role });
-check(permix, rebacSchema, 'organizationUser', before, 'assign') &&
-  check(permix, rebacSchema, 'organizationUser', after, 'assign');
-```
-
-`assign` lives on the member row (`db:organizationUser`, `db:spaceUser`) and is checked twice: on the row as it is and on the row as it will be. Its lower arm reads the role positively (`member` or `viewer`), so a record with no role passes neither arm. Removing a member is `assign` on the row as it is, or `leave`. A stored `assign` on the organization or space assigns any role (until member entitlements stop being stored flat).
-
-##### Role Assignment Rules
+### Role Assignment Rules
 
 | Assigner Role | Can Assign |
 |---------------|------------|
