@@ -129,7 +129,7 @@ Located in `packages/permissions/src/rebac/`.
 
 ##### Schema
 
-The schema is `rebacSchema` in `packages/permissions/src/rebac/schema.ts`; read the rules there. It is keyed by resource (`db:user`, `db:organization`, `db:token`, ...), each with its `actions`. Rules shared across models are named helpers at the top of the file: `actionOnOwner` (the action on whichever owner `ownerModel` names), `actorIsItsUser`, `assignRole` (high roles need one rule, member and viewer another), `roleHeldAtOwner` (the delegate's role held at its owner), and the integration blocks `integrationAdministering` (`create`, `own`, `manage`) and `integrationAccess` (`operate`, `read`, `assign`). `db:token` has `leave`, `own`, `read`, `create` and `delete`.
+The schema is `rebacSchema` in `packages/permissions/src/rebac/schema.ts`; read the rules there. It is keyed by resource (`db:user`, `db:organization`, `db:token`, ...), each with its `actions`. Rules shared across models are named helpers in `schemaHelpers.ts`: `actionOnOwner` (the action on whichever owner `ownerModel` names), `actorIsItsUser`, `assignActions` (`assignHigh` and `assignLow`), the rules `roleAssignment` and `memberRemoval`, `roleHeldAtOwner` (the delegate's role held at its owner), and the integration blocks `integrationAdministering` (`create`, `own`, `manage`) and `integrationAccess` (`operate`, `read`, `assignHigh`, `assignLow`). `db:token` has `leave`, `own`, `read`, `create` and `delete`; `db:integration` also has `delete`.
 
 ##### ActionRule Types
 

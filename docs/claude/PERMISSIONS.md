@@ -339,7 +339,7 @@ Located in `packages/permissions/src/rebac/`.
 
 ### Schema
 
-The schema is `rebacSchema` in `packages/permissions/src/rebac/schema.ts`; read the rules there. It is keyed by resource (`db:user`, `db:organization`, `db:token`, ...), each with its `actions`. Rules shared across models are named helpers at the top of the file: `actionOnOwner` (the action on whichever owner `ownerModel` names), `actorIsItsUser`, `assignRole` (high roles need one rule, member and viewer another), `roleHeldAtOwner` (the delegate's role held at its owner), and the integration blocks `integrationAdministering` (`create`, `own`, `manage`) and `integrationAccess` (`operate`, `read`, `assign`). `db:token` has `leave`, `own`, `read`, `create` and `delete`.
+The schema is `rebacSchema` in `packages/permissions/src/rebac/schema.ts`; read the rules there. It is keyed by resource (`db:user`, `db:organization`, `db:token`, ...), each with its `actions`. Rules shared across models are named helpers in `schemaHelpers.ts`: `actionOnOwner` (the action on whichever owner `ownerModel` names), `actorIsItsUser`, `assignActions` (`assignHigh` and `assignLow`), the rules `roleAssignment` and `memberRemoval`, `roleHeldAtOwner` (the delegate's role held at its owner), and the integration blocks `integrationAdministering` (`create`, `own`, `manage`) and `integrationAccess` (`operate`, `read`, `assignHigh`, `assignLow`). `db:token` has `leave`, `own`, `read`, `create` and `delete`; `db:integration` also has `delete`.
 
 ### ActionRule Types
 
@@ -557,7 +557,7 @@ const pseudo = await hydrate(submodel, ownerColumns(submodel, ownerType, owner))
 check(permix, rebacSchema, submodel, pseudo, action);
 ```
 
-- `ownerColumns(child, ownerAccessor, owner)` (`packages/db/src/registries/ownerColumns.ts`) builds the pseudo record: `id: ''`, the polymorphism registry's discriminator for that owner, and the owner keys from the child's single relation to it. An empty id never matches a grant keyed by a real row.
+- `ownerColumns(child, ownerAccessor, owner)` (`packages/db/src/utils/ownerColumns.ts`) builds the pseudo record: `id: ''`, the polymorphism registry's discriminator for that owner, and the owner keys from the child's single relation to it. An empty id never matches a grant keyed by a real row.
 - The route templates set `routeConfig` (with `model` / `submodel`) before route middleware runs, so the middleware reads the submodel there; the owner is `c.get('resource')` (`meResourceMiddleware` loads the user on `/me`).
 - It never reads the request body (route middleware runs before validation). Checks that depend on the body (a token's role / full, an integration's `assign`, an inquiry's `send`) stay in their services.
 - Using it on a route with no submodel throws on each request to that route, not when the route is built (`validateSubmodelPermission.test.ts`).
