@@ -110,33 +110,31 @@ export const roleIsLowOrUnset: ActionRule = {
   ],
 };
 
-export const assignActions = (own: ActionRule, manage: ActionRule) =>
-  ({
-    assignHigh: own,
-    assignLow: { all: [roleIsLowOrUnset, { any: [manage, 'assignHigh'] }] },
-  }) satisfies Record<string, ActionRule>;
-
 export const roleAssignment: ActionRule = {
   any: [{ all: [roleIsHigh, 'assignHigh'] }, 'assignLow'],
 };
 
-export const memberRemoval: ActionRule = { any: ['leave', 'assignHigh', 'assignLow'] };
-
-export const roleHeldAtOwner = (at = ''): ActionRule => ({
+const roleHeldVia = (heldAt: (action: string) => ActionRule): ActionRule => ({
   any: [
-    {
-      all: [
-        { rule: { field: 'role', operator: Operator.equals, value: null } },
-        actionOnOwner('read', at),
-      ],
-    },
+    { all: [{ rule: { field: 'role', operator: Operator.equals, value: null } }, heldAt('read')] },
     ...roleHierarchy.map((role) => ({
       all: [
         { rule: { field: 'role', operator: Operator.equals, value: role } },
-        actionOnOwner(roleToStandardAction(role), at),
+        heldAt(roleToStandardAction(role)),
       ],
     })),
   ],
+});
+
+export const roleHeldAtOwner = (at = ''): ActionRule =>
+  roleHeldVia((action) => actionOnOwner(action, at));
+
+export const memberRoleWrite = (tenant: 'organization' | 'space'): ActionRule => ({
+  all: [{ rel: tenant, action: 'manage' }, roleHeldVia((action) => ({ rel: tenant, action }))],
+});
+
+export const memberRemoval = (tenant: 'organization' | 'space'): ActionRule => ({
+  any: ['leave', memberRoleWrite(tenant)],
 });
 
 export const ownedByYouOrOrganizationOrSpace = (at = ''): ActionRule => ({

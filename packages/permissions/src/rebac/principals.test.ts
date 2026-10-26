@@ -83,21 +83,23 @@ describe('no self arm: the user reaches their own rows through rel user (Aron, 2
     it('the user cannot evict a peer', async () => {
       const member = await session(u1, 'operate');
       expect(can(member, 'organizationUser', r2, 'leave')).toBe(false);
-      expect(can(member, 'organizationUser', r2, memberRemoval)).toBe(false);
+      expect(can(member, 'organizationUser', r2, memberRemoval('organization'))).toBe(false);
     });
 
     it('an admin evicts a member through the org, never through leave', async () => {
       const admin = await session(ua, 'manage');
-      expect(can(admin, 'organizationUser', r2, memberRemoval)).toBe(true);
+      expect(can(admin, 'organizationUser', r2, memberRemoval('organization'))).toBe(true);
       expect(can(admin, 'organizationUser', r2, 'leave')).toBe(false);
     });
 
     it('an admin cannot evict an owner, an owner can', async () => {
       const owner = { ...r2, role: 'owner' };
-      expect(can(await session(ua, 'manage'), 'organizationUser', owner, memberRemoval)).toBe(
-        false,
-      );
-      expect(can(await session(uo, 'own'), 'organizationUser', owner, memberRemoval)).toBe(true);
+      expect(
+        can(await session(ua, 'manage'), 'organizationUser', owner, memberRemoval('organization')),
+      ).toBe(false);
+      expect(
+        can(await session(uo, 'own'), 'organizationUser', owner, memberRemoval('organization')),
+      ).toBe(true);
     });
 
     it('a member reads their own relation and every relation of their org', async () => {

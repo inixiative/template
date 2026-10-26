@@ -126,7 +126,12 @@ export const OrganizationUsersPage = ({ organizationId }: OrganizationUsersPageP
               size="sm"
               aria-label="Remove member"
               onClick={() => deleteMutation.mutate({ path: { id: member.id } })}
-              show={checkPermission(permissions, 'organizationUser', memberRecord, memberRemoval)}
+              show={checkPermission(
+                permissions,
+                'organizationUser',
+                memberRecord,
+                memberRemoval('organization'),
+              )}
             >
               <Icon icon="lucide:trash-2" className="h-4 w-4 text-destructive" />
             </Button>

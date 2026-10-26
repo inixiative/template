@@ -29,7 +29,7 @@ const send = async (user: User, method: 'PATCH' | 'DELETE', path: string, body?:
   return response.status;
 };
 
-describe('assigning an organization member a role is assign on the member row (R37e)', () => {
+describe('assigning an organization member a role needs manage and the role you set (Aron, 2026-10-26)', () => {
   let organization: Organization;
 
   const member = async (role: Role) => {
@@ -60,11 +60,12 @@ describe('assigning an organization member a role is assign on the member row (R
     expect(await setRole('owner', 'admin', 'viewer')).toBe(200);
   });
 
-  it('an admin moves members and viewers, never to or from a high role', async () => {
+  it('an admin sets roles it holds: admin and below, never to or from owner', async () => {
     expect(await setRole('admin', 'member', 'viewer')).toBe(200);
     expect(await setRole('admin', 'viewer', 'member')).toBe(200);
-    expect(await setRole('admin', 'member', 'admin')).toBe(403);
-    expect(await setRole('admin', 'admin', 'member')).toBe(403);
+    expect(await setRole('admin', 'member', 'admin')).toBe(200);
+    expect(await setRole('admin', 'admin', 'member')).toBe(200);
+    expect(await setRole('admin', 'member', 'owner')).toBe(403);
     expect(await setRole('admin', 'owner', 'viewer')).toBe(403);
   });
 
@@ -73,10 +74,10 @@ describe('assigning an organization member a role is assign on the member row (R
     expect(await setRole('viewer', 'viewer', 'viewer')).toBe(403);
   });
 
-  it('removing a member is assign on its current role, or leaving', async () => {
+  it('removing a member needs the role it has, or leaving', async () => {
     expect(await remove('owner', 'admin')).toBe(204);
     expect(await remove('admin', 'member')).toBe(204);
-    expect(await remove('admin', 'admin')).toBe(403);
+    expect(await remove('admin', 'admin')).toBe(204);
     expect(await remove('admin', 'owner')).toBe(403);
     expect(await remove('member', 'viewer')).toBe(403);
 
@@ -102,7 +103,7 @@ describe('assigning an organization member a role is assign on the member row (R
   });
 });
 
-describe('assigning a space member a role is assign on the member row (R37e)', () => {
+describe('assigning a space member a role needs manage and the role you set (Aron, 2026-10-26)', () => {
   let organization: Organization;
   let space: Space;
 
@@ -137,13 +138,15 @@ describe('assigning a space member a role is assign on the member row (R37e)', (
     expect(await remove(user, 'admin')).toBe(204);
   });
 
-  it('a space admin moves members and viewers only', async () => {
+  it('a space admin sets roles it holds: admin and below, never owner', async () => {
     const { user } = await spaceMember('admin');
     expect(await setRole(user, 'member', 'viewer')).toBe(200);
-    expect(await setRole(user, 'member', 'admin')).toBe(403);
-    expect(await setRole(user, 'admin', 'member')).toBe(403);
+    expect(await setRole(user, 'member', 'admin')).toBe(200);
+    expect(await setRole(user, 'admin', 'member')).toBe(200);
+    expect(await setRole(user, 'member', 'owner')).toBe(403);
     expect(await remove(user, 'member')).toBe(204);
-    expect(await remove(user, 'admin')).toBe(403);
+    expect(await remove(user, 'admin')).toBe(204);
+    expect(await remove(user, 'owner')).toBe(403);
   });
 
   it('a space member assigns nothing, but leaves', async () => {

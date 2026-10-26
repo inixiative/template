@@ -6,7 +6,7 @@
  */
 import { db, hydrate, Prisma } from '@template/db';
 import { check, rebacSchema } from '@template/permissions/rebac';
-import { roleAssignment } from '@template/permissions/rebac/schemaHelpers';
+import { memberRoleWrite } from '@template/permissions/rebac/schemaHelpers';
 import { getResource } from '#/lib/context/getResource';
 import { makeError } from '#/lib/errors';
 import { validateEntitlementGrants } from '#/lib/permissions/validateEntitlementGrants';
@@ -23,8 +23,8 @@ export const spaceUserUpdateController = makeController(
     const before = await hydrate('spaceUser', spaceUser);
     const after = await hydrate('spaceUser', { ...spaceUser, role: body.role ?? spaceUser.role });
     if (
-      !check(permix, rebacSchema, 'spaceUser', before, roleAssignment) ||
-      !check(permix, rebacSchema, 'spaceUser', after, roleAssignment)
+      !check(permix, rebacSchema, 'spaceUser', before, memberRoleWrite('space')) ||
+      !check(permix, rebacSchema, 'spaceUser', after, memberRoleWrite('space'))
     )
       throw makeError({ status: 403, message: `Cannot assign ${after.role} role` });
     await validateEntitlementGrants(permix, body.entitlements ?? []);
