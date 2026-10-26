@@ -211,10 +211,10 @@ The engine is `@inixiative/permissions`; `createPermissions` in `packages/permis
 
 ### installPermissions
 
-`installPermissions(c)` (`apps/api/src/lib/context/installPermissions.ts`) resets the permix, sets the actor and the superadmin bypass, then installs one table:
+`installPermissions(c)` (`apps/api/src/lib/context/installPermissions.ts`) resets the permix, sets the actor and the superadmin bypass, then installs the grants with `installGrants`:
 
-- a user (JWT or spoof): `setupUserPermissions` (`apps/api/src/lib/permissions/setupUserPermissions.ts`) installs `userEntries`: the user grant plus one grant per `OrganizationUser` and `SpaceUser` row.
-- a token: `setupTokenPermissions` (`apps/api/src/lib/permissions/setupTokenPermissions.ts`) installs `delegateTable(token, owner)` ([Delegates and Their Owners](#delegates-and-their-owners)), where `owner` is the user's table built from the members already in context for a User-owned token (`contextUserEntries`, shared with `setupUserPermissions`), and `ownerTable(token)` otherwise.
+- a user (JWT or spoof): `setupUserPermissions` (`apps/api/src/lib/permissions/setupUserPermissions.ts`) installs `userGrants`: the user's and every member row's role entries, plus each member row's entitlements owned by its tenant.
+- a token: `setupTokenPermissions` (`apps/api/src/lib/permissions/setupTokenPermissions.ts`) installs `delegateTable(token, owner)` ([Delegates and Their Owners](#delegates-and-their-owners)), where `owner` is the user's table built from the members already in context for a User-owned token (`contextUserGrants`, shared with `setupUserPermissions`), and `ownerTable(token)` otherwise.
 
 ### Vocabulary
 

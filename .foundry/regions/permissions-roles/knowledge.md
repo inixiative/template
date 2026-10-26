@@ -324,7 +324,7 @@ The engine is `@inixiative/permissions`; `createPermissions` in `packages/permis
 
 `installPermissions(c)` (`apps/api/src/lib/context/installPermissions.ts`) resets the permix, sets the actor and the superadmin bypass, then installs one table:
 
-- a user (JWT or spoof): `setupUserPermissions` (`apps/api/src/lib/permissions/setupUserPermissions.ts`) installs `userEntries`: the user grant plus one grant per `OrganizationUser` and `SpaceUser` row.
+- a user (JWT or spoof): `setupUserPermissions` (`apps/api/src/lib/permissions/setupUserPermissions.ts`) installs `userGrants`: the user grant plus one grant per `OrganizationUser` and `SpaceUser` row.
 - a token: `setupTokenPermissions` (`apps/api/src/lib/permissions/setupTokenPermissions.ts`) installs `delegateTable(token, await ownerTable(token))` ([Delegates and Their Owners](#delegates-and-their-owners)).
 
 ##### Vocabulary
