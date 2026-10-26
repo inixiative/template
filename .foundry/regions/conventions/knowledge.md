@@ -251,7 +251,7 @@ Pattern: `resourceActionSubresource`
 | Type | Convention | Example |
 |------|------------|---------|
 | Route handler | `<model><Action>` | `userCreate`, `organizationReadMany` |
-| Getter | `get<Thing>` | `getActor`, `getResource` |
+| Getter | `get<Thing>` | `getOrgPermissions`, `getResource` |
 | Boolean getter | `is<Condition>` | `isAuthenticated`, `isSuperadmin` |
 | Constructor / factory | `make<Thing>` | `makeError`, `makeJob`, `makeController` |
 
@@ -291,7 +291,7 @@ Two distinct meanings — **don't mix them**:
 
 | Context | Alias | Example |
 |---------|-------|---------|
-| Within an app | `#/` | `import { getActor } from '#/lib/context/getActor'` |
+| Within an app | `#/` | `import { installPermissions } from '#/lib/context/installPermissions'` |
 | Shared packages | `@template/` | `import { db } from '@template/db'` |
 | Within a shared package | `@template/` | `import { log } from '@template/shared/logger'` |
 | Top-level barrel exports | Relative | `export { foo } from './foo'` |
@@ -300,7 +300,7 @@ Two distinct meanings — **don't mix them**:
 // apps/api/src/modules/user/routes/userCreate.ts
 import { db } from '@template/db';                    // Shared package
 import { log } from '@template/shared/logger';        // Shared package
-import { getActor } from '#/lib/context/getActor';    // Internal to app
+import { installPermissions } from '#/lib/context/installPermissions'; // Internal to app
 
 // packages/shared/src/logger/index.ts (top-level barrel)
 export { log } from './logger';                       // Relative OK here

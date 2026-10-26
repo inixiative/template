@@ -201,7 +201,7 @@ import { jwtAuthMiddleware } from '#/middleware/auth/jwtAuthMiddleware';
 // Cross-package (from anywhere)
 import { db } from '@template/db';
 import { log } from '@template/shared/logger';
-import { setupOrgContext } from '@template/permissions';
+import { actorOf } from '@template/permissions';
 
 // Within a shared package - ALSO use @template/
 // packages/db/src/extensions/mutationLifeCycle/mutationLifeCycleExtension.ts

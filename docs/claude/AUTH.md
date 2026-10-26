@@ -370,7 +370,7 @@ organizationId: set
 
 - Tied to a user's member row in a specific org
 - Has access only to that org
-- Permissions are intersection of user's role AND token's role
+- Permissions are the token's own role and entitlements, narrowed to the member row's table and capped live by it; `full` installs the member row's table as-is
 - Used for scoped access to a single org
 
 ### Space Token
@@ -398,7 +398,7 @@ spaceId: set
 
 - Tied to a user's member row in a specific space
 - Has access only to that space
-- Permissions are intersection of user's space role AND token's role
+- Permissions are the token's own role and entitlements, narrowed to the space member row's table and capped live by it; `full` installs that table as-is
 - Used for scoped access to a single space
 
 ### Token Schema
