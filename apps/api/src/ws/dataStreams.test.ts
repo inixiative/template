@@ -1,5 +1,4 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, spyOn } from 'bun:test';
-import { createHash, randomBytes } from 'node:crypto';
 import { db, getRedisClient, redisNamespace, unregisterDbHook } from '@template/db';
 import type { Contact, Organization, User } from '@template/db/generated/client/client';
 import { PlatformRole, TokenOwnerModel } from '@template/db/generated/client/enums';
@@ -7,7 +6,6 @@ import {
   cleanupTouchedTables,
   createContact,
   createOrganizationUser,
-  createToken,
   createUser,
 } from '@template/db/test';
 import {
@@ -28,6 +26,7 @@ import { reauthorizeOpenStreams } from '#/ws/streamReauthorizeSweep';
 import { streamSeqKey } from '#/ws/streamSeq';
 import { createTestSocket } from '#tests/createTestSocket';
 import { createBearerToken } from '#tests/utils/createBearerToken';
+import { createKeyedToken } from '#tests/utils/createKeyedToken';
 
 const frames = (sent: string[]) => sent.map((message) => JSON.parse(message));
 
@@ -305,13 +304,8 @@ describe('data streams (real app)', () => {
 
   it('switching the same user to a narrower credential closes streams it cannot read', async () => {
     const { context: other } = await createOrganizationUser({ role: 'member' }, { user: member });
-    const rawKey = randomBytes(24).toString('hex');
-    await createToken(
-      {
-        keyHash: createHash('sha256').update(rawKey).digest('hex'),
-        keyPrefix: rawKey.slice(0, 16),
-        ownerModel: TokenOwnerModel.OrganizationUser,
-      },
+    const { rawKey } = await createKeyedToken(
+      { ownerModel: TokenOwnerModel.OrganizationUser },
       { organizationUser: other.organizationUser },
     );
     const { socket, sent } = connect();

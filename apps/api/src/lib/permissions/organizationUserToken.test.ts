@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { db } from '@template/db';
 import type {
   Organization,
@@ -23,6 +23,7 @@ import { organizationUserRouter } from '#/modules/organizationUser';
 import { spaceRouter } from '#/modules/space';
 import { tokenRouter } from '#/modules/token';
 import { createTestApp } from '#tests/createTestApp';
+import { createKeyedToken } from '#tests/utils/createKeyedToken';
 
 describe('a token of an organization member acts as that member, never as the user or the organization (Aron, 2026-10-25)', () => {
   let user: User;
@@ -70,15 +71,10 @@ describe('a token of an organization member acts as that member, never as the us
       { user },
     ));
 
-    key = randomUUID();
-    await createToken(
-      {
-        ownerModel: 'OrganizationUser',
-        role: 'owner',
-        keyHash: createHash('sha256').update(key).digest('hex'),
-      },
+    ({ rawKey: key } = await createKeyedToken(
+      { ownerModel: 'OrganizationUser', role: 'owner' },
       { user, organization, organizationUser: member },
-    );
+    ));
   });
 
   afterAll(async () => {
@@ -101,6 +97,12 @@ describe('a token of an organization member acts as that member, never as the us
     expect(await status('POST', '/me/tokens', { name: 'k', role: 'viewer' })).toBe(401);
     expect(await status('POST', '/me/rotateJwts')).toBe(401);
     expect(await status('POST', '/me/redact')).toBe(401);
+    expect(
+      await status('POST', '/me/webhookSubscriptions', {
+        model: 'CustomerRef',
+        url: `https://example.com/${randomUUID()}`,
+      }),
+    ).toBe(401);
     expect(await status('POST', '/organization', { name: 'o', slug: randomUUID() })).toBe(403);
     expect(await status('DELETE', `/token/${userToken.id}`)).toBe(403);
 

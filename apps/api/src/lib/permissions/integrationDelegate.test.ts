@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { createHash, randomUUID } from 'node:crypto';
-import { type AccessorName, db, fetchOne, hydrate, unregisterDbHook } from '@template/db';
+import { randomUUID } from 'node:crypto';
+import { db, unregisterDbHook } from '@template/db';
 import type {
   Integration,
   Organization,
@@ -15,80 +15,28 @@ import {
   createOrganization,
   createOrganizationUser,
   createSpace,
-  createToken,
   createUser,
 } from '@template/db/test';
-import { check, rebacSchema } from '@template/permissions/rebac';
 import { registerClearCacheHook } from '#/hooks/cache/hook';
-import { tokenAuthMiddleware } from '#/middleware/auth/tokenAuthMiddleware';
 import { batchRouter } from '#/modules/batch';
 import { integrationRouter } from '#/modules/integration';
 import { meRouter } from '#/modules/me';
 import { organizationRouter } from '#/modules/organization';
 import { createTestApp } from '#tests/createTestApp';
+import { createKeyedToken } from '#tests/utils/createKeyedToken';
+import { createTokenProbeApp } from '#tests/utils/createTokenProbeApp';
+import { type Entry, entry } from '#tests/utils/entitlementEntry';
 import { patch, post } from '#tests/utils/request';
 
-type Entry = {
-  resource: string;
-  anchor: { resource: string; id: string };
-  actions: Record<string, boolean>;
-};
-
-const entry = (resource: string, anchor: [string, string], actions: string[]): Entry => ({
-  resource,
-  anchor: { resource: anchor[0], id: anchor[1] },
-  actions: Object.fromEntries(actions.map((action) => [action, true])),
+const { call: request, holds } = createTokenProbeApp((hono) => {
+  hono.route('/api/v1/batch', batchRouter);
+  hono.route('/api/v1/integration', integrationRouter);
+  hono.route('/api/v1/me', meRouter);
+  hono.route('/api/v1/organization', organizationRouter);
 });
 
-const { app } = createTestApp({
-  mount: [
-    (hono) => {
-      hono.use('*', tokenAuthMiddleware);
-      hono.route('/api/v1/batch', batchRouter);
-      hono.route('/api/v1/me', meRouter);
-      hono.route('/api/v1/organization', organizationRouter);
-      hono.get('/api/v1/probe/actor', (c) => c.json({ actor: c.get('permix').getActor() }));
-      hono.post('/api/v1/probe/holds', async (c) => {
-        const { model, id, action } = (await c.req.json()) as {
-          model: AccessorName;
-          id: string;
-          action: string;
-        };
-        const row = await fetchOne<{ id: string }>(model, id);
-        if (!row) return c.json({ holds: false });
-        const record = await hydrate(model, row);
-        return c.json({ holds: check(c.get('permix'), rebacSchema, model, record, action) });
-      });
-    },
-  ],
-});
-
-const request = (key: string, method: string, path: string, body?: unknown) =>
-  app.request(path, {
-    method,
-    headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-
-const holds = async (key: string, model: AccessorName, id: string, action: string) => {
-  const response = await request(key, 'POST', '/api/v1/probe/holds', { model, id, action });
-  expect(response.status).toBe(200);
-  return ((await response.json()) as { holds: boolean }).holds;
-};
-
-const tokenFor = async (integration: Integration, role: Role) => {
-  const key = randomUUID();
-  await createToken(
-    {
-      ownerModel: 'Integration',
-      role,
-      keyHash: createHash('sha256').update(key).digest('hex'),
-      integrationId: integration.id,
-    },
-    {},
-  );
-  return key;
-};
+const tokenFor = async (integration: Integration, role: Role) =>
+  (await createKeyedToken({ ownerModel: 'Integration', role }, { integration })).rawKey;
 
 const userApp = (user: User, members: OrganizationUser[]) =>
   createTestApp({
@@ -141,26 +89,43 @@ describe('an integration holds entitlements and acts for its direct owner (Aron,
   });
 
   describe("a token of a member's integration", () => {
-    it('holds what the integration holds there, capped by the member', async () => {
-      const member = await memberOf('member', organization, (await createUser()).entity);
-      const key = await tokenFor(await memberIntegration(member, 'owner'), 'owner');
-      expect(await holds(key, 'organization', organization.id, 'operate')).toBe(true);
-      expect(await holds(key, 'organization', organization.id, 'manage')).toBe(false);
-    });
+    const capped = [
+      {
+        name: 'holds what the integration holds there, capped by the member',
+        memberRole: 'member',
+        integrationRole: 'owner',
+        tokenRole: 'owner',
+        holds: 'operate',
+        lacks: 'manage',
+      },
+      {
+        name: 'holds no more than its own role',
+        memberRole: 'owner',
+        integrationRole: 'owner',
+        tokenRole: 'viewer',
+        holds: 'read',
+        lacks: 'operate',
+      },
+      {
+        name: "holds no more than the integration's role",
+        memberRole: 'owner',
+        integrationRole: 'viewer',
+        tokenRole: 'owner',
+        holds: 'read',
+        lacks: 'operate',
+      },
+    ] as const;
 
-    it('holds no more than its own role', async () => {
-      const member = await memberOf('owner', organization, (await createUser()).entity);
-      const key = await tokenFor(await memberIntegration(member, 'owner'), 'viewer');
-      expect(await holds(key, 'organization', organization.id, 'read')).toBe(true);
-      expect(await holds(key, 'organization', organization.id, 'operate')).toBe(false);
-    });
-
-    it("holds no more than the integration's role", async () => {
-      const member = await memberOf('owner', organization, (await createUser()).entity);
-      const key = await tokenFor(await memberIntegration(member, 'viewer'), 'owner');
-      expect(await holds(key, 'organization', organization.id, 'read')).toBe(true);
-      expect(await holds(key, 'organization', organization.id, 'operate')).toBe(false);
-    });
+    for (const row of capped)
+      it(row.name, async () => {
+        const member = await memberOf(row.memberRole, organization, (await createUser()).entity);
+        const key = await tokenFor(
+          await memberIntegration(member, row.integrationRole),
+          row.tokenRole,
+        );
+        expect(await holds(key, 'organization', organization.id, row.holds)).toBe(true);
+        expect(await holds(key, 'organization', organization.id, row.lacks)).toBe(false);
+      });
 
     it('an integration entitled to one space reaches that space and no other', async () => {
       const member = await memberOf('owner', organization, (await createUser()).entity);
@@ -330,19 +295,15 @@ describe('an integration holds entitlements and acts for its direct owner (Aron,
       expect(data.ownerModel).toBe('Integration');
       expect(await holds(data.key, 'organization', organization.id, 'operate')).toBe(true);
 
-      const tokenApp = createTestApp({
-        mount: [
-          (hono) => {
-            hono.use('*', tokenAuthMiddleware);
-            hono.route('/api/v1/integration', integrationRouter);
-          },
-        ],
-      });
-      const again = await tokenApp.app.request(`/api/v1/integration/${integration.id}/tokens`, {
-        method: 'POST',
-        headers: { authorization: `Bearer ${data.key}`, 'content-type': 'application/json' },
-        body: JSON.stringify({ name: 'k', role: 'member' }),
-      });
+      const again = await request(
+        data.key,
+        'POST',
+        `/api/v1/integration/${integration.id}/tokens`,
+        {
+          name: 'k',
+          role: 'member',
+        },
+      );
       expect(again.status).toBe(403);
     });
   });

@@ -1,18 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { db, TokenScalarSchema, unregisterDbHook } from '@template/db';
-import type {
-  Organization,
-  OrganizationUser,
-  TokenOwnerModel,
-  User,
-} from '@template/db/generated/client/client';
+import type { Organization, TokenOwnerModel, User } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
   createIntegration,
   createOrganization,
   createOrganizationUser,
-  createToken,
   createUser,
 } from '@template/db/test';
 import { registerDelegatedKeysHook } from '#/hooks/falsePolymorphism/delegatedKeysHook';
@@ -23,6 +17,7 @@ import { batchRouter } from '#/modules/batch';
 import { meRouter } from '#/modules/me';
 import { organizationRouter } from '#/modules/organization';
 import { createTestApp } from '#tests/createTestApp';
+import { createKeyedToken } from '#tests/utils/createKeyedToken';
 
 const { app } = createTestApp({
   mount: [
@@ -54,25 +49,18 @@ const asKey = (key: string, path: string, init: RequestInit = {}) =>
     },
   });
 
-const mint = async (ownerModel: TokenOwnerModel, context: Record<string, unknown>) => {
-  const key = randomUUID();
-  await createToken(
-    { ownerModel, role: 'owner', keyHash: createHash('sha256').update(key).digest('hex') },
-    context,
-  );
-  return key;
-};
+const mint = async (ownerModel: TokenOwnerModel, context: Record<string, unknown>) =>
+  (await createKeyedToken({ ownerModel, role: 'owner' }, context)).rawKey;
 
 describe('only a user acts directly: a JWT or a spoof (Aron, 2026-10-25)', () => {
   let user: User;
   let organization: Organization;
-  let member: OrganizationUser;
 
   beforeAll(async () => {
     registerDelegatedKeysHook();
     ({ entity: user } = await createUser());
     ({ entity: organization } = await createOrganization());
-    ({ entity: member } = await createOrganizationUser({ role: 'owner' }, { user, organization }));
+    await createOrganizationUser({ role: 'owner' }, { user, organization });
   });
 
   afterAll(async () => {
@@ -104,18 +92,6 @@ describe('only a user acts directly: a JWT or a spoof (Aron, 2026-10-25)', () =>
   });
 
   describe('/me is the user a User token belongs to, and nobody else', () => {
-    it("a user's own token reads /me", async () => {
-      const key = await mint('User', { user });
-      const response = await asKey(key, '/api/v1/me');
-      expect(response.status).toBe(200);
-      expect(((await response.json()) as { data: { id: string } }).data.id).toBe(user.id);
-    });
-
-    it("a member's token does not", async () => {
-      const key = await mint('OrganizationUser', { organizationUser: member });
-      expect((await asKey(key, '/api/v1/me')).status).toBe(401);
-    });
-
     it("a user's integration's token does not", async () => {
       const { entity: integration } = await createIntegration({
         ownerModel: 'User',

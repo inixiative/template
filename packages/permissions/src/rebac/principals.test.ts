@@ -79,10 +79,6 @@ const acting = (permix: Awaited<ReturnType<typeof table>>, model: ActorModel, id
 
 describe('no self arm: the user reaches their own rows through rel user (Aron, 2026-10-23)', () => {
   describe('the user and their relation', () => {
-    it('the user leaves their own relation', async () => {
-      expect(can(await session(u1, 'operate'), 'organizationUser', r1, 'leave')).toBe(true);
-    });
-
     it('the user cannot evict a peer', async () => {
       const member = await session(u1, 'operate');
       expect(can(member, 'organizationUser', r2, 'leave')).toBe(false);

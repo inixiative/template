@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { createHash, randomBytes, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import {
   type AccessorName,
   cacheKey,
@@ -23,13 +23,13 @@ import {
   createOrganizationUser,
   createSpace,
   createSpaceUser,
-  createToken,
   createUser,
 } from '@template/db/test';
 import { app } from '#/app';
 import { registerClearCacheHook } from '#/hooks/cache/hook';
 import { tokenAuthMiddleware } from '#/middleware/auth/tokenAuthMiddleware';
 import { createTestApp } from '#tests/createTestApp';
+import { createKeyedToken } from '#tests/utils/createKeyedToken';
 
 // Member and user changes reach the next request through the cache hooks the app registers.
 beforeAll(() => registerClearCacheHook());
@@ -38,49 +38,24 @@ afterAll(async () => {
   await cleanupTouchedTables(db);
 });
 
-const mintKey = () => {
-  const rawKey = randomBytes(24).toString('hex');
-  return {
-    rawKey,
-    fields: {
-      keyHash: createHash('sha256').update(rawKey).digest('hex'),
-      keyPrefix: rawKey.slice(0, 16),
-    },
-  };
-};
-
-const userToken = async (user: User, expiresAt: Date | null = null) => {
-  const { rawKey, fields } = mintKey();
-  await createToken({ ownerModel: 'User', role: 'owner', expiresAt, ...fields }, { user });
+const ownerBearer = async (...[data, context]: Parameters<typeof createKeyedToken>) => {
+  const { rawKey } = await createKeyedToken({ role: 'owner', ...data }, context);
   return { authorization: `Bearer ${rawKey}` };
 };
 
-const organizationToken = async (organization: Organization) => {
-  const { rawKey, fields } = mintKey();
-  await createToken({ ownerModel: 'Organization', role: 'owner', ...fields }, { organization });
-  return { authorization: `Bearer ${rawKey}` };
-};
+const userToken = (user: User, expiresAt: Date | null = null) =>
+  ownerBearer({ ownerModel: 'User', expiresAt }, { user });
 
-const spaceToken = async (space: Space) => {
-  const { rawKey, fields } = mintKey();
-  await createToken({ ownerModel: 'Space', role: 'owner', ...fields }, { space });
-  return { authorization: `Bearer ${rawKey}` };
-};
+const organizationToken = (organization: Organization) =>
+  ownerBearer({ ownerModel: 'Organization' }, { organization });
 
-const organizationUserToken = async (organizationUser: OrganizationUser) => {
-  const { rawKey, fields } = mintKey();
-  await createToken(
-    { ownerModel: 'OrganizationUser', role: 'owner', ...fields },
-    { organizationUser },
-  );
-  return { authorization: `Bearer ${rawKey}` };
-};
+const spaceToken = (space: Space) => ownerBearer({ ownerModel: 'Space' }, { space });
 
-const spaceUserToken = async (spaceUser: SpaceUser) => {
-  const { rawKey, fields } = mintKey();
-  await createToken({ ownerModel: 'SpaceUser', role: 'owner', ...fields }, { spaceUser });
-  return { authorization: `Bearer ${rawKey}` };
-};
+const organizationUserToken = (organizationUser: OrganizationUser) =>
+  ownerBearer({ ownerModel: 'OrganizationUser' }, { organizationUser });
+
+const spaceUserToken = (spaceUser: SpaceUser) =>
+  ownerBearer({ ownerModel: 'SpaceUser' }, { spaceUser });
 
 const readMe = (headers: Record<string, string>) => app.request('/api/v1/me', { headers });
 
@@ -328,9 +303,7 @@ describe('every token type is refused once its owner is gone', () => {
       ownerModel: 'User',
       userId: user.id,
     });
-    const { rawKey, fields } = mintKey();
-    await createToken({ ownerModel: 'Integration', role: 'owner', ...fields }, { integration });
-    const headers = { authorization: `Bearer ${rawKey}` };
+    const headers = await ownerBearer({ ownerModel: 'Integration' }, { integration });
     expect(await authenticatedTokenId(headers)).not.toBeNull();
 
     await db.integration.update({ where: { id: integration.id }, data: { deletedAt: new Date() } });
@@ -339,9 +312,8 @@ describe('every token type is refused once its owner is gone', () => {
 
   it('a deactivated token is refused, cached or not', async () => {
     const { entity: user } = await createUser();
-    const { rawKey, fields } = mintKey();
-    const { entity: token } = await createToken(
-      { ownerModel: 'User', role: 'owner', ...fields },
+    const { entity: token, rawKey } = await createKeyedToken(
+      { ownerModel: 'User', role: 'owner' },
       { user },
     );
     const headers = { authorization: `Bearer ${rawKey}` };
@@ -353,22 +325,19 @@ describe('every token type is refused once its owner is gone', () => {
 
   it('lastUsedAt marks an accepted use: a refused token is not stamped', async () => {
     const { entity: user } = await createUser();
-    const live = mintKey();
-    const { entity: accepted } = await createToken(
-      { ownerModel: 'User', role: 'owner', ...live.fields },
-      { user },
-    );
-    const dead = mintKey();
-    const { entity: refused } = await createToken(
-      { ownerModel: 'User', role: 'owner', expiresAt: new Date(Date.now() - 1000), ...dead.fields },
+    const live = await createKeyedToken({ ownerModel: 'User', role: 'owner' }, { user });
+    const dead = await createKeyedToken(
+      { ownerModel: 'User', role: 'owner', expiresAt: new Date(Date.now() - 1000) },
       { user },
     );
     await authenticatedTokenId({ authorization: `Bearer ${live.rawKey}` });
     await authenticatedTokenId({ authorization: `Bearer ${dead.rawKey}` });
     expect(
-      (await db.token.findUniqueOrThrow({ where: { id: accepted.id } })).lastUsedAt,
+      (await db.token.findUniqueOrThrow({ where: { id: live.entity.id } })).lastUsedAt,
     ).not.toBeNull();
-    expect((await db.token.findUniqueOrThrow({ where: { id: refused.id } })).lastUsedAt).toBeNull();
+    expect(
+      (await db.token.findUniqueOrThrow({ where: { id: dead.entity.id } })).lastUsedAt,
+    ).toBeNull();
   });
 
   it('a token minted already expired is refused', async () => {
@@ -450,8 +419,10 @@ describe('a token is refused once anything its owner stands on is gone, cached o
         ownerModel: 'User',
         userId: user.id,
       });
-      const { rawKey, fields } = mintKey();
-      await createToken({ ownerModel: 'Integration', role: 'owner', ...fields }, { integration });
+      const { rawKey } = await createKeyedToken(
+        { ownerModel: 'Integration', role: 'owner' },
+        { integration },
+      );
       return {
         headers: { authorization: `Bearer ${rawKey}` },
         removals: { integration: softDelete('integration', integration.id) },

@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { randomUUID } from 'node:crypto';
-import { type AccessorName, db, fetchOne, hydrate, unregisterDbHook } from '@template/db';
+import { db, unregisterDbHook } from '@template/db';
 import type {
   Integration,
   Organization,
@@ -17,12 +17,9 @@ import {
   createOrganizationUser,
   createSpace,
   createSpaceUser,
-  createUser,
 } from '@template/db/test';
-import { check, rebacSchema } from '@template/permissions/rebac';
 import { registerClearCacheHook } from '#/hooks/cache/hook';
 import { registerRulesHook } from '#/hooks/rules/hook';
-import { tokenAuthMiddleware } from '#/middleware/auth/tokenAuthMiddleware';
 import { integrationRouter } from '#/modules/integration';
 import { meRouter } from '#/modules/me';
 import { organizationRouter } from '#/modules/organization';
@@ -30,48 +27,11 @@ import { organizationUserRouter } from '#/modules/organizationUser';
 import { spaceRouter } from '#/modules/space';
 import { tokenRouter } from '#/modules/token';
 import { createTestApp } from '#tests/createTestApp';
+import { createTokenProbeApp } from '#tests/utils/createTokenProbeApp';
+import { type Entry, entry } from '#tests/utils/entitlementEntry';
 import { del, patch, post } from '#tests/utils/request';
 
-type Entry = {
-  resource: string;
-  anchor: { resource: string; id: string };
-  actions: Record<string, boolean>;
-};
-
-const entry = (resource: string, anchor: [string, string], actions: string[]): Entry => ({
-  resource,
-  anchor: { resource: anchor[0], id: anchor[1] },
-  actions: Object.fromEntries(actions.map((action) => [action, true])),
-});
-
-const { app: tokenApp } = createTestApp({
-  mount: [
-    (hono) => {
-      hono.use('*', tokenAuthMiddleware);
-      hono.post('/holds', async (c) => {
-        const { model, id, action } = (await c.req.json()) as {
-          model: AccessorName;
-          id: string;
-          action: string;
-        };
-        const row = await fetchOne<{ id: string }>(model, id);
-        if (!row) return c.json({ holds: false });
-        const record = await hydrate(model, row);
-        return c.json({ holds: check(c.get('permix'), rebacSchema, model, record, action) });
-      });
-    },
-  ],
-});
-
-const holds = async (key: string, model: AccessorName, id: string, action: string) => {
-  const response = await tokenApp.request('/holds', {
-    method: 'POST',
-    headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
-    body: JSON.stringify({ model, id, action }),
-  });
-  expect(response.status).toBe(200);
-  return ((await response.json()) as { holds: boolean }).holds;
-};
+const { holds } = createTokenProbeApp();
 
 const as = (user: User, organizationUsers: OrganizationUser[], spaceUsers: SpaceUser[] = []) =>
   createTestApp({

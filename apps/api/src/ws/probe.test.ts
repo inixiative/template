@@ -1,7 +1,6 @@
 // canSubscribe/resolveIdentity dry-run the REAL app: real session auth, real spoof middleware,
 // real permissions. Route auth IS channel auth, end to end.
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { createHash, randomUUID } from 'node:crypto';
 import { db } from '@template/db';
 import type { User } from '@template/db/generated/client/client';
 import {
@@ -14,12 +13,12 @@ import {
   cleanupTouchedTables,
   createInquiry,
   createOrganization,
-  createToken,
   createUser,
 } from '@template/db/test';
 import { STREAM_DEFINITIONS, WS_CHANNELS } from '@template/shared/ws';
 import { canSubscribe, resolveIdentity } from '#/ws/probe';
 import { createBearerToken } from '#tests/utils/createBearerToken';
+import { createKeyedToken } from '#tests/utils/createKeyedToken';
 
 describe('ws subscribe probe (real app)', () => {
   let superadmin: User;
@@ -44,16 +43,11 @@ describe('ws subscribe probe (real app)', () => {
       content: { organizationId: sourceOrganization.id, role: 'member' },
     });
     inquiryId = inquiry.id;
-    const key = randomUUID();
-    await createToken(
-      {
-        ownerModel: 'Organization',
-        role: 'owner',
-        keyHash: createHash('sha256').update(key).digest('hex'),
-      },
+    const { rawKey } = await createKeyedToken(
+      { ownerModel: 'Organization', role: 'owner' },
       { organization: sourceOrganization },
     );
-    organizationBearer = { authorization: `Bearer ${key}` };
+    organizationBearer = { authorization: `Bearer ${rawKey}` };
   });
 
   it("an organization's token is identified as a token, with no user", async () => {

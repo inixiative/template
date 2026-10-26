@@ -1,5 +1,4 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { createHash, randomBytes } from 'node:crypto';
 import { z } from '@hono/zod-openapi';
 import { db, hydrate, ownerColumns, unregisterDbHook } from '@template/db';
 import type { Organization, Role, Space, User } from '@template/db/generated/client/client';
@@ -10,7 +9,6 @@ import {
   createOrganizationUser,
   createSpace,
   createSpaceUser,
-  createToken,
   createUser,
 } from '@template/db/test';
 import { createPermissions } from '@template/permissions/client';
@@ -21,6 +19,7 @@ import { readRoute } from '#/lib/routeTemplates';
 import { AUTH_PROBE_HEADER, AUTH_PROBE_SECRET } from '#/lib/utils/authProbe';
 import { validateSubmodelPermission } from '#/middleware/validations/validateSubmodelPermission';
 import { Modules } from '#/modules/modules';
+import { createKeyedToken } from '#tests/utils/createKeyedToken';
 import { createUserJwt } from '#tests/utils/createUserJwt';
 
 beforeAll(() => registerClearCacheHook());
@@ -35,19 +34,10 @@ const jwt = async (user: User): Promise<Headers> => ({
   authorization: (await createUserJwt(user)).authorization,
 });
 
-const userToken = async (user: User, role: Role): Promise<Headers> => {
-  const rawKey = randomBytes(24).toString('hex');
-  await createToken(
-    {
-      ownerModel: 'User',
-      role,
-      keyHash: createHash('sha256').update(rawKey).digest('hex'),
-      keyPrefix: rawKey.slice(0, 16),
-    },
-    { user },
-  );
-  return { authorization: `Bearer ${rawKey}` };
-};
+const bearer = (rawKey: string): Headers => ({ authorization: `Bearer ${rawKey}` });
+
+const userToken = async (user: User, role: Role): Promise<Headers> =>
+  bearer((await createKeyedToken({ ownerModel: 'User', role }, { user })).rawKey);
 
 const gate = async (headers: Headers, method: 'GET' | 'POST', path: string) => {
   const response = await app.request(`/api/v1${path}`, {
@@ -96,230 +86,155 @@ describe('submodel actions act on the submodel, under the owner (R38)', () => {
       ),
     );
 
+  const outcomes = (
+    callers: string[],
+    passing: string[],
+    fixed: Record<string, string> = {},
+  ): Record<string, string> =>
+    Object.fromEntries(
+      callers.map((who) => [who, fixed[who] ?? (passing.includes(who) ? 'passes' : 'denied')]),
+    );
+
+  type Row = { name: string; path: string; create?: string[]; list?: string[] };
+
+  const members = ['owner', 'admin', 'member', 'viewer'];
+  const managers = ['owner', 'admin'];
+  const operators = ['owner', 'admin', 'member'];
+
+  const expectRow = async (
+    callers: Record<string, Headers>,
+    at: (path: string) => string,
+    row: Row,
+  ) => {
+    const names = Object.keys(callers);
+    if (row.create)
+      expect(await statuses(callers, 'POST', at(row.path))).toEqual(outcomes(names, row.create));
+    if (row.list)
+      expect(await statuses(callers, 'GET', at(row.path))).toEqual(outcomes(names, row.list));
+  };
+
   describe('organization children', () => {
-    const at = (path: string) => `/organization/${organization.id}${path}`;
-    const callers = () => ({ ...org, outsider });
+    const rows: Row[] = [
+      {
+        name: 'contacts: managers create, every member lists',
+        path: '/contacts',
+        create: managers,
+        list: members,
+      },
+      {
+        name: 'integrations: managers create, every member lists',
+        path: '/integrations',
+        create: managers,
+        list: members,
+      },
+      {
+        name: 'webhook subscriptions: operators create, every member lists',
+        path: '/webhookSubscriptions',
+        create: operators,
+        list: members,
+      },
+      { name: 'auth providers: only owners create', path: '/authProviders', create: ['owner'] },
+      {
+        name: 'tokens: only owners list (R38: token list read = own at the owner)',
+        path: '/tokens',
+        list: ['owner'],
+      },
+    ];
 
-    it('contacts: managers create, every member lists', async () => {
-      expect(await statuses(callers(), 'POST', at('/contacts'))).toEqual({
-        owner: 'passes',
-        admin: 'passes',
-        member: 'denied',
-        viewer: 'denied',
-        outsider: 'denied',
-      });
-      expect(await statuses(callers(), 'GET', at('/contacts'))).toEqual({
-        owner: 'passes',
-        admin: 'passes',
-        member: 'passes',
-        viewer: 'passes',
-        outsider: 'denied',
-      });
-    });
-
-    it('integrations: managers create, every member lists', async () => {
-      expect(await statuses(callers(), 'POST', at('/integrations'))).toEqual({
-        owner: 'passes',
-        admin: 'passes',
-        member: 'denied',
-        viewer: 'denied',
-        outsider: 'denied',
-      });
-      expect(await statuses(callers(), 'GET', at('/integrations'))).toEqual({
-        owner: 'passes',
-        admin: 'passes',
-        member: 'passes',
-        viewer: 'passes',
-        outsider: 'denied',
-      });
-    });
-
-    it('webhook subscriptions: operators create, every member lists', async () => {
-      expect(await statuses(callers(), 'POST', at('/webhookSubscriptions'))).toEqual({
-        owner: 'passes',
-        admin: 'passes',
-        member: 'passes',
-        viewer: 'denied',
-        outsider: 'denied',
-      });
-      expect(await statuses(callers(), 'GET', at('/webhookSubscriptions'))).toEqual({
-        owner: 'passes',
-        admin: 'passes',
-        member: 'passes',
-        viewer: 'passes',
-        outsider: 'denied',
-      });
-    });
-
-    it('auth providers: only owners create', async () => {
-      expect(await statuses(callers(), 'POST', at('/authProviders'))).toEqual({
-        owner: 'passes',
-        admin: 'denied',
-        member: 'denied',
-        viewer: 'denied',
-        outsider: 'denied',
-      });
-    });
-
-    it('tokens: only owners list (R38: token list read = own at the owner)', async () => {
-      expect(await statuses(callers(), 'GET', at('/tokens'))).toEqual({
-        owner: 'passes',
-        admin: 'denied',
-        member: 'denied',
-        viewer: 'denied',
-        outsider: 'denied',
-      });
-    });
+    for (const row of rows)
+      it(row.name, () =>
+        expectRow({ ...org, outsider }, (path) => `/organization/${organization.id}${path}`, row),
+      );
   });
 
   describe('space children', () => {
-    const at = (path: string) => `/space/${space.id}${path}`;
-    let orgOwnerNoSeat: Headers;
-    let orgAdminNoSeat: Headers;
+    const withOrgOwner = (callers: string[]) => [...callers, 'orgOwnerNoSeat'];
+    const rows: Row[] = [
+      {
+        name: 'contacts: space managers and org owners create; space members list',
+        path: '/contacts',
+        create: withOrgOwner(managers),
+        list: withOrgOwner(members),
+      },
+      {
+        name: 'integrations: space managers and org owners create; space members list',
+        path: '/integrations',
+        create: withOrgOwner(managers),
+        list: withOrgOwner(members),
+      },
+      {
+        name: 'webhook subscriptions: space operators create; space members list',
+        path: '/webhookSubscriptions',
+        create: withOrgOwner(operators),
+        list: withOrgOwner(members),
+      },
+      {
+        name: 'tokens: only space owners (and org owners) list',
+        path: '/tokens',
+        list: withOrgOwner(['owner']),
+      },
+    ];
 
-    beforeAll(() => {
-      orgOwnerNoSeat = org.owner;
-      orgAdminNoSeat = org.admin;
-    });
-
-    const callers = () => ({ ...spc, orgOwnerNoSeat, orgAdminNoSeat, outsider });
-
-    it('contacts: space managers and org owners create; space members list', async () => {
-      expect(await statuses(callers(), 'POST', at('/contacts'))).toEqual({
-        owner: 'passes',
-        admin: 'passes',
-        member: 'denied',
-        viewer: 'denied',
-        orgOwnerNoSeat: 'passes',
-        orgAdminNoSeat: 'denied',
-        outsider: 'denied',
-      });
-      expect(await statuses(callers(), 'GET', at('/contacts'))).toEqual({
-        owner: 'passes',
-        admin: 'passes',
-        member: 'passes',
-        viewer: 'passes',
-        orgOwnerNoSeat: 'passes',
-        orgAdminNoSeat: 'denied',
-        outsider: 'denied',
-      });
-    });
-
-    it('integrations: space managers and org owners create; space members list', async () => {
-      expect(await statuses(callers(), 'POST', at('/integrations'))).toEqual({
-        owner: 'passes',
-        admin: 'passes',
-        member: 'denied',
-        viewer: 'denied',
-        orgOwnerNoSeat: 'passes',
-        orgAdminNoSeat: 'denied',
-        outsider: 'denied',
-      });
-      expect(await statuses(callers(), 'GET', at('/integrations'))).toEqual({
-        owner: 'passes',
-        admin: 'passes',
-        member: 'passes',
-        viewer: 'passes',
-        orgOwnerNoSeat: 'passes',
-        orgAdminNoSeat: 'denied',
-        outsider: 'denied',
-      });
-    });
-
-    it('webhook subscriptions: space operators create; space members list', async () => {
-      expect(await statuses(callers(), 'POST', at('/webhookSubscriptions'))).toEqual({
-        owner: 'passes',
-        admin: 'passes',
-        member: 'passes',
-        viewer: 'denied',
-        orgOwnerNoSeat: 'passes',
-        orgAdminNoSeat: 'denied',
-        outsider: 'denied',
-      });
-      expect(await statuses(callers(), 'GET', at('/webhookSubscriptions'))).toEqual({
-        owner: 'passes',
-        admin: 'passes',
-        member: 'passes',
-        viewer: 'passes',
-        orgOwnerNoSeat: 'passes',
-        orgAdminNoSeat: 'denied',
-        outsider: 'denied',
-      });
-    });
-
-    it('tokens: only space owners (and org owners) list', async () => {
-      expect(await statuses(callers(), 'GET', at('/tokens'))).toEqual({
-        owner: 'passes',
-        admin: 'denied',
-        member: 'denied',
-        viewer: 'denied',
-        orgOwnerNoSeat: 'passes',
-        orgAdminNoSeat: 'denied',
-        outsider: 'denied',
-      });
-    });
+    for (const row of rows)
+      it(row.name, () =>
+        expectRow(
+          { ...spc, orgOwnerNoSeat: org.owner, orgAdminNoSeat: org.admin, outsider },
+          (path) => `/space/${space.id}${path}`,
+          row,
+        ),
+      );
   });
 
   describe('my children (/me)', () => {
     let callers: Record<string, Headers>;
+    const memberTokenOutcome = { memberToken: 'unauthenticated' };
 
     beforeAll(async () => {
       const { entity: organizationUser } = await createOrganizationUser(
         { role: 'owner' },
         { organization },
       );
-      const memberKey = randomBytes(24).toString('hex');
-      await createToken(
-        {
-          ownerModel: 'OrganizationUser',
-          role: 'owner',
-          keyHash: createHash('sha256').update(memberKey).digest('hex'),
-          keyPrefix: memberKey.slice(0, 16),
-        },
+      const { rawKey } = await createKeyedToken(
+        { ownerModel: 'OrganizationUser', role: 'owner' },
         { organizationUser },
       );
       callers = {
         user: await jwt((await createUser()).entity),
         ownerToken: await userToken((await createUser()).entity, 'owner'),
         viewerToken: await userToken((await createUser()).entity, 'viewer'),
-        memberToken: { authorization: `Bearer ${memberKey}` },
+        memberToken: bearer(rawKey),
       };
     });
 
-    it('creates need operate on me', async () => {
-      for (const path of ['/contacts', '/flows', '/integrations', '/webhookSubscriptions'])
-        expect([path, await statuses(callers, 'POST', `/me${path}`)]).toEqual([
-          path,
-          {
-            user: 'passes',
-            ownerToken: 'passes',
-            viewerToken: 'denied',
-            memberToken: 'unauthenticated',
-          },
-        ]);
-    });
+    const rows = [
+      {
+        name: 'creates need operate on me',
+        method: 'POST',
+        paths: ['/contacts', '/flows', '/integrations', '/webhookSubscriptions'],
+        passing: ['user', 'ownerToken'],
+      },
+      {
+        name: 'lists need read on me',
+        method: 'GET',
+        paths: ['/contacts', '/integrations', '/webhookSubscriptions'],
+        passing: ['user', 'ownerToken', 'viewerToken'],
+      },
+      {
+        name: 'my tokens: own on me',
+        method: 'GET',
+        paths: ['/tokens'],
+        passing: ['user', 'ownerToken'],
+      },
+    ] as const;
 
-    it('lists need read on me', async () => {
-      for (const path of ['/contacts', '/integrations', '/webhookSubscriptions'])
-        expect([path, await statuses(callers, 'GET', `/me${path}`)]).toEqual([
-          path,
-          {
-            user: 'passes',
-            ownerToken: 'passes',
-            viewerToken: 'passes',
-            memberToken: 'unauthenticated',
-          },
-        ]);
-    });
-
-    it('my tokens: own on me', async () => {
-      expect(await statuses(callers, 'GET', '/me/tokens')).toEqual({
-        user: 'passes',
-        ownerToken: 'passes',
-        viewerToken: 'denied',
-        memberToken: 'unauthenticated',
+    for (const row of rows)
+      it(row.name, async () => {
+        for (const path of row.paths)
+          expect([path, await statuses(callers, row.method, `/me${path}`)]).toEqual([
+            path,
+            outcomes(Object.keys(callers), [...row.passing], memberTokenOutcome),
+          ]);
       });
-    });
   });
 
   describe('attempts to get around it', () => {
@@ -371,8 +286,7 @@ describe('submodel actions act on the submodel, under the owner (R38)', () => {
       const { entity: other } = await createOrganization();
       const { context } = await createOrganizationUser({ role: 'owner' }, { organization: other });
       await createOrganizationUser({ role: 'viewer' }, { organization, user: context.user });
-      const rawKey = randomBytes(24).toString('hex');
-      await createToken(
+      const { rawKey } = await createKeyedToken(
         {
           ownerModel: 'User',
           role: 'viewer',
@@ -383,12 +297,10 @@ describe('submodel actions act on the submodel, under the owner (R38)', () => {
               actions: { create: true },
             },
           ],
-          keyHash: createHash('sha256').update(rawKey).digest('hex'),
-          keyPrefix: rawKey.slice(0, 16),
         },
         { user: context.user },
       );
-      const headers = { authorization: `Bearer ${rawKey}` };
+      const headers = bearer(rawKey);
       expect(await gate(headers, 'POST', `/organization/${organization.id}/contacts`)).toBe(
         'denied',
       );

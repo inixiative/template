@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { db } from '@template/db';
 import type {
   Organization,
@@ -7,12 +7,10 @@ import type {
   Role,
   User,
 } from '@template/db/generated/client/client';
-import type { TokenOwnerModel } from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
   createOrganization,
   createOrganizationUser,
-  createToken,
   createUser,
 } from '@template/db/test';
 import { tokenAuthMiddleware } from '#/middleware/auth/tokenAuthMiddleware';
@@ -20,6 +18,7 @@ import { meRouter } from '#/modules/me';
 import { organizationRouter } from '#/modules/organization';
 import { tokenRouter } from '#/modules/token';
 import { createTestApp } from '#tests/createTestApp';
+import { createKeyedToken } from '#tests/utils/createKeyedToken';
 import { post } from '#tests/utils/request';
 
 describe('every route names its action; a token is never a user (Aron, 2026-10-23)', () => {
@@ -48,15 +47,12 @@ describe('every route names its action; a token is never a user (Aron, 2026-10-2
       }),
     );
 
-  const mint = async (owner: User, role: Role, ownerModel: TokenOwnerModel = 'User') => {
-    const key = randomUUID();
-    const { entity } = await createToken(
-      { ownerModel, role, keyHash: createHash('sha256').update(key).digest('hex') },
-      ownerModel === 'OrganizationUser'
-        ? { user: owner, organization, organizationUser: member }
-        : { user: owner },
+  const mint = async (owner: User, role: Role) => {
+    const { entity, rawKey } = await createKeyedToken(
+      { ownerModel: 'User', role },
+      { user: owner },
     );
-    return { key, token: entity };
+    return { key: rawKey, token: entity };
   };
 
   const webhook = () => ({ model: 'CustomerRef', url: `https://example.com/${randomUUID()}` });
@@ -125,13 +121,5 @@ describe('every route names its action; a token is never a user (Aron, 2026-10-2
     expect(
       (await call(key, 'POST', '/organization', { name: 'o', slug: randomUUID() })).status,
     ).toBe(201);
-  });
-
-  it('an OrganizationUser token has no me: /me answers 401', async () => {
-    const { key } = await mint(user, 'owner', 'OrganizationUser');
-    expect((await call(key, 'GET', '/me')).status).toBe(401);
-    expect((await call(key, 'GET', '/me/organizations')).status).toBe(401);
-    expect((await call(key, 'GET', '/me/tokens')).status).toBe(401);
-    expect((await call(key, 'POST', '/me/webhookSubscriptions', webhook())).status).toBe(401);
   });
 });

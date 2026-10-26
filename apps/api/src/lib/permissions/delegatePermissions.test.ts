@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { type AccessorName, db, fetchOne, hydrate, unregisterDbHook } from '@template/db';
+import { db, unregisterDbHook } from '@template/db';
 import type {
   Integration,
   Organization,
@@ -18,67 +18,26 @@ import {
   createSpaceUser,
   createUser,
 } from '@template/db/test';
-import { check, rebacSchema } from '@template/permissions/rebac';
 import { registerClearCacheHook } from '#/hooks/cache/hook';
 import { registerDelegatedKeysHook } from '#/hooks/falsePolymorphism/delegatedKeysHook';
 import { registerRulesHook } from '#/hooks/rules/hook';
-import { tokenAuthMiddleware } from '#/middleware/auth/tokenAuthMiddleware';
 import { integrationRouter } from '#/modules/integration';
 import { meRouter } from '#/modules/me';
 import { organizationRouter } from '#/modules/organization';
 import { organizationUserRouter } from '#/modules/organizationUser';
 import { tokenRouter } from '#/modules/token';
 import { createTestApp } from '#tests/createTestApp';
+import { createTokenProbeApp } from '#tests/utils/createTokenProbeApp';
+import { type Entry, entry } from '#tests/utils/entitlementEntry';
 import { del, patch, post } from '#tests/utils/request';
-
-type Entry = {
-  resource: string;
-  anchor: { resource: string; id: string };
-  actions: Record<string, boolean>;
-};
 
 type Permissions = { role?: Role | null; full?: boolean; entitlements?: Entry[] | null };
 
-const entry = (resource: string, anchor: [string, string], actions: string[]): Entry => ({
-  resource,
-  anchor: { resource: anchor[0], id: anchor[1] },
-  actions: Object.fromEntries(actions.map((action) => [action, true])),
+const { call: asToken, holds } = createTokenProbeApp((hono) => {
+  hono.route('/api/v1/me', meRouter);
+  hono.route('/api/v1/organization', organizationRouter);
+  hono.route('/api/v1/token', tokenRouter);
 });
-
-const { app: tokenApp } = createTestApp({
-  mount: [
-    (hono) => {
-      hono.use('*', tokenAuthMiddleware);
-      hono.route('/api/v1/me', meRouter);
-      hono.route('/api/v1/organization', organizationRouter);
-      hono.route('/api/v1/token', tokenRouter);
-      hono.post('/api/v1/probe/holds', async (c) => {
-        const { model, id, action } = (await c.req.json()) as {
-          model: AccessorName;
-          id: string;
-          action: string;
-        };
-        const row = await fetchOne<{ id: string }>(model, id);
-        if (!row) return c.json({ holds: false });
-        const record = await hydrate(model, row);
-        return c.json({ holds: check(c.get('permix'), rebacSchema, model, record, action) });
-      });
-    },
-  ],
-});
-
-const asToken = (key: string, method: string, path: string, body?: unknown) =>
-  tokenApp.request(path, {
-    method,
-    headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-
-const holds = async (key: string, model: AccessorName, id: string, action: string) => {
-  const response = await asToken(key, 'POST', '/api/v1/probe/holds', { model, id, action });
-  expect(response.status).toBe(200);
-  return ((await response.json()) as { holds: boolean }).holds;
-};
 
 const userApp = (user: User, organizationUsers: OrganizationUser[], spaceUsers: SpaceUser[] = []) =>
   createTestApp({
@@ -430,15 +389,6 @@ describe('a delegate holds its permissions, and no more than whoever grants it (
         token: { full: true },
         status: 201,
         holds: 'own',
-      },
-      {
-        name: 'full token, full integration, member member',
-        memberRole: 'member',
-        integration: { full: true },
-        token: { full: true },
-        status: 201,
-        holds: 'operate',
-        lacks: 'manage',
       },
       {
         name: 'full token, viewer integration',

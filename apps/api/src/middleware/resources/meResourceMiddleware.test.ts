@@ -1,13 +1,8 @@
 import { afterAll, describe, expect, it } from 'bun:test';
-import { createHash, randomBytes } from 'node:crypto';
 import { db } from '@template/db';
-import {
-  cleanupTouchedTables,
-  createOrganizationUser,
-  createToken,
-  createUser,
-} from '@template/db/test';
+import { cleanupTouchedTables, createOrganizationUser, createUser } from '@template/db/test';
 import { app } from '#/app';
+import { createKeyedToken } from '#tests/utils/createKeyedToken';
 import { createUserJwt } from '#tests/utils/createUserJwt';
 
 afterAll(async () => {
@@ -18,16 +13,7 @@ const request = (path: string, headers: Record<string, string> = {}, init: Reque
   app.request(`/api/v1${path}`, { ...init, headers: { ...headers, ...init.headers } });
 
 const bearer = async (ownerModel: 'User' | 'OrganizationUser', owners: Record<string, unknown>) => {
-  const rawKey = randomBytes(24).toString('hex');
-  await createToken(
-    {
-      ownerModel,
-      role: 'owner',
-      keyHash: createHash('sha256').update(rawKey).digest('hex'),
-      keyPrefix: rawKey.slice(0, 16),
-    },
-    owners,
-  );
+  const { rawKey } = await createKeyedToken({ ownerModel, role: 'owner' }, owners);
   return { authorization: `Bearer ${rawKey}` };
 };
 

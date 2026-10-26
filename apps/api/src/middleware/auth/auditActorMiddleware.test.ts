@@ -1,18 +1,17 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { createHash, randomUUID } from 'node:crypto';
 import { db, unregisterDbHook } from '@template/db';
 import { auditActorContext } from '@template/db/lib/auditActorContext';
 import {
   cleanupTouchedTables,
   createIntegration,
   createOrganizationUser,
-  createToken,
   createUser,
 } from '@template/db/test';
 import { registerDelegatedKeysHook } from '#/hooks/falsePolymorphism/delegatedKeysHook';
 import { auditActorMiddleware } from '#/middleware/auth/auditActorMiddleware';
 import { tokenAuthMiddleware } from '#/middleware/auth/tokenAuthMiddleware';
 import { createTestApp } from '#tests/createTestApp';
+import { createKeyedToken } from '#tests/utils/createKeyedToken';
 
 type Echo = {
   integrationId: string | null;
@@ -54,12 +53,8 @@ describe('an integration acts through its token, and the audit names it (Aron, 2
   });
 
   const mint = async (fields: Record<string, unknown>, context: Record<string, unknown>) => {
-    const key = randomUUID();
-    const { entity } = await createToken(
-      { role: 'owner', keyHash: createHash('sha256').update(key).digest('hex'), ...fields },
-      context,
-    );
-    return { key, token: entity };
+    const { entity, rawKey } = await createKeyedToken({ role: 'owner', ...fields }, context);
+    return { key: rawKey, token: entity };
   };
 
   it("an integration's token carries its integration onto the audit", async () => {

@@ -1,15 +1,10 @@
 import { afterAll, describe, expect, it } from 'bun:test';
-import { createHash, randomUUID } from 'node:crypto';
 import { db } from '@template/db';
-import {
-  cleanupTouchedTables,
-  createOrganization,
-  createToken,
-  createUser,
-} from '@template/db/test';
+import { cleanupTouchedTables, createOrganization, createUser } from '@template/db/test';
 import { tokenAuthMiddleware } from '#/middleware/auth/tokenAuthMiddleware';
 import { identifyRouter } from '#/modules/identify';
 import { createTestApp, type MountFn } from '#tests/createTestApp';
+import { createKeyedToken } from '#tests/utils/createKeyedToken';
 
 type Identified = { data: { model: string; record: Record<string, unknown> } };
 
@@ -39,13 +34,8 @@ describe('GET /identify: who the credential is, for any actor (Aron, 2026-10-26)
 
   it("an organization's token is a Token actor, its row without the key hash", async () => {
     const { entity: organization } = await createOrganization();
-    const key = randomUUID();
-    const { entity: token } = await createToken(
-      {
-        ownerModel: 'Organization',
-        role: 'owner',
-        keyHash: createHash('sha256').update(key).digest('hex'),
-      },
+    const { entity: token, rawKey: key } = await createKeyedToken(
+      { ownerModel: 'Organization', role: 'owner' },
       { organization },
     );
     const { app } = createTestApp({ mount });

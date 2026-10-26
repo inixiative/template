@@ -1,62 +1,19 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { createHash, randomBytes } from 'node:crypto';
-import { type AccessorName, db, fetchOne, hydrate } from '@template/db';
+import { db } from '@template/db';
 import type { Organization, Role, Space } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
   createOrganization,
   createOrganizationUser,
   createSpace,
-  createToken,
 } from '@template/db/test';
-import { check, rebacSchema } from '@template/permissions/rebac';
-import { tokenAuthMiddleware } from '#/middleware/auth/tokenAuthMiddleware';
 import { organizationRouter } from '#/modules/organization';
-import { createTestApp } from '#tests/createTestApp';
+import { createKeyedToken } from '#tests/utils/createKeyedToken';
+import { createTokenProbeApp } from '#tests/utils/createTokenProbeApp';
 
-const mintKey = () => {
-  const rawKey = randomBytes(24).toString('hex');
-  return {
-    rawKey,
-    fields: {
-      keyHash: createHash('sha256').update(rawKey).digest('hex'),
-      keyPrefix: rawKey.slice(0, 16),
-    },
-  };
-};
-
-const { app } = createTestApp({
-  mount: [
-    (hono) => {
-      hono.use('*', tokenAuthMiddleware);
-      hono.route('/api/v1/organization', organizationRouter);
-      hono.post('/holds', async (c) => {
-        const { model, id, action } = (await c.req.json()) as {
-          model: AccessorName;
-          id: string;
-          action: string;
-        };
-        const row = await fetchOne<{ id: string }>(model, id);
-        if (!row) return c.json({ holds: false });
-        const record = await hydrate(model, row);
-        return c.json({ holds: check(c.get('permix'), rebacSchema, model, record, action) });
-      });
-    },
-  ],
-});
-
-const call = (key: string, method: string, path: string, body?: unknown) =>
-  app.request(path, {
-    method,
-    headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-
-const holds = async (key: string, model: AccessorName, id: string, action: string) => {
-  const response = await call(key, 'POST', '/holds', { model, id, action });
-  expect(response.status).toBe(200);
-  return ((await response.json()) as { holds: boolean }).holds;
-};
+const { call, holds } = createTokenProbeApp((hono) =>
+  hono.route('/api/v1/organization', organizationRouter),
+);
 
 type Actions = Record<string, boolean> | null;
 
@@ -78,36 +35,26 @@ describe('a credential never exceeds its owner (Aron, 2026-10-23)', () => {
   const member = (role: Role, entitlements: Actions = null) =>
     createOrganizationUser({ role, entitlements: onOrganization(entitlements) }, { organization });
 
-  const userToken = async (
+  const token = async (
+    ownerModel: 'User' | 'OrganizationUser',
     organizationUser: Awaited<ReturnType<typeof member>>,
     role: Role,
     entitlements: Actions = null,
-  ) => {
-    const { rawKey, fields } = mintKey();
-    await createToken(
-      { ownerModel: 'User', role, entitlements: onOrganization(entitlements), ...fields },
-      { user: organizationUser.context.user },
-    );
-    return rawKey;
-  };
+  ) =>
+    (
+      await createKeyedToken(
+        { ownerModel, role, entitlements: onOrganization(entitlements) },
+        ownerModel === 'User'
+          ? { user: organizationUser.context.user }
+          : { organizationUser: organizationUser.entity },
+      )
+    ).rawKey;
 
-  const memberToken = async (
+  const userToken = (
     organizationUser: Awaited<ReturnType<typeof member>>,
     role: Role,
     entitlements: Actions = null,
-  ) => {
-    const { rawKey, fields } = mintKey();
-    await createToken(
-      {
-        ownerModel: 'OrganizationUser',
-        role,
-        entitlements: onOrganization(entitlements),
-        ...fields,
-      },
-      { organizationUser: organizationUser.entity },
-    );
-    return rawKey;
-  };
+  ) => token('User', organizationUser, role, entitlements);
 
   beforeAll(async () => {
     ({ entity: organization } = await createOrganization());
@@ -147,7 +94,7 @@ describe('a credential never exceeds its owner (Aron, 2026-10-23)', () => {
   });
 
   it("a member's owner-role token on an admin member manages and does not own", async () => {
-    const key = await memberToken(await member('admin'), 'owner', { own: true });
+    const key = await token('OrganizationUser', await member('admin'), 'owner', { own: true });
     expect(await holds(key, 'organization', organization.id, 'manage')).toBe(true);
     expect(await holds(key, 'organization', organization.id, 'own')).toBe(false);
   });

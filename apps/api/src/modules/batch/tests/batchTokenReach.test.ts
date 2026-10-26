@@ -1,6 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { createHash, randomBytes } from 'node:crypto';
-import { type AccessorName, db, fetchOne, hydrate, unregisterDbHook } from '@template/db';
+import { type AccessorName, db, unregisterDbHook } from '@template/db';
 import type { Organization, Space, User } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
@@ -8,57 +7,31 @@ import {
   createOrganizationUser,
   createSpace,
   createSpaceUser,
-  createToken,
   createUser,
 } from '@template/db/test';
-import { check, rebacSchema } from '@template/permissions/rebac';
 import { registerClearCacheHook } from '#/hooks/cache/hook';
-import { tokenAuthMiddleware } from '#/middleware/auth/tokenAuthMiddleware';
 import { batchRouter } from '#/modules/batch';
 import { meRouter } from '#/modules/me';
-import { createTestApp } from '#tests/createTestApp';
+import { createKeyedToken } from '#tests/utils/createKeyedToken';
+import { createTokenProbeApp } from '#tests/utils/createTokenProbeApp';
 
 type Probe = { model: AccessorName; id: string; action: string };
 type SubResult = { status: number; body: unknown };
 
-const mintKey = () => {
-  const rawKey = randomBytes(24).toString('hex');
-  return {
-    rawKey,
-    fields: {
-      keyHash: createHash('sha256').update(rawKey).digest('hex'),
-      keyPrefix: rawKey.slice(0, 16),
-    },
-  };
-};
-
-const { app } = createTestApp({
-  mount: [
-    (hono) => {
-      hono.use('*', tokenAuthMiddleware);
-      hono.route('/api/v1/batch', batchRouter);
-      hono.route('/api/v1/me', meRouter);
-      hono.get('/api/v1/probe/actor', (c) => c.json({ actor: c.get('permix').getActor() }));
-      hono.post('/api/v1/probe/holds', async (c) => {
-        const { model, id, action } = (await c.req.json()) as Probe;
-        const row = await fetchOne<{ id: string }>(model, id);
-        if (!row) return c.json({ holds: false });
-        const record = await hydrate(model, row);
-        return c.json({ holds: check(c.get('permix'), rebacSchema, model, record, action) });
-      });
-      hono.post('/api/v1/probe/demote/:id', async (c) => {
-        await db.organizationUser.update({
-          where: { id: c.req.param('id') },
-          data: { role: 'viewer' },
-        });
-        return c.json({});
-      });
-      hono.post('/api/v1/probe/deactivate/:id', async (c) => {
-        await db.token.update({ where: { id: c.req.param('id') }, data: { isActive: false } });
-        return c.json({});
-      });
-    },
-  ],
+const { call } = createTokenProbeApp((hono) => {
+  hono.route('/api/v1/batch', batchRouter);
+  hono.route('/api/v1/me', meRouter);
+  hono.post('/api/v1/probe/demote/:id', async (c) => {
+    await db.organizationUser.update({
+      where: { id: c.req.param('id') },
+      data: { role: 'viewer' },
+    });
+    return c.json({});
+  });
+  hono.post('/api/v1/probe/deactivate/:id', async (c) => {
+    await db.token.update({ where: { id: c.req.param('id') }, data: { isActive: false } });
+    return c.json({});
+  });
 });
 
 const holdsRequest = (probe: Probe) => ({
@@ -68,10 +41,9 @@ const holdsRequest = (probe: Probe) => ({
 });
 
 const batch = async (rawKey: string, rounds: unknown[][]) => {
-  const response = await app.request('/api/v1/batch/execute', {
-    method: 'POST',
-    headers: { authorization: `Bearer ${rawKey}`, 'content-type': 'application/json' },
-    body: JSON.stringify({ requests: rounds, strategy: 'allowFailures' }),
+  const response = await call(rawKey, 'POST', '/api/v1/batch/execute', {
+    requests: rounds,
+    strategy: 'allowFailures',
   });
   expect(response.status).toBe(200);
   return ((await response.json()) as { data: { batch: SubResult[][] } }).data.batch;
@@ -88,11 +60,8 @@ describe('a batch keeps every round inside its credential (Aron, 2026-10-25)', (
   let memberA: Awaited<ReturnType<typeof createOrganizationUser>>;
   let spaceMemberA: Awaited<ReturnType<typeof createSpaceUser>>;
 
-  const mint = async (fields: Record<string, unknown>, owners: Record<string, unknown>) => {
-    const key = mintKey();
-    await createToken({ role: 'owner', ...fields, ...key.fields }, owners);
-    return key.rawKey;
-  };
+  const mint = async (fields: Record<string, unknown>, owners: Record<string, unknown>) =>
+    (await createKeyedToken({ role: 'owner', ...fields }, owners)).rawKey;
 
   beforeAll(async () => {
     ({ entity: user } = await createUser());
@@ -154,43 +123,39 @@ describe('a batch keeps every round inside its credential (Aron, 2026-10-25)', (
     expect(second.map(held)).toEqual([true, true]);
   });
 
-  it('an organization token holds its organization in every round, acting as a token', async () => {
-    const key = await mint({ ownerModel: 'Organization' }, { organization: orgA });
-    const round = [
-      holdsRequest({ model: 'organization', id: orgA.id, action: 'own' }),
-      holdsRequest({ model: 'organization', id: orgB.id, action: 'read' }),
-      { method: 'GET', path: '/api/v1/probe/actor' },
-    ];
+  const ownerTokens = [
+    {
+      name: 'an organization token holds its organization in every round, acting as a token',
+      key: () => mint({ ownerModel: 'Organization' }, { organization: orgA }),
+      holds: (): Probe => ({ model: 'organization', id: orgA.id, action: 'own' }),
+      lacks: (): Probe => ({ model: 'organization', id: orgB.id, action: 'read' }),
+    },
+    {
+      name: 'a space token holds its space in every round, acting as a token',
+      key: () => mint({ ownerModel: 'Space' }, { space: spaceA }),
+      holds: (): Probe => ({ model: 'space', id: spaceA.id, action: 'own' }),
+      lacks: (): Probe => ({ model: 'organization', id: orgA.id, action: 'read' }),
+    },
+  ];
 
-    const [first, second] = await batch(key, [round, round]);
+  for (const row of ownerTokens)
+    it(row.name, async () => {
+      const round = [
+        holdsRequest(row.holds()),
+        holdsRequest(row.lacks()),
+        { method: 'GET', path: '/api/v1/probe/actor' },
+      ];
 
-    for (const results of [first, second]) {
-      expect(results.slice(0, 2).map(held)).toEqual([true, false]);
-      expect(results[2]).toEqual({
-        status: 200,
-        body: { actor: expect.objectContaining({ model: 'Token' }) },
-      });
-    }
-  });
+      const [first, second] = await batch(await row.key(), [round, round]);
 
-  it('a space token holds its space in every round, acting as a token', async () => {
-    const key = await mint({ ownerModel: 'Space' }, { space: spaceA });
-    const round = [
-      holdsRequest({ model: 'space', id: spaceA.id, action: 'own' }),
-      holdsRequest({ model: 'organization', id: orgA.id, action: 'read' }),
-      { method: 'GET', path: '/api/v1/probe/actor' },
-    ];
-
-    const [first, second] = await batch(key, [round, round]);
-
-    for (const results of [first, second]) {
-      expect(results.slice(0, 2).map(held)).toEqual([true, false]);
-      expect(results[2]).toEqual({
-        status: 200,
-        body: { actor: expect.objectContaining({ model: 'Token' }) },
-      });
-    }
-  });
+      for (const results of [first, second]) {
+        expect(results.slice(0, 2).map(held)).toEqual([true, false]);
+        expect(results[2]).toEqual({
+          status: 200,
+          body: { actor: expect.objectContaining({ model: 'Token' }) },
+        });
+      }
+    });
 });
 
 describe('a batch signs its token in again between rounds', () => {
@@ -202,9 +167,8 @@ describe('a batch signs its token in again between rounds', () => {
 
   it('a member demoted in one round loses the role in the next', async () => {
     const { entity: organizationUser, context } = await createOrganizationUser({ role: 'owner' });
-    const key = mintKey();
-    await createToken(
-      { ownerModel: 'OrganizationUser', role: 'owner', ...key.fields },
+    const key = await createKeyedToken(
+      { ownerModel: 'OrganizationUser', role: 'owner' },
       { organizationUser },
     );
     const own = holdsRequest({ model: 'organization', id: context.organization.id, action: 'own' });
@@ -220,22 +184,17 @@ describe('a batch signs its token in again between rounds', () => {
 
   it('a token deactivated in one round ends the batch with 401', async () => {
     const { entity: user } = await createUser();
-    const key = mintKey();
-    const { entity: token } = await createToken(
-      { ownerModel: 'User', role: 'owner', ...key.fields },
+    const { entity: token, rawKey } = await createKeyedToken(
+      { ownerModel: 'User', role: 'owner' },
       { user },
     );
 
-    const response = await app.request('/api/v1/batch/execute', {
-      method: 'POST',
-      headers: { authorization: `Bearer ${key.rawKey}`, 'content-type': 'application/json' },
-      body: JSON.stringify({
-        requests: [
-          [{ method: 'POST', path: `/api/v1/probe/deactivate/${token.id}` }],
-          [{ method: 'GET', path: '/api/v1/probe/actor' }],
-        ],
-        strategy: 'allowFailures',
-      }),
+    const response = await call(rawKey, 'POST', '/api/v1/batch/execute', {
+      requests: [
+        [{ method: 'POST', path: `/api/v1/probe/deactivate/${token.id}` }],
+        [{ method: 'GET', path: '/api/v1/probe/actor' }],
+      ],
+      strategy: 'allowFailures',
     });
 
     expect(response.status).toBe(401);

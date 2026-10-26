@@ -1,5 +1,4 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { createHash, randomUUID } from 'node:crypto';
 import type { z } from '@hono/zod-openapi';
 import type {
   Organization,
@@ -7,11 +6,13 @@ import type {
   Role,
   User,
 } from '@template/db/generated/client/client';
-import { cleanupTouchedTables, createOrganizationUser, createToken } from '@template/db/test';
+import { cleanupTouchedTables, createOrganizationUser } from '@template/db/test';
 import { tokenAuthMiddleware } from '#/middleware/auth/tokenAuthMiddleware';
 import { organizationUserRouter } from '#/modules/organizationUser';
 import type { organizationUserUpdateRoute } from '#/modules/organizationUser/routes/organizationUserUpdate';
 import { createTestApp } from '#tests/createTestApp';
+import { createKeyedToken } from '#tests/utils/createKeyedToken';
+import { type Entry, entry } from '#tests/utils/entitlementEntry';
 import { json, patch } from '#tests/utils/request';
 
 type UpdateOrgUserResponse = z.infer<typeof organizationUserUpdateRoute.responseSchema>;
@@ -57,18 +58,8 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
     expect(data.role).toBe('viewer');
   });
 
-  type Entry = {
-    resource: string;
-    anchor: { resource: string; id: string };
-    actions: Record<string, boolean>;
-  };
-
   const onOrganization = (...actions: string[]): Entry[] => [
-    {
-      resource: 'db:organization',
-      anchor: { resource: 'db:organization', id: org.id },
-      actions: Object.fromEntries(actions.map((action) => [action, true])),
-    },
+    entry('db:organization', ['db:organization', org.id], actions),
   ];
 
   describe("a member's entitlements are library entries the writer could grant (Aron, 2026-10-26)", () => {
@@ -125,12 +116,8 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
         { role: 'member' },
         { organization: org },
       );
-      const assignOwnRow: Entry[] = [
-        {
-          resource: 'db:organizationUser',
-          anchor: { resource: 'db:organizationUser', id: target.id },
-          actions: { assign: true },
-        },
+      const assignOwnRow = [
+        entry('db:organizationUser', ['db:organizationUser', target.id], ['assign']),
       ];
       const granted = await (await writer('admin')).fetch(
         patch(`/api/v1/organizationUser/${target.id}`, { entitlements: assignOwnRow }),
@@ -152,11 +139,7 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
       const response = await (await writer('owner')).fetch(
         patch(`/api/v1/organizationUser/${target.id}`, {
           entitlements: [
-            {
-              resource: 'db:organizationUser',
-              anchor: { resource: 'db:organizationUser', id: target.id },
-              actions: { assign: true },
-            },
+            entry('db:organizationUser', ['db:organizationUser', target.id], ['assign']),
           ],
         }),
       );
@@ -194,16 +177,11 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
         { role: memberRole },
         { organization: org },
       );
-      const key = randomUUID();
-      await createToken(
-        {
-          ownerModel: 'OrganizationUser',
-          role: tokenRole,
-          keyHash: createHash('sha256').update(key).digest('hex'),
-        },
+      const { rawKey } = await createKeyedToken(
+        { ownerModel: 'OrganizationUser', role: tokenRole },
         { organizationUser: member },
       );
-      return key;
+      return rawKey;
     };
 
     const grantAs = async (key: string, entitlements: Entry[]) => {
@@ -221,21 +199,32 @@ describe('PATCH /api/v1/organizationUser/:id', () => {
       return response.status;
     };
 
-    it('an owner-role token on an owner member grants what the member could', async () => {
-      const key = await memberToken('owner', 'owner');
-      expect(await grantAs(key, onOrganization('operate'))).toBe(200);
-      expect(await grantAs(key, onOrganization('own'))).toBe(200);
-    });
+    const grants = [
+      {
+        name: 'an owner-role token on an owner member grants what the member could',
+        memberRole: 'owner',
+        tokenRole: 'owner',
+        statuses: { operate: 200, own: 200 },
+      },
+      {
+        name: 'an owner-role token on an admin member grants no more than the admin',
+        memberRole: 'admin',
+        tokenRole: 'owner',
+        statuses: { operate: 200, own: 403 },
+      },
+      {
+        name: 'a viewer-role token on an owner member grants nothing above read',
+        memberRole: 'owner',
+        tokenRole: 'viewer',
+        statuses: { operate: 403 },
+      },
+    ] as const;
 
-    it('an owner-role token on an admin member grants no more than the admin', async () => {
-      const key = await memberToken('admin', 'owner');
-      expect(await grantAs(key, onOrganization('operate'))).toBe(200);
-      expect(await grantAs(key, onOrganization('own'))).toBe(403);
-    });
-
-    it('a viewer-role token on an owner member grants nothing above read', async () => {
-      const key = await memberToken('owner', 'viewer');
-      expect(await grantAs(key, onOrganization('operate'))).toBe(403);
-    });
+    for (const row of grants)
+      it(row.name, async () => {
+        const key = await memberToken(row.memberRole, row.tokenRole);
+        for (const [action, status] of Object.entries(row.statuses))
+          expect([action, await grantAs(key, onOrganization(action))]).toEqual([action, status]);
+      });
   });
 });
