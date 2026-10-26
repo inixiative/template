@@ -116,7 +116,7 @@ export const resolveInquiryTarget = async <C extends ValidatedContext<'json', In
         status: 422,
         message: 'targetOrganizationId and targetUserId are required',
       });
-    const membership = await db.organizationUser.findUnique({
+    const organizationUser = await db.organizationUser.findUnique({
       where: {
         organizationId_userId: {
           organizationId: body.targetOrganizationId as OrganizationId,
@@ -124,29 +124,29 @@ export const resolveInquiryTarget = async <C extends ValidatedContext<'json', In
         },
       },
     });
-    if (!membership)
+    if (!organizationUser)
       throw makeError({ status: 404, message: 'Target organization user not found' });
     return {
       ...nullTargetFields,
       targetModel,
-      targetOrganizationId: membership.organizationId as OrganizationId,
-      targetUserId: membership.userId as UserId,
+      targetOrganizationId: organizationUser.organizationId as OrganizationId,
+      targetUserId: organizationUser.userId as UserId,
     };
   }
 
   if (targetModel === InquiryResourceModel.SpaceUser) {
     if (!body.targetSpaceId || !body.targetUserId)
       throw makeError({ status: 422, message: 'targetSpaceId and targetUserId are required' });
-    const membership = await db.spaceUser.findFirst({
+    const spaceUser = await db.spaceUser.findFirst({
       where: { spaceId: body.targetSpaceId as SpaceId, userId: body.targetUserId as UserId },
     });
-    if (!membership) throw makeError({ status: 404, message: 'Target space user not found' });
+    if (!spaceUser) throw makeError({ status: 404, message: 'Target space user not found' });
     return {
       ...nullTargetFields,
       targetModel,
-      targetOrganizationId: membership.organizationId as OrganizationId,
-      targetSpaceId: membership.spaceId as SpaceId,
-      targetUserId: membership.userId as UserId,
+      targetOrganizationId: spaceUser.organizationId as OrganizationId,
+      targetSpaceId: spaceUser.spaceId as SpaceId,
+      targetUserId: spaceUser.userId as UserId,
     };
   }
 

@@ -59,11 +59,11 @@ describe('handler: inviteOrganizationUser', () => {
     expect(response.status).toBe(200);
     expect(data.status).toBe(InquiryStatus.approved);
 
-    const membership = await db.organizationUser.findUnique({
+    const organizationUser = await db.organizationUser.findUnique({
       where: { organizationId_userId: { organizationId: org.id, userId: invitee.id } },
     });
-    expect(membership).toBeTruthy();
-    expect(membership?.role).toBe('member');
+    expect(organizationUser).toBeTruthy();
+    expect(organizationUser?.role).toBe('member');
   });
 
   it('deny does not create OrganizationUser', async () => {
@@ -86,10 +86,10 @@ describe('handler: inviteOrganizationUser', () => {
       }),
     );
 
-    const membership = await db.organizationUser.findUnique({
+    const organizationUser = await db.organizationUser.findUnique({
       where: { organizationId_userId: { organizationId: org.id, userId: invitee.id } },
     });
-    expect(membership).toBeNull();
+    expect(organizationUser).toBeNull();
   });
 
   it('invitee cannot override role via resolution', async () => {
@@ -114,9 +114,9 @@ describe('handler: inviteOrganizationUser', () => {
       }),
     );
 
-    const membership = await db.organizationUser.findUnique({
+    const organizationUser = await db.organizationUser.findUnique({
       where: { organizationId_userId: { organizationId: org.id, userId: invitee.id } },
     });
-    expect(membership?.role).toBe('member');
+    expect(organizationUser?.role).toBe('member');
   });
 });

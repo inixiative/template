@@ -10,7 +10,7 @@
   - [Role](#role)
   - [Role Hierarchy](#role-hierarchy)
 - [Actions](#actions)
-  - [Session Actions](#session-actions)
+  - [Actions on Their Own Models](#actions-on-their-own-models)
   - [The Actor](#the-actor)
   - [Role → Action Mapping](#role--action-mapping)
   - [roleToStandardAction](#roletostandardaction)
@@ -137,26 +137,18 @@ export const StandardAction = {
 } as const;
 ```
 
-### Session Actions
+### Actions on Their Own Models
 
-Actions on the user's own account and the user-only acts on other records; every route names one ([The user as a resource](#the-user-as-a-resource)):
+Every action lives on the model it acts on; a dotted action is named after its model (`packages/permissions/src/rebac/principals.test.ts`):
 
 ```typescript
 // packages/permissions/src/client.ts
-export const SessionAction = {
-  createToken: 'token.create',              // every token create route
-  deleteToken: 'token.delete',              // tokenDelete
-  redactUser: 'user.redact',                // meRedact
-  rotateUserJwts: 'user.rotateJwts',        // meRotateJwts
-  deleteOrganization: 'organization.delete', // organizationDelete, with `own` on the organization
-} as const;
-
-export const UserAction = {
-  ...StandardAction,
-  ...SessionAction,
-  createOrganization: 'organization.create', // organizationCreate
-};
+export const OrganizationAction = { ...StandardAction, create: 'create', delete: 'delete' };
+export const UserAction = { ...StandardAction, redactUser: 'user.redact', rotateUserJwts: 'user.rotateJwts' };
+export const TokenAction = { create: 'create', delete: 'delete' };
 ```
+
+Creating checks `create` on a pseudo record of the model being created (token create in `createToken`, organization create in `organizationCreate`). User-only acts are rules on the actor: `actorIsUser` (`__actor.model == User`) and `actorIsDelegateOfUser` (`__actor.record.ownerModel == User`).
 
 The schema maps `'organization.create'` to `'operate'` on the user. The session actions are user-only, written as `{ all: [{ actor: model equals User }, 'operate' | 'own'] }`, so a token holding `own` still cannot mint, delete tokens, redact, rotate or delete an organization. They sit on the record each acts on (below). A superadmin passes on any credential.
 
@@ -310,11 +302,11 @@ A delegate holds its permissions, capped live by its owner. `installPermissions`
 | `Organization` / `Space` | `owner` on itself |
 | `Integration` | the integration's permissions, capped by its own owner's table |
 
-Permissions expand through `delegateEntries` (`packages/permissions/src/roles/delegatePermissions.ts`):
+A role and named entitlements expand through `delegateEntries` (`packages/permissions/src/roles/delegatePermissions.ts`):
 
 - `role` applies at every anchor the owner has (`narrowing(resource, id, role)` per anchor), so a User token's role reaches each of the user's organizations, capped by the member row there; an integration's role reaches whatever its owner reaches.
 - `entitlements` are entries `{ resource, anchor, actions }`, held as written. "Only the user's own things" is no role plus one entry anchored on `db:user`.
-- `full` passes the owner's table through whole, resolved on every request. A token that is not `full` has a role, entitlements or both; `full` takes neither, and only exists on a delegation chain: an `Organization` or `Space` token or integration cannot be `full`.
+- `full` is inheritance, not a permission: a `full` delegate skips to its owner — `delegateTable` (`apps/api/src/lib/permissions/ownerTable.ts`) installs the owner's table unchanged, for tokens and for integration owners. The schema never reads `full` (CI rule `no-full-in-rebac-schema`). Setting `full` takes `own` on the delegate's owner. A token that is not `full` has a role, entitlements or both; `full` takes neither. `full` may be set on tokens owned by a User, OrganizationUser, SpaceUser or Integration, and on integrations owned by a User, OrganizationUser or SpaceUser (`delegatePermissionRules.ts`).
 
 Nothing is inherited: a token holds only its own permissions. They are installed with the owner's table as owner, so at check time each action holds only if the owner still allows it on that record through the normal walk. Demote the member and its tokens lose it on the next request.
 
@@ -328,10 +320,10 @@ An integration has a nullable `role`, `full` and `entitlements`, capped live by 
 
 ### Granting an Entitlement
 
-A grant is an action: the writer must be able to take every action the delegate would hold, from its anchor. `canGrantEntitlement(permix, entry, anchor)` (`packages/permissions/src/rebac/canGrantEntitlement.ts`, over the library's `createCanGrantEntitlement`) judges each action through the ordinary check on a stand-in record of the entry's resource placed under the hydrated anchor. A granted action skips the ABAC in its rule, so an action whose rule reads the record or `__actor` is granted at its strongest: the writer must also hold the resource's terminal actions (`own`).
+A grant is an action: the writer must be able to take every action the delegate would hold, from its anchor. `canGrantEntitlement(permix, entry, anchor)` (`packages/permissions/src/rebac/canGrantEntitlement.ts`, over the library's `createCanGrantEntitlement`) judges each action through the ordinary check on a pseudo record of the entry's resource placed under the hydrated anchor. The holder's read runs the action through the writer's walk on the real record, so the rule's conditions (on the record and on `__actor`) hold there.
 
 - `PATCH /organizationUser/:id` with `entitlements` checks each action as an entry anchored on the organization: an admin grants `operate` and `manage`, not `own` or `assign`.
-- A delegate's permissions are the writer's permissions or less: `validateDelegateGrant` (`apps/api/src/lib/permissions/validateDelegateGrant.ts`) is the one check, run after the permissions' shape passes the write rule (422 before 403), for every token mint (inside `createToken`) and for `PATCH /integration/:id`. A role or `full` is a ceiling over the owner's anchors, so only what the owner would really pass on is checked; named entitlements are checked as written.
+- A delegate's named entitlements go through `validateEntitlementGrants` (`apps/api/src/lib/permissions/validateEntitlementGrants.ts`: fetch the anchor, then `canGrantEntitlement`). A token's role is checked by `create` on `db:token`; an integration's role by `assign` on `db:integration` (`validateIntegrationGrant`), on the row before and after a change.
 
 Situations: `organizationUserUpdate.test.ts`, `integrationDelegate.test.ts`, `delegatePermissions.test.ts`.
 
@@ -820,7 +812,7 @@ check(permix, rebacSchema, 'organizationUser', assigned, 'assign');
 
 ### Token Creation
 
-Every create-token route calls `createToken`, which runs `validateDelegateGrant` against the token's owner; the permissions' shape (`full` blocks a role and entitlements, otherwise a role, entitlements or both; no `full` for Organization or Space) is a write rule in `RulesRegistry` (`apps/api/src/hooks/rules/delegatePermissionRules.ts`): a token is your permissions or less. Member token routes also require the member's own user (`leave` on the member). Minting is user-only (`SessionAction.createToken`).
+Every create-token route calls `createToken`, which checks `create` on a pseudo record of the token: the actor is a user (`actorIsUser`), holds the role at the token's direct owner (for an integration-owned token, at the integration's owner — its access, never its administering), and the owner is theirs (`userId == __actor.record.id`) or an organization or space they are on. Setting `full` also takes `own` on the token (= on its owner). Named entitlements go through `validateEntitlementGrants`. The permissions' shape is a write rule in `RulesRegistry` (`apps/api/src/hooks/rules/delegatePermissionRules.ts`).
 
 ### Token Deletion
 
