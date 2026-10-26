@@ -4,9 +4,11 @@
  * @partOf primitive:ui
  * @uses primitive:sdk
  */
+
 import { Icon } from '@iconify/react';
 import type { HydratedRecord } from '@template/db';
 import { Role } from '@template/db/generated/client/enums';
+import { memberRemoval } from '@template/permissions/rebac/schemaHelpers';
 import {
   type OrganizationReadManyUsersResponse,
   type OrganizationUserDeleteData,
@@ -124,7 +126,7 @@ export const OrganizationUsersPage = ({ organizationId }: OrganizationUsersPageP
               size="sm"
               aria-label="Remove member"
               onClick={() => deleteMutation.mutate({ path: { id: member.id } })}
-              show={checkPermission(permissions, 'organizationUser', memberRecord, 'delete')}
+              show={checkPermission(permissions, 'organizationUser', memberRecord, memberRemoval)}
             >
               <Icon icon="lucide:trash-2" className="h-4 w-4 text-destructive" />
             </Button>
