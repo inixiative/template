@@ -7,7 +7,7 @@
 import { lensFields } from '@template/shared/rules';
 import { schemaGuide } from '#/lib/jsonSchema/schemaGuide';
 import { makeController } from '#/lib/utils/makeController';
-import { customerRefLens } from '#/modules/customerRef/lib/customerRefLens';
+import { customerRefLens } from '#/modules/customerRef/lib/lenses/customerRefLens';
 import { segmentInfoRoute } from '#/modules/segment/routes/segmentInfo';
 import { segmentInfoResponseSchema } from '#/modules/segment/schemas/segmentInfoResponseSchema';
 
