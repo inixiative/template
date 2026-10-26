@@ -386,23 +386,5 @@ describe('a writer gives its permissions or less (Aron, 2026-10-25/26)', () => {
           .status,
       ).toBe(403);
     });
-
-    it('an admin up the chain revokes a token on a member integration, even a full one; another member does not', async () => {
-      const { m, integration } = await memberIntegration();
-      const path = `integration/${integration.id}`;
-      const plain = await mint(m, path, { role: 'member' });
-      const whole = await mint(m, path, { full: true });
-      const ids = await db.token.findMany({
-        where: { integrationId: integration.id },
-        orderBy: { createdAt: 'asc' },
-      });
-      expect(plain.status).toBe(201);
-      expect(whole.status).toBe(201);
-      const revoke = (writer: { user: User; organizationUser: OrganizationUser }, id: string) =>
-        as(writer.user, [writer.organizationUser])(del(`/api/v1/token/${id}`));
-      expect((await revoke(await member('member'), ids[0]!.id)).status).toBe(403);
-      expect((await revoke(admin, ids[0]!.id)).status).toBe(204);
-      expect((await revoke(admin, ids[1]!.id)).status).toBe(204);
-    });
   });
 });

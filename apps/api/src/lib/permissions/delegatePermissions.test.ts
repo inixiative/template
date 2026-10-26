@@ -361,7 +361,7 @@ describe('a delegate holds its permissions, and no more than whoever grants it (
       ).toBe(200);
     });
 
-    it('its user revokes it; an admin up the chain revokes any token on it, even a full one', async () => {
+    it('its user revokes it; an admin up the chain revokes any token on it, even a full one; another member does not', async () => {
       const { user, organizationUser } = await asMember('owner');
       const integration = await memberIntegration(organizationUser, { full: true });
       const member = await mintOn(integration, user, [organizationUser], { role: 'member' });
@@ -370,6 +370,8 @@ describe('a delegate holds its permissions, and no more than whoever grants it (
       const { user: admin, organizationUser: adminMember } = await asMember('admin');
       const revoke = (by: User, organizationUsers: OrganizationUser[], id: string) =>
         userApp(by, organizationUsers).fetch(del(`/api/v1/token/${id}`));
+      const { user: other, organizationUser: otherMember } = await asMember('member');
+      expect((await revoke(other, [otherMember], member.id!)).status).toBe(403);
       expect((await revoke(admin, [adminMember], member.id!)).status).toBe(204);
       expect((await revoke(admin, [adminMember], full.id!)).status).toBe(204);
       expect((await revoke(user, [organizationUser], mine.id!)).status).toBe(204);

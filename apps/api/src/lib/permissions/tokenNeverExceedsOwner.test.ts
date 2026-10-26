@@ -151,7 +151,7 @@ describe('a credential never exceeds its owner (Aron, 2026-10-23)', () => {
     expect(await holds(key, 'organization', organization.id, 'own')).toBe(false);
   });
 
-  it('a member token below its member row holds the lesser', async () => {
+  it('a user token below its member row holds the lesser', async () => {
     const key = await userToken(await member('owner'), 'viewer');
     expect(await holds(key, 'organization', organization.id, 'read')).toBe(true);
     expect(await holds(key, 'organization', organization.id, 'operate')).toBe(false);
