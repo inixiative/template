@@ -6,6 +6,7 @@ import type {
   OrganizationUser,
   Role,
   Space,
+  SpaceUser,
   User,
 } from '@template/db/generated/client/client';
 import {
@@ -14,6 +15,7 @@ import {
   createOrganization,
   createOrganizationUser,
   createSpace,
+  createSpaceUser,
   createUser,
 } from '@template/db/test';
 import { check, rebacSchema } from '@template/permissions/rebac';
@@ -78,10 +80,11 @@ const holds = async (key: string, model: AccessorName, id: string, action: strin
   return ((await response.json()) as { holds: boolean }).holds;
 };
 
-const userApp = (user: User, organizationUsers: OrganizationUser[]) =>
+const userApp = (user: User, organizationUsers: OrganizationUser[], spaceUsers: SpaceUser[] = []) =>
   createTestApp({
     mockUser: user,
     mockOrganizationUsers: organizationUsers,
+    mockSpaceUsers: spaceUsers,
     mount: [
       (hono) => {
         hono.route('/api/v1/integration', integrationRouter);
@@ -401,5 +404,213 @@ describe('a delegate holds its permissions, and no more than whoever grants it (
     const whole = await mint(user, [organizationUser], '/api/v1/me/tokens', { full: true });
     expect(whole.status).toBe(201);
     expect(await holds(whole.key!, 'organization', organization.id, 'manage')).toBe(true);
+  });
+
+  describe('setting full is own on the direct owner, for tokens and integrations alike (Aron, 2026-10-26)', () => {
+    type Mint = {
+      name: string;
+      memberRole: Role;
+      integration: Permissions;
+      token: Permissions;
+      status: number;
+      holds?: string;
+      lacks?: string;
+    };
+
+    const mints: Mint[] = [
+      {
+        name: 'full token, full integration, owner member',
+        memberRole: 'owner',
+        integration: { full: true },
+        token: { full: true },
+        status: 201,
+        holds: 'own',
+      },
+      {
+        name: 'full token, full integration, member member',
+        memberRole: 'member',
+        integration: { full: true },
+        token: { full: true },
+        status: 201,
+        holds: 'operate',
+        lacks: 'manage',
+      },
+      {
+        name: 'full token, viewer integration',
+        memberRole: 'member',
+        integration: { role: 'viewer' },
+        token: { full: true },
+        status: 201,
+        holds: 'read',
+        lacks: 'operate',
+      },
+      {
+        name: 'admin token, full integration, admin member',
+        memberRole: 'admin',
+        integration: { full: true },
+        token: { role: 'admin' },
+        status: 201,
+        holds: 'manage',
+        lacks: 'own',
+      },
+      {
+        name: 'owner token, full integration, admin member',
+        memberRole: 'admin',
+        integration: { full: true },
+        token: { role: 'owner' },
+        status: 403,
+      },
+      {
+        name: 'admin token, full integration, member member',
+        memberRole: 'member',
+        integration: { full: true },
+        token: { role: 'admin' },
+        status: 403,
+      },
+      {
+        name: 'admin token, viewer integration, owner member',
+        memberRole: 'owner',
+        integration: { role: 'viewer' },
+        token: { role: 'admin' },
+        status: 201,
+        holds: 'read',
+        lacks: 'operate',
+      },
+    ];
+
+    for (const row of mints)
+      it(`its user mints a token on their member's integration: ${row.name}`, async () => {
+        const { user, organizationUser } = await asMember(row.memberRole);
+        const integration = await memberIntegration(organizationUser, row.integration);
+        const minted = await mintOn(integration, user, [organizationUser], row.token);
+        expect(minted.status).toBe(row.status);
+        if (row.holds)
+          expect(await holds(minted.key!, 'organization', organization.id, row.holds)).toBe(true);
+        if (row.lacks)
+          expect(await holds(minted.key!, 'organization', organization.id, row.lacks)).toBe(false);
+      });
+
+    it("an owner of the organization cannot mint a full token on another member's full integration", async () => {
+      const { organizationUser } = await asMember('member');
+      const integration = await memberIntegration(organizationUser, { full: true });
+      const { user: owner, organizationUser: ownerMember } = await asMember('owner');
+      expect((await mintOn(integration, owner, [ownerMember], { full: true })).status).toBe(403);
+    });
+
+    it("a full token on an organization's integration: an owner mints it, an admin does not", async () => {
+      const { entity: integration } = await createIntegration({
+        ownerModel: 'Organization',
+        organizationId: organization.id,
+        role: 'admin',
+      });
+      const { user: admin, organizationUser: adminMember } = await asMember('admin');
+      expect((await mintOn(integration, admin, [adminMember], { full: true })).status).toBe(403);
+      expect((await mintOn(integration, admin, [adminMember], { role: 'admin' })).status).toBe(201);
+      const { user: owner, organizationUser: ownerMember } = await asMember('owner');
+      const minted = await mintOn(integration, owner, [ownerMember], { full: true });
+      expect(minted.status).toBe(201);
+      expect(await holds(minted.key!, 'organization', organization.id, 'manage')).toBe(true);
+      expect(await holds(minted.key!, 'organization', organization.id, 'own')).toBe(false);
+    });
+
+    type Write = {
+      name: string;
+      memberRole: Role;
+      before: Permissions;
+      after: Permissions;
+      status: number;
+    };
+
+    const writes: Write[] = [
+      {
+        name: 'an owner member makes it full',
+        memberRole: 'owner',
+        before: { role: 'viewer' },
+        after: { full: true, role: null },
+        status: 200,
+      },
+      {
+        name: 'an admin member cannot make it full',
+        memberRole: 'admin',
+        before: { role: 'viewer' },
+        after: { full: true, role: null },
+        status: 403,
+      },
+      {
+        name: 'an owner member takes full away',
+        memberRole: 'owner',
+        before: { full: true },
+        after: { full: false, role: 'member' },
+        status: 200,
+      },
+      {
+        name: 'an admin member cannot take full away',
+        memberRole: 'admin',
+        before: { full: true },
+        after: { full: false, role: 'member' },
+        status: 403,
+      },
+      {
+        name: 'a member member cannot make it full',
+        memberRole: 'member',
+        before: { role: 'viewer' },
+        after: { full: true, role: null },
+        status: 403,
+      },
+    ];
+
+    for (const row of writes)
+      it(`its user writes their member's integration: ${row.name}`, async () => {
+        const { user, organizationUser } = await asMember(row.memberRole);
+        const integration = await memberIntegration(organizationUser, row.before);
+        const response = await userApp(user, [organizationUser]).fetch(
+          patch(`/api/v1/integration/${integration.id}`, row.after),
+        );
+        expect(response.status).toBe(row.status);
+      });
+
+    it("its user makes their own user's integration full", async () => {
+      const { user, organizationUser } = await asMember('member');
+      const { entity: integration } = await createIntegration({
+        ownerModel: 'User',
+        userId: user.id,
+        role: 'viewer',
+      });
+      const response = await userApp(user, [organizationUser]).fetch(
+        patch(`/api/v1/integration/${integration.id}`, { full: true, role: null }),
+      );
+      expect(response.status).toBe(200);
+    });
+
+    for (const [spaceRole, status] of [
+      ['owner', 200],
+      ['admin', 403],
+    ] as const)
+      it(`its user writes their space member's integration: a space ${spaceRole} ${status === 200 ? 'makes' : 'cannot make'} it full`, async () => {
+        const { user, organizationUser } = await asMember('member');
+        const { entity: spaceUser } = await createSpaceUser(
+          { role: spaceRole },
+          { user, organization, organizationUser, space },
+        );
+        const { entity: integration } = await createIntegration({
+          ownerModel: 'SpaceUser',
+          organizationId: organization.id,
+          spaceId: space.id,
+          userId: user.id,
+          role: 'viewer',
+        });
+        const response = await userApp(user, [organizationUser], [spaceUser]).fetch(
+          patch(`/api/v1/integration/${integration.id}`, { full: true, role: null }),
+        );
+        expect(response.status).toBe(status);
+      });
+
+    it('a user creates a full integration of their own', async () => {
+      const { user, organizationUser } = await asMember('member');
+      const response = await userApp(user, [organizationUser]).fetch(
+        post('/api/v1/me/integrations', { name: 'i', full: true }),
+      );
+      expect(response.status).toBe(201);
+    });
   });
 });
