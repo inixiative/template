@@ -33,6 +33,12 @@ validateRuleInLens(rule, lens, { sourceValues })
 - A source the caller did not pass is not checked. A leaf `describeRuleSources` marks `dynamic`
   (path/bind values, substring, range, window) is not checked.
 - Without `sourceValues`, behaviour is unchanged.
+- **Fuzzy sources.** A `SourceSpec` may declare `fuzzy` (reusing `FuzzyConfig`) for sources whose values
+  are typed rather than picked: job titles, company domains, free-ish enrichment values. Under
+  `fuzzy`, a value is accepted when it is close to an option (normalized case, whitespace and
+  punctuation, then the config's threshold), and the issue names the closest options instead of
+  refusing outright. An identity source (one with a `label`, which names rows by uuid) can never
+  be fuzzy: `validateNarrowing` refuses `fuzzy` there.
 
 `describeRuleSources` already finds each source's values with the operator catalog, so this is that
 walk plus a membership check, not a new traversal.
