@@ -4,11 +4,12 @@
  * @partOf feature:tenancy
  * @uses primitive:authz, primitive:routeTemplates, infrastructure:prisma
  */
-import { db, hydrate } from '@template/db';
+import { db, hydrate, Prisma } from '@template/db';
 import { check, rebacSchema } from '@template/permissions/rebac';
 import { roleAssignment } from '@template/permissions/rebac/schemaHelpers';
 import { getResource } from '#/lib/context/getResource';
 import { makeError } from '#/lib/errors';
+import { validateEntitlementGrants } from '#/lib/permissions/validateEntitlementGrants';
 import { makeController } from '#/lib/utils/makeController';
 import { spaceUserUpdateRoute } from '#/modules/spaceUser/routes/spaceUserUpdate';
 
@@ -26,10 +27,17 @@ export const spaceUserUpdateController = makeController(
       !check(permix, rebacSchema, 'spaceUser', after, roleAssignment)
     )
       throw makeError({ status: 403, message: `Cannot assign ${after.role} role` });
+    await validateEntitlementGrants(permix, body.entitlements ?? []);
 
     const updated = await db.spaceUser.update({
       where: { id: spaceUser.id },
-      data: body,
+      data: {
+        ...body,
+        entitlements:
+          body.entitlements === null
+            ? Prisma.DbNull
+            : (body.entitlements as Prisma.InputJsonValue | undefined),
+      },
     });
 
     return respond.ok(updated);
