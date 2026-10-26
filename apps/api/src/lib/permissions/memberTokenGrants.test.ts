@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { createHash, randomBytes } from 'node:crypto';
-import { type AccessorName, db, fetchOne, hydrate } from '@template/db';
+import { type AccessorName, db, fetchOne, hydrate, unregisterDbHook } from '@template/db';
 import type { Organization, Space } from '@template/db/generated/client/client';
 import {
   cleanupTouchedTables,
@@ -12,6 +12,7 @@ import {
   createToken,
 } from '@template/db/test';
 import { check, rebacSchema } from '@template/permissions/rebac';
+import { registerClearCacheHook } from '#/hooks/cache/hook';
 import { tokenAuthMiddleware } from '#/middleware/auth/tokenAuthMiddleware';
 import { meRouter } from '#/modules/me';
 import { organizationRouter } from '#/modules/organization';
@@ -209,5 +210,39 @@ describe('full skips one step at every link: token, integration, member (Aron, 2
     const may = await chain({ role: 'member', full: false }, { role: 'viewer', full: false });
     expect(await may('read')).toBe(true);
     expect(await may('operate')).toBe(false);
+  });
+});
+
+describe('a member token follows its member row as soon as the row changes', () => {
+  let organization: Organization;
+
+  beforeAll(async () => {
+    registerClearCacheHook();
+    ({ entity: organization } = await createOrganization());
+  });
+
+  afterAll(async () => {
+    unregisterDbHook('clearCache');
+    await cleanupTouchedTables(db);
+  });
+
+  it('a demoted member row takes its token down with it', async () => {
+    const { entity: organizationUser } = await createOrganizationUser(
+      { role: 'admin' },
+      { organization },
+    );
+    const { rawKey, fields } = mintKey();
+    await createToken(
+      { ownerModel: 'OrganizationUser', role: 'admin', ...fields },
+      { organizationUser },
+    );
+    expect(await holds(rawKey, 'organization', organization.id, 'manage')).toBe(true);
+
+    await db.organizationUser.update({
+      where: { id: organizationUser.id },
+      data: { role: 'viewer' },
+    });
+
+    expect(await holds(rawKey, 'organization', organization.id, 'manage')).toBe(false);
   });
 });
