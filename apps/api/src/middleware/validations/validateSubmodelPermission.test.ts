@@ -56,7 +56,12 @@ describe('submodel actions act on the submodel, under the owner (R38)', () => {
   let space: Space;
   const org: Record<string, Headers> = {};
   const spc: Record<string, Headers> = {};
+  const noSeat: Record<string, Headers> = {};
   let outsider: Headers;
+  let spaceOutsider: Headers;
+
+  const anOutsider = async () =>
+    jwt((await createOrganizationUser({ role: 'owner' })).context.user);
 
   const orgRoles = ['owner', 'admin', 'member', 'viewer'] as const;
 
@@ -67,13 +72,17 @@ describe('submodel actions act on the submodel, under the owner (R38)', () => {
       const { context } = await createOrganizationUser({ role }, { organization });
       org[role] = await jwt(context.user);
     }
+    for (const role of ['owner', 'admin'] as const) {
+      const { context } = await createOrganizationUser({ role }, { organization });
+      noSeat[role] = await jwt(context.user);
+    }
     for (const role of orgRoles) {
       const { context } = await createOrganizationUser({ role: 'member' }, { organization });
       await createSpaceUser({ role }, { ...context, space });
       spc[role] = await jwt(context.user);
     }
-    const { context } = await createOrganizationUser({ role: 'owner' });
-    outsider = await jwt(context.user);
+    outsider = await anOutsider();
+    spaceOutsider = await anOutsider();
   });
 
   const statuses = async (callers: Record<string, Headers>, method: 'GET' | 'POST', path: string) =>
@@ -133,6 +142,13 @@ describe('submodel actions act on the submodel, under the owner (R38)', () => {
         create: operators,
         list: members,
       },
+      {
+        name: 'segments: managers create, every member lists',
+        path: '/segments',
+        create: managers,
+        list: members,
+      },
+      { name: 'segment reach: managers', path: '/segments/reach', create: managers },
       { name: 'auth providers: only owners create', path: '/authProviders', create: ['owner'] },
       {
         name: 'tokens: only owners list (R38: token list read = own at the owner)',
@@ -169,6 +185,17 @@ describe('submodel actions act on the submodel, under the owner (R38)', () => {
         list: withOrgOwner(members),
       },
       {
+        name: 'segments: space managers and org owners create; space members list',
+        path: '/segments',
+        create: withOrgOwner(managers),
+        list: withOrgOwner(members),
+      },
+      {
+        name: 'segment reach: space managers and org owners',
+        path: '/segments/reach',
+        create: withOrgOwner(managers),
+      },
+      {
         name: 'tokens: only space owners (and org owners) list',
         path: '/tokens',
         list: withOrgOwner(['owner']),
@@ -178,7 +205,12 @@ describe('submodel actions act on the submodel, under the owner (R38)', () => {
     for (const row of rows)
       it(row.name, () =>
         expectRow(
-          { ...spc, orgOwnerNoSeat: org.owner, orgAdminNoSeat: org.admin, outsider },
+          {
+            ...spc,
+            orgOwnerNoSeat: noSeat.owner,
+            orgAdminNoSeat: noSeat.admin,
+            outsider: spaceOutsider,
+          },
           (path) => `/space/${space.id}${path}`,
           row,
         ),
@@ -210,7 +242,14 @@ describe('submodel actions act on the submodel, under the owner (R38)', () => {
       {
         name: 'creates need operate on me',
         method: 'POST',
-        paths: ['/contacts', '/flows', '/integrations', '/webhookSubscriptions'],
+        paths: [
+          '/contacts',
+          '/flows',
+          '/integrations',
+          '/webhookSubscriptions',
+          '/segments',
+          '/segments/reach',
+        ],
         passing: ['user', 'ownerToken'],
       },
       {
@@ -256,7 +295,7 @@ describe('submodel actions act on the submodel, under the owner (R38)', () => {
           })
         ).status;
       expect(await probe(org.viewer)).toBe(204);
-      expect(await probe(outsider)).toBe(403);
+      expect(await probe(await anOutsider())).toBe(403);
     });
 
     it("a member's stored actions at another organization open nothing here", async () => {

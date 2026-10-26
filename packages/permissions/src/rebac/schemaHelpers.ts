@@ -123,14 +123,15 @@ export const ownedByUser: ActionRule = {
   rule: { field: 'ownerModel', operator: Operator.equals, value: 'User' },
 };
 
+export const createdByItsUserOrManager: ActionRule = {
+  any: [
+    { all: [ownedByUser, { rel: 'user', action: 'operate' }] },
+    { all: [ownedByOrganizationOrSpace(), actionOnOwner('manage')] },
+  ],
+};
+
 export const integrationAdministering = {
-  create: {
-    any: [
-      { all: [ownedByUser, { rel: 'user', action: 'operate' }] },
-      { all: [ownedByOrganizationOrSpace(), actionOnOwner('manage')] },
-      { all: [ownedByMember, actorIsItsUser()] },
-    ],
-  },
+  create: { any: [createdByItsUserOrManager, { all: [ownedByMember, actorIsItsUser()] }] },
   own: { any: [actorIsItsUser(), { all: [ownedByOrganizationOrSpace(), actionOnOwner('own')] }] },
   manage: {
     any: [actorIsItsUser(), { all: [ownedByOrganizationOrSpace(), actionOnOwner('manage')] }],

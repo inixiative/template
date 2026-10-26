@@ -10,6 +10,7 @@ import {
   actorIsDelegateOfUser,
   actorIsUser,
   assignRole,
+  createdByItsUserOrManager,
   highRoles,
   integrationAccess,
   integrationAdministering,
@@ -77,7 +78,9 @@ export const rebacSchema: RebacSchema = {
       },
     },
     'db:webhookSubscription': { actions: { ...ownerActions(), create: 'operate' } },
-    'db:segment': { actions: ownerActions() },
+    'db:segment': {
+      actions: { ...ownerActions(), create: createdByItsUserOrManager },
+    },
     'db:segmentMember': {
       actions: {
         own: { rel: 'segment', action: 'own' },
