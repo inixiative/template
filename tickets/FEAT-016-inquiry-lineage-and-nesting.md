@@ -154,3 +154,7 @@ With both changes, `as unknown as` can be removed and inference flows end-to-end
 ---
 
 _Stub ticket — capture ideas, decide approach when a concrete use case is being implemented._
+
+## Permissions inconsistency to fix with inquiries (from #221 review, 2026-10-26)
+
+Inviting someone as admin requires `own` on the organization (the `inviteOrganizationUser` `send` arm reads `content.role` against the high roles), while member role writes let an admin make an admin (manage at the tenant and hold the role you set). So "invite as member, then promote to admin" succeeds where "invite as admin" fails. Align the invite rule with role writes when inquiries are reworked.
