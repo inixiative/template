@@ -87,7 +87,10 @@ const assignRole = (own: ActionRule, manage: ActionRule): ActionRule => ({
   any: [
     { all: [highRole, own] },
     {
-      all: [{ rule: { field: 'role', operator: Operator.notIn, value: highRoles } }, manage],
+      all: [
+        { rule: { field: 'role', operator: Operator.in, value: ['member', 'viewer'] } },
+        manage,
+      ],
     },
   ],
 });
