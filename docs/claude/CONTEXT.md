@@ -19,7 +19,6 @@
   - [Context Types](#context-types)
     - [TokenWithRelations](#tokenwithrelations)
   - [Complex Getters](#complex-getters)
-    - [getActor](#getactor)
     - [getResource / getResourceType](#getresource--getresourcetype)
     - [getValidatedBody / getValidatedQuery](#getvalidatedbody--getvalidatedquery)
     - [isSuperadmin](#issuperadmin)
@@ -351,22 +350,6 @@ Loaded by `tokenAuthMiddleware` based on token's `ownerModel`.
 ### Complex Getters
 
 Some getters have logic and remain as functions in `apps/api/src/lib/context/`.
-
-#### getActor
-
-```typescript
-import { getActor } from '#/lib/context/getActor';
-
-const { user, organization, organizationUser, space, spaceUser, token } = getActor(c);
-```
-
-Tenancy for the current credential. `user` is the request's user only (a JWT session or a spoof); a token never sets it. `organization`, `space`, `organizationUser` and `spaceUser` come from the token's key columns, for rate-limit buckets and the like, never identity. The user a token acts for is `me(c)` (`apps/api/src/lib/context/me.ts`).
-
-**Returns stripped objects** (relations removed to prevent circular refs):
-```typescript
-type OrgUserWithoutRelations = Omit<OrgUserFromToken, 'user' | 'organization'>;
-type SpaceUserWithoutRelations = Omit<SpaceUserFromToken, 'user' | 'organization' | 'organizationUser' | 'space'>;
-```
 
 #### getResource / getResourceType
 

@@ -6,7 +6,6 @@
  */
 import type { Context } from 'hono';
 import { clientIp } from '#/lib/clientIp';
-import { getActor } from '#/lib/context/getActor';
 import type { AppEnv } from '#/types/appEnv';
 
 export const ipIdentity = (c: Context<AppEnv>): string => `ip:${clientIp(c)}`;
@@ -20,11 +19,11 @@ export const userIdentity = (c: Context<AppEnv>): string | null => {
 export const principalIdentity = (c: Context<AppEnv>): string => userIdentity(c) ?? ipIdentity(c);
 
 export const organizationIdentity = (c: Context<AppEnv>): string | null => {
-  const { organization } = getActor(c);
-  return organization ? `organization:${organization.id}` : null;
+  const organizationId = c.get('token')?.organizationId;
+  return organizationId ? `organization:${organizationId}` : null;
 };
 
 export const spaceIdentity = (c: Context<AppEnv>): string | null => {
-  const { space } = getActor(c);
-  return space ? `space:${space.id}` : null;
+  const spaceId = c.get('token')?.spaceId;
+  return spaceId ? `space:${spaceId}` : null;
 };

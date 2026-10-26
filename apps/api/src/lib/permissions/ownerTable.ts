@@ -48,7 +48,7 @@ export const delegatePermissionsOf = (row: PermissionsRow): DelegatePermissions 
       : (entitlementEntriesSchema.parse(row.entitlements) as DelegatePermissions['entitlements']),
 });
 
-export const ownerPermix = async (table: OwnerTable): Promise<Permix> => {
+const ownerPermix = async (table: OwnerTable): Promise<Permix> => {
   const permix = createPermissions();
   await permix.setup(table.entries, table.owner ? { owner: table.owner } : undefined);
   return permix;

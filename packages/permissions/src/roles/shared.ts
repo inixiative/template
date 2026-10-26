@@ -13,9 +13,6 @@ export const isSuperadmin = (user?: Pick<User, 'platformRole'> | null) =>
 
 export const roleHierarchy = ['viewer', 'member', 'admin', 'owner'] as const;
 
-export const allTrue = <T extends Record<string, string>>(actions: T): Record<keyof T, boolean> =>
-  Object.fromEntries(Object.keys(actions).map((k) => [k, true])) as Record<keyof T, boolean>;
-
 const roleActionMap: Record<Role, Action> = {
   [Role.owner]: 'own',
   [Role.admin]: 'manage',
@@ -24,9 +21,3 @@ const roleActionMap: Record<Role, Action> = {
 };
 
 export const roleToStandardAction = (role: Role): Action => roleActionMap[role];
-
-export const rolesAtOrAbove = (role: Role | string): Role[] => {
-  const idx = roleHierarchy.indexOf(role as (typeof roleHierarchy)[number]);
-  if (idx === -1) return [role as Role];
-  return roleHierarchy.slice(idx) as unknown as Role[];
-};
