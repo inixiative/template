@@ -12,10 +12,8 @@ import {
   validateRuleForLens,
 } from '@template/db';
 import type { ProviderModel } from '@template/db/generated/client/enums';
-import {
-  customerRefLens,
-  resolvedCustomerRefLens,
-} from '#/modules/customerRef/lib/customerRefLens';
+import { customerRefLens } from '#/modules/customerRef/lib/lenses/customerRefLens';
+import { resolvedCustomerRefLens } from '#/modules/customerRef/lib/resolvedCustomerRefLens';
 
 const PROBE_OWNER_ID = '00000000-0000-7000-8000-000000000000';
 

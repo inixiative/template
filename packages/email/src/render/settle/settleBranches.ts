@@ -80,7 +80,7 @@ export const settleBranches = (
               lens: emailRuleVocabulary(lens),
               rule: judged,
               references: emailRuleReferences(lens, judged),
-              live: options.liveRefs,
+              existingTargets: options.existingTargets,
             },
             {
               degraded: (issues) => {

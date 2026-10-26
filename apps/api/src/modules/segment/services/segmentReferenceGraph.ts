@@ -7,7 +7,7 @@
 import type { Condition } from '@inixiative/json-rules';
 import { ruleReferences } from '@template/db';
 import type { Segment } from '@template/db/generated/client/client';
-import { customerRefLens } from '#/modules/customerRef/lib/customerRefLens';
+import { customerRefLens } from '#/modules/customerRef/lib/lenses/customerRefLens';
 
 export type ReferenceMap = Map<string, Set<string>>;
 

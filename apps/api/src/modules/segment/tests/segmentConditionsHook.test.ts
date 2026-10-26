@@ -9,7 +9,10 @@ import {
   createSegment,
   createSpace,
 } from '@template/db/test';
+import { registerRuleReferenceHook } from '#/hooks/ruleReference/hook';
+import { registerRulesHook } from '#/hooks/rules/hook';
 import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
+import { deadReferencesOf } from '#tests/utils/deadReferences';
 
 const acmeRule = { field: 'customerUser.email', operator: Operator.endsWith, value: '@acme.test' };
 
@@ -20,6 +23,8 @@ describe('segmentConditions hook', () => {
 
   beforeAll(async () => {
     registerSegmentConditionsHook();
+    registerRulesHook();
+    registerRuleReferenceHook();
     const { context } = await createOrganizationUser({ role: 'admin' });
     user = context.user;
     organization = context.organization;
@@ -137,12 +142,12 @@ describe('segmentConditions hook', () => {
       arrayOperator: 'any',
       condition: { field: 'segment.id', operator: Operator.equals, value: id },
     });
-    await expect(
-      createSegment(
-        { ownerModel: 'Space', conditions: membersOf('00000000-0000-7000-8000-00000000dead') },
-        { space },
+    const absent = '00000000-0000-7000-8000-00000000dead';
+    expect(
+      await deadReferencesOf(
+        createSegment({ ownerModel: 'Space', conditions: membersOf(absent) }, { space }),
       ),
-    ).rejects.toThrow('does not own');
+    ).toEqual([{ model: 'Segment', id: absent, state: 'missing' }]);
 
     const { context } = await createOrganizationUser();
     const elsewhere = (await createSpace({}, { organization: context.organization })).entity;
@@ -150,9 +155,11 @@ describe('segmentConditions hook', () => {
       { ownerModel: 'Space', conditions: acmeRule },
       { space: elsewhere },
     );
-    await expect(
-      createSegment({ ownerModel: 'Space', conditions: membersOf(foreign.id) }, { space }),
-    ).rejects.toThrow('does not own');
+    expect(
+      await deadReferencesOf(
+        createSegment({ ownerModel: 'Space', conditions: membersOf(foreign.id) }, { space }),
+      ),
+    ).toEqual([{ model: 'Segment', id: foreign.id, state: 'missing' }]);
 
     const { entity: own } = await createSegment(
       { ownerModel: 'Space', conditions: acmeRule },

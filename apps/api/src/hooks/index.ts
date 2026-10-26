@@ -8,11 +8,11 @@ import { registerDelegatedKeysHook } from '#/hooks/falsePolymorphism/delegatedKe
 import { registerImmutableFieldsHook } from '#/hooks/immutableFields/hook';
 import { registerOrderedListHook } from '#/hooks/orderedList/hook';
 import { registerPreventHardDeleteHook } from '#/hooks/preventHardDelete/hook';
+import { registerRuleReferenceHook } from '#/hooks/ruleReference/hook';
 import { registerRuleReferenceTargetHook } from '#/hooks/ruleReference/targetHook';
 import { registerRulesHook } from '#/hooks/rules/hook';
 import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
 import { registerSegmentMemberOwnerHook } from '#/hooks/segmentMemberOwner/hook';
-import { registerSegmentRuleReferencesHook } from '#/hooks/segmentRuleReferences/hook';
 import { registerSoftDeleteCascadeHook } from '#/hooks/softDeleteCascade/hook';
 import { registerTagOwnerCategoryHook } from '#/hooks/tagOwnerCategory/hook';
 import { registerUserEmailInvariantHook } from '#/hooks/userEmail/hook';
@@ -32,10 +32,10 @@ export const registerHooks = () => {
   registerImmutableFieldsHook();
   registerOrderedListHook();
   registerPreventHardDeleteHook();
+  registerRuleReferenceHook();
   registerRuleReferenceTargetHook();
   registerSegmentConditionsHook();
   registerSegmentMemberOwnerHook();
-  registerSegmentRuleReferencesHook();
   registerSoftDeleteCascadeHook();
   registerTagOwnerCategoryHook();
   registerUserEmailInvariantHook();

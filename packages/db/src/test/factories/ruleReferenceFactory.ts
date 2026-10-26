@@ -7,9 +7,7 @@
 import { createFactory } from '@template/db/test/factory';
 
 const ruleReferenceFactory = createFactory('RuleReference', {
-  defaults: () => ({
-    targetId: '',
-  }),
+  defaults: () => ({}),
   dependencies: {
     sourceEmailTemplate: {
       modelName: 'EmailTemplate',

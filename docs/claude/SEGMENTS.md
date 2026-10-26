@@ -114,7 +114,8 @@ can inspect. See [COMMUNICATIONS.md](COMMUNICATIONS.md#the-email-lens).
 ## Source map
 
 - `packages/db/prisma/schema/segment.prisma`, `segmentMember.prisma`: data model.
-- `apps/api/src/modules/customerRef/lib/customerRefLens.ts`: vocabulary and ownership scope.
+- `apps/api/src/modules/customerRef/lib/lenses/`: the static lenses, `customerRefLens` (vocabulary
+  and ownership scope) and `customerRefsByIdLens` (the rows a reconcile hydrates).
 - `apps/api/src/modules/segment/`: routes, services, trigger registry and tests.
 - `apps/api/src/jobs/handlers/`: reconciliation and sweep jobs.
 - `apps/web/app/config/nav/features/segments.ts`, `apps/web/app/routes/_authenticated/segments/`:

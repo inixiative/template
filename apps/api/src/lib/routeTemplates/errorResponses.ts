@@ -35,6 +35,7 @@ export const errorSchema = z
     message: z.string(),
     guidance: z.enum(guidances),
     fieldErrors: z.record(z.string(), z.array(z.string())).optional(),
+    details: z.array(z.record(z.string(), z.unknown())).optional(),
     requestId: z.string(),
   })
   .openapi('Error');

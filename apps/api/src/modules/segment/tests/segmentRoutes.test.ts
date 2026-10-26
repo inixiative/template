@@ -21,6 +21,9 @@ import {
   createUser,
   getNextSeq,
 } from '@template/db/test';
+import { registerRuleReferenceHook } from '#/hooks/ruleReference/hook';
+import { registerRuleReferenceTargetHook } from '#/hooks/ruleReference/targetHook';
+import { registerRulesHook } from '#/hooks/rules/hook';
 import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
 import { registerSegmentMemberOwnerHook } from '#/hooks/segmentMemberOwner/hook';
 import { meRouter } from '#/modules/me';
@@ -59,6 +62,9 @@ describe('segment routes', () => {
   beforeAll(async () => {
     registerSegmentConditionsHook();
     registerSegmentMemberOwnerHook();
+    registerRulesHook();
+    registerRuleReferenceHook();
+    registerRuleReferenceTargetHook();
 
     const { entity: ou, context } = await createOrganizationUser({ role: 'admin' });
     orgUser = ou;
@@ -138,6 +144,36 @@ describe('segment routes', () => {
     expect(response.status).toBe(200);
     expect(data.map((each) => each.id)).toContain(segment.id);
     expect(data.find((each) => each.id === segment.id)!.ruleIssues).toEqual([]);
+  });
+
+  it('the read carries the rows its rule names, so a degraded rule can say which and why', async () => {
+    const { entity: target } = await createSegment(
+      { ownerModel: 'Space', name: `target-${getNextSeq()}`, conditions: acmeRule },
+      { space },
+    );
+    const { entity: dependent } = await createSegment(
+      { ownerModel: 'Space', conditions: membersOf(target.id) },
+      { space },
+    );
+    const read = async () =>
+      (
+        await json<{ ruleReferences: Record<string, unknown>[] }>(
+          await ownerFetch(get(`/api/v1/segment/${dependent.id}`)),
+        )
+      ).data.ruleReferences;
+
+    expect(await read()).toEqual([
+      {
+        targetModel: 'Segment',
+        targetId: target.id,
+        targetDeletedAt: null,
+      },
+    ]);
+
+    await db.segment.update({ where: { id: target.id }, data: { deletedAt: new Date() } });
+    const [degraded] = await read();
+    expect(degraded).toMatchObject({ targetModel: 'Segment', targetId: target.id });
+    expect(degraded?.targetDeletedAt).toBeTruthy();
   });
 
   it('the customer sees the segment they belong to and cannot read the owner view', async () => {

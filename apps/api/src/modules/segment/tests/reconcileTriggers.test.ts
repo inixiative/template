@@ -16,11 +16,12 @@ import {
 } from '@template/db/test';
 import { emitAppEvent } from '#/appEvents/emit';
 import { AppEventName } from '#/appEvents/handlers';
+import { registerRuleReferenceHook } from '#/hooks/ruleReference/hook';
+import { registerRulesHook } from '#/hooks/rules/hook';
 import { registerSegmentConditionsHook } from '#/hooks/segmentConditions/hook';
 import { registerSegmentMemberOwnerHook } from '#/hooks/segmentMemberOwner/hook';
-import { registerSegmentRuleReferencesHook } from '#/hooks/segmentRuleReferences/hook';
 import { registerSoftDeleteCascadeHook } from '#/hooks/softDeleteCascade/hook';
-import { customerRefReachedModels } from '#/modules/customerRef/lib/customerRefLens';
+import { customerRefReachedModels } from '#/modules/customerRef/lib/customerRefReachedModels';
 import { RECONCILE_TRIGGERS } from '#/modules/segment/lib/reconcileTriggers';
 import { acmeRule, memberIds } from '#/modules/segment/tests/fixtures';
 
@@ -70,7 +71,8 @@ describe('reconcile triggers — membership follows the events', () => {
   beforeAll(async () => {
     registerSegmentConditionsHook();
     registerSegmentMemberOwnerHook();
-    registerSegmentRuleReferencesHook();
+    registerRulesHook();
+    registerRuleReferenceHook();
     registerSoftDeleteCascadeHook();
     const { context } = await createOrganizationUser({ role: 'admin' });
     space = (await createSpace({}, { organization: context.organization })).entity;

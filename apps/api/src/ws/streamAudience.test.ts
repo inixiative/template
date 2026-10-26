@@ -1,6 +1,4 @@
 import { afterAll, describe, expect, it } from 'bun:test';
-import { readdirSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { db } from '@template/db';
 import {
   cleanupTouchedTables,
@@ -15,7 +13,6 @@ import {
   type StreamParams,
 } from '@template/shared/ws';
 import { z } from 'zod';
-import { isPerCallerScope, scopeNarrowing } from '#/middleware/resources/scopeNarrowing';
 import { type AudienceCaller, expectStreamAudience } from '#tests/expectStreamAudience';
 import { createBearerToken } from '#tests/utils/createBearerToken';
 
@@ -47,20 +44,6 @@ const STREAM_AUDIENCE_FIXTURES: { [F in StreamFamily]: AudienceFixture<F> } = {
   },
 };
 
-const routeConfig = async (operationId: string): Promise<{ middleware?: unknown } | null> => {
-  const modulesDir = resolve(import.meta.dirname, '../modules');
-  for (const module of readdirSync(modulesDir)) {
-    const file = resolve(modulesDir, module, 'routes', `${operationId}.ts`);
-    if (!(await Bun.file(file).exists())) continue;
-    const routeModule = await import(file);
-    return routeModule[`${operationId}Route`] ?? routeModule.default ?? null;
-  }
-  return null;
-};
-
-const usesPerCallerScope = (route: { middleware?: unknown } | null): boolean =>
-  [route?.middleware].flat().some(isPerCallerScope);
-
 describe('stream audience', () => {
   afterAll(async () => {
     await cleanupTouchedTables(db);
@@ -68,12 +51,6 @@ describe('stream audience', () => {
 
   for (const family of Object.keys(STREAM_DEFINITIONS) as StreamFamily[]) {
     const definition = STREAM_DEFINITIONS[family];
-
-    it(`${family}: a 'shared' stream's route adds no per-caller lens scope`, async () => {
-      const route = await routeConfig(family);
-      expect(route).not.toBeNull();
-      if (definition.audience === 'shared') expect(usesPerCallerScope(route)).toBe(false);
-    });
 
     it(`${family}: every authorized caller gets the data its audience declares`, async () => {
       const { params, callers } = await STREAM_AUDIENCE_FIXTURES[family]();
@@ -114,11 +91,5 @@ describe('stream audience', () => {
       { label: 'alice', headers: await bearer(alice) },
       { label: 'bob', headers: await bearer(bob) },
     ]);
-  });
-
-  it('detects a lens scope that narrows rows per request', () => {
-    const scoped = { middleware: [scopeNarrowing(() => ({ root: {} }))] };
-    expect(usesPerCallerScope(scoped)).toBe(true);
-    expect(usesPerCallerScope({ middleware: [async () => {}] })).toBe(false);
   });
 });

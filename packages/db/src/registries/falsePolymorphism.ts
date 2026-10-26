@@ -23,6 +23,7 @@ export type PolymorphicValue = ModelName | SpecialOwner;
 export type PolymorphicAxis = {
   field: string; // e.g., 'customerModel', 'ownerModel'
   fkMap: Partial<Record<PolymorphicValue, readonly string[]>>; // typeValue → required FK fields
+  materialized?: string; // the plain column holding the one id the set typed FK points at
   delegates?: Partial<Record<PolymorphicValue, ModelName>>;
 };
 
@@ -206,6 +207,7 @@ export const PolymorphismRegistry = {
     axes: [
       {
         field: 'sourceModel',
+        materialized: 'sourceId',
         fkMap: {
           EmailTemplate: ['sourceEmailTemplateId'],
           EmailComponent: ['sourceEmailComponentId'],
@@ -214,6 +216,7 @@ export const PolymorphismRegistry = {
       },
       {
         field: 'targetModel',
+        materialized: 'targetId',
         fkMap: {
           Tag: ['targetTagId'],
           Organization: ['targetOrganizationId'],
