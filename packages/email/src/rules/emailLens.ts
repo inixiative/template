@@ -16,6 +16,7 @@ import {
   type LensNarrowing,
   lensVisit,
   type ModelNarrowing,
+  type NarrowingDefaults,
   narrowRule,
   Operator,
   projectRows,
@@ -67,6 +68,7 @@ export type EmailLensInput = {
   data?: RuleLens | null;
   narrowing?: EmailSlotLenses;
   recipientDefault?: ModelNarrowing;
+  scope?: NarrowingDefaults['models'];
 };
 
 const referenced: ModelNarrowing = {
@@ -158,20 +160,36 @@ const exactly = (shown: RuleLens, node: ModelNarrowing, path = ''): ModelNarrowi
   };
 };
 
-const slot = (lens: RuleLens, view?: ModelNarrowing, surface?: ModelNarrowing): RuleLens => {
+const firstLayer = (
+  lens: RuleLens,
+  models: NarrowingDefaults['models'],
+  surface?: ModelNarrowing,
+): LensNarrowing => {
   const base = getLensRoot(lens);
-  const prisma = base.mapName === 'prisma';
-  const root =
-    surface ??
-    ('parent' in lens
-      ? undefined
-      : scalarPicks(base.maps[base.mapName]?.models[base.model]?.fields ?? {}));
-  const declared: LensNarrowing = {
-    parent: lens,
-    ...(prisma ? { mapDefaults: { prisma: { models: referenceableSources } } } : {}),
-    ...(root ? { root } : {}),
-  };
-  if (root) assertValidNarrowing(declared);
+  const mapDefaults = base.mapName === 'prisma' ? { mapDefaults: { prisma: { models } } } : {};
+  if (!('parent' in lens))
+    return {
+      parent: base,
+      ...mapDefaults,
+      root: surface ?? scalarPicks(base.maps[base.mapName]?.models[base.model]?.fields ?? {}),
+    };
+  if (lens.parent !== base || lens.mapDefaults)
+    throw new Error(
+      'An email slot lens is one narrowing over its base lens, without model defaults',
+    );
+  const declared: LensNarrowing = { ...lens, ...mapDefaults };
+  return surface ? { parent: declared, root: surface } : declared;
+};
+
+const slot = (
+  lens: RuleLens,
+  view?: ModelNarrowing,
+  surface?: ModelNarrowing,
+  models: NarrowingDefaults['models'] = referenceableSources,
+): RuleLens => {
+  const prisma = getLensRoot(lens).mapName === 'prisma';
+  const declared = firstLayer(lens, models, surface);
+  assertValidNarrowing(declared);
   const shown = prisma ? redactLens(omitForeignKeys(declared)) : declared;
   if (!view) return shown;
   const viewed: LensNarrowing = { parent: shown, root: exactly(shown, view) };
@@ -230,14 +248,16 @@ export const emailLens = ({
   data,
   narrowing = {},
   recipientDefault,
+  scope,
 }: EmailLensInput = {}): EmailLens => ({
-  ...(sender ? { sender: slot(sender, narrowing.sender) } : {}),
+  ...(sender ? { sender: slot(sender, narrowing.sender, undefined, scope) } : {}),
   recipient: slot(
     recipient,
     narrowing.recipient ?? recipientDefault,
     isUserLens(recipient) ? DEFAULT_RECIPIENT_NARROWING : undefined,
+    scope,
   ),
-  data: data ? slot(data, narrowing.data) : OPAQUE_SLOT,
+  data: data ? slot(data, narrowing.data, undefined, scope) : OPAQUE_SLOT,
   system: systemSlot(),
 });
 

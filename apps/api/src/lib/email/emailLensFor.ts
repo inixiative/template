@@ -16,7 +16,6 @@ import {
 import {
   defaultRecipientNarrowing,
   type EmailLens,
-  emailLens,
   OPAQUE_SLOT,
   parseSlotLenses,
   scopeEmailLens,
@@ -38,19 +37,23 @@ export const emailLensFor = (
   const entry = slug ? registry[slug] : undefined;
   const scope = emailOwnerProvider(owner);
   const memberships = (sender && senderLensOwner(sender)) ?? scope;
-  const lens = emailLens({
-    sender: entry ? senderLens(entry.sender) : sender ? senderLens(sender) : undefined,
-    data: entry?.data,
-    narrowing: parseSlotLenses(stored),
-    recipientDefault: defaultRecipientNarrowing(memberships),
-  });
+  const lens = scopeEmailLens(
+    {
+      sender: entry ? senderLens(entry.sender) : sender ? senderLens(sender) : undefined,
+      data: entry?.data,
+      narrowing: parseSlotLenses(stored),
+      recipientDefault: defaultRecipientNarrowing(memberships),
+    },
+    scope,
+    memberships,
+  );
   if (
     lens.recipient &&
     lens.recipient !== OPAQUE_SLOT &&
     !lensVisit(lens.recipient, '')?.fields.email
   )
     throw new Error('The recipient lens must keep `email`: delivery addresses the recipient by it');
-  return scopeEmailLens(lens, scope, memberships);
+  return lens;
 };
 
 export const emailLensAt = async (slug: string, owner: OwnerScope): Promise<EmailLens> =>

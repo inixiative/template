@@ -1,5 +1,11 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { db, snapshotHookRegistry, withMaterializedIds } from '@template/db';
+import {
+  db,
+  materializedIdConflicts,
+  snapshotHookRegistry,
+  syncRuleReferenceEdges,
+  withMaterializedIds,
+} from '@template/db';
 import type { EmailComponent, Tag } from '@template/db/generated/client/client';
 import { cleanupTouchedTables, createEmailComponent, createTag } from '@template/db/test';
 import { registerImmutableFieldsHook } from '#/hooks/immutableFields/hook';
@@ -25,25 +31,36 @@ describe('materialized ids on a false-polymorphic axis', () => {
     await cleanupTouchedTables(db);
   });
 
-  const edge = (extra: Record<string, unknown> = {}) =>
-    db.ruleReference.create({
-      data: {
-        sourceModel: 'EmailComponent',
-        sourceEmailComponentId: component.id,
-        targetModel: 'Tag',
-        targetTagId: tag.id,
-        ...extra,
-      } as never,
+  const edge = async () => {
+    await db.txn(() =>
+      syncRuleReferenceEdges({ model: 'EmailComponent', id: component.id }, [
+        { model: 'Tag', id: tag.id },
+      ]),
+    );
+    return db.ruleReference.findFirstOrThrow({
+      where: { sourceEmailComponentId: component.id, targetTagId: tag.id },
     });
+  };
+
+  const clearEdges = () =>
+    db.txn(() => syncRuleReferenceEdges({ model: 'EmailComponent', id: component.id }, []));
 
   it('a create writes each materialized column from its set typed FK', async () => {
-    const created = await edge();
-    expect(created).toMatchObject({ sourceId: component.id, targetId: tag.id });
-    await db.ruleReference.delete({ where: { id: created.id } });
+    expect(await edge()).toMatchObject({ sourceId: component.id, targetId: tag.id });
+    await clearEdges();
   });
 
-  it('a create whose materialized column disagrees with its typed FK is refused', async () => {
-    await expect(edge({ targetId: other.id })).rejects.toMatchObject({ status: 422 });
+  it('a create whose materialized column disagrees with its typed FK is a conflict', () => {
+    const row = {
+      sourceModel: 'EmailComponent',
+      sourceEmailComponentId: component.id,
+      targetModel: 'Tag',
+      targetTagId: tag.id,
+    };
+    expect(materializedIdConflicts('RuleReference', row)).toEqual([]);
+    expect(materializedIdConflicts('RuleReference', { ...row, targetId: other.id })).toEqual([
+      `RuleReference.targetId must equal the Tag id ${tag.id}`,
+    ]);
   });
 
   it('an update touching a typed FK or a materialized column is refused; a restamp is not', async () => {
@@ -61,7 +78,7 @@ describe('materialized ids on a false-polymorphic axis', () => {
       data: { targetDeletedAt: stamp },
     });
     expect(restamped).toMatchObject({ targetId: tag.id, targetDeletedAt: stamp });
-    await db.ruleReference.delete({ where: { id: created.id } });
+    await clearEdges();
   });
 
   it('an axis without a materialized column is left as written', () => {

@@ -356,8 +356,12 @@ owner's, segments are the owner's (via `recipient.providerRefs.segmentMembers.se
 tiers see platform tags and no segments; the link rows are bound the same way — a tag attachment or
 segment membership by its far side, a customer ref by its provider.
 `OrganizationUser`/`SpaceUser` rows scope to the person, like the cascade they sit on. The scope
-is merged into each slot's **first** narrowing (json-rules `clampLens`): json-rules 3.4 lets a later layer's
-clamp read only what its parent shows, and these clamps read columns the slot hides.
+is one of four static declarations in `packages/email/src/rules/scopes/` (tenant owner and sender,
+owner only, platform owner with a tenant sender, platform), chosen by `emailScopeFor(owner, sender)`
+and written into each slot's **first** narrowing, because json-rules lets a later layer's clamp read
+only what its parent shows and these clamps read columns the slot hides. Every owner id is an
+optional bind token (`equalsSuppliedBind`: the column exists and equals the token), so an
+unsupplied token matches no row; the row's `emailLensBindings(owner, sender)` go to `bindLens`.
 **Memberships are the sender's.** At send, `emailLensFor(slug, owner, stored, sender)` also clamps
 `OrganizationUser` / `SpaceUser` rows to the sending owner's tree (`senderLensOwner`): an
 Organization, OrganizationUser, Space or SpaceUser sender to its organization (the organization and

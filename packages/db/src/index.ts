@@ -100,6 +100,7 @@ export {
   type RelationField,
   type ScalarField,
 } from '@inixiative/prisma-map';
+export { equalsSuppliedBind } from './registries/equalsSuppliedBind';
 export {
   POLYMORPHIC_BINDS,
   type PolymorphicKind,
