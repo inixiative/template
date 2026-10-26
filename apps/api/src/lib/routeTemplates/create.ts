@@ -52,7 +52,6 @@ export const createRoute = <const T extends RouteArgs>(args: T) => {
       middleware,
       skipId: skipResource,
       includeDeleted: args.includeDeleted,
-      submodel,
       route: (): RouteConfig => route,
     }),
     request: buildRequest({ ...args, skipId: skipIdForRequest }),

@@ -11,13 +11,9 @@ import type { MiddlewareHandler } from 'hono';
 import { makeError } from '#/lib/errors';
 import type { AppEnv } from '#/types/appEnv';
 
-const submodelChecks = new WeakSet<MiddlewareHandler>();
-
-export const isSubmodelCheck = (middleware: MiddlewareHandler): boolean =>
-  submodelChecks.has(middleware);
-
-export const validateSubmodelPermission = (action: Action): MiddlewareHandler<AppEnv> => {
-  const handler: MiddlewareHandler<AppEnv> = async (c, next) => {
+export const validateSubmodelPermission =
+  (action: Action): MiddlewareHandler<AppEnv> =>
+  async (c, next) => {
     const submodel = c.get('routeConfig')?.submodel;
     const owner = c.get('resource') as Record<string, unknown> | null;
     const ownerType = c.get('resourceType');
@@ -32,6 +28,3 @@ export const validateSubmodelPermission = (action: Action): MiddlewareHandler<Ap
 
     await next();
   };
-  submodelChecks.add(handler as MiddlewareHandler);
-  return handler;
-};

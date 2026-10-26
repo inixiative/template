@@ -439,13 +439,13 @@ describe('ownerRef places a pseudo record of the child under its owner', () => {
 });
 
 describe('validateSubmodelPermission on a route with no submodel is a configuration error', () => {
-  it('throws when the route is built', () => {
-    expect(() =>
-      readRoute({
-        model: Modules.organization,
-        responseSchema: z.object({}),
-        middleware: [validateSubmodelPermission('read')],
-      }),
-    ).toThrow('validateSubmodelPermission needs a route with a submodel');
+  it('throws on the request', async () => {
+    const route = readRoute({ model: Modules.organization, responseSchema: z.object({}) });
+    const context = {
+      get: (key: string) => (key === 'routeConfig' ? route : undefined),
+    } as unknown as Parameters<ReturnType<typeof validateSubmodelPermission>>[0];
+    await expect(validateSubmodelPermission('read')(context, async () => {})).rejects.toThrow(
+      'validateSubmodelPermission needs a route with a model submodel',
+    );
   });
 });

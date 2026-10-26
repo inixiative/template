@@ -73,7 +73,6 @@ export const readRoute = <const T extends RouteArgs>(args: T) => {
       skipId: skipResource,
       filterLens,
       includeDeleted: args.includeDeleted,
-      submodel,
       route: (): RouteConfig => route,
     }),
     request: buildRequest(args),

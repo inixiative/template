@@ -48,7 +48,6 @@ export const deleteRoute = <const T extends RouteArgs>(args: T) => {
       middleware,
       skipId: skipId,
       includeDeleted: args.includeDeleted,
-      submodel,
       route: (): RouteConfig => route,
     }),
     request: buildRequest(args),
