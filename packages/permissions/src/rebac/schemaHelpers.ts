@@ -17,6 +17,19 @@ export const actorIsDelegateOfUser: ActionRule = {
   rule: { field: '__actor.record.ownerModel', operator: Operator.equals, value: 'User' },
 };
 
+export const delegateHoldsOperate: ActionRule = {
+  any: [
+    { rule: { field: '__actor.record.full', operator: Operator.equals, value: true } },
+    {
+      rule: {
+        field: '__actor.record.role',
+        operator: Operator.in,
+        value: roleHierarchy.slice(roleHierarchy.indexOf('member')),
+      },
+    },
+  ],
+};
+
 export const ownerRelations = [
   ['User', 'user'],
   ['Organization', 'organization'],
