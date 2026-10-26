@@ -12,7 +12,12 @@ export const changePasswordBodySchema = z.object({
   newPassword: z.string().min(passwordLength.min).max(passwordLength.max),
 });
 
-export const changePasswordResponseSchema = z.object({
+export const userJwtHandoffSchema = z.object({
   token: z.string().regex(/^[\w-]+\.[\w-]+\.[\w-]+$/),
   expiresAt: z.string().datetime(),
 });
+
+export const changePasswordResponseSchema = z.union([
+  userJwtHandoffSchema,
+  z.object({ token: z.null(), expiresAt: z.null() }),
+]);

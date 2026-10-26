@@ -10,7 +10,7 @@ import { me } from '#/lib/context/me';
 import { makeError } from '#/lib/errors';
 import { makeController } from '#/lib/utils/makeController';
 import { meChangePasswordRoute } from '#/modules/me/routes/meChangePassword';
-import { changePasswordResponseSchema } from '#/modules/me/schemas/changePasswordSchemas';
+import { userJwtHandoffSchema } from '#/modules/me/schemas/changePasswordSchemas';
 
 export const meChangePasswordController = makeController(
   meChangePasswordRoute,
@@ -22,8 +22,9 @@ export const meChangePasswordController = makeController(
         headers,
       }),
     );
-    const parsed = changePasswordResponseSchema.safeParse(handoff);
+    const parsed = userJwtHandoffSchema.safeParse(handoff);
     if (!parsed.success) throw makeError({ status: 500 });
+    if (c.get('spoofedBy')) return respond.ok({ token: null, expiresAt: null });
     return respond.ok(parsed.data);
   },
 );

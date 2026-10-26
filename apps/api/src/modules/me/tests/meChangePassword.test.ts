@@ -207,6 +207,25 @@ describe('POST /api/v1/me/changePassword', () => {
     expect((await signIn(person.email, currentPassword)).status).not.toBe(200);
   });
 
+  it('a spoofing superadmin gets no JWT for the spoofed user back', async () => {
+    const person = await signUpVerified();
+    const personJwt = await signedInJwt(person.email);
+    const { entity: admin } = await createUser({ platformRole: PlatformRole.superadmin });
+    const { jwt } = await createUserJwt(admin);
+    const response = await changePassword(
+      jwt,
+      { currentPassword, newPassword },
+      { 'x-spoof-user-email': person.email },
+    );
+    expect(response.status).toBe(200);
+    expect(((await response.json()) as { data: unknown }).data).toEqual({
+      token: null,
+      expiresAt: null,
+    });
+    expect((await readMe(personJwt)).status).toBe(401);
+    expect((await readMe(jwt)).status).toBe(200);
+  });
+
   it('two concurrent changes: one wins, the other is refused without a 401, no session left', async () => {
     const person = await signUpVerified();
     const jwt = await signedInJwt(person.email);

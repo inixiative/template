@@ -29,6 +29,7 @@ let requests: Recorded[];
 let respond: (path: string) => Response;
 let fetchSpy: ReturnType<typeof spyOn<typeof globalThis, 'fetch'>>;
 let authenticate: ReturnType<typeof mock>;
+let store: ReturnType<typeof createTestStore>;
 
 beforeEach(() => {
   clearToken();
@@ -63,7 +64,7 @@ beforeEach(() => {
     close: () => {},
     resync: () => {},
   } satisfies ApiWebsocket;
-  const store = createTestStore({ websocket });
+  store = createTestStore({ websocket });
   store.setState((state) => ({ auth: { ...state.auth, isAuthenticated: true } }));
   useAppStore.setState(store.getState());
 });
@@ -117,6 +118,21 @@ describe('ChangePasswordCard', () => {
     const view = render(<ChangePasswordCard />);
     submit(view, 'wrong-password', 'brand-new-password');
     await waitFor(() => expect(view.getByRole('alert').textContent).toContain('Invalid password'));
+    expect(getToken()).toBe(oldToken);
+    expect(authenticate).not.toHaveBeenCalled();
+  });
+
+  test('while spoofing, keeps the superadmin’s own JWT', async () => {
+    store.setState((state) => ({
+      auth: { ...state.auth, spoofUserEmail: 'someone@example.test' },
+    }));
+    useAppStore.setState(store.getState());
+    respond = () => Response.json({ data: { token: newToken, expiresAt } });
+    const view = render(<ChangePasswordCard />);
+    submit(view, 'current-password', 'brand-new-password');
+
+    await waitFor(() => expect(requests).toHaveLength(1));
+    await waitFor(() => expect(view.queryByRole('alert')).toBeNull());
     expect(getToken()).toBe(oldToken);
     expect(authenticate).not.toHaveBeenCalled();
   });

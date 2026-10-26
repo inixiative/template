@@ -23,6 +23,9 @@
  *   import or re-export of a signer module, or any reference to `createSession` (property, string
  *   element access, destructuring)
  *
+ * - importing `withThrowawaySession` (import, re-export, dynamic `import()`, `require`) anywhere but
+ *   the callers named in THROWAWAY_SESSION_CALLERS; each new caller is a reviewed one-line addition
+ *
  * Exemptions: none in exempt.txt. One named file may build a session credential:
  * `withThrowawaySession` (THROWAWAY_SESSION_HELPER), which hands a short-lived session to a
  * BetterAuth server call and deletes it.
@@ -148,6 +151,33 @@ const sessionCredentialBuild: Check = (node, sourceFile) => {
   return createSessionReference ? sessionCredential(node, 'createSession') : null;
 };
 
+const THROWAWAY_SESSION_CALLERS = new Set([
+  THROWAWAY_SESSION_HELPER,
+  'apps/api/src/modules/me/controllers/meChangePassword.ts',
+]);
+
+const isThrowawaySessionModule = (node: ts.Node | undefined): boolean =>
+  !!node && ts.isStringLiteralLike(node) && /(^|\/)withThrowawaySession(\.ts)?$/.test(node.text);
+
+const throwawaySessionImport: Check = (node, sourceFile) => {
+  if (THROWAWAY_SESSION_CALLERS.has(sourceFile.fileName)) return null;
+  const imports =
+    ((ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) &&
+      isThrowawaySessionModule(node.moduleSpecifier)) ||
+    (ts.isCallExpression(node) &&
+      (node.expression.kind === ts.SyntaxKind.ImportKeyword ||
+        (ts.isIdentifier(node.expression) && node.expression.text === 'require')) &&
+      isThrowawaySessionModule(node.arguments[0]));
+  return imports
+    ? {
+        node,
+        key: 'throwaway-session-caller',
+        detail:
+          'imports withThrowawaySession outside THROWAWAY_SESSION_CALLERS; a new caller is added there, in review',
+      }
+    : null;
+};
+
 const CHECKS: Check[] = [
   (node, sourceFile) =>
     propertyName(node, sourceFile) === 'cookieCache'
@@ -188,6 +218,7 @@ const CHECKS: Check[] = [
   sessionLookup,
   bearerPluginImport,
   sessionCredentialBuild,
+  throwawaySessionImport,
 ];
 
 const violations: Violation[] = [];
