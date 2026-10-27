@@ -211,12 +211,14 @@ The engine is `@inixiative/permissions`; `createPermissions` in `packages/permis
 
 ### installPermissions
 
-`installPermissions(c)` (`apps/api/src/lib/context/installPermissions.ts`) resets the permix, sets the actor and the superadmin bypass, then installs the grants with `installGrants`:
+One builder fills a permix for whoever acts: `installPermissionsFor(permix, { user, token, organizationUsers, spaceUsers })` (`apps/api/src/lib/permissions/userPermissions.ts`). `user` is the user behind the request (`me(c)`), and the member rows are that user's. It resets the permix, sets the actor (the token if there is one, else the user) and the superadmin bypass from the user's platform role, then installs with `installGrants`:
 
-- a user (JWT or spoof): `installUserPermissions(permix, user, members)` (`apps/api/src/lib/permissions/userPermissions.ts`) sets the user as the actor and the bypass from their platform role, and installs `userGrants`: the user's and every member row's role entries, plus each member row's entitlements owned by its tenant.
-- a token: `setupTokenPermissions` (`apps/api/src/lib/permissions/setupTokenPermissions.ts`) installs `delegateTable(token, owner)` ([Delegates and Their Owners](#delegates-and-their-owners)), where `owner` is the user's table built from the members already in context for a User-owned token (`contextUserGrants`, shared with `setupUserPermissions`), and `ownerTable(token)` otherwise.
+- no token (JWT or spoof): `userGrants`, the user's and every member row's role entries, plus each member row's entitlements owned by its tenant.
+- a token: `delegateTable(token, owner)` ([Delegates and Their Owners](#delegates-and-their-owners)), where `owner` is that same user table for a User-owned token and `ownerTable(token)` otherwise.
 
-A user who is not the requester (an issuer re-checking the user it acts for, a job acting as a user): `userPermissions(userId)` loads the user with `findUserWithRelations` and returns a fresh permix built by the same `installUserPermissions`, or `null` when the user does not exist. It answers what that user's own JWT request answers (`apps/api/src/lib/permissions/userPermissions.test.ts`).
+`installPermissions(c)` (`apps/api/src/lib/context/installPermissions.ts`) is the request's call: it passes `me(c)`, the token and the member rows already on the context.
+
+A user who is not the requester (an issuer re-checking the user it acts for, a job acting as a user): `userPermissions(userId)` loads the user with `findUserWithRelations` and calls the same builder on a fresh permix, or returns `null` when the user does not exist. It answers what that user's own JWT request answers (`apps/api/src/lib/permissions/userPermissions.test.ts`).
 
 ### Vocabulary
 
@@ -238,7 +240,7 @@ One word per party, used in code and prose alike:
 
 ### Delegates and Their Owners
 
-A delegate holds its permissions, capped live by its owner. `installPermissions` installs a user's own table (`setupUserPermissions`: the user grant plus one grant per member row) or, for a token, the token's permissions (`setupTokenPermissions`). `ownerTable` (`apps/api/src/lib/permissions/ownerTable.ts`) builds the owner's table from the owner model:
+A delegate holds its permissions, capped live by its owner. `installPermissionsFor` installs a user's own table (the user grant plus one grant per member row) or, for a token, the token's permissions capped by its owner. `ownerTable` (`apps/api/src/lib/permissions/ownerTable.ts`) builds the owner's table from the owner model:
 
 | Owner model | Owner table |
 |---|---|

@@ -14,15 +14,28 @@ import {
   userGrants,
 } from '@template/permissions';
 import { createPermissions, type Permix } from '@template/permissions/client';
+import type { TokenWithRelations } from '#/lib/context/types';
+import { delegateTable, ownerTable } from '#/lib/permissions/ownerTable';
 import { findUserWithRelations } from '#/modules/user/services/find';
 
-type Members = Pick<UserWithRelations, 'organizationUsers' | 'spaceUsers'>;
+type Acting = Pick<UserWithRelations, 'organizationUsers' | 'spaceUsers'> & {
+  user: User | null;
+  token: TokenWithRelations | null;
+};
 
-export const installUserPermissions = async (permix: Permix, user: User, members: Members) => {
+export const installPermissionsFor = async (
+  permix: Permix,
+  { user, token, organizationUsers, spaceUsers }: Acting,
+) => {
   await permix.setup([], { replace: true });
-  permix.setActor(actorOf(ActorModel.User, user));
+  if (token) permix.setActor(actorOf(ActorModel.Token, token));
+  else if (user) permix.setActor(actorOf(ActorModel.User, user));
   permix.setSuperadmin(isSuperadmin(user));
-  await installGrants(permix, userGrants(user.id, members.organizationUsers, members.spaceUsers));
+
+  const usersTable = userGrants(user?.id ?? null, organizationUsers, spaceUsers);
+  if (!token) return installGrants(permix, usersTable);
+  const owner = token.ownerModel === 'User' ? usersTable : await ownerTable(token);
+  await installGrants(permix, delegateTable(token, owner));
 };
 
 export const userPermissions = async (userId: string): Promise<Permix | null> => {
@@ -36,6 +49,6 @@ export const userPermissions = async (userId: string): Promise<Permix | null> =>
     ...user
   } = userWithRelations;
   const permix = createPermissions();
-  await installUserPermissions(permix, user, { organizationUsers, spaceUsers });
+  await installPermissionsFor(permix, { user, token: null, organizationUsers, spaceUsers });
   return permix;
 };
