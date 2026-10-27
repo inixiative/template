@@ -53,7 +53,6 @@ export {
 export {
   CACHE_STATES,
   type CacheCheck,
-  type CacheOptions,
   type CacheState,
   COMMAND_TIMEOUT_MS,
   cache,

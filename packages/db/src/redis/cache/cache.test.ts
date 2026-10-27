@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, spyOn } from 'bun:test';
 import { Readable } from 'node:stream';
-import { db } from '@template/db/client';
 import { cache } from '@template/db/redis/cache/cache';
 import { cacheKey } from '@template/db/redis/cache/cacheKey';
 import { checkCache } from '@template/db/redis/cache/checkCache';
@@ -594,20 +593,6 @@ describe('cache invalidation during a read', () => {
     paused.resume();
 
     expect(await inFlight).toBe('old');
-    expect(await getRedisClient().get(key)).toBeNull();
-  });
-
-  it('shouldBypassInTxn serves the cache outside a transaction and skips it inside one', async () => {
-    const key = cacheKey('txn', 'bypass');
-    await getRedisClient().setex(key, 60, superjson.stringify('cached'));
-    const produce = async () => 'fresh';
-
-    expect(await cache(key, produce, 60, { shouldBypassInTxn: true })).toBe('cached');
-    expect(await db.txn(() => cache(key, produce, 60, { shouldBypassInTxn: true }))).toBe('fresh');
-    expect(await readRaw(key)).toBe('cached');
-
-    await getRedisClient().del(key);
-    expect(await db.txn(() => cache(key, produce, 60, { shouldBypassInTxn: true }))).toBe('fresh');
     expect(await getRedisClient().get(key)).toBeNull();
   });
 

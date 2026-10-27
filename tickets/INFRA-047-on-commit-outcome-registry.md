@@ -13,7 +13,7 @@ A transaction that touches the same cache key more than once (read, write, read 
 - a row written three times queues three clears (the cache invalidation hook already does this today).
 
 Separately, `cache()` inside `db.txn()` should read the database directly and only reach Redis after
-commit. Today that is the opt-in `shouldBypassInTxn`, which skips the cache entirely.
+commit. Today `cache()` inside a transaction behaves as it does outside one.
 
 ## Idea (Aron, 2026-10-27)
 

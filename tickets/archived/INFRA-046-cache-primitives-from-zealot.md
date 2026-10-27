@@ -48,8 +48,8 @@ A run that loses its lock is never cancelled, so the missed-beat budget only dec
 `cache.lock.wait`, `cache.publish.skipped`. Large writes keep the template's `log.warn` record, now
 tagged by accessor.
 
-**Options.** `cache(key, fn, ttl, { shouldBypassInTxn })`, from Zealot #2735 (ZLT-5337). Zealot's
-`shouldKeepExisting` and evict-only clears are not ported: generations already make a write-through win,
+**Not ported.** Zealot's `cache()` options from #2735 (ZLT-5337) stay out. `shouldBypassInTxn`: caching
+inside a transaction is the open design in INFRA-047. `shouldKeepExisting` and evict-only clears: generations already make a write-through win,
 and a bad value is dropped by checking it before clearing (Aron, 2026-10-27).
 
 **Warm on boot.** The worker enqueues every registered cache's branch when it starts

@@ -1,4 +1,4 @@
-export { type CacheOptions, cache } from './cache/cache';
+export { cache } from './cache/cache';
 export { cacheKey } from './cache/cacheKey';
 export { CACHE_STATES, type CacheCheck, type CacheState } from './cache/cacheStates';
 export { checkCache } from './cache/checkCache';
