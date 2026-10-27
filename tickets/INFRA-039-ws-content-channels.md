@@ -79,6 +79,12 @@ built; ideally it becomes the same channel, later.
   route authorizes them like any stream, and the seq key no longer needs a user.
 - Channels are re-probed on a sweep like streams (one sweep for both, a single interval), so a
   revoked token or demoted seat loses channels as it loses streams.
+- Abstract the customer → channel mapping. `customerSegmentsChanged`
+  (`apps/api/src/appEvents/handlers/customerRef/customerSegmentsChanged.ts`, #220) builds each
+  channel by hand: a User customer through `meChannel`, an Organization or Space customer through a
+  `${lowerFirst(customerModel)}ReadManySegmentMemberships` key. Aron, 2026-10-27: "very manual…
+  definitely not well abstracted… we can abstract that out later"; the `me` channel "looks a lot
+  more correct".
 
 ## Definition of done
 
