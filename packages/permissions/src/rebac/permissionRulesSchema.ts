@@ -4,10 +4,21 @@
  * @partOf primitive:authz
  * @uses none
  */
-import { actionRuleSchema as actionRuleBase } from '@inixiative/permissions/actionRuleSchema';
 import type { AccessorName } from '@template/db';
 import { rebacSchema } from '@template/permissions/rebac/schema';
 import { z } from 'zod';
+
+const actionRuleBase: z.ZodType = z.lazy(() =>
+  z.union([
+    z.string(),
+    z.boolean(),
+    z.null(),
+    z.object({ rel: z.string(), action: z.string() }).strict(),
+    z.object({ rule: z.unknown() }).strict(),
+    z.object({ any: z.array(actionRuleBase) }).strict(),
+    z.object({ all: z.array(actionRuleBase) }).strict(),
+  ]),
+);
 
 // Register a $ref name so zod-to-openapi can break the recursion when api
 // boots and serializes its OpenAPI spec. The `.openapi()` method is patched

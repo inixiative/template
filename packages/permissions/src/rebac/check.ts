@@ -4,8 +4,8 @@
  * @partOf primitive:authz
  * @uses infrastructure:prisma
  */
-import { createRebacCheck, type DirectOwner, type ResolveRelation } from '@inixiative/permissions';
-import { type AccessorName, directOwner, type HydratedRecord } from '@template/db';
+import { createRebacCheck, type ResolveRelation } from '@inixiative/permissions';
+import type { AccessorName, HydratedRecord } from '@template/db';
 import { prismaMap } from '@template/db/generated/prismaMap';
 import type { Permix } from '@template/permissions/client';
 import type { ActionRule, RebacSchema } from '@template/permissions/rebac/types';
@@ -25,12 +25,7 @@ export const resolveRelation: ResolveRelation = (resource, relationName) => {
   return `db:${lowerFirst(field.type)}`;
 };
 
-export const ownerAnchor: DirectOwner = (resource, record) => {
-  const owner = directOwner((resource.split(':')[1] ?? resource) as AccessorName, record);
-  return owner ? { resource: `db:${owner.accessor}`, id: owner.id } : null;
-};
-
-const rebacCheck = createRebacCheck(resolveRelation, { directOwner: ownerAnchor });
+const rebacCheck = createRebacCheck(resolveRelation);
 
 export const check = (
   permix: Permix,

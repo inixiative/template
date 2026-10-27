@@ -267,6 +267,35 @@ describe('what an integration entitlement from the organization reaches (2026-10
     );
   });
 
+  it("a composite anchor: a member's integrations, not another member's", async () => {
+    const { entity: anchorMember } = await createOrganizationUser(
+      { role: 'viewer' },
+      { organization },
+    );
+    const { entity: otherMember } = await createOrganizationUser(
+      { role: 'viewer' },
+      { organization },
+    );
+    const memberIntegration = async (member: { userId: string }) =>
+      (
+        await createIntegration({
+          ownerModel: 'OrganizationUser',
+          organizationId: organization.id,
+          userId: member.userId,
+          role: 'viewer',
+        })
+      ).entity;
+    const key = await fullMemberToken('viewer', [
+      entry('db:integration', ['db:organizationUser', anchorMember.id], ['operate']),
+    ]);
+    expect(
+      await holds(key, 'integration', (await memberIntegration(anchorMember)).id, 'operate'),
+    ).toBe(true);
+    expect(
+      await holds(key, 'integration', (await memberIntegration(otherMember)).id, 'operate'),
+    ).toBe(false);
+  });
+
   it('an org admin does not manage a space-owned integration', async () => {
     const key = await fullMemberToken('admin');
     const integration = await spaceIntegration();

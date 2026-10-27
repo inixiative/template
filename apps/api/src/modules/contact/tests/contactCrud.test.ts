@@ -240,6 +240,21 @@ describe('Contact CRUD', () => {
       expect(response.status).toBe(403);
     });
 
+    it('a permission rule that can hold on a missing value is malformed (422)', async () => {
+      const { entity: contact } = await createContact({
+        userId: user.id,
+        ownerModel: 'User',
+        type: 'website',
+        value: { url: `https://rules${getNextSeq()}.example.com` },
+      });
+      const response = await fetch(
+        patch(`/api/v1/contact/${contact.id}`, {
+          permissionRules: { read: { rule: { field: 'label', operator: 'isEmpty' } } },
+        }),
+      );
+      expect(response.status).toBe(422);
+    });
+
     it('rejects updating another user contact (403)', async () => {
       const { entity: otherUser } = await createUser();
       const { entity: contact } = await createContact({

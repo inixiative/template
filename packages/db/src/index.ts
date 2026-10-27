@@ -142,7 +142,6 @@ export {
   type RuntimeDelegate,
   update,
 } from './utils/delegates';
-export { directOwner } from './utils/directOwner';
 export { hasDeletedAt, lookupField, modelFields, SOFT_DELETE_MODELS } from './utils/fieldMetadata';
 // Prisma error narrowing
 export { isUniqueConstraintError } from './utils/isUniqueConstraintError';
@@ -163,7 +162,7 @@ export {
   toAccessor,
   toModelName,
 } from './utils/modelNames';
-export { ownerColumns } from './utils/ownerColumns';
+export { ownerColumns, placedUnder } from './utils/ownerColumns';
 // Relation introspection, derived from the generated prismaMap (single source of truth)
 export { getModelRelations } from './utils/prismaMapRelations';
 export { isCleared, isPrismaNull } from './utils/prismaNull';
