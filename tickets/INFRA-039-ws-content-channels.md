@@ -1,6 +1,6 @@
 # INFRA-039 — Every WebSocket delivery is a content channel
 
-**Status:** 🆕 Not Started · **Line:** INFRA · **Priority:** Low · **Related:** #219 (actor, `/identify`), INFRA-038, AUTH-005
+**Status:** 🆕 Not Started · **Line:** INFRA · **Priority:** Low · **Related:** #219 (actor, `/identify`), #220 (segment memberships, the `/me` proxy), INFRA-038, AUTH-005
 
 ## Context
 
@@ -35,8 +35,7 @@ So every delivery is a channel named by its content:
 - **receive**: whoever's credential the route lets read it subscribes: the person's session, their
   own token within its claim, an admin tool. A seat's token cannot read it, so it never gets it.
 
-This removes `sendToUser`, the `byUser` index, `ws.data.userId`, the pubsub `'user'` message and the
-`me`-relative push keys. There is one delivery rule (subscribe to content; the route authorizes) and
+This removes `sendToUser`, the `byUser` index and the pubsub `'user'` message. There is one delivery rule (subscribe to content; the route authorizes) and
 no "whom to address" question.
 
 ### Why not address identities (User / Token / Integration / org / seat)?
@@ -51,13 +50,30 @@ An earlier variant, a bare `user:<id>` channel, was rejected by an adversarial p
 it, "can read the user row" lets a superadmin hear anyone, and its pushes were `me`-relative. A
 channel on real content has a route, a non-`me` key, and an audience that is exactly who may read it.
 
+## Ruling 2026-10-26: `/me` is the proxy
+
+Aron: "you listen to the user route. But it happens through me… there's, like, a small proxy there."
+A user's own content is still published under the user's id, but the client subscribes through its
+`/me` route and never names an id:
+
+- **subscribe**: the client sends the `/me` channel (`meReadManySegmentMemberships`); the server
+  authorizes it by replaying the `/me` route with the socket's credential, then files it under the
+  socket's user (`meChannel(channel, userId)`, for a `WS_CHANNELS` entry marked `me`). A socket
+  with no user (a member, organization, space or integration token) cannot subscribe.
+- **publish**: the event sends to that user-keyed channel (`meChannel(…, customerId)`).
+- the socket's user is what `me(c)` is over HTTP: the user for a JWT or spoof, the token's user for
+  a User-owned token, none otherwise. So `ws.data.userId` stays, as the proxy's key.
+
+Subscribing to another user's content directly (`/user/:id/…`) is a separate subscription, not
+built; ideally it becomes the same channel, later.
+
 ## What it takes
 
 - Each app event that pushes to users publishes to the content channel instead; the channel's route
   must exist (add the GET where it does not).
-- `WS_CHANNELS` entries for those routes; `meReadMany…` push keys become the content's keys.
+- `WS_CHANNELS` entries for those routes; a user's own content is a `me` entry (above).
 - The frontend subscribes to the content channels it shows (a hook keyed on the record it renders,
-  e.g. `me.id` for the person's own lists), rather than relying on implicit per-user delivery. On
+  its `/me` route for the user's own lists), rather than relying on implicit per-user delivery. On
   logout / spoof, the client re-subscribes for the new person instead of trusting replay.
 - `perRecipient` streams become streams named by their content (`…:id:u`), audience `shared`; the
   route authorizes them like any stream, and the seq key no longer needs a user.
@@ -66,10 +82,11 @@ channel on real content has a route, a non-`me` key, and an audience that is exa
 
 ## Definition of done
 
-- [ ] No delivery path addresses a user id: `sendToUser`, `byUser`, `ws.data.userId` and the pubsub
-      `'user'` message are gone.
-- [ ] The segment-membership refetch publishes to `userReadManySegmentMemberships:id:<user>`; the
-      person's session and own token receive it, a seat token cannot subscribe.
+- [ ] No delivery path addresses a user id: `sendToUser`, `byUser` and the pubsub `'user'` message
+      are gone (#220).
+- [ ] The segment-membership refetch reaches a User customer through the `/me` channel and an
+      Organization or Space customer through its own channel; the user's session and own token
+      receive it, a member token cannot subscribe (#220).
 - [ ] `perRecipient` is gone; the contacts stream (and any new stream) is named by content.
 - [ ] One recheck sweep covers channels and streams; a revoked token loses both within an interval.
 - [ ] WEBSOCKETS.md: everything a socket receives is content it subscribed to, authorized by the
