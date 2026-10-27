@@ -42,6 +42,7 @@ kanban
     INFRA-036-clock-sensitive-rule-tick
     INFRA-038-ws-channel-tenancy
     INFRA-040-ws-content-channels
+    INFRA-047-on-commit-outcome-registry
     DOC-001-scalar-api-docs-ui
     DOC-002-ai-discoverable-api-metadata
     FE-002-editor-slice-pattern
@@ -90,6 +91,7 @@ kanban
 - [INFRA-036: Clock-Sensitive Rule Tick](./INFRA-036-clock-sensitive-rule-tick.md) - `Segment.clockUnit` (hour/day/week/month) derived at save by a json-rules fold; one sweep cron row per unit
 - [INFRA-038: WS Channel Tenancy](./INFRA-038-ws-channel-tenancy.md) - Tenancy query on channel names + probe-reported tenant, deferred until a route resolves its tenant outside its path
 - [INFRA-040: WS Content Channels](./INFRA-040-ws-content-channels.md) - Every delivery is a channel named by content and authorized by its route; drops per-user addressing
+- [INFRA-047: On-Commit Outcome Registry](./INFRA-047-on-commit-outcome-registry.md) - Deferred: one keyed action per transaction (cache clear / set / refresh), last registration wins, run once after the hooks
 
 **Audit & Compliance:**
 - [FEAT-017: Audit Log Hardening, Inquiry Lineage, and Explorer](./FEAT-017-audit-log-hardening-lineage-and-explorer.md) - Durable audit writes, inquiry causality, and admin audit browsing
