@@ -14,6 +14,7 @@ import {
 } from '@template/db/extensions/hookRegistry';
 import { getCurrentTransaction } from '@template/db/extensions/transactionRegistry';
 import type { Prisma } from '@template/db/generated/client/client';
+import { pickColumns } from '@template/db/utils/pickColumns';
 
 // Hooks run on a Prisma continuation where the caller's async-local storage has not survived, so
 // they get the caller's context re-entered around them rather than passed in. See
@@ -62,7 +63,10 @@ export const intercept =
       hookOptions.previous = (await loadPrevious(openTransaction, model, where)) as never;
     await runHooks(openTransaction, HookTiming.before, hookOptions);
     const result = await query(args);
-    hookOptions.result = (action === DbAction.deleteMany ? hookOptions.previous : result) as never;
+    if (action === DbAction.deleteMany) hookOptions.result = hookOptions.previous as never;
+    else if (Array.isArray(result))
+      hookOptions.result = result.map((row) => pickColumns(model, row)) as never;
+    else hookOptions.result = pickColumns(model, result as Record<string, unknown>) as never;
     await runHooks(openTransaction, HookTiming.after, hookOptions);
     return result;
   };

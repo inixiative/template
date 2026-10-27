@@ -6,12 +6,14 @@ import type {
   User,
 } from '@template/db/generated/client/client';
 import {
+  AuditSubjectModel,
   InquiryResourceModel,
   InquiryStatus,
   InquiryType,
 } from '@template/db/generated/client/enums';
 import {
   cleanupTouchedTables,
+  createAuditLog,
   createInquiry,
   createOrganization,
   createOrganizationUser,
@@ -71,6 +73,29 @@ describe('GET /api/v1/inquiry/:id', () => {
 
     expect(response.status).toBe(200);
     expect(data.id).toBe(inquiry.id);
+  });
+
+  it('returns the inquiry with its audit history', async () => {
+    const { entity: invitee } = await createUser();
+    const { entity: inquiry } = await createInquiry({
+      type: InquiryType.inviteOrganizationUser,
+      status: InquiryStatus.sent,
+      sourceModel: InquiryResourceModel.Organization,
+      sourceOrganizationId: org.id,
+      targetModel: InquiryResourceModel.User,
+      targetUserId: invitee.id,
+      content: { organizationId: org.id, role: 'member' },
+    });
+    const { entity: auditLog } = await createAuditLog({
+      subjectModel: AuditSubjectModel.Inquiry,
+      subjectInquiryId: inquiry.id,
+    });
+
+    const response = await fetch(get(`/api/v1/inquiry/${inquiry.id}`));
+    const { data } = await json<Inquiry & { auditLogsAsSubject: { id: string }[] }>(response);
+
+    expect(response.status).toBe(200);
+    expect(data.auditLogsAsSubject.map(({ id }) => id)).toEqual([auditLog.id]);
   });
 
   it('target can read inquiry sent to them', async () => {

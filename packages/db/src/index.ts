@@ -102,6 +102,7 @@ export {
 } from '@inixiative/prisma-map';
 export { equalsSuppliedBind } from './registries/equalsSuppliedBind';
 export {
+  isOwnerKind,
   POLYMORPHIC_BINDS,
   type PolymorphicKind,
   polymorphicBindings,

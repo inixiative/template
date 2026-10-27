@@ -72,7 +72,7 @@ All Prisma mutations wrapped with before/after hooks via `mutationLifeCycle` ext
 | `model` | string | Prisma model name |
 | `action` | DbAction | create, update, delete, etc. |
 | `args` | object | Prisma query args |
-| `result` | object/array | Mutation result (after only) |
+| `result` | object/array | Mutation result projected onto the model's columns (after only). An `include` on the write never reaches hooks, so `result` and `previous` have the same shape |
 | `previous` | object/array | Previous state (if fetched) |
 
 ### Action Types
@@ -146,7 +146,7 @@ export const AUDIT_ENABLED_MODELS: AuditSubjectModel[] = [
 |-------|-------------|
 | `action` | `create`, `update`, or `delete` |
 | `subjectModel` | Which model was mutated |
-| `before` / `after` | Full record state (filtered + redacted) |
+| `before` / `after` | The record's own columns (filtered + redacted). Never its relations: an `include` on the write is dropped, so a snapshot never embeds related rows or earlier audit history |
 | `changes` | Field-level diff for updates only |
 | `actorUserId` | `me(c)`: the JWT's or spoofed user, or the user of an acting User token (a member's, organization's, space's or integration's token names none) |
 | `actorSpoofUserId` | The superadmin spoofing, when spoofing |
@@ -161,13 +161,14 @@ export const AUDIT_ENABLED_MODELS: AuditSubjectModel[] = [
 
 ### Field Processing Pipeline
 
-Before storing, each record goes through:
+`buildAuditEntry` (`apps/api/src/hooks/auditLog/hook.ts`) runs each record through:
 
-1. **Ignore fields** — strip noise fields (`updatedAt`, `lastLoginAt`, `lastUsedAt`) that don't represent meaningful changes
-2. **Redact fields** — replace sensitive values with `[REDACTED]` (passwords, token hashes, auth secrets)
-3. **Diff** — for updates, compute which fields actually changed (after filtering/redacting)
+1. **Filter** (`filterForAudit` → `filterFields`) — strip noop fields (`updatedAt`, `lastLoginAt`, `lastUsedAt`, ordered-list positions). Both sides are already column-only: the mutation lifecycle projects `result` through `pickColumns`.
+2. **Diff** — for updates, `computeDiff` compares the filtered, **unredacted** before/after, so a change to a sensitive column is still detected.
+3. **Empty-diff guard** — an update whose diff is empty (only noop fields changed) writes no audit log.
+4. **Redact** — `redactSensitiveFields` masks sensitive columns (passwords, token hashes, encrypted columns) in `before`/`after` with `[REDACTED]`, and `redactChangeDiff` masks both sides of a changed sensitive field in `changes`.
 
-If an update produces an empty diff (only ignored/redacted fields changed), no audit log is written.
+`processAuditData` (filter + redact) builds the same column-only snapshot for the email-versioning hook.
 
 ### Soft Delete Detection
 
@@ -223,10 +224,14 @@ export const webhookEnabledModels: WebhookModel[] = [
 
 ### How It Works
 
-1. DB mutation triggers `webhookDelivery` hook (after commit)
-2. Hook finds active subscriptions for the model
-3. Enqueues `sendWebhook` job for each subscription
-4. Job signs payload with RSA-SHA256 and delivers
+1. A mutation runs the `webhookDelivery` hook (after the write; jobs are scheduled with `db.onCommit`). It acts when the model is webhook-enabled, or when `webhookRelatedModels` lists it as a party of one
+2. The hook determines each changed row's parties from the model's false-polymorphism axes. A CustomerRef's parties are its customer and its provider. A related row (a User, Organization or Space) takes the counterparty of every live CustomerRef it sits on, on either axis
+3. It loads only the active subscriptions owned by those parties, and enqueues one `sendWebhook` job per (subscription, changed row), skipping the write's origin integration and no-op updates
+4. The job signs the payload with RSA-SHA256 and delivers it
+
+### Tenancy (AUTH-006 stopgap)
+
+A subscription receives a CustomerRef change when its owner (User, Organization or Space) is one of its two parties. It receives a party's own change when its owner is that party's counterparty on a live CustomerRef: a provider hears its customers, a customer hears its providers. The changed party does not hear its own change, and nothing travels past one CustomerRef. A row that sits on several CustomerRefs, or on both axes, reaches each subscription once. A soft delete (`deletedAt` set) is delivered as `delete`. When a party is soft-deleted, its counterparties still hear it through CustomerRefs the cascade tombstoned with the same `deletedAt`; CustomerRefs deleted earlier stay silent. An organization does not yet hear about the CustomerRefs of its spaces (no inheritance), and `sendWebhook` does not re-check the relationship at delivery time. Both are part of `tickets/AUTH-006-webhook-tenant-isolation.md`.
 
 ### Webhook Payload
 
@@ -235,8 +240,8 @@ export const webhookEnabledModels: WebhookModel[] = [
   model: 'User',
   action: 'create' | 'update' | 'delete',
   resourceId: '...',
-  data: { ...fields },
-  previousData: { ...fields },  // For updates only
+  data: { ...columns },
+  previousData: { ...columns },  // For updates only
   timestamp: '2024-01-15T12:00:00.000Z'
 }
 ```
@@ -300,14 +305,19 @@ Use cases:
 
 ### Related Models
 
-Child models can trigger parent webhooks:
+A party's own row changes reach its counterparties on its CustomerRefs. Each party model is registered on both axes:
 
 ```typescript
 // packages/db/src/registries/webhook/relatedModels.ts
 export const webhookRelatedModels: Record<string, FlexibleRef[]> = {
-  User: [{ model: 'CustomerRef', axis: 'customerModel', value: 'User' }],
+  User: [
+    { model: 'CustomerRef', axis: 'customerModel', value: 'User' },
+    { model: 'CustomerRef', axis: 'providerModel', value: 'User' },
+  ],
 };
 ```
+
+Private fields of a party stay off the row (a settings or config table that is not related), or are dropped from webhooks in `WEBHOOK_NOOP_FIELDS` (`User.platformRole`). A change that touches only dropped fields emits nothing.
 
 ---
 

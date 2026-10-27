@@ -79,15 +79,11 @@ export const buildSubjectFkFields = (
   return subjectFields;
 };
 
-// Drops noop keys only — no redaction. buildAuditEntry diffs on this so a change touching only a
-// sensitive field is still detected; redacting first masks both sides to the same token and the
-// change vanishes under the empty-diff guard.
 export const filterForAudit = (
   model: string,
   data: Record<string, unknown>,
 ): Record<string, unknown> => filterFields(model, data, NOOP_FIELDS) as Record<string, unknown>;
 
-// Filtered + redacted snapshot (before/after JSON) — also used by the email-versioning hook.
 export const processAuditData = (
   model: string,
   data: Record<string, unknown>,

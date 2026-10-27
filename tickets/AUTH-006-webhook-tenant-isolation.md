@@ -1,10 +1,10 @@
 # AUTH-006: Enforce webhook tenant isolation
 
-**Status**: 🆕 Not Started
+**Status**: 🔄 Stopgap shipped (PR #201, 2026-10-18): no cross-tenant delivery. A subscription hears the CustomerRefs its owner is a party to and the counterparty changes on them: providers hear customers, customers hear providers. Still open: org-to-space inheritance, the combined payload, the delivery-time recheck.
 **Assignee**: Unassigned
 **Priority**: High
 **Created**: 2026-09-30
-**Updated**: 2026-09-30
+**Updated**: 2026-10-23
 
 ## Problem
 
@@ -34,6 +34,28 @@ Observed result:
 ```
 
 This establishes unauthorized targeting at the enqueue boundary. No external webhook was sent by the probe, and no hosted disclosure was established. The current delivery worker checks subscription activity and poisoned-record state but does not enforce the subscription owner's access to the payload.
+
+## Seen in production (2026-10-15)
+
+An outside-agent test of Kingdom prod (GPT-6-Astra and GPT-6.1-Sol, each in its own sandbox organization) reproduced this end to end. Sol's organization created a `CustomerRef` subscription; it then received six events about Astra's Space, in a different organization, all delivered to the subscriber's URL. Each Space change was delivered twice, because `webhookRelatedModels.Space` lists two axes and the hook enqueues once per axis without deduplicating.
+
+## Design (agreed with Aron, 2026-10-15)
+
+Tenancy comes from `CustomerRef`. Zealot's brand-based filter (`eligibleWebhookSubscriptionsWhere` in Zealot's `hooks/webhooks/hook.ts`) is not the model: Zealot tenancy is one owner per record, while a CustomerRef is a relationship between two parties, either of which may listen. Only its per-target deduplication carries over.
+
+- **A webhook event is about one CustomerRef.** `resourceId` is the CustomerRef id, so `IntegrationRecord` and poisoning stay per relationship.
+- **Triggers.** A CustomerRef row is created, updated or deleted; or a party (User, Organization, Space) changes, which fans out to every live CustomerRef that party stands on, through the axes declared in `webhookRelatedModels`. One event per (subscription, CustomerRef) per mutation.
+- **Audience: the two parties of that CustomerRef.** The provider hears about its customers ("my customer changed"); the customer hears about its provider ("my organization changed"). No one else.
+- **Both axes for every party.** `CustomerModel` and `ProviderModel` both allow User, Organization and Space, so each party model is registered on both `customerModel` and `providerModel` axes (today User and Organization are on the customer axis only).
+- **Inheritance must work.** An organization's subscription also hears about the CustomerRefs of the organization's spaces (Aron: "Inheritance should be able to work"). Resolve it through the existing ownership relations, not a second registry.
+- **Payload.** The CustomerRef plus the counterpart party's columns (scalar only, redacted), plus which side changed: `customer`, `provider` or `relationship`.
+- **Delivery-time check.** `sendWebhook` re-checks that the CustomerRef is still live and the subscriber is still one of its parties (or inherits one); otherwise it sends nothing and stores no `WebhookEvent`.
+
+## Open questions
+
+- **Own record.** Does an owner's subscription hear changes to the owner itself (an organization listening to its own row) without a CustomerRef? Aron said "I can listen to my own org"; it is unresolved whether that means the owner's own row or a member listening to their organization.
+- **Who creates CustomerRefs.** Nothing in template, Kingdom or Tribe creates CustomerRefs outside factories, so after this fix those apps deliver no webhooks until each app decides which relationships are CustomerRefs (for example whether organization membership makes a user a customer of the organization).
+- **Counterpart visibility.** Which of a provider's fields its customers may receive, and the reverse.
 
 ## Implementation references
 
