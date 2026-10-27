@@ -6,7 +6,7 @@
  */
 import { meRead, meReadQueryKey } from '@template/sdk';
 import { Page } from '@template/ui/components';
-import { ProfileFormCard } from '@template/ui/components/settings';
+import { ChangePasswordCard, ProfileFormCard } from '@template/ui/components/settings';
 import { useQuery } from '@template/ui/hooks';
 import { apiQuery } from '@template/ui/lib/apiQuery';
 
@@ -23,12 +23,15 @@ export const UserProfilePage = () => {
       {isLoading ? (
         <div className="h-40 animate-pulse rounded-xl bg-muted/50" />
       ) : (
-        <ProfileFormCard
-          name={profile?.name ?? ''}
-          canEditName={false}
-          readOnlyMessage="User profile editing coming soon"
-          showThemeToggle
-        />
+        <div className="max-w-2xl space-y-6">
+          <ProfileFormCard
+            name={profile?.name ?? ''}
+            canEditName={false}
+            readOnlyMessage="User profile editing coming soon"
+            showThemeToggle
+          />
+          <ChangePasswordCard />
+        </div>
       )}
     </Page>
   );

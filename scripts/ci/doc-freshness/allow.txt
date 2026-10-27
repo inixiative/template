@@ -8,6 +8,9 @@ c.json
 dangerouslySetInnerHTML
 retryJobs
 storeSessionInDatabase
+docs/claude/AUTH.md	changeEmail
+docs/claude/AUTH.md	verifyPassword
+docs/claude/AUTH.md	linkSocialAccount
 updateAge
 sequenceDiagram
 erDiagram

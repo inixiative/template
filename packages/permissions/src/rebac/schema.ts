@@ -30,6 +30,7 @@ export const rebacSchema: RebacSchema = {
         operate: 'manage',
         read: 'operate',
         'user.rotateJwts': { all: [actorIsUser, 'operate'] },
+        'user.changePassword': { all: [actorIsUser, 'operate'] },
         'user.redact': { all: [actorIsUser, 'own'] },
       },
     },

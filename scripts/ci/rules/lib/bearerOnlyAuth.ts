@@ -17,8 +17,18 @@
  * - any session lookup: a `getSession(...)` call, `findSession(...)`, or a read of the `session`
  *   table (`<x>.session.find*` / `.count`); a person is resolved from a JWT, never a session
  * - importing BetterAuth's `bearer` plugin (it accepts a session token as a bearer credential)
+ * - building a session credential: importing or re-exporting a session-cookie signer
+ *   (`makeSignature`, `setRequestCookie`, `setSessionCookie`, `serializeSignedCookie`,
+ *   `signCookieValue`, `createHMAC`) from better-auth, @better-auth/* or better-call, a namespace
+ *   import or re-export of a signer module, or any reference to `createSession` (property, string
+ *   element access, destructuring)
  *
- * Exemptions: none.
+ * - importing `withThrowawaySession` (import, re-export, dynamic `import()`, `require`) anywhere but
+ *   the callers named in THROWAWAY_SESSION_CALLERS; each new caller is a reviewed one-line addition
+ *
+ * Exemptions: none in exempt.txt. One named file may build a session credential:
+ * `withThrowawaySession` (THROWAWAY_SESSION_HELPER), which hands a short-lived session to a
+ * BetterAuth server call and deletes it.
  */
 import ts from 'typescript';
 import { finishFence, isTestFile, lineAt, listFiles, readSource, type Violation } from './fence';
@@ -89,6 +99,86 @@ const bearerPluginImport: Check = (node) =>
       }
     : null;
 
+const THROWAWAY_SESSION_HELPER = 'apps/api/src/lib/auth/withThrowawaySession.ts';
+
+const SESSION_CREDENTIAL_SOURCES = /^(@better-auth\/|better-auth(\/|$)|better-call(\/|$))/;
+const SESSION_CREDENTIAL_SIGNERS = new Set([
+  'makeSignature',
+  'setRequestCookie',
+  'setSessionCookie',
+  'serializeSignedCookie',
+  'signCookieValue',
+  'createHMAC',
+]);
+const SIGNER_MODULES = /^(better-auth\/(crypto|cookies)|better-call|@better-auth\/utils(\/.*)?)$/;
+
+const sessionCredential = (node: ts.Node, key: string): Found => ({
+  node,
+  key: `session-credential: ${key}`,
+  detail: `builds a BetterAuth session credential (${key}); only withThrowawaySession may (${THROWAWAY_SESSION_HELPER})`,
+});
+
+const moduleOf = (node: ts.ImportDeclaration | ts.ExportDeclaration): string | null =>
+  node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier)
+    ? node.moduleSpecifier.text
+    : null;
+
+const namedSigner = (elements: ts.NodeArray<ts.ImportSpecifier | ts.ExportSpecifier>) =>
+  elements
+    .map((element) => (element.propertyName ?? element.name).text)
+    .find((name) => SESSION_CREDENTIAL_SIGNERS.has(name));
+
+const sessionCredentialBuild: Check = (node, sourceFile) => {
+  if (sourceFile.fileName === THROWAWAY_SESSION_HELPER) return null;
+  if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) {
+    const source = moduleOf(node);
+    if (!source || !SESSION_CREDENTIAL_SOURCES.test(source)) return null;
+    const bindings = ts.isImportDeclaration(node)
+      ? node.importClause?.namedBindings
+      : node.exportClause;
+    if (!bindings || ts.isNamespaceImport(bindings) || ts.isNamespaceExport(bindings))
+      return SIGNER_MODULES.test(source) ? sessionCredential(node, `* from ${source}`) : null;
+    const signer = namedSigner(bindings.elements);
+    return signer ? sessionCredential(node, signer) : null;
+  }
+  const createSessionReference =
+    (ts.isPropertyAccessExpression(node) && node.name.text === 'createSession') ||
+    (ts.isElementAccessExpression(node) &&
+      ts.isStringLiteralLike(node.argumentExpression) &&
+      node.argumentExpression.text === 'createSession') ||
+    (ts.isBindingElement(node) &&
+      unquote((node.propertyName ?? node.name).getText(sourceFile)) === 'createSession');
+  return createSessionReference ? sessionCredential(node, 'createSession') : null;
+};
+
+const THROWAWAY_SESSION_CALLERS = new Set([
+  'apps/api/src/modules/me/controllers/meChangePassword.ts',
+]);
+
+const isThrowawaySessionModule = (node: ts.Node | undefined): boolean =>
+  !!node &&
+  ts.isStringLiteralLike(node) &&
+  /(^|\/)withThrowawaySession(\.[cm]?[jt]sx?)?$/.test(node.text);
+
+const throwawaySessionImport: Check = (node, sourceFile) => {
+  if (THROWAWAY_SESSION_CALLERS.has(sourceFile.fileName)) return null;
+  const imports =
+    ((ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) &&
+      isThrowawaySessionModule(node.moduleSpecifier)) ||
+    (ts.isCallExpression(node) &&
+      (node.expression.kind === ts.SyntaxKind.ImportKeyword ||
+        (ts.isIdentifier(node.expression) && node.expression.text === 'require')) &&
+      isThrowawaySessionModule(node.arguments[0]));
+  return imports
+    ? {
+        node,
+        key: 'throwaway-session-caller',
+        detail:
+          'imports withThrowawaySession outside THROWAWAY_SESSION_CALLERS; a new caller is added there, in review',
+      }
+    : null;
+};
+
 const CHECKS: Check[] = [
   (node, sourceFile) =>
     propertyName(node, sourceFile) === 'cookieCache'
@@ -128,12 +218,19 @@ const CHECKS: Check[] = [
       : null,
   sessionLookup,
   bearerPluginImport,
+  sessionCredentialBuild,
+  throwawaySessionImport,
 ];
 
 const violations: Violation[] = [];
 
-for (const file of listFiles(['apps', 'packages'], /\.tsx?$/)) {
-  if (isTestFile(file)) continue;
+// Helpers under tests/ are not test files: they can carry the helper out to production code.
+const checksFor = (file: string): Check[] =>
+  /\.test\.[cm]?[jt]sx?$/.test(file) ? [] : isTestFile(file) ? [throwawaySessionImport] : CHECKS;
+
+for (const file of listFiles(['apps', 'packages'], /\.[cm]?[jt]sx?$/)) {
+  const checks = checksFor(file);
+  if (!checks.length) continue;
   const source = readSource(file);
   const sourceFile = ts.createSourceFile(
     file,
@@ -143,7 +240,7 @@ for (const file of listFiles(['apps', 'packages'], /\.tsx?$/)) {
     ts.ScriptKind.TSX,
   );
   const visit = (node: ts.Node) => {
-    for (const check of CHECKS) {
+    for (const check of checks) {
       const found = check(node, sourceFile);
       if (found)
         violations.push({

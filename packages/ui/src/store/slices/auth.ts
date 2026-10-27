@@ -4,9 +4,14 @@
  * @partOf primitive:ui
  * @uses none
  */
+import {
+  type ChangePasswordInput,
+  changePassword as changePasswordFn,
+} from '@template/ui/lib/auth/changePassword';
 import { fetchAndHydrateMe } from '@template/ui/lib/auth/fetchAndHydrateMe';
 import { signIn as signInFn } from '@template/ui/lib/auth/signin';
 import { signUp as signUpFn } from '@template/ui/lib/auth/signup';
+import { storeJwtHandoff } from '@template/ui/lib/auth/storeJwtHandoff';
 import { clearToken, getToken } from '@template/ui/lib/auth/token';
 import type { AuthMethod } from '@template/ui/lib/auth/types';
 import type { AppStore } from '@template/ui/store/types';
@@ -95,6 +100,13 @@ export const createAuthSlice: StateCreator<AppStore, [], [], AuthSlice> = (set, 
           syncWsAuth();
         }
         return result;
+      },
+
+      changePassword: async (input: ChangePasswordInput) => {
+        const handoff = await changePasswordFn(input);
+        if (get().auth.spoofUserEmail || !handoff.token) return;
+        storeJwtHandoff(handoff);
+        syncWsAuth();
       },
 
       setStrategy: (strategy) =>

@@ -23,6 +23,7 @@
 - [Security](#security)
   - [Singleton Pattern](#singleton-pattern)
   - [Absolute URL Protection](#absolute-url-protection)
+  - [Routes That Cannot Batch](#routes-that-cannot-batch)
   - [Limits](#limits)
   - [Timeout Calculation](#timeout-calculation)
 - [Implementation Patterns](#implementation-patterns)
@@ -343,6 +344,7 @@ data.batch.forEach((round, roundIndex) => {
 **Exception:** Only returns non-200 for:
 - `400` - Invalid batch request syntax (validation failure)
 - `400` - Nested batch request attempt (security violation)
+- `400` - A request reaches a route marked `'x-batch': false`
 - `500` - Unexpected server error (not request failures)
 
 ---
@@ -378,6 +380,10 @@ Detection: Requests with `X-Batch-Id` header are rejected.
 ```
 
 Only relative paths are allowed.
+
+### Routes That Cannot Batch
+
+A route whose effect a batch transaction cannot roll back (a signed JWT, a password) carries `'x-batch': false` in its route args; it lands in the OpenAPI document as an operation extension. `assertBatchable` (`modules/batch/services/assertBatchable.ts`) scans every request of every round against the app's OpenAPI registry before anything runs, and one match refuses the whole batch with a 400. An interpolated segment (`<<0.0.body.id>>`) is resolved only when its round runs, so it counts as matching any route below it. Today: `POST /api/v1/me/changePassword`, `POST /api/v1/me/rotateJwts`, and every Better Auth endpoint (`/api/auth/*`, any method), which signs, revokes and resets credentials outside the registry.
 
 ### Limits
 

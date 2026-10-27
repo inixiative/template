@@ -11,6 +11,7 @@
 - [OAuth Callback](#oauth-callback)
 - [Guards](#guards)
 - [Auth Slice](#auth-slice)
+- [Change Password](#change-password)
 - [Navigation Helpers](#navigation-helpers)
 - [Security](#security)
 - [Testing](#testing)
@@ -177,6 +178,7 @@ Initialization errors are swallowed; the redirect handles the unauthenticated ca
 | `signIn(method)` | Calls `lib/auth/signIn`; for non-OAuth methods hydrates `/me` and authenticates the websocket |
 | `signUp(method)` | Calls `lib/auth/signUp`; hydrates on `authenticated`, clears local auth on `verification-pending`; returns the result |
 | `refreshMe()` | Re-hydrate `/me` |
+| `changePassword({ currentPassword, newPassword })` | Calls `lib/auth/changePassword` (`POST /api/v1/me/changePassword` through `apiFetchInternal`, with the current JWT as bearer), stores the new JWT the response carries (`storeJwtHandoff`) and re-authenticates the websocket with it; while spoofing it stores nothing and the superadmin's JWT stays. Every older JWT, including other tabs' and devices', is a 401 from then on ([AUTH.md → Change password](../AUTH.md#change-password)). Throws the API's error on a wrong current password; the stored JWT stays |
 | `setSpoof(email \| null)` | Sets `spoofUserEmail`, re-hydrates `/me` (sent as `x-spoof-user-email`), spoofs/unspoofs the websocket |
 | `logout()` | Signs out of this browser: clears the JWT, user, permissions, websocket identity and tenant (→ public) and navigates to `/login`. No server call: the API keeps no session to end. Ending every JWT on every device is `POST /api/v1/me/rotateJwts` ([AUTH.md → Revocation and sign-out](../AUTH.md#revocation-and-sign-out)) |
 | `setStrategy(strategy)` | `{ type: 'login' }` or `{ type: 'embed', parentOrigin? }`; sets `isEmbedded` |
@@ -189,6 +191,12 @@ Logout from a component:
 const logout = useAppStore((state) => state.auth.logout);
 await logout();
 ```
+
+---
+
+## Change Password
+
+`ChangePasswordCard` (`packages/ui/src/components/settings/ChangePasswordCard.tsx`) sits on the personal Profile page (`UserProfilePage`). Current, new and confirm fields; a confirmation that does not match is refused without a call; the button is disabled while a change is in flight, so a double submit can't race two changes; length limits come from `passwordLength` (`@template/shared/auth/passwordLength`), the API's own; the API's message shows in an alert (`Invalid password`, `Credential account not found` for a Google-only account), and a 422's `fieldErrors` through `formatFieldErrors`, and success says every other device is signed out. No cookie and no BetterAuth client are involved; the session BetterAuth needs lives and dies inside the API ([AUTH.md → withThrowawaySession](../AUTH.md#account-changes-through-betterauth-withthrowawaysession)).
 
 ---
 

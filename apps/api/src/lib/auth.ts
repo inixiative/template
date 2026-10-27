@@ -5,6 +5,7 @@
  * @uses infrastructure:prisma, infrastructure:redis, primitive:appEvents
  */
 import { db, getRedisClient, redisNamespace } from '@template/db';
+import { passwordLength } from '@template/shared/auth/passwordLength';
 import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { emitAppEvent } from '#/appEvents/emit';
@@ -23,6 +24,8 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: true,
+    minPasswordLength: passwordLength.min,
+    maxPasswordLength: passwordLength.max,
     onPasswordReset: async ({ user }) => rotateUserJwts(user.id),
   },
 
