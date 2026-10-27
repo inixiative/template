@@ -5,6 +5,7 @@
  * @uses none
  */
 import { Operator } from '@inixiative/json-rules';
+import { InquiryType } from '@template/db/generated/client/enums';
 import {
   actionOnOwner,
   actorIsDelegateOfUser,
@@ -14,6 +15,7 @@ import {
   highRoles,
   integrationAccess,
   integrationAdministering,
+  lowRoles,
   managedUpTheChain,
   ownerActions,
   tokenAccessIsYours,
@@ -180,7 +182,12 @@ export const rebacSchema: RebacSchema = {
                 {
                   rule: { field: 'type', operator: Operator.in, value: ['inviteOrganizationUser'] },
                 },
-                { rule: { field: 'content.role', operator: Operator.notIn, value: highRoles } },
+                {
+                  any: [
+                    { rule: { field: 'content.role', operator: Operator.in, value: lowRoles } },
+                    { rule: { field: 'content.role', operator: Operator.equals, value: null } },
+                  ],
+                },
                 { rel: 'sourceOrganization', action: 'manage' },
               ],
             },
@@ -224,7 +231,15 @@ export const rebacSchema: RebacSchema = {
                 // all other types — target org manager
                 {
                   all: [
-                    { rule: { field: 'type', operator: Operator.notIn, value: ['transferSpace'] } },
+                    {
+                      rule: {
+                        field: 'type',
+                        operator: Operator.in,
+                        value: Object.values(InquiryType).filter(
+                          (type) => type !== 'transferSpace',
+                        ),
+                      },
+                    },
                     { rel: 'targetOrganization', action: 'manage' },
                   ],
                 },

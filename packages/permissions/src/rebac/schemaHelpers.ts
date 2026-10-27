@@ -9,6 +9,7 @@ import type { ActionRule, ResourcePermission } from '@template/permissions/rebac
 import { roleHierarchy, roleToStandardAction } from '@template/permissions/roles/shared';
 
 export const highRoles = ['owner', 'admin'];
+export const lowRoles = roleHierarchy.filter((role) => !highRoles.includes(role));
 export const actorIsUser: ActionRule = {
   rule: { field: '__actor.model', operator: Operator.equals, value: 'User' },
 };
@@ -99,14 +100,8 @@ export const roleIsHigh: ActionRule = {
 
 export const roleIsLowOrUnset: ActionRule = {
   any: [
-    {
-      rule: {
-        field: 'role',
-        operator: Operator.in,
-        value: roleHierarchy.filter((role) => !highRoles.includes(role)),
-      },
-    },
-    { rule: { field: 'role', operator: Operator.isEmpty, value: true } },
+    { rule: { field: 'role', operator: Operator.in, value: lowRoles } },
+    { rule: { field: 'role', operator: Operator.equals, value: null } },
   ],
 };
 
